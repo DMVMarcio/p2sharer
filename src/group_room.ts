@@ -61,41 +61,43 @@ export class GroupRoomManager {
       this.room = joinRoom(
         {
           appId: APP_ID,
-          rtcConfig: RTC_CONFIG,
           relayConfig: RELAY_CONFIG,
+          rtcConfig: RTC_CONFIG,
         },
         this.roomId
       );
 
-      // 1. Data Channel Action: Chat Messages
-      const [sendChat, onChatReceived] = this.room.makeAction('chat');
-      this.chatAction = { send: sendChat };
-      onChatReceived((data: ChatMessage) => {
-        if (data && data.text) {
-          callbacks.onChat(data);
+      // 1. Setup Chat Action
+      this.chatAction = this.room.makeAction('chat');
+      this.chatAction.onMessage = (msg: ChatMessage) => {
+        if (this.callbacks) {
+          this.callbacks.onChat(msg);
         }
-      });
+      };
 
-      // 2. Data Channel Action: Presence & Nicknames
-      const [sendPresence, onPresenceReceived] = this.room.makeAction('presence');
-      this.presenceAction = { send: sendPresence };
-      onPresenceReceived((data: { username: string; isCreator: boolean }, peerId: string) => {
-        if (data && data.username) {
-          this.peers.set(peerId, data.username);
+      // 2. Setup Presence Action (Exchange usernames)
+      this.presenceAction = this.room.makeAction('presence');
+      this.presenceAction.onMessage = (data: { username: string; isCreator?: boolean }, meta: { peerId: string }) => {
+        const peerId = meta.peerId;
+        const oldName = this.peers.get(peerId);
+        const newName = data.username || `Usuário (${peerId.slice(0, 4)})`;
+        if (oldName !== newName) {
+          this.peers.set(peerId, newName);
           this.notifyPeersUpdate();
           this.notifyStreamsUpdate();
         }
-      });
+        callbacks.onStatusChange('P2P Conectado');
+      };
 
-      // 3. Data Channel Action: Stream Active Status
-      const [sendStreamStatus, onStreamStatus] = this.room.makeAction('stream-status');
-      this.streamStatusAction = { send: sendStreamStatus };
-      onStreamStatus((data: { isStreaming: boolean; senderName?: string }, peerId: string) => {
+      // 3. Setup Stream Status Action
+      this.streamStatusAction = this.room.makeAction('stream_status');
+      this.streamStatusAction.onMessage = (data: { isStreaming: boolean; senderName?: string }, meta: { peerId: string }) => {
+        const peerId = meta.peerId;
         if (!data.isStreaming && this.remoteStreams.has(peerId)) {
           this.remoteStreams.delete(peerId);
           this.notifyStreamsUpdate();
         }
-      });
+      };
 
       // 4. Peer Lifecycle Listeners
       this.room.onPeerJoin = (peerId: string) => {
@@ -110,7 +112,6 @@ export class GroupRoomManager {
         if (this.localStream) {
           try {
             this.room.addStream(this.localStream, peerId);
-            setTimeout(() => this.boostAllSendersBitrate(), 150);
           } catch (err) {
             console.warn('[P2P] Error adding stream to new peer:', err);
           }
@@ -134,7 +135,7 @@ export class GroupRoomManager {
         }
       };
 
-      // 5. Incoming Stream Listener
+      // 5. Incoming Stream Listener (Supports multiple concurrent streams from different peers!)
       this.room.onPeerStream = (stream: MediaStream, peerId: string) => {
         console.log(`[P2P] Received stream from peer: ${peerId}`);
         this.remoteStreams.set(peerId, stream);
@@ -169,7 +170,6 @@ export class GroupRoomManager {
     if (this.room && stream) {
       try {
         this.room.addStream(stream);
-        setTimeout(() => this.boostAllSendersBitrate(), 100);
       } catch (err) {
         console.warn('[P2P] Error adding broadcast stream:', err);
       }
@@ -180,33 +180,6 @@ export class GroupRoomManager {
 
       this.notifyStreamsUpdate();
     }
-  }
-
-  public boostAllSendersBitrate() {
-    try {
-      const peers = this.room?.getPeers?.() || {};
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      Object.values(peers).forEach((peerObj: any) => {
-        const pc: RTCPeerConnection = peerObj?.connection || peerObj?.pc || peerObj;
-        if (pc?.getSenders) {
-          pc.getSenders().forEach((sender) => {
-            if (sender.track && sender.track.kind === 'video') {
-              try {
-                const params = sender.getParameters();
-                if (!params.encodings || params.encodings.length === 0) {
-                  params.encodings = [{}];
-                }
-                params.encodings[0].maxBitrate = 25000000; // 25 Mbps
-                params.encodings[0].maxFramerate = 60;
-                params.encodings[0].networkPriority = 'high';
-                params.encodings[0].priority = 'high';
-                sender.setParameters(params).catch(() => {});
-              } catch {}
-            }
-          });
-        }
-      });
-    } catch {}
   }
 
   public stopStream() {
@@ -227,66 +200,73 @@ export class GroupRoomManager {
     this.notifyStreamsUpdate();
   }
 
+  public getAllActiveStreams(): ActiveStreamInfo[] {
+    const list: ActiveStreamInfo[] = [];
+
+    // Local stream (if sharing)
+    if (this.localStream) {
+      list.push({
+        peerId: 'local',
+        senderName: `${this.username} (Sua Tela)`,
+        stream: this.localStream,
+        isLocal: true,
+      });
+    }
+
+    // Remote streams from other peers
+    this.remoteStreams.forEach((stream, peerId) => {
+      const senderName = this.peers.get(peerId) || `Participante (${peerId.slice(0, 4)})`;
+      list.push({
+        peerId,
+        senderName,
+        stream,
+        isLocal: false,
+      });
+    });
+
+    return list;
+  }
+
+  public notifyStreamsUpdate() {
+    if (!this.callbacks) return;
+    const streams = this.getAllActiveStreams();
+    const hash = streams.map((s) => `${s.peerId}:${s.senderName}:${s.stream.id}`).join('|');
+    if (hash === this.lastStreamsHash) return; // Prevent unnecessary re-renders & flickering!
+    this.lastStreamsHash = hash;
+    this.callbacks.onStreamsUpdate(streams);
+  }
+
   public sendChatMessage(text: string): ChatMessage {
     const msg: ChatMessage = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      id: crypto.randomUUID(),
       sender: this.username,
-      text: text.trim(),
+      text,
       timestamp: Date.now(),
       isHost: this.isCreator,
     };
 
-    if (this.chatAction && this.room) {
+    if (this.chatAction) {
       this.chatAction.send(msg);
     }
-
     return msg;
   }
 
-  private notifyPeersUpdate() {
-    if (!this.callbacks) return;
-    const peerList: PeerInfo[] = [];
+  public getConnectedPeers(): PeerInfo[] {
+    const list: PeerInfo[] = [];
     this.peers.forEach((uname, id) => {
-      peerList.push({
+      list.push({
         id,
         username: uname,
         connectionState: 'connected',
         joinedAt: Date.now(),
       });
     });
-    this.callbacks.onPeersUpdate(peerList);
+    return list;
   }
 
-  private notifyStreamsUpdate() {
-    if (!this.callbacks) return;
-    const streamsList: ActiveStreamInfo[] = [];
-
-    // 1. My own stream
-    if (this.localStream) {
-      streamsList.push({
-        peerId: 'local-self',
-        senderName: `${this.username} (Você)`,
-        stream: this.localStream,
-        isLocal: true,
-      });
-    }
-
-    // 2. Remote streams from peers
-    this.remoteStreams.forEach((stream, peerId) => {
-      const name = this.peers.get(peerId) || `Participante (${peerId.slice(0, 4)})`;
-      streamsList.push({
-        peerId,
-        senderName: name,
-        stream,
-        isLocal: false,
-      });
-    });
-
-    // Stream signature deduplication to avoid DOM rebuilding
-    const currentHash = streamsList.map((s) => `${s.peerId}:${s.stream.id}`).sort().join('|');
-    if (currentHash !== this.lastStreamsHash) {
-      this.lastStreamsHash = currentHash;
-      this.callbacks.onStreamsUpdate(streamsList);
+  private notifyPeersUpdate() {
+    if (this.callbacks) {
+      this.callbacks.onPeersUpdate(this.getConnectedPeers());
     }
   }
 
@@ -295,15 +275,13 @@ export class GroupRoomManager {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
     }
-    if (this.localStream) {
-      this.stopStream();
-    }
+    this.stopStream();
     if (this.room) {
       this.room.leave();
       this.room = null;
     }
     this.peers.clear();
     this.remoteStreams.clear();
-    this.callbacks = null;
+    this.lastStreamsHash = '';
   }
 }
