@@ -112,6 +112,7 @@ export class GroupRoomManager {
         if (this.localStream) {
           try {
             this.room.addStream(this.localStream, peerId);
+            setTimeout(() => this.boostAllSendersBitrate(), 200);
           } catch (err) {
             console.warn('[P2P] Error adding stream to new peer:', err);
           }
