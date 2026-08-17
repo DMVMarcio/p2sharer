@@ -21,7 +21,6 @@ class App {
   private roomManager: GroupRoomManager | null = null;
   private nativeVideoBridge: NativeVideoBridge = new NativeVideoBridge();
   private audioBridge: AudioBridge = new AudioBridge();
-  private activeLocalStream: MediaStream | null = null;
 
   private audioProcesses: ProcessItem[] = [];
   private selectedFilterMode: 'exclude' | 'include' = 'exclude';
@@ -31,7 +30,6 @@ class App {
   private activeStreams: ActiveStreamInfo[] = [];
   private layoutMode: 'grid' | 'spotlight' = 'grid';
   private pinnedPeerId: string | null = null;
-  private streamVolumes: Map<string, { volume: number; muted: boolean }> = new Map();
   private isSidebarCollapsed: boolean = false;
 
   // Stream Settings & Picker State
@@ -44,14 +42,75 @@ class App {
   private currentBitrate: number = 25000;
   private currentResolution: { width: number; height: number; label: string } = { width: 1920, height: 1080, label: '1080p' };
 
+  // Theme & Customization State
+  private currentThemeMode: 'dark' | 'light' | 'system' = 'dark';
+  private currentAccentColor: string = 'cyan';
+
   constructor() {
     this.init();
   }
 
   private async init() {
+    this.setupThemeAndSettings();
     this.setupUsername();
     this.bindEvents();
     this.generateRandomRoomCode();
+  }
+
+  // --- THEME & SETTINGS INITIALIZATION ---
+  private setupThemeAndSettings() {
+    const savedTheme = (localStorage.getItem('p2sharer_theme_mode') as 'dark' | 'light' | 'system') || 'dark';
+    const savedAccent = localStorage.getItem('p2sharer_accent_color') || 'cyan';
+    const savedRes = localStorage.getItem('p2sharer_default_res') || '1080p';
+    const savedFps = parseInt(localStorage.getItem('p2sharer_default_fps') || '60', 10);
+    const savedBitrate = parseInt(localStorage.getItem('p2sharer_default_bitrate') || '25000', 10);
+    const savedCursor = localStorage.getItem('p2sharer_default_cursor') !== 'false';
+
+    this.currentThemeMode = savedTheme;
+    this.currentAccentColor = savedAccent;
+    this.currentFps = savedFps;
+    this.currentBitrate = savedBitrate;
+
+    this.applyTheme(this.currentThemeMode);
+    this.applyAccent(this.currentAccentColor);
+
+    // Apply defaults to modal dropdowns
+    const modalRes = document.getElementById('modal-select-resolution') as HTMLSelectElement;
+    const modalFps = document.getElementById('modal-select-fps') as HTMLSelectElement;
+    const modalBitrate = document.getElementById('modal-select-bitrate') as HTMLSelectElement;
+    const modalCursor = document.getElementById('modal-check-cursor') as HTMLInputElement;
+
+    if (modalRes) modalRes.value = savedRes;
+    if (modalFps) modalFps.value = savedFps.toString();
+    if (modalBitrate) modalBitrate.value = savedBitrate.toString();
+    if (modalCursor) modalCursor.checked = savedCursor;
+  }
+
+  private applyTheme(mode: 'dark' | 'light' | 'system') {
+    this.currentThemeMode = mode;
+    let effectiveTheme = mode;
+    if (mode === 'system') {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      effectiveTheme = prefersDark ? 'dark' : 'light';
+    }
+    document.documentElement.setAttribute('data-theme', effectiveTheme);
+    localStorage.setItem('p2sharer_theme_mode', mode);
+
+    // Update settings pills UI
+    document.querySelectorAll('.theme-mode-pills .pill-btn').forEach((btn) => {
+      btn.classList.toggle('active', btn.getAttribute('data-theme-mode') === mode);
+    });
+  }
+
+  private applyAccent(accent: string) {
+    this.currentAccentColor = accent;
+    document.documentElement.setAttribute('data-accent', accent);
+    localStorage.setItem('p2sharer_accent_color', accent);
+
+    // Update settings swatches UI
+    document.querySelectorAll('.accent-swatch').forEach((swatch) => {
+      swatch.classList.toggle('active', swatch.getAttribute('data-accent') === accent);
+    });
   }
 
   private generateRandomRoomCode() {
@@ -72,9 +131,7 @@ class App {
 
   private updateUsernameDisplay() {
     const displayEl = document.getElementById('current-username-display');
-    const myPeerName = document.getElementById('my-peer-name');
     if (displayEl) displayEl.textContent = this.username || 'Usuário';
-    if (myPeerName) myPeerName.textContent = `${this.username || 'Você'} (Você)`;
   }
 
   private showUsernameModal() {
@@ -114,8 +171,30 @@ class App {
 
   // --- EVENT BINDINGS ---
   private bindEvents() {
-    // Username pill
-    document.getElementById('user-pill')?.addEventListener('click', () => this.showUsernameModal());
+    // Settings Button & Modal
+    document.getElementById('btn-open-settings')?.addEventListener('click', () => this.openSettingsModal());
+    document.getElementById('btn-close-settings')?.addEventListener('click', () => this.closeSettingsModal());
+    document.getElementById('btn-cancel-settings')?.addEventListener('click', () => this.closeSettingsModal());
+    document.getElementById('btn-save-settings')?.addEventListener('click', () => this.saveSettingsFromModal());
+
+    // Theme Mode Selection
+    document.querySelectorAll('.theme-mode-pills .pill-btn').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        const mode = (e.currentTarget as HTMLElement).getAttribute('data-theme-mode') as 'dark' | 'light' | 'system';
+        if (mode) this.applyTheme(mode);
+      });
+    });
+
+    // Accent Color Swatches
+    document.querySelectorAll('.accent-swatch').forEach((swatch) => {
+      swatch.addEventListener('click', (e) => {
+        const accent = (e.currentTarget as HTMLElement).getAttribute('data-accent');
+        if (accent) this.applyAccent(accent);
+      });
+    });
+
+    // Username modal & pill
+    document.getElementById('user-pill')?.addEventListener('click', () => this.openSettingsModal());
     document.getElementById('btn-save-username')?.addEventListener('click', () => {
       const input = document.getElementById('input-username') as HTMLInputElement;
       const val = input.value.trim();
@@ -145,6 +224,9 @@ class App {
     // Toggle Sidebar (Chat)
     document.getElementById('btn-toggle-sidebar')?.addEventListener('click', () => this.toggleSidebar());
 
+    // Empty state stream start button
+    document.getElementById('btn-empty-start-stream')?.addEventListener('click', () => this.openScreenPickerModal());
+
     // Transmission Button (Opens Discord-style picker or stops active stream)
     document.getElementById('btn-toggle-share-screen')?.addEventListener('click', () => {
       if (this.isSharingScreen) {
@@ -155,7 +237,7 @@ class App {
     });
 
     // Screen Picker Modal Tabs & Buttons
-    document.getElementById('btn-close-picker-modal')?.addEventListener('click', () => this.closeScreenPickerModal());
+    document.getElementById('btn-close-screen-picker')?.addEventListener('click', () => this.closeScreenPickerModal());
     document.getElementById('btn-cancel-picker')?.addEventListener('click', () => this.closeScreenPickerModal());
     document.getElementById('btn-confirm-picker')?.addEventListener('click', () => this.startSelectedCapture());
 
@@ -182,25 +264,15 @@ class App {
     // Room Topbar Controls
     document.getElementById('btn-leave-room')?.addEventListener('click', () => this.leaveRoom());
     document.getElementById('btn-room-fullscreen')?.addEventListener('click', () => this.toggleFullscreen());
-    document.getElementById('btn-floating-exit-fs')?.addEventListener('click', () => this.exitFullscreen());
-
-    // Fullscreen change listener to sync UI buttons
-    document.addEventListener('fullscreenchange', () => {
-      const isFs = Boolean(document.fullscreenElement);
-      const floatBtn = document.getElementById('btn-floating-exit-fs');
-      if (floatBtn) {
-        floatBtn.classList.toggle('hidden', !isFs);
-      }
-    });
 
     // Sidebar Tabs
-    document.getElementById('tab-chat')?.addEventListener('click', () => this.switchSidebarTab('chat'));
-    document.getElementById('tab-peers')?.addEventListener('click', () => this.switchSidebarTab('peers'));
+    document.getElementById('tab-btn-chat')?.addEventListener('click', () => this.switchSidebarTab('chat'));
+    document.getElementById('tab-btn-participants')?.addEventListener('click', () => this.switchSidebarTab('participants'));
 
     // Chat Form
-    document.getElementById('chat-form')?.addEventListener('submit', (e) => {
+    document.getElementById('chat-input-form')?.addEventListener('submit', (e) => {
       e.preventDefault();
-      const input = document.getElementById('chat-input') as HTMLInputElement;
+      const input = document.getElementById('chat-input-field') as HTMLInputElement;
       const text = input.value.trim();
       if (!text) return;
 
@@ -210,6 +282,50 @@ class App {
         input.value = '';
       }
     });
+  }
+
+  // --- SETTINGS MODAL ---
+  private openSettingsModal() {
+    const modal = document.getElementById('modal-settings');
+    const inputUsername = document.getElementById('settings-input-username') as HTMLInputElement;
+    const selectRes = document.getElementById('settings-default-resolution') as HTMLSelectElement;
+    const selectFps = document.getElementById('settings-default-fps') as HTMLSelectElement;
+    const selectBitrate = document.getElementById('settings-default-bitrate') as HTMLSelectElement;
+    const checkCursor = document.getElementById('settings-check-cursor') as HTMLInputElement;
+
+    if (inputUsername) inputUsername.value = this.username;
+    if (selectRes) selectRes.value = localStorage.getItem('p2sharer_default_res') || '1080p';
+    if (selectFps) selectFps.value = localStorage.getItem('p2sharer_default_fps') || '60';
+    if (selectBitrate) selectBitrate.value = localStorage.getItem('p2sharer_default_bitrate') || '25000';
+    if (checkCursor) checkCursor.checked = localStorage.getItem('p2sharer_default_cursor') !== 'false';
+
+    modal?.classList.remove('hidden');
+  }
+
+  private closeSettingsModal() {
+    document.getElementById('modal-settings')?.classList.add('hidden');
+  }
+
+  private saveSettingsFromModal() {
+    const inputUsername = document.getElementById('settings-input-username') as HTMLInputElement;
+    const selectRes = document.getElementById('settings-default-resolution') as HTMLSelectElement;
+    const selectFps = document.getElementById('settings-default-fps') as HTMLSelectElement;
+    const selectBitrate = document.getElementById('settings-default-bitrate') as HTMLSelectElement;
+    const checkCursor = document.getElementById('settings-check-cursor') as HTMLInputElement;
+
+    if (inputUsername && inputUsername.value.trim()) {
+      this.username = inputUsername.value.trim();
+      localStorage.setItem('p2sharer_username', this.username);
+      this.updateUsernameDisplay();
+    }
+
+    if (selectRes) localStorage.setItem('p2sharer_default_res', selectRes.value);
+    if (selectFps) localStorage.setItem('p2sharer_default_fps', selectFps.value);
+    if (selectBitrate) localStorage.setItem('p2sharer_default_bitrate', selectBitrate.value);
+    if (checkCursor) localStorage.setItem('p2sharer_default_cursor', checkCursor.checked.toString());
+
+    this.closeSettingsModal();
+    this.showToast('Configurações salvas com sucesso!');
   }
 
   // --- TOGGLE SIDEBAR (CHAT) ---
@@ -308,8 +424,8 @@ class App {
     const chatContainer = document.getElementById('chat-messages-container');
     if (chatContainer) {
       chatContainer.innerHTML = `
-        <div class="chat-system-msg">
-          <span>Você entrou na sala <strong>${this.currentRoomCode}</strong>. Compartilhe o código acima.</span>
+        <div class="chat-welcome-notice">
+          <span>Você entrou na sala <strong>${this.currentRoomCode}</strong>. Compartilhe o código para convidar amigos.</span>
         </div>
       `;
     }
@@ -320,10 +436,9 @@ class App {
 
   // --- STATS HUD ---
   private updateStatsHUD() {
-    const hud = document.getElementById('stream-stats-floating');
-    const resEl = document.getElementById('hud-stat-resolution');
-    const fpsEl = document.getElementById('hud-stat-fps');
-    const bitrateEl = document.getElementById('hud-stat-bitrate');
+    const hud = document.getElementById('stream-hud-overlay');
+    const resFpsText = document.getElementById('hud-res-fps-text');
+    const bitrateText = document.getElementById('hud-bitrate-text');
 
     if (!hud) return;
 
@@ -332,206 +447,96 @@ class App {
       return;
     }
 
-    hud.style.display = 'flex';
-    if (resEl) resEl.textContent = this.currentResolution.label;
-    if (fpsEl) fpsEl.textContent = `${this.currentFps} FPS`;
-    if (bitrateEl) bitrateEl.textContent = `${(this.currentBitrate / 1000).toFixed(1)} Mbps`;
+    hud.style.display = 'block';
+    if (resFpsText) resFpsText.textContent = `${this.currentResolution.label} ${this.currentFps} FPS`;
+    if (bitrateText) bitrateText.textContent = `${(this.currentBitrate / 1000).toFixed(1)} Mbps`;
   }
 
   // --- DYNAMIC MULTI-STREAM RENDERER ---
   private renderStreams() {
     const wrapper = document.getElementById('streams-grid-wrapper');
-    const idleBox = document.getElementById('room-video-idle');
+    const emptyState = document.getElementById('room-empty-stream-state');
     const sharingTag = document.getElementById('room-sharing-status-tag');
     const liveBadge = document.getElementById('room-live-badge');
 
-    if (!wrapper || !idleBox) return;
+    if (!wrapper || !emptyState) return;
 
     if (this.activeStreams.length === 0) {
-      wrapper.classList.remove('active');
       wrapper.innerHTML = '';
-      idleBox.classList.remove('hidden');
+      emptyState.classList.add('active');
       if (sharingTag) sharingTag.textContent = '0 telas';
-      if (liveBadge) {
-        liveBadge.textContent = 'SALA ATIVA';
-        liveBadge.classList.remove('streaming');
-      }
-      this.updateStatsHUD();
+      if (liveBadge) liveBadge.textContent = 'SALA ATIVA';
       return;
     }
 
-    idleBox.classList.add('hidden');
-    wrapper.classList.add('active');
+    emptyState.classList.remove('active');
+    if (sharingTag) sharingTag.textContent = `${this.activeStreams.length} ${this.activeStreams.length === 1 ? 'tela' : 'telas'}`;
+    if (liveBadge) liveBadge.textContent = 'AO VIVO';
 
-    // Update status bar
-    const count = this.activeStreams.length;
-    if (sharingTag) sharingTag.textContent = `${count} ${count === 1 ? 'tela' : 'telas'}`;
-    if (liveBadge) {
-      liveBadge.textContent = 'AO VIVO';
-      liveBadge.classList.add('streaming');
+    // Auto-adjust layout
+    if (this.pinnedPeerId && !this.activeStreams.some((s) => s.peerId === this.pinnedPeerId)) {
+      this.pinnedPeerId = null;
+      this.layoutMode = 'grid';
     }
 
-    // Determine spotlight pinned stream
-    if (!this.pinnedPeerId || !this.activeStreams.some((s) => s.peerId === this.pinnedPeerId)) {
-      this.pinnedPeerId = this.activeStreams[0].peerId;
-    }
-
-    this.updateStatsHUD();
-
-    wrapper.className = `streams-grid-wrapper active ${this.layoutMode === 'grid' ? 'layout-grid' : 'layout-spotlight'}`;
+    wrapper.className = `streams-grid-wrapper layout-${this.layoutMode}`;
     wrapper.innerHTML = '';
 
-    if (this.layoutMode === 'spotlight') {
-      const pinnedItem = this.activeStreams.find((s) => s.peerId === this.pinnedPeerId) || this.activeStreams[0];
-      const otherItems = this.activeStreams.filter((s) => s.peerId !== pinnedItem.peerId);
+    const visibleStreams =
+      this.layoutMode === 'spotlight' && this.pinnedPeerId
+        ? this.activeStreams.filter((s) => s.peerId === this.pinnedPeerId)
+        : this.activeStreams;
 
-      // 1. Pinned large stream card
-      const mainCard = this.createStreamCard(pinnedItem, true);
-      wrapper.appendChild(mainCard);
+    visibleStreams.forEach((streamInfo) => {
+      const card = document.createElement('div');
+      card.className = `stream-card ${streamInfo.peerId === this.pinnedPeerId ? 'pinned' : ''}`;
+      card.title = 'Clique para alternar entre modo destaque e grade';
 
-      // 2. Horizontal strip for other streams
-      if (otherItems.length > 0) {
-        const strip = document.createElement('div');
-        strip.className = 'spotlight-strip';
-        otherItems.forEach((item) => {
-          strip.appendChild(this.createStreamCard(item, false));
-        });
-        wrapper.appendChild(strip);
+      const video = document.createElement('video');
+      video.autoplay = true;
+      video.playsInline = true;
+      video.srcObject = streamInfo.stream;
+
+      if (streamInfo.isLocal) {
+        video.muted = true; // Avoid feedback
       }
-    } else {
-      // Grid view
-      this.activeStreams.forEach((item) => {
-        wrapper.appendChild(this.createStreamCard(item, item.peerId === this.pinnedPeerId));
+
+      const overlay = document.createElement('div');
+      overlay.className = 'stream-card-overlay';
+      overlay.innerHTML = `
+        <span class="user-status-dot"></span>
+        <span>${streamInfo.senderName}</span>
+      `;
+
+      card.appendChild(video);
+      card.appendChild(overlay);
+
+      card.addEventListener('click', () => {
+        if (this.layoutMode === 'spotlight' && this.pinnedPeerId === streamInfo.peerId) {
+          this.layoutMode = 'grid';
+          this.pinnedPeerId = null;
+        } else {
+          this.layoutMode = 'spotlight';
+          this.pinnedPeerId = streamInfo.peerId;
+        }
+        this.renderStreams();
       });
-    }
+
+      wrapper.appendChild(card);
+    });
   }
 
-  private createStreamCard(item: ActiveStreamInfo, isPinned: boolean): HTMLElement {
-    const card = document.createElement('div');
-    card.className = `stream-card ${isPinned ? 'pinned' : ''}`;
-    card.id = `stream-card-${item.peerId}`;
-
-    const video = document.createElement('video');
-    video.autoplay = true;
-    video.playsInline = true;
-    video.srcObject = item.stream;
-
-    // Get volume settings for this stream
-    if (!this.streamVolumes.has(item.peerId)) {
-      this.streamVolumes.set(item.peerId, { volume: item.isLocal ? 0 : 1, muted: item.isLocal });
-    }
-    const volState = this.streamVolumes.get(item.peerId)!;
-
-    video.muted = volState.muted;
-    video.volume = volState.volume;
-    video.play().catch(() => {});
-
-    // Card Header (Title & Pin/Fullscreen buttons)
-    const header = document.createElement('div');
-    header.className = 'stream-card-header';
-    header.innerHTML = `
-      <div class="stream-card-title">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>
-        <span>${item.senderName}</span>
-      </div>
-      <div class="stream-card-tools">
-        <button class="stream-card-btn btn-pin-stream" title="${isPinned && this.layoutMode === 'spotlight' ? 'Voltar para Grade' : 'Destacar tela'}">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 17v4"/><path d="M5 17h14"/><path d="m15 2-3 3-3-3"/></svg>
-        </button>
-        <button class="stream-card-btn btn-fs-stream" title="Tela cheia">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" x2="14" y1="3" y2="10"/><line x1="3" x2="10" y1="21" y2="14"/></svg>
-        </button>
-      </div>
-    `;
-
-    // Card Footer (Volume slider & Mute button)
-    const footer = document.createElement('div');
-    footer.className = 'stream-card-footer';
-    footer.innerHTML = `
-      <button class="stream-mute-btn ${volState.muted ? 'muted' : ''}" title="${volState.muted ? 'Desmutar' : 'Silenciar'}">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-      </button>
-      <input type="range" class="stream-volume-slider" min="0" max="1" step="0.02" value="${volState.muted ? 0 : volState.volume}" title="Volume: ${Math.round(volState.volume * 100)}%" />
-    `;
-
-    // Clicking anywhere on the card toggles spotlight <-> grid
-    card.addEventListener('click', (e) => {
-      const target = e.target as HTMLElement;
-      if (target.closest('.stream-card-footer') || target.closest('.stream-card-tools')) {
-        return;
-      }
-      if (this.layoutMode === 'spotlight' && this.pinnedPeerId === item.peerId) {
-        this.layoutMode = 'grid';
-      } else {
-        this.pinnedPeerId = item.peerId;
-        this.layoutMode = 'spotlight';
-      }
-      this.renderStreams();
-    });
-
-    // Bind Pin Button
-    header.querySelector('.btn-pin-stream')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (this.layoutMode === 'spotlight' && this.pinnedPeerId === item.peerId) {
-        this.layoutMode = 'grid';
-      } else {
-        this.pinnedPeerId = item.peerId;
-        this.layoutMode = 'spotlight';
-      }
-      this.renderStreams();
-    });
-
-    // Bind Fullscreen Button
-    header.querySelector('.btn-fs-stream')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (!document.fullscreenElement) {
-        card.requestFullscreen().catch(() => {});
-      } else {
-        document.exitFullscreen().catch(() => {});
-      }
-    });
-
-    // Bind Volume Slider
-    const volSlider = footer.querySelector('.stream-volume-slider') as HTMLInputElement;
-    const muteBtn = footer.querySelector('.stream-mute-btn') as HTMLButtonElement;
-
-    volSlider?.addEventListener('input', (e) => {
-      e.stopPropagation();
-      const val = parseFloat((e.target as HTMLInputElement).value);
-      volState.volume = val;
-      volState.muted = val === 0;
-      video.volume = val;
-      video.muted = volState.muted;
-      muteBtn.classList.toggle('muted', volState.muted);
-      volSlider.title = `Volume: ${Math.round(val * 100)}%`;
-    });
-
-    // Bind Mute Toggle Button
-    muteBtn?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      volState.muted = !volState.muted;
-      video.muted = volState.muted;
-      muteBtn.classList.toggle('muted', volState.muted);
-      if (volState.muted) {
-        volSlider.value = '0';
-      } else {
-        volSlider.value = String(volState.volume || 1);
-        video.volume = volState.volume || 1;
-      }
-    });
-
-    card.appendChild(video);
-    card.appendChild(header);
-    card.appendChild(footer);
-
-    return card;
-  }
-
-  // --- DISCORD-STYLE SCREEN / WINDOW PICKER MODAL ---
+  // --- DISCORD-STYLE SCREEN & WINDOW PICKER ---
   private async openScreenPickerModal() {
     const modal = document.getElementById('modal-screen-picker');
-    modal?.classList.remove('hidden');
-    await this.refreshScreenSources();
+    if (!modal) return;
+    modal.classList.remove('hidden');
+
+    this.currentPickerTab = 'screens';
+    this.selectedSourceId = 'screen:0';
+    this.updatePickerTabUI();
+
+    await this.loadScreenSources();
   }
 
   private closeScreenPickerModal() {
@@ -540,40 +545,40 @@ class App {
 
   private switchPickerTab(tab: 'screens' | 'windows') {
     this.currentPickerTab = tab;
-    document.getElementById('picker-tab-screens')?.classList.toggle('active', tab === 'screens');
-    document.getElementById('picker-tab-windows')?.classList.toggle('active', tab === 'windows');
+    this.updatePickerTabUI();
     this.renderSourceCards();
   }
 
-  private async refreshScreenSources() {
-    const container = document.getElementById('source-cards-container');
-    if (container) {
-      container.innerHTML = '<div class="loading-state">Capturando miniaturas das telas e janelas...</div>';
-    }
+  private updatePickerTabUI() {
+    document.getElementById('picker-tab-screens')?.classList.toggle('active', this.currentPickerTab === 'screens');
+    document.getElementById('picker-tab-windows')?.classList.toggle('active', this.currentPickerTab === 'windows');
+  }
+
+  private async loadScreenSources() {
+    const container = document.getElementById('picker-sources-container');
+    if (container) container.innerHTML = '<div class="loading-state">Detectando telas e janelas ativas...</div>';
 
     try {
-      const res = await invoke<ScreenSourcesResponse>('list_screen_sources');
-      this.availableMonitors = res.monitors || [];
-      this.availableWindows = res.windows || [];
+      const resp = await invoke<ScreenSourcesResponse>('list_screen_sources');
+      this.availableMonitors = resp.monitors || [];
+      this.availableWindows = resp.windows || [];
 
-      if (this.availableMonitors.length > 0 && !this.selectedSourceId) {
+      if (this.availableMonitors.length > 0) {
         this.selectedSourceId = this.availableMonitors[0].id;
+      } else if (this.availableWindows.length > 0) {
+        this.selectedSourceId = this.availableWindows[0].id;
       }
 
       this.renderSourceCards();
     } catch (err) {
-      console.warn('Fallback loading screen sources:', err);
-      this.availableMonitors = [
-        { id: 'screen:0', name: 'Monitor 1 (Principal)', width: 1920, height: 1080, is_primary: true, thumbnail: undefined },
-      ];
-      this.renderSourceCards();
+      console.error('Failed to list screen sources:', err);
+      if (container) container.innerHTML = '<div class="loading-state">Erro ao detectar telas.</div>';
     }
   }
 
   private renderSourceCards() {
-    const container = document.getElementById('source-cards-container');
+    const container = document.getElementById('picker-sources-container');
     if (!container) return;
-
     container.innerHTML = '';
 
     if (this.currentPickerTab === 'screens') {
@@ -644,33 +649,32 @@ class App {
     else if (resValue === '480p') res = { width: 854, height: 480, label: '480p' };
     else if (resValue === '360p') res = { width: 640, height: 360, label: '360p' };
 
+    this.currentResolution = res;
     this.currentFps = fpsValue;
     this.currentBitrate = bitrateValue;
-    this.currentResolution = res;
-
-    // Sync bottom quick select controls as well
-    const qRes = document.getElementById('quick-select-resolution') as HTMLSelectElement;
-    const qFps = document.getElementById('quick-select-fps') as HTMLSelectElement;
-    const qBit = document.getElementById('quick-select-bitrate') as HTMLSelectElement;
-    if (qRes) qRes.value = resValue;
-    if (qFps) qFps.value = String(fpsValue);
-    if (qBit) qBit.value = String(bitrateValue);
 
     try {
-      // 1. Audio bridge listener
-      const customAudioTrack = this.audioBridge.init();
-      await this.audioBridge.startListening();
+      this.showToast('Iniciando transmissão...');
 
-      // 2. Direct GPU Hardware Capture
+      // 1. Start audio capture (Process-filtered WASAPI loopback)
+      let customAudioTrack: MediaStreamTrack | null = null;
+      try {
+        customAudioTrack = this.audioBridge.init();
+        await this.audioBridge.startListening();
+      } catch (audioErr) {
+        console.warn('Audio capture startup warning:', audioErr);
+      }
+
+      // 2. Start native Rust video capture (ZERO BROWSER POPUPS!)
       const videoStream = await this.nativeVideoBridge.startCapture(
         this.selectedSourceId,
         fpsValue,
-        res,
+        { width: res.width, height: res.height },
         mouseEnabled,
-        92
+        70
       );
 
-      // Listen for when the user clicks native "Parar de compartilhar"
+      // Listen for when capture ends
       videoStream.getVideoTracks()[0].onended = () => {
         this.stopScreenSharing();
       };
@@ -687,7 +691,6 @@ class App {
         combinedStream.addTrack(customAudioTrack);
       }
 
-      this.activeLocalStream = combinedStream;
       this.isSharingScreen = true;
 
       // Broadcast stream to everyone in the room
@@ -709,69 +712,33 @@ class App {
     this.audioBridge.stop();
     invoke('stop_audio_capture').catch(() => {});
 
-    if (this.activeLocalStream) {
-      this.activeLocalStream.getTracks().forEach((t) => t.stop());
-      this.activeLocalStream = null;
-    }
-
     if (this.roomManager) {
       this.roomManager.stopStream();
     }
 
     this.updateShareButtonUI(false);
     this.updateStatsHUD();
-    this.showToast('Sua transmissão de tela foi encerrada.');
+    this.showToast('Transmissão encerrada.');
   }
 
   private updateShareButtonUI(isSharing: boolean) {
     const dot = document.getElementById('stream-sharing-dot');
     const label = document.getElementById('label-share-screen');
+
     if (dot) {
       dot.classList.toggle('active', isSharing);
     }
     if (label) {
-      label.textContent = isSharing ? 'Parar' : 'Transmissão';
+      label.textContent = isSharing ? 'Gerenciar' : 'Transmissão';
     }
   }
 
-  private toggleFullscreen() {
-    const container = document.getElementById('room-video-container');
-    if (!container) return;
-    if (!document.fullscreenElement) {
-      container.requestFullscreen().catch(() => {});
-    } else {
-      document.exitFullscreen().catch(() => {});
-    }
-  }
-
-  private exitFullscreen() {
-    if (document.fullscreenElement) {
-      document.exitFullscreen().catch(() => {});
-    }
-  }
-
-  private copyRoomCodeToClipboard() {
-    navigator.clipboard.writeText(this.currentRoomCode);
-    this.showToast(`Código da sala "${this.currentRoomCode}" copiado para a área de transferência!`);
-  }
-
-  private leaveRoom() {
-    if (this.isSharingScreen) {
-      this.stopScreenSharing();
-    }
-    if (this.roomManager) {
-      this.roomManager.leave();
-      this.roomManager = null;
-    }
-
-    this.switchView('view-home');
-    this.showToast('Você saiu da sala.');
-  }
-
-  // --- AUDIO FILTER & WASAPI PROCESS LIST ---
-  private async openAudioFilterModal() {
-    document.getElementById('modal-audio-filter')?.classList.remove('hidden');
-    await this.loadProcessList();
+  // --- AUDIO FILTER MODAL ---
+  private openAudioFilterModal() {
+    const modal = document.getElementById('modal-audio-filter');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    this.loadProcessList();
   }
 
   private closeAudioFilterModal() {
@@ -780,139 +747,82 @@ class App {
 
   private async loadProcessList() {
     const container = document.getElementById('process-checkboxes-container');
-    if (container) {
-      container.innerHTML = '<div class="loading-state">Buscando programas no Windows...</div>';
-    }
+    if (container) container.innerHTML = '<div class="loading-state">Atualizando lista de aplicativos...</div>';
 
     try {
-      const processes = await invoke<ProcessItem[]>('list_audio_processes');
-      this.audioProcesses = processes;
+      this.audioProcesses = await invoke<ProcessItem[]>('list_audio_processes');
       this.renderProcessCheckboxes();
     } catch (err) {
-      console.warn('Process fallback:', err);
-      this.audioProcesses = [
-        { pid: 10420, name: 'Discord.exe', window_title: 'Discord - #geral', is_likely_chat_or_voice: true },
-        { pid: 14880, name: 'Spotify.exe', window_title: 'Spotify Premium', is_likely_chat_or_voice: false },
-        { pid: 9812, name: 'chrome.exe', window_title: 'YouTube - Google Chrome', is_likely_chat_or_voice: false },
-      ];
-      this.renderProcessCheckboxes();
+      console.error('Failed to list processes:', err);
+      if (container) container.innerHTML = '<div class="loading-state">Erro ao carregar aplicativos.</div>';
     }
   }
 
-  private renderProcessCheckboxes(searchTerm = '') {
+  private renderProcessCheckboxes(filterText = '') {
     const container = document.getElementById('process-checkboxes-container');
     if (!container) return;
 
-    const filtered = this.audioProcesses.filter((p) => {
-      const matchName = p.name.toLowerCase().includes(searchTerm);
-      const matchTitle = (p.window_title || '').toLowerCase().includes(searchTerm);
-      return matchName || matchTitle;
-    });
+    const filtered = this.audioProcesses.filter(
+      (p) =>
+        p.name.toLowerCase().includes(filterText) ||
+        (p.window_title && p.window_title.toLowerCase().includes(filterText)) ||
+        p.pid.toString().includes(filterText)
+    );
 
     if (filtered.length === 0) {
-      container.innerHTML = '<div class="loading-state">Nenhum processo encontrado.</div>';
+      container.innerHTML = '<div class="loading-state">Nenhum aplicativo correspondente.</div>';
       return;
     }
 
     container.innerHTML = '';
-    filtered.forEach((proc) => {
-      const row = document.createElement('div');
-      row.className = 'process-row';
-      const isChecked = this.selectedPids.has(proc.pid);
+    filtered.forEach((p) => {
+      const label = document.createElement('label');
+      label.className = 'process-item-label';
+      const isChecked = this.selectedPids.has(p.pid);
 
-      row.innerHTML = `
-        <div class="process-row-info">
-          <input type="checkbox" data-pid="${proc.pid}" ${isChecked ? 'checked' : ''} />
-          <div>
-            <strong>${proc.name}</strong>
-            ${proc.window_title ? `<span style="color: var(--text-muted); margin-left: 8px;">(${proc.window_title})</span>` : ''}
-          </div>
-          ${proc.is_likely_chat_or_voice ? '<span class="voice-badge">Voz / Chat</span>' : ''}
-        </div>
-        <span style="color: var(--text-muted); font-size: 11px;">PID: ${proc.pid}</span>
+      label.innerHTML = `
+        <input type="checkbox" value="${p.pid}" ${isChecked ? 'checked' : ''} />
+        <span class="process-name">${p.name}</span>
+        ${p.window_title ? `<span class="process-title">(${p.window_title})</span>` : ''}
+        <span class="process-pid">PID: ${p.pid}</span>
       `;
 
-      row.querySelector('input')?.addEventListener('change', (e) => {
-        const checked = (e.target as HTMLInputElement).checked;
-        if (checked) {
-          this.selectedPids.add(proc.pid);
+      const checkbox = label.querySelector('input');
+      checkbox?.addEventListener('change', (e) => {
+        const target = e.target as HTMLInputElement;
+        if (target.checked) {
+          this.selectedPids.add(p.pid);
         } else {
-          this.selectedPids.delete(proc.pid);
+          this.selectedPids.delete(p.pid);
         }
       });
 
-      container.appendChild(row);
+      container.appendChild(label);
     });
   }
 
   private async applyAudioFilters() {
-    const pids = Array.from(this.selectedPids);
-    const mode = this.selectedFilterMode;
-
+    const pidsArray = Array.from(this.selectedPids);
     try {
       await invoke('start_audio_capture', {
-        config: {
-          mode,
-          target_pids: pids,
-          sample_rate: 48000,
-        },
+        filterMode: this.selectedFilterMode,
+        targetPids: pidsArray,
       });
-
-      const label = document.getElementById('active-audio-mode-label');
-      if (label) {
-        if (pids.length === 0) {
-          label.textContent = 'Áudio: Sistema Completo';
-        } else if (mode === 'exclude') {
-          label.textContent = `Áudio: Ignorando ${pids.length} app(s)`;
-        } else {
-          label.textContent = `Áudio: Capturando ${pids.length} app(s)`;
-        }
-      }
-
       this.closeAudioFilterModal();
-      this.showToast('Filtros de áudio aplicados!');
-    } catch {
-      this.closeAudioFilterModal();
+      this.showToast('Filtros de áudio aplicados com sucesso!');
+    } catch (err) {
+      console.error('Error applying audio filter:', err);
+      this.showToast('Erro ao aplicar filtros de áudio.');
     }
   }
 
   // --- SIDEBAR & CHAT ---
-  private switchSidebarTab(tab: 'chat' | 'peers') {
-    document.getElementById('tab-chat')?.classList.toggle('active', tab === 'chat');
-    document.getElementById('tab-peers')?.classList.toggle('active', tab === 'peers');
-    document.getElementById('pane-chat')?.classList.toggle('active', tab === 'chat');
-    document.getElementById('pane-peers')?.classList.toggle('active', tab === 'peers');
-  }
+  private switchSidebarTab(tab: 'chat' | 'participants') {
+    document.getElementById('tab-btn-chat')?.classList.toggle('active', tab === 'chat');
+    document.getElementById('tab-btn-participants')?.classList.toggle('active', tab === 'participants');
 
-  private updatePeersList(peers: PeerInfo[]) {
-    const countEl = document.getElementById('peer-count');
-    if (countEl) countEl.textContent = String(peers.length + 1);
-
-    const listEl = document.getElementById('peer-list-container');
-    if (!listEl) return;
-
-    listEl.innerHTML = `
-      <div class="peer-item">
-        <div>
-          <span class="peer-name">${this.username} (Você)</span>
-          <span style="font-size: 11px; color: var(--text-muted); display: block;">${this.isCreator ? 'Criador da Sala' : 'Participante'}</span>
-        </div>
-        <span class="peer-status">● Online</span>
-      </div>
-    `;
-
-    peers.forEach((p) => {
-      const item = document.createElement('div');
-      item.className = 'peer-item';
-      item.innerHTML = `
-        <div>
-          <span class="peer-name">${p.username}</span>
-          <span style="font-size: 11px; color: var(--text-muted); display: block;">ID: ${p.id.slice(0, 6)}</span>
-        </div>
-        <span class="peer-status">● Online</span>
-      `;
-      listEl.appendChild(item);
-    });
+    document.getElementById('tab-content-chat')?.classList.toggle('active', tab === 'chat');
+    document.getElementById('tab-content-participants')?.classList.toggle('active', tab === 'participants');
   }
 
   private appendChatMessage(msg: ChatMessage) {
@@ -920,38 +830,76 @@ class App {
     if (!container) return;
 
     const timeStr = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const msgEl = document.createElement('div');
+    msgEl.className = 'chat-msg';
+    msgEl.innerHTML = `
+      <div class="chat-msg-header">
+        <span class="chat-msg-sender">${msg.sender}</span>
+        <span class="chat-msg-time">${timeStr}</span>
+      </div>
+      <div class="chat-msg-bubble">${msg.text}</div>
+    `;
 
-    if (msg.isSystem) {
-      const div = document.createElement('div');
-      div.className = 'chat-system-msg';
-      div.innerHTML = `<span>${msg.text}</span>`;
-      container.appendChild(div);
-    } else {
-      const div = document.createElement('div');
-      div.className = 'chat-msg';
-      div.innerHTML = `
-        <div class="chat-msg-header">
-          <span class="chat-sender ${msg.isHost ? 'host' : ''}">${msg.sender} ${msg.isHost ? '(Host)' : ''}</span>
-          <span class="chat-time">${timeStr}</span>
-        </div>
-        <div class="chat-bubble">${this.escapeHTML(msg.text)}</div>
-      `;
-      container.appendChild(div);
-    }
-
+    container.appendChild(msgEl);
     container.scrollTop = container.scrollHeight;
   }
 
-  private escapeHTML(str: string): string {
-    return str
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
+  private updatePeersList(peers: PeerInfo[]) {
+    const countEl = document.getElementById('count-participants');
+    if (countEl) countEl.textContent = (peers.length + 1).toString();
+
+    const listEl = document.getElementById('participants-list');
+    if (!listEl) return;
+
+    listEl.innerHTML = `
+      <div class="participant-item">
+        <span>${this.username} (Você)</span>
+        <span class="user-status-dot"></span>
+      </div>
+    `;
+
+    peers.forEach((p) => {
+      const item = document.createElement('div');
+      item.className = 'participant-item';
+      item.innerHTML = `
+        <span>${p.username}</span>
+        <span class="user-status-dot"></span>
+      `;
+      listEl.appendChild(item);
+    });
+  }
+
+  // --- FULLSCREEN ---
+  private toggleFullscreen() {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  }
+
+  // --- COPY ROOM CODE ---
+  private copyRoomCodeToClipboard() {
+    navigator.clipboard
+      .writeText(this.currentRoomCode)
+      .then(() => this.showToast(`Código "${this.currentRoomCode}" copiado!`))
+      .catch(() => this.showToast(`Código da sala: ${this.currentRoomCode}`));
+  }
+
+  // --- LEAVE ROOM ---
+  private leaveRoom() {
+    if (this.isSharingScreen) {
+      this.stopScreenSharing();
+    }
+    if (this.roomManager) {
+      this.roomManager.leave();
+      this.roomManager = null;
+    }
+    this.activeStreams = [];
+    this.switchView('view-home');
+    this.showToast('Você saiu da sala.');
   }
 }
 
-// Start application when DOM is ready
-window.addEventListener('DOMContentLoaded', () => {
-  new App();
-});
+// Instantiate App
+new App();
