@@ -170,6 +170,7 @@ export class GroupRoomManager {
     if (this.room && stream) {
       try {
         this.room.addStream(stream);
+        this.boostAllSendersBitrate();
       } catch (err) {
         console.warn('[P2P] Error adding broadcast stream:', err);
       }
@@ -180,6 +181,32 @@ export class GroupRoomManager {
 
       this.notifyStreamsUpdate();
     }
+  }
+
+  private boostAllSendersBitrate() {
+    try {
+      const peers = this.room?.getPeers?.() || {};
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      Object.values(peers).forEach((peerObj: any) => {
+        const pc: RTCPeerConnection = peerObj?.connection || peerObj?.pc || peerObj;
+        if (pc?.getSenders) {
+          pc.getSenders().forEach((sender) => {
+            if (sender.track && sender.track.kind === 'video') {
+              try {
+                const params = sender.getParameters();
+                if (!params.encodings || params.encodings.length === 0) {
+                  params.encodings = [{}];
+                }
+                params.encodings[0].maxBitrate = 25000000; // 25 Mbps
+                params.encodings[0].maxFramerate = 60;
+                params.encodings[0].networkPriority = 'high';
+                sender.setParameters(params).catch(() => {});
+              } catch {}
+            }
+          });
+        }
+      });
+    } catch {}
   }
 
   public stopStream() {
