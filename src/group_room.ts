@@ -273,7 +273,7 @@ export class GroupRoomManager {
     if (this.localStream) {
       list.push({
         peerId: 'local',
-        senderName: `${this.username} (Sua Tela)`,
+        senderName: this.username,
         stream: this.localStream,
         isLocal: true,
       });
@@ -299,7 +299,7 @@ export class GroupRoomManager {
     // 1. Local slot (Always present)
     list.push({
       peerId: 'local',
-      senderName: `${this.username} (Você)`,
+      senderName: this.username,
       stream: this.localStream,
       isStreaming: Boolean(this.localStream),
       isLocal: true,
