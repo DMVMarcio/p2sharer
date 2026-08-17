@@ -75,6 +75,34 @@ body {
   color: #fff;
 }
 
+.header-user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.room-code-header-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: rgba(0, 240, 255, 0.08);
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  padding: 4px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.room-code-header-pill:hover {
+  background-color: rgba(0, 240, 255, 0.15);
+  border-color: var(--accent-cyan);
+  transform: translateY(-1px);
+}
+
+.room-code-header-pill.hidden {
+  display: none;
+}
+
 .user-pill {
   display: flex;
   align-items: center;
@@ -310,6 +338,20 @@ body {
   color: #000;
 }
 
+.stream-sharing-indicator {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--text-muted);
+  display: inline-block;
+  transition: all 0.3s ease;
+}
+
+.stream-sharing-indicator.active {
+  background-color: var(--accent-emerald);
+  box-shadow: 0 0 8px var(--accent-emerald);
+}
+
 /* ROOM LAYOUT */
 .room-layout {
   display: flex;
@@ -486,7 +528,7 @@ body {
 }
 
 .stream-card.pinned {
-  cursor: default;
+  cursor: pointer;
 }
 
 .stream-card video {
@@ -645,29 +687,40 @@ body {
   display: none;
 }
 
-.room-code-floating {
+/* LIVE STREAM STATS HUD */
+.stream-stats-floating {
   position: absolute;
   top: 16px;
   right: 16px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  background-color: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(8px);
-  padding: 8px 14px;
+  gap: 6px;
+  background-color: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(10px);
+  padding: 6px 12px;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(0, 240, 255, 0.3);
-  font-size: 13px;
-  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 20;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-primary);
 }
 
-.room-code-floating:hover {
-  background-color: rgba(0, 0, 0, 0.9);
-  border-color: var(--accent-cyan);
-  transform: scale(1.02);
+.stat-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+}
+
+.stat-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--accent-cyan);
 }
 
 /* FLOATING EXIT FULLSCREEN BUTTON */
@@ -1172,6 +1225,19 @@ body {
   font-size: 12px;
   font-weight: 600;
   color: var(--text-secondary);
+}
+
+.picker-mouse-toggle-row {
+  margin-top: 4px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
 }
 
 /* AUDIO FILTER PROCESS LIST */
