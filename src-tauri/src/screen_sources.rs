@@ -1,12 +1,15 @@
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
+use futures_util::{SinkExt, StreamExt};
 use image::codecs::jpeg::JpegEncoder;
 use image::imageops::FilterType;
 use serde::{Deserialize, Serialize};
 use std::io::Cursor;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter};
+use tokio::net::TcpListener;
+use tokio::sync::broadcast;
+use tokio_tungstenite::tungstenite::protocol::Message;
 use xcap::{Monitor, Window};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -37,6 +40,44 @@ pub struct ScreenSourcesResponse {
 }
 
 static CAPTURING_VIDEO: AtomicBool = AtomicBool::new(false);
+static WS_SERVER_INITIALIZED: AtomicBool = AtomicBool::new(false);
+static FRAME_SENDER: std::sync::OnceLock<broadcast::Sender<Vec<u8>>> = std::sync::OnceLock::new();
+
+fn get_frame_sender() -> &'static broadcast::Sender<Vec<u8>> {
+    FRAME_SENDER.get_or_init(|| {
+        let (tx, _rx) = broadcast::channel(16);
+        tx
+    })
+}
+
+// Start WebSocket server on 127.0.0.1:49153 to stream binary frames with 0ms latency
+fn ensure_ws_server_running() {
+    if WS_SERVER_INITIALIZED.swap(true, Ordering::SeqCst) {
+        return;
+    }
+
+    tokio::spawn(async move {
+        let addr = "127.0.0.1:49153";
+        if let Ok(listener) = TcpListener::bind(addr).await {
+            println!("[Native Video WS] Listening on {}", addr);
+            while let Ok((stream, _)) = listener.accept().await {
+                let sender = get_frame_sender();
+                let mut rx = sender.subscribe();
+
+                tokio::spawn(async move {
+                    if let Ok(ws_stream) = tokio_tungstenite::accept_async(stream).await {
+                        let (mut write, mut _read) = ws_stream.split();
+                        while let Ok(frame_data) = rx.recv().await {
+                            if write.send(Message::Binary(frame_data.into())).await.is_err() {
+                                break;
+                            }
+                        }
+                    }
+                });
+            }
+        }
+    });
+}
 
 #[tauri::command]
 pub fn list_screen_sources() -> ScreenSourcesResponse {
@@ -142,13 +183,6 @@ pub fn list_screen_sources() -> ScreenSourcesResponse {
         monitors: monitors_out,
         windows: windows_out,
     }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct VideoFramePayload {
-    pub jpeg_base64: String,
-    pub width: u32,
-    pub height: u32,
 }
 
 #[cfg(windows)]
@@ -273,7 +307,6 @@ fn draw_authentic_cursor(img: &mut image::RgbaImage, origin_x: i32, origin_y: i3
 
 #[tauri::command]
 pub fn start_native_screen_capture(
-    app: AppHandle,
     source_id: String,
     target_fps: u32,
     target_width: u32,
@@ -281,6 +314,7 @@ pub fn start_native_screen_capture(
     capture_mouse: Option<bool>,
     quality: Option<u8>,
 ) -> Result<bool, String> {
+    ensure_ws_server_running();
     CAPTURING_VIDEO.store(true, Ordering::SeqCst);
     let is_capturing = Arc::new(AtomicBool::new(true));
     let is_capturing_clone = is_capturing.clone();
@@ -288,7 +322,9 @@ pub fn start_native_screen_capture(
     let fps = target_fps.max(15).min(120);
     let frame_delay_ms = (1000 / fps).max(6) as u64;
     let should_draw_mouse = capture_mouse.unwrap_or(true);
-    let jpeg_quality = quality.unwrap_or(85).max(60).min(95);
+    let jpeg_quality = quality.unwrap_or(80).max(50).min(90);
+
+    let sender = get_frame_sender().clone();
 
     std::thread::spawn(move || {
         let is_window = source_id.starts_with("window:");
@@ -343,23 +379,18 @@ pub fn start_native_screen_capture(
             };
 
             if let Some(img) = captured_img {
-                // Avoid expensive resizing if dimensions match
+                // Resize if needed
                 let scaled_img = if img.width() != target_width || img.height() != target_height {
                     image::imageops::resize(&img, target_width, target_height, FilterType::Nearest)
                 } else {
                     img
                 };
 
-                let mut jpeg_bytes = Vec::with_capacity(120_000);
+                let mut jpeg_bytes = Vec::with_capacity(90_000);
                 let mut cursor = Cursor::new(&mut jpeg_bytes);
                 let mut encoder = JpegEncoder::new_with_quality(&mut cursor, jpeg_quality);
                 if encoder.encode_image(&scaled_img).is_ok() {
-                    let payload = VideoFramePayload {
-                        jpeg_base64: BASE64.encode(&jpeg_bytes),
-                        width: target_width,
-                        height: target_height,
-                    };
-                    let _ = app.emit("p2sharer://video-frame", payload);
+                    let _ = sender.send(jpeg_bytes);
                 }
             }
 
