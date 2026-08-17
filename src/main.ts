@@ -907,6 +907,7 @@ class App {
   }
 
   private updateShareButtonUI(isSharing: boolean) {
+    const btn = document.getElementById('btn-toggle-share-screen');
     const dot = document.getElementById('stream-sharing-dot');
     const label = document.getElementById('label-share-screen');
 
@@ -914,7 +915,18 @@ class App {
       dot.classList.toggle('active', isSharing);
     }
     if (label) {
-      label.textContent = isSharing ? 'Gerenciar' : 'Transmissão';
+      label.textContent = isSharing ? 'Parar Transmissão' : 'Transmissão';
+    }
+    if (btn) {
+      if (isSharing) {
+        btn.classList.remove('btn-outline');
+        btn.classList.add('btn-danger');
+        btn.title = 'Parar compartilhamento de tela';
+      } else {
+        btn.classList.remove('btn-danger');
+        btn.classList.add('btn-outline');
+        btn.title = 'Compartilhar Tela ou Janela';
+      }
     }
   }
 
