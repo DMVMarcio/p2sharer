@@ -26,6 +26,43 @@ export interface RoomCallbacks {
   onStatusChange: (status: string) => void;
 }
 
+/**
+ * Injects instant 25-35 Mbps WebRTC parameters directly into SDP Offer / Answer.
+ * Eliminates the 15-second bandwidth ramp-up delay in Google Congestion Control!
+ */
+export function boostSdpBitrate(sdp: string): string {
+  if (!sdp) return sdp;
+  let modified = sdp;
+
+  // 1. Add bandwidth caps directly to m=video section (25000 kbps / 25000000 bps)
+  if (!modified.includes('b=AS:')) {
+    modified = modified.replace(/(m=video [^\r\n]+[\r\n]+)/g, '$1b=AS:25000\r\nb=TIAS:25000000\r\n');
+  }
+
+  // 2. Add Google-specific instant start bitrate to video fmtp lines
+  if (!modified.includes('x-google-start-bitrate')) {
+    modified = modified.replace(
+      /(a=fmtp:\d+ [^\r\n]+)/g,
+      '$1;x-google-min-bitrate=10000;x-google-start-bitrate=25000;x-google-max-bitrate=35000'
+    );
+  }
+
+  return modified;
+}
+
+// Automatically patch RTCPeerConnection to inject instant start-bitrate SDP into all P2P connections
+if (typeof window !== 'undefined' && window.RTCPeerConnection) {
+  const origSetLocalDescription = RTCPeerConnection.prototype.setLocalDescription;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  RTCPeerConnection.prototype.setLocalDescription = function (...args: any[]) {
+    if (args[0] && args[0].sdp) {
+      args[0].sdp = boostSdpBitrate(args[0].sdp);
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (origSetLocalDescription as any).apply(this, args);
+  };
+}
+
 export class GroupRoomManager {
   private username: string;
   private roomId: string;
@@ -61,43 +98,41 @@ export class GroupRoomManager {
       this.room = joinRoom(
         {
           appId: APP_ID,
-          relayConfig: RELAY_CONFIG,
           rtcConfig: RTC_CONFIG,
+          relayConfig: RELAY_CONFIG,
         },
         this.roomId
       );
 
-      // 1. Setup Chat Action
-      this.chatAction = this.room.makeAction('chat');
-      this.chatAction.onMessage = (msg: ChatMessage) => {
-        if (this.callbacks) {
-          this.callbacks.onChat(msg);
+      // 1. Data Channel Action: Chat Messages
+      const [sendChat, onChatReceived] = this.room.makeAction('chat');
+      this.chatAction = { send: sendChat };
+      onChatReceived((data: ChatMessage) => {
+        if (data && data.text) {
+          callbacks.onChat(data);
         }
-      };
+      });
 
-      // 2. Setup Presence Action (Exchange usernames)
-      this.presenceAction = this.room.makeAction('presence');
-      this.presenceAction.onMessage = (data: { username: string; isCreator?: boolean }, meta: { peerId: string }) => {
-        const peerId = meta.peerId;
-        const oldName = this.peers.get(peerId);
-        const newName = data.username || `Usuário (${peerId.slice(0, 4)})`;
-        if (oldName !== newName) {
-          this.peers.set(peerId, newName);
+      // 2. Data Channel Action: Presence & Nicknames
+      const [sendPresence, onPresenceReceived] = this.room.makeAction('presence');
+      this.presenceAction = { send: sendPresence };
+      onPresenceReceived((data: { username: string; isCreator: boolean }, peerId: string) => {
+        if (data && data.username) {
+          this.peers.set(peerId, data.username);
           this.notifyPeersUpdate();
           this.notifyStreamsUpdate();
         }
-        callbacks.onStatusChange('P2P Conectado');
-      };
+      });
 
-      // 3. Setup Stream Status Action
-      this.streamStatusAction = this.room.makeAction('stream_status');
-      this.streamStatusAction.onMessage = (data: { isStreaming: boolean; senderName?: string }, meta: { peerId: string }) => {
-        const peerId = meta.peerId;
+      // 3. Data Channel Action: Stream Active Status
+      const [sendStreamStatus, onStreamStatus] = this.room.makeAction('stream-status');
+      this.streamStatusAction = { send: sendStreamStatus };
+      onStreamStatus((data: { isStreaming: boolean; senderName?: string }, peerId: string) => {
         if (!data.isStreaming && this.remoteStreams.has(peerId)) {
           this.remoteStreams.delete(peerId);
           this.notifyStreamsUpdate();
         }
-      };
+      });
 
       // 4. Peer Lifecycle Listeners
       this.room.onPeerJoin = (peerId: string) => {
@@ -112,7 +147,7 @@ export class GroupRoomManager {
         if (this.localStream) {
           try {
             this.room.addStream(this.localStream, peerId);
-            setTimeout(() => this.boostAllSendersBitrate(), 200);
+            setTimeout(() => this.boostAllSendersBitrate(), 150);
           } catch (err) {
             console.warn('[P2P] Error adding stream to new peer:', err);
           }
@@ -136,7 +171,7 @@ export class GroupRoomManager {
         }
       };
 
-      // 5. Incoming Stream Listener (Supports multiple concurrent streams from different peers!)
+      // 5. Incoming Stream Listener
       this.room.onPeerStream = (stream: MediaStream, peerId: string) => {
         console.log(`[P2P] Received stream from peer: ${peerId}`);
         this.remoteStreams.set(peerId, stream);
@@ -171,7 +206,7 @@ export class GroupRoomManager {
     if (this.room && stream) {
       try {
         this.room.addStream(stream);
-        this.boostAllSendersBitrate();
+        setTimeout(() => this.boostAllSendersBitrate(), 100);
       } catch (err) {
         console.warn('[P2P] Error adding broadcast stream:', err);
       }
@@ -184,7 +219,7 @@ export class GroupRoomManager {
     }
   }
 
-  private boostAllSendersBitrate() {
+  public boostAllSendersBitrate() {
     try {
       const peers = this.room?.getPeers?.() || {};
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -198,9 +233,14 @@ export class GroupRoomManager {
                 if (!params.encodings || params.encodings.length === 0) {
                   params.encodings = [{}];
                 }
-                params.encodings[0].maxBitrate = 25000000; // 25 Mbps
+                params.encodings[0].maxBitrate = 30000000; // 30 Mbps
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (params.encodings[0] as any).minBitrate = 10000000; // 10 Mbps floor
                 params.encodings[0].maxFramerate = 60;
                 params.encodings[0].networkPriority = 'high';
+                params.encodings[0].priority = 'high';
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (params as any).degradationPreference = 'maintain-framerate';
                 sender.setParameters(params).catch(() => {});
               } catch {}
             }
@@ -228,73 +268,66 @@ export class GroupRoomManager {
     this.notifyStreamsUpdate();
   }
 
-  public getAllActiveStreams(): ActiveStreamInfo[] {
-    const list: ActiveStreamInfo[] = [];
-
-    // Local stream (if sharing)
-    if (this.localStream) {
-      list.push({
-        peerId: 'local',
-        senderName: `${this.username} (Sua Tela)`,
-        stream: this.localStream,
-        isLocal: true,
-      });
-    }
-
-    // Remote streams from other peers
-    this.remoteStreams.forEach((stream, peerId) => {
-      const senderName = this.peers.get(peerId) || `Participante (${peerId.slice(0, 4)})`;
-      list.push({
-        peerId,
-        senderName,
-        stream,
-        isLocal: false,
-      });
-    });
-
-    return list;
-  }
-
-  public notifyStreamsUpdate() {
-    if (!this.callbacks) return;
-    const streams = this.getAllActiveStreams();
-    const hash = streams.map((s) => `${s.peerId}:${s.senderName}:${s.stream.id}`).join('|');
-    if (hash === this.lastStreamsHash) return; // Prevent unnecessary re-renders & flickering!
-    this.lastStreamsHash = hash;
-    this.callbacks.onStreamsUpdate(streams);
-  }
-
   public sendChatMessage(text: string): ChatMessage {
     const msg: ChatMessage = {
-      id: crypto.randomUUID(),
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       sender: this.username,
-      text,
+      text: text.trim(),
       timestamp: Date.now(),
       isHost: this.isCreator,
     };
 
-    if (this.chatAction) {
+    if (this.chatAction && this.room) {
       this.chatAction.send(msg);
     }
+
     return msg;
   }
 
-  public getConnectedPeers(): PeerInfo[] {
-    const list: PeerInfo[] = [];
+  private notifyPeersUpdate() {
+    if (!this.callbacks) return;
+    const peerList: PeerInfo[] = [];
     this.peers.forEach((uname, id) => {
-      list.push({
+      peerList.push({
         id,
         username: uname,
         connectionState: 'connected',
         joinedAt: Date.now(),
       });
     });
-    return list;
+    this.callbacks.onPeersUpdate(peerList);
   }
 
-  private notifyPeersUpdate() {
-    if (this.callbacks) {
-      this.callbacks.onPeersUpdate(this.getConnectedPeers());
+  private notifyStreamsUpdate() {
+    if (!this.callbacks) return;
+    const streamsList: ActiveStreamInfo[] = [];
+
+    // 1. My own stream
+    if (this.localStream) {
+      streamsList.push({
+        peerId: 'local-self',
+        senderName: `${this.username} (Você)`,
+        stream: this.localStream,
+        isLocal: true,
+      });
+    }
+
+    // 2. Remote streams from peers
+    this.remoteStreams.forEach((stream, peerId) => {
+      const name = this.peers.get(peerId) || `Participante (${peerId.slice(0, 4)})`;
+      streamsList.push({
+        peerId,
+        senderName: name,
+        stream,
+        isLocal: false,
+      });
+    });
+
+    // Stream signature deduplication to avoid DOM rebuilding
+    const currentHash = streamsList.map((s) => `${s.peerId}:${s.stream.id}`).sort().join('|');
+    if (currentHash !== this.lastStreamsHash) {
+      this.lastStreamsHash = currentHash;
+      this.callbacks.onStreamsUpdate(streamsList);
     }
   }
 
@@ -303,13 +336,15 @@ export class GroupRoomManager {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
     }
-    this.stopStream();
+    if (this.localStream) {
+      this.stopStream();
+    }
     if (this.room) {
       this.room.leave();
       this.room = null;
     }
     this.peers.clear();
     this.remoteStreams.clear();
-    this.lastStreamsHash = '';
+    this.callbacks = null;
   }
 }

@@ -5,11 +5,8 @@ import { NativeVideoBridge } from './native_video_bridge';
 import {
   ActiveStreamInfo,
   ChatMessage,
-  MonitorSource,
   PeerInfo,
   ProcessItem,
-  ScreenSourcesResponse,
-  WindowSource,
 } from './types';
 
 class App {
@@ -34,11 +31,7 @@ class App {
   private streamVolumes: Map<string, { volume: number; muted: boolean }> = new Map();
   private isSidebarCollapsed: boolean = false;
 
-  // Custom Screen Picker State
-  private availableMonitors: MonitorSource[] = [];
-  private availableWindows: WindowSource[] = [];
-  private selectedSourceId: string = 'screen:0';
-  private selectedSourceName: string = 'Monitor Principal';
+  // Stream Settings State
   private currentFps: number = 60;
   private currentBitrate: number = 25000;
   private currentResolution: { width: number; height: number; label: string } = { width: 1920, height: 1080, label: '1080p' };
@@ -141,22 +134,17 @@ class App {
     document.getElementById('btn-cancel-join-dialog')?.addEventListener('click', () => this.closeJoinDialog());
     document.getElementById('btn-confirm-join-dialog')?.addEventListener('click', () => this.confirmJoinFromDialog());
 
-    // Layout Toggle (Grid vs Spotlight)
-    document.getElementById('btn-toggle-layout')?.addEventListener('click', () => this.toggleLayoutMode());
-
     // Toggle Sidebar (Chat)
     document.getElementById('btn-toggle-sidebar')?.addEventListener('click', () => this.toggleSidebar());
 
-    // Inside Room: Transmission Manager Button (Always titled "Transmissão")
+    // Inside Room: Transmission Settings Button
     document.getElementById('btn-toggle-share-screen')?.addEventListener('click', () => {
       this.openScreenPickerModal();
     });
 
-    // Custom Screen Picker Modal
+    // Transmission Settings Modal
     document.getElementById('btn-close-screen-picker')?.addEventListener('click', () => this.closeScreenPickerModal());
     document.getElementById('btn-cancel-screen-picker')?.addEventListener('click', () => this.closeScreenPickerModal());
-    document.getElementById('tab-source-screens')?.addEventListener('click', () => this.switchSourcePickerTab('screens'));
-    document.getElementById('tab-source-windows')?.addEventListener('click', () => this.switchSourcePickerTab('windows'));
     document.getElementById('btn-confirm-start-stream')?.addEventListener('click', () => this.confirmStartScreenCapture());
     document.getElementById('btn-modal-stop-stream')?.addEventListener('click', () => {
       this.stopScreenSharing();
@@ -319,20 +307,7 @@ class App {
     this.switchView('view-group-room');
   }
 
-  // --- DYNAMIC MULTI-STREAM RENDERER (GOOGLE MEET / DISCORD STYLE) ---
-  private toggleLayoutMode() {
-    this.layoutMode = this.layoutMode === 'grid' ? 'spotlight' : 'grid';
-    this.updateLayoutToggleUI();
-    this.renderStreams();
-  }
-
-  private updateLayoutToggleUI() {
-    const label = document.getElementById('label-toggle-layout');
-    if (label) {
-      label.textContent = this.layoutMode === 'spotlight' ? 'Modo Grade' : 'Modo Destaque';
-    }
-  }
-
+  // --- STATS HUD ---
   private updateStatsHUD() {
     const hud = document.getElementById('stream-stats-floating');
     const resEl = document.getElementById('hud-stat-resolution');
@@ -352,6 +327,7 @@ class App {
     if (bitrateEl) bitrateEl.textContent = `${(this.currentBitrate / 1000).toFixed(1)} Mbps`;
   }
 
+  // --- DYNAMIC MULTI-STREAM RENDERER (GOOGLE MEET / DISCORD STYLE) ---
   private renderStreams() {
     const wrapper = document.getElementById('streams-grid-wrapper');
     const idleBox = document.getElementById('room-video-idle');
@@ -389,7 +365,6 @@ class App {
       this.pinnedPeerId = this.activeStreams[0].peerId;
     }
 
-    this.updateLayoutToggleUI();
     this.updateStatsHUD();
 
     wrapper.className = `streams-grid-wrapper active ${this.layoutMode === 'grid' ? 'layout-grid' : 'layout-spotlight'}`;
@@ -541,8 +516,8 @@ class App {
     return card;
   }
 
-  // --- CUSTOM SCREEN & APPLICATION PICKER ---
-  private async openScreenPickerModal() {
+  // --- TRANSMISSION SETTINGS & DIRECT SCREEN PICKER ---
+  private openScreenPickerModal() {
     const modal = document.getElementById('modal-custom-screen-picker');
     const stopBtn = document.getElementById('btn-modal-stop-stream');
     const confirmBtnLabel = document.getElementById('label-btn-start-stream');
@@ -552,133 +527,20 @@ class App {
       stopBtn.classList.toggle('hidden', !this.isSharingScreen);
     }
     if (confirmBtnLabel) {
-      confirmBtnLabel.textContent = this.isSharingScreen ? 'Atualizar Transmissão' : 'Iniciar Transmissão';
+      confirmBtnLabel.textContent = this.isSharingScreen ? 'Alterar Tela / Janela' : 'Escolher Tela / Janela';
     }
     if (modalTitle) {
-      modalTitle.textContent = this.isSharingScreen ? 'Gerenciar Transmissão de Tela' : 'Iniciar Transmissão de Tela';
+      modalTitle.textContent = this.isSharingScreen ? 'Gerenciar Transmissão' : 'Configurações de Transmissão';
     }
 
     modal?.classList.remove('hidden');
-    await this.loadScreenSources();
   }
 
   private closeScreenPickerModal() {
     document.getElementById('modal-custom-screen-picker')?.classList.add('hidden');
   }
 
-  private switchSourcePickerTab(tab: 'screens' | 'windows') {
-    document.getElementById('tab-source-screens')?.classList.toggle('active', tab === 'screens');
-    document.getElementById('tab-source-windows')?.classList.toggle('active', tab === 'windows');
-    document.getElementById('pane-source-screens')?.classList.toggle('active', tab === 'screens');
-    document.getElementById('pane-source-windows')?.classList.toggle('active', tab === 'windows');
-  }
-
-  private async loadScreenSources() {
-    const screenGrid = document.getElementById('grid-screen-sources');
-    const windowGrid = document.getElementById('grid-window-sources');
-    if (screenGrid) screenGrid.innerHTML = '<div class="loading-state">Buscando monitores...</div>';
-    if (windowGrid) windowGrid.innerHTML = '<div class="loading-state">Buscando janelas...</div>';
-
-    try {
-      const resp = await invoke<ScreenSourcesResponse>('list_screen_sources');
-      this.availableMonitors = resp.monitors;
-      this.availableWindows = resp.windows;
-      this.renderScreenSources();
-      this.renderWindowSources();
-    } catch (err) {
-      console.warn('Fallback screen sources:', err);
-      this.availableMonitors = [
-        { id: 'screen:0', name: 'Monitor 1 (Principal) - 1920x1080', width: 1920, height: 1080, is_primary: true, thumbnail: undefined },
-      ];
-      this.availableWindows = [
-        { id: 'window:1', title: 'Discord', process_name: 'Discord.exe', pid: 10420, width: 1280, height: 720, thumbnail: undefined },
-        { id: 'window:2', title: 'Google Chrome', process_name: 'chrome.exe', pid: 9812, width: 1920, height: 1080, thumbnail: undefined },
-      ];
-      this.renderScreenSources();
-      this.renderWindowSources();
-    }
-  }
-
-  private renderScreenSources() {
-    const grid = document.getElementById('grid-screen-sources');
-    if (!grid) return;
-
-    if (this.availableMonitors.length === 0) {
-      grid.innerHTML = '<div class="loading-state">Nenhum monitor detectado.</div>';
-      return;
-    }
-
-    grid.innerHTML = '';
-    this.availableMonitors.forEach((mon) => {
-      const card = document.createElement('div');
-      card.className = `source-card ${this.selectedSourceId === mon.id ? 'selected' : ''}`;
-
-      const thumbHTML = mon.thumbnail
-        ? `<img src="${mon.thumbnail}" class="source-thumbnail-img" alt="${mon.name}" />`
-        : `<div class="source-placeholder-icon">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>
-           </div>`;
-
-      card.innerHTML = `
-        ${mon.is_primary ? '<span class="source-badge-primary">Principal</span>' : ''}
-        <div class="source-thumbnail-container">
-          ${thumbHTML}
-        </div>
-        <div class="source-title" title="${mon.name}">${mon.name}</div>
-        <div class="source-subtitle">${mon.width} x ${mon.height} Pixels</div>
-      `;
-
-      card.addEventListener('click', () => {
-        document.querySelectorAll('#modal-custom-screen-picker .source-card').forEach((c) => c.classList.remove('selected'));
-        card.classList.add('selected');
-        this.selectedSourceId = mon.id;
-        this.selectedSourceName = mon.name;
-      });
-
-      grid.appendChild(card);
-    });
-  }
-
-  private renderWindowSources() {
-    const grid = document.getElementById('grid-window-sources');
-    if (!grid) return;
-
-    if (this.availableWindows.length === 0) {
-      grid.innerHTML = '<div class="loading-state">Nenhuma janela aberta detectada.</div>';
-      return;
-    }
-
-    grid.innerHTML = '';
-    this.availableWindows.forEach((win) => {
-      const card = document.createElement('div');
-      card.className = `source-card ${this.selectedSourceId === win.id ? 'selected' : ''}`;
-
-      const thumbHTML = win.thumbnail
-        ? `<img src="${win.thumbnail}" class="source-thumbnail-img" alt="${win.title}" />`
-        : `<div class="source-placeholder-icon">
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect width="20" height="16" x="2" y="4" rx="2"/><line x1="2" x2="22" y1="9" y2="9"/><line x1="6" x2="6.01" y1="6.5" y2="6.5"/><line x1="10" x2="10.01" y1="6.5" y2="6.5"/></svg>
-           </div>`;
-
-      card.innerHTML = `
-        <div class="source-thumbnail-container">
-          ${thumbHTML}
-        </div>
-        <div class="source-title" title="${win.title}">${win.title}</div>
-        <div class="source-subtitle">${win.process_name} (${win.width}x${win.height})</div>
-      `;
-
-      card.addEventListener('click', () => {
-        document.querySelectorAll('#modal-custom-screen-picker .source-card').forEach((c) => c.classList.remove('selected'));
-        card.classList.add('selected');
-        this.selectedSourceId = win.id;
-        this.selectedSourceName = win.title;
-      });
-
-      grid.appendChild(card);
-    });
-  }
-
-  // --- START SCREEN CAPTURE ---
+  // --- START HARDWARE-ACCELERATED SCREEN CAPTURE ---
   private async confirmStartScreenCapture() {
     const resValue = (document.getElementById('picker-select-resolution') as HTMLSelectElement).value;
     const fpsValue = parseInt((document.getElementById('picker-select-fps') as HTMLSelectElement).value, 10) || 60;
@@ -695,31 +557,26 @@ class App {
     this.currentBitrate = bitrateValue;
     this.currentResolution = res;
 
-    // If currently sharing, stop old capture gracefully before restarting with new settings
-    if (this.isSharingScreen) {
-      this.nativeVideoBridge.stop();
-      this.audioBridge.stop();
-      if (this.activeLocalStream) {
-        this.activeLocalStream.getTracks().forEach((t) => t.stop());
-      }
-    }
-
     this.closeScreenPickerModal();
-    this.showToast('Iniciando captura direta em alta fidelidade...');
 
     try {
       // 1. Audio bridge listener
       const customAudioTrack = this.audioBridge.init();
       await this.audioBridge.startListening();
 
-      // 2. High-quality Native Video Capture with Mouse Overlay and quality 92
+      // 2. Direct GPU Hardware Capture (Opens system screen selector ONCE)
       const videoStream = await this.nativeVideoBridge.startCapture(
-        this.selectedSourceId,
+        'screen:0',
         fpsValue,
         res,
         captureMouse,
         92
       );
+
+      // Listen for when the user clicks browser's native "Parar de compartilhar"
+      videoStream.getVideoTracks()[0].onended = () => {
+        this.stopScreenSharing();
+      };
 
       // 3. Assemble combined MediaStream
       const combinedStream = new MediaStream();
@@ -736,23 +593,20 @@ class App {
       this.activeLocalStream = combinedStream;
       this.isSharingScreen = true;
 
-      // Broadcast stream to everyone in the room
+      // Broadcast stream to everyone in the room with instant 25Mbps boost
       if (this.roomManager) {
         this.roomManager.shareStream(combinedStream);
       }
 
       // Update UI tags
       const sourceLabel = document.getElementById('active-source-label');
-      if (sourceLabel) sourceLabel.textContent = `${this.selectedSourceName} (${res.width}x${res.height} @ ${fpsValue}fps)`;
+      if (sourceLabel) sourceLabel.textContent = `Ao Vivo (${res.width}x${res.height} @ ${fpsValue}fps)`;
 
       this.updateShareButtonUI(true);
       this.updateStatsHUD();
-      this.showToast('Você está transmitindo sua tela!');
+      this.showToast('Transmissão iniciada em alta velocidade!');
     } catch (err: unknown) {
-      console.error('Failed to start native capture:', err);
-      const errMsg = err instanceof Error ? err.message : String(err);
-      this.showToast(`Erro ao capturar tela: ${errMsg}`);
-      this.stopScreenSharing();
+      console.warn('Screen selection cancelled or failed:', err);
     }
   }
 
