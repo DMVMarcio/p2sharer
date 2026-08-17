@@ -44,6 +44,9 @@ export class NativeVideoBridge {
 
     // 3. Connect to local binary WebSocket stream (Dedicated dynamic port per instance)
     const port = (await invoke<number>('get_video_ws_port').catch(() => 49153)) || 49153;
+    let sequenceCounter = 0;
+    let lastRenderedSequence = 0;
+
     await new Promise<void>((resolve) => {
       let resolved = false;
       const wsUrl = `ws://127.0.0.1:${port}`;
@@ -61,9 +64,18 @@ export class NativeVideoBridge {
         if (!this.isCapturing) return;
 
         if (evt.data instanceof ArrayBuffer) {
+          const frameSeq = ++sequenceCounter;
           try {
             const blob = new Blob([evt.data], { type: 'image/jpeg' });
             const bitmap = await createImageBitmap(blob);
+
+            // Drop frame if a newer frame has already rendered
+            if (frameSeq < lastRenderedSequence || !this.isCapturing) {
+              bitmap.close();
+              return;
+            }
+
+            lastRenderedSequence = frameSeq;
             if (this.latestBitmap) {
               this.latestBitmap.close();
             }

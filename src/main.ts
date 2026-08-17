@@ -32,6 +32,7 @@ class App {
   private layoutMode: 'grid' | 'spotlight' = 'grid';
   private pinnedPeerId: string | null = null;
   private subscribedStreams: Set<string> = new Set();
+  private cachedCards: Map<string, { el: HTMLElement; isVideo: boolean; streamId?: string }> = new Map();
   private isSidebarCollapsed: boolean = false;
   private isSpotlightTrayCollapsed: boolean = false;
 
@@ -618,18 +619,27 @@ class App {
       this.layoutMode = 'grid';
     }
 
+    // Prune stale cached cards for peers who left
+    const currentPeerIds = new Set(this.roomSlots.map((s) => s.peerId));
+    this.cachedCards.forEach((_, key) => {
+      const peerId = key.split(':')[0];
+      if (!currentPeerIds.has(peerId)) {
+        this.cachedCards.delete(key);
+      }
+    });
+
     if (this.layoutMode === 'grid') {
       gridWrapper.classList.remove('hidden');
       spotlightStage.classList.add('hidden');
       gridWrapper.innerHTML = '';
 
       this.roomSlots.forEach((slot) => {
-        const card = this.createCardElement(slot, false);
-        card.addEventListener('click', () => {
+        const card = this.getOrCreateCard(slot, false);
+        card.onclick = () => {
           this.pinnedPeerId = slot.peerId;
           this.layoutMode = 'spotlight';
           this.renderRoomCards();
-        });
+        };
         gridWrapper.appendChild(card);
       });
     } else {
@@ -641,27 +651,52 @@ class App {
 
       const featuredSlot = this.roomSlots.find((s) => s.peerId === this.pinnedPeerId) || this.roomSlots[0];
       if (featuredSlot) {
-        const bigCard = this.createCardElement(featuredSlot, true);
-        bigCard.addEventListener('click', () => {
+        const bigCard = this.getOrCreateCard(featuredSlot, true);
+        bigCard.onclick = () => {
           // Clicking the featured card switches back to Grid mode
           this.layoutMode = 'grid';
           this.pinnedPeerId = null;
           this.renderRoomCards();
-        });
+        };
         featuredArea.appendChild(bigCard);
       }
 
       // Populate bottom tray with all other participants
       const otherSlots = this.roomSlots.filter((s) => s.peerId !== featuredSlot?.peerId);
       otherSlots.forEach((slot) => {
-        const miniCard = this.createCardElement(slot, false);
-        miniCard.addEventListener('click', () => {
+        const miniCard = this.getOrCreateCard(slot, false);
+        miniCard.onclick = () => {
           this.pinnedPeerId = slot.peerId;
           this.renderRoomCards();
-        });
+        };
         trayStrip.appendChild(miniCard);
       });
     }
+  }
+
+  private getOrCreateCard(slot: RoomSlotInfo, isFeatured: boolean): HTMLElement {
+    const isSubscribed = this.subscribedStreams.has(slot.peerId);
+    const shouldBeVideo =
+      (slot.isLocal && slot.isStreaming && Boolean(slot.stream)) ||
+      (!slot.isLocal && slot.isStreaming && isSubscribed && Boolean(slot.stream));
+
+    const streamId = slot.stream?.id;
+    const cacheKey = `${slot.peerId}:${isFeatured ? 'feat' : 'norm'}`;
+    const cached = this.cachedCards.get(cacheKey);
+
+    if (cached && cached.isVideo === shouldBeVideo && cached.streamId === streamId) {
+      // Re-use existing DOM element without resetting the <video> tag
+      const label = cached.el.querySelector('.participant-avatar-label, .stream-card-overlay span:nth-child(2)');
+      if (label && label.textContent !== slot.senderName) {
+        label.textContent = slot.senderName;
+      }
+      return cached.el;
+    }
+
+    // Create fresh element and save to cache
+    const el = this.createCardElement(slot, isFeatured);
+    this.cachedCards.set(cacheKey, { el, isVideo: shouldBeVideo, streamId });
+    return el;
   }
 
   private renderChatHistory(messages: ChatMessage[]) {
@@ -1236,6 +1271,7 @@ class App {
       this.roomManager = null;
     }
     this.subscribedStreams.clear();
+    this.cachedCards.clear();
     this.roomSlots = [];
     this.switchView('view-home');
     this.showToast('Você saiu da sala.');
