@@ -44,6 +44,7 @@ export class GroupRoomManager {
 
   private callbacks: RoomCallbacks | null = null;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  private lastStreamsHash: string = '';
 
   constructor(username: string, roomId: string, isCreator = false) {
     this.username = username;
@@ -78,10 +79,13 @@ export class GroupRoomManager {
       this.presenceAction = this.room.makeAction('presence');
       this.presenceAction.onMessage = (data: { username: string; isCreator?: boolean }, meta: { peerId: string }) => {
         const peerId = meta.peerId;
-        console.log(`[P2P] Presence received from ${peerId}:`, data.username);
-        this.peers.set(peerId, data.username || `Usuário (${peerId.slice(0, 4)})`);
-        this.notifyPeersUpdate();
-        this.notifyStreamsUpdate();
+        const oldName = this.peers.get(peerId);
+        const newName = data.username || `Usuário (${peerId.slice(0, 4)})`;
+        if (oldName !== newName) {
+          this.peers.set(peerId, newName);
+          this.notifyPeersUpdate();
+          this.notifyStreamsUpdate();
+        }
         callbacks.onStatusChange('P2P Conectado');
       };
 
@@ -89,7 +93,7 @@ export class GroupRoomManager {
       this.streamStatusAction = this.room.makeAction('stream_status');
       this.streamStatusAction.onMessage = (data: { isStreaming: boolean; senderName?: string }, meta: { peerId: string }) => {
         const peerId = meta.peerId;
-        if (!data.isStreaming) {
+        if (!data.isStreaming && this.remoteStreams.has(peerId)) {
           this.remoteStreams.delete(peerId);
           this.notifyStreamsUpdate();
         }
@@ -121,9 +125,11 @@ export class GroupRoomManager {
       this.room.onPeerLeave = (peerId: string) => {
         console.log(`[P2P] Peer left room: ${peerId}`);
         this.peers.delete(peerId);
-        this.remoteStreams.delete(peerId);
+        if (this.remoteStreams.has(peerId)) {
+          this.remoteStreams.delete(peerId);
+          this.notifyStreamsUpdate();
+        }
         this.notifyPeersUpdate();
-        this.notifyStreamsUpdate();
         if (this.peers.size === 0) {
           callbacks.onStatusChange(this.isCreator ? 'Sala Ativa (Aguardando amigos)' : 'P2P Conectado');
         }
@@ -137,13 +143,13 @@ export class GroupRoomManager {
         callbacks.onStatusChange('Ao Vivo');
       };
 
-      // 6. Continuous presence heartbeat (every 2.5s)
+      // 6. Continuous presence heartbeat (every 3s)
       this.heartbeatTimer = setInterval(() => {
         if (!this.room) return;
         if (this.presenceAction) {
           this.presenceAction.send({ username: this.username, isCreator: this.isCreator });
         }
-      }, 2500);
+      }, 3000);
 
       // Initial broadcast
       setTimeout(() => {
@@ -222,9 +228,12 @@ export class GroupRoomManager {
   }
 
   public notifyStreamsUpdate() {
-    if (this.callbacks) {
-      this.callbacks.onStreamsUpdate(this.getAllActiveStreams());
-    }
+    if (!this.callbacks) return;
+    const streams = this.getAllActiveStreams();
+    const hash = streams.map((s) => `${s.peerId}:${s.senderName}:${s.stream.id}`).join('|');
+    if (hash === this.lastStreamsHash) return; // Prevent unnecessary re-renders & flickering!
+    this.lastStreamsHash = hash;
+    this.callbacks.onStreamsUpdate(streams);
   }
 
   public sendChatMessage(text: string): ChatMessage {
@@ -273,5 +282,6 @@ export class GroupRoomManager {
     }
     this.peers.clear();
     this.remoteStreams.clear();
+    this.lastStreamsHash = '';
   }
 }
