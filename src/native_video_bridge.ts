@@ -42,10 +42,11 @@ export class NativeVideoBridge {
       quality,
     });
 
-    // 3. Connect to local binary WebSocket stream
+    // 3. Connect to local binary WebSocket stream (Dedicated dynamic port per instance)
+    const port = (await invoke<number>('get_video_ws_port').catch(() => 49153)) || 49153;
     await new Promise<void>((resolve) => {
       let resolved = false;
-      const wsUrl = 'ws://127.0.0.1:49153';
+      const wsUrl = `ws://127.0.0.1:${port}`;
       this.ws = new WebSocket(wsUrl);
       this.ws.binaryType = 'arraybuffer';
 

@@ -230,6 +230,12 @@ class App {
     document.getElementById('btn-cancel-join-dialog')?.addEventListener('click', () => this.closeJoinDialog());
     document.getElementById('btn-confirm-join-dialog')?.addEventListener('click', () => this.confirmJoinFromDialog());
 
+    // Cancel Connecting Button
+    document.getElementById('btn-cancel-connecting')?.addEventListener('click', () => {
+      this.hideConnectingOverlay();
+      this.leaveRoom();
+    });
+
     // Toggle Sidebar (Chat)
     document.getElementById('btn-toggle-sidebar')?.addEventListener('click', () => this.toggleSidebar());
 
@@ -434,10 +440,33 @@ class App {
     this.showToast(`Conectando à sala ${this.currentRoomCode}...`);
   }
 
+  private showConnectingOverlay(roomCode: string, title = 'Entrando na sala...', subtitle = 'Estabelecendo sinalização e túnel P2P criptografado...') {
+    const overlay = document.getElementById('connecting-overlay');
+    const titleEl = document.getElementById('connecting-title');
+    const subEl = document.getElementById('connecting-subtitle');
+    const codeEl = document.getElementById('connecting-room-code');
+
+    if (titleEl) titleEl.textContent = title;
+    if (subEl) subEl.textContent = subtitle;
+    if (codeEl) codeEl.textContent = `SALA: ${roomCode}`;
+    if (overlay) overlay.classList.remove('hidden');
+  }
+
+  private hideConnectingOverlay() {
+    const overlay = document.getElementById('connecting-overlay');
+    if (overlay) overlay.classList.add('hidden');
+  }
+
   private connectToRoom() {
     if (this.roomManager) {
       this.roomManager.leave();
     }
+
+    this.showConnectingOverlay(
+      this.currentRoomCode,
+      this.isCreator ? 'Criando sala P2P...' : 'Conectando à sala...',
+      'Aguardando sincronização de rede e nós P2P...'
+    );
 
     const turnConfig: TurnConfig = {
       enabled: localStorage.getItem('p2sharer_turn_enabled') === 'true',
@@ -464,6 +493,12 @@ class App {
       onStatusChange: (status) => {
         const statsBadge = document.getElementById('room-stats-badge');
         if (statsBadge) statsBadge.textContent = status;
+
+        if (status === 'Sala Ativa' || status.includes('Conectado') || status === 'Ao Vivo') {
+          setTimeout(() => {
+            this.hideConnectingOverlay();
+          }, 350);
+        }
       },
     });
   }

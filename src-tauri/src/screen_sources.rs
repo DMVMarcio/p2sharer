@@ -41,6 +41,7 @@ pub struct ScreenSourcesResponse {
 
 static CAPTURING_VIDEO: AtomicBool = AtomicBool::new(false);
 static WS_SERVER_INITIALIZED: AtomicBool = AtomicBool::new(false);
+static WS_PORT: std::sync::atomic::AtomicU16 = std::sync::atomic::AtomicU16::new(0);
 static FRAME_SENDER: std::sync::OnceLock<broadcast::Sender<Vec<u8>>> = std::sync::OnceLock::new();
 
 fn get_frame_sender() -> &'static broadcast::Sender<Vec<u8>> {
@@ -50,7 +51,12 @@ fn get_frame_sender() -> &'static broadcast::Sender<Vec<u8>> {
     })
 }
 
-// Start WebSocket server on 127.0.0.1:49153 in a dedicated multi-threaded runtime
+#[tauri::command]
+pub fn get_video_ws_port() -> u16 {
+    WS_PORT.load(Ordering::SeqCst)
+}
+
+// Start WebSocket server dynamically in a dedicated multi-threaded runtime
 pub fn ensure_ws_server_running() {
     if WS_SERVER_INITIALIZED.swap(true, Ordering::SeqCst) {
         return;
@@ -66,24 +72,38 @@ pub fn ensure_ws_server_running() {
         };
 
         rt.block_on(async {
-            let addr = "127.0.0.1:49153";
-            if let Ok(listener) = TcpListener::bind(addr).await {
-                println!("[Native Video WS] Listening on {}", addr);
-                while let Ok((stream, _)) = listener.accept().await {
-                    let sender = get_frame_sender();
-                    let mut rx = sender.subscribe();
+            // Try default 49153 first, otherwise bind to port 0 (OS assigned)
+            let listener = match TcpListener::bind("127.0.0.1:49153").await {
+                Ok(l) => l,
+                Err(_) => match TcpListener::bind("127.0.0.1:0").await {
+                    Ok(l) => l,
+                    Err(e) => {
+                        eprintln!("[Native Video WS] Failed to bind any port: {:?}", e);
+                        return;
+                    }
+                },
+            };
 
-                    tokio::spawn(async move {
-                        if let Ok(ws_stream) = tokio_tungstenite::accept_async(stream).await {
-                            let (mut write, mut _read) = ws_stream.split();
-                            while let Ok(frame_data) = rx.recv().await {
-                                if write.send(Message::Binary(frame_data.into())).await.is_err() {
-                                    break;
-                                }
+            if let Ok(local_addr) = listener.local_addr() {
+                let port = local_addr.port();
+                WS_PORT.store(port, Ordering::SeqCst);
+                println!("[Native Video WS] Dedicated instance listening on 127.0.0.1:{}", port);
+            }
+
+            while let Ok((stream, _)) = listener.accept().await {
+                let sender = get_frame_sender();
+                let mut rx = sender.subscribe();
+
+                tokio::spawn(async move {
+                    if let Ok(ws_stream) = tokio_tungstenite::accept_async(stream).await {
+                        let (mut write, mut _read) = ws_stream.split();
+                        while let Ok(frame_data) = rx.recv().await {
+                            if write.send(Message::Binary(frame_data.into())).await.is_err() {
+                                break;
                             }
                         }
-                    });
-                }
+                    }
+                });
             }
         });
     });
