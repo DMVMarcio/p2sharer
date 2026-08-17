@@ -50,32 +50,42 @@ fn get_frame_sender() -> &'static broadcast::Sender<Vec<u8>> {
     })
 }
 
-// Start WebSocket server on 127.0.0.1:49153 to stream binary frames with 0ms latency
-fn ensure_ws_server_running() {
+// Start WebSocket server on 127.0.0.1:49153 in a dedicated multi-threaded runtime
+pub fn ensure_ws_server_running() {
     if WS_SERVER_INITIALIZED.swap(true, Ordering::SeqCst) {
         return;
     }
 
-    tokio::spawn(async move {
-        let addr = "127.0.0.1:49153";
-        if let Ok(listener) = TcpListener::bind(addr).await {
-            println!("[Native Video WS] Listening on {}", addr);
-            while let Ok((stream, _)) = listener.accept().await {
-                let sender = get_frame_sender();
-                let mut rx = sender.subscribe();
+    std::thread::spawn(|| {
+        let rt = match tokio::runtime::Builder::new_multi_thread().enable_all().build() {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("[Native Video WS] Failed to create tokio runtime: {:?}", e);
+                return;
+            }
+        };
 
-                tokio::spawn(async move {
-                    if let Ok(ws_stream) = tokio_tungstenite::accept_async(stream).await {
-                        let (mut write, mut _read) = ws_stream.split();
-                        while let Ok(frame_data) = rx.recv().await {
-                            if write.send(Message::Binary(frame_data.into())).await.is_err() {
-                                break;
+        rt.block_on(async {
+            let addr = "127.0.0.1:49153";
+            if let Ok(listener) = TcpListener::bind(addr).await {
+                println!("[Native Video WS] Listening on {}", addr);
+                while let Ok((stream, _)) = listener.accept().await {
+                    let sender = get_frame_sender();
+                    let mut rx = sender.subscribe();
+
+                    tokio::spawn(async move {
+                        if let Ok(ws_stream) = tokio_tungstenite::accept_async(stream).await {
+                            let (mut write, mut _read) = ws_stream.split();
+                            while let Ok(frame_data) = rx.recv().await {
+                                if write.send(Message::Binary(frame_data.into())).await.is_err() {
+                                    break;
+                                }
                             }
                         }
-                    }
-                });
+                    });
+                }
             }
-        }
+        });
     });
 }
 
