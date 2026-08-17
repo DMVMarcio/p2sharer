@@ -1,6 +1,7 @@
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use image::imageops::FilterType;
+use image::codecs::jpeg::JpegEncoder;
 use serde::{Deserialize, Serialize};
 use std::io::Cursor;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -59,7 +60,8 @@ pub fn list_screen_sources() -> ScreenSourcesResponse {
                 let thumb = image::imageops::resize(&rgba_img, 300, 168, FilterType::Nearest);
                 let mut buf = Vec::new();
                 let mut cursor = Cursor::new(&mut buf);
-                if thumb.write_to(&mut cursor, image::ImageFormat::Jpeg).is_ok() {
+                let mut encoder = JpegEncoder::new_with_quality(&mut cursor, 60);
+                if encoder.encode_image(&thumb).is_ok() {
                     thumb_b64 = Some(format!("data:image/jpeg;base64,{}", BASE64.encode(&buf)));
                 }
             }
@@ -89,7 +91,7 @@ pub fn list_screen_sources() -> ScreenSourcesResponse {
             "tauri-app",
         ];
 
-        for win in windows.into_iter().take(20) {
+        for win in windows.into_iter().take(25) {
             let is_minimized = win.is_minimized().unwrap_or(false);
             if is_minimized {
                 continue;
@@ -118,7 +120,8 @@ pub fn list_screen_sources() -> ScreenSourcesResponse {
                 let thumb = image::imageops::resize(&rgba_img, 300, 168, FilterType::Nearest);
                 let mut buf = Vec::new();
                 let mut cursor = Cursor::new(&mut buf);
-                if thumb.write_to(&mut cursor, image::ImageFormat::Jpeg).is_ok() {
+                let mut encoder = JpegEncoder::new_with_quality(&mut cursor, 60);
+                if encoder.encode_image(&thumb).is_ok() {
                     thumb_b64 = Some(format!("data:image/jpeg;base64,{}", BASE64.encode(&buf)));
                 }
             }
@@ -167,24 +170,34 @@ pub fn start_native_screen_capture(
         let is_window = source_id.starts_with("window:");
         let raw_id = source_id.split(':').nth(1).unwrap_or("0");
 
+        // Locate monitor or window
+        let target_mon_idx: usize = if !is_window {
+            raw_id.parse().unwrap_or(0)
+        } else {
+            0
+        };
+
+        let target_win_id = raw_id.to_string();
+
         while is_capturing_clone.load(Ordering::Relaxed) && CAPTURING_VIDEO.load(Ordering::Relaxed) {
             let start_time = std::time::Instant::now();
 
             let captured_img = if is_window {
-                // Find matching window
-                Window::all().ok().and_then(|wins| {
-                    wins.into_iter()
-                        .find(|w| w.id().map(|id| id.to_string()).unwrap_or_default() == raw_id)
+                if let Ok(windows) = Window::all() {
+                    windows.into_iter()
+                        .find(|w| w.id().map(|id| id.to_string()).unwrap_or_default() == target_win_id)
                         .and_then(|w| w.capture_image().ok())
-                })
+                } else {
+                    None
+                }
             } else {
-                // Find matching monitor
-                let mon_idx: usize = raw_id.parse().unwrap_or(0);
-                Monitor::all().ok().and_then(|mons| {
-                    mons.into_iter()
-                        .nth(mon_idx)
+                if let Ok(monitors) = Monitor::all() {
+                    monitors.into_iter()
+                        .nth(target_mon_idx)
                         .and_then(|m| m.capture_image().ok())
-                })
+                } else {
+                    None
+                }
             };
 
             if let Some(img) = captured_img {
@@ -196,7 +209,8 @@ pub fn start_native_screen_capture(
 
                 let mut jpeg_bytes = Vec::new();
                 let mut cursor = Cursor::new(&mut jpeg_bytes);
-                if scaled_img.write_to(&mut cursor, image::ImageFormat::Jpeg).is_ok() {
+                let mut encoder = JpegEncoder::new_with_quality(&mut cursor, 75);
+                if encoder.encode_image(&scaled_img).is_ok() {
                     let payload = VideoFramePayload {
                         jpeg_base64: BASE64.encode(&jpeg_bytes),
                         width: target_width,
