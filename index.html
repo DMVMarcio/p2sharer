@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>P2Sharer - Compartilhamento P2P de Tela e Áudio</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <!-- Top App Titlebar -->
+    <header class="app-header" data-tauri-drag-region>
+      <div class="logo-group">
+        <div class="logo-icon">
+          <!-- Lucide: MonitorPlay -->
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/><polygon points="10 8 15 11 10 14 10 8" fill="currentColor"/>
+          </svg>
+        </div>
+        <span class="logo-title">P2Sharer</span>
+        <span class="badge-tag">P2P Serverless</span>
+      </div>
+
+      <div class="header-user-info">
+        <div class="user-pill" id="user-pill" title="Clique para alterar seu apelido">
+          <span class="user-status-dot"></span>
+          <span id="current-username-display">Usuário</span>
+          <!-- Lucide: UserCheck -->
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/></svg>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="app-main" id="app-main">
+      
+      <!-- VIEW 1: HOME / DASHBOARD -->
+      <section class="view active" id="view-home">
+        <div class="hero-container">
+          <div class="hero-text">
+            <h1 class="hero-title">Salas P2P em Grupo para Telas em 60 FPS</h1>
+            <p class="hero-subtitle">Crie ou entre em salas com seus amigos sem precisar de servidor. Transmita quando quiser com filtro de áudio por programa.</p>
+          </div>
+
+          <div class="action-cards-grid">
+            <!-- Card Create Room -->
+            <div class="action-card" id="card-action-host">
+              <div class="card-icon-wrapper host-glow">
+                <!-- Lucide: Users -->
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+              </div>
+              <h2 class="card-title">Criar Nova Sala de Grupo</h2>
+              <p class="card-desc">Crie um espaço para sua turma. Qualquer pessoa com o código poderá entrar para assistir ou conversar, e você pode compartilhar sua tela a qualquer momento.</p>
+              <div class="card-footer">
+                <button class="btn btn-primary" id="btn-create-room-direct">
+                  <span>Criar Sala e Entrar</span>
+                  <!-- Lucide: ArrowRight -->
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" x2="19" y1="12" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Card Join Room -->
+            <div class="action-card" id="card-action-join">
+              <div class="card-icon-wrapper viewer-glow">
+                <!-- Lucide: LogIn -->
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" x2="3" y1="12" y2="12"/>
+                </svg>
+              </div>
+              <h2 class="card-title">Entrar em uma Sala</h2>
+              <p class="card-desc">Digite o código de sala fornecido pelo criador da sala para assistir à transmissão ou conversar em grupo sem login.</p>
+              <div class="card-footer">
+                <button class="btn btn-secondary" id="btn-start-join-flow">
+                  <span>Entrar com Código</span>
+                  <!-- Lucide: ArrowRight -->
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" x2="19" y1="12" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 2: UNIFIED GROUP ROOM -->
+      <section class="view" id="view-group-room">
+        <div class="room-layout">
+          <!-- Main Stream Area -->
+          <div class="stream-area">
+            <div class="stream-header-bar">
+              <div class="stream-status">
+                <span class="live-indicator" id="room-live-badge">SALA ATIVA</span>
+                <span class="stream-host-tag" id="room-sharing-status-tag">Nenhuma transmissão no momento</span>
+                <span class="stream-info-badge" id="room-stats-badge">P2P Conectado</span>
+              </div>
+              
+              <div class="stream-actions">
+                <!-- Share / Stop Share Button -->
+                <button class="btn btn-sm btn-accent" id="btn-toggle-share-screen">
+                  <!-- Lucide: ScreenShare -->
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 3H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-3"/><path d="M8 21h8"/><path d="M12 17v4"/><path d="m17 8 5-5"/><path d="M17 3h5v5"/></svg>
+                  <span id="label-toggle-share">Compartilhar Tela</span>
+                </button>
+
+                <!-- Audio Filter Config -->
+                <button class="btn btn-sm btn-outline" id="btn-open-audio-filter" title="Configurar filtros de áudio (ignorar Discord)">
+                  <!-- Lucide: Sliders -->
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" x2="4" y1="21" y2="14"/><line x1="4" x2="4" y1="10" y2="3"/><line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/><line x1="20" x2="20" y1="21" y2="16"/><line x1="20" x2="20" y1="12" y2="3"/><line x1="1" x2="7" y1="14" y2="14"/><line x1="9" x2="15" y1="8" y2="8"/><line x1="17" x2="23" y1="16" y2="16"/></svg>
+                  <span>Filtro de Áudio</span>
+                </button>
+
+                <!-- Fullscreen -->
+                <button class="btn btn-sm btn-outline" id="btn-room-fullscreen" title="Tela Cheia">
+                  <!-- Lucide: Maximize2 -->
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" x2="14" y1="3" y2="10"/><line x1="3" x2="10" y1="21" y2="14"/></svg>
+                </button>
+
+                <!-- Leave Room -->
+                <button class="btn btn-sm btn-danger" id="btn-leave-room">
+                  <!-- Lucide: LogOut -->
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+                  <span>Sair</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Video Player Display Container -->
+            <div class="video-container" id="room-video-container">
+              <video id="room-main-video" autoplay playsinline></video>
+              
+              <!-- Idle State when no one is sharing -->
+              <div class="video-idle-state" id="room-video-idle">
+                <!-- Lucide: Tv -->
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--text-muted);"><rect width="20" height="15" x="2" y="7" rx="2"/><polyline points="17 2 12 7 7 2"/></svg>
+                <h3>Nenhum participante transmitindo</h3>
+                <p>Clique em <strong>"Compartilhar Tela"</strong> acima para transmitir seu monitor ou janela para os participantes.</p>
+              </div>
+
+              <!-- Unmute Overlay -->
+              <div class="unmute-overlay hidden" id="room-unmute-overlay">
+                <button class="btn btn-primary" id="btn-unmute-room-audio">
+                  <!-- Lucide: Volume2 -->
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                  <span>Clique para Ouvir o Áudio da Transmissão</span>
+                </button>
+              </div>
+
+              <!-- Live VU Meter -->
+              <div class="video-overlay-meter" id="room-vu-meter-container">
+                <!-- Lucide: Volume2 -->
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                <div class="meter-bar-track">
+                  <div class="meter-bar-fill" id="room-vu-meter" style="width: 0%;"></div>
+                </div>
+              </div>
+
+              <!-- Floating Room Code -->
+              <div class="room-code-floating" id="room-code-pill" title="Clique para copiar o código da sala">
+                <span style="color: var(--text-muted);">SALA:</span>
+                <strong id="display-room-code" style="color: var(--accent-cyan);">P2P-1234</strong>
+                <!-- Lucide: Copy -->
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+              </div>
+            </div>
+
+            <!-- Bottom Stream Info Bar -->
+            <div class="host-quick-bar">
+              <div class="quick-setting">
+                <label>Origem:</label>
+                <span class="audio-mode-tag" id="active-source-label">Nenhuma tela ativa</span>
+              </div>
+              <div class="quick-setting">
+                <label>Filtro de Som:</label>
+                <span class="audio-mode-tag" id="active-audio-mode-label">Sistema Completo (Sem Filtros)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sidebar: Chat & Participants -->
+          <aside class="room-sidebar">
+            <div class="sidebar-tabs">
+              <button class="tab-btn active" id="tab-chat">
+                <!-- Lucide: MessageSquare -->
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                <span>Chat do Grupo</span>
+              </button>
+              <button class="tab-btn" id="tab-peers">
+                <!-- Lucide: Users -->
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                <span>Participantes (<span id="peer-count">1</span>)</span>
+              </button>
+            </div>
+
+            <!-- Tab Content: Chat -->
+            <div class="tab-pane active" id="pane-chat">
+              <div class="chat-messages" id="chat-messages-container">
+                <div class="chat-system-msg">
+                  <span>Você entrou na sala. Convide amigos compartilhando o código da sala acima.</span>
+                </div>
+              </div>
+              <form class="chat-input-bar" id="chat-form">
+                <input type="text" id="chat-input" placeholder="Enviar mensagem no chat..." autocomplete="off" />
+                <button type="submit" class="btn btn-icon" title="Enviar Mensagem">
+                  <!-- Lucide: Send -->
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" x2="11" y1="2" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                </button>
+              </form>
+            </div>
+
+            <!-- Tab Content: Peers -->
+            <div class="tab-pane" id="pane-peers">
+              <div class="peer-list" id="peer-list-container">
+                <div class="peer-item">
+                  <div>
+                    <span class="peer-name" id="my-peer-name">Você</span>
+                    <span style="font-size: 11px; color: var(--text-muted); display: block;">Criador / Membro</span>
+                  </div>
+                  <span class="peer-status">● Online</span>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- MODAL: SET USERNAME -->
+    <div class="modal-overlay hidden" id="modal-username">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="modal-header-icon">
+            <!-- Lucide: User -->
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          <h2>Definir seu Nome / Apelido</h2>
+        </div>
+        <div class="modal-body">
+          <p>Como você deseja ser identificado pelos outros participantes da sala?</p>
+          <input type="text" id="input-username" class="text-input" placeholder="Ex: Marcos, Player1, etc." maxlength="25" />
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-primary" id="btn-save-username">Continuar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: CUSTOM SCREEN & APPLICATION PICKER WITH LIVE THUMBNAILS -->
+    <div class="modal-overlay hidden" id="modal-custom-screen-picker">
+      <div class="modal-card modal-xl">
+        <div class="modal-header">
+          <div class="modal-header-icon">
+            <!-- Lucide: Monitor -->
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>
+          </div>
+          <div>
+            <h2>Selecione o que deseja Transmitir</h2>
+            <p class="modal-subtitle">Escolha um monitor inteiro ou a janela de um aplicativo aberto no Windows.</p>
+          </div>
+          <button class="btn-close" id="btn-close-screen-picker">&times;</button>
+        </div>
+
+        <div class="modal-body">
+          <div class="source-tabs">
+            <button class="tab-btn active" id="tab-source-screens">
+              <!-- Lucide: Monitor -->
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>
+              <span>Telas / Monitores</span>
+            </button>
+            <button class="tab-btn" id="tab-source-windows">
+              <!-- Lucide: AppWindow -->
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="16" x="2" y="4" rx="2"/><line x1="2" x2="22" y1="9" y2="9"/><line x1="6" x2="6.01" y1="6.5" y2="6.5"/><line x1="10" x2="10.01" y1="6.5" y2="6.5"/></svg>
+              <span>Janelas de Aplicativos</span>
+            </button>
+          </div>
+
+          <!-- Screens Grid with Thumbnails -->
+          <div class="sources-grid-pane active" id="pane-source-screens">
+            <div class="sources-grid" id="grid-screen-sources">
+              <div class="loading-state">Buscando monitores e gerando miniaturas...</div>
+            </div>
+          </div>
+
+          <!-- Windows Grid with Thumbnails -->
+          <div class="sources-grid-pane" id="pane-source-windows">
+            <div class="sources-grid" id="grid-window-sources">
+              <div class="loading-state">Buscando janelas de aplicativos e gerando miniaturas...</div>
+            </div>
+          </div>
+
+          <!-- SEPARATE QUALITY, FPS AND BITRATE CONTROLS -->
+          <div class="picker-bottom-settings-grid">
+            <div class="picker-setting-card">
+              <label>
+                <!-- Lucide: Eye -->
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                <span>Qualidade / Resolução:</span>
+              </label>
+              <select id="picker-select-resolution" class="select-input">
+                <option value="native">Original (Nativa da Tela)</option>
+                <option value="4k">4K Ultra HD (3840 x 2160)</option>
+                <option value="1440p">1440p 2K (2560 x 1440)</option>
+                <option value="1080p" selected>1080p Full HD (1920 x 1080)</option>
+                <option value="720p">720p HD (1280 x 720)</option>
+                <option value="480p">480p SD (854 x 480)</option>
+              </select>
+            </div>
+
+            <div class="picker-setting-card">
+              <label>
+                <!-- Lucide: Activity -->
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                <span>Taxa de Quadros (FPS):</span>
+              </label>
+              <select id="picker-select-fps" class="select-input">
+                <option value="120">120 FPS (Ultra Fluido)</option>
+                <option value="60" selected>60 FPS (Recomendado)</option>
+                <option value="30">30 FPS (Padrão)</option>
+                <option value="15">15 FPS (Econômico)</option>
+              </select>
+            </div>
+
+            <div class="picker-setting-card">
+              <label>
+                <!-- Lucide: Gauge -->
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg>
+                <span>Taxa de Bits (Bitrate):</span>
+              </label>
+              <select id="picker-select-bitrate" class="select-input">
+                <option value="25000">25 Mbps (Qualidade Máxima)</option>
+                <option value="15000" selected>15 Mbps (Alta Fidelidade)</option>
+                <option value="8000">8 Mbps (Equilibrado)</option>
+                <option value="4000">4 Mbps (Baixo Consumo)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="btn-cancel-screen-picker">Cancelar</button>
+          <button class="btn btn-primary" id="btn-confirm-start-stream">
+            <span>Iniciar Transmissão</span>
+            <!-- Lucide: ArrowRight -->
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" x2="19" y1="12" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: AUDIO PROCESS FILTER (WASAPI Loopback) -->
+    <div class="modal-overlay hidden" id="modal-audio-filter">
+      <div class="modal-card modal-lg">
+        <div class="modal-header">
+          <div class="modal-header-icon">
+            <!-- Lucide: MicOff -->
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="2" x2="22" y1="2" y2="22"/><path d="M18.89 13.23A7.12 7.12 0 0 0 19 12v-2"/><path d="M5 10v2a7 7 0 0 0 12 5"/><path d="M15 9.34V5a3 3 0 0 0-5.68-1.33"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+          </div>
+          <div>
+            <h2>Filtro de Áudio por Processo (Windows)</h2>
+            <p class="modal-subtitle">Escolha quais aplicativos ignorar para que a sua voz/áudio do Discord não vaze na transmissão.</p>
+          </div>
+          <button class="btn-close" id="btn-close-audio-modal">&times;</button>
+        </div>
+
+        <div class="modal-body">
+          <div class="filter-mode-selector">
+            <label class="radio-card">
+              <input type="radio" name="audio-filter-mode" value="exclude" checked />
+              <div class="radio-card-content">
+                <strong>Capturar Som do Sistema e Ignorar Selecionados (Recomendado)</strong>
+                <span>Captura jogos e sons gerais do computador, silenciando apenas os apps marcados (Discord, WhatsApp, etc.).</span>
+              </div>
+            </label>
+            <label class="radio-card">
+              <input type="radio" name="audio-filter-mode" value="include" />
+              <div class="radio-card-content">
+                <strong>Capturar Exclusivamente o Aplicativo Selecionado</strong>
+                <span>Captura o áudio apenas do app marcado e silencia todo o restante do Windows.</span>
+              </div>
+            </label>
+          </div>
+
+          <div class="process-filter-controls">
+            <input type="text" id="input-search-process" class="text-input" placeholder="Filtrar aplicativo (ex: discord, spotify, chrome)..." />
+            <button class="btn btn-sm btn-outline" id="btn-refresh-processes">
+              <!-- Lucide: RefreshCw -->
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+              <span>Atualizar</span>
+            </button>
+          </div>
+
+          <div class="process-list-container" id="process-checkboxes-container">
+            <div class="loading-state">Carregando lista de aplicativos abertos...</div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="btn-cancel-audio-filter">Cancelar</button>
+          <button class="btn btn-primary" id="btn-apply-audio-filter">Aplicar Filtros de Áudio</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: JOIN ROOM DIALOG -->
+    <div class="modal-overlay hidden" id="modal-join-room-dialog">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="modal-header-icon">
+            <!-- Lucide: LogIn -->
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" x2="3" y1="12" y2="12"/></svg>
+          </div>
+          <h2>Entrar em uma Sala de Grupo</h2>
+          <button class="btn-close" id="btn-close-join-dialog">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p>Digite o Código da Sala compartilhado pelo apresentador:</p>
+          <input type="text" id="input-join-room-code-dialog" class="text-input" placeholder="Ex: P2P-8842 ou SALA-XYZ" style="font-family: var(--font-mono); font-size: 16px; font-weight: 700; text-transform: uppercase;" />
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="btn-cancel-join-dialog">Cancelar</button>
+          <button class="btn btn-primary" id="btn-confirm-join-dialog">
+            <span>Entrar na Sala</span>
+            <!-- Lucide: ArrowRight -->
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" x2="19" y1="12" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
