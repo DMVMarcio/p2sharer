@@ -1,54 +1,118 @@
+import { invoke } from '@tauri-apps/api/core';
+
 export class NativeVideoBridge {
   private activeStream: MediaStream | null = null;
+  private canvas: HTMLCanvasElement | null = null;
+  private ctx: CanvasRenderingContext2D | null = null;
+  private ws: WebSocket | null = null;
+  private isCapturing: boolean = false;
 
   public async startCapture(
-    _sourceId: string,
+    sourceId: string,
     fps: number,
     resolution: { width: number; height: number },
     captureMouse: boolean = true,
-    _quality: number = 92
+    quality: number = 82
   ): Promise<MediaStream> {
     this.stop();
 
-    // Direct GPU Hardware Acceleration (Windows Graphics Capture / NVENC / QuickSync)
-    const constraints: DisplayMediaStreamOptions = {
-      video: {
-        frameRate: { ideal: fps, max: fps },
-        width: { ideal: resolution.width, max: resolution.width },
-        height: { ideal: resolution.height, max: resolution.height },
-        // @ts-expect-error cursor is supported in modern Chromium
-        cursor: captureMouse ? 'always' : 'never',
-      },
-      audio: false,
-    };
+    // 1. Create high performance offscreen canvas
+    this.canvas = document.createElement('canvas');
+    this.canvas.width = resolution.width;
+    this.canvas.height = resolution.height;
+    this.ctx = this.canvas.getContext('2d', { alpha: false, desynchronized: true });
 
-    try {
-      const stream = await navigator.mediaDevices.getDisplayMedia(constraints);
-      const videoTrack = stream.getVideoTracks()[0];
-      if (videoTrack) {
-        if ('contentHint' in videoTrack) {
-          videoTrack.contentHint = 'motion';
-        }
-        try {
-          await videoTrack.applyConstraints({
-            frameRate: { ideal: fps, max: fps },
-            width: { ideal: resolution.width, max: resolution.width },
-            height: { ideal: resolution.height, max: resolution.height },
-          });
-        } catch {}
-      }
-      this.activeStream = stream;
-      return stream;
-    } catch (err) {
-      console.error('Failed to get hardware display media:', err);
-      throw err;
+    if (this.ctx) {
+      this.ctx.imageSmoothingEnabled = true;
+      this.ctx.imageSmoothingQuality = 'medium';
+      this.ctx.fillStyle = '#000000';
+      this.ctx.fillRect(0, 0, resolution.width, resolution.height);
     }
+
+    this.isCapturing = true;
+
+    // 2. Start native Rust capture thread
+    await invoke('start_native_screen_capture', {
+      sourceId,
+      targetFps: fps,
+      targetWidth: resolution.width,
+      targetHeight: resolution.height,
+      captureMouse,
+      quality,
+    });
+
+    // 3. Connect to local binary WebSocket stream (ZERO BROWSER POPUPS!)
+    await new Promise<void>((resolve) => {
+      let resolved = false;
+      const wsUrl = 'ws://127.0.0.1:49153';
+      this.ws = new WebSocket(wsUrl);
+      this.ws.binaryType = 'arraybuffer';
+
+      this.ws.onopen = () => {
+        if (!resolved) {
+          resolved = true;
+          resolve();
+        }
+      };
+
+      this.ws.onmessage = async (evt: MessageEvent) => {
+        if (!this.isCapturing || !this.ctx || !this.canvas) return;
+
+        if (evt.data instanceof ArrayBuffer) {
+          try {
+            const blob = new Blob([evt.data], { type: 'image/jpeg' });
+            const bitmap = await createImageBitmap(blob);
+            if (this.isCapturing && this.ctx && this.canvas) {
+              this.ctx.drawImage(bitmap, 0, 0, this.canvas.width, this.canvas.height);
+            }
+            bitmap.close();
+          } catch {}
+        }
+      };
+
+      this.ws.onerror = () => {
+        if (!resolved) {
+          resolved = true;
+          resolve();
+        }
+      };
+
+      setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          resolve();
+        }
+      }, 500);
+    });
+
+    // 4. Capture native WebRTC MediaStream from canvas at exact target FPS
+    const stream = this.canvas.captureStream(fps);
+    const videoTrack = stream.getVideoTracks()[0];
+    if (videoTrack) {
+      if ('contentHint' in videoTrack) {
+        videoTrack.contentHint = 'motion';
+      }
+    }
+
+    this.activeStream = stream;
+    return stream;
   }
 
   public stop(): void {
+    this.isCapturing = false;
+    invoke('stop_native_screen_capture').catch(() => {});
+
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
+
     if (this.activeStream) {
       this.activeStream.getTracks().forEach((t) => t.stop());
       this.activeStream = null;
     }
+
+    this.canvas = null;
+    this.ctx = null;
   }
 }
