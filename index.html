@@ -42,7 +42,7 @@
         <div class="hero-container">
           <div class="hero-text">
             <h1 class="hero-title">Salas P2P em Grupo para Telas em 60 FPS</h1>
-            <p class="hero-subtitle">Crie ou entre em salas com seus amigos sem precisar de servidor. Transmita quando quiser com filtro de áudio por programa.</p>
+            <p class="hero-subtitle">Crie ou entre em salas com seus amigos sem precisar de servidor. Múltiplas pessoas podem transmitir suas telas simultaneamente.</p>
           </div>
 
           <div class="action-cards-grid">
@@ -55,7 +55,7 @@
                 </svg>
               </div>
               <h2 class="card-title">Criar Nova Sala de Grupo</h2>
-              <p class="card-desc">Crie um espaço para sua turma. Qualquer pessoa com o código poderá entrar para assistir ou conversar, e você pode compartilhar sua tela a qualquer momento.</p>
+              <p class="card-desc">Crie um espaço para sua turma. Qualquer pessoa com o código poderá entrar para assistir ou compartilhar suas próprias telas ao mesmo tempo.</p>
               <div class="card-footer">
                 <button class="btn btn-primary" id="btn-create-room-direct">
                   <span>Criar Sala e Entrar</span>
@@ -74,7 +74,7 @@
                 </svg>
               </div>
               <h2 class="card-title">Entrar em uma Sala</h2>
-              <p class="card-desc">Digite o código de sala fornecido pelo criador da sala para assistir à transmissão ou conversar em grupo sem login.</p>
+              <p class="card-desc">Digite o código de sala fornecido pelo criador da sala para assistir às transmissões, conversar e compartilhar sua tela sem login.</p>
               <div class="card-footer">
                 <button class="btn btn-secondary" id="btn-start-join-flow">
                   <span>Entrar com Código</span>
@@ -87,7 +87,7 @@
         </div>
       </section>
 
-      <!-- VIEW 2: UNIFIED GROUP ROOM -->
+      <!-- VIEW 2: UNIFIED GROUP ROOM (MULTI-STREAM DYNAMIC GRID) -->
       <section class="view" id="view-group-room">
         <div class="room-layout">
           <!-- Main Stream Area -->
@@ -95,11 +95,18 @@
             <div class="stream-header-bar">
               <div class="stream-status">
                 <span class="live-indicator" id="room-live-badge">SALA ATIVA</span>
-                <span class="stream-host-tag" id="room-sharing-status-tag">Nenhuma transmissão no momento</span>
+                <span class="stream-host-tag" id="room-sharing-status-tag">0 telas transmitindo</span>
                 <span class="stream-info-badge" id="room-stats-badge">P2P Conectado</span>
               </div>
               
               <div class="stream-actions">
+                <!-- Layout Toggle (Grid vs Spotlight) -->
+                <button class="btn btn-sm btn-outline" id="btn-toggle-layout" title="Alternar Modo Grade / Destaque">
+                  <!-- Lucide: LayoutGrid -->
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
+                  <span id="label-toggle-layout">Modo Grade</span>
+                </button>
+
                 <!-- Share / Stop Share Button -->
                 <button class="btn btn-sm btn-accent" id="btn-toggle-share-screen">
                   <!-- Lucide: ScreenShare -->
@@ -129,34 +136,19 @@
               </div>
             </div>
 
-            <!-- Video Player Display Container -->
+            <!-- Video Player Multi-Stream Container -->
             <div class="video-container" id="room-video-container">
-              <video id="room-main-video" autoplay playsinline></video>
+              <!-- Dynamic Multi-Stream Grid/Spotlight -->
+              <div class="streams-grid-wrapper layout-grid" id="streams-grid-wrapper">
+                <!-- Stream cards injected dynamically -->
+              </div>
               
-              <!-- Idle State when no one is sharing -->
+              <!-- Idle State when 0 streams are active -->
               <div class="video-idle-state" id="room-video-idle">
                 <!-- Lucide: Tv -->
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--text-muted);"><rect width="20" height="15" x="2" y="7" rx="2"/><polyline points="17 2 12 7 7 2"/></svg>
                 <h3>Nenhum participante transmitindo</h3>
-                <p>Clique em <strong>"Compartilhar Tela"</strong> acima para transmitir seu monitor ou janela para os participantes.</p>
-              </div>
-
-              <!-- Unmute Overlay -->
-              <div class="unmute-overlay hidden" id="room-unmute-overlay">
-                <button class="btn btn-primary" id="btn-unmute-room-audio">
-                  <!-- Lucide: Volume2 -->
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-                  <span>Clique para Ouvir o Áudio da Transmissão</span>
-                </button>
-              </div>
-
-              <!-- Live VU Meter -->
-              <div class="video-overlay-meter" id="room-vu-meter-container">
-                <!-- Lucide: Volume2 -->
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-                <div class="meter-bar-track">
-                  <div class="meter-bar-fill" id="room-vu-meter" style="width: 0%;"></div>
-                </div>
+                <p>Clique em <strong>"Compartilhar Tela"</strong> acima para transmitir seu monitor ou janela para a sala.</p>
               </div>
 
               <!-- Floating Room Code -->
@@ -171,7 +163,7 @@
             <!-- Bottom Stream Info Bar -->
             <div class="host-quick-bar">
               <div class="quick-setting">
-                <label>Origem:</label>
+                <label>Sua Transmissão:</label>
                 <span class="audio-mode-tag" id="active-source-label">Nenhuma tela ativa</span>
               </div>
               <div class="quick-setting">
@@ -218,7 +210,7 @@
                 <div class="peer-item">
                   <div>
                     <span class="peer-name" id="my-peer-name">Você</span>
-                    <span style="font-size: 11px; color: var(--text-muted); display: block;">Criador / Membro</span>
+                    <span style="font-size: 11px; color: var(--text-muted); display: block;">Membro da Sala</span>
                   </div>
                   <span class="peer-status">● Online</span>
                 </div>
@@ -250,7 +242,7 @@
       </div>
     </div>
 
-    <!-- MODAL: CUSTOM SCREEN & APPLICATION PICKER WITH LIVE THUMBNAILS -->
+    <!-- MODAL: CUSTOM SCREEN & APPLICATION PICKER -->
     <div class="modal-overlay hidden" id="modal-custom-screen-picker">
       <div class="modal-card modal-xl">
         <div class="modal-header">

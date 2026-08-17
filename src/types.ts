@@ -1,7 +1,6 @@
 export interface ProcessItem {
   pid: number;
   name: string;
-  exe_path?: string;
   window_title?: string;
   is_likely_chat_or_voice: boolean;
 }
@@ -33,22 +32,11 @@ export interface ScreenSourcesResponse {
   windows: WindowSource[];
 }
 
-export interface QualityProfile {
+export interface PeerInfo {
   id: string;
-  name: string;
-  width: number;
-  height: number;
-  frameRate: number;
-  bitrateKbps: number;
-}
-
-export interface RoomToken {
-  type: 'offer' | 'answer';
-  senderName: string;
-  peerId: string;
-  sdp: string;
-  candidates?: RTCIceCandidateInit[];
-  timestamp: number;
+  username: string;
+  connectionState: 'connected' | 'connecting' | 'disconnected';
+  joinedAt: number;
 }
 
 export interface ChatMessage {
@@ -60,9 +48,30 @@ export interface ChatMessage {
   isSystem?: boolean;
 }
 
-export interface PeerInfo {
+export interface ActiveStreamInfo {
+  peerId: string;
+  senderName: string;
+  stream: MediaStream;
+  isLocal: boolean;
+}
+
+export interface QualityProfile {
   id: string;
-  username: string;
-  connectionState: string;
-  joinedAt: number;
+  name: string;
+  width: number;
+  height: number;
+  fps?: number;
+  frameRate?: number;
+  maxBitrateKbps: number;
+}
+
+export interface RoomToken {
+  version?: number;
+  roomId?: string;
+  type: 'offer' | 'answer';
+  sdp: string;
+  timestamp: number;
+  hostName?: string;
+  senderName?: string;
+  peerId?: string;
 }

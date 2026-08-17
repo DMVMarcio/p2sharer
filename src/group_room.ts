@@ -1,7 +1,7 @@
 import { joinRoom, selfId } from '@trystero-p2p/mqtt';
-import { ChatMessage, PeerInfo } from './types';
+import { ActiveStreamInfo, ChatMessage, PeerInfo } from './types';
 
-const APP_ID = 'p2sharer-mqtt-room-v2';
+const APP_ID = 'p2sharer-multi-stream-v1';
 
 const RTC_CONFIG = {
   iceServers: [
@@ -20,8 +20,7 @@ const RELAY_CONFIG = {
 };
 
 export interface RoomCallbacks {
-  onStream: (stream: MediaStream, senderName: string) => void;
-  onStreamEnded: () => void;
+  onStreamsUpdate: (streams: ActiveStreamInfo[]) => void;
   onChat: (msg: ChatMessage) => void;
   onPeersUpdate: (peers: PeerInfo[]) => void;
   onStatusChange: (status: string) => void;
@@ -35,6 +34,7 @@ export class GroupRoomManager {
   private room: any = null;
   private localStream: MediaStream | null = null;
   private peers: Map<string, string> = new Map(); // peerId -> username
+  private remoteStreams: Map<string, MediaStream> = new Map(); // peerId -> stream
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private chatAction: any = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -43,7 +43,6 @@ export class GroupRoomManager {
   private streamStatusAction: any = null;
 
   private callbacks: RoomCallbacks | null = null;
-  private activeStreamSenderName: string = '';
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(username: string, roomId: string, isCreator = false) {
@@ -82,22 +81,21 @@ export class GroupRoomManager {
         console.log(`[P2P] Presence received from ${peerId}:`, data.username);
         this.peers.set(peerId, data.username || `Usuário (${peerId.slice(0, 4)})`);
         this.notifyPeersUpdate();
+        this.notifyStreamsUpdate();
         callbacks.onStatusChange('P2P Conectado');
       };
 
       // 3. Setup Stream Status Action
       this.streamStatusAction = this.room.makeAction('stream_status');
-      this.streamStatusAction.onMessage = (data: { isStreaming: boolean; senderName?: string }) => {
-        if (data.isStreaming) {
-          this.activeStreamSenderName = data.senderName || 'Participante';
-          callbacks.onStatusChange(`Ao Vivo: ${this.activeStreamSenderName}`);
-        } else {
-          callbacks.onStreamEnded();
-          callbacks.onStatusChange('P2P Conectado');
+      this.streamStatusAction.onMessage = (data: { isStreaming: boolean; senderName?: string }, meta: { peerId: string }) => {
+        const peerId = meta.peerId;
+        if (!data.isStreaming) {
+          this.remoteStreams.delete(peerId);
+          this.notifyStreamsUpdate();
         }
       };
 
-      // 4. Peer Lifecycle Listeners (Setters in Trystero 0.20+)
+      // 4. Peer Lifecycle Listeners
       this.room.onPeerJoin = (peerId: string) => {
         console.log(`[P2P] Peer joined room: ${peerId}`);
         
@@ -106,7 +104,7 @@ export class GroupRoomManager {
           this.presenceAction.send({ username: this.username, isCreator: this.isCreator }, { target: peerId });
         }
 
-        // If I am already sharing screen, broadcast to new peer
+        // If I am already sharing a stream, broadcast it to the new peer
         if (this.localStream) {
           try {
             this.room.addStream(this.localStream, peerId);
@@ -115,7 +113,7 @@ export class GroupRoomManager {
           }
         }
 
-        this.peers.set(peerId, `Conectando... (${peerId.slice(0, 4)})`);
+        this.peers.set(peerId, `Conectado (${peerId.slice(0, 4)})`);
         this.notifyPeersUpdate();
         callbacks.onStatusChange('P2P Conectado');
       };
@@ -123,18 +121,20 @@ export class GroupRoomManager {
       this.room.onPeerLeave = (peerId: string) => {
         console.log(`[P2P] Peer left room: ${peerId}`);
         this.peers.delete(peerId);
+        this.remoteStreams.delete(peerId);
         this.notifyPeersUpdate();
+        this.notifyStreamsUpdate();
         if (this.peers.size === 0) {
           callbacks.onStatusChange(this.isCreator ? 'Sala Ativa (Aguardando amigos)' : 'P2P Conectado');
         }
       };
 
-      // 5. Incoming Stream Listener
+      // 5. Incoming Stream Listener (Supports multiple concurrent streams from different peers!)
       this.room.onPeerStream = (stream: MediaStream, peerId: string) => {
-        console.log(`[P2P] Received stream from peer ${peerId}`);
-        const sender = this.peers.get(peerId) || this.activeStreamSenderName || 'Participante';
-        callbacks.onStream(stream, sender);
-        callbacks.onStatusChange(`Ao Vivo por ${sender}`);
+        console.log(`[P2P] Received stream from peer: ${peerId}`);
+        this.remoteStreams.set(peerId, stream);
+        this.notifyStreamsUpdate();
+        callbacks.onStatusChange('Ao Vivo');
       };
 
       // 6. Continuous presence heartbeat (every 2.5s)
@@ -171,6 +171,8 @@ export class GroupRoomManager {
       if (this.streamStatusAction) {
         this.streamStatusAction.send({ isStreaming: true, senderName: this.username });
       }
+
+      this.notifyStreamsUpdate();
     }
   }
 
@@ -187,6 +189,41 @@ export class GroupRoomManager {
 
     if (this.streamStatusAction) {
       this.streamStatusAction.send({ isStreaming: false });
+    }
+
+    this.notifyStreamsUpdate();
+  }
+
+  public getAllActiveStreams(): ActiveStreamInfo[] {
+    const list: ActiveStreamInfo[] = [];
+
+    // Local stream (if sharing)
+    if (this.localStream) {
+      list.push({
+        peerId: 'local',
+        senderName: `${this.username} (Sua Tela)`,
+        stream: this.localStream,
+        isLocal: true,
+      });
+    }
+
+    // Remote streams from other peers
+    this.remoteStreams.forEach((stream, peerId) => {
+      const senderName = this.peers.get(peerId) || `Participante (${peerId.slice(0, 4)})`;
+      list.push({
+        peerId,
+        senderName,
+        stream,
+        isLocal: false,
+      });
+    });
+
+    return list;
+  }
+
+  public notifyStreamsUpdate() {
+    if (this.callbacks) {
+      this.callbacks.onStreamsUpdate(this.getAllActiveStreams());
     }
   }
 
@@ -235,5 +272,6 @@ export class GroupRoomManager {
       this.room = null;
     }
     this.peers.clear();
+    this.remoteStreams.clear();
   }
 }
