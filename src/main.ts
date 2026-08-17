@@ -723,7 +723,12 @@ class App {
 
       // 3. Assemble combined MediaStream
       const combinedStream = new MediaStream();
-      videoStream.getVideoTracks().forEach((vt) => combinedStream.addTrack(vt));
+      videoStream.getVideoTracks().forEach((vt) => {
+        if ('contentHint' in vt) {
+          vt.contentHint = 'motion';
+        }
+        combinedStream.addTrack(vt);
+      });
       if (customAudioTrack) {
         combinedStream.addTrack(customAudioTrack);
       }
