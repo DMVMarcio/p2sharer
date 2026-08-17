@@ -54,7 +54,7 @@ export class GroupRoomManager {
 
   public join(callbacks: RoomCallbacks) {
     this.callbacks = callbacks;
-    callbacks.onStatusChange('Conectando ao canal P2P...');
+    callbacks.onStatusChange('Conectando...');
     console.log(`[P2P] Joining room ${this.roomId} as ${this.username} (Self ID: ${selfId})`);
 
     try {
@@ -131,11 +131,11 @@ export class GroupRoomManager {
         }
         this.notifyPeersUpdate();
         if (this.peers.size === 0) {
-          callbacks.onStatusChange(this.isCreator ? 'Sala Ativa (Aguardando amigos)' : 'P2P Conectado');
+          callbacks.onStatusChange('Sala Ativa');
         }
       };
 
-      // 5. Incoming Stream Listener (Supports multiple concurrent streams from different peers!)
+      // 5. Incoming Stream Listener
       this.room.onPeerStream = (stream: MediaStream, peerId: string) => {
         console.log(`[P2P] Received stream from peer: ${peerId}`);
         this.remoteStreams.set(peerId, stream);
@@ -158,7 +158,7 @@ export class GroupRoomManager {
         }
       }, 300);
 
-      callbacks.onStatusChange(this.isCreator ? 'Sala Ativa (Aguardando amigos)' : 'P2P Conectado');
+      callbacks.onStatusChange('Sala Ativa');
     } catch (err) {
       console.error('[P2P] Failed to join room in GroupRoomManager:', err);
       callbacks.onStatusChange('Erro ao conectar');
@@ -231,7 +231,7 @@ export class GroupRoomManager {
     if (!this.callbacks) return;
     const streams = this.getAllActiveStreams();
     const hash = streams.map((s) => `${s.peerId}:${s.senderName}:${s.stream.id}`).join('|');
-    if (hash === this.lastStreamsHash) return; // Prevent unnecessary re-renders & flickering!
+    if (hash === this.lastStreamsHash) return;
     this.lastStreamsHash = hash;
     this.callbacks.onStreamsUpdate(streams);
   }

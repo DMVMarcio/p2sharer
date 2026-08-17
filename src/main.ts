@@ -137,18 +137,13 @@ class App {
     // Toggle Sidebar (Chat)
     document.getElementById('btn-toggle-sidebar')?.addEventListener('click', () => this.toggleSidebar());
 
-    // Inside Room: Transmission Settings Button
+    // Direct 1-Click Screen Share Button
     document.getElementById('btn-toggle-share-screen')?.addEventListener('click', () => {
-      this.openScreenPickerModal();
-    });
-
-    // Transmission Settings Modal
-    document.getElementById('btn-close-screen-picker')?.addEventListener('click', () => this.closeScreenPickerModal());
-    document.getElementById('btn-cancel-screen-picker')?.addEventListener('click', () => this.closeScreenPickerModal());
-    document.getElementById('btn-confirm-start-stream')?.addEventListener('click', () => this.confirmStartScreenCapture());
-    document.getElementById('btn-modal-stop-stream')?.addEventListener('click', () => {
-      this.stopScreenSharing();
-      this.closeScreenPickerModal();
+      if (this.isSharingScreen) {
+        this.stopScreenSharing();
+      } else {
+        this.startScreenCapture();
+      }
     });
 
     // Audio Filter Modal
@@ -210,7 +205,7 @@ class App {
       sidebar.classList.toggle('collapsed', this.isSidebarCollapsed);
     }
     if (label) {
-      label.textContent = this.isSidebarCollapsed ? 'Abrir Chat' : 'Chat';
+      label.textContent = this.isSidebarCollapsed ? 'Abrir' : 'Chat';
     }
   }
 
@@ -298,7 +293,7 @@ class App {
     if (chatContainer) {
       chatContainer.innerHTML = `
         <div class="chat-system-msg">
-          <span>Você entrou na sala <strong>${this.currentRoomCode}</strong>. Compartilhe o código para convidar amigos.</span>
+          <span>Você entrou na sala <strong>${this.currentRoomCode}</strong>. Compartilhe o código acima.</span>
         </div>
       `;
     }
@@ -340,7 +335,7 @@ class App {
       wrapper.classList.remove('active');
       wrapper.innerHTML = '';
       idleBox.classList.remove('hidden');
-      if (sharingTag) sharingTag.textContent = '0 telas transmitindo';
+      if (sharingTag) sharingTag.textContent = '0 telas';
       if (liveBadge) {
         liveBadge.textContent = 'SALA ATIVA';
         liveBadge.classList.remove('streaming');
@@ -354,7 +349,7 @@ class App {
 
     // Update status bar
     const count = this.activeStreams.length;
-    if (sharingTag) sharingTag.textContent = `${count} ${count === 1 ? 'tela ao vivo' : 'telas ao vivo'}`;
+    if (sharingTag) sharingTag.textContent = `${count} ${count === 1 ? 'tela' : 'telas'}`;
     if (liveBadge) {
       liveBadge.textContent = 'AO VIVO';
       liveBadge.classList.add('streaming');
@@ -420,15 +415,15 @@ class App {
     header.className = 'stream-card-header';
     header.innerHTML = `
       <div class="stream-card-title">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>
         <span>${item.senderName}</span>
       </div>
       <div class="stream-card-tools">
         <button class="stream-card-btn btn-pin-stream" title="${isPinned && this.layoutMode === 'spotlight' ? 'Voltar para Grade' : 'Destacar tela'}">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 17v4"/><path d="M5 17h14"/><path d="m15 2-3 3-3-3"/></svg>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 17v4"/><path d="M5 17h14"/><path d="m15 2-3 3-3-3"/></svg>
         </button>
         <button class="stream-card-btn btn-fs-stream" title="Tela cheia">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" x2="14" y1="3" y2="10"/><line x1="3" x2="10" y1="21" y2="14"/></svg>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" x2="14" y1="3" y2="10"/><line x1="3" x2="10" y1="21" y2="14"/></svg>
         </button>
       </div>
     `;
@@ -438,7 +433,7 @@ class App {
     footer.className = 'stream-card-footer';
     footer.innerHTML = `
       <button class="stream-mute-btn ${volState.muted ? 'muted' : ''}" title="${volState.muted ? 'Desmutar' : 'Silenciar'}">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
       </button>
       <input type="range" class="stream-volume-slider" min="0" max="1" step="0.02" value="${volState.muted ? 0 : volState.volume}" title="Volume: ${Math.round(volState.volume * 100)}%" />
     `;
@@ -516,60 +511,32 @@ class App {
     return card;
   }
 
-  // --- TRANSMISSION SETTINGS & DIRECT SCREEN PICKER ---
-  private openScreenPickerModal() {
-    const modal = document.getElementById('modal-custom-screen-picker');
-    const stopBtn = document.getElementById('btn-modal-stop-stream');
-    const confirmBtnLabel = document.getElementById('label-btn-start-stream');
-    const modalTitle = document.getElementById('screen-picker-modal-title');
-
-    if (stopBtn) {
-      stopBtn.classList.toggle('hidden', !this.isSharingScreen);
-    }
-    if (confirmBtnLabel) {
-      confirmBtnLabel.textContent = this.isSharingScreen ? 'Alterar Tela / Janela' : 'Escolher Tela / Janela';
-    }
-    if (modalTitle) {
-      modalTitle.textContent = this.isSharingScreen ? 'Gerenciar Transmissão' : 'Configurações de Transmissão';
-    }
-
-    modal?.classList.remove('hidden');
-  }
-
-  private closeScreenPickerModal() {
-    document.getElementById('modal-custom-screen-picker')?.classList.add('hidden');
-  }
-
-  // --- START HARDWARE-ACCELERATED SCREEN CAPTURE ---
-  private async confirmStartScreenCapture() {
-    const resValue = (document.getElementById('picker-select-resolution') as HTMLSelectElement).value;
-    const fpsValue = parseInt((document.getElementById('picker-select-fps') as HTMLSelectElement).value, 10) || 60;
-    const bitrateValue = parseInt((document.getElementById('picker-select-bitrate') as HTMLSelectElement).value, 10) || 25000;
-    const captureMouse = (document.getElementById('picker-checkbox-mouse') as HTMLInputElement)?.checked ?? true;
+  // --- START HARDWARE-ACCELERATED SCREEN CAPTURE (1-CLICK DIRECT FLOW) ---
+  private async startScreenCapture() {
+    const resValue = (document.getElementById('quick-select-resolution') as HTMLSelectElement)?.value || '1080p';
+    const fpsValue = parseInt((document.getElementById('quick-select-fps') as HTMLSelectElement)?.value, 10) || 60;
+    const bitrateValue = parseInt((document.getElementById('quick-select-bitrate') as HTMLSelectElement)?.value, 10) || 25000;
 
     let res = { width: 1920, height: 1080, label: '1080p' };
     if (resValue === '4k') res = { width: 3840, height: 2160, label: '4K' };
     else if (resValue === '1440p') res = { width: 2560, height: 1440, label: '1440p' };
     else if (resValue === '720p') res = { width: 1280, height: 720, label: '720p' };
-    else if (resValue === '480p') res = { width: 854, height: 480, label: '480p' };
 
     this.currentFps = fpsValue;
     this.currentBitrate = bitrateValue;
     this.currentResolution = res;
-
-    this.closeScreenPickerModal();
 
     try {
       // 1. Audio bridge listener
       const customAudioTrack = this.audioBridge.init();
       await this.audioBridge.startListening();
 
-      // 2. Direct GPU Hardware Capture (Opens system screen selector ONCE)
+      // 2. Direct GPU Hardware Capture (Opens system picker immediately in 1 click!)
       const videoStream = await this.nativeVideoBridge.startCapture(
         'screen:0',
         fpsValue,
         res,
-        captureMouse,
+        true,
         92
       );
 
@@ -593,14 +560,10 @@ class App {
       this.activeLocalStream = combinedStream;
       this.isSharingScreen = true;
 
-      // Broadcast stream to everyone in the room with instant 25Mbps boost
+      // Broadcast stream to everyone in the room
       if (this.roomManager) {
         this.roomManager.shareStream(combinedStream);
       }
-
-      // Update UI tags
-      const sourceLabel = document.getElementById('active-source-label');
-      if (sourceLabel) sourceLabel.textContent = `Ao Vivo (${res.width}x${res.height} @ ${fpsValue}fps)`;
 
       this.updateShareButtonUI(true);
       this.updateStatsHUD();
@@ -625,9 +588,6 @@ class App {
       this.roomManager.stopStream();
     }
 
-    const sourceLabel = document.getElementById('active-source-label');
-    if (sourceLabel) sourceLabel.textContent = 'Nenhuma tela ativa';
-
     this.updateShareButtonUI(false);
     this.updateStatsHUD();
     this.showToast('Sua transmissão de tela foi encerrada.');
@@ -635,8 +595,12 @@ class App {
 
   private updateShareButtonUI(isSharing: boolean) {
     const dot = document.getElementById('stream-sharing-dot');
+    const label = document.getElementById('label-share-screen');
     if (dot) {
       dot.classList.toggle('active', isSharing);
+    }
+    if (label) {
+      label.textContent = isSharing ? 'Parar' : 'Transmissão';
     }
   }
 
@@ -767,11 +731,11 @@ class App {
       const label = document.getElementById('active-audio-mode-label');
       if (label) {
         if (pids.length === 0) {
-          label.textContent = 'Sistema Completo (Sem Filtros)';
+          label.textContent = 'Áudio: Sistema Completo';
         } else if (mode === 'exclude') {
-          label.textContent = `Ignorando ${pids.length} app(s) (ex: Discord)`;
+          label.textContent = `Áudio: Ignorando ${pids.length} app(s)`;
         } else {
-          label.textContent = `Capturando apenas ${pids.length} app(s)`;
+          label.textContent = `Áudio: Capturando ${pids.length} app(s)`;
         }
       }
 
