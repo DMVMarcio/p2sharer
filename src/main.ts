@@ -692,7 +692,7 @@ class App {
 
       // Broadcast stream to everyone in the room
       if (this.roomManager) {
-        this.roomManager.shareStream(combinedStream);
+        this.roomManager.shareStream(combinedStream, bitrateValue * 1000, fpsValue);
       }
 
       this.updateShareButtonUI(true);

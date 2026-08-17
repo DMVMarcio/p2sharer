@@ -45,6 +45,8 @@ export class GroupRoomManager {
   private callbacks: RoomCallbacks | null = null;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private lastStreamsHash: string = '';
+  private currentTargetBitrate: number = 25000000;
+  private currentTargetFps: number = 60;
 
   constructor(username: string, roomId: string, isCreator = false) {
     this.username = username;
@@ -112,6 +114,7 @@ export class GroupRoomManager {
         if (this.localStream) {
           try {
             this.room.addStream(this.localStream, peerId);
+            setTimeout(() => this.boostSenders(this.currentTargetBitrate, this.currentTargetFps), 150);
           } catch (err) {
             console.warn('[P2P] Error adding stream to new peer:', err);
           }
@@ -165,11 +168,15 @@ export class GroupRoomManager {
     }
   }
 
-  public shareStream(stream: MediaStream) {
+  public shareStream(stream: MediaStream, targetBitrateBps: number = 25000000, targetFps: number = 60) {
     this.localStream = stream;
+    this.currentTargetBitrate = targetBitrateBps;
+    this.currentTargetFps = targetFps;
+
     if (this.room && stream) {
       try {
         this.room.addStream(stream);
+        setTimeout(() => this.boostSenders(targetBitrateBps, targetFps), 100);
       } catch (err) {
         console.warn('[P2P] Error adding broadcast stream:', err);
       }
@@ -180,6 +187,35 @@ export class GroupRoomManager {
 
       this.notifyStreamsUpdate();
     }
+  }
+
+  public boostSenders(maxBitrateBps: number = 25000000, maxFps: number = 60) {
+    try {
+      const peers = this.room?.getPeers?.() || {};
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      Object.values(peers).forEach((peerObj: any) => {
+        const pc: RTCPeerConnection = peerObj?.connection || peerObj?.pc || peerObj;
+        if (pc?.getSenders) {
+          pc.getSenders().forEach((sender) => {
+            if (sender.track && sender.track.kind === 'video') {
+              try {
+                const params = sender.getParameters();
+                if (!params.encodings || params.encodings.length === 0) {
+                  params.encodings = [{}];
+                }
+                params.encodings[0].maxBitrate = maxBitrateBps;
+                params.encodings[0].maxFramerate = maxFps;
+                params.encodings[0].networkPriority = 'high';
+                params.encodings[0].priority = 'high';
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (params as any).degradationPreference = 'maintain-framerate';
+                sender.setParameters(params).catch(() => {});
+              } catch {}
+            }
+          });
+        }
+      });
+    } catch {}
   }
 
   public stopStream() {
