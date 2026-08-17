@@ -12,6 +12,8 @@ export class NativeVideoBridge {
   private ctx: CanvasRenderingContext2D | null;
   private unlisten: UnlistenFn | null = null;
   private isCapturing = false;
+  private latestImage: HTMLImageElement | null = null;
+  private animFrameId: number | null = null;
 
   constructor() {
     this.canvas = document.createElement('canvas');
@@ -28,7 +30,7 @@ export class NativeVideoBridge {
     this.canvas.width = resolution.width;
     this.canvas.height = resolution.height;
 
-    // Initial background
+    // Draw initial studio background
     if (this.ctx) {
       this.ctx.fillStyle = '#0a0c10';
       this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
@@ -37,10 +39,11 @@ export class NativeVideoBridge {
     try {
       this.unlisten = await listen<VideoFramePayload>('p2sharer://video-frame', (event) => {
         const payload = event.payload;
-        if (!payload.jpeg_base64) return;
+        if (!payload || !payload.jpeg_base64) return;
 
         const img = new Image();
         img.onload = () => {
+          this.latestImage = img;
           if (this.ctx) {
             this.ctx.drawImage(img, 0, 0, this.canvas.width, this.canvas.height);
           }
@@ -56,6 +59,16 @@ export class NativeVideoBridge {
       });
 
       this.isCapturing = true;
+
+      // Active paint loop to ensure canvas.captureStream always has active frames
+      const renderLoop = () => {
+        if (!this.isCapturing) return;
+        if (this.latestImage && this.ctx) {
+          this.ctx.drawImage(this.latestImage, 0, 0, this.canvas.width, this.canvas.height);
+        }
+        this.animFrameId = requestAnimationFrame(renderLoop);
+      };
+      this.animFrameId = requestAnimationFrame(renderLoop);
     } catch (err) {
       console.warn('Native screen capture failed, falling back to display media:', err);
       return await navigator.mediaDevices.getDisplayMedia({
@@ -72,11 +85,17 @@ export class NativeVideoBridge {
     if (!this.isCapturing) return;
     this.isCapturing = false;
 
+    if (this.animFrameId) {
+      cancelAnimationFrame(this.animFrameId);
+      this.animFrameId = null;
+    }
+
     if (this.unlisten) {
       this.unlisten();
       this.unlisten = null;
     }
 
+    this.latestImage = null;
     invoke('stop_native_screen_capture').catch(() => {});
   }
 }
