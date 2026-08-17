@@ -475,7 +475,7 @@ class App {
     this.roomSlots = [
       {
         peerId: 'local',
-        senderName: `${this.username} (Você)`,
+        senderName: this.username,
         stream: null,
         isStreaming: false,
         isLocal: true,
@@ -611,6 +611,7 @@ class App {
       overlay.innerHTML = `
         <span class="user-status-dot"></span>
         <span>${slot.senderName}</span>
+        ${slot.isLocal ? '<span class="badge-you">VOCÊ</span>' : ''}
       `;
 
       card.appendChild(video);
@@ -623,18 +624,16 @@ class App {
       card.style.setProperty('--user-color', slot.color);
       card.title = isFeatured ? 'Clique para voltar à grade' : 'Clique para destacar este participante';
 
-      const initials = slot.senderName
-        .split(' ')
-        .map((n) => n[0])
-        .join('')
-        .slice(0, 2)
-        .toUpperCase();
-
       card.innerHTML = `
         <div class="participant-avatar-badge">
-          <span>${initials}</span>
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+          </svg>
         </div>
-        <div class="participant-avatar-label">${slot.senderName}</div>
+        <div class="participant-name-row">
+          <span class="participant-avatar-label">${slot.senderName}</span>
+          ${slot.isLocal ? '<span class="badge-you">VOCÊ</span>' : ''}
+        </div>
         <div class="participant-status-text">Sem transmissão</div>
       `;
 
@@ -969,7 +968,10 @@ class App {
 
     listEl.innerHTML = `
       <div class="participant-item">
-        <span>${this.username} (Você)</span>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span>${this.username}</span>
+          <span class="badge-you">VOCÊ</span>
+        </div>
         <span class="user-status-dot"></span>
       </div>
     `;
