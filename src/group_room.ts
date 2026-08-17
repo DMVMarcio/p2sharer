@@ -26,43 +26,6 @@ export interface RoomCallbacks {
   onStatusChange: (status: string) => void;
 }
 
-/**
- * Injects instant 25-35 Mbps WebRTC parameters directly into SDP Offer / Answer.
- * Eliminates the 15-second bandwidth ramp-up delay in Google Congestion Control!
- */
-export function boostSdpBitrate(sdp: string): string {
-  if (!sdp) return sdp;
-  let modified = sdp;
-
-  // 1. Add bandwidth caps directly to m=video section (25000 kbps / 25000000 bps)
-  if (!modified.includes('b=AS:')) {
-    modified = modified.replace(/(m=video [^\r\n]+[\r\n]+)/g, '$1b=AS:25000\r\nb=TIAS:25000000\r\n');
-  }
-
-  // 2. Add Google-specific instant start bitrate to video fmtp lines
-  if (!modified.includes('x-google-start-bitrate')) {
-    modified = modified.replace(
-      /(a=fmtp:\d+ [^\r\n]+)/g,
-      '$1;x-google-min-bitrate=10000;x-google-start-bitrate=25000;x-google-max-bitrate=35000'
-    );
-  }
-
-  return modified;
-}
-
-// Automatically patch RTCPeerConnection to inject instant start-bitrate SDP into all P2P connections
-if (typeof window !== 'undefined' && window.RTCPeerConnection) {
-  const origSetLocalDescription = RTCPeerConnection.prototype.setLocalDescription;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  RTCPeerConnection.prototype.setLocalDescription = function (...args: any[]) {
-    if (args[0] && args[0].sdp) {
-      args[0].sdp = boostSdpBitrate(args[0].sdp);
-    }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (origSetLocalDescription as any).apply(this, args);
-  };
-}
-
 export class GroupRoomManager {
   private username: string;
   private roomId: string;
@@ -194,7 +157,7 @@ export class GroupRoomManager {
         }
       }, 300);
 
-      callbacks.onStatusChange(this.isCreator ? 'Sala Ativa (Aguardando amigos)' : 'Conectado à sala');
+      callbacks.onStatusChange(this.isCreator ? 'Sala Ativa (Aguardando amigos)' : 'P2P Conectado');
     } catch (err) {
       console.error('[P2P] Failed to join room in GroupRoomManager:', err);
       callbacks.onStatusChange('Erro ao conectar');
@@ -233,14 +196,10 @@ export class GroupRoomManager {
                 if (!params.encodings || params.encodings.length === 0) {
                   params.encodings = [{}];
                 }
-                params.encodings[0].maxBitrate = 30000000; // 30 Mbps
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                (params.encodings[0] as any).minBitrate = 10000000; // 10 Mbps floor
+                params.encodings[0].maxBitrate = 25000000; // 25 Mbps
                 params.encodings[0].maxFramerate = 60;
                 params.encodings[0].networkPriority = 'high';
                 params.encodings[0].priority = 'high';
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                (params as any).degradationPreference = 'maintain-framerate';
                 sender.setParameters(params).catch(() => {});
               } catch {}
             }
