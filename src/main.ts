@@ -462,11 +462,30 @@ class App {
       this.roomManager.leave();
     }
 
-    this.showConnectingOverlay(
-      this.currentRoomCode,
-      this.isCreator ? 'Criando sala P2P...' : 'Conectando à sala...',
-      'Aguardando sincronização de rede e nós P2P...'
-    );
+    let hasLoadedPeers = false;
+    let fallbackTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    if (this.isCreator) {
+      this.showConnectingOverlay(
+        this.currentRoomCode,
+        'Criando sala P2P...',
+        'Iniciando canal de transmissão e nó mestre...'
+      );
+    } else {
+      this.showConnectingOverlay(
+        this.currentRoomCode,
+        'Entrando na sala...',
+        'Localizando apresentador e participantes...'
+      );
+
+      // Fallback: If room is empty or takes longer than 3.5s, reveal the room anyway
+      fallbackTimeout = setTimeout(() => {
+        if (!hasLoadedPeers) {
+          hasLoadedPeers = true;
+          this.hideConnectingOverlay();
+        }
+      }, 3500);
+    }
 
     const turnConfig: TurnConfig = {
       enabled: localStorage.getItem('p2sharer_turn_enabled') === 'true',
@@ -483,21 +502,37 @@ class App {
         this.roomSlots = slots;
         this.renderRoomCards();
         this.updateStatsHUD();
+
+        // When joining, dismiss loading screen as soon as other participants are loaded
+        if (!this.isCreator && slots.length > 1 && !hasLoadedPeers) {
+          hasLoadedPeers = true;
+          if (fallbackTimeout) clearTimeout(fallbackTimeout);
+          setTimeout(() => {
+            this.hideConnectingOverlay();
+          }, 350);
+        }
       },
       onChat: (msg) => {
         this.appendChatMessage(msg);
       },
       onPeersUpdate: (peers) => {
         this.updatePeersList(peers);
+        if (!this.isCreator && peers.length > 0 && !hasLoadedPeers) {
+          hasLoadedPeers = true;
+          if (fallbackTimeout) clearTimeout(fallbackTimeout);
+          setTimeout(() => {
+            this.hideConnectingOverlay();
+          }, 350);
+        }
       },
       onStatusChange: (status) => {
         const statsBadge = document.getElementById('room-stats-badge');
         if (statsBadge) statsBadge.textContent = status;
 
-        if (status === 'Sala Ativa' || status.includes('Conectado') || status === 'Ao Vivo') {
+        if (this.isCreator && (status === 'Sala Ativa' || status.includes('Conectado'))) {
           setTimeout(() => {
             this.hideConnectingOverlay();
-          }, 350);
+          }, 450);
         }
       },
     });
