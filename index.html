@@ -105,8 +105,8 @@
               </div>
               
               <div class="stream-actions">
-                <!-- Transmission 1-Click Button -->
-                <button class="btn btn-sm btn-outline btn-compact" id="btn-toggle-share-screen" title="Iniciar / Parar Compartilhamento de Tela">
+                <!-- Transmission Button (Opens Discord-style screen picker or stops) -->
+                <button class="btn btn-sm btn-outline btn-compact" id="btn-toggle-share-screen" title="Compartilhar Tela ou Janela">
                   <span class="stream-sharing-indicator" id="stream-sharing-dot"></span>
                   <!-- Lucide: ScreenShare -->
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 3H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-3"/><path d="M8 21h8"/><path d="M12 17v4"/><path d="m17 8 5-5"/><path d="M17 3h5v5"/></svg>
@@ -154,7 +154,7 @@
                 <!-- Lucide: Tv -->
                 <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--text-muted);"><rect width="20" height="15" x="2" y="7" rx="2"/><polyline points="17 2 12 7 7 2"/></svg>
                 <h3>Nenhum participante transmitindo</h3>
-                <p>Clique em <strong>"Transmissão"</strong> no topo para compartilhar seu monitor ou janela em 60 FPS.</p>
+                <p>Clique em <strong>"Transmissão"</strong> no topo para compartilhar seu monitor ou janela de aplicativo.</p>
               </div>
 
               <!-- Live Stream Stats HUD (Resolution, FPS, Speed/Bitrate) -->
@@ -182,6 +182,8 @@
                     <option value="1440p">1440p 2K</option>
                     <option value="1080p" selected>1080p Full HD</option>
                     <option value="720p">720p HD</option>
+                    <option value="480p">480p SD</option>
+                    <option value="360p">360p Baixa</option>
                   </select>
                 </div>
                 <div class="quick-setting">
@@ -190,6 +192,7 @@
                     <option value="120">120 FPS</option>
                     <option value="60" selected>60 FPS</option>
                     <option value="30">30 FPS</option>
+                    <option value="15">15 FPS</option>
                   </select>
                 </div>
                 <div class="quick-setting">
@@ -199,6 +202,8 @@
                     <option value="25000" selected>25 Mbps</option>
                     <option value="15000">15 Mbps</option>
                     <option value="8000">8 Mbps</option>
+                    <option value="3000">3 Mbps</option>
+                    <option value="1000">1 Mbps</option>
                   </select>
                 </div>
               </div>
@@ -257,6 +262,94 @@
       </section>
 
     </main>
+
+    <!-- MODAL: DISCORD-STYLE SCREEN / WINDOW PICKER -->
+    <div class="modal-overlay hidden" id="modal-screen-picker">
+      <div class="modal-card modal-lg">
+        <div class="modal-header">
+          <div class="modal-header-icon">
+            <!-- Lucide: ScreenShare -->
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 3H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-3"/><path d="M8 21h8"/><path d="M12 17v4"/><path d="m17 8 5-5"/><path d="M17 3h5v5"/></svg>
+          </div>
+          <div>
+            <h2>Transmitir Tela ou Janela</h2>
+            <p class="modal-subtitle">Escolha o monitor ou aplicativo que deseja transmitir para a sala.</p>
+          </div>
+          <button class="btn-close" id="btn-close-picker-modal">&times;</button>
+        </div>
+
+        <!-- Tabs: Telas | Janelas -->
+        <div class="picker-tabs">
+          <button class="picker-tab active" id="picker-tab-screens">
+            <!-- Lucide: Monitor -->
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>
+            <span>Telas Inteiras</span>
+          </button>
+          <button class="picker-tab" id="picker-tab-windows">
+            <!-- Lucide: AppWindow -->
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 4v4"/><path d="M2 8h20"/><path d="M6 4v4"/></svg>
+            <span>Janelas de Apps</span>
+          </button>
+        </div>
+
+        <div class="modal-body" style="padding: 14px 20px;">
+          <!-- Grid of Screen / Window Cards with live previews -->
+          <div class="source-cards-grid" id="source-cards-container">
+            <div class="loading-state">Carregando telas e janelas disponíveis...</div>
+          </div>
+
+          <!-- Stream Options Strip inside Modal -->
+          <div class="picker-settings-row">
+            <div class="picker-setting-item">
+              <label>Resolução:</label>
+              <select id="modal-select-resolution" class="select-input-sm">
+                <option value="4k">4K (3840x2160)</option>
+                <option value="1440p">1440p 2K</option>
+                <option value="1080p" selected>1080p Full HD</option>
+                <option value="720p">720p HD</option>
+                <option value="480p">480p SD</option>
+                <option value="360p">360p Baixa</option>
+              </select>
+            </div>
+
+            <div class="picker-setting-item">
+              <label>Taxa de FPS:</label>
+              <select id="modal-select-fps" class="select-input-sm">
+                <option value="120">120 FPS</option>
+                <option value="60" selected>60 FPS</option>
+                <option value="30">30 FPS</option>
+                <option value="15">15 FPS</option>
+              </select>
+            </div>
+
+            <div class="picker-setting-item">
+              <label>Bitrate:</label>
+              <select id="modal-select-bitrate" class="select-input-sm">
+                <option value="35000">35 Mbps</option>
+                <option value="25000" selected>25 Mbps</option>
+                <option value="15000">15 Mbps</option>
+                <option value="8000">8 Mbps</option>
+                <option value="3000">3 Mbps</option>
+                <option value="1000">1 Mbps</option>
+              </select>
+            </div>
+
+            <label class="picker-checkbox-label">
+              <input type="checkbox" id="modal-check-cursor" checked />
+              <span>Exibir Cursor</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="btn-cancel-picker" style="width: auto;">Cancelar</button>
+          <button class="btn btn-primary" id="btn-confirm-picker" style="width: auto; min-width: 140px;">
+            <span>Transmitir Ao Vivo</span>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
 
     <!-- MODAL: SET USERNAME -->
     <div class="modal-overlay hidden" id="modal-username">
