@@ -60,7 +60,7 @@ pub fn list_screen_sources() -> ScreenSourcesResponse {
                 let thumb = image::imageops::resize(&rgba_img, 300, 168, FilterType::Nearest);
                 let mut buf = Vec::new();
                 let mut cursor = Cursor::new(&mut buf);
-                let mut encoder = JpegEncoder::new_with_quality(&mut cursor, 65);
+                let mut encoder = JpegEncoder::new_with_quality(&mut cursor, 60);
                 if encoder.encode_image(&thumb).is_ok() {
                     thumb_b64 = Some(format!("data:image/jpeg;base64,{}", BASE64.encode(&buf)));
                 }
@@ -120,7 +120,7 @@ pub fn list_screen_sources() -> ScreenSourcesResponse {
                 let thumb = image::imageops::resize(&rgba_img, 300, 168, FilterType::Nearest);
                 let mut buf = Vec::new();
                 let mut cursor = Cursor::new(&mut buf);
-                let mut encoder = JpegEncoder::new_with_quality(&mut cursor, 65);
+                let mut encoder = JpegEncoder::new_with_quality(&mut cursor, 60);
                 if encoder.encode_image(&thumb).is_ok() {
                     thumb_b64 = Some(format!("data:image/jpeg;base64,{}", BASE64.encode(&buf)));
                 }
@@ -152,48 +152,122 @@ pub struct VideoFramePayload {
 }
 
 #[cfg(windows)]
-fn draw_cursor_overlay(img: &mut image::RgbaImage, origin_x: i32, origin_y: i32) {
-    use windows::Win32::UI::WindowsAndMessaging::{GetCursorInfo, CURSORINFO, CURSOR_SHOWING};
+fn draw_authentic_cursor(img: &mut image::RgbaImage, origin_x: i32, origin_y: i32) {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GetCursorInfo, GetIconInfo, DrawIconEx, CURSORINFO, CURSOR_SHOWING, DI_NORMAL, ICONINFO,
+    };
+    use windows::Win32::Graphics::Gdi::{
+        CreateCompatibleDC, CreateDIBSection, SelectObject, DeleteDC, DeleteObject,
+        BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HDC, HGDIOBJ, HBRUSH,
+    };
+    use std::ptr::null_mut;
 
     unsafe {
         let mut ci = CURSORINFO {
             cbSize: std::mem::size_of::<CURSORINFO>() as u32,
             ..Default::default()
         };
-        if GetCursorInfo(&mut ci).is_ok() && (ci.flags.0 & CURSOR_SHOWING.0 != 0) {
-            let cx = ci.ptScreenPos.x - origin_x;
-            let cy = ci.ptScreenPos.y - origin_y;
+        if GetCursorInfo(&mut ci).is_err() || (ci.flags.0 & CURSOR_SHOWING.0 == 0) {
+            return;
+        }
 
-            // Draw clean high-visibility cursor arrow
-            let arrow_pixels: &[(i32, i32, [u8; 4])] = &[
-                // Outer black border
-                (-1, -1, [0, 0, 0, 255]), (0, -1, [0, 0, 0, 255]), (1, -1, [0, 0, 0, 255]),
-                (-1, 0, [0, 0, 0, 255]), (1, 1, [0, 0, 0, 255]), (2, 2, [0, 0, 0, 255]),
-                (3, 3, [0, 0, 0, 255]), (4, 4, [0, 0, 0, 255]), (5, 5, [0, 0, 0, 255]),
-                (6, 6, [0, 0, 0, 255]), (7, 7, [0, 0, 0, 255]), (8, 8, [0, 0, 0, 255]),
-                (9, 9, [0, 0, 0, 255]), (10, 10, [0, 0, 0, 255]), (11, 11, [0, 0, 0, 255]),
-                // Inner white body
-                (0, 0, [255, 255, 255, 255]), (0, 1, [255, 255, 255, 255]), (0, 2, [255, 255, 255, 255]),
-                (0, 3, [255, 255, 255, 255]), (0, 4, [255, 255, 255, 255]), (0, 5, [255, 255, 255, 255]),
-                (0, 6, [255, 255, 255, 255]), (0, 7, [255, 255, 255, 255]), (0, 8, [255, 255, 255, 255]),
-                (0, 9, [255, 255, 255, 255]), (0, 10, [255, 255, 255, 255]),
-                (1, 2, [255, 255, 255, 255]), (1, 3, [255, 255, 255, 255]), (1, 4, [255, 255, 255, 255]),
-                (1, 5, [255, 255, 255, 255]), (1, 6, [255, 255, 255, 255]), (1, 7, [255, 255, 255, 255]),
-                (2, 3, [255, 255, 255, 255]), (2, 4, [255, 255, 255, 255]), (2, 5, [255, 255, 255, 255]),
-                (2, 6, [255, 255, 255, 255]), (3, 4, [255, 255, 255, 255]), (3, 5, [255, 255, 255, 255]),
-                (4, 5, [255, 255, 255, 255]), (4, 6, [255, 255, 255, 255]), (5, 6, [255, 255, 255, 255]),
-                (6, 7, [255, 255, 255, 255]), (7, 8, [255, 255, 255, 255]), (8, 9, [255, 255, 255, 255]),
-                (9, 10, [255, 255, 255, 255]), (10, 11, [255, 255, 255, 255]),
-            ];
+        let mut ii = ICONINFO::default();
+        if GetIconInfo(ci.hCursor, &mut ii).is_err() {
+            return;
+        }
 
-            for &(dx, dy, color) in arrow_pixels {
-                let px = cx + dx;
-                let py = cy + dy;
-                if px >= 0 && px < img.width() as i32 && py >= 0 && py < img.height() as i32 {
-                    img.put_pixel(px as u32, py as u32, image::Rgba(color));
+        let hotspot_x = ii.xHotspot as i32;
+        let hotspot_y = ii.yHotspot as i32;
+
+        if !ii.hbmMask.is_invalid() {
+            let _ = DeleteObject(HGDIOBJ(ii.hbmMask.0));
+        }
+        if !ii.hbmColor.is_invalid() {
+            let _ = DeleteObject(HGDIOBJ(ii.hbmColor.0));
+        }
+
+        let cursor_screen_x = ci.ptScreenPos.x - origin_x - hotspot_x;
+        let cursor_screen_y = ci.ptScreenPos.y - origin_y - hotspot_y;
+
+        let cursor_w = 32i32;
+        let cursor_h = 32i32;
+
+        let mem_dc = CreateCompatibleDC(HDC::default());
+        if mem_dc.is_invalid() {
+            return;
+        }
+
+        let bmi = BITMAPINFO {
+            bmiHeader: BITMAPINFOHEADER {
+                biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+                biWidth: cursor_w,
+                biHeight: -cursor_h, // top-down
+                biPlanes: 1,
+                biBitCount: 32,
+                biCompression: BI_RGB.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let mut bits: *mut std::ffi::c_void = null_mut();
+        let hbmp_res = CreateDIBSection(
+            mem_dc,
+            &bmi,
+            DIB_RGB_COLORS,
+            &mut bits,
+            windows::Win32::Foundation::HANDLE::default(),
+            0,
+        );
+
+        if let Ok(hbmp) = hbmp_res {
+            if !bits.is_null() {
+                let old_bmp = SelectObject(mem_dc, HGDIOBJ(hbmp.0));
+
+                let _ = DrawIconEx(
+                    mem_dc,
+                    0,
+                    0,
+                    ci.hCursor,
+                    cursor_w,
+                    cursor_h,
+                    0,
+                    HBRUSH::default(),
+                    DI_NORMAL,
+                );
+
+                let pixel_slice = std::slice::from_raw_parts(bits as *const u8, (cursor_w * cursor_h * 4) as usize);
+
+                for cy in 0..cursor_h {
+                    for cx in 0..cursor_w {
+                        let idx = ((cy * cursor_w + cx) * 4) as usize;
+                        let b = pixel_slice[idx];
+                        let g = pixel_slice[idx + 1];
+                        let r = pixel_slice[idx + 2];
+                        let a = pixel_slice[idx + 3];
+
+                        if a > 0 || r > 0 || g > 0 || b > 0 {
+                            let target_x = cursor_screen_x + cx;
+                            let target_y = cursor_screen_y + cy;
+
+                            if target_x >= 0 && target_x < img.width() as i32 && target_y >= 0 && target_y < img.height() as i32 {
+                                let alpha = if a > 0 { a as f32 / 255.0 } else { 1.0 };
+                                let existing = img.get_pixel(target_x as u32, target_y as u32);
+                                let out_r = (r as f32 * alpha + existing[0] as f32 * (1.0 - alpha)) as u8;
+                                let out_g = (g as f32 * alpha + existing[1] as f32 * (1.0 - alpha)) as u8;
+                                let out_b = (b as f32 * alpha + existing[2] as f32 * (1.0 - alpha)) as u8;
+                                img.put_pixel(target_x as u32, target_y as u32, image::Rgba([out_r, out_g, out_b, 255]));
+                            }
+                        }
+                    }
                 }
+
+                let _ = SelectObject(mem_dc, old_bmp);
+                let _ = DeleteObject(HGDIOBJ(hbmp.0));
             }
         }
+
+        let _ = DeleteDC(mem_dc);
     }
 }
 
@@ -212,9 +286,9 @@ pub fn start_native_screen_capture(
     let is_capturing_clone = is_capturing.clone();
 
     let fps = target_fps.max(15).min(120);
-    let frame_delay_ms = (1000 / fps).max(8) as u64;
+    let frame_delay_ms = (1000 / fps).max(6) as u64;
     let should_draw_mouse = capture_mouse.unwrap_or(true);
-    let jpeg_quality = quality.unwrap_or(90).max(60).min(98);
+    let jpeg_quality = quality.unwrap_or(85).max(60).min(95);
 
     std::thread::spawn(move || {
         let is_window = source_id.starts_with("window:");
@@ -231,7 +305,7 @@ pub fn start_native_screen_capture(
         while is_capturing_clone.load(Ordering::Relaxed) && CAPTURING_VIDEO.load(Ordering::Relaxed) {
             let start_time = std::time::Instant::now();
 
-            let mut captured_img = if is_window {
+            let captured_img = if is_window {
                 if let Ok(windows) = Window::all() {
                     windows
                         .into_iter()
@@ -242,7 +316,7 @@ pub fn start_native_screen_capture(
                             w.capture_image().ok().map(|mut img| {
                                 #[cfg(windows)]
                                 if should_draw_mouse {
-                                    draw_cursor_overlay(&mut img, origin_x, origin_y);
+                                    draw_authentic_cursor(&mut img, origin_x, origin_y);
                                 }
                                 img
                             })
@@ -258,7 +332,7 @@ pub fn start_native_screen_capture(
                         m.capture_image().ok().map(|mut img| {
                             #[cfg(windows)]
                             if should_draw_mouse {
-                                draw_cursor_overlay(&mut img, origin_x, origin_y);
+                                draw_authentic_cursor(&mut img, origin_x, origin_y);
                             }
                             img
                         })
@@ -268,14 +342,15 @@ pub fn start_native_screen_capture(
                 }
             };
 
-            if let Some(mut img) = captured_img.take() {
+            if let Some(img) = captured_img {
+                // Avoid expensive resizing if dimensions match
                 let scaled_img = if img.width() != target_width || img.height() != target_height {
                     image::imageops::resize(&img, target_width, target_height, FilterType::Nearest)
                 } else {
                     img
                 };
 
-                let mut jpeg_bytes = Vec::new();
+                let mut jpeg_bytes = Vec::with_capacity(120_000);
                 let mut cursor = Cursor::new(&mut jpeg_bytes);
                 let mut encoder = JpegEncoder::new_with_quality(&mut cursor, jpeg_quality);
                 if encoder.encode_image(&scaled_img).is_ok() {
