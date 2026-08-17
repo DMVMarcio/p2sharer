@@ -32,6 +32,7 @@ class App {
   private layoutMode: 'grid' | 'spotlight' = 'grid';
   private pinnedPeerId: string | null = null;
   private streamVolumes: Map<string, { volume: number; muted: boolean }> = new Map();
+  private isSidebarCollapsed: boolean = false;
 
   // Custom Screen Picker State
   private availableMonitors: MonitorSource[] = [];
@@ -132,6 +133,9 @@ class App {
     // Layout Toggle (Grid vs Spotlight)
     document.getElementById('btn-toggle-layout')?.addEventListener('click', () => this.toggleLayoutMode());
 
+    // Toggle Sidebar (Chat)
+    document.getElementById('btn-toggle-sidebar')?.addEventListener('click', () => this.toggleSidebar());
+
     // Inside Room: Share Screen toggle
     document.getElementById('btn-toggle-share-screen')?.addEventListener('click', () => {
       if (this.isSharingScreen) {
@@ -169,6 +173,16 @@ class App {
     document.getElementById('room-code-pill')?.addEventListener('click', () => this.copyRoomCodeToClipboard());
     document.getElementById('btn-leave-room')?.addEventListener('click', () => this.leaveRoom());
     document.getElementById('btn-room-fullscreen')?.addEventListener('click', () => this.toggleFullscreen());
+    document.getElementById('btn-floating-exit-fs')?.addEventListener('click', () => this.exitFullscreen());
+
+    // Fullscreen change listener to sync UI buttons
+    document.addEventListener('fullscreenchange', () => {
+      const isFs = Boolean(document.fullscreenElement);
+      const floatBtn = document.getElementById('btn-floating-exit-fs');
+      if (floatBtn) {
+        floatBtn.classList.toggle('hidden', !isFs);
+      }
+    });
 
     // Sidebar Tabs
     document.getElementById('tab-chat')?.addEventListener('click', () => this.switchSidebarTab('chat'));
@@ -187,6 +201,19 @@ class App {
         input.value = '';
       }
     });
+  }
+
+  // --- TOGGLE SIDEBAR (CHAT) ---
+  private toggleSidebar() {
+    this.isSidebarCollapsed = !this.isSidebarCollapsed;
+    const sidebar = document.getElementById('room-sidebar');
+    const label = document.getElementById('label-toggle-sidebar');
+    if (sidebar) {
+      sidebar.classList.toggle('collapsed', this.isSidebarCollapsed);
+    }
+    if (label) {
+      label.textContent = this.isSidebarCollapsed ? 'Abrir Chat' : 'Chat';
+    }
   }
 
   // --- CREATE ROOM ---
@@ -284,11 +311,17 @@ class App {
   // --- DYNAMIC MULTI-STREAM RENDERER (GOOGLE MEET / DISCORD STYLE) ---
   private toggleLayoutMode() {
     this.layoutMode = this.layoutMode === 'grid' ? 'spotlight' : 'grid';
+    this.updateLayoutToggleUI();
+    this.renderStreams();
+  }
+
+  private updateLayoutToggleUI() {
     const label = document.getElementById('label-toggle-layout');
     if (label) {
-      label.textContent = this.layoutMode === 'grid' ? 'Modo Grade' : 'Modo Destaque';
+      // If currently in spotlight mode, show button option to return to Grid ("Modo Grade")
+      // If currently in grid mode, show button option to switch to Spotlight ("Modo Destaque")
+      label.textContent = this.layoutMode === 'spotlight' ? 'Modo Grade' : 'Modo Destaque';
     }
-    this.renderStreams();
   }
 
   private renderStreams() {
@@ -326,6 +359,8 @@ class App {
     if (!this.pinnedPeerId || !this.activeStreams.some((s) => s.peerId === this.pinnedPeerId)) {
       this.pinnedPeerId = this.activeStreams[0].peerId;
     }
+
+    this.updateLayoutToggleUI();
 
     wrapper.className = `streams-grid-wrapper active ${this.layoutMode === 'grid' ? 'layout-grid' : 'layout-spotlight'}`;
     wrapper.innerHTML = '';
@@ -403,6 +438,18 @@ class App {
       <input type="range" class="stream-volume-slider" min="0" max="1" step="0.02" value="${volState.muted ? 0 : volState.volume}" title="Volume: ${Math.round(volState.volume * 100)}%" />
     `;
 
+    // Clicking anywhere on the card switches to spotlight mode on that stream!
+    card.addEventListener('click', (e) => {
+      // Don't trigger if clicked on volume slider or action tools
+      const target = e.target as HTMLElement;
+      if (target.closest('.stream-card-footer') || target.closest('.stream-card-tools')) {
+        return;
+      }
+      this.pinnedPeerId = item.peerId;
+      this.layoutMode = 'spotlight';
+      this.renderStreams();
+    });
+
     // Bind Pin Button
     header.querySelector('.btn-pin-stream')?.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -426,6 +473,7 @@ class App {
     const muteBtn = footer.querySelector('.stream-mute-btn') as HTMLButtonElement;
 
     volSlider?.addEventListener('input', (e) => {
+      e.stopPropagation();
       const val = parseFloat((e.target as HTMLInputElement).value);
       volState.volume = val;
       volState.muted = val === 0;
@@ -436,7 +484,8 @@ class App {
     });
 
     // Bind Mute Toggle Button
-    muteBtn?.addEventListener('click', () => {
+    muteBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
       volState.muted = !volState.muted;
       video.muted = volState.muted;
       muteBtn.classList.toggle('muted', volState.muted);
@@ -671,6 +720,12 @@ class App {
     if (!document.fullscreenElement) {
       container.requestFullscreen().catch(() => {});
     } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  }
+
+  private exitFullscreen() {
+    if (document.fullscreenElement) {
       document.exitFullscreen().catch(() => {});
     }
   }
