@@ -5,8 +5,11 @@ import { NativeVideoBridge } from './native_video_bridge';
 import {
   ActiveStreamInfo,
   ChatMessage,
+  MonitorSource,
   PeerInfo,
   ProcessItem,
+  ScreenSourcesResponse,
+  WindowSource,
 } from './types';
 
 class App {
@@ -31,7 +34,12 @@ class App {
   private streamVolumes: Map<string, { volume: number; muted: boolean }> = new Map();
   private isSidebarCollapsed: boolean = false;
 
-  // Stream Settings State
+  // Stream Settings & Picker State
+  private availableMonitors: MonitorSource[] = [];
+  private availableWindows: WindowSource[] = [];
+  private currentPickerTab: 'screens' | 'windows' = 'screens';
+  private selectedSourceId: string = 'screen:0';
+
   private currentFps: number = 60;
   private currentBitrate: number = 25000;
   private currentResolution: { width: number; height: number; label: string } = { width: 1920, height: 1080, label: '1080p' };
@@ -137,14 +145,22 @@ class App {
     // Toggle Sidebar (Chat)
     document.getElementById('btn-toggle-sidebar')?.addEventListener('click', () => this.toggleSidebar());
 
-    // Direct 1-Click Screen Share Button
+    // Transmission Button (Opens Discord-style picker or stops active stream)
     document.getElementById('btn-toggle-share-screen')?.addEventListener('click', () => {
       if (this.isSharingScreen) {
         this.stopScreenSharing();
       } else {
-        this.startScreenCapture();
+        this.openScreenPickerModal();
       }
     });
+
+    // Screen Picker Modal Tabs & Buttons
+    document.getElementById('btn-close-picker-modal')?.addEventListener('click', () => this.closeScreenPickerModal());
+    document.getElementById('btn-cancel-picker')?.addEventListener('click', () => this.closeScreenPickerModal());
+    document.getElementById('btn-confirm-picker')?.addEventListener('click', () => this.startSelectedCapture());
+
+    document.getElementById('picker-tab-screens')?.addEventListener('click', () => this.switchPickerTab('screens'));
+    document.getElementById('picker-tab-windows')?.addEventListener('click', () => this.switchPickerTab('windows'));
 
     // Audio Filter Modal
     document.getElementById('btn-open-audio-filter')?.addEventListener('click', () => this.openAudioFilterModal());
@@ -322,7 +338,7 @@ class App {
     if (bitrateEl) bitrateEl.textContent = `${(this.currentBitrate / 1000).toFixed(1)} Mbps`;
   }
 
-  // --- DYNAMIC MULTI-STREAM RENDERER (GOOGLE MEET / DISCORD STYLE) ---
+  // --- DYNAMIC MULTI-STREAM RENDERER ---
   private renderStreams() {
     const wrapper = document.getElementById('streams-grid-wrapper');
     const idleBox = document.getElementById('room-video-idle');
@@ -438,7 +454,7 @@ class App {
       <input type="range" class="stream-volume-slider" min="0" max="1" step="0.02" value="${volState.muted ? 0 : volState.volume}" title="Volume: ${Math.round(volState.volume * 100)}%" />
     `;
 
-    // Clicking anywhere on the card switches to spotlight, OR returns to grid if already in spotlight!
+    // Clicking anywhere on the card toggles spotlight <-> grid
     card.addEventListener('click', (e) => {
       const target = e.target as HTMLElement;
       if (target.closest('.stream-card-footer') || target.closest('.stream-card-tools')) {
@@ -453,7 +469,7 @@ class App {
       this.renderStreams();
     });
 
-    // Bind Pin Button (Toggles Spotlight <-> Grid)
+    // Bind Pin Button
     header.querySelector('.btn-pin-stream')?.addEventListener('click', (e) => {
       e.stopPropagation();
       if (this.layoutMode === 'spotlight' && this.pinnedPeerId === item.peerId) {
@@ -511,36 +527,150 @@ class App {
     return card;
   }
 
-  // --- START HARDWARE-ACCELERATED SCREEN CAPTURE (1-CLICK DIRECT FLOW) ---
-  private async startScreenCapture() {
-    const resValue = (document.getElementById('quick-select-resolution') as HTMLSelectElement)?.value || '1080p';
-    const fpsValue = parseInt((document.getElementById('quick-select-fps') as HTMLSelectElement)?.value, 10) || 60;
-    const bitrateValue = parseInt((document.getElementById('quick-select-bitrate') as HTMLSelectElement)?.value, 10) || 25000;
+  // --- DISCORD-STYLE SCREEN / WINDOW PICKER MODAL ---
+  private async openScreenPickerModal() {
+    const modal = document.getElementById('modal-screen-picker');
+    modal?.classList.remove('hidden');
+    await this.refreshScreenSources();
+  }
+
+  private closeScreenPickerModal() {
+    document.getElementById('modal-screen-picker')?.classList.add('hidden');
+  }
+
+  private switchPickerTab(tab: 'screens' | 'windows') {
+    this.currentPickerTab = tab;
+    document.getElementById('picker-tab-screens')?.classList.toggle('active', tab === 'screens');
+    document.getElementById('picker-tab-windows')?.classList.toggle('active', tab === 'windows');
+    this.renderSourceCards();
+  }
+
+  private async refreshScreenSources() {
+    const container = document.getElementById('source-cards-container');
+    if (container) {
+      container.innerHTML = '<div class="loading-state">Capturando miniaturas das telas e janelas...</div>';
+    }
+
+    try {
+      const res = await invoke<ScreenSourcesResponse>('list_screen_sources');
+      this.availableMonitors = res.monitors || [];
+      this.availableWindows = res.windows || [];
+
+      if (this.availableMonitors.length > 0 && !this.selectedSourceId) {
+        this.selectedSourceId = this.availableMonitors[0].id;
+      }
+
+      this.renderSourceCards();
+    } catch (err) {
+      console.warn('Fallback loading screen sources:', err);
+      this.availableMonitors = [
+        { id: 'screen:0', name: 'Monitor 1 (Principal)', width: 1920, height: 1080, is_primary: true, thumbnail: undefined },
+      ];
+      this.renderSourceCards();
+    }
+  }
+
+  private renderSourceCards() {
+    const container = document.getElementById('source-cards-container');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    if (this.currentPickerTab === 'screens') {
+      if (this.availableMonitors.length === 0) {
+        container.innerHTML = '<div class="loading-state">Nenhum monitor detectado.</div>';
+        return;
+      }
+
+      this.availableMonitors.forEach((mon) => {
+        const isSelected = this.selectedSourceId === mon.id;
+        const card = document.createElement('div');
+        card.className = `source-card ${isSelected ? 'selected' : ''}`;
+        card.innerHTML = `
+          <div class="source-card-thumb">
+            ${mon.thumbnail ? `<img src="${mon.thumbnail}" alt="${mon.name}" />` : '<div class="source-card-thumb-placeholder">Monitor</div>'}
+          </div>
+          <div class="source-card-info">
+            <div class="source-card-title">${mon.name}</div>
+            <div class="source-card-subtitle">${mon.width}x${mon.height}</div>
+          </div>
+        `;
+        card.addEventListener('click', () => {
+          this.selectedSourceId = mon.id;
+          this.renderSourceCards();
+        });
+        container.appendChild(card);
+      });
+    } else {
+      if (this.availableWindows.length === 0) {
+        container.innerHTML = '<div class="loading-state">Nenhuma janela aberta encontrada.</div>';
+        return;
+      }
+
+      this.availableWindows.forEach((win) => {
+        const isSelected = this.selectedSourceId === win.id;
+        const card = document.createElement('div');
+        card.className = `source-card ${isSelected ? 'selected' : ''}`;
+        card.innerHTML = `
+          <div class="source-card-thumb">
+            ${win.thumbnail ? `<img src="${win.thumbnail}" alt="${win.title}" />` : '<div class="source-card-thumb-placeholder">Janela</div>'}
+          </div>
+          <div class="source-card-info">
+            <div class="source-card-title">${win.title || win.process_name}</div>
+            <div class="source-card-subtitle">${win.process_name}</div>
+          </div>
+        `;
+        card.addEventListener('click', () => {
+          this.selectedSourceId = win.id;
+          this.renderSourceCards();
+        });
+        container.appendChild(card);
+      });
+    }
+  }
+
+  private async startSelectedCapture() {
+    this.closeScreenPickerModal();
+
+    const resValue = (document.getElementById('modal-select-resolution') as HTMLSelectElement)?.value || '1080p';
+    const fpsValue = parseInt((document.getElementById('modal-select-fps') as HTMLSelectElement)?.value, 10) || 60;
+    const bitrateValue = parseInt((document.getElementById('modal-select-bitrate') as HTMLSelectElement)?.value, 10) || 25000;
+    const mouseEnabled = (document.getElementById('modal-check-cursor') as HTMLInputElement)?.checked ?? true;
 
     let res = { width: 1920, height: 1080, label: '1080p' };
     if (resValue === '4k') res = { width: 3840, height: 2160, label: '4K' };
     else if (resValue === '1440p') res = { width: 2560, height: 1440, label: '1440p' };
     else if (resValue === '720p') res = { width: 1280, height: 720, label: '720p' };
+    else if (resValue === '480p') res = { width: 854, height: 480, label: '480p' };
+    else if (resValue === '360p') res = { width: 640, height: 360, label: '360p' };
 
     this.currentFps = fpsValue;
     this.currentBitrate = bitrateValue;
     this.currentResolution = res;
+
+    // Sync bottom quick select controls as well
+    const qRes = document.getElementById('quick-select-resolution') as HTMLSelectElement;
+    const qFps = document.getElementById('quick-select-fps') as HTMLSelectElement;
+    const qBit = document.getElementById('quick-select-bitrate') as HTMLSelectElement;
+    if (qRes) qRes.value = resValue;
+    if (qFps) qFps.value = String(fpsValue);
+    if (qBit) qBit.value = String(bitrateValue);
 
     try {
       // 1. Audio bridge listener
       const customAudioTrack = this.audioBridge.init();
       await this.audioBridge.startListening();
 
-      // 2. Direct GPU Hardware Capture (Opens system picker immediately in 1 click!)
+      // 2. Direct GPU Hardware Capture
       const videoStream = await this.nativeVideoBridge.startCapture(
-        'screen:0',
+        this.selectedSourceId,
         fpsValue,
         res,
-        true,
+        mouseEnabled,
         92
       );
 
-      // Listen for when the user clicks browser's native "Parar de compartilhar"
+      // Listen for when the user clicks native "Parar de compartilhar"
       videoStream.getVideoTracks()[0].onended = () => {
         this.stopScreenSharing();
       };
