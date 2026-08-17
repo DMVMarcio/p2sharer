@@ -24,6 +24,14 @@
       </div>
 
       <div class="header-user-info">
+        <!-- Room Code Header Pill (Visible inside room) -->
+        <div class="room-code-header-pill hidden" id="header-room-code-pill" title="Clique para copiar o código da sala">
+          <span style="color: var(--text-muted); font-size: 11px; font-weight: 700;">SALA:</span>
+          <strong id="display-room-code" style="color: var(--accent-cyan); font-family: var(--font-mono); font-size: 13px;">P2P-1234</strong>
+          <!-- Lucide: Copy -->
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+        </div>
+
         <div class="user-pill" id="user-pill" title="Clique para alterar seu apelido">
           <span class="user-status-dot"></span>
           <span id="current-username-display">Usuário</span>
@@ -106,11 +114,12 @@
                   <span id="label-toggle-layout">Modo Destaque</span>
                 </button>
 
-                <!-- Share / Stop Share Button -->
-                <button class="btn btn-sm btn-accent" id="btn-toggle-share-screen">
+                <!-- Transmission Manager Button (Always titled "Transmissão") -->
+                <button class="btn btn-sm btn-outline" id="btn-toggle-share-screen">
+                  <span class="stream-sharing-indicator" id="stream-sharing-dot"></span>
                   <!-- Lucide: ScreenShare -->
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 3H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-3"/><path d="M8 21h8"/><path d="M12 17v4"/><path d="m17 8 5-5"/><path d="M17 3h5v5"/></svg>
-                  <span id="label-toggle-share">Compartilhar Tela</span>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 3H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-3"/><path d="M8 21h8"/><path d="M12 17v4"/><path d="m17 8 5-5"/><path d="M17 3h5v5"/></svg>
+                  <span>Transmissão</span>
                 </button>
 
                 <!-- Audio Filter Config -->
@@ -154,15 +163,14 @@
                 <!-- Lucide: Tv -->
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--text-muted);"><rect width="20" height="15" x="2" y="7" rx="2"/><polyline points="17 2 12 7 7 2"/></svg>
                 <h3>Nenhum participante transmitindo</h3>
-                <p>Clique em <strong>"Compartilhar Tela"</strong> acima para transmitir seu monitor ou janela para a sala.</p>
+                <p>Clique em <strong>"Transmissão"</strong> acima para transmitir seu monitor ou janela para a sala.</p>
               </div>
 
-              <!-- Floating Room Code -->
-              <div class="room-code-floating" id="room-code-pill" title="Clique para copiar o código da sala">
-                <span style="color: var(--text-muted);">SALA:</span>
-                <strong id="display-room-code" style="color: var(--accent-cyan);">P2P-1234</strong>
-                <!-- Lucide: Copy -->
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+              <!-- Live Stream Stats HUD (Resolution, FPS, Speed/Bitrate) -->
+              <div class="stream-stats-floating" id="stream-stats-floating">
+                <div class="stat-pill"><span class="stat-dot"></span><span id="hud-stat-resolution">1080p</span></div>
+                <div class="stat-pill"><span id="hud-stat-fps">60 FPS</span></div>
+                <div class="stat-pill"><span id="hud-stat-bitrate">15.0 Mbps</span></div>
               </div>
 
               <!-- Floating Exit Fullscreen Button (Visible only during fullscreen) -->
@@ -255,7 +263,7 @@
       </div>
     </div>
 
-    <!-- MODAL: CUSTOM SCREEN & APPLICATION PICKER -->
+    <!-- MODAL: TRANSMISSION MANAGER & SCREEN PICKER -->
     <div class="modal-overlay hidden" id="modal-custom-screen-picker">
       <div class="modal-card modal-xl">
         <div class="modal-header">
@@ -264,7 +272,7 @@
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>
           </div>
           <div>
-            <h2>Selecione o que deseja Transmitir</h2>
+            <h2 id="screen-picker-modal-title">Gerenciar Transmissão de Tela</h2>
             <p class="modal-subtitle">Escolha um monitor inteiro ou a janela de um aplicativo aberto no Windows.</p>
           </div>
           <button class="btn-close" id="btn-close-screen-picker">&times;</button>
@@ -298,7 +306,7 @@
             </div>
           </div>
 
-          <!-- SEPARATE QUALITY, FPS AND BITRATE CONTROLS -->
+          <!-- SEPARATE QUALITY, FPS, BITRATE AND MOUSE CONTROLS -->
           <div class="picker-bottom-settings-grid">
             <div class="picker-setting-card">
               <label>
@@ -337,19 +345,32 @@
                 <span>Taxa de Bits (Bitrate):</span>
               </label>
               <select id="picker-select-bitrate" class="select-input">
-                <option value="25000">25 Mbps (Qualidade Máxima)</option>
-                <option value="15000" selected>15 Mbps (Alta Fidelidade)</option>
+                <option value="25000" selected>25 Mbps (Qualidade Máxima)</option>
+                <option value="15000">15 Mbps (Alta Fidelidade)</option>
                 <option value="8000">8 Mbps (Equilibrado)</option>
                 <option value="4000">4 Mbps (Baixo Consumo)</option>
               </select>
             </div>
           </div>
+
+          <!-- MOUSE CURSOR TOGGLE OPTION -->
+          <div class="picker-mouse-toggle-row">
+            <label class="checkbox-label">
+              <input type="checkbox" id="picker-checkbox-mouse" checked />
+              <span>Exibir cursor do mouse na transmissão</span>
+            </label>
+          </div>
         </div>
 
         <div class="modal-footer">
-          <button class="btn btn-secondary" id="btn-cancel-screen-picker">Cancelar</button>
-          <button class="btn btn-primary" id="btn-confirm-start-stream">
-            <span>Iniciar Transmissão</span>
+          <button class="btn btn-danger hidden" id="btn-modal-stop-stream" style="width: auto; margin-right: auto;">
+            <!-- Lucide: Square -->
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><rect width="18" height="18" x="3" y="3" rx="2"/></svg>
+            <span>Encerrar Transmissão</span>
+          </button>
+          <button class="btn btn-secondary" id="btn-cancel-screen-picker" style="width: auto;">Fechar</button>
+          <button class="btn btn-primary" id="btn-confirm-start-stream" style="width: auto;">
+            <span id="label-btn-start-stream">Iniciar Transmissão</span>
             <!-- Lucide: ArrowRight -->
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" x2="19" y1="12" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
           </button>

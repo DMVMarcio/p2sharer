@@ -39,6 +39,9 @@ class App {
   private availableWindows: WindowSource[] = [];
   private selectedSourceId: string = 'screen:0';
   private selectedSourceName: string = 'Monitor Principal';
+  private currentFps: number = 60;
+  private currentBitrate: number = 25000;
+  private currentResolution: { width: number; height: number; label: string } = { width: 1920, height: 1080, label: '1080p' };
 
   constructor() {
     this.init();
@@ -88,6 +91,11 @@ class App {
     document.querySelectorAll('.view').forEach((el) => el.classList.remove('active'));
     const target = document.getElementById(viewId);
     if (target) target.classList.add('active');
+
+    const headerPill = document.getElementById('header-room-code-pill');
+    if (headerPill) {
+      headerPill.classList.toggle('hidden', viewId !== 'view-group-room');
+    }
   }
 
   // --- TOAST NOTIFICATIONS ---
@@ -121,6 +129,9 @@ class App {
       this.showToast(`Nome salvo: ${this.username}`);
     });
 
+    // Header Room Code Pill Copy
+    document.getElementById('header-room-code-pill')?.addEventListener('click', () => this.copyRoomCodeToClipboard());
+
     // Home Actions
     document.getElementById('btn-create-room-direct')?.addEventListener('click', () => this.createRoomAsHost());
     document.getElementById('btn-start-join-flow')?.addEventListener('click', () => this.openJoinDialog());
@@ -136,13 +147,9 @@ class App {
     // Toggle Sidebar (Chat)
     document.getElementById('btn-toggle-sidebar')?.addEventListener('click', () => this.toggleSidebar());
 
-    // Inside Room: Share Screen toggle
+    // Inside Room: Transmission Manager Button (Always titled "Transmissão")
     document.getElementById('btn-toggle-share-screen')?.addEventListener('click', () => {
-      if (this.isSharingScreen) {
-        this.stopScreenSharing();
-      } else {
-        this.openScreenPickerModal();
-      }
+      this.openScreenPickerModal();
     });
 
     // Custom Screen Picker Modal
@@ -151,6 +158,10 @@ class App {
     document.getElementById('tab-source-screens')?.addEventListener('click', () => this.switchSourcePickerTab('screens'));
     document.getElementById('tab-source-windows')?.addEventListener('click', () => this.switchSourcePickerTab('windows'));
     document.getElementById('btn-confirm-start-stream')?.addEventListener('click', () => this.confirmStartScreenCapture());
+    document.getElementById('btn-modal-stop-stream')?.addEventListener('click', () => {
+      this.stopScreenSharing();
+      this.closeScreenPickerModal();
+    });
 
     // Audio Filter Modal
     document.getElementById('btn-open-audio-filter')?.addEventListener('click', () => this.openAudioFilterModal());
@@ -170,7 +181,6 @@ class App {
     });
 
     // Room Topbar Controls
-    document.getElementById('room-code-pill')?.addEventListener('click', () => this.copyRoomCodeToClipboard());
     document.getElementById('btn-leave-room')?.addEventListener('click', () => this.leaveRoom());
     document.getElementById('btn-room-fullscreen')?.addEventListener('click', () => this.toggleFullscreen());
     document.getElementById('btn-floating-exit-fs')?.addEventListener('click', () => this.exitFullscreen());
@@ -274,6 +284,7 @@ class App {
       onStreamsUpdate: (streams) => {
         this.activeStreams = streams;
         this.renderStreams();
+        this.updateStatsHUD();
       },
       onChat: (msg) => {
         this.appendChatMessage(msg);
@@ -318,10 +329,27 @@ class App {
   private updateLayoutToggleUI() {
     const label = document.getElementById('label-toggle-layout');
     if (label) {
-      // If currently in spotlight mode, show button option to return to Grid ("Modo Grade")
-      // If currently in grid mode, show button option to switch to Spotlight ("Modo Destaque")
       label.textContent = this.layoutMode === 'spotlight' ? 'Modo Grade' : 'Modo Destaque';
     }
+  }
+
+  private updateStatsHUD() {
+    const hud = document.getElementById('stream-stats-floating');
+    const resEl = document.getElementById('hud-stat-resolution');
+    const fpsEl = document.getElementById('hud-stat-fps');
+    const bitrateEl = document.getElementById('hud-stat-bitrate');
+
+    if (!hud) return;
+
+    if (this.activeStreams.length === 0) {
+      hud.style.display = 'none';
+      return;
+    }
+
+    hud.style.display = 'flex';
+    if (resEl) resEl.textContent = this.currentResolution.label;
+    if (fpsEl) fpsEl.textContent = `${this.currentFps} FPS`;
+    if (bitrateEl) bitrateEl.textContent = `${(this.currentBitrate / 1000).toFixed(1)} Mbps`;
   }
 
   private renderStreams() {
@@ -341,6 +369,7 @@ class App {
         liveBadge.textContent = 'SALA ATIVA';
         liveBadge.classList.remove('streaming');
       }
+      this.updateStatsHUD();
       return;
     }
 
@@ -361,6 +390,7 @@ class App {
     }
 
     this.updateLayoutToggleUI();
+    this.updateStatsHUD();
 
     wrapper.className = `streams-grid-wrapper active ${this.layoutMode === 'grid' ? 'layout-grid' : 'layout-spotlight'}`;
     wrapper.innerHTML = '';
@@ -419,7 +449,7 @@ class App {
         <span>${item.senderName}</span>
       </div>
       <div class="stream-card-tools">
-        <button class="stream-card-btn btn-pin-stream" title="Destacar tela">
+        <button class="stream-card-btn btn-pin-stream" title="${isPinned && this.layoutMode === 'spotlight' ? 'Voltar para Grade' : 'Destacar tela'}">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 17v4"/><path d="M5 17h14"/><path d="m15 2-3 3-3-3"/></svg>
         </button>
         <button class="stream-card-btn btn-fs-stream" title="Tela cheia">
@@ -438,23 +468,30 @@ class App {
       <input type="range" class="stream-volume-slider" min="0" max="1" step="0.02" value="${volState.muted ? 0 : volState.volume}" title="Volume: ${Math.round(volState.volume * 100)}%" />
     `;
 
-    // Clicking anywhere on the card switches to spotlight mode on that stream!
+    // Clicking anywhere on the card switches to spotlight, OR returns to grid if already in spotlight!
     card.addEventListener('click', (e) => {
-      // Don't trigger if clicked on volume slider or action tools
       const target = e.target as HTMLElement;
       if (target.closest('.stream-card-footer') || target.closest('.stream-card-tools')) {
         return;
       }
-      this.pinnedPeerId = item.peerId;
-      this.layoutMode = 'spotlight';
+      if (this.layoutMode === 'spotlight' && this.pinnedPeerId === item.peerId) {
+        this.layoutMode = 'grid';
+      } else {
+        this.pinnedPeerId = item.peerId;
+        this.layoutMode = 'spotlight';
+      }
       this.renderStreams();
     });
 
-    // Bind Pin Button
+    // Bind Pin Button (Toggles Spotlight <-> Grid)
     header.querySelector('.btn-pin-stream')?.addEventListener('click', (e) => {
       e.stopPropagation();
-      this.pinnedPeerId = item.peerId;
-      this.layoutMode = 'spotlight';
+      if (this.layoutMode === 'spotlight' && this.pinnedPeerId === item.peerId) {
+        this.layoutMode = 'grid';
+      } else {
+        this.pinnedPeerId = item.peerId;
+        this.layoutMode = 'spotlight';
+      }
       this.renderStreams();
     });
 
@@ -507,6 +544,20 @@ class App {
   // --- CUSTOM SCREEN & APPLICATION PICKER ---
   private async openScreenPickerModal() {
     const modal = document.getElementById('modal-custom-screen-picker');
+    const stopBtn = document.getElementById('btn-modal-stop-stream');
+    const confirmBtnLabel = document.getElementById('label-btn-start-stream');
+    const modalTitle = document.getElementById('screen-picker-modal-title');
+
+    if (stopBtn) {
+      stopBtn.classList.toggle('hidden', !this.isSharingScreen);
+    }
+    if (confirmBtnLabel) {
+      confirmBtnLabel.textContent = this.isSharingScreen ? 'Atualizar Transmissão' : 'Iniciar Transmissão';
+    }
+    if (modalTitle) {
+      modalTitle.textContent = this.isSharingScreen ? 'Gerenciar Transmissão de Tela' : 'Iniciar Transmissão de Tela';
+    }
+
     modal?.classList.remove('hidden');
     await this.loadScreenSources();
   }
@@ -631,23 +682,44 @@ class App {
   private async confirmStartScreenCapture() {
     const resValue = (document.getElementById('picker-select-resolution') as HTMLSelectElement).value;
     const fpsValue = parseInt((document.getElementById('picker-select-fps') as HTMLSelectElement).value, 10) || 60;
+    const bitrateValue = parseInt((document.getElementById('picker-select-bitrate') as HTMLSelectElement).value, 10) || 25000;
+    const captureMouse = (document.getElementById('picker-checkbox-mouse') as HTMLInputElement)?.checked ?? true;
 
-    let res = { width: 1920, height: 1080 };
-    if (resValue === '4k') res = { width: 3840, height: 2160 };
-    else if (resValue === '1440p') res = { width: 2560, height: 1440 };
-    else if (resValue === '720p') res = { width: 1280, height: 720 };
-    else if (resValue === '480p') res = { width: 854, height: 480 };
+    let res = { width: 1920, height: 1080, label: '1080p' };
+    if (resValue === '4k') res = { width: 3840, height: 2160, label: '4K' };
+    else if (resValue === '1440p') res = { width: 2560, height: 1440, label: '1440p' };
+    else if (resValue === '720p') res = { width: 1280, height: 720, label: '720p' };
+    else if (resValue === '480p') res = { width: 854, height: 480, label: '480p' };
+
+    this.currentFps = fpsValue;
+    this.currentBitrate = bitrateValue;
+    this.currentResolution = res;
+
+    // If currently sharing, stop old capture gracefully before restarting with new settings
+    if (this.isSharingScreen) {
+      this.nativeVideoBridge.stop();
+      this.audioBridge.stop();
+      if (this.activeLocalStream) {
+        this.activeLocalStream.getTracks().forEach((t) => t.stop());
+      }
+    }
 
     this.closeScreenPickerModal();
-    this.showToast('Iniciando captura direta...');
+    this.showToast('Iniciando captura direta em alta fidelidade...');
 
     try {
       // 1. Audio bridge listener
       const customAudioTrack = this.audioBridge.init();
       await this.audioBridge.startListening();
 
-      // 2. Native Canvas Video Capture
-      const videoStream = await this.nativeVideoBridge.startCapture(this.selectedSourceId, fpsValue, res);
+      // 2. High-quality Native Video Capture with Mouse Overlay and quality 92
+      const videoStream = await this.nativeVideoBridge.startCapture(
+        this.selectedSourceId,
+        fpsValue,
+        res,
+        captureMouse,
+        92
+      );
 
       // 3. Assemble combined MediaStream
       const combinedStream = new MediaStream();
@@ -669,6 +741,7 @@ class App {
       if (sourceLabel) sourceLabel.textContent = `${this.selectedSourceName} (${res.width}x${res.height} @ ${fpsValue}fps)`;
 
       this.updateShareButtonUI(true);
+      this.updateStatsHUD();
       this.showToast('Você está transmitindo sua tela!');
     } catch (err: unknown) {
       console.error('Failed to start native capture:', err);
@@ -697,20 +770,14 @@ class App {
     if (sourceLabel) sourceLabel.textContent = 'Nenhuma tela ativa';
 
     this.updateShareButtonUI(false);
+    this.updateStatsHUD();
     this.showToast('Sua transmissão de tela foi encerrada.');
   }
 
   private updateShareButtonUI(isSharing: boolean) {
-    const btn = document.getElementById('btn-toggle-share-screen');
-    const label = document.getElementById('label-toggle-share');
-    if (btn && label) {
-      if (isSharing) {
-        btn.className = 'btn btn-sm btn-danger';
-        label.textContent = 'Parar Transmissão';
-      } else {
-        btn.className = 'btn btn-sm btn-accent';
-        label.textContent = 'Compartilhar Tela';
-      }
+    const dot = document.getElementById('stream-sharing-dot');
+    if (dot) {
+      dot.classList.toggle('active', isSharing);
     }
   }
 

@@ -12,20 +12,22 @@ export class NativeVideoBridge {
   private ctx: CanvasRenderingContext2D | null;
   private unlisten: UnlistenFn | null = null;
   private isCapturing = false;
-  private latestImage: HTMLImageElement | null = null;
+  private latestBitmap: ImageBitmap | null = null;
   private animFrameId: number | null = null;
 
   constructor() {
     this.canvas = document.createElement('canvas');
     this.canvas.width = 1920;
     this.canvas.height = 1080;
-    this.ctx = this.canvas.getContext('2d', { alpha: false });
+    this.ctx = this.canvas.getContext('2d', { alpha: false, desynchronized: true });
   }
 
   public async startCapture(
     sourceId: string,
     fps: number,
-    resolution: { width: number; height: number }
+    resolution: { width: number; height: number },
+    captureMouse: boolean = true,
+    quality: number = 92
   ): Promise<MediaStream> {
     this.canvas.width = resolution.width;
     this.canvas.height = resolution.height;
@@ -37,18 +39,28 @@ export class NativeVideoBridge {
     }
 
     try {
-      this.unlisten = await listen<VideoFramePayload>('p2sharer://video-frame', (event) => {
+      this.unlisten = await listen<VideoFramePayload>('p2sharer://video-frame', async (event) => {
         const payload = event.payload;
         if (!payload || !payload.jpeg_base64) return;
 
-        const img = new Image();
-        img.onload = () => {
-          this.latestImage = img;
-          if (this.ctx) {
-            this.ctx.drawImage(img, 0, 0, this.canvas.width, this.canvas.height);
+        try {
+          const binary = atob(payload.jpeg_base64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
           }
-        };
-        img.src = `data:image/jpeg;base64,${payload.jpeg_base64}`;
+          const blob = new Blob([bytes], { type: 'image/jpeg' });
+          const bitmap = await createImageBitmap(blob);
+          if (this.latestBitmap) {
+            this.latestBitmap.close();
+          }
+          this.latestBitmap = bitmap;
+          if (this.ctx) {
+            this.ctx.drawImage(bitmap, 0, 0, this.canvas.width, this.canvas.height);
+          }
+        } catch {
+          // Ignore transient decode errors
+        }
       });
 
       await invoke('start_native_screen_capture', {
@@ -56,6 +68,8 @@ export class NativeVideoBridge {
         targetFps: fps,
         targetWidth: resolution.width,
         targetHeight: resolution.height,
+        captureMouse,
+        quality,
       });
 
       this.isCapturing = true;
@@ -63,8 +77,8 @@ export class NativeVideoBridge {
       // Active paint loop to ensure canvas.captureStream always has active frames
       const renderLoop = () => {
         if (!this.isCapturing) return;
-        if (this.latestImage && this.ctx) {
-          this.ctx.drawImage(this.latestImage, 0, 0, this.canvas.width, this.canvas.height);
+        if (this.latestBitmap && this.ctx) {
+          this.ctx.drawImage(this.latestBitmap, 0, 0, this.canvas.width, this.canvas.height);
         }
         this.animFrameId = requestAnimationFrame(renderLoop);
       };
@@ -95,7 +109,11 @@ export class NativeVideoBridge {
       this.unlisten = null;
     }
 
-    this.latestImage = null;
+    if (this.latestBitmap) {
+      this.latestBitmap.close();
+      this.latestBitmap = null;
+    }
+
     invoke('stop_native_screen_capture').catch(() => {});
   }
 }
