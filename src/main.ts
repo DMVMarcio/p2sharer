@@ -3,12 +3,13 @@ import { AudioBridge } from './audio_bridge';
 import { GroupRoomManager } from './group_room';
 import { NativeVideoBridge } from './native_video_bridge';
 import {
-  ActiveStreamInfo,
   ChatMessage,
   MonitorSource,
   PeerInfo,
   ProcessItem,
+  RoomSlotInfo,
   ScreenSourcesResponse,
+  TurnConfig,
   WindowSource,
 } from './types';
 
@@ -26,11 +27,12 @@ class App {
   private selectedFilterMode: 'exclude' | 'include' = 'exclude';
   private selectedPids: Set<number> = new Set();
 
-  // Multi-stream Dynamic Grid State
-  private activeStreams: ActiveStreamInfo[] = [];
+  // Multi-stream Dynamic Grid & Participant Slots State
+  private roomSlots: RoomSlotInfo[] = [];
   private layoutMode: 'grid' | 'spotlight' = 'grid';
   private pinnedPeerId: string | null = null;
   private isSidebarCollapsed: boolean = false;
+  private isSpotlightTrayCollapsed: boolean = false;
 
   // Stream Settings & Picker State
   private availableMonitors: MonitorSource[] = [];
@@ -193,6 +195,13 @@ class App {
       });
     });
 
+    // TURN config toggle in settings
+    document.getElementById('settings-enable-turn')?.addEventListener('change', (e) => {
+      const isChecked = (e.target as HTMLInputElement).checked;
+      const fields = document.getElementById('turn-config-fields');
+      if (fields) fields.style.display = isChecked ? 'flex' : 'none';
+    });
+
     // Username modal & pill
     document.getElementById('user-pill')?.addEventListener('click', () => this.openSettingsModal());
     document.getElementById('btn-save-username')?.addEventListener('click', () => {
@@ -224,8 +233,8 @@ class App {
     // Toggle Sidebar (Chat)
     document.getElementById('btn-toggle-sidebar')?.addEventListener('click', () => this.toggleSidebar());
 
-    // Empty state stream start button
-    document.getElementById('btn-empty-start-stream')?.addEventListener('click', () => this.openScreenPickerModal());
+    // Spotlight bottom tray toggle
+    document.getElementById('btn-toggle-spotlight-tray')?.addEventListener('click', () => this.toggleSpotlightTray());
 
     // Transmission Button (Opens Discord-style picker or stops active stream)
     document.getElementById('btn-toggle-share-screen')?.addEventListener('click', () => {
@@ -293,11 +302,26 @@ class App {
     const selectBitrate = document.getElementById('settings-default-bitrate') as HTMLSelectElement;
     const checkCursor = document.getElementById('settings-check-cursor') as HTMLInputElement;
 
+    const checkTurn = document.getElementById('settings-enable-turn') as HTMLInputElement;
+    const inputTurnUrl = document.getElementById('settings-turn-url') as HTMLInputElement;
+    const inputTurnUser = document.getElementById('settings-turn-username') as HTMLInputElement;
+    const inputTurnCred = document.getElementById('settings-turn-credential') as HTMLInputElement;
+    const checkTurnRelay = document.getElementById('settings-turn-force-relay') as HTMLInputElement;
+    const turnFields = document.getElementById('turn-config-fields');
+
     if (inputUsername) inputUsername.value = this.username;
     if (selectRes) selectRes.value = localStorage.getItem('p2sharer_default_res') || '1080p';
     if (selectFps) selectFps.value = localStorage.getItem('p2sharer_default_fps') || '60';
     if (selectBitrate) selectBitrate.value = localStorage.getItem('p2sharer_default_bitrate') || '25000';
     if (checkCursor) checkCursor.checked = localStorage.getItem('p2sharer_default_cursor') !== 'false';
+
+    const turnEnabled = localStorage.getItem('p2sharer_turn_enabled') === 'true';
+    if (checkTurn) checkTurn.checked = turnEnabled;
+    if (inputTurnUrl) inputTurnUrl.value = localStorage.getItem('p2sharer_turn_url') || '';
+    if (inputTurnUser) inputTurnUser.value = localStorage.getItem('p2sharer_turn_user') || '';
+    if (inputTurnCred) inputTurnCred.value = localStorage.getItem('p2sharer_turn_cred') || '';
+    if (checkTurnRelay) checkTurnRelay.checked = localStorage.getItem('p2sharer_turn_force_relay') === 'true';
+    if (turnFields) turnFields.style.display = turnEnabled ? 'flex' : 'none';
 
     modal?.classList.remove('hidden');
   }
@@ -313,6 +337,12 @@ class App {
     const selectBitrate = document.getElementById('settings-default-bitrate') as HTMLSelectElement;
     const checkCursor = document.getElementById('settings-check-cursor') as HTMLInputElement;
 
+    const checkTurn = document.getElementById('settings-enable-turn') as HTMLInputElement;
+    const inputTurnUrl = document.getElementById('settings-turn-url') as HTMLInputElement;
+    const inputTurnUser = document.getElementById('settings-turn-username') as HTMLInputElement;
+    const inputTurnCred = document.getElementById('settings-turn-credential') as HTMLInputElement;
+    const checkTurnRelay = document.getElementById('settings-turn-force-relay') as HTMLInputElement;
+
     if (inputUsername && inputUsername.value.trim()) {
       this.username = inputUsername.value.trim();
       localStorage.setItem('p2sharer_username', this.username);
@@ -323,6 +353,12 @@ class App {
     if (selectFps) localStorage.setItem('p2sharer_default_fps', selectFps.value);
     if (selectBitrate) localStorage.setItem('p2sharer_default_bitrate', selectBitrate.value);
     if (checkCursor) localStorage.setItem('p2sharer_default_cursor', checkCursor.checked.toString());
+
+    if (checkTurn) localStorage.setItem('p2sharer_turn_enabled', checkTurn.checked.toString());
+    if (inputTurnUrl) localStorage.setItem('p2sharer_turn_url', inputTurnUrl.value.trim());
+    if (inputTurnUser) localStorage.setItem('p2sharer_turn_user', inputTurnUser.value.trim());
+    if (inputTurnCred) localStorage.setItem('p2sharer_turn_cred', inputTurnCred.value.trim());
+    if (checkTurnRelay) localStorage.setItem('p2sharer_turn_force_relay', checkTurnRelay.checked.toString());
 
     this.closeSettingsModal();
     this.showToast('Configurações salvas com sucesso!');
@@ -338,6 +374,15 @@ class App {
     }
     if (label) {
       label.textContent = this.isSidebarCollapsed ? 'Abrir' : 'Chat';
+    }
+  }
+
+  // --- TOGGLE SPOTLIGHT BOTTOM TRAY ---
+  private toggleSpotlightTray() {
+    this.isSpotlightTrayCollapsed = !this.isSpotlightTrayCollapsed;
+    const tray = document.getElementById('spotlight-tray-container');
+    if (tray) {
+      tray.classList.toggle('collapsed', this.isSpotlightTrayCollapsed);
     }
   }
 
@@ -394,11 +439,20 @@ class App {
       this.roomManager.leave();
     }
 
-    this.roomManager = new GroupRoomManager(this.username, this.currentRoomCode, this.isCreator);
+    const turnConfig: TurnConfig = {
+      enabled: localStorage.getItem('p2sharer_turn_enabled') === 'true',
+      url: localStorage.getItem('p2sharer_turn_url') || undefined,
+      username: localStorage.getItem('p2sharer_turn_user') || undefined,
+      credential: localStorage.getItem('p2sharer_turn_cred') || undefined,
+      forceRelay: localStorage.getItem('p2sharer_turn_force_relay') === 'true',
+    };
+
+    this.roomManager = new GroupRoomManager(this.username, this.currentRoomCode, this.isCreator, turnConfig);
     this.roomManager.join({
-      onStreamsUpdate: (streams) => {
-        this.activeStreams = streams;
-        this.renderStreams();
+      onStreamsUpdate: () => {},
+      onSlotsUpdate: (slots) => {
+        this.roomSlots = slots;
+        this.renderRoomCards();
         this.updateStatsHUD();
       },
       onChat: (msg) => {
@@ -418,8 +472,17 @@ class App {
     const displayRoomCode = document.getElementById('display-room-code');
     if (displayRoomCode) displayRoomCode.textContent = this.currentRoomCode;
 
-    this.activeStreams = [];
-    this.renderStreams();
+    this.roomSlots = [
+      {
+        peerId: 'local',
+        senderName: `${this.username} (Você)`,
+        stream: null,
+        isStreaming: false,
+        isLocal: true,
+        color: 'hsl(190, 65%, 45%)',
+      },
+    ];
+    this.renderRoomCards();
 
     const chatContainer = document.getElementById('chat-messages-container');
     if (chatContainer) {
@@ -442,7 +505,9 @@ class App {
 
     if (!hud) return;
 
-    if (this.activeStreams.length === 0) {
+    const streamingSlots = this.roomSlots.filter((s) => s.isStreaming);
+
+    if (streamingSlots.length === 0) {
       hud.style.display = 'none';
       return;
     }
@@ -452,78 +517,129 @@ class App {
     if (bitrateText) bitrateText.textContent = `${(this.currentBitrate / 1000).toFixed(1)} Mbps`;
   }
 
-  // --- DYNAMIC MULTI-STREAM RENDERER ---
-  private renderStreams() {
-    const wrapper = document.getElementById('streams-grid-wrapper');
-    const emptyState = document.getElementById('room-empty-stream-state');
+  // --- ROOM CARDS RENDERER (AVATARS + SCREENS) ---
+  private renderRoomCards() {
+    const gridWrapper = document.getElementById('streams-grid-wrapper');
+    const spotlightStage = document.getElementById('spotlight-stage');
+    const featuredArea = document.getElementById('spotlight-featured-area');
+    const trayStrip = document.getElementById('spotlight-tray-strip');
     const sharingTag = document.getElementById('room-sharing-status-tag');
     const liveBadge = document.getElementById('room-live-badge');
 
-    if (!wrapper || !emptyState) return;
+    if (!gridWrapper || !spotlightStage || !featuredArea || !trayStrip) return;
 
-    if (this.activeStreams.length === 0) {
-      wrapper.innerHTML = '';
-      emptyState.classList.add('active');
-      if (sharingTag) sharingTag.textContent = '0 telas';
-      if (liveBadge) liveBadge.textContent = 'SALA ATIVA';
-      return;
+    const totalCount = this.roomSlots.length;
+    const streamingCount = this.roomSlots.filter((s) => s.isStreaming).length;
+
+    if (sharingTag) {
+      sharingTag.textContent = `${totalCount} ${totalCount === 1 ? 'pessoa' : 'pessoas'} (${streamingCount} ao vivo)`;
+    }
+    if (liveBadge) {
+      liveBadge.textContent = streamingCount > 0 ? 'AO VIVO' : 'SALA ATIVA';
     }
 
-    emptyState.classList.remove('active');
-    if (sharingTag) sharingTag.textContent = `${this.activeStreams.length} ${this.activeStreams.length === 1 ? 'tela' : 'telas'}`;
-    if (liveBadge) liveBadge.textContent = 'AO VIVO';
-
-    // Auto-adjust layout
-    if (this.pinnedPeerId && !this.activeStreams.some((s) => s.peerId === this.pinnedPeerId)) {
+    // Auto-adjust spotlight if the pinned person left
+    if (this.pinnedPeerId && !this.roomSlots.some((s) => s.peerId === this.pinnedPeerId)) {
       this.pinnedPeerId = null;
       this.layoutMode = 'grid';
     }
 
-    wrapper.className = `streams-grid-wrapper layout-${this.layoutMode}`;
-    wrapper.innerHTML = '';
+    if (this.layoutMode === 'grid') {
+      gridWrapper.classList.remove('hidden');
+      spotlightStage.classList.add('hidden');
+      gridWrapper.innerHTML = '';
 
-    const visibleStreams =
-      this.layoutMode === 'spotlight' && this.pinnedPeerId
-        ? this.activeStreams.filter((s) => s.peerId === this.pinnedPeerId)
-        : this.activeStreams;
+      this.roomSlots.forEach((slot) => {
+        const card = this.createCardElement(slot, false);
+        card.addEventListener('click', () => {
+          this.pinnedPeerId = slot.peerId;
+          this.layoutMode = 'spotlight';
+          this.renderRoomCards();
+        });
+        gridWrapper.appendChild(card);
+      });
+    } else {
+      // Spotlight Mode
+      gridWrapper.classList.add('hidden');
+      spotlightStage.classList.remove('hidden');
+      featuredArea.innerHTML = '';
+      trayStrip.innerHTML = '';
 
-    visibleStreams.forEach((streamInfo) => {
+      const featuredSlot = this.roomSlots.find((s) => s.peerId === this.pinnedPeerId) || this.roomSlots[0];
+      if (featuredSlot) {
+        const bigCard = this.createCardElement(featuredSlot, true);
+        bigCard.addEventListener('click', () => {
+          // Clicking the featured card switches back to Grid mode
+          this.layoutMode = 'grid';
+          this.pinnedPeerId = null;
+          this.renderRoomCards();
+        });
+        featuredArea.appendChild(bigCard);
+      }
+
+      // Populate bottom tray with all other participants
+      const otherSlots = this.roomSlots.filter((s) => s.peerId !== featuredSlot?.peerId);
+      otherSlots.forEach((slot) => {
+        const miniCard = this.createCardElement(slot, false);
+        miniCard.addEventListener('click', () => {
+          this.pinnedPeerId = slot.peerId;
+          this.renderRoomCards();
+        });
+        trayStrip.appendChild(miniCard);
+      });
+    }
+  }
+
+  private createCardElement(slot: RoomSlotInfo, isFeatured: boolean): HTMLElement {
+    if (slot.isStreaming && slot.stream) {
+      // 1. Live Screen Video Card
       const card = document.createElement('div');
-      card.className = `stream-card ${streamInfo.peerId === this.pinnedPeerId ? 'pinned' : ''}`;
-      card.title = 'Clique para alternar entre modo destaque e grade';
+      card.className = `stream-card ${isFeatured ? 'featured' : ''}`;
+      card.title = isFeatured ? 'Clique para voltar à grade' : 'Clique para destacar esta transmissão';
 
       const video = document.createElement('video');
       video.autoplay = true;
       video.playsInline = true;
-      video.srcObject = streamInfo.stream;
+      video.srcObject = slot.stream;
 
-      if (streamInfo.isLocal) {
-        video.muted = true; // Avoid feedback
+      if (slot.isLocal) {
+        video.muted = true;
       }
 
       const overlay = document.createElement('div');
       overlay.className = 'stream-card-overlay';
       overlay.innerHTML = `
         <span class="user-status-dot"></span>
-        <span>${streamInfo.senderName}</span>
+        <span>${slot.senderName}</span>
       `;
 
       card.appendChild(video);
       card.appendChild(overlay);
+      return card;
+    } else {
+      // 2. Colored Avatar Card (Not Streaming)
+      const card = document.createElement('div');
+      card.className = `participant-card ${isFeatured ? 'featured' : ''}`;
+      card.style.setProperty('--user-color', slot.color);
+      card.title = isFeatured ? 'Clique para voltar à grade' : 'Clique para destacar este participante';
 
-      card.addEventListener('click', () => {
-        if (this.layoutMode === 'spotlight' && this.pinnedPeerId === streamInfo.peerId) {
-          this.layoutMode = 'grid';
-          this.pinnedPeerId = null;
-        } else {
-          this.layoutMode = 'spotlight';
-          this.pinnedPeerId = streamInfo.peerId;
-        }
-        this.renderStreams();
-      });
+      const initials = slot.senderName
+        .split(' ')
+        .map((n) => n[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase();
 
-      wrapper.appendChild(card);
-    });
+      card.innerHTML = `
+        <div class="participant-avatar-badge">
+          <span>${initials}</span>
+        </div>
+        <div class="participant-avatar-label">${slot.senderName}</div>
+        <div class="participant-status-text">Sem transmissão</div>
+      `;
+
+      return card;
+    }
   }
 
   // --- DISCORD-STYLE SCREEN & WINDOW PICKER ---
@@ -895,7 +1011,7 @@ class App {
       this.roomManager.leave();
       this.roomManager = null;
     }
-    this.activeStreams = [];
+    this.roomSlots = [];
     this.switchView('view-home');
     this.showToast('Você saiu da sala.');
   }

@@ -1,26 +1,20 @@
 import { joinRoom, selfId } from '@trystero-p2p/mqtt';
-import { ActiveStreamInfo, ChatMessage, PeerInfo } from './types';
+import { ActiveStreamInfo, ChatMessage, PeerInfo, RoomSlotInfo, TurnConfig } from './types';
 
 const APP_ID = 'p2sharer-multi-stream-v1';
 
-const RTC_CONFIG = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:global.stun.twilio.com:3478' },
-  ],
-};
-
-const RELAY_CONFIG = {
-  urls: [
-    'wss://broker.emqx.io:8084/mqtt',
-    'wss://broker.hivemq.com:8884/mqtt',
-  ],
-};
+export function generateUserColor(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = Math.abs(hash % 360);
+  return `hsl(${hue}, 65%, 45%)`;
+}
 
 export interface RoomCallbacks {
   onStreamsUpdate: (streams: ActiveStreamInfo[]) => void;
+  onSlotsUpdate: (slots: RoomSlotInfo[]) => void;
   onChat: (msg: ChatMessage) => void;
   onPeersUpdate: (peers: PeerInfo[]) => void;
   onStatusChange: (status: string) => void;
@@ -30,6 +24,7 @@ export class GroupRoomManager {
   private username: string;
   private roomId: string;
   private isCreator: boolean;
+  private turnConfig: TurnConfig | null = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private room: any = null;
   private localStream: MediaStream | null = null;
@@ -48,10 +43,11 @@ export class GroupRoomManager {
   private currentTargetBitrate: number = 25000000;
   private currentTargetFps: number = 60;
 
-  constructor(username: string, roomId: string, isCreator = false) {
+  constructor(username: string, roomId: string, isCreator = false, turnConfig?: TurnConfig) {
     this.username = username;
     this.roomId = roomId.toUpperCase().trim();
     this.isCreator = isCreator;
+    this.turnConfig = turnConfig || null;
   }
 
   public join(callbacks: RoomCallbacks) {
@@ -59,12 +55,44 @@ export class GroupRoomManager {
     callbacks.onStatusChange('Conectando...');
     console.log(`[P2P] Joining room ${this.roomId} as ${this.username} (Self ID: ${selfId})`);
 
+    const iceServers: RTCIceServer[] = [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+      { urls: 'stun:global.stun.twilio.com:3478' },
+    ];
+
+    if (this.turnConfig?.enabled && this.turnConfig.url) {
+      const customTurn: RTCIceServer = {
+        urls: this.turnConfig.url.trim(),
+      };
+      if (this.turnConfig.username) {
+        customTurn.username = this.turnConfig.username.trim();
+      }
+      if (this.turnConfig.credential) {
+        customTurn.credential = this.turnConfig.credential.trim();
+      }
+      iceServers.unshift(customTurn);
+    }
+
+    const rtcConfig: RTCConfiguration = {
+      iceServers,
+      iceTransportPolicy: this.turnConfig?.forceRelay ? 'relay' : 'all',
+    };
+
+    const relayConfig = {
+      urls: [
+        'wss://broker.emqx.io:8084/mqtt',
+        'wss://broker.hivemq.com:8884/mqtt',
+      ],
+    };
+
     try {
       this.room = joinRoom(
         {
           appId: APP_ID,
-          relayConfig: RELAY_CONFIG,
-          rtcConfig: RTC_CONFIG,
+          relayConfig,
+          rtcConfig,
         },
         this.roomId
       );
@@ -88,7 +116,7 @@ export class GroupRoomManager {
           this.notifyPeersUpdate();
           this.notifyStreamsUpdate();
         }
-        callbacks.onStatusChange('P2P Conectado');
+        callbacks.onStatusChange(this.turnConfig?.forceRelay ? 'P2P (Relay Seguro)' : 'P2P Conectado');
       };
 
       // 3. Setup Stream Status Action
@@ -122,7 +150,8 @@ export class GroupRoomManager {
 
         this.peers.set(peerId, `Conectado (${peerId.slice(0, 4)})`);
         this.notifyPeersUpdate();
-        callbacks.onStatusChange('P2P Conectado');
+        this.notifyStreamsUpdate();
+        callbacks.onStatusChange(this.turnConfig?.forceRelay ? 'P2P (Relay Seguro)' : 'P2P Conectado');
       };
 
       this.room.onPeerLeave = (peerId: string) => {
@@ -130,9 +159,9 @@ export class GroupRoomManager {
         this.peers.delete(peerId);
         if (this.remoteStreams.has(peerId)) {
           this.remoteStreams.delete(peerId);
-          this.notifyStreamsUpdate();
         }
         this.notifyPeersUpdate();
+        this.notifyStreamsUpdate();
         if (this.peers.size === 0) {
           callbacks.onStatusChange('Sala Ativa');
         }
@@ -162,6 +191,7 @@ export class GroupRoomManager {
       }, 300);
 
       callbacks.onStatusChange('Sala Ativa');
+      this.notifyStreamsUpdate();
     } catch (err) {
       console.error('[P2P] Failed to join room in GroupRoomManager:', err);
       callbacks.onStatusChange('Erro ao conectar');
@@ -263,13 +293,46 @@ export class GroupRoomManager {
     return list;
   }
 
+  public getAllRoomSlots(): RoomSlotInfo[] {
+    const list: RoomSlotInfo[] = [];
+
+    // 1. Local slot (Always present)
+    list.push({
+      peerId: 'local',
+      senderName: `${this.username} (Você)`,
+      stream: this.localStream,
+      isStreaming: Boolean(this.localStream),
+      isLocal: true,
+      color: generateUserColor(this.username),
+    });
+
+    // 2. Peer slots
+    this.peers.forEach((uname, peerId) => {
+      const stream = this.remoteStreams.get(peerId) || null;
+      list.push({
+        peerId,
+        senderName: uname,
+        stream,
+        isStreaming: Boolean(stream),
+        isLocal: false,
+        color: generateUserColor(uname),
+      });
+    });
+
+    return list;
+  }
+
   public notifyStreamsUpdate() {
     if (!this.callbacks) return;
     const streams = this.getAllActiveStreams();
-    const hash = streams.map((s) => `${s.peerId}:${s.senderName}:${s.stream.id}`).join('|');
+    const slots = this.getAllRoomSlots();
+
+    const hash = slots.map((s) => `${s.peerId}:${s.senderName}:${s.isStreaming}:${s.stream?.id}`).join('|');
     if (hash === this.lastStreamsHash) return;
     this.lastStreamsHash = hash;
+
     this.callbacks.onStreamsUpdate(streams);
+    this.callbacks.onSlotsUpdate(slots);
   }
 
   public sendChatMessage(text: string): ChatMessage {

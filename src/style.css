@@ -177,6 +177,10 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+.hidden {
+  display: none !important;
+}
+
 /* ==========================================================================
    APP HEADER
    ========================================================================== */
@@ -322,7 +326,7 @@ body {
 }
 
 /* ==========================================================================
-   VIEW 1: CLEAN HERO / HOME
+   VIEW 1: HOME / DASHBOARD
    ========================================================================== */
 
 .hero-container {
@@ -578,7 +582,7 @@ body {
 }
 
 /* ==========================================================================
-   MULTI-STREAM VIDEO CONTAINER & GRID
+   MULTI-STREAM VIDEO CONTAINER & GRID / SPOTLIGHT
    ========================================================================== */
 
 .video-container {
@@ -586,31 +590,123 @@ body {
   position: relative;
   background-color: #000000;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
   overflow: hidden;
-  padding: 10px;
+  padding: 8px;
 }
 
+/* Grid Layout */
 .streams-grid-wrapper {
   display: grid;
   width: 100%;
   height: 100%;
-  gap: 10px;
+  gap: 8px;
   align-content: center;
   justify-content: center;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
 }
 
-.streams-grid-wrapper.layout-grid {
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+/* Spotlight Layout (Main Featured Stage + Minimizable Bottom Tray) */
+.spotlight-stage {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  gap: 8px;
+  position: relative;
 }
 
-.streams-grid-wrapper.layout-spotlight {
-  display: grid;
-  grid-template-columns: 1fr;
-  grid-template-rows: 1fr;
+.spotlight-featured-area {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  border-radius: var(--radius-md);
+  overflow: hidden;
 }
 
+.spotlight-featured-area .stream-card,
+.spotlight-featured-area .participant-card {
+  width: 100%;
+  height: 100%;
+}
+
+.spotlight-tray-container {
+  height: 110px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  background-color: rgba(18, 18, 21, 0.75);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 6px;
+  transition: all var(--transition-normal);
+  flex-shrink: 0;
+}
+
+.spotlight-tray-container.collapsed {
+  height: 18px;
+  padding: 0;
+  background-color: transparent;
+  border-color: transparent;
+}
+
+.btn-toggle-spotlight-tray {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-full);
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-secondary);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-fast);
+  outline: none;
+}
+
+.btn-toggle-spotlight-tray:hover {
+  background-color: var(--bg-elevated);
+  color: var(--text-primary);
+  border-color: var(--border-focus);
+}
+
+.spotlight-tray-container.collapsed .btn-toggle-spotlight-tray svg {
+  transform: rotate(180deg);
+}
+
+.spotlight-tray-strip {
+  display: flex;
+  gap: 8px;
+  height: 100%;
+  overflow-x: auto;
+  align-items: center;
+  padding: 2px 4px;
+}
+
+.spotlight-tray-container.collapsed .spotlight-tray-strip {
+  display: none;
+}
+
+.spotlight-tray-strip .stream-card,
+.spotlight-tray-strip .participant-card {
+  height: 100%;
+  width: auto;
+  aspect-ratio: 16 / 9;
+  flex-shrink: 0;
+}
+
+/* Stream Video Card */
 .stream-card {
   position: relative;
   background-color: #0d0d11;
@@ -621,11 +717,17 @@ body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  aspect-ratio: 16 / 9;
   transition: all var(--transition-fast);
 }
 
 .stream-card:hover {
   border-color: var(--accent-border);
+}
+
+.stream-card.selected {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 1px var(--accent-color);
 }
 
 .stream-card video {
@@ -651,44 +753,63 @@ body {
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.1);
   pointer-events: none;
+  z-index: 5;
 }
 
-/* Empty Stream State */
-.no-stream-state {
-  display: none;
-  position: absolute;
-  inset: 0;
+/* Participant Colored Avatar Card (When NOT sharing screen) */
+.participant-card {
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  background-color: var(--bg-app);
+  cursor: pointer;
+  aspect-ratio: 16 / 9;
+  background: radial-gradient(circle at center, var(--user-color, #1f2937) 0%, #0d0d11 90%);
+  transition: all var(--transition-fast);
 }
 
-.no-stream-state.active {
+.participant-card:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: scale(1.005);
+}
+
+.participant-card.selected {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 1px var(--accent-color);
+}
+
+.participant-avatar-badge {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-full);
+  background-color: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(8px);
+  border: 2px solid rgba(255, 255, 255, 0.3);
   display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
 }
 
-.empty-state-card {
-  max-width: 380px;
-  text-align: center;
-  padding: 32px 24px;
-}
-
-.empty-icon-pulse {
-  color: var(--text-muted);
-  margin-bottom: 16px;
-}
-
-.empty-state-card h3 {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 6px;
-}
-
-.empty-state-card p {
+.participant-avatar-label {
+  margin-top: 10px;
   font-size: 13px;
-  line-height: 1.5;
-  color: var(--text-muted);
+  font-weight: 600;
+  color: #ffffff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+}
+
+.participant-status-text {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.65);
+  margin-top: 2px;
 }
 
 /* Stream HUD */
@@ -930,7 +1051,7 @@ body {
 }
 
 .modal-card.modal-lg {
-  max-width: 600px;
+  max-width: 620px;
 }
 
 .modal-card.modal-xl {
@@ -1012,7 +1133,7 @@ body {
   background-color: var(--bg-input);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
-  padding: 10px 14px;
+  padding: 9px 12px;
   font-size: 13px;
   color: var(--text-primary);
   outline: none;

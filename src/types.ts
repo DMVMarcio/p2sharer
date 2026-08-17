@@ -55,6 +55,23 @@ export interface ActiveStreamInfo {
   isLocal: boolean;
 }
 
+export interface RoomSlotInfo {
+  peerId: string;
+  senderName: string;
+  stream: MediaStream | null;
+  isStreaming: boolean;
+  isLocal: boolean;
+  color: string;
+}
+
+export interface TurnConfig {
+  enabled: boolean;
+  url?: string;
+  username?: string;
+  credential?: string;
+  forceRelay?: boolean;
+}
+
 export interface QualityProfile {
   id: string;
   name: string;

@@ -30,12 +30,12 @@
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
         </div>
 
-        <button class="user-pill" id="user-pill" title="Clique para alterar seu apelido">
+        <button class="user-pill" id="user-pill" title="Configurações e Perfil">
           <span class="user-status-dot"></span>
           <span id="current-username-display">Usuário</span>
         </button>
 
-        <button class="btn-icon-header" id="btn-open-settings" title="Configurações e Tema">
+        <button class="btn-icon-header" id="btn-open-settings" title="Configurações">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>
           </svg>
@@ -100,7 +100,7 @@
             <div class="stream-header-bar">
               <div class="stream-status">
                 <span class="live-indicator" id="room-live-badge">SALA ATIVA</span>
-                <span class="stream-host-tag" id="room-sharing-status-tag">0 telas</span>
+                <span class="stream-host-tag" id="room-sharing-status-tag">1 pessoa</span>
                 <span class="stream-info-badge" id="room-stats-badge">P2P</span>
               </div>
               
@@ -139,25 +139,22 @@
 
             <!-- Video Player Multi-Stream Container -->
             <div class="video-container" id="room-video-container">
-              <!-- Dynamic Multi-Stream Grid/Spotlight -->
+              <!-- GRID VIEW (Default) -->
               <div class="streams-grid-wrapper layout-grid" id="streams-grid-wrapper">
-                <!-- Stream cards injected dynamically -->
+                <!-- Participant and Stream cards rendered dynamically -->
               </div>
 
-              <!-- Empty State Overlay when no active streams exist -->
-              <div class="no-stream-state active" id="room-empty-stream-state">
-                <div class="empty-state-card">
-                  <div class="empty-icon-pulse">
-                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                      <rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/>
-                    </svg>
-                  </div>
-                  <h3>Nenhuma transmissão no momento</h3>
-                  <p>A sala está pronta. Clique abaixo para compartilhar sua tela ou aguarde seus amigos iniciarem.</p>
-                  <button class="btn btn-primary" id="btn-empty-start-stream" style="margin-top: 14px;">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 3H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-3"/><path d="M8 21h8"/><path d="M12 17v4"/><path d="m17 8 5-5"/><path d="M17 3h5v5"/></svg>
-                    <span>Iniciar Compartilhamento</span>
+              <!-- SPOTLIGHT STAGE (Active when a stream/person is clicked) -->
+              <div class="spotlight-stage hidden" id="spotlight-stage">
+                <!-- Featured Main Screen / Avatar Card -->
+                <div class="spotlight-featured-area" id="spotlight-featured-area"></div>
+
+                <!-- Minimizable Bottom Tray with other participants -->
+                <div class="spotlight-tray-container" id="spotlight-tray-container">
+                  <button class="btn-toggle-spotlight-tray" id="btn-toggle-spotlight-tray" title="Minimizar / Expandir miniaturas">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
                   </button>
+                  <div class="spotlight-tray-strip" id="spotlight-tray-strip"></div>
                 </div>
               </div>
 
@@ -221,14 +218,14 @@
           </div>
           <div>
             <h2>Configurações</h2>
-            <p class="modal-subtitle">Personalize a aparência, tema e opções de transmissão.</p>
+            <p class="modal-subtitle">Personalize a aparência, padrões de vídeo e proteção de rede.</p>
           </div>
           <button class="btn-close" id="btn-close-settings">&times;</button>
         </div>
 
         <div class="modal-body">
           <div class="settings-grid">
-            <!-- SECTION 1: APPARÊNCIA -->
+            <!-- SECTION 1: APARÊNCIA -->
             <div class="settings-section">
               <h3 class="settings-section-title">Aparência e Tema</h3>
               
@@ -317,6 +314,42 @@
                   <input type="checkbox" id="settings-check-cursor" checked />
                   <span>Exibir cursor do mouse por padrão</span>
                 </label>
+              </div>
+            </div>
+
+            <!-- SECTION 4: REDE E PROTEÇÃO DE IP (TURN RELAY) -->
+            <div class="settings-section">
+              <h3 class="settings-section-title">Rede & Proteção de IP (TURN Relay)</h3>
+              <p class="modal-subtitle" style="margin-bottom: 8px;">Opcional: Oculte o seu IP residencial encaminhando o tráfego por um servidor proxy/relay WebRTC personalizado.</p>
+              
+              <div class="settings-row">
+                <label class="picker-checkbox-label">
+                  <input type="checkbox" id="settings-enable-turn" />
+                  <span>Ativar Servidor TURN / Proxy de IP Personalizado</span>
+                </label>
+              </div>
+
+              <div id="turn-config-fields" style="display: none; flex-direction: column; gap: 8px; margin-top: 8px;">
+                <div class="settings-col">
+                  <label class="settings-label">URL do Servidor TURN:</label>
+                  <input type="text" id="settings-turn-url" class="text-input" placeholder="ex: turn:openrelay.metered.ca:80 ou turn:meu-ip:3478" />
+                </div>
+                <div class="settings-row-grid">
+                  <div class="settings-col">
+                    <label class="settings-label">Usuário (Username):</label>
+                    <input type="text" id="settings-turn-username" class="text-input" placeholder="ex: openrelayproject" />
+                  </div>
+                  <div class="settings-col">
+                    <label class="settings-label">Senha / Credencial:</label>
+                    <input type="password" id="settings-turn-credential" class="text-input" placeholder="ex: openrelayproject" />
+                  </div>
+                  <div class="settings-col" style="justify-content: flex-end; padding-bottom: 2px;">
+                    <label class="picker-checkbox-label">
+                      <input type="checkbox" id="settings-turn-force-relay" />
+                      <span>Forçar Relay (100% Oculto)</span>
+                    </label>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
