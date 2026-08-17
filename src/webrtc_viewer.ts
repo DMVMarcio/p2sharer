@@ -51,7 +51,7 @@ export class ViewerManager {
       throw new Error('O código colado não é um Convite de Sala válido (P2P-OFFER).');
     }
 
-    this.hostName = offerToken.senderName;
+    this.hostName = offerToken.senderName || offerToken.hostName || 'Apresentador';
     if (this.pc) {
       this.pc.close();
     }

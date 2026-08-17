@@ -3,6 +3,7 @@ import { AudioBridge } from './audio_bridge';
 import { GroupRoomManager } from './group_room';
 import { NativeVideoBridge } from './native_video_bridge';
 import {
+  ActiveStreamInfo,
   ChatMessage,
   MonitorSource,
   PeerInfo,
@@ -25,6 +26,12 @@ class App {
   private audioProcesses: ProcessItem[] = [];
   private selectedFilterMode: 'exclude' | 'include' = 'exclude';
   private selectedPids: Set<number> = new Set();
+
+  // Multi-stream Dynamic Grid State
+  private activeStreams: ActiveStreamInfo[] = [];
+  private layoutMode: 'grid' | 'spotlight' = 'grid';
+  private pinnedPeerId: string | null = null;
+  private streamVolumes: Map<string, { volume: number; muted: boolean }> = new Map();
 
   // Custom Screen Picker State
   private availableMonitors: MonitorSource[] = [];
@@ -122,6 +129,9 @@ class App {
     document.getElementById('btn-cancel-join-dialog')?.addEventListener('click', () => this.closeJoinDialog());
     document.getElementById('btn-confirm-join-dialog')?.addEventListener('click', () => this.confirmJoinFromDialog());
 
+    // Layout Toggle (Grid vs Spotlight)
+    document.getElementById('btn-toggle-layout')?.addEventListener('click', () => this.toggleLayoutMode());
+
     // Inside Room: Share Screen toggle
     document.getElementById('btn-toggle-share-screen')?.addEventListener('click', () => {
       if (this.isSharingScreen) {
@@ -159,7 +169,6 @@ class App {
     document.getElementById('room-code-pill')?.addEventListener('click', () => this.copyRoomCodeToClipboard());
     document.getElementById('btn-leave-room')?.addEventListener('click', () => this.leaveRoom());
     document.getElementById('btn-room-fullscreen')?.addEventListener('click', () => this.toggleFullscreen());
-    document.getElementById('btn-unmute-room-audio')?.addEventListener('click', () => this.unmuteRoomAudio());
 
     // Sidebar Tabs
     document.getElementById('tab-chat')?.addEventListener('click', () => this.switchSidebarTab('chat'));
@@ -235,21 +244,9 @@ class App {
 
     this.roomManager = new GroupRoomManager(this.username, this.currentRoomCode, this.isCreator);
     this.roomManager.join({
-      onStream: (stream, senderName) => {
-        this.renderRemoteStream(stream, senderName);
-      },
-      onStreamEnded: () => {
-        const video = document.getElementById('room-main-video') as HTMLVideoElement;
-        const idleBox = document.getElementById('room-video-idle');
-        const sharingStatus = document.getElementById('room-sharing-status-tag');
-        const liveBadge = document.getElementById('room-live-badge');
-        if (video) video.srcObject = null;
-        if (idleBox) idleBox.classList.remove('hidden');
-        if (sharingStatus) sharingStatus.textContent = 'Nenhuma transmissão no momento';
-        if (liveBadge) {
-          liveBadge.textContent = 'SALA ATIVA';
-          liveBadge.classList.remove('streaming');
-        }
+      onStreamsUpdate: (streams) => {
+        this.activeStreams = streams;
+        this.renderStreams();
       },
       onChat: (msg) => {
         this.appendChatMessage(msg);
@@ -268,11 +265,8 @@ class App {
     const displayRoomCode = document.getElementById('display-room-code');
     if (displayRoomCode) displayRoomCode.textContent = this.currentRoomCode;
 
-    const idleBox = document.getElementById('room-video-idle');
-    if (idleBox) idleBox.classList.remove('hidden');
-
-    const video = document.getElementById('room-main-video') as HTMLVideoElement;
-    if (video) video.srcObject = null;
+    this.activeStreams = [];
+    this.renderStreams();
 
     const chatContainer = document.getElementById('chat-messages-container');
     if (chatContainer) {
@@ -285,6 +279,180 @@ class App {
 
     this.updateShareButtonUI(false);
     this.switchView('view-group-room');
+  }
+
+  // --- DYNAMIC MULTI-STREAM RENDERER (GOOGLE MEET / DISCORD STYLE) ---
+  private toggleLayoutMode() {
+    this.layoutMode = this.layoutMode === 'grid' ? 'spotlight' : 'grid';
+    const label = document.getElementById('label-toggle-layout');
+    if (label) {
+      label.textContent = this.layoutMode === 'grid' ? 'Modo Grade' : 'Modo Destaque';
+    }
+    this.renderStreams();
+  }
+
+  private renderStreams() {
+    const wrapper = document.getElementById('streams-grid-wrapper');
+    const idleBox = document.getElementById('room-video-idle');
+    const sharingTag = document.getElementById('room-sharing-status-tag');
+    const liveBadge = document.getElementById('room-live-badge');
+
+    if (!wrapper || !idleBox) return;
+
+    if (this.activeStreams.length === 0) {
+      wrapper.classList.remove('active');
+      wrapper.innerHTML = '';
+      idleBox.classList.remove('hidden');
+      if (sharingTag) sharingTag.textContent = '0 telas transmitindo';
+      if (liveBadge) {
+        liveBadge.textContent = 'SALA ATIVA';
+        liveBadge.classList.remove('streaming');
+      }
+      return;
+    }
+
+    idleBox.classList.add('hidden');
+    wrapper.classList.add('active');
+
+    // Update status bar
+    const count = this.activeStreams.length;
+    if (sharingTag) sharingTag.textContent = `${count} ${count === 1 ? 'tela ao vivo' : 'telas ao vivo'}`;
+    if (liveBadge) {
+      liveBadge.textContent = 'AO VIVO';
+      liveBadge.classList.add('streaming');
+    }
+
+    // Determine spotlight pinned stream
+    if (!this.pinnedPeerId || !this.activeStreams.some((s) => s.peerId === this.pinnedPeerId)) {
+      this.pinnedPeerId = this.activeStreams[0].peerId;
+    }
+
+    wrapper.className = `streams-grid-wrapper active ${this.layoutMode === 'grid' ? 'layout-grid' : 'layout-spotlight'}`;
+    wrapper.innerHTML = '';
+
+    if (this.layoutMode === 'spotlight') {
+      const pinnedItem = this.activeStreams.find((s) => s.peerId === this.pinnedPeerId) || this.activeStreams[0];
+      const otherItems = this.activeStreams.filter((s) => s.peerId !== pinnedItem.peerId);
+
+      // 1. Pinned large stream card
+      const mainCard = this.createStreamCard(pinnedItem, true);
+      wrapper.appendChild(mainCard);
+
+      // 2. Horizontal strip for other streams
+      if (otherItems.length > 0) {
+        const strip = document.createElement('div');
+        strip.className = 'spotlight-strip';
+        otherItems.forEach((item) => {
+          strip.appendChild(this.createStreamCard(item, false));
+        });
+        wrapper.appendChild(strip);
+      }
+    } else {
+      // Grid view
+      this.activeStreams.forEach((item) => {
+        wrapper.appendChild(this.createStreamCard(item, item.peerId === this.pinnedPeerId));
+      });
+    }
+  }
+
+  private createStreamCard(item: ActiveStreamInfo, isPinned: boolean): HTMLElement {
+    const card = document.createElement('div');
+    card.className = `stream-card ${isPinned ? 'pinned' : ''}`;
+    card.id = `stream-card-${item.peerId}`;
+
+    const video = document.createElement('video');
+    video.autoplay = true;
+    video.playsInline = true;
+    video.srcObject = item.stream;
+
+    // Get volume settings for this stream
+    if (!this.streamVolumes.has(item.peerId)) {
+      this.streamVolumes.set(item.peerId, { volume: item.isLocal ? 0 : 1, muted: item.isLocal });
+    }
+    const volState = this.streamVolumes.get(item.peerId)!;
+
+    video.muted = volState.muted;
+    video.volume = volState.volume;
+    video.play().catch(() => {});
+
+    // Card Header (Title & Pin/Fullscreen buttons)
+    const header = document.createElement('div');
+    header.className = 'stream-card-header';
+    header.innerHTML = `
+      <div class="stream-card-title">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>
+        <span>${item.senderName}</span>
+      </div>
+      <div class="stream-card-tools">
+        <button class="stream-card-btn btn-pin-stream" title="Destacar tela">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 17v4"/><path d="M5 17h14"/><path d="m15 2-3 3-3-3"/></svg>
+        </button>
+        <button class="stream-card-btn btn-fs-stream" title="Tela cheia">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" x2="14" y1="3" y2="10"/><line x1="3" x2="10" y1="21" y2="14"/></svg>
+        </button>
+      </div>
+    `;
+
+    // Card Footer (Volume slider & Mute button)
+    const footer = document.createElement('div');
+    footer.className = 'stream-card-footer';
+    footer.innerHTML = `
+      <button class="stream-mute-btn ${volState.muted ? 'muted' : ''}" title="${volState.muted ? 'Desmutar' : 'Silenciar'}">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+      </button>
+      <input type="range" class="stream-volume-slider" min="0" max="1" step="0.02" value="${volState.muted ? 0 : volState.volume}" title="Volume: ${Math.round(volState.volume * 100)}%" />
+    `;
+
+    // Bind Pin Button
+    header.querySelector('.btn-pin-stream')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.pinnedPeerId = item.peerId;
+      this.layoutMode = 'spotlight';
+      this.renderStreams();
+    });
+
+    // Bind Fullscreen Button
+    header.querySelector('.btn-fs-stream')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!document.fullscreenElement) {
+        card.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    });
+
+    // Bind Volume Slider
+    const volSlider = footer.querySelector('.stream-volume-slider') as HTMLInputElement;
+    const muteBtn = footer.querySelector('.stream-mute-btn') as HTMLButtonElement;
+
+    volSlider?.addEventListener('input', (e) => {
+      const val = parseFloat((e.target as HTMLInputElement).value);
+      volState.volume = val;
+      volState.muted = val === 0;
+      video.volume = val;
+      video.muted = volState.muted;
+      muteBtn.classList.toggle('muted', volState.muted);
+      volSlider.title = `Volume: ${Math.round(val * 100)}%`;
+    });
+
+    // Bind Mute Toggle Button
+    muteBtn?.addEventListener('click', () => {
+      volState.muted = !volState.muted;
+      video.muted = volState.muted;
+      muteBtn.classList.toggle('muted', volState.muted);
+      if (volState.muted) {
+        volSlider.value = '0';
+      } else {
+        volSlider.value = String(volState.volume || 1);
+        video.volume = volState.volume || 1;
+      }
+    });
+
+    card.appendChild(video);
+    card.appendChild(header);
+    card.appendChild(footer);
+
+    return card;
   }
 
   // --- CUSTOM SCREEN & APPLICATION PICKER ---
@@ -426,13 +594,7 @@ class App {
 
     try {
       // 1. Audio bridge listener
-      const customAudioTrack = this.audioBridge.init((rmsLevel) => {
-        const vuBar = document.getElementById('room-vu-meter');
-        if (vuBar) {
-          const percent = Math.min(100, Math.round(rmsLevel * 250));
-          vuBar.style.width = `${percent}%`;
-        }
-      });
+      const customAudioTrack = this.audioBridge.init();
       await this.audioBridge.startListening();
 
       // 2. Native Canvas Video Capture
@@ -448,16 +610,6 @@ class App {
       this.activeLocalStream = combinedStream;
       this.isSharingScreen = true;
 
-      // Render local preview on video element
-      const video = document.getElementById('room-main-video') as HTMLVideoElement;
-      const idleBox = document.getElementById('room-video-idle');
-      if (video) {
-        video.srcObject = combinedStream;
-        video.muted = true;
-        video.play();
-      }
-      if (idleBox) idleBox.classList.add('hidden');
-
       // Broadcast stream to everyone in the room
       if (this.roomManager) {
         this.roomManager.shareStream(combinedStream);
@@ -465,17 +617,10 @@ class App {
 
       // Update UI tags
       const sourceLabel = document.getElementById('active-source-label');
-      const sharingStatus = document.getElementById('room-sharing-status-tag');
-      const liveBadge = document.getElementById('room-live-badge');
       if (sourceLabel) sourceLabel.textContent = `${this.selectedSourceName} (${res.width}x${res.height} @ ${fpsValue}fps)`;
-      if (sharingStatus) sharingStatus.textContent = `Você está transmitindo: ${this.selectedSourceName}`;
-      if (liveBadge) {
-        liveBadge.textContent = 'TRANSMITINDO';
-        liveBadge.classList.add('streaming');
-      }
 
       this.updateShareButtonUI(true);
-      this.showToast('Transmissão ao vivo iniciada!');
+      this.showToast('Você está transmitindo sua tela!');
     } catch (err: unknown) {
       console.error('Failed to start native capture:', err);
       const errMsg = err instanceof Error ? err.message : String(err);
@@ -499,23 +644,11 @@ class App {
       this.roomManager.stopStream();
     }
 
-    const video = document.getElementById('room-main-video') as HTMLVideoElement;
-    const idleBox = document.getElementById('room-video-idle');
-    if (video) video.srcObject = null;
-    if (idleBox) idleBox.classList.remove('hidden');
-
     const sourceLabel = document.getElementById('active-source-label');
-    const sharingStatus = document.getElementById('room-sharing-status-tag');
-    const liveBadge = document.getElementById('room-live-badge');
     if (sourceLabel) sourceLabel.textContent = 'Nenhuma tela ativa';
-    if (sharingStatus) sharingStatus.textContent = 'Nenhuma transmissão no momento';
-    if (liveBadge) {
-      liveBadge.textContent = 'SALA ATIVA';
-      liveBadge.classList.remove('streaming');
-    }
 
     this.updateShareButtonUI(false);
-    this.showToast('Transmissão de tela encerrada.');
+    this.showToast('Sua transmissão de tela foi encerrada.');
   }
 
   private updateShareButtonUI(isSharing: boolean) {
@@ -532,47 +665,13 @@ class App {
     }
   }
 
-  // --- REMOTE STREAM RENDERING ---
-  private renderRemoteStream(stream: MediaStream, senderName: string) {
-    const video = document.getElementById('room-main-video') as HTMLVideoElement;
-    const idleBox = document.getElementById('room-video-idle');
-    const sharingStatus = document.getElementById('room-sharing-status-tag');
-    const liveBadge = document.getElementById('room-live-badge');
-
-    if (idleBox) idleBox.classList.add('hidden');
-    if (video) {
-      video.srcObject = stream;
-      video.muted = false;
-      video.play().catch(() => {
-        document.getElementById('room-unmute-overlay')?.classList.remove('hidden');
-      });
-    }
-
-    if (sharingStatus) sharingStatus.textContent = `Ao Vivo por: ${senderName}`;
-    if (liveBadge) {
-      liveBadge.textContent = 'AO VIVO';
-      liveBadge.classList.add('streaming');
-    }
-
-    this.showToast(`Transmissão de ${senderName} recebida!`);
-  }
-
-  private unmuteRoomAudio() {
-    const video = document.getElementById('room-main-video') as HTMLVideoElement;
-    if (video) {
-      video.muted = false;
-      video.play();
-    }
-    document.getElementById('room-unmute-overlay')?.classList.add('hidden');
-  }
-
   private toggleFullscreen() {
     const container = document.getElementById('room-video-container');
     if (!container) return;
     if (!document.fullscreenElement) {
-      container.requestFullscreen();
+      container.requestFullscreen().catch(() => {});
     } else {
-      document.exitFullscreen();
+      document.exitFullscreen().catch(() => {});
     }
   }
 

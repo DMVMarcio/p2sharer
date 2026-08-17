@@ -128,19 +128,20 @@ export class HostManager {
       throw new Error('O código colado não é uma Resposta de Convidado (P2P-JOIN).');
     }
 
-    const peerData = this.peers.get(token.peerId);
+    const targetPeerId = token.peerId || '';
+    const peerData = this.peers.get(targetPeerId);
     if (!peerData) {
-      throw new Error(`Nenhum convite pendente encontrado para este código (Slot: ${token.peerId}).`);
+      throw new Error(`Nenhum convite pendente encontrado para este código (Slot: ${targetPeerId}).`);
     }
 
-    peerData.username = token.senderName;
+    peerData.username = token.senderName || 'Participante';
 
     await peerData.pc.setRemoteDescription(
       new RTCSessionDescription({ type: 'answer', sdp: token.sdp })
     );
 
     this.notifyPeersUpdate();
-    return token.senderName;
+    return peerData.username;
   }
 
   private setupDataChannel(dc: RTCDataChannel, peerId: string) {
@@ -209,10 +210,11 @@ export class HostManager {
   public getConnectedPeers(): PeerInfo[] {
     const list: PeerInfo[] = [];
     this.peers.forEach((peer, id) => {
+      const state = peer.pc.connectionState === 'connected' ? 'connected' : peer.pc.connectionState === 'connecting' ? 'connecting' : 'disconnected';
       list.push({
         id,
         username: peer.username,
-        connectionState: peer.pc.connectionState,
+        connectionState: state,
         joinedAt: Date.now(),
       });
     });
