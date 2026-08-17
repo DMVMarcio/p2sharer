@@ -1,7 +1,7 @@
-import { joinRoom } from '@trystero-p2p/nostr';
+import { joinRoom, selfId } from '@trystero-p2p/mqtt';
 import { ChatMessage, PeerInfo } from './types';
 
-const APP_ID = 'p2sharer-group-v1';
+const APP_ID = 'p2sharer-mqtt-room';
 
 const RTC_CONFIG = {
   iceServers: [
@@ -45,7 +45,8 @@ export class GroupRoomManager {
 
   public join(callbacks: RoomCallbacks) {
     this.callbacks = callbacks;
-    callbacks.onStatusChange('Conectando à rede P2P...');
+    callbacks.onStatusChange('Conectando ao canal P2P...');
+    console.log(`[P2P] Joining room ${this.roomId} as ${this.username} (Self ID: ${selfId})`);
 
     try {
       this.room = joinRoom(
@@ -74,9 +75,10 @@ export class GroupRoomManager {
       const onPresence = presenceTuple[1];
       if (typeof onPresence === 'function') {
         onPresence((data: { username: string; isCreator?: boolean }, peerId: string) => {
-          console.log(`[P2P] Presence from ${peerId}:`, data.username);
+          console.log(`[P2P] Presence received from ${peerId}:`, data.username);
           this.peers.set(peerId, data.username || `Usuário (${peerId.slice(0, 4)})`);
           this.notifyPeersUpdate();
+          callbacks.onStatusChange('P2P Conectado');
         });
       }
 
@@ -98,7 +100,7 @@ export class GroupRoomManager {
 
       // 4. Peer Lifecycle
       this.room.onPeerJoin((peerId: string) => {
-        console.log(`[P2P] Peer joined: ${peerId}`);
+        console.log(`[P2P] Peer joined room: ${peerId}`);
         // Broadcast my username to the new peer
         if (this.sendPresenceAction) {
           this.sendPresenceAction({ username: this.username, isCreator: this.isCreator }, peerId);
@@ -113,17 +115,17 @@ export class GroupRoomManager {
           }
         }
 
-        this.peers.set(peerId, `Conectando... (${peerId.slice(0, 4)})`);
+        this.peers.set(peerId, `Conectado (${peerId.slice(0, 4)})`);
         this.notifyPeersUpdate();
         callbacks.onStatusChange('P2P Conectado');
       });
 
       this.room.onPeerLeave((peerId: string) => {
-        console.log(`[P2P] Peer left: ${peerId}`);
+        console.log(`[P2P] Peer left room: ${peerId}`);
         this.peers.delete(peerId);
         this.notifyPeersUpdate();
         if (this.peers.size === 0) {
-          callbacks.onStatusChange('Aguardando participantes');
+          callbacks.onStatusChange(this.isCreator ? 'Sala Ativa (Aguardando amigos)' : 'P2P Conectado');
         }
       });
 
@@ -135,14 +137,25 @@ export class GroupRoomManager {
         callbacks.onStatusChange(`Ao Vivo por ${sender}`);
       });
 
-      // Broadcast my presence to any existing peers
+      // Heartbeat presence announcement every 3 seconds to ensure sync
+      const presenceInterval = setInterval(() => {
+        if (!this.room) {
+          clearInterval(presenceInterval);
+          return;
+        }
+        if (this.sendPresenceAction) {
+          this.sendPresenceAction({ username: this.username, isCreator: this.isCreator });
+        }
+      }, 3000);
+
+      // Initial presence broadcast
       setTimeout(() => {
         if (this.sendPresenceAction) {
           this.sendPresenceAction({ username: this.username, isCreator: this.isCreator });
         }
-      }, 500);
+      }, 300);
 
-      callbacks.onStatusChange(this.isCreator ? 'Sala Ativa (Aguardando amigos)' : 'Conectado à sala');
+      callbacks.onStatusChange(this.isCreator ? 'Sala Aberta (Aguardando amigos)' : 'Conectado à sala');
     } catch (err) {
       console.error('[P2P] Failed to join room:', err);
       callbacks.onStatusChange('Erro ao conectar');
