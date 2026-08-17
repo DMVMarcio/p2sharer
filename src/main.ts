@@ -31,6 +31,7 @@ class App {
   private roomSlots: RoomSlotInfo[] = [];
   private layoutMode: 'grid' | 'spotlight' = 'grid';
   private pinnedPeerId: string | null = null;
+  private subscribedStreams: Set<string> = new Set();
   private isSidebarCollapsed: boolean = false;
   private isSpotlightTrayCollapsed: boolean = false;
 
@@ -515,6 +516,9 @@ class App {
       onChat: (msg) => {
         this.appendChatMessage(msg);
       },
+      onChatHistory: (messages) => {
+        this.renderChatHistory(messages);
+      },
       onPeersUpdate: (peers) => {
         this.updatePeersList(peers);
         if (!this.isCreator && peers.length > 0 && !hasLoadedPeers) {
@@ -660,35 +664,167 @@ class App {
     }
   }
 
+  private renderChatHistory(messages: ChatMessage[]) {
+    const chatContainer = document.getElementById('chat-messages-container');
+    if (!chatContainer) return;
+
+    chatContainer.innerHTML = `
+      <div class="chat-welcome-notice">
+        <span>Você entrou na sala <strong>${this.currentRoomCode}</strong>. Histórico recuperado via P2P.</span>
+      </div>
+    `;
+
+    messages.forEach((msg) => {
+      this.appendChatMessage(msg);
+    });
+  }
+
   private createCardElement(slot: RoomSlotInfo, isFeatured: boolean): HTMLElement {
-    if (slot.isStreaming && slot.stream) {
-      // 1. Live Screen Video Card
-      const card = document.createElement('div');
-      card.className = `stream-card ${isFeatured ? 'featured' : ''}`;
-      card.title = isFeatured ? 'Clique para voltar à grade' : 'Clique para destacar esta transmissão';
+    const isSubscribed = this.subscribedStreams.has(slot.peerId);
 
-      const video = document.createElement('video');
-      video.autoplay = true;
-      video.playsInline = true;
-      video.srcObject = slot.stream;
+    if (slot.isLocal) {
+      if (slot.isStreaming && slot.stream) {
+        // 1. Local live stream
+        const card = document.createElement('div');
+        card.className = `stream-card ${isFeatured ? 'featured' : ''}`;
+        card.title = isFeatured ? 'Clique para voltar à grade' : 'Clique para destacar sua transmissão';
 
-      if (slot.isLocal) {
+        const video = document.createElement('video');
+        video.autoplay = true;
+        video.playsInline = true;
+        video.srcObject = slot.stream;
         video.muted = true;
+
+        const overlay = document.createElement('div');
+        overlay.className = 'stream-card-overlay';
+        overlay.innerHTML = `
+          <span class="user-status-dot"></span>
+          <span>${slot.senderName}</span>
+          <span class="badge-you">VOCÊ</span>
+        `;
+
+        card.appendChild(video);
+        card.appendChild(overlay);
+        return card;
+      } else {
+        // Local avatar (not streaming)
+        const card = document.createElement('div');
+        card.className = `participant-card ${isFeatured ? 'featured' : ''}`;
+        card.style.setProperty('--user-color', slot.color);
+        card.title = isFeatured ? 'Clique para voltar à grade' : 'Clique para destacar seu card';
+
+        card.innerHTML = `
+          <div class="participant-avatar-badge">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+            </svg>
+          </div>
+          <div class="participant-name-row">
+            <span class="participant-avatar-label">${slot.senderName}</span>
+            <span class="badge-you">VOCÊ</span>
+          </div>
+          <div class="participant-status-text">Você não está transmitindo</div>
+        `;
+        return card;
       }
+    }
 
-      const overlay = document.createElement('div');
-      overlay.className = 'stream-card-overlay';
-      overlay.innerHTML = `
-        <span class="user-status-dot"></span>
-        <span>${slot.senderName}</span>
-        ${slot.isLocal ? '<span class="badge-you">VOCÊ</span>' : ''}
-      `;
+    // Remote peer
+    if (slot.isStreaming) {
+      if (isSubscribed && slot.stream) {
+        // Remote streaming & Watching
+        const card = document.createElement('div');
+        card.className = `stream-card ${isFeatured ? 'featured' : ''}`;
+        card.title = isFeatured ? 'Clique para voltar à grade' : 'Clique para destacar esta transmissão';
 
-      card.appendChild(video);
-      card.appendChild(overlay);
-      return card;
+        const video = document.createElement('video');
+        video.autoplay = true;
+        video.playsInline = true;
+        video.srcObject = slot.stream;
+
+        const overlay = document.createElement('div');
+        overlay.className = 'stream-card-overlay';
+        overlay.innerHTML = `
+          <span class="user-status-dot"></span>
+          <span>${slot.senderName}</span>
+        `;
+
+        const stopBtn = document.createElement('button');
+        stopBtn.className = 'btn-stop-watch-stream';
+        stopBtn.title = 'Parar de assistir esta transmissão';
+        stopBtn.textContent = 'Parar de Assistir';
+        stopBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.subscribedStreams.delete(slot.peerId);
+          this.renderRoomCards();
+        });
+
+        card.appendChild(video);
+        card.appendChild(overlay);
+        card.appendChild(stopBtn);
+        return card;
+      } else if (isSubscribed && !slot.stream) {
+        // Remote streaming & Subscribed but waiting for stream tracks
+        const card = document.createElement('div');
+        card.className = `participant-card ${isFeatured ? 'featured' : ''}`;
+        card.style.setProperty('--user-color', slot.color);
+
+        card.innerHTML = `
+          <div class="participant-avatar-badge">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+            </svg>
+          </div>
+          <div class="participant-name-row">
+            <span class="participant-avatar-label">${slot.senderName}</span>
+          </div>
+          <div class="participant-status-text" style="color: var(--accent-color);">Conectando transmissão...</div>
+        `;
+
+        // Request stream from peer
+        this.roomManager?.requestStreamFromPeer(slot.peerId);
+        return card;
+      } else {
+        // Remote streaming & NOT yet watching (Discord-style avatar + "Assistir Transmissão" button)
+        const card = document.createElement('div');
+        card.className = `participant-card ${isFeatured ? 'featured' : ''}`;
+        card.style.setProperty('--user-color', slot.color);
+        card.title = isFeatured ? 'Clique para voltar à grade' : 'Clique para destacar este participante';
+
+        card.innerHTML = `
+          <span class="badge-live-stream">
+            <span class="badge-live-dot"></span>AO VIVO
+          </span>
+          <div class="participant-avatar-badge">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+            </svg>
+          </div>
+          <div class="participant-name-row">
+            <span class="participant-avatar-label">${slot.senderName}</span>
+          </div>
+          <div class="participant-action-row">
+            <button class="btn-watch-stream" data-peer="${slot.peerId}">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="5 3 19 12 5 21 5 3"/>
+              </svg>
+              <span>Assistir Transmissão</span>
+            </button>
+          </div>
+        `;
+
+        const watchBtn = card.querySelector('.btn-watch-stream');
+        watchBtn?.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.subscribedStreams.add(slot.peerId);
+          this.roomManager?.requestStreamFromPeer(slot.peerId);
+          this.renderRoomCards();
+        });
+
+        return card;
+      }
     } else {
-      // 2. Colored Avatar Card (Not Streaming)
+      // Remote participant NOT streaming
       const card = document.createElement('div');
       card.className = `participant-card ${isFeatured ? 'featured' : ''}`;
       card.style.setProperty('--user-color', slot.color);
@@ -702,7 +838,6 @@ class App {
         </div>
         <div class="participant-name-row">
           <span class="participant-avatar-label">${slot.senderName}</span>
-          ${slot.isLocal ? '<span class="badge-you">VOCÊ</span>' : ''}
         </div>
         <div class="participant-status-text">Sem transmissão</div>
       `;
@@ -844,8 +979,10 @@ class App {
       // 1. Start audio capture (Process-filtered WASAPI loopback)
       let customAudioTrack: MediaStreamTrack | null = null;
       try {
-        customAudioTrack = this.audioBridge.init();
-        await this.audioBridge.startListening();
+        customAudioTrack = await this.audioBridge.startCapture(
+          this.selectedFilterMode,
+          Array.from(this.selectedPids)
+        );
       } catch (audioErr) {
         console.warn('Audio capture startup warning:', audioErr);
       }
@@ -1002,8 +1139,11 @@ class App {
     const pidsArray = Array.from(this.selectedPids);
     try {
       await invoke('start_audio_capture', {
-        filterMode: this.selectedFilterMode,
-        targetPids: pidsArray,
+        config: {
+          mode: this.selectedFilterMode,
+          target_pids: pidsArray,
+          sample_rate: 48000,
+        },
       });
       this.closeAudioFilterModal();
       this.showToast('Filtros de áudio aplicados com sucesso!');
@@ -1095,6 +1235,7 @@ class App {
       this.roomManager.leave();
       this.roomManager = null;
     }
+    this.subscribedStreams.clear();
     this.roomSlots = [];
     this.switchView('view-home');
     this.showToast('Você saiu da sala.');
