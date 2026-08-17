@@ -1,14 +1,31 @@
 import { joinRoom } from '@trystero-p2p/nostr';
 import { ChatMessage, PeerInfo } from './types';
 
-const APP_ID = 'p2sharer-nostr-group-v1';
+const APP_ID = 'p2sharer-group-v1';
 
-export class GroupHostManager {
+const RTC_CONFIG = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+  ],
+};
+
+export interface RoomCallbacks {
+  onStream: (stream: MediaStream, senderName: string) => void;
+  onStreamEnded: () => void;
+  onChat: (msg: ChatMessage) => void;
+  onPeersUpdate: (peers: PeerInfo[]) => void;
+  onStatusChange: (status: string) => void;
+}
+
+export class GroupRoomManager {
   private username: string;
   private roomId: string;
+  private isCreator: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private room: any = null;
-  private stream: MediaStream | null = null;
+  private localStream: MediaStream | null = null;
   private peers: Map<string, string> = new Map(); // peerId -> username
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private sendChatAction: any = null;
@@ -16,88 +33,150 @@ export class GroupHostManager {
   private sendPresenceAction: any = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private sendStreamStatusAction: any = null;
-  private onChatCallback: ((msg: ChatMessage) => void) | null = null;
-  private onPeersUpdateCallback: ((peers: PeerInfo[]) => void) | null = null;
 
-  constructor(username: string, roomId: string) {
+  private callbacks: RoomCallbacks | null = null;
+  private activeStreamSenderName: string = '';
+
+  constructor(username: string, roomId: string, isCreator = false) {
     this.username = username;
     this.roomId = roomId.toUpperCase().trim();
+    this.isCreator = isCreator;
   }
 
-  public join(
-    onChat: (msg: ChatMessage) => void,
-    onPeersUpdate: (peers: PeerInfo[]) => void
-  ) {
-    this.onChatCallback = onChat;
-    this.onPeersUpdateCallback = onPeersUpdate;
+  public join(callbacks: RoomCallbacks) {
+    this.callbacks = callbacks;
+    callbacks.onStatusChange('Conectando à rede P2P...');
 
     try {
-      this.room = joinRoom({ appId: APP_ID }, this.roomId);
+      this.room = joinRoom(
+        {
+          appId: APP_ID,
+          rtcConfig: RTC_CONFIG,
+        },
+        this.roomId
+      );
 
-      const chatActions = this.room.makeAction('chat');
-      this.sendChatAction = chatActions[0];
-      const onChatReceived = chatActions[1];
-      if (typeof onChatReceived === 'function') {
-        onChatReceived((msg: ChatMessage) => {
-          if (this.onChatCallback) {
-            this.onChatCallback(msg);
+      // 1. Chat Action
+      const chatTuple = this.room.makeAction('chat');
+      this.sendChatAction = chatTuple[0];
+      const onChat = chatTuple[1];
+      if (typeof onChat === 'function') {
+        onChat((msg: ChatMessage) => {
+          if (this.callbacks) {
+            this.callbacks.onChat(msg);
           }
         });
       }
 
-      const presenceActions = this.room.makeAction('presence');
-      this.sendPresenceAction = presenceActions[0];
-      const onPresenceReceived = presenceActions[1];
-      if (typeof onPresenceReceived === 'function') {
-        onPresenceReceived((data: { username: string }, peerId: string) => {
-          this.peers.set(peerId, data.username || `Convidado (${peerId.slice(0, 4)})`);
+      // 2. Presence Action (Exchange usernames)
+      const presenceTuple = this.room.makeAction('presence');
+      this.sendPresenceAction = presenceTuple[0];
+      const onPresence = presenceTuple[1];
+      if (typeof onPresence === 'function') {
+        onPresence((data: { username: string; isCreator?: boolean }, peerId: string) => {
+          console.log(`[P2P] Presence from ${peerId}:`, data.username);
+          this.peers.set(peerId, data.username || `Usuário (${peerId.slice(0, 4)})`);
           this.notifyPeersUpdate();
         });
       }
 
-      const streamStatusActions = this.room.makeAction('stream_status');
-      this.sendStreamStatusAction = streamStatusActions[0];
+      // 3. Stream Status Action
+      const streamStatusTuple = this.room.makeAction('stream_status');
+      this.sendStreamStatusAction = streamStatusTuple[0];
+      const onStreamStatus = streamStatusTuple[1];
+      if (typeof onStreamStatus === 'function') {
+        onStreamStatus((data: { isStreaming: boolean; senderName?: string }) => {
+          if (data.isStreaming) {
+            this.activeStreamSenderName = data.senderName || 'Participante';
+            callbacks.onStatusChange(`Ao Vivo: ${this.activeStreamSenderName}`);
+          } else {
+            callbacks.onStreamEnded();
+            callbacks.onStatusChange('P2P Conectado');
+          }
+        });
+      }
 
+      // 4. Peer Lifecycle
       this.room.onPeerJoin((peerId: string) => {
-        console.log(`[Host] Peer joined: ${peerId}`);
-        if (this.stream && this.room) {
+        console.log(`[P2P] Peer joined: ${peerId}`);
+        // Broadcast my username to the new peer
+        if (this.sendPresenceAction) {
+          this.sendPresenceAction({ username: this.username, isCreator: this.isCreator }, peerId);
+        }
+
+        // If I am currently sharing a screen, send the stream to the new peer
+        if (this.localStream) {
           try {
-            this.room.addStream(this.stream, peerId);
-          } catch (e) {
-            console.warn('Failed to addStream to peer:', e);
+            this.room.addStream(this.localStream, peerId);
+          } catch (err) {
+            console.warn('[P2P] Failed to add stream to new peer:', err);
           }
         }
-        if (this.sendPresenceAction) {
-          this.sendPresenceAction({ username: this.username }, peerId);
-        }
-        this.peers.set(peerId, `Convidado (${peerId.slice(0, 4)})`);
+
+        this.peers.set(peerId, `Conectando... (${peerId.slice(0, 4)})`);
         this.notifyPeersUpdate();
+        callbacks.onStatusChange('P2P Conectado');
       });
 
       this.room.onPeerLeave((peerId: string) => {
-        console.log(`[Host] Peer left: ${peerId}`);
+        console.log(`[P2P] Peer left: ${peerId}`);
         this.peers.delete(peerId);
         this.notifyPeersUpdate();
+        if (this.peers.size === 0) {
+          callbacks.onStatusChange('Aguardando participantes');
+        }
       });
+
+      // 5. Incoming Stream
+      this.room.onPeerStream((stream: MediaStream, peerId: string) => {
+        console.log(`[P2P] Received stream from peer ${peerId}`);
+        const sender = this.peers.get(peerId) || this.activeStreamSenderName || 'Participante';
+        callbacks.onStream(stream, sender);
+        callbacks.onStatusChange(`Ao Vivo por ${sender}`);
+      });
+
+      // Broadcast my presence to any existing peers
+      setTimeout(() => {
+        if (this.sendPresenceAction) {
+          this.sendPresenceAction({ username: this.username, isCreator: this.isCreator });
+        }
+      }, 500);
+
+      callbacks.onStatusChange(this.isCreator ? 'Sala Ativa (Aguardando amigos)' : 'Conectado à sala');
     } catch (err) {
-      console.error('Failed to initialize group host room:', err);
+      console.error('[P2P] Failed to join room:', err);
+      callbacks.onStatusChange('Erro ao conectar');
     }
   }
 
-  public setStream(stream: MediaStream | null) {
-    this.stream = stream;
+  public shareStream(stream: MediaStream) {
+    this.localStream = stream;
     if (this.room && stream) {
-      this.peers.forEach((_, peerId) => {
-        try {
-          this.room.addStream(stream, peerId);
-        } catch (e) {
-          console.warn('Error adding stream to peer:', peerId, e);
-        }
-      });
+      try {
+        this.room.addStream(stream);
+      } catch (err) {
+        console.warn('[P2P] Error adding broadcast stream:', err);
+      }
+
+      if (this.sendStreamStatusAction) {
+        this.sendStreamStatusAction({ isStreaming: true, senderName: this.username });
+      }
+    }
+  }
+
+  public stopStream() {
+    if (this.room && this.localStream) {
+      try {
+        this.room.removeStream(this.localStream);
+      } catch (err) {
+        console.warn('[P2P] Error removing stream:', err);
+      }
     }
 
+    this.localStream = null;
+
     if (this.sendStreamStatusAction) {
-      this.sendStreamStatusAction({ isStreaming: stream !== null, hostName: this.username });
+      this.sendStreamStatusAction({ isStreaming: false });
     }
   }
 
@@ -107,7 +186,7 @@ export class GroupHostManager {
       sender: this.username,
       text,
       timestamp: Date.now(),
-      isHost: true,
+      isHost: this.isCreator,
     };
 
     if (this.sendChatAction) {
@@ -130,144 +209,17 @@ export class GroupHostManager {
   }
 
   private notifyPeersUpdate() {
-    if (this.onPeersUpdateCallback) {
-      this.onPeersUpdateCallback(this.getConnectedPeers());
+    if (this.callbacks) {
+      this.callbacks.onPeersUpdate(this.getConnectedPeers());
     }
   }
 
-  public stop() {
+  public leave() {
+    this.stopStream();
     if (this.room) {
       this.room.leave();
       this.room = null;
-    }
-    if (this.stream) {
-      this.stream.getTracks().forEach((t) => t.stop());
-      this.stream = null;
     }
     this.peers.clear();
-  }
-}
-
-export class GroupViewerManager {
-  private username: string;
-  private roomId: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private room: any = null;
-  private remoteStream: MediaStream = new MediaStream();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private sendChatAction: any = null;
-  private onChatCallback: ((msg: ChatMessage) => void) | null = null;
-  private onStreamReceivedCallback: ((stream: MediaStream) => void) | null = null;
-  private onStreamEndedCallback: (() => void) | null = null;
-  private hostName = 'Apresentador';
-
-  constructor(username: string, roomId: string) {
-    this.username = username;
-    this.roomId = roomId.toUpperCase().trim();
-  }
-
-  public join(
-    onStream: (stream: MediaStream) => void,
-    onStreamEnded: () => void,
-    onChat: (msg: ChatMessage) => void,
-    onStatusChange: (status: string) => void
-  ) {
-    this.onStreamReceivedCallback = onStream;
-    this.onStreamEndedCallback = onStreamEnded;
-    this.onChatCallback = onChat;
-
-    onStatusChange('Conectando à rede...');
-    try {
-      this.room = joinRoom({ appId: APP_ID }, this.roomId);
-
-      const chatActions = this.room.makeAction('chat');
-      this.sendChatAction = chatActions[0];
-      const onChatReceived = chatActions[1];
-      if (typeof onChatReceived === 'function') {
-        onChatReceived((msg: ChatMessage) => {
-          if (this.onChatCallback) {
-            this.onChatCallback(msg);
-          }
-        });
-      }
-
-      const presenceActions = this.room.makeAction('presence');
-      const sendPresence = presenceActions[0];
-      const onPresenceReceived = presenceActions[1];
-      if (typeof onPresenceReceived === 'function') {
-        onPresenceReceived((data: { username: string }) => {
-          this.hostName = data.username || 'Apresentador';
-        });
-      }
-
-      const streamStatusActions = this.room.makeAction('stream_status');
-      const onStreamStatus = streamStatusActions[1];
-      if (typeof onStreamStatus === 'function') {
-        onStreamStatus((data: { isStreaming: boolean; hostName?: string }) => {
-          if (data.isStreaming) {
-            if (data.hostName) this.hostName = data.hostName;
-            onStatusChange(`Ao Vivo por ${this.hostName}`);
-          } else {
-            if (this.onStreamEndedCallback) {
-              this.onStreamEndedCallback();
-            }
-            onStatusChange('Transmissão encerrada');
-          }
-        });
-      }
-
-      this.room.onPeerJoin((peerId: string) => {
-        if (typeof sendPresence === 'function') {
-          sendPresence({ username: this.username }, peerId);
-        }
-        onStatusChange('Conectado à sala');
-      });
-
-      this.room.onPeerStream((stream: MediaStream, _peerId: string) => {
-        console.log('[Viewer] Remote stream received');
-        this.remoteStream = stream;
-        if (this.onStreamReceivedCallback) {
-          this.onStreamReceivedCallback(stream);
-        }
-        onStatusChange('Ao Vivo');
-      });
-
-      this.room.onPeerLeave(() => {
-        onStatusChange('Participante desconectou.');
-      });
-    } catch (err) {
-      console.error('Failed to join room in GroupViewerManager:', err);
-      onStatusChange('Erro ao conectar');
-    }
-  }
-
-  public getRemoteStream(): MediaStream {
-    return this.remoteStream;
-  }
-
-  public getHostName(): string {
-    return this.hostName;
-  }
-
-  public sendChatMessage(text: string): ChatMessage {
-    const msg: ChatMessage = {
-      id: crypto.randomUUID(),
-      sender: this.username,
-      text,
-      timestamp: Date.now(),
-      isHost: false,
-    };
-
-    if (this.sendChatAction) {
-      this.sendChatAction(msg);
-    }
-    return msg;
-  }
-
-  public stop() {
-    if (this.room) {
-      this.room.leave();
-      this.room = null;
-    }
   }
 }

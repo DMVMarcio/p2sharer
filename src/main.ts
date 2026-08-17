@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { AudioBridge } from './audio_bridge';
-import { GroupHostManager, GroupViewerManager } from './group_room';
+import { GroupRoomManager } from './group_room';
 import { NativeVideoBridge } from './native_video_bridge';
 import {
   ChatMessage,
@@ -14,11 +14,10 @@ import {
 class App {
   private username: string = '';
   private currentRoomCode: string = 'P2P-ROOM';
-  private isHost: boolean = false;
+  private isCreator: boolean = false;
   private isSharingScreen: boolean = false;
 
-  private groupHostManager: GroupHostManager | null = null;
-  private groupViewerManager: GroupViewerManager | null = null;
+  private roomManager: GroupRoomManager | null = null;
   private nativeVideoBridge: NativeVideoBridge = new NativeVideoBridge();
   private audioBridge: AudioBridge = new AudioBridge();
   private activeLocalStream: MediaStream | null = null;
@@ -173,41 +172,30 @@ class App {
       const text = input.value.trim();
       if (!text) return;
 
-      let msg: ChatMessage | null = null;
-      if (this.isHost && this.groupHostManager) {
-        msg = this.groupHostManager.sendChatMessage(text);
-      } else if (this.groupViewerManager) {
-        msg = this.groupViewerManager.sendChatMessage(text);
-      }
-
-      if (msg) {
+      if (this.roomManager) {
+        const msg = this.roomManager.sendChatMessage(text);
         this.appendChatMessage(msg);
         input.value = '';
       }
     });
   }
 
-  // --- CREATE ROOM (AS HOST / ROOM OWNER) ---
+  // --- CREATE ROOM ---
   private createRoomAsHost() {
     if (!this.username) {
       this.showUsernameModal();
       return;
     }
 
-    this.isHost = true;
+    this.isCreator = true;
     this.generateRandomRoomCode();
     this.enterRoomUI();
 
-    this.groupHostManager = new GroupHostManager(this.username, this.currentRoomCode);
-    this.groupHostManager.join(
-      (msg) => this.appendChatMessage(msg),
-      (peers) => this.updatePeersList(peers)
-    );
-
+    this.connectToRoom();
     this.showToast(`Sala "${this.currentRoomCode}" criada!`);
   }
 
-  // --- JOIN ROOM DIALOG ---
+  // --- JOIN ROOM ---
   private openJoinDialog() {
     if (!this.username) {
       this.showUsernameModal();
@@ -231,17 +219,26 @@ class App {
       return;
     }
 
-    this.isHost = false;
+    this.isCreator = false;
     this.currentRoomCode = input.toUpperCase();
     this.closeJoinDialog();
     this.enterRoomUI();
 
-    this.groupViewerManager = new GroupViewerManager(this.username, this.currentRoomCode);
-    this.groupViewerManager.join(
-      (stream) => {
-        this.renderRemoteStream(stream);
+    this.connectToRoom();
+    this.showToast(`Conectando à sala ${this.currentRoomCode}...`);
+  }
+
+  private connectToRoom() {
+    if (this.roomManager) {
+      this.roomManager.leave();
+    }
+
+    this.roomManager = new GroupRoomManager(this.username, this.currentRoomCode, this.isCreator);
+    this.roomManager.join({
+      onStream: (stream, senderName) => {
+        this.renderRemoteStream(stream, senderName);
       },
-      () => {
+      onStreamEnded: () => {
         const video = document.getElementById('room-main-video') as HTMLVideoElement;
         const idleBox = document.getElementById('room-video-idle');
         const sharingStatus = document.getElementById('room-sharing-status-tag');
@@ -254,14 +251,17 @@ class App {
           liveBadge.classList.remove('streaming');
         }
       },
-      (msg) => this.appendChatMessage(msg),
-      (status) => {
+      onChat: (msg) => {
+        this.appendChatMessage(msg);
+      },
+      onPeersUpdate: (peers) => {
+        this.updatePeersList(peers);
+      },
+      onStatusChange: (status) => {
         const statsBadge = document.getElementById('room-stats-badge');
         if (statsBadge) statsBadge.textContent = status;
-      }
-    );
-
-    this.showToast(`Conectando à sala ${this.currentRoomCode}...`);
+      },
+    });
   }
 
   private enterRoomUI() {
@@ -287,7 +287,7 @@ class App {
     this.switchView('view-group-room');
   }
 
-  // --- CUSTOM SCREEN & APPLICATION PICKER WITH LIVE THUMBNAILS ---
+  // --- CUSTOM SCREEN & APPLICATION PICKER ---
   private async openScreenPickerModal() {
     const modal = document.getElementById('modal-custom-screen-picker');
     modal?.classList.remove('hidden');
@@ -308,8 +308,8 @@ class App {
   private async loadScreenSources() {
     const screenGrid = document.getElementById('grid-screen-sources');
     const windowGrid = document.getElementById('grid-window-sources');
-    if (screenGrid) screenGrid.innerHTML = '<div class="loading-state">Buscando monitores e gerando miniaturas...</div>';
-    if (windowGrid) windowGrid.innerHTML = '<div class="loading-state">Buscando janelas e gerando miniaturas...</div>';
+    if (screenGrid) screenGrid.innerHTML = '<div class="loading-state">Buscando monitores...</div>';
+    if (windowGrid) windowGrid.innerHTML = '<div class="loading-state">Buscando janelas...</div>';
 
     try {
       const resp = await invoke<ScreenSourcesResponse>('list_screen_sources');
@@ -323,8 +323,8 @@ class App {
         { id: 'screen:0', name: 'Monitor 1 (Principal) - 1920x1080', width: 1920, height: 1080, is_primary: true, thumbnail: undefined },
       ];
       this.availableWindows = [
-        { id: 'window:1', title: 'Discord', process_name: 'Discord.exe', pid: 10420, hwnd: 1, width: 1280, height: 720, thumbnail: undefined },
-        { id: 'window:2', title: 'Google Chrome', process_name: 'chrome.exe', pid: 9812, hwnd: 2, width: 1920, height: 1080, thumbnail: undefined },
+        { id: 'window:1', title: 'Discord', process_name: 'Discord.exe', pid: 10420, width: 1280, height: 720, thumbnail: undefined },
+        { id: 'window:2', title: 'Google Chrome', process_name: 'chrome.exe', pid: 9812, width: 1920, height: 1080, thumbnail: undefined },
       ];
       this.renderScreenSources();
       this.renderWindowSources();
@@ -376,7 +376,7 @@ class App {
     if (!grid) return;
 
     if (this.availableWindows.length === 0) {
-      grid.innerHTML = '<div class="loading-state">Nenhuma janela de aplicativo aberta detectada.</div>';
+      grid.innerHTML = '<div class="loading-state">Nenhuma janela aberta detectada.</div>';
       return;
     }
 
@@ -410,7 +410,7 @@ class App {
     });
   }
 
-  // --- START SCREEN CAPTURE (ZERO CHROME POPUPS) ---
+  // --- START SCREEN CAPTURE ---
   private async confirmStartScreenCapture() {
     const resValue = (document.getElementById('picker-select-resolution') as HTMLSelectElement).value;
     const fpsValue = parseInt((document.getElementById('picker-select-fps') as HTMLSelectElement).value, 10) || 60;
@@ -435,7 +435,7 @@ class App {
       });
       await this.audioBridge.startListening();
 
-      // 2. Native Canvas Video Capture (ZERO Chrome popups!)
+      // 2. Native Canvas Video Capture
       const videoStream = await this.nativeVideoBridge.startCapture(this.selectedSourceId, fpsValue, res);
 
       // 3. Assemble combined MediaStream
@@ -458,9 +458,9 @@ class App {
       }
       if (idleBox) idleBox.classList.add('hidden');
 
-      // Update room stream for connected peers
-      if (this.groupHostManager) {
-        this.groupHostManager.setStream(combinedStream);
+      // Broadcast stream to everyone in the room
+      if (this.roomManager) {
+        this.roomManager.shareStream(combinedStream);
       }
 
       // Update UI tags
@@ -495,8 +495,8 @@ class App {
       this.activeLocalStream = null;
     }
 
-    if (this.groupHostManager) {
-      this.groupHostManager.setStream(null);
+    if (this.roomManager) {
+      this.roomManager.stopStream();
     }
 
     const video = document.getElementById('room-main-video') as HTMLVideoElement;
@@ -533,7 +533,7 @@ class App {
   }
 
   // --- REMOTE STREAM RENDERING ---
-  private renderRemoteStream(stream: MediaStream) {
+  private renderRemoteStream(stream: MediaStream, senderName: string) {
     const video = document.getElementById('room-main-video') as HTMLVideoElement;
     const idleBox = document.getElementById('room-video-idle');
     const sharingStatus = document.getElementById('room-sharing-status-tag');
@@ -548,14 +548,13 @@ class App {
       });
     }
 
-    const hostName = this.groupViewerManager?.getHostName() || 'Apresentador';
-    if (sharingStatus) sharingStatus.textContent = `Ao Vivo por: ${hostName}`;
+    if (sharingStatus) sharingStatus.textContent = `Ao Vivo por: ${senderName}`;
     if (liveBadge) {
       liveBadge.textContent = 'AO VIVO';
       liveBadge.classList.add('streaming');
     }
 
-    this.showToast(`Transmissão de ${hostName} recebida!`);
+    this.showToast(`Transmissão de ${senderName} recebida!`);
   }
 
   private unmuteRoomAudio() {
@@ -586,13 +585,9 @@ class App {
     if (this.isSharingScreen) {
       this.stopScreenSharing();
     }
-    if (this.groupHostManager) {
-      this.groupHostManager.stop();
-      this.groupHostManager = null;
-    }
-    if (this.groupViewerManager) {
-      this.groupViewerManager.stop();
-      this.groupViewerManager = null;
+    if (this.roomManager) {
+      this.roomManager.leave();
+      this.roomManager = null;
     }
 
     this.switchView('view-home');
@@ -612,7 +607,7 @@ class App {
   private async loadProcessList() {
     const container = document.getElementById('process-checkboxes-container');
     if (container) {
-      container.innerHTML = '<div class="loading-state">Buscando programas em execução no Windows...</div>';
+      container.innerHTML = '<div class="loading-state">Buscando programas no Windows...</div>';
     }
 
     try {
@@ -726,7 +721,7 @@ class App {
       <div class="peer-item">
         <div>
           <span class="peer-name">${this.username} (Você)</span>
-          <span style="font-size: 11px; color: var(--text-muted); display: block;">${this.isHost ? 'Criador da Sala' : 'Participante'}</span>
+          <span style="font-size: 11px; color: var(--text-muted); display: block;">${this.isCreator ? 'Criador da Sala' : 'Participante'}</span>
         </div>
         <span class="peer-status">● Online</span>
       </div>
