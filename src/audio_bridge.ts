@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/core';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 
 export interface AudioStreamPayload {
@@ -27,6 +28,23 @@ export class AudioBridge {
       console.warn('Web Audio API not initialized:', e);
       return null;
     }
+  }
+
+  public async startCapture(mode: string = 'exclude', targetPids: number[] = []): Promise<MediaStreamTrack | null> {
+    const track = this.init();
+    await this.startListening();
+    try {
+      await invoke('start_audio_capture', {
+        config: {
+          mode,
+          target_pids: targetPids,
+          sample_rate: 48000,
+        },
+      });
+    } catch (err) {
+      console.warn('Rust start_audio_capture warning:', err);
+    }
+    return track;
   }
 
   public async startListening(): Promise<void> {

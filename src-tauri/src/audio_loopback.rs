@@ -3,14 +3,25 @@ use base64::Engine;
 use byteorder::{ByteOrder, LittleEndian};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AudioConfig {
+    #[serde(default = "default_mode")]
     pub mode: String, // "full", "exclude", "include"
+    #[serde(default)]
     pub target_pids: Vec<u32>,
+    #[serde(default = "default_sample_rate")]
     pub sample_rate: u32,
+}
+
+fn default_mode() -> String {
+    "exclude".to_string()
+}
+
+fn default_sample_rate() -> u32 {
+    48000
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -21,7 +32,7 @@ pub struct AudioStreamPayload {
     pub rms_level: f32,
 }
 
-static CAPTURING: AtomicBool = AtomicBool::new(false);
+static CURRENT_STOP_FLAG: Mutex<Option<Arc<AtomicBool>>> = Mutex::new(None);
 
 #[cfg(windows)]
 mod win_audio {
@@ -43,7 +54,7 @@ mod win_audio {
             let enumerator = match enumerator {
                 Ok(e) => e,
                 Err(err) => {
-                    eprintln!("Failed to create MMDeviceEnumerator: {:?}", err);
+                    eprintln!("[Audio Loopback] Failed to create MMDeviceEnumerator: {:?}", err);
                     let _ = CoUninitialize();
                     return;
                 }
@@ -52,7 +63,7 @@ mod win_audio {
             let device = match enumerator.GetDefaultAudioEndpoint(eRender, eConsole) {
                 Ok(d) => d,
                 Err(err) => {
-                    eprintln!("Failed to get default audio endpoint: {:?}", err);
+                    eprintln!("[Audio Loopback] Failed to get default audio endpoint: {:?}", err);
                     let _ = CoUninitialize();
                     return;
                 }
@@ -61,7 +72,7 @@ mod win_audio {
             let audio_client: IAudioClient = match device.Activate(CLSCTX_ALL, None) {
                 Ok(c) => c,
                 Err(err) => {
-                    eprintln!("Failed to activate IAudioClient: {:?}", err);
+                    eprintln!("[Audio Loopback] Failed to activate IAudioClient: {:?}", err);
                     let _ = CoUninitialize();
                     return;
                 }
@@ -70,7 +81,7 @@ mod win_audio {
             let mix_format_ptr: *mut WAVEFORMATEX = match audio_client.GetMixFormat() {
                 Ok(ptr) => ptr,
                 Err(err) => {
-                    eprintln!("Failed to get mix format: {:?}", err);
+                    eprintln!("[Audio Loopback] Failed to get mix format: {:?}", err);
                     let _ = CoUninitialize();
                     return;
                 }
@@ -97,7 +108,7 @@ mod win_audio {
                 mix_format_ptr,
                 None,
             ) {
-                eprintln!("Failed to initialize audio client: {:?}", err);
+                eprintln!("[Audio Loopback] Failed to initialize audio client: {:?}", err);
                 CoTaskMemFree(Some(mix_format_ptr as *const _));
                 let _ = CoUninitialize();
                 return;
@@ -108,17 +119,19 @@ mod win_audio {
             let capture_client: IAudioCaptureClient = match audio_client.GetService() {
                 Ok(c) => c,
                 Err(err) => {
-                    eprintln!("Failed to get capture client: {:?}", err);
+                    eprintln!("[Audio Loopback] Failed to get capture client: {:?}", err);
                     let _ = CoUninitialize();
                     return;
                 }
             };
 
             if let Err(err) = audio_client.Start() {
-                eprintln!("Failed to start audio client: {:?}", err);
+                eprintln!("[Audio Loopback] Failed to start audio client: {:?}", err);
                 let _ = CoUninitialize();
                 return;
             }
+
+            println!("[Audio Loopback] Windows WASAPI loopback capture started ({} Hz, {} channels)", sample_rate, channels);
 
             let mut send_buffer: Vec<f32> = Vec::with_capacity(4096);
 
@@ -169,7 +182,7 @@ mod win_audio {
                     packet_size = capture_client.GetNextPacketSize().unwrap_or(0);
                 }
 
-                // If we accumulated ~20ms of audio, emit to frontend
+                // Emit chunk every ~20ms
                 let min_samples_to_send = (sample_rate as usize * channels as usize) / 50;
                 if send_buffer.len() >= min_samples_to_send {
                     let mut sum_sq = 0.0f32;
@@ -195,23 +208,36 @@ mod win_audio {
 
             let _ = audio_client.Stop();
             let _ = CoUninitialize();
+            println!("[Audio Loopback] Audio loopback stopped cleanly.");
         }
     }
 }
 
 #[tauri::command]
-pub async fn start_audio_capture(app: AppHandle, config: AudioConfig) -> Result<bool, String> {
-    if CAPTURING.load(Ordering::SeqCst) {
-        return Ok(true);
+pub fn start_audio_capture(app: AppHandle, config: Option<AudioConfig>) -> Result<bool, String> {
+    // 1. Stop any currently running capture loop
+    if let Ok(mut guard) = CURRENT_STOP_FLAG.lock() {
+        if let Some(flag) = guard.take() {
+            flag.store(false, Ordering::SeqCst);
+        }
     }
 
-    CAPTURING.store(true, Ordering::SeqCst);
+    let cfg = config.unwrap_or(AudioConfig {
+        mode: "exclude".to_string(),
+        target_pids: vec![],
+        sample_rate: 48000,
+    });
+
     let stop_flag = Arc::new(AtomicBool::new(true));
     let stop_clone = stop_flag.clone();
 
+    if let Ok(mut guard) = CURRENT_STOP_FLAG.lock() {
+        *guard = Some(stop_flag);
+    }
+
     std::thread::spawn(move || {
         #[cfg(windows)]
-        win_audio::run_capture_loop(app, config, stop_clone);
+        win_audio::run_capture_loop(app, cfg, stop_clone);
     });
 
     Ok(true)
@@ -219,6 +245,10 @@ pub async fn start_audio_capture(app: AppHandle, config: AudioConfig) -> Result<
 
 #[tauri::command]
 pub fn stop_audio_capture() -> Result<bool, String> {
-    CAPTURING.store(false, Ordering::SeqCst);
+    if let Ok(mut guard) = CURRENT_STOP_FLAG.lock() {
+        if let Some(flag) = guard.take() {
+            flag.store(false, Ordering::SeqCst);
+        }
+    }
     Ok(true)
 }

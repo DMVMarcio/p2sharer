@@ -16,6 +16,7 @@ export interface RoomCallbacks {
   onStreamsUpdate: (streams: ActiveStreamInfo[]) => void;
   onSlotsUpdate: (slots: RoomSlotInfo[]) => void;
   onChat: (msg: ChatMessage) => void;
+  onChatHistory: (messages: ChatMessage[]) => void;
   onPeersUpdate: (peers: PeerInfo[]) => void;
   onStatusChange: (status: string) => void;
 }
@@ -73,13 +74,19 @@ export class GroupRoomManager {
   private room: any = null;
   private localStream: MediaStream | null = null;
   private peers: Map<string, string> = new Map(); // peerId -> username
+  private streamingPeers: Set<string> = new Set(); // peerId set of who is broadcasting
   private remoteStreams: Map<string, MediaStream> = new Map(); // peerId -> stream
+  private chatHistory: ChatMessage[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private chatAction: any = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private historyAction: any = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private presenceAction: any = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private streamStatusAction: any = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private streamReqAction: any = null;
 
   private callbacks: RoomCallbacks | null = null;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
@@ -145,42 +152,100 @@ export class GroupRoomManager {
       // 1. Setup Chat Action
       this.chatAction = this.room.makeAction('chat');
       this.chatAction.onMessage = (msg: ChatMessage) => {
+        this.chatHistory.push(msg);
         if (this.callbacks) {
           this.callbacks.onChat(msg);
         }
       };
 
-      // 2. Setup Presence Action (Exchange usernames)
+      // 2. Setup Chat History Sync Action (P2P pull from host / peers)
+      this.historyAction = this.room.makeAction('history_sync');
+      this.historyAction.onMessage = (data: { request?: boolean; history?: ChatMessage[] }, meta: { peerId: string }) => {
+        const peerId = meta.peerId;
+        if (data.request) {
+          // Send my history back to the requesting peer
+          if (this.chatHistory.length > 0) {
+            this.historyAction.send({ history: this.chatHistory }, { target: peerId });
+          }
+        } else if (data.history && Array.isArray(data.history) && data.history.length > 0) {
+          // Merge history without duplicates
+          const existingIds = new Set(this.chatHistory.map((m) => m.id));
+          const newMessages = data.history.filter((m) => !existingIds.has(m.id));
+          if (newMessages.length > 0) {
+            this.chatHistory = [...this.chatHistory, ...newMessages].sort((a, b) => a.timestamp - b.timestamp);
+            if (this.callbacks) {
+              this.callbacks.onChatHistory(this.chatHistory);
+            }
+          }
+        }
+      };
+
+      // 3. Setup Presence Action (Exchange usernames & broadcast status)
       this.presenceAction = this.room.makeAction('presence');
-      this.presenceAction.onMessage = (data: { username: string; isCreator?: boolean }, meta: { peerId: string }) => {
+      this.presenceAction.onMessage = (
+        data: { username: string; isCreator?: boolean; isStreaming?: boolean },
+        meta: { peerId: string }
+      ) => {
         const peerId = meta.peerId;
         const oldName = this.peers.get(peerId);
         const newName = data.username || `Usuário (${peerId.slice(0, 4)})`;
         if (oldName !== newName) {
           this.peers.set(peerId, newName);
-          this.notifyPeersUpdate();
-          this.notifyStreamsUpdate();
         }
+
+        if (data.isStreaming) {
+          this.streamingPeers.add(peerId);
+        } else if (data.isStreaming === false) {
+          this.streamingPeers.delete(peerId);
+        }
+
+        this.notifyPeersUpdate();
+        this.notifyStreamsUpdate();
         callbacks.onStatusChange(this.turnConfig?.forceRelay ? 'P2P (Relay Seguro)' : 'P2P Conectado');
       };
 
-      // 3. Setup Stream Status Action
+      // 4. Setup Stream Status Action
       this.streamStatusAction = this.room.makeAction('stream_status');
       this.streamStatusAction.onMessage = (data: { isStreaming: boolean; senderName?: string }, meta: { peerId: string }) => {
         const peerId = meta.peerId;
-        if (!data.isStreaming && this.remoteStreams.has(peerId)) {
-          this.remoteStreams.delete(peerId);
-          this.notifyStreamsUpdate();
+        if (data.isStreaming) {
+          this.streamingPeers.add(peerId);
+        } else {
+          this.streamingPeers.delete(peerId);
+          if (this.remoteStreams.has(peerId)) {
+            this.remoteStreams.delete(peerId);
+          }
+        }
+        this.notifyStreamsUpdate();
+      };
+
+      // 5. Setup On-Demand Stream Request Action
+      this.streamReqAction = this.room.makeAction('stream_req');
+      this.streamReqAction.onMessage = (data: { request?: boolean }, meta: { peerId: string }) => {
+        const requesterId = meta.peerId;
+        console.log(`[P2P] Received stream request from peer ${requesterId}`);
+        if (this.localStream && data.request) {
+          try {
+            this.room.addStream(this.localStream, requesterId);
+            [30, 100, 250, 500, 1000, 2000].forEach((delay) => {
+              setTimeout(() => this.boostSenders(this.currentTargetBitrate, this.currentTargetFps), delay);
+            });
+          } catch (err) {
+            console.warn('[P2P] Error servicing stream request:', err);
+          }
         }
       };
 
-      // 4. Peer Lifecycle Listeners
+      // 6. Peer Lifecycle Listeners
       this.room.onPeerJoin = (peerId: string) => {
         console.log(`[P2P] Peer joined room: ${peerId}`);
         
         // Send presence immediately to new peer
         if (this.presenceAction) {
-          this.presenceAction.send({ username: this.username, isCreator: this.isCreator }, { target: peerId });
+          this.presenceAction.send(
+            { username: this.username, isCreator: this.isCreator, isStreaming: Boolean(this.localStream) },
+            { target: peerId }
+          );
         }
 
         // If I am already sharing a stream, broadcast it to the new peer with burst bitrate
@@ -204,6 +269,7 @@ export class GroupRoomManager {
       this.room.onPeerLeave = (peerId: string) => {
         console.log(`[P2P] Peer left room: ${peerId}`);
         this.peers.delete(peerId);
+        this.streamingPeers.delete(peerId);
         if (this.remoteStreams.has(peerId)) {
           this.remoteStreams.delete(peerId);
         }
@@ -214,34 +280,53 @@ export class GroupRoomManager {
         }
       };
 
-      // 5. Incoming Stream Listener
+      // 7. Incoming Stream Listener
       this.room.onPeerStream = (stream: MediaStream, peerId: string) => {
         console.log(`[P2P] Received stream from peer: ${peerId}`);
+        this.streamingPeers.add(peerId);
         this.remoteStreams.set(peerId, stream);
         this.notifyStreamsUpdate();
         callbacks.onStatusChange('Ao Vivo');
       };
 
-      // 6. Continuous presence heartbeat (every 3s)
+      // 8. Continuous presence heartbeat (every 3s)
       this.heartbeatTimer = setInterval(() => {
         if (!this.room) return;
         if (this.presenceAction) {
-          this.presenceAction.send({ username: this.username, isCreator: this.isCreator });
+          this.presenceAction.send({
+            username: this.username,
+            isCreator: this.isCreator,
+            isStreaming: Boolean(this.localStream),
+          });
         }
       }, 3000);
 
-      // Initial broadcast
+      // Initial broadcast and request history from room
       setTimeout(() => {
         if (this.presenceAction) {
-          this.presenceAction.send({ username: this.username, isCreator: this.isCreator });
+          this.presenceAction.send({
+            username: this.username,
+            isCreator: this.isCreator,
+            isStreaming: Boolean(this.localStream),
+          });
         }
-      }, 300);
+        if (this.historyAction && !this.isCreator) {
+          this.historyAction.send({ request: true });
+        }
+      }, 350);
 
       callbacks.onStatusChange('Sala Ativa');
       this.notifyStreamsUpdate();
     } catch (err) {
       console.error('[P2P] Failed to join room in GroupRoomManager:', err);
       callbacks.onStatusChange('Erro ao conectar');
+    }
+  }
+
+  public requestStreamFromPeer(peerId: string) {
+    if (this.streamReqAction && peerId !== 'local') {
+      console.log(`[P2P] Requesting live stream from peer ${peerId}`);
+      this.streamReqAction.send({ request: true }, { target: peerId });
     }
   }
 
@@ -360,11 +445,12 @@ export class GroupRoomManager {
     // 2. Peer slots
     this.peers.forEach((uname, peerId) => {
       const stream = this.remoteStreams.get(peerId) || null;
+      const isBroadcasting = this.streamingPeers.has(peerId) || Boolean(stream);
       list.push({
         peerId,
         senderName: uname,
         stream,
-        isStreaming: Boolean(stream),
+        isStreaming: isBroadcasting,
         isLocal: false,
         color: generateUserColor(uname),
       });
@@ -394,6 +480,8 @@ export class GroupRoomManager {
       timestamp: Date.now(),
       isHost: this.isCreator,
     };
+
+    this.chatHistory.push(msg);
 
     if (this.chatAction) {
       this.chatAction.send(msg);
@@ -431,7 +519,9 @@ export class GroupRoomManager {
       this.room = null;
     }
     this.peers.clear();
+    this.streamingPeers.clear();
     this.remoteStreams.clear();
+    this.chatHistory = [];
     this.lastStreamsHash = '';
   }
 }
