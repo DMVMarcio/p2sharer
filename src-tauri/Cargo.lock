@@ -2938,6 +2938,7 @@ dependencies = [
  "byteorder",
  "futures-util",
  "image",
+ "rayon",
  "serde",
  "serde_json",
  "sysinfo",

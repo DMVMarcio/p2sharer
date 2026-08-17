@@ -45,7 +45,7 @@ static FRAME_SENDER: std::sync::OnceLock<broadcast::Sender<Vec<u8>>> = std::sync
 
 fn get_frame_sender() -> &'static broadcast::Sender<Vec<u8>> {
     FRAME_SENDER.get_or_init(|| {
-        let (tx, _rx) = broadcast::channel(16);
+        let (tx, _rx) = broadcast::channel(32);
         tx
     })
 }
@@ -330,11 +330,20 @@ pub fn start_native_screen_capture(
     let is_capturing_clone = is_capturing.clone();
 
     let fps = target_fps.max(15).min(120);
-    let frame_delay_ms = (1000 / fps).max(6) as u64;
+    let frame_interval = std::time::Duration::from_millis((1000 / fps).max(6) as u64);
     let should_draw_mouse = capture_mouse.unwrap_or(true);
-    let jpeg_quality = quality.unwrap_or(80).max(50).min(90);
+    let jpeg_quality = quality.unwrap_or(65).max(45).min(80);
 
     let sender = get_frame_sender().clone();
+
+    // Create a 4-thread parallel compression pool
+    let pool = Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(4)
+            .thread_name(|i| format!("screen-encoder-{}", i))
+            .build()
+            .unwrap_or_else(|_| rayon::ThreadPoolBuilder::new().build().unwrap()),
+    );
 
     std::thread::spawn(move || {
         let is_window = source_id.starts_with("window:");
@@ -349,7 +358,7 @@ pub fn start_native_screen_capture(
         let target_win_id = raw_id.to_string();
 
         while is_capturing_clone.load(Ordering::Relaxed) && CAPTURING_VIDEO.load(Ordering::Relaxed) {
-            let start_time = std::time::Instant::now();
+            let loop_start = std::time::Instant::now();
 
             let captured_img = if is_window {
                 if let Ok(windows) = Window::all() {
@@ -389,24 +398,27 @@ pub fn start_native_screen_capture(
             };
 
             if let Some(img) = captured_img {
-                // Resize if needed
-                let scaled_img = if img.width() != target_width || img.height() != target_height {
-                    image::imageops::resize(&img, target_width, target_height, FilterType::Nearest)
-                } else {
-                    img
-                };
+                let tx = sender.clone();
+                // Dispatch compression to the parallel thread pool with zero lag
+                pool.spawn(move || {
+                    let scaled_img = if img.width() != target_width || img.height() != target_height {
+                        image::imageops::resize(&img, target_width, target_height, FilterType::Nearest)
+                    } else {
+                        img
+                    };
 
-                let mut jpeg_bytes = Vec::with_capacity(90_000);
-                let mut cursor = Cursor::new(&mut jpeg_bytes);
-                let mut encoder = JpegEncoder::new_with_quality(&mut cursor, jpeg_quality);
-                if encoder.encode_image(&scaled_img).is_ok() {
-                    let _ = sender.send(jpeg_bytes);
-                }
+                    let mut jpeg_bytes = Vec::with_capacity(80_000);
+                    let mut cursor = Cursor::new(&mut jpeg_bytes);
+                    let mut encoder = JpegEncoder::new_with_quality(&mut cursor, jpeg_quality);
+                    if encoder.encode_image(&scaled_img).is_ok() {
+                        let _ = tx.send(jpeg_bytes);
+                    }
+                });
             }
 
-            let elapsed = start_time.elapsed().as_millis() as u64;
-            if elapsed < frame_delay_ms {
-                std::thread::sleep(std::time::Duration::from_millis(frame_delay_ms - elapsed));
+            let elapsed = loop_start.elapsed();
+            if elapsed < frame_interval {
+                std::thread::sleep(frame_interval - elapsed);
             }
         }
     });
