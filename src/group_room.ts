@@ -20,6 +20,50 @@ export interface RoomCallbacks {
   onStatusChange: (status: string) => void;
 }
 
+function optimizeSDP(sdp: string, bitrateKbps: number = 25000): string {
+  let modified = sdp;
+  const bitrateBps = bitrateKbps * 1000;
+
+  // 1. Add bandwidth modifier (b=AS and b=TIAS) directly under video media line
+  modified = modified.replace(
+    /(m=video[^\r\n]*\r\n)/g,
+    `$1b=AS:${bitrateKbps}\r\nb=TIAS:${bitrateBps}\r\n`
+  );
+
+  // 2. Add Google-specific initial bitrate parameters to fmtp lines
+  modified = modified.replace(
+    /(a=fmtp:\d+ [^\r\n]*)/g,
+    `$1;x-google-min-bitrate=${Math.floor(bitrateKbps * 0.5)};x-google-start-bitrate=${bitrateKbps};x-google-max-bitrate=${Math.floor(bitrateKbps * 1.5)}`
+  );
+
+  return modified;
+}
+
+let sdpHooked = false;
+function ensureSDPHooked() {
+  if (sdpHooked || typeof RTCPeerConnection === 'undefined') return;
+  sdpHooked = true;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const originalSetLocalDescription = (RTCPeerConnection.prototype as any).setLocalDescription;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (RTCPeerConnection.prototype as any).setLocalDescription = function (description: any, ...args: any[]) {
+    if (description && description.sdp) {
+      const optimized = optimizeSDP(description.sdp, 25000);
+      try {
+        const newDesc = {
+          type: description.type,
+          sdp: optimized,
+        };
+        return originalSetLocalDescription.apply(this, [newDesc, ...args]);
+      } catch {
+        return originalSetLocalDescription.apply(this, [description, ...args]);
+      }
+    }
+    return originalSetLocalDescription.apply(this, [description, ...args]);
+  };
+}
+
 export class GroupRoomManager {
   private username: string;
   private roomId: string;
@@ -48,6 +92,7 @@ export class GroupRoomManager {
     this.roomId = roomId.toUpperCase().trim();
     this.isCreator = isCreator;
     this.turnConfig = turnConfig || null;
+    ensureSDPHooked();
   }
 
   public join(callbacks: RoomCallbacks) {
@@ -138,11 +183,13 @@ export class GroupRoomManager {
           this.presenceAction.send({ username: this.username, isCreator: this.isCreator }, { target: peerId });
         }
 
-        // If I am already sharing a stream, broadcast it to the new peer
+        // If I am already sharing a stream, broadcast it to the new peer with burst bitrate
         if (this.localStream) {
           try {
             this.room.addStream(this.localStream, peerId);
-            setTimeout(() => this.boostSenders(this.currentTargetBitrate, this.currentTargetFps), 150);
+            [50, 150, 300, 600, 1200, 2000].forEach((delay) => {
+              setTimeout(() => this.boostSenders(this.currentTargetBitrate, this.currentTargetFps), delay);
+            });
           } catch (err) {
             console.warn('[P2P] Error adding stream to new peer:', err);
           }
@@ -206,7 +253,10 @@ export class GroupRoomManager {
     if (this.room && stream) {
       try {
         this.room.addStream(stream);
-        setTimeout(() => this.boostSenders(targetBitrateBps, targetFps), 100);
+        // Fire rapid bursts so WebRTC skips the 6-second low-bitrate probing ramp-up
+        [30, 100, 250, 500, 1000, 1800, 2500].forEach((delay) => {
+          setTimeout(() => this.boostSenders(targetBitrateBps, targetFps), delay);
+        });
       } catch (err) {
         console.warn('[P2P] Error adding broadcast stream:', err);
       }
@@ -235,6 +285,7 @@ export class GroupRoomManager {
                 }
                 params.encodings[0].maxBitrate = maxBitrateBps;
                 params.encodings[0].maxFramerate = maxFps;
+                params.encodings[0].scaleResolutionDownBy = 1.0;
                 params.encodings[0].networkPriority = 'high';
                 params.encodings[0].priority = 'high';
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
