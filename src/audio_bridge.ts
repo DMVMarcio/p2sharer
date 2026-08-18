@@ -21,6 +21,9 @@ export class AudioBridge {
     try {
       const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       this.audioCtx = new AudioContextClass({ sampleRate: 48000 });
+      if (this.audioCtx.state === 'suspended') {
+        this.audioCtx.resume().catch(() => {});
+      }
       this.destNode = this.audioCtx.createMediaStreamDestination();
       this.nextPlayTime = 0;
       return this.destNode.stream.getAudioTracks()[0] || null;
