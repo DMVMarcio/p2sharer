@@ -299,6 +299,11 @@ class App {
         input.value = '';
       }
     });
+
+    // Window Unload (Auto-leave room on close / refresh)
+    window.addEventListener('beforeunload', () => {
+      this.leaveRoom();
+    });
   }
 
   // --- SETTINGS MODAL ---

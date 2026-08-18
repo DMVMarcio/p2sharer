@@ -2,7 +2,7 @@ use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use byteorder::{ByteOrder, LittleEndian};
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
 
@@ -38,43 +38,211 @@ static CURRENT_STOP_FLAG: Mutex<Option<Arc<AtomicBool>>> = Mutex::new(None);
 mod win_audio {
     use super::*;
     use std::ptr::null_mut;
+    use windows::core::{Interface, HRESULT, PCWSTR};
+    use windows::Win32::Foundation::{E_NOINTERFACE, E_POINTER, S_OK};
     use windows::Win32::Media::Audio::*;
     use windows::Win32::System::Com::*;
 
     const AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM: u32 = 0x80000000;
     const AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY: u32 = 0x08000000;
 
-    pub fn run_capture_loop(app: AppHandle, _config: AudioConfig, stop_flag: Arc<AtomicBool>) {
+    const AUDIOCLIENT_ACTIVATION_TYPE_PROCESS_LOOPBACK: u32 = 1;
+    const PROCESS_LOOPBACK_MODE_INCLUDE_PROCESS_TREE: u32 = 0;
+    const PROCESS_LOOPBACK_MODE_EXCLUDE_PROCESS_TREE: u32 = 1;
+
+    #[repr(C)]
+    struct AUDIOCLIENT_PROCESS_LOOPBACK_PARAMS {
+        TargetProcessId: u32,
+        ProcessLoopbackMode: u32,
+    }
+
+    #[repr(C)]
+    struct AUDIOCLIENT_ACTIVATION_PARAMS {
+        ActivationType: u32,
+        ProcessLoopbackParams: AUDIOCLIENT_PROCESS_LOOPBACK_PARAMS,
+    }
+
+    #[repr(C)]
+    struct RawBlob {
+        cb_size: u32,
+        p_blob_data: *mut u8,
+    }
+
+    #[repr(C)]
+    struct RawPropVariant {
+        vt: u16,
+        w_reserved1: u16,
+        w_reserved2: u16,
+        w_reserved3: u16,
+        blob: RawBlob,
+    }
+
+    #[repr(C)]
+    struct AudioActivationContext {
+        vptr: *const IActivateAudioInterfaceCompletionHandler_Vtbl,
+        ref_count: AtomicU32,
+        sender: std::sync::mpsc::Sender<Result<IAudioClient, windows::core::Error>>,
+    }
+
+    static HANDLER_VTBL: IActivateAudioInterfaceCompletionHandler_Vtbl =
+        IActivateAudioInterfaceCompletionHandler_Vtbl {
+            base__: windows::core::IUnknown_Vtbl {
+                QueryInterface: handler_query_interface,
+                AddRef: handler_add_ref,
+                Release: handler_release,
+            },
+            ActivateCompleted: handler_activate_completed,
+        };
+
+    unsafe extern "system" fn handler_query_interface(
+        this: *mut std::ffi::c_void,
+        riid: *const windows::core::GUID,
+        ppv: *mut *mut std::ffi::c_void,
+    ) -> HRESULT {
+        if ppv.is_null() || riid.is_null() {
+            return E_POINTER;
+        }
+        if *riid == windows::core::IUnknown::IID
+            || *riid == IActivateAudioInterfaceCompletionHandler::IID
+        {
+            *ppv = this;
+            handler_add_ref(this);
+            S_OK
+        } else {
+            *ppv = null_mut();
+            E_NOINTERFACE
+        }
+    }
+
+    unsafe extern "system" fn handler_add_ref(this: *mut std::ffi::c_void) -> u32 {
+        let obj = &*(this as *const AudioActivationContext);
+        obj.ref_count.fetch_add(1, Ordering::SeqCst) + 1
+    }
+
+    unsafe extern "system" fn handler_release(this: *mut std::ffi::c_void) -> u32 {
+        let obj = &*(this as *const AudioActivationContext);
+        let count = obj.ref_count.fetch_sub(1, Ordering::SeqCst) - 1;
+        if count == 0 {
+            let _ = Box::from_raw(this as *mut AudioActivationContext);
+        }
+        count
+    }
+
+    unsafe extern "system" fn handler_activate_completed(
+        this: *mut std::ffi::c_void,
+        operation: *mut std::ffi::c_void,
+    ) -> HRESULT {
+        let obj = &*(this as *const AudioActivationContext);
+        if !operation.is_null() {
+            let op = &*(operation as *const IActivateAudioInterfaceAsyncOperation);
+            let mut hr = HRESULT(0);
+            let mut unk = None;
+            if op.GetActivateResult(&mut hr, &mut unk).is_ok() && hr.is_ok() {
+                if let Some(u) = unk {
+                    if let Ok(client) = u.cast::<IAudioClient>() {
+                        let _ = obj.sender.send(Ok(client));
+                        return S_OK;
+                    }
+                }
+            }
+        }
+        let _ = obj.sender.send(Err(windows::core::Error::from_hresult(HRESULT(-1))));
+        S_OK
+    }
+
+    fn activate_process_loopback_client(pid: u32, exclude: bool) -> Result<IAudioClient, String> {
+        unsafe {
+            let (tx, rx) = std::sync::mpsc::channel();
+            let context = Box::new(AudioActivationContext {
+                vptr: &HANDLER_VTBL,
+                ref_count: AtomicU32::new(1),
+                sender: tx,
+            });
+
+            let raw_context = Box::into_raw(context);
+            let handler: IActivateAudioInterfaceCompletionHandler =
+                std::mem::transmute(raw_context);
+
+            let mut params = AUDIOCLIENT_ACTIVATION_PARAMS {
+                ActivationType: AUDIOCLIENT_ACTIVATION_TYPE_PROCESS_LOOPBACK,
+                ProcessLoopbackParams: AUDIOCLIENT_PROCESS_LOOPBACK_PARAMS {
+                    TargetProcessId: pid,
+                    ProcessLoopbackMode: if exclude {
+                        PROCESS_LOOPBACK_MODE_EXCLUDE_PROCESS_TREE
+                    } else {
+                        PROCESS_LOOPBACK_MODE_INCLUDE_PROCESS_TREE
+                    },
+                },
+            };
+
+            let prop_var = RawPropVariant {
+                vt: 0x0041, // VT_BLOB
+                w_reserved1: 0,
+                w_reserved2: 0,
+                w_reserved3: 0,
+                blob: RawBlob {
+                    cb_size: std::mem::size_of::<AUDIOCLIENT_ACTIVATION_PARAMS>() as u32,
+                    p_blob_data: &mut params as *mut _ as *mut u8,
+                },
+            };
+
+            let virtual_device_path: Vec<u16> =
+                "VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK\0".encode_utf16().collect();
+
+            let res = ActivateAudioInterfaceAsync(
+                PCWSTR(virtual_device_path.as_ptr()),
+                &IAudioClient::IID,
+                Some(&prop_var as *const _ as *const _),
+                &handler,
+            );
+
+            if let Err(e) = res {
+                return Err(format!("ActivateAudioInterfaceAsync failed: {:?}", e));
+            }
+
+            match rx.recv_timeout(std::time::Duration::from_millis(1500)) {
+                Ok(Ok(client)) => Ok(client),
+                Ok(Err(e)) => Err(format!("Audio activation callback returned error: {:?}", e)),
+                Err(e) => Err(format!("Audio activation timeout: {:?}", e)),
+            }
+        }
+    }
+
+    pub fn run_capture_loop(app: AppHandle, config: AudioConfig, stop_flag: Arc<AtomicBool>) {
         unsafe {
             let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
 
-            let enumerator: Result<IMMDeviceEnumerator, _> =
-                CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL);
+            // Determine activation method based on PID and mode
+            let target_pid = config.target_pids.first().copied().unwrap_or(0);
+            let is_filtered = target_pid > 0 && (config.mode == "exclude" || config.mode == "include");
 
-            let enumerator = match enumerator {
-                Ok(e) => e,
-                Err(err) => {
-                    eprintln!("[Audio Loopback] Failed to create MMDeviceEnumerator: {:?}", err);
-                    let _ = CoUninitialize();
-                    return;
+            let audio_client: IAudioClient = if is_filtered {
+                let exclude = config.mode == "exclude";
+                println!(
+                    "[Audio Loopback] Activating Windows WASAPI Process Loopback (PID: {}, Mode: {})",
+                    target_pid, config.mode
+                );
+                match activate_process_loopback_client(target_pid, exclude) {
+                    Ok(client) => client,
+                    Err(err) => {
+                        eprintln!("[Audio Loopback] Process loopback activation failed, falling back to master loopback: {}", err);
+                        match get_default_render_audio_client() {
+                            Ok(c) => c,
+                            Err(_) => {
+                                let _ = CoUninitialize();
+                                return;
+                            }
+                        }
+                    }
                 }
-            };
-
-            let device = match enumerator.GetDefaultAudioEndpoint(eRender, eConsole) {
-                Ok(d) => d,
-                Err(err) => {
-                    eprintln!("[Audio Loopback] Failed to get default audio endpoint: {:?}", err);
-                    let _ = CoUninitialize();
-                    return;
-                }
-            };
-
-            let audio_client: IAudioClient = match device.Activate(CLSCTX_ALL, None) {
-                Ok(c) => c,
-                Err(err) => {
-                    eprintln!("[Audio Loopback] Failed to activate IAudioClient: {:?}", err);
-                    let _ = CoUninitialize();
-                    return;
+            } else {
+                match get_default_render_audio_client() {
+                    Ok(c) => c,
+                    Err(err) => {
+                        eprintln!("[Audio Loopback] Master audio client activation failed: {:?}", err);
+                        let _ = CoUninitialize();
+                        return;
+                    }
                 }
             };
 
@@ -92,13 +260,12 @@ mod win_audio {
             let channels = mix_format.nChannels;
             let bits_per_sample = mix_format.wBitsPerSample;
 
-            // Stream flags: Loopback mode + auto convert
+            // Stream flags: Loopback mode + auto convert PCM
             let stream_flags = AUDCLNT_STREAMFLAGS_LOOPBACK
                 | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM
                 | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY;
 
-            // 100ms buffer in 100ns units
-            let buffer_duration = 1_000_000i64;
+            let buffer_duration = 1_000_000i64; // 100ms in 100ns units
 
             if let Err(err) = audio_client.Initialize(
                 AUDCLNT_SHAREMODE_SHARED,
@@ -131,7 +298,10 @@ mod win_audio {
                 return;
             }
 
-            println!("[Audio Loopback] Windows WASAPI loopback capture started ({} Hz, {} channels)", sample_rate, channels);
+            println!(
+                "[Audio Loopback] Windows WASAPI loopback capture running ({} Hz, {} channels, Filter: {})",
+                sample_rate, channels, config.mode
+            );
 
             let mut send_buffer: Vec<f32> = Vec::with_capacity(4096);
 
@@ -209,6 +379,16 @@ mod win_audio {
             let _ = audio_client.Stop();
             let _ = CoUninitialize();
             println!("[Audio Loopback] Audio loopback stopped cleanly.");
+        }
+    }
+
+    fn get_default_render_audio_client() -> Result<IAudioClient, windows::core::Error> {
+        unsafe {
+            let enumerator: IMMDeviceEnumerator =
+                CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)?;
+            let device = enumerator.GetDefaultAudioEndpoint(eRender, eConsole)?;
+            let audio_client: IAudioClient = device.Activate(CLSCTX_ALL, None)?;
+            Ok(audio_client)
         }
     }
 }
