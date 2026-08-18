@@ -2,7 +2,7 @@ use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use byteorder::{ByteOrder, LittleEndian};
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
 
@@ -39,7 +39,6 @@ mod win_audio {
     use super::*;
     use std::ptr::null_mut;
     use windows::core::{Interface, HRESULT, PCWSTR};
-    use windows::Win32::Foundation::{E_NOINTERFACE, E_POINTER, S_OK};
     use windows::Win32::Media::Audio::*;
     use windows::Win32::System::Com::*;
 
@@ -51,12 +50,14 @@ mod win_audio {
     const PROCESS_LOOPBACK_MODE_EXCLUDE_PROCESS_TREE: u32 = 1;
 
     #[repr(C)]
+    #[allow(non_snake_case)]
     struct AUDIOCLIENT_PROCESS_LOOPBACK_PARAMS {
         TargetProcessId: u32,
         ProcessLoopbackMode: u32,
     }
 
     #[repr(C)]
+    #[allow(non_snake_case)]
     struct AUDIOCLIENT_ACTIVATION_PARAMS {
         ActivationType: u32,
         ProcessLoopbackParams: AUDIOCLIENT_PROCESS_LOOPBACK_PARAMS,
@@ -77,91 +78,92 @@ mod win_audio {
         blob: RawBlob,
     }
 
-    #[repr(C)]
-    struct AudioActivationContext {
-        vptr: *const IActivateAudioInterfaceCompletionHandler_Vtbl,
-        ref_count: AtomicU32,
-        sender: std::sync::mpsc::Sender<Result<IAudioClient, windows::core::Error>>,
+    #[windows::core::implement(IActivateAudioInterfaceCompletionHandler)]
+    struct AudioActivationHandler {
+        sender: std::sync::Mutex<Option<std::sync::mpsc::Sender<Result<IAudioClient, String>>>>,
     }
 
-    static HANDLER_VTBL: IActivateAudioInterfaceCompletionHandler_Vtbl =
-        IActivateAudioInterfaceCompletionHandler_Vtbl {
-            base__: windows::core::IUnknown_Vtbl {
-                QueryInterface: handler_query_interface,
-                AddRef: handler_add_ref,
-                Release: handler_release,
-            },
-            ActivateCompleted: handler_activate_completed,
-        };
+    impl IActivateAudioInterfaceCompletionHandler_Impl for AudioActivationHandler_Impl {
+        fn ActivateCompleted(
+            &self,
+            operation: Option<&IActivateAudioInterfaceAsyncOperation>,
+        ) -> windows::core::Result<()> {
+            let Some(op) = operation else {
+                if let Ok(mut guard) = self.sender.lock() {
+                    if let Some(tx) = guard.take() {
+                        let _ = tx.send(Err("ActivateCompleted called with None operation".to_string()));
+                    }
+                }
+                return Ok(());
+            };
 
-    unsafe extern "system" fn handler_query_interface(
-        this: *mut std::ffi::c_void,
-        riid: *const windows::core::GUID,
-        ppv: *mut *mut std::ffi::c_void,
-    ) -> HRESULT {
-        if ppv.is_null() || riid.is_null() {
-            return E_POINTER;
-        }
-        if *riid == windows::core::IUnknown::IID
-            || *riid == IActivateAudioInterfaceCompletionHandler::IID
-        {
-            *ppv = this;
-            handler_add_ref(this);
-            S_OK
-        } else {
-            *ppv = null_mut();
-            E_NOINTERFACE
-        }
-    }
-
-    unsafe extern "system" fn handler_add_ref(this: *mut std::ffi::c_void) -> u32 {
-        let obj = &*(this as *const AudioActivationContext);
-        obj.ref_count.fetch_add(1, Ordering::SeqCst) + 1
-    }
-
-    unsafe extern "system" fn handler_release(this: *mut std::ffi::c_void) -> u32 {
-        let obj = &*(this as *const AudioActivationContext);
-        let count = obj.ref_count.fetch_sub(1, Ordering::SeqCst) - 1;
-        if count == 0 {
-            let _ = Box::from_raw(this as *mut AudioActivationContext);
-        }
-        count
-    }
-
-    unsafe extern "system" fn handler_activate_completed(
-        this: *mut std::ffi::c_void,
-        operation: *mut std::ffi::c_void,
-    ) -> HRESULT {
-        let obj = &*(this as *const AudioActivationContext);
-        if !operation.is_null() {
-            let op = &*(operation as *const IActivateAudioInterfaceAsyncOperation);
             let mut hr = HRESULT(0);
             let mut unk = None;
-            if op.GetActivateResult(&mut hr, &mut unk).is_ok() && hr.is_ok() {
+            let res = unsafe { op.GetActivateResult(&mut hr, &mut unk) };
+            if res.is_ok() && hr.is_ok() {
                 if let Some(u) = unk {
                     if let Ok(client) = u.cast::<IAudioClient>() {
-                        let _ = obj.sender.send(Ok(client));
-                        return S_OK;
+                        if let Ok(mut guard) = self.sender.lock() {
+                            if let Some(tx) = guard.take() {
+                                let _ = tx.send(Ok(client));
+                            }
+                        }
+                        return Ok(());
                     }
                 }
             }
+
+            if let Ok(mut guard) = self.sender.lock() {
+                if let Some(tx) = guard.take() {
+                    let _ = tx.send(Err(format!(
+                        "Audio activation failed: op.GetActivateResult={:?}, hr=0x{:08X}",
+                        res, hr.0 as u32
+                    )));
+                }
+            }
+            Ok(())
         }
-        let _ = obj.sender.send(Err(windows::core::Error::from_hresult(HRESULT(-1))));
-        S_OK
+    }
+
+    fn resolve_target_pid(pids: &[u32]) -> u32 {
+        let valid_pid = pids.iter().find(|&&p| p > 0).copied().unwrap_or(0);
+        if valid_pid == 0 {
+            return 0;
+        }
+
+        let mut sys = sysinfo::System::new_all();
+        sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+
+        let mut current_pid = sysinfo::Pid::from_u32(valid_pid);
+        let mut target_name: Option<String> = None;
+        if let Some(proc) = sys.process(current_pid) {
+            target_name = Some(proc.name().to_string_lossy().to_lowercase());
+        }
+
+        while let Some(proc) = sys.process(current_pid) {
+            if let Some(parent_pid) = proc.parent() {
+                if let Some(parent_proc) = sys.process(parent_pid) {
+                    if let Some(ref name) = target_name {
+                        if parent_proc.name().to_string_lossy().to_lowercase() == *name {
+                            current_pid = parent_pid;
+                            continue;
+                        }
+                    }
+                }
+            }
+            break;
+        }
+
+        current_pid.as_u32()
     }
 
     fn activate_process_loopback_client(pid: u32, exclude: bool) -> Result<IAudioClient, String> {
         unsafe {
             let (tx, rx) = std::sync::mpsc::channel();
-            let context = Box::new(AudioActivationContext {
-                vptr: &HANDLER_VTBL,
-                ref_count: AtomicU32::new(1),
-                sender: tx,
-            });
-
-            let raw_context = Box::into_raw(context);
-            let handler: IActivateAudioInterfaceCompletionHandler =
-                std::mem::transmute(raw_context);
+            let handler_impl = AudioActivationHandler {
+                sender: std::sync::Mutex::new(Some(tx)),
+            };
+            let handler: IActivateAudioInterfaceCompletionHandler = handler_impl.into();
 
             let mut params = AUDIOCLIENT_ACTIVATION_PARAMS {
                 ActivationType: AUDIOCLIENT_ACTIVATION_TYPE_PROCESS_LOOPBACK,
@@ -200,9 +202,9 @@ mod win_audio {
                 return Err(format!("ActivateAudioInterfaceAsync failed: {:?}", e));
             }
 
-            match rx.recv_timeout(std::time::Duration::from_millis(1500)) {
+            match rx.recv_timeout(std::time::Duration::from_millis(2500)) {
                 Ok(Ok(client)) => Ok(client),
-                Ok(Err(e)) => Err(format!("Audio activation callback returned error: {:?}", e)),
+                Ok(Err(e)) => Err(e),
                 Err(e) => Err(format!("Audio activation timeout: {:?}", e)),
             }
         }
@@ -213,19 +215,22 @@ mod win_audio {
             let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
 
             // Determine activation method based on PID and mode
-            let target_pid = config.target_pids.first().copied().unwrap_or(0);
+            let target_pid = resolve_target_pid(&config.target_pids);
             let is_filtered = target_pid > 0 && (config.mode == "exclude" || config.mode == "include");
 
             let audio_client: IAudioClient = if is_filtered {
                 let exclude = config.mode == "exclude";
                 println!(
-                    "[Audio Loopback] Activating Windows WASAPI Process Loopback (PID: {}, Mode: {})",
+                    "[Audio Loopback] Activating Windows WASAPI Process Loopback (Root PID: {}, Mode: {})",
                     target_pid, config.mode
                 );
                 match activate_process_loopback_client(target_pid, exclude) {
-                    Ok(client) => client,
+                    Ok(client) => {
+                        println!("[Audio Loopback] Successfully activated process loopback for PID {}", target_pid);
+                        client
+                    }
                     Err(err) => {
-                        eprintln!("[Audio Loopback] Process loopback activation failed, falling back to master loopback: {}", err);
+                        eprintln!("[Audio Loopback] Process loopback activation failed ({}), falling back to master loopback", err);
                         match get_default_render_audio_client() {
                             Ok(c) => c,
                             Err(_) => {
@@ -245,6 +250,7 @@ mod win_audio {
                     }
                 }
             };
+
 
             let mix_format_ptr: *mut WAVEFORMATEX = match audio_client.GetMixFormat() {
                 Ok(ptr) => ptr,

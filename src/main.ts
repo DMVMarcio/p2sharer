@@ -25,7 +25,10 @@ class App {
 
   private audioProcesses: ProcessItem[] = [];
   private selectedFilterMode: 'exclude' | 'include' = 'exclude';
-  private selectedPids: Set<number> = new Set();
+  private excludePids: Set<number> = new Set();
+  private includePids: Set<number> = new Set();
+  private excludeProcessNames: Set<string> = new Set();
+  private includeProcessNames: Set<string> = new Set();
 
   // Multi-stream Dynamic Grid & Participant Slots State
   private roomSlots: RoomSlotInfo[] = [];
@@ -65,18 +68,32 @@ class App {
   private setupThemeAndSettings() {
     const savedTheme = (localStorage.getItem('p2sharer_theme_mode') as 'dark' | 'light' | 'system') || 'dark';
     const savedAccent = localStorage.getItem('p2sharer_accent_color') || 'cyan';
+
+    this.currentThemeMode = savedTheme;
+    this.currentAccentColor = savedAccent;
+
+    this.applyTheme(this.currentThemeMode);
+    this.applyAccent(this.currentAccentColor);
+    this.syncPickerModalDefaults();
+    this.initAudioFilterSettings();
+  }
+
+  public syncPickerModalDefaults() {
     const savedRes = localStorage.getItem('p2sharer_default_res') || '1080p';
     const savedFps = parseInt(localStorage.getItem('p2sharer_default_fps') || '60', 10);
     const savedBitrate = parseInt(localStorage.getItem('p2sharer_default_bitrate') || '25000', 10);
     const savedCursor = localStorage.getItem('p2sharer_default_cursor') !== 'false';
 
-    this.currentThemeMode = savedTheme;
-    this.currentAccentColor = savedAccent;
     this.currentFps = savedFps;
     this.currentBitrate = savedBitrate;
 
-    this.applyTheme(this.currentThemeMode);
-    this.applyAccent(this.currentAccentColor);
+    let res = { width: 1920, height: 1080, label: '1080p' };
+    if (savedRes === '4k') res = { width: 3840, height: 2160, label: '4K' };
+    else if (savedRes === '1440p') res = { width: 2560, height: 1440, label: '1440p' };
+    else if (savedRes === '720p') res = { width: 1280, height: 720, label: '720p' };
+    else if (savedRes === '480p') res = { width: 854, height: 480, label: '480p' };
+    else if (savedRes === '360p') res = { width: 640, height: 360, label: '360p' };
+    this.currentResolution = res;
 
     // Apply defaults to modal dropdowns
     const modalRes = document.getElementById('modal-select-resolution') as HTMLSelectElement;
@@ -89,6 +106,43 @@ class App {
     if (modalBitrate) modalBitrate.value = savedBitrate.toString();
     if (modalCursor) modalCursor.checked = savedCursor;
   }
+
+  private initAudioFilterSettings() {
+    const savedMode = (localStorage.getItem('p2sharer_audio_filter_mode') as 'exclude' | 'include') || 'exclude';
+    this.selectedFilterMode = savedMode;
+
+    try {
+      const savedExclude = JSON.parse(localStorage.getItem('p2sharer_audio_exclude_names') || '[]');
+      if (Array.isArray(savedExclude)) {
+        this.excludeProcessNames = new Set(savedExclude.map((n: string) => n.toLowerCase()));
+      }
+    } catch {
+      this.excludeProcessNames = new Set();
+    }
+
+    try {
+      const savedInclude = JSON.parse(localStorage.getItem('p2sharer_audio_include_names') || '[]');
+      if (Array.isArray(savedInclude)) {
+        this.includeProcessNames = new Set(savedInclude.map((n: string) => n.toLowerCase()));
+      }
+    } catch {
+      this.includeProcessNames = new Set();
+    }
+
+    const radio = document.querySelector(`input[name="audio-filter-mode"][value="${savedMode}"]`) as HTMLInputElement;
+    if (radio) radio.checked = true;
+  }
+
+  private saveAudioFilterPresets() {
+    localStorage.setItem('p2sharer_audio_filter_mode', this.selectedFilterMode);
+    localStorage.setItem('p2sharer_audio_exclude_names', JSON.stringify(Array.from(this.excludeProcessNames)));
+    localStorage.setItem('p2sharer_audio_include_names', JSON.stringify(Array.from(this.includeProcessNames)));
+  }
+
+  private getActiveFilterPids(): number[] {
+    return Array.from(this.selectedFilterMode === 'exclude' ? this.excludePids : this.includePids);
+  }
+
 
   private applyTheme(mode: 'dark' | 'light' | 'system') {
     this.currentThemeMode = mode;
@@ -275,6 +329,9 @@ class App {
     document.querySelectorAll('input[name="audio-filter-mode"]').forEach((r) => {
       r.addEventListener('change', (e) => {
         this.selectedFilterMode = (e.target as HTMLInputElement).value as 'exclude' | 'include';
+        this.saveAudioFilterPresets();
+        const search = (document.getElementById('input-search-process') as HTMLInputElement)?.value.toLowerCase() || '';
+        this.renderProcessCheckboxes(search);
       });
     });
 
@@ -373,6 +430,7 @@ class App {
     if (inputTurnCred) localStorage.setItem('p2sharer_turn_cred', inputTurnCred.value.trim());
     if (checkTurnRelay) localStorage.setItem('p2sharer_turn_force_relay', checkTurnRelay.checked.toString());
 
+    this.syncPickerModalDefaults();
     this.closeSettingsModal();
     this.showToast('Configurações salvas com sucesso!');
   }
@@ -892,6 +950,8 @@ class App {
     if (!modal) return;
     modal.classList.remove('hidden');
 
+    this.syncPickerModalDefaults();
+
     this.currentPickerTab = 'screens';
     this.selectedSourceId = 'screen:0';
     this.updatePickerTabUI();
@@ -1019,9 +1079,10 @@ class App {
       // 1. Start audio capture (Process-filtered WASAPI loopback)
       let customAudioTrack: MediaStreamTrack | null = null;
       try {
+        const activePids = this.getActiveFilterPids();
         customAudioTrack = await this.audioBridge.startCapture(
           this.selectedFilterMode,
-          Array.from(this.selectedPids)
+          activePids
         );
       } catch (audioErr) {
         console.warn('Audio capture startup warning:', audioErr);
@@ -1112,6 +1173,10 @@ class App {
     const modal = document.getElementById('modal-audio-filter');
     if (!modal) return;
     modal.classList.remove('hidden');
+
+    const radio = document.querySelector(`input[name="audio-filter-mode"][value="${this.selectedFilterMode}"]`) as HTMLInputElement;
+    if (radio) radio.checked = true;
+
     this.loadProcessList();
   }
 
@@ -1125,7 +1190,23 @@ class App {
 
     try {
       this.audioProcesses = await invoke<ProcessItem[]>('list_audio_processes');
-      this.renderProcessCheckboxes();
+
+      this.excludePids.clear();
+      this.includePids.clear();
+
+      this.audioProcesses.forEach((p) => {
+        const nameLower = p.name.toLowerCase();
+        if (this.excludeProcessNames.has(nameLower)) {
+          this.excludePids.add(p.pid);
+        }
+        if (this.includeProcessNames.has(nameLower)) {
+          this.includePids.add(p.pid);
+        }
+      });
+
+      const searchInput = document.getElementById('input-search-process') as HTMLInputElement;
+      const search = searchInput ? searchInput.value.toLowerCase() : '';
+      this.renderProcessCheckboxes(search);
     } catch (err) {
       console.error('Failed to list processes:', err);
       if (container) container.innerHTML = '<div class="loading-state">Erro ao carregar aplicativos.</div>';
@@ -1135,6 +1216,10 @@ class App {
   private renderProcessCheckboxes(filterText = '') {
     const container = document.getElementById('process-checkboxes-container');
     if (!container) return;
+
+    const isExclude = this.selectedFilterMode === 'exclude';
+    const activePids = isExclude ? this.excludePids : this.includePids;
+    const activeNames = isExclude ? this.excludeProcessNames : this.includeProcessNames;
 
     const filtered = this.audioProcesses.filter(
       (p) =>
@@ -1150,9 +1235,10 @@ class App {
 
     container.innerHTML = '';
     filtered.forEach((p) => {
+      const nameLower = p.name.toLowerCase();
       const label = document.createElement('label');
       label.className = 'process-item-label';
-      const isChecked = this.selectedPids.has(p.pid);
+      const isChecked = activePids.has(p.pid) || activeNames.has(nameLower);
 
       label.innerHTML = `
         <input type="checkbox" value="${p.pid}" ${isChecked ? 'checked' : ''} />
@@ -1165,10 +1251,18 @@ class App {
       checkbox?.addEventListener('change', (e) => {
         const target = e.target as HTMLInputElement;
         if (target.checked) {
-          this.selectedPids.add(p.pid);
+          activePids.add(p.pid);
+          activeNames.add(nameLower);
         } else {
-          this.selectedPids.delete(p.pid);
+          activePids.delete(p.pid);
+          const otherRunningWithSameName = this.audioProcesses.some(
+            (other) => other.pid !== p.pid && other.name.toLowerCase() === nameLower && activePids.has(other.pid)
+          );
+          if (!otherRunningWithSameName) {
+            activeNames.delete(nameLower);
+          }
         }
+        this.saveAudioFilterPresets();
       });
 
       container.appendChild(label);
@@ -1176,7 +1270,9 @@ class App {
   }
 
   private async applyAudioFilters() {
-    const pidsArray = Array.from(this.selectedPids);
+    const pidsArray = this.getActiveFilterPids();
+    this.saveAudioFilterPresets();
+
     try {
       await invoke('start_audio_capture', {
         config: {
@@ -1186,7 +1282,11 @@ class App {
         },
       });
       this.closeAudioFilterModal();
-      this.showToast('Filtros de áudio aplicados com sucesso!');
+      const msg =
+        this.selectedFilterMode === 'exclude'
+          ? `Filtro aplicado: Silenciando ${pidsArray.length} aplicativo(s)`
+          : `Filtro aplicado: Transmitindo apenas ${pidsArray.length} aplicativo(s)`;
+      this.showToast(msg);
     } catch (err) {
       console.error('Error applying audio filter:', err);
       this.showToast('Erro ao aplicar filtros de áudio.');
