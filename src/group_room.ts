@@ -74,6 +74,7 @@ export class GroupRoomManager {
   private room: any = null;
   private localStream: MediaStream | null = null;
   private peers: Map<string, string> = new Map(); // peerId -> username
+  private peerLastSeen: Map<string, number> = new Map(); // peerId -> timestamp
   private streamingPeers: Set<string> = new Set(); // peerId set of who is broadcasting
   private remoteStreams: Map<string, MediaStream> = new Map(); // peerId -> stream
   private chatHistory: ChatMessage[] = [];
@@ -87,6 +88,8 @@ export class GroupRoomManager {
   private streamStatusAction: any = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private streamReqAction: any = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private leaveAction: any = null;
 
   private callbacks: RoomCallbacks | null = null;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
@@ -187,6 +190,8 @@ export class GroupRoomManager {
         meta: { peerId: string }
       ) => {
         const peerId = meta.peerId;
+        this.peerLastSeen.set(peerId, Date.now());
+
         const oldName = this.peers.get(peerId);
         const newName = data.username || `Usuário (${peerId.slice(0, 4)})`;
         if (oldName !== newName) {
@@ -208,6 +213,8 @@ export class GroupRoomManager {
       this.streamStatusAction = this.room.makeAction('stream_status');
       this.streamStatusAction.onMessage = (data: { isStreaming: boolean; senderName?: string }, meta: { peerId: string }) => {
         const peerId = meta.peerId;
+        this.peerLastSeen.set(peerId, Date.now());
+
         if (data.isStreaming) {
           this.streamingPeers.add(peerId);
         } else {
@@ -223,6 +230,8 @@ export class GroupRoomManager {
       this.streamReqAction = this.room.makeAction('stream_req');
       this.streamReqAction.onMessage = (data: { request?: boolean }, meta: { peerId: string }) => {
         const requesterId = meta.peerId;
+        this.peerLastSeen.set(requesterId, Date.now());
+
         console.log(`[P2P] Received stream request from peer ${requesterId}`);
         if (this.localStream && data.request) {
           try {
@@ -236,9 +245,18 @@ export class GroupRoomManager {
         }
       };
 
-      // 6. Peer Lifecycle Listeners
+      // 6. Setup Explicit Peer Leave Action (Instant ghost peer elimination)
+      this.leaveAction = this.room.makeAction('peer_leave');
+      this.leaveAction.onMessage = (_data: unknown, meta: { peerId: string }) => {
+        const peerId = meta.peerId;
+        console.log(`[P2P] Received explicit leave notice from peer ${peerId}`);
+        this.removePeer(peerId);
+      };
+
+      // 7. Peer Lifecycle Listeners
       this.room.onPeerJoin = (peerId: string) => {
         console.log(`[P2P] Peer joined room: ${peerId}`);
+        this.peerLastSeen.set(peerId, Date.now());
         
         // Send presence immediately to new peer
         if (this.presenceAction) {
@@ -268,30 +286,24 @@ export class GroupRoomManager {
 
       this.room.onPeerLeave = (peerId: string) => {
         console.log(`[P2P] Peer left room: ${peerId}`);
-        this.peers.delete(peerId);
-        this.streamingPeers.delete(peerId);
-        if (this.remoteStreams.has(peerId)) {
-          this.remoteStreams.delete(peerId);
-        }
-        this.notifyPeersUpdate();
-        this.notifyStreamsUpdate();
-        if (this.peers.size === 0) {
-          callbacks.onStatusChange('Sala Ativa');
-        }
+        this.removePeer(peerId);
       };
 
-      // 7. Incoming Stream Listener
+      // 8. Incoming Stream Listener
       this.room.onPeerStream = (stream: MediaStream, peerId: string) => {
         console.log(`[P2P] Received stream from peer: ${peerId}`);
+        this.peerLastSeen.set(peerId, Date.now());
         this.streamingPeers.add(peerId);
         this.remoteStreams.set(peerId, stream);
         this.notifyStreamsUpdate();
         callbacks.onStatusChange('Ao Vivo');
       };
 
-      // 8. Continuous presence heartbeat (every 3s)
+      // 9. Continuous presence heartbeat & Ghost Peer Pruner (every 2.5s)
       this.heartbeatTimer = setInterval(() => {
         if (!this.room) return;
+
+        // Broadcast presence
         if (this.presenceAction) {
           this.presenceAction.send({
             username: this.username,
@@ -299,7 +311,21 @@ export class GroupRoomManager {
             isStreaming: Boolean(this.localStream),
           });
         }
-      }, 3000);
+
+        // Prune ghost peers that missed heartbeats for > 6.5s
+        const now = Date.now();
+        const deadPeers: string[] = [];
+        this.peerLastSeen.forEach((lastSeen, peerId) => {
+          if (now - lastSeen > 6500) {
+            deadPeers.push(peerId);
+          }
+        });
+
+        deadPeers.forEach((p) => {
+          console.log(`[P2P] Pruning ghost peer due to timeout: ${p}`);
+          this.removePeer(p);
+        });
+      }, 2500);
 
       // Initial broadcast and request history from room
       setTimeout(() => {
@@ -320,6 +346,20 @@ export class GroupRoomManager {
     } catch (err) {
       console.error('[P2P] Failed to join room in GroupRoomManager:', err);
       callbacks.onStatusChange('Erro ao conectar');
+    }
+  }
+
+  public removePeer(peerId: string) {
+    this.peers.delete(peerId);
+    this.peerLastSeen.delete(peerId);
+    this.streamingPeers.delete(peerId);
+    if (this.remoteStreams.has(peerId)) {
+      this.remoteStreams.delete(peerId);
+    }
+    this.notifyPeersUpdate();
+    this.notifyStreamsUpdate();
+    if (this.peers.size === 0 && this.callbacks) {
+      this.callbacks.onStatusChange('Sala Ativa');
     }
   }
 
@@ -513,12 +553,20 @@ export class GroupRoomManager {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
     }
+
+    if (this.leaveAction) {
+      try {
+        this.leaveAction.send({ peerId: selfId });
+      } catch {}
+    }
+
     this.stopStream();
     if (this.room) {
       this.room.leave();
       this.room = null;
     }
     this.peers.clear();
+    this.peerLastSeen.clear();
     this.streamingPeers.clear();
     this.remoteStreams.clear();
     this.chatHistory = [];
