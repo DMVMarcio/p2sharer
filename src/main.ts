@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { AudioBridge } from './audio_bridge';
-import { GroupRoomManager } from './group_room';
+import { generateRandomRoomSlug, GroupRoomManager } from './group_room';
 import { NativeVideoBridge } from './native_video_bridge';
 import {
   ChatMessage,
@@ -13,9 +13,19 @@ import {
   WindowSource,
 } from './types';
 
+interface PeerAudioSinkState {
+  audioCtx: AudioContext;
+  source: MediaStreamAudioSourceNode | null;
+  gainNode: GainNode;
+  streamId: string;
+  volume: number;
+  isMuted: boolean;
+}
+
 class App {
   private username: string = '';
-  private currentRoomCode: string = 'P2P-ROOM';
+  private currentRoomCode: string = 'cyber-falcon-482';
+  private currentRoomPassword: string = '';
   private isCreator: boolean = false;
   private isSharingScreen: boolean = false;
 
@@ -36,6 +46,7 @@ class App {
   private pinnedPeerId: string | null = null;
   private subscribedStreams: Set<string> = new Set();
   private cachedCards: Map<string, { el: HTMLElement; isVideo: boolean; streamId?: string }> = new Map();
+  private peerAudioSinks: Map<string, PeerAudioSinkState> = new Map();
   private isSidebarCollapsed: boolean = false;
   private isSpotlightTrayCollapsed: boolean = false;
 
@@ -131,6 +142,9 @@ class App {
 
     const radio = document.querySelector(`input[name="audio-filter-mode"][value="${savedMode}"]`) as HTMLInputElement;
     if (radio) radio.checked = true;
+
+    // Pre-populate process list and map PIDs immediately on start
+    this.loadProcessList().catch(() => {});
   }
 
   private saveAudioFilterPresets() {
@@ -141,6 +155,10 @@ class App {
 
   private getActiveFilterPids(): number[] {
     return Array.from(this.selectedFilterMode === 'exclude' ? this.excludePids : this.includePids);
+  }
+
+  private getActiveFilterNames(): string[] {
+    return Array.from(this.selectedFilterMode === 'exclude' ? this.excludeProcessNames : this.includeProcessNames);
   }
 
 
@@ -172,8 +190,7 @@ class App {
   }
 
   private generateRandomRoomCode() {
-    const randomNum = Math.floor(1000 + Math.random() * 9000);
-    this.currentRoomCode = `P2P-${randomNum}`;
+    this.currentRoomCode = generateRandomRoomSlug();
   }
 
   // --- USERNAME SETUP ---
@@ -274,17 +291,38 @@ class App {
       this.showToast(`Nome salvo: ${this.username}`);
     });
 
-    // Header Room Code Pill Copy
+    // Room Header Badges & Actions
     document.getElementById('header-room-code-pill')?.addEventListener('click', () => this.copyRoomCodeToClipboard());
+    document.getElementById('btn-open-room-security')?.addEventListener('click', () => this.openRoomSecurityModal());
 
-    // Home Actions
-    document.getElementById('btn-create-room-direct')?.addEventListener('click', () => this.createRoomAsHost());
+    // Create Room Modal Actions
+    document.getElementById('btn-create-room-direct')?.addEventListener('click', () => this.openCreateRoomDialog());
+    document.getElementById('btn-close-create-dialog')?.addEventListener('click', () => this.closeCreateRoomDialog());
+    document.getElementById('btn-cancel-create-dialog')?.addEventListener('click', () => this.closeCreateRoomDialog());
+    document.getElementById('btn-regen-room-code')?.addEventListener('click', () => this.regenCreateRoomCode());
+    document.getElementById('btn-confirm-create-dialog')?.addEventListener('click', () => this.confirmCreateRoomFromDialog());
+
+    // Join Room Modal Actions
     document.getElementById('btn-start-join-flow')?.addEventListener('click', () => this.openJoinDialog());
-
-    // Join Dialog Modal
     document.getElementById('btn-close-join-dialog')?.addEventListener('click', () => this.closeJoinDialog());
     document.getElementById('btn-cancel-join-dialog')?.addEventListener('click', () => this.closeJoinDialog());
     document.getElementById('btn-confirm-join-dialog')?.addEventListener('click', () => this.confirmJoinFromDialog());
+
+    // Room Security Modal Actions
+    document.getElementById('btn-close-room-security')?.addEventListener('click', () => this.closeRoomSecurityModal());
+    document.getElementById('btn-cancel-room-security')?.addEventListener('click', () => this.closeRoomSecurityModal());
+    document.getElementById('btn-save-room-security')?.addEventListener('click', () => this.saveRoomSecurityPassword());
+
+    // Password Visibility Toggles
+    document.getElementById('btn-toggle-create-password-visibility')?.addEventListener('click', () => {
+      this.togglePasswordVisibility('input-create-room-password-dialog', 'icon-create-pass-toggle');
+    });
+    document.getElementById('btn-toggle-join-password-visibility')?.addEventListener('click', () => {
+      this.togglePasswordVisibility('input-join-room-password-dialog', 'icon-join-pass-toggle');
+    });
+    document.getElementById('btn-toggle-security-password-visibility')?.addEventListener('click', () => {
+      this.togglePasswordVisibility('input-room-security-password', 'icon-sec-pass-toggle');
+    });
 
     // Cancel Connecting Button
     document.getElementById('btn-cancel-connecting')?.addEventListener('click', () => {
@@ -458,18 +496,48 @@ class App {
   }
 
   // --- CREATE ROOM ---
-  private createRoomAsHost() {
+  private openCreateRoomDialog() {
     if (!this.username) {
       this.showUsernameModal();
       return;
     }
+    const modal = document.getElementById('modal-create-room-dialog');
+    const codeInput = document.getElementById('input-create-room-code-dialog') as HTMLInputElement;
+    const passInput = document.getElementById('input-create-room-password-dialog') as HTMLInputElement;
 
+    if (codeInput) codeInput.value = generateRandomRoomSlug();
+    if (passInput) passInput.value = '';
+
+    modal?.classList.remove('hidden');
+    codeInput?.focus();
+  }
+
+  private closeCreateRoomDialog() {
+    document.getElementById('modal-create-room-dialog')?.classList.add('hidden');
+  }
+
+  private regenCreateRoomCode() {
+    const codeInput = document.getElementById('input-create-room-code-dialog') as HTMLInputElement;
+    if (codeInput) codeInput.value = generateRandomRoomSlug();
+  }
+
+  private confirmCreateRoomFromDialog() {
+    const codeInput = (document.getElementById('input-create-room-code-dialog') as HTMLInputElement).value.trim();
+    const passInput = (document.getElementById('input-create-room-password-dialog') as HTMLInputElement).value.trim();
+
+    this.currentRoomCode = codeInput || generateRandomRoomSlug();
+    this.currentRoomPassword = passInput;
     this.isCreator = true;
-    this.generateRandomRoomCode();
-    this.enterRoomUI();
 
+    this.closeCreateRoomDialog();
+    this.enterRoomUI();
     this.connectToRoom();
-    this.showToast(`Sala "${this.currentRoomCode}" criada!`);
+
+    if (this.currentRoomPassword) {
+      this.showToast(`Sala "${this.currentRoomCode}" criada com proteção por senha!`);
+    } else {
+      this.showToast(`Sala "${this.currentRoomCode}" criada!`);
+    }
   }
 
   // --- JOIN ROOM ---
@@ -479,10 +547,14 @@ class App {
       return;
     }
     const modal = document.getElementById('modal-join-room-dialog');
-    const input = document.getElementById('input-join-room-code-dialog') as HTMLInputElement;
-    if (input) input.value = '';
+    const codeInput = document.getElementById('input-join-room-code-dialog') as HTMLInputElement;
+    const passInput = document.getElementById('input-join-room-password-dialog') as HTMLInputElement;
+
+    if (codeInput) codeInput.value = '';
+    if (passInput) passInput.value = '';
+
     modal?.classList.remove('hidden');
-    input?.focus();
+    codeInput?.focus();
   }
 
   private closeJoinDialog() {
@@ -490,19 +562,103 @@ class App {
   }
 
   private confirmJoinFromDialog() {
-    const input = (document.getElementById('input-join-room-code-dialog') as HTMLInputElement).value.trim();
-    if (!input) {
-      this.showToast('Digite o código da sala.');
+    const codeInput = (document.getElementById('input-join-room-code-dialog') as HTMLInputElement).value.trim();
+    const passInput = (document.getElementById('input-join-room-password-dialog') as HTMLInputElement).value.trim();
+
+    if (!codeInput) {
+      this.showToast('Por favor, digite o código da sala.');
       return;
     }
 
     this.isCreator = false;
-    this.currentRoomCode = input.toUpperCase();
+    this.currentRoomCode = codeInput;
+    this.currentRoomPassword = passInput;
+
     this.closeJoinDialog();
     this.enterRoomUI();
-
     this.connectToRoom();
     this.showToast(`Conectando à sala ${this.currentRoomCode}...`);
+  }
+
+  // --- ROOM SECURITY & PASSWORD MANAGER ---
+  private openRoomSecurityModal() {
+    const modal = document.getElementById('modal-room-security');
+    const codeEl = document.getElementById('sec-modal-room-code');
+    const statusEl = document.getElementById('sec-modal-current-status');
+    const passInput = document.getElementById('input-room-security-password') as HTMLInputElement;
+
+    if (codeEl) codeEl.textContent = this.currentRoomCode;
+    if (statusEl) {
+      statusEl.textContent = this.currentRoomPassword
+        ? `🔒 Protegida (Senha: "${this.currentRoomPassword}")`
+        : '🔓 Pública (Sem Senha)';
+    }
+    if (passInput) passInput.value = this.currentRoomPassword;
+
+    modal?.classList.remove('hidden');
+    passInput?.focus();
+  }
+
+  private closeRoomSecurityModal() {
+    document.getElementById('modal-room-security')?.classList.add('hidden');
+  }
+
+  private saveRoomSecurityPassword() {
+    const passInput = (document.getElementById('input-room-security-password') as HTMLInputElement).value.trim();
+    const oldPassword = this.currentRoomPassword;
+    this.currentRoomPassword = passInput;
+
+    if (this.roomManager) {
+      this.roomManager.updateRoomPassword(passInput);
+    }
+
+    this.updateRoomSecurityHeaderUI();
+    this.closeRoomSecurityModal();
+
+    if (passInput) {
+      this.showToast(`Senha da sala alterada para "${passInput}" e sincronizada com todos!`, 4000);
+    } else if (oldPassword && !passInput) {
+      this.showToast('Senha removida: a sala agora é pública.', 4000);
+    } else {
+      this.showToast('Configurações de segurança da sala salvas.');
+    }
+  }
+
+  // --- PASSWORD VISIBILITY TOGGLE ---
+  private togglePasswordVisibility(inputId: string, iconId: string) {
+    const input = document.getElementById(inputId) as HTMLInputElement;
+    const icon = document.getElementById(iconId);
+    if (!input) return;
+
+    if (input.type === 'password') {
+      input.type = 'text';
+      if (icon) icon.textContent = '🙈';
+    } else {
+      input.type = 'password';
+      if (icon) icon.textContent = '👁️';
+    }
+  }
+
+  private updateRoomSecurityHeaderUI() {
+    const codeEl = document.getElementById('display-room-code');
+    const lockEl = document.getElementById('header-room-lock-icon');
+    const pillEl = document.getElementById('header-room-code-pill');
+
+    if (codeEl) codeEl.textContent = this.currentRoomCode;
+    if (lockEl) {
+      if (this.currentRoomPassword) {
+        lockEl.textContent = '🔒';
+        lockEl.title = `Protegida por Senha: ${this.currentRoomPassword}`;
+      } else {
+        lockEl.textContent = '🔓';
+        lockEl.title = 'Sala Pública (Sem Senha)';
+      }
+    }
+    if (pillEl) {
+      pillEl.title = this.currentRoomPassword
+        ? `Clique para copiar o código e senha da sala (${this.currentRoomCode})`
+        : `Clique para copiar o código da sala (${this.currentRoomCode})`;
+    }
   }
 
   private showConnectingOverlay(roomCode: string, title = 'Entrando na sala...', subtitle = 'Estabelecendo sinalização e túnel P2P criptografado...') {
@@ -513,7 +669,7 @@ class App {
 
     if (titleEl) titleEl.textContent = title;
     if (subEl) subEl.textContent = subtitle;
-    if (codeEl) codeEl.textContent = `SALA: ${roomCode}`;
+    if (codeEl) codeEl.textContent = `SALA: ${roomCode}${this.currentRoomPassword ? ' 🔒' : ''}`;
     if (overlay) overlay.classList.remove('hidden');
   }
 
@@ -560,7 +716,14 @@ class App {
       forceRelay: localStorage.getItem('p2sharer_turn_force_relay') === 'true',
     };
 
-    this.roomManager = new GroupRoomManager(this.username, this.currentRoomCode, this.isCreator, turnConfig);
+    this.roomManager = new GroupRoomManager(
+      this.username,
+      this.currentRoomCode,
+      this.currentRoomPassword,
+      this.isCreator,
+      turnConfig
+    );
+
     this.roomManager.join({
       onStreamsUpdate: () => {},
       onSlotsUpdate: (slots) => {
@@ -603,12 +766,23 @@ class App {
           }, 450);
         }
       },
+      onPasswordChange: (newPassword, updatedBy) => {
+        this.currentRoomPassword = newPassword;
+        this.updateRoomSecurityHeaderUI();
+        if (newPassword) {
+          this.showToast(`🔒 A senha da sala foi atualizada por ${updatedBy}: "${newPassword}"`, 5000);
+        } else {
+          this.showToast(`🔓 A sala agora é pública (sem senha) - atualizado por ${updatedBy}`, 5000);
+        }
+      },
     });
   }
 
   private enterRoomUI() {
     const displayRoomCode = document.getElementById('display-room-code');
     if (displayRoomCode) displayRoomCode.textContent = this.currentRoomCode;
+
+    this.updateRoomSecurityHeaderUI();
 
     this.roomSlots = [
       {
@@ -626,7 +800,9 @@ class App {
     if (chatContainer) {
       chatContainer.innerHTML = `
         <div class="chat-welcome-notice">
-          <span>Você entrou na sala <strong>${this.currentRoomCode}</strong>. Compartilhe o código para convidar amigos.</span>
+          <span>Você entrou na sala <strong>${this.currentRoomCode}</strong>${
+        this.currentRoomPassword ? ' (🔒 com senha)' : ''
+      }. Compartilhe o código para convidar amigos.</span>
         </div>
       `;
     }
@@ -688,6 +864,7 @@ class App {
       const peerId = key.split(':')[0];
       if (!currentPeerIds.has(peerId)) {
         this.cachedCards.delete(key);
+        this.detachPeerAudio(peerId);
       }
     });
 
@@ -753,6 +930,11 @@ class App {
       if (label && label.textContent !== slot.senderName) {
         label.textContent = slot.senderName;
       }
+      const videoEl = cached.el.querySelector('video');
+      if (videoEl && slot.stream && (videoEl.srcObject !== slot.stream || videoEl.paused)) {
+        videoEl.srcObject = slot.stream;
+        videoEl.play().catch(() => {});
+      }
       return cached.el;
     }
 
@@ -775,6 +957,84 @@ class App {
     messages.forEach((msg) => {
       this.appendChatMessage(msg);
     });
+  }
+
+  private attachPeerAudio(peerId: string, stream: MediaStream): PeerAudioSinkState {
+    let state = this.peerAudioSinks.get(peerId);
+    if (!state) {
+      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const audioCtx = new AudioContextClass();
+      const gainNode = audioCtx.createGain();
+      gainNode.gain.value = 1.0;
+      gainNode.connect(audioCtx.destination);
+      state = {
+        audioCtx,
+        source: null,
+        gainNode,
+        streamId: '',
+        volume: 100,
+        isMuted: false,
+      };
+      this.peerAudioSinks.set(peerId, state);
+    }
+
+    if (state.audioCtx.state === 'suspended') {
+      state.audioCtx.resume().catch(() => {});
+    }
+
+    if (state.streamId !== stream.id || !state.source) {
+      if (state.source) {
+        try {
+          state.source.disconnect();
+        } catch {}
+      }
+      try {
+        state.source = state.audioCtx.createMediaStreamSource(stream);
+        state.source.connect(state.gainNode);
+        state.streamId = stream.id;
+      } catch (err) {
+        console.warn('Failed to connect media stream source for peer:', peerId, err);
+      }
+    }
+
+    state.gainNode.gain.value = state.isMuted ? 0 : state.volume / 100;
+    return state;
+  }
+
+  private detachPeerAudio(peerId: string) {
+    const state = this.peerAudioSinks.get(peerId);
+    if (state) {
+      if (state.source) {
+        try { state.source.disconnect(); } catch {}
+      }
+      try { state.gainNode.disconnect(); } catch {}
+      if (state.audioCtx.state !== 'closed') {
+        state.audioCtx.close().catch(() => {});
+      }
+      this.peerAudioSinks.delete(peerId);
+    }
+  }
+
+  private setPeerVolume(peerId: string, volume: number, isMuted?: boolean) {
+    const state = this.peerAudioSinks.get(peerId);
+    if (state) {
+      state.volume = Math.max(0, Math.min(100, volume));
+      if (isMuted !== undefined) {
+        state.isMuted = isMuted;
+      }
+      state.gainNode.gain.value = state.isMuted ? 0 : state.volume / 100;
+      if (state.audioCtx.state === 'suspended' && !state.isMuted && state.volume > 0) {
+        state.audioCtx.resume().catch(() => {});
+      }
+    }
+  }
+
+  private getPeerVolumeState(peerId: string): { volume: number; isMuted: boolean } {
+    const state = this.peerAudioSinks.get(peerId);
+    if (state) {
+      return { volume: state.volume, isMuted: state.isMuted };
+    }
+    return { volume: 100, isMuted: false };
   }
 
   private createCardElement(slot: RoomSlotInfo, isFeatured: boolean): HTMLElement {
@@ -839,6 +1099,11 @@ class App {
         video.autoplay = true;
         video.playsInline = true;
         video.srcObject = slot.stream;
+        video.muted = true; // Crucial: Mute HTML video tag completely to prevent duplicate/raw audio output
+
+        // Connect to unified AudioContext and GainNode for this peer
+        this.attachPeerAudio(slot.peerId, slot.stream);
+        const currentAudioState = this.getPeerVolumeState(slot.peerId);
 
         const overlay = document.createElement('div');
         overlay.className = 'stream-card-overlay';
@@ -853,13 +1118,101 @@ class App {
         stopBtn.textContent = 'Parar de Assistir';
         stopBtn.addEventListener('click', (e) => {
           e.stopPropagation();
+          this.detachPeerAudio(slot.peerId);
           this.subscribedStreams.delete(slot.peerId);
           this.renderRoomCards();
         });
 
+        // Interactive volume control with hover slider
+        const volumeWrapper = document.createElement('div');
+        volumeWrapper.className = 'stream-volume-controller';
+        volumeWrapper.title = 'Controle de Volume da Transmissão';
+        volumeWrapper.addEventListener('click', (e) => e.stopPropagation());
+
+        const volumeBtn = document.createElement('button');
+        volumeBtn.className = 'btn-stream-volume';
+        volumeBtn.title = 'Mutar / Desmutar';
+
+        const updateVolumeIcon = (vol: number, isMuted: boolean) => {
+          if (isMuted || vol === 0) {
+            volumeBtn.innerHTML = `
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                <line x1="23" x2="17" y1="9" y2="15"/><line x1="17" x2="23" y1="9" y2="15"/>
+              </svg>
+            `;
+          } else if (vol < 50) {
+            volumeBtn.innerHTML = `
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+              </svg>
+            `;
+          } else {
+            volumeBtn.innerHTML = `
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+              </svg>
+            `;
+          }
+        };
+
+        updateVolumeIcon(currentAudioState.volume, currentAudioState.isMuted);
+
+        const sliderBox = document.createElement('div');
+        sliderBox.className = 'stream-volume-slider-box';
+
+        const slider = document.createElement('input');
+        slider.type = 'range';
+        slider.min = '0';
+        slider.max = '100';
+        slider.value = currentAudioState.isMuted ? '0' : currentAudioState.volume.toString();
+        slider.className = 'stream-volume-range';
+
+        const volumePercent = document.createElement('span');
+        volumePercent.className = 'stream-volume-percent';
+        volumePercent.textContent = `${slider.value}%`;
+
+        let lastVolume = currentAudioState.volume || 100;
+
+        slider.addEventListener('input', (e) => {
+          e.stopPropagation();
+          const val = parseInt(slider.value, 10);
+          this.setPeerVolume(slot.peerId, val, val === 0);
+          if (val > 0) lastVolume = val;
+          volumePercent.textContent = `${val}%`;
+          updateVolumeIcon(val, val === 0);
+        });
+
+        volumeBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const st = this.getPeerVolumeState(slot.peerId);
+          if (st.isMuted || st.volume === 0) {
+            const targetVol = lastVolume || 100;
+            this.setPeerVolume(slot.peerId, targetVol, false);
+            slider.value = targetVol.toString();
+            volumePercent.textContent = `${targetVol}%`;
+            updateVolumeIcon(targetVol, false);
+          } else {
+            lastVolume = st.volume || 100;
+            this.setPeerVolume(slot.peerId, 0, true);
+            slider.value = '0';
+            volumePercent.textContent = '0%';
+            updateVolumeIcon(0, true);
+          }
+        });
+
+        sliderBox.appendChild(slider);
+        sliderBox.appendChild(volumePercent);
+        volumeWrapper.appendChild(volumeBtn);
+        volumeWrapper.appendChild(sliderBox);
+
         card.appendChild(video);
         card.appendChild(overlay);
         card.appendChild(stopBtn);
+        card.appendChild(volumeWrapper);
         return card;
       } else if (isSubscribed && !slot.stream) {
         // Remote streaming & Subscribed but waiting for stream tracks
@@ -1080,9 +1433,11 @@ class App {
       let customAudioTrack: MediaStreamTrack | null = null;
       try {
         const activePids = this.getActiveFilterPids();
+        const activeNames = this.getActiveFilterNames();
         customAudioTrack = await this.audioBridge.startCapture(
           this.selectedFilterMode,
-          activePids
+          activePids,
+          activeNames
         );
       } catch (audioErr) {
         console.warn('Audio capture startup warning:', audioErr);
@@ -1094,7 +1449,7 @@ class App {
         fpsValue,
         { width: res.width, height: res.height },
         mouseEnabled,
-        70
+        85
       );
 
       // Listen for when capture ends
@@ -1251,16 +1606,19 @@ class App {
       checkbox?.addEventListener('change', (e) => {
         const target = e.target as HTMLInputElement;
         if (target.checked) {
-          activePids.add(p.pid);
           activeNames.add(nameLower);
+          this.audioProcesses.forEach((other) => {
+            if (other.name.toLowerCase() === nameLower) {
+              activePids.add(other.pid);
+            }
+          });
         } else {
-          activePids.delete(p.pid);
-          const otherRunningWithSameName = this.audioProcesses.some(
-            (other) => other.pid !== p.pid && other.name.toLowerCase() === nameLower && activePids.has(other.pid)
-          );
-          if (!otherRunningWithSameName) {
-            activeNames.delete(nameLower);
-          }
+          activeNames.delete(nameLower);
+          this.audioProcesses.forEach((other) => {
+            if (other.name.toLowerCase() === nameLower) {
+              activePids.delete(other.pid);
+            }
+          });
         }
         this.saveAudioFilterPresets();
       });
@@ -1271,6 +1629,7 @@ class App {
 
   private async applyAudioFilters() {
     const pidsArray = this.getActiveFilterPids();
+    const namesArray = this.getActiveFilterNames();
     this.saveAudioFilterPresets();
 
     try {
@@ -1278,14 +1637,16 @@ class App {
         config: {
           mode: this.selectedFilterMode,
           target_pids: pidsArray,
+          target_names: namesArray,
           sample_rate: 48000,
         },
       });
       this.closeAudioFilterModal();
+      const count = namesArray.length || pidsArray.length;
       const msg =
         this.selectedFilterMode === 'exclude'
-          ? `Filtro aplicado: Silenciando ${pidsArray.length} aplicativo(s)`
-          : `Filtro aplicado: Transmitindo apenas ${pidsArray.length} aplicativo(s)`;
+          ? `Filtro aplicado: Silenciando ${count} aplicativo(s)`
+          : `Filtro aplicado: Transmitindo apenas ${count} aplicativo(s)`;
       this.showToast(msg);
     } catch (err) {
       console.error('Error applying audio filter:', err);
@@ -1360,9 +1721,17 @@ class App {
 
   // --- COPY ROOM CODE ---
   private copyRoomCodeToClipboard() {
+    let copyText = this.currentRoomCode;
+    let toastMsg = `Código "${this.currentRoomCode}" copiado para a área de transferência!`;
+
+    if (this.currentRoomPassword) {
+      copyText = `Sala: ${this.currentRoomCode} | Senha: ${this.currentRoomPassword}`;
+      toastMsg = `Código "${this.currentRoomCode}" e senha copiados!`;
+    }
+
     navigator.clipboard
-      .writeText(this.currentRoomCode)
-      .then(() => this.showToast(`Código "${this.currentRoomCode}" copiado!`))
+      .writeText(copyText)
+      .then(() => this.showToast(toastMsg))
       .catch(() => this.showToast(`Código da sala: ${this.currentRoomCode}`));
   }
 
@@ -1375,6 +1744,8 @@ class App {
       this.roomManager.leave();
       this.roomManager = null;
     }
+    this.peerAudioSinks.forEach((_, pId) => this.detachPeerAudio(pId));
+    this.peerAudioSinks.clear();
     this.subscribedStreams.clear();
     this.cachedCards.clear();
     this.roomSlots = [];

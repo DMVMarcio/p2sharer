@@ -3,6 +3,53 @@ import { ActiveStreamInfo, ChatMessage, PeerInfo, RoomSlotInfo, TurnConfig } fro
 
 const APP_ID = 'p2sharer-multi-stream-v1';
 
+const ADJECTIVES = [
+  'cyber', 'neon', 'rapid', 'swift', 'cosmic', 'hyper', 'solar', 'lunar',
+  'mystic', 'sonic', 'ultra', 'mega', 'royal', 'epic', 'prime', 'iron',
+  'silver', 'golden', 'shadow', 'crystal', 'astro', 'blaze', 'storm', 'vortex',
+  'quantum', 'echo', 'alpha', 'nova', 'turbo', 'ninja', 'pixel', 'phantom'
+];
+
+const NOUNS = [
+  'falcon', 'tiger', 'wolf', 'eagle', 'hawk', 'panther', 'fox', 'dragon',
+  'phoenix', 'bear', 'shark', 'cobra', 'viper', 'lion', 'lynx', 'titan',
+  'nomad', 'runner', 'driver', 'spark', 'storm', 'pulse', 'byte', 'core',
+  'matrix', 'drift', 'horizon', 'forge', 'nexus', 'rover', 'shield', 'vortex'
+];
+
+export function generateRandomRoomSlug(): string {
+  const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
+  const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
+  const num = Math.floor(100 + Math.random() * 900);
+  return `${adj}-${noun}-${num}`;
+}
+
+export async function computeSignalingRoomId(roomId: string, password = ''): Promise<string> {
+  const cleanRoom = roomId.trim().toLowerCase();
+  const cleanPass = password.trim();
+  if (!cleanPass) {
+    return `public-${cleanRoom}`;
+  }
+  // Cryptographically isolate rooms with passwords (even with identical names)
+  try {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(`p2sharer-auth:${cleanRoom}:${cleanPass}`);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('').substring(0, 16);
+    return `sec-${cleanRoom}-${hashHex}`;
+  } catch {
+    // Fallback if crypto.subtle is unavailable
+    let hash = 0;
+    const combined = `${cleanRoom}:${cleanPass}`;
+    for (let i = 0; i < combined.length; i++) {
+      hash = (hash << 5) - hash + combined.charCodeAt(i);
+      hash |= 0;
+    }
+    return `sec-${cleanRoom}-${Math.abs(hash).toString(16)}`;
+  }
+}
+
 export function generateUserColor(name: string): string {
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
@@ -19,23 +66,54 @@ export interface RoomCallbacks {
   onChatHistory: (messages: ChatMessage[]) => void;
   onPeersUpdate: (peers: PeerInfo[]) => void;
   onStatusChange: (status: string) => void;
+  onPasswordChange?: (newPassword: string, updatedBy: string) => void;
 }
 
 function optimizeSDP(sdp: string, bitrateKbps: number = 25000): string {
   let modified = sdp;
   const bitrateBps = bitrateKbps * 1000;
 
-  // 1. Add bandwidth modifier (b=AS and b=TIAS) directly under video media line
-  modified = modified.replace(
-    /(m=video[^\r\n]*\r\n)/g,
-    `$1b=AS:${bitrateKbps}\r\nb=TIAS:${bitrateBps}\r\n`
-  );
+  // 1. Add bandwidth modifier (b=AS and b=TIAS) specifically under m=video section
+  const videoSectionRegex = /(m=video [^\r\n]+(?:\r?\n[\s\S]*?)(?=m=|$))/g;
+  modified = modified.replace(videoSectionRegex, (videoBlock) => {
+    let block = videoBlock;
+    if (!block.includes('b=AS:')) {
+      block = block.replace(/(m=video[^\r\n]*\r?\n)/, `$1b=AS:${bitrateKbps}\r\nb=TIAS:${bitrateBps}\r\n`);
+    } else {
+      block = block.replace(/b=AS:\d+/g, `b=AS:${bitrateKbps}`);
+      block = block.replace(/b=TIAS:\d+/g, `b=TIAS:${bitrateBps}`);
+    }
 
-  // 2. Add Google-specific initial bitrate parameters to fmtp lines
-  modified = modified.replace(
-    /(a=fmtp:\d+ [^\r\n]*)/g,
-    `$1;x-google-min-bitrate=${Math.floor(bitrateKbps * 0.5)};x-google-start-bitrate=${bitrateKbps};x-google-max-bitrate=${Math.floor(bitrateKbps * 1.5)}`
-  );
+    // Find video payload types (H264/VP8/VP9/AV1)
+    const rtpmapMatches = Array.from(block.matchAll(/a=rtpmap:(\d+) (?:H264|VP8|VP9|AV1|H265)\//gi));
+    const videoPts = new Set<string>();
+    for (const m of rtpmapMatches) {
+      videoPts.add(m[1]);
+    }
+
+    // Add google bitrate parameters exclusively to video payload fmtp lines
+    for (const pt of videoPts) {
+      const fmtpRegex = new RegExp(`(a=fmtp:${pt} [^\\r\\n]*)`, 'g');
+      if (fmtpRegex.test(block)) {
+        block = block.replace(fmtpRegex, (line) => {
+          if (line.includes('x-google-min-bitrate')) return line;
+          return `${line};x-google-min-bitrate=${Math.floor(bitrateKbps * 0.6)};x-google-start-bitrate=${bitrateKbps};x-google-max-bitrate=${Math.floor(bitrateKbps * 1.5)}`;
+        });
+      } else {
+        block = block.replace(
+          new RegExp(`(a=rtpmap:${pt} [^\\r\\n]*\\r?\\n)`),
+          `$1a=fmtp:${pt} x-google-min-bitrate=${Math.floor(bitrateKbps * 0.6)};x-google-start-bitrate=${bitrateKbps};x-google-max-bitrate=${Math.floor(bitrateKbps * 1.5)}\r\n`
+        );
+      }
+    }
+    return block;
+  });
+
+  // 2. Opus audio optimizations (low latency, high fidelity stereo)
+  modified = modified.replace(/(a=fmtp:111 [^\r\n]*)/g, (line) => {
+    if (line.includes('minptime=')) return line;
+    return `${line};minptime=10;useinbandfec=1;stereo=1;maxaveragebitrate=128000;cbr=1`;
+  });
 
   return modified;
 }
@@ -68,6 +146,7 @@ function ensureSDPHooked() {
 export class GroupRoomManager {
   private username: string;
   private roomId: string;
+  private password: string = '';
   private isCreator: boolean;
   private turnConfig: TurnConfig | null = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -90,6 +169,8 @@ export class GroupRoomManager {
   private streamReqAction: any = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private leaveAction: any = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private passwordAction: any = null;
 
   private callbacks: RoomCallbacks | null = null;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
@@ -97,18 +178,27 @@ export class GroupRoomManager {
   private currentTargetBitrate: number = 25000000;
   private currentTargetFps: number = 60;
 
-  constructor(username: string, roomId: string, isCreator = false, turnConfig?: TurnConfig) {
+  constructor(username: string, roomId: string, password = '', isCreator = false, turnConfig?: TurnConfig) {
     this.username = username;
-    this.roomId = roomId.toUpperCase().trim();
+    this.roomId = roomId.trim();
+    this.password = password.trim();
     this.isCreator = isCreator;
     this.turnConfig = turnConfig || null;
     ensureSDPHooked();
   }
 
-  public join(callbacks: RoomCallbacks) {
+  public getDisplayRoomId(): string {
+    return this.roomId;
+  }
+
+  public getPassword(): string {
+    return this.password;
+  }
+
+  public async join(callbacks: RoomCallbacks) {
     this.callbacks = callbacks;
     callbacks.onStatusChange('Conectando...');
-    console.log(`[P2P] Joining room ${this.roomId} as ${this.username} (Self ID: ${selfId})`);
+    console.log(`[P2P] Joining room ${this.roomId} (Password Protected: ${Boolean(this.password)}) as ${this.username} (Self ID: ${selfId})`);
 
     const iceServers: RTCIceServer[] = [
       { urls: 'stun:stun.l.google.com:19302' },
@@ -143,14 +233,27 @@ export class GroupRoomManager {
     };
 
     try {
+      const signalingTopic = await computeSignalingRoomId(this.roomId, this.password);
+
       this.room = joinRoom(
         {
           appId: APP_ID,
           relayConfig,
           rtcConfig,
         },
-        this.roomId
+        signalingTopic
       );
+
+      // 0. Setup Live Room Password Sync Action
+      this.passwordAction = this.room.makeAction('room_password_sync');
+      this.passwordAction.onMessage = (data: { newPassword?: string; updatedBy?: string }) => {
+        if (typeof data.newPassword === 'string') {
+          this.password = data.newPassword.trim();
+          if (this.callbacks?.onPasswordChange) {
+            this.callbacks.onPasswordChange(this.password, data.updatedBy || 'Participante');
+          }
+        }
+      };
 
       // 1. Setup Chat Action
       this.chatAction = this.room.makeAction('chat');
@@ -202,6 +305,14 @@ export class GroupRoomManager {
           this.streamingPeers.add(peerId);
         } else if (data.isStreaming === false) {
           this.streamingPeers.delete(peerId);
+          if (this.remoteStreams.has(peerId)) {
+            this.remoteStreams.delete(peerId);
+          }
+        }
+
+        // If I am currently streaming, push stream to this peer on presence
+        if (this.localStream) {
+          this.sendStreamToPeer(peerId);
         }
 
         this.notifyPeersUpdate();
@@ -234,14 +345,7 @@ export class GroupRoomManager {
 
         console.log(`[P2P] Received stream request from peer ${requesterId}`);
         if (this.localStream && data.request) {
-          try {
-            this.room.addStream(this.localStream, requesterId);
-            [30, 100, 250, 500, 1000, 2000].forEach((delay) => {
-              setTimeout(() => this.boostSenders(this.currentTargetBitrate, this.currentTargetFps), delay);
-            });
-          } catch (err) {
-            console.warn('[P2P] Error servicing stream request:', err);
-          }
+          this.sendStreamToPeer(requesterId);
         }
       };
 
@@ -268,14 +372,7 @@ export class GroupRoomManager {
 
         // If I am already sharing a stream, broadcast it to the new peer with burst bitrate
         if (this.localStream) {
-          try {
-            this.room.addStream(this.localStream, peerId);
-            [50, 150, 300, 600, 1200, 2000].forEach((delay) => {
-              setTimeout(() => this.boostSenders(this.currentTargetBitrate, this.currentTargetFps), delay);
-            });
-          } catch (err) {
-            console.warn('[P2P] Error adding stream to new peer:', err);
-          }
+          this.sendStreamToPeer(peerId);
         }
 
         this.peers.set(peerId, `Conectado (${peerId.slice(0, 4)})`);
@@ -295,6 +392,34 @@ export class GroupRoomManager {
         this.peerLastSeen.set(peerId, Date.now());
         this.streamingPeers.add(peerId);
         this.remoteStreams.set(peerId, stream);
+
+        // Listen to track state so if host stops, remote stream clears cleanly
+        stream.getTracks().forEach((track) => {
+          track.onended = () => {
+            console.log(`[P2P] Track ended for peer: ${peerId}`);
+            if (this.remoteStreams.get(peerId)?.id === stream.id) {
+              this.remoteStreams.delete(peerId);
+              this.notifyStreamsUpdate();
+            }
+          };
+        });
+
+        // Eliminate Chromium receiver jitter buffer delay for true real-time P2P (Discord/TeamSpeak level)
+        try {
+          const peers = this.room?.getPeers?.() || {};
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const peerObj: any = peers[peerId];
+          const pc: RTCPeerConnection = peerObj?.connection || peerObj?.pc || peerObj;
+          if (pc?.getReceivers) {
+            pc.getReceivers().forEach((receiver) => {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              (receiver as any).playoutDelayHint = 0;
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              (receiver as any).jitterBufferTarget = 0;
+            });
+          }
+        } catch {}
+
         this.notifyStreamsUpdate();
         callbacks.onStatusChange('Ao Vivo');
       };
@@ -370,6 +495,50 @@ export class GroupRoomManager {
     }
   }
 
+  public sendStreamToPeer(peerId: string) {
+    if (!this.localStream || !this.room) return;
+    try {
+      const peers = this.room.getPeers?.() || {};
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const peerObj: any = peers[peerId];
+      const pc: RTCPeerConnection = peerObj?.connection || peerObj?.pc || peerObj;
+
+      if (pc && pc.getSenders) {
+        const existingSenders = pc.getSenders();
+        const localVideoTrack = this.localStream.getVideoTracks()[0];
+        const localAudioTrack = this.localStream.getAudioTracks()[0];
+
+        const videoSender = existingSenders.find((s) => s.track && s.track.kind === 'video');
+        const audioSender = existingSenders.find((s) => s.track && s.track.kind === 'audio');
+
+        let replaced = false;
+        if (videoSender && localVideoTrack) {
+          videoSender.replaceTrack(localVideoTrack).catch(() => {});
+          replaced = true;
+        }
+        if (audioSender && localAudioTrack) {
+          audioSender.replaceTrack(localAudioTrack).catch(() => {});
+          replaced = true;
+        }
+
+        if (!replaced) {
+          this.room.addStream(this.localStream, peerId);
+        }
+      } else {
+        this.room.addStream(this.localStream, peerId);
+      }
+
+      [0, 30, 80, 150, 300, 600, 1200, 2000].forEach((delay) => {
+        setTimeout(() => this.boostSenders(this.currentTargetBitrate, this.currentTargetFps), delay);
+      });
+    } catch (err) {
+      console.warn('[P2P] Error sending stream to peer, fallback:', err);
+      try {
+        this.room.addStream(this.localStream, peerId);
+      } catch {}
+    }
+  }
+
   public shareStream(stream: MediaStream, targetBitrateBps: number = 25000000, targetFps: number = 60) {
     this.localStream = stream;
     this.currentTargetBitrate = targetBitrateBps;
@@ -377,9 +546,14 @@ export class GroupRoomManager {
 
     if (this.room && stream) {
       try {
-        this.room.addStream(stream);
-        // Fire rapid bursts so WebRTC skips the 6-second low-bitrate probing ramp-up
-        [30, 100, 250, 500, 1000, 1800, 2500].forEach((delay) => {
+        const peers = this.room.getPeers?.() || {};
+        const peerIds = Object.keys(peers);
+        if (peerIds.length > 0) {
+          peerIds.forEach((pId) => this.sendStreamToPeer(pId));
+        } else {
+          this.room.addStream(stream);
+        }
+        [0, 30, 80, 150, 300, 600, 1200, 2000].forEach((delay) => {
           setTimeout(() => this.boostSenders(targetBitrateBps, targetFps), delay);
         });
       } catch (err) {
@@ -413,8 +587,9 @@ export class GroupRoomManager {
                 params.encodings[0].scaleResolutionDownBy = 1.0;
                 params.encodings[0].networkPriority = 'high';
                 params.encodings[0].priority = 'high';
+                // Lock resolution to avoid 8-second blurriness downscaling
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                (params as any).degradationPreference = 'maintain-framerate';
+                (params as any).degradationPreference = 'maintain-resolution';
                 sender.setParameters(params).catch(() => {});
               } catch {}
             }
@@ -545,6 +720,19 @@ export class GroupRoomManager {
   private notifyPeersUpdate() {
     if (this.callbacks) {
       this.callbacks.onPeersUpdate(this.getConnectedPeers());
+    }
+  }
+
+  public updateRoomPassword(newPassword: string) {
+    this.password = newPassword.trim();
+    if (this.passwordAction) {
+      this.passwordAction.send({
+        newPassword: this.password,
+        updatedBy: this.username,
+      });
+    }
+    if (this.callbacks?.onPasswordChange) {
+      this.callbacks.onPasswordChange(this.password, this.username);
     }
   }
 

@@ -43,10 +43,11 @@ static CAPTURING_VIDEO: AtomicBool = AtomicBool::new(false);
 static WS_SERVER_INITIALIZED: AtomicBool = AtomicBool::new(false);
 static WS_PORT: std::sync::atomic::AtomicU16 = std::sync::atomic::AtomicU16::new(0);
 static FRAME_SENDER: std::sync::OnceLock<broadcast::Sender<Vec<u8>>> = std::sync::OnceLock::new();
+static CURRENT_CAPTURE_FLAG: std::sync::Mutex<Option<Arc<AtomicBool>>> = std::sync::Mutex::new(None);
 
 fn get_frame_sender() -> &'static broadcast::Sender<Vec<u8>> {
     FRAME_SENDER.get_or_init(|| {
-        let (tx, _rx) = broadcast::channel(32);
+        let (tx, _rx) = broadcast::channel(4);
         tx
     })
 }
@@ -97,9 +98,20 @@ pub fn ensure_ws_server_running() {
                 tokio::spawn(async move {
                     if let Ok(ws_stream) = tokio_tungstenite::accept_async(stream).await {
                         let (mut write, mut _read) = ws_stream.split();
-                        while let Ok(frame_data) = rx.recv().await {
-                            if write.send(Message::Binary(frame_data.into())).await.is_err() {
-                                break;
+                        loop {
+                            match rx.recv().await {
+                                Ok(frame_data) => {
+                                    if write.send(Message::Binary(frame_data.into())).await.is_err() {
+                                        break;
+                                    }
+                                }
+                                Err(broadcast::error::RecvError::Lagged(_)) => {
+                                    // Drop lagged frames to guarantee absolute zero latency
+                                    continue;
+                                }
+                                Err(broadcast::error::RecvError::Closed) => {
+                                    break;
+                                }
                             }
                         }
                     }
@@ -345,14 +357,27 @@ pub fn start_native_screen_capture(
     quality: Option<u8>,
 ) -> Result<bool, String> {
     ensure_ws_server_running();
+
+    // Stop any existing capture thread
+    CAPTURING_VIDEO.store(false, Ordering::SeqCst);
+    if let Ok(mut guard) = CURRENT_CAPTURE_FLAG.lock() {
+        if let Some(flag) = guard.take() {
+            flag.store(false, Ordering::SeqCst);
+        }
+    }
+
     CAPTURING_VIDEO.store(true, Ordering::SeqCst);
     let is_capturing = Arc::new(AtomicBool::new(true));
     let is_capturing_clone = is_capturing.clone();
 
+    if let Ok(mut guard) = CURRENT_CAPTURE_FLAG.lock() {
+        *guard = Some(is_capturing);
+    }
+
     let fps = target_fps.max(15).min(120);
     let frame_interval = std::time::Duration::from_millis((1000 / fps).max(6) as u64);
     let should_draw_mouse = capture_mouse.unwrap_or(true);
-    let jpeg_quality = quality.unwrap_or(65).max(45).min(80);
+    let jpeg_quality = quality.unwrap_or(80).max(60).min(92);
 
     let sender = get_frame_sender().clone();
 
@@ -421,13 +446,13 @@ pub fn start_native_screen_capture(
                 let tx = sender.clone();
                 // Dispatch compression to the parallel thread pool with zero lag
                 pool.spawn(move || {
-                    let scaled_img = if img.width() != target_width || img.height() != target_height {
+                    let scaled_img = if target_width > 0 && target_height > 0 && (img.width() != target_width || img.height() != target_height) {
                         image::imageops::resize(&img, target_width, target_height, FilterType::Nearest)
                     } else {
                         img
                     };
 
-                    let mut jpeg_bytes = Vec::with_capacity(80_000);
+                    let mut jpeg_bytes = Vec::with_capacity(120_000);
                     let mut cursor = Cursor::new(&mut jpeg_bytes);
                     let mut encoder = JpegEncoder::new_with_quality(&mut cursor, jpeg_quality);
                     if encoder.encode_image(&scaled_img).is_ok() {
@@ -449,5 +474,10 @@ pub fn start_native_screen_capture(
 #[tauri::command]
 pub fn stop_native_screen_capture() -> Result<bool, String> {
     CAPTURING_VIDEO.store(false, Ordering::SeqCst);
+    if let Ok(mut guard) = CURRENT_CAPTURE_FLAG.lock() {
+        if let Some(flag) = guard.take() {
+            flag.store(false, Ordering::SeqCst);
+        }
+    }
     Ok(true)
 }

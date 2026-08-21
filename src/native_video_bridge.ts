@@ -46,6 +46,7 @@ export class NativeVideoBridge {
     const port = (await invoke<number>('get_video_ws_port').catch(() => 49153)) || 49153;
     let sequenceCounter = 0;
     let lastRenderedSequence = 0;
+    let isProcessingFrame = false;
 
     await new Promise<void>((resolve) => {
       let resolved = false;
@@ -65,6 +66,13 @@ export class NativeVideoBridge {
 
         if (evt.data instanceof ArrayBuffer) {
           const frameSeq = ++sequenceCounter;
+          
+          // Drop incoming packet if already busy decoding a frame to prevent queue lag
+          if (isProcessingFrame && frameSeq - lastRenderedSequence > 1) {
+            return;
+          }
+
+          isProcessingFrame = true;
           try {
             const blob = new Blob([evt.data], { type: 'image/jpeg' });
             const bitmap = await createImageBitmap(blob);
@@ -72,19 +80,28 @@ export class NativeVideoBridge {
             // Drop frame if a newer frame has already rendered
             if (frameSeq < lastRenderedSequence || !this.isCapturing) {
               bitmap.close();
+              isProcessingFrame = false;
               return;
             }
 
             lastRenderedSequence = frameSeq;
-            if (this.latestBitmap) {
-              this.latestBitmap.close();
+            if (this.ctx && this.canvas) {
+              this.ctx.drawImage(bitmap, 0, 0, this.canvas.width, this.canvas.height);
+              
+              // Trigger instant WebRTC frame capture if supported
+              const track = this.activeStream?.getVideoTracks()[0];
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              if (track && typeof (track as any).requestFrame === 'function') {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (track as any).requestFrame();
+              }
             }
-            this.latestBitmap = bitmap;
-
-            if (this.ctx && this.canvas && this.latestBitmap) {
-              this.ctx.drawImage(this.latestBitmap, 0, 0, this.canvas.width, this.canvas.height);
-            }
-          } catch {}
+            bitmap.close();
+          } catch {
+            // Frame parse error ignored
+          } finally {
+            isProcessingFrame = false;
+          }
         }
       };
 

@@ -224,7 +224,7 @@ body {
 }
 
 .room-code-header-pill {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
   background-color: var(--accent-subtle);
@@ -233,13 +233,16 @@ body {
   border-radius: var(--radius-full);
   cursor: pointer;
   font-size: 12px;
+  font-family: var(--font-sans);
   color: var(--accent-color);
   transition: all var(--transition-fast);
+  outline: none;
 }
 
 .room-code-header-pill:hover {
   background-color: var(--accent-color);
   color: var(--accent-text-on-accent);
+  transform: translateY(-1px);
 }
 
 .room-code-header-pill strong {
@@ -917,6 +920,102 @@ body {
   background-color: rgba(239, 68, 68, 0.75);
   border-color: rgba(239, 68, 68, 0.9);
   color: #ffffff;
+}
+
+/* Stream Volume Controller (Hover Expandable Slider) */
+.stream-volume-controller {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background-color: rgba(10, 10, 15, 0.82);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  padding: 4px 8px;
+  border-radius: var(--radius-full);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  transition: all var(--transition-fast);
+}
+
+.stream-volume-controller:hover {
+  background-color: rgba(15, 15, 22, 0.94);
+  border-color: var(--accent-border);
+}
+
+.btn-stream-volume {
+  background: none;
+  border: none;
+  color: #f4f4f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 3px;
+  border-radius: var(--radius-full);
+  transition: color var(--transition-fast), transform var(--transition-fast);
+}
+
+.btn-stream-volume:hover {
+  color: var(--accent-color);
+  transform: scale(1.1);
+}
+
+.stream-volume-slider-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transition: max-width var(--transition-normal), opacity var(--transition-fast);
+}
+
+.stream-volume-controller:hover .stream-volume-slider-box,
+.stream-volume-controller:focus-within .stream-volume-slider-box {
+  max-width: 120px;
+  opacity: 1;
+  overflow: visible;
+  pointer-events: auto;
+}
+
+.stream-volume-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 70px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.25);
+  outline: none;
+  cursor: pointer;
+}
+
+.stream-volume-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent-color, #06b6d4);
+  cursor: pointer;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
+  transition: transform var(--transition-fast);
+}
+
+.stream-volume-range::-webkit-slider-thumb:hover {
+  transform: scale(1.25);
+}
+
+.stream-volume-percent {
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: #d4d4d8;
+  min-width: 28px;
+  user-select: none;
 }
 
 /* Stream HUD */
@@ -1719,3 +1818,83 @@ body {
 .btn-cancel-connect {
   width: 140px;
 }
+
+.room-lock-icon {
+  font-size: 11px;
+}
+
+/* Input with action inside (like refresh or show password) */
+.input-with-action {
+  display: flex;
+  align-items: center;
+  position: relative;
+  gap: 6px;
+}
+
+.input-with-action .text-input {
+  flex: 1;
+}
+
+.btn-inline-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.label-hint {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-left: 6px;
+}
+
+.field-info-text {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
+/* Security Modal Details Box */
+.room-security-info-box {
+  background-color: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.security-info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.security-info-label {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.security-info-value {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--accent-color);
+}
+
+.security-info-status {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+

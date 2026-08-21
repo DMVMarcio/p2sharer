@@ -12,6 +12,8 @@ pub struct AudioConfig {
     pub mode: String, // "full", "exclude", "include"
     #[serde(default)]
     pub target_pids: Vec<u32>,
+    #[serde(default)]
+    pub target_names: Vec<String>,
     #[serde(default = "default_sample_rate")]
     pub sample_rate: u32,
 }
@@ -125,36 +127,98 @@ mod win_audio {
         }
     }
 
-    fn resolve_target_pid(pids: &[u32]) -> u32 {
-        let valid_pid = pids.iter().find(|&&p| p > 0).copied().unwrap_or(0);
-        if valid_pid == 0 {
-            return 0;
-        }
-
+    fn resolve_target_process_tree(target_names: &[String], target_pids: &[u32]) -> u32 {
         let mut sys = sysinfo::System::new_all();
         sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
 
-        let mut current_pid = sysinfo::Pid::from_u32(valid_pid);
-        let mut target_name: Option<String> = None;
-        if let Some(proc) = sys.process(current_pid) {
-            target_name = Some(proc.name().to_string_lossy().to_lowercase());
+        let normalized_names: Vec<String> = target_names.iter().map(|n| n.to_lowercase()).collect();
+
+        // 1. Gather all candidate PIDs matching target names or explicit PIDs
+        let mut candidate_pids: Vec<u32> = Vec::new();
+
+        for &pid in target_pids {
+            if pid > 0 && sys.process(sysinfo::Pid::from_u32(pid)).is_some() {
+                candidate_pids.push(pid);
+            }
         }
 
-        while let Some(proc) = sys.process(current_pid) {
-            if let Some(parent_pid) = proc.parent() {
-                if let Some(parent_proc) = sys.process(parent_pid) {
-                    if let Some(ref name) = target_name {
-                        if parent_proc.name().to_string_lossy().to_lowercase() == *name {
-                            current_pid = parent_pid;
+        for (pid, proc) in sys.processes() {
+            let p_name = proc.name().to_string_lossy().to_lowercase();
+            if normalized_names.iter().any(|target| p_name.contains(target) || target.contains(&p_name)) {
+                let u = pid.as_u32();
+                if !candidate_pids.contains(&u) {
+                    candidate_pids.push(u);
+                }
+            }
+        }
+
+        if candidate_pids.is_empty() {
+            return 0;
+        }
+
+        // 2. Find the top-most living root ancestor among candidates
+        let mut root_pids: Vec<u32> = Vec::new();
+        for &start_pid in &candidate_pids {
+            let mut curr = sysinfo::Pid::from_u32(start_pid);
+            let start_name = sys.process(curr).map(|p| p.name().to_string_lossy().to_lowercase());
+
+            while let Some(proc) = sys.process(curr) {
+                if let Some(parent_pid) = proc.parent() {
+                    if let Some(parent_proc) = sys.process(parent_pid) {
+                        let parent_name = parent_proc.name().to_string_lossy().to_lowercase();
+                        if start_name.as_deref() == Some(&parent_name) || candidate_pids.contains(&parent_pid.as_u32()) {
+                            curr = parent_pid;
                             continue;
                         }
                     }
                 }
+                break;
             }
-            break;
+
+            let r_u32 = curr.as_u32();
+            if !root_pids.contains(&r_u32) {
+                root_pids.push(r_u32);
+            }
         }
 
-        current_pid.as_u32()
+        // 3. Prioritize process root that currently has an active audio session
+        unsafe {
+            if let Ok(enumerator) = CoCreateInstance::<_, IMMDeviceEnumerator>(&MMDeviceEnumerator, None, CLSCTX_ALL) {
+                if let Ok(device) = enumerator.GetDefaultAudioEndpoint(eRender, eConsole) {
+                    if let Ok(session_manager) = device.Activate::<IAudioSessionManager2>(CLSCTX_ALL, None) {
+                        if let Ok(session_enum) = session_manager.GetSessionEnumerator() {
+                            if let Ok(count) = session_enum.GetCount() {
+                                for i in 0..count {
+                                    if let Ok(control) = session_enum.GetSession(i) {
+                                        if let Ok(control2) = control.cast::<IAudioSessionControl2>() {
+                                            let s_pid = control2.GetProcessId().unwrap_or(0);
+                                            if candidate_pids.contains(&s_pid) {
+                                                for &r in &root_pids {
+                                                    let mut check = sysinfo::Pid::from_u32(s_pid);
+                                                    while let Some(cp) = sys.process(check) {
+                                                        if check.as_u32() == r {
+                                                            return r;
+                                                        }
+                                                        if let Some(pp) = cp.parent() {
+                                                            check = pp;
+                                                        } else {
+                                                            break;
+                                                        }
+                                                    }
+                                                }
+                                                return s_pid;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        root_pids[0]
     }
 
     fn activate_process_loopback_client(pid: u32, exclude: bool) -> Result<IAudioClient, String> {
@@ -165,7 +229,7 @@ mod win_audio {
             };
             let handler: IActivateAudioInterfaceCompletionHandler = handler_impl.into();
 
-            let mut params = AUDIOCLIENT_ACTIVATION_PARAMS {
+            let mut params = Box::new(AUDIOCLIENT_ACTIVATION_PARAMS {
                 ActivationType: AUDIOCLIENT_ACTIVATION_TYPE_PROCESS_LOOPBACK,
                 ProcessLoopbackParams: AUDIOCLIENT_PROCESS_LOOPBACK_PARAMS {
                     TargetProcessId: pid,
@@ -175,7 +239,7 @@ mod win_audio {
                         PROCESS_LOOPBACK_MODE_INCLUDE_PROCESS_TREE
                     },
                 },
-            };
+            });
 
             let prop_var = RawPropVariant {
                 vt: 0x0041, // VT_BLOB
@@ -184,12 +248,12 @@ mod win_audio {
                 w_reserved3: 0,
                 blob: RawBlob {
                     cb_size: std::mem::size_of::<AUDIOCLIENT_ACTIVATION_PARAMS>() as u32,
-                    p_blob_data: &mut params as *mut _ as *mut u8,
+                    p_blob_data: params.as_mut() as *mut _ as *mut u8,
                 },
             };
 
             let virtual_device_path: Vec<u16> =
-                "VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK\0".encode_utf16().collect();
+                "VAD\\Process_Loopback\0".encode_utf16().collect();
 
             let res = ActivateAudioInterfaceAsync(
                 PCWSTR(virtual_device_path.as_ptr()),
@@ -202,7 +266,7 @@ mod win_audio {
                 return Err(format!("ActivateAudioInterfaceAsync failed: {:?}", e));
             }
 
-            match rx.recv_timeout(std::time::Duration::from_millis(2500)) {
+            match rx.recv_timeout(std::time::Duration::from_millis(3000)) {
                 Ok(Ok(client)) => Ok(client),
                 Ok(Err(e)) => Err(e),
                 Err(e) => Err(format!("Audio activation timeout: {:?}", e)),
@@ -214,11 +278,22 @@ mod win_audio {
         unsafe {
             let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
 
-            // Determine activation method based on PID and mode
-            let target_pid = resolve_target_pid(&config.target_pids);
-            let is_filtered = target_pid > 0 && (config.mode == "exclude" || config.mode == "include");
+            // Special Case: In "include" mode with 0 apps selected, stream absolute silence
+            if config.mode == "include" && config.target_pids.is_empty() && config.target_names.is_empty() {
+                println!("[Audio Loopback] Include mode active with 0 apps selected - streaming silence.");
+                while stop_flag.load(Ordering::Relaxed) {
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                }
+                let _ = CoUninitialize();
+                return;
+            }
 
-            let audio_client: IAudioClient = if is_filtered {
+            // Determine activation method based on PID / Name and mode
+            let target_pid = resolve_target_process_tree(&config.target_names, &config.target_pids);
+            let is_process_mode = target_pid > 0 && (config.mode == "exclude" || config.mode == "include");
+
+            let mut was_process_loopback = false;
+            let audio_client: IAudioClient = if is_process_mode {
                 let exclude = config.mode == "exclude";
                 println!(
                     "[Audio Loopback] Activating Windows WASAPI Process Loopback (Root PID: {}, Mode: {})",
@@ -227,6 +302,7 @@ mod win_audio {
                 match activate_process_loopback_client(target_pid, exclude) {
                     Ok(client) => {
                         println!("[Audio Loopback] Successfully activated process loopback for PID {}", target_pid);
+                        was_process_loopback = true;
                         client
                     }
                     Err(err) => {
@@ -251,27 +327,29 @@ mod win_audio {
                 }
             };
 
-
-            let mix_format_ptr: *mut WAVEFORMATEX = match audio_client.GetMixFormat() {
-                Ok(ptr) => ptr,
-                Err(err) => {
-                    eprintln!("[Audio Loopback] Failed to get mix format: {:?}", err);
-                    let _ = CoUninitialize();
-                    return;
-                }
+            // Query mix format from default render device (process loopback doesn't implement GetMixFormat directly)
+            let mix_format_ptr: *mut WAVEFORMATEX = if let Ok(master_client) = get_default_render_audio_client() {
+                master_client.GetMixFormat().unwrap_or_else(|_| std::ptr::null_mut())
+            } else {
+                audio_client.GetMixFormat().unwrap_or_else(|_| std::ptr::null_mut())
             };
+
+            if mix_format_ptr.is_null() {
+                eprintln!("[Audio Loopback] Failed to retrieve valid mix format.");
+                let _ = CoUninitialize();
+                return;
+            }
 
             let mix_format = &*mix_format_ptr;
             let sample_rate = mix_format.nSamplesPerSec;
             let channels = mix_format.nChannels;
             let bits_per_sample = mix_format.wBitsPerSample;
 
-            // Stream flags: Loopback mode + auto convert PCM
             let stream_flags = AUDCLNT_STREAMFLAGS_LOOPBACK
                 | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM
                 | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY;
 
-            let buffer_duration = 1_000_000i64; // 100ms in 100ns units
+            let buffer_duration = 10_000_000i64; // 1 second buffer in 100ns units
 
             if let Err(err) = audio_client.Initialize(
                 AUDCLNT_SHAREMODE_SHARED,
@@ -281,7 +359,7 @@ mod win_audio {
                 mix_format_ptr,
                 None,
             ) {
-                eprintln!("[Audio Loopback] Failed to initialize audio client: {:?}", err);
+                eprintln!("[Audio Loopback] Failed to initialize audio client (was_process={}): {:?}", was_process_loopback, err);
                 CoTaskMemFree(Some(mix_format_ptr as *const _));
                 let _ = CoUninitialize();
                 return;
@@ -305,14 +383,14 @@ mod win_audio {
             }
 
             println!(
-                "[Audio Loopback] Windows WASAPI loopback capture running ({} Hz, {} channels, Filter: {})",
-                sample_rate, channels, config.mode
+                "[Audio Loopback] Windows WASAPI loopback capture active ({} Hz, {} channels, ProcessFilter: {})",
+                sample_rate, channels, was_process_loopback
             );
 
-            let mut send_buffer: Vec<f32> = Vec::with_capacity(4096);
+            let mut send_buffer: Vec<f32> = Vec::with_capacity(2048);
 
             while stop_flag.load(Ordering::Relaxed) {
-                std::thread::sleep(std::time::Duration::from_millis(15));
+                std::thread::sleep(std::time::Duration::from_millis(5));
 
                 let mut packet_size = match capture_client.GetNextPacketSize() {
                     Ok(s) => s,
@@ -358,8 +436,8 @@ mod win_audio {
                     packet_size = capture_client.GetNextPacketSize().unwrap_or(0);
                 }
 
-                // Emit chunk every ~20ms
-                let min_samples_to_send = (sample_rate as usize * channels as usize) / 50;
+                // Emit chunk every ~10ms for minimal latency (Discord / TeamSpeak level)
+                let min_samples_to_send = (sample_rate as usize * channels as usize) / 100;
                 if send_buffer.len() >= min_samples_to_send {
                     let mut sum_sq = 0.0f32;
                     for &s in &send_buffer {
@@ -411,6 +489,7 @@ pub fn start_audio_capture(app: AppHandle, config: Option<AudioConfig>) -> Resul
     let cfg = config.unwrap_or(AudioConfig {
         mode: "exclude".to_string(),
         target_pids: vec![],
+        target_names: vec![],
         sample_rate: 48000,
     });
 
