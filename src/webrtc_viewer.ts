@@ -61,6 +61,12 @@ export class ViewerManager {
 
     this.pc.ontrack = (event) => {
       this.remoteStream.addTrack(event.track);
+      if (event.receiver) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (event.receiver as any).playoutDelayHint = 0;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (event.receiver as any).jitterBufferTarget = 0;
+      }
     };
 
     this.pc.ondatachannel = (event) => {

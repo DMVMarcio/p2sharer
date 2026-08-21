@@ -24,11 +24,12 @@
 
       <div class="header-user-info">
         <!-- Room Code Header Pill (Visible inside room) -->
-        <div class="room-code-header-pill hidden" id="header-room-code-pill" title="Clique para copiar o código da sala">
+        <button class="room-code-header-pill hidden" id="header-room-code-pill" title="Clique para copiar o código e senha da sala">
           <span class="header-pill-label">SALA</span>
-          <strong id="display-room-code">P2P-1234</strong>
+          <strong id="display-room-code">cyber-falcon-482</strong>
+          <span class="room-lock-icon" id="header-room-lock-icon" title="Status da Senha">🔓</span>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-        </div>
+        </button>
 
         <button class="user-pill" id="user-pill" title="Configurações e Perfil">
           <span class="user-status-dot"></span>
@@ -101,7 +102,6 @@
               <div class="stream-status">
                 <span class="live-indicator" id="room-live-badge">SALA ATIVA</span>
                 <span class="stream-host-tag" id="room-sharing-status-tag">1 pessoa</span>
-                <span class="stream-info-badge" id="room-stats-badge">P2P</span>
               </div>
               
               <div class="stream-actions">
@@ -116,6 +116,12 @@
                 <button class="btn btn-sm btn-outline btn-compact" id="btn-open-audio-filter" title="Configurar filtros de áudio (ignorar Discord)">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" x2="4" y1="21" y2="14"/><line x1="4" x2="4" y1="10" y2="3"/><line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/><line x1="20" x2="20" y1="21" y2="16"/><line x1="20" x2="20" y1="12" y2="3"/><line x1="1" x2="7" y1="14" y2="14"/><line x1="9" x2="15" y1="8" y2="8"/><line x1="17" x2="23" y1="16" y2="16"/></svg>
                   <span class="btn-text">Áudio</span>
+                </button>
+
+                <!-- Room Security / Password Button -->
+                <button class="btn btn-sm btn-outline btn-compact" id="btn-open-room-security" title="Segurança da Sala (Definir / Alterar Senha)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  <span class="btn-text" id="label-room-security">Senha</span>
                 </button>
 
                 <!-- Toggle Sidebar (Chat) -->
@@ -509,6 +515,58 @@
       </div>
     </div>
 
+    <!-- MODAL: CREATE ROOM DIALOG -->
+    <div class="modal-overlay hidden" id="modal-create-room-dialog">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="modal-header-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <div>
+            <h2>Criar Nova Sala</h2>
+            <p class="modal-subtitle">Escolha o código e configure uma senha opcional para sua sala.</p>
+          </div>
+          <button class="btn-close" id="btn-close-create-dialog">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label" for="input-create-room-code-dialog">Código / Nome da Sala:</label>
+            <div class="input-with-action">
+              <input type="text" id="input-create-room-code-dialog" class="text-input" placeholder="Ex: cyber-falcon-482" style="font-family: var(--font-mono); font-size: 15px; font-weight: 700;" />
+              <button class="btn btn-sm btn-outline btn-inline-action" id="btn-regen-room-code" title="Gerar outro código aleatório">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                <span>Regerar</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 14px;">
+            <label class="form-label" for="input-create-room-password-dialog">
+              <span>Senha de Proteção (Opcional):</span>
+              <span class="label-hint">Deixe em branco para sala pública</span>
+            </label>
+            <div class="input-with-action">
+              <input type="password" id="input-create-room-password-dialog" class="text-input" placeholder="Ex: 1234, segredo..." maxlength="40" />
+              <button class="btn btn-sm btn-outline btn-inline-action" id="btn-toggle-create-password-visibility" title="Mostrar / Ocultar Senha">
+                <span id="icon-create-pass-toggle">👁️</span>
+              </button>
+            </div>
+            <p class="field-info-text">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+              Salas com o mesmo código e senhas diferentes são 100% isoladas criptograficamente.
+            </p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="btn-cancel-create-dialog">Cancelar</button>
+          <button class="btn btn-primary" id="btn-confirm-create-dialog">
+            <span>Criar Sala e Entrar</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" x2="19" y1="12" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- MODAL: JOIN ROOM DIALOG -->
     <div class="modal-overlay hidden" id="modal-join-room-dialog">
       <div class="modal-card">
@@ -516,18 +574,87 @@
           <div class="modal-header-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" x2="3" y1="12" y2="12"/></svg>
           </div>
-          <h2>Entrar em uma Sala de Grupo</h2>
+          <div>
+            <h2>Entrar em uma Sala de Grupo</h2>
+            <p class="modal-subtitle">Insira o código e a senha da sala para se conectar.</p>
+          </div>
           <button class="btn-close" id="btn-close-join-dialog">&times;</button>
         </div>
         <div class="modal-body">
-          <p>Digite o Código da Sala compartilhado pelo apresentador:</p>
-          <input type="text" id="input-join-room-code-dialog" class="text-input" placeholder="Ex: P2P-8842 ou SALA-XYZ" style="font-family: var(--font-mono); font-size: 16px; font-weight: 700; text-transform: uppercase;" />
+          <div class="form-group">
+            <label class="form-label" for="input-join-room-code-dialog">Código da Sala:</label>
+            <input type="text" id="input-join-room-code-dialog" class="text-input" placeholder="Ex: cyber-falcon-482 ou SALA-1" style="font-family: var(--font-mono); font-size: 15px; font-weight: 700;" />
+          </div>
+
+          <div class="form-group" style="margin-top: 14px;">
+            <label class="form-label" for="input-join-room-password-dialog">
+              <span>Senha da Sala:</span>
+              <span class="label-hint">Deixe em branco se a sala for pública</span>
+            </label>
+            <div class="input-with-action">
+              <input type="password" id="input-join-room-password-dialog" class="text-input" placeholder="Digite a senha (se houver)..." maxlength="40" />
+              <button class="btn btn-sm btn-outline btn-inline-action" id="btn-toggle-join-password-visibility" title="Mostrar / Ocultar Senha">
+                <span id="icon-join-pass-toggle">👁️</span>
+              </button>
+            </div>
+          </div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" id="btn-cancel-join-dialog">Cancelar</button>
           <button class="btn btn-primary" id="btn-confirm-join-dialog">
             <span>Entrar na Sala</span>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" x2="19" y1="12" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: ROOM SECURITY & LIVE PASSWORD MANAGER -->
+    <div class="modal-overlay hidden" id="modal-room-security">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="modal-header-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </div>
+          <div>
+            <h2>Segurança da Sala</h2>
+            <p class="modal-subtitle">Altere a senha da sala a qualquer momento e sincronize com todos os participantes.</p>
+          </div>
+          <button class="btn-close" id="btn-close-room-security">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="room-security-info-box">
+            <div class="security-info-row">
+              <span class="security-info-label">Código da Sala:</span>
+              <span class="security-info-value" id="sec-modal-room-code">cyber-falcon-482</span>
+            </div>
+            <div class="security-info-row">
+              <span class="security-info-label">Status Atual:</span>
+              <span class="security-info-status" id="sec-modal-current-status">🔓 Pública (Sem Senha)</span>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 16px;">
+            <label class="form-label" for="input-room-security-password">
+              <span>Nova Senha da Sala:</span>
+              <span class="label-hint">Deixe vazio para tornar pública</span>
+            </label>
+            <div class="input-with-action">
+              <input type="password" id="input-room-security-password" class="text-input" placeholder="Digite uma nova senha..." maxlength="40" />
+              <button class="btn btn-sm btn-outline btn-inline-action" id="btn-toggle-security-password-visibility" title="Mostrar / Ocultar Senha">
+                <span id="icon-sec-pass-toggle">👁️</span>
+              </button>
+            </div>
+            <p class="field-info-text">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+              Ao salvar, todos os participantes conectados serão notificados e atualizados automaticamente.
+            </p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="btn-cancel-room-security">Fechar</button>
+          <button class="btn btn-primary" id="btn-save-room-security">
+            <span>Atualizar Senha da Sala</span>
           </button>
         </div>
       </div>
@@ -541,7 +668,7 @@
         </div>
         <h2 class="connecting-title" id="connecting-title">Entrando na sala...</h2>
         <p class="connecting-subtitle" id="connecting-subtitle">Estabelecendo sinalização e túnel P2P criptografado...</p>
-        <div class="connecting-room-badge" id="connecting-room-code">SALA: P2P-1234</div>
+        <div class="connecting-room-badge" id="connecting-room-code">SALA: cyber-falcon-482</div>
         <button class="btn btn-secondary btn-cancel-connect" id="btn-cancel-connecting">
           <span>Cancelar</span>
         </button>

@@ -33,7 +33,11 @@ export class AudioBridge {
     }
   }
 
-  public async startCapture(mode: string = 'exclude', targetPids: number[] = []): Promise<MediaStreamTrack | null> {
+  public async startCapture(
+    mode: string = 'exclude',
+    targetPids: number[] = [],
+    targetNames: string[] = []
+  ): Promise<MediaStreamTrack | null> {
     const track = this.init();
     await this.startListening();
     try {
@@ -41,6 +45,7 @@ export class AudioBridge {
         config: {
           mode,
           target_pids: targetPids,
+          target_names: targetNames,
           sample_rate: 48000,
         },
       });
@@ -79,26 +84,28 @@ export class AudioBridge {
       }
 
       const binary = atob(payload.pcm_base64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) {
+      const len = binary.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
         bytes[i] = binary.charCodeAt(i);
       }
       const floats = new Float32Array(bytes.buffer);
-      const frames = floats.length / (payload.channels || 2);
+      const channels = payload.channels || 2;
+      const frames = floats.length / channels;
 
       if (frames === 0) return;
 
       const buffer = this.audioCtx.createBuffer(
-        payload.channels || 2,
+        channels,
         frames,
         payload.sample_rate || 48000
       );
 
       // De-interleave channels
-      for (let ch = 0; ch < payload.channels; ch++) {
+      for (let ch = 0; ch < channels; ch++) {
         const chData = buffer.getChannelData(ch);
         for (let i = 0; i < frames; i++) {
-          chData[i] = floats[i * payload.channels + ch];
+          chData[i] = floats[i * channels + ch];
         }
       }
 
@@ -107,9 +114,9 @@ export class AudioBridge {
       source.connect(this.destNode);
 
       const currentTime = this.audioCtx.currentTime;
-      // If next scheduled time is in the past or far behind, reset with a small 30ms jitter buffer
-      if (this.nextPlayTime < currentTime) {
-        this.nextPlayTime = currentTime + 0.03;
+      // Real-time ultra low latency jitter buffer (~8ms)
+      if (this.nextPlayTime < currentTime || this.nextPlayTime > currentTime + 0.08) {
+        this.nextPlayTime = currentTime + 0.008;
       }
 
       source.start(this.nextPlayTime);
