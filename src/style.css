@@ -1820,7 +1820,14 @@ body {
 }
 
 .room-lock-icon {
-  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.room-lock-icon svg {
+  display: block;
 }
 
 /* Input with action inside (like refresh or show password) */
@@ -1838,6 +1845,7 @@ body {
 .btn-inline-action {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
   padding: 8px 12px;
   height: 40px;
@@ -1894,6 +1902,9 @@ body {
 }
 
 .security-info-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-weight: 600;
   color: var(--text-primary);
 }

@@ -22,6 +22,13 @@ interface PeerAudioSinkState {
   isMuted: boolean;
 }
 
+const ICONS = {
+  lock: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`,
+  unlock: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>`,
+  eye: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`,
+  eyeOff: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`,
+};
+
 class App {
   private username: string = '';
   private currentRoomCode: string = 'cyber-falcon-482';
@@ -589,9 +596,9 @@ class App {
 
     if (codeEl) codeEl.textContent = this.currentRoomCode;
     if (statusEl) {
-      statusEl.textContent = this.currentRoomPassword
-        ? `🔒 Protegida (Senha: "${this.currentRoomPassword}")`
-        : '🔓 Pública (Sem Senha)';
+      statusEl.innerHTML = this.currentRoomPassword
+        ? `${ICONS.lock} <span>Protegida por Senha ("${this.currentRoomPassword}")</span>`
+        : `${ICONS.unlock} <span>Pública (Sem Senha)</span>`;
     }
     if (passInput) passInput.value = this.currentRoomPassword;
 
@@ -632,10 +639,10 @@ class App {
 
     if (input.type === 'password') {
       input.type = 'text';
-      if (icon) icon.textContent = '🙈';
+      if (icon) icon.innerHTML = ICONS.eyeOff;
     } else {
       input.type = 'password';
-      if (icon) icon.textContent = '👁️';
+      if (icon) icon.innerHTML = ICONS.eye;
     }
   }
 
@@ -646,13 +653,10 @@ class App {
 
     if (codeEl) codeEl.textContent = this.currentRoomCode;
     if (lockEl) {
-      if (this.currentRoomPassword) {
-        lockEl.textContent = '🔒';
-        lockEl.title = `Protegida por Senha: ${this.currentRoomPassword}`;
-      } else {
-        lockEl.textContent = '🔓';
-        lockEl.title = 'Sala Pública (Sem Senha)';
-      }
+      lockEl.innerHTML = this.currentRoomPassword ? ICONS.lock : ICONS.unlock;
+      lockEl.title = this.currentRoomPassword
+        ? `Protegida por Senha: ${this.currentRoomPassword}`
+        : 'Sala Pública (Sem Senha)';
     }
     if (pillEl) {
       pillEl.title = this.currentRoomPassword
@@ -669,7 +673,7 @@ class App {
 
     if (titleEl) titleEl.textContent = title;
     if (subEl) subEl.textContent = subtitle;
-    if (codeEl) codeEl.textContent = `SALA: ${roomCode}${this.currentRoomPassword ? ' 🔒' : ''}`;
+    if (codeEl) codeEl.textContent = `SALA: ${roomCode}${this.currentRoomPassword ? ' (Protegida)' : ''}`;
     if (overlay) overlay.classList.remove('hidden');
   }
 
@@ -770,9 +774,9 @@ class App {
         this.currentRoomPassword = newPassword;
         this.updateRoomSecurityHeaderUI();
         if (newPassword) {
-          this.showToast(`🔒 A senha da sala foi atualizada por ${updatedBy}: "${newPassword}"`, 5000);
+          this.showToast(`A senha da sala foi atualizada por ${updatedBy}: "${newPassword}"`, 5000);
         } else {
-          this.showToast(`🔓 A sala agora é pública (sem senha) - atualizado por ${updatedBy}`, 5000);
+          this.showToast(`A sala agora é pública (sem senha) - atualizado por ${updatedBy}`, 5000);
         }
       },
     });
@@ -801,7 +805,7 @@ class App {
       chatContainer.innerHTML = `
         <div class="chat-welcome-notice">
           <span>Você entrou na sala <strong>${this.currentRoomCode}</strong>${
-        this.currentRoomPassword ? ' (🔒 com senha)' : ''
+        this.currentRoomPassword ? ' (com senha)' : ''
       }. Compartilhe o código para convidar amigos.</span>
         </div>
       `;
