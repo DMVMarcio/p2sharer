@@ -600,11 +600,20 @@ class App {
     if (selectBitrate) localStorage.setItem('p2sharer_default_bitrate', selectBitrate.value);
     if (checkCursor) localStorage.setItem('p2sharer_default_cursor', checkCursor.checked.toString());
 
-    if (checkTurn) localStorage.setItem('p2sharer_turn_enabled', checkTurn.checked.toString());
-    if (inputTurnUrl) localStorage.setItem('p2sharer_turn_url', inputTurnUrl.value.trim());
+    const isTurnChecked = checkTurn?.checked === true;
+    localStorage.setItem('p2sharer_turn_enabled', isTurnChecked ? 'true' : 'false');
+    
+    if (inputTurnUrl) {
+      let turnUrlVal = inputTurnUrl.value.trim();
+      if (turnUrlVal && !turnUrlVal.startsWith('turn:') && !turnUrlVal.startsWith('turns:') && !turnUrlVal.startsWith('stun:')) {
+        turnUrlVal = `turn:${turnUrlVal}`;
+        inputTurnUrl.value = turnUrlVal;
+      }
+      localStorage.setItem('p2sharer_turn_url', turnUrlVal);
+    }
     if (inputTurnUser) localStorage.setItem('p2sharer_turn_user', inputTurnUser.value.trim());
     if (inputTurnCred) localStorage.setItem('p2sharer_turn_cred', inputTurnCred.value.trim());
-    if (checkTurnRelay) localStorage.setItem('p2sharer_turn_force_relay', checkTurnRelay.checked.toString());
+    if (checkTurnRelay) localStorage.setItem('p2sharer_turn_force_relay', checkTurnRelay.checked ? 'true' : 'false');
 
     this.syncPickerModalDefaults();
     this.closeSettingsModal();
@@ -843,12 +852,21 @@ class App {
       }, 3500);
     }
 
+    const isTurnEnabled = localStorage.getItem('p2sharer_turn_enabled') === 'true';
+    const rawTurnUrl = (localStorage.getItem('p2sharer_turn_url') || '').trim();
+    let sanitizedTurnUrl: string | undefined = undefined;
+    if (isTurnEnabled && rawTurnUrl) {
+      sanitizedTurnUrl = (rawTurnUrl.startsWith('turn:') || rawTurnUrl.startsWith('turns:') || rawTurnUrl.startsWith('stun:'))
+        ? rawTurnUrl
+        : `turn:${rawTurnUrl}`;
+    }
+
     const turnConfig: TurnConfig = {
-      enabled: localStorage.getItem('p2sharer_turn_enabled') === 'true',
-      url: localStorage.getItem('p2sharer_turn_url') || undefined,
-      username: localStorage.getItem('p2sharer_turn_user') || undefined,
-      credential: localStorage.getItem('p2sharer_turn_cred') || undefined,
-      forceRelay: localStorage.getItem('p2sharer_turn_force_relay') === 'true',
+      enabled: isTurnEnabled && Boolean(sanitizedTurnUrl),
+      url: isTurnEnabled ? sanitizedTurnUrl : undefined,
+      username: isTurnEnabled ? (localStorage.getItem('p2sharer_turn_user') || undefined) : undefined,
+      credential: isTurnEnabled ? (localStorage.getItem('p2sharer_turn_cred') || undefined) : undefined,
+      forceRelay: isTurnEnabled && localStorage.getItem('p2sharer_turn_force_relay') === 'true',
     };
 
     this.roomManager = new GroupRoomManager(

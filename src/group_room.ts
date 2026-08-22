@@ -207,9 +207,16 @@ export class GroupRoomManager {
       { urls: 'stun:global.stun.twilio.com:3478' },
     ];
 
-    if (this.turnConfig?.enabled && this.turnConfig.url) {
+    if (this.turnConfig?.enabled && this.turnConfig.url && this.turnConfig.url.trim()) {
+      let turnUrl = this.turnConfig.url.trim();
+      if (!turnUrl.startsWith('turn:') && !turnUrl.startsWith('turns:') && !turnUrl.startsWith('stun:')) {
+        turnUrl = `turn:${turnUrl}`;
+      }
+
+      console.log(`[P2P] Custom TURN relay enabled: "${turnUrl}" (Force Relay: ${Boolean(this.turnConfig.forceRelay)})`);
+
       const customTurn: RTCIceServer = {
-        urls: this.turnConfig.url.trim(),
+        urls: turnUrl,
       };
       if (this.turnConfig.username) {
         customTurn.username = this.turnConfig.username.trim();
@@ -218,11 +225,13 @@ export class GroupRoomManager {
         customTurn.credential = this.turnConfig.credential.trim();
       }
       iceServers.unshift(customTurn);
+    } else {
+      console.log('[P2P] Custom TURN relay is disabled. Using public Google & Twilio STUN servers.');
     }
 
     const rtcConfig: RTCConfiguration = {
       iceServers,
-      iceTransportPolicy: this.turnConfig?.forceRelay ? 'relay' : 'all',
+      iceTransportPolicy: this.turnConfig?.enabled && this.turnConfig?.forceRelay ? 'relay' : 'all',
     };
 
     const relayConfig = {
