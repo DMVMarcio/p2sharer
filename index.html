@@ -338,13 +338,19 @@
               </div>
 
               <div class="settings-row">
-                <label class="picker-checkbox-label">
-                  <input type="checkbox" id="settings-check-sfx-enabled" checked />
-                  <span>Ativar efeitos sonoros da aplicação</span>
+                <label class="settings-switch-row" for="settings-check-sfx-enabled">
+                  <div class="settings-switch-label-group">
+                    <span class="settings-switch-title">Efeitos Sonoros</span>
+                    <span class="settings-switch-subtitle">Ativar notificações sonoras para eventos da sala e transmissões</span>
+                  </div>
+                  <div class="modern-switch">
+                    <input type="checkbox" id="settings-check-sfx-enabled" checked />
+                    <span class="switch-slider"></span>
+                  </div>
                 </label>
               </div>
 
-              <div class="settings-row" id="settings-sfx-volume-row" style="margin-top: 10px;">
+              <div class="settings-row" id="settings-sfx-volume-row" style="margin-top: 12px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                   <label class="settings-label" for="settings-slider-sfx-volume" style="margin-bottom: 0;">Volume dos Efeitos:</label>
                   <span id="settings-sfx-volume-label" style="font-size: 13px; font-weight: 700; font-family: var(--font-mono); color: var(--accent-color);">60%</span>
@@ -421,9 +427,15 @@
               </div>
 
               <div class="settings-row" style="margin-top: 14px;">
-                <label class="picker-checkbox-label">
-                  <input type="checkbox" id="settings-check-cursor" checked />
-                  <span>Exibir cursor do mouse por padrão na captura</span>
+                <label class="settings-switch-row" for="settings-check-cursor">
+                  <div class="settings-switch-label-group">
+                    <span class="settings-switch-title">Captura do Cursor do Mouse</span>
+                    <span class="settings-switch-subtitle">Exibir o cursor do mouse por padrão ao iniciar uma transmissão</span>
+                  </div>
+                  <div class="modern-switch">
+                    <input type="checkbox" id="settings-check-cursor" checked />
+                    <span class="switch-slider"></span>
+                  </div>
                 </label>
               </div>
             </div>
@@ -436,9 +448,15 @@
               </div>
 
               <div class="settings-row">
-                <label class="picker-checkbox-label">
-                  <input type="checkbox" id="settings-enable-turn" />
-                  <span>Ativar Servidor TURN / Proxy de IP Personalizado</span>
+                <label class="settings-switch-row" for="settings-enable-turn">
+                  <div class="settings-switch-label-group">
+                    <span class="settings-switch-title">Servidor TURN / Proxy de IP</span>
+                    <span class="settings-switch-subtitle">Encaminhar conexões por um servidor relay para proteger seu IP residencial</span>
+                  </div>
+                  <div class="modern-switch">
+                    <input type="checkbox" id="settings-enable-turn" />
+                    <span class="switch-slider"></span>
+                  </div>
                 </label>
               </div>
 
@@ -460,9 +478,15 @@
                 </div>
 
                 <div class="settings-row" style="margin-top: 8px;">
-                  <label class="picker-checkbox-label">
-                    <input type="checkbox" id="settings-turn-force-relay" />
-                    <span>Forçar Relay (100% Oculto)</span>
+                  <label class="settings-switch-row" for="settings-turn-force-relay">
+                    <div class="settings-switch-label-group">
+                      <span class="settings-switch-title">Forçar Modo Relay</span>
+                      <span class="settings-switch-subtitle">Desativa conexões P2P diretas e força 100% do tráfego pelo servidor TURN</span>
+                    </div>
+                    <div class="modern-switch">
+                      <input type="checkbox" id="settings-turn-force-relay" />
+                      <span class="switch-slider"></span>
+                    </div>
                   </label>
                 </div>
               </div>
