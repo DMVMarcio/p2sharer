@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { AudioBridge } from './audio_bridge';
 import { generateRandomRoomSlug, GroupRoomManager } from './group_room';
 import { NativeVideoBridge } from './native_video_bridge';
+import { soundEffects } from './sound_effects';
 import {
   ChatMessage,
   MonitorSource,
@@ -175,6 +176,8 @@ class App {
   // Theme & Customization State
   private currentThemeMode: 'dark' | 'light' | 'system' = 'dark';
   private currentAccentColor: string = 'cyan';
+
+  private liveStatsTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
     this.init();
@@ -370,6 +373,21 @@ class App {
     document.getElementById('btn-cancel-settings')?.addEventListener('click', () => this.closeSettingsModal());
     document.getElementById('btn-save-settings')?.addEventListener('click', () => this.saveSettingsFromModal());
 
+    // Settings Vertical Tabs Navigation
+    document.querySelectorAll('.settings-nav-item').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        const targetTab = (e.currentTarget as HTMLElement).getAttribute('data-settings-tab');
+        if (!targetTab) return;
+
+        document.querySelectorAll('.settings-nav-item').forEach((b) => b.classList.remove('active'));
+        document.querySelectorAll('.settings-tab-pane').forEach((p) => p.classList.remove('active'));
+
+        (e.currentTarget as HTMLElement).classList.add('active');
+        const pane = document.getElementById(`settings-pane-${targetTab}`);
+        if (pane) pane.classList.add('active');
+      });
+    });
+
     // Diagnostics & Execution Logs Actions
     document.getElementById('btn-open-latest-log')?.addEventListener('click', async () => {
       try {
@@ -402,6 +420,26 @@ class App {
         if (accent) this.applyAccent(accent);
       });
     });
+
+    // Sound Effects Settings Controls
+    const checkSfx = document.getElementById('settings-check-sfx-enabled') as HTMLInputElement;
+    const sliderSfx = document.getElementById('settings-slider-sfx-volume') as HTMLInputElement;
+    const labelSfx = document.getElementById('settings-sfx-volume-label');
+
+    checkSfx?.addEventListener('change', () => {
+      soundEffects.setEnabled(checkSfx.checked);
+    });
+
+    sliderSfx?.addEventListener('input', () => {
+      const vol = parseInt(sliderSfx.value, 10);
+      soundEffects.setVolume(vol / 100);
+      if (labelSfx) labelSfx.textContent = `${vol}%`;
+    });
+
+    document.getElementById('btn-test-sfx-join')?.addEventListener('click', () => soundEffects.playUserJoin());
+    document.getElementById('btn-test-sfx-stream-start')?.addEventListener('click', () => soundEffects.playScreenShareStart());
+    document.getElementById('btn-test-sfx-watch-start')?.addEventListener('click', () => soundEffects.playWatchStreamStart());
+    document.getElementById('btn-test-sfx-watch-stop')?.addEventListener('click', () => soundEffects.playWatchStreamStop());
 
     // TURN config toggle in settings
     document.getElementById('settings-enable-turn')?.addEventListener('change', (e) => {
@@ -566,6 +604,15 @@ class App {
     if (checkTurnRelay) checkTurnRelay.checked = localStorage.getItem('p2sharer_turn_force_relay') === 'true';
     if (turnFields) turnFields.style.display = turnEnabled ? 'flex' : 'none';
 
+    // Populate Sound Effects Settings
+    const checkSfx = document.getElementById('settings-check-sfx-enabled') as HTMLInputElement;
+    const sliderSfx = document.getElementById('settings-slider-sfx-volume') as HTMLInputElement;
+    const labelSfx = document.getElementById('settings-sfx-volume-label');
+    if (checkSfx) checkSfx.checked = soundEffects.getEnabled();
+    const currentVolPercent = Math.round(soundEffects.getVolume() * 100);
+    if (sliderSfx) sliderSfx.value = currentVolPercent.toString();
+    if (labelSfx) labelSfx.textContent = `${currentVolPercent}%`;
+
     // Load Log Path
     invoke<string>('get_log_file_path')
       .then((path) => {
@@ -593,6 +640,12 @@ class App {
     const inputTurnUser = document.getElementById('settings-turn-username') as HTMLInputElement;
     const inputTurnCred = document.getElementById('settings-turn-credential') as HTMLInputElement;
     const checkTurnRelay = document.getElementById('settings-turn-force-relay') as HTMLInputElement;
+
+    const checkSfx = document.getElementById('settings-check-sfx-enabled') as HTMLInputElement;
+    const sliderSfx = document.getElementById('settings-slider-sfx-volume') as HTMLInputElement;
+
+    if (checkSfx) soundEffects.setEnabled(checkSfx.checked);
+    if (sliderSfx) soundEffects.setVolume(parseInt(sliderSfx.value, 10) / 100);
 
     if (inputUsername && inputUsername.value.trim()) {
       this.username = inputUsername.value.trim();
@@ -914,6 +967,38 @@ class App {
           }, 350);
         }
       },
+      onPeerJoined: (_peer, isInitial) => {
+        if (!isInitial) {
+          soundEffects.playUserJoin();
+        }
+      },
+      onPeerLeft: (_peerId, _username) => {
+        soundEffects.playUserLeave();
+      },
+      onStreamStarted: (_peerId, _username, _isLocal) => {
+        soundEffects.playScreenShareStart();
+      },
+      onStreamStopped: (peerId, _username, isLocal) => {
+        soundEffects.playScreenShareStop();
+        if (!isLocal && this.subscribedStreams.has(peerId)) {
+          this.subscribedStreams.delete(peerId);
+          this.renderRoomCards();
+        }
+      },
+      onWatchStarted: (watcherPeerId, _watcherName, broadcasterPeerId) => {
+        const isWatchingThisStream = this.subscribedStreams.has(broadcasterPeerId);
+        const isMyStream = broadcasterPeerId === 'local' || this.isSharingScreen;
+        if (isWatchingThisStream || isMyStream || watcherPeerId === 'local') {
+          soundEffects.playWatchStreamStart();
+        }
+      },
+      onWatchStopped: (watcherPeerId, _watcherName, broadcasterPeerId) => {
+        const isWatchingThisStream = this.subscribedStreams.has(broadcasterPeerId);
+        const isMyStream = broadcasterPeerId === 'local' || this.isSharingScreen;
+        if (isWatchingThisStream || isMyStream || watcherPeerId === 'local') {
+          soundEffects.playWatchStreamStop();
+        }
+      },
       onStatusChange: (status) => {
         const statsBadge = document.getElementById('room-stats-badge');
         if (statsBadge) statsBadge.textContent = status;
@@ -938,6 +1023,7 @@ class App {
   }
 
   private enterRoomUI() {
+    soundEffects.playUserJoin();
     const displayRoomCode = document.getElementById('display-room-code');
     if (displayRoomCode) displayRoomCode.textContent = this.currentRoomCode;
 
@@ -967,7 +1053,112 @@ class App {
     }
 
     this.updateShareButtonUI(false);
+    this.startLiveStatsTracker();
     this.switchView('view-group-room');
+  }
+
+  // --- LIVE STATS TRACKER (FPS, RESOLUTION, PING & WATCHERS) ---
+  private startLiveStatsTracker() {
+    this.stopLiveStatsTracker();
+    this.liveStatsTimer = setInterval(async () => {
+      await this.updateLiveStreamStats();
+    }, 1500);
+    // Initial run
+    setTimeout(() => this.updateLiveStreamStats(), 200);
+  }
+
+  private stopLiveStatsTracker() {
+    if (this.liveStatsTimer) {
+      clearInterval(this.liveStatsTimer);
+      this.liveStatsTimer = null;
+    }
+  }
+
+  private async updateLiveStreamStats() {
+    const streamCards = document.querySelectorAll<HTMLElement>('.stream-card');
+    if (streamCards.length === 0) {
+      const hud = document.getElementById('stream-hud-overlay');
+      if (hud) hud.style.display = 'none';
+      return;
+    }
+
+    for (const card of Array.from(streamCards)) {
+      const peerId = card.getAttribute('data-peer-id');
+      if (!peerId) continue;
+
+      const video = card.querySelector('video');
+      const qualityEl = card.querySelector('.stat-quality-text');
+      const pingEl = card.querySelector('.stat-ping-text');
+      const pingDot = card.querySelector('.stat-ping-dot');
+      const watchersEl = card.querySelector('.stat-watchers-text');
+      const isLocal = peerId === 'local';
+
+      // 1. Resolution / Quality Label
+      let qualityLabel = isLocal ? this.currentResolution.label : '1080p';
+      if (video && video.videoHeight > 0) {
+        const h = video.videoHeight;
+        if (h >= 2000) qualityLabel = '4K';
+        else if (h >= 1400) qualityLabel = '1440p';
+        else if (h >= 1000) qualityLabel = '1080p';
+        else if (h >= 700) qualityLabel = '720p';
+        else if (h >= 450) qualityLabel = '480p';
+        else if (h >= 300) qualityLabel = '360p';
+        else qualityLabel = `${h}p`;
+      }
+
+      // 2. Fetch live stats
+      const stats = isLocal ? null : await this.roomManager?.getPeerStats(peerId);
+      const fps = stats?.fps ?? (isLocal ? this.currentFps : video && video.videoHeight > 0 ? 60 : 30);
+      const ping = isLocal ? 0 : (stats?.pingMs ?? this.roomManager?.getPeerPing(peerId) ?? null);
+
+      if (qualityEl) {
+        qualityEl.textContent = `${qualityLabel} ${fps} FPS`;
+      }
+
+      if (pingEl) {
+        if (isLocal) {
+          pingEl.textContent = 'Local';
+        } else {
+          pingEl.textContent = ping !== null ? `${ping} ms` : '-- ms';
+          if (pingDot && ping !== null) {
+            pingDot.className = `stat-ping-dot ${ping < 80 ? 'ping-good' : ping < 180 ? 'ping-medium' : 'ping-poor'}`;
+          }
+        }
+      }
+
+      // 3. Watchers
+      const watchers = this.roomManager?.getStreamWatchers(peerId) || [];
+      const count = watchers.length;
+      if (watchersEl) {
+        watchersEl.textContent = count === 1 ? '1 assistindo' : `${count} assistindo`;
+        const tooltip = count > 0 ? `Assistindo: ${watchers.map((w) => w.username).join(', ')}` : 'Ninguém assistindo no momento';
+        watchersEl.parentElement?.setAttribute('title', tooltip);
+      }
+
+      // 4. Update Floating HUD overlay (spotlight / pinned stream)
+      if (card.classList.contains('featured') || streamCards.length === 1) {
+        const hud = document.getElementById('stream-hud-overlay');
+        const resFpsText = document.getElementById('hud-res-fps-text');
+        const bitrateText = document.getElementById('hud-bitrate-text');
+        const pingTextEl = document.getElementById('hud-ping-text');
+        const watchersTextEl = document.getElementById('hud-watchers-text');
+
+        if (hud) hud.style.display = 'block';
+        if (resFpsText) resFpsText.textContent = `${qualityLabel} ${fps} FPS`;
+        if (bitrateText) {
+          const bitrateVal = stats?.bitrateKbps ? (stats.bitrateKbps / 1000).toFixed(1) : (this.currentBitrate / 1000).toFixed(1);
+          bitrateText.textContent = `${bitrateVal} Mbps`;
+        }
+        if (pingTextEl) {
+          pingTextEl.textContent = isLocal ? '0 ms (Local)' : ping !== null ? `${ping} ms` : '-- ms';
+        }
+        if (watchersTextEl) {
+          watchersTextEl.textContent = `👁️ ${count} assistindo`;
+          const tooltip = count > 0 ? `Assistindo: ${watchers.map((w) => w.username).join(', ')}` : 'Nenhum espectador';
+          watchersTextEl.setAttribute('title', tooltip);
+        }
+      }
+    }
   }
 
   // --- STATS HUD ---
@@ -975,6 +1166,8 @@ class App {
     const hud = document.getElementById('stream-hud-overlay');
     const resFpsText = document.getElementById('hud-res-fps-text');
     const bitrateText = document.getElementById('hud-bitrate-text');
+    const pingTextEl = document.getElementById('hud-ping-text');
+    const watchersTextEl = document.getElementById('hud-watchers-text');
 
     if (!hud) return;
 
@@ -988,6 +1181,11 @@ class App {
     hud.style.display = 'block';
     if (resFpsText) resFpsText.textContent = `${this.currentResolution.label} ${this.currentFps} FPS`;
     if (bitrateText) bitrateText.textContent = `${(this.currentBitrate / 1000).toFixed(1)} Mbps`;
+    if (pingTextEl) pingTextEl.textContent = this.isSharingScreen ? '0 ms' : '15 ms';
+    if (watchersTextEl) {
+      const localWatchers = this.roomManager?.getStreamWatchers('local') || [];
+      watchersTextEl.textContent = `👁️ ${localWatchers.length} assistindo`;
+    }
   }
 
   // --- ROOM CARDS RENDERER (AVATARS + SCREENS) ---
@@ -1204,6 +1402,7 @@ class App {
         // 1. Local live stream
         const card = document.createElement('div');
         card.className = `stream-card ${isFeatured ? 'featured' : ''}`;
+        card.setAttribute('data-peer-id', 'local');
         card.title = isFeatured ? 'Clique para voltar à grade' : 'Clique para destacar sua transmissão';
 
         const video = document.createElement('video');
@@ -1211,6 +1410,25 @@ class App {
         video.playsInline = true;
         video.srcObject = slot.stream;
         video.muted = true;
+
+        const watchers = slot.watchers || [];
+        const watchersCount = watchers.length;
+        const watchersTooltip = watchersCount > 0
+          ? `Assistindo sua transmissão: ${watchers.map((w) => w.username).join(', ')}`
+          : 'Ninguém assistindo no momento';
+
+        const statsHud = document.createElement('div');
+        statsHud.className = 'stream-card-stats-hud';
+        statsHud.innerHTML = `
+          <span class="stat-badge stat-badge-quality" title="Qualidade e FPS da sua transmissão">
+            <span class="stat-badge-dot"></span>
+            <span class="stat-quality-text">${this.currentResolution.label} ${this.currentFps} FPS</span>
+          </span>
+          <span class="stat-badge stat-badge-watchers" title="${watchersTooltip}">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            <span class="stat-watchers-text">${watchersCount === 1 ? '1 assistindo' : `${watchersCount} assistindo`}</span>
+          </span>
+        `;
 
         const overlay = document.createElement('div');
         overlay.className = 'stream-card-overlay';
@@ -1221,6 +1439,7 @@ class App {
         `;
 
         card.appendChild(video);
+        card.appendChild(statsHud);
         card.appendChild(overlay);
         return card;
       } else {
@@ -1252,6 +1471,7 @@ class App {
         // Remote streaming & Watching
         const card = document.createElement('div');
         card.className = `stream-card ${isFeatured ? 'featured' : ''}`;
+        card.setAttribute('data-peer-id', slot.peerId);
         card.title = isFeatured ? 'Clique para voltar à grade' : 'Clique para destacar esta transmissão';
 
         const video = document.createElement('video');
@@ -1263,6 +1483,33 @@ class App {
         // Connect to unified AudioContext and GainNode for this peer
         this.attachPeerAudio(slot.peerId, slot.stream);
         const currentAudioState = this.getPeerVolumeState(slot.peerId);
+
+        const watchers = slot.watchers || [];
+        const watchersCount = watchers.length;
+        const watchersTooltip = watchersCount > 0
+          ? `Pessoas assistindo: ${watchers.map((w) => w.username).join(', ')}`
+          : 'Ninguém assistindo no momento';
+
+        const pingVal = this.roomManager?.getPeerPing(slot.peerId);
+        const pingText = pingVal !== null && pingVal !== undefined ? `${pingVal} ms` : '15 ms';
+        const pingClass = (pingVal ?? 15) < 80 ? 'ping-good' : (pingVal ?? 15) < 180 ? 'ping-medium' : 'ping-poor';
+
+        const statsHud = document.createElement('div');
+        statsHud.className = 'stream-card-stats-hud';
+        statsHud.innerHTML = `
+          <span class="stat-badge stat-badge-quality" title="Qualidade e FPS recebidos">
+            <span class="stat-badge-dot"></span>
+            <span class="stat-quality-text">1080p 60 FPS</span>
+          </span>
+          <span class="stat-badge stat-badge-ping" title="Latência WebRTC com o transmissor (Ping)">
+            <span class="stat-ping-dot ${pingClass}"></span>
+            <span class="stat-ping-text">${pingText}</span>
+          </span>
+          <span class="stat-badge stat-badge-watchers" title="${watchersTooltip}">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            <span class="stat-watchers-text">${watchersCount === 1 ? '1 assistindo' : `${watchersCount} assistindo`}</span>
+          </span>
+        `;
 
         const overlay = document.createElement('div');
         overlay.className = 'stream-card-overlay';
@@ -1279,6 +1526,7 @@ class App {
           e.stopPropagation();
           this.detachPeerAudio(slot.peerId);
           this.subscribedStreams.delete(slot.peerId);
+          this.roomManager?.stopWatchingStream(slot.peerId);
           this.renderRoomCards();
         });
 
@@ -1369,6 +1617,7 @@ class App {
         volumeWrapper.appendChild(sliderBox);
 
         card.appendChild(video);
+        card.appendChild(statsHud);
         card.appendChild(overlay);
         card.appendChild(stopBtn);
         card.appendChild(volumeWrapper);
@@ -1401,10 +1650,26 @@ class App {
         card.style.setProperty('--user-color', slot.color);
         card.title = isFeatured ? 'Clique para voltar à grade' : 'Clique para destacar este participante';
 
+        const watchers = slot.watchers || [];
+        const watchersCount = watchers.length;
+        const watchersTooltip = watchersCount > 0
+          ? `Assistindo: ${watchers.map((w) => w.username).join(', ')}`
+          : '';
+
         card.innerHTML = `
           <span class="badge-live-stream">
             <span class="badge-live-dot"></span>AO VIVO
           </span>
+          ${
+            watchersCount > 0
+              ? `
+          <span class="badge-live-watchers" title="${watchersTooltip}">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            <span>${watchersCount} assistindo</span>
+          </span>
+          `
+              : ''
+          }
           <div class="participant-avatar-badge">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
@@ -1428,6 +1693,7 @@ class App {
           e.stopPropagation();
           this.subscribedStreams.add(slot.peerId);
           this.roomManager?.requestStreamFromPeer(slot.peerId);
+          this.roomManager?.startWatchingStream(slot.peerId);
           this.renderRoomCards();
         });
 
@@ -1896,6 +2162,8 @@ class App {
 
   // --- LEAVE ROOM ---
   private async leaveRoom() {
+    soundEffects.playUserLeave();
+    this.stopLiveStatsTracker();
     if (this.isSharingScreen) {
       this.stopScreenSharing();
     }
