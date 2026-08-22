@@ -2289,4 +2289,104 @@ body {
   color: #ffffff !important;
 }
 
+/* ==========================================================================
+   MODERN SWITCH TOGGLE COMPONENT (SETTINGS)
+   ========================================================================== */
+
+.settings-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 14px;
+  background-color: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  user-select: none;
+  transition: all var(--transition-fast);
+}
+
+.settings-switch-row:hover {
+  background-color: var(--bg-surface-hover);
+  border-color: var(--border-default);
+}
+
+.settings-switch-label-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.settings-switch-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.settings-switch-subtitle {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+.modern-switch {
+  position: relative;
+  display: inline-block;
+  width: 42px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.modern-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.switch-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+  border-radius: var(--radius-full);
+}
+
+.switch-slider::before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #ffffff;
+  transition: transform var(--transition-fast), background-color var(--transition-fast);
+  border-radius: 50%;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+}
+
+.modern-switch input:checked + .switch-slider {
+  background-color: var(--accent-color, #06b6d4);
+  border-color: var(--accent-color, #06b6d4);
+  box-shadow: 0 0 12px var(--accent-glow, rgba(6, 182, 212, 0.35));
+}
+
+.modern-switch input:focus-visible + .switch-slider {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+.modern-switch input:checked + .switch-slider::before {
+  transform: translateX(18px);
+  background-color: #ffffff;
+}
+
 
