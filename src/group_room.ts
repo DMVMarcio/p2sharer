@@ -143,20 +143,34 @@ function ensureSDPHooked() {
   };
 }
 
+interface PeerExchangeItem {
+  peerId: string;
+  username: string;
+  isStreaming: boolean;
+  isCreator: boolean;
+  joinedAt: number;
+}
+
 export class GroupRoomManager {
   private username: string;
   private roomId: string;
   private password: string = '';
   private isCreator: boolean;
+  private myJoinedAt: number = Date.now();
   private turnConfig: TurnConfig | null = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private room: any = null;
   private localStream: MediaStream | null = null;
+
   private peers: Map<string, string> = new Map(); // peerId -> username
   private peerLastSeen: Map<string, number> = new Map(); // peerId -> timestamp
+  private peerJoinedAt: Map<string, number> = new Map(); // peerId -> join timestamp
+  private peerIsCreator: Map<string, boolean> = new Map(); // peerId -> isCreator
   private streamingPeers: Set<string> = new Set(); // peerId set of who is broadcasting
   private remoteStreams: Map<string, MediaStream> = new Map(); // peerId -> stream
   private chatHistory: ChatMessage[] = [];
+  private seenChatMsgIds: Set<string> = new Set();
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private chatAction: any = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -171,6 +185,10 @@ export class GroupRoomManager {
   private leaveAction: any = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private passwordAction: any = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private pexAction: any = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private meshRelayAction: any = null;
 
   private callbacks: RoomCallbacks | null = null;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
@@ -183,6 +201,7 @@ export class GroupRoomManager {
     this.roomId = roomId.trim();
     this.password = password.trim();
     this.isCreator = isCreator;
+    this.myJoinedAt = Date.now();
     this.turnConfig = turnConfig || null;
     ensureSDPHooked();
   }
@@ -193,6 +212,52 @@ export class GroupRoomManager {
 
   public getPassword(): string {
     return this.password;
+  }
+
+  public isRoomHost(): boolean {
+    if (this.isCreator) return true;
+    let hasCreatorPeer = false;
+    this.peerIsCreator.forEach((isCr) => {
+      if (isCr) hasCreatorPeer = true;
+    });
+    if (hasCreatorPeer) return false;
+
+    // Deterministic leader election: Lowest joinedAt timestamp, or lowest peerId
+    let oldestPeerId = selfId;
+    let oldestJoin = this.myJoinedAt;
+
+    this.peerJoinedAt.forEach((joinedAt, peerId) => {
+      if (joinedAt < oldestJoin || (joinedAt === oldestJoin && peerId < oldestPeerId)) {
+        oldestJoin = joinedAt;
+        oldestPeerId = peerId;
+      }
+    });
+
+    return oldestPeerId === selfId;
+  }
+
+  private getPeersPayload(): PeerExchangeItem[] {
+    const list: PeerExchangeItem[] = [
+      {
+        peerId: selfId,
+        username: this.username,
+        isStreaming: Boolean(this.localStream),
+        isCreator: this.isCreator,
+        joinedAt: this.myJoinedAt,
+      },
+    ];
+
+    this.peers.forEach((uname, pId) => {
+      list.push({
+        peerId: pId,
+        username: uname,
+        isStreaming: this.streamingPeers.has(pId),
+        isCreator: Boolean(this.peerIsCreator.get(pId)),
+        joinedAt: this.peerJoinedAt.get(pId) || Date.now(),
+      });
+    });
+
+    return list;
   }
 
   public async join(callbacks: RoomCallbacks) {
@@ -234,10 +299,13 @@ export class GroupRoomManager {
       iceTransportPolicy: this.turnConfig?.enabled && this.turnConfig?.forceRelay ? 'relay' : 'all',
     };
 
+    // Redundant fast public WebSocket MQTT brokers
     const relayConfig = {
       urls: [
         'wss://broker.emqx.io:8084/mqtt',
         'wss://broker.hivemq.com:8884/mqtt',
+        'wss://test.mosquitto.org:8081/mqtt',
+        'wss://public.cloud.shiftr.io',
       ],
     };
 
@@ -246,7 +314,6 @@ export class GroupRoomManager {
       const signalingTopic = await computeSignalingRoomId(this.roomId, this.password);
       console.log(`[P2P] Computed signaling topic: "${signalingTopic}"`);
 
-      console.log(`[P2P] Initializing joinRoom for appId "${APP_ID}" with relays:`, relayConfig.urls);
       this.room = joinRoom(
         {
           appId: APP_ID,
@@ -268,13 +335,26 @@ export class GroupRoomManager {
         }
       };
 
-      // 1. Setup Chat Action
+      // 1. Setup Chat Action with In-Mesh Forwarding & Deduplication
       this.chatAction = this.room.makeAction('chat');
       this.chatAction.onMessage = (msg: ChatMessage) => {
+        if (!msg || !msg.id) return;
+        if (this.seenChatMsgIds.has(msg.id)) return;
+        this.seenChatMsgIds.add(msg.id);
+        if (this.seenChatMsgIds.size > 500) {
+          const firstKey = this.seenChatMsgIds.values().next().value;
+          if (firstKey) this.seenChatMsgIds.delete(firstKey);
+        }
+
         this.chatHistory.push(msg);
         if (this.callbacks) {
           this.callbacks.onChat(msg);
         }
+
+        // Mesh forward to ensure 100% room delivery across all peers
+        try {
+          this.chatAction.send(msg);
+        } catch {}
       };
 
       // 2. Setup Chat History Sync Action (P2P pull from host / peers)
@@ -282,15 +362,14 @@ export class GroupRoomManager {
       this.historyAction.onMessage = (data: { request?: boolean; history?: ChatMessage[] }, meta: { peerId: string }) => {
         const peerId = meta.peerId;
         if (data.request) {
-          // Send my history back to the requesting peer
           if (this.chatHistory.length > 0) {
             this.historyAction.send({ history: this.chatHistory }, { target: peerId });
           }
         } else if (data.history && Array.isArray(data.history) && data.history.length > 0) {
-          // Merge history without duplicates
           const existingIds = new Set(this.chatHistory.map((m) => m.id));
           const newMessages = data.history.filter((m) => !existingIds.has(m.id));
           if (newMessages.length > 0) {
+            newMessages.forEach((m) => this.seenChatMsgIds.add(m.id));
             this.chatHistory = [...this.chatHistory, ...newMessages].sort((a, b) => a.timestamp - b.timestamp);
             if (this.callbacks) {
               this.callbacks.onChatHistory(this.chatHistory);
@@ -299,14 +378,16 @@ export class GroupRoomManager {
         }
       };
 
-      // 3. Setup Presence Action (Exchange usernames & broadcast status)
+      // 3. Setup Presence Action (Exchange usernames, host status & broadcast stream state)
       this.presenceAction = this.room.makeAction('presence');
       this.presenceAction.onMessage = (
-        data: { username: string; isCreator?: boolean; isStreaming?: boolean },
+        data: { username: string; isCreator?: boolean; isStreaming?: boolean; joinedAt?: number },
         meta: { peerId: string }
       ) => {
         const peerId = meta.peerId;
         this.peerLastSeen.set(peerId, Date.now());
+        if (data.joinedAt) this.peerJoinedAt.set(peerId, data.joinedAt);
+        if (data.isCreator !== undefined) this.peerIsCreator.set(peerId, Boolean(data.isCreator));
 
         const oldName = this.peers.get(peerId);
         const newName = data.username || `Usuário (${peerId.slice(0, 4)})`;
@@ -364,23 +445,96 @@ export class GroupRoomManager {
 
       // 6. Setup Explicit Peer Leave Action (Instant ghost peer elimination)
       this.leaveAction = this.room.makeAction('peer_leave');
-      this.leaveAction.onMessage = (_data: unknown, meta: { peerId: string }) => {
-        const peerId = meta.peerId;
-        console.log(`[P2P] Received explicit leave notice from peer ${peerId}`);
-        this.removePeer(peerId);
+      this.leaveAction.onMessage = (data: { peerId?: string } | unknown, meta: { peerId: string }) => {
+        const payloadPid = (data as { peerId?: string })?.peerId;
+        const targetPid = payloadPid || meta.peerId;
+        console.log(`[P2P] Received explicit leave notice for peer ${targetPid}`);
+        this.removePeer(targetPid);
       };
 
-      // 7. Peer Lifecycle Listeners
+      // 7. Setup Peer Exchange (PEX) - Resolves split-mesh & peer invisibility!
+      this.pexAction = this.room.makeAction('peer_exchange');
+      this.pexAction.onMessage = (data: { peers?: PeerExchangeItem[] }, meta: { peerId: string }) => {
+        if (!data || !Array.isArray(data.peers)) return;
+        this.peerLastSeen.set(meta.peerId, Date.now());
+
+        let changed = false;
+        data.peers.forEach((p) => {
+          if (p.peerId && p.peerId !== selfId) {
+            this.peerLastSeen.set(p.peerId, Date.now());
+            if (p.joinedAt) this.peerJoinedAt.set(p.peerId, p.joinedAt);
+            if (p.isCreator !== undefined) this.peerIsCreator.set(p.peerId, Boolean(p.isCreator));
+
+            if (!this.peers.has(p.peerId)) {
+              this.peers.set(p.peerId, p.username || `Participante (${p.peerId.slice(0, 4)})`);
+              changed = true;
+              console.log(`[P2P/PEX] Discovered new peer via mesh bridge (${meta.peerId}): ${p.peerId} (${p.username})`);
+            }
+
+            if (p.isStreaming && !this.streamingPeers.has(p.peerId)) {
+              this.streamingPeers.add(p.peerId);
+              changed = true;
+            } else if (!p.isStreaming && this.streamingPeers.has(p.peerId)) {
+              this.streamingPeers.delete(p.peerId);
+              changed = true;
+            }
+          }
+        });
+
+        if (changed) {
+          this.notifyPeersUpdate();
+          this.notifyStreamsUpdate();
+        }
+      };
+
+      // 8. Setup In-Mesh Signaling Relay (Forwarding messages between unbridged peers)
+      this.meshRelayAction = this.room.makeAction('mesh_relay');
+      this.meshRelayAction.onMessage = (
+        data: { target: string; origin: string; kind: string; payload: any },
+        meta: { peerId: string }
+      ) => {
+        if (!data) return;
+        this.peerLastSeen.set(meta.peerId, Date.now());
+
+        if (data.target === selfId || data.target === 'all') {
+          // Process message targeted to self
+          if (data.kind === 'stream_req' && this.localStream) {
+            this.sendStreamToPeer(data.origin);
+          } else if (data.kind === 'peer_leave') {
+            this.removePeer(data.origin);
+          }
+        } else if (data.target && this.peers.has(data.target)) {
+          // Act as mesh relay! Forward to target peer
+          try {
+            this.meshRelayAction.send(data, { target: data.target });
+          } catch {}
+        }
+      };
+
+      // 9. Peer Lifecycle Listeners
       this.room.onPeerJoin = (peerId: string) => {
-        console.log(`[P2P] Peer joined room: ${peerId}`);
+        console.log(`[P2P] Direct WebRTC peer connection active: ${peerId}`);
         this.peerLastSeen.set(peerId, Date.now());
-        
+        if (!this.peerJoinedAt.has(peerId)) {
+          this.peerJoinedAt.set(peerId, Date.now());
+        }
+
         // Send presence immediately to new peer
         if (this.presenceAction) {
           this.presenceAction.send(
-            { username: this.username, isCreator: this.isCreator, isStreaming: Boolean(this.localStream) },
+            {
+              username: this.username,
+              isCreator: this.isCreator,
+              isStreaming: Boolean(this.localStream),
+              joinedAt: this.myJoinedAt,
+            },
             { target: peerId }
           );
+        }
+
+        // Share known peers via PEX immediately to bridge mesh
+        if (this.pexAction) {
+          this.pexAction.send({ peers: this.getPeersPayload() }, { target: peerId });
         }
 
         // If I am already sharing a stream, broadcast it to the new peer with burst bitrate
@@ -388,7 +542,10 @@ export class GroupRoomManager {
           this.sendStreamToPeer(peerId);
         }
 
-        this.peers.set(peerId, `Conectado (${peerId.slice(0, 4)})`);
+        if (!this.peers.has(peerId)) {
+          this.peers.set(peerId, `Conectado (${peerId.slice(0, 4)})`);
+        }
+
         this.notifyPeersUpdate();
         this.notifyStreamsUpdate();
         callbacks.onStatusChange(this.turnConfig?.forceRelay ? 'P2P (Relay Seguro)' : 'P2P Conectado');
@@ -399,7 +556,7 @@ export class GroupRoomManager {
         this.removePeer(peerId);
       };
 
-      // 8. Incoming Stream Listener
+      // 10. Incoming Stream Listener
       this.room.onPeerStream = (stream: MediaStream, peerId: string) => {
         console.log(`[P2P] Received stream from peer: ${peerId}`);
         this.peerLastSeen.set(peerId, Date.now());
@@ -417,7 +574,7 @@ export class GroupRoomManager {
           };
         });
 
-        // Eliminate Chromium receiver jitter buffer delay for true real-time P2P (Discord/TeamSpeak level)
+        // Eliminate Chromium receiver jitter buffer delay for true real-time P2P
         try {
           const peers = this.room?.getPeers?.() || {};
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -437,7 +594,7 @@ export class GroupRoomManager {
         callbacks.onStatusChange('Ao Vivo');
       };
 
-      // 9. Continuous presence heartbeat & Ghost Peer Pruner (every 2.5s)
+      // 11. Continuous presence heartbeat, PEX sync & Ghost Peer Pruner (every 2.0s)
       this.heartbeatTimer = setInterval(() => {
         if (!this.room) return;
 
@@ -447,14 +604,20 @@ export class GroupRoomManager {
             username: this.username,
             isCreator: this.isCreator,
             isStreaming: Boolean(this.localStream),
+            joinedAt: this.myJoinedAt,
           });
         }
 
-        // Prune ghost peers that missed heartbeats for > 6.5s
+        // Broadcast PEX to bridge any disconnected pairs in the mesh
+        if (this.pexAction) {
+          this.pexAction.send({ peers: this.getPeersPayload() });
+        }
+
+        // Prune ghost peers that missed heartbeats for > 6.0s
         const now = Date.now();
         const deadPeers: string[] = [];
         this.peerLastSeen.forEach((lastSeen, peerId) => {
-          if (now - lastSeen > 6500) {
+          if (now - lastSeen > 6000) {
             deadPeers.push(peerId);
           }
         });
@@ -463,7 +626,7 @@ export class GroupRoomManager {
           console.log(`[P2P] Pruning ghost peer due to timeout: ${p}`);
           this.removePeer(p);
         });
-      }, 2500);
+      }, 2000);
 
       // Initial broadcast and request history from room
       setTimeout(() => {
@@ -472,12 +635,16 @@ export class GroupRoomManager {
             username: this.username,
             isCreator: this.isCreator,
             isStreaming: Boolean(this.localStream),
+            joinedAt: this.myJoinedAt,
           });
         }
-        if (this.historyAction && !this.isCreator) {
+        if (this.pexAction) {
+          this.pexAction.send({ peers: this.getPeersPayload() });
+        }
+        if (this.historyAction) {
           this.historyAction.send({ request: true });
         }
-      }, 350);
+      }, 300);
 
       callbacks.onStatusChange('Sala Ativa');
       this.notifyStreamsUpdate();
@@ -491,6 +658,8 @@ export class GroupRoomManager {
   public removePeer(peerId: string) {
     this.peers.delete(peerId);
     this.peerLastSeen.delete(peerId);
+    this.peerJoinedAt.delete(peerId);
+    this.peerIsCreator.delete(peerId);
     this.streamingPeers.delete(peerId);
     if (this.remoteStreams.has(peerId)) {
       this.remoteStreams.delete(peerId);
@@ -503,9 +672,18 @@ export class GroupRoomManager {
   }
 
   public requestStreamFromPeer(peerId: string) {
-    if (this.streamReqAction && peerId !== 'local') {
-      console.log(`[P2P] Requesting live stream from peer ${peerId}`);
+    if (peerId === 'local') return;
+    console.log(`[P2P] Requesting live stream from peer ${peerId}`);
+    if (this.streamReqAction) {
       this.streamReqAction.send({ request: true }, { target: peerId });
+    }
+    if (this.meshRelayAction) {
+      this.meshRelayAction.send({
+        target: peerId,
+        origin: selfId,
+        kind: 'stream_req',
+        payload: { request: true },
+      });
     }
   }
 
@@ -707,13 +885,16 @@ export class GroupRoomManager {
       sender: this.username,
       text,
       timestamp: Date.now(),
-      isHost: this.isCreator,
+      isHost: this.isRoomHost(),
     };
 
+    this.seenChatMsgIds.add(msg.id);
     this.chatHistory.push(msg);
 
     if (this.chatAction) {
-      this.chatAction.send(msg);
+      try {
+        this.chatAction.send(msg);
+      } catch {}
     }
     return msg;
   }
@@ -725,7 +906,7 @@ export class GroupRoomManager {
         id,
         username: uname,
         connectionState: 'connected',
-        joinedAt: Date.now(),
+        joinedAt: this.peerJoinedAt.get(id) || Date.now(),
       });
     });
     return list;
@@ -750,7 +931,7 @@ export class GroupRoomManager {
     }
   }
 
-  public leave() {
+  public async leave(): Promise<void> {
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
@@ -758,20 +939,40 @@ export class GroupRoomManager {
 
     if (this.leaveAction) {
       try {
-        this.leaveAction.send({ peerId: selfId });
+        this.leaveAction.send({ peerId: selfId, username: this.username });
+      } catch {}
+    }
+    if (this.meshRelayAction) {
+      try {
+        this.meshRelayAction.send({
+          target: 'all',
+          origin: selfId,
+          kind: 'peer_leave',
+          payload: { peerId: selfId },
+        });
       } catch {}
     }
 
     this.stopStream();
+
+    // Allow a brief flush window for socket buffers before tearing down WebRTC
+    await new Promise((resolve) => setTimeout(resolve, 60));
+
     if (this.room) {
-      this.room.leave();
+      try {
+        this.room.leave();
+      } catch {}
       this.room = null;
     }
+
     this.peers.clear();
     this.peerLastSeen.clear();
+    this.peerJoinedAt.clear();
+    this.peerIsCreator.clear();
     this.streamingPeers.clear();
     this.remoteStreams.clear();
     this.chatHistory = [];
+    this.seenChatMsgIds.clear();
     this.lastStreamsHash = '';
   }
 }

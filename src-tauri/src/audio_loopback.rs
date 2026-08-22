@@ -127,11 +127,74 @@ mod win_audio {
         }
     }
 
-    fn resolve_target_process_tree(target_names: &[String], target_pids: &[u32]) -> u32 {
+    fn resolve_target_process_tree(target_names: &[String], target_pids: &[u32], mode: &str) -> u32 {
         let mut sys = sysinfo::System::new_all();
         sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
 
+        let self_pid = std::process::id();
+        let mut self_pids = vec![self_pid];
+        let mut added = true;
+        while added {
+            added = false;
+            for (pid, proc) in sys.processes() {
+                let u = pid.as_u32();
+                if !self_pids.contains(&u) {
+                    if let Some(pp) = proc.parent() {
+                        if self_pids.contains(&pp.as_u32()) {
+                            self_pids.push(u);
+                            added = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Check if any msedgewebview2 processes belong to this user session/parent
+        for (pid, proc) in sys.processes() {
+            let u = pid.as_u32();
+            let p_name = proc.name().to_string_lossy().to_lowercase();
+            if (p_name.contains("msedgewebview2") || p_name.contains("p2sharer")) && !self_pids.contains(&u) {
+                if let Some(pp) = proc.parent() {
+                    if self_pids.contains(&pp.as_u32()) {
+                        self_pids.push(u);
+                    }
+                }
+            }
+        }
+
         let normalized_names: Vec<String> = target_names.iter().map(|n| n.to_lowercase()).collect();
+        let specifies_self = normalized_names.iter().any(|target| target.contains("p2sharer") || target.contains("msedgewebview2"))
+            || target_pids.iter().any(|&p| self_pids.contains(&p));
+
+        // In exclude mode, if no targets are specified or self is selected, default to isolating self application
+        if mode == "exclude" && (target_names.is_empty() && target_pids.is_empty() || specifies_self) {
+            // Find active audio session for self/webview if currently emitting sound
+            unsafe {
+                if let Ok(enumerator) = CoCreateInstance::<_, IMMDeviceEnumerator>(&MMDeviceEnumerator, None, CLSCTX_ALL) {
+                    if let Ok(device) = enumerator.GetDefaultAudioEndpoint(eRender, eConsole) {
+                        if let Ok(session_manager) = device.Activate::<IAudioSessionManager2>(CLSCTX_ALL, None) {
+                            if let Ok(session_enum) = session_manager.GetSessionEnumerator() {
+                                if let Ok(count) = session_enum.GetCount() {
+                                    for i in 0..count {
+                                        if let Ok(control) = session_enum.GetSession(i) {
+                                            if let Ok(control2) = control.cast::<IAudioSessionControl2>() {
+                                                let s_pid = control2.GetProcessId().unwrap_or(0);
+                                                if s_pid > 0 && (self_pids.contains(&s_pid) || sys.process(sysinfo::Pid::from_u32(s_pid)).map(|p| p.name().to_string_lossy().to_lowercase().contains("msedgewebview2")).unwrap_or(false)) {
+                                                    println!("[Audio Loopback] Found active p2sharer audio session on PID {}", s_pid);
+                                                    return s_pid;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            println!("[Audio Loopback] Defaulting exclude mode to root p2sharer PID {}", self_pid);
+            return self_pid;
+        }
 
         // 1. Gather all candidate PIDs matching target names or explicit PIDs
         let mut candidate_pids: Vec<u32> = Vec::new();
@@ -153,7 +216,7 @@ mod win_audio {
         }
 
         if candidate_pids.is_empty() {
-            return 0;
+            return if mode == "exclude" { self_pid } else { 0 };
         }
 
         // 2. Find the top-most living root ancestor among candidates
@@ -218,7 +281,13 @@ mod win_audio {
             }
         }
 
-        root_pids[0]
+        if !root_pids.is_empty() {
+            root_pids[0]
+        } else if mode == "exclude" {
+            self_pid
+        } else {
+            0
+        }
     }
 
     fn activate_process_loopback_client(pid: u32, exclude: bool) -> Result<IAudioClient, String> {
@@ -289,7 +358,7 @@ mod win_audio {
             }
 
             // Determine activation method based on PID / Name and mode
-            let target_pid = resolve_target_process_tree(&config.target_names, &config.target_pids);
+            let target_pid = resolve_target_process_tree(&config.target_names, &config.target_pids, &config.mode);
             let is_process_mode = target_pid > 0 && (config.mode == "exclude" || config.mode == "include");
 
             let mut was_process_loopback = false;

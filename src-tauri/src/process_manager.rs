@@ -102,17 +102,25 @@ pub fn list_audio_processes() -> Vec<ProcessItem> {
         #[cfg(not(windows))]
         let window_title: Option<String> = None;
 
-        let is_voice = voice_keywords.iter().any(|&k| name_lower.contains(k));
+        let self_pid = std::process::id();
+        let is_self = pid_u32 == self_pid || name_lower.contains("p2sharer");
+        let is_voice = is_self || voice_keywords.iter().any(|&k| name_lower.contains(k));
+
+        let effective_title = if is_self {
+            Some("p2sharer (Este Aplicativo)".to_string())
+        } else {
+            window_title
+        };
 
         // Filter to interesting processes (either has a window or is a known audio/voice app)
-        if window_title.is_some() || is_voice {
+        if effective_title.is_some() || is_voice {
             if seen_pids.insert(pid_u32) {
                 let exe_path = process.exe().map(|p| p.to_string_lossy().to_string());
                 results.push(ProcessItem {
                     pid: pid_u32,
                     name,
                     exe_path,
-                    window_title,
+                    window_title: effective_title,
                     is_likely_chat_or_voice: is_voice,
                 });
             }
