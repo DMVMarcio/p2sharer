@@ -4,7 +4,7 @@ pub mod process_manager;
 pub mod screen_sources;
 
 use audio_loopback::{start_audio_capture, stop_audio_capture};
-use logger::{get_log_file_path, open_latest_log, open_log_folder, write_frontend_log};
+use logger::{clear_log_file, get_log_file_path, open_latest_log, open_log_folder, write_frontend_log};
 use process_manager::list_audio_processes;
 use screen_sources::{
     ensure_ws_server_running, get_video_ws_port, list_screen_sources, start_native_screen_capture,
@@ -29,7 +29,8 @@ pub fn run() {
             write_frontend_log,
             get_log_file_path,
             open_log_folder,
-            open_latest_log
+            open_latest_log,
+            clear_log_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

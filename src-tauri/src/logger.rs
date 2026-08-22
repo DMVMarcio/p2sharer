@@ -215,3 +215,41 @@ pub fn open_latest_log() -> Result<(), String> {
 
     Ok(())
 }
+
+#[tauri::command]
+pub fn clear_log_file() -> Result<(), String> {
+    let log_dir = get_log_dir();
+    let latest_path = log_dir.join("latest.log");
+
+    match OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(&latest_path)
+    {
+        Ok(mut file) => {
+            let start_time = get_timestamp();
+            let header = format!(
+                "================================================================================\r\n\
+                 P2Sharer Execution & Diagnostics Log (latest.log)\r\n\
+                 Log Cleared: {}\r\n\
+                 OS: Windows (Architecture: {})\r\n\
+                 App Version: 1.0.0\r\n\
+                 Log File: {}\r\n\
+                 ================================================================================\r\n\r\n",
+                start_time,
+                std::env::consts::ARCH,
+                latest_path.to_string_lossy()
+            );
+            let _ = file.write_all(header.as_bytes());
+            let _ = file.flush();
+
+            if let Ok(mut lock) = LOG_FILE.lock() {
+                *lock = Some(file);
+            }
+            log_msg("INFO", "system", "Log file cleared by user request.");
+            Ok(())
+        }
+        Err(e) => Err(format!("Falha ao limpar arquivo de log: {}", e)),
+    }
+}
