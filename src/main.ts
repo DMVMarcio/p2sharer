@@ -34,10 +34,57 @@ function initFrontendLogger() {
   const originalWarn = console.warn;
   const originalError = console.error;
 
-  const formatArgs = (args: any[]) =>
-    args
-      .map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a)))
-      .join(' ');
+  const formatValue = (val: any, depth = 0): string => {
+    if (val === null) return 'null';
+    if (val === undefined) return 'undefined';
+    if (typeof val === 'string') return val;
+    if (typeof val === 'number' || typeof val === 'boolean' || typeof val === 'symbol' || typeof val === 'bigint') {
+      return String(val);
+    }
+    if (typeof val === 'function') {
+      return `[Function: ${val.name || 'anonymous'}]`;
+    }
+
+    if (val instanceof Error || (typeof val === 'object' && 'message' in val && 'name' in val)) {
+      const name = val.name || 'Error';
+      const msg = val.message || '';
+      const stack = val.stack ? `\n  Stack: ${val.stack}` : '';
+      const cause = (val as any).cause ? `\n  Cause: ${formatValue((val as any).cause, depth + 1)}` : '';
+      const extraProps: Record<string, any> = {};
+      for (const key of Object.getOwnPropertyNames(val)) {
+        if (key !== 'name' && key !== 'message' && key !== 'stack') {
+          try {
+            extraProps[key] = (val as any)[key];
+          } catch {}
+        }
+      }
+      const extraStr = Object.keys(extraProps).length > 0 ? `\n  Details: ${JSON.stringify(extraProps, null, 2)}` : '';
+      return `[${name}: ${msg}]${stack}${cause}${extraStr}`;
+    }
+
+    if (typeof val === 'object') {
+      if (depth > 3) return '[Object]';
+      try {
+        const propNames = Object.getOwnPropertyNames(val);
+        if (propNames.length === 0) {
+          return String(val);
+        }
+        const plainObj: Record<string, any> = {};
+        for (const k of propNames) {
+          try {
+            plainObj[k] = val[k];
+          } catch {}
+        }
+        return JSON.stringify(plainObj, null, 2);
+      } catch {
+        return String(val);
+      }
+    }
+
+    return String(val);
+  };
+
+  const formatArgs = (args: any[]) => args.map((a) => formatValue(a)).join(' ');
 
   console.log = (...args: any[]) => {
     originalLog(...args);
@@ -67,7 +114,9 @@ function initFrontendLogger() {
   };
 
   window.addEventListener('error', (event) => {
-    const errorDetails = `${event.message} at ${event.filename}:${event.lineno}:${event.colno}`;
+    const errorDetails = event.error
+      ? formatValue(event.error)
+      : `${event.message} at ${event.filename}:${event.lineno}:${event.colno}`;
     invoke('write_frontend_log', {
       level: 'ERROR',
       message: `Uncaught Exception: ${errorDetails}`,
@@ -76,7 +125,7 @@ function initFrontendLogger() {
   });
 
   window.addEventListener('unhandledrejection', (event) => {
-    const reason = event.reason ? (event.reason.stack || String(event.reason)) : 'Unknown promise rejection';
+    const reason = event.reason ? formatValue(event.reason) : 'Unknown promise rejection';
     invoke('write_frontend_log', {
       level: 'ERROR',
       message: `Unhandled Promise Rejection: ${reason}`,

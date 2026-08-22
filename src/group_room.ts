@@ -233,8 +233,11 @@ export class GroupRoomManager {
     };
 
     try {
+      console.log(`[P2P] Computing signaling topic for room "${this.roomId}" (password: "${this.password}")...`);
       const signalingTopic = await computeSignalingRoomId(this.roomId, this.password);
+      console.log(`[P2P] Computed signaling topic: "${signalingTopic}"`);
 
+      console.log(`[P2P] Initializing joinRoom for appId "${APP_ID}" with relays:`, relayConfig.urls);
       this.room = joinRoom(
         {
           appId: APP_ID,
@@ -243,6 +246,7 @@ export class GroupRoomManager {
         },
         signalingTopic
       );
+      console.log('[P2P] joinRoom instance initialized successfully. Configuring actions...');
 
       // 0. Setup Live Room Password Sync Action
       this.passwordAction = this.room.makeAction('room_password_sync');
@@ -468,9 +472,10 @@ export class GroupRoomManager {
 
       callbacks.onStatusChange('Sala Ativa');
       this.notifyStreamsUpdate();
-    } catch (err) {
+    } catch (err: any) {
       console.error('[P2P] Failed to join room in GroupRoomManager:', err);
-      callbacks.onStatusChange('Erro ao conectar');
+      const msg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+      callbacks.onStatusChange(`Erro ao conectar (${msg})`);
     }
   }
 
