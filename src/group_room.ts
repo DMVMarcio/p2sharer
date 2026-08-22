@@ -75,80 +75,6 @@ export interface RoomCallbacks {
   onWatchStopped?: (watcherPeerId: string, watcherName: string, broadcasterPeerId: string) => void;
 }
 
-function optimizeSDP(sdp: string, bitrateKbps: number = 25000): string {
-  let modified = sdp;
-  const bitrateBps = bitrateKbps * 1000;
-
-  // 1. Add bandwidth modifier (b=AS and b=TIAS) specifically under m=video section
-  const videoSectionRegex = /(m=video [^\r\n]+(?:\r?\n[\s\S]*?)(?=m=|$))/g;
-  modified = modified.replace(videoSectionRegex, (videoBlock) => {
-    let block = videoBlock;
-    if (!block.includes('b=AS:')) {
-      block = block.replace(/(m=video[^\r\n]*\r?\n)/, `$1b=AS:${bitrateKbps}\r\nb=TIAS:${bitrateBps}\r\n`);
-    } else {
-      block = block.replace(/b=AS:\d+/g, `b=AS:${bitrateKbps}`);
-      block = block.replace(/b=TIAS:\d+/g, `b=TIAS:${bitrateBps}`);
-    }
-
-    // Find video payload types (H264/VP8/VP9/AV1)
-    const rtpmapMatches = Array.from(block.matchAll(/a=rtpmap:(\d+) (?:H264|VP8|VP9|AV1|H265)\//gi));
-    const videoPts = new Set<string>();
-    for (const m of rtpmapMatches) {
-      videoPts.add(m[1]);
-    }
-
-    // Add google bitrate parameters exclusively to video payload fmtp lines
-    for (const pt of videoPts) {
-      const fmtpRegex = new RegExp(`(a=fmtp:${pt} [^\\r\\n]*)`, 'g');
-      if (fmtpRegex.test(block)) {
-        block = block.replace(fmtpRegex, (line) => {
-          if (line.includes('x-google-min-bitrate')) return line;
-          return `${line};x-google-min-bitrate=${Math.floor(bitrateKbps * 0.6)};x-google-start-bitrate=${bitrateKbps};x-google-max-bitrate=${Math.floor(bitrateKbps * 1.5)}`;
-        });
-      } else {
-        block = block.replace(
-          new RegExp(`(a=rtpmap:${pt} [^\\r\\n]*\\r?\\n)`),
-          `$1a=fmtp:${pt} x-google-min-bitrate=${Math.floor(bitrateKbps * 0.6)};x-google-start-bitrate=${bitrateKbps};x-google-max-bitrate=${Math.floor(bitrateKbps * 1.5)}\r\n`
-        );
-      }
-    }
-    return block;
-  });
-
-  // 2. Opus audio optimizations (low latency, high fidelity stereo)
-  modified = modified.replace(/(a=fmtp:111 [^\r\n]*)/g, (line) => {
-    if (line.includes('minptime=')) return line;
-    return `${line};minptime=10;useinbandfec=1;stereo=1;maxaveragebitrate=128000;cbr=1`;
-  });
-
-  return modified;
-}
-
-let sdpHooked = false;
-function ensureSDPHooked() {
-  if (sdpHooked || typeof RTCPeerConnection === 'undefined') return;
-  sdpHooked = true;
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const originalSetLocalDescription = (RTCPeerConnection.prototype as any).setLocalDescription;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (RTCPeerConnection.prototype as any).setLocalDescription = function (description: any, ...args: any[]) {
-    if (description && description.sdp) {
-      const optimized = optimizeSDP(description.sdp, 25000);
-      try {
-        const newDesc = {
-          type: description.type,
-          sdp: optimized,
-        };
-        return originalSetLocalDescription.apply(this, [newDesc, ...args]);
-      } catch {
-        return originalSetLocalDescription.apply(this, [description, ...args]);
-      }
-    }
-    return originalSetLocalDescription.apply(this, [description, ...args]);
-  };
-}
-
 interface PeerExchangeItem {
   peerId: string;
   username: string;
@@ -221,7 +147,6 @@ export class GroupRoomManager {
     this.isCreator = isCreator;
     this.myJoinedAt = Date.now();
     this.turnConfig = turnConfig || null;
-    ensureSDPHooked();
   }
 
   public getDisplayRoomId(): string {
@@ -317,16 +242,6 @@ export class GroupRoomManager {
       iceTransportPolicy: this.turnConfig?.enabled && this.turnConfig?.forceRelay ? 'relay' : 'all',
     };
 
-    // Redundant fast public WebSocket MQTT brokers
-    const relayConfig = {
-      urls: [
-        'wss://test.mosquitto.org:8081/mqtt',
-        'wss://broker.emqx.io:8084/mqtt',
-        'wss://public:public@public.cloud.shiftr.io',
-        'wss://broker.hivemq.com:8884/mqtt',
-      ],
-    };
-
     try {
       console.log(`[P2P] Computing signaling topic for room "${this.roomId}" (password: "${this.password}")...`);
       const signalingTopic = await computeSignalingRoomId(this.roomId, this.password);
@@ -335,7 +250,6 @@ export class GroupRoomManager {
       this.room = joinRoom(
         {
           appId: APP_ID,
-          relayConfig,
           rtcConfig,
         },
         signalingTopic
