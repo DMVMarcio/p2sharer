@@ -235,13 +235,18 @@ class App {
     const savedMode = (localStorage.getItem('p2sharer_audio_filter_mode') as 'exclude' | 'include') || 'exclude';
     this.selectedFilterMode = savedMode;
 
-    try {
-      const savedExclude = JSON.parse(localStorage.getItem('p2sharer_audio_exclude_names') || '[]');
-      if (Array.isArray(savedExclude)) {
-        this.excludeProcessNames = new Set(savedExclude.map((n: string) => n.toLowerCase()));
+    const savedExcludeRaw = localStorage.getItem('p2sharer_audio_exclude_names');
+    if (savedExcludeRaw) {
+      try {
+        const savedExclude = JSON.parse(savedExcludeRaw);
+        if (Array.isArray(savedExclude)) {
+          this.excludeProcessNames = new Set(savedExclude.map((n: string) => n.toLowerCase()));
+        }
+      } catch {
+        this.excludeProcessNames = new Set(['p2sharer', 'p2sharer.exe']);
       }
-    } catch {
-      this.excludeProcessNames = new Set();
+    } else {
+      this.excludeProcessNames = new Set(['p2sharer', 'p2sharer.exe']);
     }
 
     try {
@@ -913,10 +918,11 @@ class App {
         const statsBadge = document.getElementById('room-stats-badge');
         if (statsBadge) statsBadge.textContent = status;
 
-        if (this.isCreator && (status === 'Sala Ativa' || status.includes('Conectado'))) {
+        if (status === 'Sala Ativa' || status.includes('Conectado') || status === 'Ao Vivo') {
+          if (fallbackTimeout) clearTimeout(fallbackTimeout);
           setTimeout(() => {
             this.hideConnectingOverlay();
-          }, 450);
+          }, 350);
         }
       },
       onPasswordChange: (newPassword, updatedBy) => {
@@ -1889,12 +1895,12 @@ class App {
   }
 
   // --- LEAVE ROOM ---
-  private leaveRoom() {
+  private async leaveRoom() {
     if (this.isSharingScreen) {
       this.stopScreenSharing();
     }
     if (this.roomManager) {
-      this.roomManager.leave();
+      await this.roomManager.leave();
       this.roomManager = null;
     }
     this.peerAudioSinks.forEach((_, pId) => this.detachPeerAudio(pId));
