@@ -903,6 +903,12 @@ class App {
         'Criando sala P2P...',
         'Iniciando canal de transmissão e nó mestre...'
       );
+      fallbackTimeout = setTimeout(() => {
+        if (!hasLoadedPeers) {
+          hasLoadedPeers = true;
+          this.hideConnectingOverlay();
+        }
+      }, 1500);
     } else {
       this.showConnectingOverlay(
         this.currentRoomCode,
@@ -910,13 +916,13 @@ class App {
         'Localizando apresentador e participantes...'
       );
 
-      // Fallback: If room is empty or takes longer than 3.5s, reveal the room anyway
+      // Fallback: If room is empty or takes longer than 2.5s, reveal the room anyway
       fallbackTimeout = setTimeout(() => {
         if (!hasLoadedPeers) {
           hasLoadedPeers = true;
           this.hideConnectingOverlay();
         }
-      }, 3500);
+      }, 2500);
     }
 
     const isTurnEnabled = localStorage.getItem('p2sharer_turn_enabled') === 'true';
@@ -951,13 +957,15 @@ class App {
         this.renderRoomCards();
         this.updateStatsHUD();
 
-        // When joining, dismiss loading screen as soon as other participants are loaded
-        if (!this.isCreator && slots.length > 1 && !hasLoadedPeers) {
+        // Dismiss loading screen when slots are ready
+        if (this.isCreator && !hasLoadedPeers) {
           hasLoadedPeers = true;
           if (fallbackTimeout) clearTimeout(fallbackTimeout);
-          setTimeout(() => {
-            this.hideConnectingOverlay();
-          }, 350);
+          this.hideConnectingOverlay();
+        } else if (!this.isCreator && slots.length > 1 && !hasLoadedPeers) {
+          hasLoadedPeers = true;
+          if (fallbackTimeout) clearTimeout(fallbackTimeout);
+          this.hideConnectingOverlay();
         }
       },
       onChat: (msg) => {
@@ -971,9 +979,7 @@ class App {
         if (!this.isCreator && peers.length > 0 && !hasLoadedPeers) {
           hasLoadedPeers = true;
           if (fallbackTimeout) clearTimeout(fallbackTimeout);
-          setTimeout(() => {
-            this.hideConnectingOverlay();
-          }, 350);
+          this.hideConnectingOverlay();
         }
       },
       onPeerJoined: (_peer, isInitial) => {
@@ -1014,9 +1020,11 @@ class App {
 
         if (status === 'Sala Ativa' || status.includes('Conectado') || status === 'Ao Vivo') {
           if (fallbackTimeout) clearTimeout(fallbackTimeout);
-          setTimeout(() => {
-            this.hideConnectingOverlay();
-          }, 350);
+          this.hideConnectingOverlay();
+        } else if (status.startsWith('Erro')) {
+          if (fallbackTimeout) clearTimeout(fallbackTimeout);
+          this.hideConnectingOverlay();
+          this.showToast(status, 5000);
         }
       },
       onPasswordChange: (newPassword, updatedBy) => {
