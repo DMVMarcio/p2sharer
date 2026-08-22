@@ -62,6 +62,16 @@ export interface RoomSlotInfo {
   isStreaming: boolean;
   isLocal: boolean;
   color: string;
+  watchers?: { peerId: string; username: string }[];
+}
+
+export interface PeerStatsInfo {
+  pingMs: number | null;
+  fps: number | null;
+  width: number | null;
+  height: number | null;
+  bitrateKbps: number | null;
+  connectionType: string;
 }
 
 export interface TurnConfig {

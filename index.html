@@ -173,6 +173,10 @@
                   <span id="hud-res-fps-text">1080p 60 FPS</span>
                   <span class="hud-divider">|</span>
                   <span id="hud-bitrate-text">25.0 Mbps</span>
+                  <span class="hud-divider">|</span>
+                  <span id="hud-ping-text" title="Latência WebRTC">15 ms</span>
+                  <span class="hud-divider">|</span>
+                  <span id="hud-watchers-text" title="Espectadores assistindo esta tela">👁️ 0</span>
                 </div>
               </div>
             </div>
@@ -215,9 +219,9 @@
 
     </main>
 
-    <!-- MODAL: SETTINGS & CUSTOMIZATION -->
+    <!-- MODAL: SETTINGS & CUSTOMIZATION (VERTICAL TABS) -->
     <div class="modal-overlay hidden" id="modal-settings">
-      <div class="modal-card modal-lg">
+      <div class="modal-card modal-settings">
         <div class="modal-header">
           <div class="modal-header-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -226,73 +230,161 @@
           </div>
           <div>
             <h2>Configurações</h2>
-            <p class="modal-subtitle">Personalize a aparência, padrões de vídeo e proteção de rede.</p>
+            <p class="modal-subtitle">Personalize a aparência, áudio, transmissão e rede.</p>
           </div>
           <button class="btn-close" id="btn-close-settings">&times;</button>
         </div>
 
-        <div class="modal-body">
-          <div class="settings-grid">
-            <!-- SECTION 1: APARÊNCIA -->
-            <div class="settings-section">
-              <h3 class="settings-section-title">Aparência e Tema</h3>
-              
+        <div class="modal-body-settings-layout">
+          <!-- Left Vertical Sidebar Tabs -->
+          <nav class="settings-nav-sidebar">
+            <button type="button" class="settings-nav-item active" data-settings-tab="profile">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <span>Perfil</span>
+            </button>
+            <button type="button" class="settings-nav-item" data-settings-tab="appearance">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+              <span>Aparência</span>
+            </button>
+            <button type="button" class="settings-nav-item" data-settings-tab="audio">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+              <span>Efeitos Sonoros</span>
+            </button>
+            <button type="button" class="settings-nav-item" data-settings-tab="stream">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>
+              <span>Transmissão</span>
+            </button>
+            <button type="button" class="settings-nav-item" data-settings-tab="network">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" x2="22" y1="12" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+              <span>Rede & TURN</span>
+            </button>
+            <button type="button" class="settings-nav-item" data-settings-tab="diagnostics">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              <span>Diagnóstico & Logs</span>
+            </button>
+          </nav>
+
+          <!-- Right Content Panes -->
+          <div class="settings-tab-content-area">
+            <!-- TAB PANE 1: PERFIL -->
+            <div class="settings-tab-pane active" id="settings-pane-profile">
+              <div class="settings-pane-header">
+                <h3 class="settings-pane-title">Perfil do Participante</h3>
+                <p class="settings-pane-desc">Defina seu nome exibido na lista de participantes, cards e chat.</p>
+              </div>
+
+              <div class="settings-row">
+                <label class="settings-label" for="settings-input-username">Apelido na Sala:</label>
+                <input type="text" id="settings-input-username" class="text-input" placeholder="Ex: Marcos" maxlength="25" />
+                <p class="field-info-text" style="margin-top: 4px;">
+                  Este nome será enviado aos outros participantes assim que você se conectar à sala.
+                </p>
+              </div>
+            </div>
+
+            <!-- TAB PANE 2: APARÊNCIA -->
+            <div class="settings-tab-pane" id="settings-pane-appearance">
+              <div class="settings-pane-header">
+                <h3 class="settings-pane-title">Aparência e Tema</h3>
+                <p class="settings-pane-desc">Personalize o tema visual e as cores da interface da aplicação.</p>
+              </div>
+
               <div class="settings-row">
                 <label class="settings-label">Modo de Exibição:</label>
                 <div class="theme-mode-pills">
-                  <button class="pill-btn active" data-theme-mode="dark" id="btn-theme-dark">
+                  <button type="button" class="pill-btn active" data-theme-mode="dark" id="btn-theme-dark">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
                     <span>Escuro</span>
                   </button>
-                  <button class="pill-btn" data-theme-mode="light" id="btn-theme-light">
+                  <button type="button" class="pill-btn" data-theme-mode="light" id="btn-theme-light">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
                     <span>Claro</span>
                   </button>
-                  <button class="pill-btn" data-theme-mode="system" id="btn-theme-system">
+                  <button type="button" class="pill-btn" data-theme-mode="system" id="btn-theme-system">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>
                     <span>Sistema</span>
                   </button>
                 </div>
               </div>
 
-              <div class="settings-row">
+              <div class="settings-row" style="margin-top: 10px;">
                 <label class="settings-label">Cor de Destaque:</label>
                 <div class="accent-colors-palette" id="accent-colors-palette">
-                  <button class="accent-swatch active" data-accent="cyan" style="--swatch-color: #06b6d4;" title="Ciano"></button>
-                  <button class="accent-swatch" data-accent="sky" style="--swatch-color: #0284c7;" title="Azul Celeste"></button>
-                  <button class="accent-swatch" data-accent="blue" style="--swatch-color: #3b82f6;" title="Azul"></button>
-                  <button class="accent-swatch" data-accent="indigo" style="--swatch-color: #6366f1;" title="Índigo"></button>
-                  <button class="accent-swatch" data-accent="violet" style="--swatch-color: #8b5cf6;" title="Violeta"></button>
-                  <button class="accent-swatch" data-accent="purple" style="--swatch-color: #a855f7;" title="Roxo"></button>
-                  <button class="accent-swatch" data-accent="fuchsia" style="--swatch-color: #d946ef;" title="Fúcsia"></button>
-                  <button class="accent-swatch" data-accent="pink" style="--swatch-color: #ec4899;" title="Rosa"></button>
-                  <button class="accent-swatch" data-accent="rose" style="--swatch-color: #f43f5e;" title="Rose"></button>
-                  <button class="accent-swatch" data-accent="red" style="--swatch-color: #ef4444;" title="Vermelho"></button>
-                  <button class="accent-swatch" data-accent="orange" style="--swatch-color: #f97316;" title="Laranja"></button>
-                  <button class="accent-swatch" data-accent="amber" style="--swatch-color: #f59e0b;" title="Âmbar"></button>
-                  <button class="accent-swatch" data-accent="lime" style="--swatch-color: #84cc16;" title="Lima"></button>
-                  <button class="accent-swatch" data-accent="emerald" style="--swatch-color: #10b981;" title="Esmeralda"></button>
-                  <button class="accent-swatch" data-accent="teal" style="--swatch-color: #14b8a6;" title="Verde Água"></button>
-                  <button class="accent-swatch" data-accent="zinc" style="--swatch-color: #a1a1aa;" title="Monocromático"></button>
+                  <button type="button" class="accent-swatch active" data-accent="cyan" style="--swatch-color: #06b6d4;" title="Ciano"></button>
+                  <button type="button" class="accent-swatch" data-accent="sky" style="--swatch-color: #0284c7;" title="Azul Celeste"></button>
+                  <button type="button" class="accent-swatch" data-accent="blue" style="--swatch-color: #3b82f6;" title="Azul"></button>
+                  <button type="button" class="accent-swatch" data-accent="indigo" style="--swatch-color: #6366f1;" title="Índigo"></button>
+                  <button type="button" class="accent-swatch" data-accent="violet" style="--swatch-color: #8b5cf6;" title="Violeta"></button>
+                  <button type="button" class="accent-swatch" data-accent="purple" style="--swatch-color: #a855f7;" title="Roxo"></button>
+                  <button type="button" class="accent-swatch" data-accent="fuchsia" style="--swatch-color: #d946ef;" title="Fúcsia"></button>
+                  <button type="button" class="accent-swatch" data-accent="pink" style="--swatch-color: #ec4899;" title="Rosa"></button>
+                  <button type="button" class="accent-swatch" data-accent="rose" style="--swatch-color: #f43f5e;" title="Rose"></button>
+                  <button type="button" class="accent-swatch" data-accent="red" style="--swatch-color: #ef4444;" title="Vermelho"></button>
+                  <button type="button" class="accent-swatch" data-accent="orange" style="--swatch-color: #f97316;" title="Laranja"></button>
+                  <button type="button" class="accent-swatch" data-accent="amber" style="--swatch-color: #f59e0b;" title="Âmbar"></button>
+                  <button type="button" class="accent-swatch" data-accent="lime" style="--swatch-color: #84cc16;" title="Lima"></button>
+                  <button type="button" class="accent-swatch" data-accent="emerald" style="--swatch-color: #10b981;" title="Esmeralda"></button>
+                  <button type="button" class="accent-swatch" data-accent="teal" style="--swatch-color: #14b8a6;" title="Verde Água"></button>
+                  <button type="button" class="accent-swatch" data-accent="zinc" style="--swatch-color: #a1a1aa;" title="Monocromático"></button>
                 </div>
               </div>
             </div>
 
-            <!-- SECTION 2: PERFIL -->
-            <div class="settings-section">
-              <h3 class="settings-section-title">Perfil do Participante</h3>
+            <!-- TAB PANE 3: ÁUDIO & EFEITOS SONOROS -->
+            <div class="settings-tab-pane" id="settings-pane-audio">
+              <div class="settings-pane-header">
+                <h3 class="settings-pane-title">Efeitos Sonoros & Notificações</h3>
+                <p class="settings-pane-desc">Sons ao vivo para início/fim de transmissão, espectadores e entrada/saída de participantes.</p>
+              </div>
+
               <div class="settings-row">
-                <label class="settings-label">Apelido na Sala:</label>
-                <input type="text" id="settings-input-username" class="text-input" placeholder="Ex: Marcos" maxlength="25" />
+                <label class="picker-checkbox-label">
+                  <input type="checkbox" id="settings-check-sfx-enabled" checked />
+                  <span>Ativar efeitos sonoros da aplicação</span>
+                </label>
+              </div>
+
+              <div class="settings-row" id="settings-sfx-volume-row" style="margin-top: 8px; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                <label class="settings-label" style="margin-bottom: 0;">Volume dos Efeitos:</label>
+                <div style="display: flex; align-items: center; gap: 10px; flex: 1; max-width: 260px;">
+                  <input type="range" id="settings-slider-sfx-volume" min="0" max="100" value="60" class="stream-volume-range" style="flex: 1;" />
+                  <span id="settings-sfx-volume-label" style="font-size: 13px; font-weight: 600; min-width: 40px; text-align: right;">60%</span>
+                </div>
+              </div>
+
+              <div class="settings-row" style="margin-top: 14px;">
+                <label class="settings-label">Testar e Pré-escutar Sons:</label>
+                <div class="sfx-test-buttons-grid">
+                  <button type="button" class="btn btn-sm btn-outline" id="btn-test-sfx-join" title="Testar som de entrada na sala">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" x2="3" y1="12" y2="12"/></svg>
+                    <span>Entrada na Sala</span>
+                  </button>
+                  <button type="button" class="btn btn-sm btn-outline" id="btn-test-sfx-stream-start" title="Testar som de início de transmissão">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    <span>Iniciar Transmissão</span>
+                  </button>
+                  <button type="button" class="btn btn-sm btn-outline" id="btn-test-sfx-watch-start" title="Testar som de espectador assistindo">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/></svg>
+                    <span>Começar a Assistir</span>
+                  </button>
+                  <button type="button" class="btn btn-sm btn-outline" id="btn-test-sfx-watch-stop" title="Testar som de parar de assistir">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    <span>Parar de Assistir</span>
+                  </button>
+                </div>
               </div>
             </div>
 
-            <!-- SECTION 3: PADRÕES DE TRANSMISSÃO -->
-            <div class="settings-section">
-              <h3 class="settings-section-title">Padrões de Transmissão</h3>
+            <!-- TAB PANE 4: TRANSMISSÃO -->
+            <div class="settings-tab-pane" id="settings-pane-stream">
+              <div class="settings-pane-header">
+                <h3 class="settings-pane-title">Padrões de Transmissão</h3>
+                <p class="settings-pane-desc">Valores padrão aplicados ao abrir o seletor de tela ou janela.</p>
+              </div>
+
               <div class="settings-row-grid">
                 <div class="settings-col">
-                  <label class="settings-label">Resolução Padrão:</label>
+                  <label class="settings-label" for="settings-default-resolution">Resolução Padrão:</label>
                   <select id="settings-default-resolution" class="select-input-sm">
                     <option value="4k">4K (3840x2160)</option>
                     <option value="1440p">1440p 2K</option>
@@ -304,7 +396,7 @@
                 </div>
 
                 <div class="settings-col">
-                  <label class="settings-label">Taxa de FPS:</label>
+                  <label class="settings-label" for="settings-default-fps">Taxa de FPS:</label>
                   <select id="settings-default-fps" class="select-input-sm">
                     <option value="120">120 FPS</option>
                     <option value="60" selected>60 FPS</option>
@@ -314,31 +406,33 @@
                 </div>
 
                 <div class="settings-col">
-                  <label class="settings-label">Bitrate:</label>
+                  <label class="settings-label" for="settings-default-bitrate">Bitrate de Vídeo:</label>
                   <select id="settings-default-bitrate" class="select-input-sm">
-                    <option value="35000">35 Mbps</option>
-                    <option value="25000" selected>25 Mbps</option>
-                    <option value="15000">15 Mbps</option>
-                    <option value="8000">8 Mbps</option>
+                    <option value="35000">35 Mbps (Ultra)</option>
+                    <option value="25000" selected>25 Mbps (Alto)</option>
+                    <option value="15000">15 Mbps (Médio)</option>
+                    <option value="8000">8 Mbps (Econômico)</option>
                     <option value="3000">3 Mbps</option>
                     <option value="1000">1 Mbps</option>
                   </select>
                 </div>
               </div>
 
-              <div class="settings-row" style="margin-top: 12px;">
+              <div class="settings-row" style="margin-top: 14px;">
                 <label class="picker-checkbox-label">
                   <input type="checkbox" id="settings-check-cursor" checked />
-                  <span>Exibir cursor do mouse por padrão</span>
+                  <span>Exibir cursor do mouse por padrão na captura</span>
                 </label>
               </div>
             </div>
 
-            <!-- SECTION 4: REDE E PROTEÇÃO DE IP (TURN RELAY) -->
-            <div class="settings-section">
-              <h3 class="settings-section-title">Rede & Proteção de IP (TURN Relay)</h3>
-              <p class="modal-subtitle" style="margin-bottom: 8px;">Opcional: Oculte o seu IP residencial encaminhando o tráfego por um servidor proxy/relay WebRTC personalizado.</p>
-              
+            <!-- TAB PANE 5: REDE & TURN -->
+            <div class="settings-tab-pane" id="settings-pane-network">
+              <div class="settings-pane-header">
+                <h3 class="settings-pane-title">Rede & Proteção de IP (TURN Relay)</h3>
+                <p class="settings-pane-desc">Opcional: Oculte seu IP residencial encaminhando o tráfego P2P por um servidor relay.</p>
+              </div>
+
               <div class="settings-row">
                 <label class="picker-checkbox-label">
                   <input type="checkbox" id="settings-enable-turn" />
@@ -346,18 +440,18 @@
                 </label>
               </div>
 
-              <div id="turn-config-fields" style="display: none; flex-direction: column; gap: 8px; margin-top: 8px;">
+              <div id="turn-config-fields" style="display: none; flex-direction: column; gap: 10px; margin-top: 8px;">
                 <div class="settings-col">
-                  <label class="settings-label">URL do Servidor TURN:</label>
+                  <label class="settings-label" for="settings-turn-url">URL do Servidor TURN:</label>
                   <input type="text" id="settings-turn-url" class="text-input" placeholder="ex: turn:openrelay.metered.ca:80 ou turn:meu-ip:3478" />
                 </div>
                 <div class="settings-row-grid">
                   <div class="settings-col">
-                    <label class="settings-label">Usuário (Username):</label>
+                    <label class="settings-label" for="settings-turn-username">Usuário (Username):</label>
                     <input type="text" id="settings-turn-username" class="text-input" placeholder="ex: openrelayproject" />
                   </div>
                   <div class="settings-col">
-                    <label class="settings-label">Senha / Credencial:</label>
+                    <label class="settings-label" for="settings-turn-credential">Senha / Credencial:</label>
                     <input type="password" id="settings-turn-credential" class="text-input" placeholder="ex: openrelayproject" />
                   </div>
                   <div class="settings-col" style="justify-content: flex-end; padding-bottom: 2px;">
@@ -370,22 +464,24 @@
               </div>
             </div>
 
-            <!-- SECTION 5: DIAGNÓSTICO E LOGS DE EXECUÇÃO -->
-            <div class="settings-section">
-              <h3 class="settings-section-title">Diagnóstico & Logs de Execução</h3>
-              <p class="modal-subtitle" style="margin-bottom: 10px;">O arquivo <code>latest.log</code> armazena todos os eventos, erros, dados de WebRTC e rastreamentos da execução atual.</p>
-              
+            <!-- TAB PANE 6: DIAGNÓSTICO & LOGS -->
+            <div class="settings-tab-pane" id="settings-pane-diagnostics">
+              <div class="settings-pane-header">
+                <h3 class="settings-pane-title">Diagnóstico & Logs de Execução</h3>
+                <p class="settings-pane-desc">O arquivo <code>latest.log</code> armazena todos os eventos, erros e dados de WebRTC em tempo real.</p>
+              </div>
+
               <div class="log-path-box">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
                 <span class="log-path-text" id="settings-log-path-text">Carregando caminho do log...</span>
               </div>
 
               <div class="log-actions-row" style="margin-top: 10px; display: flex; gap: 8px;">
-                <button class="btn btn-sm btn-outline" id="btn-open-latest-log" title="Abrir latest.log no Bloco de Notas">
+                <button type="button" class="btn btn-sm btn-outline" id="btn-open-latest-log" title="Abrir latest.log no Bloco de Notas">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                   <span>Abrir Log (latest.log)</span>
                 </button>
-                <button class="btn btn-sm btn-outline" id="btn-open-log-folder" title="Abrir pasta no Explorador de Arquivos">
+                <button type="button" class="btn btn-sm btn-outline" id="btn-open-log-folder" title="Abrir pasta no Explorador de Arquivos">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                   <span>Abrir Pasta de Logs</span>
                 </button>
@@ -395,8 +491,8 @@
         </div>
 
         <div class="modal-footer">
-          <button class="btn btn-secondary" id="btn-cancel-settings">Fechar</button>
-          <button class="btn btn-primary" id="btn-save-settings">Salvar Configurações</button>
+          <button type="button" class="btn btn-secondary" id="btn-cancel-settings">Fechar</button>
+          <button type="button" class="btn btn-primary" id="btn-save-settings">Salvar Configurações</button>
         </div>
       </div>
     </div>

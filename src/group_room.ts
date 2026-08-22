@@ -1,5 +1,5 @@
 import { joinRoom, selfId } from '@trystero-p2p/mqtt';
-import { ActiveStreamInfo, ChatMessage, PeerInfo, RoomSlotInfo, TurnConfig } from './types';
+import { ActiveStreamInfo, ChatMessage, PeerInfo, PeerStatsInfo, RoomSlotInfo, TurnConfig } from './types';
 
 const APP_ID = 'p2sharer-multi-stream-v1';
 
@@ -67,6 +67,12 @@ export interface RoomCallbacks {
   onPeersUpdate: (peers: PeerInfo[]) => void;
   onStatusChange: (status: string) => void;
   onPasswordChange?: (newPassword: string, updatedBy: string) => void;
+  onPeerJoined?: (peer: PeerInfo, isInitial: boolean) => void;
+  onPeerLeft?: (peerId: string, username: string) => void;
+  onStreamStarted?: (peerId: string, username: string, isLocal: boolean) => void;
+  onStreamStopped?: (peerId: string, username: string, isLocal: boolean) => void;
+  onWatchStarted?: (watcherPeerId: string, watcherName: string, broadcasterPeerId: string) => void;
+  onWatchStopped?: (watcherPeerId: string, watcherName: string, broadcasterPeerId: string) => void;
 }
 
 function optimizeSDP(sdp: string, bitrateKbps: number = 25000): string {
@@ -189,6 +195,18 @@ export class GroupRoomManager {
   private pexAction: any = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private meshRelayAction: any = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private watchAction: any = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private pingAction: any = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private pongAction: any = null;
+
+  private streamWatchers: Map<string, Set<string>> = new Map(); // broadcasterId -> Set<watcherPeerId>
+  private watcherNames: Map<string, string> = new Map(); // peerId -> username
+  private peerPings: Map<string, number> = new Map(); // peerId -> ping in ms
+  private lastPeerStats: Map<string, { bytesReceived: number; timestamp: number }> = new Map();
+  private initialJoinComplete: boolean = false;
 
   private callbacks: RoomCallbacks | null = null;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
@@ -395,12 +413,20 @@ export class GroupRoomManager {
           this.peers.set(peerId, newName);
         }
 
+        const wasStreaming = this.streamingPeers.has(peerId);
         if (data.isStreaming) {
           this.streamingPeers.add(peerId);
+          if (!wasStreaming && this.initialJoinComplete) {
+            this.callbacks?.onStreamStarted?.(peerId, newName, false);
+          }
         } else if (data.isStreaming === false) {
           this.streamingPeers.delete(peerId);
           if (this.remoteStreams.has(peerId)) {
             this.remoteStreams.delete(peerId);
+          }
+          if (wasStreaming) {
+            this.callbacks?.onStreamStopped?.(peerId, newName, false);
+            this.cleanupStreamWatchers(peerId, newName);
           }
         }
 
@@ -419,13 +445,54 @@ export class GroupRoomManager {
       this.streamStatusAction.onMessage = (data: { isStreaming: boolean; senderName?: string }, meta: { peerId: string }) => {
         const peerId = meta.peerId;
         this.peerLastSeen.set(peerId, Date.now());
+        const senderName = data.senderName || this.peers.get(peerId) || `Participante (${peerId.slice(0, 4)})`;
+        const wasStreaming = this.streamingPeers.has(peerId);
 
         if (data.isStreaming) {
           this.streamingPeers.add(peerId);
+          if (!wasStreaming) {
+            this.callbacks?.onStreamStarted?.(peerId, senderName, false);
+          }
         } else {
           this.streamingPeers.delete(peerId);
           if (this.remoteStreams.has(peerId)) {
             this.remoteStreams.delete(peerId);
+          }
+          if (wasStreaming) {
+            this.callbacks?.onStreamStopped?.(peerId, senderName, false);
+            this.cleanupStreamWatchers(peerId, senderName);
+          }
+        }
+        this.notifyStreamsUpdate();
+      };
+
+      // 4.5. Setup Live Watch Status Action (Tracks who is watching whose screen share)
+      this.watchAction = this.room.makeAction('watch_status');
+      this.watchAction.onMessage = (
+        data: { broadcasterId?: string; isWatching?: boolean; watcherName?: string },
+        meta: { peerId: string }
+      ) => {
+        const watcherPeerId = meta.peerId;
+        const watcherName = data.watcherName || this.peers.get(watcherPeerId) || `Participante (${watcherPeerId.slice(0, 4)})`;
+        this.watcherNames.set(watcherPeerId, watcherName);
+        const broadcasterId = data.broadcasterId;
+        if (!broadcasterId) return;
+
+        let watchers = this.streamWatchers.get(broadcasterId);
+        if (!watchers) {
+          watchers = new Set();
+          this.streamWatchers.set(broadcasterId, watchers);
+        }
+
+        if (data.isWatching) {
+          if (!watchers.has(watcherPeerId)) {
+            watchers.add(watcherPeerId);
+            this.callbacks?.onWatchStarted?.(watcherPeerId, watcherName, broadcasterId);
+          }
+        } else {
+          if (watchers.has(watcherPeerId)) {
+            watchers.delete(watcherPeerId);
+            this.callbacks?.onWatchStopped?.(watcherPeerId, watcherName, broadcasterId);
           }
         }
         this.notifyStreamsUpdate();
@@ -511,6 +578,25 @@ export class GroupRoomManager {
         }
       };
 
+      // 8.5. Setup Ping / Pong for latency & connection health
+      this.pingAction = this.room.makeAction('peer_ping');
+      this.pongAction = this.room.makeAction('peer_pong');
+
+      this.pingAction.onMessage((data: { t: number }, meta: { peerId: string }) => {
+        if (data?.t && this.pongAction) {
+          try {
+            this.pongAction.send({ t: data.t }, { target: meta.peerId });
+          } catch {}
+        }
+      });
+
+      this.pongAction.onMessage((data: { t: number }, meta: { peerId: string }) => {
+        if (data?.t) {
+          const ping = Math.max(1, Date.now() - data.t);
+          this.peerPings.set(meta.peerId, ping);
+        }
+      });
+
       // 9. Peer Lifecycle Listeners
       this.room.onPeerJoin = (peerId: string) => {
         console.log(`[P2P] Direct WebRTC peer connection active: ${peerId}`);
@@ -542,8 +628,17 @@ export class GroupRoomManager {
           this.sendStreamToPeer(peerId);
         }
 
-        if (!this.peers.has(peerId)) {
-          this.peers.set(peerId, `Conectado (${peerId.slice(0, 4)})`);
+        const isNew = !this.peers.has(peerId);
+        const uname = this.peers.get(peerId) || `Conectado (${peerId.slice(0, 4)})`;
+        if (isNew) {
+          this.peers.set(peerId, uname);
+          const peerInfo: PeerInfo = {
+            id: peerId,
+            username: uname,
+            connectionState: 'connected',
+            joinedAt: this.peerJoinedAt.get(peerId) || Date.now(),
+          };
+          this.callbacks?.onPeerJoined?.(peerInfo, !this.initialJoinComplete);
         }
 
         this.notifyPeersUpdate();
@@ -613,6 +708,15 @@ export class GroupRoomManager {
           this.pexAction.send({ peers: this.getPeersPayload() });
         }
 
+        // Ping all active peers for live latency calculation
+        if (this.pingAction) {
+          this.peers.forEach((_, pid) => {
+            try {
+              this.pingAction.send({ t: Date.now() }, { target: pid });
+            } catch {}
+          });
+        }
+
         // Prune ghost peers that missed heartbeats for > 6.0s
         const now = Date.now();
         const deadPeers: string[] = [];
@@ -646,6 +750,10 @@ export class GroupRoomManager {
         }
       }, 300);
 
+      setTimeout(() => {
+        this.initialJoinComplete = true;
+      }, 1500);
+
       callbacks.onStatusChange('Sala Ativa');
       this.notifyStreamsUpdate();
     } catch (err: any) {
@@ -655,20 +763,102 @@ export class GroupRoomManager {
     }
   }
 
+  private cleanupStreamWatchers(broadcasterId: string, _broadcasterName?: string) {
+    const watchers = this.streamWatchers.get(broadcasterId);
+    if (watchers) {
+      watchers.forEach((watcherId) => {
+        const watcherName = watcherId === selfId ? this.username : (this.peers.get(watcherId) || `Participante (${watcherId.slice(0, 4)})`);
+        this.callbacks?.onWatchStopped?.(watcherId, watcherName, broadcasterId);
+      });
+      this.streamWatchers.delete(broadcasterId);
+    }
+  }
+
   public removePeer(peerId: string) {
+    const username = this.peers.get(peerId) || `Participante (${peerId.slice(0, 4)})`;
+    const wasStreaming = this.streamingPeers.has(peerId);
+
+    // If this peer was watching any active streams, notify that they stopped watching
+    this.streamWatchers.forEach((watchers, broadcasterId) => {
+      if (watchers.has(peerId)) {
+        watchers.delete(peerId);
+        this.callbacks?.onWatchStopped?.(peerId, username, broadcasterId);
+      }
+    });
+
+    // If this peer was streaming, notify stream stopped and cleanup their watchers
+    if (wasStreaming) {
+      this.callbacks?.onStreamStopped?.(peerId, username, false);
+      this.cleanupStreamWatchers(peerId, username);
+    }
+
     this.peers.delete(peerId);
     this.peerLastSeen.delete(peerId);
     this.peerJoinedAt.delete(peerId);
     this.peerIsCreator.delete(peerId);
     this.streamingPeers.delete(peerId);
+    this.peerPings.delete(peerId);
+    this.lastPeerStats.delete(peerId);
+    this.watcherNames.delete(peerId);
     if (this.remoteStreams.has(peerId)) {
       this.remoteStreams.delete(peerId);
     }
+
+    this.callbacks?.onPeerLeft?.(peerId, username);
     this.notifyPeersUpdate();
     this.notifyStreamsUpdate();
     if (this.peers.size === 0 && this.callbacks) {
       this.callbacks.onStatusChange('Sala Ativa');
     }
+  }
+
+  public startWatchingStream(broadcasterId: string) {
+    let watchers = this.streamWatchers.get(broadcasterId);
+    if (!watchers) {
+      watchers = new Set();
+      this.streamWatchers.set(broadcasterId, watchers);
+    }
+    const alreadyWatching = watchers.has(selfId);
+    watchers.add(selfId);
+    this.watcherNames.set(selfId, this.username);
+
+    if (this.watchAction) {
+      try {
+        this.watchAction.send({
+          broadcasterId,
+          isWatching: true,
+          watcherName: this.username,
+        });
+      } catch {}
+    }
+
+    if (!alreadyWatching) {
+      this.callbacks?.onWatchStarted?.(selfId, this.username, broadcasterId);
+    }
+    this.notifyStreamsUpdate();
+  }
+
+  public stopWatchingStream(broadcasterId: string) {
+    const watchers = this.streamWatchers.get(broadcasterId);
+    const wasWatching = watchers ? watchers.has(selfId) : false;
+    if (watchers) {
+      watchers.delete(selfId);
+    }
+
+    if (this.watchAction) {
+      try {
+        this.watchAction.send({
+          broadcasterId,
+          isWatching: false,
+          watcherName: this.username,
+        });
+      } catch {}
+    }
+
+    if (wasWatching) {
+      this.callbacks?.onWatchStopped?.(selfId, this.username, broadcasterId);
+    }
+    this.notifyStreamsUpdate();
   }
 
   public requestStreamFromPeer(peerId: string) {
@@ -736,6 +926,8 @@ export class GroupRoomManager {
     this.currentTargetBitrate = targetBitrateBps;
     this.currentTargetFps = targetFps;
 
+    this.callbacks?.onStreamStarted?.('local', this.username, true);
+
     if (this.room && stream) {
       try {
         const peers = this.room.getPeers?.() || {};
@@ -792,6 +984,7 @@ export class GroupRoomManager {
   }
 
   public stopStream() {
+    const wasStreaming = Boolean(this.localStream);
     if (this.room && this.localStream) {
       try {
         this.room.removeStream(this.localStream);
@@ -804,6 +997,12 @@ export class GroupRoomManager {
 
     if (this.streamStatusAction) {
       this.streamStatusAction.send({ isStreaming: false });
+    }
+
+    if (wasStreaming) {
+      this.callbacks?.onStreamStopped?.('local', this.username, true);
+      this.cleanupStreamWatchers('local', this.username);
+      this.cleanupStreamWatchers(selfId, this.username);
     }
 
     this.notifyStreamsUpdate();
@@ -847,6 +1046,7 @@ export class GroupRoomManager {
       isStreaming: Boolean(this.localStream),
       isLocal: true,
       color: generateUserColor(this.username),
+      watchers: this.getStreamWatchers('local'),
     });
 
     // 2. Peer slots
@@ -860,10 +1060,121 @@ export class GroupRoomManager {
         isStreaming: isBroadcasting,
         isLocal: false,
         color: generateUserColor(uname),
+        watchers: this.getStreamWatchers(peerId),
       });
     });
 
     return list;
+  }
+
+  public getStreamWatchers(broadcasterId: string): { peerId: string; username: string }[] {
+    const result: { peerId: string; username: string }[] = [];
+    const targetKeys = [broadcasterId];
+    if (broadcasterId === 'local') targetKeys.push(selfId);
+    if (broadcasterId === selfId) targetKeys.push('local');
+
+    const watcherSet = new Set<string>();
+    targetKeys.forEach((k) => {
+      const set = this.streamWatchers.get(k);
+      if (set) {
+        set.forEach((w) => watcherSet.add(w));
+      }
+    });
+
+    watcherSet.forEach((wPid) => {
+      let name = wPid === selfId ? this.username : this.peers.get(wPid) || this.watcherNames.get(wPid);
+      if (!name) {
+        name = `Participante (${wPid.slice(0, 4)})`;
+      }
+      result.push({ peerId: wPid, username: name });
+    });
+
+    return result;
+  }
+
+  public getPeerPing(peerId: string): number | null {
+    if (peerId === 'local' || peerId === selfId) return 0;
+    return this.peerPings.get(peerId) ?? null;
+  }
+
+  public async getPeerStats(peerId: string): Promise<PeerStatsInfo | null> {
+    const pingMs = this.getPeerPing(peerId);
+    let fps: number | null = null;
+    let width: number | null = null;
+    let height: number | null = null;
+    let bitrateKbps: number | null = null;
+    let connectionType = 'P2P Direto';
+
+    try {
+      const peers = this.room?.getPeers?.() || {};
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const peerObj: any = peers[peerId];
+      const pc: RTCPeerConnection = peerObj?.connection || peerObj?.pc || peerObj;
+      if (pc && typeof pc.getStats === 'function') {
+        const stats = await pc.getStats();
+        let rttMs: number | null = null;
+        let bytesReceived: number | null = null;
+        let timestamp: number = Date.now();
+
+        stats.forEach((report) => {
+          if (report.type === 'candidate-pair' && (report.state === 'succeeded' || report.nominated)) {
+            if (typeof report.currentRoundTripTime === 'number') {
+              rttMs = Math.round(report.currentRoundTripTime * 1000);
+            } else if (typeof report.roundTripTime === 'number') {
+              rttMs = Math.round(report.roundTripTime * 1000);
+            }
+          }
+          if (report.type === 'inbound-rtp' && report.kind === 'video') {
+            if (typeof report.framesPerSecond === 'number') {
+              fps = Math.round(report.framesPerSecond);
+            }
+            if (typeof report.frameWidth === 'number' && typeof report.frameHeight === 'number') {
+              width = report.frameWidth;
+              height = report.frameHeight;
+            }
+            if (typeof report.bytesReceived === 'number') {
+              bytesReceived = report.bytesReceived;
+            }
+            if (typeof report.timestamp === 'number') {
+              timestamp = report.timestamp;
+            }
+          }
+          if (report.type === 'remote-candidate' && (report.candidateType === 'relay' || report.candidateType === 'relayed')) {
+            connectionType = 'TURN Relay';
+          }
+        });
+
+        if (bytesReceived !== null) {
+          const last = this.lastPeerStats.get(peerId);
+          if (last) {
+            const deltaBytes = bytesReceived - last.bytesReceived;
+            const deltaSec = (timestamp - last.timestamp) / 1000;
+            if (deltaSec > 0 && deltaBytes >= 0) {
+              bitrateKbps = Math.round((deltaBytes * 8) / (deltaSec * 1000));
+            }
+          }
+          this.lastPeerStats.set(peerId, { bytesReceived, timestamp });
+        }
+
+        return {
+          pingMs: rttMs !== null ? rttMs : pingMs,
+          fps,
+          width,
+          height,
+          bitrateKbps,
+          connectionType,
+        };
+      }
+    } catch {}
+
+    return {
+      pingMs,
+      fps: null,
+      width: null,
+      height: null,
+      bitrateKbps: null,
+      connectionType,
+    };
   }
 
   public notifyStreamsUpdate() {
@@ -871,7 +1182,9 @@ export class GroupRoomManager {
     const streams = this.getAllActiveStreams();
     const slots = this.getAllRoomSlots();
 
-    const hash = slots.map((s) => `${s.peerId}:${s.senderName}:${s.isStreaming}:${s.stream?.id}`).join('|');
+    const hash = slots
+      .map((s) => `${s.peerId}:${s.senderName}:${s.isStreaming}:${s.stream?.id}:${s.watchers?.length || 0}`)
+      .join('|');
     if (hash === this.lastStreamsHash) return;
     this.lastStreamsHash = hash;
 
@@ -971,6 +1284,8 @@ export class GroupRoomManager {
     this.peerIsCreator.clear();
     this.streamingPeers.clear();
     this.remoteStreams.clear();
+    this.streamWatchers.clear();
+    this.initialJoinComplete = false;
     this.chatHistory = [];
     this.seenChatMsgIds.clear();
     this.lastStreamsHash = '';
