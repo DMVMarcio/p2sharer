@@ -344,11 +344,13 @@
                 </label>
               </div>
 
-              <div class="settings-row" id="settings-sfx-volume-row" style="margin-top: 8px; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
-                <label class="settings-label" style="margin-bottom: 0;">Volume dos Efeitos:</label>
-                <div style="display: flex; align-items: center; gap: 10px; flex: 1; max-width: 260px;">
-                  <input type="range" id="settings-slider-sfx-volume" min="0" max="100" value="60" class="stream-volume-range" style="flex: 1;" />
-                  <span id="settings-sfx-volume-label" style="font-size: 13px; font-weight: 600; min-width: 40px; text-align: right;">60%</span>
+              <div class="settings-row" id="settings-sfx-volume-row" style="margin-top: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                  <label class="settings-label" for="settings-slider-sfx-volume" style="margin-bottom: 0;">Volume dos Efeitos:</label>
+                  <span id="settings-sfx-volume-label" style="font-size: 13px; font-weight: 700; font-family: var(--font-mono); color: var(--accent-color);">60%</span>
+                </div>
+                <div class="settings-slider-container">
+                  <input type="range" id="settings-slider-sfx-volume" min="0" max="100" value="60" class="settings-slider-input" />
                 </div>
               </div>
 
@@ -440,26 +442,28 @@
                 </label>
               </div>
 
-              <div id="turn-config-fields" style="display: none; flex-direction: column; gap: 10px; margin-top: 8px;">
-                <div class="settings-col">
+              <div class="turn-config-box" id="turn-config-fields" style="display: none; margin-top: 10px;">
+                <div class="settings-row">
                   <label class="settings-label" for="settings-turn-url">URL do Servidor TURN:</label>
-                  <input type="text" id="settings-turn-url" class="text-input" placeholder="ex: turn:openrelay.metered.ca:80 ou turn:meu-ip:3478" />
+                  <input type="text" id="settings-turn-url" class="text-input-sm" placeholder="turn:turn.exemplo.com:3478?transport=udp" />
                 </div>
-                <div class="settings-row-grid">
+
+                <div class="settings-row-grid" style="margin-top: 8px;">
                   <div class="settings-col">
                     <label class="settings-label" for="settings-turn-username">Usuário (Username):</label>
-                    <input type="text" id="settings-turn-username" class="text-input" placeholder="ex: openrelayproject" />
+                    <input type="text" id="settings-turn-username" class="text-input-sm" placeholder="meu-usuario" />
                   </div>
                   <div class="settings-col">
-                    <label class="settings-label" for="settings-turn-credential">Senha / Credencial:</label>
-                    <input type="password" id="settings-turn-credential" class="text-input" placeholder="ex: openrelayproject" />
+                    <label class="settings-label" for="settings-turn-credential">Senha (Credential):</label>
+                    <input type="password" id="settings-turn-credential" class="text-input-sm" placeholder="••••••••" />
                   </div>
-                  <div class="settings-col" style="justify-content: flex-end; padding-bottom: 2px;">
-                    <label class="picker-checkbox-label">
-                      <input type="checkbox" id="settings-turn-force-relay" />
-                      <span>Forçar Relay (100% Oculto)</span>
-                    </label>
-                  </div>
+                </div>
+
+                <div class="settings-row" style="margin-top: 8px;">
+                  <label class="picker-checkbox-label">
+                    <input type="checkbox" id="settings-turn-force-relay" />
+                    <span>Forçar Relay (100% Oculto)</span>
+                  </label>
                 </div>
               </div>
             </div>
@@ -476,7 +480,7 @@
                 <span class="log-path-text" id="settings-log-path-text">Carregando caminho do log...</span>
               </div>
 
-              <div class="log-actions-row" style="margin-top: 10px; display: flex; gap: 8px;">
+              <div class="log-actions-row" style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap;">
                 <button type="button" class="btn btn-sm btn-outline" id="btn-open-latest-log" title="Abrir latest.log no Bloco de Notas">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                   <span>Abrir Log (latest.log)</span>
@@ -484,6 +488,10 @@
                 <button type="button" class="btn btn-sm btn-outline" id="btn-open-log-folder" title="Abrir pasta no Explorador de Arquivos">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                   <span>Abrir Pasta de Logs</span>
+                </button>
+                <button type="button" class="btn btn-sm btn-outline btn-outline-danger" id="btn-clear-log-file" title="Limpar todo o conteúdo do latest.log">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                  <span>Limpar Logs</span>
                 </button>
               </div>
             </div>

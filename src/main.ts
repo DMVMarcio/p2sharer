@@ -405,6 +405,15 @@ class App {
       }
     });
 
+    document.getElementById('btn-clear-log-file')?.addEventListener('click', async () => {
+      try {
+        await invoke('clear_log_file');
+        this.showToast('Arquivo de log limpo com sucesso!');
+      } catch (err: any) {
+        this.showToast(`Erro ao limpar log: ${err}`);
+      }
+    });
+
     // Theme Mode Selection
     document.querySelectorAll('.theme-mode-pills .pill-btn').forEach((btn) => {
       btn.addEventListener('click', (e) => {
