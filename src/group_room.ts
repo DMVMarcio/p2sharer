@@ -320,10 +320,10 @@ export class GroupRoomManager {
     // Redundant fast public WebSocket MQTT brokers
     const relayConfig = {
       urls: [
-        'wss://broker.emqx.io:8084/mqtt',
-        'wss://broker.hivemq.com:8884/mqtt',
         'wss://test.mosquitto.org:8081/mqtt',
-        'wss://public.cloud.shiftr.io',
+        'wss://broker.emqx.io:8084/mqtt',
+        'wss://public:public@public.cloud.shiftr.io',
+        'wss://broker.hivemq.com:8884/mqtt',
       ],
     };
 
@@ -582,20 +582,20 @@ export class GroupRoomManager {
       this.pingAction = this.room.makeAction('peer_ping');
       this.pongAction = this.room.makeAction('peer_pong');
 
-      this.pingAction.onMessage((data: { t: number }, meta: { peerId: string }) => {
+      this.pingAction.onMessage = (data: { t: number }, meta: { peerId: string }) => {
         if (data?.t && this.pongAction) {
           try {
             this.pongAction.send({ t: data.t }, { target: meta.peerId });
           } catch {}
         }
-      });
+      };
 
-      this.pongAction.onMessage((data: { t: number }, meta: { peerId: string }) => {
+      this.pongAction.onMessage = (data: { t: number }, meta: { peerId: string }) => {
         if (data?.t) {
           const ping = Math.max(1, Date.now() - data.t);
           this.peerPings.set(meta.peerId, ping);
         }
-      });
+      };
 
       // 9. Peer Lifecycle Listeners
       this.room.onPeerJoin = (peerId: string) => {
