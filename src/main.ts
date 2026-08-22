@@ -29,6 +29,62 @@ const ICONS = {
   eyeOff: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`,
 };
 
+function initFrontendLogger() {
+  const originalLog = console.log;
+  const originalWarn = console.warn;
+  const originalError = console.error;
+
+  const formatArgs = (args: any[]) =>
+    args
+      .map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a)))
+      .join(' ');
+
+  console.log = (...args: any[]) => {
+    originalLog(...args);
+    invoke('write_frontend_log', {
+      level: 'INFO',
+      message: formatArgs(args),
+      context: 'frontend',
+    }).catch(() => {});
+  };
+
+  console.warn = (...args: any[]) => {
+    originalWarn(...args);
+    invoke('write_frontend_log', {
+      level: 'WARN',
+      message: formatArgs(args),
+      context: 'frontend',
+    }).catch(() => {});
+  };
+
+  console.error = (...args: any[]) => {
+    originalError(...args);
+    invoke('write_frontend_log', {
+      level: 'ERROR',
+      message: formatArgs(args),
+      context: 'frontend',
+    }).catch(() => {});
+  };
+
+  window.addEventListener('error', (event) => {
+    const errorDetails = `${event.message} at ${event.filename}:${event.lineno}:${event.colno}`;
+    invoke('write_frontend_log', {
+      level: 'ERROR',
+      message: `Uncaught Exception: ${errorDetails}`,
+      context: 'window.onerror',
+    }).catch(() => {});
+  });
+
+  window.addEventListener('unhandledrejection', (event) => {
+    const reason = event.reason ? (event.reason.stack || String(event.reason)) : 'Unknown promise rejection';
+    invoke('write_frontend_log', {
+      level: 'ERROR',
+      message: `Unhandled Promise Rejection: ${reason}`,
+      context: 'unhandledrejection',
+    }).catch(() => {});
+  });
+}
+
 class App {
   private username: string = '';
   private currentRoomCode: string = 'cyber-falcon-482';
@@ -76,6 +132,7 @@ class App {
   }
 
   private async init() {
+    initFrontendLogger();
     this.setupThemeAndSettings();
     this.setupUsername();
     this.bindEvents();
@@ -259,6 +316,23 @@ class App {
     document.getElementById('btn-cancel-settings')?.addEventListener('click', () => this.closeSettingsModal());
     document.getElementById('btn-save-settings')?.addEventListener('click', () => this.saveSettingsFromModal());
 
+    // Diagnostics & Execution Logs Actions
+    document.getElementById('btn-open-latest-log')?.addEventListener('click', async () => {
+      try {
+        await invoke('open_latest_log');
+      } catch (err: any) {
+        this.showToast(`Erro ao abrir o log: ${err}`);
+      }
+    });
+
+    document.getElementById('btn-open-log-folder')?.addEventListener('click', async () => {
+      try {
+        await invoke('open_log_folder');
+      } catch (err: any) {
+        this.showToast(`Erro ao abrir a pasta: ${err}`);
+      }
+    });
+
     // Theme Mode Selection
     document.querySelectorAll('.theme-mode-pills .pill-btn').forEach((btn) => {
       btn.addEventListener('click', (e) => {
@@ -437,6 +511,14 @@ class App {
     if (inputTurnCred) inputTurnCred.value = localStorage.getItem('p2sharer_turn_cred') || '';
     if (checkTurnRelay) checkTurnRelay.checked = localStorage.getItem('p2sharer_turn_force_relay') === 'true';
     if (turnFields) turnFields.style.display = turnEnabled ? 'flex' : 'none';
+
+    // Load Log Path
+    invoke<string>('get_log_file_path')
+      .then((path) => {
+        const pathEl = document.getElementById('settings-log-path-text');
+        if (pathEl) pathEl.textContent = path;
+      })
+      .catch(() => {});
 
     modal?.classList.remove('hidden');
   }
