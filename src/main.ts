@@ -1891,7 +1891,7 @@ class App {
         fpsValue,
         { width: res.width, height: res.height },
         mouseEnabled,
-        85
+        75
       );
 
       // Listen for when capture ends

@@ -13,6 +13,21 @@ use screen_sources::{
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(windows)]
+    {
+        // Enable GPU hardware rasterization, zero-copy video pipeline & WebRTC HW acceleration in WebView2
+        let current_args = std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS").unwrap_or_default();
+        if !current_args.contains("--enable-gpu-rasterization") {
+            let extra_args = "--enable-gpu-rasterization --enable-zero-copy --ignore-gpu-blocklist --enable-features=WebRtcHardwareVideoEncoding,WebRtcHardwareVideoDecoding";
+            let new_args = if current_args.is_empty() {
+                extra_args.to_string()
+            } else {
+                format!("{} {}", current_args, extra_args)
+            };
+            std::env::set_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", new_args);
+        }
+    }
+
     logger::init_logger();
     ensure_ws_server_running();
 
