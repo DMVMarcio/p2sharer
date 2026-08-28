@@ -4,6 +4,7 @@ export class NativeVideoBridge {
   private activeStream: MediaStream | null = null;
   private canvas: HTMLCanvasElement | null = null;
   private ctx: CanvasRenderingContext2D | null = null;
+  private bitmapCtx: ImageBitmapRenderingContext | null = null;
   private ws: WebSocket | null = null;
   private isCapturing: boolean = false;
   private latestBitmap: ImageBitmap | null = null;
@@ -14,7 +15,7 @@ export class NativeVideoBridge {
     fps: number,
     resolution: { width: number; height: number },
     captureMouse: boolean = true,
-    quality: number = 70
+    quality: number = 75
   ): Promise<MediaStream> {
     this.stop();
 
@@ -22,12 +23,21 @@ export class NativeVideoBridge {
     this.canvas = document.createElement('canvas');
     this.canvas.width = resolution.width;
     this.canvas.height = resolution.height;
-    this.ctx = this.canvas.getContext('2d', { alpha: false, desynchronized: true });
 
-    if (this.ctx) {
-      this.ctx.imageSmoothingEnabled = false;
-      this.ctx.fillStyle = '#000000';
-      this.ctx.fillRect(0, 0, resolution.width, resolution.height);
+    // Try zero-copy bitmaprenderer first (GPU hardware blit), fallback to 2d
+    try {
+      this.bitmapCtx = this.canvas.getContext('bitmaprenderer') as ImageBitmapRenderingContext | null;
+    } catch {
+      this.bitmapCtx = null;
+    }
+
+    if (!this.bitmapCtx) {
+      this.ctx = this.canvas.getContext('2d', { alpha: false, desynchronized: true });
+      if (this.ctx) {
+        this.ctx.imageSmoothingEnabled = false;
+        this.ctx.fillStyle = '#000000';
+        this.ctx.fillRect(0, 0, resolution.width, resolution.height);
+      }
     }
 
     this.isCapturing = true;
@@ -85,18 +95,23 @@ export class NativeVideoBridge {
             }
 
             lastRenderedSequence = frameSeq;
-            if (this.ctx && this.canvas) {
+            if (this.bitmapCtx) {
+              // Direct zero-copy GPU texture transfer
+              this.bitmapCtx.transferFromImageBitmap(bitmap);
+            } else if (this.ctx && this.canvas) {
               this.ctx.drawImage(bitmap, 0, 0, this.canvas.width, this.canvas.height);
-              
-              // Trigger instant WebRTC frame capture if supported
-              const track = this.activeStream?.getVideoTracks()[0];
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              if (track && typeof (track as any).requestFrame === 'function') {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                (track as any).requestFrame();
-              }
+              bitmap.close();
+            } else {
+              bitmap.close();
             }
-            bitmap.close();
+
+            // Trigger instant WebRTC frame capture if supported
+            const track = this.activeStream?.getVideoTracks()[0];
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            if (track && typeof (track as any).requestFrame === 'function') {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              (track as any).requestFrame();
+            }
           } catch {
             // Frame parse error ignored
           } finally {
@@ -159,5 +174,6 @@ export class NativeVideoBridge {
 
     this.canvas = null;
     this.ctx = null;
+    this.bitmapCtx = null;
   }
 }

@@ -243,7 +243,7 @@ fn draw_authentic_cursor(img: &mut image::RgbaImage, origin_x: i32, origin_y: i3
             cbSize: std::mem::size_of::<CURSORINFO>() as u32,
             ..Default::default()
         };
-        if GetCursorInfo(&mut ci).is_err() || (ci.flags.0 & CURSOR_SHOWING.0 == 0) {
+        if GetCursorInfo(&mut ci).is_err() || (ci.flags.0 & CURSOR_SHOWING.0 == 0) || ci.hCursor.is_invalid() {
             return;
         }
 
@@ -267,6 +267,15 @@ fn draw_authentic_cursor(img: &mut image::RgbaImage, origin_x: i32, origin_y: i3
 
         let cursor_w = 32i32;
         let cursor_h = 32i32;
+
+        // Quick bounding box check before any GDI allocation
+        if cursor_screen_x + cursor_w <= 0
+            || cursor_screen_x >= img.width() as i32
+            || cursor_screen_y + cursor_h <= 0
+            || cursor_screen_y >= img.height() as i32
+        {
+            return;
+        }
 
         let mem_dc = CreateCompatibleDC(HDC::default());
         if mem_dc.is_invalid() {
@@ -313,9 +322,20 @@ fn draw_authentic_cursor(img: &mut image::RgbaImage, origin_x: i32, origin_y: i3
                 );
 
                 let pixel_slice = std::slice::from_raw_parts(bits as *const u8, (cursor_w * cursor_h * 4) as usize);
+                let img_w = img.width() as i32;
+                let img_h = img.height() as i32;
 
                 for cy in 0..cursor_h {
+                    let target_y = cursor_screen_y + cy;
+                    if target_y < 0 || target_y >= img_h {
+                        continue;
+                    }
                     for cx in 0..cursor_w {
+                        let target_x = cursor_screen_x + cx;
+                        if target_x < 0 || target_x >= img_w {
+                            continue;
+                        }
+
                         let idx = ((cy * cursor_w + cx) * 4) as usize;
                         let b = pixel_slice[idx];
                         let g = pixel_slice[idx + 1];
@@ -323,17 +343,12 @@ fn draw_authentic_cursor(img: &mut image::RgbaImage, origin_x: i32, origin_y: i3
                         let a = pixel_slice[idx + 3];
 
                         if a > 0 || r > 0 || g > 0 || b > 0 {
-                            let target_x = cursor_screen_x + cx;
-                            let target_y = cursor_screen_y + cy;
-
-                            if target_x >= 0 && target_x < img.width() as i32 && target_y >= 0 && target_y < img.height() as i32 {
-                                let alpha = if a > 0 { a as f32 / 255.0 } else { 1.0 };
-                                let existing = img.get_pixel(target_x as u32, target_y as u32);
-                                let out_r = (r as f32 * alpha + existing[0] as f32 * (1.0 - alpha)) as u8;
-                                let out_g = (g as f32 * alpha + existing[1] as f32 * (1.0 - alpha)) as u8;
-                                let out_b = (b as f32 * alpha + existing[2] as f32 * (1.0 - alpha)) as u8;
-                                img.put_pixel(target_x as u32, target_y as u32, image::Rgba([out_r, out_g, out_b, 255]));
-                            }
+                            let alpha = if a > 0 { a as f32 / 255.0 } else { 1.0 };
+                            let existing = img.get_pixel(target_x as u32, target_y as u32);
+                            let out_r = (r as f32 * alpha + existing[0] as f32 * (1.0 - alpha)) as u8;
+                            let out_g = (g as f32 * alpha + existing[1] as f32 * (1.0 - alpha)) as u8;
+                            let out_b = (b as f32 * alpha + existing[2] as f32 * (1.0 - alpha)) as u8;
+                            img.put_pixel(target_x as u32, target_y as u32, image::Rgba([out_r, out_g, out_b, 255]));
                         }
                     }
                 }
@@ -375,9 +390,9 @@ pub fn start_native_screen_capture(
     }
 
     let fps = target_fps.max(15).min(120);
-    let frame_interval = std::time::Duration::from_millis((1000 / fps).max(6) as u64);
+    let frame_interval = std::time::Duration::from_nanos((1_000_000_000 / fps as u64).max(8_000_000));
     let should_draw_mouse = capture_mouse.unwrap_or(true);
-    let jpeg_quality = quality.unwrap_or(80).max(60).min(92);
+    let jpeg_quality = quality.unwrap_or(75).max(50).min(90);
 
     let sender = get_frame_sender().clone();
 
@@ -389,6 +404,9 @@ pub fn start_native_screen_capture(
             .build()
             .unwrap_or_else(|_| rayon::ThreadPoolBuilder::new().build().unwrap()),
     );
+
+    // Limit active in-flight compression tasks to avoid queue backlog & CPU spikes
+    let in_flight_frames = Arc::new(std::sync::atomic::AtomicUsize::new(0));
 
     std::thread::spawn(move || {
         let is_window = source_id.starts_with("window:");
@@ -402,63 +420,106 @@ pub fn start_native_screen_capture(
 
         let target_win_id = raw_id.to_string();
 
+        // Cache target capture object outside the loop to avoid calling EnumWindows/EnumDisplayMonitors on every single frame!
+        let mut cached_monitor: Option<Monitor> = if !is_window {
+            Monitor::all().ok().and_then(|mons| mons.into_iter().nth(target_mon_idx))
+        } else {
+            None
+        };
+
+        let mut cached_window: Option<Window> = if is_window {
+            Window::all().ok().and_then(|wins| {
+                wins.into_iter().find(|w| w.id().map(|id| id.to_string()).unwrap_or_default() == target_win_id)
+            })
+        } else {
+            None
+        };
+
+        let mut last_retry = std::time::Instant::now();
+
         while is_capturing_clone.load(Ordering::Relaxed) && CAPTURING_VIDEO.load(Ordering::Relaxed) {
             let loop_start = std::time::Instant::now();
 
             let captured_img = if is_window {
-                if let Ok(windows) = Window::all() {
-                    windows
-                        .into_iter()
-                        .find(|w| w.id().map(|id| id.to_string()).unwrap_or_default() == target_win_id)
-                        .and_then(|w| {
-                            let origin_x = w.x().unwrap_or(0);
-                            let origin_y = w.y().unwrap_or(0);
-                            w.capture_image().ok().map(|mut img| {
-                                #[cfg(windows)]
-                                if should_draw_mouse {
-                                    draw_authentic_cursor(&mut img, origin_x, origin_y);
-                                }
-                                img
-                            })
-                        })
-                } else {
-                    None
+                // If window handle is not cached or was invalidated, retry search at most every 500ms
+                if cached_window.is_none() && last_retry.elapsed().as_millis() > 500 {
+                    last_retry = std::time::Instant::now();
+                    cached_window = Window::all().ok().and_then(|wins| {
+                        wins.into_iter().find(|w| w.id().map(|id| id.to_string()).unwrap_or_default() == target_win_id)
+                    });
                 }
-            } else {
-                if let Ok(monitors) = Monitor::all() {
-                    monitors.into_iter().nth(target_mon_idx).and_then(|m| {
-                        let origin_x = m.x().unwrap_or(0);
-                        let origin_y = m.y().unwrap_or(0);
-                        m.capture_image().ok().map(|mut img| {
+
+                if let Some(ref win) = cached_window {
+                    let origin_x = win.x().unwrap_or(0);
+                    let origin_y = win.y().unwrap_or(0);
+                    match win.capture_image() {
+                        Ok(mut img) => {
                             #[cfg(windows)]
                             if should_draw_mouse {
                                 draw_authentic_cursor(&mut img, origin_x, origin_y);
                             }
-                            img
-                        })
-                    })
+                            Some(img)
+                        }
+                        Err(_) => {
+                            // Invalidate cached window handle on capture error so it can be re-acquired
+                            cached_window = None;
+                            None
+                        }
+                    }
+                } else {
+                    None
+                }
+            } else {
+                // If monitor handle is not cached or was invalidated, retry search at most every 500ms
+                if cached_monitor.is_none() && last_retry.elapsed().as_millis() > 500 {
+                    last_retry = std::time::Instant::now();
+                    cached_monitor = Monitor::all().ok().and_then(|mons| mons.into_iter().nth(target_mon_idx));
+                }
+
+                if let Some(ref mon) = cached_monitor {
+                    let origin_x = mon.x().unwrap_or(0);
+                    let origin_y = mon.y().unwrap_or(0);
+                    match mon.capture_image() {
+                        Ok(mut img) => {
+                            #[cfg(windows)]
+                            if should_draw_mouse {
+                                draw_authentic_cursor(&mut img, origin_x, origin_y);
+                            }
+                            Some(img)
+                        }
+                        Err(_) => {
+                            cached_monitor = None;
+                            None
+                        }
+                    }
                 } else {
                     None
                 }
             };
 
             if let Some(img) = captured_img {
-                let tx = sender.clone();
-                // Dispatch compression to the parallel thread pool with zero lag
-                pool.spawn(move || {
-                    let scaled_img = if target_width > 0 && target_height > 0 && (img.width() != target_width || img.height() != target_height) {
-                        image::imageops::resize(&img, target_width, target_height, FilterType::Nearest)
-                    } else {
-                        img
-                    };
+                // Throttle encoding if 2 frames are already in-flight (drops stale frames, saves massive CPU)
+                if in_flight_frames.load(Ordering::Relaxed) < 2 {
+                    in_flight_frames.fetch_add(1, Ordering::Relaxed);
+                    let in_flight_clone = in_flight_frames.clone();
+                    let tx = sender.clone();
 
-                    let mut jpeg_bytes = Vec::with_capacity(120_000);
-                    let mut cursor = Cursor::new(&mut jpeg_bytes);
-                    let mut encoder = JpegEncoder::new_with_quality(&mut cursor, jpeg_quality);
-                    if encoder.encode_image(&scaled_img).is_ok() {
-                        let _ = tx.send(jpeg_bytes);
-                    }
-                });
+                    pool.spawn(move || {
+                        let scaled_img = if target_width > 0 && target_height > 0 && (img.width() != target_width || img.height() != target_height) {
+                            image::imageops::resize(&img, target_width, target_height, FilterType::Nearest)
+                        } else {
+                            img
+                        };
+
+                        let mut jpeg_bytes = Vec::with_capacity(128 * 1024);
+                        let mut cursor = Cursor::new(&mut jpeg_bytes);
+                        let mut encoder = JpegEncoder::new_with_quality(&mut cursor, jpeg_quality);
+                        if encoder.encode_image(&scaled_img).is_ok() {
+                            let _ = tx.send(jpeg_bytes);
+                        }
+                        in_flight_clone.fetch_sub(1, Ordering::Relaxed);
+                    });
+                }
             }
 
             let elapsed = loop_start.elapsed();
