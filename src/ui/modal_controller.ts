@@ -440,8 +440,10 @@ export class ModalController {
     stateStore.currentFps = fpsValue;
     stateStore.currentBitrate = bitrateValue;
 
+    const chosenSource = this.selectedSourceId || (this.currentPickerTab === 'windows' ? 'window:0' : 'screen:0');
+
     await this.callbacks.onStartCapture(
-      this.selectedSourceId,
+      chosenSource,
       fpsValue,
       { width: stateStore.currentResolution.width, height: stateStore.currentResolution.height },
       mouseEnabled

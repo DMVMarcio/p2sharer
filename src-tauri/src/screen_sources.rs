@@ -490,7 +490,7 @@ pub fn start_native_screen_capture(
 
         let mut last_retry = std::time::Instant::now();
         let mut consecutive_errors: u32 = 0;
-        let mut jpeg_bytes = Vec::with_capacity(256 * 1024);
+        let mut jpeg_bytes = Vec::with_capacity(128 * 1024);
 
         while is_capturing_clone.load(Ordering::Relaxed) && CAPTURING_VIDEO.load(Ordering::Relaxed) {
             let loop_start = std::time::Instant::now();

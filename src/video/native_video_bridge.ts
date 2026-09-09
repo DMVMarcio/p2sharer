@@ -25,18 +25,38 @@ export class NativeVideoBridge implements VideoCaptureBridge {
   /**
    * Captures screen directly via Chromium/WebView2 GPU pipeline (Zero CPU copy / HW NVENC/QSV/VCN)
    */
-  public async startDisplayMediaCapture(frameRate: number = 60): Promise<MediaStream> {
+  public async startDisplayMediaCapture(
+    frameRate: number = 60,
+    resolution?: { width: number; height: number },
+    cursor: boolean = true,
+    preferSurface?: 'monitor' | 'window'
+  ): Promise<MediaStream> {
     await this.stopCapture();
     this.isCapturing = true;
     this.isDirectGpu = true;
     this.currentFps = frameRate;
 
     try {
+      const videoConstraints: MediaTrackConstraints = {
+        frameRate: { ideal: frameRate, max: 120 },
+      };
+
+      if (resolution && resolution.width > 0 && resolution.height > 0) {
+        videoConstraints.width = { ideal: resolution.width, max: resolution.width };
+        videoConstraints.height = { ideal: resolution.height, max: resolution.height };
+      }
+
+      if (preferSurface) {
+        // Hint to Chromium whether we prefer monitor or window picker tab
+        (videoConstraints as Record<string, unknown>).displaySurface = preferSurface;
+      }
+
+      if (!cursor) {
+        (videoConstraints as Record<string, unknown>).cursor = 'never';
+      }
+
       const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: {
-          frameRate: { ideal: frameRate, max: 120 },
-          displaySurface: 'monitor',
-        } as MediaTrackConstraints,
+        video: videoConstraints,
         audio: false,
       });
 
@@ -68,22 +88,22 @@ export class NativeVideoBridge implements VideoCaptureBridge {
   ): Promise<MediaStream> {
     if (typeof optionsOrSourceId === 'object' && optionsOrSourceId !== null) {
       const opts = optionsOrSourceId as VideoSourceOptions;
-      if (opts.mode === 'gpu_direct') {
-        return this.startDisplayMediaCapture(opts.frameRate || fps);
-      }
-      const sId = opts.sourceId || 'screen:0';
-      return this.startNativeCapture(sId, opts.frameRate || fps, resolution, captureMouse, quality);
+      const targetFps = opts.frameRate || fps;
+      const preferSurface = opts.mode === 'native_window' ? 'window' : 'monitor';
+      return this.startDisplayMediaCapture(targetFps, resolution, captureMouse, preferSurface);
     }
 
-    if (
-      optionsOrSourceId === 'gpu_direct' ||
-      optionsOrSourceId === 'direct_gpu' ||
-      optionsOrSourceId === 'screen:direct_gpu'
-    ) {
-      return this.startDisplayMediaCapture(fps);
-    }
+    const sId = optionsOrSourceId || 'screen:0';
+    const preferSurface = sId.startsWith('window:') ? 'window' : 'monitor';
 
-    return this.startNativeCapture(optionsOrSourceId, fps, resolution, captureMouse, quality);
+    // Fast GPU direct path for zero CPU consumption
+    try {
+      return await this.startDisplayMediaCapture(fps, resolution, captureMouse, preferSurface);
+    } catch (err) {
+      console.warn('[NativeVideoBridge] Direct GPU capture was cancelled or failed, falling back to native capture:', err);
+      // If user cancelled getDisplayMedia or it failed, fall back to native capture if needed
+      return this.startNativeCapture(sId, fps, resolution, captureMouse, quality);
+    }
   }
 
   private async startNativeCapture(
