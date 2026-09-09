@@ -42,14 +42,60 @@ pub struct ScreenSourcesResponse {
 static CAPTURING_VIDEO: AtomicBool = AtomicBool::new(false);
 static WS_SERVER_INITIALIZED: AtomicBool = AtomicBool::new(false);
 static WS_PORT: std::sync::atomic::AtomicU16 = std::sync::atomic::AtomicU16::new(0);
-static FRAME_SENDER: std::sync::OnceLock<broadcast::Sender<Vec<u8>>> = std::sync::OnceLock::new();
+static FRAME_SENDER: std::sync::OnceLock<broadcast::Sender<Message>> = std::sync::OnceLock::new();
 static CURRENT_CAPTURE_FLAG: std::sync::Mutex<Option<Arc<AtomicBool>>> = std::sync::Mutex::new(None);
 
-fn get_frame_sender() -> &'static broadcast::Sender<Vec<u8>> {
+fn get_frame_sender() -> &'static broadcast::Sender<Message> {
     FRAME_SENDER.get_or_init(|| {
-        let (tx, _rx) = broadcast::channel(4);
+        let (tx, _rx) = broadcast::channel(8);
         tx
     })
+}
+
+#[cfg(windows)]
+pub struct MultimediaTimerGuard;
+
+#[cfg(windows)]
+impl MultimediaTimerGuard {
+    pub fn new() -> Self {
+        unsafe {
+            let _ = windows::Win32::Media::timeBeginPeriod(1);
+        }
+        MultimediaTimerGuard
+    }
+}
+
+#[cfg(windows)]
+impl Default for MultimediaTimerGuard {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(windows)]
+impl Drop for MultimediaTimerGuard {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = windows::Win32::Media::timeEndPeriod(1);
+        }
+    }
+}
+
+#[cfg(not(windows))]
+pub struct MultimediaTimerGuard;
+
+#[cfg(not(windows))]
+impl MultimediaTimerGuard {
+    pub fn new() -> Self {
+        MultimediaTimerGuard
+    }
+}
+
+#[cfg(not(windows))]
+impl Default for MultimediaTimerGuard {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[tauri::command]
@@ -100,8 +146,8 @@ pub fn ensure_ws_server_running() {
                         let (mut write, mut _read) = ws_stream.split();
                         loop {
                             match rx.recv().await {
-                                Ok(frame_data) => {
-                                    if write.send(Message::Binary(frame_data.into())).await.is_err() {
+                                Ok(msg) => {
+                                    if write.send(msg).await.is_err() {
                                         break;
                                     }
                                 }
@@ -126,7 +172,7 @@ pub fn list_screen_sources() -> ScreenSourcesResponse {
     let mut monitors_out = Vec::new();
     let mut windows_out = Vec::new();
 
-    // 1. Enumerate Monitors via xcap (Hardware Accelerated)
+    // 1. Enumerate Monitors via xcap (Fast lightweight thumbnails: 160x90, quality 40)
     if let Ok(monitors) = Monitor::all() {
         for (idx, mon) in monitors.iter().enumerate() {
             let width = mon.width().unwrap_or(1920);
@@ -140,10 +186,10 @@ pub fn list_screen_sources() -> ScreenSourcesResponse {
 
             let mut thumb_b64 = None;
             if let Ok(rgba_img) = mon.capture_image() {
-                let thumb = image::imageops::resize(&rgba_img, 300, 168, FilterType::Nearest);
+                let thumb = image::imageops::resize(&rgba_img, 160, 90, FilterType::Nearest);
                 let mut buf = Vec::new();
                 let mut cursor = Cursor::new(&mut buf);
-                let mut encoder = JpegEncoder::new_with_quality(&mut cursor, 60);
+                let mut encoder = JpegEncoder::new_with_quality(&mut cursor, 40);
                 if encoder.encode_image(&thumb).is_ok() {
                     thumb_b64 = Some(format!("data:image/jpeg;base64,{}", BASE64.encode(&buf)));
                 }
@@ -160,7 +206,7 @@ pub fn list_screen_sources() -> ScreenSourcesResponse {
         }
     }
 
-    // 2. Enumerate Windows via xcap (Hardware Accelerated)
+    // 2. Enumerate Windows via xcap (Decoupled: small 160x90 thumbnails only for top foreground windows)
     if let Ok(windows) = Window::all() {
         let ignore_apps = [
             "Settings",
@@ -174,7 +220,8 @@ pub fn list_screen_sources() -> ScreenSourcesResponse {
             "tauri-app",
         ];
 
-        for win in windows.into_iter().take(30) {
+        let mut candidate_windows = Vec::new();
+        for win in windows {
             let is_minimized = win.is_minimized().unwrap_or(false);
             if is_minimized {
                 continue;
@@ -195,17 +242,27 @@ pub fn list_screen_sources() -> ScreenSourcesResponse {
                 continue;
             }
 
+            candidate_windows.push((win, title_trim, app_name, width, height));
+            if candidate_windows.len() >= 20 {
+                break;
+            }
+        }
+
+        for (idx, (win, title_trim, app_name, width, height)) in candidate_windows.into_iter().enumerate() {
             let pid = win.pid().unwrap_or(0);
             let win_id = win.id().map(|id| id.to_string()).unwrap_or_else(|_| pid.to_string());
 
             let mut thumb_b64 = None;
-            if let Ok(rgba_img) = win.capture_image() {
-                let thumb = image::imageops::resize(&rgba_img, 300, 168, FilterType::Nearest);
-                let mut buf = Vec::new();
-                let mut cursor = Cursor::new(&mut buf);
-                let mut encoder = JpegEncoder::new_with_quality(&mut cursor, 60);
-                if encoder.encode_image(&thumb).is_ok() {
-                    thumb_b64 = Some(format!("data:image/jpeg;base64,{}", BASE64.encode(&buf)));
+            // Only generate thumbnails for top 6 foreground windows to eliminate 2-5s IPC freeze
+            if idx < 6 {
+                if let Ok(rgba_img) = win.capture_image() {
+                    let thumb = image::imageops::resize(&rgba_img, 160, 90, FilterType::Nearest);
+                    let mut buf = Vec::new();
+                    let mut cursor = Cursor::new(&mut buf);
+                    let mut encoder = JpegEncoder::new_with_quality(&mut cursor, 40);
+                    if encoder.encode_image(&thumb).is_ok() {
+                        thumb_b64 = Some(format!("data:image/jpeg;base64,{}", BASE64.encode(&buf)));
+                    }
                 }
             }
 
@@ -365,12 +422,16 @@ fn draw_authentic_cursor(img: &mut image::RgbaImage, origin_x: i32, origin_y: i3
 #[tauri::command]
 pub fn start_native_screen_capture(
     source_id: String,
-    target_fps: u32,
-    target_width: u32,
-    target_height: u32,
+    target_fps: Option<u32>,
+    target_width: Option<u32>,
+    target_height: Option<u32>,
     capture_mouse: Option<bool>,
     quality: Option<u8>,
 ) -> Result<bool, String> {
+    if source_id.trim().is_empty() {
+        return Err("sourceId cannot be empty".to_string());
+    }
+
     ensure_ws_server_running();
 
     // Stop any existing capture thread
@@ -389,26 +450,19 @@ pub fn start_native_screen_capture(
         *guard = Some(is_capturing);
     }
 
-    let fps = target_fps.max(15).min(120);
+    let fps = target_fps.unwrap_or(60).clamp(15, 120);
     let frame_interval = std::time::Duration::from_nanos((1_000_000_000 / fps as u64).max(8_000_000));
+    let width = target_width.unwrap_or(0);
+    let height = target_height.unwrap_or(0);
     let should_draw_mouse = capture_mouse.unwrap_or(true);
-    let jpeg_quality = quality.unwrap_or(75).max(50).min(90);
+    let jpeg_quality = quality.unwrap_or(75).clamp(50, 90);
 
     let sender = get_frame_sender().clone();
 
-    // Create a 4-thread parallel compression pool
-    let pool = Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(4)
-            .thread_name(|i| format!("screen-encoder-{}", i))
-            .build()
-            .unwrap_or_else(|_| rayon::ThreadPoolBuilder::new().build().unwrap()),
-    );
-
-    // Limit active in-flight compression tasks to avoid queue backlog & CPU spikes
-    let in_flight_frames = Arc::new(std::sync::atomic::AtomicUsize::new(0));
-
     std::thread::spawn(move || {
+        // Enforce 1ms multimedia timer resolution on Windows; restored upon thread drop
+        let _timer_guard = MultimediaTimerGuard::new();
+
         let is_window = source_id.starts_with("window:");
         let raw_id = source_id.split(':').nth(1).unwrap_or("0");
 
@@ -420,7 +474,6 @@ pub fn start_native_screen_capture(
 
         let target_win_id = raw_id.to_string();
 
-        // Cache target capture object outside the loop to avoid calling EnumWindows/EnumDisplayMonitors on every single frame!
         let mut cached_monitor: Option<Monitor> = if !is_window {
             Monitor::all().ok().and_then(|mons| mons.into_iter().nth(target_mon_idx))
         } else {
@@ -436,12 +489,21 @@ pub fn start_native_screen_capture(
         };
 
         let mut last_retry = std::time::Instant::now();
+        let mut consecutive_errors: u32 = 0;
+        let mut jpeg_bytes = Vec::with_capacity(256 * 1024);
 
         while is_capturing_clone.load(Ordering::Relaxed) && CAPTURING_VIDEO.load(Ordering::Relaxed) {
             let loop_start = std::time::Instant::now();
 
             let captured_img = if is_window {
-                // If window handle is not cached or was invalidated, retry search at most every 500ms
+                // If window is minimized, trigger fallback immediately
+                if let Some(ref win) = cached_window {
+                    if win.is_minimized().unwrap_or(false) {
+                        let _ = sender.send(Message::Text("{\"type\":\"fallback\",\"reason\":\"window_minimized\"}".to_string()));
+                        break;
+                    }
+                }
+
                 if cached_window.is_none() && last_retry.elapsed().as_millis() > 500 {
                     last_retry = std::time::Instant::now();
                     cached_window = Window::all().ok().and_then(|wins| {
@@ -454,6 +516,7 @@ pub fn start_native_screen_capture(
                     let origin_y = win.y().unwrap_or(0);
                     match win.capture_image() {
                         Ok(mut img) => {
+                            consecutive_errors = 0;
                             #[cfg(windows)]
                             if should_draw_mouse {
                                 draw_authentic_cursor(&mut img, origin_x, origin_y);
@@ -461,16 +524,24 @@ pub fn start_native_screen_capture(
                             Some(img)
                         }
                         Err(_) => {
-                            // Invalidate cached window handle on capture error so it can be re-acquired
                             cached_window = None;
+                            consecutive_errors += 1;
+                            if consecutive_errors >= 5 {
+                                let _ = sender.send(Message::Text("{\"type\":\"fallback\",\"reason\":\"capture_error\"}".to_string()));
+                                break;
+                            }
                             None
                         }
                     }
                 } else {
+                    consecutive_errors += 1;
+                    if consecutive_errors >= 5 {
+                        let _ = sender.send(Message::Text("{\"type\":\"fallback\",\"reason\":\"window_not_found\"}".to_string()));
+                        break;
+                    }
                     None
                 }
             } else {
-                // If monitor handle is not cached or was invalidated, retry search at most every 500ms
                 if cached_monitor.is_none() && last_retry.elapsed().as_millis() > 500 {
                     last_retry = std::time::Instant::now();
                     cached_monitor = Monitor::all().ok().and_then(|mons| mons.into_iter().nth(target_mon_idx));
@@ -481,6 +552,7 @@ pub fn start_native_screen_capture(
                     let origin_y = mon.y().unwrap_or(0);
                     match mon.capture_image() {
                         Ok(mut img) => {
+                            consecutive_errors = 0;
                             #[cfg(windows)]
                             if should_draw_mouse {
                                 draw_authentic_cursor(&mut img, origin_x, origin_y);
@@ -489,36 +561,36 @@ pub fn start_native_screen_capture(
                         }
                         Err(_) => {
                             cached_monitor = None;
+                            consecutive_errors += 1;
+                            if consecutive_errors >= 5 {
+                                let _ = sender.send(Message::Text("{\"type\":\"fallback\",\"reason\":\"capture_error\"}".to_string()));
+                                break;
+                            }
                             None
                         }
                     }
                 } else {
+                    consecutive_errors += 1;
+                    if consecutive_errors >= 5 {
+                        let _ = sender.send(Message::Text("{\"type\":\"fallback\",\"reason\":\"monitor_not_found\"}".to_string()));
+                        break;
+                    }
                     None
                 }
             };
 
             if let Some(img) = captured_img {
-                // Throttle encoding if 2 frames are already in-flight (drops stale frames, saves massive CPU)
-                if in_flight_frames.load(Ordering::Relaxed) < 2 {
-                    in_flight_frames.fetch_add(1, Ordering::Relaxed);
-                    let in_flight_clone = in_flight_frames.clone();
-                    let tx = sender.clone();
+                let scaled_img = if width > 0 && height > 0 && (img.width() != width || img.height() != height) {
+                    image::imageops::resize(&img, width, height, FilterType::Nearest)
+                } else {
+                    img
+                };
 
-                    pool.spawn(move || {
-                        let scaled_img = if target_width > 0 && target_height > 0 && (img.width() != target_width || img.height() != target_height) {
-                            image::imageops::resize(&img, target_width, target_height, FilterType::Nearest)
-                        } else {
-                            img
-                        };
-
-                        let mut jpeg_bytes = Vec::with_capacity(128 * 1024);
-                        let mut cursor = Cursor::new(&mut jpeg_bytes);
-                        let mut encoder = JpegEncoder::new_with_quality(&mut cursor, jpeg_quality);
-                        if encoder.encode_image(&scaled_img).is_ok() {
-                            let _ = tx.send(jpeg_bytes);
-                        }
-                        in_flight_clone.fetch_sub(1, Ordering::Relaxed);
-                    });
+                jpeg_bytes.clear();
+                let mut cursor = Cursor::new(&mut jpeg_bytes);
+                let mut encoder = JpegEncoder::new_with_quality(&mut cursor, jpeg_quality);
+                if encoder.encode_image(&scaled_img).is_ok() {
+                    let _ = sender.send(Message::Binary(jpeg_bytes.clone()));
                 }
             }
 
@@ -542,3 +614,41 @@ pub fn stop_native_screen_capture() -> Result<bool, String> {
     }
     Ok(true)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sanitize_quality(quality: Option<u8>) -> u8 {
+        quality.unwrap_or(75).clamp(50, 90)
+    }
+
+    #[test]
+    fn test_fps_clamp() {
+        assert_eq!(10u32.clamp(15, 120), 15);
+        assert_eq!(60u32.clamp(15, 120), 60);
+        assert_eq!(144u32.clamp(15, 120), 120);
+    }
+
+    #[test]
+    fn test_quality_clamp() {
+        assert_eq!(sanitize_quality(None), 75);
+        assert_eq!(sanitize_quality(Some(30)), 50);
+        assert_eq!(sanitize_quality(Some(75)), 75);
+        assert_eq!(sanitize_quality(Some(100)), 90);
+    }
+
+    #[test]
+    fn test_timer_guard_lifecycle() {
+        let guard = MultimediaTimerGuard::new();
+        drop(guard);
+    }
+
+    #[test]
+    fn test_start_native_screen_capture_empty_source_id() {
+        let res = start_native_screen_capture("".to_string(), None, None, None, None, None);
+        assert!(res.is_err());
+        assert_eq!(res.unwrap_err(), "sourceId cannot be empty");
+    }
+}
+

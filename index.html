@@ -544,6 +544,26 @@
         </div>
 
         <div class="modal-body">
+          <!-- Prominent Direct GPU Mode Banner -->
+          <div class="direct-gpu-card" id="card-direct-gpu-capture" role="button" tabindex="0" title="Iniciar captura acelerada diretamente pela GPU (Zero Cópia)">
+            <div class="direct-gpu-icon-badge">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" fill="currentColor" fill-opacity="0.2"/>
+              </svg>
+            </div>
+            <div class="direct-gpu-text">
+              <div class="direct-gpu-header">
+                <span class="direct-gpu-title">Captura Direta GPU (Tela Cheia 60 FPS - Zero Cópia)</span>
+                <span class="direct-gpu-badge">Aceleração Máxima</span>
+              </div>
+              <div class="direct-gpu-desc">Captura direta via DirectX / Chromium GPU Pipeline com codificação de hardware NVENC/QSV/VCN. Zero sobrecarga de CPU, ideal para jogos e transmissões de alta taxa de quadros.</div>
+            </div>
+            <button type="button" class="btn btn-primary btn-sm direct-gpu-btn" id="btn-start-direct-gpu">
+              <span>Iniciar GPU Direta</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            </button>
+          </div>
+
           <div class="picker-tabs">
             <button class="picker-tab-btn active" id="picker-tab-screens">Telas Inteiras</button>
             <button class="picker-tab-btn" id="picker-tab-windows">Janelas de Apps</button>

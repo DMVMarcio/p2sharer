@@ -27,4 +27,21 @@ export default defineConfig(async () => ({
       ignored: ["**/src-tauri/**"],
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/@trystero-p2p') || id.includes('node_modules/trystero')) {
+            return 'trystero';
+          }
+          if (id.includes('node_modules/@tauri-apps')) {
+            return 'tauri';
+          }
+          if (id.includes('node_modules')) {
+            return 'vendor';
+          }
+        },
+      },
+    },
+  },
 }));
