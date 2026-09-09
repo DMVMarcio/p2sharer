@@ -113,17 +113,15 @@ pub fn list_audio_processes() -> Vec<ProcessItem> {
         };
 
         // Filter to interesting processes (either has a window or is a known audio/voice app)
-        if effective_title.is_some() || is_voice {
-            if seen_pids.insert(pid_u32) {
-                let exe_path = process.exe().map(|p| p.to_string_lossy().to_string());
-                results.push(ProcessItem {
-                    pid: pid_u32,
-                    name,
-                    exe_path,
-                    window_title: effective_title,
-                    is_likely_chat_or_voice: is_voice,
-                });
-            }
+        if (effective_title.is_some() || is_voice) && seen_pids.insert(pid_u32) {
+            let exe_path = process.exe().map(|p| p.to_string_lossy().to_string());
+            results.push(ProcessItem {
+                pid: pid_u32,
+                name,
+                exe_path,
+                window_title: effective_title,
+                is_likely_chat_or_voice: is_voice,
+            });
         }
     }
 
