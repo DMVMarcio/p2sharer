@@ -241,6 +241,9 @@ export class GroupRoomManager {
       console.log(`[P2P] Computed signaling topic: "${this.signalingTopic}"`);
 
       this.setupRoomInstance();
+      this.notifyStreamsUpdate();
+      this.notifyPeersUpdate();
+      callbacks.onStatusChange(this.isCreator ? 'Sala Ativa' : 'Procurando Participantes...');
     } catch (err) {
       console.error('[P2P] Fatal room join error:', err);
       callbacks.onStatusChange('Erro ao conectar na sala');

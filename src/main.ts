@@ -18,6 +18,7 @@ class App {
   private modalController: ModalController;
   private viewerRenderer: ViewerRenderer;
   private hudController = new HudController();
+  private roomConnectingTimeout: ReturnType<typeof setTimeout> | null = null;
 
   private get groupRoomManager(): GroupRoomManager | null {
     return this.roomManager;
@@ -99,6 +100,22 @@ class App {
     this.switchView('view-group-room');
     this.modalController.showConnectingOverlay(code, isCreator ? 'Criando sala P2P...' : 'Entrando na sala...');
 
+    if (this.roomConnectingTimeout) {
+      clearTimeout(this.roomConnectingTimeout);
+      this.roomConnectingTimeout = null;
+    }
+
+    const dismissOverlay = () => {
+      if (this.roomConnectingTimeout) {
+        clearTimeout(this.roomConnectingTimeout);
+        this.roomConnectingTimeout = null;
+      }
+      this.modalController.hideConnectingOverlay();
+    };
+
+    // Defensive fallback: dismiss overlay after 1.2s for creator (room is ready) or 2.5s for joiner
+    this.roomConnectingTimeout = setTimeout(dismissOverlay, isCreator ? 1200 : 2500);
+
     if (this.roomManager) this.roomManager.leave();
     this.roomManager = new GroupRoomManager(stateStore.username, code, pass, isCreator, stateStore.getTurnConfig());
 
@@ -115,11 +132,14 @@ class App {
         stateStore.roomSlots = slots;
         this.viewerRenderer.renderRoomCards();
         this.hudController.updateStatsHUD();
-        this.modalController.hideConnectingOverlay();
+        dismissOverlay();
       },
       onChat: (msg) => this.appendChatMessage(msg),
       onChatHistory: (messages) => messages.forEach((m) => this.appendChatMessage(m)),
-      onPeersUpdate: (peers) => { this.updatePeersList(peers); this.modalController.hideConnectingOverlay(); },
+      onPeersUpdate: (peers) => {
+        this.updatePeersList(peers);
+        dismissOverlay();
+      },
       onPeerJoined: (_peer, isInitial) => { if (!isInitial) soundEffects.playUserJoin(); },
       onPeerLeft: () => soundEffects.playUserLeave(),
       onStreamStarted: () => soundEffects.playScreenShareStart(),
@@ -135,7 +155,18 @@ class App {
       onStatusChange: (status) => {
         const statsBadge = document.getElementById('room-stats-badge');
         if (statsBadge) statsBadge.textContent = status;
-        if (status.includes('Conectado') || status === 'Sala Ativa' || status === 'Ao Vivo') this.modalController.hideConnectingOverlay();
+        if (
+          status.includes('Conectado') ||
+          status === 'Sala Ativa' ||
+          status === 'Ao Vivo' ||
+          status.includes('P2P') ||
+          status.includes('Participante')
+        ) {
+          dismissOverlay();
+        } else if (status.startsWith('Erro')) {
+          dismissOverlay();
+          this.modalController.showToast(status, 5000);
+        }
       },
       onPasswordChange: (newPassword, updatedBy) => {
         stateStore.currentRoomPassword = newPassword;
@@ -180,6 +211,10 @@ class App {
   }
 
   private async leaveRoom(): Promise<void> {
+    if (this.roomConnectingTimeout) {
+      clearTimeout(this.roomConnectingTimeout);
+      this.roomConnectingTimeout = null;
+    }
     soundEffects.playUserLeave();
     this.hudController.stop();
     if (stateStore.isSharingScreen) this.stopScreenSharing();
