@@ -86,22 +86,19 @@ fn test_event_handle_guard_unwind_safety() {
         let handle = CreateEventW(None, false, false, PCWSTR::null())
             .expect("CreateEventW must succeed");
 
-        let raw_val = handle.0 as usize;
+        assert_eq!(WaitForSingleObject(handle, 0), WAIT_TIMEOUT);
 
-        let thread_handle = std::thread::spawn(move || {
-            let h = HANDLE(raw_val as *mut _);
-            let _guard = EventHandleGuard(h);
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _guard = EventHandleGuard(handle);
             panic!("Simulated audio thread crash");
-        });
+        }));
+        assert!(result.is_err(), "Panic must occur and be caught");
 
-        // Thread must panic and return Err
-        assert!(thread_handle.join().is_err());
-
-        // Handle must still be properly closed via drop unwinding
-        let wait_res = WaitForSingleObject(handle, 0);
-        assert_eq!(
-            wait_res, WAIT_FAILED,
-            "Handle must be closed even after thread panic unwind"
+        // After panic unwind, _guard must have been dropped and handle closed
+        let close_res = CloseHandle(handle);
+        assert!(
+            close_res.is_err(),
+            "CloseHandle on dropped EventHandleGuard must fail because handle is already closed"
         );
         assert_eq!(GetLastError(), ERROR_INVALID_HANDLE);
     }
