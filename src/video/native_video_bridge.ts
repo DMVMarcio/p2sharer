@@ -88,22 +88,24 @@ export class NativeVideoBridge implements VideoCaptureBridge {
   ): Promise<MediaStream> {
     if (typeof optionsOrSourceId === 'object' && optionsOrSourceId !== null) {
       const opts = optionsOrSourceId as VideoSourceOptions;
-      const targetFps = opts.frameRate || fps;
-      const preferSurface = opts.mode === 'native_window' ? 'window' : 'monitor';
-      return this.startDisplayMediaCapture(targetFps, resolution, captureMouse, preferSurface);
+      if (opts.mode === 'gpu_direct') {
+        return this.startDisplayMediaCapture(opts.frameRate || fps, resolution, captureMouse);
+      }
+      const sId = opts.sourceId || 'screen:0';
+      return this.startNativeCapture(sId, opts.frameRate || fps, resolution, captureMouse, quality);
     }
 
-    const sId = optionsOrSourceId || 'screen:0';
-    const preferSurface = sId.startsWith('window:') ? 'window' : 'monitor';
-
-    // Fast GPU direct path for zero CPU consumption
-    try {
-      return await this.startDisplayMediaCapture(fps, resolution, captureMouse, preferSurface);
-    } catch (err) {
-      console.warn('[NativeVideoBridge] Direct GPU capture was cancelled or failed, falling back to native capture:', err);
-      // If user cancelled getDisplayMedia or it failed, fall back to native capture if needed
-      return this.startNativeCapture(sId, fps, resolution, captureMouse, quality);
+    const sId = (optionsOrSourceId as string) || 'screen:0';
+    if (
+      sId === 'gpu_direct' ||
+      sId === 'direct_gpu' ||
+      sId === 'screen:direct_gpu'
+    ) {
+      return this.startDisplayMediaCapture(fps, resolution, captureMouse);
     }
+
+    // Custom in-app selected screen or window: capture directly via native capture without Chromium prompt!
+    return this.startNativeCapture(sId, fps, resolution, captureMouse, quality);
   }
 
   private async startNativeCapture(
