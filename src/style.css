@@ -266,6 +266,33 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Custom Scrollbars (Prevents ugly white native browser scrollbars) */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.32);
+}
+
+html[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.18);
+}
+
+html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.35);
+}
+
 .hidden {
   display: none !important;
 }
@@ -1515,8 +1542,10 @@ body {
 }
 
 /* Inputs */
-.text-input {
+.text-input,
+.text-input-sm {
   width: 100%;
+  box-sizing: border-box;
   background-color: var(--bg-input);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
@@ -1525,11 +1554,19 @@ body {
   color: var(--text-primary);
   outline: none;
   font-family: inherit;
-  transition: border-color var(--transition-fast);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
-.text-input:focus {
-  border-color: var(--border-focus);
+.text-input-sm {
+  padding: 8px 12px;
+  font-size: 12.5px;
+  border-radius: var(--radius-sm);
+}
+
+.text-input:focus,
+.text-input-sm:focus {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px var(--accent-subtle);
 }
 
 .select-input-sm {
@@ -1618,6 +1655,7 @@ body {
   flex: 1;
   padding: 22px 26px;
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   background-color: var(--bg-surface);
@@ -1657,18 +1695,37 @@ body {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  width: 100%;
 }
 
 .settings-row-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
+  width: 100%;
+}
+
+.settings-row-grid-2col {
+  grid-template-columns: repeat(2, 1fr) !important;
 }
 
 @media (max-width: 580px) {
-  .settings-row-grid {
-    grid-template-columns: 1fr;
+  .settings-row-grid,
+  .settings-row-grid-2col {
+    grid-template-columns: 1fr !important;
   }
+}
+
+.turn-config-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
+  background-color: var(--bg-surface-elevated, #141417);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 16px;
 }
 
 .settings-col {
