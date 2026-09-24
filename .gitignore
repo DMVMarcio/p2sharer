@@ -23,5 +23,5 @@ dist-ssr
 *.sln
 *.sw?
 
-# Agent teamwork metadata
-.agents/
+# Agent ephemeral task tracking
+.agents/tasks/
