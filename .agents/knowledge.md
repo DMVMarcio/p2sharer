@@ -46,14 +46,15 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 - `[Audio]` **Process Isolation & Sync**: Keep WASAPI loopback event-driven (<20us latency). Ensure ITU-R BS.775 downmixing and fractional 48kHz resampling phase continuity across streaming chunks.
 - `[P2P]` **Ghost Peer Mitigation & Mesh Bridging**: Enforce strict direct WebRTC verification; quarantine BitTorrent PEX gossip rumors while actively bridging indirect peers via in-mesh data channels to form resilient full-mesh topologies.
 - `[P2P]` **Signaling Synchronization**: Prevent premature client-side transport failovers; monitor MQTT brokers with active probe WebSockets and enforce a 6s startup grace period.
+- `[Build]` **Full Desktop Packaging**: Always build and verify the full native desktop artifact using `npm run tauri:build`. While `npm run build` only bundles the web frontend (`dist/`), `npm run tauri:build` encapsulates it via `beforeBuildCommand` and compiles the complete release binary and Windows bundle.
 
 ---
 
 ## 5. Build, Test & Run Commands
 - **Development Server**: `npm run dev` (Vite on port 1420)
 - **Tauri App Dev**: `npm run tauri:dev` (runs `npm run dev` and starts Tauri window)
-- **Frontend Typecheck & Build**: `npm run build` (`tsc && vite build`)
-- **Tauri Production Build**: `npm run tauri:build`
+- **Frontend Typecheck & Build (Web Only)**: `npm run build` (`tsc && vite build`)
+- **Full Production Desktop Build (Frontend + Rust Native Bundle)**: `npm run tauri:build` (invokes `beforeBuildCommand: "npm run build"`, compiles Rust in release mode, and outputs `p2sharer.exe` and bundles to `src-tauri/target/release/bundle/`)
 - **Frontend Unit & Adversarial Tests**: `node --experimental-strip-types --test test/unit/*.test.ts` (137+ tests across 11 suites)
 - **Backend Rust Tests**: `cargo test` inside `src-tauri/` (38+ tests)
 - **Cargo Compilation Check**: `cargo check` inside `src-tauri/`
