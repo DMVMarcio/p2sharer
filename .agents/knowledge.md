@@ -44,7 +44,8 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 - `[UI]` **Canonical Reuse**: Search `src/ui/` and `src/style.css` before authoring new elements. Never create ad-hoc inline styles or unmodular UI components. Maintain dark/light theme tokens and accent colors.
 - `[Video]` **Hardware Acceleration**: Preserve WebView2 GPU acceleration flags in `src-tauri/src/lib.rs` and SDP codec priority (H.264/AV1/VP9/VP8) in `MediaCoordinator`.
 - `[Audio]` **Process Isolation & Sync**: Keep WASAPI loopback event-driven (<20us latency). Ensure ITU-R BS.775 downmixing and fractional 48kHz resampling phase continuity across streaming chunks.
-- `[P2P]` **Ghost Peer Mitigation**: Enforce strict direct WebRTC verification; quarantine BitTorrent PEX gossip rumors until direct handshake completes.
+- `[P2P]` **Ghost Peer Mitigation & Mesh Bridging**: Enforce strict direct WebRTC verification; quarantine BitTorrent PEX gossip rumors while actively bridging indirect peers via in-mesh data channels to form resilient full-mesh topologies.
+- `[P2P]` **Signaling Synchronization**: Prevent premature client-side transport failovers; monitor MQTT brokers with active probe WebSockets and enforce a 6s startup grace period.
 
 ---
 
@@ -53,6 +54,6 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 - **Tauri App Dev**: `npm run tauri:dev` (runs `npm run dev` and starts Tauri window)
 - **Frontend Typecheck & Build**: `npm run build` (`tsc && vite build`)
 - **Tauri Production Build**: `npm run tauri:build`
-- **Frontend Unit & Adversarial Tests**: `node --experimental-strip-types --test test/unit/*.test.ts` (129+ tests)
+- **Frontend Unit & Adversarial Tests**: `node --experimental-strip-types --test test/unit/*.test.ts` (137+ tests across 11 suites)
 - **Backend Rust Tests**: `cargo test` inside `src-tauri/` (38+ tests)
 - **Cargo Compilation Check**: `cargo check` inside `src-tauri/`

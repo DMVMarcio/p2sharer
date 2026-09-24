@@ -49,7 +49,11 @@ export class PeerTracker {
       this.directConnectedPeers.add(peerId);
       this.unverifiedRumors.delete(peerId);
 
-      const resolvedName = username?.trim() || this.peers.get(peerId) || `Participante (${peerId.slice(0, 4)})`;
+      const resolvedName =
+        username?.trim() ||
+        this.peers.get(peerId) ||
+        this.watcherNames.get(peerId) ||
+        `Participante (${peerId.slice(0, 4)})`;
       this.peers.set(peerId, resolvedName);
       this.peerLastSeen.set(peerId, Date.now());
 
@@ -62,9 +66,23 @@ export class PeerTracker {
       // Unverified PEX rumor - do not accept as connected peer until WebRTC connects
       if (!this.directConnectedPeers.has(peerId)) {
         this.unverifiedRumors.add(peerId);
+        if (username?.trim()) {
+          this.watcherNames.set(peerId, username.trim());
+        }
       }
       return false;
     }
+  }
+
+  /**
+   * Returns list of currently quarantined, unverified peer rumors.
+   */
+  public getPendingRumors(): string[] {
+    return Array.from(this.unverifiedRumors);
+  }
+
+  public getRumorUsername(peerId: string): string | undefined {
+    return this.watcherNames.get(peerId);
   }
 
   /**

@@ -44,6 +44,7 @@ export function buildRtcConfiguration(turnConfig?: TurnConfig | null): RTCConfig
   return {
     iceServers: buildIceServers(turnConfig),
     iceTransportPolicy: turnConfig?.forceRelay ? 'relay' : 'all',
+    iceCandidatePoolSize: 2,
   };
 }
 
@@ -62,7 +63,7 @@ export function formatJoinError(details: JoinErrorDetails): string {
     if (err.includes('check that your TURN server')) {
       return `Falha de conexão WebRTC${peer}: servidor TURN configurado inacessível por ambos os peers.`;
     }
-    return `Falha de conexão WebRTC${peer} (NAT Simétrico): ambos os peers estão atrás de roteadores restritivos. Configure um servidor TURN nas opções de rede.`;
+    return `Falha de conexão WebRTC${peer} (NAT Simétrico / Timeout de ICE): rota direta não estabelecida a tempo. Configure um servidor TURN nas opções de rede se persistir.`;
   }
 
   if (err.includes('handshake timeout')) {
