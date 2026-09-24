@@ -1,5 +1,5 @@
 import { selfId } from '@trystero-p2p/core';
-import {
+import type {
   ActiveStreamInfo,
   ChatMessage,
   PeerInfo,
@@ -252,11 +252,10 @@ export class GroupRoomManager {
 
   private setupRoomInstance(): void {
     const joinErrorHandler = createJoinErrorHandler((formattedMsg, details) => {
-      if (this.callbacks) {
+      console.warn(`[P2P/ICE Diagnostics] ${formattedMsg}`, details);
+      if (this.callbacks && this.peerTracker.directConnectedPeers.size === 0) {
         this.callbacks.onStatusChange(formattedMsg);
       }
-      // If error indicates SDP exchange failure without reachable relay, notify status
-      console.warn(`[P2P/ICE Diagnostics] ${formattedMsg}`, details);
     });
 
     this.room = signalingManager.joinRoom(
@@ -403,6 +402,12 @@ export class GroupRoomManager {
         this.sendStreamToPeer(peerId);
       }
 
+      // Proactive stream request for joining existing sessions:
+      // If this peer is broadcasting and we do not have their stream yet, request it!
+      if (data.isStreaming && !this.remoteStreams.has(peerId)) {
+        this.requestStreamFromPeer(peerId);
+      }
+
       this.notifyPeersUpdate();
       this.notifyStreamsUpdate();
       this.callbacks?.onStatusChange(
@@ -509,9 +514,13 @@ export class GroupRoomManager {
 
       data.peers.forEach((p) => {
         if (p.peerId && p.peerId !== selfId) {
-          // If peer is not yet connected via direct WebRTC, quarantine in unverifiedRumors!
           const isDirect = this.peerTracker.isVerified(p.peerId);
           this.peerTracker.receivePeerExchange(p.peerId, isDirect, p.username, p.isCreator, p.joinedAt);
+
+          // If peer is not yet directly connected to us, bridge via intermediary peer
+          if (!isDirect && !this.peerTracker.isVerified(p.peerId)) {
+            this.bridgeIndirectPeer(p.peerId, meta.peerId, p.username);
+          }
         }
       });
     };
@@ -527,7 +536,58 @@ export class GroupRoomManager {
       this.peerTracker.touchPeer(meta.peerId);
 
       if (data.target === selfId || data.target === 'all') {
-        if (data.kind === 'stream_req' && this.localStream) {
+        if (data.kind === 'mesh_hello') {
+          console.log(`[P2P/Mesh] Received mesh_hello from indirect peer ${data.origin}`);
+          const p = data.payload || {};
+          this.peerTracker.receivePeerExchange(data.origin, false, p.username, p.isCreator, p.joinedAt);
+
+          // Reply with mesh_ack back through the intermediary
+          if (this.meshRelayAction) {
+            try {
+              this.meshRelayAction.send(
+                {
+                  target: data.origin,
+                  origin: selfId,
+                  kind: 'mesh_ack',
+                  payload: {
+                    username: this.username,
+                    isCreator: this.isCreator,
+                    joinedAt: this.myJoinedAt,
+                    isStreaming: Boolean(this.localStream),
+                  },
+                },
+                { target: meta.peerId }
+              );
+            } catch {}
+          }
+
+          // Trigger presence broadcast to help Trystero's broker signaling match the indirect pair
+          if (this.presenceAction) {
+            try {
+              this.presenceAction.send({
+                username: this.username,
+                isCreator: this.isCreator,
+                isStreaming: Boolean(this.localStream),
+                joinedAt: this.myJoinedAt,
+              });
+            } catch {}
+          }
+        } else if (data.kind === 'mesh_ack') {
+          console.log(`[P2P/Mesh] Received mesh_ack from indirect peer ${data.origin}`);
+          const p = data.payload || {};
+          this.peerTracker.receivePeerExchange(data.origin, false, p.username, p.isCreator, p.joinedAt);
+
+          if (this.presenceAction) {
+            try {
+              this.presenceAction.send({
+                username: this.username,
+                isCreator: this.isCreator,
+                isStreaming: Boolean(this.localStream),
+                joinedAt: this.myJoinedAt,
+              });
+            } catch {}
+          }
+        } else if (data.kind === 'stream_req' && this.localStream) {
           this.sendStreamToPeer(data.origin);
         } else if (data.kind === 'peer_leave') {
           this.removePeer(data.origin);
@@ -739,6 +799,42 @@ export class GroupRoomManager {
       this.callbacks?.onWatchStopped?.(w.peerId, w.username, broadcasterId);
     });
     this.notifyStreamsUpdate();
+  }
+
+  private bridgeIndirectPeer(targetPeerId: string, intermediaryPeerId: string, targetUsername?: string): void {
+    if (
+      !targetPeerId ||
+      targetPeerId === selfId ||
+      targetPeerId === this.username ||
+      targetPeerId === 'local' ||
+      this.peerTracker.isVerified(targetPeerId)
+    ) {
+      return;
+    }
+
+    console.log(`[P2P/Mesh] Bridging indirect peer ${targetPeerId} via intermediary ${intermediaryPeerId}`);
+
+    if (this.meshRelayAction) {
+      try {
+        this.meshRelayAction.send(
+          {
+            target: targetPeerId,
+            origin: selfId,
+            kind: 'mesh_hello',
+            payload: {
+              username: this.username,
+              isCreator: this.isCreator,
+              joinedAt: this.myJoinedAt,
+              isStreaming: Boolean(this.localStream),
+              targetUsername,
+            },
+          },
+          { target: intermediaryPeerId }
+        );
+      } catch (err) {
+        console.warn(`[P2P/Mesh] Failed to send mesh_hello to ${targetPeerId}:`, err);
+      }
+    }
   }
 
   public watchStream(broadcasterId: string) {

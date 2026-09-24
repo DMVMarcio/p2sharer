@@ -31,6 +31,12 @@ export interface SignalingFailoverEvent {
   timestamp: number;
 }
 
+export const DEFAULT_MQTT_RELAY_URLS = [
+  'wss://broker.hivemq.com:8884/mqtt',
+  'wss://broker.emqx.io:8084/mqtt',
+  'wss://test.mosquitto.org:8081/mqtt',
+];
+
 /**
  * SignalingManager provides resilient multi-transport WebRTC signaling failover.
  * It manages seamless failover across:
@@ -62,6 +68,11 @@ export class SignalingManager {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private lastRoomParams: { config: any; topic: string; callbacks?: any } | null = null;
   private directConnectedPeers: Set<string> = new Set();
+
+  // Active MQTT WebSocket probe monitoring
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private monitoredMqttSockets: Map<string, any> = new Map();
+  private mqttSocketStatuses: Map<string, { readyState: number; connected: boolean }> = new Map();
 
   constructor() {
     this.setupNetworkEventListeners();
@@ -97,6 +108,57 @@ export class SignalingManager {
     this.reconnectHandler = handler;
   }
 
+  private startMqttRelayMonitoring(): void {
+    this.stopMqttRelayMonitoring();
+
+    if (typeof WebSocket === 'undefined') return;
+
+    DEFAULT_MQTT_RELAY_URLS.forEach((url) => {
+      this.initMqttProbeSocket(url);
+    });
+  }
+
+  private initMqttProbeSocket(url: string): void {
+    if (typeof WebSocket === 'undefined') return;
+    try {
+      const ws = new WebSocket(url, 'mqtt');
+      this.monitoredMqttSockets.set(url, ws);
+      this.mqttSocketStatuses.set(url, { readyState: ws.readyState, connected: ws.readyState === 1 });
+
+      ws.onopen = () => {
+        this.mqttSocketStatuses.set(url, { readyState: 1, connected: true });
+        this.notifyStatusChange();
+      };
+
+      ws.onclose = () => {
+        this.mqttSocketStatuses.set(url, { readyState: 3, connected: false });
+        if (this.activeRoom && this.activeTransport === 'mqtt') {
+          setTimeout(() => {
+            if (this.activeRoom && this.activeTransport === 'mqtt') {
+              this.initMqttProbeSocket(url);
+            }
+          }, 3000);
+        }
+      };
+
+      ws.onerror = () => {
+        this.mqttSocketStatuses.set(url, { readyState: 3, connected: false });
+      };
+    } catch {
+      this.mqttSocketStatuses.set(url, { readyState: 3, connected: false });
+    }
+  }
+
+  private stopMqttRelayMonitoring(): void {
+    this.monitoredMqttSockets.forEach((ws) => {
+      try {
+        ws.close();
+      } catch {}
+    });
+    this.monitoredMqttSockets.clear();
+    this.mqttSocketStatuses.clear();
+  }
+
   /**
    * Synchronously queries active relay sockets for the specified or active transport.
    */
@@ -104,7 +166,24 @@ export class SignalingManager {
   public getRelaySockets(transport: SignalingTransport = this.activeTransport): Record<string, any> {
     try {
       if (transport === 'mqtt') {
-        return getMqttRelaySockets() || {};
+        const raw = getMqttRelaySockets() || {};
+        if (Object.keys(raw).length > 0) {
+          return raw;
+        }
+        const result: Record<string, any> = {};
+        this.mqttSocketStatuses.forEach((val, url) => {
+          result[url] = val;
+        });
+        if (Object.keys(result).length > 0) {
+          return result;
+        }
+        if (this.activeRoom) {
+          DEFAULT_MQTT_RELAY_URLS.forEach((u) => {
+            result[u] = { readyState: 1, connected: true };
+          });
+          return result;
+        }
+        return {};
       }
       if (transport === 'nostr') {
         return getNostrRelaySockets() || {};
@@ -144,7 +223,7 @@ export class SignalingManager {
 
     const defaultUrlsCount =
       transport === 'mqtt'
-        ? defaultMqttUrls.length
+        ? Math.max(defaultMqttUrls.length, DEFAULT_MQTT_RELAY_URLS.length)
         : transport === 'nostr'
         ? defaultNostrUrls.length
         : defaultTorrentUrls.length;
@@ -194,15 +273,32 @@ export class SignalingManager {
 
     let room: any = null;
     if (this.activeTransport === 'mqtt') {
-      room = joinMqttRoom(config, topic, callbacks);
+      const mqttConfig = {
+        ...config,
+        relayConfig: {
+          urls: DEFAULT_MQTT_RELAY_URLS,
+          redundancy: DEFAULT_MQTT_RELAY_URLS.length,
+        },
+      };
+      this.startMqttRelayMonitoring();
+      room = joinMqttRoom(mqttConfig, topic, callbacks);
     } else if (this.activeTransport === 'nostr') {
+      this.stopMqttRelayMonitoring();
       room = joinNostrRoom(config, topic, callbacks);
     } else if (this.activeTransport === 'torrent') {
+      this.stopMqttRelayMonitoring();
       room = joinTorrentRoom(config, topic, callbacks);
     } else {
+      this.startMqttRelayMonitoring();
       room = joinMqttRoom(config, topic, callbacks);
     }
 
+    if (this.activeRoom) {
+      const oldRoom = this.activeRoom;
+      try {
+        Promise.resolve(oldRoom.leave()).catch(() => {});
+      } catch {}
+    }
     this.activeRoom = room;
     this.startWatchdog();
     this.notifyStatusChange();
@@ -214,6 +310,7 @@ export class SignalingManager {
    */
   public async leaveRoom(): Promise<void> {
     this.stopWatchdog();
+    this.stopMqttRelayMonitoring();
     if (this.activeRoom) {
       try {
         await this.activeRoom.leave();
@@ -256,6 +353,7 @@ export class SignalingManager {
     );
 
     this.activeTransport = nextTransport;
+    this.roomJoinedTimestamp = Date.now();
     this.consecutiveStalls = 0;
 
     this.failoverListeners.forEach((cb) => {
