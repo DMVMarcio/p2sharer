@@ -14,6 +14,7 @@ export function useRoom() {
   const username = useStore((s) => s.username);
   const isSidebarCollapsed = useStore((s) => s.isSidebarCollapsed);
   const isSpotlightTrayCollapsed = useStore((s) => s.isSpotlightTrayCollapsed);
+  const streamFilter = useStore((s) => s.streamFilter);
 
   const [, setServiceTick] = useState(0);
 
@@ -79,6 +80,12 @@ export function useRoom() {
     });
   }, []);
 
+  const setStreamFilter = useCallback((filter: import('../core/types').StreamFilterMode) => {
+    stateStore.set((s) => {
+      s.streamFilter = filter;
+    });
+  }, []);
+
   return {
     // State
     roomSlots,
@@ -91,6 +98,7 @@ export function useRoom() {
     username,
     isSidebarCollapsed,
     isSpotlightTrayCollapsed,
+    streamFilter,
     chatMessages: roomService.chatMessages,
     peers: roomService.peers,
     roomStatusText: roomService.roomStatusText,
@@ -108,6 +116,7 @@ export function useRoom() {
     togglePin,
     toggleSidebar,
     toggleSpotlightTray,
+    setStreamFilter,
     getPeerPing: (peerId: string) => roomService.getPeerPing(peerId),
     hideConnecting: () => roomService.hideConnecting(),
   };

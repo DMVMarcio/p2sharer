@@ -21,7 +21,8 @@ export interface UseStreamZoomReturn {
 
 export function useStreamZoom(
   cardRef: React.RefObject<HTMLDivElement | null>,
-  stream: MediaStream | null | undefined
+  stream: MediaStream | null | undefined,
+  enabled: boolean = true
 ): UseStreamZoomReturn {
   const [zoom, setZoom] = useState<number>(1.0);
   const [pan, setPan] = useState<PanOffset>({ x: 0, y: 0 });
@@ -50,6 +51,7 @@ export function useStreamZoom(
 
   // Non-passive wheel listener for smooth focal-point zoom
   useEffect(() => {
+    if (!enabled) return;
     const el = cardRef.current;
     if (!el) return;
 
@@ -128,7 +130,7 @@ export function useStreamZoom(
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
-      if (zoomRef.current <= 1.0 || e.button !== 0) return;
+      if (!enabled || zoomRef.current <= 1.0 || e.button !== 0) return;
 
       const target = e.target as HTMLElement;
       if (
@@ -195,6 +197,7 @@ export function useStreamZoom(
 
   const handleDoubleClick = useCallback(
     (e: React.MouseEvent) => {
+      if (!enabled) return;
       const target = e.target as HTMLElement;
       if (
         target.closest(
