@@ -54,7 +54,6 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
       {inTray && isSelectedFeatured && (
         <span className="selected-featured-badge" title="Este participante está em destaque">
           <span className="selected-featured-badge-dot"></span>
-          <span>EM FOCO</span>
         </span>
       )}
 
