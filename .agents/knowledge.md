@@ -46,7 +46,7 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 - `[Audio]` **Process Isolation & Sync**: Keep WASAPI loopback event-driven (<20us latency). Ensure ITU-R BS.775 downmixing and fractional 48kHz resampling phase continuity across streaming chunks.
 - `[P2P]` **Ghost Peer Mitigation & Mesh Bridging**: Enforce strict direct WebRTC verification; quarantine BitTorrent PEX gossip rumors while actively bridging indirect peers via in-mesh data channels to form resilient full-mesh topologies.
 - `[P2P]` **Signaling Synchronization**: Prevent premature client-side transport failovers; monitor MQTT brokers with active probe WebSockets and enforce a 6s startup grace period.
-- `[Build]` **Full Desktop Packaging**: Always build and verify the full native desktop artifact using `npm run tauri:build`. While `npm run build` only bundles the web frontend (`dist/`), `npm run tauri:build` encapsulates it via `beforeBuildCommand` and compiles the complete release binary and Windows bundle.
+- `[Build]` **Mandatory Full Desktop Packaging**: ALWAYS build and verify the full native desktop artifact using `npm run tauri:build`. Never stop at `npm run build`. `npm run tauri:build` encapsulates the frontend bundling via `beforeBuildCommand`, compiles the native Rust release binary, and builds the Windows desktop installer/bundle. Any code change must pass `npm run tauri:build`.
 
 ---
 

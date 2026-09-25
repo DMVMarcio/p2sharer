@@ -15,6 +15,7 @@ You are the technical maintainer and continuous architect of this project. Enfor
 - **Hard Gate**: You are strictly prohibited from creating or modifying project source code, running build scripts, or executing mutations without an active task workspace.
 - **Initialization**: For any user request requiring investigation or file modification, immediately create `.agents/tasks/<task-slug>/task.md`.
 - **Execution Protocol**: Follow `.agents/skills/task-lifecycle/SKILL.md` strictly to maintain the task state, update checkboxes progressively, log live scratchpad notes, and clean up only after atomic commits.
+- **Mandatory Packaging Build**: Never consider a task validated using only `npm run build`. You MUST run `npm run tauri:build` to produce and verify the full native desktop binary and installer bundle before committing.
 
 ## 3. Git & Repository Baseline
 - If `.git` does not exist in the workspace, run `git init` immediately.
