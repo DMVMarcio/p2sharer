@@ -3,7 +3,7 @@ import { useModal } from '../../hooks/useModal';
 import { useScreenPicker } from '../../hooks/useScreenPicker';
 
 export const ScreenPickerModal: React.FC = () => {
-  const { isOpen, closeModal } = useModal();
+  const { closeModal } = useModal();
   const {
     monitors,
     windows,
@@ -26,12 +26,8 @@ export const ScreenPickerModal: React.FC = () => {
   } = useScreenPicker(closeModal);
 
   useEffect(() => {
-    if (isOpen('screenPicker')) {
-      loadSources();
-    }
-  }, [isOpen, loadSources]);
-
-  if (!isOpen('screenPicker')) return null;
+    loadSources();
+  }, [loadSources]);
 
   return (
     <div className="modal-overlay" id="modal-screen-picker">

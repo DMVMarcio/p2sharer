@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useModal } from '../../hooks/useModal';
-import { useRoom } from '../../hooks/useRoom';
 import { useAppTheme, ACCENT_COLORS } from '../../hooks/useAppTheme';
 import { stateStore } from '../../core/state_store';
 import { soundEffects } from '../../ui/sound_effects';
@@ -9,56 +8,48 @@ import { showToast } from '../../hooks/useToast';
 import { ThemeMode } from '../../core/types';
 
 export const SettingsModal: React.FC = () => {
-  const { isOpen, closeModal } = useModal();
-  const { username } = useRoom();
+  const { closeModal } = useModal();
   const { themeMode, accentColor, setThemeMode, setAccentColor } = useAppTheme();
 
   const [activeTab, setActiveTab] = useState<
     'profile' | 'appearance' | 'audio' | 'stream' | 'network' | 'diagnostics'
   >('profile');
 
-  // Form states
-  const [nick, setNick] = useState(username);
-  const [sfxEnabled, setSfxEnabled] = useState(soundEffects.getEnabled());
-  const [sfxVolume, setSfxVolume] = useState(Math.round(soundEffects.getVolume() * 100));
+  // Form states initialized once upon mounting
+  const [nick, setNick] = useState(() => stateStore.username);
+  const [sfxEnabled, setSfxEnabled] = useState(() => soundEffects.getEnabled());
+  const [sfxVolume, setSfxVolume] = useState(() => Math.round(soundEffects.getVolume() * 100));
 
-  const [defaultRes, setDefaultRes] = useState('1080p');
-  const [defaultFps, setDefaultFps] = useState('60');
-  const [defaultBitrate, setDefaultBitrate] = useState('25000');
-  const [defaultCursor, setDefaultCursor] = useState(true);
+  const [defaultRes, setDefaultRes] = useState(
+    () => localStorage.getItem('p2sharer_default_res') || '1080p'
+  );
+  const [defaultFps, setDefaultFps] = useState(
+    () => localStorage.getItem('p2sharer_default_fps') || '60'
+  );
+  const [defaultBitrate, setDefaultBitrate] = useState(
+    () => localStorage.getItem('p2sharer_default_bitrate') || '25000'
+  );
+  const [defaultCursor, setDefaultCursor] = useState(
+    () => localStorage.getItem('p2sharer_default_cursor') !== 'false'
+  );
 
-  const [turnEnabled, setTurnEnabled] = useState(false);
-  const [turnUrl, setTurnUrl] = useState('');
-  const [turnUser, setTurnUser] = useState('');
-  const [turnCred, setTurnCred] = useState('');
-  const [turnForceRelay, setTurnForceRelay] = useState(false);
+  const [turnEnabled, setTurnEnabled] = useState(
+    () => localStorage.getItem('p2sharer_turn_enabled') === 'true'
+  );
+  const [turnUrl, setTurnUrl] = useState(() => localStorage.getItem('p2sharer_turn_url') || '');
+  const [turnUser, setTurnUser] = useState(() => localStorage.getItem('p2sharer_turn_user') || '');
+  const [turnCred, setTurnCred] = useState(() => localStorage.getItem('p2sharer_turn_cred') || '');
+  const [turnForceRelay, setTurnForceRelay] = useState(
+    () => localStorage.getItem('p2sharer_turn_force_relay') === 'true'
+  );
 
   const [logPath, setLogPath] = useState('Carregando caminho do log...');
 
   useEffect(() => {
-    if (isOpen('settings')) {
-      setNick(stateStore.username);
-      setSfxEnabled(soundEffects.getEnabled());
-      setSfxVolume(Math.round(soundEffects.getVolume() * 100));
-
-      setDefaultRes(localStorage.getItem('p2sharer_default_res') || '1080p');
-      setDefaultFps(localStorage.getItem('p2sharer_default_fps') || '60');
-      setDefaultBitrate(localStorage.getItem('p2sharer_default_bitrate') || '25000');
-      setDefaultCursor(localStorage.getItem('p2sharer_default_cursor') !== 'false');
-
-      setTurnEnabled(localStorage.getItem('p2sharer_turn_enabled') === 'true');
-      setTurnUrl(localStorage.getItem('p2sharer_turn_url') || '');
-      setTurnUser(localStorage.getItem('p2sharer_turn_user') || '');
-      setTurnCred(localStorage.getItem('p2sharer_turn_cred') || '');
-      setTurnForceRelay(localStorage.getItem('p2sharer_turn_force_relay') === 'true');
-
-      invoke<string>('get_log_file_path')
-        .then((path) => setLogPath(path))
-        .catch(() => setLogPath('Não foi possível obter o caminho do log.'));
-    }
-  }, [isOpen]);
-
-  if (!isOpen('settings')) return null;
+    invoke<string>('get_log_file_path')
+      .then((path) => setLogPath(path))
+      .catch(() => setLogPath('Não foi possível obter o caminho do log.'));
+  }, []);
 
   const handleSave = () => {
     // Save username

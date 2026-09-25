@@ -1,23 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useModal } from '../../hooks/useModal';
 import { useRoom } from '../../hooks/useRoom';
 import { showToast } from '../../hooks/useToast';
 
 export const RoomSecurityModal: React.FC = () => {
-  const { isOpen, closeModal } = useModal();
+  const { closeModal } = useModal();
   const { currentRoomCode, currentRoomPassword, updateRoomPassword } = useRoom();
 
-  const [password, setPassword] = useState('');
+  const [password, setPassword] = useState(() => currentRoomPassword);
   const [showPassword, setShowPassword] = useState(false);
-
-  useEffect(() => {
-    if (isOpen('roomSecurity')) {
-      setPassword(currentRoomPassword);
-      setShowPassword(false);
-    }
-  }, [isOpen, currentRoomPassword]);
-
-  if (!isOpen('roomSecurity')) return null;
 
   const handleSave = () => {
     const finalPass = password.trim();

@@ -1,26 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useModal } from '../../hooks/useModal';
 import { useRoom } from '../../hooks/useRoom';
 import { generateRandomRoomSlug } from '../../p2p/group_room';
 import { showToast } from '../../hooks/useToast';
 
 export const CreateRoomModal: React.FC = () => {
-  const { isOpen, closeModal } = useModal();
+  const { closeModal } = useModal();
   const { joinRoom } = useRoom();
 
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState(() => generateRandomRoomSlug());
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-
-  useEffect(() => {
-    if (isOpen('createRoom')) {
-      setCode(generateRandomRoomSlug());
-      setPassword('');
-      setShowPassword(false);
-    }
-  }, [isOpen]);
-
-  if (!isOpen('createRoom')) return null;
 
   const handleRegenCode = () => {
     setCode(generateRandomRoomSlug());

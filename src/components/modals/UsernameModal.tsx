@@ -1,19 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useModal } from '../../hooks/useModal';
 import { stateStore } from '../../core/state_store';
 import { showToast } from '../../hooks/useToast';
 
 export const UsernameModal: React.FC = () => {
-  const { isOpen, closeModal } = useModal();
-  const [val, setVal] = useState('');
-
-  useEffect(() => {
-    if (isOpen('username')) {
-      setVal(stateStore.username || `User_${Math.floor(1000 + Math.random() * 9000)}`);
-    }
-  }, [isOpen]);
-
-  if (!isOpen('username')) return null;
+  const { closeModal } = useModal();
+  const [val, setVal] = useState(
+    () => stateStore.username || `User_${Math.floor(1000 + Math.random() * 9000)}`
+  );
 
   const handleSave = () => {
     const trimmed = val.trim();
