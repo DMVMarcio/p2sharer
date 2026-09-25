@@ -1,4 +1,4 @@
-import type { ResolutionConfig, RoomSlotInfo, ThemeMode, TurnConfig } from './types.ts';
+import type { ResolutionConfig, RoomSlotInfo, StreamFilterMode, ThemeMode, TurnConfig } from './types.ts';
 
 export class StateStore {
   private static instance: StateStore | null = null;
@@ -13,6 +13,7 @@ export class StateStore {
   public pinnedPeerId: string | null = null;
   public subscribedStreams: Set<string> = new Set();
   public roomSlots: RoomSlotInfo[] = [];
+  public streamFilter: StreamFilterMode = 'all';
 
   public currentThemeMode: ThemeMode = 'dark';
   public currentAccentColor: string = 'cyan';

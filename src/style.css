@@ -712,6 +712,101 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   color: var(--text-muted);
 }
 
+/* Stream Header Filter Group */
+.stream-filter-group {
+  display: inline-flex;
+  align-items: center;
+  background-color: rgba(14, 14, 18, 0.75);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-full);
+  padding: 2px;
+  gap: 3px;
+  margin-left: 6px;
+  flex-shrink: 0;
+}
+
+.btn-stream-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  user-select: none;
+}
+
+.btn-stream-filter:hover {
+  color: var(--text-primary);
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.btn-stream-filter.active {
+  background-color: var(--accent-color);
+  color: #080d14;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(6, 182, 212, 0.35);
+}
+
+.filter-count-badge {
+  font-size: 9px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  padding: 0 4px;
+  border-radius: 6px;
+  background-color: rgba(255, 255, 255, 0.14);
+  color: inherit;
+}
+
+.btn-stream-filter.active .filter-count-badge {
+  background-color: rgba(0, 0, 0, 0.22);
+  color: #080d14;
+}
+
+.filter-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #ef4444;
+}
+
+.btn-stream-filter.active .filter-live-dot {
+  background-color: #080d14;
+}
+
+/* Stream Filter Empty State */
+.stream-filter-empty-state {
+  width: 100%;
+  height: 100%;
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.filter-empty-title {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.filter-empty-btn {
+  margin-top: 4px;
+}
+
 .stream-actions {
   display: flex;
   align-items: center;
@@ -854,6 +949,94 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   width: auto;
   aspect-ratio: 16 / 9;
   flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+/* Spotlight Tray Clean Layout (Less Clutter) */
+.spotlight-tray-strip .stream-card-stats-hud,
+.spotlight-tray-strip .stream-volume-controller,
+.spotlight-tray-strip .stream-zoom-bar,
+.spotlight-tray-strip .participant-status-text {
+  display: none !important;
+}
+
+.spotlight-tray-strip .stream-card-overlay {
+  bottom: 5px;
+  left: 5px;
+  padding: 2px 7px;
+  font-size: 9.5px;
+  border-radius: var(--radius-full);
+}
+
+.spotlight-tray-strip .btn-stop-watch-stream {
+  top: 5px;
+  right: 5px;
+  font-size: 9.5px;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  background-color: rgba(0, 0, 0, 0.75);
+}
+
+.spotlight-tray-strip .participant-avatar-badge {
+  width: 36px;
+  height: 36px;
+}
+
+.spotlight-tray-strip .participant-avatar-badge svg {
+  width: 18px;
+  height: 18px;
+}
+
+.spotlight-tray-strip .participant-name-row {
+  margin-top: 4px;
+}
+
+.spotlight-tray-strip .participant-avatar-label {
+  font-size: 11px;
+}
+
+.spotlight-tray-strip .participant-action-row {
+  margin-top: 4px;
+}
+
+.spotlight-tray-strip .btn-watch-stream {
+  padding: 3px 8px;
+  font-size: 10px;
+}
+
+/* Active featured screen indicator in bottom tray */
+.spotlight-tray-strip .stream-card.selected-featured,
+.spotlight-tray-strip .participant-card.selected-featured {
+  border: 2px solid var(--accent-color, #06b6d4) !important;
+  box-shadow: 0 0 14px rgba(6, 182, 212, 0.5);
+  position: relative;
+}
+
+.selected-featured-badge {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  z-index: 12;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background-color: var(--accent-color, #06b6d4);
+  color: #080d14;
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: var(--radius-full);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+
+.selected-featured-badge-dot {
+  width: 4.5px;
+  height: 4.5px;
+  border-radius: 50%;
+  background-color: #080d14;
 }
 
 /* Stream Video Card */

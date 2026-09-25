@@ -10,9 +10,16 @@ import { ZoomControlBar } from './ZoomControlBar';
 interface VideoCardProps {
   slot: RoomSlotInfo;
   isFeatured?: boolean;
+  inTray?: boolean;
+  isSelectedFeatured?: boolean;
 }
 
-export const VideoCard: React.FC<VideoCardProps> = ({ slot, isFeatured = false }) => {
+export const VideoCard: React.FC<VideoCardProps> = ({
+  slot,
+  isFeatured = false,
+  inTray = false,
+  isSelectedFeatured = false,
+}) => {
   const { togglePin, stopWatchingStream, getPeerPing, username } = useRoom();
   const currentResolution = useStore((s) => s.currentResolution);
   const currentFps = useStore((s) => s.currentFps);
@@ -37,7 +44,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({ slot, isFeatured = false }
     resetZoom,
     handleMouseDown,
     handleDoubleClick,
-  } = useStreamZoom(cardRef, slot.stream);
+  } = useStreamZoom(cardRef, slot.stream, !inTray);
 
   const videoRef = useCallback(
     (el: HTMLVideoElement | null) => {
@@ -143,6 +150,10 @@ export const VideoCard: React.FC<VideoCardProps> = ({ slot, isFeatured = false }
     : '';
 
   const getTitle = () => {
+    if (inTray) {
+      if (isSelectedFeatured) return 'Em destaque no palco (clique para voltar à grade)';
+      return 'Clique para destacar esta transmissão no palco';
+    }
     if (zoom > 1.0) return 'Arraste para mover / Dê duplo-clique para redefinir zoom';
     if (isFeatured) return 'Clique para voltar à grade';
     if (slot.isLocal) return 'Clique para destacar sua transmissão';
@@ -152,12 +163,12 @@ export const VideoCard: React.FC<VideoCardProps> = ({ slot, isFeatured = false }
   return (
     <div
       ref={cardRef}
-      className={`stream-card ${isFeatured ? 'featured' : ''} ${zoom > 1.0 ? 'is-zoomed' : ''} ${isDragging ? 'is-dragging' : ''} ${!slot.isLocal ? 'has-volume-controller' : ''}`}
+      className={`stream-card ${isFeatured ? 'featured' : ''} ${inTray ? 'in-tray' : ''} ${isSelectedFeatured ? 'selected-featured' : ''} ${zoom > 1.0 && !inTray ? 'is-zoomed' : ''} ${isDragging && !inTray ? 'is-dragging' : ''} ${!slot.isLocal && !inTray ? 'has-volume-controller' : ''}`}
       data-peer-id={slot.peerId}
       title={getTitle()}
       onClick={handleCardClick}
-      onMouseDown={handleMouseDown}
-      onDoubleClick={handleDoubleClick}
+      onMouseDown={!inTray ? handleMouseDown : undefined}
+      onDoubleClick={!inTray ? handleDoubleClick : undefined}
     >
       <div
         className="stream-video-viewport"
@@ -180,16 +191,25 @@ export const VideoCard: React.FC<VideoCardProps> = ({ slot, isFeatured = false }
             width: '100%',
             height: '100%',
             objectFit: 'contain',
-            transform: zoom > 1.0 ? `translate3d(${pan.x}px, ${pan.y}px, 0px) scale(${zoom})` : 'none',
+            transform: zoom > 1.0 && !inTray ? `translate3d(${pan.x}px, ${pan.y}px, 0px) scale(${zoom})` : 'none',
             transformOrigin: 'center center',
             transition: isDragging ? 'none' : 'transform 0.08s ease-out',
-            willChange: zoom > 1.0 ? 'transform' : 'auto',
+            willChange: zoom > 1.0 && !inTray ? 'transform' : 'auto',
           }}
         />
       </div>
 
-      {/* Stats HUD on top of card */}
-      <div className="stream-card-stats-hud">
+      {/* Featured badge when in tray */}
+      {inTray && isSelectedFeatured && (
+        <span className="selected-featured-badge" title="Esta transmissão está aberta em destaque">
+          <span className="selected-featured-badge-dot"></span>
+          <span>EM FOCO</span>
+        </span>
+      )}
+
+      {/* Stats HUD on top of card - only when not in tray */}
+      {!inTray && (
+        <div className="stream-card-stats-hud">
         <span className="stat-badge stat-badge-quality">
           <span className="stat-badge-dot"></span>
           <span className="stat-quality-text">
@@ -260,6 +280,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({ slot, isFeatured = false }
           </div>
         </div>
       </div>
+    )}
 
       {/* User overlay at bottom-left */}
       <div className="stream-card-overlay">
@@ -279,56 +300,60 @@ export const VideoCard: React.FC<VideoCardProps> = ({ slot, isFeatured = false }
             Parar de Assistir
           </button>
 
-          <div
-            className="stream-volume-controller"
-            title="Controle de Volume da Transmissão"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button className="btn-stream-volume" title="Mutar / Desmutar" onClick={handleToggleMute}>
-              {isMuted || volume === 0 ? (
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-                  <line x1="23" x2="17" y1="9" y2="15"/>
-                  <line x1="17" x2="23" y1="9" y2="15"/>
-                </svg>
-              ) : volume < 50 ? (
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-                  <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
-                </svg>
-              ) : (
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-                  <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
-                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
-                </svg>
-              )}
-            </button>
+          {!inTray && (
+            <div
+              className="stream-volume-controller"
+              title="Controle de Volume da Transmissão"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button className="btn-stream-volume" title="Mutar / Desmutar" onClick={handleToggleMute}>
+                {isMuted || volume === 0 ? (
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                    <line x1="23" x2="17" y1="9" y2="15"/>
+                    <line x1="17" x2="23" y1="9" y2="15"/>
+                  </svg>
+                ) : volume < 50 ? (
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                    <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                  </svg>
+                ) : (
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                    <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+                  </svg>
+                )}
+              </button>
 
-            <div className="stream-volume-slider-box">
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={isMuted ? 0 : volume}
-                className="stream-volume-range"
-                onChange={handleVolumeChange}
-                onClick={(e) => e.stopPropagation()}
-              />
-              <span className="stream-volume-percent">{isMuted ? '0%' : `${volume}%`}</span>
+              <div className="stream-volume-slider-box">
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={isMuted ? 0 : volume}
+                  className="stream-volume-range"
+                  onChange={handleVolumeChange}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <span className="stream-volume-percent">{isMuted ? '0%' : `${volume}%`}</span>
+              </div>
             </div>
-          </div>
+          )}
         </>
       )}
 
-      {/* Precision Zoom Control Bar (visible when zoom > 1.0) */}
-      <ZoomControlBar
-        zoom={zoom}
-        onZoomChange={setZoomDirect}
-        onStepZoom={stepZoomLevel}
-        onResetZoom={resetZoom}
-        hasVolumeControl={!slot.isLocal}
-      />
+      {/* Precision Zoom Control Bar (visible when zoom > 1.0 and not in tray) */}
+      {!inTray && (
+        <ZoomControlBar
+          zoom={zoom}
+          onZoomChange={setZoomDirect}
+          onStepZoom={stepZoomLevel}
+          onResetZoom={resetZoom}
+          hasVolumeControl={!slot.isLocal}
+        />
+      )}
     </div>
   );
 };

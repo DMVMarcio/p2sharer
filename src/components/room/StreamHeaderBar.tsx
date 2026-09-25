@@ -1,6 +1,7 @@
 import React from 'react';
 import { useRoom } from '../../hooks/useRoom';
 import { useModal } from '../../hooks/useModal';
+import { useStore } from '../../hooks/useStore';
 
 export const StreamHeaderBar: React.FC = () => {
   const {
@@ -10,11 +11,17 @@ export const StreamHeaderBar: React.FC = () => {
     leaveRoom,
     toggleSidebar,
     isSidebarCollapsed,
+    streamFilter,
+    setStreamFilter,
   } = useRoom();
   const { openModal } = useModal();
+  const subscribedStreams = useStore((s) => s.subscribedStreams);
 
   const totalCount = roomSlots.length;
   const streamingCount = roomSlots.filter((s) => s.isStreaming).length;
+  const watchingCount = roomSlots.filter(
+    (s) => (s.isLocal && s.isStreaming) || (!s.isLocal && s.isStreaming && subscribedStreams.has(s.peerId))
+  ).length;
 
   const handleToggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -42,6 +49,44 @@ export const StreamHeaderBar: React.FC = () => {
           {totalCount} {totalCount === 1 ? 'pessoa' : 'pessoas'}
           {streamingCount > 0 ? ` (${streamingCount} ao vivo)` : ''}
         </span>
+      </div>
+
+      {/* Stream Filter Controls */}
+      <div className="stream-filter-group" role="group" aria-label="Filtro de visualização">
+        <button
+          type="button"
+          className={`btn-stream-filter ${streamFilter === 'all' ? 'active' : ''}`}
+          onClick={() => setStreamFilter('all')}
+          title="Mostrar todos os participantes da sala"
+        >
+          <span>Todos</span>
+          <span className="filter-count-badge">{totalCount}</span>
+        </button>
+
+        <button
+          type="button"
+          className={`btn-stream-filter ${streamFilter === 'streaming' ? 'active' : ''}`}
+          onClick={() => setStreamFilter(streamFilter === 'streaming' ? 'all' : 'streaming')}
+          title="Mostrar apenas participantes transmitindo tela"
+        >
+          <span className="filter-live-dot"></span>
+          <span>Transmitindo</span>
+          <span className="filter-count-badge">{streamingCount}</span>
+        </button>
+
+        <button
+          type="button"
+          className={`btn-stream-filter ${streamFilter === 'watching' ? 'active' : ''}`}
+          onClick={() => setStreamFilter(streamFilter === 'watching' ? 'all' : 'watching')}
+          title="Mostrar apenas telas que você está assistindo"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+          <span>Assistindo</span>
+          <span className="filter-count-badge">{watchingCount}</span>
+        </button>
       </div>
 
       <div className="stream-actions">

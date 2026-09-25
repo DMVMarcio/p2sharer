@@ -6,9 +6,16 @@ import { useStore } from '../../hooks/useStore';
 interface ParticipantCardProps {
   slot: RoomSlotInfo;
   isFeatured?: boolean;
+  inTray?: boolean;
+  isSelectedFeatured?: boolean;
 }
 
-export const ParticipantCard: React.FC<ParticipantCardProps> = ({ slot, isFeatured = false }) => {
+export const ParticipantCard: React.FC<ParticipantCardProps> = ({
+  slot,
+  isFeatured = false,
+  inTray = false,
+  isSelectedFeatured = false,
+}) => {
   const { togglePin, requestStream, username } = useRoom();
   const subscribedStreams = useStore((s) => s.subscribedStreams);
 
@@ -26,6 +33,10 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({ slot, isFeatur
   };
 
   const getTitle = () => {
+    if (inTray) {
+      if (isSelectedFeatured) return 'Em destaque no palco (clique para voltar à grade)';
+      return 'Clique para destacar este participante no palco';
+    }
     if (isFeatured) return 'Clique para voltar à grade';
     if (slot.isLocal) return 'Clique para destacar seu card';
     return 'Clique para destacar este participante';
@@ -33,19 +44,27 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({ slot, isFeatur
 
   return (
     <div
-      className={`participant-card ${isFeatured ? 'featured' : ''}`}
+      className={`participant-card ${isFeatured ? 'featured' : ''} ${inTray ? 'in-tray' : ''} ${isSelectedFeatured ? 'selected-featured' : ''}`}
       data-peer-id={slot.peerId}
       style={{ '--user-color': slot.color } as React.CSSProperties}
       title={getTitle()}
       onClick={handleCardClick}
     >
+      {/* Featured badge when in tray */}
+      {inTray && isSelectedFeatured && (
+        <span className="selected-featured-badge" title="Este participante está em destaque">
+          <span className="selected-featured-badge-dot"></span>
+          <span>EM FOCO</span>
+        </span>
+      )}
+
       {/* If remote and is streaming but not subscribed, show AO VIVO and watchers */}
       {!slot.isLocal && slot.isStreaming && !isSubscribed && (
         <>
           <span className="badge-live-stream">
             <span className="badge-live-dot"></span>AO VIVO
           </span>
-          {watchersCount > 0 && (
+          {watchersCount > 0 && !inTray && (
             <div
               className="badge-live-watchers custom-tooltip-container"
               onClick={(e) => e.stopPropagation()}
@@ -95,15 +114,15 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({ slot, isFeatur
         {slot.isLocal && <span className="badge-you">VOCÊ</span>}
       </div>
 
-      {slot.isLocal && !slot.isStreaming && (
+      {!inTray && slot.isLocal && !slot.isStreaming && (
         <div className="participant-status-text">Você não está transmitindo</div>
       )}
 
-      {!slot.isLocal && !slot.isStreaming && (
+      {!inTray && !slot.isLocal && !slot.isStreaming && (
         <div className="participant-status-text">Sem transmissão</div>
       )}
 
-      {!slot.isLocal && slot.isStreaming && isSubscribed && !slot.stream && (
+      {!inTray && !slot.isLocal && slot.isStreaming && isSubscribed && !slot.stream && (
         <div className="participant-status-text" style={{ color: 'var(--accent-color)' }}>
           Conectando transmissão...
         </div>

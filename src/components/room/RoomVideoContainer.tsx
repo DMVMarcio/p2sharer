@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useRoom } from '../../hooks/useRoom';
 import { useStore } from '../../hooks/useStore';
 import { VideoCard } from './VideoCard';
@@ -12,6 +12,8 @@ export const RoomVideoContainer: React.FC = () => {
     pinnedPeerId,
     isSpotlightTrayCollapsed,
     toggleSpotlightTray,
+    streamFilter,
+    setStreamFilter,
   } = useRoom();
   const subscribedStreams = useStore((s) => s.subscribedStreams);
 
@@ -22,16 +24,53 @@ export const RoomVideoContainer: React.FC = () => {
     );
   };
 
-  const renderSlotCard = (slot: RoomSlotInfo, isFeatured = false) => {
-    if (shouldRenderVideo(slot)) {
-      return <VideoCard key={slot.peerId} slot={slot} isFeatured={isFeatured} />;
-    }
-    return <ParticipantCard key={slot.peerId} slot={slot} isFeatured={isFeatured} />;
-  };
+  const filteredSlots = useMemo(() => {
+    return roomSlots.filter((slot) => {
+      if (streamFilter === 'streaming') {
+        return slot.isStreaming;
+      }
+      if (streamFilter === 'watching') {
+        const isSelfStreaming = slot.isLocal && slot.isStreaming;
+        const isRemoteWatched = !slot.isLocal && slot.isStreaming && subscribedStreams.has(slot.peerId);
+        return isSelfStreaming || isRemoteWatched;
+      }
+      return true;
+    });
+  }, [roomSlots, streamFilter, subscribedStreams]);
 
   const featuredSlot =
-    roomSlots.find((s) => s.peerId === pinnedPeerId) || roomSlots[0];
-  const otherSlots = roomSlots.filter((s) => s.peerId !== featuredSlot?.peerId);
+    filteredSlots.find((s) => s.peerId === pinnedPeerId) ||
+    filteredSlots[0] ||
+    roomSlots.find((s) => s.peerId === pinnedPeerId) ||
+    roomSlots[0];
+
+  const renderSlotCard = (
+    slot: RoomSlotInfo,
+    isFeatured = false,
+    inTray = false,
+    isSelectedFeatured = false
+  ) => {
+    if (shouldRenderVideo(slot)) {
+      return (
+        <VideoCard
+          key={slot.peerId}
+          slot={slot}
+          isFeatured={isFeatured}
+          inTray={inTray}
+          isSelectedFeatured={isSelectedFeatured}
+        />
+      );
+    }
+    return (
+      <ParticipantCard
+        key={slot.peerId}
+        slot={slot}
+        isFeatured={isFeatured}
+        inTray={inTray}
+        isSelectedFeatured={isSelectedFeatured}
+      />
+    );
+  };
 
   return (
     <div className="video-container" id="room-video-container">
@@ -40,7 +79,19 @@ export const RoomVideoContainer: React.FC = () => {
         className={`streams-grid-wrapper layout-grid ${layoutMode !== 'grid' ? 'hidden' : ''}`}
         id="streams-grid-wrapper"
       >
-        {roomSlots.map((slot) => renderSlotCard(slot, false))}
+        {filteredSlots.length > 0 ? (
+          filteredSlots.map((slot) => renderSlotCard(slot, false, false, false))
+        ) : (
+          <div className="stream-filter-empty-state">
+            <p className="filter-empty-title">Nenhum participante com o filtro selecionado.</p>
+            <button
+              className="btn btn-sm btn-outline filter-empty-btn"
+              onClick={() => setStreamFilter('all')}
+            >
+              Mostrar todos ({roomSlots.length})
+            </button>
+          </div>
+        )}
       </div>
 
       {/* SPOTLIGHT STAGE */}
@@ -50,7 +101,19 @@ export const RoomVideoContainer: React.FC = () => {
       >
         {/* Featured Area */}
         <div className="spotlight-featured-area" id="spotlight-featured-area">
-          {featuredSlot && renderSlotCard(featuredSlot, true)}
+          {featuredSlot ? (
+            renderSlotCard(featuredSlot, true, false, false)
+          ) : (
+            <div className="stream-filter-empty-state">
+              <p className="filter-empty-title">Nenhuma transmissão selecionada.</p>
+              <button
+                className="btn btn-sm btn-outline filter-empty-btn"
+                onClick={() => setStreamFilter('all')}
+              >
+                Mostrar todos ({roomSlots.length})
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Bottom Tray */}
@@ -69,7 +132,9 @@ export const RoomVideoContainer: React.FC = () => {
             </svg>
           </button>
           <div className="spotlight-tray-strip" id="spotlight-tray-strip">
-            {otherSlots.map((slot) => renderSlotCard(slot, false))}
+            {filteredSlots.map((slot) =>
+              renderSlotCard(slot, false, true, slot.peerId === featuredSlot?.peerId)
+            )}
           </div>
         </div>
       </div>
