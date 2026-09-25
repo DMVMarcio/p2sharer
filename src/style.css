@@ -889,7 +889,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 
 .stream-card-overlay {
   position: absolute;
-  top: 10px;
+  bottom: 10px;
   left: 10px;
   display: flex;
   align-items: center;
@@ -1369,6 +1369,161 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   color: #d4d4d8;
   min-width: 28px;
   user-select: none;
+}
+
+/* Stream Zoom Precision Controller */
+.stream-zoom-bar {
+  position: absolute;
+  bottom: 48px;
+  right: 10px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background-color: rgba(10, 10, 15, 0.88);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 4px 8px;
+  border-radius: var(--radius-full);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.55);
+  animation: zoom-bar-fade-in 0.15s ease-out;
+  user-select: none;
+  pointer-events: auto;
+}
+
+.stream-card:not(.has-volume-controller) .stream-zoom-bar {
+  bottom: 10px;
+}
+
+@keyframes zoom-bar-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.stream-zoom-bar:hover {
+  background-color: rgba(15, 15, 22, 0.96);
+  border-color: var(--accent-border);
+}
+
+.stream-zoom-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-color, #06b6d4);
+  padding: 0 2px;
+}
+
+.btn-zoom-step {
+  background: none;
+  border: none;
+  color: #f4f4f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 3px;
+  border-radius: var(--radius-full);
+  transition: color var(--transition-fast), transform var(--transition-fast), background-color var(--transition-fast);
+}
+
+.btn-zoom-step:hover:not(:disabled) {
+  color: var(--accent-color);
+  background-color: rgba(255, 255, 255, 0.1);
+  transform: scale(1.1);
+}
+
+.btn-zoom-step:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.stream-zoom-slider-container {
+  display: flex;
+  align-items: center;
+}
+
+.stream-zoom-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 76px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.25);
+  outline: none;
+  cursor: pointer;
+}
+
+.stream-zoom-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent-color, #06b6d4);
+  cursor: pointer;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
+  transition: transform var(--transition-fast), background-color var(--transition-fast);
+}
+
+.stream-zoom-range::-webkit-slider-thumb:hover {
+  transform: scale(1.25);
+  background: #38bdf8;
+}
+
+.stream-zoom-badge {
+  font-size: 10.5px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: #f4f4f5;
+  min-width: 32px;
+  text-align: center;
+}
+
+.btn-zoom-reset {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #e4e4e7;
+  font-size: 9.5px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  padding: 2px 6px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-zoom-reset:hover {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: rgba(239, 68, 68, 0.6);
+  color: #fca5a5;
+  transform: scale(1.04);
+}
+
+/* Zoom cursor states on video element and card */
+.stream-card.is-zoomed {
+  cursor: grab;
+}
+
+.stream-card.is-zoomed.is-dragging {
+  cursor: grabbing !important;
+  user-select: none;
+}
+
+.stream-card.is-zoomed video {
+  cursor: grab;
+}
+
+.stream-card.is-zoomed.is-dragging video {
+  cursor: grabbing !important;
 }
 
 /* Stream HUD */

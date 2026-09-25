@@ -1,9 +1,11 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { RoomSlotInfo } from '../../core/types';
 import { useRoom } from '../../hooks/useRoom';
 import { useStore } from '../../hooks/useStore';
+import { useStreamZoom } from '../../hooks/useStreamZoom';
 import { audioContextManager } from '../../audio/audio_context_manager';
 import { roomService } from '../../services/room_service';
+import { ZoomControlBar } from './ZoomControlBar';
 
 interface VideoCardProps {
   slot: RoomSlotInfo;
@@ -23,6 +25,19 @@ export const VideoCard: React.FC<VideoCardProps> = ({ slot, isFeatured = false }
   const [volume, setVolume] = useState<number>(100);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [lastVolume, setLastVolume] = useState<number>(100);
+
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  const {
+    zoom,
+    pan,
+    isDragging,
+    didDragRef,
+    setZoomDirect,
+    stepZoomLevel,
+    resetZoom,
+    handleMouseDown,
+    handleDoubleClick,
+  } = useStreamZoom(cardRef, slot.stream);
 
   const videoRef = useCallback(
     (el: HTMLVideoElement | null) => {
@@ -75,6 +90,13 @@ export const VideoCard: React.FC<VideoCardProps> = ({ slot, isFeatured = false }
   }, [slot.isLocal, slot.peerId, currentBitrate, currentFps]);
 
   const handleCardClick = () => {
+    if (didDragRef.current) {
+      didDragRef.current = false;
+      return;
+    }
+    if (zoom > 1.0) {
+      return;
+    }
     togglePin(slot.peerId);
   };
 
@@ -121,6 +143,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({ slot, isFeatured = false }
     : '';
 
   const getTitle = () => {
+    if (zoom > 1.0) return 'Arraste para mover / Dê duplo-clique para redefinir zoom';
     if (isFeatured) return 'Clique para voltar à grade';
     if (slot.isLocal) return 'Clique para destacar sua transmissão';
     return 'Clique para destacar esta transmissão';
@@ -128,18 +151,42 @@ export const VideoCard: React.FC<VideoCardProps> = ({ slot, isFeatured = false }
 
   return (
     <div
-      className={`stream-card ${isFeatured ? 'featured' : ''}`}
+      ref={cardRef}
+      className={`stream-card ${isFeatured ? 'featured' : ''} ${zoom > 1.0 ? 'is-zoomed' : ''} ${isDragging ? 'is-dragging' : ''} ${!slot.isLocal ? 'has-volume-controller' : ''}`}
       data-peer-id={slot.peerId}
       title={getTitle()}
       onClick={handleCardClick}
+      onMouseDown={handleMouseDown}
+      onDoubleClick={handleDoubleClick}
     >
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-      />
+      <div
+        className="stream-video-viewport"
+        style={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+          position: 'relative',
+        }}
+      >
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            transform: zoom > 1.0 ? `translate3d(${pan.x}px, ${pan.y}px, 0px) scale(${zoom})` : 'none',
+            transformOrigin: 'center center',
+            transition: isDragging ? 'none' : 'transform 0.08s ease-out',
+            willChange: zoom > 1.0 ? 'transform' : 'auto',
+          }}
+        />
+      </div>
 
       {/* Stats HUD on top of card */}
       <div className="stream-card-stats-hud">
@@ -273,6 +320,15 @@ export const VideoCard: React.FC<VideoCardProps> = ({ slot, isFeatured = false }
           </div>
         </>
       )}
+
+      {/* Precision Zoom Control Bar (visible when zoom > 1.0) */}
+      <ZoomControlBar
+        zoom={zoom}
+        onZoomChange={setZoomDirect}
+        onStepZoom={stepZoomLevel}
+        onResetZoom={resetZoom}
+        hasVolumeControl={!slot.isLocal}
+      />
     </div>
   );
 };
