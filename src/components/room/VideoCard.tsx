@@ -32,6 +32,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   const [volume, setVolume] = useState<number>(100);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [lastVolume, setLastVolume] = useState<number>(100);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
   const cardRef = useRef<HTMLDivElement | null>(null);
   const {
@@ -45,6 +46,30 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     handleMouseDown,
     handleDoubleClick,
   } = useStreamZoom(cardRef, slot.stream, !inTray);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(document.fullscreenElement === cardRef.current);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
+  const handleToggleFullscreen = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (document.fullscreenElement !== cardRef.current) {
+      if (cardRef.current?.requestFullscreen) {
+        cardRef.current.requestFullscreen().catch(() => {});
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
+  };
 
   const videoRef = useCallback(
     (el: HTMLVideoElement | null) => {
@@ -203,7 +228,6 @@ export const VideoCard: React.FC<VideoCardProps> = ({
       {inTray && isSelectedFeatured && (
         <span className="selected-featured-badge" title="Esta transmissão está aberta em destaque">
           <span className="selected-featured-badge-dot"></span>
-          <span>EM FOCO</span>
         </span>
       )}
 
@@ -289,24 +313,35 @@ export const VideoCard: React.FC<VideoCardProps> = ({
         {slot.isLocal && <span className="badge-you">VOCÊ</span>}
       </div>
 
-      {/* Remote peer controls: Stop Watching and Volume */}
+      {/* Remote peer controls: Stop Watching */}
       {!slot.isLocal && (
-        <>
-          <button
-            className="btn-stop-watch-stream"
-            title="Parar de assistir esta transmissão"
-            onClick={handleStopWatching}
-          >
-            Parar de Assistir
-          </button>
+        <button
+          className="btn-stop-watch-stream"
+          title="Parar de assistir esta transmissão"
+          onClick={handleStopWatching}
+        >
+          Parar de Assistir
+        </button>
+      )}
 
-          {!inTray && (
+      {/* Bottom-right stream controls: Volume (remote only) + Fullscreen */}
+      {!inTray && (
+        <div
+          className="stream-controls-group"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {!slot.isLocal && (
             <div
               className="stream-volume-controller"
               title="Controle de Volume da Transmissão"
-              onClick={(e) => e.stopPropagation()}
             >
-              <button className="btn-stream-volume" title="Mutar / Desmutar" onClick={handleToggleMute}>
+              <button
+                type="button"
+                className="btn-stream-volume"
+                title="Mutar / Desmutar"
+                onClick={handleToggleMute}
+                aria-label="Mutar / Desmutar"
+              >
                 {isMuted || volume === 0 ? (
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
@@ -341,7 +376,32 @@ export const VideoCard: React.FC<VideoCardProps> = ({
               </div>
             </div>
           )}
-        </>
+
+          <button
+            type="button"
+            className="btn-stream-fullscreen"
+            id={`btn-stream-fullscreen-${slot.peerId}`}
+            title={isFullscreen ? "Sair da Tela Cheia" : "Tela Cheia"}
+            onClick={handleToggleFullscreen}
+            aria-label={isFullscreen ? "Sair da Tela Cheia" : "Tela Cheia"}
+          >
+            {isFullscreen ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="4 14 10 14 10 20"/>
+                <polyline points="20 10 14 10 14 4"/>
+                <line x1="14" x2="21" y1="10" y2="3"/>
+                <line x1="3" x2="10" y1="21" y2="14"/>
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 3 21 3 21 9"/>
+                <polyline points="9 21 3 21 3 15"/>
+                <line x1="21" x2="14" y1="3" y2="10"/>
+                <line x1="3" x2="10" y1="21" y2="14"/>
+              </svg>
+            )}
+          </button>
+        </div>
       )}
 
       {/* Precision Zoom Control Bar (visible when zoom > 1.0 and not in tray) */}

@@ -9,8 +9,6 @@ export const StreamHeaderBar: React.FC = () => {
     isSharingScreen,
     stopScreenSharing,
     leaveRoom,
-    toggleSidebar,
-    isSidebarCollapsed,
     streamFilter,
     setStreamFilter,
   } = useRoom();
@@ -23,14 +21,6 @@ export const StreamHeaderBar: React.FC = () => {
     (s) => (s.isLocal && s.isStreaming) || (!s.isLocal && s.isStreaming && subscribedStreams.has(s.peerId))
   ).length;
 
-  const handleToggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
-    } else {
-      document.exitFullscreen().catch(() => {});
-    }
-  };
-
   const handleToggleTransmission = () => {
     if (isSharingScreen) {
       stopScreenSharing();
@@ -41,17 +31,7 @@ export const StreamHeaderBar: React.FC = () => {
 
   return (
     <div className="stream-header-bar">
-      <div className="stream-status">
-        <span className="live-indicator" id="room-live-badge">
-          {streamingCount > 0 ? 'AO VIVO' : 'SALA ATIVA'}
-        </span>
-        <span className="stream-host-tag" id="room-sharing-status-tag">
-          {totalCount} {totalCount === 1 ? 'pessoa' : 'pessoas'}
-          {streamingCount > 0 ? ` (${streamingCount} ao vivo)` : ''}
-        </span>
-      </div>
-
-      {/* Stream Filter Controls */}
+      {/* Stream Filter Controls on Left */}
       <div className="stream-filter-group" role="group" aria-label="Filtro de visualização">
         <button
           type="button"
@@ -106,7 +86,7 @@ export const StreamHeaderBar: React.FC = () => {
             <path d="M17 3h5v5"/>
           </svg>
           <span className="btn-text" id="label-share-screen">
-            {isSharingScreen ? 'Parar Transmissão' : 'Transmissão'}
+            {isSharingScreen ? 'Parar Transmissão' : 'Transmitir'}
           </span>
         </button>
 
@@ -143,36 +123,6 @@ export const StreamHeaderBar: React.FC = () => {
             <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
           </svg>
           <span className="btn-text" id="label-room-security">Senha</span>
-        </button>
-
-        {/* Toggle Sidebar (Chat) */}
-        <button
-          className="btn btn-sm btn-outline btn-compact"
-          id="btn-toggle-sidebar"
-          onClick={toggleSidebar}
-          title="Ocultar / Mostrar Chat"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-          </svg>
-          <span className="btn-text" id="label-toggle-sidebar">
-            {isSidebarCollapsed ? 'Abrir' : 'Chat'}
-          </span>
-        </button>
-
-        {/* Fullscreen */}
-        <button
-          className="btn btn-sm btn-outline btn-compact"
-          id="btn-room-fullscreen"
-          onClick={handleToggleFullscreen}
-          title="Tela Cheia"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="15 3 21 3 21 9"/>
-            <polyline points="9 21 3 21 3 15"/>
-            <line x1="21" x2="14" y1="3" y2="10"/>
-            <line x1="3" x2="10" y1="21" y2="14"/>
-          </svg>
         </button>
 
         {/* Leave Room */}

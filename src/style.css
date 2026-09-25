@@ -657,6 +657,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  position: relative;
 }
 
 .stream-area {
@@ -722,7 +723,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   border-radius: var(--radius-full);
   padding: 2px;
   gap: 3px;
-  margin-left: 6px;
+  margin-left: 0;
   flex-shrink: 0;
 }
 
@@ -954,6 +955,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 
 /* Spotlight Tray Clean Layout (Less Clutter) */
 .spotlight-tray-strip .stream-card-stats-hud,
+.spotlight-tray-strip .stream-controls-group,
 .spotlight-tray-strip .stream-volume-controller,
 .spotlight-tray-strip .stream-zoom-bar,
 .spotlight-tray-strip .participant-status-text {
@@ -1014,27 +1016,23 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 
 .selected-featured-badge {
   position: absolute;
-  top: 5px;
-  left: 5px;
+  top: 6px;
+  left: 6px;
   z-index: 12;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
   background-color: var(--accent-color, #06b6d4);
-  color: #080d14;
-  font-size: 8.5px;
-  font-weight: 800;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  padding: 2px 6px;
   border-radius: var(--radius-full);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 8px var(--accent-color, #06b6d4), 0 2px 6px rgba(0, 0, 0, 0.6);
   pointer-events: none;
 }
 
 .selected-featured-badge-dot {
-  width: 4.5px;
-  height: 4.5px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background-color: #080d14;
 }
@@ -1458,6 +1456,60 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   font-family: var(--font-sans);
 }
 
+/* Stream Controls Group (Volume & Fullscreen) */
+.stream-controls-group {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stream-controls-group .stream-volume-controller {
+  position: relative;
+  bottom: auto;
+  right: auto;
+}
+
+.btn-stream-fullscreen {
+  background-color: rgba(10, 10, 15, 0.82);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #f4f4f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: var(--radius-full);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-stream-fullscreen:hover {
+  background-color: rgba(15, 15, 22, 0.94);
+  border-color: var(--accent-border);
+  color: var(--accent-color);
+  transform: scale(1.08);
+}
+
+/* Stream Video Card Fullscreen Presentation */
+.stream-card:fullscreen,
+.stream-card:-webkit-full-screen {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+  border-radius: 0 !important;
+  border: none !important;
+  aspect-ratio: auto !important;
+  background-color: #000000 !important;
+}
+
 /* Stream Volume Controller (Hover Expandable Slider) */
 .stream-volume-controller {
   position: absolute;
@@ -1574,9 +1626,6 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   pointer-events: auto;
 }
 
-.stream-card:not(.has-volume-controller) .stream-zoom-bar {
-  bottom: 10px;
-}
 
 @keyframes zoom-bar-fade-in {
   from {
@@ -1764,6 +1813,67 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   width: 0;
   border-left: none;
   overflow: hidden;
+}
+
+/* Lateral Hoverable Sidebar Toggle Arrow */
+.sidebar-toggle-edge {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  right: 320px;
+  width: 28px;
+  height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 45;
+  transition: right var(--transition-normal);
+  pointer-events: auto;
+  margin-right: -14px;
+}
+
+.sidebar-toggle-edge.collapsed {
+  right: 0px;
+  margin-right: 0px;
+  width: 24px;
+  justify-content: flex-end;
+}
+
+.sidebar-edge-toggle-btn {
+  opacity: 0;
+  width: 22px;
+  height: 48px;
+  background-color: rgba(15, 15, 20, 0.88);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  transition: opacity 0.2s ease, background-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast), border-color var(--transition-fast);
+  outline: none;
+}
+
+.sidebar-toggle-edge:hover .sidebar-edge-toggle-btn,
+.sidebar-edge-toggle-btn:focus-visible {
+  opacity: 1;
+}
+
+.sidebar-toggle-edge.collapsed .sidebar-edge-toggle-btn {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  border-right: none;
+}
+
+.sidebar-edge-toggle-btn:hover {
+  background-color: rgba(22, 22, 30, 0.98);
+  color: var(--accent-color, #06b6d4);
+  border-color: var(--accent-color, #06b6d4);
+  box-shadow: 0 0 12px rgba(6, 182, 212, 0.35), 0 4px 16px rgba(0, 0, 0, 0.6);
+  transform: scale(1.06);
 }
 
 .sidebar-tabs {
@@ -3111,5 +3221,21 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   transform: translateX(18px);
   background-color: #ffffff;
 }
+
+/* Responsive Adjustments for Stream Header on Compact Screens */
+@media (max-width: 720px) {
+  .stream-header-bar {
+    padding: 0 8px;
+    gap: 6px;
+  }
+  .btn-stream-filter {
+    padding: 3px 6px;
+    font-size: 10.5px;
+  }
+  .stream-actions .btn-compact .btn-text {
+    display: none;
+  }
+}
+
 
 
