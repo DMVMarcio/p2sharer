@@ -11,9 +11,26 @@ export const CreateRoomModal: React.FC = () => {
   const [code, setCode] = useState(() => generateRandomRoomSlug());
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const handleRegenCode = () => {
     setCode(generateRandomRoomSlug());
+    setCopied(false);
+  };
+
+  const handleCopyCode = () => {
+    const textToCopy = code.trim();
+    if (!textToCopy) return;
+    navigator.clipboard
+      .writeText(textToCopy)
+      .then(() => {
+        setCopied(true);
+        showToast('Código da sala copiado!');
+        setTimeout(() => setCopied(false), 2000);
+      })
+      .catch(() => {
+        showToast('Falha ao copiar código da sala.');
+      });
   };
 
   const handleConfirm = () => {
@@ -64,8 +81,30 @@ export const CreateRoomModal: React.FC = () => {
                 placeholder="Ex: cyber-falcon-482"
                 style={{ fontFamily: 'var(--font-mono)', fontSize: '15px', fontWeight: 700 }}
                 value={code}
-                onChange={(e) => setCode(e.target.value)}
+                onChange={(e) => {
+                  setCode(e.target.value);
+                  setCopied(false);
+                }}
               />
+              <button
+                type="button"
+                className="btn btn-sm btn-outline btn-inline-action btn-inline-action-icon"
+                id="btn-copy-room-code"
+                title={copied ? 'Código copiado!' : 'Copiar código da sala'}
+                aria-label="Copiar código da sala"
+                onClick={handleCopyCode}
+              >
+                {copied ? (
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--accent-color)' }}>
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                ) : (
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                  </svg>
+                )}
+              </button>
               <button
                 type="button"
                 className="btn btn-sm btn-outline btn-inline-action"
@@ -98,7 +137,7 @@ export const CreateRoomModal: React.FC = () => {
               />
               <button
                 type="button"
-                className="btn btn-sm btn-outline btn-inline-action"
+                className="btn btn-sm btn-outline btn-inline-action btn-inline-action-icon"
                 id="btn-toggle-create-password-visibility"
                 title="Mostrar / Ocultar Senha"
                 onClick={() => setShowPassword(!showPassword)}
