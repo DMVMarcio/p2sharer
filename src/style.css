@@ -1747,6 +1747,31 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   gap: 14px;
 }
 
+.modal-body p {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-label {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.1px;
+  user-select: none;
+  margin-bottom: 2px;
+}
+
 .modal-footer {
   padding: 14px 22px;
   border-top: 1px solid var(--border-subtle);
