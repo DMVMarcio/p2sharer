@@ -9,9 +9,43 @@ The frontend is built using TypeScript 5.6, HTML5, and CSS3, bundled via Vite 6.
 
 ```
 src/
+├── components/              # Modular React UI components
+│   ├── common/              # Common UI widgets (ToastContainer, etc.)
+│   ├── header/              # Titlebar header & room code / user pills (AppHeader)
+│   ├── home/                # Welcome & lobby action cards (HomeView)
+│   ├── room/                # Room view, grid/spotlight, stream cards, chat, sidebar
+│   │   ├── RoomView.tsx
+│   │   ├── StreamHeaderBar.tsx
+│   │   ├── RoomVideoContainer.tsx
+│   │   ├── ParticipantCard.tsx
+│   │   ├── VideoCard.tsx
+│   │   ├── StreamHudOverlay.tsx
+│   │   ├── RoomSidebar.tsx
+│   │   ├── ChatPane.tsx
+│   │   └── ParticipantsPane.tsx
+│   └── modals/              # Modular modal dialogs
+│       ├── SettingsModal.tsx
+│       ├── ScreenPickerModal.tsx
+│       ├── UsernameModal.tsx
+│       ├── AudioFilterModal.tsx
+│       ├── CreateRoomModal.tsx
+│       ├── JoinRoomModal.tsx
+│       ├── RoomSecurityModal.tsx
+│       └── ConnectingOverlay.tsx
+├── hooks/                   # Specialized business logic hooks
+│   ├── useStore.ts          # Reactive subscription via useSyncExternalStore
+│   ├── useRoom.ts           # Room lifecycle, P2P mesh & chat
+│   ├── useScreenCapture.ts  # Native video & WASAPI audio capture
+│   ├── useScreenPicker.ts   # Screen/window source selection & GPU direct
+│   ├── useAudioFilter.ts    # Windows process audio filtering
+│   ├── useAppTheme.ts       # Dark/Light/System & 16-color accent palette
+│   ├── useModal.ts          # Declarative modal dialog manager
+│   └── useToast.ts          # Reactive floating toast notifications
+├── services/                # Core service coordinator
+│   └── room_service.ts      # Singleton bridge between React and WebRTC/WASAPI
 ├── core/                    # Fundamental app primitives
 │   ├── types.ts             # Shared interfaces, message contracts, states
-│   ├── state_store.ts       # Central state management & localStorage persistence
+│   ├── state_store.ts       # Central state management & reactive subscriptions
 │   ├── event_bus.ts         # Pub/sub event emitter for cross-module decoupling
 │   └── logger.ts            # Frontend logger forwarding to Rust backend
 ├── p2p/                     # WebRTC networking & signaling
@@ -25,14 +59,14 @@ src/
 │   └── audio_context_manager.ts # Zero-allocation buffer reuse & AudioContext lifecycle
 ├── video/                   # Video pipeline & presentation
 │   ├── native_video_bridge.ts # Rust WebSocket client & getDisplayMedia fallback
-│   └── viewer_renderer.ts   # Keyed in-place DOM reconciliation & layout engine
-├── ui/                      # Visual components & controllers
-│   ├── modal_controller.ts  # Modals (screens, settings, filters, logs, theme)
+│   └── viewer_renderer.ts   # Unit-tested DOM reconciliation engine
+├── ui/                      # Audio SFX & diagnostics
 │   ├── hud_controller.ts    # WebRTC HUD diagnostics overlay
 │   └── sound_effects.ts     # Synthesized Web Audio UI sound indicators
-├── main.ts                  # Application entrypoint & composition root
+├── App.tsx                  # Root application component
+├── main.tsx                 # React DOM mount entrypoint
 ├── style.css                # Global design system & component tokens
-└── index.html               # Main view shell & modal templates
+└── index.html               # App HTML shell with #root mount point
 ```
 
 ---

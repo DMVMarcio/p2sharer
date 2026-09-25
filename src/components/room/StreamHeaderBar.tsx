@@ -1,0 +1,150 @@
+import React from 'react';
+import { useRoom } from '../../hooks/useRoom';
+import { useModal } from '../../hooks/useModal';
+
+export const StreamHeaderBar: React.FC = () => {
+  const {
+    roomSlots,
+    isSharingScreen,
+    stopScreenSharing,
+    leaveRoom,
+    toggleSidebar,
+    isSidebarCollapsed,
+  } = useRoom();
+  const { openModal } = useModal();
+
+  const totalCount = roomSlots.length;
+  const streamingCount = roomSlots.filter((s) => s.isStreaming).length;
+
+  const handleToggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  };
+
+  const handleToggleTransmission = () => {
+    if (isSharingScreen) {
+      stopScreenSharing();
+    } else {
+      openModal('screenPicker');
+    }
+  };
+
+  return (
+    <div className="stream-header-bar">
+      <div className="stream-status">
+        <span className="live-indicator" id="room-live-badge">
+          {streamingCount > 0 ? 'AO VIVO' : 'SALA ATIVA'}
+        </span>
+        <span className="stream-host-tag" id="room-sharing-status-tag">
+          {totalCount} {totalCount === 1 ? 'pessoa' : 'pessoas'}
+          {streamingCount > 0 ? ` (${streamingCount} ao vivo)` : ''}
+        </span>
+      </div>
+
+      <div className="stream-actions">
+        {/* Transmission Button */}
+        <button
+          className={`btn btn-sm btn-compact ${isSharingScreen ? 'btn-danger' : 'btn-outline'}`}
+          id="btn-toggle-share-screen"
+          onClick={handleToggleTransmission}
+          title="Compartilhar Tela ou Janela"
+        >
+          <span className={`stream-sharing-indicator ${isSharingScreen ? 'active' : ''}`} id="stream-sharing-dot"></span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M13 3H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-3"/>
+            <path d="M8 21h8"/>
+            <path d="M12 17v4"/>
+            <path d="m17 8 5-5"/>
+            <path d="M17 3h5v5"/>
+          </svg>
+          <span className="btn-text" id="label-share-screen">
+            {isSharingScreen ? 'Parar Transmissão' : 'Transmissão'}
+          </span>
+        </button>
+
+        {/* Audio Filter Config */}
+        <button
+          className="btn btn-sm btn-outline btn-compact"
+          id="btn-open-audio-filter"
+          onClick={() => openModal('audioFilter')}
+          title="Configurar filtros de áudio (ignorar Discord)"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="4" x2="4" y1="21" y2="14"/>
+            <line x1="4" x2="4" y1="10" y2="3"/>
+            <line x1="12" x2="12" y1="21" y2="12"/>
+            <line x1="12" x2="12" y1="8" y2="3"/>
+            <line x1="20" x2="20" y1="21" y2="16"/>
+            <line x1="20" x2="20" y1="12" y2="3"/>
+            <line x1="1" x2="7" y1="14" y2="14"/>
+            <line x1="9" x2="15" y1="8" y2="8"/>
+            <line x1="17" x2="23" y1="16" y2="16"/>
+          </svg>
+          <span className="btn-text">Áudio</span>
+        </button>
+
+        {/* Room Security / Password Button */}
+        <button
+          className="btn btn-sm btn-outline btn-compact"
+          id="btn-open-room-security"
+          onClick={() => openModal('roomSecurity')}
+          title="Segurança da Sala (Definir / Alterar Senha)"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+          <span className="btn-text" id="label-room-security">Senha</span>
+        </button>
+
+        {/* Toggle Sidebar (Chat) */}
+        <button
+          className="btn btn-sm btn-outline btn-compact"
+          id="btn-toggle-sidebar"
+          onClick={toggleSidebar}
+          title="Ocultar / Mostrar Chat"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+          <span className="btn-text" id="label-toggle-sidebar">
+            {isSidebarCollapsed ? 'Abrir' : 'Chat'}
+          </span>
+        </button>
+
+        {/* Fullscreen */}
+        <button
+          className="btn btn-sm btn-outline btn-compact"
+          id="btn-room-fullscreen"
+          onClick={handleToggleFullscreen}
+          title="Tela Cheia"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="15 3 21 3 21 9"/>
+            <polyline points="9 21 3 21 3 15"/>
+            <line x1="21" x2="14" y1="3" y2="10"/>
+            <line x1="3" x2="10" y1="21" y2="14"/>
+          </svg>
+        </button>
+
+        {/* Leave Room */}
+        <button
+          className="btn btn-sm btn-danger btn-compact"
+          id="btn-leave-room"
+          onClick={leaveRoom}
+          title="Sair da Sala"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" x2="9" y1="12" y2="12"/>
+          </svg>
+          <span className="btn-text">Sair</span>
+        </button>
+      </div>
+    </div>
+  );
+};
