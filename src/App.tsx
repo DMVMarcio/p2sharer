@@ -19,7 +19,7 @@ import { stateStore } from './core/state_store';
 
 export const App: React.FC = () => {
   const { isInRoom, stopScreenSharing, leaveRoom, isSharingScreen } = useRoom();
-  const { openModal } = useModal();
+  const { openModal, activeModal } = useModal();
   useAppTheme(); // Sets data-theme & data-accent
 
   useEffect(() => {
@@ -51,13 +51,13 @@ export const App: React.FC = () => {
       </main>
 
       {/* Modals & Overlays */}
-      <SettingsModal />
-      <ScreenPickerModal />
-      <UsernameModal />
-      <AudioFilterModal />
-      <CreateRoomModal />
-      <JoinRoomModal />
-      <RoomSecurityModal />
+      {activeModal === 'settings' && <SettingsModal />}
+      {activeModal === 'screenPicker' && <ScreenPickerModal />}
+      {activeModal === 'username' && <UsernameModal />}
+      {activeModal === 'audioFilter' && <AudioFilterModal />}
+      {activeModal === 'createRoom' && <CreateRoomModal />}
+      {activeModal === 'joinRoom' && <JoinRoomModal />}
+      {activeModal === 'roomSecurity' && <RoomSecurityModal />}
       <ConnectingOverlay />
 
       {/* Global Notifications */}

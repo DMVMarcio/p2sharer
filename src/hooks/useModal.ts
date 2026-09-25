@@ -57,10 +57,15 @@ export function useModal() {
     modalManager.close();
   }, []);
 
+  const isOpen = useCallback(
+    (modal: ModalType) => activeModal === modal,
+    [activeModal]
+  );
+
   return {
     activeModal,
     openModal,
     closeModal,
-    isOpen: (modal: ModalType) => activeModal === modal,
+    isOpen,
   };
 }

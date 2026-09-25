@@ -1,25 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useModal } from '../../hooks/useModal';
 import { useRoom } from '../../hooks/useRoom';
 import { showToast } from '../../hooks/useToast';
 
 export const JoinRoomModal: React.FC = () => {
-  const { isOpen, closeModal } = useModal();
+  const { closeModal } = useModal();
   const { joinRoom } = useRoom();
 
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-
-  useEffect(() => {
-    if (isOpen('joinRoom')) {
-      setCode('');
-      setPassword('');
-      setShowPassword(false);
-    }
-  }, [isOpen]);
-
-  if (!isOpen('joinRoom')) return null;
 
   const handleConfirm = () => {
     const finalCode = code.trim();

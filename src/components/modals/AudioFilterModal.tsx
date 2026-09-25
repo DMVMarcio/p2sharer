@@ -3,7 +3,7 @@ import { useModal } from '../../hooks/useModal';
 import { useAudioFilter } from '../../hooks/useAudioFilter';
 
 export const AudioFilterModal: React.FC = () => {
-  const { isOpen, closeModal } = useModal();
+  const { closeModal } = useModal();
   const {
     processes,
     isLoading,
@@ -19,12 +19,8 @@ export const AudioFilterModal: React.FC = () => {
   } = useAudioFilter();
 
   useEffect(() => {
-    if (isOpen('audioFilter')) {
-      loadProcesses();
-    }
-  }, [isOpen, loadProcesses]);
-
-  if (!isOpen('audioFilter')) return null;
+    loadProcesses();
+  }, [loadProcesses]);
 
   const handleApply = async () => {
     const success = await applyFilters();
