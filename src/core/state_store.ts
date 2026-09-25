@@ -30,11 +30,37 @@ export class StateStore {
   public isSidebarCollapsed: boolean = false;
   public isSpotlightTrayCollapsed: boolean = false;
 
+  public version: number = 0;
+  private listeners: Set<() => void> = new Set();
+
   public static getInstance(): StateStore {
     if (!StateStore.instance) {
       StateStore.instance = new StateStore();
     }
     return StateStore.instance;
+  }
+
+  public subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  public notify(): void {
+    this.version++;
+    this.listeners.forEach((listener) => {
+      try {
+        listener();
+      } catch (err) {
+        console.error('Error in StateStore listener:', err);
+      }
+    });
+  }
+
+  public set(updater: (state: StateStore) => void): void {
+    updater(this);
+    this.notify();
   }
 
   constructor() {

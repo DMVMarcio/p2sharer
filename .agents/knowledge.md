@@ -6,14 +6,14 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 - **Ecosystem & Stack**:
   - **Host Framework**: Tauri v2 (`@tauri-apps/api: ^2`, `@tauri-apps/cli: ^2`, `tauri-plugin-opener: ^2`)
   - **Backend**: Rust 2021 edition (`src-tauri/`), Windows Win32 / Core Audio APIs (`windows: 0.58`), `xcap: 0.9.8`, `tokio: 1`, `tokio-tungstenite: 0.24`, `rayon: 1.10`, `sysinfo: 0.32`, `image: 0.25`
-  - **Frontend**: TypeScript 5.6, Vite 6 (`src/`), Web Audio API, Lucide icons (`lucide: ^1.31.0`), Pako compression (`pako: ^3.0.1`)
+  - **Frontend**: React 18, TypeScript 5.6, Vite 6 (`src/`), Web Audio API, Lucide icons (`lucide: ^1.31.0`, `lucide-react`), Pako compression (`pako: ^3.0.1`)
   - **Networking & P2P**: Trystero (`@trystero-p2p/mqtt`, `@trystero-p2p/nostr`, `@trystero-p2p/torrent`, `trystero: ^0.25.3`), WebRTC mesh with multi-transport signaling failover
 - **Primary Design Pattern**:
   - Event-driven, decoupled modular architecture.
   - Rust side: Asynchronous Tokio runtime, event-driven audio loopback, thread-safe broadcast channels for video streaming.
-  - Frontend side: Modular domain separation (`core/`, `p2p/`, `audio/`, `video/`, `ui/`) with central reactive state store and pub/sub event bus.
+  - Frontend side: React 18 component tree (`components/`), specialized custom hooks (`hooks/`), central reactive state store (`core/state_store.ts` with `useStore`), and service coordinator (`services/room_service.ts`).
 - **Core Entrypoints**:
-  - Frontend: `src/main.ts`
+  - Frontend: `src/main.tsx`, `src/App.tsx`
   - Backend Rust: `src-tauri/src/main.rs`, `src-tauri/src/lib.rs`
   - Shell / UI: `index.html`, `src/style.css`
 
