@@ -1204,6 +1204,12 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   transform: translateX(-50%) translateY(0);
 }
 
+.watchers-tooltip {
+  width: max-content;
+  min-width: 190px;
+  max-width: 280px;
+}
+
 .watchers-tooltip-header {
   display: flex;
   align-items: center;
@@ -1214,6 +1220,11 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   margin-bottom: 6px;
   padding-bottom: 4px;
   border-bottom: 1px solid var(--border-subtle);
+  white-space: nowrap;
+}
+
+.watchers-tooltip-header span {
+  white-space: nowrap;
 }
 
 .watchers-tooltip-list {

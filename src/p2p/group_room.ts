@@ -475,14 +475,22 @@ export class GroupRoomManager {
       const broadcasterId = data.broadcasterId;
       if (!broadcasterId) return;
 
+      const currentWatchers = this.peerTracker.getWatchers(broadcasterId);
+      const isAlreadyWatching = currentWatchers.some((w) => w.peerId === watcherPeerId);
+
       if (data.isWatching) {
-        this.peerTracker.addWatcher(broadcasterId, watcherPeerId, watcherName);
-        this.callbacks?.onWatchStarted?.(watcherPeerId, watcherName, broadcasterId);
+        if (!isAlreadyWatching) {
+          this.peerTracker.addWatcher(broadcasterId, watcherPeerId, watcherName);
+          this.callbacks?.onWatchStarted?.(watcherPeerId, watcherName, broadcasterId);
+          this.notifyStreamsUpdate();
+        }
       } else {
-        this.peerTracker.removeWatcher(broadcasterId, watcherPeerId);
-        this.callbacks?.onWatchStopped?.(watcherPeerId, watcherName, broadcasterId);
+        if (isAlreadyWatching) {
+          this.peerTracker.removeWatcher(broadcasterId, watcherPeerId);
+          this.callbacks?.onWatchStopped?.(watcherPeerId, watcherName, broadcasterId);
+          this.notifyStreamsUpdate();
+        }
       }
-      this.notifyStreamsUpdate();
     };
 
     // 5. Setup On-Demand Stream Request Action (Stream Recovery Protocol Receiver)
@@ -797,6 +805,7 @@ export class GroupRoomManager {
   private cleanupStreamWatchers(broadcasterId: string, _broadcasterName: string) {
     const watchers = this.peerTracker.getWatchers(broadcasterId);
     watchers.forEach((w) => {
+      this.peerTracker.removeWatcher(broadcasterId, w.peerId);
       this.callbacks?.onWatchStopped?.(w.peerId, w.username, broadcasterId);
     });
     this.notifyStreamsUpdate();
@@ -842,6 +851,7 @@ export class GroupRoomManager {
     if (broadcasterId === 'local' || broadcasterId === selfId) return;
     const currentWatchers = this.peerTracker.getWatchers(broadcasterId);
     const alreadyWatching = currentWatchers.some((w) => w.peerId === selfId);
+    if (alreadyWatching) return;
 
     this.peerTracker.addWatcher(broadcasterId, selfId, this.username);
 
@@ -855,15 +865,14 @@ export class GroupRoomManager {
       } catch {}
     }
 
-    if (!alreadyWatching) {
-      this.callbacks?.onWatchStarted?.(selfId, this.username, broadcasterId);
-    }
+    this.callbacks?.onWatchStarted?.(selfId, this.username, broadcasterId);
     this.notifyStreamsUpdate();
   }
 
   public stopWatchingStream(broadcasterId: string) {
     const currentWatchers = this.peerTracker.getWatchers(broadcasterId);
     const wasWatching = currentWatchers.some((w) => w.peerId === selfId);
+    if (!wasWatching) return;
 
     this.peerTracker.removeWatcher(broadcasterId, selfId);
 
@@ -877,9 +886,7 @@ export class GroupRoomManager {
       } catch {}
     }
 
-    if (wasWatching) {
-      this.callbacks?.onWatchStopped?.(selfId, this.username, broadcasterId);
-    }
+    this.callbacks?.onWatchStopped?.(selfId, this.username, broadcasterId);
     this.notifyStreamsUpdate();
   }
 
