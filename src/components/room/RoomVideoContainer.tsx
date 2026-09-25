@@ -3,7 +3,6 @@ import { useRoom } from '../../hooks/useRoom';
 import { useStore } from '../../hooks/useStore';
 import { VideoCard } from './VideoCard';
 import { ParticipantCard } from './ParticipantCard';
-import { StreamHudOverlay } from './StreamHudOverlay';
 import { RoomSlotInfo } from '../../core/types';
 
 export const RoomVideoContainer: React.FC = () => {
@@ -74,9 +73,6 @@ export const RoomVideoContainer: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {/* Live Stream HUD Overlay */}
-      <StreamHudOverlay />
     </div>
   );
 };

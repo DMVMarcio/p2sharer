@@ -3,6 +3,7 @@ import { RoomSlotInfo } from '../../core/types';
 import { useRoom } from '../../hooks/useRoom';
 import { useStore } from '../../hooks/useStore';
 import { audioContextManager } from '../../audio/audio_context_manager';
+import { roomService } from '../../services/room_service';
 
 interface VideoCardProps {
   slot: RoomSlotInfo;
@@ -10,9 +11,14 @@ interface VideoCardProps {
 }
 
 export const VideoCard: React.FC<VideoCardProps> = ({ slot, isFeatured = false }) => {
-  const { togglePin, stopWatchingStream, getPeerPing } = useRoom();
+  const { togglePin, stopWatchingStream, getPeerPing, username } = useRoom();
   const currentResolution = useStore((s) => s.currentResolution);
   const currentFps = useStore((s) => s.currentFps);
+  const currentBitrate = useStore((s) => s.currentBitrate);
+
+  const [liveFps, setLiveFps] = useState<number>(() => (slot.isLocal ? currentFps : 60));
+  const [liveBitrate, setLiveBitrate] = useState<number>(() => (slot.isLocal ? currentBitrate : 0));
+  const [remoteResolution, setRemoteResolution] = useState<string>('1080p');
 
   const [volume, setVolume] = useState<number>(100);
   const [isMuted, setIsMuted] = useState<boolean>(false);
@@ -41,6 +47,32 @@ export const VideoCard: React.FC<VideoCardProps> = ({ slot, isFeatured = false }
       if (st.volume > 0) setLastVolume(st.volume);
     }
   }, [slot.isLocal, slot.peerId, slot.stream]);
+
+  useEffect(() => {
+    if (slot.isLocal) {
+      setLiveBitrate(currentBitrate);
+      setLiveFps(currentFps);
+      return;
+    }
+
+    let isMounted = true;
+    const fetchStats = async () => {
+      const stats = await roomService.roomManager?.getPeerStats(slot.peerId);
+      if (!isMounted) return;
+      if (stats?.bitrateKbps) setLiveBitrate(stats.bitrateKbps);
+      if (stats?.fps) setLiveFps(stats.fps);
+      if (stats?.height) {
+        setRemoteResolution(`${stats.height}p`);
+      }
+    };
+
+    fetchStats();
+    const interval = setInterval(fetchStats, 2000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [slot.isLocal, slot.peerId, currentBitrate, currentFps]);
 
   const handleCardClick = () => {
     togglePin(slot.peerId);
@@ -77,12 +109,6 @@ export const VideoCard: React.FC<VideoCardProps> = ({ slot, isFeatured = false }
 
   const watchers = slot.watchers || [];
   const watchersCount = watchers.length;
-  const watchersTooltip =
-    watchersCount > 0
-      ? slot.isLocal
-        ? `Assistindo sua transmissão: ${watchers.map((w) => w.username).join(', ')}`
-        : `Pessoas assistindo: ${watchers.map((w) => w.username).join(', ')}`
-      : 'Ninguém assistindo no momento';
 
   const pingVal = !slot.isLocal ? getPeerPing(slot.peerId) : 0;
   const pingNum = pingVal ?? 15;
@@ -112,31 +138,75 @@ export const VideoCard: React.FC<VideoCardProps> = ({ slot, isFeatured = false }
 
       {/* Stats HUD on top of card */}
       <div className="stream-card-stats-hud">
-        <span className="stat-badge stat-badge-quality" title="Qualidade e FPS da transmissão">
+        <span className="stat-badge stat-badge-quality">
           <span className="stat-badge-dot"></span>
           <span className="stat-quality-text">
             {slot.isLocal
               ? `${currentResolution.label} ${currentFps} FPS`
-              : '1080p 60 FPS'}
+              : `${remoteResolution} ${liveFps} FPS`}
           </span>
         </span>
 
+        {liveBitrate > 0 && (
+          <span className="stat-badge stat-badge-bitrate">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+            <span className="stat-bitrate-text">{(liveBitrate / 1000).toFixed(1)} Mbps</span>
+          </span>
+        )}
+
         {!slot.isLocal && (
-          <span className="stat-badge stat-badge-ping" title="Latência WebRTC com o transmissor (Ping)">
+          <span className="stat-badge stat-badge-ping">
             <span className={`stat-ping-dot ${pingClass}`}></span>
             <span className="stat-ping-text">{pingStr}</span>
           </span>
         )}
 
-        <span className="stat-badge stat-badge-watchers" title={watchersTooltip}>
+        <div
+          className="stat-badge stat-badge-watchers custom-tooltip-container"
+          onClick={(e) => e.stopPropagation()}
+        >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"/>
             <circle cx="12" cy="12" r="3"/>
           </svg>
           <span className="stat-watchers-text">
             {watchersCount === 1 ? '1 assistindo' : `${watchersCount} assistindo`}
           </span>
-        </span>
+
+          <div className="custom-tooltip watchers-tooltip">
+            <div className="watchers-tooltip-header">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+              <span>
+                {watchersCount === 0
+                  ? 'Ninguém assistindo'
+                  : watchersCount === 1
+                  ? '1 pessoa assistindo:'
+                  : `${watchersCount} pessoas assistindo:`}
+              </span>
+            </div>
+            {watchersCount > 0 ? (
+              <div className="watchers-tooltip-list">
+                {watchers.map((w) => {
+                  const isSelf = w.username === username;
+                  return (
+                    <div key={w.peerId} className="watchers-tooltip-item">
+                      <span className="watchers-tooltip-dot"></span>
+                      <span className="watchers-tooltip-name">{w.username}</span>
+                      {isSelf && <span className="badge-you">VOCÊ</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="watchers-tooltip-empty">Nenhum espectador no momento</div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* User overlay at bottom-left */}

@@ -9,16 +9,12 @@ interface ParticipantCardProps {
 }
 
 export const ParticipantCard: React.FC<ParticipantCardProps> = ({ slot, isFeatured = false }) => {
-  const { togglePin, requestStream } = useRoom();
+  const { togglePin, requestStream, username } = useRoom();
   const subscribedStreams = useStore((s) => s.subscribedStreams);
 
   const isSubscribed = subscribedStreams.has(slot.peerId);
   const watchers = slot.watchers || [];
   const watchersCount = watchers.length;
-  const watchersTooltip =
-    watchersCount > 0
-      ? `Assistindo: ${watchers.map((w) => w.username).join(', ')}`
-      : '';
 
   const handleCardClick = () => {
     togglePin(slot.peerId);
@@ -50,13 +46,40 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({ slot, isFeatur
             <span className="badge-live-dot"></span>AO VIVO
           </span>
           {watchersCount > 0 && (
-            <span className="badge-live-watchers" title={watchersTooltip}>
+            <div
+              className="badge-live-watchers custom-tooltip-container"
+              onClick={(e) => e.stopPropagation()}
+            >
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"/>
                 <circle cx="12" cy="12" r="3"/>
               </svg>
               <span>{watchersCount} assistindo</span>
-            </span>
+
+              <div className="custom-tooltip watchers-tooltip">
+                <div className="watchers-tooltip-header">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                  </svg>
+                  <span>
+                    {watchersCount === 1 ? '1 pessoa assistindo:' : `${watchersCount} pessoas assistindo:`}
+                  </span>
+                </div>
+                <div className="watchers-tooltip-list">
+                  {watchers.map((w) => {
+                    const isSelf = w.username === username;
+                    return (
+                      <div key={w.peerId} className="watchers-tooltip-item">
+                        <span className="watchers-tooltip-dot"></span>
+                        <span className="watchers-tooltip-name">{w.username}</span>
+                        {isSelf && <span className="badge-you">VOCÊ</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
           )}
         </>
       )}

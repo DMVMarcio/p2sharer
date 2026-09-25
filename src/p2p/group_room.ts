@@ -685,6 +685,7 @@ export class GroupRoomManager {
       this.peerTracker.touchPeer(peerId);
       this.peerTracker.setStreaming(peerId, true);
       this.remoteStreams.set(peerId, stream);
+      this.watchStream(peerId);
 
       // Listen to track state so if host stops, remote stream clears cleanly
       stream.getTracks().forEach((track) => {
@@ -1253,21 +1254,11 @@ export class GroupRoomManager {
         this.streamReqAction.send(payload, { target: peerId });
       } catch {}
     }
-    if (this.watchAction) {
-      try {
-        this.watchAction.send({ broadcasterId: peerId, isWatching: true, watcherName: this.username });
-      } catch {}
-    }
+    this.watchStream(peerId);
   }
 
   public stopWatching(peerId: string): void {
-    if (this.watchAction) {
-      try {
-        this.watchAction.send({ broadcasterId: peerId, isWatching: false, watcherName: this.username });
-      } catch {}
-    }
-    this.peerTracker.removeWatcher(peerId, selfId);
-    this.notifyStreamsUpdate();
+    this.stopWatchingStream(peerId);
   }
 
   public async leave(): Promise<void> {

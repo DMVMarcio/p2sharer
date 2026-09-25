@@ -1135,8 +1135,18 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   box-shadow: 0 0 6px #ef4444;
 }
 
+.stat-badge-bitrate {
+  color: #a78bfa;
+}
+
+.stat-badge-bitrate svg {
+  color: #a78bfa;
+  flex-shrink: 0;
+}
+
 .stat-badge-watchers {
   color: #38bdf8;
+  cursor: pointer;
 }
 
 .stat-badge-watchers svg {
@@ -1159,6 +1169,88 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   padding: 3px 8px;
   border-radius: var(--radius-full);
   backdrop-filter: blur(4px);
+  cursor: pointer;
+}
+
+/* Custom Tooltip System for Watchers */
+.custom-tooltip-container {
+  position: relative;
+}
+
+.custom-tooltip {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background-color: rgba(18, 18, 22, 0.96);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-focus);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  min-width: 170px;
+  max-width: 250px;
+  box-shadow: var(--shadow-lg);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--transition-fast), transform var(--transition-fast), visibility var(--transition-fast);
+  z-index: 100;
+  text-align: left;
+}
+
+.custom-tooltip-container:hover .custom-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+.watchers-tooltip-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-color);
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.watchers-tooltip-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.watchers-tooltip-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+}
+
+.watchers-tooltip-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: var(--radius-full);
+  background-color: var(--accent-color);
+  flex-shrink: 0;
+}
+
+.watchers-tooltip-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.watchers-tooltip-empty {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
 }
 
 /* Stream Volume Controller (Hover Expandable Slider) */
@@ -1473,6 +1565,64 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   border-radius: var(--radius-sm);
   font-size: 12px;
   color: var(--text-primary);
+  transition: all var(--transition-fast);
+}
+
+.participant-item:hover {
+  border-color: var(--border-default);
+  background-color: var(--bg-card-hover);
+}
+
+.participant-item-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.participant-item-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  border: 1.5px solid var(--border-default);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-sm);
+}
+
+.participant-item-avatar-letter {
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.participant-item-text {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.participant-item-name {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
+.badge-live-stream-mini {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  background-color: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  color: var(--danger-text);
+  border-radius: var(--radius-xs);
+  letter-spacing: 0.4px;
 }
 
 /* ==========================================================================
