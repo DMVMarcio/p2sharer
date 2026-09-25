@@ -115,6 +115,11 @@ export const VideoCard: React.FC<VideoCardProps> = ({ slot, isFeatured = false }
   const pingStr = pingVal !== null && pingVal !== undefined ? `${pingVal} ms` : '15 ms';
   const pingClass = pingNum < 80 ? 'ping-good' : pingNum < 180 ? 'ping-medium' : 'ping-poor';
 
+  const signalingStatus = roomService.roomManager?.getSignalingStatus?.();
+  const transportTag = signalingStatus?.activeTransport
+    ? ` [${signalingStatus.activeTransport.toUpperCase()}]`
+    : '';
+
   const getTitle = () => {
     if (isFeatured) return 'Clique para voltar à grade';
     if (slot.isLocal) return 'Clique para destacar sua transmissão';
@@ -159,7 +164,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({ slot, isFeatured = false }
         {!slot.isLocal && (
           <span className="stat-badge stat-badge-ping">
             <span className={`stat-ping-dot ${pingClass}`}></span>
-            <span className="stat-ping-text">{pingStr}</span>
+            <span className="stat-ping-text">{pingStr}{transportTag}</span>
           </span>
         )}
 

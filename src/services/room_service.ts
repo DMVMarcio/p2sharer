@@ -4,7 +4,6 @@ import { audioContextManager } from '../audio/audio_context_manager';
 import { stateStore } from '../core/state_store';
 import { ChatMessage, PeerInfo, RoomSlotInfo } from '../core/types';
 import { generateRandomRoomSlug, GroupRoomManager } from '../p2p/group_room';
-import { HudController } from '../ui/hud_controller';
 import { soundEffects } from '../ui/sound_effects';
 import { NativeVideoBridge } from '../video/native_video_bridge';
 import { showToast } from '../hooks/useToast';
@@ -24,7 +23,6 @@ class RoomService {
   public roomManager: GroupRoomManager | null = null;
   public nativeVideoBridge = new NativeVideoBridge();
   public audioBridge = new AudioBridge();
-  public hudController = new HudController();
 
   public chatMessages: ChatMessage[] = [];
   public peers: PeerInfo[] = [];
@@ -90,7 +88,6 @@ class RoomService {
               this.nativeVideoBridge.getCurrentFps()
             );
           }
-          this.hudController.updateStatsHUD();
           const videoTrack = fallbackStream.getVideoTracks()[0];
           if (videoTrack) {
             videoTrack.onended = () => this.stopScreenSharing();
@@ -172,13 +169,6 @@ class RoomService {
       stateStore.getTurnConfig()
     );
 
-    this.hudController.start({
-      getPeerStats: (pId) => (this.roomManager ? this.roomManager.getPeerStats(pId) : Promise.resolve(null)),
-      getPeerPing: (pId) => this.roomManager?.getPeerPing(pId),
-      getStreamWatchers: (pId) => (this.roomManager ? this.roomManager.getStreamWatchers(pId) : []),
-      getSignalingStatus: () => this.roomManager?.getSignalingStatus(),
-    });
-
     this.roomManager.join({
       onStreamsUpdate: () => {
         this.notify();
@@ -187,7 +177,6 @@ class RoomService {
         stateStore.set((s) => {
           s.roomSlots = slots;
         });
-        this.hudController.updateStatsHUD();
         this.hideConnecting();
         this.notify();
       },
@@ -292,7 +281,6 @@ class RoomService {
         this.roomManager.shareStream(videoStream, stateStore.currentBitrate * 1000, fps);
       }
 
-      this.hudController.updateStatsHUD();
       soundEffects.playScreenShareStart();
       this.notify();
     } catch (err) {
@@ -319,7 +307,6 @@ class RoomService {
       this.roomManager.stopStream();
     }
 
-    this.hudController.updateStatsHUD();
     soundEffects.playScreenShareStop();
     this.notify();
   }
@@ -331,7 +318,6 @@ class RoomService {
     }
 
     soundEffects.playUserLeave();
-    this.hudController.stop();
 
     if (stateStore.isSharingScreen) {
       this.stopScreenSharing();
