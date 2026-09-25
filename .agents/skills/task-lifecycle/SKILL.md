@@ -55,8 +55,8 @@ Concise breakdown of user requirements and acceptance criteria.
 - [ ] Validate rendering / behavior across states
 
 ### Quality, Validation & Cleanup
-- [ ] Build / compile workspace to verify zero regressions
-- [ ] Manual test / automated test verification
+- [ ] Build and package full desktop application (`npm run tauri:build`) to verify zero regressions
+- [ ] Manual test / automated test verification (`node --experimental-strip-types --test test/unit/*.test.ts`)
 - [ ] Transfer durable technical patterns to `.agents/knowledge.md`
 - [ ] Atomic Conventional Commit (`feat: ...` or `fix: ...`)
 
