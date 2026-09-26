@@ -329,7 +329,7 @@ pub fn convert_and_downmix_to_stereo(
 static CURRENT_STOP_FLAG: Mutex<Option<Arc<AtomicBool>>> = Mutex::new(None);
 
 #[cfg(windows)]
-mod win_audio {
+pub(crate) mod win_audio {
     use super::*;
     use std::ptr::null_mut;
     use windows::core::{Interface, HRESULT, PCWSTR};
@@ -338,9 +338,9 @@ mod win_audio {
     use windows::Win32::System::Com::*;
     use windows::Win32::System::Threading::{CreateEventW, WaitForSingleObject};
 
-    const AUDCLNT_STREAMFLAGS_EVENTCALLBACK: u32 = 0x00040000;
-    const AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM: u32 = 0x80000000;
-    const AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY: u32 = 0x08000000;
+    pub(crate) const AUDCLNT_STREAMFLAGS_EVENTCALLBACK: u32 = 0x00040000;
+    pub(crate) const AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM: u32 = 0x80000000;
+    pub(crate) const AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY: u32 = 0x08000000;
 
     struct EventHandleGuard(HANDLE);
 
@@ -469,12 +469,15 @@ mod win_audio {
             }
         }
 
+        if mode == "full" || (target_names.is_empty() && target_pids.is_empty()) {
+            return 0;
+        }
+
         let normalized_names: Vec<String> = target_names.iter().map(|n| n.to_lowercase()).collect();
         let specifies_self = normalized_names.iter().any(|target| target.contains("p2sharer") || target.contains("msedgewebview2"))
             || target_pids.iter().any(|&p| self_pids.contains(&p));
 
-        // In exclude mode, if no targets are specified or self is selected, default to isolating self application
-        if mode == "exclude" && (target_names.is_empty() && target_pids.is_empty() || specifies_self) {
+        if specifies_self {
             // Find active audio session for self/webview if currently emitting sound
             unsafe {
                 if let Ok(enumerator) = CoCreateInstance::<_, IMMDeviceEnumerator>(&MMDeviceEnumerator, None, CLSCTX_ALL) {
@@ -499,7 +502,7 @@ mod win_audio {
                     }
                 }
             }
-            println!("[Audio Loopback] Defaulting exclude mode to root p2sharer PID {}", self_pid);
+            println!("[Audio Loopback] Isolating root p2sharer PID {}", self_pid);
             return self_pid;
         }
 
@@ -523,7 +526,7 @@ mod win_audio {
         }
 
         if candidate_pids.is_empty() {
-            return if mode == "exclude" { self_pid } else { 0 };
+            return 0;
         }
 
         // 2. Find the top-most living root ancestor among candidates
@@ -590,14 +593,12 @@ mod win_audio {
 
         if !root_pids.is_empty() {
             root_pids[0]
-        } else if mode == "exclude" {
-            self_pid
         } else {
             0
         }
     }
 
-    fn activate_process_loopback_client(pid: u32, exclude: bool) -> Result<IAudioClient, String> {
+    pub(crate) fn activate_process_loopback_client(pid: u32, exclude: bool) -> Result<IAudioClient, String> {
         unsafe {
             let (tx, rx) = std::sync::mpsc::channel();
             let handler_impl = AudioActivationHandler {
@@ -654,19 +655,13 @@ mod win_audio {
         unsafe {
             let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
 
-            // Special Case: In "include" mode with 0 apps selected, stream absolute silence
-            if config.mode == "include" && config.target_pids.is_empty() && config.target_names.is_empty() {
-                println!("[Audio Loopback] Include mode active with 0 apps selected - streaming silence.");
-                while stop_flag.load(Ordering::Relaxed) {
-                    std::thread::sleep(std::time::Duration::from_millis(50));
-                }
-                CoUninitialize();
-                return;
-            }
-
             // Determine activation method based on PID / Name and mode
             let target_pid = resolve_target_process_tree(&config.target_names, &config.target_pids, &config.mode);
             let is_process_mode = target_pid > 0 && (config.mode == "exclude" || config.mode == "include");
+
+            if config.mode == "include" && !is_process_mode {
+                println!("[Audio Loopback] Include mode requested with no valid target; falling back to master loopback to prevent silence.");
+            }
 
             let mut was_process_loopback = false;
             let audio_client: IAudioClient = if is_process_mode {
@@ -704,16 +699,28 @@ mod win_audio {
             };
 
             // Query mix format from default render device (process loopback doesn't implement GetMixFormat directly)
-            let mix_format_ptr: *mut WAVEFORMATEX = if let Ok(master_client) = get_default_render_audio_client() {
+            let mut is_allocated_format = false;
+            let mut mix_format_ptr: *mut WAVEFORMATEX = if let Ok(master_client) = get_default_render_audio_client() {
                 master_client.GetMixFormat().unwrap_or(std::ptr::null_mut())
             } else {
                 audio_client.GetMixFormat().unwrap_or(std::ptr::null_mut())
             };
 
+            let mut fallback_format = WAVEFORMATEX {
+                wFormatTag: 1, // WAVE_FORMAT_PCM
+                nChannels: 2,
+                nSamplesPerSec: 48000,
+                nAvgBytesPerSec: 48000 * 2 * 2,
+                nBlockAlign: 4,
+                wBitsPerSample: 16,
+                cbSize: 0,
+            };
+
             if mix_format_ptr.is_null() {
-                eprintln!("[Audio Loopback] Failed to retrieve valid mix format.");
-                CoUninitialize();
-                return;
+                eprintln!("[Audio Loopback] Failed to retrieve valid mix format, using standard 48kHz stereo fallback.");
+                mix_format_ptr = &mut fallback_format as *mut _;
+            } else {
+                is_allocated_format = true;
             }
 
             let mix_format = &*mix_format_ptr;
@@ -721,34 +728,59 @@ mod win_audio {
             let channels = mix_format.nChannels;
             let bits_per_sample = mix_format.wBitsPerSample;
 
-            let stream_flags = if was_process_loopback {
-                AUDCLNT_STREAMFLAGS_EVENTCALLBACK
-                    | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM
-                    | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY
-            } else {
-                AUDCLNT_STREAMFLAGS_LOOPBACK
-                    | AUDCLNT_STREAMFLAGS_EVENTCALLBACK
-                    | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM
-                    | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY
-            };
+            // WASAPI process loopback and endpoint loopback both require AUDCLNT_STREAMFLAGS_LOOPBACK
+            let stream_flags = AUDCLNT_STREAMFLAGS_LOOPBACK
+                | AUDCLNT_STREAMFLAGS_EVENTCALLBACK
+                | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM
+                | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY;
 
             let buffer_duration = 10_000_000i64; // 1 second buffer in 100ns units
 
-            if let Err(err) = audio_client.Initialize(
+            let mut active_client = audio_client;
+            let mut init_res = active_client.Initialize(
                 AUDCLNT_SHAREMODE_SHARED,
                 stream_flags,
                 buffer_duration,
                 0,
                 mix_format_ptr,
                 None,
-            ) {
-                eprintln!("[Audio Loopback] Failed to initialize audio client (was_process={}): {:?}", was_process_loopback, err);
-                CoTaskMemFree(Some(mix_format_ptr as *const _));
+            );
+
+            // Resilient fallback: If process loopback fails initialization, recover on master render client
+            if init_res.is_err() && was_process_loopback {
+                eprintln!(
+                    "[Audio Loopback] Process loopback client initialization failed: {:?}. Recovering via master render client.",
+                    init_res
+                );
+                if let Ok(master_client) = get_default_render_audio_client() {
+                    init_res = master_client.Initialize(
+                        AUDCLNT_SHAREMODE_SHARED,
+                        stream_flags,
+                        buffer_duration,
+                        0,
+                        mix_format_ptr,
+                        None,
+                    );
+                    if init_res.is_ok() {
+                        println!("[Audio Loopback] Master audio client fallback initialized successfully.");
+                        active_client = master_client;
+                        was_process_loopback = false;
+                    }
+                }
+            }
+
+            if let Err(err) = init_res {
+                eprintln!("[Audio Loopback] Failed to initialize audio client: {:?}", err);
+                if is_allocated_format {
+                    CoTaskMemFree(Some(mix_format_ptr as *const _));
+                }
                 CoUninitialize();
                 return;
             }
 
-            CoTaskMemFree(Some(mix_format_ptr as *const _));
+            if is_allocated_format {
+                CoTaskMemFree(Some(mix_format_ptr as *const _));
+            }
 
             let audio_event = match CreateEventW(None, false, false, PCWSTR::null()) {
                 Ok(handle) => handle,
@@ -760,13 +792,13 @@ mod win_audio {
             };
             let _event_guard = EventHandleGuard(audio_event);
 
-            if let Err(err) = audio_client.SetEventHandle(audio_event) {
+            if let Err(err) = active_client.SetEventHandle(audio_event) {
                 eprintln!("[Audio Loopback] Failed to set event handle: {:?}", err);
                 CoUninitialize();
                 return;
             }
 
-            let capture_client: IAudioCaptureClient = match audio_client.GetService() {
+            let capture_client: IAudioCaptureClient = match active_client.GetService() {
                 Ok(c) => c,
                 Err(err) => {
                     eprintln!("[Audio Loopback] Failed to get capture client: {:?}", err);
@@ -775,7 +807,7 @@ mod win_audio {
                 }
             };
 
-            if let Err(err) = audio_client.Start() {
+            if let Err(err) = active_client.Start() {
                 eprintln!("[Audio Loopback] Failed to start audio client: {:?}", err);
                 CoUninitialize();
                 return;
@@ -879,13 +911,13 @@ mod win_audio {
                 }
             }
 
-            let _ = audio_client.Stop();
+            let _ = active_client.Stop();
             CoUninitialize();
             println!("[Audio Loopback] Audio loopback stopped cleanly.");
         }
     }
 
-    fn get_default_render_audio_client() -> Result<IAudioClient, windows::core::Error> {
+    pub(crate) fn get_default_render_audio_client() -> Result<IAudioClient, windows::core::Error> {
         unsafe {
             let enumerator: IMMDeviceEnumerator =
                 CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)?;
@@ -939,6 +971,8 @@ pub fn stop_audio_capture() -> Result<bool, String> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
     fn test_repeat_n_silence_buffer() {
         let mut buffer: Vec<f32> = Vec::new();
@@ -947,4 +981,77 @@ mod tests {
         assert_eq!(buffer.len(), 480);
         assert!(buffer.iter().all(|&s| s == 0.0f32));
     }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_process_loopback_activation_and_init() {
+        unsafe {
+            use windows::core::PCWSTR;
+            use windows::Win32::Foundation::CloseHandle;
+            use windows::Win32::Media::Audio::*;
+            use windows::Win32::System::Com::*;
+            use windows::Win32::System::Threading::{CreateEventW, WaitForSingleObject};
+
+            let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+            let my_pid = std::process::id();
+            let client_res = win_audio::activate_process_loopback_client(my_pid, true);
+            assert!(client_res.is_ok(), "Process loopback activation must succeed for valid PID");
+
+            if let Ok(client) = client_res {
+                let master = win_audio::get_default_render_audio_client();
+                if let Ok(master_client) = master {
+                    let mix_format = master_client.GetMixFormat().unwrap();
+
+                    // Regression test: Without AUDCLNT_STREAMFLAGS_LOOPBACK, WASAPI rejects with AUDCLNT_E_INVALID_STREAM_FLAG (0x88890021)
+                    let flags_without = win_audio::AUDCLNT_STREAMFLAGS_EVENTCALLBACK
+                        | win_audio::AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM
+                        | win_audio::AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY;
+                    let res_without = client.Initialize(
+                        AUDCLNT_SHAREMODE_SHARED,
+                        flags_without,
+                        10_000_000,
+                        0,
+                        mix_format,
+                        None,
+                    );
+                    assert!(res_without.is_err(), "Initialize without LOOPBACK must be rejected");
+
+                    // With AUDCLNT_STREAMFLAGS_LOOPBACK, initialization and capture pipeline must succeed
+                    if let Ok(client2) = win_audio::activate_process_loopback_client(my_pid, true) {
+                        let flags_with = AUDCLNT_STREAMFLAGS_LOOPBACK
+                            | win_audio::AUDCLNT_STREAMFLAGS_EVENTCALLBACK
+                            | win_audio::AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM
+                            | win_audio::AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY;
+                        let res_with = client2.Initialize(
+                            AUDCLNT_SHAREMODE_SHARED,
+                            flags_with,
+                            10_000_000,
+                            0,
+                            mix_format,
+                            None,
+                        );
+                        assert!(res_with.is_ok(), "Initialize with LOOPBACK must succeed");
+
+                        let event = CreateEventW(None, false, false, PCWSTR::null()).unwrap();
+                        let set_ev_res = client2.SetEventHandle(event);
+                        assert!(set_ev_res.is_ok(), "SetEventHandle must succeed");
+
+                        let cap_res: windows::core::Result<IAudioCaptureClient> = client2.GetService();
+                        assert!(cap_res.is_ok(), "GetService must succeed");
+
+                        let start_res = client2.Start();
+                        assert!(start_res.is_ok(), "Start must succeed");
+
+                        let _ = WaitForSingleObject(event, 20);
+
+                        let stop_res = client2.Stop();
+                        assert!(stop_res.is_ok(), "Stop must succeed");
+
+                        let _ = CloseHandle(event);
+                    }
+                }
+            }
+        }
+    }
 }
+
