@@ -91,10 +91,11 @@ export class MediaCoordinator {
             (params as any).degradationPreference = 'maintain-resolution';
             await sender.setParameters(params);
 
+            // Enforce 'detail' contentHint to prevent WebRTC from lowering spatial resolution or blurring on camera motion
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             if (sender.track && 'contentHint' in sender.track) {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              (sender.track as any).contentHint = 'motion';
+              (sender.track as any).contentHint = 'detail';
             }
           } catch (err) {
             console.warn('Failed to apply sender bitrate parameters:', err);
