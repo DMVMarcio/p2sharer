@@ -97,7 +97,8 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
 
     fn new(ctx: Context<Self::Flags>) -> Result<Self, Self::Error> {
         let fps = ctx.flags.target_fps.clamp(15, 120);
-        let min_frame_interval = std::time::Duration::from_nanos(1_000_000_000 / (fps as u64 + 4));
+        // Allow frames up to 2x target FPS so natural +/- 1.5ms VSync/DWM jitter is never dropped
+        let min_frame_interval = std::time::Duration::from_nanos(1_000_000_000 / (fps as u64 * 2));
         Ok(Self {
             sender: ctx.flags.sender,
             target_width: ctx.flags.target_width,
@@ -162,7 +163,7 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
 
                 if let Some(dst_img) = self.resized_image.as_mut() {
                     let options =
-                        ResizeOptions::new().resize_alg(ResizeAlg::Convolution(FilterType::CatmullRom));
+                        ResizeOptions::new().resize_alg(ResizeAlg::Convolution(FilterType::Bilinear));
                     if self.resizer.resize(&src_img, dst_img, &options).is_ok() {
                         (dst_img.buffer(), dst_w, dst_h)
                     } else {
@@ -637,9 +638,11 @@ pub fn start_native_screen_capture(
     let pacer_active = is_capturing.clone();
     let pacer_sender = sender.clone();
     let pacer_cache = latest_frame_cache.clone();
-    let pacer_last_sent_us = last_sent_us.clone();
+    let pacer_wgc_last_sent_us = last_sent_us.clone();
     let pacer_start = start_instant;
     let target_interval_us = (1_000_000 / fps as u64).max(8_000);
+    let slack_us = (target_interval_us * 35) / 100; // ~5.8ms slack window for 60fps
+    let static_timeout_us = target_interval_us + slack_us; // ~22.5ms threshold before emitting static ticks
 
     std::thread::spawn(move || {
         let _timer_guard = MultimediaTimerGuard::new();
@@ -647,25 +650,19 @@ pub fn start_native_screen_capture(
         let mut pacer_tick_count: u64 = 0;
 
         while pacer_active.load(Ordering::Relaxed) && CAPTURING_VIDEO.load(Ordering::Relaxed) {
-            std::thread::sleep(std::time::Duration::from_millis(1));
-
-            if !pacer_active.load(Ordering::Relaxed) || !CAPTURING_VIDEO.load(Ordering::Relaxed) {
-                break;
-            }
-
             let now_us = pacer_start.elapsed().as_micros() as u64;
-            let last_sent = pacer_last_sent_us.load(Ordering::Acquire);
+            let last_wgc = pacer_wgc_last_sent_us.load(Ordering::Acquire);
 
-            // If WGC emitted a new frame, shift next_tick_us forward to avoid redundant double-emit
-            if last_sent > 0 && next_tick_us <= last_sent {
-                next_tick_us = last_sent + target_interval_us;
+            // If a real WGC frame arrived recently (< static_timeout_us), WGC is actively streaming:
+            // Back off next_tick_us so pacer does not compete with WGC
+            if last_wgc > 0 && now_us.saturating_sub(last_wgc) < static_timeout_us {
+                next_tick_us = last_wgc + static_timeout_us;
             }
 
             if now_us >= next_tick_us {
                 pacer_tick_count += 1;
                 if let Ok(guard) = pacer_cache.lock() {
                     if let Some(frame) = guard.as_ref() {
-                        pacer_last_sent_us.store(now_us, Ordering::Release);
                         // Full frame keyframe refresh once every 60 ticks (~1 sec);
                         // On intermediate static ticks, emit 1-byte heartbeat tick [0] to bypass CPU JPEG decoding in JS!
                         if pacer_tick_count % 60 == 0 {
@@ -680,6 +677,11 @@ pub fn start_native_screen_capture(
                     next_tick_us = now_us + target_interval_us;
                 }
             }
+
+            // Dynamically sleep based on time remaining to avoid 1000 wakeups/second
+            let remaining_us = next_tick_us.saturating_sub(now_us);
+            let sleep_ms = (remaining_us / 2000).clamp(1, 8);
+            std::thread::sleep(std::time::Duration::from_millis(sleep_ms));
         }
     });
 
@@ -968,7 +970,7 @@ pub fn start_native_screen_capture(
                             }
                             if let Some(dst_img) = resized_img_buf.as_mut() {
                                 let options = ResizeOptions::new()
-                                    .resize_alg(ResizeAlg::Convolution(FilterType::CatmullRom));
+                                    .resize_alg(ResizeAlg::Convolution(FilterType::Bilinear));
                                 if resizer.resize(&src_img, dst_img, &options).is_ok() {
                                     (dst_img.buffer(), width, height)
                                 } else {

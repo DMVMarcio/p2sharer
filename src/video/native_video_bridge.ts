@@ -205,7 +205,10 @@ export class NativeVideoBridge implements VideoCaptureBridge {
         // If buffer contains a real JPEG payload (> 4 bytes), decode it into an ImageBitmap
         if (buffer.byteLength > 4) {
           const blob = new Blob([buffer], { type: 'image/jpeg' });
-          const newBitmap = await createImageBitmap(blob, { premultiplyAlpha: 'none' });
+          const newBitmap = await createImageBitmap(blob, {
+            premultiplyAlpha: 'none',
+            colorSpaceConversion: 'none',
+          });
 
           if (!this.isCapturing) {
             newBitmap.close();
@@ -230,10 +233,10 @@ export class NativeVideoBridge implements VideoCaptureBridge {
         const VideoFrameClass = (globalThis as any).VideoFrame;
         if (this.trackWriter && typeof VideoFrameClass === 'function') {
           try {
-            const nowUs = performance.now() * 1000;
+            const nowUs = Math.round(performance.now() * 1000);
             const videoFrame = new VideoFrameClass(bitmap, {
               timestamp: nowUs,
-              duration: (1000 / Math.max(this.currentFps, 1)) * 1000,
+              duration: Math.round((1000 / Math.max(this.currentFps, 1)) * 1000),
             });
             await this.trackWriter.write(videoFrame);
             videoFrame.close();
