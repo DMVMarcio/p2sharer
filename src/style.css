@@ -56,6 +56,9 @@ html[data-theme="dark"],
   --success-bg: rgba(16, 185, 129, 0.12);
   --success-border: rgba(16, 185, 129, 0.3);
   --success-text: #34d399;
+
+  --skeleton-base: rgba(255, 255, 255, 0.05);
+  --skeleton-highlight: rgba(255, 255, 255, 0.12);
 }
 
 /* LIGHT THEME */
@@ -85,6 +88,9 @@ html[data-theme="light"] {
   --success-bg: rgba(16, 185, 129, 0.08);
   --success-border: rgba(16, 185, 129, 0.25);
   --success-text: #059669;
+
+  --skeleton-base: rgba(0, 0, 0, 0.05);
+  --skeleton-highlight: rgba(0, 0, 0, 0.12);
 }
 
 /* ==========================================================================
@@ -588,6 +594,12 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   font-family: inherit;
   white-space: nowrap;
   width: 100%;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .btn-primary {
@@ -2900,6 +2912,83 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .source-card-subtitle {
   font-size: 11px;
   color: var(--text-muted);
+}
+
+/* Screen Picker Loading Skeleton */
+.source-card-skeleton {
+  cursor: default;
+  pointer-events: none;
+  background-color: var(--bg-card);
+  border-color: var(--border-subtle);
+}
+
+.source-card-skeleton:hover {
+  background-color: var(--bg-card);
+  border-color: var(--border-subtle);
+}
+
+.source-card-thumb-skeleton-icon {
+  color: var(--text-disabled);
+  opacity: 0.35;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(
+    90deg,
+    var(--skeleton-base) 0%,
+    var(--skeleton-highlight) 50%,
+    var(--skeleton-base) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer-sweep 1.5s infinite ease-in-out;
+}
+
+@keyframes skeleton-shimmer-sweep {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton-line {
+  border-radius: var(--radius-xs);
+}
+
+.skeleton-title-line {
+  height: 12px;
+  width: 75%;
+  margin-top: 2px;
+}
+
+.skeleton-sub-line {
+  height: 10px;
+  width: 45%;
+  margin-top: 4px;
+}
+
+.source-cards-empty-state {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+  gap: 10px;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+  padding: 30px;
+}
+
+.source-cards-empty-state svg {
+  color: var(--text-disabled);
 }
 
 .picker-settings-row {
