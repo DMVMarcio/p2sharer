@@ -92,7 +92,23 @@ export const RoomVideoContainer: React.FC = () => {
     });
   }, [roomSlots, streamFilter, subscribedStreams]);
 
+  const slotIdsKey = useMemo(() => {
+    return filteredSlots.map((s) => s.peerId).join(',');
+  }, [filteredSlots]);
+
+  const prevSlotIdsKeyRef = useRef(slotIdsKey);
+  const prevLayoutModeRef = useRef(layoutMode);
+
   useLayoutEffect(() => {
+    const idsChanged = prevSlotIdsKeyRef.current !== slotIdsKey;
+    const modeChanged = prevLayoutModeRef.current !== layoutMode;
+    prevSlotIdsKeyRef.current = slotIdsKey;
+    prevLayoutModeRef.current = layoutMode;
+
+    if (!idsChanged && !modeChanged) {
+      return;
+    }
+
     if (layoutMode === 'grid') {
       applyFlipAnimation(gridWrapperRef.current, prevGridRectsRef.current);
     } else {
@@ -104,7 +120,7 @@ export const RoomVideoContainer: React.FC = () => {
     } else {
       prevTrayRectsRef.current.clear();
     }
-  }, [filteredSlots, layoutMode]);
+  }, [slotIdsKey, layoutMode]);
 
   const featuredSlot =
     filteredSlots.find((s) => s.peerId === pinnedPeerId) ||

@@ -122,8 +122,10 @@ class RoomService {
       clearTimeout(this.roomConnectingTimeout);
       this.roomConnectingTimeout = null;
     }
-    this.connectingOverlay.visible = false;
-    this.notify();
+    if (this.connectingOverlay.visible) {
+      this.connectingOverlay.visible = false;
+      this.notify();
+    }
   }
 
   public async joinRoom(code: string, pass: string, isCreator: boolean): Promise<void> {
@@ -186,14 +188,13 @@ class RoomService {
 
     this.roomManager.join({
       onStreamsUpdate: () => {
-        this.notify();
+        // Handled via onSlotsUpdate to prevent double notification cascades
       },
       onSlotsUpdate: (slots: RoomSlotInfo[]) => {
         stateStore.set((s) => {
           s.roomSlots = slots;
         });
         this.hideConnecting();
-        this.notify();
       },
       onChat: (msg: ChatMessage) => {
         this.chatMessages.push(msg);

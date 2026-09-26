@@ -229,7 +229,8 @@ export class MediaCoordinator {
    */
   public static shouldRequestStreamRecovery(
     currentStream: MediaStream | null | undefined,
-    incomingStatus: StreamStatusPayload
+    incomingStatus: StreamStatusPayload,
+    lastKnownBroadcasterStreamId?: string
   ): boolean {
     if (!incomingStatus.isStreaming) {
       return false;
@@ -247,6 +248,12 @@ export class MediaCoordinator {
     const hasLiveVideoTrack = videoTracks.some((t) => t.readyState === 'live');
     if (!hasLiveVideoTrack) {
       return true;
+    }
+
+    // If lastKnownBroadcasterStreamId is provided and video track is live,
+    // only trigger recovery if broadcaster actually switched to a different stream ID
+    if (lastKnownBroadcasterStreamId !== undefined && incomingStatus.streamId) {
+      return lastKnownBroadcasterStreamId !== '' && lastKnownBroadcasterStreamId !== incomingStatus.streamId;
     }
 
     if (incomingStatus.streamId && currentStream.id !== incomingStatus.streamId) {

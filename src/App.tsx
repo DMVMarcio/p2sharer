@@ -24,7 +24,9 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     initFrontendLogger();
+  }, []);
 
+  useEffect(() => {
     // Check username on initial load
     if (!stateStore.username) {
       openModal('username');

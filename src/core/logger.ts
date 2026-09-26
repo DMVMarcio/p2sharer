@@ -1,6 +1,11 @@
 import { invoke } from '@tauri-apps/api/core';
 
+let isLoggerInitialized = false;
+
 export function initFrontendLogger(): void {
+  if (isLoggerInitialized) return;
+  isLoggerInitialized = true;
+
   const originalLog = console.log;
   const originalWarn = console.warn;
   const originalError = console.error;
@@ -41,11 +46,21 @@ export function initFrontendLogger(): void {
 
   console.log = (...args: unknown[]) => {
     originalLog(...args);
-    invoke('write_frontend_log', {
-      level: 'INFO',
-      message: formatArgs(args),
-      context: 'frontend',
-    }).catch(() => {});
+    // Only forward major application lifecycle tags, skipping high-frequency ticks
+    const firstArg = typeof args[0] === 'string' ? args[0] : '';
+    if (
+      firstArg.startsWith('[P2P] Joining') ||
+      firstArg.startsWith('[P2P] Direct WebRTC peer') ||
+      firstArg.startsWith('[P2P] Peer left') ||
+      firstArg.startsWith('[SignalingManager] Joining') ||
+      firstArg.startsWith('[RoomService]')
+    ) {
+      invoke('write_frontend_log', {
+        level: 'INFO',
+        message: formatArgs(args),
+        context: 'frontend',
+      }).catch(() => {});
+    }
   };
 
   console.warn = (...args: unknown[]) => {
