@@ -961,6 +961,8 @@ pub(crate) mod win_audio {
             let mut raw_stereo_buffer: Vec<f32> = Vec::with_capacity(4096);
             let mut standardized_buffer: Vec<f32> = Vec::with_capacity(4096);
             let mut last_session_check = std::time::Instant::now();
+            let mut next_mix_time = std::time::Instant::now();
+            let mix_tick_duration = std::time::Duration::from_millis(10);
 
             while stop_flag.load(Ordering::Relaxed) {
                 // Dynamic session discovery & cleanup every 500ms
@@ -1009,9 +1011,9 @@ pub(crate) mod win_audio {
                 let wait_len = events.len().min(64);
                 let wait_handles = &events[..wait_len];
 
-                let wait_res = WaitForMultipleObjects(wait_handles, false, 20);
+                let wait_res = WaitForMultipleObjects(wait_handles, false, 5);
 
-                if wait_res.0 >= WAIT_OBJECT_0.0 && wait_res.0 < WAIT_OBJECT_0.0 + wait_len as u32 {
+                if (wait_res.0 >= WAIT_OBJECT_0.0 && wait_res.0 < WAIT_OBJECT_0.0 + wait_len as u32) || wait_res == WAIT_TIMEOUT {
                     for source in &mut multi_sources {
                         let mut packet_size = source.capture.GetNextPacketSize().unwrap_or(0);
                         while packet_size > 0 {
@@ -1048,63 +1050,74 @@ pub(crate) mod win_audio {
                             packet_size = source.capture.GetNextPacketSize().unwrap_or(0);
                         }
 
-                        // Bound FIFO to prevent buffer bloat and excessive latency (max 9600 samples = 100ms at 48kHz stereo)
-                        const MAX_FIFO_SAMPLES: usize = 9600;
+                        // Bound FIFO to prevent buffer bloat and excessive latency (max 2880 samples = 30ms at 48kHz stereo)
+                        const MAX_FIFO_SAMPLES: usize = 2880;
                         if source.fifo.len() > MAX_FIFO_SAMPLES {
                             let excess = source.fifo.len() - MAX_FIFO_SAMPLES;
-                            source.fifo.drain(..excess);
+                            let excess_even = (excess / 2) * 2;
+                            source.fifo.drain(..excess_even);
                         }
                     }
 
-                    if multi_sources.len() == 1 {
-                        let fifo = &mut multi_sources[0].fifo;
-                        if !fifo.is_empty() {
-                            raw_stereo_buffer.extend(fifo.drain(..));
+                    // Periodic synchronous mixing tick: exactly 480 frames (960 floats) per 10ms
+                    let now = std::time::Instant::now();
+                    if now >= next_mix_time {
+                        next_mix_time += mix_tick_duration;
+                        if next_mix_time < now {
+                            next_mix_time = now + mix_tick_duration;
                         }
-                    } else if multi_sources.len() > 1 {
-                        let max_avail = multi_sources.iter().map(|s| s.fifo.len()).max().unwrap_or(0);
-                        let max_pairs = max_avail / 2;
 
-                        if max_pairs > 0 {
-                            for _ in 0..max_pairs {
-                                let mut sum_l = 0.0f32;
-                                let mut sum_r = 0.0f32;
-                                let mut active_sources = 0usize;
+                        if multi_sources.len() == 1 {
+                            let fifo = &mut multi_sources[0].fifo;
+                            if fifo.len() >= 960 {
+                                raw_stereo_buffer.extend(fifo.drain(..960));
+                            } else if !fifo.is_empty() {
+                                raw_stereo_buffer.extend(fifo.drain(..));
+                            }
+                        } else if multi_sources.len() > 1 {
+                            let any_has_audio = multi_sources.iter().any(|s| !s.fifo.is_empty());
+                            if any_has_audio {
+                                const FRAMES_TO_MIX: usize = 480;
+                                raw_stereo_buffer.reserve(FRAMES_TO_MIX * 2);
 
-                                for s in &mut multi_sources {
-                                    if s.fifo.len() >= 2 {
-                                        let l = s.fifo.pop_front().unwrap_or(0.0);
-                                        let r = s.fifo.pop_front().unwrap_or(0.0);
-                                        if l.abs() > 0.0001 || r.abs() > 0.0001 {
-                                            active_sources += 1;
+                                for _ in 0..FRAMES_TO_MIX {
+                                    let mut sum_l = 0.0f32;
+                                    let mut sum_r = 0.0f32;
+                                    let mut active_sources = 0usize;
+
+                                    for s in &mut multi_sources {
+                                        if s.fifo.len() >= 2 {
+                                            let l = s.fifo.pop_front().unwrap_or(0.0);
+                                            let r = s.fifo.pop_front().unwrap_or(0.0);
+                                            if l.abs() > 0.0001 || r.abs() > 0.0001 {
+                                                active_sources += 1;
+                                            }
+                                            sum_l += l;
+                                            sum_r += r;
                                         }
-                                        sum_l += l;
-                                        sum_r += r;
                                     }
-                                }
 
-                                if active_sources > 1 {
-                                    let headroom_scale = 1.0 / (active_sources as f32).sqrt();
-                                    sum_l *= headroom_scale;
-                                    sum_r *= headroom_scale;
-                                }
+                                    if active_sources > 1 {
+                                        let headroom_scale = 1.0 / (active_sources as f32).sqrt();
+                                        sum_l *= headroom_scale;
+                                        sum_r *= headroom_scale;
+                                    }
 
-                                raw_stereo_buffer.push(soft_clip_sample(sum_l));
-                                raw_stereo_buffer.push(soft_clip_sample(sum_r));
+                                    raw_stereo_buffer.push(soft_clip_sample(sum_l));
+                                    raw_stereo_buffer.push(soft_clip_sample(sum_r));
+                                }
                             }
                         }
-                    }
 
-                    if !raw_stereo_buffer.is_empty() {
-                        if sample_rate != 48000 {
-                            resampler.resample(&raw_stereo_buffer, &mut standardized_buffer);
-                        } else {
-                            standardized_buffer.extend_from_slice(&raw_stereo_buffer);
+                        if !raw_stereo_buffer.is_empty() {
+                            if sample_rate != 48000 {
+                                resampler.resample(&raw_stereo_buffer, &mut standardized_buffer);
+                            } else {
+                                standardized_buffer.extend_from_slice(&raw_stereo_buffer);
+                            }
+                            raw_stereo_buffer.clear();
                         }
-                        raw_stereo_buffer.clear();
                     }
-                } else if wait_res == WAIT_TIMEOUT {
-                    continue;
                 } else {
                     break;
                 }
