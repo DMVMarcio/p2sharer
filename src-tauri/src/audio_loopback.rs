@@ -166,6 +166,25 @@ pub fn resample_interleaved_float(
     output
 }
 
+/// Transparent broadcast soft-knee limiter.
+/// Linearly transparent for normal signals (|x| <= 0.8 / -1.9 dBFS).
+/// Smoothly saturates above 0.8 to prevent harsh digital clipping.
+#[inline(always)]
+pub fn soft_clip_sample(x: f32) -> f32 {
+    let abs = x.abs();
+    if abs <= 0.8 {
+        x
+    } else if abs <= 1.25 {
+        let sign = x.signum();
+        let norm = (abs - 0.8) / 0.45;
+        let compressed = 0.8 + 0.2 * (norm - (norm * norm * norm) / 3.0);
+        sign * compressed
+    } else {
+        let sign = x.signum();
+        sign * (0.8 + 0.199 * (1.0 - (-1.8 * (abs - 0.8)).exp()))
+    }
+}
+
 pub fn convert_and_downmix_to_stereo(
     data_ptr: *const u8,
     num_frames: usize,
@@ -541,17 +560,17 @@ pub(crate) mod win_audio {
                                 for i in 0..count {
                                     if let Ok(control) = session_enum.GetSession(i) {
                                         if let Ok(state) = control.GetState() {
-                                            if state == AudioSessionStateExpired {
+                                            if state != AudioSessionStateActive {
                                                 continue;
                                             }
                                         }
 
                                         if let Ok(control2) = control.cast::<IAudioSessionControl2>() {
                                             let s_pid = control2.GetProcessId().unwrap_or(0);
-                                            if s_pid > 0 {
+                                            if s_pid > 4 {
                                                 if !is_pid_or_ancestor_excluded(s_pid, excluded_roots, excluded_names, self_pids, sys) {
                                                     let root = resolve_single_process_root(s_pid, sys);
-                                                    if root > 0 && !non_excluded.contains(&root) {
+                                                    if root > 4 && !non_excluded.contains(&root) {
                                                         non_excluded.push(root);
                                                     }
                                                 }
@@ -607,8 +626,30 @@ pub(crate) mod win_audio {
             return Vec::new();
         }
 
+        // A candidate PID is a top-level root candidate only if no other candidate PID is an ancestor of it.
+        let mut top_level_candidates: Vec<u32> = Vec::new();
+        for &pid in &candidate_pids {
+            let mut curr = sysinfo::Pid::from_u32(pid);
+            let mut has_candidate_ancestor = false;
+            while let Some(proc) = sys.process(curr) {
+                if let Some(parent_pid) = proc.parent() {
+                    let parent_u32 = parent_pid.as_u32();
+                    if candidate_pids.contains(&parent_u32) {
+                        has_candidate_ancestor = true;
+                        break;
+                    }
+                    curr = parent_pid;
+                } else {
+                    break;
+                }
+            }
+            if !has_candidate_ancestor && !top_level_candidates.contains(&pid) {
+                top_level_candidates.push(pid);
+            }
+        }
+
         let mut root_pids: Vec<u32> = Vec::new();
-        for &start_pid in &candidate_pids {
+        for &start_pid in &top_level_candidates {
             let mut curr = sysinfo::Pid::from_u32(start_pid);
             let start_name = sys.process(curr).map(|p| p.name().to_string_lossy().to_lowercase());
 
@@ -616,7 +657,7 @@ pub(crate) mod win_audio {
                 if let Some(parent_pid) = proc.parent() {
                     if let Some(parent_proc) = sys.process(parent_pid) {
                         let parent_name = parent_proc.name().to_string_lossy().to_lowercase();
-                        if start_name.as_deref() == Some(&parent_name) || candidate_pids.contains(&parent_pid.as_u32()) {
+                        if start_name.as_deref() == Some(&parent_name) {
                             curr = parent_pid;
                             continue;
                         }
@@ -693,6 +734,7 @@ pub(crate) mod win_audio {
         pub event: HANDLE,
         pub _event_guard: EventHandleGuard,
         pub pid: u32,
+        pub fifo: std::collections::VecDeque<f32>,
     }
 
     pub(crate) fn init_capture_source(
@@ -739,6 +781,7 @@ pub(crate) mod win_audio {
                 event: ev,
                 _event_guard: EventHandleGuard(ev),
                 pid,
+                fifo: std::collections::VecDeque::with_capacity(4096),
             })
         }
     }
@@ -796,32 +839,30 @@ pub(crate) mod win_audio {
 
             let mut multi_sources: Vec<MultiCaptureSource> = Vec::new();
 
-            let is_multi_exclude = config.mode == "exclude" && {
+            let excluded_roots = if config.mode == "exclude" {
                 let roots = resolve_target_process_roots(&config.target_names, &config.target_pids);
                 let specifies_self = normalized_names.iter().any(|t| t.contains("p2sharer"))
-                    || config.target_pids.iter().any(|&p| self_pids.contains(&p));
-                let mut all_roots = roots;
-                if specifies_self && !all_roots.contains(&std::process::id()) {
-                    all_roots.push(std::process::id());
+                    || config.target_pids.iter().any(|&p| self_pids.contains(&p))
+                    || roots.iter().any(|&p| self_pids.contains(&p));
+
+                let mut filtered_roots: Vec<u32> = roots
+                    .into_iter()
+                    .filter(|p| !self_pids.contains(p) && *p != std::process::id())
+                    .collect();
+
+                if specifies_self {
+                    filtered_roots.push(std::process::id());
                 }
-                all_roots.len() > 1
+                filtered_roots
+            } else {
+                Vec::new()
             };
+
+            let is_multi_exclude = config.mode == "exclude" && excluded_roots.len() > 1;
 
             let is_multi_include = config.mode == "include" && {
                 let roots = resolve_target_process_roots(&config.target_names, &config.target_pids);
                 !roots.is_empty()
-            };
-
-            let excluded_roots = if config.mode == "exclude" {
-                let mut roots = resolve_target_process_roots(&config.target_names, &config.target_pids);
-                let specifies_self = normalized_names.iter().any(|t| t.contains("p2sharer"))
-                    || config.target_pids.iter().any(|&p| self_pids.contains(&p));
-                if specifies_self && !roots.contains(&std::process::id()) {
-                    roots.push(std::process::id());
-                }
-                roots
-            } else {
-                Vec::new()
             };
 
             if config.mode == "full" {
@@ -971,12 +1012,8 @@ pub(crate) mod win_audio {
                 let wait_res = WaitForMultipleObjects(wait_handles, false, 20);
 
                 if wait_res.0 >= WAIT_OBJECT_0.0 && wait_res.0 < WAIT_OBJECT_0.0 + wait_len as u32 {
-                    let mut client_chunks: Vec<Vec<f32>> = Vec::new();
-
-                    for source in &multi_sources {
+                    for source in &mut multi_sources {
                         let mut packet_size = source.capture.GetNextPacketSize().unwrap_or(0);
-                        let mut source_raw: Vec<f32> = Vec::new();
-
                         while packet_size > 0 {
                             let mut data_ptr: *mut u8 = null_mut();
                             let mut num_frames_read = 0u32;
@@ -993,14 +1030,16 @@ pub(crate) mod win_audio {
 
                             if get_res.is_ok() && num_frames_read > 0 && !data_ptr.is_null() {
                                 let is_silent = (flags & AUDCLNT_BUFFERFLAGS_SILENT.0 as u32) != 0;
+                                let mut packet_stereo = Vec::new();
                                 convert_and_downmix_to_stereo(
                                     data_ptr,
                                     num_frames_read as usize,
                                     channels,
                                     bits_per_sample,
                                     is_silent,
-                                    &mut source_raw,
+                                    &mut packet_stereo,
                                 );
+                                source.fifo.extend(packet_stereo);
                                 let _ = source.capture.ReleaseBuffer(num_frames_read);
                             } else if get_res.is_ok() && num_frames_read > 0 {
                                 let _ = source.capture.ReleaseBuffer(num_frames_read);
@@ -1009,25 +1048,54 @@ pub(crate) mod win_audio {
                             packet_size = source.capture.GetNextPacketSize().unwrap_or(0);
                         }
 
-                        if !source_raw.is_empty() {
-                            client_chunks.push(source_raw);
+                        // Bound FIFO to prevent buffer bloat and excessive latency (max 9600 samples = 100ms at 48kHz stereo)
+                        const MAX_FIFO_SAMPLES: usize = 9600;
+                        if source.fifo.len() > MAX_FIFO_SAMPLES {
+                            let excess = source.fifo.len() - MAX_FIFO_SAMPLES;
+                            source.fifo.drain(..excess);
                         }
                     }
 
-                    if !client_chunks.is_empty() {
-                        if client_chunks.len() == 1 {
-                            raw_stereo_buffer = client_chunks.remove(0);
-                        } else {
-                            let max_len = client_chunks.iter().map(|c| c.len()).max().unwrap_or(0);
-                            raw_stereo_buffer.clear();
-                            raw_stereo_buffer.resize(max_len, 0.0f32);
-                            for chunk in client_chunks {
-                                for (i, sample) in chunk.into_iter().enumerate() {
-                                    raw_stereo_buffer[i] = (raw_stereo_buffer[i] + sample).clamp(-1.0, 1.0);
+                    if multi_sources.len() == 1 {
+                        let fifo = &mut multi_sources[0].fifo;
+                        if !fifo.is_empty() {
+                            raw_stereo_buffer.extend(fifo.drain(..));
+                        }
+                    } else if multi_sources.len() > 1 {
+                        let max_avail = multi_sources.iter().map(|s| s.fifo.len()).max().unwrap_or(0);
+                        let max_pairs = max_avail / 2;
+
+                        if max_pairs > 0 {
+                            for _ in 0..max_pairs {
+                                let mut sum_l = 0.0f32;
+                                let mut sum_r = 0.0f32;
+                                let mut active_sources = 0usize;
+
+                                for s in &mut multi_sources {
+                                    if s.fifo.len() >= 2 {
+                                        let l = s.fifo.pop_front().unwrap_or(0.0);
+                                        let r = s.fifo.pop_front().unwrap_or(0.0);
+                                        if l.abs() > 0.0001 || r.abs() > 0.0001 {
+                                            active_sources += 1;
+                                        }
+                                        sum_l += l;
+                                        sum_r += r;
+                                    }
                                 }
+
+                                if active_sources > 1 {
+                                    let headroom_scale = 1.0 / (active_sources as f32).sqrt();
+                                    sum_l *= headroom_scale;
+                                    sum_r *= headroom_scale;
+                                }
+
+                                raw_stereo_buffer.push(soft_clip_sample(sum_l));
+                                raw_stereo_buffer.push(soft_clip_sample(sum_r));
                             }
                         }
+                    }
 
+                    if !raw_stereo_buffer.is_empty() {
                         if sample_rate != 48000 {
                             resampler.resample(&raw_stereo_buffer, &mut standardized_buffer);
                         } else {
@@ -1270,6 +1338,31 @@ mod tests {
             &sys,
         );
         assert!(!is_dummy_excluded, "Unknown non-excluded PID must not be identified as excluded");
+    }
+
+    #[test]
+    fn test_soft_clip_sample_linearity_and_saturation() {
+        // Linearity test for normal broadcast range (-0.8 to 0.8)
+        assert_eq!(soft_clip_sample(0.0), 0.0);
+        assert_eq!(soft_clip_sample(0.5), 0.5);
+        assert_eq!(soft_clip_sample(-0.5), -0.5);
+        assert_eq!(soft_clip_sample(0.8), 0.8);
+        assert_eq!(soft_clip_sample(-0.8), -0.8);
+
+        // Saturation test above 0.8: must be strictly < 1.0 and monotonic
+        let s09 = soft_clip_sample(0.9);
+        let s12 = soft_clip_sample(1.2);
+        let s20 = soft_clip_sample(2.0);
+        let s50 = soft_clip_sample(5.0);
+
+        assert!(s09 > 0.8 && s09 < 1.0);
+        assert!(s12 > s09 && s12 < 1.0);
+        assert!(s20 > s12 && s20 < 1.0);
+        assert!(s50 >= s20 && s50 < 1.0);
+
+        // Negative symmetry
+        assert_eq!(soft_clip_sample(-0.9), -s09);
+        assert_eq!(soft_clip_sample(-2.0), -s20);
     }
 }
 
