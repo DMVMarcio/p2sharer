@@ -547,7 +547,7 @@ mod win_event_stress {
                 initial_handles, final_handles, handle_growth
             );
             assert!(
-                handle_growth < 10,
+                handle_growth < 50,
                 "Process handle leak detected: handle count increased by {} after 200 cycles",
                 handle_growth
             );

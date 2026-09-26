@@ -188,7 +188,7 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
 
         self.jpeg_buffer.clear();
         let mut encoder = FastJpegEncoder::new(&mut self.jpeg_buffer, self.quality);
-        encoder.set_sampling_factor(SamplingFactor::R_4_2_0);
+        encoder.set_sampling_factor(SamplingFactor::R_4_4_4);
         if encoder
             .encode(
                 final_pixels,
@@ -642,7 +642,7 @@ pub fn start_native_screen_capture(
     let width = target_width.unwrap_or(0);
     let height = target_height.unwrap_or(0);
     let should_draw_mouse = capture_mouse.unwrap_or(true);
-    let jpeg_quality = quality.unwrap_or(75).clamp(50, 90);
+    let jpeg_quality = quality.unwrap_or(92).clamp(60, 95);
 
     let sender = get_frame_sender().clone();
     let start_instant = std::time::Instant::now();
@@ -650,7 +650,7 @@ pub fn start_native_screen_capture(
         Arc::new(std::sync::Mutex::new(None));
     let last_sent_us = Arc::new(std::sync::atomic::AtomicU64::new(0));
 
-    // High-precision frame heartbeat pacer thread (guarantees constant 60 FPS even when screen is static)
+    // High-precision frame heartbeat pacer thread (guarantees constant stream heartbeat without starvation)
     let pacer_active = is_capturing.clone();
     let pacer_sender = sender.clone();
     let pacer_cache = latest_frame_cache.clone();
@@ -696,7 +696,7 @@ pub fn start_native_screen_capture(
 
             // Dynamically sleep based on time remaining to avoid 1000 wakeups/second
             let remaining_us = next_tick_us.saturating_sub(now_us);
-            let sleep_ms = (remaining_us / 2000).clamp(1, 8);
+            let sleep_ms = (remaining_us / 2000).clamp(1, 16);
             std::thread::sleep(std::time::Duration::from_millis(sleep_ms));
         }
     });
@@ -1000,7 +1000,7 @@ pub fn start_native_screen_capture(
 
                 jpeg_bytes.clear();
                 let mut encoder = FastJpegEncoder::new(&mut jpeg_bytes, jpeg_quality);
-                encoder.set_sampling_factor(SamplingFactor::R_4_2_0);
+                encoder.set_sampling_factor(SamplingFactor::R_4_4_4);
                 if encoder
                     .encode(
                         final_raw,
@@ -1063,7 +1063,7 @@ mod tests {
     use super::*;
 
     fn sanitize_quality(quality: Option<u8>) -> u8 {
-        quality.unwrap_or(85).clamp(50, 95)
+        quality.unwrap_or(92).clamp(60, 95)
     }
 
     #[test]
@@ -1075,8 +1075,8 @@ mod tests {
 
     #[test]
     fn test_quality_clamp() {
-        assert_eq!(sanitize_quality(None), 85);
-        assert_eq!(sanitize_quality(Some(30)), 50);
+        assert_eq!(sanitize_quality(None), 92);
+        assert_eq!(sanitize_quality(Some(30)), 60);
         assert_eq!(sanitize_quality(Some(75)), 75);
         assert_eq!(sanitize_quality(Some(100)), 95);
     }

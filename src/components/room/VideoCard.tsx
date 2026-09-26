@@ -253,6 +253,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
               width: '100%',
               height: '100%',
               objectFit: 'contain',
+              imageRendering: '-webkit-optimize-contrast' as any,
               transform: zoom > 1.0 && !inTray ? `translate3d(${pan.x}px, ${pan.y}px, 0px) scale(${zoom})` : 'none',
               transformOrigin: 'center center',
               transition: isDragging ? 'none' : 'transform 0.08s ease-out',
