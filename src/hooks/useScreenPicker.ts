@@ -47,6 +47,11 @@ export function useScreenPicker(onClose?: () => void) {
       setWindows(winList);
 
       if (monList.length > 0) {
+        try {
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('p2sharer_last_monitor_count', monList.length.toString());
+          }
+        } catch {}
         setSelectedSourceId(monList[0].id);
       } else if (winList.length > 0) {
         setSelectedSourceId(winList[0].id);
