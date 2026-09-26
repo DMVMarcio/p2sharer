@@ -13,11 +13,16 @@ WebRTC signaling is handled through Trystero multi-transport adapters in strict 
 3. **WebTorrent (`@trystero-p2p/torrent`)**: Tertiary fallback (~1–3s latency). Employs public BitTorrent trackers (`wss://tracker.openwebtorrent.com`, etc.).
 
 ### Watchdog, Health Probing & Failover Protocol
-- **Active WebSocket Probe Monitoring**: In MQTT.js v5, internal WebSocket stream sockets are encapsulated and invisible to `getMqttRelaySockets()`. `SignalingManager` maintains dedicated lightweight probe WebSockets to each broker endpoint to track real-time socket health and prevent false zero-socket stalls.
-- **Health Polling & Grace Window**: A watchdog runs every 1.5 seconds checking socket readiness states. During the initial 6.0 seconds after room join, watchdog failover is suppressed to allow WebSocket handshakes and TLS negotiation to complete.
+- **Real MQTT Probe Keep-Alives**: In MQTT.js v5, internal WebSocket stream sockets are encapsulated and invisible to `getMqttRelaySockets()`. Public MQTT brokers (HiveMQ, Mosquitto, EMQX) enforce strict handshake timeouts, dropping idle raw WebSockets after 5.0 seconds (code 1006) if no MQTT `CONNECT` packet is received. `SignalingManager` maintains dedicated lightweight `mqtt.connect` probe clients with 20s keep-alives (`PINGREQ`/`PINGRESP`) to each broker endpoint. This ensures accurate socket status without broker disconnects and prevents false zero-socket stalls.
+- **Health Polling & Grace Window**: A watchdog runs every 1.5 seconds checking socket readiness states. During the initial 4.0 seconds after room join, watchdog failover is suppressed to allow WebSocket handshakes and TLS negotiation to complete.
+- **Failover Safety with Active Peers**: The watchdog will never trigger transport failover when direct WebRTC peers are actively connected (`directConnectedPeers.size > 0`), protecting running voice and video sessions from unexpected teardown during brief broker hiccups.
 - **Failover Reset**: When failover executes (`mqtt -> nostr -> torrent -> mqtt`), the grace timestamp resets to give the new transport an honest connection window. Clean room detachment (`activeRoom.leave()`) is executed before transition to prevent zombie socket leaks.
 - **Network Awareness**: Listens to browser `online` and `offline` events. When the network reconnects, watchdog stalls are cleared and sockets are reprobed immediately.
 - **Failover History**: Records all transitions (`from`, `to`, `reason`, `timestamp`) for live diagnostics in the UI HUD.
+
+### Room Lifecycle & Teardown Protection
+- **Async Teardown Synchronization**: `RoomService.joinRoom` must `await oldManager.leave()` before creating a new `GroupRoomManager`. `GroupRoomManager.leave()` includes a 60ms socket flush delay. Without `await`, a new room's initialization races with the old room's exit, causing the old room's deferred `signalingManager.leaveRoom()` call to wipe `activeRoom` on the new session.
+- **Instance-Guarded Signaling Teardown**: `SignalingManager.leaveRoom(targetRoom?)` checks room identity against `this.activeRoom`. If `targetRoom` does not match `this.activeRoom`, it ignores the stale teardown request, protecting the current active session.
 
 ---
 
@@ -26,9 +31,10 @@ WebRTC signaling is handled through Trystero multi-transport adapters in strict 
 In P2P meshes (especially when using WebTorrent/PEX or multi-broker signaling), peer discovery can introduce "ghost peers" or partial mesh splits in 3+ peer sessions.
 
 - **Strict WebRTC Verification**: Only peers that have completed a direct WebRTC handshake (`onPeerJoin`) are treated as verified active peers.
-- **PEX Rumor Tracking & Active Bridging**: When an indirect peer is announced via Peer Exchange (PEX) gossip, it is recorded as a pending rumor. Rather than abandoning it in quarantine, connected intermediary peers actively bridge signaling using `meshRelayAction` (`mesh_hello`, `mesh_ack`), prompting the isolated peers to re-announce presence and establish the missing direct WebRTC mesh link.
+- **PEX Rumor Tracking & Active Bridging**: When an indirect peer is announced via Peer Exchange (PEX) gossip, it is recorded as a pending rumor. Rather than abandoning it in quarantine, connected intermediary peers actively bridge signaling using `meshRelayAction` (`mesh_hello`, `mesh_ack`).
+- **In-Mesh Signaling Re-Announcement**: Trystero's `makeAction` broadcasts exclusively across existing WebRTC DataChannels, meaning indirect peers cannot receive actions from peers they are not connected to. To solve this, `SignalingManager.reannounce(topic, targetPeerId)` was introduced. It calculates Trystero's SHA-1 topic strings (`Trystero@appId@topic` and `...topic@targetPeerId`) and directly publishes peer presence onto the active MQTT brokers, forcing Trystero to trigger native SDP offer/answer negotiation between the unmeshed pair.
 - **Existing Room Stream Requesting**: When a peer enters an existing room where broadcasters are already active, presence announcements immediately trigger targeted `requestStreamFromPeer` actions to discover and pull remote streams without requiring broadcaster restarts.
-- **Heartbeat & Pruning**: Peers send periodic heartbeats. Any peer without a heartbeat for `> 6000ms` is pruned from room slots and viewer lists.
+- **WebRTC Connection State-Guarded Pruning**: Peers send periodic heartbeats. Stale peer pruning runs on a 25.0s threshold (extended from 6.0s to prevent false drops during high-bitrate screen sharing). Crucially, before removing any peer, `GroupRoomManager` inspects `RTCPeerConnection.connectionState`. If the WebRTC connection is `connected`, the peer is physically alive and its touch timestamp is refreshed, preventing accidental UI removal.
 - **Deterministic Host Election**: When host responsibilities (e.g. room moderation, relay coordinator) are needed, the active peer with the lexicographically lowest peer ID is deterministically elected as host.
 
 ---

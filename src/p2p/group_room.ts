@@ -570,31 +570,18 @@ export class GroupRoomManager {
             } catch {}
           }
 
-          // Trigger presence broadcast to help Trystero's broker signaling match the indirect pair
-          if (this.presenceAction) {
-            try {
-              this.presenceAction.send({
-                username: this.username,
-                isCreator: this.isCreator,
-                isStreaming: Boolean(this.localStream),
-                joinedAt: this.myJoinedAt,
-              });
-            } catch {}
+          // Force signaling re-announcement on the broker to immediately pair the indirect peers!
+          if (this.signalingTopic) {
+            signalingManager.reannounce(this.signalingTopic, data.origin);
           }
         } else if (data.kind === 'mesh_ack') {
           console.log(`[P2P/Mesh] Received mesh_ack from indirect peer ${data.origin}`);
           const p = data.payload || {};
           this.peerTracker.receivePeerExchange(data.origin, false, p.username, p.isCreator, p.joinedAt);
 
-          if (this.presenceAction) {
-            try {
-              this.presenceAction.send({
-                username: this.username,
-                isCreator: this.isCreator,
-                isStreaming: Boolean(this.localStream),
-                joinedAt: this.myJoinedAt,
-              });
-            } catch {}
+          // Force signaling re-announcement on the broker
+          if (this.signalingTopic) {
+            signalingManager.reannounce(this.signalingTopic, data.origin);
           }
         } else if (data.kind === 'stream_req' && this.localStream) {
           this.sendStreamToPeer(data.origin);
@@ -754,16 +741,29 @@ export class GroupRoomManager {
         });
       }
 
-      // Prune ghost peers that missed heartbeats for > 6.0s
-      const pruned = this.peerTracker.pruneStalePeers(6000);
-      if (pruned.length > 0) {
-        pruned.forEach((p) => {
-          console.log(`[P2P] Pruning ghost peer due to timeout: ${p}`);
-          signalingManager.setPeerDisconnected(p);
-          this.remoteStreams.delete(p);
+      // If there are quarantined rumors from PEX that haven't paired yet, re-announce on broker
+      const rumors = this.peerTracker.getPendingRumors();
+      if (rumors.length > 0 && this.signalingTopic) {
+        signalingManager.reannounce(this.signalingTopic);
+      }
+
+      // Prune ghost peers that missed heartbeats, but ONLY if their WebRTC connection is not active
+      const activePeers = this.room?.getPeers?.() || {};
+      const staleCandidateIds = this.peerTracker.getStalePeerIds(25000);
+      if (staleCandidateIds.length > 0) {
+        staleCandidateIds.forEach((p) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const peerObj: any = activePeers[p];
+          const pc: RTCPeerConnection = peerObj?.connection || peerObj?.pc || peerObj;
+          if (pc && (pc.connectionState === 'connected' || pc.iceConnectionState === 'connected')) {
+            // WebRTC channel is physically alive - refresh touch so it isn't dropped falsely
+            this.peerTracker.touchPeer(p);
+            return;
+          }
+
+          console.log(`[P2P] Pruning ghost peer due to timeout and disconnected WebRTC channel: ${p}`);
+          this.removePeer(p);
         });
-        this.notifyPeersUpdate();
-        this.notifyStreamsUpdate();
       }
     }, 2000);
 
@@ -824,6 +824,11 @@ export class GroupRoomManager {
     }
 
     console.log(`[P2P/Mesh] Bridging indirect peer ${targetPeerId} via intermediary ${intermediaryPeerId}`);
+
+    // Proactively re-announce on signaling broker targeting the indirect peer
+    if (this.signalingTopic) {
+      signalingManager.reannounce(this.signalingTopic, targetPeerId);
+    }
 
     if (this.meshRelayAction) {
       try {
@@ -1383,8 +1388,9 @@ export class GroupRoomManager {
     // Allow a brief flush window for socket buffers before tearing down WebRTC
     await new Promise((resolve) => setTimeout(resolve, 60));
 
-    await signalingManager.leaveRoom();
+    const roomToLeave = this.room;
     this.room = null;
+    await signalingManager.leaveRoom(roomToLeave);
 
     this.peerTracker.clear();
     this.remoteStreams.clear();

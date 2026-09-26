@@ -1,3 +1,4 @@
+import mqtt from 'mqtt';
 import {
   defaultRelayUrls as defaultMqttUrls,
   getRelaySockets as getMqttRelaySockets,
@@ -36,6 +37,22 @@ export const DEFAULT_MQTT_RELAY_URLS = [
   'wss://broker.emqx.io:8084/mqtt',
   'wss://test.mosquitto.org:8081/mqtt',
 ];
+
+export async function computeTrysteroSha1(str: string): Promise<string> {
+  try {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(str);
+    const hashBuffer = await crypto.subtle.digest('SHA-1', data);
+    return Array.from(new Uint8Array(hashBuffer)).map((b) => b.toString(36)).join('');
+  } catch {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = (hash << 5) - hash + str.charCodeAt(i);
+      hash |= 0;
+    }
+    return Math.abs(hash).toString(36);
+  }
+}
 
 /**
  * SignalingManager provides resilient multi-transport WebRTC signaling failover.
@@ -111,14 +128,48 @@ export class SignalingManager {
   private startMqttRelayMonitoring(): void {
     this.stopMqttRelayMonitoring();
 
-    if (typeof WebSocket === 'undefined') return;
-
     DEFAULT_MQTT_RELAY_URLS.forEach((url) => {
       this.initMqttProbeSocket(url);
     });
   }
 
   private initMqttProbeSocket(url: string): void {
+    try {
+      if (typeof mqtt !== 'undefined' && typeof mqtt.connect === 'function') {
+        const client = mqtt.connect(url, {
+          connectTimeout: 7000,
+          keepalive: 20,
+          reconnectPeriod: 4000,
+        });
+
+        this.monitoredMqttSockets.set(url, client);
+        this.mqttSocketStatuses.set(url, {
+          readyState: client.connected ? 1 : 0,
+          connected: Boolean(client.connected),
+        });
+
+        client.on('connect', () => {
+          this.mqttSocketStatuses.set(url, { readyState: 1, connected: true });
+          this.notifyStatusChange();
+        });
+
+        client.on('close', () => {
+          this.mqttSocketStatuses.set(url, { readyState: 3, connected: false });
+        });
+
+        client.on('offline', () => {
+          this.mqttSocketStatuses.set(url, { readyState: 3, connected: false });
+        });
+
+        client.on('error', () => {
+          this.mqttSocketStatuses.set(url, { readyState: 3, connected: false });
+        });
+        return;
+      }
+    } catch {
+      // Fallback to WebSocket below
+    }
+
     if (typeof WebSocket === 'undefined') return;
     try {
       const ws = new WebSocket(url, 'mqtt');
@@ -150,9 +201,13 @@ export class SignalingManager {
   }
 
   private stopMqttRelayMonitoring(): void {
-    this.monitoredMqttSockets.forEach((ws) => {
+    this.monitoredMqttSockets.forEach((client) => {
       try {
-        ws.close();
+        if (typeof client.end === 'function') {
+          client.end(true);
+        } else if (typeof client.close === 'function') {
+          client.close();
+        }
       } catch {}
     });
     this.monitoredMqttSockets.clear();
@@ -307,8 +362,18 @@ export class SignalingManager {
 
   /**
    * Leaves current room and terminates signaling connections.
+   * If targetRoom is specified, only tears down if activeRoom matches it, preventing stale async leaves.
    */
-  public async leaveRoom(): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  public async leaveRoom(targetRoom?: any): Promise<void> {
+    if (targetRoom && this.activeRoom && this.activeRoom !== targetRoom) {
+      console.log('[SignalingManager] Ignoring stale leaveRoom call for inactive room instance');
+      try {
+        await Promise.resolve(targetRoom.leave()).catch(() => {});
+      } catch {}
+      return;
+    }
+
     this.stopWatchdog();
     this.stopMqttRelayMonitoring();
     if (this.activeRoom) {
@@ -323,6 +388,42 @@ export class SignalingManager {
     this.directConnectedPeers.clear();
     this.consecutiveStalls = 0;
     this.notifyStatusChange();
+  }
+
+  /**
+   * Proactively broadcasts an instant presence announcement on the active signaling transport.
+   * If targetPeerId is provided, also dispatches directly to the peer's private topic.
+   * Used by in-mesh bridging to force immediate WebRTC handshake between indirect pairs.
+   */
+  public async reannounce(topic: string, targetPeerId?: string): Promise<void> {
+    if (this.activeTransport !== 'mqtt') return;
+    try {
+      const rootTopic = await computeTrysteroSha1(`Trystero@p2sharer-multi-stream-v1@${topic}`);
+      const payload = JSON.stringify({ peerId: this.getSelfId() });
+
+      this.monitoredMqttSockets.forEach((client) => {
+        if (client && client.connected && typeof client.publish === 'function') {
+          try {
+            client.publish(rootTopic, payload);
+          } catch {}
+        }
+      });
+
+      if (targetPeerId) {
+        const peerTopic = await computeTrysteroSha1(
+          `Trystero@p2sharer-multi-stream-v1@${topic}@${targetPeerId}`
+        );
+        this.monitoredMqttSockets.forEach((client) => {
+          if (client && client.connected && typeof client.publish === 'function') {
+            try {
+              client.publish(peerTopic, payload);
+            } catch {}
+          }
+        });
+      }
+    } catch (err) {
+      console.warn('[SignalingManager] Reannounce error:', err);
+    }
   }
 
   /**
