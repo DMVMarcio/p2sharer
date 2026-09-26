@@ -28,6 +28,8 @@ export interface TooltipProps {
   hideDelay?: number;
   /** Whether the tooltip is disabled. */
   disabled?: boolean;
+  /** Callback fired when the tooltip visibility state changes. */
+  onOpenChange?: (open: boolean) => void;
 }
 
 export const Tooltip: React.FC<TooltipProps> = ({
@@ -40,6 +42,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
   showDelay = 80,
   hideDelay = 100,
   disabled = false,
+  onOpenChange,
 }) => {
   const tooltipId = useId();
   const [isOpen, setIsOpen] = useState(false);
@@ -97,6 +100,16 @@ export const Tooltip: React.FC<TooltipProps> = ({
       setCoords(null);
     }, hideDelay);
   }, [clearTimers, hideDelay]);
+
+  // Notify parent on open change and cleanup on unmount
+  useEffect(() => {
+    onOpenChange?.(isOpen);
+    return () => {
+      if (isOpen) {
+        onOpenChange?.(false);
+      }
+    };
+  }, [isOpen, onOpenChange]);
 
   // Position measurement right after opening or DOM change
   useLayoutEffect(() => {
