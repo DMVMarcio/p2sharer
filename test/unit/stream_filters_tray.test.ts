@@ -79,13 +79,13 @@ describe('Spotlight Tray & Stream Filters Architecture', () => {
       assert.ok(!result.some((s) => s.peerId === 'peer-charlie'));
     });
 
-    it('filter "watching" returns only streams actively subscribed or local streaming', () => {
+    it('filter "watching" returns only remote streams actively subscribed, ignoring own screen', () => {
       store.subscribedStreams.add('peer-alice');
 
       const filterFn = (slot: RoomSlotInfo, mode: StreamFilterMode, subscribed: Set<string>) => {
         if (mode === 'streaming') return slot.isStreaming;
         if (mode === 'watching') {
-          return (slot.isLocal && slot.isStreaming) || (!slot.isLocal && slot.isStreaming && subscribed.has(slot.peerId));
+          return !slot.isLocal && slot.isStreaming && subscribed.has(slot.peerId);
         }
         return true;
       };
@@ -94,12 +94,12 @@ describe('Spotlight Tray & Stream Filters Architecture', () => {
       assert.equal(result.length, 1);
       assert.equal(result[0]!.peerId, 'peer-alice');
 
-      // Now make local user stream as well
+      // Now make local user stream as well - should NOT be included in "watching"
       store.roomSlots[0]!.isStreaming = true;
       const resultWithLocal = store.roomSlots.filter((s) => filterFn(s, 'watching', store.subscribedStreams));
-      assert.equal(resultWithLocal.length, 2);
-      assert.ok(resultWithLocal.some((s) => s.peerId === 'peer-local'));
-      assert.ok(resultWithLocal.some((s) => s.peerId === 'peer-alice'));
+      assert.equal(resultWithLocal.length, 1);
+      assert.equal(resultWithLocal[0]!.peerId, 'peer-alice');
+      assert.ok(!resultWithLocal.some((s) => s.peerId === 'peer-local'));
     });
   });
 

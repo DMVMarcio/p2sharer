@@ -18,7 +18,7 @@ export const StreamHeaderBar: React.FC = () => {
   const totalCount = roomSlots.length;
   const streamingCount = roomSlots.filter((s) => s.isStreaming).length;
   const watchingCount = roomSlots.filter(
-    (s) => (s.isLocal && s.isStreaming) || (!s.isLocal && s.isStreaming && subscribedStreams.has(s.peerId))
+    (s) => !s.isLocal && s.isStreaming && subscribedStreams.has(s.peerId)
   ).length;
 
   const handleToggleTransmission = () => {

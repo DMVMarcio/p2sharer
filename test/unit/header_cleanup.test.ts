@@ -85,10 +85,17 @@ describe('Header Cleanup, Stream Fullscreen & Sidebar Toggle Architecture', () =
       assert.strictEqual(streamingCount, 1);
       assert.strictEqual(watchingCount, 0);
 
+      // Local user streaming does not increment watchingCount
+      store.roomSlots[0]!.isStreaming = true;
+      const watchingWithLocalStreaming = store.roomSlots.filter(
+        (s) => !s.isLocal && s.isStreaming && store.subscribedStreams.has(s.peerId)
+      ).length;
+      assert.strictEqual(watchingWithLocalStreaming, 0);
+
       // Subscribe to remote-1
       store.subscribedStreams.add('remote-1');
       const updatedWatching = store.roomSlots.filter(
-        (s) => (s.isLocal && s.isStreaming) || (!s.isLocal && s.isStreaming && store.subscribedStreams.has(s.peerId))
+        (s) => !s.isLocal && s.isStreaming && store.subscribedStreams.has(s.peerId)
       ).length;
       assert.strictEqual(updatedWatching, 1);
     });

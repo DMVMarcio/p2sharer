@@ -30,9 +30,7 @@ export const RoomVideoContainer: React.FC = () => {
         return slot.isStreaming;
       }
       if (streamFilter === 'watching') {
-        const isSelfStreaming = slot.isLocal && slot.isStreaming;
-        const isRemoteWatched = !slot.isLocal && slot.isStreaming && subscribedStreams.has(slot.peerId);
-        return isSelfStreaming || isRemoteWatched;
+        return !slot.isLocal && slot.isStreaming && subscribedStreams.has(slot.peerId);
       }
       return true;
     });
