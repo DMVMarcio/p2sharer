@@ -4,7 +4,7 @@ import { stateStore } from '../../core/state_store';
 import { showToast } from '../../hooks/useToast';
 
 export const UsernameModal: React.FC = () => {
-  const { closeModal } = useModal();
+  const { closeModal, isClosing } = useModal();
   const [val, setVal] = useState(
     () => stateStore.username || `User_${Math.floor(1000 + Math.random() * 9000)}`
   );
@@ -24,7 +24,7 @@ export const UsernameModal: React.FC = () => {
   };
 
   return (
-    <div className="modal-overlay" id="modal-username">
+    <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} id="modal-username">
       <div className="modal-card">
         <div className="modal-header">
           <div className="modal-header-icon">

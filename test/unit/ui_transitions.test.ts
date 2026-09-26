@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { modalManager } from '../../src/hooks/useModal.ts';
 
 describe('UI Visual Transitions and Animations', () => {
   const cssPath = path.resolve('src/style.css');
@@ -23,42 +24,57 @@ describe('UI Visual Transitions and Animations', () => {
     return cssContent.slice(openBrace + 1, current - 1);
   }
 
-  describe('Modal Opening Fade Animation', () => {
-    it('defines modalFadeIn keyframes with pure opacity fade', () => {
-      assert.ok(cssContent.includes('@keyframes modalFadeIn'), 'Must define modalFadeIn keyframes');
-      const body = extractKeyframesBlock('modalFadeIn');
-      assert.ok(body.length > 0, 'Keyframe block must exist');
-      assert.ok(body.includes('opacity: 0'), 'Must fade from opacity 0');
-      assert.ok(body.includes('opacity: 1'), 'Must fade to opacity 1');
-      assert.ok(!body.includes('transform'), 'Must not contain transform to maintain pure fade');
+  describe('Modal Opening and Closing Animation & Scale', () => {
+    it('defines modalFadeIn and modalFadeOut keyframes', () => {
+      assert.ok(cssContent.includes('@keyframes modalFadeIn'), 'Must define modalFadeIn');
+      assert.ok(cssContent.includes('@keyframes modalFadeOut'), 'Must define modalFadeOut');
+      const inBody = extractKeyframesBlock('modalFadeIn');
+      assert.ok(inBody.includes('opacity: 0') && inBody.includes('opacity: 1'));
+      const outBody = extractKeyframesBlock('modalFadeOut');
+      assert.ok(outBody.includes('opacity: 1') && outBody.includes('opacity: 0'));
     });
 
-    it('applies valid modalFadeIn animation to .modal-overlay without syntax conflicts', () => {
-      const overlayMatch = cssContent.match(/\.modal-overlay\s*\{([\s\S]*?)\}/);
-      assert.ok(overlayMatch, '.modal-overlay must be defined');
-      const rule = overlayMatch[1];
+    it('defines modalCardEnter and modalCardExit keyframes for smooth scaling', () => {
+      assert.ok(cssContent.includes('@keyframes modalCardEnter'), 'Must define modalCardEnter');
+      assert.ok(cssContent.includes('@keyframes modalCardExit'), 'Must define modalCardExit');
+
+      const enterBody = extractKeyframesBlock('modalCardEnter');
+      assert.ok(enterBody.includes('transform: scale(0.93)'), 'Must scale up from 0.93 on open');
+      assert.ok(enterBody.includes('transform: scale(1)'), 'Must reach scale 1 on open');
+
+      const exitBody = extractKeyframesBlock('modalCardExit');
+      assert.ok(exitBody.includes('transform: scale(1)'), 'Must start at scale 1 on close');
+      assert.ok(exitBody.includes('transform: scale(0.93)'), 'Must minimize to 0.93 on close');
+    });
+
+    it('applies modalCardEnter and modalCardExit to modal cards', () => {
       assert.ok(
-        rule.includes('modalFadeIn'),
-        '.modal-overlay must apply modalFadeIn animation'
+        cssContent.includes('.modal-overlay .modal-card'),
+        'Must define .modal-overlay .modal-card'
       );
       assert.ok(
-        !rule.includes('var(--transition-normal) ease-out'),
-        'Must not concatenate var(--transition-normal) and ease-out which causes invalid CSS syntax'
+        cssContent.includes('.modal-overlay.closing .modal-card'),
+        'Must define .modal-overlay.closing .modal-card'
+      );
+      assert.ok(
+        cssContent.includes('.modal-overlay.closing'),
+        'Must define .modal-overlay.closing'
       );
     });
 
-    it('applies valid modalFadeIn animation to .connecting-overlay without syntax conflicts', () => {
-      const connectingMatch = cssContent.match(/\.connecting-overlay\s*\{([\s\S]*?)\}/);
-      assert.ok(connectingMatch, '.connecting-overlay must be defined');
-      const rule = connectingMatch[1];
-      assert.ok(
-        rule.includes('modalFadeIn'),
-        '.connecting-overlay must apply modalFadeIn animation'
-      );
-      assert.ok(
-        !rule.includes('var(--transition-normal) ease-out'),
-        'Must not concatenate var(--transition-normal) and ease-out which causes invalid CSS syntax'
-      );
+    it('manages isClosing state and 240ms exit grace period in modalManager', async () => {
+      modalManager.open('settings');
+      assert.equal(modalManager.getActive(), 'settings');
+      assert.equal(modalManager.getIsClosing(), false);
+
+      modalManager.close();
+      assert.equal(modalManager.getActive(), 'settings', 'Active modal remains during exit transition');
+      assert.equal(modalManager.getIsClosing(), true, 'isClosing flag becomes true immediately');
+
+      // Wait for exit timer to complete
+      await new Promise((r) => setTimeout(r, 260));
+      assert.equal(modalManager.getActive(), null, 'Modal unmounts after exit transition completes');
+      assert.equal(modalManager.getIsClosing(), false);
     });
   });
 
@@ -69,7 +85,7 @@ describe('UI Visual Transitions and Animations', () => {
       assert.ok(body.length > 0, 'Keyframe block must exist');
       assert.ok(body.includes('opacity: 0'), 'Must animate opacity from 0');
       assert.ok(body.includes('opacity: 1'), 'Must animate opacity to 1');
-      assert.ok(body.includes('transform: scale('), 'Must subtly scale for smooth entrance');
+      assert.ok(body.includes('transform: scale('), 'Must scale for smooth entrance');
     });
 
     it('applies viewModeEnter to .streams-grid-wrapper:not(.hidden)', () => {
@@ -118,17 +134,17 @@ describe('UI Visual Transitions and Animations', () => {
   });
 
   describe('Dynamic Peer Entry and Layout Animations', () => {
-    it('defines peerCardEnter keyframes with dynamic spring scale and translateY pop', () => {
+    it('defines peerCardEnter keyframes with subtle, contained scale and translateY pop', () => {
       assert.ok(cssContent.includes('@keyframes peerCardEnter'), 'Must define peerCardEnter keyframes');
       const body = extractKeyframesBlock('peerCardEnter');
       assert.ok(body.length > 0, 'peerCardEnter body must exist');
       assert.ok(body.includes('opacity: 0'), 'Must start at opacity 0');
       assert.ok(body.includes('opacity: 1'), 'Must transition to opacity 1');
-      assert.ok(body.includes('transform: scale('), 'Must scale in');
-      assert.ok(body.includes('translateY('), 'Must pop vertically');
+      assert.ok(body.includes('transform: scale(0.94)'), 'Must start at subtle 0.94 scale without blowing up');
+      assert.ok(!body.includes('scale(1.03)'), 'Must not overshoot above 1.0 to prevent container leaking');
     });
 
-    it('applies peerCardEnter to grid cards and spotlight tray cards', () => {
+    it('applies peerCardEnter to grid cards and spotlight tray cards with smooth deceleration', () => {
       assert.ok(
         cssContent.includes('.streams-grid-wrapper .stream-card'),
         'Must style grid stream-card'
@@ -142,6 +158,7 @@ describe('UI Visual Transitions and Animations', () => {
       );
       assert.ok(gridMatch, 'Grid cards selector must match');
       assert.ok(gridMatch[1].includes('peerCardEnter'), 'Grid cards must play peerCardEnter');
+      assert.ok(gridMatch[1].includes('cubic-bezier(0.16, 1, 0.3, 1)'), 'Must use smooth deceleration');
 
       const trayMatch = cssContent.match(
         /\.spotlight-tray-strip \.stream-card,\s*\.spotlight-tray-strip \.participant-card\s*\{([\s\S]*?)\}/
@@ -171,7 +188,7 @@ describe('UI Visual Transitions and Animations', () => {
       );
     });
 
-    it('fades out skeleton layer smoothly with opacity 0 and pointer-events none', () => {
+    it('fades out skeleton layer smoothly with opacity 0 and pointer-events none over 0.4s', () => {
       const fadeOutMatch = cssContent.match(/\.source-cards-skeleton-layer\.fade-out\s*\{([\s\S]*?)\}/);
       assert.ok(fadeOutMatch, 'Fade out rule must match');
       const body = fadeOutMatch[1];

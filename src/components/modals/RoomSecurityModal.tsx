@@ -4,7 +4,7 @@ import { useRoom } from '../../hooks/useRoom';
 import { showToast } from '../../hooks/useToast';
 
 export const RoomSecurityModal: React.FC = () => {
-  const { closeModal } = useModal();
+  const { closeModal, isClosing } = useModal();
   const { currentRoomCode, currentRoomPassword, updateRoomPassword } = useRoom();
 
   const [password, setPassword] = useState(() => currentRoomPassword);
@@ -27,7 +27,7 @@ export const RoomSecurityModal: React.FC = () => {
   };
 
   return (
-    <div className="modal-overlay" id="modal-room-security">
+    <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} id="modal-room-security">
       <div className="modal-card">
         <div className="modal-header">
           <div className="modal-header-icon">

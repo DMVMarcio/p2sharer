@@ -4,7 +4,7 @@ import { useScreenPicker } from '../../hooks/useScreenPicker';
 import { getSkeletonCountForTab } from './screen_picker_utils';
 
 export const ScreenPickerModal: React.FC = () => {
-  const { closeModal } = useModal();
+  const { closeModal, isClosing } = useModal();
   const {
     monitors,
     windows,
@@ -49,7 +49,7 @@ export const ScreenPickerModal: React.FC = () => {
   const skeletonCount = getSkeletonCountForTab(currentTab, monitors.length);
 
   return (
-    <div className="modal-overlay" id="modal-screen-picker">
+    <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} id="modal-screen-picker">
       <div className="modal-card modal-xl">
         <div className="modal-header">
           <div className="modal-header-icon">
