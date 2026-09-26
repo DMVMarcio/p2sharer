@@ -482,6 +482,27 @@ describe('Tier 5 Adversarial Coverage Hardening: Frontend, Video & P2P Architect
         },
         'applySenderBitrate safely handles throwing getSenders() without unhandled rejections'
       );
+
+      // 5. Verification of maintain-resolution degradationPreference and scaleResolutionDownBy = 1.0
+      let capturedParams: any = null;
+      const validSenderPc = {
+        getSenders: () => [
+          {
+            track: { kind: 'video' },
+            getParameters: () => ({ encodings: [{}] }),
+            setParameters: async (params: any) => {
+              capturedParams = params;
+            },
+          },
+        ],
+      };
+
+      await MediaCoordinator.applySenderBitrate(validSenderPc as any, 15000000, 60);
+      assert.ok(capturedParams, 'sender.setParameters was invoked with parameters');
+      assert.strictEqual(capturedParams.degradationPreference, 'maintain-resolution');
+      assert.strictEqual(capturedParams.encodings[0].scaleResolutionDownBy, 1.0);
+      assert.strictEqual(capturedParams.encodings[0].maxBitrate, 15000000);
+      assert.strictEqual(capturedParams.encodings[0].maxFramerate, 60);
     });
 
     it('3.3: Targeted Stream Dispatch Exception Isolation', () => {

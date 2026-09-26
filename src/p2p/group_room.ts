@@ -987,6 +987,9 @@ export class GroupRoomManager {
         if (typeof pc.addEventListener === 'function') {
           pc.addEventListener('negotiationneeded', () => {
             MediaCoordinator.configureCodecPreferences(pc);
+            setTimeout(() => {
+              MediaCoordinator.applySenderBitrate(pc, this.currentTargetBitrate, this.currentTargetFps);
+            }, 100);
           });
         }
       }

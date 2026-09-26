@@ -67,42 +67,65 @@ describe('Screen Picker Loading Skeleton & Modal Architecture', () => {
       });
     });
 
-    it('determines confirm button disabled state based on isLoading and source availability', () => {
+    it('determines confirm button disabled state based on isLoading, isStarting and source availability', () => {
       const isConfirmDisabled = (
         isLoading: boolean,
+        isStarting: boolean,
         selectedSourceId: string,
         currentTab: 'screens' | 'windows',
         monitorsCount: number,
         windowsCount: number
       ) => {
-        return (
-          isLoading ||
-          (!selectedSourceId && (currentTab === 'screens' ? monitorsCount === 0 : windowsCount === 0))
-        );
+        const hasAvailableSources = currentTab === 'screens' ? monitorsCount > 0 : windowsCount > 0;
+        return isLoading || isStarting || !selectedSourceId || !hasAvailableSources;
       };
 
-      // While loading, always disabled
-      assert.equal(isConfirmDisabled(true, 'screen:0', 'screens', 2, 5), true);
-      assert.equal(isConfirmDisabled(true, '', 'screens', 0, 0), true);
+      // While loading or starting, always disabled
+      assert.equal(isConfirmDisabled(true, false, 'screen:0', 'screens', 2, 5), true);
+      assert.equal(isConfirmDisabled(false, true, 'screen:0', 'screens', 2, 5), true);
+      assert.equal(isConfirmDisabled(true, false, '', 'screens', 0, 0), true);
 
-      // When done loading with valid selection, enabled
-      assert.equal(isConfirmDisabled(false, 'screen:0', 'screens', 2, 5), false);
-      assert.equal(isConfirmDisabled(false, 'window:1', 'windows', 2, 5), false);
+      // When done loading with valid selection and sources, enabled
+      assert.equal(isConfirmDisabled(false, false, 'screen:0', 'screens', 2, 5), false);
+      assert.equal(isConfirmDisabled(false, false, 'window:1', 'windows', 2, 5), false);
 
-      // When done loading but no sources exist and no selection, disabled
-      assert.equal(isConfirmDisabled(false, '', 'screens', 0, 5), true);
-      assert.equal(isConfirmDisabled(false, '', 'windows', 2, 0), true);
+      // When done loading but no sources exist or no selection, disabled
+      assert.equal(isConfirmDisabled(false, false, '', 'screens', 2, 5), true);
+      assert.equal(isConfirmDisabled(false, false, 'screen:0', 'screens', 0, 5), true);
+      assert.equal(isConfirmDisabled(false, false, 'window:1', 'windows', 2, 0), true);
     });
 
-    it('handles tab switching between screens and windows appropriately', () => {
+    it('handles tab switching between screens and windows appropriately with smart source selection', () => {
       let currentTab: 'screens' | 'windows' = 'screens';
-      const setTab = (tab: 'screens' | 'windows') => {
+      let selectedSourceId = 'screen:0';
+      const monitors = [{ id: 'screen:0', name: 'Monitor 1' }];
+      const windows = [{ id: 'window:42', title: 'Code Editor' }];
+
+      const handleTabChange = (tab: 'screens' | 'windows') => {
         currentTab = tab;
+        if (tab === 'screens' && monitors.length > 0) {
+          if (!selectedSourceId || !selectedSourceId.startsWith('screen:')) {
+            selectedSourceId = monitors[0].id;
+          }
+        } else if (tab === 'windows' && windows.length > 0) {
+          if (!selectedSourceId || !selectedSourceId.startsWith('window:')) {
+            selectedSourceId = windows[0].id;
+          }
+        }
       };
 
       assert.equal(currentTab, 'screens');
-      setTab('windows');
+      assert.equal(selectedSourceId, 'screen:0');
+
+      // Switching to windows tab should select first window
+      handleTabChange('windows');
       assert.equal(currentTab, 'windows');
+      assert.equal(selectedSourceId, 'window:42');
+
+      // Switching back to screens tab should select first screen
+      handleTabChange('screens');
+      assert.equal(currentTab, 'screens');
+      assert.equal(selectedSourceId, 'screen:0');
     });
 
     it('verifies early return on confirmPicker when still loading', async () => {

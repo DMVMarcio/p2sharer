@@ -13,6 +13,7 @@ export const ScreenPickerModal: React.FC = () => {
     selectedSourceId,
     setSelectedSourceId,
     isLoading,
+    isStarting,
     resolution,
     setResolution,
     fps,
@@ -265,18 +266,24 @@ export const ScreenPickerModal: React.FC = () => {
           <button className="btn btn-secondary" id="btn-cancel-picker" style={{ width: 'auto' }} onClick={closeModal}>
             Cancelar
           </button>
-          <button
-            className="btn btn-primary"
-            id="btn-confirm-picker"
-            style={{ width: 'auto', minWidth: '160px' }}
-            disabled={isLoading || (!selectedSourceId && (currentTab === 'screens' ? monitors.length === 0 : windows.length === 0))}
-            onClick={confirmPicker}
-          >
-            <span>Iniciar Transmissão</span>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polygon points="5 3 19 12 5 21 5 3"/>
-            </svg>
-          </button>
+          {(() => {
+            const hasAvailableSources = currentTab === 'screens' ? monitors.length > 0 : windows.length > 0;
+            const isConfirmDisabled = isLoading || isStarting || !selectedSourceId || !hasAvailableSources;
+            return (
+              <button
+                className="btn btn-primary"
+                id="btn-confirm-picker"
+                style={{ width: 'auto', minWidth: '160px' }}
+                disabled={isConfirmDisabled}
+                onClick={confirmPicker}
+              >
+                <span>{isStarting ? 'Iniciando...' : 'Iniciar Transmissão'}</span>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polygon points="5 3 19 12 5 21 5 3"/>
+                </svg>
+              </button>
+            );
+          })()}
         </div>
       </div>
     </div>
