@@ -12,20 +12,39 @@ export type ModalType =
 
 class ModalManager {
   private activeModal: ModalType = null;
+  private isClosing: boolean = false;
+  private closeTimer: ReturnType<typeof setTimeout> | null = null;
   private listeners = new Set<() => void>();
 
   public getActive(): ModalType {
     return this.activeModal;
   }
 
+  public getIsClosing(): boolean {
+    return this.isClosing;
+  }
+
   public open(modal: ModalType): void {
+    if (this.closeTimer) {
+      clearTimeout(this.closeTimer);
+      this.closeTimer = null;
+    }
+    this.isClosing = false;
     this.activeModal = modal;
     this.notify();
   }
 
   public close(): void {
-    this.activeModal = null;
+    if (!this.activeModal || this.isClosing) return;
+    this.isClosing = true;
     this.notify();
+
+    this.closeTimer = setTimeout(() => {
+      this.activeModal = null;
+      this.isClosing = false;
+      this.closeTimer = null;
+      this.notify();
+    }, 240);
   }
 
   public subscribe(listener: () => void): () => void {
@@ -49,6 +68,12 @@ export function useModal() {
     () => modalManager.getActive()
   );
 
+  const isClosing = useSyncExternalStore(
+    (cb) => modalManager.subscribe(cb),
+    () => modalManager.getIsClosing(),
+    () => modalManager.getIsClosing()
+  );
+
   const openModal = useCallback((modal: ModalType) => {
     modalManager.open(modal);
   }, []);
@@ -58,12 +83,13 @@ export function useModal() {
   }, []);
 
   const isOpen = useCallback(
-    (modal: ModalType) => activeModal === modal,
-    [activeModal]
+    (modal: ModalType) => activeModal === modal && !isClosing,
+    [activeModal, isClosing]
   );
 
   return {
     activeModal,
+    isClosing,
     openModal,
     closeModal,
     isOpen,

@@ -5,7 +5,7 @@ import { generateRandomRoomSlug } from '../../p2p/group_room';
 import { showToast } from '../../hooks/useToast';
 
 export const CreateRoomModal: React.FC = () => {
-  const { closeModal } = useModal();
+  const { closeModal, isClosing } = useModal();
   const { joinRoom } = useRoom();
 
   const [code, setCode] = useState(() => generateRandomRoomSlug());
@@ -48,7 +48,7 @@ export const CreateRoomModal: React.FC = () => {
   };
 
   return (
-    <div className="modal-overlay" id="modal-create-room-dialog">
+    <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} id="modal-create-room-dialog">
       <div className="modal-card">
         <div className="modal-header">
           <div className="modal-header-icon">

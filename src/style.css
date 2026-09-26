@@ -903,27 +903,23 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   animation: spotlightFeaturedEnter 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* Dynamic Peer Entry & Grid Transition Animation */
+/* Dynamic Peer Entry & Grid Transition Animation (Subtle & Contained) */
 .streams-grid-wrapper .stream-card,
 .streams-grid-wrapper .participant-card {
-  animation: peerCardEnter 0.45s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+  animation: peerCardEnter 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
   will-change: transform, opacity;
 }
 
 .spotlight-tray-strip .stream-card,
 .spotlight-tray-strip .participant-card {
-  animation: peerCardEnter 0.45s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+  animation: peerCardEnter 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
   will-change: transform, opacity;
 }
 
 @keyframes peerCardEnter {
   0% {
     opacity: 0;
-    transform: scale(0.72) translateY(20px);
-  }
-  65% {
-    opacity: 1;
-    transform: scale(1.03) translateY(-2px);
+    transform: scale(0.94) translateY(6px);
   }
   100% {
     opacity: 1;
@@ -2441,6 +2437,37 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   }
 }
 
+@keyframes modalFadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes modalCardEnter {
+  0% {
+    opacity: 0;
+    transform: scale(0.93) translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes modalCardExit {
+  0% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.93) translateY(8px);
+  }
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -2451,7 +2478,21 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   justify-content: center;
   z-index: 1000;
   padding: 20px;
-  animation: modalFadeIn 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: modalFadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.modal-overlay.closing {
+  animation: modalFadeOut 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  pointer-events: none;
+}
+
+.modal-overlay .modal-card {
+  animation: modalCardEnter 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
+}
+
+.modal-overlay.closing .modal-card {
+  animation: modalCardExit 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .modal-overlay.hidden {
@@ -3597,6 +3638,8 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   max-width: 400px;
   width: 90%;
   box-shadow: var(--shadow-lg);
+  animation: modalCardEnter 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
 }
 
 .connecting-spinner-wrapper {

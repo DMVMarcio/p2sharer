@@ -4,7 +4,7 @@ import { useAudioFilter } from '../../hooks/useAudioFilter';
 import { Tooltip } from '../common/Tooltip';
 
 export const AudioFilterModal: React.FC = () => {
-  const { closeModal } = useModal();
+  const { closeModal, isClosing } = useModal();
   const {
     processes,
     rawProcessCount,
@@ -49,7 +49,7 @@ export const AudioFilterModal: React.FC = () => {
 
   return (
     <div
-      className="modal-overlay"
+      className={`modal-overlay ${isClosing ? 'closing' : ''}`}
       id="modal-audio-filter"
       onClick={(e) => {
         if (e.target === e.currentTarget) {

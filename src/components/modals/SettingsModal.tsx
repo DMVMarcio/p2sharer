@@ -8,7 +8,7 @@ import { showToast } from '../../hooks/useToast';
 import { ThemeMode } from '../../core/types';
 
 export const SettingsModal: React.FC = () => {
-  const { closeModal } = useModal();
+  const { closeModal, isClosing } = useModal();
   const { themeMode, accentColor, setThemeMode, setAccentColor } = useAppTheme();
 
   const [activeTab, setActiveTab] = useState<
@@ -122,7 +122,7 @@ export const SettingsModal: React.FC = () => {
   };
 
   return (
-    <div className="modal-overlay" id="modal-settings">
+    <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} id="modal-settings">
       <div className="modal-card modal-settings">
         <div className="modal-header">
           <div className="modal-header-icon">
