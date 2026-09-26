@@ -97,6 +97,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   }, [slot.isLocal, slot.peerId, slot.stream]);
 
   useEffect(() => {
+    if (inTray) return;
     if (slot.isLocal) {
       setLiveBitrate(currentBitrate);
       setLiveFps(currentFps);
@@ -120,7 +121,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
       isMounted = false;
       clearInterval(interval);
     };
-  }, [slot.isLocal, slot.peerId, currentBitrate, currentFps]);
+  }, [slot.isLocal, slot.peerId, currentBitrate, currentFps, inTray]);
 
   const handleCardClick = () => {
     if (didDragRef.current) {
@@ -208,7 +209,14 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           position: 'relative',
         }}
       >
-        {slot.isLocal && !showLocalPreview ? (
+        {inTray && isSelectedFeatured ? (
+          <div className="tray-featured-placeholder">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            <span className="tray-featured-placeholder-text">No Palco</span>
+          </div>
+        ) : slot.isLocal && !showLocalPreview ? (
           <div className="local-broadcaster-placeholder">
             <div className="local-broadcaster-radar-pulse">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

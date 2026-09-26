@@ -153,4 +153,19 @@ describe('Spotlight Tray & Stream Filters Architecture', () => {
       assert.equal(traySlots[2]!.isSelectedFeatured, true);
     });
   });
+
+  describe('Resolution Bitrate Automation', () => {
+    it('returns appropriate default bitrates for each resolution', () => {
+      assert.equal(store.getDefaultBitrateForResolution('720p'), 8000);
+      assert.equal(store.getDefaultBitrateForResolution('1080p'), 15000);
+      assert.equal(store.getDefaultBitrateForResolution('1440p'), 25000);
+      assert.equal(store.getDefaultBitrateForResolution('4k'), 35000);
+      assert.equal(store.getDefaultBitrateForResolution('480p'), 3000);
+      assert.equal(store.getDefaultBitrateForResolution('360p'), 1000);
+    });
+
+    it('fallback resolution returns default 15 Mbps', () => {
+      assert.equal(store.getDefaultBitrateForResolution('unknown'), 15000);
+    });
+  });
 });

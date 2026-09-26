@@ -19,7 +19,7 @@ export class StateStore {
   public currentAccentColor: string = 'cyan';
 
   public currentFps: number = 60;
-  public currentBitrate: number = 25000;
+  public currentBitrate: number = 15000;
   public currentResolution: ResolutionConfig = { width: 1920, height: 1080, label: '1080p' };
 
   public selectedFilterMode: 'exclude' | 'include' = 'exclude';
@@ -75,7 +75,7 @@ export class StateStore {
     this.currentAccentColor = localStorage.getItem('p2sharer_accent_color') || 'cyan';
 
     this.currentFps = parseInt(localStorage.getItem('p2sharer_default_fps') || '60', 10);
-    this.currentBitrate = parseInt(localStorage.getItem('p2sharer_default_bitrate') || '25000', 10);
+    this.currentBitrate = parseInt(localStorage.getItem('p2sharer_default_bitrate') || '15000', 10);
 
     const savedRes = localStorage.getItem('p2sharer_default_res') || '1080p';
     this.currentResolution = this.parseResolution(savedRes);
@@ -97,6 +97,25 @@ export class StateStore {
       }
     } catch {
       this.includeProcessNames = new Set();
+    }
+  }
+
+  public getDefaultBitrateForResolution(resLabel: string): number {
+    switch (resLabel.toLowerCase()) {
+      case '4k':
+        return 35000;
+      case '1440p':
+        return 25000;
+      case '1080p':
+        return 15000;
+      case '720p':
+        return 8000;
+      case '480p':
+        return 3000;
+      case '360p':
+        return 1000;
+      default:
+        return 15000;
     }
   }
 
