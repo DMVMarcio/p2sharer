@@ -33,6 +33,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [lastVolume, setLastVolume] = useState<number>(100);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [showLocalPreview, setShowLocalPreview] = useState<boolean>(false);
 
   const cardRef = useRef<HTMLDivElement | null>(null);
   const {
@@ -207,21 +208,56 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           position: 'relative',
         }}
       >
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'contain',
-            transform: zoom > 1.0 && !inTray ? `translate3d(${pan.x}px, ${pan.y}px, 0px) scale(${zoom})` : 'none',
-            transformOrigin: 'center center',
-            transition: isDragging ? 'none' : 'transform 0.08s ease-out',
-            willChange: zoom > 1.0 && !inTray ? 'transform' : 'auto',
-          }}
-        />
+        {slot.isLocal && !showLocalPreview ? (
+          <div className="local-broadcaster-placeholder">
+            <div className="local-broadcaster-radar-pulse">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                <line x1="8" y1="21" x2="16" y2="21"/>
+                <line x1="12" y1="17" x2="12" y2="21"/>
+              </svg>
+            </div>
+            <span className="local-broadcaster-title">Você está transmitindo</span>
+            {!inTray && (
+              <span className="local-broadcaster-subtitle">
+                {currentResolution.label} • {currentFps} FPS • Transmissão Ativa
+              </span>
+            )}
+            {!inTray && (
+              <button
+                type="button"
+                className="btn-toggle-local-preview"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowLocalPreview(true);
+                }}
+                title="Exibir prévia da sua transmissão"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+                Ver Prévia
+              </button>
+            )}
+          </div>
+        ) : (
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              transform: zoom > 1.0 && !inTray ? `translate3d(${pan.x}px, ${pan.y}px, 0px) scale(${zoom})` : 'none',
+              transformOrigin: 'center center',
+              transition: isDragging ? 'none' : 'transform 0.08s ease-out',
+              willChange: zoom > 1.0 && !inTray ? 'transform' : 'auto',
+            }}
+          />
+        )}
       </div>
 
       {/* Featured badge when in tray */}
@@ -330,6 +366,23 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           className="stream-controls-group"
           onClick={(e) => e.stopPropagation()}
         >
+          {slot.isLocal && showLocalPreview && (
+            <button
+              type="button"
+              className="btn-toggle-local-preview active"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowLocalPreview(false);
+              }}
+              title="Ocultar prévia para economizar CPU"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                <line x1="1" y1="1" x2="23" y2="23"/>
+              </svg>
+              Ocultar Prévia
+            </button>
+          )}
           {!slot.isLocal && (
             <div
               className="stream-volume-controller"
