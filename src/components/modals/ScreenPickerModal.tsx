@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useModal } from '../../hooks/useModal';
 import { useScreenPicker } from '../../hooks/useScreenPicker';
 import { getSkeletonCountForTab } from './screen_picker_utils';
@@ -25,9 +25,26 @@ export const ScreenPickerModal: React.FC = () => {
     confirmPicker,
   } = useScreenPicker(closeModal);
 
+  const [displaySkeleton, setDisplaySkeleton] = useState(isLoading);
+  const [isFadingOut, setIsFadingOut] = useState(false);
+
   useEffect(() => {
     loadSources();
   }, [loadSources]);
+
+  useEffect(() => {
+    if (!isLoading && displaySkeleton) {
+      setIsFadingOut(true);
+      const timer = setTimeout(() => {
+        setDisplaySkeleton(false);
+        setIsFadingOut(false);
+      }, 200);
+      return () => clearTimeout(timer);
+    } else if (isLoading && !displaySkeleton) {
+      setDisplaySkeleton(true);
+      setIsFadingOut(false);
+    }
+  }, [isLoading, displaySkeleton]);
 
   const skeletonCount = getSkeletonCountForTab(currentTab, monitors.length);
 
@@ -70,9 +87,12 @@ export const ScreenPickerModal: React.FC = () => {
             </button>
           </div>
 
-          <div className="source-cards-grid" id="picker-sources-container">
-            {isLoading && (
-              <>
+          <div className="picker-sources-container-wrapper" id="picker-sources-container">
+            {displaySkeleton && (
+              <div
+                className={`source-cards-grid source-cards-skeleton-layer ${isFadingOut ? 'fade-out' : ''}`}
+                aria-hidden="true"
+              >
                 {Array.from({ length: skeletonCount }).map((_, idx) => (
                   <div
                     key={`source-skeleton-${idx}`}
@@ -103,76 +123,80 @@ export const ScreenPickerModal: React.FC = () => {
                     </div>
                   </div>
                 ))}
-              </>
-            )}
-
-            {!isLoading && currentTab === 'screens' && monitors.length === 0 && (
-              <div className="source-cards-empty-state">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <rect width="20" height="14" x="2" y="3" rx="2"/>
-                  <line x1="8" x2="16" y1="21" y2="21"/>
-                  <line x1="12" x2="12" y1="17" y2="21"/>
-                </svg>
-                <span>Nenhum monitor detectado.</span>
               </div>
             )}
 
-            {!isLoading && currentTab === 'screens' && monitors.map((mon) => {
-              const isSelected = selectedSourceId === mon.id;
-              return (
-                <div
-                  key={mon.id}
-                  className={`source-card ${isSelected ? 'selected' : ''}`}
-                  onClick={() => setSelectedSourceId(mon.id)}
-                >
-                  <div className="source-card-thumb">
-                    {mon.thumbnail ? (
-                      <img src={mon.thumbnail} alt={mon.name} />
-                    ) : (
-                      <div className="source-card-thumb-placeholder">Monitor</div>
-                    )}
+            {!isLoading && (
+              <div className="source-cards-grid source-cards-content-layer">
+                {currentTab === 'screens' && monitors.length === 0 && (
+                  <div className="source-cards-empty-state">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <rect width="20" height="14" x="2" y="3" rx="2"/>
+                      <line x1="8" x2="16" y1="21" y2="21"/>
+                      <line x1="12" x2="12" y1="17" y2="21"/>
+                    </svg>
+                    <span>Nenhum monitor detectado.</span>
                   </div>
-                  <div className="source-card-info">
-                    <div className="source-card-title">{mon.name}</div>
-                    <div className="source-card-subtitle">{mon.width}x{mon.height}</div>
-                  </div>
-                </div>
-              );
-            })}
+                )}
 
-            {!isLoading && currentTab === 'windows' && windows.length === 0 && (
-              <div className="source-cards-empty-state">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <rect width="18" height="18" x="3" y="3" rx="2"/>
-                  <line x1="3" x2="21" y1="9" y2="9"/>
-                  <line x1="9" x2="21" y2="9"/>
-                </svg>
-                <span>Nenhuma janela aberta encontrada.</span>
+                {currentTab === 'screens' && monitors.map((mon) => {
+                  const isSelected = selectedSourceId === mon.id;
+                  return (
+                    <div
+                      key={mon.id}
+                      className={`source-card ${isSelected ? 'selected' : ''}`}
+                      onClick={() => setSelectedSourceId(mon.id)}
+                    >
+                      <div className="source-card-thumb">
+                        {mon.thumbnail ? (
+                          <img src={mon.thumbnail} alt={mon.name} />
+                        ) : (
+                          <div className="source-card-thumb-placeholder">Monitor</div>
+                        )}
+                      </div>
+                      <div className="source-card-info">
+                        <div className="source-card-title">{mon.name}</div>
+                        <div className="source-card-subtitle">{mon.width}x{mon.height}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {currentTab === 'windows' && windows.length === 0 && (
+                  <div className="source-cards-empty-state">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <rect width="18" height="18" x="3" y="3" rx="2"/>
+                      <line x1="3" x2="21" y1="9" y2="9"/>
+                      <line x1="9" x2="21" y2="9"/>
+                    </svg>
+                    <span>Nenhuma janela aberta encontrada.</span>
+                  </div>
+                )}
+
+                {currentTab === 'windows' && windows.map((win) => {
+                  const isSelected = selectedSourceId === win.id;
+                  return (
+                    <div
+                      key={win.id}
+                      className={`source-card ${isSelected ? 'selected' : ''}`}
+                      onClick={() => setSelectedSourceId(win.id)}
+                    >
+                      <div className="source-card-thumb">
+                        {win.thumbnail ? (
+                          <img src={win.thumbnail} alt={win.title} />
+                        ) : (
+                          <div className="source-card-thumb-placeholder">Janela</div>
+                        )}
+                      </div>
+                      <div className="source-card-info">
+                        <div className="source-card-title">{win.title || win.process_name}</div>
+                        <div className="source-card-subtitle">{win.process_name}</div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
-
-            {!isLoading && currentTab === 'windows' && windows.map((win) => {
-              const isSelected = selectedSourceId === win.id;
-              return (
-                <div
-                  key={win.id}
-                  className={`source-card ${isSelected ? 'selected' : ''}`}
-                  onClick={() => setSelectedSourceId(win.id)}
-                >
-                  <div className="source-card-thumb">
-                    {win.thumbnail ? (
-                      <img src={win.thumbnail} alt={win.title} />
-                    ) : (
-                      <div className="source-card-thumb-placeholder">Janela</div>
-                    )}
-                  </div>
-                  <div className="source-card-info">
-                    <div className="source-card-title">{win.title || win.process_name}</div>
-                    <div className="source-card-subtitle">{win.process_name}</div>
-                  </div>
-                </div>
-              );
-            })}
           </div>
 
           <div className="picker-settings-row">
