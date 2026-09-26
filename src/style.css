@@ -586,6 +586,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   outline: none;
   text-decoration: none;
   font-family: inherit;
+  white-space: nowrap;
   width: 100%;
 }
 
@@ -2489,6 +2490,11 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   background-color: var(--bg-surface);
 }
 
+.modal-footer .btn {
+  width: auto;
+  white-space: nowrap;
+}
+
 /* Inputs */
 .text-input,
 .text-input-sm {
@@ -3203,12 +3209,22 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .audio-footer-count {
   font-size: 11px;
   color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .audio-footer-buttons {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
+}
+
+.audio-footer-buttons .btn {
+  width: auto;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* ==========================================================================
