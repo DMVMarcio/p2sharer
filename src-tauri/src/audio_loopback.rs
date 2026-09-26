@@ -735,6 +735,7 @@ pub(crate) mod win_audio {
         pub _event_guard: EventHandleGuard,
         pub pid: u32,
         pub fifo: std::collections::VecDeque<f32>,
+        pub is_buffering: bool,
     }
 
     pub(crate) fn init_capture_source(
@@ -782,6 +783,7 @@ pub(crate) mod win_audio {
                 _event_guard: EventHandleGuard(ev),
                 pid,
                 fifo: std::collections::VecDeque::with_capacity(4096),
+                is_buffering: true,
             })
         }
     }
@@ -789,6 +791,16 @@ pub(crate) mod win_audio {
     pub fn run_capture_loop(app: AppHandle, config: AudioConfig, stop_flag: Arc<AtomicBool>) {
         unsafe {
             let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+            let _ = windows::Win32::Media::timeBeginPeriod(1);
+            struct TimePeriodGuard;
+            impl Drop for TimePeriodGuard {
+                fn drop(&mut self) {
+                    unsafe {
+                        let _ = windows::Win32::Media::timeEndPeriod(1);
+                    }
+                }
+            }
+            let _time_guard = TimePeriodGuard;
 
             let mut is_allocated_format = false;
             let mut mix_format_ptr: *mut WAVEFORMATEX = if let Ok(master_client) = get_default_render_audio_client() {
@@ -1050,8 +1062,14 @@ pub(crate) mod win_audio {
                             packet_size = source.capture.GetNextPacketSize().unwrap_or(0);
                         }
 
-                        // Bound FIFO to prevent buffer bloat and excessive latency (max 2880 samples = 30ms at 48kHz stereo)
-                        const MAX_FIFO_SAMPLES: usize = 2880;
+                        // Pre-roll watermark: 20ms cushion = 960 stereo frames = 1920 floats at 48kHz
+                        const PREROLL_FLOATS: usize = 1920;
+                        if source.is_buffering && source.fifo.len() >= PREROLL_FLOATS {
+                            source.is_buffering = false;
+                        }
+
+                        // Bound FIFO to prevent buffer bloat and excessive latency (max 4800 samples = 50ms at 48kHz stereo)
+                        const MAX_FIFO_SAMPLES: usize = 4800;
                         if source.fifo.len() > MAX_FIFO_SAMPLES {
                             let excess = source.fifo.len() - MAX_FIFO_SAMPLES;
                             let excess_even = (excess / 2) * 2;
@@ -1062,60 +1080,72 @@ pub(crate) mod win_audio {
                     // Periodic synchronous mixing tick: exactly 480 frames (960 floats) per 10ms
                     let now = std::time::Instant::now();
                     if now >= next_mix_time {
-                        next_mix_time += mix_tick_duration;
+                        let mut ticks_to_run = 0usize;
+                        while next_mix_time <= now && ticks_to_run < 2 {
+                            next_mix_time += mix_tick_duration;
+                            ticks_to_run += 1;
+                        }
                         if next_mix_time < now {
                             next_mix_time = now + mix_tick_duration;
                         }
 
-                        if multi_sources.len() == 1 {
-                            let fifo = &mut multi_sources[0].fifo;
-                            if fifo.len() >= 960 {
-                                raw_stereo_buffer.extend(fifo.drain(..960));
-                            } else if !fifo.is_empty() {
-                                raw_stereo_buffer.extend(fifo.drain(..));
-                            }
-                        } else if multi_sources.len() > 1 {
-                            let any_has_audio = multi_sources.iter().any(|s| !s.fifo.is_empty());
-                            if any_has_audio {
-                                const FRAMES_TO_MIX: usize = 480;
-                                raw_stereo_buffer.reserve(FRAMES_TO_MIX * 2);
+                        for _ in 0..ticks_to_run {
+                            if multi_sources.len() == 1 {
+                                let fifo = &mut multi_sources[0].fifo;
+                                if fifo.len() >= 960 {
+                                    raw_stereo_buffer.extend(fifo.drain(..960));
+                                } else if !fifo.is_empty() {
+                                    raw_stereo_buffer.extend(fifo.drain(..));
+                                }
+                            } else if multi_sources.len() > 1 {
+                                let any_active = multi_sources.iter().any(|s| !s.is_buffering && s.fifo.len() >= 960);
+                                if any_active {
+                                    const FRAMES_TO_MIX: usize = 480;
+                                    raw_stereo_buffer.reserve(FRAMES_TO_MIX * 2);
 
-                                for _ in 0..FRAMES_TO_MIX {
-                                    let mut sum_l = 0.0f32;
-                                    let mut sum_r = 0.0f32;
-                                    let mut active_sources = 0usize;
+                                    for _ in 0..FRAMES_TO_MIX {
+                                        let mut sum_l = 0.0f32;
+                                        let mut sum_r = 0.0f32;
+                                        let mut active_sources = 0usize;
+
+                                        for s in &mut multi_sources {
+                                            if !s.is_buffering && s.fifo.len() >= 2 {
+                                                let l = s.fifo.pop_front().unwrap_or(0.0);
+                                                let r = s.fifo.pop_front().unwrap_or(0.0);
+                                                if l.abs() > 0.0001 || r.abs() > 0.0001 {
+                                                    active_sources += 1;
+                                                }
+                                                sum_l += l;
+                                                sum_r += r;
+                                            }
+                                        }
+
+                                        if active_sources > 1 {
+                                            let headroom_scale = 1.0 / (active_sources as f32).sqrt();
+                                            sum_l *= headroom_scale;
+                                            sum_r *= headroom_scale;
+                                        }
+
+                                        raw_stereo_buffer.push(soft_clip_sample(sum_l));
+                                        raw_stereo_buffer.push(soft_clip_sample(sum_r));
+                                    }
 
                                     for s in &mut multi_sources {
-                                        if s.fifo.len() >= 2 {
-                                            let l = s.fifo.pop_front().unwrap_or(0.0);
-                                            let r = s.fifo.pop_front().unwrap_or(0.0);
-                                            if l.abs() > 0.0001 || r.abs() > 0.0001 {
-                                                active_sources += 1;
-                                            }
-                                            sum_l += l;
-                                            sum_r += r;
+                                        if !s.is_buffering && s.fifo.is_empty() {
+                                            s.is_buffering = true;
                                         }
                                     }
-
-                                    if active_sources > 1 {
-                                        let headroom_scale = 1.0 / (active_sources as f32).sqrt();
-                                        sum_l *= headroom_scale;
-                                        sum_r *= headroom_scale;
-                                    }
-
-                                    raw_stereo_buffer.push(soft_clip_sample(sum_l));
-                                    raw_stereo_buffer.push(soft_clip_sample(sum_r));
                                 }
                             }
-                        }
 
-                        if !raw_stereo_buffer.is_empty() {
-                            if sample_rate != 48000 {
-                                resampler.resample(&raw_stereo_buffer, &mut standardized_buffer);
-                            } else {
-                                standardized_buffer.extend_from_slice(&raw_stereo_buffer);
+                            if !raw_stereo_buffer.is_empty() {
+                                if sample_rate != 48000 {
+                                    resampler.resample(&raw_stereo_buffer, &mut standardized_buffer);
+                                } else {
+                                    standardized_buffer.extend_from_slice(&raw_stereo_buffer);
+                                }
+                                raw_stereo_buffer.clear();
                             }
-                            raw_stereo_buffer.clear();
                         }
                     }
                 } else {
