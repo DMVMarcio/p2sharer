@@ -131,7 +131,6 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
         if elapsed < self.min_frame_interval {
             return Ok(());
         }
-        self.last_frame_time = std::time::Instant::now();
 
         let src_width = frame.width();
         let src_height = frame.height();
@@ -139,7 +138,15 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
             return Ok(());
         }
 
-        let frame_buffer = frame.buffer()?;
+        let frame_buffer = match frame.buffer() {
+            Ok(buf) => buf,
+            Err(_e) => {
+                // Transient DXGI surface lock or swapchain mode switch (e.g. game launched / resized)
+                // Returning Ok(()) ensures windows-capture does NOT abort the capture loop!
+                return Ok(());
+            }
+        };
+        self.last_frame_time = std::time::Instant::now();
         let pixel_data = frame_buffer.as_nopadding_buffer(&mut self.raw_buffer);
 
         let (final_pixels, final_w, final_h) = if self.target_width > 0
@@ -225,7 +232,7 @@ static CURRENT_WGC_CONTROL: std::sync::Mutex<Option<ActiveCaptureControl>> =
 
 fn get_frame_sender() -> &'static broadcast::Sender<Message> {
     FRAME_SENDER.get_or_init(|| {
-        let (tx, _rx) = broadcast::channel(8);
+        let (tx, _rx) = broadcast::channel(32);
         tx
     })
 }
@@ -623,6 +630,14 @@ pub fn start_native_screen_capture(
         *guard = Some(is_capturing.clone());
     }
 
+    #[cfg(windows)]
+    unsafe {
+        use windows::Win32::System::Threading::{
+            GetCurrentProcess, SetPriorityClass, HIGH_PRIORITY_CLASS,
+        };
+        let _ = SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
+    }
+
     let fps = target_fps.unwrap_or(60).clamp(15, 120);
     let width = target_width.unwrap_or(0);
     let height = target_height.unwrap_or(0);
@@ -642,8 +657,9 @@ pub fn start_native_screen_capture(
     let pacer_wgc_last_sent_us = last_sent_us.clone();
     let pacer_start = start_instant;
     let target_interval_us = (1_000_000 / fps as u64).max(8_000);
-    let slack_us = (target_interval_us * 35) / 100; // ~5.8ms slack window for 60fps
-    let static_timeout_us = target_interval_us + slack_us; // ~22.5ms threshold before emitting static ticks
+    // Only emit static heartbeat if capture has genuinely been idle/silent for >= 100ms (~6 frames).
+    // This guarantees the pacer never competes with or drops frames from active 3D games!
+    let static_timeout_us = 100_000;
 
     std::thread::spawn(move || {
         let _timer_guard = MultimediaTimerGuard::new();
@@ -741,9 +757,7 @@ pub fn start_native_screen_capture(
                     cursor_settings,
                     DrawBorderSettings::WithoutBorder,
                     SecondaryWindowSettings::Default,
-                    MinimumUpdateIntervalSettings::Custom(std::time::Duration::from_nanos(
-                        1_000_000_000 / (fps as u64 + 4),
-                    )),
+                    MinimumUpdateIntervalSettings::Default,
                     DirtyRegionSettings::Default,
                     ColorFormat::Rgba8,
                     flags.clone(),
@@ -775,9 +789,7 @@ pub fn start_native_screen_capture(
                     cursor_settings,
                     DrawBorderSettings::WithoutBorder,
                     SecondaryWindowSettings::Default,
-                    MinimumUpdateIntervalSettings::Custom(std::time::Duration::from_nanos(
-                        1_000_000_000 / (fps as u64 + 4),
-                    )),
+                    MinimumUpdateIntervalSettings::Default,
                     DirtyRegionSettings::Default,
                     ColorFormat::Rgba8,
                     flags.clone(),
@@ -1036,6 +1048,13 @@ pub fn stop_native_screen_capture() -> Result<bool, String> {
                 let _ = control.stop();
             });
         }
+    }
+    #[cfg(windows)]
+    unsafe {
+        use windows::Win32::System::Threading::{
+            GetCurrentProcess, SetPriorityClass, NORMAL_PRIORITY_CLASS,
+        };
+        let _ = SetPriorityClass(GetCurrentProcess(), NORMAL_PRIORITY_CLASS);
     }
     Ok(true)
 }

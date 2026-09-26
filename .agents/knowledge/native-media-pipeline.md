@@ -70,10 +70,23 @@ These flags force hardware-accelerated encoding/decoding and zero-copy texture t
 
 ---
 
-## 4. Diagnostics & Logging (`src-tauri/src/logger.rs`)
+## 5. Windows Graphics Capture (WGC) & Fullscreen 3D Gaming Hardening
 
-- Rotates two log files in `%APPDATA%\p2sharer\logs`:
-  - `latest.log`: Current active session.
-  - `previous.log`: Previous session backup.
-- Exposes Tauri commands `open_log_folder`, `open_latest_log`, and `write_frontend_log`.
-- Frontend logs are forwarded to this single canonical file for full-stack diagnostics.
+### DirectFlip / Independent Flip & MinimumUpdateInterval
+- DirectX 11/12 and Vulkan games running in exclusive fullscreen or borderless window engage DirectFlip / Independent Flip (MPO hardware scanout bypass), bypassing DWM desktop composition.
+- Setting `MinimumUpdateIntervalSettings::Custom(...)` calls WinRT `SetMinUpdateInterval`, which relies on DWM compositor ticks. Under DirectFlip, DWM composition is dormant, causing frame arrival callbacks to stall or drop to ~0-1 FPS.
+- Always use `MinimumUpdateIntervalSettings::Default` on WGC capture sessions. Software rate-limiting (`min_frame_interval = 1s / (fps * 2)`) inside `on_frame_arrived` handles framerate capping without DWM dependencies.
+
+### Transient DXGI Error Recovery in `on_frame_arrived`
+- When a game launches, switches resolutions, or alters swapchain presentation formats, mapping Direct3D11 staging textures via `frame.buffer()` can temporarily fail with transient DXGI errors (`DXGI_ERROR_INVALID_CALL` or surface lock contention).
+- In `windows-capture`, returning `Err` from `on_frame_arrived` immediately posts `WM_QUIT` and permanently terminates the capture loop.
+- Handling `frame.buffer()` with `match` and returning `Ok(())` on transient error skips the single corrupted frame while keeping the WGC capture loop alive.
+
+### Windows Game Mode & Process Priority (`HIGH_PRIORITY_CLASS`)
+- Windows Game Mode deprioritizes background applications when a 3D game launches, which can starve capture and encoding threads.
+- Setting `SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS)` on capture startup and restoring `NORMAL_PRIORITY_CLASS` on teardown guarantees CPU and GPU scheduling slices even under 100% game load.
+
+### Pacer Heartbeat De-confliction & WebCodecs Monotonic Timestamps
+- The pacer thread monitors `last_sent_us` with a 100ms threshold (`static_timeout_us = 100_000`). While games deliver frames at 30-120 FPS, the pacer remains completely dormant and sends 0 competing WebSocket messages.
+- In `NativeVideoBridge` (`src/video/native_video_bridge.ts`), incoming 1-byte dummy heartbeat ticks (`byteLength <= 4`) never overwrite real video frames (`pendingBuffer.byteLength > 4`) awaiting asynchronous decoding.
+- WebCodecs `VideoFrame` timestamps are strictly checked and advanced (`nowUs > lastTimestampUs`) to prevent pipeline rejection.
