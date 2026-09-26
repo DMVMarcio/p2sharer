@@ -181,7 +181,7 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
 
         self.jpeg_buffer.clear();
         let mut encoder = FastJpegEncoder::new(&mut self.jpeg_buffer, self.quality);
-        encoder.set_sampling_factor(SamplingFactor::R_4_2_0);
+        encoder.set_sampling_factor(SamplingFactor::R_4_4_4);
         if encoder
             .encode(
                 final_pixels,
@@ -191,7 +191,8 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
             )
             .is_ok()
         {
-            let frame_arc = Arc::new(self.jpeg_buffer.clone());
+            let frame_bytes = std::mem::take(&mut self.jpeg_buffer);
+            let frame_arc = Arc::new(frame_bytes);
             if let Ok(mut cache) = self.latest_frame.lock() {
                 *cache = Some(frame_arc.clone());
             }
@@ -988,7 +989,7 @@ pub fn start_native_screen_capture(
 
                 jpeg_bytes.clear();
                 let mut encoder = FastJpegEncoder::new(&mut jpeg_bytes, jpeg_quality);
-                encoder.set_sampling_factor(SamplingFactor::R_4_2_0);
+                encoder.set_sampling_factor(SamplingFactor::R_4_4_4);
                 if encoder
                     .encode(
                         final_raw,

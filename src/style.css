@@ -1095,7 +1095,16 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   background-color: var(--accent-subtle);
   border: 1px solid var(--accent-border);
   color: var(--accent-color);
-  animation: radar-pulse-glow 2.5s infinite ease-in-out;
+}
+
+.local-broadcaster-radar-pulse::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--accent-color);
+  animation: radar-pulse-ring 2.5s infinite ease-out;
+  pointer-events: none;
 }
 
 .spotlight-tray-strip .local-broadcaster-placeholder {
@@ -1108,15 +1117,18 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   height: 32px;
 }
 
-@keyframes radar-pulse-glow {
+@keyframes radar-pulse-ring {
   0% {
-    box-shadow: 0 0 0 0 rgba(6, 182, 212, 0.4);
+    transform: scale(0.95);
+    opacity: 0.8;
   }
   70% {
-    box-shadow: 0 0 0 14px rgba(6, 182, 212, 0);
+    transform: scale(1.4);
+    opacity: 0;
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(6, 182, 212, 0);
+    transform: scale(1.4);
+    opacity: 0;
   }
 }
 
