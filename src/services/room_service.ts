@@ -253,7 +253,7 @@ class RoomService {
     mouse: boolean
   ): Promise<void> {
     try {
-      showToast('Iniciando transmissão (GPU Direta)...');
+      showToast('Iniciando transmissão...');
       const chosenSource = (sourceId === 'gpu_direct' || !sourceId) ? 'screen:0' : sourceId;
       const videoStream = await this.nativeVideoBridge.startCapture(chosenSource, fps, res, mouse, 75);
 

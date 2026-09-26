@@ -12,6 +12,10 @@ export class NativeVideoBridge implements VideoCaptureBridge {
   private latestBitmap: ImageBitmap | null = null;
   private animationFrameId: number | null = null;
   private currentFps: number = 60;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private trackGenerator: any = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private trackWriter: any = null;
   public onFallbackNeeded: ((reason: string, stream?: MediaStream) => void) | null = null;
 
   public isCapturingDirectGpu(): boolean {
@@ -113,23 +117,42 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     await this.stopCapture();
     this.currentFps = fps;
 
-    // 1. Create high performance offscreen canvas
-    this.canvas = document.createElement('canvas');
-    this.canvas.width = resolution.width;
-    this.canvas.height = resolution.height;
-
-    try {
-      this.bitmapCtx = this.canvas.getContext('bitmaprenderer') as ImageBitmapRenderingContext | null;
-    } catch {
-      this.bitmapCtx = null;
+    // 1. Initialize WebCodecs MediaStreamTrackGenerator if available for zero-copy GPU video pipeline
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const GeneratorClass = (globalThis as any).MediaStreamTrackGenerator;
+    if (typeof GeneratorClass === 'function') {
+      try {
+        this.trackGenerator = new GeneratorClass({ kind: 'video' });
+        this.trackWriter = this.trackGenerator.writable.getWriter();
+        if ('contentHint' in this.trackGenerator) {
+          this.trackGenerator.contentHint = 'motion';
+        }
+      } catch (err) {
+        console.warn('[NativeVideoBridge] MediaStreamTrackGenerator failed, using canvas fallback:', err);
+        this.trackGenerator = null;
+        this.trackWriter = null;
+      }
     }
 
-    if (!this.bitmapCtx) {
-      this.ctx = this.canvas.getContext('2d', { alpha: false, desynchronized: true });
-      if (this.ctx) {
-        this.ctx.imageSmoothingEnabled = false;
-        this.ctx.fillStyle = '#000000';
-        this.ctx.fillRect(0, 0, resolution.width, resolution.height);
+    // Fallback: Create high performance offscreen canvas
+    if (!this.trackGenerator) {
+      this.canvas = document.createElement('canvas');
+      this.canvas.width = resolution.width;
+      this.canvas.height = resolution.height;
+
+      try {
+        this.bitmapCtx = this.canvas.getContext('bitmaprenderer') as ImageBitmapRenderingContext | null;
+      } catch {
+        this.bitmapCtx = null;
+      }
+
+      if (!this.bitmapCtx) {
+        this.ctx = this.canvas.getContext('2d', { alpha: false, desynchronized: true });
+        if (this.ctx) {
+          this.ctx.imageSmoothingEnabled = false;
+          this.ctx.fillStyle = '#000000';
+          this.ctx.fillRect(0, 0, resolution.width, resolution.height);
+        }
       }
     }
 
@@ -211,20 +234,41 @@ export class NativeVideoBridge implements VideoCaptureBridge {
             }
 
             lastRenderedSequence = frameSeq;
-            if (this.bitmapCtx) {
-              this.bitmapCtx.transferFromImageBitmap(bitmap);
-            } else if (this.ctx && this.canvas) {
-              this.ctx.drawImage(bitmap, 0, 0, this.canvas.width, this.canvas.height);
-              bitmap.close();
-            } else {
-              bitmap.close();
-            }
 
-            const track = this.activeStream?.getVideoTracks()[0];
+            // Direct WebCodecs GPU pathway
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            if (track && typeof (track as any).requestFrame === 'function') {
+            const VideoFrameClass = (globalThis as any).VideoFrame;
+            if (this.trackWriter && typeof VideoFrameClass === 'function') {
+              try {
+                const nowUs = performance.now() * 1000;
+                const videoFrame = new VideoFrameClass(bitmap, {
+                  timestamp: nowUs,
+                  duration: (1000 / this.currentFps) * 1000,
+                });
+                await this.trackWriter.write(videoFrame);
+                videoFrame.close();
+              } catch (writeErr) {
+                console.warn('[NativeVideoBridge] VideoFrame write failed:', writeErr);
+              } finally {
+                bitmap.close();
+              }
+            } else {
+              // Canvas fallback
+              if (this.bitmapCtx) {
+                this.bitmapCtx.transferFromImageBitmap(bitmap);
+              } else if (this.ctx && this.canvas) {
+                this.ctx.drawImage(bitmap, 0, 0, this.canvas.width, this.canvas.height);
+                bitmap.close();
+              } else {
+                bitmap.close();
+              }
+
+              const track = this.activeStream?.getVideoTracks()[0];
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              (track as any).requestFrame();
+              if (track && typeof (track as any).requestFrame === 'function') {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (track as any).requestFrame();
+              }
             }
           } catch {
             // Ignore frame decode failure
@@ -249,12 +293,17 @@ export class NativeVideoBridge implements VideoCaptureBridge {
       }, 500);
     });
 
-    const stream = this.canvas.captureStream(fps);
-    const videoTrack = stream.getVideoTracks()[0];
-    if (videoTrack) {
-      if ('contentHint' in videoTrack) {
+    let stream: MediaStream;
+    if (this.trackGenerator) {
+      stream = new MediaStream([this.trackGenerator]);
+    } else if (this.canvas) {
+      stream = this.canvas.captureStream(fps);
+      const videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack && 'contentHint' in videoTrack) {
         videoTrack.contentHint = 'motion';
       }
+    } else {
+      stream = new MediaStream();
     }
 
     this.activeStream = stream;
@@ -328,6 +377,20 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     if (this.activeStream) {
       this.activeStream.getTracks().forEach((t) => t.stop());
       this.activeStream = null;
+    }
+
+    if (this.trackWriter) {
+      try {
+        this.trackWriter.close().catch(() => {});
+      } catch {}
+      this.trackWriter = null;
+    }
+
+    if (this.trackGenerator) {
+      try {
+        this.trackGenerator.stop();
+      } catch {}
+      this.trackGenerator = null;
     }
 
     this.canvas = null;

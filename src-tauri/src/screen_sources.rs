@@ -3,6 +3,7 @@ use base64::Engine;
 use futures_util::{SinkExt, StreamExt};
 use image::codecs::jpeg::JpegEncoder;
 use image::imageops::FilterType;
+use jpeg_encoder::{ColorType, Encoder as FastJpegEncoder, SamplingFactor};
 use serde::{Deserialize, Serialize};
 use std::io::Cursor;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -587,9 +588,17 @@ pub fn start_native_screen_capture(
                 };
 
                 jpeg_bytes.clear();
-                let mut cursor = Cursor::new(&mut jpeg_bytes);
-                let mut encoder = JpegEncoder::new_with_quality(&mut cursor, jpeg_quality);
-                if encoder.encode_image(&scaled_img).is_ok() {
+                let mut encoder = FastJpegEncoder::new(&mut jpeg_bytes, jpeg_quality);
+                encoder.set_sampling_factor(SamplingFactor::R_4_2_0);
+                if encoder
+                    .encode(
+                        scaled_img.as_raw(),
+                        scaled_img.width() as u16,
+                        scaled_img.height() as u16,
+                        ColorType::Rgba,
+                    )
+                    .is_ok()
+                {
                     let _ = sender.send(Message::Binary(jpeg_bytes.clone()));
                 }
             }

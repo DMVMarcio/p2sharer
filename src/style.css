@@ -2536,18 +2536,6 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   box-shadow: 0 0 0 2px var(--bg-surface), 0 0 0 4px var(--swatch-color);
 }
 
-/* Direct GPU Badge */
-.direct-gpu-badge {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  padding: 2px 7px;
-  border-radius: var(--radius-full);
-  background-color: rgba(34, 211, 238, 0.15);
-  color: var(--accent-color, #22d3ee);
-  border: 1px solid rgba(34, 211, 238, 0.3);
-}
 
 .picker-tabs {
   display: flex;

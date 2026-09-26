@@ -40,11 +40,8 @@ export const ScreenPickerModal: React.FC = () => {
             </svg>
           </div>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h2>Compartilhar Tela</h2>
-              <span className="direct-gpu-badge">GPU Direta</span>
-            </div>
-            <p className="modal-subtitle">Escolha um monitor ou janela com aceleração nativa por hardware (Zero Cópia).</p>
+            <h2>Compartilhar Tela</h2>
+            <p className="modal-subtitle">Escolha uma tela inteira ou janela para transmitir.</p>
           </div>
           <button className="btn-close" id="btn-close-screen-picker" onClick={closeModal}>
             &times;
@@ -200,7 +197,7 @@ export const ScreenPickerModal: React.FC = () => {
             style={{ width: 'auto', minWidth: '160px' }}
             onClick={confirmPicker}
           >
-            <span>Transmitir com GPU Direta</span>
+            <span>Iniciar Transmissão</span>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polygon points="5 3 19 12 5 21 5 3"/>
             </svg>
