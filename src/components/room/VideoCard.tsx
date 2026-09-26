@@ -36,6 +36,12 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   const [lastVolume, setLastVolume] = useState<number>(100);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [showLocalPreview, setShowLocalPreview] = useState<boolean>(false);
+  const [isHudPinned, setIsHudPinned] = useState<boolean>(false);
+  const [activeTooltips, setActiveTooltips] = useState<number>(0);
+
+  const handleTooltipOpenChange = useCallback((open: boolean) => {
+    setActiveTooltips((prev) => Math.max(0, prev + (open ? 1 : -1)));
+  }, []);
 
   const cardRef = useRef<HTMLDivElement | null>(null);
   const {
@@ -180,7 +186,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   return (
     <div
       ref={cardRef}
-      className={`stream-card ${isFeatured ? 'featured' : ''} ${inTray ? 'in-tray' : ''} ${isSelectedFeatured ? 'selected-featured' : ''} ${zoom > 1.0 && !inTray ? 'is-zoomed' : ''} ${isDragging && !inTray ? 'is-dragging' : ''} ${!slot.isLocal && !inTray ? 'has-volume-controller' : ''}`}
+      className={`stream-card ${isFeatured ? 'featured' : ''} ${inTray ? 'in-tray' : ''} ${isSelectedFeatured ? 'selected-featured' : ''} ${zoom > 1.0 && !inTray ? 'is-zoomed' : ''} ${isDragging && !inTray ? 'is-dragging' : ''} ${!slot.isLocal && !inTray ? 'has-volume-controller' : ''} ${isHudPinned ? 'is-hud-pinned' : ''} ${activeTooltips > 0 ? 'is-hud-active' : ''}`}
       data-peer-id={slot.peerId}
       onClick={handleCardClick}
       onMouseDown={!inTray ? handleMouseDown : undefined}
@@ -278,6 +284,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
         {liveBitrate > 0 ? (
           <Tooltip
             tooltipClassName="bitrate-tooltip"
+            onOpenChange={handleTooltipOpenChange}
             content={
               <>
                 <div className="bitrate-tooltip-header">
@@ -314,6 +321,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
         ) : slot.isLocal ? (
           <Tooltip
             tooltipClassName="bitrate-tooltip"
+            onOpenChange={handleTooltipOpenChange}
             content={
               <>
                 <div className="bitrate-tooltip-header">
@@ -356,6 +364,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
         <Tooltip
           interactive
           tooltipClassName="watchers-tooltip"
+          onOpenChange={handleTooltipOpenChange}
           content={<WatchersTooltipContent watchers={watchers} currentUsername={username} />}
         >
           <div
@@ -424,18 +433,18 @@ export const VideoCard: React.FC<VideoCardProps> = ({
                 aria-label="Mutar / Desmutar"
               >
                 {isMuted || volume === 0 ? (
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
                     <line x1="23" x2="17" y1="9" y2="15"/>
                     <line x1="17" x2="23" y1="9" y2="15"/>
                   </svg>
                 ) : volume < 50 ? (
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
                     <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
                   </svg>
                 ) : (
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
                     <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
                     <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
@@ -457,6 +466,43 @@ export const VideoCard: React.FC<VideoCardProps> = ({
               </div>
             </div>
           )}
+
+          <Tooltip
+            content={
+              isHudPinned
+                ? 'Desafixar interface (ocultar automaticamente)'
+                : 'Fixar interface (sempre visível)'
+            }
+            onOpenChange={handleTooltipOpenChange}
+          >
+            <button
+              type="button"
+              className={`btn-stream-pin ${isHudPinned ? 'active' : ''}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsHudPinned((p) => !p);
+              }}
+              aria-label={
+                isHudPinned
+                  ? 'Desafixar interface da transmissão'
+                  : 'Fixar interface da transmissão'
+              }
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill={isHudPinned ? 'currentColor' : 'none'}
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="12" y1="17" x2="12" y2="22" />
+                <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.79-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.79.9A2 2 0 0 0 5 15.24Z" />
+              </svg>
+            </button>
+          </Tooltip>
 
           <button
             type="button"
