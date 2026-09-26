@@ -26,7 +26,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   const currentBitrate = useStore((s) => s.currentBitrate);
 
   const [liveFps, setLiveFps] = useState<number>(() => (slot.isLocal ? currentFps : 60));
-  const [liveBitrate, setLiveBitrate] = useState<number>(() => (slot.isLocal ? currentBitrate : 0));
+  const [liveBitrate, setLiveBitrate] = useState<number>(0);
   const [remoteResolution, setRemoteResolution] = useState<string>('1080p');
 
   const [volume, setVolume] = useState<number>(100);
@@ -98,18 +98,17 @@ export const VideoCard: React.FC<VideoCardProps> = ({
 
   useEffect(() => {
     if (inTray) return;
-    if (slot.isLocal) {
-      setLiveBitrate(currentBitrate);
-      setLiveFps(currentFps);
-      return;
-    }
 
     let isMounted = true;
     const fetchStats = async () => {
       const stats = await roomService.roomManager?.getPeerStats(slot.peerId);
       if (!isMounted) return;
-      if (stats?.bitrateKbps) setLiveBitrate(stats.bitrateKbps);
-      if (stats?.fps) setLiveFps(stats.fps);
+      if (stats?.bitrateKbps !== null && stats?.bitrateKbps !== undefined) {
+        setLiveBitrate(stats.bitrateKbps);
+      }
+      if (stats?.fps !== null && stats?.fps !== undefined) {
+        setLiveFps(stats.fps);
+      }
       if (stats?.height) {
         setRemoteResolution(`${stats.height}p`);
       }
@@ -121,7 +120,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
       isMounted = false;
       clearInterval(interval);
     };
-  }, [slot.isLocal, slot.peerId, currentBitrate, currentFps, inTray]);
+  }, [slot.isLocal, slot.peerId, inTray]);
 
   const handleCardClick = () => {
     if (didDragRef.current) {
@@ -286,14 +285,31 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           </span>
         </span>
 
-        {liveBitrate > 0 && (
-          <span className="stat-badge stat-badge-bitrate">
+        {liveBitrate > 0 ? (
+          <span
+            className="stat-badge stat-badge-bitrate"
+            title={
+              slot.isLocal
+                ? `Taxa de envio em tempo real: ${(liveBitrate / 1000).toFixed(1)} Mbps (Limite: ${(currentBitrate / 1000).toFixed(0)} Mbps)`
+                : `Taxa de recepção em tempo real: ${(liveBitrate / 1000).toFixed(1)} Mbps`
+            }
+          >
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
             </svg>
             <span className="stat-bitrate-text">{(liveBitrate / 1000).toFixed(1)} Mbps</span>
           </span>
-        )}
+        ) : slot.isLocal ? (
+          <span
+            className="stat-badge stat-badge-bitrate"
+            title={`Limite configurado: ${(currentBitrate / 1000).toFixed(0)} Mbps (Aguardando espectadores ou movimento na tela)`}
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+            <span className="stat-bitrate-text">{(currentBitrate / 1000).toFixed(0)}M máx</span>
+          </span>
+        ) : null}
 
         {!slot.isLocal && (
           <span className="stat-badge stat-badge-ping">

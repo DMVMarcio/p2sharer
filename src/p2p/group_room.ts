@@ -147,6 +147,7 @@ export class GroupRoomManager {
   private pongAction: any = null;
 
   private lastPeerStats: Map<string, { bytesReceived: number; timestamp: number }> = new Map();
+  private lastLocalStats: { bytesSent: number; timestamp: number } | null = null;
   private initialJoinComplete: boolean = false;
   private callbacks: RoomCallbacks | null = null;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
@@ -1003,6 +1004,7 @@ export class GroupRoomManager {
     }
 
     this.localStream = null;
+    this.lastLocalStats = null;
 
     // Screen share toggle protocol: emit stream_status with isStreaming: false
     if (this.streamStatusAction) {
@@ -1108,7 +1110,93 @@ export class GroupRoomManager {
     return this.peerTracker.getPing(peerId) ?? null;
   }
 
+  public async getLocalBroadcasterStats(): Promise<PeerStatsInfo> {
+    let fps: number | null = this.currentTargetFps || 60;
+    let width: number | null = null;
+    let height: number | null = null;
+    let bitrateKbps: number | null = null;
+
+    if (!this.localStream || !this.room) {
+      return {
+        pingMs: 0,
+        fps,
+        width,
+        height,
+        bitrateKbps: null,
+        connectionType: 'P2P Direto',
+      };
+    }
+
+    try {
+      const vTrack = this.localStream.getVideoTracks()[0];
+      if (vTrack) {
+        const settings = vTrack.getSettings?.();
+        if (settings) {
+          width = settings.width || null;
+          height = settings.height || null;
+          if (settings.frameRate) {
+            fps = Math.round(settings.frameRate);
+          }
+        }
+      }
+
+      const peers = this.room?.getPeers?.() || {};
+      const peerList = Object.values(peers);
+      let totalBytesSent = 0;
+      let timestamp = Date.now();
+      let foundOutbound = false;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const peerObj of peerList as any[]) {
+        const pc: RTCPeerConnection = peerObj?.connection || peerObj?.pc || peerObj;
+        if (pc && typeof pc.getStats === 'function') {
+          const stats = await pc.getStats();
+          stats.forEach((report) => {
+            if (report.type === 'outbound-rtp' && report.kind === 'video') {
+              if (typeof report.bytesSent === 'number') {
+                totalBytesSent += report.bytesSent;
+                foundOutbound = true;
+              }
+              if (typeof report.framesPerSecond === 'number' && report.framesPerSecond > 0) {
+                fps = Math.round(report.framesPerSecond);
+              }
+              if (typeof report.timestamp === 'number') {
+                timestamp = report.timestamp;
+              }
+            }
+          });
+        }
+      }
+
+      if (foundOutbound) {
+        if (this.lastLocalStats) {
+          const deltaBytes = totalBytesSent - this.lastLocalStats.bytesSent;
+          const deltaSec = (timestamp - this.lastLocalStats.timestamp) / 1000;
+          if (deltaSec > 0 && deltaBytes >= 0) {
+            const peerCount = Math.max(1, peerList.length);
+            bitrateKbps = Math.round((deltaBytes * 8) / (deltaSec * 1000 * peerCount));
+          }
+        }
+        this.lastLocalStats = { bytesSent: totalBytesSent, timestamp };
+      }
+    } catch (err) {
+      console.warn('[P2P] Failed to get local broadcaster stats:', err);
+    }
+
+    return {
+      pingMs: 0,
+      fps,
+      width,
+      height,
+      bitrateKbps,
+      connectionType: 'P2P Direto',
+    };
+  }
+
   public async getPeerStats(peerId: string): Promise<PeerStatsInfo | null> {
+    if (peerId === 'local' || peerId === selfId) {
+      return this.getLocalBroadcasterStats();
+    }
     const pingMs = this.getPeerPing(peerId);
     let fps: number | null = null;
     let width: number | null = null;
