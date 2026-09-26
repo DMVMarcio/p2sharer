@@ -336,13 +336,13 @@ pub(crate) mod win_audio {
     use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT};
     use windows::Win32::Media::Audio::*;
     use windows::Win32::System::Com::*;
-    use windows::Win32::System::Threading::{CreateEventW, WaitForMultipleObjects, WaitForSingleObject};
+    use windows::Win32::System::Threading::{CreateEventW, WaitForMultipleObjects};
 
     pub(crate) const AUDCLNT_STREAMFLAGS_EVENTCALLBACK: u32 = 0x00040000;
     pub(crate) const AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM: u32 = 0x80000000;
     pub(crate) const AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY: u32 = 0x08000000;
 
-    struct EventHandleGuard(HANDLE);
+    pub(crate) struct EventHandleGuard(pub(crate) HANDLE);
 
     impl Drop for EventHandleGuard {
         fn drop(&mut self) {
@@ -434,10 +434,7 @@ pub(crate) mod win_audio {
         }
     }
 
-    fn resolve_target_process_tree(target_names: &[String], target_pids: &[u32], mode: &str) -> u32 {
-        let mut sys = sysinfo::System::new_all();
-        sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
-
+    pub(crate) fn resolve_self_and_child_pids(sys: &sysinfo::System) -> Vec<u32> {
         let self_pid = std::process::id();
         let mut self_pids = vec![self_pid];
         let mut added = true;
@@ -456,7 +453,6 @@ pub(crate) mod win_audio {
             }
         }
 
-        // Check if any msedgewebview2 processes belong to this user session/parent
         for (pid, proc) in sys.processes() {
             let u = pid.as_u32();
             let p_name = proc.name().to_string_lossy().to_lowercase();
@@ -468,30 +464,96 @@ pub(crate) mod win_audio {
                 }
             }
         }
+        self_pids
+    }
 
-        if mode == "full" || (target_names.is_empty() && target_pids.is_empty()) {
-            return 0;
+    pub(crate) fn resolve_single_process_root(pid: u32, sys: &sysinfo::System) -> u32 {
+        let mut curr = sysinfo::Pid::from_u32(pid);
+        let start_name = sys.process(curr).map(|p| p.name().to_string_lossy().to_lowercase());
+
+        while let Some(proc) = sys.process(curr) {
+            if let Some(parent_pid) = proc.parent() {
+                if let Some(parent_proc) = sys.process(parent_pid) {
+                    let parent_name = parent_proc.name().to_string_lossy().to_lowercase();
+                    if start_name.as_deref() == Some(&parent_name) {
+                        curr = parent_pid;
+                        continue;
+                    }
+                }
+            }
+            break;
         }
 
-        let normalized_names: Vec<String> = target_names.iter().map(|n| n.to_lowercase()).collect();
-        let specifies_self = normalized_names.iter().any(|target| target.contains("p2sharer") || target.contains("msedgewebview2"))
-            || target_pids.iter().any(|&p| self_pids.contains(&p));
+        curr.as_u32()
+    }
 
-        if specifies_self {
-            // Find active audio session for self/webview if currently emitting sound
-            unsafe {
-                if let Ok(enumerator) = CoCreateInstance::<_, IMMDeviceEnumerator>(&MMDeviceEnumerator, None, CLSCTX_ALL) {
-                    if let Ok(device) = enumerator.GetDefaultAudioEndpoint(eRender, eConsole) {
-                        if let Ok(session_manager) = device.Activate::<IAudioSessionManager2>(CLSCTX_ALL, None) {
-                            if let Ok(session_enum) = session_manager.GetSessionEnumerator() {
-                                if let Ok(count) = session_enum.GetCount() {
-                                    for i in 0..count {
-                                        if let Ok(control) = session_enum.GetSession(i) {
-                                            if let Ok(control2) = control.cast::<IAudioSessionControl2>() {
-                                                let s_pid = control2.GetProcessId().unwrap_or(0);
-                                                if s_pid > 0 && (self_pids.contains(&s_pid) || sys.process(sysinfo::Pid::from_u32(s_pid)).map(|p| p.name().to_string_lossy().to_lowercase().contains("msedgewebview2")).unwrap_or(false)) {
-                                                    println!("[Audio Loopback] Found active p2sharer audio session on PID {}", s_pid);
-                                                    return s_pid;
+    pub(crate) fn is_pid_or_ancestor_excluded(
+        pid: u32,
+        excluded_roots: &[u32],
+        excluded_names: &[String],
+        self_pids: &[u32],
+        sys: &sysinfo::System,
+    ) -> bool {
+        if self_pids.contains(&pid) || excluded_roots.contains(&pid) {
+            return true;
+        }
+
+        let mut curr = sysinfo::Pid::from_u32(pid);
+        while let Some(proc) = sys.process(curr) {
+            let p_name = proc.name().to_string_lossy().to_lowercase();
+            if excluded_names.iter().any(|target| {
+                let target_clean = target.trim_end_matches(".exe");
+                let p_clean = p_name.trim_end_matches(".exe");
+                p_clean.eq_ignore_ascii_case(target_clean) || p_name.contains(target) || target.contains(&p_name)
+            }) {
+                return true;
+            }
+
+            if let Some(parent_pid) = proc.parent() {
+                let p_u32 = parent_pid.as_u32();
+                if self_pids.contains(&p_u32) || excluded_roots.contains(&p_u32) {
+                    return true;
+                }
+                curr = parent_pid;
+            } else {
+                break;
+            }
+        }
+
+        false
+    }
+
+    pub(crate) fn discover_active_non_excluded_pids(
+        excluded_roots: &[u32],
+        excluded_names: &[String],
+        self_pids: &[u32],
+        sys: &mut sysinfo::System,
+    ) -> Vec<u32> {
+        sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+        let mut non_excluded: Vec<u32> = Vec::new();
+
+        unsafe {
+            if let Ok(enumerator) = CoCreateInstance::<_, IMMDeviceEnumerator>(&MMDeviceEnumerator, None, CLSCTX_ALL) {
+                if let Ok(device) = enumerator.GetDefaultAudioEndpoint(eRender, eConsole) {
+                    if let Ok(session_manager) = device.Activate::<IAudioSessionManager2>(CLSCTX_ALL, None) {
+                        if let Ok(session_enum) = session_manager.GetSessionEnumerator() {
+                            if let Ok(count) = session_enum.GetCount() {
+                                for i in 0..count {
+                                    if let Ok(control) = session_enum.GetSession(i) {
+                                        if let Ok(state) = control.GetState() {
+                                            if state == AudioSessionStateExpired {
+                                                continue;
+                                            }
+                                        }
+
+                                        if let Ok(control2) = control.cast::<IAudioSessionControl2>() {
+                                            let s_pid = control2.GetProcessId().unwrap_or(0);
+                                            if s_pid > 0 {
+                                                if !is_pid_or_ancestor_excluded(s_pid, excluded_roots, excluded_names, self_pids, sys) {
+                                                    let root = resolve_single_process_root(s_pid, sys);
+                                                    if root > 0 && !non_excluded.contains(&root) {
+                                                        non_excluded.push(root);
+                                                    }
                                                 }
                                             }
                                         }
@@ -502,11 +564,9 @@ pub(crate) mod win_audio {
                     }
                 }
             }
-            println!("[Audio Loopback] Isolating root p2sharer PID {}", self_pid);
-            return self_pid;
         }
 
-        resolve_target_process_tree_internal(&normalized_names, target_pids)
+        non_excluded
     }
 
     pub(crate) fn resolve_target_process_roots(
@@ -531,7 +591,11 @@ pub(crate) mod win_audio {
 
         for (pid, proc) in sys.processes() {
             let p_name = proc.name().to_string_lossy().to_lowercase();
-            if normalized_names.iter().any(|target| p_name.contains(target) || target.contains(&p_name)) {
+            if normalized_names.iter().any(|target| {
+                let target_clean = target.trim_end_matches(".exe");
+                let p_clean = p_name.trim_end_matches(".exe");
+                p_clean == target_clean || p_name.contains(target) || target.contains(&p_name)
+            }) {
                 let u = pid.as_u32();
                 if !candidate_pids.contains(&u) {
                     candidate_pids.push(u);
@@ -568,102 +632,6 @@ pub(crate) mod win_audio {
         }
 
         root_pids
-    }
-
-    fn resolve_target_process_tree_internal(
-        normalized_names: &[String],
-        target_pids: &[u32],
-    ) -> u32 {
-        let mut sys = sysinfo::System::new();
-        sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
-
-        let mut candidate_pids: Vec<u32> = Vec::new();
-        for &pid in target_pids {
-            if pid > 0 && sys.process(sysinfo::Pid::from_u32(pid)).is_some() {
-                candidate_pids.push(pid);
-            }
-        }
-
-        for (pid, proc) in sys.processes() {
-            let p_name = proc.name().to_string_lossy().to_lowercase();
-            if normalized_names.iter().any(|target| p_name.contains(target) || target.contains(&p_name)) {
-                let u = pid.as_u32();
-                if !candidate_pids.contains(&u) {
-                    candidate_pids.push(u);
-                }
-            }
-        }
-
-        if candidate_pids.is_empty() {
-            return 0;
-        }
-
-        let mut root_pids: Vec<u32> = Vec::new();
-        for &start_pid in &candidate_pids {
-            let mut curr = sysinfo::Pid::from_u32(start_pid);
-            let start_name = sys.process(curr).map(|p| p.name().to_string_lossy().to_lowercase());
-
-            while let Some(proc) = sys.process(curr) {
-                if let Some(parent_pid) = proc.parent() {
-                    if let Some(parent_proc) = sys.process(parent_pid) {
-                        let parent_name = parent_proc.name().to_string_lossy().to_lowercase();
-                        if start_name.as_deref() == Some(&parent_name) || candidate_pids.contains(&parent_pid.as_u32()) {
-                            curr = parent_pid;
-                            continue;
-                        }
-                    }
-                }
-                break;
-            }
-
-            let r_u32 = curr.as_u32();
-            if !root_pids.contains(&r_u32) {
-                root_pids.push(r_u32);
-            }
-        }
-
-        // Prioritize process root that currently has an active audio session
-        unsafe {
-            if let Ok(enumerator) = CoCreateInstance::<_, IMMDeviceEnumerator>(&MMDeviceEnumerator, None, CLSCTX_ALL) {
-                if let Ok(device) = enumerator.GetDefaultAudioEndpoint(eRender, eConsole) {
-                    if let Ok(session_manager) = device.Activate::<IAudioSessionManager2>(CLSCTX_ALL, None) {
-                        if let Ok(session_enum) = session_manager.GetSessionEnumerator() {
-                            if let Ok(count) = session_enum.GetCount() {
-                                for i in 0..count {
-                                    if let Ok(control) = session_enum.GetSession(i) {
-                                        if let Ok(control2) = control.cast::<IAudioSessionControl2>() {
-                                            let s_pid = control2.GetProcessId().unwrap_or(0);
-                                            if candidate_pids.contains(&s_pid) {
-                                                for &r in &root_pids {
-                                                    let mut check = sysinfo::Pid::from_u32(s_pid);
-                                                    while let Some(cp) = sys.process(check) {
-                                                        if check.as_u32() == r {
-                                                            return r;
-                                                        }
-                                                        if let Some(pp) = cp.parent() {
-                                                            check = pp;
-                                                        } else {
-                                                            break;
-                                                        }
-                                                    }
-                                                }
-                                                return s_pid;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        if !root_pids.is_empty() {
-            root_pids[0]
-        } else {
-            0
-        }
     }
 
     pub(crate) fn activate_process_loopback_client(pid: u32, exclude: bool) -> Result<IAudioClient, String> {
@@ -719,59 +687,71 @@ pub(crate) mod win_audio {
         }
     }
 
+    pub(crate) struct MultiCaptureSource {
+        pub client: IAudioClient,
+        pub capture: IAudioCaptureClient,
+        pub event: HANDLE,
+        pub _event_guard: EventHandleGuard,
+        pub pid: u32,
+    }
+
+    pub(crate) fn init_capture_source(
+        client: IAudioClient,
+        stream_flags: u32,
+        buffer_duration: i64,
+        mix_format_ptr: *const WAVEFORMATEX,
+        pid: u32,
+    ) -> Result<MultiCaptureSource, String> {
+        unsafe {
+            client.Initialize(
+                AUDCLNT_SHAREMODE_SHARED,
+                stream_flags,
+                buffer_duration,
+                0,
+                mix_format_ptr,
+                None,
+            ).map_err(|e| format!("Initialize failed for PID {}: {:?}", pid, e))?;
+
+            let ev = CreateEventW(None, false, false, PCWSTR::null())
+                .map_err(|e| format!("CreateEventW failed for PID {}: {:?}", pid, e))?;
+
+            if let Err(e) = client.SetEventHandle(ev) {
+                let _ = CloseHandle(ev);
+                return Err(format!("SetEventHandle failed for PID {}: {:?}", pid, e));
+            }
+
+            let capture: IAudioCaptureClient = match client.GetService() {
+                Ok(c) => c,
+                Err(e) => {
+                    let _ = CloseHandle(ev);
+                    return Err(format!("GetService failed for PID {}: {:?}", pid, e));
+                }
+            };
+
+            if let Err(e) = client.Start() {
+                let _ = CloseHandle(ev);
+                return Err(format!("Start failed for PID {}: {:?}", pid, e));
+            }
+
+            Ok(MultiCaptureSource {
+                client,
+                capture,
+                event: ev,
+                _event_guard: EventHandleGuard(ev),
+                pid,
+            })
+        }
+    }
+
     pub fn run_capture_loop(app: AppHandle, config: AudioConfig, stop_flag: Arc<AtomicBool>) {
         unsafe {
             let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
 
-            // Determine activation method based on PID / Name and mode
-            let target_pid = resolve_target_process_tree(&config.target_names, &config.target_pids, &config.mode);
-            let is_process_mode = target_pid > 0 && (config.mode == "exclude" || config.mode == "include");
-
-            if config.mode == "include" && !is_process_mode {
-                println!("[Audio Loopback] Include mode requested with no valid target; falling back to master loopback to prevent silence.");
-            }
-
-            let mut was_process_loopback = false;
-            let audio_client: IAudioClient = if is_process_mode {
-                let exclude = config.mode == "exclude";
-                println!(
-                    "[Audio Loopback] Activating Windows WASAPI Process Loopback (Root PID: {}, Mode: {})",
-                    target_pid, config.mode
-                );
-                match activate_process_loopback_client(target_pid, exclude) {
-                    Ok(client) => {
-                        println!("[Audio Loopback] Successfully activated process loopback for PID {}", target_pid);
-                        was_process_loopback = true;
-                        client
-                    }
-                    Err(err) => {
-                        eprintln!("[Audio Loopback] Process loopback activation failed ({}), falling back to master loopback", err);
-                        match get_default_render_audio_client() {
-                            Ok(c) => c,
-                            Err(_) => {
-                                CoUninitialize();
-                                return;
-                            }
-                        }
-                    }
-                }
-            } else {
-                match get_default_render_audio_client() {
-                    Ok(c) => c,
-                    Err(err) => {
-                        eprintln!("[Audio Loopback] Master audio client activation failed: {:?}", err);
-                        CoUninitialize();
-                        return;
-                    }
-                }
-            };
-
-            // Query mix format from default render device (process loopback doesn't implement GetMixFormat directly)
             let mut is_allocated_format = false;
             let mut mix_format_ptr: *mut WAVEFORMATEX = if let Ok(master_client) = get_default_render_audio_client() {
                 master_client.GetMixFormat().unwrap_or(std::ptr::null_mut())
             } else {
-                audio_client.GetMixFormat().unwrap_or(std::ptr::null_mut())
+                std::ptr::null_mut()
             };
 
             let mut fallback_format = WAVEFORMATEX {
@@ -796,7 +776,6 @@ pub(crate) mod win_audio {
             let channels = mix_format.nChannels;
             let bits_per_sample = mix_format.wBitsPerSample;
 
-            // WASAPI process loopback and endpoint loopback both require AUDCLNT_STREAMFLAGS_LOOPBACK
             let stream_flags = AUDCLNT_STREAMFLAGS_LOOPBACK
                 | AUDCLNT_STREAMFLAGS_EVENTCALLBACK
                 | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM
@@ -804,341 +783,269 @@ pub(crate) mod win_audio {
 
             let buffer_duration = 10_000_000i64; // 1 second buffer in 100ns units
 
-            // Multi-process include mode support: activate multiple loopback clients if multiple root processes exist
-            struct MultiCaptureSource {
-                client: IAudioClient,
-                capture: IAudioCaptureClient,
-                event: HANDLE,
-                _event_guard: EventHandleGuard,
-                _pid: u32,
-            }
+            let mut sys = sysinfo::System::new_all();
+            sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+            let self_pids = resolve_self_and_child_pids(&sys);
 
-            let include_roots = if config.mode == "include" {
-                resolve_target_process_roots(&config.target_names, &config.target_pids)
+            let normalized_names: Vec<String> = config
+                .target_names
+                .iter()
+                .map(|s| s.trim().to_lowercase())
+                .filter(|s| !s.is_empty())
+                .collect();
+
+            let mut multi_sources: Vec<MultiCaptureSource> = Vec::new();
+
+            let is_multi_exclude = config.mode == "exclude" && {
+                let roots = resolve_target_process_roots(&config.target_names, &config.target_pids);
+                let specifies_self = normalized_names.iter().any(|t| t.contains("p2sharer"))
+                    || config.target_pids.iter().any(|&p| self_pids.contains(&p));
+                let mut all_roots = roots;
+                if specifies_self && !all_roots.contains(&std::process::id()) {
+                    all_roots.push(std::process::id());
+                }
+                all_roots.len() > 1
+            };
+
+            let is_multi_include = config.mode == "include" && {
+                let roots = resolve_target_process_roots(&config.target_names, &config.target_pids);
+                !roots.is_empty()
+            };
+
+            let excluded_roots = if config.mode == "exclude" {
+                let mut roots = resolve_target_process_roots(&config.target_names, &config.target_pids);
+                let specifies_self = normalized_names.iter().any(|t| t.contains("p2sharer"))
+                    || config.target_pids.iter().any(|&p| self_pids.contains(&p));
+                if specifies_self && !roots.contains(&std::process::id()) {
+                    roots.push(std::process::id());
+                }
+                roots
             } else {
                 Vec::new()
             };
 
-            let mut multi_sources: Vec<MultiCaptureSource> = Vec::new();
-            if config.mode == "include" && include_roots.len() > 1 {
-                for &pid in &include_roots {
-                    if let Ok(c) = activate_process_loopback_client(pid, false) {
-                        let res = c.Initialize(
-                            AUDCLNT_SHAREMODE_SHARED,
-                            stream_flags,
-                            buffer_duration,
-                            0,
-                            mix_format_ptr,
-                            None,
-                        );
-                        if res.is_ok() {
-                            if let Ok(ev) = CreateEventW(None, false, false, PCWSTR::null()) {
-                                if c.SetEventHandle(ev).is_ok() {
-                                    if let Ok(cap) = c.GetService::<IAudioCaptureClient>() {
-                                        if c.Start().is_ok() {
-                                            println!("[Audio Loopback] Multi-process: Started loopback for PID {}", pid);
-                                            multi_sources.push(MultiCaptureSource {
-                                                client: c,
-                                                capture: cap,
-                                                event: ev,
-                                                _event_guard: EventHandleGuard(ev),
-                                                _pid: pid,
-                                            });
-                                        } else {
-                                            let _ = CloseHandle(ev);
-                                        }
-                                    } else {
-                                        let _ = CloseHandle(ev);
-                                    }
-                                } else {
-                                    let _ = CloseHandle(ev);
-                                }
-                            }
-                        }
+            if config.mode == "full" {
+                println!("[Audio Loopback] Mode: FULL. Activating master loopback.");
+                if let Ok(master) = get_default_render_audio_client() {
+                    if let Ok(src) = init_capture_source(master, stream_flags, buffer_duration, mix_format_ptr, 0) {
+                        multi_sources.push(src);
                     }
                 }
-            }
-
-            if multi_sources.len() > 1 {
-                if is_allocated_format {
-                    CoTaskMemFree(Some(mix_format_ptr as *const _));
-                }
-
+            } else if config.mode == "include" {
+                let include_roots = resolve_target_process_roots(&config.target_names, &config.target_pids);
                 println!(
-                    "[Audio Loopback] Multi-process loopback active with {} targets ({} Hz, {} channels)",
-                    multi_sources.len(), sample_rate, channels
+                    "[Audio Loopback] Mode: INCLUDE. Resolved {} target root(s): {:?}",
+                    include_roots.len(),
+                    include_roots
                 );
-
-                let stream_start = std::time::Instant::now();
-                let mut resampler = AudioResampler::new(sample_rate, 48000);
-                let mut raw_stereo_buffer: Vec<f32> = Vec::with_capacity(4096);
-                let mut standardized_buffer: Vec<f32> = Vec::with_capacity(4096);
-                let events: Vec<HANDLE> = multi_sources.iter().map(|s| s.event).collect();
-
-                while stop_flag.load(Ordering::Relaxed) {
-                    let wait_res = WaitForMultipleObjects(&events, false, 20);
-
-                    if wait_res.0 >= WAIT_OBJECT_0.0 && wait_res.0 < WAIT_OBJECT_0.0 + events.len() as u32 {
-                        let mut client_chunks: Vec<Vec<f32>> = Vec::new();
-
-                        for source in &multi_sources {
-                            let mut packet_size = source.capture.GetNextPacketSize().unwrap_or(0);
-                            let mut source_raw: Vec<f32> = Vec::new();
-
-                            while packet_size > 0 {
-                                let mut data_ptr: *mut u8 = null_mut();
-                                let mut num_frames_read = 0u32;
-                                let mut flags = 0u32;
-                                let mut qpc_pos = 0u64;
-
-                                let get_res = source.capture.GetBuffer(
-                                    &mut data_ptr,
-                                    &mut num_frames_read,
-                                    &mut flags,
-                                    None,
-                                    Some(&mut qpc_pos),
-                                );
-
-                                if get_res.is_ok() && num_frames_read > 0 && !data_ptr.is_null() {
-                                    let is_silent = (flags & AUDCLNT_BUFFERFLAGS_SILENT.0 as u32) != 0;
-                                    convert_and_downmix_to_stereo(
-                                        data_ptr,
-                                        num_frames_read as usize,
-                                        channels,
-                                        bits_per_sample,
-                                        is_silent,
-                                        &mut source_raw,
-                                    );
-                                    let _ = source.capture.ReleaseBuffer(num_frames_read);
-                                } else if get_res.is_ok() && num_frames_read > 0 {
-                                    let _ = source.capture.ReleaseBuffer(num_frames_read);
-                                }
-
-                                packet_size = source.capture.GetNextPacketSize().unwrap_or(0);
-                            }
-
-                            if !source_raw.is_empty() {
-                                client_chunks.push(source_raw);
-                            }
+                if include_roots.is_empty() {
+                    println!("[Audio Loopback] No include targets found running; falling back to master loopback to prevent silence.");
+                    if let Ok(master) = get_default_render_audio_client() {
+                        if let Ok(src) = init_capture_source(master, stream_flags, buffer_duration, mix_format_ptr, 0) {
+                            multi_sources.push(src);
                         }
-
-                        if !client_chunks.is_empty() {
-                            if client_chunks.len() == 1 {
-                                raw_stereo_buffer = client_chunks.remove(0);
-                            } else {
-                                let max_len = client_chunks.iter().map(|c| c.len()).max().unwrap_or(0);
-                                raw_stereo_buffer.clear();
-                                raw_stereo_buffer.resize(max_len, 0.0f32);
-                                for chunk in client_chunks {
-                                    for (i, sample) in chunk.into_iter().enumerate() {
-                                        raw_stereo_buffer[i] = (raw_stereo_buffer[i] + sample).clamp(-1.0, 1.0);
-                                    }
-                                }
-                            }
-
-                            if sample_rate != 48000 {
-                                resampler.resample(&raw_stereo_buffer, &mut standardized_buffer);
-                            } else {
-                                standardized_buffer.extend_from_slice(&raw_stereo_buffer);
-                            }
-                            raw_stereo_buffer.clear();
-                        }
-                    } else if wait_res == WAIT_TIMEOUT {
-                        continue;
-                    } else {
-                        break;
                     }
-
-                    let min_samples = 960;
-                    while standardized_buffer.len() >= min_samples {
-                        let chunk_samples = &standardized_buffer[..min_samples];
-
-                        let mut sum_sq = 0.0f32;
-                        for &s in chunk_samples {
-                            sum_sq += s * s;
+                } else {
+                    for &pid in &include_roots {
+                        if let Ok(client) = activate_process_loopback_client(pid, false) {
+                            if let Ok(src) = init_capture_source(client, stream_flags, buffer_duration, mix_format_ptr, pid) {
+                                println!("[Audio Loopback] Include: Started loopback for PID {}", pid);
+                                multi_sources.push(src);
+                            }
                         }
-                        let rms = (sum_sq / chunk_samples.len() as f32).sqrt().min(1.0);
-
-                        let mut byte_vec = vec![0u8; min_samples * 4];
-                        LittleEndian::write_f32_into(chunk_samples, &mut byte_vec);
-
-                        let timestamp_us = stream_start.elapsed().as_micros() as u64;
-
-                        let payload = AudioStreamPayload {
-                            pcm_base64: BASE64.encode(&byte_vec),
-                            sample_rate: 48000,
-                            channels: 2,
-                            rms_level: rms,
-                            timestamp_us,
-                        };
-
-                        let _ = app.emit("p2sharer://audio-stream", payload);
-
-                        standardized_buffer.drain(..min_samples);
                     }
                 }
-
-                for source in multi_sources {
-                    let _ = source.client.Stop();
-                }
-                CoUninitialize();
-                println!("[Audio Loopback] Multi-process loopback stopped cleanly.");
-                return;
-            }
-
-            let mut active_client = if multi_sources.len() == 1 {
-                let single = multi_sources.remove(0);
-                was_process_loopback = true;
-                single.client
             } else {
-                audio_client
-            };
-
-            let mut init_res = active_client.Initialize(
-                AUDCLNT_SHAREMODE_SHARED,
-                stream_flags,
-                buffer_duration,
-                0,
-                mix_format_ptr,
-                None,
-            );
-
-            // Resilient fallback: If process loopback fails initialization, recover on master render client
-            if init_res.is_err() && was_process_loopback {
-                eprintln!(
-                    "[Audio Loopback] Process loopback client initialization failed: {:?}. Recovering via master render client.",
-                    init_res
+                // config.mode == "exclude"
+                println!(
+                    "[Audio Loopback] Mode: EXCLUDE. Resolved {} excluded root(s): {:?}",
+                    excluded_roots.len(),
+                    excluded_roots
                 );
-                if let Ok(master_client) = get_default_render_audio_client() {
-                    init_res = master_client.Initialize(
-                        AUDCLNT_SHAREMODE_SHARED,
-                        stream_flags,
-                        buffer_duration,
-                        0,
-                        mix_format_ptr,
-                        None,
+                if excluded_roots.is_empty() {
+                    println!("[Audio Loopback] Exclude mode with 0 targets; capturing all audio via master loopback.");
+                    if let Ok(master) = get_default_render_audio_client() {
+                        if let Ok(src) = init_capture_source(master, stream_flags, buffer_duration, mix_format_ptr, 0) {
+                            multi_sources.push(src);
+                        }
+                    }
+                } else if excluded_roots.len() == 1 {
+                    let single_pid = excluded_roots[0];
+                    println!(
+                        "[Audio Loopback] Exclude mode with 1 target (PID {}). Activating native WASAPI exclude loopback.",
+                        single_pid
                     );
-                    if init_res.is_ok() {
-                        println!("[Audio Loopback] Master audio client fallback initialized successfully.");
-                        active_client = master_client;
-                        was_process_loopback = false;
+                    let mut activated = false;
+                    if let Ok(client) = activate_process_loopback_client(single_pid, true) {
+                        if let Ok(src) = init_capture_source(client, stream_flags, buffer_duration, mix_format_ptr, single_pid) {
+                            multi_sources.push(src);
+                            activated = true;
+                        }
+                    }
+                    if !activated {
+                        eprintln!("[Audio Loopback] Native exclude failed, falling back to master loopback.");
+                        if let Ok(master) = get_default_render_audio_client() {
+                            if let Ok(src) = init_capture_source(master, stream_flags, buffer_duration, mix_format_ptr, 0) {
+                                multi_sources.push(src);
+                            }
+                        }
+                    }
+                } else {
+                    println!(
+                        "[Audio Loopback] Multi-exclude mode active for {} apps. Using dynamic session inversion.",
+                        excluded_roots.len()
+                    );
+                    let initial_pids = discover_active_non_excluded_pids(&excluded_roots, &normalized_names, &self_pids, &mut sys);
+                    println!(
+                        "[Audio Loopback] Discovered {} non-excluded active audio sessions to capture: {:?}",
+                        initial_pids.len(),
+                        initial_pids
+                    );
+                    for &pid in &initial_pids {
+                        if let Ok(client) = activate_process_loopback_client(pid, false) {
+                            if let Ok(src) = init_capture_source(client, stream_flags, buffer_duration, mix_format_ptr, pid) {
+                                println!("[Audio Loopback] Multi-exclude: Capturing non-excluded session PID {}", pid);
+                                multi_sources.push(src);
+                            }
+                        }
                     }
                 }
-            }
-
-            if let Err(err) = init_res {
-                eprintln!("[Audio Loopback] Failed to initialize audio client: {:?}", err);
-                if is_allocated_format {
-                    CoTaskMemFree(Some(mix_format_ptr as *const _));
-                }
-                CoUninitialize();
-                return;
-            }
-
-            if is_allocated_format {
-                CoTaskMemFree(Some(mix_format_ptr as *const _));
-            }
-
-            let audio_event = match CreateEventW(None, false, false, PCWSTR::null()) {
-                Ok(handle) => handle,
-                Err(err) => {
-                    eprintln!("[Audio Loopback] Failed to create capture event: {:?}", err);
-                    CoUninitialize();
-                    return;
-                }
-            };
-            let _event_guard = EventHandleGuard(audio_event);
-
-            if let Err(err) = active_client.SetEventHandle(audio_event) {
-                eprintln!("[Audio Loopback] Failed to set event handle: {:?}", err);
-                CoUninitialize();
-                return;
-            }
-
-            let capture_client: IAudioCaptureClient = match active_client.GetService() {
-                Ok(c) => c,
-                Err(err) => {
-                    eprintln!("[Audio Loopback] Failed to get capture client: {:?}", err);
-                    CoUninitialize();
-                    return;
-                }
-            };
-
-            if let Err(err) = active_client.Start() {
-                eprintln!("[Audio Loopback] Failed to start audio client: {:?}", err);
-                CoUninitialize();
-                return;
             }
 
             println!(
-                "[Audio Loopback] Windows WASAPI loopback capture active ({} Hz, {} channels, ProcessFilter: {})",
-                sample_rate, channels, was_process_loopback
+                "[Audio Loopback] Initialized with {} active capture client(s) ({} Hz, {} ch, bits: {})",
+                multi_sources.len(),
+                sample_rate,
+                channels,
+                bits_per_sample
             );
 
             let stream_start = std::time::Instant::now();
             let mut resampler = AudioResampler::new(sample_rate, 48000);
             let mut raw_stereo_buffer: Vec<f32> = Vec::with_capacity(4096);
             let mut standardized_buffer: Vec<f32> = Vec::with_capacity(4096);
+            let mut last_session_check = std::time::Instant::now();
 
             while stop_flag.load(Ordering::Relaxed) {
-                let wait_res = WaitForSingleObject(audio_event, 20);
+                // Dynamic session discovery & cleanup every 500ms
+                if last_session_check.elapsed() >= std::time::Duration::from_millis(500) {
+                    last_session_check = std::time::Instant::now();
 
-                if wait_res == WAIT_OBJECT_0 {
-                    let mut packet_size = match capture_client.GetNextPacketSize() {
-                        Ok(s) => s,
-                        Err(_) => break,
-                    };
+                    if is_multi_exclude {
+                        sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+                        multi_sources.retain(|s| s.pid == 0 || sys.process(sysinfo::Pid::from_u32(s.pid)).is_some());
 
-                    while packet_size > 0 {
-                        let mut data_ptr: *mut u8 = null_mut();
-                        let mut num_frames_read = 0u32;
-                        let mut flags = 0u32;
-                        let mut qpc_pos = 0u64;
+                        let active_pids = discover_active_non_excluded_pids(&excluded_roots, &normalized_names, &self_pids, &mut sys);
+                        for pid in active_pids {
+                            if !multi_sources.iter().any(|s| s.pid == pid) && multi_sources.len() < 64 {
+                                if let Ok(client) = activate_process_loopback_client(pid, false) {
+                                    if let Ok(src) = init_capture_source(client, stream_flags, buffer_duration, mix_format_ptr, pid) {
+                                        println!("[Audio Loopback] Multi-exclude: Dynamically captured new audio session PID {}", pid);
+                                        multi_sources.push(src);
+                                    }
+                                }
+                            }
+                        }
+                    } else if is_multi_include {
+                        sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+                        multi_sources.retain(|s| s.pid == 0 || sys.process(sysinfo::Pid::from_u32(s.pid)).is_some());
 
-                        let get_res = capture_client.GetBuffer(
-                            &mut data_ptr,
-                            &mut num_frames_read,
-                            &mut flags,
-                            None,
-                            Some(&mut qpc_pos),
-                        );
+                        let target_roots = resolve_target_process_roots(&config.target_names, &config.target_pids);
+                        for pid in target_roots {
+                            if !multi_sources.iter().any(|s| s.pid == pid) && multi_sources.len() < 64 {
+                                if let Ok(client) = activate_process_loopback_client(pid, false) {
+                                    if let Ok(src) = init_capture_source(client, stream_flags, buffer_duration, mix_format_ptr, pid) {
+                                        println!("[Audio Loopback] Multi-include: Dynamically captured newly started target PID {}", pid);
+                                        multi_sources.push(src);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
 
-                        if get_res.is_ok() && num_frames_read > 0 && !data_ptr.is_null() {
-                            let is_silent = (flags & AUDCLNT_BUFFERFLAGS_SILENT.0 as u32) != 0;
+                if multi_sources.is_empty() {
+                    std::thread::sleep(std::time::Duration::from_millis(20));
+                    continue;
+                }
 
-                            // Step 1: Format conversion & downmix to stereo f32
-                            convert_and_downmix_to_stereo(
-                                data_ptr,
-                                num_frames_read as usize,
-                                channels,
-                                bits_per_sample,
-                                is_silent,
-                                &mut raw_stereo_buffer,
+                let events: Vec<HANDLE> = multi_sources.iter().map(|s| s.event).collect();
+                let wait_len = events.len().min(64);
+                let wait_handles = &events[..wait_len];
+
+                let wait_res = WaitForMultipleObjects(wait_handles, false, 20);
+
+                if wait_res.0 >= WAIT_OBJECT_0.0 && wait_res.0 < WAIT_OBJECT_0.0 + wait_len as u32 {
+                    let mut client_chunks: Vec<Vec<f32>> = Vec::new();
+
+                    for source in &multi_sources {
+                        let mut packet_size = source.capture.GetNextPacketSize().unwrap_or(0);
+                        let mut source_raw: Vec<f32> = Vec::new();
+
+                        while packet_size > 0 {
+                            let mut data_ptr: *mut u8 = null_mut();
+                            let mut num_frames_read = 0u32;
+                            let mut flags = 0u32;
+                            let mut qpc_pos = 0u64;
+
+                            let get_res = source.capture.GetBuffer(
+                                &mut data_ptr,
+                                &mut num_frames_read,
+                                &mut flags,
+                                None,
+                                Some(&mut qpc_pos),
                             );
 
-                            // Step 2: Resample to 48000 Hz if hardware is not 48 kHz
-                            if sample_rate != 48000 {
-                                resampler.resample(&raw_stereo_buffer, &mut standardized_buffer);
-                            } else {
-                                standardized_buffer.extend_from_slice(&raw_stereo_buffer);
+                            if get_res.is_ok() && num_frames_read > 0 && !data_ptr.is_null() {
+                                let is_silent = (flags & AUDCLNT_BUFFERFLAGS_SILENT.0 as u32) != 0;
+                                convert_and_downmix_to_stereo(
+                                    data_ptr,
+                                    num_frames_read as usize,
+                                    channels,
+                                    bits_per_sample,
+                                    is_silent,
+                                    &mut source_raw,
+                                );
+                                let _ = source.capture.ReleaseBuffer(num_frames_read);
+                            } else if get_res.is_ok() && num_frames_read > 0 {
+                                let _ = source.capture.ReleaseBuffer(num_frames_read);
                             }
-                            raw_stereo_buffer.clear();
 
-                            let _ = capture_client.ReleaseBuffer(num_frames_read);
-                        } else if get_res.is_ok() && num_frames_read > 0 {
-                            let _ = capture_client.ReleaseBuffer(num_frames_read);
+                            packet_size = source.capture.GetNextPacketSize().unwrap_or(0);
                         }
 
-                        packet_size = capture_client.GetNextPacketSize().unwrap_or(0);
+                        if !source_raw.is_empty() {
+                            client_chunks.push(source_raw);
+                        }
+                    }
+
+                    if !client_chunks.is_empty() {
+                        if client_chunks.len() == 1 {
+                            raw_stereo_buffer = client_chunks.remove(0);
+                        } else {
+                            let max_len = client_chunks.iter().map(|c| c.len()).max().unwrap_or(0);
+                            raw_stereo_buffer.clear();
+                            raw_stereo_buffer.resize(max_len, 0.0f32);
+                            for chunk in client_chunks {
+                                for (i, sample) in chunk.into_iter().enumerate() {
+                                    raw_stereo_buffer[i] = (raw_stereo_buffer[i] + sample).clamp(-1.0, 1.0);
+                                }
+                            }
+                        }
+
+                        if sample_rate != 48000 {
+                            resampler.resample(&raw_stereo_buffer, &mut standardized_buffer);
+                        } else {
+                            standardized_buffer.extend_from_slice(&raw_stereo_buffer);
+                        }
+                        raw_stereo_buffer.clear();
                     }
                 } else if wait_res == WAIT_TIMEOUT {
-                    // Timeout: audio engine was silent during this 20ms slice.
                     continue;
                 } else {
                     break;
                 }
 
-                // Step 3: Emit chunks of ~10ms (480 frames = 960 floats for stereo at 48kHz)
                 let min_samples = 960;
                 while standardized_buffer.len() >= min_samples {
                     let chunk_samples = &standardized_buffer[..min_samples];
@@ -1168,7 +1075,13 @@ pub(crate) mod win_audio {
                 }
             }
 
-            let _ = active_client.Stop();
+            for source in multi_sources {
+                let _ = source.client.Stop();
+            }
+
+            if is_allocated_format {
+                CoTaskMemFree(Some(mix_format_ptr as *const _));
+            }
             CoUninitialize();
             println!("[Audio Loopback] Audio loopback stopped cleanly.");
         }
@@ -1331,6 +1244,37 @@ mod tests {
         let my_pid = std::process::id();
         let roots = win_audio::resolve_target_process_roots(&[], &[my_pid]);
         assert!(!roots.is_empty(), "Should resolve root for current process");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_multi_process_exclusion_filtering() {
+        let my_pid = std::process::id();
+        let roots = win_audio::resolve_target_process_roots(&["p2sharer".to_string()], &[my_pid]);
+        assert!(!roots.is_empty(), "Should resolve roots for target");
+
+        let mut sys = sysinfo::System::new_all();
+        sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+        let self_pids = win_audio::resolve_self_and_child_pids(&sys);
+        assert!(self_pids.contains(&my_pid), "Self PIDs must contain current PID");
+
+        let is_self_excluded = win_audio::is_pid_or_ancestor_excluded(
+            my_pid,
+            &roots,
+            &["p2sharer.exe".to_string(), "discord.exe".to_string(), "firefox.exe".to_string()],
+            &self_pids,
+            &sys,
+        );
+        assert!(is_self_excluded, "Self process must be identified as excluded");
+
+        let is_dummy_excluded = win_audio::is_pid_or_ancestor_excluded(
+            999_999,
+            &roots,
+            &["p2sharer.exe".to_string(), "discord.exe".to_string(), "firefox.exe".to_string()],
+            &self_pids,
+            &sys,
+        );
+        assert!(!is_dummy_excluded, "Unknown non-excluded PID must not be identified as excluded");
     }
 }
 
