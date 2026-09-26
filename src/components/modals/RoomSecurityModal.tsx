@@ -102,7 +102,7 @@ export const RoomSecurityModal: React.FC = () => {
                 type="button"
                 className="btn btn-sm btn-outline btn-inline-action"
                 id="btn-toggle-security-password-visibility"
-                title="Mostrar / Ocultar Senha"
+                aria-label="Mostrar / Ocultar Senha"
                 onClick={() => setShowPassword(!showPassword)}
               >
                 <span id="icon-sec-pass-toggle">

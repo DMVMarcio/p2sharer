@@ -681,6 +681,8 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   padding: 0 14px;
   flex-shrink: 0;
   gap: 10px;
+  position: relative;
+  z-index: 30;
 }
 
 .stream-status {
@@ -1453,6 +1455,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 
 .stat-badge-bitrate {
   color: #a78bfa;
+  cursor: pointer;
 }
 
 .stat-badge-bitrate svg {
@@ -1531,6 +1534,41 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   transform: translateX(-50%) translateY(0);
 }
 
+/* Compact / Single-line Custom Tooltips (Buttons, Header, Actions) */
+.custom-tooltip.tooltip-compact {
+  min-width: auto;
+  max-width: 280px;
+  width: max-content;
+  padding: 5px 9px;
+  font-size: 11px;
+  font-weight: 500;
+  font-family: var(--font-sans);
+  color: var(--text-primary);
+  white-space: nowrap;
+  text-align: center;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.custom-tooltip.tooltip-align-right {
+  left: auto;
+  right: 0;
+  transform: translateY(4px);
+}
+
+.custom-tooltip-container:hover .custom-tooltip.tooltip-align-right {
+  transform: translateY(0);
+}
+
+.custom-tooltip.tooltip-align-left {
+  left: 0;
+  transform: translateY(4px);
+}
+
+.custom-tooltip-container:hover .custom-tooltip.tooltip-align-left {
+  transform: translateY(0);
+}
+
 .watchers-tooltip {
   width: max-content;
   min-width: 190px;
@@ -1589,6 +1627,67 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   font-size: 11px;
   color: var(--text-muted);
   font-family: var(--font-sans);
+}
+
+/* Custom Tooltip System for Bitrate */
+.bitrate-tooltip {
+  width: max-content;
+  min-width: 180px;
+  max-width: 270px;
+}
+
+.bitrate-tooltip-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #a78bfa;
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-subtle);
+  white-space: nowrap;
+}
+
+.bitrate-tooltip-header svg {
+  color: #a78bfa;
+  flex-shrink: 0;
+}
+
+.bitrate-tooltip-header span {
+  white-space: nowrap;
+}
+
+.bitrate-tooltip-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bitrate-tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-family: var(--font-sans);
+}
+
+.bitrate-tooltip-label {
+  color: var(--text-secondary);
+}
+
+.bitrate-tooltip-value {
+  color: var(--text-primary);
+  font-weight: 600;
+  font-family: var(--font-mono, monospace);
+}
+
+.bitrate-tooltip-hint {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  line-height: 1.35;
+  margin-top: 2px;
 }
 
 /* Stream Controls Group (Volume & Fullscreen) */

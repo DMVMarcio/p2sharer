@@ -90,7 +90,6 @@ export const CreateRoomModal: React.FC = () => {
                 type="button"
                 className="btn btn-sm btn-outline btn-inline-action btn-inline-action-icon"
                 id="btn-copy-room-code"
-                title={copied ? 'Código copiado!' : 'Copiar código da sala'}
                 aria-label="Copiar código da sala"
                 onClick={handleCopyCode}
               >
@@ -109,7 +108,7 @@ export const CreateRoomModal: React.FC = () => {
                 type="button"
                 className="btn btn-sm btn-outline btn-inline-action"
                 id="btn-regen-room-code"
-                title="Gerar outro código aleatório"
+                aria-label="Gerar outro código aleatório"
                 onClick={handleRegenCode}
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -139,7 +138,7 @@ export const CreateRoomModal: React.FC = () => {
                 type="button"
                 className="btn btn-sm btn-outline btn-inline-action btn-inline-action-icon"
                 id="btn-toggle-create-password-visibility"
-                title="Mostrar / Ocultar Senha"
+                aria-label="Mostrar / Ocultar Senha"
                 onClick={() => setShowPassword(!showPassword)}
               >
                 <span id="icon-create-pass-toggle">

@@ -31,10 +31,9 @@ export const ZoomControlBar: React.FC<ZoomControlBarProps> = ({
       className={`stream-zoom-bar ${hasVolumeControl ? 'has-volume' : ''}`}
       onClick={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
-      title="Controle de Precisão do Zoom"
     >
       {/* Zoom Icon */}
-      <span className="stream-zoom-icon" title="Zoom de Tela Ativo">
+      <span className="stream-zoom-icon">
         <svg
           width="13"
           height="13"
@@ -56,7 +55,7 @@ export const ZoomControlBar: React.FC<ZoomControlBarProps> = ({
       <button
         type="button"
         className="btn-zoom-step btn-zoom-out"
-        title="Diminuir Zoom (-25%)"
+        aria-label="Diminuir Zoom (-25%)"
         disabled={zoom <= MIN_ZOOM}
         onClick={(e) => {
           e.stopPropagation();
@@ -94,7 +93,7 @@ export const ZoomControlBar: React.FC<ZoomControlBarProps> = ({
       <button
         type="button"
         className="btn-zoom-step btn-zoom-in"
-        title="Aumentar Zoom (+25%)"
+        aria-label="Aumentar Zoom (+25%)"
         disabled={zoom >= MAX_ZOOM}
         onClick={(e) => {
           e.stopPropagation();
@@ -116,7 +115,7 @@ export const ZoomControlBar: React.FC<ZoomControlBarProps> = ({
       </button>
 
       {/* Percentage Readout Badge */}
-      <span className="stream-zoom-badge" title="Nível de ampliação atual">
+      <span className="stream-zoom-badge">
         {percentage}%
       </span>
 
@@ -124,7 +123,7 @@ export const ZoomControlBar: React.FC<ZoomControlBarProps> = ({
       <button
         type="button"
         className="btn-zoom-reset"
-        title="Redefinir Zoom para 100% (ou dê duplo-clique no vídeo)"
+        aria-label="Redefinir Zoom para 100%"
         onClick={(e) => {
           e.stopPropagation();
           onResetZoom();
