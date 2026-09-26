@@ -975,6 +975,7 @@ pub(crate) mod win_audio {
             let mut last_session_check = std::time::Instant::now();
             let mut next_mix_time = std::time::Instant::now();
             let mix_tick_duration = std::time::Duration::from_millis(10);
+            let mut silent_mix_ticks = 0usize;
 
             while stop_flag.load(Ordering::Relaxed) {
                 // Dynamic session discovery & cleanup every 500ms
@@ -1081,7 +1082,7 @@ pub(crate) mod win_audio {
                     let now = std::time::Instant::now();
                     if now >= next_mix_time {
                         let mut ticks_to_run = 0usize;
-                        while next_mix_time <= now && ticks_to_run < 2 {
+                        while next_mix_time <= now && ticks_to_run < 4 {
                             next_mix_time += mix_tick_duration;
                             ticks_to_run += 1;
                         }
@@ -1089,16 +1090,26 @@ pub(crate) mod win_audio {
                             next_mix_time = now + mix_tick_duration;
                         }
 
+                        let all_sources_empty = multi_sources.iter().all(|s| s.fifo.is_empty());
+                        if all_sources_empty {
+                            silent_mix_ticks = silent_mix_ticks.saturating_add(ticks_to_run);
+                        } else {
+                            silent_mix_ticks = 0;
+                        }
+
                         for _ in 0..ticks_to_run {
                             if multi_sources.len() == 1 {
-                                let fifo = &mut multi_sources[0].fifo;
-                                if fifo.len() >= 960 {
-                                    raw_stereo_buffer.extend(fifo.drain(..960));
-                                } else if !fifo.is_empty() {
-                                    raw_stereo_buffer.extend(fifo.drain(..));
+                                let source = &mut multi_sources[0];
+                                if !source.is_buffering {
+                                    if source.fifo.len() >= 960 {
+                                        raw_stereo_buffer.extend(source.fifo.drain(..960));
+                                    } else if !source.fifo.is_empty() {
+                                        raw_stereo_buffer.extend(source.fifo.drain(..));
+                                        source.is_buffering = true;
+                                    }
                                 }
                             } else if multi_sources.len() > 1 {
-                                let any_active = multi_sources.iter().any(|s| !s.is_buffering && s.fifo.len() >= 960);
+                                let any_active = multi_sources.iter().any(|s| !s.is_buffering && !s.fifo.is_empty());
                                 if any_active {
                                     const FRAMES_TO_MIX: usize = 480;
                                     raw_stereo_buffer.reserve(FRAMES_TO_MIX * 2);
@@ -1178,6 +1189,44 @@ pub(crate) mod win_audio {
                     let _ = app.emit("p2sharer://audio-stream", payload);
 
                     standardized_buffer.drain(..min_samples);
+                }
+
+                // If all sources have been quiet for at least 2 ticks (~20ms) and residual samples (< 960) remain,
+                // smoothly fade-out and flush the residual packet to prevent tail-end clicks ("mini chiado")
+                // and stale audio contamination on subsequent sounds.
+                if silent_mix_ticks >= 2 && !standardized_buffer.is_empty() {
+                    let rem = standardized_buffer.len();
+                    let fade_len = rem.min(64);
+                    let start_idx = rem - fade_len;
+                    for i in 0..fade_len {
+                        let factor = 1.0 - (i as f32 / fade_len as f32);
+                        standardized_buffer[start_idx + i] *= factor;
+                    }
+                    standardized_buffer.resize(min_samples, 0.0f32);
+                    silent_mix_ticks = 0;
+
+                    let mut sum_sq = 0.0f32;
+                    for &s in &standardized_buffer[..min_samples] {
+                        sum_sq += s * s;
+                    }
+                    let rms = (sum_sq / min_samples as f32).sqrt().min(1.0);
+
+                    let mut byte_vec = vec![0u8; min_samples * 4];
+                    LittleEndian::write_f32_into(&standardized_buffer[..min_samples], &mut byte_vec);
+
+                    let timestamp_us = stream_start.elapsed().as_micros() as u64;
+
+                    let payload = AudioStreamPayload {
+                        pcm_base64: BASE64.encode(&byte_vec),
+                        sample_rate: 48000,
+                        channels: 2,
+                        rms_level: rms,
+                        timestamp_us,
+                    };
+
+                    let _ = app.emit("p2sharer://audio-stream", payload);
+
+                    standardized_buffer.clear();
                 }
             }
 
