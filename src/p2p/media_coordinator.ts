@@ -86,9 +86,9 @@ export class MediaCoordinator {
             params.encodings[0].scaleResolutionDownBy = 1.0;
             params.encodings[0].networkPriority = 'high';
             params.encodings[0].priority = 'high';
-            // Maintain high framerate (60 FPS) for smooth streaming
+            // Maintain full resolution (prevent blurry downscaling to intermediate resolutions)
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (params as any).degradationPreference = 'maintain-framerate';
+            (params as any).degradationPreference = 'maintain-resolution';
             await sender.setParameters(params);
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any

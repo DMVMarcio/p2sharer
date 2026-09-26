@@ -67,6 +67,9 @@ pub struct CaptureFlags {
     pub target_height: u32,
     pub quality: u8,
     pub active_flag: Arc<AtomicBool>,
+    pub latest_frame: Arc<std::sync::Mutex<Option<Arc<Vec<u8>>>>>,
+    pub last_sent_us: Arc<std::sync::atomic::AtomicU64>,
+    pub start_instant: std::time::Instant,
 }
 
 #[cfg(windows)]
@@ -82,6 +85,9 @@ pub struct NativeWgcHandler {
     jpeg_buffer: Vec<u8>,
     last_frame_time: std::time::Instant,
     min_frame_interval: std::time::Duration,
+    latest_frame: Arc<std::sync::Mutex<Option<Arc<Vec<u8>>>>>,
+    last_sent_us: Arc<std::sync::atomic::AtomicU64>,
+    start_instant: std::time::Instant,
 }
 
 #[cfg(windows)]
@@ -104,6 +110,9 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
             jpeg_buffer: Vec::with_capacity(256 * 1024),
             last_frame_time: std::time::Instant::now() - std::time::Duration::from_secs(1),
             min_frame_interval,
+            latest_frame: ctx.flags.latest_frame,
+            last_sent_us: ctx.flags.last_sent_us,
+            start_instant: ctx.flags.start_instant,
         })
     }
 
@@ -153,7 +162,7 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
 
                 if let Some(dst_img) = self.resized_image.as_mut() {
                     let options =
-                        ResizeOptions::new().resize_alg(ResizeAlg::Convolution(FilterType::Bilinear));
+                        ResizeOptions::new().resize_alg(ResizeAlg::Convolution(FilterType::CatmullRom));
                     if self.resizer.resize(&src_img, dst_img, &options).is_ok() {
                         (dst_img.buffer(), dst_w, dst_h)
                     } else {
@@ -171,7 +180,7 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
 
         self.jpeg_buffer.clear();
         let mut encoder = FastJpegEncoder::new(&mut self.jpeg_buffer, self.quality);
-        encoder.set_sampling_factor(SamplingFactor::R_4_4_4);
+        encoder.set_sampling_factor(SamplingFactor::R_4_2_0);
         if encoder
             .encode(
                 final_pixels,
@@ -181,7 +190,15 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
             )
             .is_ok()
         {
-            let _ = self.sender.send(Message::Binary(self.jpeg_buffer.clone()));
+            let frame_arc = Arc::new(self.jpeg_buffer.clone());
+            if let Ok(mut cache) = self.latest_frame.lock() {
+                *cache = Some(frame_arc.clone());
+            }
+            self.last_sent_us.store(
+                self.start_instant.elapsed().as_micros() as u64,
+                Ordering::Release,
+            );
+            let _ = self.sender.send(Message::Binary((*frame_arc).clone()));
         }
 
         Ok(())
@@ -611,6 +628,52 @@ pub fn start_native_screen_capture(
     let jpeg_quality = quality.unwrap_or(85).clamp(50, 95);
 
     let sender = get_frame_sender().clone();
+    let start_instant = std::time::Instant::now();
+    let latest_frame_cache: Arc<std::sync::Mutex<Option<Arc<Vec<u8>>>>> =
+        Arc::new(std::sync::Mutex::new(None));
+    let last_sent_us = Arc::new(std::sync::atomic::AtomicU64::new(0));
+
+    // High-precision frame heartbeat pacer thread (guarantees constant 60 FPS even when screen is static)
+    let pacer_active = is_capturing.clone();
+    let pacer_sender = sender.clone();
+    let pacer_cache = latest_frame_cache.clone();
+    let pacer_last_sent_us = last_sent_us.clone();
+    let pacer_start = start_instant;
+    let target_interval_us = (1_000_000 / fps as u64).max(8_000);
+
+    std::thread::spawn(move || {
+        let _timer_guard = MultimediaTimerGuard::new();
+        let mut next_tick_us = pacer_start.elapsed().as_micros() as u64 + target_interval_us;
+
+        while pacer_active.load(Ordering::Relaxed) && CAPTURING_VIDEO.load(Ordering::Relaxed) {
+            std::thread::sleep(std::time::Duration::from_millis(1));
+
+            if !pacer_active.load(Ordering::Relaxed) || !CAPTURING_VIDEO.load(Ordering::Relaxed) {
+                break;
+            }
+
+            let now_us = pacer_start.elapsed().as_micros() as u64;
+            let last_sent = pacer_last_sent_us.load(Ordering::Acquire);
+
+            // If WGC emitted a new frame, shift next_tick_us forward to avoid redundant double-emit
+            if last_sent > 0 && next_tick_us <= last_sent {
+                next_tick_us = last_sent + target_interval_us;
+            }
+
+            if now_us >= next_tick_us {
+                if let Ok(guard) = pacer_cache.lock() {
+                    if let Some(frame) = guard.as_ref() {
+                        pacer_last_sent_us.store(now_us, Ordering::Release);
+                        let _ = pacer_sender.send(Message::Binary((**frame).clone()));
+                    }
+                }
+                next_tick_us += target_interval_us;
+                if next_tick_us < now_us {
+                    next_tick_us = now_us + target_interval_us;
+                }
+            }
+        }
+    });
 
     #[cfg(windows)]
     {
@@ -621,6 +684,9 @@ pub fn start_native_screen_capture(
             target_height: height,
             quality: jpeg_quality,
             active_flag: is_capturing.clone(),
+            latest_frame: latest_frame_cache.clone(),
+            last_sent_us: last_sent_us.clone(),
+            start_instant,
         };
 
         let cursor_settings = if should_draw_mouse {
@@ -731,6 +797,8 @@ pub fn start_native_screen_capture(
     // Fallback capture thread (xcap) if WGC is unsupported or failed
     let frame_interval =
         std::time::Duration::from_nanos((1_000_000_000 / fps as u64).max(8_000_000));
+    let xcap_latest_cache = latest_frame_cache.clone();
+    let xcap_last_sent_us = last_sent_us.clone();
     std::thread::spawn(move || {
         let _timer_guard = MultimediaTimerGuard::new();
 
@@ -892,7 +960,7 @@ pub fn start_native_screen_capture(
                             }
                             if let Some(dst_img) = resized_img_buf.as_mut() {
                                 let options = ResizeOptions::new()
-                                    .resize_alg(ResizeAlg::Convolution(FilterType::Bilinear));
+                                    .resize_alg(ResizeAlg::Convolution(FilterType::CatmullRom));
                                 if resizer.resize(&src_img, dst_img, &options).is_ok() {
                                     (dst_img.buffer(), width, height)
                                 } else {
@@ -910,7 +978,7 @@ pub fn start_native_screen_capture(
 
                 jpeg_bytes.clear();
                 let mut encoder = FastJpegEncoder::new(&mut jpeg_bytes, jpeg_quality);
-                encoder.set_sampling_factor(SamplingFactor::R_4_4_4);
+                encoder.set_sampling_factor(SamplingFactor::R_4_2_0);
                 if encoder
                     .encode(
                         final_raw,
@@ -920,7 +988,15 @@ pub fn start_native_screen_capture(
                     )
                     .is_ok()
                 {
-                    let _ = sender.send(Message::Binary(jpeg_bytes.clone()));
+                    let frame_arc = Arc::new(jpeg_bytes.clone());
+                    if let Ok(mut cache) = xcap_latest_cache.lock() {
+                        *cache = Some(frame_arc.clone());
+                    }
+                    xcap_last_sent_us.store(
+                        start_instant.elapsed().as_micros() as u64,
+                        Ordering::Release,
+                    );
+                    let _ = sender.send(Message::Binary((*frame_arc).clone()));
                 }
             }
 
@@ -988,6 +1064,73 @@ mod tests {
         assert!(res.is_err());
         assert_eq!(res.unwrap_err(), "sourceId cannot be empty");
     }
+
+    #[test]
+    fn test_jpeg_sampling_sizes() {
+        let dummy = vec![128u8; 1920 * 1080 * 4];
+        let mut buf_444 = Vec::new();
+        let mut enc_444 = FastJpegEncoder::new(&mut buf_444, 80);
+        enc_444.set_sampling_factor(SamplingFactor::R_4_4_4);
+        enc_444.encode(&dummy, 1920, 1080, ColorType::Rgba).unwrap();
+
+        let mut buf_420 = Vec::new();
+        let mut enc_420 = FastJpegEncoder::new(&mut buf_420, 80);
+        enc_420.set_sampling_factor(SamplingFactor::R_4_2_0);
+        enc_420.encode(&dummy, 1920, 1080, ColorType::Rgba).unwrap();
+
+        println!("dummy 1080p: 444 = {} bytes, 420 = {} bytes", buf_444.len(), buf_420.len());
+    }
+
+    #[test]
+    fn test_wgc_live_fps() {
+        let mut rx = get_frame_sender().subscribe();
+        let res = start_native_screen_capture("screen:0".to_string(), Some(60), Some(1920), Some(1080), Some(true), Some(80));
+        println!("start_native_screen_capture result: {:?}", res);
+        assert!(res.is_ok());
+
+        let timeout = std::time::Instant::now();
+        let mut first_frame_time = None;
+        let mut frame_count = 0;
+        let measure_duration = std::time::Duration::from_millis(2000);
+
+        while timeout.elapsed().as_millis() < 4000 {
+            match rx.try_recv() {
+                Ok(tokio_tungstenite::tungstenite::Message::Binary(bytes)) => {
+                    if first_frame_time.is_none() {
+                        first_frame_time = Some(std::time::Instant::now());
+                        println!("First frame received! size = {} bytes", bytes.len());
+                    }
+                    frame_count += 1;
+                }
+                Ok(_) => {}
+                Err(tokio::sync::broadcast::error::TryRecvError::Empty) => {
+                    std::thread::sleep(std::time::Duration::from_millis(1));
+                }
+                Err(tokio::sync::broadcast::error::TryRecvError::Lagged(n)) => {
+                    frame_count += n;
+                }
+                Err(e) => {
+                    println!("rx error: {:?}", e);
+                    break;
+                }
+            }
+
+            if let Some(first_time) = first_frame_time {
+                if first_time.elapsed() >= measure_duration {
+                    break;
+                }
+            }
+        }
+
+        let elapsed_sec = first_frame_time.map_or(0.0, |t| t.elapsed().as_secs_f64());
+        let fps = if elapsed_sec > 0.0 { frame_count as f64 / elapsed_sec } else { 0.0 };
+        println!("Captured {} frames in {:.2}s = {:.1} FPS", frame_count, elapsed_sec, fps);
+
+        let stop_res = stop_native_screen_capture();
+        println!("stop_native_screen_capture result: {:?}", stop_res);
+        assert!(fps >= 55.0, "Expected at least 55 FPS, got {:.1}", fps);
+    }
 }
+
 
 

@@ -15,10 +15,10 @@ use screen_sources::{
 pub fn run() {
     #[cfg(windows)]
     {
-        // Enable GPU hardware rasterization, zero-copy video pipeline & WebRTC HW acceleration in WebView2
+        // Enable GPU hardware rasterization, zero-copy video pipeline, WebCodecs & WebRTC HW acceleration in WebView2
         let current_args = std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS").unwrap_or_default();
-        if !current_args.contains("--enable-gpu-rasterization") {
-            let extra_args = "--enable-gpu-rasterization --enable-zero-copy --ignore-gpu-blocklist --enable-features=WebRtcHardwareVideoEncoding,WebRtcHardwareVideoDecoding";
+        if !current_args.contains("--enable-blink-features=MediaStreamTrackGenerator") {
+            let extra_args = "--enable-gpu-rasterization --enable-zero-copy --ignore-gpu-blocklist --enable-accelerated-video-decode --enable-accelerated-mjpeg-decode --enable-features=WebRtcHardwareVideoEncoding,WebRtcHardwareVideoDecoding,MediaStreamTrackGenerator --enable-blink-features=MediaStreamTrackGenerator --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows";
             let new_args = if current_args.is_empty() {
                 extra_args.to_string()
             } else {

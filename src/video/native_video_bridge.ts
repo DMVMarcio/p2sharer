@@ -134,11 +134,22 @@ export class NativeVideoBridge implements VideoCaptureBridge {
       }
     }
 
-    // Fallback: Create high performance offscreen canvas
+    // Fallback: Create high performance canvas attached to DOM to prevent Chromium power throttle
     if (!this.trackGenerator) {
       this.canvas = document.createElement('canvas');
       this.canvas.width = resolution.width;
       this.canvas.height = resolution.height;
+      this.canvas.style.position = 'fixed';
+      this.canvas.style.top = '-99999px';
+      this.canvas.style.left = '-99999px';
+      this.canvas.style.width = '1px';
+      this.canvas.style.height = '1px';
+      this.canvas.style.opacity = '0';
+      this.canvas.style.pointerEvents = 'none';
+      this.canvas.setAttribute('aria-hidden', 'true');
+      if (typeof document !== 'undefined' && document.body) {
+        document.body.appendChild(this.canvas);
+      }
 
       try {
         this.bitmapCtx = this.canvas.getContext('bitmaprenderer') as ImageBitmapRenderingContext | null;
@@ -190,7 +201,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
 
       try {
         const blob = new Blob([buffer], { type: 'image/jpeg' });
-        const bitmap = await createImageBitmap(blob);
+        const bitmap = await createImageBitmap(blob, { premultiplyAlpha: 'none' });
 
         if (!this.isCapturing) {
           bitmap.close();
@@ -396,7 +407,12 @@ export class NativeVideoBridge implements VideoCaptureBridge {
       this.trackGenerator = null;
     }
 
-    this.canvas = null;
+    if (this.canvas) {
+      if (this.canvas.parentNode) {
+        this.canvas.parentNode.removeChild(this.canvas);
+      }
+      this.canvas = null;
+    }
     this.ctx = null;
     this.bitmapCtx = null;
   }
