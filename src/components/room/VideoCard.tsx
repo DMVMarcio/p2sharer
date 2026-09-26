@@ -213,7 +213,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
                 <line x1="12" y1="17" x2="12" y2="21"/>
               </svg>
             </div>
-            <span className="local-broadcaster-title">Você está transmitindo</span>
+            {!inTray && <span className="local-broadcaster-title">Você está transmitindo</span>}
             {!inTray && (
               <span className="local-broadcaster-subtitle">
                 {currentResolution.label} • {currentFps} FPS • Transmissão Ativa
