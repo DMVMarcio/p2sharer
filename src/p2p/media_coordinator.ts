@@ -91,9 +91,10 @@ export class MediaCoordinator {
               params.encodings = [{}];
             }
             params.encodings[0].maxBitrate = maxBitrateBps;
-            // Enforce minimum bitrate floor so WebRTC BWE never starves the encoder down to 2 Mbps during fast camera motion
+            // Enforce dynamic minimum bitrate floor (50% of target) so WebRTC BWE never starves the encoder during camera motion
+            const minBitrateFloor = Math.max(1_000_000, Math.round(maxBitrateBps * 0.5));
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (params.encodings[0] as any).minBitrate = Math.min(maxBitrateBps, 8_000_000);
+            (params.encodings[0] as any).minBitrate = Math.min(maxBitrateBps, minBitrateFloor);
             params.encodings[0].maxFramerate = maxFps;
             params.encodings[0].scaleResolutionDownBy = 1.0;
             params.encodings[0].networkPriority = 'high';
