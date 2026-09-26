@@ -12,6 +12,7 @@ export function useScreenPicker(onClose?: () => void) {
   const [currentTab, setCurrentTab] = useState<'screens' | 'windows'>('screens');
   const [selectedSourceId, setSelectedSourceId] = useState<string>('screen:0');
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isStarting, setIsStarting] = useState<boolean>(false);
 
   const defaultRes = useStore((s) => s.currentResolution.label.toLowerCase());
   const defaultFps = useStore((s) => s.currentFps);
@@ -37,6 +38,19 @@ export function useScreenPicker(onClose?: () => void) {
     setBitrate(autoBitrate);
   }, []);
 
+  const handleTabChange = useCallback((tab: 'screens' | 'windows') => {
+    setCurrentTab(tab);
+    if (tab === 'screens' && monitors.length > 0) {
+      if (!selectedSourceId || !selectedSourceId.startsWith('screen:')) {
+        setSelectedSourceId(monitors[0].id);
+      }
+    } else if (tab === 'windows' && windows.length > 0) {
+      if (!selectedSourceId || !selectedSourceId.startsWith('window:')) {
+        setSelectedSourceId(windows[0].id);
+      }
+    }
+  }, [monitors, windows, selectedSourceId]);
+
   const loadSources = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -54,6 +68,7 @@ export function useScreenPicker(onClose?: () => void) {
         } catch {}
         setSelectedSourceId(monList[0].id);
       } else if (winList.length > 0) {
+        setCurrentTab('windows');
         setSelectedSourceId(winList[0].id);
       }
     } catch (err) {
@@ -64,27 +79,52 @@ export function useScreenPicker(onClose?: () => void) {
   }, []);
 
   const confirmPicker = useCallback(async () => {
-    if (isLoading) return;
-    const resConfig = stateStore.parseResolution(resolution);
-    stateStore.set((s) => {
-      s.currentResolution = resConfig;
-      s.currentFps = fps;
-      s.currentBitrate = bitrate;
-    });
+    if (isLoading || isStarting) return;
+    setIsStarting(true);
+    try {
+      const resConfig = stateStore.parseResolution(resolution);
+      stateStore.set((s) => {
+        s.currentResolution = resConfig;
+        s.currentFps = fps;
+        s.currentBitrate = bitrate;
+      });
 
-    const chosen = selectedSourceId || (currentTab === 'windows' ? 'window:0' : 'screen:0');
-    if (onClose) onClose();
-    await startCapture(chosen, fps, { width: resConfig.width, height: resConfig.height }, showCursor);
-  }, [resolution, fps, bitrate, selectedSourceId, currentTab, showCursor, onClose, startCapture]);
+      const fallbackId = currentTab === 'windows'
+        ? (windows[0]?.id || 'window:0')
+        : (monitors[0]?.id || 'screen:0');
+      const chosen = selectedSourceId || fallbackId;
+
+      if (onClose) onClose();
+      await startCapture(chosen, fps, { width: resConfig.width, height: resConfig.height }, showCursor);
+    } catch (err) {
+      console.error('Failed to start capture:', err);
+    } finally {
+      setIsStarting(false);
+    }
+  }, [
+    isLoading,
+    isStarting,
+    resolution,
+    fps,
+    bitrate,
+    selectedSourceId,
+    currentTab,
+    windows,
+    monitors,
+    showCursor,
+    onClose,
+    startCapture,
+  ]);
 
   return {
     monitors,
     windows,
     currentTab,
-    setCurrentTab,
+    setCurrentTab: handleTabChange,
     selectedSourceId,
     setSelectedSourceId,
     isLoading,
+    isStarting,
     resolution,
     setResolution: handleResolutionChange,
     fps,

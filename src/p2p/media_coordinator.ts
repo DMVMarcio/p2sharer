@@ -90,18 +90,24 @@ export class MediaCoordinator {
             if (!params.encodings || params.encodings.length === 0) {
               params.encodings = [{}];
             }
-            params.encodings[0].maxBitrate = maxBitrateBps;
-            // Enforce dynamic minimum bitrate floor (50% of target) so WebRTC BWE never starves the encoder during camera motion
-            const minBitrateFloor = Math.max(1_000_000, Math.round(maxBitrateBps * 0.5));
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (params.encodings[0] as any).minBitrate = Math.min(maxBitrateBps, minBitrateFloor);
-            params.encodings[0].maxFramerate = maxFps;
-            params.encodings[0].scaleResolutionDownBy = 1.0;
-            params.encodings[0].networkPriority = 'high';
-            params.encodings[0].priority = 'high';
-            // Maintain high framerate (60 FPS) for smooth streaming without 25 FPS throttling
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (params as any).degradationPreference = 'maintain-framerate';
+            params.encodings.forEach((enc) => {
+              enc.maxBitrate = maxBitrateBps;
+              enc.maxFramerate = maxFps;
+              enc.scaleResolutionDownBy = 1.0;
+              enc.networkPriority = 'high';
+              enc.priority = 'high';
+            });
+            // Enforce 'maintain-resolution' so WebRTC never downscales the stream resolution
+            // (e.g. from 1080p down to 720p/540p/360p/270p/180p) during network fluctuations.
+            // For screen sharing, preserving text legibility and full resolution is paramount;
+            // if bandwidth drops, WebRTC will drop framerate slightly instead of blurring the screen.
+            try {
+              (params as any).degradationPreference = 'maintain-resolution';
+            } catch {
+              try {
+                (params as any).degradationPreference = 'balanced';
+              } catch {}
+            }
             await sender.setParameters(params);
 
             // Enforce 'motion' contentHint to prevent WebRTC screenshare throttling to 25 FPS
