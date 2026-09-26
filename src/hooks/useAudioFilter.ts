@@ -42,19 +42,51 @@ export function useAudioFilter() {
     }
   }, []);
 
-  const setFilterMode = useCallback((mode: 'exclude' | 'include') => {
-    stateStore.set((s) => {
-      s.selectedFilterMode = mode;
-      s.saveAudioFilterPresets();
-    });
-    // Update local selection based on new mode
-    const activeNames = mode === 'exclude' ? stateStore.excludeProcessNames : stateStore.includeProcessNames;
-    setSelectedNames(new Set(activeNames));
-  }, []);
+  const setFilterMode = useCallback(
+    (mode: 'exclude' | 'include') => {
+      stateStore.set((s) => {
+        s.selectedFilterMode = mode;
+        s.saveAudioFilterPresets();
+      });
+      // Synchronize selection based on new mode
+      const activeNames = mode === 'exclude' ? stateStore.excludeProcessNames : stateStore.includeProcessNames;
+      const nextNames = new Set(activeNames);
+      const nextPids = new Set<number>();
+      processes.forEach((p) => {
+        if (nextNames.has(p.name.toLowerCase())) {
+          nextPids.add(p.pid);
+        }
+      });
+      setSelectedNames(nextNames);
+      setSelectedPids(nextPids);
+    },
+    [processes]
+  );
 
   const toggleProcess = useCallback(
     (item: ProcessItem, checked: boolean) => {
       const nameLower = item.name.toLowerCase();
+
+      // If in include mode, enforce single selection (focus on one app)
+      if (stateStore.selectedFilterMode === 'include') {
+        const nextNames = new Set<string>();
+        const nextPids = new Set<number>();
+        if (checked) {
+          nextNames.add(nameLower);
+          nextPids.add(item.pid);
+        }
+        setSelectedNames(nextNames);
+        setSelectedPids(nextPids);
+
+        stateStore.set((s) => {
+          s.includeProcessNames = nextNames;
+          s.includePids = nextPids;
+          s.saveAudioFilterPresets();
+        });
+        return;
+      }
+
+      // Exclude mode allows multi-selection
       const nextNames = new Set(selectedNames);
       const nextPids = new Set(selectedPids);
 
@@ -78,18 +110,75 @@ export function useAudioFilter() {
       setSelectedPids(nextPids);
 
       stateStore.set((s) => {
-        if (s.selectedFilterMode === 'exclude') {
-          s.excludeProcessNames = nextNames;
-          s.excludePids = nextPids;
-        } else {
-          s.includeProcessNames = nextNames;
-          s.includePids = nextPids;
-        }
+        s.excludeProcessNames = nextNames;
+        s.excludePids = nextPids;
         s.saveAudioFilterPresets();
       });
     },
     [processes, selectedNames, selectedPids]
   );
+
+  const selectSingleProcess = useCallback(
+    (item: ProcessItem) => {
+      const nameLower = item.name.toLowerCase();
+      const nextNames = new Set([nameLower]);
+      const nextPids = new Set([item.pid]);
+
+      setSelectedNames(nextNames);
+      setSelectedPids(nextPids);
+
+      stateStore.set((s) => {
+        if (s.selectedFilterMode === 'include') {
+          s.includeProcessNames = nextNames;
+          s.includePids = nextPids;
+        } else {
+          s.excludeProcessNames = nextNames;
+          s.excludePids = nextPids;
+        }
+        s.saveAudioFilterPresets();
+      });
+    },
+    []
+  );
+
+  const clearSelection = useCallback(() => {
+    setSelectedNames(new Set());
+    setSelectedPids(new Set());
+
+    stateStore.set((s) => {
+      if (s.selectedFilterMode === 'exclude') {
+        s.excludeProcessNames = new Set();
+        s.excludePids = new Set();
+      } else {
+        s.includeProcessNames = new Set();
+        s.includePids = new Set();
+      }
+      s.saveAudioFilterPresets();
+    });
+  }, []);
+
+  const selectVoiceApps = useCallback(() => {
+    const nextNames = new Set<string>();
+    const nextPids = new Set<number>();
+
+    processes.forEach((p) => {
+      if (p.is_likely_chat_or_voice) {
+        nextNames.add(p.name.toLowerCase());
+        nextPids.add(p.pid);
+      }
+    });
+
+    setSelectedNames(nextNames);
+    setSelectedPids(nextPids);
+
+    stateStore.set((s) => {
+      if (s.selectedFilterMode === 'exclude') {
+        s.excludeProcessNames = nextNames;
+        s.excludePids = nextPids;
+      }
+      s.saveAudioFilterPresets();
+    });
+  }, [processes]);
 
   const applyFilters = useCallback(async () => {
     const pidsArray = stateStore.getActiveFilterPids();
@@ -106,10 +195,18 @@ export function useAudioFilter() {
         },
       });
       const count = namesArray.length || pidsArray.length;
-      const msg =
-        stateStore.selectedFilterMode === 'exclude'
-          ? `Filtro aplicado: Silenciando ${count} aplicativo(s)`
-          : `Filtro aplicado: Transmitindo apenas ${count} aplicativo(s)`;
+      let msg = '';
+      if (stateStore.selectedFilterMode === 'exclude') {
+        msg =
+          count === 0
+            ? 'Filtro atualizado: Transmitindo todo o som do computador'
+            : `Filtro aplicado: Silenciando ${count} aplicativo(s)`;
+      } else {
+        msg =
+          count === 0
+            ? 'Transmitindo todo o áudio (nenhum app específico marcado)'
+            : `Filtro aplicado: Transmitindo exclusivamente ${count} aplicativo(s)`;
+      }
       showToast(msg);
       return true;
     } catch (err) {
@@ -131,6 +228,7 @@ export function useAudioFilter() {
 
   return {
     processes: filteredProcesses,
+    rawProcessCount: processes.length,
     isLoading,
     searchText,
     setSearchText,
@@ -139,6 +237,9 @@ export function useAudioFilter() {
     selectedPids,
     selectedNames,
     toggleProcess,
+    selectSingleProcess,
+    selectVoiceApps,
+    clearSelection,
     loadProcesses,
     applyFilters,
   };

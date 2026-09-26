@@ -81,13 +81,20 @@ export class StateStore {
     this.currentResolution = this.parseResolution(savedRes);
 
     this.selectedFilterMode = (localStorage.getItem('p2sharer_audio_filter_mode') as 'exclude' | 'include') || 'exclude';
-    try {
-      const savedExclude = JSON.parse(localStorage.getItem('p2sharer_audio_exclude_names') || '["p2sharer", "p2sharer.exe"]');
-      if (Array.isArray(savedExclude)) {
-        this.excludeProcessNames = new Set(savedExclude.map((n: string) => n.toLowerCase()));
+    const rawExclude = localStorage.getItem('p2sharer_audio_exclude_names');
+    if (rawExclude !== null) {
+      try {
+        const savedExclude = JSON.parse(rawExclude);
+        if (Array.isArray(savedExclude)) {
+          this.excludeProcessNames = new Set(savedExclude.map((n: string) => n.toLowerCase()));
+        } else {
+          this.excludeProcessNames = new Set(['p2sharer', 'p2sharer.exe']);
+        }
+      } catch {
+        this.excludeProcessNames = new Set(['p2sharer', 'p2sharer.exe']);
       }
-    } catch {
-      this.excludeProcessNames = new Set(['p2sharer', 'p2sharer.exe']);
+    } else {
+      this.excludeProcessNames = new Set();
     }
 
     try {

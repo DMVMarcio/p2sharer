@@ -28,11 +28,18 @@ When capture devices output 5.1, 7.1, or other multi-channel audio:
 
 ### Selective Process-Level Audio Filtering
 - **Modes**:
-  - `full`: Captures all desktop sound.
+  - `full`: Captures all desktop sound via master render audio client.
   - `exclude`: Captures desktop sound but omits specific processes (e.g. Discord, Spotify, Chrome VoIP).
   - `include`: Captures sound strictly from designated processes (e.g. game window only).
-- Matches by process ID (PID) and executable name (case-insensitive).
-- Uses `process_manager.rs` to discover processes and detect common voice/chat applications automatically.
+- **Windows WASAPI Process Loopback (`VAD\Process_Loopback`)**:
+  - Activated asynchronously via `ActivateAudioInterfaceAsync` using `AUDIOCLIENT_PROCESS_LOOPBACK_PARAMS` with either `PROCESS_LOOPBACK_MODE_EXCLUDE` or `PROCESS_LOOPBACK_MODE_INCLUDE`.
+  - **Mandatory Flag**: `IAudioClient::Initialize` strictly requires `AUDCLNT_STREAMFLAGS_LOOPBACK` even for process loopback interfaces. Omitting this flag triggers error `0x88890021` (`AUDCLNT_E_INVALID_STREAM_FLAG`), which causes the capture thread to abort into total silence.
+  - **Resilient Fallback**: If process loopback activation fails, or target PID tree returns invalid handle, the loopback thread automatically falls back to master audio (`get_default_render_audio_client()`) rather than dropping to silence.
+  - **48kHz Stereo WaveFormat Fallback**: If device mix format pointer is null or unqueryable, a canonical IEEE float 48kHz stereo `WAVEFORMATEX` is synthesized as a fallback.
+- **Process Manager Grouping & Deduplication (`process_manager.rs`)**:
+  - Windows multi-process applications (Discord, Chrome, Steam) spawn multiple child PIDs under the same executable name.
+  - `process_manager.rs` deduplicates processes by lowercase executable name, prioritizing instances with active visible window titles.
+  - The Rust backend loopback worker resolves the target tree across all associated PIDs, ensuring comprehensive mute or capture without UI clutter.
 
 ### Monotonic Microsecond A/V Timestamps
 - Every audio chunk payload contains `timestamp_us` derived from `std::time::Instant` or `QueryPerformanceCounter`.

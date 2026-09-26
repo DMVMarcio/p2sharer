@@ -70,8 +70,9 @@ pub fn list_audio_processes() -> Vec<ProcessItem> {
         let _ = EnumWindows(Some(enum_windows_callback), lparam);
     }
 
-    let mut results = Vec::new();
-    let mut seen_pids = std::collections::HashSet::new();
+    // Group processes by executable name so users see 1 clean entry per application
+    // rather than multiple PID entries for multi-process apps (e.g. Discord, Chrome, Steam)
+    let mut app_map: std::collections::HashMap<String, ProcessItem> = std::collections::HashMap::new();
 
     // Known communication / voice apps to highlight for easy 1-click exclusion
     let voice_keywords = [
@@ -113,17 +114,31 @@ pub fn list_audio_processes() -> Vec<ProcessItem> {
         };
 
         // Filter to interesting processes (either has a window or is a known audio/voice app)
-        if (effective_title.is_some() || is_voice) && seen_pids.insert(pid_u32) {
+        if effective_title.is_some() || is_voice {
             let exe_path = process.exe().map(|p| p.to_string_lossy().to_string());
-            results.push(ProcessItem {
+            let item = ProcessItem {
                 pid: pid_u32,
-                name,
+                name: name.clone(),
                 exe_path,
                 window_title: effective_title,
                 is_likely_chat_or_voice: is_voice,
-            });
+            };
+
+            // If already present, prefer the entry with a window title
+            match app_map.entry(name_lower) {
+                std::collections::hash_map::Entry::Vacant(v) => {
+                    v.insert(item);
+                }
+                std::collections::hash_map::Entry::Occupied(mut o) => {
+                    if o.get().window_title.is_none() && item.window_title.is_some() {
+                        o.insert(item);
+                    }
+                }
+            }
         }
     }
+
+    let mut results: Vec<ProcessItem> = app_map.into_values().collect();
 
     // Sort voice apps first, then alphabetically
     results.sort_by(|a, b| {
