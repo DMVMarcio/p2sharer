@@ -22,6 +22,7 @@ export class StateStore {
   public currentBitrate: number = 15000;
   public currentResolution: ResolutionConfig = { width: 1920, height: 1080, label: '1080p' };
 
+  public isAudioFilterFullAudio: boolean = false;
   public selectedFilterMode: 'exclude' | 'include' = 'exclude';
   public excludeProcessNames: Set<string> = new Set(['p2sharer', 'p2sharer.exe']);
   public includeProcessNames: Set<string> = new Set();
@@ -80,6 +81,7 @@ export class StateStore {
     const savedRes = localStorage.getItem('p2sharer_default_res') || '1080p';
     this.currentResolution = this.parseResolution(savedRes);
 
+    this.isAudioFilterFullAudio = localStorage.getItem('p2sharer_audio_filter_full') === 'true';
     this.selectedFilterMode = (localStorage.getItem('p2sharer_audio_filter_mode') as 'exclude' | 'include') || 'exclude';
     const rawExclude = localStorage.getItem('p2sharer_audio_exclude_names');
     if (rawExclude !== null) {
@@ -137,6 +139,7 @@ export class StateStore {
 
   public saveAudioFilterPresets(): void {
     if (typeof localStorage === 'undefined') return;
+    localStorage.setItem('p2sharer_audio_filter_full', String(this.isAudioFilterFullAudio));
     localStorage.setItem('p2sharer_audio_filter_mode', this.selectedFilterMode);
     localStorage.setItem('p2sharer_audio_exclude_names', JSON.stringify(Array.from(this.excludeProcessNames)));
     localStorage.setItem('p2sharer_audio_include_names', JSON.stringify(Array.from(this.includeProcessNames)));
