@@ -168,4 +168,49 @@ describe('Spotlight Tray & Stream Filters Architecture', () => {
       assert.equal(store.getDefaultBitrateForResolution('unknown'), 15000);
     });
   });
+
+  describe('Spotlight Tray Card Element Simplification', () => {
+    it('determines live badge visibility: omitted when inTray is true, shown when inTray is false', () => {
+      const shouldShowLiveBadge = (slot: RoomSlotInfo, isSubscribed: boolean, inTray: boolean) => {
+        return !inTray && !slot.isLocal && slot.isStreaming && !isSubscribed;
+      };
+
+      const remoteStreamingSlot: RoomSlotInfo = {
+        peerId: 'peer-alice',
+        senderName: 'Alice',
+        stream: null,
+        isStreaming: true,
+        isLocal: false,
+        color: '#00ff00',
+      };
+
+      // In featured area / stage (inTray = false): live badge is visible
+      assert.equal(shouldShowLiveBadge(remoteStreamingSlot, false, false), true);
+      // In bottom tray (inTray = true): live badge is omitted
+      assert.equal(shouldShowLiveBadge(remoteStreamingSlot, false, true), false);
+      // When already subscribed: live badge is omitted regardless
+      assert.equal(shouldShowLiveBadge(remoteStreamingSlot, true, false), false);
+      assert.equal(shouldShowLiveBadge(remoteStreamingSlot, true, true), false);
+    });
+
+    it('determines local broadcaster title visibility: omitted when inTray is true, shown when inTray is false', () => {
+      const shouldShowLocalBroadcasterTitle = (slot: RoomSlotInfo, showLocalPreview: boolean, inTray: boolean) => {
+        return !inTray && slot.isLocal && !showLocalPreview;
+      };
+
+      const localBroadcastingSlot: RoomSlotInfo = {
+        peerId: 'peer-local',
+        senderName: 'Local User',
+        stream: {} as MediaStream,
+        isStreaming: true,
+        isLocal: true,
+        color: '#ff0000',
+      };
+
+      // In featured area / stage (inTray = false): "Você está transmitindo" title is visible
+      assert.equal(shouldShowLocalBroadcasterTitle(localBroadcastingSlot, false, false), true);
+      // In bottom tray (inTray = true): "Você está transmitindo" title is omitted
+      assert.equal(shouldShowLocalBroadcasterTitle(localBroadcastingSlot, false, true), false);
+    });
+  });
 });

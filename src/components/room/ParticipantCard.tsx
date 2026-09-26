@@ -48,13 +48,13 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
         </span>
       )}
 
-      {/* If remote and is streaming but not subscribed, show AO VIVO and watchers */}
-      {!slot.isLocal && slot.isStreaming && !isSubscribed && (
+      {/* If remote and is streaming but not subscribed, show AO VIVO and watchers (omitted in bottom tray) */}
+      {!inTray && !slot.isLocal && slot.isStreaming && !isSubscribed && (
         <>
           <span className="badge-live-stream">
             <span className="badge-live-dot"></span>AO VIVO
           </span>
-          {watchersCount > 0 && !inTray && (
+          {watchersCount > 0 && (
             <Tooltip
               interactive
               tooltipClassName="watchers-tooltip"

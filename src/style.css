@@ -984,7 +984,9 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .spotlight-tray-strip .stream-controls-group,
 .spotlight-tray-strip .stream-volume-controller,
 .spotlight-tray-strip .stream-zoom-bar,
-.spotlight-tray-strip .participant-status-text {
+.spotlight-tray-strip .participant-status-text,
+.spotlight-tray-strip .badge-live-stream,
+.spotlight-tray-strip .local-broadcaster-title {
   display: none !important;
 }
 
