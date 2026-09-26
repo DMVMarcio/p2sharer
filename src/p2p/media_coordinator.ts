@@ -86,9 +86,16 @@ export class MediaCoordinator {
             params.encodings[0].scaleResolutionDownBy = 1.0;
             params.encodings[0].networkPriority = 'high';
             params.encodings[0].priority = 'high';
+            // Maintain high framerate (60 FPS) for smooth streaming
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (params as any).degradationPreference = 'maintain-resolution';
+            (params as any).degradationPreference = 'maintain-framerate';
             await sender.setParameters(params);
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            if (sender.track && 'contentHint' in sender.track) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              (sender.track as any).contentHint = 'motion';
+            }
           } catch (err) {
             console.warn('Failed to apply sender bitrate parameters:', err);
           }

@@ -13,6 +13,19 @@ use tokio::sync::broadcast;
 use tokio_tungstenite::tungstenite::protocol::Message;
 use xcap::{Monitor, Window};
 
+#[cfg(windows)]
+use windows_capture::{
+    capture::{CaptureControl, Context, GraphicsCaptureApiHandler},
+    frame::Frame,
+    graphics_capture_api::InternalCaptureControl,
+    monitor::Monitor as WgcMonitor,
+    settings::{
+        ColorFormat, CursorCaptureSettings, DirtyRegionSettings, DrawBorderSettings,
+        MinimumUpdateIntervalSettings, SecondaryWindowSettings, Settings,
+    },
+    window::Window as WgcWindow,
+};
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MonitorSource {
     pub id: String,
@@ -45,6 +58,151 @@ static WS_SERVER_INITIALIZED: AtomicBool = AtomicBool::new(false);
 static WS_PORT: std::sync::atomic::AtomicU16 = std::sync::atomic::AtomicU16::new(0);
 static FRAME_SENDER: std::sync::OnceLock<broadcast::Sender<Message>> = std::sync::OnceLock::new();
 static CURRENT_CAPTURE_FLAG: std::sync::Mutex<Option<Arc<AtomicBool>>> = std::sync::Mutex::new(None);
+
+#[derive(Clone)]
+pub struct CaptureFlags {
+    pub sender: broadcast::Sender<Message>,
+    pub target_fps: u32,
+    pub target_width: u32,
+    pub target_height: u32,
+    pub quality: u8,
+    pub active_flag: Arc<AtomicBool>,
+}
+
+#[cfg(windows)]
+pub struct NativeWgcHandler {
+    sender: broadcast::Sender<Message>,
+    target_width: u32,
+    target_height: u32,
+    quality: u8,
+    active_flag: Arc<AtomicBool>,
+    raw_buffer: Vec<u8>,
+    resized_image: Option<fast_image_resize::images::Image<'static>>,
+    resizer: fast_image_resize::Resizer,
+    jpeg_buffer: Vec<u8>,
+    last_frame_time: std::time::Instant,
+    min_frame_interval: std::time::Duration,
+}
+
+#[cfg(windows)]
+impl GraphicsCaptureApiHandler for NativeWgcHandler {
+    type Flags = CaptureFlags;
+    type Error = Box<dyn std::error::Error + Send + Sync>;
+
+    fn new(ctx: Context<Self::Flags>) -> Result<Self, Self::Error> {
+        let fps = ctx.flags.target_fps.clamp(15, 120);
+        let min_frame_interval = std::time::Duration::from_nanos(1_000_000_000 / (fps as u64 + 4));
+        Ok(Self {
+            sender: ctx.flags.sender,
+            target_width: ctx.flags.target_width,
+            target_height: ctx.flags.target_height,
+            quality: ctx.flags.quality,
+            active_flag: ctx.flags.active_flag,
+            raw_buffer: Vec::with_capacity(1920 * 1080 * 4),
+            resized_image: None,
+            resizer: fast_image_resize::Resizer::new(),
+            jpeg_buffer: Vec::with_capacity(256 * 1024),
+            last_frame_time: std::time::Instant::now() - std::time::Duration::from_secs(1),
+            min_frame_interval,
+        })
+    }
+
+    fn on_frame_arrived(
+        &mut self,
+        frame: &mut Frame,
+        capture_control: InternalCaptureControl,
+    ) -> Result<(), Self::Error> {
+        if !self.active_flag.load(Ordering::Relaxed) || !CAPTURING_VIDEO.load(Ordering::Relaxed) {
+            capture_control.stop();
+            return Ok(());
+        }
+
+        let elapsed = self.last_frame_time.elapsed();
+        if elapsed < self.min_frame_interval {
+            return Ok(());
+        }
+        self.last_frame_time = std::time::Instant::now();
+
+        let src_width = frame.width();
+        let src_height = frame.height();
+        if src_width == 0 || src_height == 0 {
+            return Ok(());
+        }
+
+        let frame_buffer = frame.buffer()?;
+        let pixel_data = frame_buffer.as_nopadding_buffer(&mut self.raw_buffer);
+
+        let (final_pixels, final_w, final_h) = if self.target_width > 0
+            && self.target_height > 0
+            && (src_width != self.target_width || src_height != self.target_height)
+        {
+            use fast_image_resize::images::{Image, ImageRef};
+            use fast_image_resize::{FilterType, PixelType, ResizeAlg, ResizeOptions};
+
+            if let Ok(src_img) = ImageRef::new(src_width, src_height, pixel_data, PixelType::U8x4) {
+                let dst_w = self.target_width;
+                let dst_h = self.target_height;
+
+                if self
+                    .resized_image
+                    .as_ref()
+                    .map_or(true, |img| img.width() != dst_w || img.height() != dst_h)
+                {
+                    self.resized_image = Some(Image::new(dst_w, dst_h, PixelType::U8x4));
+                }
+
+                if let Some(dst_img) = self.resized_image.as_mut() {
+                    let options =
+                        ResizeOptions::new().resize_alg(ResizeAlg::Convolution(FilterType::Bilinear));
+                    if self.resizer.resize(&src_img, dst_img, &options).is_ok() {
+                        (dst_img.buffer(), dst_w, dst_h)
+                    } else {
+                        (pixel_data, src_width, src_height)
+                    }
+                } else {
+                    (pixel_data, src_width, src_height)
+                }
+            } else {
+                (pixel_data, src_width, src_height)
+            }
+        } else {
+            (pixel_data, src_width, src_height)
+        };
+
+        self.jpeg_buffer.clear();
+        let mut encoder = FastJpegEncoder::new(&mut self.jpeg_buffer, self.quality);
+        encoder.set_sampling_factor(SamplingFactor::R_4_4_4);
+        if encoder
+            .encode(
+                final_pixels,
+                final_w as u16,
+                final_h as u16,
+                ColorType::Rgba,
+            )
+            .is_ok()
+        {
+            let _ = self.sender.send(Message::Binary(self.jpeg_buffer.clone()));
+        }
+
+        Ok(())
+    }
+
+    fn on_closed(&mut self) -> Result<(), Self::Error> {
+        let _ = self.sender.send(Message::Text(
+            "{\"type\":\"fallback\",\"reason\":\"window_closed\"}".to_string(),
+        ));
+        Ok(())
+    }
+}
+
+#[cfg(windows)]
+type ActiveCaptureControl =
+    CaptureControl<NativeWgcHandler, Box<dyn std::error::Error + Send + Sync>>;
+
+#[cfg(windows)]
+static CURRENT_WGC_CONTROL: std::sync::Mutex<Option<ActiveCaptureControl>> =
+    std::sync::Mutex::new(None);
+
 
 fn get_frame_sender() -> &'static broadcast::Sender<Message> {
     FRAME_SENDER.get_or_init(|| {
@@ -435,33 +593,145 @@ pub fn start_native_screen_capture(
 
     ensure_ws_server_running();
 
-    // Stop any existing capture thread
-    CAPTURING_VIDEO.store(false, Ordering::SeqCst);
-    if let Ok(mut guard) = CURRENT_CAPTURE_FLAG.lock() {
-        if let Some(flag) = guard.take() {
-            flag.store(false, Ordering::SeqCst);
-        }
-    }
+    // Stop any existing capture session first
+    let _ = stop_native_screen_capture();
 
     CAPTURING_VIDEO.store(true, Ordering::SeqCst);
     let is_capturing = Arc::new(AtomicBool::new(true));
     let is_capturing_clone = is_capturing.clone();
 
     if let Ok(mut guard) = CURRENT_CAPTURE_FLAG.lock() {
-        *guard = Some(is_capturing);
+        *guard = Some(is_capturing.clone());
     }
 
     let fps = target_fps.unwrap_or(60).clamp(15, 120);
-    let frame_interval = std::time::Duration::from_nanos((1_000_000_000 / fps as u64).max(8_000_000));
     let width = target_width.unwrap_or(0);
     let height = target_height.unwrap_or(0);
     let should_draw_mouse = capture_mouse.unwrap_or(true);
-    let jpeg_quality = quality.unwrap_or(75).clamp(50, 90);
+    let jpeg_quality = quality.unwrap_or(85).clamp(50, 95);
 
     let sender = get_frame_sender().clone();
 
+    #[cfg(windows)]
+    {
+        let flags = CaptureFlags {
+            sender: sender.clone(),
+            target_fps: fps,
+            target_width: width,
+            target_height: height,
+            quality: jpeg_quality,
+            active_flag: is_capturing.clone(),
+        };
+
+        let cursor_settings = if should_draw_mouse {
+            CursorCaptureSettings::WithCursor
+        } else {
+            CursorCaptureSettings::WithoutCursor
+        };
+
+        let is_window = source_id.starts_with("window:");
+        let raw_id = source_id.split(':').nth(1).unwrap_or("0");
+
+        let mut wgc_started = false;
+
+        if is_window {
+            let wgc_window = if let Ok(hwnd_int) = raw_id.parse::<usize>() {
+                let candidate = WgcWindow::from_raw_hwnd(hwnd_int as *mut std::ffi::c_void);
+                if candidate.is_valid() {
+                    Some(candidate)
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            let wgc_window = wgc_window.or_else(|| {
+                if let Ok(windows) = WgcWindow::enumerate() {
+                    if let Ok(target_pid) = raw_id.parse::<u32>() {
+                        windows.into_iter().find(|w| w.process_id().unwrap_or(0) == target_pid)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            });
+
+            if let Some(win) = wgc_window {
+                let settings = Settings::new(
+                    win,
+                    cursor_settings,
+                    DrawBorderSettings::WithoutBorder,
+                    SecondaryWindowSettings::Default,
+                    MinimumUpdateIntervalSettings::Custom(std::time::Duration::from_nanos(
+                        1_000_000_000 / (fps as u64 + 4),
+                    )),
+                    DirtyRegionSettings::Default,
+                    ColorFormat::Rgba8,
+                    flags.clone(),
+                );
+
+                match NativeWgcHandler::start_free_threaded(settings) {
+                    Ok(control) => {
+                        if let Ok(mut guard) = CURRENT_WGC_CONTROL.lock() {
+                            *guard = Some(control);
+                        }
+                        wgc_started = true;
+                    }
+                    Err(err) => {
+                        eprintln!(
+                            "[Native Video] WGC window capture start failed: {:?}, falling back to xcap",
+                            err
+                        );
+                    }
+                }
+            }
+        } else {
+            let target_mon_idx: usize = raw_id.parse().unwrap_or(0);
+            let wgc_monitor =
+                WgcMonitor::from_index(target_mon_idx + 1).or_else(|_| WgcMonitor::primary());
+
+            if let Ok(mon) = wgc_monitor {
+                let settings = Settings::new(
+                    mon,
+                    cursor_settings,
+                    DrawBorderSettings::WithoutBorder,
+                    SecondaryWindowSettings::Default,
+                    MinimumUpdateIntervalSettings::Custom(std::time::Duration::from_nanos(
+                        1_000_000_000 / (fps as u64 + 4),
+                    )),
+                    DirtyRegionSettings::Default,
+                    ColorFormat::Rgba8,
+                    flags.clone(),
+                );
+
+                match NativeWgcHandler::start_free_threaded(settings) {
+                    Ok(control) => {
+                        if let Ok(mut guard) = CURRENT_WGC_CONTROL.lock() {
+                            *guard = Some(control);
+                        }
+                        wgc_started = true;
+                    }
+                    Err(err) => {
+                        eprintln!(
+                            "[Native Video] WGC monitor capture start failed: {:?}, falling back to xcap",
+                            err
+                        );
+                    }
+                }
+            }
+        }
+
+        if wgc_started {
+            return Ok(true);
+        }
+    }
+
+    // Fallback capture thread (xcap) if WGC is unsupported or failed
+    let frame_interval =
+        std::time::Duration::from_nanos((1_000_000_000 / fps as u64).max(8_000_000));
     std::thread::spawn(move || {
-        // Enforce 1ms multimedia timer resolution on Windows; restored upon thread drop
         let _timer_guard = MultimediaTimerGuard::new();
 
         let is_window = source_id.starts_with("window:");
@@ -476,14 +746,18 @@ pub fn start_native_screen_capture(
         let target_win_id = raw_id.to_string();
 
         let mut cached_monitor: Option<Monitor> = if !is_window {
-            Monitor::all().ok().and_then(|mons| mons.into_iter().nth(target_mon_idx))
+            Monitor::all()
+                .ok()
+                .and_then(|mons| mons.into_iter().nth(target_mon_idx))
         } else {
             None
         };
 
         let mut cached_window: Option<Window> = if is_window {
             Window::all().ok().and_then(|wins| {
-                wins.into_iter().find(|w| w.id().map(|id| id.to_string()).unwrap_or_default() == target_win_id)
+                wins.into_iter().find(|w| {
+                    w.id().map(|id| id.to_string()).unwrap_or_default() == target_win_id
+                })
             })
         } else {
             None
@@ -491,16 +765,20 @@ pub fn start_native_screen_capture(
 
         let mut last_retry = std::time::Instant::now();
         let mut consecutive_errors: u32 = 0;
-        let mut jpeg_bytes = Vec::with_capacity(128 * 1024);
+        let mut jpeg_bytes = Vec::with_capacity(256 * 1024);
+        let mut resizer = fast_image_resize::Resizer::new();
+        let mut resized_img_buf: Option<fast_image_resize::images::Image<'static>> = None;
 
-        while is_capturing_clone.load(Ordering::Relaxed) && CAPTURING_VIDEO.load(Ordering::Relaxed) {
+        while is_capturing_clone.load(Ordering::Relaxed) && CAPTURING_VIDEO.load(Ordering::Relaxed)
+        {
             let loop_start = std::time::Instant::now();
 
             let captured_img = if is_window {
-                // If window is minimized, trigger fallback immediately
                 if let Some(ref win) = cached_window {
                     if win.is_minimized().unwrap_or(false) {
-                        let _ = sender.send(Message::Text("{\"type\":\"fallback\",\"reason\":\"window_minimized\"}".to_string()));
+                        let _ = sender.send(Message::Text(
+                            "{\"type\":\"fallback\",\"reason\":\"window_minimized\"}".to_string(),
+                        ));
                         break;
                     }
                 }
@@ -508,7 +786,9 @@ pub fn start_native_screen_capture(
                 if cached_window.is_none() && last_retry.elapsed().as_millis() > 500 {
                     last_retry = std::time::Instant::now();
                     cached_window = Window::all().ok().and_then(|wins| {
-                        wins.into_iter().find(|w| w.id().map(|id| id.to_string()).unwrap_or_default() == target_win_id)
+                        wins.into_iter().find(|w| {
+                            w.id().map(|id| id.to_string()).unwrap_or_default() == target_win_id
+                        })
                     });
                 }
 
@@ -528,7 +808,10 @@ pub fn start_native_screen_capture(
                             cached_window = None;
                             consecutive_errors += 1;
                             if consecutive_errors >= 5 {
-                                let _ = sender.send(Message::Text("{\"type\":\"fallback\",\"reason\":\"capture_error\"}".to_string()));
+                                let _ = sender.send(Message::Text(
+                                    "{\"type\":\"fallback\",\"reason\":\"capture_error\"}"
+                                        .to_string(),
+                                ));
                                 break;
                             }
                             None
@@ -537,7 +820,9 @@ pub fn start_native_screen_capture(
                 } else {
                     consecutive_errors += 1;
                     if consecutive_errors >= 5 {
-                        let _ = sender.send(Message::Text("{\"type\":\"fallback\",\"reason\":\"window_not_found\"}".to_string()));
+                        let _ = sender.send(Message::Text(
+                            "{\"type\":\"fallback\",\"reason\":\"window_not_found\"}".to_string(),
+                        ));
                         break;
                     }
                     None
@@ -545,7 +830,9 @@ pub fn start_native_screen_capture(
             } else {
                 if cached_monitor.is_none() && last_retry.elapsed().as_millis() > 500 {
                     last_retry = std::time::Instant::now();
-                    cached_monitor = Monitor::all().ok().and_then(|mons| mons.into_iter().nth(target_mon_idx));
+                    cached_monitor = Monitor::all()
+                        .ok()
+                        .and_then(|mons| mons.into_iter().nth(target_mon_idx));
                 }
 
                 if let Some(ref mon) = cached_monitor {
@@ -564,7 +851,10 @@ pub fn start_native_screen_capture(
                             cached_monitor = None;
                             consecutive_errors += 1;
                             if consecutive_errors >= 5 {
-                                let _ = sender.send(Message::Text("{\"type\":\"fallback\",\"reason\":\"capture_error\"}".to_string()));
+                                let _ = sender.send(Message::Text(
+                                    "{\"type\":\"fallback\",\"reason\":\"capture_error\"}"
+                                        .to_string(),
+                                ));
                                 break;
                             }
                             None
@@ -573,7 +863,9 @@ pub fn start_native_screen_capture(
                 } else {
                     consecutive_errors += 1;
                     if consecutive_errors >= 5 {
-                        let _ = sender.send(Message::Text("{\"type\":\"fallback\",\"reason\":\"monitor_not_found\"}".to_string()));
+                        let _ = sender.send(Message::Text(
+                            "{\"type\":\"fallback\",\"reason\":\"monitor_not_found\"}".to_string(),
+                        ));
                         break;
                     }
                     None
@@ -581,20 +873,49 @@ pub fn start_native_screen_capture(
             };
 
             if let Some(img) = captured_img {
-                let scaled_img = if width > 0 && height > 0 && (img.width() != width || img.height() != height) {
-                    image::imageops::resize(&img, width, height, FilterType::Nearest)
-                } else {
-                    img
-                };
+                use fast_image_resize::images::{Image, ImageRef};
+                use fast_image_resize::{FilterType, PixelType, ResizeAlg, ResizeOptions};
+
+                let src_w = img.width();
+                let src_h = img.height();
+
+                let (final_raw, final_w, final_h) =
+                    if width > 0 && height > 0 && (src_w != width || src_h != height) {
+                        if let Ok(src_img) =
+                            ImageRef::new(src_w, src_h, img.as_raw(), PixelType::U8x4)
+                        {
+                            if resized_img_buf
+                                .as_ref()
+                                .map_or(true, |r| r.width() != width || r.height() != height)
+                            {
+                                resized_img_buf = Some(Image::new(width, height, PixelType::U8x4));
+                            }
+                            if let Some(dst_img) = resized_img_buf.as_mut() {
+                                let options = ResizeOptions::new()
+                                    .resize_alg(ResizeAlg::Convolution(FilterType::Bilinear));
+                                if resizer.resize(&src_img, dst_img, &options).is_ok() {
+                                    (dst_img.buffer(), width, height)
+                                } else {
+                                    (img.as_raw().as_slice(), src_w, src_h)
+                                }
+                            } else {
+                                (img.as_raw().as_slice(), src_w, src_h)
+                            }
+                        } else {
+                            (img.as_raw().as_slice(), src_w, src_h)
+                        }
+                    } else {
+                        (img.as_raw().as_slice(), src_w, src_h)
+                    };
 
                 jpeg_bytes.clear();
                 let mut encoder = FastJpegEncoder::new(&mut jpeg_bytes, jpeg_quality);
-                encoder.set_sampling_factor(SamplingFactor::R_4_2_0);
+                encoder.set_sampling_factor(SamplingFactor::R_4_4_4);
                 if encoder
                     .encode(
-                        scaled_img.as_raw(),
-                        scaled_img.width() as u16,
-                        scaled_img.height() as u16,
+                        final_raw,
+                        final_w as u16,
+                        final_h as u16,
                         ColorType::Rgba,
                     )
                     .is_ok()
@@ -621,6 +942,14 @@ pub fn stop_native_screen_capture() -> Result<bool, String> {
             flag.store(false, Ordering::SeqCst);
         }
     }
+    #[cfg(windows)]
+    if let Ok(mut guard) = CURRENT_WGC_CONTROL.lock() {
+        if let Some(control) = guard.take() {
+            std::thread::spawn(move || {
+                let _ = control.stop();
+            });
+        }
+    }
     Ok(true)
 }
 
@@ -629,7 +958,7 @@ mod tests {
     use super::*;
 
     fn sanitize_quality(quality: Option<u8>) -> u8 {
-        quality.unwrap_or(75).clamp(50, 90)
+        quality.unwrap_or(85).clamp(50, 95)
     }
 
     #[test]
@@ -641,10 +970,10 @@ mod tests {
 
     #[test]
     fn test_quality_clamp() {
-        assert_eq!(sanitize_quality(None), 75);
+        assert_eq!(sanitize_quality(None), 85);
         assert_eq!(sanitize_quality(Some(30)), 50);
         assert_eq!(sanitize_quality(Some(75)), 75);
-        assert_eq!(sanitize_quality(Some(100)), 90);
+        assert_eq!(sanitize_quality(Some(100)), 95);
     }
 
     #[test]
@@ -660,4 +989,5 @@ mod tests {
         assert_eq!(res.unwrap_err(), "sourceId cannot be empty");
     }
 }
+
 

@@ -173,15 +173,75 @@ export class NativeVideoBridge implements VideoCaptureBridge {
       this.isCapturing = false;
       this.isDirectGpu = false;
       const reason = err instanceof Error ? err.message : String(err);
-      console.error('[NativeVideoBridge] Native Direct GPU capture failed to start:', reason);
-      throw new Error(`Falha ao iniciar captura GPU da tela ou janela: ${reason}`);
+      console.error('[NativeVideoBridge] Native capture failed to start:', reason);
+      throw new Error(`Falha ao iniciar transmissão da tela ou janela: ${reason}`);
     }
 
     // 3. Connect to local binary WebSocket stream
     const port = (await invoke<number>('get_video_ws_port').catch(() => 49153)) || 49153;
-    let sequenceCounter = 0;
-    let lastRenderedSequence = 0;
-    let isProcessingFrame = false;
+    let pendingBuffer: ArrayBuffer | null = null;
+    let isDecoding = false;
+
+    const pumpNextFrame = async () => {
+      if (isDecoding || !pendingBuffer || !this.isCapturing) return;
+      isDecoding = true;
+      const buffer = pendingBuffer;
+      pendingBuffer = null;
+
+      try {
+        const blob = new Blob([buffer], { type: 'image/jpeg' });
+        const bitmap = await createImageBitmap(blob);
+
+        if (!this.isCapturing) {
+          bitmap.close();
+          isDecoding = false;
+          return;
+        }
+
+        // Direct WebCodecs GPU pathway
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const VideoFrameClass = (globalThis as any).VideoFrame;
+        if (this.trackWriter && typeof VideoFrameClass === 'function') {
+          try {
+            const nowUs = performance.now() * 1000;
+            const videoFrame = new VideoFrameClass(bitmap, {
+              timestamp: nowUs,
+              duration: (1000 / Math.max(this.currentFps, 1)) * 1000,
+            });
+            await this.trackWriter.write(videoFrame);
+            videoFrame.close();
+          } catch (writeErr) {
+            console.warn('[NativeVideoBridge] VideoFrame write failed:', writeErr);
+          } finally {
+            bitmap.close();
+          }
+        } else {
+          // Canvas fallback
+          if (this.bitmapCtx) {
+            this.bitmapCtx.transferFromImageBitmap(bitmap);
+          } else if (this.ctx && this.canvas) {
+            this.ctx.drawImage(bitmap, 0, 0, this.canvas.width, this.canvas.height);
+            bitmap.close();
+          } else {
+            bitmap.close();
+          }
+
+          const track = this.activeStream?.getVideoTracks()[0];
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          if (track && typeof (track as any).requestFrame === 'function') {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (track as any).requestFrame();
+          }
+        }
+      } catch {
+        // Ignore frame decode failure
+      } finally {
+        isDecoding = false;
+        if (pendingBuffer) {
+          pumpNextFrame();
+        }
+      }
+    };
 
     await new Promise<void>((resolve) => {
       let resolved = false;
@@ -196,7 +256,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
         }
       };
 
-      this.ws.onmessage = async (evt: MessageEvent) => {
+      this.ws.onmessage = (evt: MessageEvent) => {
         if (!this.isCapturing) return;
 
         // Handle error signaling from native backend (window minimized, DRM, capture error)
@@ -216,65 +276,8 @@ export class NativeVideoBridge implements VideoCaptureBridge {
         }
 
         if (evt.data instanceof ArrayBuffer) {
-          const frameSeq = ++sequenceCounter;
-
-          if (isProcessingFrame && frameSeq - lastRenderedSequence > 1) {
-            return;
-          }
-
-          isProcessingFrame = true;
-          try {
-            const blob = new Blob([evt.data], { type: 'image/jpeg' });
-            const bitmap = await createImageBitmap(blob);
-
-            if (frameSeq < lastRenderedSequence || !this.isCapturing) {
-              bitmap.close();
-              isProcessingFrame = false;
-              return;
-            }
-
-            lastRenderedSequence = frameSeq;
-
-            // Direct WebCodecs GPU pathway
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const VideoFrameClass = (globalThis as any).VideoFrame;
-            if (this.trackWriter && typeof VideoFrameClass === 'function') {
-              try {
-                const nowUs = performance.now() * 1000;
-                const videoFrame = new VideoFrameClass(bitmap, {
-                  timestamp: nowUs,
-                  duration: (1000 / this.currentFps) * 1000,
-                });
-                await this.trackWriter.write(videoFrame);
-                videoFrame.close();
-              } catch (writeErr) {
-                console.warn('[NativeVideoBridge] VideoFrame write failed:', writeErr);
-              } finally {
-                bitmap.close();
-              }
-            } else {
-              // Canvas fallback
-              if (this.bitmapCtx) {
-                this.bitmapCtx.transferFromImageBitmap(bitmap);
-              } else if (this.ctx && this.canvas) {
-                this.ctx.drawImage(bitmap, 0, 0, this.canvas.width, this.canvas.height);
-                bitmap.close();
-              } else {
-                bitmap.close();
-              }
-
-              const track = this.activeStream?.getVideoTracks()[0];
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              if (track && typeof (track as any).requestFrame === 'function') {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                (track as any).requestFrame();
-              }
-            }
-          } catch {
-            // Ignore frame decode failure
-          } finally {
-            isProcessingFrame = false;
-          }
+          pendingBuffer = evt.data;
+          pumpNextFrame();
         }
       };
 
@@ -318,7 +321,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
         this.onFallbackNeeded(reason, fallbackStream);
       }
     } catch (err) {
-      console.warn('[NativeVideoBridge] Direct GPU fallback was cancelled or failed:', err);
+      console.warn('[NativeVideoBridge] Screen capture fallback was cancelled or failed:', err);
     }
   }
 
