@@ -86,16 +86,16 @@ export class MediaCoordinator {
             params.encodings[0].scaleResolutionDownBy = 1.0;
             params.encodings[0].networkPriority = 'high';
             params.encodings[0].priority = 'high';
-            // Maintain full resolution (prevent blurry downscaling to intermediate resolutions)
+            // Maintain high framerate (60 FPS) for smooth streaming without 25 FPS throttling
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (params as any).degradationPreference = 'maintain-resolution';
+            (params as any).degradationPreference = 'maintain-framerate';
             await sender.setParameters(params);
 
-            // Enforce 'detail' contentHint to prevent WebRTC from lowering spatial resolution or blurring on camera motion
+            // Enforce 'motion' contentHint to prevent WebRTC screenshare throttling to 25 FPS
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             if (sender.track && 'contentHint' in sender.track) {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              (sender.track as any).contentHint = 'detail';
+              (sender.track as any).contentHint = 'motion';
             }
           } catch (err) {
             console.warn('Failed to apply sender bitrate parameters:', err);
