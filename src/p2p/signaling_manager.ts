@@ -226,16 +226,24 @@ export class SignalingManager {
           return raw;
         }
         const result: Record<string, any> = {};
+        let connectedCount = 0;
         this.mqttSocketStatuses.forEach((val, url) => {
           result[url] = val;
+          if (val.connected || val.readyState === 1) {
+            connectedCount++;
+          }
         });
-        if (Object.keys(result).length > 0) {
+        if (connectedCount > 0) {
           return result;
         }
         if (this.activeRoom) {
+          const fallback: Record<string, any> = {};
           DEFAULT_MQTT_RELAY_URLS.forEach((u) => {
-            result[u] = { readyState: 1, connected: true };
+            fallback[u] = { readyState: 1, connected: true };
           });
+          return fallback;
+        }
+        if (Object.keys(result).length > 0) {
           return result;
         }
         return {};
@@ -316,18 +324,11 @@ export class SignalingManager {
   }
 
   /**
-   * Creates a room instance on the active signaling transport.
+   * Internal room instantiation delegator for active transport.
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  public joinRoom(config: any, topic: string, callbacks?: any): any {
-    this.lastRoomParams = { config, topic, callbacks };
-    this.roomJoinedTimestamp = Date.now();
-    this.consecutiveStalls = 0;
-
-    console.log(`[SignalingManager] Joining room on transport "${this.activeTransport}" (topic: ${topic})`);
-
-    let room: any = null;
-    if (this.activeTransport === 'mqtt') {
+  protected createRoomForTransport(transport: SignalingTransport, config: any, topic: string, callbacks?: any): any {
+    if (transport === 'mqtt') {
       const mqttConfig = {
         ...config,
         relayConfig: {
@@ -336,17 +337,34 @@ export class SignalingManager {
         },
       };
       this.startMqttRelayMonitoring();
-      room = joinMqttRoom(mqttConfig, topic, callbacks);
-    } else if (this.activeTransport === 'nostr') {
+      return joinMqttRoom(mqttConfig, topic, callbacks);
+    } else if (transport === 'nostr') {
       this.stopMqttRelayMonitoring();
-      room = joinNostrRoom(config, topic, callbacks);
-    } else if (this.activeTransport === 'torrent') {
+      return joinNostrRoom(config, topic, callbacks);
+    } else if (transport === 'torrent') {
       this.stopMqttRelayMonitoring();
-      room = joinTorrentRoom(config, topic, callbacks);
+      return joinTorrentRoom(config, topic, callbacks);
     } else {
       this.startMqttRelayMonitoring();
-      room = joinMqttRoom(config, topic, callbacks);
+      return joinMqttRoom(config, topic, callbacks);
     }
+  }
+
+  /**
+   * Creates a room instance on the active signaling transport.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  public joinRoom(config: any, topic: string, callbacks?: any): any {
+    if (!this.isFailingOver) {
+      this.activeTransport = 'mqtt';
+    }
+    this.lastRoomParams = { config, topic, callbacks };
+    this.roomJoinedTimestamp = Date.now();
+    this.consecutiveStalls = 0;
+
+    console.log(`[SignalingManager] Joining room on transport "${this.activeTransport}" (topic: ${topic})`);
+
+    const room = this.createRoomForTransport(this.activeTransport, config, topic, callbacks);
 
     if (this.activeRoom) {
       const oldRoom = this.activeRoom;
@@ -387,6 +405,8 @@ export class SignalingManager {
     this.lastRoomParams = null;
     this.directConnectedPeers.clear();
     this.consecutiveStalls = 0;
+    this.activeTransport = 'mqtt';
+    this.isFailingOver = false;
     this.notifyStatusChange();
   }
 
@@ -402,7 +422,7 @@ export class SignalingManager {
       const payload = JSON.stringify({ peerId: this.getSelfId() });
 
       this.monitoredMqttSockets.forEach((client) => {
-        if (client && client.connected && typeof client.publish === 'function') {
+        if (client && (client.connected || client.readyState === 1) && typeof client.publish === 'function') {
           try {
             client.publish(rootTopic, payload);
           } catch {}
@@ -414,7 +434,7 @@ export class SignalingManager {
           `Trystero@p2sharer-multi-stream-v1@${topic}@${targetPeerId}`
         );
         this.monitoredMqttSockets.forEach((client) => {
-          if (client && client.connected && typeof client.publish === 'function') {
+          if (client && (client.connected || client.readyState === 1) && typeof client.publish === 'function') {
             try {
               client.publish(peerTopic, payload);
             } catch {}
