@@ -38,7 +38,7 @@ export const ScreenPickerModal: React.FC = () => {
       const timer = setTimeout(() => {
         setDisplaySkeleton(false);
         setIsFadingOut(false);
-      }, 200);
+      }, 400);
       return () => clearTimeout(timer);
     } else if (isLoading && !displaySkeleton) {
       setDisplaySkeleton(true);

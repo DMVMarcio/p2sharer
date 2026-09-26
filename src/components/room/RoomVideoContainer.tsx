@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useLayoutEffect } from 'react';
 import { useRoom } from '../../hooks/useRoom';
 import { useStore } from '../../hooks/useStore';
 import { VideoCard } from './VideoCard';
@@ -16,6 +16,62 @@ export const RoomVideoContainer: React.FC = () => {
     setStreamFilter,
   } = useRoom();
   const subscribedStreams = useStore((s) => s.subscribedStreams);
+
+  const gridWrapperRef = useRef<HTMLDivElement | null>(null);
+  const trayStripRef = useRef<HTMLDivElement | null>(null);
+  const prevGridRectsRef = useRef<Map<string, DOMRect>>(new Map());
+  const prevTrayRectsRef = useRef<Map<string, DOMRect>>(new Map());
+
+  // FLIP animation helper: smoothly slides existing cards to new positions when peers join or leave
+  const applyFlipAnimation = (
+    container: HTMLElement | null,
+    prevRectsMap: Map<string, DOMRect>
+  ) => {
+    if (!container) return;
+
+    const cards = container.querySelectorAll<HTMLElement>('[data-peer-id]');
+    const currentRects = new Map<string, DOMRect>();
+
+    cards.forEach((card) => {
+      const peerId = card.getAttribute('data-peer-id');
+      if (peerId) {
+        currentRects.set(peerId, card.getBoundingClientRect());
+      }
+    });
+
+    cards.forEach((card) => {
+      const peerId = card.getAttribute('data-peer-id');
+      if (!peerId) return;
+
+      const prevRect = prevRectsMap.get(peerId);
+      const currentRect = currentRects.get(peerId);
+
+      if (prevRect && currentRect) {
+        const dx = prevRect.left - currentRect.left;
+        const dy = prevRect.top - currentRect.top;
+
+        if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+          // Invert: visually position element back at previous coordinates
+          card.style.transform = `translate(${dx}px, ${dy}px)`;
+          card.style.transition = 'none';
+
+          // Play: smoothly animate to new coordinates
+          requestAnimationFrame(() => {
+            card.style.transition = 'transform 0.45s cubic-bezier(0.16, 1, 0.3, 1)';
+            card.style.transform = '';
+            const onEnd = () => {
+              card.style.transition = '';
+              card.removeEventListener('transitionend', onEnd);
+            };
+            card.addEventListener('transitionend', onEnd);
+          });
+        }
+      }
+    });
+
+    prevRectsMap.clear();
+    currentRects.forEach((rect, id) => prevRectsMap.set(id, rect));
+  };
 
   const shouldRenderVideo = (slot: RoomSlotInfo): boolean => {
     return Boolean(
@@ -35,6 +91,20 @@ export const RoomVideoContainer: React.FC = () => {
       return true;
     });
   }, [roomSlots, streamFilter, subscribedStreams]);
+
+  useLayoutEffect(() => {
+    if (layoutMode === 'grid') {
+      applyFlipAnimation(gridWrapperRef.current, prevGridRectsRef.current);
+    } else {
+      prevGridRectsRef.current.clear();
+    }
+
+    if (layoutMode === 'spotlight') {
+      applyFlipAnimation(trayStripRef.current, prevTrayRectsRef.current);
+    } else {
+      prevTrayRectsRef.current.clear();
+    }
+  }, [filteredSlots, layoutMode]);
 
   const featuredSlot =
     filteredSlots.find((s) => s.peerId === pinnedPeerId) ||
@@ -74,6 +144,7 @@ export const RoomVideoContainer: React.FC = () => {
     <div className="video-container" id="room-video-container">
       {/* GRID VIEW */}
       <div
+        ref={gridWrapperRef}
         className={`streams-grid-wrapper layout-grid ${layoutMode !== 'grid' ? 'hidden' : ''}`}
         id="streams-grid-wrapper"
       >
@@ -129,7 +200,7 @@ export const RoomVideoContainer: React.FC = () => {
               <polyline points="6 9 12 15 18 9"/>
             </svg>
           </button>
-          <div className="spotlight-tray-strip" id="spotlight-tray-strip">
+          <div ref={trayStripRef} className="spotlight-tray-strip" id="spotlight-tray-strip">
             {filteredSlots.map((slot) =>
               renderSlotCard(slot, false, true, slot.peerId === featuredSlot?.peerId)
             )}
