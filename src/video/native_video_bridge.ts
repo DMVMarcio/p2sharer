@@ -16,6 +16,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
   private trackGenerator: any = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private trackWriter: any = null;
+  private lastTimestampUs: number = 0;
   public onFallbackNeeded: ((reason: string, stream?: MediaStream) => void) | null = null;
 
   public isCapturingDirectGpu(): boolean {
@@ -116,6 +117,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
   ): Promise<MediaStream> {
     await this.stopCapture();
     this.currentFps = fps;
+    this.lastTimestampUs = 0;
 
     // 1. Initialize WebCodecs MediaStreamTrackGenerator if available for zero-copy GPU video pipeline
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -234,7 +236,12 @@ export class NativeVideoBridge implements VideoCaptureBridge {
         const VideoFrameClass = (globalThis as any).VideoFrame;
         if (this.trackWriter && typeof VideoFrameClass === 'function') {
           try {
-            const nowUs = Math.round(performance.now() * 1000);
+            let nowUs = Math.round(performance.now() * 1000);
+            if (nowUs <= this.lastTimestampUs) {
+              nowUs = this.lastTimestampUs + 1000;
+            }
+            this.lastTimestampUs = nowUs;
+
             const videoFrame = new VideoFrameClass(bitmap, {
               timestamp: nowUs,
               duration: Math.round((1000 / Math.max(this.currentFps, 1)) * 1000),
@@ -300,6 +307,10 @@ export class NativeVideoBridge implements VideoCaptureBridge {
         }
 
         if (evt.data instanceof ArrayBuffer) {
+          // Never allow a 1-byte pacer tick to overwrite an awaiting real video frame!
+          if (evt.data.byteLength <= 4 && pendingBuffer && pendingBuffer.byteLength > 4) {
+            return;
+          }
           pendingBuffer = evt.data;
           pumpNextFrame();
         }
