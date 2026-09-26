@@ -27,6 +27,16 @@ export const AudioFilterModal: React.FC = () => {
     loadProcesses();
   }, [loadProcesses]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeModal();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [closeModal]);
+
   const handleApply = async () => {
     const success = await applyFilters();
     if (success) {
@@ -38,7 +48,15 @@ export const AudioFilterModal: React.FC = () => {
   const selectedCount = selectedNames.size;
 
   return (
-    <div className="modal-overlay" id="modal-audio-filter">
+    <div
+      className="modal-overlay"
+      id="modal-audio-filter"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          closeModal();
+        }
+      }}
+    >
       <div className="modal-card modal-lg audio-filter-modal-card">
         {/* Modal Header */}
         <div className="modal-header">
