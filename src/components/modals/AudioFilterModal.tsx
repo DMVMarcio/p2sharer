@@ -284,9 +284,9 @@ export const AudioFilterModal: React.FC = () => {
                               <span className="audio-app-tag">Voz</span>
                             )}
                           </div>
-                          {p.window_title && (
-                            <div className="audio-app-window-title">{p.window_title}</div>
-                          )}
+                          <div className="audio-app-window-title">
+                            {p.window_title || p.exe_path || 'Processo em execução'}
+                          </div>
                         </div>
 
                         {/* Standard Checkbox for multi-selection */}
