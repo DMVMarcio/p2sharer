@@ -371,10 +371,10 @@ pub fn list_screen_sources() -> ScreenSourcesResponse {
 
             let mut thumb_b64 = None;
             if let Ok(rgba_img) = mon.capture_image() {
-                let thumb = image::imageops::resize(&rgba_img, 160, 90, FilterType::Nearest);
+                let thumb = image::imageops::resize(&rgba_img, 320, 180, FilterType::Triangle);
                 let mut buf = Vec::new();
                 let mut cursor = Cursor::new(&mut buf);
-                let mut encoder = JpegEncoder::new_with_quality(&mut cursor, 40);
+                let mut encoder = JpegEncoder::new_with_quality(&mut cursor, 65);
                 if encoder.encode_image(&thumb).is_ok() {
                     thumb_b64 = Some(format!("data:image/jpeg;base64,{}", BASE64.encode(&buf)));
                 }
@@ -441,10 +441,10 @@ pub fn list_screen_sources() -> ScreenSourcesResponse {
             // Only generate thumbnails for top 6 foreground windows to eliminate 2-5s IPC freeze
             if idx < 6 {
                 if let Ok(rgba_img) = win.capture_image() {
-                    let thumb = image::imageops::resize(&rgba_img, 160, 90, FilterType::Nearest);
+                    let thumb = image::imageops::resize(&rgba_img, 320, 180, FilterType::Triangle);
                     let mut buf = Vec::new();
                     let mut cursor = Cursor::new(&mut buf);
-                    let mut encoder = JpegEncoder::new_with_quality(&mut cursor, 40);
+                    let mut encoder = JpegEncoder::new_with_quality(&mut cursor, 65);
                     if encoder.encode_image(&thumb).is_ok() {
                         thumb_b64 = Some(format!("data:image/jpeg;base64,{}", BASE64.encode(&buf)));
                     }

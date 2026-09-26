@@ -17,18 +17,25 @@ export function useScreenPicker(onClose?: () => void) {
   const defaultFps = useStore((s) => s.currentFps);
   const defaultBitrate = useStore((s) => s.currentBitrate);
 
-  const [resolution, setResolution] = useState<string>(
-    localStorage.getItem('p2sharer_default_res') || defaultRes || '1080p'
-  );
+  const initialRes = localStorage.getItem('p2sharer_default_res') || defaultRes || '1080p';
+  const [resolution, setResolution] = useState<string>(initialRes);
   const [fps, setFps] = useState<number>(
     parseInt(localStorage.getItem('p2sharer_default_fps') || defaultFps.toString(), 10) || 60
   );
   const [bitrate, setBitrate] = useState<number>(
-    parseInt(localStorage.getItem('p2sharer_default_bitrate') || defaultBitrate.toString(), 10) || 25000
+    parseInt(localStorage.getItem('p2sharer_default_bitrate') || '', 10) ||
+      defaultBitrate ||
+      stateStore.getDefaultBitrateForResolution(initialRes)
   );
   const [showCursor, setShowCursor] = useState<boolean>(
     localStorage.getItem('p2sharer_default_cursor') !== 'false'
   );
+
+  const handleResolutionChange = useCallback((newRes: string) => {
+    setResolution(newRes);
+    const autoBitrate = stateStore.getDefaultBitrateForResolution(newRes);
+    setBitrate(autoBitrate);
+  }, []);
 
   const loadSources = useCallback(async () => {
     setIsLoading(true);
@@ -73,7 +80,7 @@ export function useScreenPicker(onClose?: () => void) {
     setSelectedSourceId,
     isLoading,
     resolution,
-    setResolution,
+    setResolution: handleResolutionChange,
     fps,
     setFps,
     bitrate,

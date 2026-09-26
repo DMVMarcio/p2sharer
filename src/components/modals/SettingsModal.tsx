@@ -27,7 +27,7 @@ export const SettingsModal: React.FC = () => {
     () => localStorage.getItem('p2sharer_default_fps') || '60'
   );
   const [defaultBitrate, setDefaultBitrate] = useState(
-    () => localStorage.getItem('p2sharer_default_bitrate') || '25000'
+    () => localStorage.getItem('p2sharer_default_bitrate') || '15000'
   );
   const [defaultCursor, setDefaultCursor] = useState(
     () => localStorage.getItem('p2sharer_default_cursor') !== 'false'
@@ -458,7 +458,11 @@ export const SettingsModal: React.FC = () => {
                       id="settings-default-resolution"
                       className="select-input-sm"
                       value={defaultRes}
-                      onChange={(e) => setDefaultRes(e.target.value)}
+                      onChange={(e) => {
+                        const newRes = e.target.value;
+                        setDefaultRes(newRes);
+                        setDefaultBitrate(String(stateStore.getDefaultBitrateForResolution(newRes)));
+                      }}
                     >
                       <option value="4k">4K (3840x2160)</option>
                       <option value="1440p">1440p 2K</option>
