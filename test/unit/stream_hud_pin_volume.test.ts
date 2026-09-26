@@ -130,7 +130,7 @@ describe('Stream Card HUD Hover Fade, Pin Toggle, and Volume Polish', () => {
       assert.ok(controllerIdx !== -1, 'Must define .stream-volume-controller block');
       const controllerBlock = cssContent.slice(controllerIdx, cssContent.indexOf('}', controllerIdx));
 
-      assert.ok(controllerBlock.includes('width: 28px;'), 'Must have width: 28px');
+      assert.ok(controllerBlock.includes('min-width: 28px;'), 'Must have min-width: 28px');
       assert.ok(controllerBlock.includes('height: 28px;'), 'Must have height: 28px');
       assert.ok(controllerBlock.includes('max-width: 28px;'), 'Must have max-width: 28px');
       assert.ok(controllerBlock.includes('padding: 0;'), 'Must have padding: 0 when collapsed');
@@ -181,6 +181,10 @@ describe('Stream Card HUD Hover Fade, Pin Toggle, and Volume Polish', () => {
       assert.ok(
         hoverBlock.includes('max-width: 175px;'),
         'Must expand max-width for slider and percent content'
+      );
+      assert.ok(
+        !hoverBlock.includes('width: auto;'),
+        'Must NOT use width: auto which prevents smooth collapse transition'
       );
     });
   });
