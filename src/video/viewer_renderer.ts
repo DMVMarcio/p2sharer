@@ -205,14 +205,8 @@ export class ViewerRenderer {
       // In-place watchers update
       const watchers = slot.watchers || [];
       const watchersCount = watchers.length;
-      const watchersTooltip = watchersCount > 0
-        ? (slot.isLocal
-            ? `Assistindo sua transmissão: ${watchers.map((w) => w.username).join(', ')}`
-            : `Pessoas assistindo: ${watchers.map((w) => w.username).join(', ')}`)
-        : 'Ninguém assistindo no momento';
       const watchersBadge = cardEl.querySelector('.stat-badge-watchers');
       if (watchersBadge) {
-        watchersBadge.setAttribute('title', watchersTooltip);
         const watchersText = watchersBadge.querySelector('.stat-watchers-text');
         if (watchersText) {
           watchersText.textContent = watchersCount === 1 ? '1 assistindo' : `${watchersCount} assistindo`;
@@ -247,7 +241,6 @@ export class ViewerRenderer {
       const watchersCount = watchers.length;
       const liveWatchersBadge = cardEl.querySelector('.badge-live-watchers');
       if (liveWatchersBadge) {
-        liveWatchersBadge.setAttribute('title', `Assistindo: ${watchers.map((w) => w.username).join(', ')}`);
         const textSpan = liveWatchersBadge.querySelector('span');
         if (textSpan) {
           textSpan.textContent = `${watchersCount} assistindo`;

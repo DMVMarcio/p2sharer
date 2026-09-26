@@ -6,6 +6,8 @@ import { useStreamZoom } from '../../hooks/useStreamZoom';
 import { audioContextManager } from '../../audio/audio_context_manager';
 import { roomService } from '../../services/room_service';
 import { ZoomControlBar } from './ZoomControlBar';
+import { Tooltip } from '../common/Tooltip';
+import { WatchersTooltipContent } from './WatchersTooltipContent';
 
 interface VideoCardProps {
   slot: RoomSlotInfo;
@@ -274,64 +276,74 @@ export const VideoCard: React.FC<VideoCardProps> = ({
         </span>
 
         {liveBitrate > 0 ? (
-          <div
-            className="stat-badge stat-badge-bitrate custom-tooltip-container"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-            </svg>
-            <span className="stat-bitrate-text">{(liveBitrate / 1000).toFixed(1)} Mbps</span>
-
-            <div className="custom-tooltip bitrate-tooltip">
-              <div className="bitrate-tooltip-header">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-                </svg>
-                <span>{slot.isLocal ? 'Taxa de Envio' : 'Taxa de Recepção'}</span>
-              </div>
-              <div className="bitrate-tooltip-content">
-                <div className="bitrate-tooltip-row">
-                  <span className="bitrate-tooltip-label">Tempo real:</span>
-                  <span className="bitrate-tooltip-value">{(liveBitrate / 1000).toFixed(1)} Mbps</span>
+          <Tooltip
+            tooltipClassName="bitrate-tooltip"
+            content={
+              <>
+                <div className="bitrate-tooltip-header">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                  </svg>
+                  <span>{slot.isLocal ? 'Taxa de Envio' : 'Taxa de Recepção'}</span>
                 </div>
-                {slot.isLocal && (
+                <div className="bitrate-tooltip-content">
+                  <div className="bitrate-tooltip-row">
+                    <span className="bitrate-tooltip-label">Tempo real:</span>
+                    <span className="bitrate-tooltip-value">{(liveBitrate / 1000).toFixed(1)} Mbps</span>
+                  </div>
+                  {slot.isLocal && (
+                    <div className="bitrate-tooltip-row">
+                      <span className="bitrate-tooltip-label">Limite configurado:</span>
+                      <span className="bitrate-tooltip-value">{(currentBitrate / 1000).toFixed(0)} Mbps</span>
+                    </div>
+                  )}
+                </div>
+              </>
+            }
+          >
+            <div
+              className="stat-badge stat-badge-bitrate"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+              </svg>
+              <span className="stat-bitrate-text">{(liveBitrate / 1000).toFixed(1)} Mbps</span>
+            </div>
+          </Tooltip>
+        ) : slot.isLocal ? (
+          <Tooltip
+            tooltipClassName="bitrate-tooltip"
+            content={
+              <>
+                <div className="bitrate-tooltip-header">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                  </svg>
+                  <span>Taxa de Envio</span>
+                </div>
+                <div className="bitrate-tooltip-content">
                   <div className="bitrate-tooltip-row">
                     <span className="bitrate-tooltip-label">Limite configurado:</span>
                     <span className="bitrate-tooltip-value">{(currentBitrate / 1000).toFixed(0)} Mbps</span>
                   </div>
-                )}
-              </div>
-            </div>
-          </div>
-        ) : slot.isLocal ? (
-          <div
-            className="stat-badge stat-badge-bitrate custom-tooltip-container"
-            onClick={(e) => e.stopPropagation()}
+                  <div className="bitrate-tooltip-hint">
+                    Aguardando espectadores ou movimento na tela
+                  </div>
+                </div>
+              </>
+            }
           >
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-            </svg>
-            <span className="stat-bitrate-text">{(currentBitrate / 1000).toFixed(0)}M máx</span>
-
-            <div className="custom-tooltip bitrate-tooltip">
-              <div className="bitrate-tooltip-header">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-                </svg>
-                <span>Taxa de Envio</span>
-              </div>
-              <div className="bitrate-tooltip-content">
-                <div className="bitrate-tooltip-row">
-                  <span className="bitrate-tooltip-label">Limite configurado:</span>
-                  <span className="bitrate-tooltip-value">{(currentBitrate / 1000).toFixed(0)} Mbps</span>
-                </div>
-                <div className="bitrate-tooltip-hint">
-                  Aguardando espectadores ou movimento na tela
-                </div>
-              </div>
+            <div
+              className="stat-badge stat-badge-bitrate"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+              </svg>
+              <span className="stat-bitrate-text">{(currentBitrate / 1000).toFixed(0)}M máx</span>
             </div>
-          </div>
+          </Tooltip>
         ) : null}
 
         {!slot.isLocal && (
@@ -341,50 +353,24 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           </span>
         )}
 
-        <div
-          className="stat-badge stat-badge-watchers custom-tooltip-container"
-          onClick={(e) => e.stopPropagation()}
+        <Tooltip
+          interactive
+          tooltipClassName="watchers-tooltip"
+          content={<WatchersTooltipContent watchers={watchers} currentUsername={username} />}
         >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"/>
-            <circle cx="12" cy="12" r="3"/>
-          </svg>
-          <span className="stat-watchers-text">
-            {watchersCount === 1 ? '1 assistindo' : `${watchersCount} assistindo`}
-          </span>
-
-          <div className="custom-tooltip watchers-tooltip">
-            <div className="watchers-tooltip-header">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"/>
-                <circle cx="12" cy="12" r="3"/>
-              </svg>
-              <span>
-                {watchersCount === 0
-                  ? 'Ninguém assistindo'
-                  : watchersCount === 1
-                  ? '1 pessoa assistindo:'
-                  : `${watchersCount} pessoas assistindo:`}
-              </span>
-            </div>
-            {watchersCount > 0 ? (
-              <div className="watchers-tooltip-list">
-                {watchers.map((w) => {
-                  const isSelf = w.username === username;
-                  return (
-                    <div key={w.peerId} className="watchers-tooltip-item">
-                      <span className="watchers-tooltip-dot"></span>
-                      <span className="watchers-tooltip-name">{w.username}</span>
-                      {isSelf && <span className="badge-you">VOCÊ</span>}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="watchers-tooltip-empty">Nenhum espectador no momento</div>
-            )}
+          <div
+            className="stat-badge stat-badge-watchers"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+            <span className="stat-watchers-text">
+              {watchersCount === 1 ? '1 assistindo' : `${watchersCount} assistindo`}
+            </span>
           </div>
-        </div>
+        </Tooltip>
       </div>
     )}
 
