@@ -189,7 +189,7 @@ describe('Tier 1: R1 Video Pipeline & Screen Capture Coverage', () => {
       assert.equal(bridge.isCapturingNative(), false);
 
       const videoTrack = stream.getVideoTracks()[0];
-      assert.equal(videoTrack.contentHint, 'motion');
+      assert.equal(videoTrack.contentHint, 'detail');
 
       await bridge.stopCapture();
       assert.equal(bridge.isCapturingDirectGpu(), false);

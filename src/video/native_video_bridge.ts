@@ -68,7 +68,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
       const videoTrack = stream.getVideoTracks()[0];
       if (videoTrack) {
         if ('contentHint' in videoTrack) {
-          videoTrack.contentHint = 'motion';
+          videoTrack.contentHint = 'detail';
         }
         videoTrack.onended = () => {
           this.stopCapture();
@@ -89,11 +89,11 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     fps: number = 60,
     resolution: { width: number; height: number } = { width: 1920, height: 1080 },
     captureMouse: boolean = true,
-    quality: number = 92
+    quality: number = 95
   ): Promise<MediaStream> {
     if (typeof optionsOrSourceId === 'object' && optionsOrSourceId !== null) {
       const opts = optionsOrSourceId as VideoSourceOptions;
-      if (opts.mode === 'gpu_direct') {
+      if (opts.mode === 'gpu_direct' || opts.sourceId === 'gpu_direct') {
         return this.startDisplayMediaCapture(opts.frameRate || fps, resolution, captureMouse, 'monitor');
       }
       const sId = opts.sourceId || 'screen:0';
@@ -101,11 +101,12 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     }
 
     const sId = (optionsOrSourceId as string) || 'screen:0';
-    const effectiveSourceId =
-      sId === 'gpu_direct' || sId === 'direct_gpu' || sId === 'screen:direct_gpu' ? 'screen:0' : sId;
+    if (sId === 'gpu_direct' || sId === 'direct_gpu' || sId === 'screen:direct_gpu') {
+      return this.startDisplayMediaCapture(fps, resolution, captureMouse, 'monitor');
+    }
 
     // In-app selected screen or window: capture directly via native GPU capture without Chromium prompt!
-    return this.startNativeCapture(effectiveSourceId, fps, resolution, captureMouse, quality);
+    return this.startNativeCapture(sId, fps, resolution, captureMouse, quality);
   }
 
   private async startNativeCapture(
@@ -127,7 +128,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
         this.trackGenerator = new GeneratorClass({ kind: 'video' });
         this.trackWriter = this.trackGenerator.writable.getWriter();
         if ('contentHint' in this.trackGenerator) {
-          this.trackGenerator.contentHint = 'motion';
+          this.trackGenerator.contentHint = 'detail';
         }
       } catch (err) {
         console.warn('[NativeVideoBridge] MediaStreamTrackGenerator failed, using canvas fallback:', err);
@@ -338,7 +339,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
       stream = this.canvas.captureStream(fps);
       const videoTrack = stream.getVideoTracks()[0];
       if (videoTrack && 'contentHint' in videoTrack) {
-        videoTrack.contentHint = 'motion';
+        videoTrack.contentHint = 'detail';
       }
     } else {
       stream = new MediaStream();
