@@ -167,7 +167,32 @@ export function useAudioFilter() {
       s.saveAudioFilterPresets();
     });
 
-    // 2. Dispatch updated config to backend audio capture engine
+    const pidsArray = Array.from(selectedFilterMode === 'exclude' ? draftExcludePids : draftIncludePids);
+    const namesArray = Array.from(selectedFilterMode === 'exclude' ? draftExcludeNames : draftIncludeNames);
+    const count = namesArray.length || pidsArray.length;
+
+    let successMsg = '';
+    if (isFullAudio) {
+      successMsg = 'Filtro aplicado: Transmitindo todo o som do computador sem filtros';
+    } else if (selectedFilterMode === 'exclude') {
+      successMsg =
+        count === 0
+          ? 'Filtro aplicado: Nenhum aplicativo silenciado'
+          : `Filtro aplicado: Silenciando ${count} aplicativo(s)`;
+    } else {
+      successMsg =
+        count === 0
+          ? 'Filtro aplicado: Silêncio (nenhum aplicativo selecionado para transmissão)'
+          : `Filtro aplicado: Transmitindo exclusivamente ${count} aplicativo(s)`;
+    }
+
+    // 2. Only dispatch updated config to backend audio capture engine IF actively sharing screen.
+    // If not streaming, presets are saved in store and will be activated when screen sharing begins.
+    if (!stateStore.isSharingScreen) {
+      showToast(successMsg);
+      return true;
+    }
+
     if (isFullAudio) {
       try {
         await invoke('start_audio_capture', {
@@ -178,7 +203,7 @@ export function useAudioFilter() {
             sample_rate: 48000,
           },
         });
-        showToast('Filtro aplicado: Transmitindo todo o som do computador sem filtros');
+        showToast(successMsg);
         return true;
       } catch (err) {
         console.error('Error applying audio filter:', err);
@@ -186,9 +211,6 @@ export function useAudioFilter() {
         return false;
       }
     }
-
-    const pidsArray = Array.from(selectedFilterMode === 'exclude' ? draftExcludePids : draftIncludePids);
-    const namesArray = Array.from(selectedFilterMode === 'exclude' ? draftExcludeNames : draftIncludeNames);
 
     try {
       await invoke('start_audio_capture', {
@@ -199,20 +221,7 @@ export function useAudioFilter() {
           sample_rate: 48000,
         },
       });
-      const count = namesArray.length || pidsArray.length;
-      let msg = '';
-      if (selectedFilterMode === 'exclude') {
-        msg =
-          count === 0
-            ? 'Filtro aplicado: Nenhum aplicativo silenciado'
-            : `Filtro aplicado: Silenciando ${count} aplicativo(s)`;
-      } else {
-        msg =
-          count === 0
-            ? 'Filtro aplicado: Silêncio (nenhum aplicativo selecionado para transmissão)'
-            : `Filtro aplicado: Transmitindo exclusivamente ${count} aplicativo(s)`;
-      }
-      showToast(msg);
+      showToast(successMsg);
       return true;
     } catch (err) {
       console.error('Error applying audio filter:', err);

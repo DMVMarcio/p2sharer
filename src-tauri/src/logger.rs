@@ -154,7 +154,6 @@ pub fn log_raw(content: &str) {
     if let Ok(mut lock) = LOG_FILE.lock() {
         if let Some(ref mut file) = *lock {
             let _ = file.write_all(content.as_bytes());
-            let _ = file.flush();
         }
     }
 }
@@ -182,8 +181,17 @@ pub fn get_log_file_path() -> String {
     get_log_dir().join("latest.log").to_string_lossy().to_string()
 }
 
+pub fn flush_log() {
+    if let Ok(mut lock) = LOG_FILE.lock() {
+        if let Some(ref mut file) = *lock {
+            let _ = file.flush();
+        }
+    }
+}
+
 #[tauri::command]
 pub fn open_log_folder() -> Result<(), String> {
+    flush_log();
     let log_dir = get_log_dir();
     let latest_path = log_dir.join("latest.log");
 
@@ -202,6 +210,7 @@ pub fn open_log_folder() -> Result<(), String> {
 
 #[tauri::command]
 pub fn open_latest_log() -> Result<(), String> {
+    flush_log();
     let latest_path = get_log_dir().join("latest.log");
     if !latest_path.exists() {
         return Err("Arquivo de log ainda não foi criado.".into());

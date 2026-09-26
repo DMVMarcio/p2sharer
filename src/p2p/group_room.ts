@@ -152,6 +152,10 @@ export class GroupRoomManager {
   private callbacks: RoomCallbacks | null = null;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private lastStreamsHash: string = '';
+  private lastBroadcasterStreamIds: Map<string, string> = new Map();
+  private lastStreamRecoveryRequests: Map<string, number> = new Map();
+  private lastBridgeAttempts: Map<string, number> = new Map();
+  private lastRumorReannounceTime: number = 0;
   private currentTargetBitrate: number = 25000000;
   private currentTargetFps: number = 60;
   private signalingTopic: string = '';
@@ -452,19 +456,30 @@ export class GroupRoomManager {
         // STREAM RECOVERY PROTOCOL:
         // If viewer has no active stream, or its track ended, or streamId changed on toggle, request stream!
         const currentStream = this.remoteStreams.get(peerId);
-        if (MediaCoordinator.shouldRequestStreamRecovery(currentStream, data)) {
-          console.log(
-            `[P2P/Recovery] Triggering stream recovery request for broadcaster ${peerId} (streamId: ${data.streamId})`
-          );
-          if (this.streamReqAction) {
-            const reqPayload: StreamRequestPayload = {
-              request: true,
-              broadcasterId: peerId,
-              requesterId: selfId,
-              reason: 'stream_resumed',
-            };
-            this.streamReqAction.send(reqPayload, { target: peerId });
+        const lastKnownStreamId = this.lastBroadcasterStreamIds.get(peerId);
+        if (MediaCoordinator.shouldRequestStreamRecovery(currentStream, data, lastKnownStreamId)) {
+          const now = Date.now();
+          const lastReqTime = this.lastStreamRecoveryRequests.get(peerId) || 0;
+          if (now - lastReqTime > 8000) {
+            this.lastStreamRecoveryRequests.set(peerId, now);
+            if (data.streamId) {
+              this.lastBroadcasterStreamIds.set(peerId, data.streamId);
+            }
+            console.log(
+              `[P2P/Recovery] Triggering stream recovery request for broadcaster ${peerId} (streamId: ${data.streamId})`
+            );
+            if (this.streamReqAction) {
+              const reqPayload: StreamRequestPayload = {
+                request: true,
+                broadcasterId: peerId,
+                requesterId: selfId,
+                reason: 'stream_resumed',
+              };
+              this.streamReqAction.send(reqPayload, { target: peerId });
+            }
           }
+        } else if (data.streamId) {
+          this.lastBroadcasterStreamIds.set(peerId, data.streamId);
         }
       } else {
         this.peerTracker.setStreaming(peerId, false);
@@ -701,6 +716,7 @@ export class GroupRoomManager {
       this.peerTracker.touchPeer(peerId);
       this.peerTracker.setStreaming(peerId, true);
       this.remoteStreams.set(peerId, stream);
+      this.lastStreamRecoveryRequests.delete(peerId);
       this.watchStream(peerId);
 
       // Listen to track state so if host stops, remote stream clears cleanly
@@ -764,7 +780,13 @@ export class GroupRoomManager {
       // Continuous presence re-announcement on broker until direct peers connect or if rumors exist
       const hasNoDirectPeers = this.peerTracker.directConnectedPeers.size === 0;
       const rumors = this.peerTracker.getPendingRumors();
-      if ((hasNoDirectPeers || rumors.length > 0) && this.signalingTopic) {
+      const now = Date.now();
+      if (
+        (hasNoDirectPeers || rumors.length > 0) &&
+        this.signalingTopic &&
+        now - this.lastRumorReannounceTime > 20000
+      ) {
+        this.lastRumorReannounceTime = now;
         signalingManager.reannounce(this.signalingTopic);
       }
 
@@ -815,6 +837,9 @@ export class GroupRoomManager {
       this.remoteStreams.delete(peerId);
     }
     this.lastPeerStats.delete(peerId);
+    this.lastBroadcasterStreamIds.delete(peerId);
+    this.lastStreamRecoveryRequests.delete(peerId);
+    this.lastBridgeAttempts.delete(peerId);
 
     if (wasRemoved) {
       this.callbacks?.onPeerLeft?.(peerId, uname);
@@ -843,6 +868,13 @@ export class GroupRoomManager {
     ) {
       return;
     }
+
+    const now = Date.now();
+    const lastAttempt = this.lastBridgeAttempts.get(targetPeerId) || 0;
+    if (now - lastAttempt < 15000) {
+      return;
+    }
+    this.lastBridgeAttempts.set(targetPeerId, now);
 
     console.log(`[P2P/Mesh] Bridging indirect peer ${targetPeerId} via intermediary ${intermediaryPeerId}`);
 
@@ -1416,6 +1448,10 @@ export class GroupRoomManager {
 
     this.peerTracker.clear();
     this.remoteStreams.clear();
+    this.lastBroadcasterStreamIds.clear();
+    this.lastStreamRecoveryRequests.clear();
+    this.lastBridgeAttempts.clear();
+    this.lastPeerStats.clear();
     this.initialJoinComplete = false;
     this.chatHistory = [];
     this.seenChatMsgIds.clear();

@@ -295,7 +295,7 @@ pub fn ensure_ws_server_running() {
     }
 
     std::thread::spawn(|| {
-        let rt = match tokio::runtime::Builder::new_multi_thread().enable_all().build() {
+        let rt = match tokio::runtime::Builder::new_current_thread().enable_all().build() {
             Ok(r) => r,
             Err(e) => {
                 eprintln!("[Native Video WS] Failed to create tokio runtime: {:?}", e);
