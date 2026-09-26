@@ -126,7 +126,7 @@ class RoomService {
     this.notify();
   }
 
-  public joinRoom(code: string, pass: string, isCreator: boolean): void {
+  public async joinRoom(code: string, pass: string, isCreator: boolean): Promise<void> {
     stateStore.set((s) => {
       s.currentRoomCode = code;
       s.currentRoomPassword = pass;
@@ -161,13 +161,19 @@ class RoomService {
     if (this.roomConnectingTimeout) {
       clearTimeout(this.roomConnectingTimeout);
     }
-    // Defensive fallback: dismiss overlay after 1.2s for creator or 2.5s for joiner
+    // Defensive fallback: dismiss overlay after 3.0s for creator or 8.0s for joiner
     this.roomConnectingTimeout = setTimeout(() => {
       this.hideConnecting();
-    }, isCreator ? 1200 : 2500);
+    }, isCreator ? 3000 : 8000);
 
     if (this.roomManager) {
-      this.roomManager.leave();
+      const oldManager = this.roomManager;
+      this.roomManager = null;
+      try {
+        await oldManager.leave();
+      } catch (err) {
+        console.warn('[RoomService] Error leaving previous room:', err);
+      }
     }
 
     this.roomManager = new GroupRoomManager(

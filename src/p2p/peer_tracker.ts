@@ -216,10 +216,9 @@ export class PeerTracker {
   }
 
   /**
-   * Prunes peers that have not sent heartbeats or pings within timeoutMs.
-   * Returns array of pruned peerIds.
+   * Returns peer IDs that have not sent heartbeats or pings within timeoutMs.
    */
-  public pruneStalePeers(timeoutMs = 6000): string[] {
+  public getStalePeerIds(timeoutMs = 25000): string[] {
     const now = Date.now();
     const stale: string[] = [];
     this.directConnectedPeers.forEach((peerId) => {
@@ -228,7 +227,15 @@ export class PeerTracker {
         stale.push(peerId);
       }
     });
+    return stale;
+  }
 
+  /**
+   * Prunes peers that have not sent heartbeats or pings within timeoutMs.
+   * Returns array of pruned peerIds.
+   */
+  public pruneStalePeers(timeoutMs = 25000): string[] {
+    const stale = this.getStalePeerIds(timeoutMs);
     stale.forEach((peerId) => {
       this.peerDisconnected(peerId);
     });
