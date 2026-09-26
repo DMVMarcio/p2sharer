@@ -100,7 +100,7 @@ export const StreamHeaderBar: React.FC = () => {
         </Tooltip>
 
         {/* Audio Filter Config */}
-        <Tooltip content="Configurar filtros de áudio (ignorar Discord)">
+        <Tooltip content="Configurar filtros de áudio">
           <button
             className="btn btn-sm btn-outline btn-compact"
             id="btn-open-audio-filter"

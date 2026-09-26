@@ -46,7 +46,7 @@ export const AudioFilterModal: React.FC = () => {
           <div>
             <h2>Filtro de Áudio por Processo (Windows)</h2>
             <p className="modal-subtitle">
-              Escolha quais aplicativos ignorar para que a sua voz/áudio do Discord não vaze na transmissão.
+              Escolha quais aplicativos ignorar para que a seu áudio não vaze na transmissão.
             </p>
           </div>
           <button className="btn-close" id="btn-close-audio-modal" onClick={closeModal}>
@@ -66,7 +66,7 @@ export const AudioFilterModal: React.FC = () => {
               />
               <div className="radio-card-content">
                 <strong>Capturar Som do Sistema e Ignorar Selecionados (Recomendado)</strong>
-                <span>Captura jogos e sons gerais do computador, silenciando apenas os apps marcados (Discord, etc.).</span>
+                <span>Captura jogos e sons gerais do computador, silenciando apenas os apps marcados.</span>
               </div>
             </label>
             <label className="radio-card">
@@ -89,7 +89,7 @@ export const AudioFilterModal: React.FC = () => {
               type="text"
               id="input-search-process"
               className="text-input"
-              placeholder="Filtrar aplicativo (ex: discord, spotify, chrome)..."
+              placeholder="Filtrar aplicativo..."
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
             />
