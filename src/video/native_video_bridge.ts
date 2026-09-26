@@ -89,7 +89,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     fps: number = 60,
     resolution: { width: number; height: number } = { width: 1920, height: 1080 },
     captureMouse: boolean = true,
-    quality: number = 85
+    quality: number = 80
   ): Promise<MediaStream> {
     if (typeof optionsOrSourceId === 'object' && optionsOrSourceId !== null) {
       const opts = optionsOrSourceId as VideoSourceOptions;
@@ -127,7 +127,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
         this.trackGenerator = new GeneratorClass({ kind: 'video' });
         this.trackWriter = this.trackGenerator.writable.getWriter();
         if ('contentHint' in this.trackGenerator) {
-          this.trackGenerator.contentHint = 'detail';
+          this.trackGenerator.contentHint = 'motion';
         }
       } catch (err) {
         console.warn('[NativeVideoBridge] MediaStreamTrackGenerator failed, using canvas fallback:', err);

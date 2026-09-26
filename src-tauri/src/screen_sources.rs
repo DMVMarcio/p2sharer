@@ -188,7 +188,7 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
 
         self.jpeg_buffer.clear();
         let mut encoder = FastJpegEncoder::new(&mut self.jpeg_buffer, self.quality);
-        encoder.set_sampling_factor(SamplingFactor::R_4_4_4);
+        encoder.set_sampling_factor(SamplingFactor::R_4_2_0);
         if encoder
             .encode(
                 final_pixels,
@@ -657,9 +657,8 @@ pub fn start_native_screen_capture(
     let pacer_wgc_last_sent_us = last_sent_us.clone();
     let pacer_start = start_instant;
     let target_interval_us = (1_000_000 / fps as u64).max(8_000);
-    // Only emit static heartbeat if capture has genuinely been idle/silent for >= 100ms (~6 frames).
-    // This guarantees the pacer never competes with or drops frames from active 3D games!
-    let static_timeout_us = 100_000;
+    let slack_us = (target_interval_us * 35) / 100; // ~5.8ms slack window for 60fps
+    let static_timeout_us = target_interval_us + slack_us; // ~22.5ms threshold before emitting static ticks
 
     std::thread::spawn(move || {
         let _timer_guard = MultimediaTimerGuard::new();
@@ -1001,7 +1000,7 @@ pub fn start_native_screen_capture(
 
                 jpeg_bytes.clear();
                 let mut encoder = FastJpegEncoder::new(&mut jpeg_bytes, jpeg_quality);
-                encoder.set_sampling_factor(SamplingFactor::R_4_4_4);
+                encoder.set_sampling_factor(SamplingFactor::R_4_2_0);
                 if encoder
                     .encode(
                         final_raw,
