@@ -11,7 +11,7 @@ export function useScreenPicker(onClose?: () => void) {
   const [windows, setWindows] = useState<WindowSource[]>([]);
   const [currentTab, setCurrentTab] = useState<'screens' | 'windows'>('screens');
   const [selectedSourceId, setSelectedSourceId] = useState<string>('screen:0');
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const defaultRes = useStore((s) => s.currentResolution.label.toLowerCase());
   const defaultFps = useStore((s) => s.currentFps);
@@ -59,6 +59,7 @@ export function useScreenPicker(onClose?: () => void) {
   }, []);
 
   const confirmPicker = useCallback(async () => {
+    if (isLoading) return;
     const resConfig = stateStore.parseResolution(resolution);
     stateStore.set((s) => {
       s.currentResolution = resConfig;
