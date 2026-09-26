@@ -32,27 +32,16 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
     requestStream(slot.peerId);
   };
 
-  const getTitle = () => {
-    if (inTray) {
-      if (isSelectedFeatured) return 'Em destaque no palco (clique para voltar à grade)';
-      return 'Clique para destacar este participante no palco';
-    }
-    if (isFeatured) return 'Clique para voltar à grade';
-    if (slot.isLocal) return 'Clique para destacar seu card';
-    return 'Clique para destacar este participante';
-  };
-
   return (
     <div
       className={`participant-card ${isFeatured ? 'featured' : ''} ${inTray ? 'in-tray' : ''} ${isSelectedFeatured ? 'selected-featured' : ''}`}
       data-peer-id={slot.peerId}
       style={{ '--user-color': slot.color } as React.CSSProperties}
-      title={getTitle()}
       onClick={handleCardClick}
     >
       {/* Featured badge when in tray */}
       {inTray && isSelectedFeatured && (
-        <span className="selected-featured-badge" title="Este participante está em destaque">
+        <span className="selected-featured-badge">
           <span className="selected-featured-badge-dot"></span>
         </span>
       )}

@@ -316,7 +316,7 @@ export const SettingsModal: React.FC = () => {
                         type="button"
                         className={`accent-swatch ${accentColor === item.id ? 'active' : ''}`}
                         style={{ '--swatch-color': item.color } as React.CSSProperties}
-                        title={item.label}
+                        aria-label={item.label}
                         onClick={() => setAccentColor(item.id)}
                       />
                     ))}
@@ -392,7 +392,6 @@ export const SettingsModal: React.FC = () => {
                       type="button"
                       className="btn btn-sm btn-outline"
                       onClick={() => soundEffects.playUserJoin()}
-                      title="Testar som de entrada na sala"
                     >
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
@@ -405,7 +404,6 @@ export const SettingsModal: React.FC = () => {
                       type="button"
                       className="btn btn-sm btn-outline"
                       onClick={() => soundEffects.playScreenShareStart()}
-                      title="Testar som de início de transmissão"
                     >
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <polygon points="5 3 19 12 5 21 5 3"/>
@@ -416,7 +414,6 @@ export const SettingsModal: React.FC = () => {
                       type="button"
                       className="btn btn-sm btn-outline"
                       onClick={() => soundEffects.playWatchStreamStart()}
-                      title="Testar som de espectador assistindo"
                     >
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <circle cx="12" cy="12" r="3"/>
@@ -428,7 +425,6 @@ export const SettingsModal: React.FC = () => {
                       type="button"
                       className="btn btn-sm btn-outline"
                       onClick={() => soundEffects.playWatchStreamStop()}
-                      title="Testar som de parar de assistir"
                     >
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <line x1="18" y1="6" x2="6" y2="18"/>
@@ -659,7 +655,6 @@ export const SettingsModal: React.FC = () => {
                     type="button"
                     className="btn btn-sm btn-outline"
                     onClick={handleOpenLatestLog}
-                    title="Abrir latest.log no Bloco de Notas"
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
@@ -673,7 +668,6 @@ export const SettingsModal: React.FC = () => {
                     type="button"
                     className="btn btn-sm btn-outline"
                     onClick={handleOpenLogFolder}
-                    title="Abrir pasta no Explorador de Arquivos"
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
@@ -685,7 +679,6 @@ export const SettingsModal: React.FC = () => {
                     type="button"
                     className="btn btn-sm btn-outline btn-outline-danger"
                     onClick={handleClearLog}
-                    title="Limpar todo o conteúdo do latest.log"
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <polyline points="3 6 5 6 21 6"/>

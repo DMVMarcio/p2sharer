@@ -82,7 +82,7 @@ export const JoinRoomModal: React.FC = () => {
                 type="button"
                 className="btn btn-sm btn-outline btn-inline-action"
                 id="btn-toggle-join-password-visibility"
-                title="Mostrar / Ocultar Senha"
+                aria-label="Mostrar / Ocultar Senha"
                 onClick={() => setShowPassword(!showPassword)}
               >
                 <span id="icon-join-pass-toggle">

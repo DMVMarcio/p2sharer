@@ -18,7 +18,6 @@ export const RoomView: React.FC = () => {
         {/* Hoverable lateral sidebar toggle arrow */}
         <div
           className={`sidebar-toggle-edge ${isSidebarCollapsed ? 'collapsed' : 'expanded'}`}
-          title={isSidebarCollapsed ? 'Abrir Chat e Participantes' : 'Ocultar Chat'}
         >
           <button
             type="button"

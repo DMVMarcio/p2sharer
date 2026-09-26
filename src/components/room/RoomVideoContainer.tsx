@@ -122,7 +122,7 @@ export const RoomVideoContainer: React.FC = () => {
           <button
             className="btn-toggle-spotlight-tray"
             id="btn-toggle-spotlight-tray"
-            title="Minimizar / Expandir miniaturas"
+            aria-label="Minimizar / Expandir miniaturas"
             onClick={toggleSpotlightTray}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">

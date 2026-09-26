@@ -175,23 +175,11 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     ? ` [${signalingStatus.activeTransport.toUpperCase()}]`
     : '';
 
-  const getTitle = () => {
-    if (inTray) {
-      if (isSelectedFeatured) return 'Em destaque no palco (clique para voltar à grade)';
-      return 'Clique para destacar esta transmissão no palco';
-    }
-    if (zoom > 1.0) return 'Arraste para mover / Dê duplo-clique para redefinir zoom';
-    if (isFeatured) return 'Clique para voltar à grade';
-    if (slot.isLocal) return 'Clique para destacar sua transmissão';
-    return 'Clique para destacar esta transmissão';
-  };
-
   return (
     <div
       ref={cardRef}
       className={`stream-card ${isFeatured ? 'featured' : ''} ${inTray ? 'in-tray' : ''} ${isSelectedFeatured ? 'selected-featured' : ''} ${zoom > 1.0 && !inTray ? 'is-zoomed' : ''} ${isDragging && !inTray ? 'is-dragging' : ''} ${!slot.isLocal && !inTray ? 'has-volume-controller' : ''}`}
       data-peer-id={slot.peerId}
-      title={getTitle()}
       onClick={handleCardClick}
       onMouseDown={!inTray ? handleMouseDown : undefined}
       onDoubleClick={!inTray ? handleDoubleClick : undefined}
@@ -237,7 +225,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
                   e.stopPropagation();
                   setShowLocalPreview(true);
                 }}
-                title="Exibir prévia da sua transmissão"
+                aria-label="Exibir prévia da sua transmissão"
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"/>
@@ -268,7 +256,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
 
       {/* Featured badge when in tray */}
       {inTray && isSelectedFeatured && (
-        <span className="selected-featured-badge" title="Esta transmissão está aberta em destaque">
+        <span className="selected-featured-badge">
           <span className="selected-featured-badge-dot"></span>
         </span>
       )}
@@ -286,29 +274,64 @@ export const VideoCard: React.FC<VideoCardProps> = ({
         </span>
 
         {liveBitrate > 0 ? (
-          <span
-            className="stat-badge stat-badge-bitrate"
-            title={
-              slot.isLocal
-                ? `Taxa de envio em tempo real: ${(liveBitrate / 1000).toFixed(1)} Mbps (Limite: ${(currentBitrate / 1000).toFixed(0)} Mbps)`
-                : `Taxa de recepção em tempo real: ${(liveBitrate / 1000).toFixed(1)} Mbps`
-            }
+          <div
+            className="stat-badge stat-badge-bitrate custom-tooltip-container"
+            onClick={(e) => e.stopPropagation()}
           >
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
             </svg>
             <span className="stat-bitrate-text">{(liveBitrate / 1000).toFixed(1)} Mbps</span>
-          </span>
+
+            <div className="custom-tooltip bitrate-tooltip">
+              <div className="bitrate-tooltip-header">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                </svg>
+                <span>{slot.isLocal ? 'Taxa de Envio' : 'Taxa de Recepção'}</span>
+              </div>
+              <div className="bitrate-tooltip-content">
+                <div className="bitrate-tooltip-row">
+                  <span className="bitrate-tooltip-label">Tempo real:</span>
+                  <span className="bitrate-tooltip-value">{(liveBitrate / 1000).toFixed(1)} Mbps</span>
+                </div>
+                {slot.isLocal && (
+                  <div className="bitrate-tooltip-row">
+                    <span className="bitrate-tooltip-label">Limite configurado:</span>
+                    <span className="bitrate-tooltip-value">{(currentBitrate / 1000).toFixed(0)} Mbps</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         ) : slot.isLocal ? (
-          <span
-            className="stat-badge stat-badge-bitrate"
-            title={`Limite configurado: ${(currentBitrate / 1000).toFixed(0)} Mbps (Aguardando espectadores ou movimento na tela)`}
+          <div
+            className="stat-badge stat-badge-bitrate custom-tooltip-container"
+            onClick={(e) => e.stopPropagation()}
           >
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
             </svg>
             <span className="stat-bitrate-text">{(currentBitrate / 1000).toFixed(0)}M máx</span>
-          </span>
+
+            <div className="custom-tooltip bitrate-tooltip">
+              <div className="bitrate-tooltip-header">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                </svg>
+                <span>Taxa de Envio</span>
+              </div>
+              <div className="bitrate-tooltip-content">
+                <div className="bitrate-tooltip-row">
+                  <span className="bitrate-tooltip-label">Limite configurado:</span>
+                  <span className="bitrate-tooltip-value">{(currentBitrate / 1000).toFixed(0)} Mbps</span>
+                </div>
+                <div className="bitrate-tooltip-hint">
+                  Aguardando espectadores ou movimento na tela
+                </div>
+              </div>
+            </div>
+          </div>
         ) : null}
 
         {!slot.isLocal && (
@@ -376,8 +399,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
       {!slot.isLocal && (
         <button
           className="btn-stop-watch-stream"
-          title="Parar de assistir esta transmissão"
           onClick={handleStopWatching}
+          aria-label="Parar de assistir esta transmissão"
         >
           Parar de Assistir
         </button>
@@ -397,7 +420,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
                 e.stopPropagation();
                 setShowLocalPreview(false);
               }}
-              title="Ocultar prévia para economizar CPU"
+              aria-label="Ocultar prévia para economizar CPU"
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
@@ -407,14 +430,10 @@ export const VideoCard: React.FC<VideoCardProps> = ({
             </button>
           )}
           {!slot.isLocal && (
-            <div
-              className="stream-volume-controller"
-              title="Controle de Volume da Transmissão"
-            >
+            <div className="stream-volume-controller">
               <button
                 type="button"
                 className="btn-stream-volume"
-                title="Mutar / Desmutar"
                 onClick={handleToggleMute}
                 aria-label="Mutar / Desmutar"
               >
@@ -457,7 +476,6 @@ export const VideoCard: React.FC<VideoCardProps> = ({
             type="button"
             className="btn-stream-fullscreen"
             id={`btn-stream-fullscreen-${slot.peerId}`}
-            title={isFullscreen ? "Sair da Tela Cheia" : "Tela Cheia"}
             onClick={handleToggleFullscreen}
             aria-label={isFullscreen ? "Sair da Tela Cheia" : "Tela Cheia"}
           >

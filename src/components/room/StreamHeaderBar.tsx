@@ -35,30 +35,32 @@ export const StreamHeaderBar: React.FC = () => {
       <div className="stream-filter-group" role="group" aria-label="Filtro de visualização">
         <button
           type="button"
-          className={`btn-stream-filter ${streamFilter === 'all' ? 'active' : ''}`}
+          className={`btn-stream-filter ${streamFilter === 'all' ? 'active' : ''} custom-tooltip-container`}
           onClick={() => setStreamFilter('all')}
-          title="Mostrar todos os participantes da sala"
+          aria-label="Mostrar todos os participantes da sala"
         >
           <span>Todos</span>
           <span className="filter-count-badge">{totalCount}</span>
+          <span className="custom-tooltip tooltip-compact">Mostrar todos os participantes ({totalCount})</span>
         </button>
 
         <button
           type="button"
-          className={`btn-stream-filter ${streamFilter === 'streaming' ? 'active' : ''}`}
+          className={`btn-stream-filter ${streamFilter === 'streaming' ? 'active' : ''} custom-tooltip-container`}
           onClick={() => setStreamFilter(streamFilter === 'streaming' ? 'all' : 'streaming')}
-          title="Mostrar apenas participantes transmitindo tela"
+          aria-label="Mostrar apenas participantes transmitindo tela"
         >
           <span className="filter-live-dot"></span>
           <span>Transmitindo</span>
           <span className="filter-count-badge">{streamingCount}</span>
+          <span className="custom-tooltip tooltip-compact">Mostrar participantes transmitindo ({streamingCount})</span>
         </button>
 
         <button
           type="button"
-          className={`btn-stream-filter ${streamFilter === 'watching' ? 'active' : ''}`}
+          className={`btn-stream-filter ${streamFilter === 'watching' ? 'active' : ''} custom-tooltip-container`}
           onClick={() => setStreamFilter(streamFilter === 'watching' ? 'all' : 'watching')}
-          title="Mostrar apenas telas que você está assistindo"
+          aria-label="Mostrar apenas telas que você está assistindo"
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"/>
@@ -66,16 +68,17 @@ export const StreamHeaderBar: React.FC = () => {
           </svg>
           <span>Assistindo</span>
           <span className="filter-count-badge">{watchingCount}</span>
+          <span className="custom-tooltip tooltip-compact">Mostrar telas que você assiste ({watchingCount})</span>
         </button>
       </div>
 
       <div className="stream-actions">
         {/* Transmission Button */}
         <button
-          className={`btn btn-sm btn-compact ${isSharingScreen ? 'btn-danger' : 'btn-outline'}`}
+          className={`btn btn-sm btn-compact custom-tooltip-container ${isSharingScreen ? 'btn-danger' : 'btn-outline'}`}
           id="btn-toggle-share-screen"
           onClick={handleToggleTransmission}
-          title="Compartilhar Tela ou Janela"
+          aria-label={isSharingScreen ? 'Parar Transmissão' : 'Transmitir'}
         >
           <span className={`stream-sharing-indicator ${isSharingScreen ? 'active' : ''}`} id="stream-sharing-dot"></span>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -88,14 +91,17 @@ export const StreamHeaderBar: React.FC = () => {
           <span className="btn-text" id="label-share-screen">
             {isSharingScreen ? 'Parar Transmissão' : 'Transmitir'}
           </span>
+          <span className="custom-tooltip tooltip-compact">
+            {isSharingScreen ? 'Parar transmissão de tela' : 'Compartilhar Tela ou Janela'}
+          </span>
         </button>
 
         {/* Audio Filter Config */}
         <button
-          className="btn btn-sm btn-outline btn-compact"
+          className="btn btn-sm btn-outline btn-compact custom-tooltip-container"
           id="btn-open-audio-filter"
           onClick={() => openModal('audioFilter')}
-          title="Configurar filtros de áudio (ignorar Discord)"
+          aria-label="Configurar filtros de áudio"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="4" x2="4" y1="21" y2="14"/>
@@ -109,28 +115,34 @@ export const StreamHeaderBar: React.FC = () => {
             <line x1="17" x2="23" y1="16" y2="16"/>
           </svg>
           <span className="btn-text">Áudio</span>
+          <span className="custom-tooltip tooltip-compact">
+            Configurar filtros de áudio (ignorar Discord)
+          </span>
         </button>
 
         {/* Room Security / Password Button */}
         <button
-          className="btn btn-sm btn-outline btn-compact"
+          className="btn btn-sm btn-outline btn-compact custom-tooltip-container"
           id="btn-open-room-security"
           onClick={() => openModal('roomSecurity')}
-          title="Segurança da Sala (Definir / Alterar Senha)"
+          aria-label="Segurança da Sala"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
             <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
           </svg>
           <span className="btn-text" id="label-room-security">Senha</span>
+          <span className="custom-tooltip tooltip-compact">
+            Segurança da Sala (Definir / Alterar Senha)
+          </span>
         </button>
 
         {/* Leave Room */}
         <button
-          className="btn btn-sm btn-danger btn-compact"
+          className="btn btn-sm btn-danger btn-compact custom-tooltip-container"
           id="btn-leave-room"
           onClick={leaveRoom}
-          title="Sair da Sala"
+          aria-label="Sair da Sala"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
@@ -138,6 +150,9 @@ export const StreamHeaderBar: React.FC = () => {
             <line x1="21" x2="9" y1="12" y2="12"/>
           </svg>
           <span className="btn-text">Sair</span>
+          <span className="custom-tooltip tooltip-compact tooltip-align-right">
+            Sair da Sala
+          </span>
         </button>
       </div>
     </div>

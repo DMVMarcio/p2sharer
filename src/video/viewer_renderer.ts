@@ -259,20 +259,6 @@ export class ViewerRenderer {
   private bindCardInteractivity(card: HTMLElement, slot: RoomSlotInfo, isFeatured: boolean): void {
     card.classList.toggle('featured', isFeatured);
 
-    if (slot.isLocal) {
-      card.title = isFeatured
-        ? 'Clique para voltar à grade'
-        : slot.isStreaming
-        ? 'Clique para destacar sua transmissão'
-        : 'Clique para destacar seu card';
-    } else {
-      card.title = isFeatured
-        ? 'Clique para voltar à grade'
-        : slot.isStreaming && stateStore.subscribedStreams.has(slot.peerId)
-        ? 'Clique para destacar esta transmissão'
-        : 'Clique para destacar este participante';
-    }
-
     card.onclick = () => {
       if (stateStore.layoutMode === 'grid') {
         stateStore.pinnedPeerId = slot.peerId;
@@ -336,7 +322,6 @@ export class ViewerRenderer {
         const card = document.createElement('div');
         card.className = `stream-card ${isFeatured ? 'featured' : ''}`;
         card.setAttribute('data-peer-id', slot.peerId);
-        card.title = isFeatured ? 'Clique para voltar à grade' : 'Clique para destacar sua transmissão';
 
         const video = document.createElement('video');
         video.autoplay = true;
@@ -346,18 +331,15 @@ export class ViewerRenderer {
 
         const watchers = slot.watchers || [];
         const watchersCount = watchers.length;
-        const watchersTooltip = watchersCount > 0
-          ? `Assistindo sua transmissão: ${watchers.map((w) => w.username).join(', ')}`
-          : 'Ninguém assistindo no momento';
 
         const statsHud = document.createElement('div');
         statsHud.className = 'stream-card-stats-hud';
         statsHud.innerHTML = `
-          <span class="stat-badge stat-badge-quality" title="Qualidade e FPS da sua transmissão">
+          <span class="stat-badge stat-badge-quality">
             <span class="stat-badge-dot"></span>
             <span class="stat-quality-text">${stateStore.currentResolution.label} ${stateStore.currentFps} FPS</span>
           </span>
-          <span class="stat-badge stat-badge-watchers" title="${watchersTooltip}">
+          <span class="stat-badge stat-badge-watchers">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
             <span class="stat-watchers-text">${watchersCount === 1 ? '1 assistindo' : `${watchersCount} assistindo`}</span>
           </span>
@@ -380,7 +362,6 @@ export class ViewerRenderer {
         card.className = `participant-card ${isFeatured ? 'featured' : ''}`;
         card.setAttribute('data-peer-id', slot.peerId);
         card.style.setProperty('--user-color', slot.color);
-        card.title = isFeatured ? 'Clique para voltar à grade' : 'Clique para destacar seu card';
 
         card.innerHTML = `
           <div class="participant-avatar-badge">
@@ -404,7 +385,6 @@ export class ViewerRenderer {
         const card = document.createElement('div');
         card.className = `stream-card ${isFeatured ? 'featured' : ''}`;
         card.setAttribute('data-peer-id', slot.peerId);
-        card.title = isFeatured ? 'Clique para voltar à grade' : 'Clique para destacar esta transmissão';
 
         const video = document.createElement('video');
         video.autoplay = true;
@@ -417,9 +397,6 @@ export class ViewerRenderer {
 
         const watchers = slot.watchers || [];
         const watchersCount = watchers.length;
-        const watchersTooltip = watchersCount > 0
-          ? `Pessoas assistindo: ${watchers.map((w) => w.username).join(', ')}`
-          : 'Ninguém assistindo no momento';
 
         const pingVal = this.callbacks.getPeerPing(slot.peerId);
         const pingText = pingVal !== null && pingVal !== undefined ? `${pingVal} ms` : '15 ms';
@@ -428,15 +405,15 @@ export class ViewerRenderer {
         const statsHud = document.createElement('div');
         statsHud.className = 'stream-card-stats-hud';
         statsHud.innerHTML = `
-          <span class="stat-badge stat-badge-quality" title="Qualidade e FPS recebidos">
+          <span class="stat-badge stat-badge-quality">
             <span class="stat-badge-dot"></span>
             <span class="stat-quality-text">1080p 60 FPS</span>
           </span>
-          <span class="stat-badge stat-badge-ping" title="Latência WebRTC com o transmissor (Ping)">
+          <span class="stat-badge stat-badge-ping">
             <span class="stat-ping-dot ${pingClass}"></span>
             <span class="stat-ping-text">${pingText}</span>
           </span>
-          <span class="stat-badge stat-badge-watchers" title="${watchersTooltip}">
+          <span class="stat-badge stat-badge-watchers">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
             <span class="stat-watchers-text">${watchersCount === 1 ? '1 assistindo' : `${watchersCount} assistindo`}</span>
           </span>
@@ -451,7 +428,7 @@ export class ViewerRenderer {
 
         const stopBtn = document.createElement('button');
         stopBtn.className = 'btn-stop-watch-stream';
-        stopBtn.title = 'Parar de assistir esta transmissão';
+        stopBtn.setAttribute('aria-label', 'Parar de assistir esta transmissão');
         stopBtn.textContent = 'Parar de Assistir';
         stopBtn.addEventListener('click', (e) => {
           e.stopPropagation();
@@ -464,12 +441,11 @@ export class ViewerRenderer {
         // Interactive volume control with hover slider
         const volumeWrapper = document.createElement('div');
         volumeWrapper.className = 'stream-volume-controller';
-        volumeWrapper.title = 'Controle de Volume da Transmissão';
         volumeWrapper.addEventListener('click', (e) => e.stopPropagation());
 
         const volumeBtn = document.createElement('button');
         volumeBtn.className = 'btn-stream-volume';
-        volumeBtn.title = 'Mutar / Desmutar';
+        volumeBtn.setAttribute('aria-label', 'Mutar / Desmutar');
 
         const updateVolumeIcon = (vol: number, isMuted: boolean) => {
           if (isMuted || vol === 0) {
@@ -578,13 +554,9 @@ export class ViewerRenderer {
         card.className = `participant-card ${isFeatured ? 'featured' : ''}`;
         card.setAttribute('data-peer-id', slot.peerId);
         card.style.setProperty('--user-color', slot.color);
-        card.title = isFeatured ? 'Clique para voltar à grade' : 'Clique para destacar este participante';
 
         const watchers = slot.watchers || [];
         const watchersCount = watchers.length;
-        const watchersTooltip = watchersCount > 0
-          ? `Assistindo: ${watchers.map((w) => w.username).join(', ')}`
-          : '';
 
         card.innerHTML = `
           <span class="badge-live-stream">
@@ -593,7 +565,7 @@ export class ViewerRenderer {
           ${
             watchersCount > 0
               ? `
-          <span class="badge-live-watchers" title="${watchersTooltip}">
+          <span class="badge-live-watchers">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
             <span>${watchersCount} assistindo</span>
           </span>
@@ -633,7 +605,6 @@ export class ViewerRenderer {
       card.className = `participant-card ${isFeatured ? 'featured' : ''}`;
       card.setAttribute('data-peer-id', slot.peerId);
       card.style.setProperty('--user-color', slot.color);
-      card.title = isFeatured ? 'Clique para voltar à grade' : 'Clique para destacar este participante';
 
       card.innerHTML = `
         <div class="participant-avatar-badge">
