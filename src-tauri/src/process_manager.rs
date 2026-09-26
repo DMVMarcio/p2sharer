@@ -8,6 +8,124 @@ pub struct ProcessItem {
     pub exe_path: Option<String>,
     pub window_title: Option<String>,
     pub is_likely_chat_or_voice: bool,
+    #[serde(default)]
+    pub icon_base64: Option<String>,
+}
+
+#[cfg(windows)]
+unsafe fn extract_icon_as_png_base64(exe_path: Option<&str>) -> Option<String> {
+    use windows::Win32::UI::Shell::{SHGetFileInfoW, SHFILEINFOW, SHGFI_ICON, SHGFI_SMALLICON};
+    use windows::Win32::UI::WindowsAndMessaging::{GetIconInfo, DestroyIcon, ICONINFO};
+    use windows::Win32::Graphics::Gdi::{
+        CreateCompatibleDC, DeleteDC, DeleteObject, GetDIBits, GetObjectW,
+        BITMAP, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS,
+    };
+    use windows::core::PCWSTR;
+    use image::{RgbaImage, ImageFormat};
+    use base64::engine::general_purpose::STANDARD as BASE64;
+    use base64::Engine;
+
+    let path = exe_path?;
+    let path_utf16: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
+    let mut sfi = SHFILEINFOW::default();
+    let res = SHGetFileInfoW(
+        PCWSTR(path_utf16.as_ptr()),
+        windows::Win32::Storage::FileSystem::FILE_FLAGS_AND_ATTRIBUTES(0),
+        Some(&mut sfi),
+        std::mem::size_of::<SHFILEINFOW>() as u32,
+        SHGFI_ICON | SHGFI_SMALLICON,
+    );
+
+    if res == 0 || sfi.hIcon.is_invalid() {
+        return None;
+    }
+    let hicon = sfi.hIcon;
+
+    let mut icon_info = ICONINFO::default();
+    if GetIconInfo(hicon, &mut icon_info).is_err() {
+        let _ = DestroyIcon(hicon);
+        return None;
+    }
+
+    let hbm_color = icon_info.hbmColor;
+    let hbm_mask = icon_info.hbmMask;
+
+    let hdc = CreateCompatibleDC(None);
+    if hdc.is_invalid() {
+        if !hbm_color.is_invalid() { let _ = DeleteObject(hbm_color); }
+        if !hbm_mask.is_invalid() { let _ = DeleteObject(hbm_mask); }
+        let _ = DestroyIcon(hicon);
+        return None;
+    }
+
+    let mut bmp = BITMAP::default();
+    let get_obj_res = GetObjectW(
+        hbm_color,
+        std::mem::size_of::<BITMAP>() as i32,
+        Some(&mut bmp as *mut _ as *mut _),
+    );
+
+    if get_obj_res == 0 || bmp.bmWidth <= 0 || bmp.bmHeight <= 0 {
+        let _ = DeleteDC(hdc);
+        if !hbm_color.is_invalid() { let _ = DeleteObject(hbm_color); }
+        if !hbm_mask.is_invalid() { let _ = DeleteObject(hbm_mask); }
+        let _ = DestroyIcon(hicon);
+        return None;
+    }
+
+    let width = bmp.bmWidth as u32;
+    let height = bmp.bmHeight as u32;
+
+    let mut bi = BITMAPINFO {
+        bmiHeader: BITMAPINFOHEADER {
+            biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+            biWidth: width as i32,
+            biHeight: -(height as i32), // top-down DIB
+            biPlanes: 1,
+            biBitCount: 32,
+            biCompression: BI_RGB.0,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let mut pixels = vec![0u8; (width * height * 4) as usize];
+    let lines = GetDIBits(
+        hdc,
+        hbm_color,
+        0,
+        height,
+        Some(pixels.as_mut_ptr() as *mut _),
+        &mut bi,
+        DIB_RGB_COLORS,
+    );
+
+    let _ = DeleteDC(hdc);
+    if !hbm_color.is_invalid() { let _ = DeleteObject(hbm_color); }
+    if !hbm_mask.is_invalid() { let _ = DeleteObject(hbm_mask); }
+    let _ = DestroyIcon(hicon);
+
+    if lines == 0 {
+        return None;
+    }
+
+    // Windows GDI returns BGRA, convert to RGBA
+    for chunk in pixels.chunks_exact_mut(4) {
+        chunk.swap(0, 2);
+    }
+
+    let has_non_zero_alpha = pixels.chunks_exact(4).any(|c| c[3] > 0);
+    if !has_non_zero_alpha {
+        for chunk in pixels.chunks_exact_mut(4) {
+            chunk[3] = 255;
+        }
+    }
+
+    let img = RgbaImage::from_raw(width, height, pixels)?;
+    let mut png_bytes = std::io::Cursor::new(Vec::new());
+    img.write_to(&mut png_bytes, ImageFormat::Png).ok()?;
+
+    Some(format!("data:image/png;base64,{}", BASE64.encode(png_bytes.into_inner())))
 }
 
 #[cfg(windows)]
@@ -73,6 +191,7 @@ pub fn list_audio_processes() -> Vec<ProcessItem> {
     // Group processes by executable name so users see 1 clean entry per application
     // rather than multiple PID entries for multi-process apps (e.g. Discord, Chrome, Steam)
     let mut app_map: std::collections::HashMap<String, ProcessItem> = std::collections::HashMap::new();
+    let mut icon_cache: std::collections::HashMap<String, Option<String>> = std::collections::HashMap::new();
 
     // Known communication / voice apps to highlight for easy 1-click exclusion
     let voice_keywords = [
@@ -116,12 +235,23 @@ pub fn list_audio_processes() -> Vec<ProcessItem> {
         // Filter to interesting processes (either has a window or is a known audio/voice app)
         if effective_title.is_some() || is_voice {
             let exe_path = process.exe().map(|p| p.to_string_lossy().to_string());
+
+            #[cfg(windows)]
+            let icon_base64 = icon_cache
+                .entry(name_lower.clone())
+                .or_insert_with(|| unsafe { extract_icon_as_png_base64(exe_path.as_deref()) })
+                .clone();
+
+            #[cfg(not(windows))]
+            let icon_base64: Option<String> = None;
+
             let item = ProcessItem {
                 pid: pid_u32,
                 name: name.clone(),
                 exe_path,
                 window_title: effective_title,
                 is_likely_chat_or_voice: is_voice,
+                icon_base64,
             };
 
             // If already present, prefer the entry with a window title

@@ -4,6 +4,7 @@ export interface ProcessItem {
   window_title?: string;
   exe_path?: string;
   is_likely_chat_or_voice: boolean;
+  icon_base64?: string;
 }
 
 export interface MonitorSource {
