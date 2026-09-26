@@ -84,6 +84,30 @@ describe('Stream Card HUD Hover Fade, Pin Toggle, and Volume Polish', () => {
       );
     });
 
+    it('paints only the border of .btn-stream-pin.active with accent color, keeping glass background', () => {
+      const activePinIdx = cssContent.indexOf('.btn-stream-pin.active {');
+      assert.ok(activePinIdx !== -1, 'Must define .btn-stream-pin.active');
+      const activeBlock = cssContent.slice(activePinIdx, cssContent.indexOf('}', activePinIdx));
+
+      assert.ok(activeBlock.includes('border-color: var(--accent-color'), 'Must paint border with accent color');
+      assert.ok(activeBlock.includes('color: var(--accent-color'), 'Must paint icon with accent color');
+      assert.ok(
+        !activeBlock.includes('background-color: var(--accent-color'),
+        'Must NOT fill entire background with accent color'
+      );
+    });
+
+    it('applies a smooth, graceful transition for HUD fade in and out', () => {
+      assert.ok(
+        cssContent.includes('0.42s') || cssContent.includes('0.4s'),
+        'Must have longer, graceful exit fade duration'
+      );
+      assert.ok(
+        cssContent.includes('0.32s') || cssContent.includes('0.35s'),
+        'Must have smooth entrance fade duration'
+      );
+    });
+
     it('supports onOpenChange in Tooltip and tracks active tooltips in VideoCard', () => {
       assert.ok(
         tooltipContent.includes('onOpenChange?: (open: boolean) => void'),
