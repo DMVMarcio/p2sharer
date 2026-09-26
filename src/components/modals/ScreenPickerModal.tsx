@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useModal } from '../../hooks/useModal';
 import { useScreenPicker } from '../../hooks/useScreenPicker';
+import { getSkeletonCountForTab } from './screen_picker_utils';
 
 export const ScreenPickerModal: React.FC = () => {
   const { closeModal } = useModal();
@@ -27,6 +28,8 @@ export const ScreenPickerModal: React.FC = () => {
   useEffect(() => {
     loadSources();
   }, [loadSources]);
+
+  const skeletonCount = getSkeletonCountForTab(currentTab, monitors.length);
 
   return (
     <div className="modal-overlay" id="modal-screen-picker">
@@ -70,7 +73,7 @@ export const ScreenPickerModal: React.FC = () => {
           <div className="source-cards-grid" id="picker-sources-container">
             {isLoading && (
               <>
-                {Array.from({ length: 6 }).map((_, idx) => (
+                {Array.from({ length: skeletonCount }).map((_, idx) => (
                   <div
                     key={`source-skeleton-${idx}`}
                     className="source-card source-card-skeleton"
