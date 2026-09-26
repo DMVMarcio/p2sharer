@@ -64,18 +64,6 @@ export function useScreenPicker(onClose?: () => void) {
     await startCapture(chosen, fps, { width: resConfig.width, height: resConfig.height }, showCursor);
   }, [resolution, fps, bitrate, selectedSourceId, currentTab, showCursor, onClose, startCapture]);
 
-  const startDirectGpu = useCallback(async () => {
-    const resConfig = stateStore.parseResolution(resolution);
-    stateStore.set((s) => {
-      s.currentResolution = resConfig;
-      s.currentFps = fps;
-      s.currentBitrate = bitrate;
-    });
-
-    if (onClose) onClose();
-    await startCapture('gpu_direct', fps, { width: resConfig.width, height: resConfig.height }, showCursor);
-  }, [resolution, fps, bitrate, showCursor, onClose, startCapture]);
-
   return {
     monitors,
     windows,
@@ -94,6 +82,5 @@ export function useScreenPicker(onClose?: () => void) {
     setShowCursor,
     loadSources,
     confirmPicker,
-    startDirectGpu,
   };
 }

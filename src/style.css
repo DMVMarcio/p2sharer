@@ -2536,67 +2536,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   box-shadow: 0 0 0 2px var(--bg-surface), 0 0 0 4px var(--swatch-color);
 }
 
-/* Direct GPU Capture Banner / Card */
-.direct-gpu-card {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 14px 18px;
-  background: linear-gradient(135deg, rgba(34, 211, 238, 0.08) 0%, rgba(14, 165, 233, 0.04) 100%), var(--bg-card);
-  border: 1px solid rgba(34, 211, 238, 0.28);
-  border-radius: var(--radius-lg);
-  cursor: pointer;
-  transition: all var(--transition-normal);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  margin-bottom: 6px;
-}
-
-.direct-gpu-card:hover {
-  background: linear-gradient(135deg, rgba(34, 211, 238, 0.14) 0%, rgba(14, 165, 233, 0.08) 100%), var(--bg-card-hover);
-  border-color: var(--accent-color, #22d3ee);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(34, 211, 238, 0.15);
-}
-
-.direct-gpu-card:focus-visible {
-  outline: 2px solid var(--accent-color, #22d3ee);
-  outline-offset: 2px;
-}
-
-.direct-gpu-icon-badge {
-  width: 44px;
-  height: 44px;
-  border-radius: var(--radius-md);
-  background: rgba(34, 211, 238, 0.12);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--accent-color, #22d3ee);
-  flex-shrink: 0;
-  border: 1px solid rgba(34, 211, 238, 0.2);
-}
-
-.direct-gpu-text {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.direct-gpu-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.direct-gpu-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-primary);
-  letter-spacing: -0.2px;
-}
-
+/* Direct GPU Badge */
 .direct-gpu-badge {
   font-size: 10px;
   font-weight: 700;
@@ -2607,17 +2547,6 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   background-color: rgba(34, 211, 238, 0.15);
   color: var(--accent-color, #22d3ee);
   border: 1px solid rgba(34, 211, 238, 0.3);
-}
-
-.direct-gpu-desc {
-  font-size: 12px;
-  color: var(--text-muted);
-  line-height: 1.35;
-}
-
-.direct-gpu-btn {
-  flex-shrink: 0;
-  white-space: nowrap;
 }
 
 .picker-tabs {

@@ -67,8 +67,8 @@ class RoomService {
 
   private initFallbackHandler(): void {
     this.nativeVideoBridge.onFallbackNeeded = (reason: string, fallbackStream?: MediaStream) => {
-      showToast(`Captura alternada para GPU Direta (${reason})`);
       if (fallbackStream) {
+        showToast(`Transmissão alternada (${reason})`);
         const isLive =
           fallbackStream.active ??
           fallbackStream.getVideoTracks().some((t) => t.readyState === 'live');
@@ -93,6 +93,15 @@ class RoomService {
             videoTrack.onended = () => this.stopScreenSharing();
           }
           this.notify();
+        }
+      } else {
+        if (reason === 'window_minimized') {
+          showToast('Aviso: A janela transmitida foi minimizada.');
+        } else if (reason === 'window_not_found') {
+          showToast('A janela transmitida foi fechada.');
+          this.stopScreenSharing();
+        } else {
+          showToast(`Alerta de captura: ${reason}`);
         }
       }
     };
@@ -244,14 +253,9 @@ class RoomService {
     mouse: boolean
   ): Promise<void> {
     try {
-      showToast('Iniciando transmissão...');
-      let videoStream: MediaStream;
-
-      if (sourceId === 'gpu_direct') {
-        videoStream = await this.nativeVideoBridge.startDisplayMediaCapture(fps, res, mouse);
-      } else {
-        videoStream = await this.nativeVideoBridge.startCapture(sourceId, fps, res, mouse, 75);
-      }
+      showToast('Iniciando transmissão (GPU Direta)...');
+      const chosenSource = (sourceId === 'gpu_direct' || !sourceId) ? 'screen:0' : sourceId;
+      const videoStream = await this.nativeVideoBridge.startCapture(chosenSource, fps, res, mouse, 75);
 
       const audioTrack = await this.audioBridge.startCapture(
         stateStore.selectedFilterMode,

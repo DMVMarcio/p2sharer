@@ -89,23 +89,18 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     if (typeof optionsOrSourceId === 'object' && optionsOrSourceId !== null) {
       const opts = optionsOrSourceId as VideoSourceOptions;
       if (opts.mode === 'gpu_direct') {
-        return this.startDisplayMediaCapture(opts.frameRate || fps, resolution, captureMouse);
+        return this.startDisplayMediaCapture(opts.frameRate || fps, resolution, captureMouse, 'monitor');
       }
       const sId = opts.sourceId || 'screen:0';
       return this.startNativeCapture(sId, opts.frameRate || fps, resolution, captureMouse, quality);
     }
 
     const sId = (optionsOrSourceId as string) || 'screen:0';
-    if (
-      sId === 'gpu_direct' ||
-      sId === 'direct_gpu' ||
-      sId === 'screen:direct_gpu'
-    ) {
-      return this.startDisplayMediaCapture(fps, resolution, captureMouse);
-    }
+    const effectiveSourceId =
+      sId === 'gpu_direct' || sId === 'direct_gpu' || sId === 'screen:direct_gpu' ? 'screen:0' : sId;
 
-    // Custom in-app selected screen or window: capture directly via native capture without Chromium prompt!
-    return this.startNativeCapture(sId, fps, resolution, captureMouse, quality);
+    // In-app selected screen or window: capture directly via native GPU capture without Chromium prompt!
+    return this.startNativeCapture(effectiveSourceId, fps, resolution, captureMouse, quality);
   }
 
   private async startNativeCapture(
@@ -139,7 +134,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     }
 
     this.isCapturing = true;
-    this.isDirectGpu = false;
+    this.isDirectGpu = true;
 
     // 2. Start native Rust capture thread
     try {
@@ -152,13 +147,11 @@ export class NativeVideoBridge implements VideoCaptureBridge {
         quality,
       });
     } catch (err) {
+      this.isCapturing = false;
+      this.isDirectGpu = false;
       const reason = err instanceof Error ? err.message : String(err);
-      console.warn('[NativeVideoBridge] Native capture failed to start, falling back to getDisplayMedia:', reason);
-      const fallbackStream = await this.startDisplayMediaCapture(fps);
-      if (this.onFallbackNeeded) {
-        this.onFallbackNeeded(reason || 'capture_error', fallbackStream);
-      }
-      return fallbackStream;
+      console.error('[NativeVideoBridge] Native Direct GPU capture failed to start:', reason);
+      throw new Error(`Falha ao iniciar captura GPU da tela ou janela: ${reason}`);
     }
 
     // 3. Connect to local binary WebSocket stream
@@ -193,7 +186,9 @@ export class NativeVideoBridge implements VideoCaptureBridge {
             reason = evt.data;
           }
           console.warn('[NativeVideoBridge] Received capture signal from native backend:', reason);
-          this.triggerFallback(reason, fps);
+          if (this.onFallbackNeeded) {
+            this.onFallbackNeeded(reason);
+          }
           return;
         }
 
@@ -266,7 +261,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     return stream;
   }
 
-  private async triggerFallback(reason: string, fps: number): Promise<void> {
+  public async triggerFallback(reason: string, fps: number): Promise<void> {
     if (this.isDirectGpu) return;
     try {
       const fallbackStream = await this.startDisplayMediaCapture(fps);

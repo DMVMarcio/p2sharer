@@ -22,7 +22,6 @@ export const ScreenPickerModal: React.FC = () => {
     setShowCursor,
     loadSources,
     confirmPicker,
-    startDirectGpu,
   } = useScreenPicker(closeModal);
 
   useEffect(() => {
@@ -41,8 +40,11 @@ export const ScreenPickerModal: React.FC = () => {
             </svg>
           </div>
           <div>
-            <h2>Compartilhar Tela</h2>
-            <p className="modal-subtitle">Escolha um monitor ou janela de aplicativo para transmitir ao vivo.</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h2>Compartilhar Tela</h2>
+              <span className="direct-gpu-badge">GPU Direta</span>
+            </div>
+            <p className="modal-subtitle">Escolha um monitor ou janela com aceleração nativa por hardware (Zero Cópia).</p>
           </div>
           <button className="btn-close" id="btn-close-screen-picker" onClick={closeModal}>
             &times;
@@ -50,50 +52,6 @@ export const ScreenPickerModal: React.FC = () => {
         </div>
 
         <div className="modal-body">
-          {/* Prominent Direct GPU Mode Banner */}
-          <div
-            className="direct-gpu-card"
-            id="card-direct-gpu-capture"
-            role="button"
-            tabIndex={0}
-            title="Iniciar captura acelerada diretamente pela GPU (Zero Cópia)"
-            onClick={startDirectGpu}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                startDirectGpu();
-              }
-            }}
-          >
-            <div className="direct-gpu-icon-badge">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" fill="currentColor" fillOpacity="0.2"/>
-              </svg>
-            </div>
-            <div className="direct-gpu-text">
-              <div className="direct-gpu-header">
-                <span className="direct-gpu-title">Captura Direta GPU (Tela Cheia 60 FPS - Zero Cópia)</span>
-                <span className="direct-gpu-badge">Aceleração Máxima</span>
-              </div>
-              <div className="direct-gpu-desc">
-                Captura direta via DirectX / Chromium GPU Pipeline com codificação de hardware NVENC/QSV/VCN. Zero sobrecarga de CPU, ideal para jogos e transmissões de alta taxa de quadros.
-              </div>
-            </div>
-            <button
-              type="button"
-              className="btn btn-primary btn-sm direct-gpu-btn"
-              id="btn-start-direct-gpu"
-              onClick={(e) => {
-                e.stopPropagation();
-                startDirectGpu();
-              }}
-            >
-              <span>Iniciar GPU Direta</span>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polygon points="5 3 19 12 5 21 5 3"/>
-              </svg>
-            </button>
-          </div>
 
           <div className="picker-tabs">
             <button
@@ -239,10 +197,10 @@ export const ScreenPickerModal: React.FC = () => {
           <button
             className="btn btn-primary"
             id="btn-confirm-picker"
-            style={{ width: 'auto', minWidth: '140px' }}
+            style={{ width: 'auto', minWidth: '160px' }}
             onClick={confirmPicker}
           >
-            <span>Transmitir Ao Vivo</span>
+            <span>Transmitir com GPU Direta</span>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polygon points="5 3 19 12 5 21 5 3"/>
             </svg>

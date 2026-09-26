@@ -50,10 +50,11 @@ When capture devices output 5.1, 7.1, or other multi-channel audio:
 - Automatically calls `timeBeginPeriod(1)` upon capture initialization and `timeEndPeriod(1)` on drop.
 - Forces Windows OS scheduler timer resolution to 1ms, ensuring steady 60–120 FPS capture timing without jitter.
 
-### Local WebSocket Video Server
+### Local WebSocket Video Server & Direct GPU Pipeline
 - For ultra-low latency native capture, Rust binds a loopback WebSocket server on an ephemeral port.
 - Transmits compressed/raw frame buffers directly to the frontend's `NativeVideoBridge` without blocking Tauri's main IPC channel.
-- If WebSocket streaming fails or user prefers browser capture, `NativeVideoBridge` falls back seamlessly to `navigator.mediaDevices.getDisplayMedia`.
+- Direct GPU capture is the official application pipeline: in-app screen and window selection dispatches directly via `NativeVideoBridge` without triggering Chromium's browser dialog (`getDisplayMedia`).
+- Capture lifecycle signals (window minimized or closed) trigger native in-app toast alerts and clean teardown instead of spawning unexpected browser popups.
 
 ---
 
