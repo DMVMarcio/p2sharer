@@ -2925,218 +2925,69 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
    ========================================================================== */
 
 /* ==========================================================================
-   AUDIO FILTER MODAL (REDESIGNED)
+   AUDIO FILTER MODAL (SOBER & NATIVE)
    ========================================================================== */
 
 .audio-filter-modal-card {
-  max-width: 640px;
+  max-width: 580px;
   width: 100%;
-}
-
-.audio-modal-icon-badge {
-  background-color: var(--accent-subtle);
-  color: var(--accent-color);
-  padding: 8px;
-  border-radius: var(--radius-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
 }
 
 .audio-filter-modal-body {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-}
-
-/* Mode Selector Grid */
-.audio-mode-selector-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
 
-@media (max-width: 580px) {
-  .audio-mode-selector-grid {
-    grid-template-columns: 1fr;
-  }
+/* Native Segmented Control */
+.audio-segmented-control {
+  display: flex;
+  background-color: var(--bg-input);
+  padding: 3px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  gap: 4px;
 }
 
-.audio-mode-card {
-  display: flex;
-  flex-direction: column;
-  padding: 12px 14px;
-  background-color: var(--bg-elevated);
-  border: 2px solid var(--border-default);
-  border-radius: var(--radius-lg);
+.audio-segment-btn {
+  flex: 1;
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
   cursor: pointer;
   transition: all var(--transition-fast);
-  user-select: none;
-  outline: none;
+  text-align: center;
 }
 
-.audio-mode-card:hover {
-  background-color: var(--bg-card-hover);
-  border-color: var(--border-hover);
-}
-
-.audio-mode-card:focus-visible {
-  box-shadow: 0 0 0 2px var(--accent-color);
-}
-
-.audio-mode-card.active {
-  background-color: var(--accent-subtle);
-  border-color: var(--accent-color);
-  box-shadow: 0 0 0 1px var(--accent-color);
-}
-
-.audio-mode-card-header {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-}
-
-.audio-mode-icon-circle {
-  width: 36px;
-  height: 36px;
-  min-width: 36px;
-  border-radius: var(--radius-full);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.audio-mode-icon-circle.exclude {
-  background: rgba(239, 68, 68, 0.14);
-  color: #f87171;
-}
-
-.audio-mode-icon-circle.include {
-  background: rgba(14, 165, 233, 0.14);
-  color: #38bdf8;
-}
-
-.audio-mode-titles {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex: 1;
-  min-width: 0;
-}
-
-.audio-mode-title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-}
-
-.audio-mode-title {
-  font-weight: 600;
-  font-size: 13px;
+.audio-segment-btn:hover {
   color: var(--text-primary);
 }
 
-.audio-mode-badge {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 2px 6px;
-  border-radius: var(--radius-full);
-  flex-shrink: 0;
+.audio-segment-btn.active {
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
 }
 
-.audio-mode-badge.recommended {
-  background: rgba(34, 197, 94, 0.15);
-  color: #4ade80;
-  border: 1px solid rgba(34, 197, 94, 0.3);
-}
-
-.audio-mode-badge.focus {
-  background: rgba(14, 165, 233, 0.15);
-  color: #38bdf8;
-  border: 1px solid rgba(14, 165, 233, 0.3);
-}
-
-.audio-mode-desc {
-  font-size: 11px;
-  line-height: 1.4;
-  color: var(--text-muted);
-}
-
-/* Dynamic Status Banner */
-.audio-status-banner {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  border-radius: var(--radius-md);
+/* Sober Informational Status Box */
+.audio-info-box {
   font-size: 12px;
   line-height: 1.4;
-  border: 1px solid transparent;
-  transition: all var(--transition-fast);
+  color: var(--text-secondary);
+  padding: 8px 12px;
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
 }
 
-.audio-status-banner.full-audio {
-  background: rgba(34, 197, 94, 0.08);
-  border-color: rgba(34, 197, 94, 0.25);
+.audio-info-box strong {
   color: var(--text-primary);
-}
-
-.audio-status-banner.filtering {
-  background: rgba(234, 179, 8, 0.08);
-  border-color: rgba(234, 179, 8, 0.25);
-  color: var(--text-primary);
-}
-
-.audio-status-banner.focus-active {
-  background: rgba(14, 165, 233, 0.08);
-  border-color: rgba(14, 165, 233, 0.25);
-  color: var(--text-primary);
-}
-
-.audio-status-banner.focus-empty {
-  background: var(--bg-elevated);
-  border-color: var(--border-default);
-  color: var(--text-muted);
-}
-
-.audio-status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-full);
-  flex-shrink: 0;
-}
-
-.audio-status-dot.active-green {
-  background-color: #22c55e;
-  box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
-}
-
-.audio-status-dot.active-warn {
-  background-color: #eab308;
-  box-shadow: 0 0 8px rgba(234, 179, 8, 0.6);
-}
-
-.audio-status-dot.active-cyan {
-  background-color: #0ea5e9;
-  box-shadow: 0 0 8px rgba(14, 165, 233, 0.6);
-}
-
-.audio-status-dot.active-neutral {
-  background-color: var(--text-muted);
-}
-
-.audio-status-text {
-  flex: 1;
-}
-
-.audio-status-text strong {
   font-weight: 600;
-  color: var(--text-primary);
 }
 
 /* Action Toolbar */
@@ -3144,7 +2995,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
 }
 
 .audio-search-input-wrapper {
@@ -3163,7 +3014,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 
 .audio-search-input {
   width: 100%;
-  padding: 7px 28px 7px 32px;
+  padding: 6px 28px 6px 30px;
   background-color: var(--bg-input);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
@@ -3187,7 +3038,6 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   cursor: pointer;
   line-height: 1;
   padding: 2px 4px;
-  border-radius: var(--radius-sm);
 }
 
 .audio-search-clear-btn:hover {
@@ -3200,17 +3050,17 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   gap: 6px;
 }
 
-.audio-quick-action-btn {
+.audio-action-btn {
   display: flex;
   align-items: center;
   gap: 5px;
   font-size: 11px;
-  padding: 5px 10px;
+  padding: 5px 8px;
   border-radius: var(--radius-sm);
 }
 
 .audio-refresh-btn {
-  padding: 6px 9px;
+  padding: 6px 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3222,16 +3072,16 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 
 /* Process Items List */
 .audio-process-list-card {
-  height: 250px;
-  max-height: 250px;
+  height: 260px;
+  max-height: 260px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   background-color: var(--bg-input);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
-  padding: 6px;
+  padding: 4px;
 }
 
 .audio-loading-state,
@@ -3242,7 +3092,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   justify-content: center;
   height: 100%;
   min-height: 180px;
-  gap: 10px;
+  gap: 8px;
   color: var(--text-muted);
   font-size: 12px;
   text-align: center;
@@ -3253,8 +3103,8 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 10px;
-  border-radius: var(--radius-md);
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
   border: 1px solid transparent;
   background-color: var(--bg-surface);
   cursor: pointer;
@@ -3274,28 +3124,16 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 
 .audio-process-row.selected {
   background-color: var(--accent-subtle);
-  border-color: var(--accent-color);
+  border-color: var(--border-default);
 }
 
-.audio-process-icon-box {
-  width: 30px;
-  height: 30px;
-  min-width: 30px;
-  border-radius: var(--radius-sm);
+.audio-process-icon {
+  color: var(--text-muted);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-}
-
-.audio-process-icon-box.voice {
-  background: rgba(168, 85, 247, 0.12);
-  color: #c084fc;
-}
-
-.audio-process-icon-box.window {
-  background: rgba(59, 130, 246, 0.12);
-  color: #60a5fa;
+  width: 20px;
 }
 
 .audio-process-details {
@@ -3309,13 +3147,13 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .audio-process-name-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   overflow: hidden;
 }
 
 .audio-app-name {
-  font-weight: 600;
-  font-size: 13px;
+  font-weight: 500;
+  font-size: 12px;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
@@ -3324,21 +3162,13 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 
 .audio-app-tag {
   font-size: 10px;
-  font-weight: 600;
-  padding: 1px 6px;
-  border-radius: var(--radius-full);
-  white-space: nowrap;
+  font-weight: 500;
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-elevated);
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
   flex-shrink: 0;
-}
-
-.audio-app-tag.voice {
-  background: rgba(168, 85, 247, 0.15);
-  color: #d8b4fe;
-}
-
-.audio-app-tag.window {
-  background: rgba(59, 130, 246, 0.15);
-  color: #93c5fd;
 }
 
 .audio-app-window-title {
@@ -3353,24 +3183,32 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding-left: 6px;
+  padding-left: 4px;
 }
 
-.audio-process-checkbox,
-.audio-process-radio {
-  width: 16px;
-  height: 16px;
+.audio-process-checkbox {
+  width: 15px;
+  height: 15px;
   cursor: pointer;
   accent-color: var(--accent-color);
 }
 
-.audio-process-footer-hint {
+.audio-modal-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+}
+
+.audio-footer-count {
   font-size: 11px;
   color: var(--text-muted);
-  padding: 0 4px;
+}
+
+.audio-footer-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 /* ==========================================================================

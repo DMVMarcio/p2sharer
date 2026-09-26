@@ -336,7 +336,7 @@ pub(crate) mod win_audio {
     use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT};
     use windows::Win32::Media::Audio::*;
     use windows::Win32::System::Com::*;
-    use windows::Win32::System::Threading::{CreateEventW, WaitForSingleObject};
+    use windows::Win32::System::Threading::{CreateEventW, WaitForMultipleObjects, WaitForSingleObject};
 
     pub(crate) const AUDCLNT_STREAMFLAGS_EVENTCALLBACK: u32 = 0x00040000;
     pub(crate) const AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM: u32 = 0x80000000;
@@ -506,9 +506,23 @@ pub(crate) mod win_audio {
             return self_pid;
         }
 
-        // 1. Gather all candidate PIDs matching target names or explicit PIDs
-        let mut candidate_pids: Vec<u32> = Vec::new();
+        resolve_target_process_tree_internal(&normalized_names, target_pids)
+    }
 
+    pub(crate) fn resolve_target_process_roots(
+        target_names: &[String],
+        target_pids: &[u32],
+    ) -> Vec<u32> {
+        let mut sys = sysinfo::System::new();
+        sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+
+        let normalized_names: Vec<String> = target_names
+            .iter()
+            .map(|s| s.trim().to_lowercase())
+            .filter(|s| !s.is_empty())
+            .collect();
+
+        let mut candidate_pids: Vec<u32> = Vec::new();
         for &pid in target_pids {
             if pid > 0 && sys.process(sysinfo::Pid::from_u32(pid)).is_some() {
                 candidate_pids.push(pid);
@@ -526,10 +540,9 @@ pub(crate) mod win_audio {
         }
 
         if candidate_pids.is_empty() {
-            return 0;
+            return Vec::new();
         }
 
-        // 2. Find the top-most living root ancestor among candidates
         let mut root_pids: Vec<u32> = Vec::new();
         for &start_pid in &candidate_pids {
             let mut curr = sysinfo::Pid::from_u32(start_pid);
@@ -554,7 +567,62 @@ pub(crate) mod win_audio {
             }
         }
 
-        // 3. Prioritize process root that currently has an active audio session
+        root_pids
+    }
+
+    fn resolve_target_process_tree_internal(
+        normalized_names: &[String],
+        target_pids: &[u32],
+    ) -> u32 {
+        let mut sys = sysinfo::System::new();
+        sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+
+        let mut candidate_pids: Vec<u32> = Vec::new();
+        for &pid in target_pids {
+            if pid > 0 && sys.process(sysinfo::Pid::from_u32(pid)).is_some() {
+                candidate_pids.push(pid);
+            }
+        }
+
+        for (pid, proc) in sys.processes() {
+            let p_name = proc.name().to_string_lossy().to_lowercase();
+            if normalized_names.iter().any(|target| p_name.contains(target) || target.contains(&p_name)) {
+                let u = pid.as_u32();
+                if !candidate_pids.contains(&u) {
+                    candidate_pids.push(u);
+                }
+            }
+        }
+
+        if candidate_pids.is_empty() {
+            return 0;
+        }
+
+        let mut root_pids: Vec<u32> = Vec::new();
+        for &start_pid in &candidate_pids {
+            let mut curr = sysinfo::Pid::from_u32(start_pid);
+            let start_name = sys.process(curr).map(|p| p.name().to_string_lossy().to_lowercase());
+
+            while let Some(proc) = sys.process(curr) {
+                if let Some(parent_pid) = proc.parent() {
+                    if let Some(parent_proc) = sys.process(parent_pid) {
+                        let parent_name = parent_proc.name().to_string_lossy().to_lowercase();
+                        if start_name.as_deref() == Some(&parent_name) || candidate_pids.contains(&parent_pid.as_u32()) {
+                            curr = parent_pid;
+                            continue;
+                        }
+                    }
+                }
+                break;
+            }
+
+            let r_u32 = curr.as_u32();
+            if !root_pids.contains(&r_u32) {
+                root_pids.push(r_u32);
+            }
+        }
+
+        // Prioritize process root that currently has an active audio session
         unsafe {
             if let Ok(enumerator) = CoCreateInstance::<_, IMMDeviceEnumerator>(&MMDeviceEnumerator, None, CLSCTX_ALL) {
                 if let Ok(device) = enumerator.GetDefaultAudioEndpoint(eRender, eConsole) {
@@ -736,7 +804,196 @@ pub(crate) mod win_audio {
 
             let buffer_duration = 10_000_000i64; // 1 second buffer in 100ns units
 
-            let mut active_client = audio_client;
+            // Multi-process include mode support: activate multiple loopback clients if multiple root processes exist
+            struct MultiCaptureSource {
+                client: IAudioClient,
+                capture: IAudioCaptureClient,
+                event: HANDLE,
+                _event_guard: EventHandleGuard,
+                _pid: u32,
+            }
+
+            let include_roots = if config.mode == "include" {
+                resolve_target_process_roots(&config.target_names, &config.target_pids)
+            } else {
+                Vec::new()
+            };
+
+            let mut multi_sources: Vec<MultiCaptureSource> = Vec::new();
+            if config.mode == "include" && include_roots.len() > 1 {
+                for &pid in &include_roots {
+                    if let Ok(c) = activate_process_loopback_client(pid, false) {
+                        let res = c.Initialize(
+                            AUDCLNT_SHAREMODE_SHARED,
+                            stream_flags,
+                            buffer_duration,
+                            0,
+                            mix_format_ptr,
+                            None,
+                        );
+                        if res.is_ok() {
+                            if let Ok(ev) = CreateEventW(None, false, false, PCWSTR::null()) {
+                                if c.SetEventHandle(ev).is_ok() {
+                                    if let Ok(cap) = c.GetService::<IAudioCaptureClient>() {
+                                        if c.Start().is_ok() {
+                                            println!("[Audio Loopback] Multi-process: Started loopback for PID {}", pid);
+                                            multi_sources.push(MultiCaptureSource {
+                                                client: c,
+                                                capture: cap,
+                                                event: ev,
+                                                _event_guard: EventHandleGuard(ev),
+                                                _pid: pid,
+                                            });
+                                        } else {
+                                            let _ = CloseHandle(ev);
+                                        }
+                                    } else {
+                                        let _ = CloseHandle(ev);
+                                    }
+                                } else {
+                                    let _ = CloseHandle(ev);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if multi_sources.len() > 1 {
+                if is_allocated_format {
+                    CoTaskMemFree(Some(mix_format_ptr as *const _));
+                }
+
+                println!(
+                    "[Audio Loopback] Multi-process loopback active with {} targets ({} Hz, {} channels)",
+                    multi_sources.len(), sample_rate, channels
+                );
+
+                let stream_start = std::time::Instant::now();
+                let mut resampler = AudioResampler::new(sample_rate, 48000);
+                let mut raw_stereo_buffer: Vec<f32> = Vec::with_capacity(4096);
+                let mut standardized_buffer: Vec<f32> = Vec::with_capacity(4096);
+                let events: Vec<HANDLE> = multi_sources.iter().map(|s| s.event).collect();
+
+                while stop_flag.load(Ordering::Relaxed) {
+                    let wait_res = WaitForMultipleObjects(&events, false, 20);
+
+                    if wait_res.0 >= WAIT_OBJECT_0.0 && wait_res.0 < WAIT_OBJECT_0.0 + events.len() as u32 {
+                        let mut client_chunks: Vec<Vec<f32>> = Vec::new();
+
+                        for source in &multi_sources {
+                            let mut packet_size = source.capture.GetNextPacketSize().unwrap_or(0);
+                            let mut source_raw: Vec<f32> = Vec::new();
+
+                            while packet_size > 0 {
+                                let mut data_ptr: *mut u8 = null_mut();
+                                let mut num_frames_read = 0u32;
+                                let mut flags = 0u32;
+                                let mut qpc_pos = 0u64;
+
+                                let get_res = source.capture.GetBuffer(
+                                    &mut data_ptr,
+                                    &mut num_frames_read,
+                                    &mut flags,
+                                    None,
+                                    Some(&mut qpc_pos),
+                                );
+
+                                if get_res.is_ok() && num_frames_read > 0 && !data_ptr.is_null() {
+                                    let is_silent = (flags & AUDCLNT_BUFFERFLAGS_SILENT.0 as u32) != 0;
+                                    convert_and_downmix_to_stereo(
+                                        data_ptr,
+                                        num_frames_read as usize,
+                                        channels,
+                                        bits_per_sample,
+                                        is_silent,
+                                        &mut source_raw,
+                                    );
+                                    let _ = source.capture.ReleaseBuffer(num_frames_read);
+                                } else if get_res.is_ok() && num_frames_read > 0 {
+                                    let _ = source.capture.ReleaseBuffer(num_frames_read);
+                                }
+
+                                packet_size = source.capture.GetNextPacketSize().unwrap_or(0);
+                            }
+
+                            if !source_raw.is_empty() {
+                                client_chunks.push(source_raw);
+                            }
+                        }
+
+                        if !client_chunks.is_empty() {
+                            if client_chunks.len() == 1 {
+                                raw_stereo_buffer = client_chunks.remove(0);
+                            } else {
+                                let max_len = client_chunks.iter().map(|c| c.len()).max().unwrap_or(0);
+                                raw_stereo_buffer.clear();
+                                raw_stereo_buffer.resize(max_len, 0.0f32);
+                                for chunk in client_chunks {
+                                    for (i, sample) in chunk.into_iter().enumerate() {
+                                        raw_stereo_buffer[i] = (raw_stereo_buffer[i] + sample).clamp(-1.0, 1.0);
+                                    }
+                                }
+                            }
+
+                            if sample_rate != 48000 {
+                                resampler.resample(&raw_stereo_buffer, &mut standardized_buffer);
+                            } else {
+                                standardized_buffer.extend_from_slice(&raw_stereo_buffer);
+                            }
+                            raw_stereo_buffer.clear();
+                        }
+                    } else if wait_res == WAIT_TIMEOUT {
+                        continue;
+                    } else {
+                        break;
+                    }
+
+                    let min_samples = 960;
+                    while standardized_buffer.len() >= min_samples {
+                        let chunk_samples = &standardized_buffer[..min_samples];
+
+                        let mut sum_sq = 0.0f32;
+                        for &s in chunk_samples {
+                            sum_sq += s * s;
+                        }
+                        let rms = (sum_sq / chunk_samples.len() as f32).sqrt().min(1.0);
+
+                        let mut byte_vec = vec![0u8; min_samples * 4];
+                        LittleEndian::write_f32_into(chunk_samples, &mut byte_vec);
+
+                        let timestamp_us = stream_start.elapsed().as_micros() as u64;
+
+                        let payload = AudioStreamPayload {
+                            pcm_base64: BASE64.encode(&byte_vec),
+                            sample_rate: 48000,
+                            channels: 2,
+                            rms_level: rms,
+                            timestamp_us,
+                        };
+
+                        let _ = app.emit("p2sharer://audio-stream", payload);
+
+                        standardized_buffer.drain(..min_samples);
+                    }
+                }
+
+                for source in multi_sources {
+                    let _ = source.client.Stop();
+                }
+                CoUninitialize();
+                println!("[Audio Loopback] Multi-process loopback stopped cleanly.");
+                return;
+            }
+
+            let mut active_client = if multi_sources.len() == 1 {
+                let single = multi_sources.remove(0);
+                was_process_loopback = true;
+                single.client
+            } else {
+                audio_client
+            };
+
             let mut init_res = active_client.Initialize(
                 AUDCLNT_SHAREMODE_SHARED,
                 stream_flags,
@@ -1052,6 +1309,28 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_wait_for_multiple_objects_and_roots() {
+        unsafe {
+            use windows::core::PCWSTR;
+            use windows::Win32::Foundation::CloseHandle;
+            use windows::Win32::System::Threading::{CreateEventW, WaitForMultipleObjects};
+
+            let ev1 = CreateEventW(None, false, false, PCWSTR::null()).unwrap();
+            let ev2 = CreateEventW(None, false, false, PCWSTR::null()).unwrap();
+            let handles = [ev1, ev2];
+            let res = WaitForMultipleObjects(&handles, false, 0);
+            let _ = CloseHandle(ev1);
+            let _ = CloseHandle(ev2);
+            assert_eq!(res, windows::Win32::Foundation::WAIT_TIMEOUT);
+        }
+
+        let my_pid = std::process::id();
+        let roots = win_audio::resolve_target_process_roots(&[], &[my_pid]);
+        assert!(!roots.is_empty(), "Should resolve root for current process");
     }
 }
 
