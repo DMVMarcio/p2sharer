@@ -63,6 +63,62 @@ describe('M7: P2P Mesh Connectivity, Indirect Bridging & Signaling Stability Har
       assert.equal(manager.getActiveTransport(), 'mqtt');
       assert.equal(manager.failoverHistory.length, 0);
     });
+
+    it('1.4: getRelaySockets falls back to activeRoom healthy sockets when probe sockets are unconnected', () => {
+      const manager = new SignalingManager();
+      // Simulate in-flight probe sockets with connected: false
+      (manager as any).mqttSocketStatuses.set('wss://test.mosquitto.org:8081', { readyState: 0, connected: false });
+      (manager as any).activeRoom = { leave: async () => {} };
+
+      const sockets = manager.getRelaySockets('mqtt');
+      const urls = Object.keys(sockets);
+      assert.ok(urls.length >= 3);
+      // Fallback to activeRoom healthy sockets must have been used
+      assert.ok(urls.every((u) => sockets[u].connected === true));
+    });
+
+    it('1.5: joinRoom and leaveRoom deterministically reset activeTransport to mqtt', async () => {
+      const manager = new SignalingManager();
+      // Simulate that transport drifted to nostr during previous session
+      (manager as any).activeTransport = 'nostr';
+      (manager as any).consecutiveStalls = 3;
+      (manager as any).isFailingOver = true;
+
+      // Leaving room resets transport, stall counter, and failover state
+      await manager.leaveRoom(null);
+      assert.equal(manager.getActiveTransport(), 'mqtt');
+      assert.equal((manager as any).consecutiveStalls, 0);
+      assert.equal((manager as any).isFailingOver, false);
+
+      // Verify joinRoom resets activeTransport to mqtt when not failing over
+      (manager as any).activeTransport = 'torrent';
+      (manager as any).isFailingOver = false;
+      (manager as any).createRoomForTransport = () => ({ leave: async () => {} });
+      manager.joinRoom({ appId: 'test' }, 'test-topic');
+      assert.equal(manager.getActiveTransport(), 'mqtt');
+      assert.equal((manager as any).consecutiveStalls, 0);
+
+      await manager.leaveRoom(null);
+    });
+
+    it('1.6: reannounce publishes to sockets with connected=true or readyState=1', async () => {
+      const manager = new SignalingManager();
+      (manager as any).activeRoom = { selfId: 'self-peer-123' };
+      const publishedTopics: string[] = [];
+      const mockClient = {
+        connected: false,
+        readyState: 1, // OPEN
+        publish: (topic: string) => {
+          publishedTopics.push(topic);
+        },
+      };
+      (manager as any).monitoredMqttSockets.set('wss://mock.broker', mockClient);
+
+      await manager.reannounce('test-room', 'peer-target');
+      // Publishes root topic + peer direct topic
+      assert.equal(publishedTopics.length, 2);
+      assert.ok(publishedTopics.every((t) => typeof t === 'string' && t.length > 0));
+    });
   });
 
   // =========================================================================

@@ -237,6 +237,10 @@ export class GroupRoomManager {
 
     this.rtcConfig = buildRtcConfiguration(this.turnConfig);
 
+    signalingManager.setRoomReconnectionHandler(async () => {
+      await this.reconnectOnNewTransport();
+    });
+
     try {
       this.signalingTopic = await computeSignalingRoomId(this.roomId, this.password);
       console.log(`[P2P] Computed signaling topic: "${this.signalingTopic}"`);
@@ -273,6 +277,17 @@ export class GroupRoomManager {
     this.bindRoomActions();
     this.bindRoomListeners();
     this.startHeartbeatLoop();
+
+    // Proactive rendezvous beacons on room join:
+    // Repeatedly broadcast presence on MQTT brokers at rapid intervals so existing peers in the room
+    // discover us immediately without waiting for 5.3s Trystero ticks.
+    [100, 400, 1000, 2200].forEach((delay) => {
+      setTimeout(() => {
+        if (this.room && this.signalingTopic) {
+          signalingManager.reannounce(this.signalingTopic);
+        }
+      }, delay);
+    });
   }
 
   private async reconnectOnNewTransport(): Promise<void> {
@@ -627,6 +642,11 @@ export class GroupRoomManager {
       this.peerTracker.receivePeerExchange(peerId, true);
       signalingManager.setPeerConnected(peerId);
 
+      // Instantly acknowledge peer on signaling broker to ensure both directions are open
+      if (this.signalingTopic) {
+        signalingManager.reannounce(this.signalingTopic, peerId);
+      }
+
       // Send presence immediately to new peer
       if (this.presenceAction) {
         this.presenceAction.send(
@@ -741,9 +761,10 @@ export class GroupRoomManager {
         });
       }
 
-      // If there are quarantined rumors from PEX that haven't paired yet, re-announce on broker
+      // Continuous presence re-announcement on broker until direct peers connect or if rumors exist
+      const hasNoDirectPeers = this.peerTracker.directConnectedPeers.size === 0;
       const rumors = this.peerTracker.getPendingRumors();
-      if (rumors.length > 0 && this.signalingTopic) {
+      if ((hasNoDirectPeers || rumors.length > 0) && this.signalingTopic) {
         signalingManager.reannounce(this.signalingTopic);
       }
 
@@ -1390,6 +1411,7 @@ export class GroupRoomManager {
 
     const roomToLeave = this.room;
     this.room = null;
+    signalingManager.setRoomReconnectionHandler(null);
     await signalingManager.leaveRoom(roomToLeave);
 
     this.peerTracker.clear();
