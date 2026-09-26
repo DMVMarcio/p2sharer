@@ -146,12 +146,14 @@ export class AudioBridge {
       const MAX_BACKLOG = 0.060; // 60ms backlog ceiling
 
       // Smooth scheduling: only re-anchor if audio clock has drifted outside allowable window
-      if (this.nextPlayTime < currentTime || this.nextPlayTime > currentTime + MAX_BACKLOG) {
+      // Use 25ms grace window to prevent false re-anchoring on minor OS scheduling jitter
+      if (this.nextPlayTime < currentTime - 0.025 || this.nextPlayTime > currentTime + MAX_BACKLOG) {
         this.nextPlayTime = currentTime + TARGET_LEAD;
       }
 
-      source.start(this.nextPlayTime);
-      this.nextPlayTime += buffer.duration;
+      const scheduleTime = Math.max(currentTime, this.nextPlayTime);
+      source.start(scheduleTime);
+      this.nextPlayTime = scheduleTime + buffer.duration;
     } catch (e) {
       console.error('Error playing PCM chunk in AudioBridge:', e);
     }
