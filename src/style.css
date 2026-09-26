@@ -1569,6 +1569,33 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   transform: translateY(0);
 }
 
+/* Portal-based Custom Tooltip (immune to card overflow clipping and viewport boundary leaks) */
+.custom-tooltip.custom-tooltip-portal {
+  position: fixed !important;
+  left: auto;
+  right: auto;
+  top: auto;
+  bottom: auto;
+  transform: translateY(2px);
+  margin: 0 !important;
+  pointer-events: none;
+  z-index: 99999 !important;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--transition-fast), transform var(--transition-fast), visibility var(--transition-fast);
+}
+
+.custom-tooltip.custom-tooltip-portal.visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.custom-tooltip.custom-tooltip-portal.interactive {
+  pointer-events: auto;
+}
+
+
 .watchers-tooltip {
   width: max-content;
   min-width: 190px;

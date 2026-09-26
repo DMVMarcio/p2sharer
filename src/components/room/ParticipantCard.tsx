@@ -2,6 +2,8 @@ import React from 'react';
 import { RoomSlotInfo } from '../../core/types';
 import { useRoom } from '../../hooks/useRoom';
 import { useStore } from '../../hooks/useStore';
+import { Tooltip } from '../common/Tooltip';
+import { WatchersTooltipContent } from './WatchersTooltipContent';
 
 interface ParticipantCardProps {
   slot: RoomSlotInfo;
@@ -53,40 +55,22 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
             <span className="badge-live-dot"></span>AO VIVO
           </span>
           {watchersCount > 0 && !inTray && (
-            <div
-              className="badge-live-watchers custom-tooltip-container"
-              onClick={(e) => e.stopPropagation()}
+            <Tooltip
+              interactive
+              tooltipClassName="watchers-tooltip"
+              content={<WatchersTooltipContent watchers={watchers} currentUsername={username} />}
             >
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"/>
-                <circle cx="12" cy="12" r="3"/>
-              </svg>
-              <span>{watchersCount} assistindo</span>
-
-              <div className="custom-tooltip watchers-tooltip">
-                <div className="watchers-tooltip-header">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"/>
-                    <circle cx="12" cy="12" r="3"/>
-                  </svg>
-                  <span>
-                    {watchersCount === 1 ? '1 pessoa assistindo:' : `${watchersCount} pessoas assistindo:`}
-                  </span>
-                </div>
-                <div className="watchers-tooltip-list">
-                  {watchers.map((w) => {
-                    const isSelf = w.username === username;
-                    return (
-                      <div key={w.peerId} className="watchers-tooltip-item">
-                        <span className="watchers-tooltip-dot"></span>
-                        <span className="watchers-tooltip-name">{w.username}</span>
-                        {isSelf && <span className="badge-you">VOCÊ</span>}
-                      </div>
-                    );
-                  })}
-                </div>
+              <div
+                className="badge-live-watchers"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+                <span>{watchersCount} assistindo</span>
               </div>
-            </div>
+            </Tooltip>
           )}
         </>
       )}
