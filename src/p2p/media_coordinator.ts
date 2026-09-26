@@ -9,8 +9,17 @@ export class MediaCoordinator {
    * 4. video/VP8 (fallback)
    * 5. others
    */
-  public static sortCodecs<T extends { mimeType: string }>(codecs: T[]): T[] {
-    const h264Codecs = codecs.filter((c) => c.mimeType.toLowerCase() === 'video/h264');
+  public static sortCodecs<T extends { mimeType: string; sdpFmtpLine?: string }>(codecs: T[]): T[] {
+    const h264High = codecs.filter(
+      (c) =>
+        c.mimeType.toLowerCase() === 'video/h264' &&
+        Boolean(c.sdpFmtpLine?.toLowerCase().includes('profile-level-id=6400'))
+    );
+    const h264Other = codecs.filter(
+      (c) =>
+        c.mimeType.toLowerCase() === 'video/h264' &&
+        !c.sdpFmtpLine?.toLowerCase().includes('profile-level-id=6400')
+    );
     const av1Codecs = codecs.filter((c) => c.mimeType.toLowerCase() === 'video/av1');
     const vp9Codecs = codecs.filter((c) => c.mimeType.toLowerCase() === 'video/vp9');
     const vp8Codecs = codecs.filter((c) => c.mimeType.toLowerCase() === 'video/vp8');
@@ -24,7 +33,7 @@ export class MediaCoordinator {
       );
     });
 
-    return [...h264Codecs, ...av1Codecs, ...vp9Codecs, ...vp8Codecs, ...otherCodecs];
+    return [...h264High, ...h264Other, ...av1Codecs, ...vp9Codecs, ...vp8Codecs, ...otherCodecs];
   }
 
   /**
@@ -82,6 +91,9 @@ export class MediaCoordinator {
               params.encodings = [{}];
             }
             params.encodings[0].maxBitrate = maxBitrateBps;
+            // Enforce minimum bitrate floor so WebRTC BWE never starves the encoder down to 2 Mbps during fast camera motion
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (params.encodings[0] as any).minBitrate = Math.min(maxBitrateBps, 8_000_000);
             params.encodings[0].maxFramerate = maxFps;
             params.encodings[0].scaleResolutionDownBy = 1.0;
             params.encodings[0].networkPriority = 'high';
