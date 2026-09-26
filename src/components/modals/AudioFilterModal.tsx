@@ -265,7 +265,12 @@ export const AudioFilterModal: React.FC = () => {
             <button className="btn btn-secondary" id="btn-cancel-audio-filter" onClick={closeModal}>
               Cancelar
             </button>
-            <button className="btn btn-primary" id="btn-apply-audio-filter" onClick={handleApply}>
+            <button
+              className="btn btn-primary"
+              id="btn-apply-audio-filter"
+              style={{ whiteSpace: 'nowrap' }}
+              onClick={handleApply}
+            >
               {isExclude
                 ? selectedCount === 0
                   ? 'Salvar'
