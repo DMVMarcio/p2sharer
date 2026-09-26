@@ -66,29 +66,12 @@ export function useAudioFilter() {
   const toggleProcess = useCallback(
     (item: ProcessItem, checked: boolean) => {
       const nameLower = item.name.toLowerCase();
+      const isExclude = stateStore.selectedFilterMode === 'exclude';
+      const activeNames = isExclude ? stateStore.excludeProcessNames : stateStore.includeProcessNames;
+      const activePids = isExclude ? stateStore.excludePids : stateStore.includePids;
 
-      // If in include mode, enforce single selection (focus on one app)
-      if (stateStore.selectedFilterMode === 'include') {
-        const nextNames = new Set<string>();
-        const nextPids = new Set<number>();
-        if (checked) {
-          nextNames.add(nameLower);
-          nextPids.add(item.pid);
-        }
-        setSelectedNames(nextNames);
-        setSelectedPids(nextPids);
-
-        stateStore.set((s) => {
-          s.includeProcessNames = nextNames;
-          s.includePids = nextPids;
-          s.saveAudioFilterPresets();
-        });
-        return;
-      }
-
-      // Exclude mode allows multi-selection
-      const nextNames = new Set(selectedNames);
-      const nextPids = new Set(selectedPids);
+      const nextNames = new Set(activeNames);
+      const nextPids = new Set(activePids);
 
       if (checked) {
         nextNames.add(nameLower);
@@ -110,12 +93,17 @@ export function useAudioFilter() {
       setSelectedPids(nextPids);
 
       stateStore.set((s) => {
-        s.excludeProcessNames = nextNames;
-        s.excludePids = nextPids;
+        if (isExclude) {
+          s.excludeProcessNames = nextNames;
+          s.excludePids = nextPids;
+        } else {
+          s.includeProcessNames = nextNames;
+          s.includePids = nextPids;
+        }
         s.saveAudioFilterPresets();
       });
     },
-    [processes, selectedNames, selectedPids]
+    [processes]
   );
 
   const selectSingleProcess = useCallback(
