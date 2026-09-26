@@ -839,12 +839,7 @@ pub(crate) mod win_audio {
                     include_roots
                 );
                 if include_roots.is_empty() {
-                    println!("[Audio Loopback] No include targets found running; falling back to master loopback to prevent silence.");
-                    if let Ok(master) = get_default_render_audio_client() {
-                        if let Ok(src) = init_capture_source(master, stream_flags, buffer_duration, mix_format_ptr, 0) {
-                            multi_sources.push(src);
-                        }
-                    }
+                    println!("[Audio Loopback] Mode: INCLUDE with 0 running targets; audio will be captured dynamically as targets start.");
                 } else {
                     for &pid in &include_roots {
                         if let Ok(client) = activate_process_loopback_client(pid, false) {

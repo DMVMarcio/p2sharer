@@ -257,10 +257,14 @@ class RoomService {
       const chosenSource = (sourceId === 'gpu_direct' || !sourceId) ? 'screen:0' : sourceId;
       const videoStream = await this.nativeVideoBridge.startCapture(chosenSource, fps, res, mouse, 80);
 
+      const audioMode = stateStore.isAudioFilterFullAudio ? 'full' : stateStore.selectedFilterMode;
+      const audioPids = stateStore.isAudioFilterFullAudio ? [] : stateStore.getActiveFilterPids();
+      const audioNames = stateStore.isAudioFilterFullAudio ? [] : stateStore.getActiveFilterNames();
+
       const audioTrack = await this.audioBridge.startCapture(
-        stateStore.selectedFilterMode,
-        stateStore.getActiveFilterPids(),
-        stateStore.getActiveFilterNames()
+        audioMode,
+        audioPids,
+        audioNames
       );
 
       if (audioTrack) {

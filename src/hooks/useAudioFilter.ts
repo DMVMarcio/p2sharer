@@ -7,6 +7,7 @@ import { showToast } from './useToast';
 
 export function useAudioFilter() {
   const selectedFilterMode = useStore((s) => s.selectedFilterMode);
+  const isFullAudio = useStore((s) => s.isAudioFilterFullAudio);
   const [processes, setProcesses] = useState<ProcessItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [searchText, setSearchText] = useState<string>('');
@@ -62,6 +63,13 @@ export function useAudioFilter() {
     },
     [processes]
   );
+
+  const setFullAudioMode = useCallback((enabled: boolean) => {
+    stateStore.set((s) => {
+      s.isAudioFilterFullAudio = enabled;
+      s.saveAudioFilterPresets();
+    });
+  }, []);
 
   const toggleProcess = useCallback(
     (item: ProcessItem, checked: boolean) => {
@@ -169,9 +177,29 @@ export function useAudioFilter() {
   }, [processes]);
 
   const applyFilters = useCallback(async () => {
+    stateStore.saveAudioFilterPresets();
+
+    if (stateStore.isAudioFilterFullAudio) {
+      try {
+        await invoke('start_audio_capture', {
+          config: {
+            mode: 'full',
+            target_pids: [],
+            target_names: [],
+            sample_rate: 48000,
+          },
+        });
+        showToast('Filtro aplicado: Transmitindo todo o som do computador sem filtros');
+        return true;
+      } catch (err) {
+        console.error('Error applying audio filter:', err);
+        showToast('Erro ao aplicar filtros de áudio.');
+        return false;
+      }
+    }
+
     const pidsArray = stateStore.getActiveFilterPids();
     const namesArray = stateStore.getActiveFilterNames();
-    stateStore.saveAudioFilterPresets();
 
     try {
       await invoke('start_audio_capture', {
@@ -187,12 +215,12 @@ export function useAudioFilter() {
       if (stateStore.selectedFilterMode === 'exclude') {
         msg =
           count === 0
-            ? 'Filtro atualizado: Transmitindo todo o som do computador'
+            ? 'Filtro aplicado: Nenhum aplicativo silenciado'
             : `Filtro aplicado: Silenciando ${count} aplicativo(s)`;
       } else {
         msg =
           count === 0
-            ? 'Transmitindo todo o áudio (nenhum app específico marcado)'
+            ? 'Filtro aplicado: Silêncio (nenhum aplicativo selecionado para transmissão)'
             : `Filtro aplicado: Transmitindo exclusivamente ${count} aplicativo(s)`;
       }
       showToast(msg);
@@ -220,6 +248,8 @@ export function useAudioFilter() {
     isLoading,
     searchText,
     setSearchText,
+    isFullAudio,
+    setFullAudioMode,
     selectedFilterMode,
     setFilterMode,
     selectedPids,
