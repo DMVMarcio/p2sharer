@@ -625,7 +625,7 @@ pub fn start_native_screen_capture(
     let width = target_width.unwrap_or(0);
     let height = target_height.unwrap_or(0);
     let should_draw_mouse = capture_mouse.unwrap_or(true);
-    let jpeg_quality = quality.unwrap_or(85).clamp(50, 95);
+    let jpeg_quality = quality.unwrap_or(75).clamp(50, 90);
 
     let sender = get_frame_sender().clone();
     let start_instant = std::time::Instant::now();
@@ -644,6 +644,7 @@ pub fn start_native_screen_capture(
     std::thread::spawn(move || {
         let _timer_guard = MultimediaTimerGuard::new();
         let mut next_tick_us = pacer_start.elapsed().as_micros() as u64 + target_interval_us;
+        let mut pacer_tick_count: u64 = 0;
 
         while pacer_active.load(Ordering::Relaxed) && CAPTURING_VIDEO.load(Ordering::Relaxed) {
             std::thread::sleep(std::time::Duration::from_millis(1));
@@ -661,10 +662,17 @@ pub fn start_native_screen_capture(
             }
 
             if now_us >= next_tick_us {
+                pacer_tick_count += 1;
                 if let Ok(guard) = pacer_cache.lock() {
                     if let Some(frame) = guard.as_ref() {
                         pacer_last_sent_us.store(now_us, Ordering::Release);
-                        let _ = pacer_sender.send(Message::Binary((**frame).clone()));
+                        // Full frame keyframe refresh once every 60 ticks (~1 sec);
+                        // On intermediate static ticks, emit 1-byte heartbeat tick [0] to bypass CPU JPEG decoding in JS!
+                        if pacer_tick_count % 60 == 0 {
+                            let _ = pacer_sender.send(Message::Binary((**frame).clone()));
+                        } else {
+                            let _ = pacer_sender.send(Message::Binary(vec![0]));
+                        }
                     }
                 }
                 next_tick_us += target_interval_us;

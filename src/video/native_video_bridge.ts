@@ -200,11 +200,27 @@ export class NativeVideoBridge implements VideoCaptureBridge {
       pendingBuffer = null;
 
       try {
-        const blob = new Blob([buffer], { type: 'image/jpeg' });
-        const bitmap = await createImageBitmap(blob, { premultiplyAlpha: 'none' });
+        let bitmap = this.latestBitmap;
 
-        if (!this.isCapturing) {
-          bitmap.close();
+        // If buffer contains a real JPEG payload (> 4 bytes), decode it into an ImageBitmap
+        if (buffer.byteLength > 4) {
+          const blob = new Blob([buffer], { type: 'image/jpeg' });
+          const newBitmap = await createImageBitmap(blob, { premultiplyAlpha: 'none' });
+
+          if (!this.isCapturing) {
+            newBitmap.close();
+            isDecoding = false;
+            return;
+          }
+
+          if (this.latestBitmap) {
+            this.latestBitmap.close();
+          }
+          this.latestBitmap = newBitmap;
+          bitmap = newBitmap;
+        }
+
+        if (!bitmap || !this.isCapturing) {
           isDecoding = false;
           return;
         }
@@ -223,18 +239,11 @@ export class NativeVideoBridge implements VideoCaptureBridge {
             videoFrame.close();
           } catch (writeErr) {
             console.warn('[NativeVideoBridge] VideoFrame write failed:', writeErr);
-          } finally {
-            bitmap.close();
           }
         } else {
           // Canvas fallback
-          if (this.bitmapCtx) {
-            this.bitmapCtx.transferFromImageBitmap(bitmap);
-          } else if (this.ctx && this.canvas) {
+          if (this.ctx && this.canvas) {
             this.ctx.drawImage(bitmap, 0, 0, this.canvas.width, this.canvas.height);
-            bitmap.close();
-          } else {
-            bitmap.close();
           }
 
           const track = this.activeStream?.getVideoTracks()[0];
