@@ -642,7 +642,7 @@ pub fn start_native_screen_capture(
     let width = target_width.unwrap_or(0);
     let height = target_height.unwrap_or(0);
     let should_draw_mouse = capture_mouse.unwrap_or(true);
-    let jpeg_quality = quality.unwrap_or(92).clamp(60, 95);
+    let jpeg_quality = quality.unwrap_or(95).clamp(60, 98);
 
     let sender = get_frame_sender().clone();
     let start_instant = std::time::Instant::now();
@@ -1063,7 +1063,7 @@ mod tests {
     use super::*;
 
     fn sanitize_quality(quality: Option<u8>) -> u8 {
-        quality.unwrap_or(92).clamp(60, 95)
+        quality.unwrap_or(95).clamp(60, 98)
     }
 
     #[test]
@@ -1075,10 +1075,10 @@ mod tests {
 
     #[test]
     fn test_quality_clamp() {
-        assert_eq!(sanitize_quality(None), 92);
+        assert_eq!(sanitize_quality(None), 95);
         assert_eq!(sanitize_quality(Some(30)), 60);
         assert_eq!(sanitize_quality(Some(75)), 75);
-        assert_eq!(sanitize_quality(Some(100)), 95);
+        assert_eq!(sanitize_quality(Some(100)), 98);
     }
 
     #[test]

@@ -110,11 +110,12 @@ export class MediaCoordinator {
             }
             await sender.setParameters(params);
 
-            // Enforce 'motion' contentHint to prevent WebRTC screenshare throttling to 25 FPS
+            // Enforce 'detail' contentHint to enable Screen Content Coding, prevent deblocking blur,
+            // and eliminate mosquito ringing around high-contrast text and UI elements.
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             if (sender.track && 'contentHint' in sender.track) {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              (sender.track as any).contentHint = 'motion';
+              (sender.track as any).contentHint = 'detail';
             }
           } catch (err) {
             console.warn('Failed to apply sender bitrate parameters:', err);

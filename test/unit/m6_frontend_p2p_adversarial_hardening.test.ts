@@ -1025,9 +1025,9 @@ describe('Tier 5 Adversarial Coverage Hardening: Frontend, Video & P2P Architect
         assert.strictEqual(bridge.isCapturingNative(), false);
         assert.strictEqual(bridge.getActiveStream(), mockStream);
 
-        // Motion contentHint applied
+        // Detail contentHint applied for screen sharing text fidelity
         const track = stream.getVideoTracks()[0];
-        assert.strictEqual((track as any).contentHint, 'motion');
+        assert.strictEqual((track as any).contentHint, 'detail');
 
         // Cleanup
         await bridge.stop();
