@@ -33,21 +33,31 @@ describe('UI Visual Transitions and Animations', () => {
       assert.ok(!body.includes('transform'), 'Must not contain transform to maintain pure fade');
     });
 
-    it('applies modalFadeIn animation to .modal-overlay', () => {
+    it('applies valid modalFadeIn animation to .modal-overlay without syntax conflicts', () => {
       const overlayMatch = cssContent.match(/\.modal-overlay\s*\{([\s\S]*?)\}/);
       assert.ok(overlayMatch, '.modal-overlay must be defined');
+      const rule = overlayMatch[1];
       assert.ok(
-        overlayMatch[1].includes('modalFadeIn'),
+        rule.includes('modalFadeIn'),
         '.modal-overlay must apply modalFadeIn animation'
+      );
+      assert.ok(
+        !rule.includes('var(--transition-normal) ease-out'),
+        'Must not concatenate var(--transition-normal) and ease-out which causes invalid CSS syntax'
       );
     });
 
-    it('applies modalFadeIn animation to .connecting-overlay', () => {
+    it('applies valid modalFadeIn animation to .connecting-overlay without syntax conflicts', () => {
       const connectingMatch = cssContent.match(/\.connecting-overlay\s*\{([\s\S]*?)\}/);
       assert.ok(connectingMatch, '.connecting-overlay must be defined');
+      const rule = connectingMatch[1];
       assert.ok(
-        connectingMatch[1].includes('modalFadeIn'),
+        rule.includes('modalFadeIn'),
         '.connecting-overlay must apply modalFadeIn animation'
+      );
+      assert.ok(
+        !rule.includes('var(--transition-normal) ease-out'),
+        'Must not concatenate var(--transition-normal) and ease-out which causes invalid CSS syntax'
       );
     });
   });
@@ -104,6 +114,40 @@ describe('UI Visual Transitions and Animations', () => {
         match[1].includes('spotlightFeaturedEnter'),
         'Featured cards must play spotlightFeaturedEnter animation'
       );
+    });
+  });
+
+  describe('Dynamic Peer Entry and Layout Animations', () => {
+    it('defines peerCardEnter keyframes with dynamic spring scale and translateY pop', () => {
+      assert.ok(cssContent.includes('@keyframes peerCardEnter'), 'Must define peerCardEnter keyframes');
+      const body = extractKeyframesBlock('peerCardEnter');
+      assert.ok(body.length > 0, 'peerCardEnter body must exist');
+      assert.ok(body.includes('opacity: 0'), 'Must start at opacity 0');
+      assert.ok(body.includes('opacity: 1'), 'Must transition to opacity 1');
+      assert.ok(body.includes('transform: scale('), 'Must scale in');
+      assert.ok(body.includes('translateY('), 'Must pop vertically');
+    });
+
+    it('applies peerCardEnter to grid cards and spotlight tray cards', () => {
+      assert.ok(
+        cssContent.includes('.streams-grid-wrapper .stream-card'),
+        'Must style grid stream-card'
+      );
+      assert.ok(
+        cssContent.includes('.spotlight-tray-strip .stream-card'),
+        'Must style tray stream-card'
+      );
+      const gridMatch = cssContent.match(
+        /\.streams-grid-wrapper \.stream-card,\s*\.streams-grid-wrapper \.participant-card\s*\{([\s\S]*?)\}/
+      );
+      assert.ok(gridMatch, 'Grid cards selector must match');
+      assert.ok(gridMatch[1].includes('peerCardEnter'), 'Grid cards must play peerCardEnter');
+
+      const trayMatch = cssContent.match(
+        /\.spotlight-tray-strip \.stream-card,\s*\.spotlight-tray-strip \.participant-card\s*\{([\s\S]*?)\}/
+      );
+      assert.ok(trayMatch, 'Tray cards selector must match');
+      assert.ok(trayMatch[1].includes('peerCardEnter'), 'Tray cards must play peerCardEnter');
     });
   });
 
