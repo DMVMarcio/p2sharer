@@ -1,18 +1,38 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { stateStore } from '../core/state_store';
 import { ProcessItem } from '../core/types';
-import { useStore } from './useStore';
 import { showToast } from './useToast';
 
 export function useAudioFilter() {
-  const selectedFilterMode = useStore((s) => s.selectedFilterMode);
-  const isFullAudio = useStore((s) => s.isAudioFilterFullAudio);
+  const [selectedFilterMode, setSelectedFilterMode] = useState<'exclude' | 'include'>(
+    () => stateStore.selectedFilterMode
+  );
+  const [isFullAudio, setIsFullAudio] = useState<boolean>(
+    () => stateStore.isAudioFilterFullAudio
+  );
   const [processes, setProcesses] = useState<ProcessItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [searchText, setSearchText] = useState<string>('');
-  const [selectedPids, setSelectedPids] = useState<Set<number>>(new Set());
-  const [selectedNames, setSelectedNames] = useState<Set<string>>(new Set());
+
+  // Local draft selections initialized from persistent stateStore
+  const [draftExcludeNames, setDraftExcludeNames] = useState<Set<string>>(
+    () => new Set(stateStore.excludeProcessNames)
+  );
+  const [draftIncludeNames, setDraftIncludeNames] = useState<Set<string>>(
+    () => new Set(stateStore.includeProcessNames)
+  );
+  const [draftExcludePids, setDraftExcludePids] = useState<Set<number>>(
+    () => new Set(stateStore.excludePids)
+  );
+  const [draftIncludePids, setDraftIncludePids] = useState<Set<number>>(
+    () => new Set(stateStore.includePids)
+  );
+
+  const draftExcludeNamesRef = useRef(draftExcludeNames);
+  draftExcludeNamesRef.current = draftExcludeNames;
+  const draftIncludeNamesRef = useRef(draftIncludeNames);
+  draftIncludeNamesRef.current = draftIncludeNames;
 
   const loadProcesses = useCallback(async () => {
     setIsLoading(true);
@@ -20,21 +40,19 @@ export function useAudioFilter() {
       const items = await invoke<ProcessItem[]>('list_audio_processes');
       setProcesses(items);
 
-      // Reconcile with saved active filter presets
-      const isExclude = stateStore.selectedFilterMode === 'exclude';
-      const activeNames = isExclude ? stateStore.excludeProcessNames : stateStore.includeProcessNames;
-      const newPids = new Set<number>();
-      const newNames = new Set<string>(activeNames);
+      const exNames = draftExcludeNamesRef.current;
+      const inNames = draftIncludeNamesRef.current;
+      const exPids = new Set<number>();
+      const inPids = new Set<number>();
 
       items.forEach((p) => {
         const nameLower = p.name.toLowerCase();
-        if (activeNames.has(nameLower)) {
-          newPids.add(p.pid);
-        }
+        if (exNames.has(nameLower)) exPids.add(p.pid);
+        if (inNames.has(nameLower)) inPids.add(p.pid);
       });
 
-      setSelectedPids(newPids);
-      setSelectedNames(newNames);
+      setDraftExcludePids(exPids);
+      setDraftIncludePids(inPids);
     } catch (err) {
       console.error('Failed to list processes:', err);
       showToast('Erro ao carregar lista de aplicativos de áudio.');
@@ -43,115 +61,79 @@ export function useAudioFilter() {
     }
   }, []);
 
-  const setFilterMode = useCallback(
-    (mode: 'exclude' | 'include') => {
-      stateStore.set((s) => {
-        s.selectedFilterMode = mode;
-        s.saveAudioFilterPresets();
-      });
-      // Synchronize selection based on new mode
-      const activeNames = mode === 'exclude' ? stateStore.excludeProcessNames : stateStore.includeProcessNames;
-      const nextNames = new Set(activeNames);
-      const nextPids = new Set<number>();
-      processes.forEach((p) => {
-        if (nextNames.has(p.name.toLowerCase())) {
-          nextPids.add(p.pid);
-        }
-      });
-      setSelectedNames(nextNames);
-      setSelectedPids(nextPids);
-    },
-    [processes]
-  );
+  const setFilterMode = useCallback((mode: 'exclude' | 'include') => {
+    setSelectedFilterMode(mode);
+  }, []);
 
   const setFullAudioMode = useCallback((enabled: boolean) => {
-    stateStore.set((s) => {
-      s.isAudioFilterFullAudio = enabled;
-      s.saveAudioFilterPresets();
-    });
+    setIsFullAudio(enabled);
   }, []);
 
   const toggleProcess = useCallback(
     (item: ProcessItem, checked: boolean) => {
       const nameLower = item.name.toLowerCase();
-      const isExclude = stateStore.selectedFilterMode === 'exclude';
-      const activeNames = isExclude ? stateStore.excludeProcessNames : stateStore.includeProcessNames;
-      const activePids = isExclude ? stateStore.excludePids : stateStore.includePids;
-
-      const nextNames = new Set(activeNames);
-      const nextPids = new Set(activePids);
-
-      if (checked) {
-        nextNames.add(nameLower);
-        processes.forEach((p) => {
-          if (p.name.toLowerCase() === nameLower) {
-            nextPids.add(p.pid);
-          }
+      if (selectedFilterMode === 'exclude') {
+        setDraftExcludeNames((prev) => {
+          const next = new Set(prev);
+          if (checked) next.add(nameLower);
+          else next.delete(nameLower);
+          return next;
+        });
+        setDraftExcludePids((prev) => {
+          const next = new Set(prev);
+          processes.forEach((p) => {
+            if (p.name.toLowerCase() === nameLower) {
+              if (checked) next.add(p.pid);
+              else next.delete(p.pid);
+            }
+          });
+          return next;
         });
       } else {
-        nextNames.delete(nameLower);
-        processes.forEach((p) => {
-          if (p.name.toLowerCase() === nameLower) {
-            nextPids.delete(p.pid);
-          }
+        setDraftIncludeNames((prev) => {
+          const next = new Set(prev);
+          if (checked) next.add(nameLower);
+          else next.delete(nameLower);
+          return next;
+        });
+        setDraftIncludePids((prev) => {
+          const next = new Set(prev);
+          processes.forEach((p) => {
+            if (p.name.toLowerCase() === nameLower) {
+              if (checked) next.add(p.pid);
+              else next.delete(p.pid);
+            }
+          });
+          return next;
         });
       }
-
-      setSelectedNames(nextNames);
-      setSelectedPids(nextPids);
-
-      stateStore.set((s) => {
-        if (isExclude) {
-          s.excludeProcessNames = nextNames;
-          s.excludePids = nextPids;
-        } else {
-          s.includeProcessNames = nextNames;
-          s.includePids = nextPids;
-        }
-        s.saveAudioFilterPresets();
-      });
     },
-    [processes]
+    [selectedFilterMode, processes]
   );
 
   const selectSingleProcess = useCallback(
     (item: ProcessItem) => {
       const nameLower = item.name.toLowerCase();
-      const nextNames = new Set([nameLower]);
-      const nextPids = new Set([item.pid]);
-
-      setSelectedNames(nextNames);
-      setSelectedPids(nextPids);
-
-      stateStore.set((s) => {
-        if (s.selectedFilterMode === 'include') {
-          s.includeProcessNames = nextNames;
-          s.includePids = nextPids;
-        } else {
-          s.excludeProcessNames = nextNames;
-          s.excludePids = nextPids;
-        }
-        s.saveAudioFilterPresets();
-      });
+      if (selectedFilterMode === 'exclude') {
+        setDraftExcludeNames(new Set([nameLower]));
+        setDraftExcludePids(new Set([item.pid]));
+      } else {
+        setDraftIncludeNames(new Set([nameLower]));
+        setDraftIncludePids(new Set([item.pid]));
+      }
     },
-    []
+    [selectedFilterMode]
   );
 
   const clearSelection = useCallback(() => {
-    setSelectedNames(new Set());
-    setSelectedPids(new Set());
-
-    stateStore.set((s) => {
-      if (s.selectedFilterMode === 'exclude') {
-        s.excludeProcessNames = new Set();
-        s.excludePids = new Set();
-      } else {
-        s.includeProcessNames = new Set();
-        s.includePids = new Set();
-      }
-      s.saveAudioFilterPresets();
-    });
-  }, []);
+    if (selectedFilterMode === 'exclude') {
+      setDraftExcludeNames(new Set());
+      setDraftExcludePids(new Set());
+    } else {
+      setDraftIncludeNames(new Set());
+      setDraftIncludePids(new Set());
+    }
+  }, [selectedFilterMode]);
 
   const selectVoiceApps = useCallback(() => {
     const nextNames = new Set<string>();
@@ -164,22 +146,29 @@ export function useAudioFilter() {
       }
     });
 
-    setSelectedNames(nextNames);
-    setSelectedPids(nextPids);
-
-    stateStore.set((s) => {
-      if (s.selectedFilterMode === 'exclude') {
-        s.excludeProcessNames = nextNames;
-        s.excludePids = nextPids;
-      }
-      s.saveAudioFilterPresets();
-    });
-  }, [processes]);
+    if (selectedFilterMode === 'exclude') {
+      setDraftExcludeNames(nextNames);
+      setDraftExcludePids(nextPids);
+    } else {
+      setDraftIncludeNames(nextNames);
+      setDraftIncludePids(nextPids);
+    }
+  }, [processes, selectedFilterMode]);
 
   const applyFilters = useCallback(async () => {
-    stateStore.saveAudioFilterPresets();
+    // 1. Commit draft state to persistent store and localStorage
+    stateStore.set((s) => {
+      s.isAudioFilterFullAudio = isFullAudio;
+      s.selectedFilterMode = selectedFilterMode;
+      s.excludeProcessNames = new Set(draftExcludeNames);
+      s.includeProcessNames = new Set(draftIncludeNames);
+      s.excludePids = new Set(draftExcludePids);
+      s.includePids = new Set(draftIncludePids);
+      s.saveAudioFilterPresets();
+    });
 
-    if (stateStore.isAudioFilterFullAudio) {
+    // 2. Dispatch updated config to backend audio capture engine
+    if (isFullAudio) {
       try {
         await invoke('start_audio_capture', {
           config: {
@@ -198,13 +187,13 @@ export function useAudioFilter() {
       }
     }
 
-    const pidsArray = stateStore.getActiveFilterPids();
-    const namesArray = stateStore.getActiveFilterNames();
+    const pidsArray = Array.from(selectedFilterMode === 'exclude' ? draftExcludePids : draftIncludePids);
+    const namesArray = Array.from(selectedFilterMode === 'exclude' ? draftExcludeNames : draftIncludeNames);
 
     try {
       await invoke('start_audio_capture', {
         config: {
-          mode: stateStore.selectedFilterMode,
+          mode: selectedFilterMode,
           target_pids: pidsArray,
           target_names: namesArray,
           sample_rate: 48000,
@@ -212,7 +201,7 @@ export function useAudioFilter() {
       });
       const count = namesArray.length || pidsArray.length;
       let msg = '';
-      if (stateStore.selectedFilterMode === 'exclude') {
+      if (selectedFilterMode === 'exclude') {
         msg =
           count === 0
             ? 'Filtro aplicado: Nenhum aplicativo silenciado'
@@ -230,7 +219,14 @@ export function useAudioFilter() {
       showToast('Erro ao aplicar filtros de áudio.');
       return false;
     }
-  }, []);
+  }, [
+    isFullAudio,
+    selectedFilterMode,
+    draftExcludeNames,
+    draftIncludeNames,
+    draftExcludePids,
+    draftIncludePids,
+  ]);
 
   const filteredProcesses = processes.filter((p) => {
     if (!searchText) return true;
@@ -241,6 +237,9 @@ export function useAudioFilter() {
       p.pid.toString().includes(lower)
     );
   });
+
+  const selectedNames = selectedFilterMode === 'exclude' ? draftExcludeNames : draftIncludeNames;
+  const selectedPids = selectedFilterMode === 'exclude' ? draftExcludePids : draftIncludePids;
 
   return {
     processes: filteredProcesses,
