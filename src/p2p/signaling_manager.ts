@@ -226,27 +226,8 @@ export class SignalingManager {
         if (Object.keys(raw).length > 0) {
           return raw;
         }
-        const result: Record<string, any> = {};
-        let connectedCount = 0;
-        this.mqttSocketStatuses.forEach((val, url) => {
-          result[url] = val;
-          if (val.connected || val.readyState === 1) {
-            connectedCount++;
-          }
-        });
-        if (connectedCount > 0) {
-          return result;
-        }
-        if (this.activeRoom) {
-          const fallback: Record<string, any> = {};
-          DEFAULT_MQTT_RELAY_URLS.forEach((u) => {
-            fallback[u] = { readyState: 1, connected: true };
-          });
-          return fallback;
-        }
-        if (Object.keys(result).length > 0) {
-          return result;
-        }
+        // Probe clients can publish rendezvous beacons, but their connection does not
+        // prove that Trystero's own subscriptions are connected to the broker.
         return {};
       }
       if (transport === 'nostr') {
@@ -452,6 +433,7 @@ export class SignalingManager {
    * MQTT -> Nostr -> Torrent -> MQTT
    */
   public recordWatchdogFailure(reason = 'relay_connectivity_loss'): SignalingTransport {
+    if (this.isFailingOver) return this.activeTransport;
     const previousTransport = this.activeTransport;
     const currentIdx = this.availableTransports.indexOf(this.activeTransport);
     const nextIdx = (currentIdx + 1) % this.availableTransports.length;
@@ -580,8 +562,10 @@ export class SignalingManager {
 
     const relay = this.getRelayStatus(this.activeTransport);
 
-    // If direct WebRTC peers are already active, room signaling may be idle but healthy
-    if (this.directConnectedPeers.size > 0 && relay.connected > 0) {
+    // Keep established media/data channels alive. Peers on different signaling
+    // transports cannot discover each other, so defer automatic migration while
+    // an existing mesh edge can still relay membership information.
+    if (this.directConnectedPeers.size > 0) {
       this.consecutiveStalls = 0;
       return;
     }

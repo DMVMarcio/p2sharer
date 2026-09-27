@@ -164,6 +164,10 @@ export class GroupRoomManager {
   private signalingTopic: string = '';
   private rtcConfig: RTCConfiguration | null = null;
 
+  private canAnnouncePresence(): boolean {
+    return this.isCreator || this.peerTracker.directConnectedPeers.size > 0;
+  }
+
   constructor(username: string, roomId: string, password = '', isCreator = false, turnConfig?: TurnConfig) {
     this.username = username;
     this.roomId = roomId.trim();
@@ -274,6 +278,9 @@ export class GroupRoomManager {
       {
         appId: APP_ID,
         rtcConfig: this.rtcConfig,
+        // A creator advertises the room. A joiner listens and activates only
+        // when an existing active participant announces this room.
+        passive: !this.isCreator,
       },
       this.signalingTopic,
       {
@@ -290,7 +297,7 @@ export class GroupRoomManager {
     // discover us immediately without waiting for 5.3s Trystero ticks.
     [100, 400, 1000, 2200].forEach((delay) => {
       setTimeout(() => {
-        if (this.room && this.signalingTopic) {
+        if (this.room && this.signalingTopic && this.canAnnouncePresence()) {
           signalingManager.reannounce(this.signalingTopic);
         }
       }, delay);
@@ -301,6 +308,9 @@ export class GroupRoomManager {
     if (!this.callbacks || !this.signalingTopic) return;
 
     console.log('[P2P] Re-establishing room bindings on new transport...');
+    // Replacing the Trystero room closes its old WebRTC channels. Old-room
+    // onPeerLeave callbacks are ignored, so explicitly retire those edges.
+    Array.from(this.peerTracker.directConnectedPeers).forEach((peerId) => this.removePeer(peerId));
     this.setupRoomInstance();
 
     // Re-announce presence and PEX
@@ -330,6 +340,7 @@ export class GroupRoomManager {
 
   private bindRoomActions(): void {
     if (!this.room) return;
+    const boundRoom = this.room;
 
     // 0. Setup Live Room Password Sync Action
     this.passwordAction = this.room.makeAction('room_password_sync');
@@ -397,11 +408,8 @@ export class GroupRoomManager {
       const peerId = meta.peerId;
       this.peerTracker.touchPeer(peerId);
 
-      const oldName = this.peerTracker.getUsername(peerId);
       const newName = data.username || `Usuário (${peerId.slice(0, 4)})`;
-      if (oldName !== newName) {
-        this.peerTracker.addPeer(peerId, newName, Boolean(data.isCreator), data.joinedAt);
-      }
+      this.peerTracker.addPeer(peerId, newName, Boolean(data.isCreator), data.joinedAt);
 
       const wasStreaming = this.peerTracker.isStreaming(peerId);
       if (data.isStreaming) {
@@ -657,13 +665,32 @@ export class GroupRoomManager {
         this.peerTracker.setPing(meta.peerId, ping);
       }
     };
+
+    // Trystero delivers action handlers asynchronously. A queued message from
+    // the previous transport must not mutate the replacement room's state.
+    [
+      this.passwordAction, this.chatAction, this.historyAction, this.presenceAction,
+      this.streamStatusAction, this.streamReqAction, this.leaveAction,
+      this.pexAction, this.meshRelayAction, this.watchAction,
+      this.pingAction, this.pongAction,
+    ].forEach((action) => {
+      if (!action?.onMessage) return;
+      const handler = action.onMessage;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      action.onMessage = (...args: any[]) => {
+        if (this.room !== boundRoom) return;
+        return handler(...args);
+      };
+    });
   }
 
   private bindRoomListeners(): void {
     if (!this.room) return;
+    const boundRoom = this.room;
 
     // 9. Direct WebRTC Peer Lifecycle Listeners
     this.room.onPeerJoin = (peerId: string) => {
+      if (this.room !== boundRoom) return;
       console.log(`[P2P] Direct WebRTC peer connection active: ${peerId}`);
       const isNew = !this.peerTracker.isVerified(peerId);
 
@@ -721,12 +748,14 @@ export class GroupRoomManager {
     };
 
     this.room.onPeerLeave = (peerId: string) => {
+      if (this.room !== boundRoom) return;
       console.log(`[P2P] Peer left room: ${peerId}`);
       this.removePeer(peerId);
     };
 
     // 10. Incoming Stream Listener
     this.room.onPeerStream = (stream: MediaStream, peerId: string) => {
+      if (this.room !== boundRoom) return;
       console.log(`[P2P] Received stream from peer: ${peerId}`);
       this.peerTracker.touchPeer(peerId);
       this.peerTracker.setStreaming(peerId, true);
@@ -811,6 +840,7 @@ export class GroupRoomManager {
       if (
         (hasNoDirectPeers || rumors.length > 0) &&
         this.signalingTopic &&
+        this.canAnnouncePresence() &&
         now - this.lastRumorReannounceTime > 2500
       ) {
         this.lastRumorReannounceTime = now;

@@ -236,7 +236,7 @@ describe('M3 Adversarial Challenge: Multi-Transport Signaling Failover & Watchdo
       assert.equal(manager.failoverHistory.length, 0);
     });
 
-    it('Empirical-2.4: Connected direct peers allow room to failover if signaling relays die', () => {
+    it('Empirical-2.4: Connected direct peers stay on their current mesh if relays die', () => {
       const manager = new SignalingManager();
       (manager as any).activeRoom = { leave: async () => {} };
       (manager as any).lastRoomParams = { config: {}, topic: 'test-topic' };
@@ -253,14 +253,15 @@ describe('M3 Adversarial Challenge: Multi-Transport Signaling Failover & Watchdo
       manager.checkRelayHealth();
       assert.equal((manager as any).consecutiveStalls, 0);
 
-      // Case B: 0 relays connected -> even with direct peers, signaling relay death triggers failover
-      // to permit new peers to discover the room
+      // Case B: 0 relays connected -> preserve live WebRTC channels rather than
+      // migrating only this client to an isolated signaling transport.
       manager.getRelaySockets = () => ({});
       manager.checkRelayHealth();
-      assert.equal((manager as any).consecutiveStalls, 1);
+      assert.equal((manager as any).consecutiveStalls, 0);
 
       manager.checkRelayHealth();
-      assert.equal(manager.getActiveTransport(), 'nostr');
+      assert.equal(manager.getActiveTransport(), 'mqtt');
+      assert.equal(manager.failoverHistory.length, 0);
     });
 
     it('Empirical-2.5: Relay socket status parser accurately handles various WebSocket readyState values', () => {
