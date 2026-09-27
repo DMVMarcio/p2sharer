@@ -36,28 +36,119 @@ export class MediaCoordinator {
     return [...h264High, ...h264Other, ...av1Codecs, ...vp9Codecs, ...vp8Codecs, ...otherCodecs];
   }
 
+  private static globalMungingInitialized = false;
+
   /**
-   * Munges SDP to enforce Google WebRTC bitrate floor and ceiling (x-google-min-bitrate, x-google-max-bitrate, b=AS)
+   * Installs global monkey-patches on RTCPeerConnection.prototype to ensure
+   * all SDP offers and answers (including parameterless setLocalDescription() used by Trystero)
+   * are munged with robust bitrate floor/ceiling (b=AS, b=TIAS, x-google-min-bitrate).
+   */
+  public static initGlobalWebRtcMunging(): void {
+    if (MediaCoordinator.globalMungingInitialized) return;
+    if (typeof RTCPeerConnection === 'undefined' || !RTCPeerConnection.prototype) return;
+    MediaCoordinator.globalMungingInitialized = true;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const proto = RTCPeerConnection.prototype as any;
+    const origCreateOffer = proto.createOffer;
+    const origCreateAnswer = proto.createAnswer;
+    const origSetLocalDescription = proto.setLocalDescription;
+    const origSetRemoteDescription = proto.setRemoteDescription;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    proto.createOffer = async function (options?: any) {
+      const offer = await origCreateOffer.call(this, options);
+      if (offer && offer.sdp) {
+        offer.sdp = MediaCoordinator.mungeSdpBitrates(offer.sdp);
+      }
+      return offer;
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    proto.createAnswer = async function (options?: any) {
+      const answer = await origCreateAnswer.call(this, options);
+      if (answer && answer.sdp) {
+        answer.sdp = MediaCoordinator.mungeSdpBitrates(answer.sdp);
+      }
+      return answer;
+    };
+
+    proto.setLocalDescription = async function (
+      description?: RTCLocalSessionDescriptionInit
+    ) {
+      if (!description) {
+        // Parameterless setLocalDescription() as invoked by modern WebRTC / Trystero:
+        // Automatically generate offer or answer, munge SDP with high-bitrate floor/ceiling, and apply it.
+        try {
+          if (this.signalingState === 'have-remote-offer' || this.signalingState === 'have-local-pranswer') {
+            const answer = await origCreateAnswer.call(this);
+            if (answer && answer.sdp) {
+              answer.sdp = MediaCoordinator.mungeSdpBitrates(answer.sdp);
+            }
+            return await origSetLocalDescription.call(this, answer);
+          } else {
+            const offer = await origCreateOffer.call(this);
+            if (offer && offer.sdp) {
+              offer.sdp = MediaCoordinator.mungeSdpBitrates(offer.sdp);
+            }
+            return await origSetLocalDescription.call(this, offer);
+          }
+        } catch {
+          return origSetLocalDescription.call(this);
+        }
+      } else {
+        if (description && description.sdp) {
+          description.sdp = MediaCoordinator.mungeSdpBitrates(description.sdp);
+        }
+        return origSetLocalDescription.call(this, description);
+      }
+    };
+
+    proto.setRemoteDescription = async function (
+      description: RTCSessionDescriptionInit
+    ) {
+      if (description && description.sdp) {
+        description.sdp = MediaCoordinator.mungeSdpBitrates(description.sdp);
+      }
+      return origSetRemoteDescription.call(this, description);
+    };
+  }
+
+  /**
+   * Munges SDP to enforce Google WebRTC bitrate floor and ceiling (x-google-min-bitrate, x-google-max-bitrate, b=AS, b=TIAS)
    */
   public static mungeSdpBitrates(
     sdp: string,
-    minBitrateKbps: number = 2500,
+    minBitrateKbps: number = 8000,
     maxBitrateKbps: number = 25000
   ): string {
-    const lines = sdp.split('\r\n');
+    if (!sdp || typeof sdp !== 'string') return sdp;
+
+    const lines = sdp.split(/\r?\n/);
     let inVideo = false;
     const modifiedLines: string[] = [];
+    const videoPayloadTypes: string[] = [];
+    const fmtpPayloadTypes: Set<string> = new Set();
 
     for (let i = 0; i < lines.length; i++) {
       let line = lines[i];
 
       if (line.startsWith('m=video')) {
         inVideo = true;
+        const parts = line.split(' ');
+        for (let p = 3; p < parts.length; p++) {
+          if (parts[p]) videoPayloadTypes.push(parts[p]);
+        }
         modifiedLines.push(line);
-        // Ensure b=AS line exists right after m=video line if not already present
-        const nextLine = lines[i + 1] || '';
-        if (!nextLine.startsWith('b=AS:') && !nextLine.startsWith('b=TIAS:')) {
+
+        // Ensure b=AS and b=TIAS lines exist right after m=video line if not already present
+        const nextLine1 = lines[i + 1] || '';
+        const nextLine2 = lines[i + 2] || '';
+        if (!nextLine1.startsWith('b=AS:') && !nextLine2.startsWith('b=AS:')) {
           modifiedLines.push(`b=AS:${maxBitrateKbps}`);
+        }
+        if (!nextLine1.startsWith('b=TIAS:') && !nextLine2.startsWith('b=TIAS:')) {
+          modifiedLines.push(`b=TIAS:${maxBitrateKbps * 1000}`);
         }
         continue;
       }
@@ -67,6 +158,13 @@ export class MediaCoordinator {
       }
 
       if (inVideo && line.startsWith('a=fmtp:')) {
+        const colonIdx = line.indexOf(':');
+        const spaceIdx = line.indexOf(' ', colonIdx);
+        if (colonIdx !== -1 && spaceIdx !== -1) {
+          const pt = line.slice(colonIdx + 1, spaceIdx).trim();
+          fmtpPayloadTypes.add(pt);
+        }
+
         // Append x-google-min-bitrate, start-bitrate and max-bitrate if not already present
         if (!line.includes('x-google-min-bitrate')) {
           line = `${line};x-google-min-bitrate=${minBitrateKbps};x-google-start-bitrate=${Math.round(minBitrateKbps * 1.5)};x-google-max-bitrate=${maxBitrateKbps}`;
@@ -74,6 +172,17 @@ export class MediaCoordinator {
       }
 
       modifiedLines.push(line);
+    }
+
+    if (inVideo || videoPayloadTypes.length > 0) {
+      for (const pt of videoPayloadTypes) {
+        if (!fmtpPayloadTypes.has(pt)) {
+          modifiedLines.push(
+            `a=fmtp:${pt} x-google-min-bitrate=${minBitrateKbps};x-google-start-bitrate=${Math.round(minBitrateKbps * 1.5)};x-google-max-bitrate=${maxBitrateKbps}`
+          );
+          fmtpPayloadTypes.add(pt);
+        }
+      }
     }
 
     return modifiedLines.join('\r\n');
@@ -90,11 +199,37 @@ export class MediaCoordinator {
     (pc as any).__sdp_munged = true;
 
     const originalSetLocalDescription = pc.setLocalDescription.bind(pc);
+    const originalCreateOffer = pc.createOffer ? pc.createOffer.bind(pc) : null;
+    const originalCreateAnswer = pc.createAnswer ? pc.createAnswer.bind(pc) : null;
+
     pc.setLocalDescription = async function (description?: RTCLocalSessionDescriptionInit) {
-      if (description && description.sdp) {
-        description.sdp = MediaCoordinator.mungeSdpBitrates(description.sdp);
+      if (!description) {
+        try {
+          if (
+            (pc.signalingState === 'have-remote-offer' || pc.signalingState === 'have-local-pranswer') &&
+            originalCreateAnswer
+          ) {
+            const answer = await originalCreateAnswer();
+            if (answer && answer.sdp) {
+              answer.sdp = MediaCoordinator.mungeSdpBitrates(answer.sdp);
+            }
+            return await originalSetLocalDescription(answer);
+          } else if (originalCreateOffer) {
+            const offer = await originalCreateOffer();
+            if (offer && offer.sdp) {
+              offer.sdp = MediaCoordinator.mungeSdpBitrates(offer.sdp);
+            }
+            return await originalSetLocalDescription(offer);
+          }
+        } catch {
+          return originalSetLocalDescription();
+        }
+      } else {
+        if (description && description.sdp) {
+          description.sdp = MediaCoordinator.mungeSdpBitrates(description.sdp);
+        }
+        return originalSetLocalDescription(description);
       }
-      return originalSetLocalDescription(description);
     };
   }
 
@@ -182,6 +317,13 @@ export class MediaCoordinator {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               (sender.track as any).contentHint = 'detail';
             }
+
+            // Immediately trigger an intra-keyframe to prevent encoder QP lock at low start bitrate
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            if (typeof (sender as any).generateKeyFrame === 'function') {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              (sender as any).generateKeyFrame().catch(() => {});
+            }
           } catch (err) {
             console.warn('Failed to apply sender bitrate parameters:', err);
           }
@@ -190,6 +332,26 @@ export class MediaCoordinator {
     } catch (err) {
       console.warn('Failed to apply sender bitrate parameters:', err);
     }
+  }
+
+  /**
+   * Forces video senders to encode an immediate IDR intra-keyframe with low QP,
+   * refreshing video sharpness and preventing encoder QP lock on static desktop content.
+   */
+  public static async requestKeyFrame(pc: RTCPeerConnection): Promise<void> {
+    if (!pc || typeof pc.getSenders !== 'function') return;
+    try {
+      const senders = pc.getSenders();
+      for (const sender of senders) {
+        if (sender.track && sender.track.kind === 'video') {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          if (typeof (sender as any).generateKeyFrame === 'function') {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (sender as any).generateKeyFrame().catch(() => {});
+          }
+        }
+      }
+    } catch {}
   }
 
   /**

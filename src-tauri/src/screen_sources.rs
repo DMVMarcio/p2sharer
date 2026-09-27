@@ -642,7 +642,7 @@ pub fn start_native_screen_capture(
     let width = target_width.unwrap_or(0);
     let height = target_height.unwrap_or(0);
     let should_draw_mouse = capture_mouse.unwrap_or(true);
-    let jpeg_quality = quality.unwrap_or(90).clamp(60, 98);
+    let jpeg_quality = quality.unwrap_or(95).clamp(60, 98);
 
     let sender = get_frame_sender().clone();
     let start_instant = std::time::Instant::now();
@@ -679,9 +679,9 @@ pub fn start_native_screen_capture(
                 pacer_tick_count += 1;
                 if let Ok(guard) = pacer_cache.lock() {
                     if let Some(frame) = guard.as_ref() {
-                        // Full frame keyframe refresh once every 60 ticks (~1 sec);
+                        // Full frame keyframe refresh twice per second (every 30 ticks / ~500ms);
                         // On intermediate static ticks, emit 1-byte heartbeat tick [0] to bypass CPU JPEG decoding in JS!
-                        if pacer_tick_count % 60 == 0 {
+                        if pacer_tick_count % 30 == 0 {
                             let _ = pacer_sender.send(Message::Binary((**frame).clone()));
                         } else {
                             let _ = pacer_sender.send(Message::Binary(vec![0]));

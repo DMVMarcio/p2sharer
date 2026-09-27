@@ -2,6 +2,10 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './style.css';
+import { MediaCoordinator } from './p2p/media_coordinator';
+
+// Initialize global WebRTC SDP bitrate munging at startup before any peer connection is created
+MediaCoordinator.initGlobalWebRtcMunging();
 
 const rootElement = document.getElementById('root');
 if (rootElement) {

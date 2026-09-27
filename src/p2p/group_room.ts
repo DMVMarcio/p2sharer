@@ -779,6 +779,18 @@ export class GroupRoomManager {
         });
       }
 
+      // Refresh keyframes periodically (every 2.0s) during active broadcast to maintain crystal clarity and prevent QP lock
+      if (this.localStream) {
+        const peers = this.room?.getPeers?.() || {};
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Object.values(peers).forEach((peerObj: any) => {
+          const pc: RTCPeerConnection = peerObj?.connection || peerObj?.pc || peerObj;
+          if (pc) {
+            MediaCoordinator.requestKeyFrame(pc);
+          }
+        });
+      }
+
       // Continuous presence re-announcement on broker until direct peers connect or if rumors exist
       const hasNoDirectPeers = this.peerTracker.directConnectedPeers.size === 0;
       const rumors = this.peerTracker.getPendingRumors();
@@ -1055,6 +1067,7 @@ export class GroupRoomManager {
           MediaCoordinator.patchPeerConnectionSdp(pc);
           MediaCoordinator.configureCodecPreferences(pc);
           MediaCoordinator.applySenderBitrate(pc, maxBitrateBps, maxFps);
+          MediaCoordinator.requestKeyFrame(pc);
         }
       });
     } catch {}
