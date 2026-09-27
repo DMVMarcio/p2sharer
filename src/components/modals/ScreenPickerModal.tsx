@@ -22,8 +22,6 @@ export const ScreenPickerModal: React.FC = () => {
     setBitrate,
     showCursor,
     setShowCursor,
-    captureMode,
-    setCaptureMode,
     loadSources,
     confirmPicker,
   } = useScreenPicker(closeModal);
@@ -252,19 +250,6 @@ export const ScreenPickerModal: React.FC = () => {
               </select>
             </div>
 
-            <div className="picker-setting-item">
-              <label>Modo de Captura:</label>
-              <select
-                id="modal-select-capture-mode"
-                className="select-input-sm"
-                value={captureMode}
-                onChange={(e) => setCaptureMode(e.target.value as 'gpu_direct' | 'native')}
-              >
-                <option value="gpu_direct">GPU Direta (Zero CPU / Máxima Nitidez)</option>
-                <option value="native">Nativo WGC (Sem Prompt do Windows)</option>
-              </select>
-            </div>
-
             <label className="picker-checkbox-label">
               <input
                 type="checkbox"
@@ -282,8 +267,8 @@ export const ScreenPickerModal: React.FC = () => {
             Cancelar
           </button>
           {(() => {
-            const hasAvailableSources = captureMode === 'gpu_direct' || (currentTab === 'screens' ? monitors.length > 0 : windows.length > 0);
-            const isConfirmDisabled = isLoading || isStarting || (captureMode !== 'gpu_direct' && (!selectedSourceId || !hasAvailableSources));
+            const hasAvailableSources = currentTab === 'screens' ? monitors.length > 0 : windows.length > 0;
+            const isConfirmDisabled = isLoading || isStarting || !selectedSourceId || !hasAvailableSources;
             return (
               <button
                 className="btn btn-primary"

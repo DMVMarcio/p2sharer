@@ -31,20 +31,6 @@ export function useScreenPicker(onClose?: () => void) {
   const [showCursor, setShowCursor] = useState<boolean>(
     localStorage.getItem('p2sharer_default_cursor') !== 'false'
   );
-  const [captureMode, setCaptureMode] = useState<'gpu_direct' | 'native'>(() => {
-    try {
-      return (localStorage.getItem('p2sharer_capture_mode') as 'gpu_direct' | 'native') || 'gpu_direct';
-    } catch {
-      return 'gpu_direct';
-    }
-  });
-
-  const handleCaptureModeChange = useCallback((mode: 'gpu_direct' | 'native') => {
-    setCaptureMode(mode);
-    try {
-      localStorage.setItem('p2sharer_capture_mode', mode);
-    } catch {}
-  }, []);
 
   const handleResolutionChange = useCallback((newRes: string) => {
     setResolution(newRes);
@@ -106,7 +92,7 @@ export function useScreenPicker(onClose?: () => void) {
       const fallbackId = currentTab === 'windows'
         ? (windows[0]?.id || 'window:0')
         : (monitors[0]?.id || 'screen:0');
-      const chosen = captureMode === 'gpu_direct' ? 'gpu_direct' : (selectedSourceId || fallbackId);
+      const chosen = selectedSourceId || fallbackId;
 
       if (onClose) onClose();
       await startCapture(chosen, fps, { width: resConfig.width, height: resConfig.height }, showCursor);
@@ -121,7 +107,6 @@ export function useScreenPicker(onClose?: () => void) {
     resolution,
     fps,
     bitrate,
-    captureMode,
     selectedSourceId,
     currentTab,
     windows,
@@ -148,8 +133,6 @@ export function useScreenPicker(onClose?: () => void) {
     setBitrate,
     showCursor,
     setShowCursor,
-    captureMode,
-    setCaptureMode: handleCaptureModeChange,
     loadSources,
     confirmPicker,
   };
