@@ -262,7 +262,7 @@ class RoomService {
     try {
       showToast('Iniciando transmissão...');
       const chosenSource = !sourceId || sourceId === 'gpu_direct' ? 'screen:0' : sourceId;
-      const videoStream = await this.nativeVideoBridge.startCapture(chosenSource, fps, res, mouse, 88);
+      const videoStream = await this.nativeVideoBridge.startCapture(chosenSource, fps, res, mouse, 98);
 
       const audioMode = stateStore.isAudioFilterFullAudio ? 'full' : stateStore.selectedFilterMode;
       const audioPids = stateStore.isAudioFilterFullAudio ? [] : stateStore.getActiveFilterPids();

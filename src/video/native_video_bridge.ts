@@ -89,7 +89,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     fps: number = 60,
     resolution: { width: number; height: number } = { width: 1920, height: 1080 },
     captureMouse: boolean = true,
-    quality: number = 88
+    quality: number = 98
   ): Promise<MediaStream> {
     if (typeof optionsOrSourceId === 'object' && optionsOrSourceId !== null) {
       const opts = optionsOrSourceId as VideoSourceOptions;
@@ -207,7 +207,6 @@ export class NativeVideoBridge implements VideoCaptureBridge {
           const newBitmap = await createImageBitmap(blob, {
             premultiplyAlpha: 'none',
             colorSpaceConversion: 'none',
-            resizeQuality: 'pixelated',
           });
 
           if (!this.isCapturing) {
