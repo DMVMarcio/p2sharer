@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRoom } from '../../hooks/useRoom';
 import { SystemNoticeIcon } from './SystemNoticeIcon';
+import { SystemNoticeText } from './SystemNoticeText';
 
 export const ChatPane: React.FC = () => {
   const { chatMessages, sendChatMessage } = useRoom();
@@ -37,7 +38,7 @@ export const ChatPane: React.FC = () => {
               >
                 <div className="chat-system-content">
                   <SystemNoticeIcon type={systemType} />
-                  <span className="chat-sys-text" title={msg.text}>{msg.text}</span>
+                  <span className="chat-sys-text" title={msg.text}><SystemNoticeText message={msg} /></span>
                   <time className="chat-sys-time" dateTime={new Date(msg.timestamp).toISOString()}>{timeStr}</time>
                 </div>
               </div>
