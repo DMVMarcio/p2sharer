@@ -4304,49 +4304,13 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   color: var(--danger-hover, #ef4444);
 }
 
-/* Stats overlay inside PiP positioned beneath top bar */
-.pip-overlay .stream-stats-overlay {
+/* The shared stream HUD sits beneath the PiP header. */
+.pip-overlay .pip-stream-stats-hud {
   position: absolute;
   top: 42px;
   left: 10px;
   z-index: 20;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
   max-width: calc(100% - 20px);
-}
-
-.pip-overlay .stream-stat-badge {
-  display: inline-flex;
-  align-items: center;
-  min-height: 22px;
-  padding: 3px 8px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: var(--radius-full);
-  background: rgba(12, 15, 20, 0.76);
-  color: #f4f4f5;
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 1;
-  white-space: nowrap;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(8px);
-}
-
-.pip-overlay .stream-stat-badge.stat-resolution {
-  border-color: rgba(34, 197, 94, 0.35);
-  color: #86efac;
-}
-
-.pip-overlay .stream-stat-badge.stat-fps {
-  border-color: rgba(6, 182, 212, 0.35);
-  color: #67e8f9;
-}
-
-.pip-overlay .stream-stat-badge.stat-bitrate {
-  border-color: rgba(168, 85, 247, 0.35);
-  color: #d8b4fe;
 }
 
 /* Stream controls group inside PiP */

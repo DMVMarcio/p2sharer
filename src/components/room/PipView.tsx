@@ -1,8 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event';
+import type { StreamWatcher } from '../../core/types';
+import { stateStore } from '../../core/state_store';
 import { useStreamZoom } from '../../hooks/useStreamZoom';
 import { ZoomControlBar } from './ZoomControlBar';
+import { StreamStatsOverlay } from './StreamStatsOverlay';
 import { buildIceServers } from '../../p2p/ice_config';
 
 interface PipViewProps {
@@ -14,7 +17,9 @@ interface PeerStats {
   fps: number;
   bitrateKbps: number;
   height: string;
-  watchersCount: number;
+  watchers: StreamWatcher[];
+  configuredBitrateKbps: number;
+  transportTag: string;
 }
 
 export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
@@ -28,7 +33,9 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
     fps: 60,
     bitrateKbps: 0,
     height: '1080p',
-    watchersCount: 0,
+    watchers: [],
+    configuredBitrateKbps: stateStore.currentBitrate,
+    transportTag: '',
   });
 
   const [volume, setVolume] = useState<number>(100);
@@ -37,6 +44,11 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
   const [isHudPinned, setIsHudPinned] = useState<boolean>(false);
   const [isAlwaysOnTop, setIsAlwaysOnTop] = useState<boolean>(true);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [activeTooltips, setActiveTooltips] = useState<number>(0);
+
+  const handleTooltipOpenChange = useCallback((open: boolean) => {
+    setActiveTooltips((previous) => Math.max(0, previous + (open ? 1 : -1)));
+  }, []);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -243,7 +255,16 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
     return () => {
       clearInterval(retryInterval);
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      handleBeforeUnload();
+      try {
+        pc.close();
+      } catch {}
+      try {
+        bc?.close();
+      } catch {}
+      if (unlistenSignalRef.current) {
+        unlistenSignalRef.current();
+        unlistenSignalRef.current = null;
+      }
     };
   }, [peerId]);
 
@@ -348,7 +369,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
       )}
 
       {/* Floating Hover Overlay - only shown on hover or when HUD is pinned */}
-      <div className={`pip-overlay ${isHudPinned ? 'is-hud-pinned' : ''}`}>
+      <div className={`pip-overlay ${isHudPinned || activeTooltips > 0 ? 'is-hud-pinned' : ''}`}>
         {/* Floating Top Bar with data-tauri-drag-region */}
         <div className="pip-top-bar" data-tauri-drag-region>
           <div className="pip-top-left" data-tauri-drag-region>
@@ -387,24 +408,19 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
           </div>
         </div>
 
-        {/* Hover / Pinned Stream Stats Badges (Top-Left) */}
-        <div className="stream-stats-overlay">
-          <div className="stream-stat-badge stat-resolution">
-            <span>{stats.height}</span>
-          </div>
-          <div className="stream-stat-badge stat-fps">
-            <span>{stats.fps} FPS</span>
-          </div>
-          {stats.bitrateKbps > 0 && (
-            <div className="stream-stat-badge stat-bitrate">
-              <span>
-                {stats.bitrateKbps > 1000
-                  ? `${(stats.bitrateKbps / 1000).toFixed(1)} Mbps`
-                  : `${Math.round(stats.bitrateKbps)} kbps`}
-              </span>
-            </div>
-          )}
-        </div>
+        <StreamStatsOverlay
+          className="pip-stream-stats-hud"
+          qualityText={`${stats.height} ${stats.fps} FPS`}
+          liveBitrateKbps={stats.bitrateKbps}
+          configuredBitrateKbps={stats.configuredBitrateKbps}
+          isLocal={isLocal}
+          pingText={stats.pingMs === null ? '15 ms' : `${stats.pingMs} ms`}
+          pingClass={(stats.pingMs ?? 15) < 80 ? 'ping-good' : (stats.pingMs ?? 15) < 180 ? 'ping-medium' : 'ping-poor'}
+          transportTag={stats.transportTag}
+          watchers={stats.watchers}
+          currentUsername={stateStore.username}
+          onTooltipOpenChange={handleTooltipOpenChange}
+        />
 
         {/* Hover / Pinned Controls Pill (Bottom-Right) */}
         <div className="stream-controls-group">
