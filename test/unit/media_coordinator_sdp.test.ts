@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { MediaCoordinator } from '../../src/p2p/media_coordinator.ts';
 
-describe('MediaCoordinator SDP Munging and WebRTC Bitrate Floor Architecture', () => {
+describe('MediaCoordinator SDP Munging and WebRTC Bandwidth Allocation', () => {
   const sampleSdp = [
     'v=0',
     'o=- 123456789 2 IN IP4 127.0.0.1',
@@ -102,7 +102,24 @@ describe('MediaCoordinator SDP Munging and WebRTC Bitrate Floor Architecture', (
 
     assert.ok(setLocalCalledWith, 'setLocalDescription must receive the generated munged offer');
     assert.match(setLocalCalledWith.sdp, /b=AS:25000/);
-    assert.match(setLocalCalledWith.sdp, /x-google-min-bitrate=8000/);
+    assert.match(setLocalCalledWith.sdp, /x-google-min-bitrate=500/);
+  });
+
+  it('lets video yield bandwidth to high-priority audio', async () => {
+    const videoParams: any = { encodings: [{ minBitrate: 12_500_000 }] };
+    const audioParams: any = { encodings: [{}] };
+    const pc = {
+      signalingState: 'stable',
+      getSenders: () => [
+        { track: { kind: 'video' }, getParameters: () => videoParams, setParameters: async () => {} },
+        { track: { kind: 'audio' }, getParameters: () => audioParams, setParameters: async () => {} },
+      ],
+    } as unknown as RTCPeerConnection;
+    await MediaCoordinator.applySenderBitrate(pc, 25_000_000, 60);
+    assert.equal(videoParams.encodings[0].minBitrate, undefined);
+    assert.equal(videoParams.encodings[0].networkPriority, 'medium');
+    assert.equal(audioParams.encodings[0].networkPriority, 'high');
+    assert.equal(audioParams.encodings[0].maxBitrate, 192000);
   });
 
   it('executes requestKeyFrame without throwing on supported or unsupported senders', async () => {

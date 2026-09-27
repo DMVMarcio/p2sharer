@@ -2,6 +2,7 @@ use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use byteorder::{ByteOrder, LittleEndian};
 use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
@@ -89,15 +90,19 @@ impl AudioResampler {
             let in_idx = self.phase.floor() as usize;
             let frac = (self.phase - in_idx as f64) as f32;
 
-            let (s0_l, s0_r) = (
+            let (s1_l, s1_r) = (
                 input[in_idx * 2],
                 input[in_idx * 2 + 1],
             );
 
-            let (s1_l, s1_r) = if in_idx + 1 < in_frames {
-                (input[(in_idx + 1) * 2], input[(in_idx + 1) * 2 + 1])
+            // Causal interpolation uses the preceding frame, including across
+            // packet boundaries. This avoids guessing the next frame at each
+            // chunk edge and makes output independent of WASAPI packet size.
+            let (s0_l, s0_r) = if in_idx > 0 {
+                (input[(in_idx - 1) * 2], input[(in_idx - 1) * 2 + 1])
             } else {
-                (s0_l, s0_r)
+                let previous = self.last_frame.unwrap_or([s1_l, s1_r]);
+                (previous[0], previous[1])
             };
 
             let out_l = s0_l + frac * (s1_l - s0_l);
@@ -116,6 +121,53 @@ impl AudioResampler {
     pub fn reset(&mut self) {
         self.phase = 0.0;
         self.last_frame = None;
+    }
+}
+
+/// Drain every captured frame in device-clock order. Packet arrival time must
+/// never add or remove PCM frames; the browser handles playout buffering.
+pub fn drain_single_source_samples(
+    fifo: &mut VecDeque<f32>,
+    sample_rate: u32,
+    resampler: &mut AudioResampler,
+    scratch: &mut Vec<f32>,
+    output: &mut Vec<f32>,
+) {
+    if fifo.is_empty() {
+        return;
+    }
+    scratch.extend(fifo.drain(..));
+    if sample_rate == 48000 {
+        output.extend_from_slice(scratch);
+    } else {
+        resampler.resample(scratch, output);
+    }
+    scratch.clear();
+}
+
+pub fn mix_one_chunk(fifos: &mut [&mut VecDeque<f32>], frames: usize, output: &mut Vec<f32>) {
+    for _ in 0..frames {
+        let mut left = 0.0f32;
+        let mut right = 0.0f32;
+        let mut active_sources = 0usize;
+        for fifo in fifos.iter_mut() {
+            if fifo.len() >= 2 {
+                let l = fifo.pop_front().unwrap_or(0.0);
+                let r = fifo.pop_front().unwrap_or(0.0);
+                left += l;
+                right += r;
+                if l.abs() > 0.0001 || r.abs() > 0.0001 {
+                    active_sources += 1;
+                }
+            }
+        }
+        if active_sources > 1 {
+            let headroom = 1.0 / (active_sources as f32).sqrt();
+            left *= headroom;
+            right *= headroom;
+        }
+        output.push(soft_clip_sample(left));
+        output.push(soft_clip_sample(right));
     }
 }
 
@@ -181,7 +233,8 @@ pub fn soft_clip_sample(x: f32) -> f32 {
         sign * compressed
     } else {
         let sign = x.signum();
-        sign * (0.8 + 0.199 * (1.0 - (-1.8 * (abs - 0.8)).exp()))
+        const JOIN_VALUE: f32 = 0.8 + 0.2 * (1.0 - 1.0 / 3.0);
+        sign * (JOIN_VALUE + (1.0 - JOIN_VALUE) * (1.0 - (-1.8 * (abs - 1.25)).exp()))
     }
 }
 
@@ -342,6 +395,55 @@ pub fn convert_and_downmix_to_stereo(
         _ => {
             out_stereo.extend(std::iter::repeat_n(0.0f32, num_frames * 2));
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PcmEncoding {
+    Float32,
+    Integer,
+}
+
+pub fn convert_and_downmix_encoded(
+    data_ptr: *const u8,
+    num_frames: usize,
+    channels: u16,
+    bits_per_sample: u16,
+    encoding: PcmEncoding,
+    is_silent: bool,
+    out_stereo: &mut Vec<f32>,
+) {
+    if is_silent || data_ptr.is_null() || num_frames == 0 {
+        convert_and_downmix_to_stereo(data_ptr, num_frames, channels, bits_per_sample, true, out_stereo);
+        return;
+    }
+    if bits_per_sample == 32 && encoding == PcmEncoding::Integer {
+        let samples = unsafe { std::slice::from_raw_parts(data_ptr as *const i32, num_frames * channels as usize) };
+        let floats: Vec<f32> = samples.iter().map(|&sample| sample as f32 / 2_147_483_648.0).collect();
+        convert_and_downmix_to_stereo(
+            floats.as_ptr() as *const u8,
+            num_frames,
+            channels,
+            32,
+            false,
+            out_stereo,
+        );
+    } else if bits_per_sample == 24 && encoding == PcmEncoding::Integer {
+        let bytes = unsafe { std::slice::from_raw_parts(data_ptr, num_frames * channels as usize * 3) };
+        let floats: Vec<f32> = bytes.chunks_exact(3).map(|sample| {
+            let packed = (sample[0] as i32) | ((sample[1] as i32) << 8) | ((sample[2] as i32) << 16);
+            ((packed << 8) >> 8) as f32 / 8_388_608.0
+        }).collect();
+        convert_and_downmix_to_stereo(
+            floats.as_ptr() as *const u8,
+            num_frames,
+            channels,
+            32,
+            false,
+            out_stereo,
+        );
+    } else {
+        convert_and_downmix_to_stereo(data_ptr, num_frames, channels, bits_per_sample, false, out_stereo);
     }
 }
 
@@ -735,7 +837,6 @@ pub(crate) mod win_audio {
         pub _event_guard: EventHandleGuard,
         pub pid: u32,
         pub fifo: std::collections::VecDeque<f32>,
-        pub is_buffering: bool,
         pub last_packet_time: std::time::Instant,
     }
 
@@ -784,7 +885,6 @@ pub(crate) mod win_audio {
                 _event_guard: EventHandleGuard(ev),
                 pid,
                 fifo: std::collections::VecDeque::with_capacity(4096),
-                is_buffering: true,
                 last_packet_time: std::time::Instant::now(),
             })
         }
@@ -832,6 +932,34 @@ pub(crate) mod win_audio {
             let sample_rate = mix_format.nSamplesPerSec;
             let channels = mix_format.nChannels;
             let bits_per_sample = mix_format.wBitsPerSample;
+            let encoding = match mix_format.wFormatTag {
+                1 => PcmEncoding::Integer,
+                3 => PcmEncoding::Float32,
+                0xfffe if mix_format.cbSize as usize >= std::mem::size_of::<WAVEFORMATEXTENSIBLE>() - std::mem::size_of::<WAVEFORMATEX>() => {
+                    let extended = &*(mix_format_ptr as *const WAVEFORMATEXTENSIBLE);
+                    let subtype = std::ptr::addr_of!(extended.SubFormat).read_unaligned();
+                    if subtype == windows::core::GUID::from_u128(0x00000003_0000_0010_8000_00aa00389b71) {
+                        PcmEncoding::Float32
+                    } else if subtype == windows::core::GUID::from_u128(0x00000001_0000_0010_8000_00aa00389b71) {
+                        PcmEncoding::Integer
+                    } else {
+                        eprintln!("[Audio Loopback] Unsupported extensible mix subtype.");
+                        if is_allocated_format {
+                            CoTaskMemFree(Some(mix_format_ptr as *const _));
+                        }
+                        CoUninitialize();
+                        return;
+                    }
+                }
+                tag => {
+                    eprintln!("[Audio Loopback] Unsupported mix format tag {tag}; capture cannot decode audio safely.");
+                    if is_allocated_format {
+                        CoTaskMemFree(Some(mix_format_ptr as *const _));
+                    }
+                    CoUninitialize();
+                    return;
+                }
+            };
 
             let stream_flags = AUDCLNT_STREAMFLAGS_LOOPBACK
                 | AUDCLNT_STREAMFLAGS_EVENTCALLBACK
@@ -974,43 +1102,46 @@ pub(crate) mod win_audio {
             let mut resampler = AudioResampler::new(sample_rate, 48000);
             let mut raw_stereo_buffer: Vec<f32> = Vec::with_capacity(4096);
             let mut standardized_buffer: Vec<f32> = Vec::with_capacity(4096);
-            let mut last_session_check = std::time::Instant::now();
-            let mut next_mix_time = std::time::Instant::now();
-            let mix_tick_duration = std::time::Duration::from_millis(10);
-            let mut silent_mix_ticks = 0usize;
+
+            let (session_tx, session_rx) = std::sync::mpsc::sync_channel(1);
+            if is_multi_exclude || is_multi_include {
+                let worker_stop = stop_flag.clone();
+                let worker_excluded_roots = excluded_roots.clone();
+                let worker_names = normalized_names.clone();
+                let worker_self_pids = self_pids.clone();
+                let worker_targets = config.target_names.clone();
+                let worker_target_pids = config.target_pids.clone();
+                std::thread::spawn(move || {
+                    let initialized = CoInitializeEx(None, COINIT_MULTITHREADED).is_ok();
+                    let mut worker_sys = sysinfo::System::new_all();
+                    while worker_stop.load(Ordering::Relaxed) {
+                        let active = if is_multi_exclude {
+                            discover_active_non_excluded_pids(
+                                &worker_excluded_roots, &worker_names, &worker_self_pids, &mut worker_sys,
+                            )
+                        } else {
+                            resolve_target_process_roots(&worker_targets, &worker_target_pids)
+                        };
+                        worker_sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+                        let live: Vec<u32> = worker_sys.processes().keys().map(|pid| pid.as_u32()).collect();
+                        let _ = session_tx.try_send((active, live));
+                        std::thread::sleep(std::time::Duration::from_millis(500));
+                    }
+                    if initialized {
+                        CoUninitialize();
+                    }
+                });
+            }
 
             while stop_flag.load(Ordering::Relaxed) {
-                // Dynamic session discovery & cleanup every 500ms
-                if last_session_check.elapsed() >= std::time::Duration::from_millis(500) {
-                    last_session_check = std::time::Instant::now();
-
-                    if is_multi_exclude {
-                        sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
-                        multi_sources.retain(|s| s.pid == 0 || sys.process(sysinfo::Pid::from_u32(s.pid)).is_some());
-
-                        let active_pids = discover_active_non_excluded_pids(&excluded_roots, &normalized_names, &self_pids, &mut sys);
-                        for pid in active_pids {
-                            if !multi_sources.iter().any(|s| s.pid == pid) && multi_sources.len() < 64 {
-                                if let Ok(client) = activate_process_loopback_client(pid, false) {
-                                    if let Ok(src) = init_capture_source(client, stream_flags, buffer_duration, mix_format_ptr, pid) {
-                                        println!("[Audio Loopback] Multi-exclude: Dynamically captured new audio session PID {}", pid);
-                                        multi_sources.push(src);
-                                    }
-                                }
-                            }
-                        }
-                    } else if is_multi_include {
-                        sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
-                        multi_sources.retain(|s| s.pid == 0 || sys.process(sysinfo::Pid::from_u32(s.pid)).is_some());
-
-                        let target_roots = resolve_target_process_roots(&config.target_names, &config.target_pids);
-                        for pid in target_roots {
-                            if !multi_sources.iter().any(|s| s.pid == pid) && multi_sources.len() < 64 {
-                                if let Ok(client) = activate_process_loopback_client(pid, false) {
-                                    if let Ok(src) = init_capture_source(client, stream_flags, buffer_duration, mix_format_ptr, pid) {
-                                        println!("[Audio Loopback] Multi-include: Dynamically captured newly started target PID {}", pid);
-                                        multi_sources.push(src);
-                                    }
+                if let Ok((active_pids, live_pids)) = session_rx.try_recv() {
+                    multi_sources.retain(|s| s.pid == 0 || live_pids.contains(&s.pid));
+                    for pid in active_pids {
+                        if !multi_sources.iter().any(|s| s.pid == pid) && multi_sources.len() < 64 {
+                            if let Ok(client) = activate_process_loopback_client(pid, false) {
+                                if let Ok(src) = init_capture_source(client, stream_flags, buffer_duration, mix_format_ptr, pid) {
+                                    println!("[Audio Loopback] Dynamically captured audio session PID {}", pid);
+                                    multi_sources.push(src);
                                 }
                             }
                         }
@@ -1049,11 +1180,12 @@ pub(crate) mod win_audio {
                                 source.last_packet_time = std::time::Instant::now();
                                 let is_silent = (flags & AUDCLNT_BUFFERFLAGS_SILENT.0 as u32) != 0;
                                 let mut packet_stereo = Vec::new();
-                                convert_and_downmix_to_stereo(
+                                convert_and_downmix_encoded(
                                     data_ptr,
                                     num_frames_read as usize,
                                     channels,
                                     bits_per_sample,
+                                    encoding,
                                     is_silent,
                                     &mut packet_stereo,
                                 );
@@ -1066,14 +1198,8 @@ pub(crate) mod win_audio {
                             packet_size = source.capture.GetNextPacketSize().unwrap_or(0);
                         }
 
-                        // Pre-roll watermark: 20ms cushion = 960 stereo frames = 1920 floats at 48kHz
-                        const PREROLL_FLOATS: usize = 1920;
-                        if source.is_buffering && source.fifo.len() >= PREROLL_FLOATS {
-                            source.is_buffering = false;
-                        }
-
-                        // Bound FIFO to prevent buffer bloat and excessive latency (max 4800 samples = 50ms at 48kHz stereo)
-                        const MAX_FIFO_SAMPLES: usize = 4800;
+                        // Allow a short OS scheduling pause without deleting valid samples.
+                        const MAX_FIFO_SAMPLES: usize = 19200;
                         if source.fifo.len() > MAX_FIFO_SAMPLES {
                             let excess = source.fifo.len() - MAX_FIFO_SAMPLES;
                             let excess_even = (excess / 2) * 2;
@@ -1081,93 +1207,49 @@ pub(crate) mod win_audio {
                         }
                     }
 
-                    let tick_frames = ((sample_rate as u64 * 10) / 1000) as usize;
-                    let tick_floats = tick_frames * 2;
-
-                    // Periodic synchronous mixing tick: exactly tick_frames frames per 10ms
-                    let now = std::time::Instant::now();
-                    if now >= next_mix_time {
-                        let mut ticks_to_run = 0usize;
-                        while next_mix_time <= now && ticks_to_run < 4 {
-                            next_mix_time += mix_tick_duration;
-                            ticks_to_run += 1;
-                        }
-                        if next_mix_time < now {
-                            next_mix_time = now + mix_tick_duration;
-                        }
-
-                        let all_sources_empty = multi_sources.iter().all(|s| s.fifo.is_empty());
-                        if all_sources_empty {
-                            silent_mix_ticks = silent_mix_ticks.saturating_add(ticks_to_run);
-                        } else {
-                            silent_mix_ticks = 0;
-                        }
-
-                        for _ in 0..ticks_to_run {
-                            if multi_sources.len() == 1 {
-                                let source = &mut multi_sources[0];
-                                if !source.is_buffering {
-                                    let available = source.fifo.len().min(tick_floats) & !1;
-                                    raw_stereo_buffer.extend(source.fifo.drain(..available));
-                                    // Keep the 10ms output clock continuous on packet underruns.
-                                    // Waiting for the next packet here creates irregular bursts.
-                                    if available < tick_floats {
-                                        raw_stereo_buffer.resize(tick_floats, 0.0);
-                                    }
-                                    if source.fifo.is_empty()
-                                        && source.last_packet_time.elapsed() >= std::time::Duration::from_millis(100)
-                                    {
-                                        source.is_buffering = true;
-                                    }
-                                }
-                            } else if multi_sources.len() > 1 {
-                                let any_active = multi_sources.iter().any(|s| !s.fifo.is_empty());
-                                if any_active {
-                                    raw_stereo_buffer.reserve(tick_floats);
-
-                                    for _ in 0..tick_frames {
-                                        let mut sum_l = 0.0f32;
-                                        let mut sum_r = 0.0f32;
-                                        let mut active_sources = 0usize;
-
-                                        for s in &mut multi_sources {
-                                            if s.fifo.len() >= 2 {
-                                                let l = s.fifo.pop_front().unwrap_or(0.0);
-                                                let r = s.fifo.pop_front().unwrap_or(0.0);
-                                                if l.abs() > 0.0001 || r.abs() > 0.0001 {
-                                                    active_sources += 1;
-                                                }
-                                                sum_l += l;
-                                                sum_r += r;
-                                            }
-                                        }
-
-                                        if active_sources > 1 {
-                                            let headroom_scale = 1.0 / (active_sources as f32).sqrt();
-                                            sum_l *= headroom_scale;
-                                            sum_r *= headroom_scale;
-                                        }
-
-                                        raw_stereo_buffer.push(soft_clip_sample(sum_l));
-                                        raw_stereo_buffer.push(soft_clip_sample(sum_r));
-                                    }
-
-                                    for s in &mut multi_sources {
-                                        if s.last_packet_time.elapsed() >= std::time::Duration::from_millis(50) && !s.fifo.is_empty() {
-                                            s.fifo.clear();
-                                        }
-                                    }
+                    if multi_sources.len() == 1 {
+                        // WASAPI packets carry the device's sample clock. Re-timing them with
+                        // a second wall clock periodically underflows and inserts hard zeros.
+                        let source = &mut multi_sources[0];
+                        drain_single_source_samples(
+                            &mut source.fifo,
+                            sample_rate,
+                            &mut resampler,
+                            &mut raw_stereo_buffer,
+                            &mut standardized_buffer,
+                        );
+                    } else {
+                        let tick_frames = ((sample_rate as u64 * 10) / 1000) as usize;
+                        let tick_floats = tick_frames * 2;
+                        let stale = multi_sources.iter().all(|s| {
+                            s.last_packet_time.elapsed() >= std::time::Duration::from_millis(50)
+                        });
+                        // The fullest capture FIFO supplies the pacing clock. Keep one
+                        // chunk in reserve while active so event order cannot create
+                        // hard zero-filled underruns in the mixed PCM.
+                        loop {
+                            let available = multi_sources.iter().map(|s| s.fifo.len()).max().unwrap_or(0);
+                            if available < tick_floats * 2 && !(stale && available > 0) {
+                                break;
+                            }
+                            let mut fifos: Vec<_> = multi_sources.iter_mut().map(|s| &mut s.fifo).collect();
+                            mix_one_chunk(&mut fifos, tick_frames, &mut raw_stereo_buffer);
+                            if stale && available < tick_floats {
+                                let actual_frames = available / 2;
+                                let fade_frames = actual_frames.min(240);
+                                for frame in 0..fade_frames {
+                                    let index = (actual_frames - fade_frames + frame) * 2;
+                                    let gain = 0.5 * (1.0 + (std::f32::consts::PI * frame as f32 / fade_frames as f32).cos());
+                                    raw_stereo_buffer[index] *= gain;
+                                    raw_stereo_buffer[index + 1] *= gain;
                                 }
                             }
-
-                            if !raw_stereo_buffer.is_empty() {
-                                if sample_rate != 48000 {
-                                    resampler.resample(&raw_stereo_buffer, &mut standardized_buffer);
-                                } else {
-                                    standardized_buffer.extend_from_slice(&raw_stereo_buffer);
-                                }
-                                raw_stereo_buffer.clear();
+                            if sample_rate != 48000 {
+                                resampler.resample(&raw_stereo_buffer, &mut standardized_buffer);
+                            } else {
+                                standardized_buffer.extend_from_slice(&raw_stereo_buffer);
                             }
+                            raw_stereo_buffer.clear();
                         }
                     }
                 } else {
@@ -1202,9 +1284,11 @@ pub(crate) mod win_audio {
                     standardized_buffer.drain(..min_samples);
                 }
 
-                // If all sources have been quiet for at least 5 ticks (~50ms) and residual samples (< 960) remain,
+                // If all sources have been quiet for at least 50ms and residual samples (< 960) remain,
                 // smoothly fade-out using a Hann half-cosine window (240 samples = 5ms) and flush to prevent tail-end clicks ("mini chiado").
-                if silent_mix_ticks >= 5 && !standardized_buffer.is_empty() {
+                if !standardized_buffer.is_empty()
+                    && multi_sources.iter().all(|s| s.last_packet_time.elapsed() >= std::time::Duration::from_millis(50))
+                {
                     let rem = standardized_buffer.len();
                     let fade_len = rem.min(240);
                     let start_idx = rem - fade_len;
@@ -1214,7 +1298,6 @@ pub(crate) mod win_audio {
                         standardized_buffer[start_idx + i] *= factor;
                     }
                     standardized_buffer.resize(min_samples, 0.0f32);
-                    silent_mix_ticks = 0;
 
                     let mut sum_sq = 0.0f32;
                     for &s in &standardized_buffer[..min_samples] {
@@ -1325,6 +1408,114 @@ mod tests {
         buffer.extend(std::iter::repeat_n(0.0f32, total_samples));
         assert_eq!(buffer.len(), 480);
         assert!(buffer.iter().all(|&s| s == 0.0f32));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_default_render_mix_format_is_decodable() {
+        unsafe {
+            use windows::Win32::Media::Audio::WAVEFORMATEXTENSIBLE;
+            use windows::Win32::System::Com::{CoInitializeEx, CoTaskMemFree, CoUninitialize, COINIT_MULTITHREADED};
+            let initialized = CoInitializeEx(None, COINIT_MULTITHREADED).is_ok();
+            let client = win_audio::get_default_render_audio_client().expect("default render device");
+            let format_ptr = client.GetMixFormat().expect("device mix format");
+            let format = &*format_ptr;
+            let rate = format.nSamplesPerSec;
+            let channels = format.nChannels;
+            let bits = format.wBitsPerSample;
+            let tag = format.wFormatTag;
+            println!("Default audio mix: {} Hz, {} channels, {} bits, tag 0x{:04x}",
+                rate, channels, bits, tag);
+            assert!(matches!(bits, 16 | 24 | 32));
+            assert!(matches!(tag, 1 | 3 | 0xfffe));
+            if tag == 0xfffe {
+                let extended = &*(format_ptr as *const WAVEFORMATEXTENSIBLE);
+                let subtype = std::ptr::addr_of!(extended.SubFormat).read_unaligned();
+                assert!(subtype == windows::core::GUID::from_u128(0x00000003_0000_0010_8000_00aa00389b71)
+                    || subtype == windows::core::GUID::from_u128(0x00000001_0000_0010_8000_00aa00389b71));
+            }
+            CoTaskMemFree(Some(format_ptr as *const _));
+            if initialized { CoUninitialize(); }
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "plays a quiet test tone through the default output device"]
+    fn test_live_default_loopback_tone_continuity() {
+        unsafe {
+            use windows::Win32::Media::Audio::*;
+            use windows::Win32::System::Com::{CoInitializeEx, CoTaskMemFree, CoUninitialize, COINIT_MULTITHREADED};
+            use windows::Win32::System::Threading::WaitForSingleObject;
+
+            let initialized = CoInitializeEx(None, COINIT_MULTITHREADED).is_ok();
+            let render = win_audio::get_default_render_audio_client().expect("default render client");
+            let format_ptr = render.GetMixFormat().expect("mix format");
+            let format = &*format_ptr;
+            let rate = format.nSamplesPerSec;
+            let channels = format.nChannels;
+            let bits = format.wBitsPerSample;
+            assert_eq!(bits, 32, "live fixture expects 32-bit device mix");
+            let subtype = if format.wFormatTag == 0xfffe {
+                let extended = &*(format_ptr as *const WAVEFORMATEXTENSIBLE);
+                std::ptr::addr_of!(extended.SubFormat).read_unaligned()
+            } else {
+                windows::core::GUID::from_u128(0x00000003_0000_0010_8000_00aa00389b71)
+            };
+            assert_eq!(subtype, windows::core::GUID::from_u128(0x00000003_0000_0010_8000_00aa00389b71));
+
+            render.Initialize(AUDCLNT_SHAREMODE_SHARED, 0, 10_000_000, 0, format_ptr, None)
+                .expect("render initialization");
+            let render_service: IAudioRenderClient = render.GetService().expect("render service");
+            let frame_count = render.GetBufferSize().expect("render buffer size");
+            let capture_client = win_audio::get_default_render_audio_client()
+                .expect("default loopback");
+            let flags = AUDCLNT_STREAMFLAGS_LOOPBACK | win_audio::AUDCLNT_STREAMFLAGS_EVENTCALLBACK
+                | win_audio::AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | win_audio::AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY;
+            let source = win_audio::init_capture_source(capture_client, flags, 10_000_000, format_ptr, std::process::id())
+                .expect("capture initialization");
+
+            let samples = render_service.GetBuffer(frame_count).expect("render buffer") as *mut f32;
+            for frame in 0..frame_count as usize {
+                let tone = (2.0 * std::f64::consts::PI * 997.0 * frame as f64 / rate as f64).sin() as f32 * 0.02;
+                for channel in 0..channels as usize {
+                    *samples.add(frame * channels as usize + channel) = tone;
+                }
+            }
+            render_service.ReleaseBuffer(frame_count, 0).expect("release render buffer");
+            render.Start().expect("start test tone");
+
+            let start = std::time::Instant::now();
+            let mut captured = Vec::new();
+            while start.elapsed() < std::time::Duration::from_millis(850) {
+                let _ = WaitForSingleObject(source.event, 20);
+                let mut pending = source.capture.GetNextPacketSize().unwrap_or(0);
+                while pending > 0 {
+                    let mut data = std::ptr::null_mut();
+                    let mut frames = 0;
+                    let mut packet_flags = 0;
+                    if source.capture.GetBuffer(&mut data, &mut frames, &mut packet_flags, None, None).is_ok() {
+                        convert_and_downmix_encoded(data, frames as usize, channels, 32, PcmEncoding::Float32,
+                            packet_flags & AUDCLNT_BUFFERFLAGS_SILENT.0 as u32 != 0, &mut captured);
+                        source.capture.ReleaseBuffer(frames).expect("release capture buffer");
+                    }
+                    pending = source.capture.GetNextPacketSize().unwrap_or(0);
+                }
+            }
+            render.Stop().expect("stop tone");
+            source.client.Stop().expect("stop capture");
+            CoTaskMemFree(Some(format_ptr as *const _));
+            if initialized { CoUninitialize(); }
+
+            let ten_ms = rate as usize / 100 * 2;
+            let rms: Vec<f32> = captured.chunks_exact(ten_ms).map(|block| {
+                (block.iter().map(|sample| sample * sample).sum::<f32>() / block.len() as f32).sqrt()
+            }).collect();
+            let good_blocks = rms.iter().skip(3).take(rms.len().saturating_sub(6)).filter(|&&level| level > 0.003).count();
+            println!("Captured {} frames, {} / {} steady 10ms blocks contain tone", captured.len() / 2, good_blocks, rms.len());
+            assert!(rms.len() >= 70, "too few real WASAPI packets captured");
+            assert!(good_blocks >= rms.len().saturating_sub(8), "real capture has silent dropouts");
+        }
     }
 
     #[cfg(windows)]
