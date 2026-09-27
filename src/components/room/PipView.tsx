@@ -209,32 +209,68 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
       };
     }
 
-    if (isTauri()) {
-      listen<Record<string, unknown>>(`pip-signal-${peerId}`, async (event) => {
-        await handleSignalData(event.payload);
-      }).then((unlisten) => {
-        unlistenSignalRef.current = unlisten;
-      }).catch(() => {});
-    }
-
-    // Proactively send 'pip-ready' and retry with exponential grace until offer is received
-    sendSignal({ type: 'pip-ready' });
-
+    let disposed = false;
     let retryCount = 0;
-    const retryInterval = setInterval(() => {
+    let retryInterval: ReturnType<typeof setInterval> | null = null;
+    let requestTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    const requestStream = () => {
+      if (disposed) return;
       if (hasReceivedOffer || streamRef.current) {
-        clearInterval(retryInterval);
+        if (retryInterval) clearInterval(retryInterval);
+        retryInterval = null;
         return;
       }
-      retryCount++;
       sendSignal({ type: 'pip-ready' });
-      if (retryCount >= 20) {
-        clearInterval(retryInterval);
+    };
+
+    const beginStreamRequests = () => {
+      requestStream();
+      if (hasReceivedOffer || streamRef.current || disposed) return;
+      retryInterval = setInterval(() => {
+        retryCount++;
+        requestStream();
+        if (retryCount >= 20 && retryInterval) {
+          clearInterval(retryInterval);
+          retryInterval = null;
+        }
+      }, 350);
+    };
+
+    const registerSignalListener = async () => {
+      if (isTauri()) {
+        try {
+          const unlisten = await listen<Record<string, unknown>>(`pip-signal-${peerId}`, async (event) => {
+            await handleSignalData(event.payload);
+          });
+          if (disposed) {
+            unlisten();
+            return;
+          }
+          unlistenSignalRef.current = unlisten;
+        } catch {
+          // The browser-only fallback can still use BroadcastChannel.
+        }
       }
-    }, 350);
+
+      if (!disposed) {
+        // Strict Mode cleans up its probe effect before this timeout can request an offer.
+        requestTimeout = setTimeout(beginStreamRequests, 0);
+      }
+    };
+
+    void registerSignalListener();
+
+    const disposeSignalSetup = () => {
+      disposed = true;
+      if (requestTimeout) clearTimeout(requestTimeout);
+      if (retryInterval) clearInterval(retryInterval);
+      requestTimeout = null;
+      retryInterval = null;
+    };
 
     const handleBeforeUnload = () => {
-      clearInterval(retryInterval);
+      disposeSignalSetup();
       try {
         sendSignal({ type: 'pip-close' });
       } catch {}
@@ -253,7 +289,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
-      clearInterval(retryInterval);
+      disposeSignalSetup();
       window.removeEventListener('beforeunload', handleBeforeUnload);
       try {
         pc.close();
