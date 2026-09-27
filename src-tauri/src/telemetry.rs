@@ -98,9 +98,15 @@ fn get_process_thread_counts() -> HashMap<u32, u32> {
     HashMap::new()
 }
 
+static NVIDIA_AVAILABLE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
+
 fn query_gpu_telemetry() -> Option<GpuTelemetry> {
     #[cfg(windows)]
     {
+        if !NVIDIA_AVAILABLE.load(std::sync::atomic::Ordering::Relaxed) {
+            return None;
+        }
+
         use std::os::windows::process::CommandExt;
         use std::process::Command;
         const CREATE_NO_WINDOW: u32 = 0x08000000;
@@ -113,8 +119,8 @@ fn query_gpu_telemetry() -> Option<GpuTelemetry> {
             .creation_flags(CREATE_NO_WINDOW)
             .output();
 
-        if let Ok(out) = output {
-            if out.status.success() {
+        match output {
+            Ok(out) if out.status.success() => {
                 let stdout = String::from_utf8_lossy(&out.stdout);
                 let first_line = stdout.lines().next().unwrap_or("").trim();
                 let parts: Vec<&str> = first_line.split(',').map(|s| s.trim()).collect();
@@ -133,6 +139,10 @@ fn query_gpu_telemetry() -> Option<GpuTelemetry> {
                     });
                 }
             }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                NVIDIA_AVAILABLE.store(false, std::sync::atomic::Ordering::Relaxed);
+            }
+            _ => {}
         }
     }
     None
@@ -179,18 +189,22 @@ pub fn get_system_telemetry() -> SystemTelemetryReport {
         let mut s = System::new_with_specifics(
             RefreshKind::new()
                 .with_cpu(CpuRefreshKind::everything())
-                .with_processes(sysinfo::ProcessRefreshKind::everything())
+                .with_processes(sysinfo::ProcessRefreshKind::new().with_cpu().with_memory())
                 .with_memory(sysinfo::MemoryRefreshKind::everything()),
         );
         s.refresh_all();
-        std::thread::sleep(std::time::Duration::from_millis(100));
+        std::thread::sleep(std::time::Duration::from_millis(50));
         s.refresh_all();
         s
     });
 
     sys.refresh_cpu_all();
     sys.refresh_memory();
-    sys.refresh_processes(ProcessesToUpdate::All, true);
+    sys.refresh_processes_specifics(
+        ProcessesToUpdate::All,
+        true,
+        sysinfo::ProcessRefreshKind::new().with_cpu().with_memory(),
+    );
 
     let now_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

@@ -342,20 +342,32 @@ pub fn ensure_ws_server_running() {
 
                 tokio::spawn(async move {
                     if let Ok(ws_stream) = tokio_tungstenite::accept_async(stream).await {
-                        let (mut write, mut _read) = ws_stream.split();
+                        let (mut write, mut read) = ws_stream.split();
                         loop {
-                            match rx.recv().await {
-                                Ok(msg) => {
-                                    if write.send(msg).await.is_err() {
-                                        break;
+                            tokio::select! {
+                                msg = rx.recv() => {
+                                    match msg {
+                                        Ok(msg) => {
+                                            if write.send(msg).await.is_err() {
+                                                break;
+                                            }
+                                        }
+                                        Err(broadcast::error::RecvError::Lagged(_)) => {
+                                            // Drop lagged frames to guarantee absolute zero latency
+                                            continue;
+                                        }
+                                        Err(broadcast::error::RecvError::Closed) => {
+                                            break;
+                                        }
                                     }
                                 }
-                                Err(broadcast::error::RecvError::Lagged(_)) => {
-                                    // Drop lagged frames to guarantee absolute zero latency
-                                    continue;
-                                }
-                                Err(broadcast::error::RecvError::Closed) => {
-                                    break;
+                                client_msg = read.next() => {
+                                    match client_msg {
+                                        Some(Ok(tokio_tungstenite::tungstenite::Message::Close(_))) | None | Some(Err(_)) => {
+                                            break;
+                                        }
+                                        _ => {}
+                                    }
                                 }
                             }
                         }
@@ -1035,6 +1047,49 @@ pub fn start_native_screen_capture(
     Ok(true)
 }
 
+#[cfg(windows)]
+fn safely_stop_wgc_control(control: ActiveCaptureControl) {
+    use std::os::windows::prelude::AsRawHandle;
+    use windows::Win32::Foundation::{HANDLE, LPARAM, WPARAM};
+    use windows::Win32::System::Threading::GetThreadId;
+    use windows::Win32::UI::WindowsAndMessaging::{PostThreadMessageW, WM_QUIT};
+
+    // 1. Signal halt flag immediately so on_frame_arrived halts without spinning
+    control.halt_handle().store(true, Ordering::SeqCst);
+
+    // 2. Extract thread handle and its raw Win32 thread ID
+    let thread_handle = control.into_thread_handle();
+    let raw_handle = thread_handle.as_raw_handle();
+    let thread_id = unsafe { GetThreadId(HANDLE(raw_handle)) };
+
+    // 3. Spawn a graceful shutdown task that NEVER busy-loops with yield_now()
+    std::thread::spawn(move || {
+        if thread_id != 0 {
+            // Post WM_QUIT to break Message Loop 1
+            let _ = unsafe { PostThreadMessageW(thread_id, WM_QUIT, WPARAM(0), LPARAM(0)) };
+
+            // Wait briefly to allow ShutdownQueueAsync to initiate cleanly
+            std::thread::sleep(std::time::Duration::from_millis(30));
+
+            // Post WM_QUIT again to ensure Message Loop 2 unblocks even if WinRT
+            // dispatched AsyncActionCompletedHandler onto a different COM thread
+            if !thread_handle.is_finished() {
+                let _ = unsafe { PostThreadMessageW(thread_id, WM_QUIT, WPARAM(0), LPARAM(0)) };
+            }
+        }
+
+        // 4. Polite bounded poll (max 600ms total, 20ms sleeps = 0% CPU)
+        let start = std::time::Instant::now();
+        while !thread_handle.is_finished() && start.elapsed().as_millis() < 600 {
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+
+        if thread_handle.is_finished() {
+            let _ = thread_handle.join();
+        }
+    });
+}
+
 #[tauri::command]
 pub fn stop_native_screen_capture() -> Result<bool, String> {
     CAPTURING_VIDEO.store(false, Ordering::SeqCst);
@@ -1046,9 +1101,7 @@ pub fn stop_native_screen_capture() -> Result<bool, String> {
     #[cfg(windows)]
     if let Ok(mut guard) = CURRENT_WGC_CONTROL.lock() {
         if let Some(control) = guard.take() {
-            std::thread::spawn(move || {
-                let _ = control.stop();
-            });
+            safely_stop_wgc_control(control);
         }
     }
     Ok(true)
