@@ -92,20 +92,19 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     fps: number = 60,
     resolution: { width: number; height: number } = { width: 1920, height: 1080 },
     captureMouse: boolean = true,
-    quality: number = 92
+    quality: number = 75
   ): Promise<MediaStream> {
     if (typeof optionsOrSourceId === 'object' && optionsOrSourceId !== null) {
       const opts = optionsOrSourceId as VideoSourceOptions;
-      const sId = opts.sourceId === 'gpu_direct' || !opts.sourceId ? 'screen:0' : opts.sourceId;
+      const sId = !opts.sourceId || opts.sourceId === 'gpu_direct' ? 'screen:0' : opts.sourceId;
       return this.startNativeCapture(sId, opts.frameRate || fps, resolution, captureMouse, quality);
     }
 
-    const sId = (optionsOrSourceId as string) || 'screen:0';
-    const effectiveSourceId =
-      sId === 'gpu_direct' || sId === 'direct_gpu' || sId === 'screen:direct_gpu' ? 'screen:0' : sId;
+    const rawId = (optionsOrSourceId as string) || 'screen:0';
+    const sId = rawId === 'gpu_direct' || rawId === 'direct_gpu' || rawId === 'screen:direct_gpu' ? 'screen:0' : rawId;
 
-    // In-app selected screen or window: capture directly via native GPU capture without Chromium prompt!
-    return this.startNativeCapture(effectiveSourceId, fps, resolution, captureMouse, quality);
+    // Official native in-app capture with hardware WGC
+    return this.startNativeCapture(sId, fps, resolution, captureMouse, quality);
   }
 
   private async startNativeCapture(
@@ -170,7 +169,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     }
 
     this.isCapturing = true;
-    this.isDirectGpu = true;
+    this.isDirectGpu = false;
 
     telemetryService.logEvent('CAPTURE', 'Iniciando captura de tela via Rust backend', {
       sourceId,

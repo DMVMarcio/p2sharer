@@ -97,8 +97,9 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
 
     fn new(ctx: Context<Self::Flags>) -> Result<Self, Self::Error> {
         let fps = ctx.flags.target_fps.clamp(15, 120);
-        // Allow frames up to 2x target FPS so natural +/- 1.5ms VSync/DWM jitter is never dropped
-        let min_frame_interval = std::time::Duration::from_nanos(1_000_000_000 / (fps as u64 * 2));
+        // Allow up to 10% timing tolerance to accommodate natural VSync/DWM presentation jitter without accepting double frame rate on high-refresh monitors
+        let frame_interval_ns = 1_000_000_000 / (fps as u64);
+        let min_frame_interval = std::time::Duration::from_nanos(frame_interval_ns * 9 / 10);
         Ok(Self {
             sender: ctx.flags.sender,
             target_width: ctx.flags.target_width,
@@ -151,7 +152,7 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
 
         let (final_pixels, final_w, final_h) = if self.target_width > 0
             && self.target_height > 0
-            && (src_width != self.target_width || src_height != self.target_height)
+            && (src_width > self.target_width || src_height > self.target_height)
         {
             use fast_image_resize::images::{Image, ImageRef};
             use fast_image_resize::{FilterType, PixelType, ResizeAlg, ResizeOptions};
@@ -170,7 +171,7 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
 
                 if let Some(dst_img) = self.resized_image.as_mut() {
                     let options =
-                        ResizeOptions::new().resize_alg(ResizeAlg::Convolution(FilterType::Bilinear));
+                        ResizeOptions::new().resize_alg(ResizeAlg::Convolution(FilterType::Box));
                     if self.resizer.resize(&src_img, dst_img, &options).is_ok() {
                         (dst_img.buffer(), dst_w, dst_h)
                     } else {
@@ -660,7 +661,7 @@ pub fn start_native_screen_capture(
     let width = target_width.unwrap_or(0);
     let height = target_height.unwrap_or(0);
     let should_draw_mouse = capture_mouse.unwrap_or(true);
-    let jpeg_quality = quality.unwrap_or(90).clamp(60, 95);
+    let jpeg_quality = quality.unwrap_or(75).clamp(50, 95);
 
     let sender = get_frame_sender().clone();
     let start_instant = std::time::Instant::now();
@@ -765,13 +766,17 @@ pub fn start_native_screen_capture(
                 }
             });
 
+            let min_interval = std::time::Duration::from_nanos(
+                1_000_000_000 / (flags.target_fps.clamp(15, 120) as u64),
+            );
+
             if let Some(win) = wgc_window {
                 let settings = Settings::new(
                     win,
                     cursor_settings,
                     DrawBorderSettings::WithoutBorder,
                     SecondaryWindowSettings::Default,
-                    MinimumUpdateIntervalSettings::Default,
+                    MinimumUpdateIntervalSettings::Custom(min_interval),
                     DirtyRegionSettings::Default,
                     ColorFormat::Rgba8,
                     flags.clone(),
@@ -793,6 +798,9 @@ pub fn start_native_screen_capture(
                 }
             }
         } else {
+            let min_interval = std::time::Duration::from_nanos(
+                1_000_000_000 / (flags.target_fps.clamp(15, 120) as u64),
+            );
             let target_mon_idx: usize = raw_id.parse().unwrap_or(0);
             let wgc_monitor =
                 WgcMonitor::from_index(target_mon_idx + 1).or_else(|_| WgcMonitor::primary());
@@ -803,7 +811,7 @@ pub fn start_native_screen_capture(
                     cursor_settings,
                     DrawBorderSettings::WithoutBorder,
                     SecondaryWindowSettings::Default,
-                    MinimumUpdateIntervalSettings::Default,
+                    MinimumUpdateIntervalSettings::Custom(min_interval),
                     DirtyRegionSettings::Default,
                     ColorFormat::Rgba8,
                     flags.clone(),

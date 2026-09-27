@@ -269,8 +269,8 @@ class RoomService {
         mouse,
       });
 
-      const chosenSource = !sourceId || sourceId === 'gpu_direct' ? 'screen:0' : sourceId;
-      const videoStream = await this.nativeVideoBridge.startCapture(chosenSource, fps, res, mouse, 92);
+      const chosenSource = !sourceId ? 'screen:0' : sourceId;
+      const videoStream = await this.nativeVideoBridge.startCapture(chosenSource, fps, res, mouse, 75);
 
       const audioMode = stateStore.isAudioFilterFullAudio ? 'full' : stateStore.selectedFilterMode;
       const audioPids = stateStore.isAudioFilterFullAudio ? [] : stateStore.getActiveFilterPids();
@@ -307,7 +307,13 @@ class RoomService {
       telemetryService.logEvent('CAPTURE', 'Transmissão de tela iniciada com sucesso');
       soundEffects.playScreenShareStart();
       this.notify();
-    } catch (err) {
+    } catch (err: unknown) {
+      const errName = err && typeof err === 'object' && 'name' in err ? (err as { name: string }).name : '';
+      if (errName === 'NotAllowedError' || errName === 'AbortError') {
+        telemetryService.logEvent('CAPTURE', 'Compartilhamento cancelado pelo usuário');
+        showToast('Compartilhamento cancelado');
+        return;
+      }
       telemetryService.logEvent('CAPTURE', `Erro ao iniciar captura: ${err}`);
       console.warn('Capture error:', err);
       showToast(`Erro ao iniciar captura: ${err}`);
