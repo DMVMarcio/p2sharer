@@ -79,6 +79,7 @@ export interface ChatMessage {
   timestamp: number;
   isHost?: boolean;
   isSystem?: boolean;
+  systemType?: 'join' | 'leave' | 'info' | 'generic';
 }
 
 export interface TurnConfig {
