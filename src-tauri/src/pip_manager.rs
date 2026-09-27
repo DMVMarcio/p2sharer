@@ -28,7 +28,8 @@ pub async fn open_pip_window(app: AppHandle, peer_id: String, title: String) -> 
     }
 
     let encoded_peer = encode_uri_component(&peer_id);
-    let url_str = format!("index.html?pip={}", encoded_peer);
+    let encoded_title = encode_uri_component(title.trim());
+    let url_str = format!("index.html?pip={}&name={}", encoded_peer, encoded_title);
     let win_title = if title.trim().is_empty() {
         "P2Sharer - Picture-in-Picture".to_string()
     } else {
