@@ -1000,13 +1000,15 @@ export class GroupRoomManager {
       if (pc) {
         MediaCoordinator.patchPeerConnectionSdp(pc);
         MediaCoordinator.configureCodecPreferences(pc);
-        if (typeof pc.addEventListener === 'function') {
-          pc.addEventListener('negotiationneeded', () => {
-            MediaCoordinator.patchPeerConnectionSdp(pc);
-            MediaCoordinator.configureCodecPreferences(pc);
-            setTimeout(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (typeof pc.addEventListener === 'function' && !(pc as any).__p2_stable_listener_attached) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (pc as any).__p2_stable_listener_attached = true;
+          pc.addEventListener('signalingstatechange', () => {
+            if (pc.signalingState === 'stable') {
               MediaCoordinator.applySenderBitrate(pc, this.currentTargetBitrate, this.currentTargetFps);
-            }, 100);
+              MediaCoordinator.requestKeyFrame(pc);
+            }
           });
         }
       }
