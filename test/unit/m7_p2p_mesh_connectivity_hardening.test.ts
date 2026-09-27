@@ -34,7 +34,7 @@ describe('M7: P2P Mesh Connectivity, Indirect Bridging & Signaling Stability Har
       assert.ok(DEFAULT_MQTT_RELAY_URLS[0]!.includes('shiftr.io'));
     });
 
-    it('1.2: getRelaySockets provides monitored fallback sockets when MQTT room is active', () => {
+    it('1.2: activeRoom alone does not fabricate healthy MQTT sockets', () => {
       const manager = new SignalingManager();
       // Initially no active room
       const initialSockets = manager.getRelaySockets('mqtt');
@@ -44,12 +44,11 @@ describe('M7: P2P Mesh Connectivity, Indirect Bridging & Signaling Stability Har
       (manager as any).activeRoom = { leave: async () => {} };
       const activeSockets = manager.getRelaySockets('mqtt');
       const urls = Object.keys(activeSockets);
-      assert.ok(urls.length >= 3);
-      assert.ok(urls.every((u) => activeSockets[u].connected === true));
+      assert.equal(urls.length, 0);
 
       const status = manager.getRelayStatus('mqtt');
-      assert.ok(status.connected >= 3);
-      assert.ok(status.ratio > 0);
+      assert.equal(status.connected, 0);
+      assert.equal(status.ratio, 0);
     });
 
     it('1.3: Active MQTT room does NOT trigger premature stall or failover under normal operation', () => {
@@ -58,14 +57,15 @@ describe('M7: P2P Mesh Connectivity, Indirect Bridging & Signaling Stability Har
       (manager as any).lastRoomParams = { config: {}, topic: 'steady-room' };
       (manager as any).roomJoinedTimestamp = Date.now() - 5000; // Past initial 4s grace
 
-      // Check relay health: since activeRoom has healthy monitored sockets, stalls must be 0
+      // A genuinely connected Trystero socket keeps the room healthy.
+      manager.getRelaySockets = () => ({ 'wss://relay.example': { readyState: 1 } });
       manager.checkRelayHealth();
       assert.equal((manager as any).consecutiveStalls, 0);
       assert.equal(manager.getActiveTransport(), 'mqtt');
       assert.equal(manager.failoverHistory.length, 0);
     });
 
-    it('1.4: getRelaySockets falls back to activeRoom healthy sockets when probe sockets are unconnected', () => {
+    it('1.4: unconnected probes do not masquerade as healthy room sockets', () => {
       const manager = new SignalingManager();
       // Simulate in-flight probe sockets with connected: false
       (manager as any).mqttSocketStatuses.set('wss://test.mosquitto.org:8081', { readyState: 0, connected: false });
@@ -73,9 +73,8 @@ describe('M7: P2P Mesh Connectivity, Indirect Bridging & Signaling Stability Har
 
       const sockets = manager.getRelaySockets('mqtt');
       const urls = Object.keys(sockets);
-      assert.ok(urls.length >= 3);
-      // Fallback to activeRoom healthy sockets must have been used
-      assert.ok(urls.every((u) => sockets[u].connected === true));
+      assert.equal(urls.length, 0);
+      assert.equal(manager.getRelayStatus('mqtt').connected, 0);
     });
 
     it('1.5: joinRoom and leaveRoom deterministically reset activeTransport to mqtt', async () => {

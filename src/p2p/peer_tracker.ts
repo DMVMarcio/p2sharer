@@ -40,7 +40,7 @@ export class PeerTracker {
     peerId: string,
     isDirectWebRtc: boolean,
     username?: string,
-    isCreator = false,
+    isCreator?: boolean,
     joinedAt = Date.now()
   ): boolean {
     if (!peerId) return false;
@@ -60,7 +60,9 @@ export class PeerTracker {
       if (!this.peerJoinedAt.has(peerId)) {
         this.peerJoinedAt.set(peerId, joinedAt);
       }
-      this.peerIsCreator.set(peerId, isCreator);
+      if (isCreator !== undefined) {
+        this.peerIsCreator.set(peerId, isCreator);
+      }
       return true;
     } else {
       // Unverified PEX rumor - track for in-mesh bridging and immediate room visibility

@@ -1,0 +1,120 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { GroupRoomManager } from '../../src/p2p/group_room.ts';
+import { PeerTracker } from '../../src/p2p/peer_tracker.ts';
+import { signalingManager } from '../../src/p2p/signaling_manager.ts';
+
+type MockAction = {
+  onMessage?: (data: any, context: { peerId: string }) => void;
+  send: (data: unknown, options?: unknown) => Promise<void>;
+};
+
+function mockRoom() {
+  const actions = new Map<string, MockAction>();
+  return {
+    actions,
+    room: {
+      makeAction(name: string): MockAction {
+        const action = { send: async () => {} };
+        actions.set(name, action);
+        return action;
+      },
+      getPeers: () => ({}),
+      leave: async () => {},
+      onPeerJoin: (_peerId: string) => {},
+      onPeerLeave: (_peerId: string) => {},
+      onPeerStream: (_stream: MediaStream, _peerId: string) => {},
+    },
+  };
+}
+
+function callbacks() {
+  return {
+    onStreamsUpdate: () => {},
+    onSlotsUpdate: () => {},
+    onChat: () => {},
+    onChatHistory: () => {},
+    onPeersUpdate: () => {},
+    onStatusChange: () => {},
+  };
+}
+
+test('a direct handshake does not erase the known creator role', () => {
+  const tracker = new PeerTracker();
+  tracker.receivePeerExchange('creator-peer', false, 'Creator', true, 1);
+  tracker.receivePeerExchange('creator-peer', true);
+  tracker.addPeer('creator-peer', 'Creator', true, 1);
+  tracker.receivePeerExchange('creator-peer', true);
+  assert.equal(tracker.isPeerCreator('creator-peer'), true);
+});
+
+test('creator advertises and joiner waits for an active room', async () => {
+  const originalJoin = signalingManager.joinRoom;
+  const originalLeave = signalingManager.leaveRoom;
+  const originalReannounce = signalingManager.reannounce;
+  const configs: any[] = [];
+  const rooms = [mockRoom(), mockRoom()];
+  let announcements = 0;
+  (signalingManager as any).joinRoom = (config: any) => {
+    configs.push(config);
+    return rooms[configs.length - 1]!.room;
+  };
+  (signalingManager as any).leaveRoom = async () => {};
+  (signalingManager as any).reannounce = async () => { announcements++; };
+  const creator = new GroupRoomManager('Creator', 'room-test', '', true);
+  const joiner = new GroupRoomManager('Joiner', 'room-test', '', false);
+  try {
+    await creator.join(callbacks());
+    await joiner.join(callbacks());
+    assert.equal(configs[0].passive, false);
+    assert.equal(configs[1].passive, true);
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    assert.ok(announcements > 0, 'creator must announce its room');
+    const before = announcements;
+    await creator.leave();
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    assert.equal(announcements, before, 'an unconnected joiner must not create its own room');
+  } finally {
+    await joiner.leave();
+    (signalingManager as any).joinRoom = originalJoin;
+    (signalingManager as any).leaveRoom = originalLeave;
+    (signalingManager as any).reannounce = originalReannounce;
+  }
+});
+
+test('PEX reveals a missing third peer and direct handshake promotes it', async () => {
+  const originalJoin = signalingManager.joinRoom;
+  const originalLeave = signalingManager.leaveRoom;
+  const originalReannounce = signalingManager.reannounce;
+  const mock = mockRoom();
+  const replacement = mockRoom();
+  let joins = 0;
+  (signalingManager as any).joinRoom = () => (joins++ === 0 ? mock.room : replacement.room);
+  (signalingManager as any).leaveRoom = async () => {};
+  (signalingManager as any).reannounce = async () => {};
+  const manager = new GroupRoomManager('Alice', 'mesh-test', '', true);
+  try {
+    await manager.join(callbacks());
+    mock.room.onPeerJoin('peer-b');
+    mock.actions.get('peer_exchange')!.onMessage!({
+      peers: [{ peerId: 'peer-c', username: 'Carol', isCreator: false, joinedAt: 10 }],
+    }, { peerId: 'peer-b' });
+    assert.equal(manager.getConnectedPeers().find((peer) => peer.id === 'peer-c')?.connectionState, 'connecting');
+    mock.room.onPeerJoin('peer-c');
+    assert.equal(manager.getConnectedPeers().find((peer) => peer.id === 'peer-c')?.connectionState, 'connected');
+
+    const oldLeave = mock.room.onPeerLeave;
+    const oldPex = mock.actions.get('peer_exchange')!.onMessage!;
+    await (manager as any).reconnectOnNewTransport();
+    replacement.room.onPeerJoin('peer-c');
+    oldLeave('peer-c');
+    oldPex({ peers: [{ peerId: 'stale-peer', username: 'Stale', joinedAt: 20 }] }, { peerId: 'peer-b' });
+    assert.equal(manager.getConnectedPeers().find((peer) => peer.id === 'peer-c')?.connectionState, 'connected');
+    assert.equal(manager.getConnectedPeers().find((peer) => peer.id === 'stale-peer'), undefined);
+  } finally {
+    await manager.leave();
+    (signalingManager as any).joinRoom = originalJoin;
+    (signalingManager as any).leaveRoom = originalLeave;
+    (signalingManager as any).reannounce = originalReannounce;
+  }
+});

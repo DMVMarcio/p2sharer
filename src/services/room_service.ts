@@ -37,6 +37,7 @@ export class RoomService {
 
   private listeners: Set<Listener> = new Set();
   private roomConnectingTimeout: ReturnType<typeof setTimeout> | null = null;
+  private roomTransition: Promise<void> = Promise.resolve();
 
   public static getInstance(): RoomService {
     if (!RoomService.instance) {
@@ -130,6 +131,14 @@ export class RoomService {
   }
 
   public async joinRoom(code: string, pass: string, isCreator: boolean): Promise<void> {
+    const transition = this.roomTransition.then(() => this.joinRoomNow(code, pass, isCreator));
+    this.roomTransition = transition.catch((err) => {
+      console.error('[RoomService] Room transition failed:', err);
+    });
+    return transition;
+  }
+
+  private async joinRoomNow(code: string, pass: string, isCreator: boolean): Promise<void> {
     stateStore.set((s) => {
       s.currentRoomCode = code;
       s.currentRoomPassword = pass;
@@ -166,10 +175,14 @@ export class RoomService {
     if (this.roomConnectingTimeout) {
       clearTimeout(this.roomConnectingTimeout);
     }
-    // Defensive fallback: dismiss overlay after 3.0s for creator or 8.0s for joiner
+    // Dismiss the overlay, but keep searching and describe the actual state.
     this.roomConnectingTimeout = setTimeout(() => {
+      if (!isCreator && this.peers.every((peer) => peer.connectionState !== 'connected')) {
+        this.roomStatusText = 'Ainda procurando participantes...';
+      }
       this.hideConnecting();
-    }, isCreator ? 3000 : 8000);
+      this.notify();
+    }, isCreator ? 3000 : 12000);
 
     if (this.roomManager) {
       const oldManager = this.roomManager;
@@ -181,38 +194,44 @@ export class RoomService {
       }
     }
 
-    this.roomManager = new GroupRoomManager(
+    const manager = new GroupRoomManager(
       stateStore.username || 'Usuário',
       code,
       pass,
       isCreator,
       stateStore.getTurnConfig()
     );
+    this.roomManager = manager;
 
-    this.roomManager.join({
+    await manager.join({
       onStreamsUpdate: () => {
         // Handled via onSlotsUpdate to prevent double notification cascades
       },
       onSlotsUpdate: (slots: RoomSlotInfo[]) => {
+        if (this.roomManager !== manager) return;
         stateStore.set((s) => {
           s.roomSlots = slots;
         });
-        this.hideConnecting();
+        if (isCreator || slots.some((slot) => !slot.isLocal)) this.hideConnecting();
       },
       onChat: (msg: ChatMessage) => {
+        if (this.roomManager !== manager) return;
         this.chatMessages.push(msg);
         this.notify();
       },
       onChatHistory: (messages: ChatMessage[]) => {
+        if (this.roomManager !== manager) return;
         this.chatMessages.push(...messages);
         this.notify();
       },
       onPeersUpdate: (peers: PeerInfo[]) => {
+        if (this.roomManager !== manager) return;
         this.peers = peers;
-        this.hideConnecting();
+        if (isCreator || peers.some((peer) => peer.connectionState === 'connected')) this.hideConnecting();
         this.notify();
       },
       onPeerJoined: (peer, isInitial) => {
+        if (this.roomManager !== manager) return;
         if (!isInitial) {
           soundEffects.playUserJoin();
           const name = peer.username || `Participante (${peer.id.slice(0, 4)})`;
@@ -220,6 +239,7 @@ export class RoomService {
         }
       },
       onPeerLeft: (peerId, username) => {
+        if (this.roomManager !== manager) return;
         soundEffects.playUserLeave();
         const displayName = username || `Participante (${peerId.slice(0, 4)})`;
         this.addSystemChatMessage(`${displayName} saiu da chamada.`, 'leave');
@@ -237,6 +257,7 @@ export class RoomService {
       onWatchStarted: () => soundEffects.playWatchStreamStart(),
       onWatchStopped: () => soundEffects.playWatchStreamStop(),
       onStatusChange: (status) => {
+        if (this.roomManager !== manager) return;
         this.roomStatusText = status;
         if (
           status.includes('Conectado') ||
@@ -253,6 +274,7 @@ export class RoomService {
         this.notify();
       },
       onPasswordChange: (newPassword, updatedBy) => {
+        if (this.roomManager !== manager) return;
         stateStore.set((s) => {
           s.currentRoomPassword = newPassword;
         });
@@ -347,6 +369,14 @@ export class RoomService {
   }
 
   public async leaveRoom(): Promise<void> {
+    const transition = this.roomTransition.then(() => this.leaveRoomNow());
+    this.roomTransition = transition.catch((err) => {
+      console.error('[RoomService] Room exit failed:', err);
+    });
+    return transition;
+  }
+
+  private async leaveRoomNow(): Promise<void> {
     if (this.roomConnectingTimeout) {
       clearTimeout(this.roomConnectingTimeout);
       this.roomConnectingTimeout = null;
@@ -359,8 +389,9 @@ export class RoomService {
     }
 
     if (this.roomManager) {
-      await this.roomManager.leave();
+      const oldManager = this.roomManager;
       this.roomManager = null;
+      await oldManager.leave();
     }
 
     try {
