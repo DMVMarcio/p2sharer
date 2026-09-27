@@ -18,9 +18,19 @@ describe('MediaCoordinator SDP Munging and WebRTC Bandwidth Allocation', () => {
     'a=rtpmap:97 VP8/90000',
   ].join('\r\n');
 
-  it('injects b=AS and b=TIAS right under m=video', () => {
+  it('injects bandwidth lines after c= and before a= in the video section', () => {
     const munged = MediaCoordinator.mungeSdpBitrates(sampleSdp, 8000, 25000);
-    assert.match(munged, /m=video 9 UDP\/TLS\/RTP\/SAVPF 96 97\r\nb=AS:25000\r\nb=TIAS:25000000/);
+    assert.match(munged, /m=video 9 UDP\/TLS\/RTP\/SAVPF 96 97\r\nc=IN IP4 0\.0\.0\.0\r\nb=AS:25000\r\nb=TIAS:25000000\r\na=rtpmap:96/);
+  });
+
+  it('keeps repeated global munging valid and skips RTX parameters', () => {
+    const withRtx = `${sampleSdp}\r\na=rtpmap:98 rtx/90000\r\na=fmtp:98 apt=96\r\n`;
+    const once = MediaCoordinator.mungeSdpBitrates(withRtx);
+    assert.equal(MediaCoordinator.mungeSdpBitrates(once), once);
+    assert.match(once, /a=fmtp:98 apt=96\r\n/);
+    assert.doesNotMatch(once, /a=fmtp:98 apt=96;x-google/);
+    assert.ok(once.endsWith('\r\n'));
+    assert.match(once, /a=fmtp:97 .*\r\n$/);
   });
 
   it('appends x-google-min-bitrate, start-bitrate and max-bitrate to existing a=fmtp lines', () => {

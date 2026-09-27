@@ -116,81 +116,67 @@ export class MediaCoordinator {
     if (!sdp || typeof sdp !== 'string') return sdp;
 
     const lines = sdp.split(/\r?\n/);
-    const modifiedLines: string[] = [];
-    let inVideo = false;
-    let videoPayloadTypes: string[] = [];
-    let fmtpPayloadTypes: Set<string> = new Set();
+    const result: string[] = [];
+    const bitrateParameters = `x-google-min-bitrate=${minBitrateKbps};x-google-start-bitrate=${Math.round(minBitrateKbps * 1.5)};x-google-max-bitrate=${maxBitrateKbps}`;
 
-    const flushMissingVideoFmtp = () => {
-      if (videoPayloadTypes.length > 0) {
-        for (const pt of videoPayloadTypes) {
-          if (!fmtpPayloadTypes.has(pt)) {
-            modifiedLines.push(
-              `a=fmtp:${pt} x-google-min-bitrate=${minBitrateKbps};x-google-start-bitrate=${Math.round(minBitrateKbps * 1.5)};x-google-max-bitrate=${maxBitrateKbps}`
-            );
-            fmtpPayloadTypes.add(pt);
-          }
-        }
-        videoPayloadTypes = [];
-        fmtpPayloadTypes.clear();
-      }
-    };
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-
-      if (line.startsWith('m=')) {
-        if (inVideo) {
-          flushMissingVideoFmtp();
-          inVideo = false;
-        }
-
-        if (line.startsWith('m=video')) {
-          inVideo = true;
-          const parts = line.split(' ');
-          for (let p = 3; p < parts.length; p++) {
-            if (parts[p]) videoPayloadTypes.push(parts[p]);
-          }
-          modifiedLines.push(line);
-
-          // Ensure b=AS and b=TIAS lines exist right after m=video line if not already present
-          const nextLine1 = lines[i + 1] || '';
-          const nextLine2 = lines[i + 2] || '';
-          if (!nextLine1.startsWith('b=AS:') && !nextLine2.startsWith('b=AS:')) {
-            modifiedLines.push(`b=AS:${maxBitrateKbps}`);
-          }
-          if (!nextLine1.startsWith('b=TIAS:') && !nextLine2.startsWith('b=TIAS:')) {
-            modifiedLines.push(`b=TIAS:${maxBitrateKbps * 1000}`);
-          }
-          continue;
-        }
+    for (let start = 0; start < lines.length;) {
+      let end = start + 1;
+      while (end < lines.length && !lines[end].startsWith('m=')) end++;
+      const section = lines.slice(start, end);
+      if (!section[0].startsWith('m=video ')) {
+        result.push(...section);
+        start = end;
+        continue;
       }
 
-      if (inVideo && line.startsWith('a=fmtp:')) {
-        const colonIdx = line.indexOf(':');
-        const spaceIdx = line.indexOf(' ', colonIdx);
-        if (colonIdx !== -1 && spaceIdx !== -1) {
-          const pt = line.slice(colonIdx + 1, spaceIdx).trim();
-          fmtpPayloadTypes.add(pt);
-        }
-
-        // Append x-google-min-bitrate, start-bitrate and max-bitrate if not already present
-        if (!line.includes('x-google-min-bitrate')) {
-          modifiedLines.push(
-            `${line};x-google-min-bitrate=${minBitrateKbps};x-google-start-bitrate=${Math.round(minBitrateKbps * 1.5)};x-google-max-bitrate=${maxBitrateKbps}`
-          );
-          continue;
-        }
+      let trailingEmptyLines = 0;
+      while (section.length > 1 && section[section.length - 1] === '') {
+        section.pop();
+        trailingEmptyLines++;
       }
 
-      modifiedLines.push(line);
+      const payloads = section[0].split(/\s+/).slice(3);
+      const videoCodecs = new Set<string>();
+      const existingFmtp = new Set<string>();
+      for (const line of section) {
+        const codec = /^a=rtpmap:(\d+) (H264|VP8|VP9|AV1|AV01)\//i.exec(line);
+        if (codec) videoCodecs.add(codec[1]);
+        const fmtp = /^a=fmtp:(\d+)\s/.exec(line);
+        if (fmtp) existingFmtp.add(fmtp[1]);
+      }
+
+      // RFC 4566 media sections order i=/c=/b=/a=. Inserting b= immediately
+      // after m= (before c=) makes Chromium reject the entire offer.
+      const firstAttribute = section.findIndex((line) => line.startsWith('a='));
+      const bandwidthAt = firstAttribute >= 0 ? firstAttribute : section.length;
+      const hasAs = section.some((line) => line.startsWith('b=AS:'));
+      const hasTias = section.some((line) => line.startsWith('b=TIAS:'));
+      for (let index = 0; index < section.length; index++) {
+        if (index === bandwidthAt) {
+          if (!hasAs) result.push(`b=AS:${maxBitrateKbps}`);
+          if (!hasTias) result.push(`b=TIAS:${maxBitrateKbps * 1000}`);
+        }
+        const line = section[index];
+        const fmtp = /^a=fmtp:(\d+)\s/.exec(line);
+        if (fmtp && videoCodecs.has(fmtp[1]) && !line.includes('x-google-min-bitrate')) {
+          result.push(`${line};${bitrateParameters}`);
+        } else {
+          result.push(line);
+        }
+      }
+      if (bandwidthAt === section.length) {
+        if (!hasAs) result.push(`b=AS:${maxBitrateKbps}`);
+        if (!hasTias) result.push(`b=TIAS:${maxBitrateKbps * 1000}`);
+      }
+      for (const payload of payloads) {
+        if (videoCodecs.has(payload) && !existingFmtp.has(payload)) {
+          result.push(`a=fmtp:${payload} ${bitrateParameters}`);
+        }
+      }
+      for (let index = 0; index < trailingEmptyLines; index++) result.push('');
+      start = end;
     }
-
-    if (inVideo) {
-      flushMissingVideoFmtp();
-    }
-
-    return modifiedLines.join('\r\n');
+    return result.join('\r\n');
   }
 
   /**
