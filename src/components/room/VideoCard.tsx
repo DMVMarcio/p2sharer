@@ -8,7 +8,7 @@ import { roomService } from '../../services/room_service';
 import { pipService } from '../../services/pip_service';
 import { ZoomControlBar } from './ZoomControlBar';
 import { Tooltip } from '../common/Tooltip';
-import { WatchersTooltipContent } from './WatchersTooltipContent';
+import { StreamStatsOverlay } from './StreamStatsOverlay';
 
 interface VideoCardProps {
   slot: RoomSlotInfo;
@@ -214,7 +214,6 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   };
 
   const watchers = slot.watchers || [];
-  const watchersCount = watchers.length;
 
   const pingVal = !slot.isLocal ? getPeerPing(slot.peerId) : 0;
   const pingNum = pingVal ?? 15;
@@ -349,150 +348,18 @@ export const VideoCard: React.FC<VideoCardProps> = ({
 
       {/* Stats HUD on top of card - only when not in tray and not in PiP */}
       {!inTray && !isPipActive && (
-        <div className="stream-card-stats-hud">
-        <span className="stat-badge stat-badge-quality">
-          <span className="stat-badge-dot"></span>
-          <span className="stat-quality-text">
-            {slot.isLocal
-              ? `${currentResolution.label} ${currentFps} FPS`
-              : `${remoteResolution} ${liveFps} FPS`}
-          </span>
-        </span>
-
-        {liveBitrate > 0 ? (
-          <Tooltip
-            tooltipClassName="bitrate-tooltip"
-            onOpenChange={handleTooltipOpenChange}
-            content={
-              <>
-                <div className="bitrate-tooltip-header">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-                  </svg>
-                  <span>{slot.isLocal ? 'Taxa de Envio' : 'Taxa de Recepção'}</span>
-                </div>
-                <div className="bitrate-tooltip-content">
-                  <div className="bitrate-tooltip-row">
-                    <span className="bitrate-tooltip-label">Tempo real:</span>
-                    <span className="bitrate-tooltip-value">{(liveBitrate / 1000).toFixed(1)} Mbps</span>
-                  </div>
-                  {slot.isLocal && (
-                    <div className="bitrate-tooltip-row">
-                      <span className="bitrate-tooltip-label">Limite configurado:</span>
-                      <span className="bitrate-tooltip-value">{(currentBitrate / 1000).toFixed(0)} Mbps</span>
-                    </div>
-                  )}
-                </div>
-              </>
-            }
-          >
-            <div
-              className="stat-badge stat-badge-bitrate"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-              </svg>
-              <span className="stat-bitrate-text">{(liveBitrate / 1000).toFixed(1)} Mbps</span>
-            </div>
-          </Tooltip>
-        ) : slot.isLocal ? (
-          <Tooltip
-            tooltipClassName="bitrate-tooltip"
-            onOpenChange={handleTooltipOpenChange}
-            content={
-              <>
-                <div className="bitrate-tooltip-header">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-                  </svg>
-                  <span>Taxa de Envio</span>
-                </div>
-                <div className="bitrate-tooltip-content">
-                  <div className="bitrate-tooltip-row">
-                    <span className="bitrate-tooltip-label">Limite configurado:</span>
-                    <span className="bitrate-tooltip-value">{(currentBitrate / 1000).toFixed(0)} Mbps</span>
-                  </div>
-                  <div className="bitrate-tooltip-hint">
-                    Aguardando espectadores ou movimento na tela
-                  </div>
-                </div>
-              </>
-            }
-          >
-            <div
-              className="stat-badge stat-badge-bitrate"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-              </svg>
-              <span className="stat-bitrate-text">{(currentBitrate / 1000).toFixed(0)}M máx</span>
-            </div>
-          </Tooltip>
-        ) : (
-          <Tooltip
-            tooltipClassName="bitrate-tooltip"
-            onOpenChange={handleTooltipOpenChange}
-            content={
-              <>
-                <div className="bitrate-tooltip-header">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-                  </svg>
-                  <span>Taxa de Recepção</span>
-                </div>
-                <div className="bitrate-tooltip-content">
-                  <div className="bitrate-tooltip-row">
-                    <span className="bitrate-tooltip-label">Tempo real:</span>
-                    <span className="bitrate-tooltip-value">{liveBitrate > 0 ? `${(liveBitrate / 1000).toFixed(1)} Mbps` : '0.0 Mbps'}</span>
-                  </div>
-                  <div className="bitrate-tooltip-hint">
-                    Sincronizando fluxo WebRTC em tempo real
-                  </div>
-                </div>
-              </>
-            }
-          >
-            <div
-              className="stat-badge stat-badge-bitrate"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-              </svg>
-              <span className="stat-bitrate-text">{liveBitrate > 0 ? `${(liveBitrate / 1000).toFixed(1)} Mbps` : '0.0 Mbps'}</span>
-            </div>
-          </Tooltip>
-        )}
-
-        {!slot.isLocal && (
-          <span className="stat-badge stat-badge-ping">
-            <span className={`stat-ping-dot ${pingClass}`}></span>
-            <span className="stat-ping-text">{pingStr}{transportTag}</span>
-          </span>
-        )}
-
-        <Tooltip
-          interactive
-          tooltipClassName="watchers-tooltip"
-          onOpenChange={handleTooltipOpenChange}
-          content={<WatchersTooltipContent watchers={watchers} currentUsername={username} />}
-        >
-          <div
-            className="stat-badge stat-badge-watchers"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"/>
-              <circle cx="12" cy="12" r="3"/>
-            </svg>
-            <span className="stat-watchers-text">
-              {watchersCount === 1 ? '1 assistindo' : `${watchersCount} assistindo`}
-            </span>
-          </div>
-        </Tooltip>
-      </div>
+        <StreamStatsOverlay
+          qualityText={slot.isLocal ? `${currentResolution.label} ${currentFps} FPS` : `${remoteResolution} ${liveFps} FPS`}
+          liveBitrateKbps={liveBitrate}
+          configuredBitrateKbps={currentBitrate}
+          isLocal={slot.isLocal}
+          pingText={pingStr}
+          pingClass={pingClass}
+          transportTag={transportTag}
+          watchers={watchers}
+          currentUsername={username}
+          onTooltipOpenChange={handleTooltipOpenChange}
+        />
     )}
 
       {/* User overlay at bottom-left */}

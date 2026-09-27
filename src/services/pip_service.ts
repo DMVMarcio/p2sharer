@@ -1,6 +1,7 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { stateStore } from '../core/state_store.ts';
+import type { StreamWatcher } from '../core/types.ts';
 import { roomService } from './room_service.ts';
 import { buildIceServers } from '../p2p/ice_config.ts';
 
@@ -248,7 +249,7 @@ export class PipService {
         const ping = roomService.getPeerPing(peerId);
         const stats = await roomService.roomManager?.getPeerStats(peerId);
         const slot = stateStore.roomSlots.find((sl) => sl.peerId === peerId);
-        const watchersCount = slot?.watchers?.length ?? 0;
+        const signalingStatus = roomService.roomManager?.getSignalingStatus?.();
 
         sendSignal({
           type: 'stats',
@@ -257,7 +258,11 @@ export class PipService {
             fps: stats?.fps ?? (peerId === 'local' ? stateStore.currentFps : 60),
             bitrateKbps: stats?.bitrateKbps ?? 0,
             height: stats?.height ? `${stats.height}p` : '1080p',
-            watchersCount,
+            watchers: (slot?.watchers ?? []) as StreamWatcher[],
+            configuredBitrateKbps: stateStore.currentBitrate,
+            transportTag: signalingStatus?.activeTransport
+              ? ` [${signalingStatus.activeTransport.toUpperCase()}]`
+              : '',
           },
         });
       } catch {
