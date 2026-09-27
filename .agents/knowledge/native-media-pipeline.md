@@ -73,9 +73,18 @@ At application startup, before WebView2 initialization, Rust configures `WEBVIEW
 - `--enable-gpu-rasterization`
 - `--enable-zero-copy`
 - `--ignore-gpu-blocklist`
-- `--enable-features=WebRtcHardwareVideoEncoding,WebRtcHardwareVideoDecoding`
+- `--enable-accelerated-video-decode`
+- `--enable-accelerated-video-encode`
+- `--enable-webrtc-hw-h264-encoding`
+- `--enable-webrtc-hw-vp8-encoding`
+- `--enable-gpu-memory-buffer-video-frames`
+- `--enable-features=WebRtcHardwareVideoEncoding,WebRtcHardwareVideoDecoding,AcceleratedVideoEncoder,AcceleratedVideoDecoder,MediaStreamTrackGenerator`
+- `--enable-blink-features=MediaStreamTrackGenerator`
+- `--disable-background-timer-throttling`
+- `--disable-renderer-backgrounding`
+- `--disable-backgrounding-occluded-windows`
 
-These flags force hardware-accelerated encoding/decoding and zero-copy texture transfer within Chromium.
+These flags force hardware-accelerated encoding/decoding via dedicated GPU video engines (NVENC/AMF/QuickSync) and zero-copy texture transfer within Chromium, preventing WebRTC from falling back to CPU software encoders (OpenH264/libvpx).
 
 ---
 
