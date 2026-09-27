@@ -2371,13 +2371,19 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 
 .chat-system-content {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 6px;
   min-width: 0;
   width: 100%;
   font-size: 11px;
   line-height: 1.4;
   color: var(--text-muted);
+}
+
+.chat-sys-icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  opacity: 0.75;
 }
 
 .chat-sys-text {
@@ -2409,11 +2415,17 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 }
 
 .chat-msg-sender {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-weight: 600;
   color: var(--accent-color);
 }
 
 .chat-msg-time {
+  flex-shrink: 0;
+  margin-left: auto;
   font-size: 10px;
   color: var(--text-muted);
 }
@@ -2529,15 +2541,39 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+  flex: 1;
   overflow: hidden;
 }
 
 .participant-item-name {
+  min-width: 0;
+  flex: 0 1 auto;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 140px;
+  max-width: 100%;
+}
+
+.badge-host {
+  flex-shrink: 0;
+  color: var(--accent-color);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  line-height: 1;
+}
+
+.participant-item .user-status-dot.connecting {
+  background-color: var(--text-muted);
+  opacity: 0.55;
+}
+
+.participant-item .user-status-dot,
+.participant-item .badge-you,
+.badge-live-stream-mini {
+  flex-shrink: 0;
 }
 
 .badge-live-stream-mini {

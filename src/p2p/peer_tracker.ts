@@ -216,6 +216,7 @@ export class PeerTracker {
         username: uname,
         connectionState: 'connected',
         joinedAt: this.peerJoinedAt.get(pId) || Date.now(),
+        isCreator: this.isPeerCreator(pId),
       });
     });
     return list;
@@ -237,6 +238,7 @@ export class PeerTracker {
         username: uname,
         connectionState: 'connected',
         joinedAt: this.peerJoinedAt.get(pId) || Date.now(),
+        isCreator: this.isPeerCreator(pId),
       });
     });
 

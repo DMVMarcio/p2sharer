@@ -39,6 +39,7 @@ export interface PeerInfo {
   username: string;
   connectionState: 'connected' | 'connecting' | 'disconnected';
   joinedAt: number;
+  isCreator?: boolean;
 }
 
 export interface StreamWatcher {

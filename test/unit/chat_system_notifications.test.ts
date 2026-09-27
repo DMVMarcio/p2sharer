@@ -104,8 +104,11 @@ describe('Chat System Notifications Architecture', () => {
       const noticeCss = css.slice(css.indexOf('.chat-system-msg {'), css.indexOf('.chat-msg {'));
       assert.ok(noticeCss.includes('text-overflow: ellipsis'));
       assert.ok(noticeCss.includes('white-space: nowrap'));
+      assert.ok(noticeCss.includes('align-items: center'));
+      assert.ok(noticeCss.includes('.chat-sys-icon'));
       assert.ok(!noticeCss.includes('background-color:'));
       assert.ok(!noticeCss.includes('border:'));
     });
   });
+
 });
