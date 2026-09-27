@@ -48,6 +48,42 @@ test('a direct handshake does not erase the known creator role', () => {
   assert.equal(tracker.isPeerCreator('creator-peer'), true);
 });
 
+test('join and leave notices wait for the direct presence username', async () => {
+  const originalJoin = signalingManager.joinRoom;
+  const originalLeave = signalingManager.leaveRoom;
+  const originalReannounce = signalingManager.reannounce;
+  const mock = mockRoom();
+  (signalingManager as any).joinRoom = () => mock.room;
+  (signalingManager as any).leaveRoom = async () => {};
+  (signalingManager as any).reannounce = async () => {};
+  const events: string[] = [];
+  const manager = new GroupRoomManager('Alice', 'notice-test', '', true);
+  try {
+    await manager.join({
+      ...callbacks(),
+      onPeerJoined: (peer) => events.push(`join:${peer.username}`),
+      onPeerLeft: (_peerId, username) => events.push(`leave:${username}`),
+    });
+    mock.room.onPeerJoin('peer-b');
+    assert.deepEqual(events, [], 'the WebRTC handshake alone has no real username');
+
+    const presence = mock.actions.get('presence')!.onMessage!;
+    presence({ username: '  Bob  ', isCreator: false }, { peerId: 'peer-b' });
+    presence({ username: 'Bob', isCreator: false }, { peerId: 'peer-b' });
+    assert.deepEqual(events, ['join:Bob'], 'repeated presence must not duplicate the notice');
+
+    mock.room.onPeerLeave('peer-b');
+    mock.room.onPeerJoin('peer-c');
+    mock.room.onPeerLeave('peer-c');
+    assert.deepEqual(events, ['join:Bob', 'leave:Bob'], 'unnamed transient peers produce no synthetic notice');
+  } finally {
+    await manager.leave();
+    (signalingManager as any).joinRoom = originalJoin;
+    (signalingManager as any).leaveRoom = originalLeave;
+    (signalingManager as any).reannounce = originalReannounce;
+  }
+});
+
 test('creator advertises and joiner waits for an active room', async () => {
   const originalJoin = signalingManager.joinRoom;
   const originalLeave = signalingManager.leaveRoom;
