@@ -148,6 +148,8 @@ export class GroupRoomManager {
 
   private lastPeerStats: Map<string, { bytesReceived: number; timestamp: number }> = new Map();
   private lastLocalStats: { bytesSent: number; timestamp: number } | null = null;
+  private peerStatsCache: Map<string, { stats: PeerStatsInfo; timestamp: number }> = new Map();
+  private localStatsCache: { stats: PeerStatsInfo; timestamp: number } | null = null;
   private initialJoinComplete: boolean = false;
   private callbacks: RoomCallbacks | null = null;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
@@ -837,6 +839,7 @@ export class GroupRoomManager {
       this.remoteStreams.delete(peerId);
     }
     this.lastPeerStats.delete(peerId);
+    this.peerStatsCache.delete(peerId);
     this.lastBroadcasterStreamIds.delete(peerId);
     this.lastStreamRecoveryRequests.delete(peerId);
     this.lastBridgeAttempts.delete(peerId);
@@ -983,9 +986,11 @@ export class GroupRoomManager {
       const pc: RTCPeerConnection = peerObj?.connection || peerObj?.pc || peerObj;
 
       if (pc) {
+        MediaCoordinator.patchPeerConnectionSdp(pc);
         MediaCoordinator.configureCodecPreferences(pc);
         if (typeof pc.addEventListener === 'function') {
           pc.addEventListener('negotiationneeded', () => {
+            MediaCoordinator.patchPeerConnectionSdp(pc);
             MediaCoordinator.configureCodecPreferences(pc);
             setTimeout(() => {
               MediaCoordinator.applySenderBitrate(pc, this.currentTargetBitrate, this.currentTargetFps);
@@ -1047,6 +1052,7 @@ export class GroupRoomManager {
       Object.values(peers).forEach((peerObj: any) => {
         const pc: RTCPeerConnection = peerObj?.connection || peerObj?.pc || peerObj;
         if (pc) {
+          MediaCoordinator.patchPeerConnectionSdp(pc);
           MediaCoordinator.configureCodecPreferences(pc);
           MediaCoordinator.applySenderBitrate(pc, maxBitrateBps, maxFps);
         }
@@ -1172,13 +1178,18 @@ export class GroupRoomManager {
   }
 
   public async getLocalBroadcasterStats(): Promise<PeerStatsInfo> {
+    const now = Date.now();
+    if (this.localStatsCache && now - this.localStatsCache.timestamp < 800) {
+      return this.localStatsCache.stats;
+    }
+
     let fps: number | null = this.currentTargetFps || 60;
     let width: number | null = null;
     let height: number | null = null;
-    let bitrateKbps: number | null = null;
+    let bitrateKbps: number | null = this.localStatsCache?.stats.bitrateKbps ?? null;
 
     if (!this.localStream || !this.room) {
-      return {
+      const emptyResult: PeerStatsInfo = {
         pingMs: 0,
         fps,
         width,
@@ -1186,6 +1197,8 @@ export class GroupRoomManager {
         bitrateKbps: null,
         connectionType: 'P2P Direto',
       };
+      this.localStatsCache = { stats: emptyResult, timestamp: now };
+      return emptyResult;
     }
 
     try {
@@ -1233,18 +1246,20 @@ export class GroupRoomManager {
         if (this.lastLocalStats) {
           const deltaBytes = totalBytesSent - this.lastLocalStats.bytesSent;
           const deltaSec = (timestamp - this.lastLocalStats.timestamp) / 1000;
-          if (deltaSec > 0 && deltaBytes >= 0) {
+          if (deltaSec >= 0.5 && deltaBytes >= 0) {
             const peerCount = Math.max(1, peerList.length);
             bitrateKbps = Math.round((deltaBytes * 8) / (deltaSec * 1000 * peerCount));
+            this.lastLocalStats = { bytesSent: totalBytesSent, timestamp };
           }
+        } else {
+          this.lastLocalStats = { bytesSent: totalBytesSent, timestamp };
         }
-        this.lastLocalStats = { bytesSent: totalBytesSent, timestamp };
       }
     } catch (err) {
       console.warn('[P2P] Failed to get local broadcaster stats:', err);
     }
 
-    return {
+    const result: PeerStatsInfo = {
       pingMs: 0,
       fps,
       width,
@@ -1252,17 +1267,25 @@ export class GroupRoomManager {
       bitrateKbps,
       connectionType: 'P2P Direto',
     };
+    this.localStatsCache = { stats: result, timestamp: Date.now() };
+    return result;
   }
 
   public async getPeerStats(peerId: string): Promise<PeerStatsInfo | null> {
     if (peerId === 'local' || peerId === selfId) {
       return this.getLocalBroadcasterStats();
     }
+    const now = Date.now();
+    const cached = this.peerStatsCache.get(peerId);
+    if (cached && now - cached.timestamp < 800) {
+      return cached.stats;
+    }
+
     const pingMs = this.getPeerPing(peerId);
     let fps: number | null = null;
     let width: number | null = null;
     let height: number | null = null;
-    let bitrateKbps: number | null = null;
+    let bitrateKbps: number | null = cached?.stats.bitrateKbps ?? null;
     let connectionType = 'P2P Direto';
 
     try {
@@ -1312,14 +1335,16 @@ export class GroupRoomManager {
           if (last) {
             const deltaBytes = bytesReceived - last.bytesReceived;
             const deltaSec = (timestamp - last.timestamp) / 1000;
-            if (deltaSec > 0 && deltaBytes >= 0) {
+            if (deltaSec >= 0.5 && deltaBytes >= 0) {
               bitrateKbps = Math.round((deltaBytes * 8) / (deltaSec * 1000));
+              this.lastPeerStats.set(peerId, { bytesReceived, timestamp });
             }
+          } else {
+            this.lastPeerStats.set(peerId, { bytesReceived, timestamp });
           }
-          this.lastPeerStats.set(peerId, { bytesReceived, timestamp });
         }
 
-        return {
+        const result: PeerStatsInfo = {
           pingMs: rttMs !== null ? rttMs : pingMs,
           fps,
           width,
@@ -1327,17 +1352,21 @@ export class GroupRoomManager {
           bitrateKbps,
           connectionType,
         };
+        this.peerStatsCache.set(peerId, { stats: result, timestamp: Date.now() });
+        return result;
       }
     } catch {}
 
-    return {
+    const fallbackResult: PeerStatsInfo = {
       pingMs,
       fps: null,
       width: null,
       height: null,
-      bitrateKbps: null,
+      bitrateKbps,
       connectionType,
     };
+    this.peerStatsCache.set(peerId, { stats: fallbackResult, timestamp: Date.now() });
+    return fallbackResult;
   }
 
   public notifyStreamsUpdate() {
@@ -1455,6 +1484,8 @@ export class GroupRoomManager {
     this.lastStreamRecoveryRequests.clear();
     this.lastBridgeAttempts.clear();
     this.lastPeerStats.clear();
+    this.peerStatsCache.clear();
+    this.localStatsCache = null;
     this.initialJoinComplete = false;
     this.chatHistory = [];
     this.seenChatMsgIds.clear();

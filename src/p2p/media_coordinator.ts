@@ -37,6 +37,68 @@ export class MediaCoordinator {
   }
 
   /**
+   * Munges SDP to enforce Google WebRTC bitrate floor and ceiling (x-google-min-bitrate, x-google-max-bitrate, b=AS)
+   */
+  public static mungeSdpBitrates(
+    sdp: string,
+    minBitrateKbps: number = 2500,
+    maxBitrateKbps: number = 25000
+  ): string {
+    const lines = sdp.split('\r\n');
+    let inVideo = false;
+    const modifiedLines: string[] = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      let line = lines[i];
+
+      if (line.startsWith('m=video')) {
+        inVideo = true;
+        modifiedLines.push(line);
+        // Ensure b=AS line exists right after m=video line if not already present
+        const nextLine = lines[i + 1] || '';
+        if (!nextLine.startsWith('b=AS:') && !nextLine.startsWith('b=TIAS:')) {
+          modifiedLines.push(`b=AS:${maxBitrateKbps}`);
+        }
+        continue;
+      }
+
+      if (line.startsWith('m=audio') || line.startsWith('m=application')) {
+        inVideo = false;
+      }
+
+      if (inVideo && line.startsWith('a=fmtp:')) {
+        // Append x-google-min-bitrate, start-bitrate and max-bitrate if not already present
+        if (!line.includes('x-google-min-bitrate')) {
+          line = `${line};x-google-min-bitrate=${minBitrateKbps};x-google-start-bitrate=${Math.round(minBitrateKbps * 1.5)};x-google-max-bitrate=${maxBitrateKbps}`;
+        }
+      }
+
+      modifiedLines.push(line);
+    }
+
+    return modifiedLines.join('\r\n');
+  }
+
+  /**
+   * Transparently intercepts RTCPeerConnection.setLocalDescription to inject
+   * SDP bitrate parameters for hardware and software rate controllers.
+   */
+  public static patchPeerConnectionSdp(pc: RTCPeerConnection): void {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (!pc || (pc as any).__sdp_munged) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (pc as any).__sdp_munged = true;
+
+    const originalSetLocalDescription = pc.setLocalDescription.bind(pc);
+    pc.setLocalDescription = async function (description?: RTCLocalSessionDescriptionInit) {
+      if (description && description.sdp) {
+        description.sdp = MediaCoordinator.mungeSdpBitrates(description.sdp);
+      }
+      return originalSetLocalDescription(description);
+    };
+  }
+
+  /**
    * Prioritizes hardware accelerated codecs (H.264, AV1, VP9, VP8) on all video transceivers
    */
   public static configureCodecPreferences(pc: RTCPeerConnection): void {
