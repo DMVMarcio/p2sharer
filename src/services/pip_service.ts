@@ -1,12 +1,15 @@
 import { invoke } from '@tauri-apps/api/core';
-import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { stateStore } from '../core/state_store.ts';
 import { roomService } from './room_service.ts';
+import { buildIceServers } from '../p2p/ice_config.ts';
 
 interface PipSession {
   pc: RTCPeerConnection;
-  bc: BroadcastChannel;
+  bc: BroadcastChannel | null;
+  unlistenSignal: UnlistenFn | null;
   stream: MediaStream | null;
+  pendingCandidates: RTCIceCandidateInit[];
   statsInterval: ReturnType<typeof setInterval> | null;
 }
 
@@ -59,48 +62,75 @@ export class PipService {
 
     stateStore.setPeerPipActive(peerId, true);
 
-    const channelName = `p2sharer-pip-${peerId}`;
-    const bc = typeof BroadcastChannel !== 'undefined'
-      ? new BroadcastChannel(channelName)
-      : ({ postMessage: () => {}, close: () => {}, onmessage: null } as unknown as BroadcastChannel);
+    // Resolve active media stream with fallback
+    let activeStream = stream;
+    if (!activeStream) {
+      const slot = stateStore.roomSlots.find((s) => s.peerId === peerId);
+      activeStream = slot?.stream || null;
+    }
+    if (!activeStream && peerId === 'local') {
+      activeStream =
+        (roomService.roomManager as unknown as { localStream?: MediaStream | null })?.localStream ||
+        (roomService as unknown as { nativeVideoBridge?: { activeStream?: MediaStream | null } })?.nativeVideoBridge?.activeStream ||
+        null;
+    }
 
-    const pc = typeof RTCPeerConnection !== 'undefined'
-      ? new RTCPeerConnection({ iceServers: [] })
-      : ({
-          addTrack: () => {},
-          removeTrack: () => {},
-          getSenders: () => [],
-          createOffer: async () => ({ sdp: '', type: 'offer' as RTCSdpType }),
-          createAnswer: async () => ({ sdp: '', type: 'answer' as RTCSdpType }),
-          setLocalDescription: async () => {},
-          setRemoteDescription: async () => {},
-          addIceCandidate: async () => {},
-          close: () => {},
-          onicecandidate: null,
-        } as unknown as RTCPeerConnection);
+    const channelName = `p2sharer-pip-${peerId}`;
+    const bc: BroadcastChannel | null =
+      typeof BroadcastChannel !== 'undefined'
+        ? new BroadcastChannel(channelName)
+        : null;
+
+    const iceServers = typeof RTCPeerConnection !== 'undefined' ? buildIceServers() : [];
+    const pc =
+      typeof RTCPeerConnection !== 'undefined'
+        ? new RTCPeerConnection({ iceServers })
+        : ({
+            addTrack: () => {},
+            removeTrack: () => {},
+            getSenders: () => [],
+            createOffer: async () => ({ sdp: '', type: 'offer' as RTCSdpType }),
+            createAnswer: async () => ({ sdp: '', type: 'answer' as RTCSdpType }),
+            setLocalDescription: async () => {},
+            setRemoteDescription: async () => {},
+            addIceCandidate: async () => {},
+            close: () => {},
+            onicecandidate: null,
+          } as unknown as RTCPeerConnection);
 
     const session: PipSession = {
       pc,
       bc,
-      stream,
+      unlistenSignal: null,
+      stream: activeStream,
+      pendingCandidates: [],
       statsInterval: null,
     };
     this.sessions.set(peerId, session);
 
-    // Attach existing stream tracks to loopback peer connection
-    if (stream) {
-      stream.getTracks().forEach((track) => {
+    // Attach stream tracks
+    if (activeStream) {
+      activeStream.getTracks().forEach((track) => {
         try {
-          pc.addTrack(track, stream);
+          pc.addTrack(track, activeStream!);
         } catch (err) {
           console.warn('[PipService] Error adding track to loopback:', err);
         }
       });
     }
 
+    const sendSignal = (data: unknown) => {
+      try {
+        bc?.postMessage(data);
+      } catch {}
+      try {
+        emit(`pip-signal-${peerId}`, data).catch(() => {});
+      } catch {}
+    };
+
     pc.onicecandidate = (e) => {
       if (e.candidate) {
-        bc.postMessage({
+        sendSignal({
           type: 'candidate',
           candidate: e.candidate.toJSON(),
         });
@@ -109,9 +139,19 @@ export class PipService {
 
     const sendOffer = async () => {
       try {
+        // Re-attach tracks if needed
+        const senders = pc.getSenders();
+        if (senders.length === 0 && session.stream) {
+          session.stream.getTracks().forEach((t) => {
+            try {
+              pc.addTrack(t, session.stream!);
+            } catch {}
+          });
+        }
+
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
-        bc.postMessage({
+        sendSignal({
           type: 'offer',
           sdp: offer.sdp,
           senderName,
@@ -122,19 +162,26 @@ export class PipService {
       }
     };
 
-    bc.onmessage = async (event) => {
-      const data = event.data;
+    const handleSignalData = async (data: Record<string, unknown>) => {
       if (!data || typeof data !== 'object') return;
 
       switch (data.type) {
-        case 'pip-ready': {
+        case 'pip-ready':
+        case 'pip-request-stream': {
           await sendOffer();
           break;
         }
         case 'answer': {
-          if (data.sdp) {
+          if (data.sdp && typeof data.sdp === 'string') {
             try {
               await pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: data.sdp }));
+              // Drain any queued candidates
+              while (session.pendingCandidates.length > 0) {
+                const cand = session.pendingCandidates.shift();
+                if (cand) {
+                  await pc.addIceCandidate(new RTCIceCandidate(cand)).catch(() => {});
+                }
+              }
             } catch (err) {
               console.warn('[PipService] Error setting loopback remote answer:', err);
             }
@@ -142,17 +189,18 @@ export class PipService {
           break;
         }
         case 'candidate': {
-          if (data.candidate) {
+          if (data.candidate && typeof data.candidate === 'object') {
+            const cand = data.candidate as RTCIceCandidateInit;
             try {
-              await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+              if (pc.remoteDescription) {
+                await pc.addIceCandidate(new RTCIceCandidate(cand));
+              } else {
+                session.pendingCandidates.push(cand);
+              }
             } catch (err) {
               console.warn('[PipService] Error adding loopback ICE candidate:', err);
             }
           }
-          break;
-        }
-        case 'pip-request-stream': {
-          await sendOffer();
           break;
         }
         case 'pip-close': {
@@ -162,6 +210,22 @@ export class PipService {
       }
     };
 
+    // 1. Listen via BroadcastChannel
+    if (bc) {
+      bc.onmessage = async (event) => {
+        await handleSignalData(event.data);
+      };
+    }
+
+    // 2. Listen via native Tauri Event
+    try {
+      session.unlistenSignal = await listen<Record<string, unknown>>(`pip-signal-${peerId}`, async (event) => {
+        await handleSignalData(event.payload);
+      });
+    } catch {
+      // In web-only test environments
+    }
+
     // Periodic stats dispatcher
     session.statsInterval = setInterval(async () => {
       try {
@@ -170,7 +234,7 @@ export class PipService {
         const slot = stateStore.roomSlots.find((sl) => sl.peerId === peerId);
         const watchersCount = slot?.watchers?.length ?? 0;
 
-        bc.postMessage({
+        sendSignal({
           type: 'stats',
           stats: {
             pingMs: ping ?? null,
@@ -185,8 +249,8 @@ export class PipService {
       }
     }, 1200);
 
-    if (session.statsInterval && typeof (session.statsInterval as any).unref === 'function') {
-      (session.statsInterval as any).unref();
+    if (session.statsInterval && typeof (session.statsInterval as unknown as { unref?: () => void }).unref === 'function') {
+      (session.statsInterval as unknown as { unref: () => void }).unref();
     }
 
     // Invoke Tauri command to open frameless window
@@ -224,10 +288,16 @@ export class PipService {
       // Re-negotiate offer
       session.pc.createOffer().then((offer) => {
         session.pc.setLocalDescription(offer).then(() => {
-          session.bc.postMessage({
+          const payload = {
             type: 'offer',
             sdp: offer.sdp,
-          });
+          };
+          try {
+            session.bc?.postMessage(payload);
+          } catch {}
+          try {
+            emit(`pip-signal-${peerId}`, payload).catch(() => {});
+          } catch {}
         });
       });
     } catch (err) {
@@ -241,9 +311,16 @@ export class PipService {
       if (session.statsInterval) {
         clearInterval(session.statsInterval);
       }
+      if (session.unlistenSignal) {
+        session.unlistenSignal();
+        session.unlistenSignal = null;
+      }
       try {
-        session.bc.postMessage({ type: 'main-closed' });
-        session.bc.close();
+        session.bc?.postMessage({ type: 'main-closed' });
+        session.bc?.close();
+      } catch {}
+      try {
+        emit(`pip-signal-${peerId}`, { type: 'main-closed' }).catch(() => {});
       } catch {}
       try {
         session.pc.close();
@@ -264,8 +341,12 @@ export class PipService {
       if (session.statsInterval) {
         clearInterval(session.statsInterval);
       }
+      if (session.unlistenSignal) {
+        session.unlistenSignal();
+        session.unlistenSignal = null;
+      }
       try {
-        session.bc.close();
+        session.bc?.close();
       } catch {}
       try {
         session.pc.close();

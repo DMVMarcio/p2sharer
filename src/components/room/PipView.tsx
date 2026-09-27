@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { useStreamZoom } from '../../hooks/useStreamZoom';
 import { ZoomControlBar } from './ZoomControlBar';
+import { buildIceServers } from '../../p2p/ice_config';
 
 interface PipViewProps {
   peerId: string;
@@ -35,8 +38,10 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const bcRef = useRef<BroadcastChannel | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
+  const unlistenSignalRef = useRef<UnlistenFn | null>(null);
 
   const {
     zoom,
@@ -49,53 +54,95 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
     handleDoubleClick,
   } = useStreamZoom(containerRef, stream, true);
 
-  // Setup loopback WebRTC receiver & BroadcastChannel on mount
+  // Setup loopback WebRTC receiver & dual signaling on mount
   useEffect(() => {
     const channelName = `p2sharer-pip-${peerId}`;
-    const bc = new BroadcastChannel(channelName);
+    const bc = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel(channelName) : null;
     bcRef.current = bc;
 
-    const pc = new RTCPeerConnection({ iceServers: [] });
+    const iceServers = typeof RTCPeerConnection !== 'undefined' ? buildIceServers() : [];
+    const pc = new RTCPeerConnection({ iceServers });
     pcRef.current = pc;
 
+    const pendingCandidates: RTCIceCandidateInit[] = [];
+    let hasReceivedOffer = false;
+
+    const sendSignal = (data: unknown) => {
+      try {
+        bc?.postMessage(data);
+      } catch {}
+      try {
+        emit(`pip-signal-${peerId}`, data).catch(() => {});
+      } catch {}
+    };
+
     pc.ontrack = (event) => {
-      if (event.streams && event.streams[0]) {
-        const remoteStream = event.streams[0];
-        setStream(remoteStream);
-        if (videoRef.current) {
-          videoRef.current.srcObject = remoteStream;
+      let targetStream = event.streams && event.streams[0];
+      if (!targetStream) {
+        if (!streamRef.current) {
+          streamRef.current = new MediaStream();
+        }
+        streamRef.current.addTrack(event.track);
+        targetStream = streamRef.current;
+      } else {
+        streamRef.current = targetStream;
+      }
+
+      setStream(targetStream);
+
+      if (videoRef.current) {
+        if (videoRef.current.srcObject !== targetStream) {
+          videoRef.current.srcObject = targetStream;
+        }
+        videoRef.current.play().catch(() => {});
+      }
+
+      event.track.onunmute = () => {
+        if (videoRef.current && videoRef.current.srcObject) {
           videoRef.current.play().catch(() => {});
         }
-      }
+      };
     };
 
     pc.onicecandidate = (event) => {
       if (event.candidate) {
-        bc.postMessage({
+        sendSignal({
           type: 'candidate',
           candidate: event.candidate.toJSON(),
         });
       }
     };
 
-    bc.onmessage = async (event) => {
-      const data = event.data;
+    const handleSignalData = async (data: Record<string, unknown>) => {
       if (!data || typeof data !== 'object') return;
 
       switch (data.type) {
         case 'offer': {
-          if (data.senderName) setSenderName(data.senderName);
+          hasReceivedOffer = true;
+          if (data.senderName && typeof data.senderName === 'string') {
+            setSenderName(data.senderName);
+          }
           if (typeof data.isLocal === 'boolean') {
             setIsLocal(data.isLocal);
             if (data.isLocal) setIsMuted(true);
           }
 
-          if (data.sdp) {
+          if (data.sdp && typeof data.sdp === 'string') {
             try {
               await pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: data.sdp }));
+
+              // Drain pending queued ICE candidates
+              while (pendingCandidates.length > 0) {
+                const cand = pendingCandidates.shift();
+                if (cand) {
+                  await pc.addIceCandidate(new RTCIceCandidate(cand)).catch(() => {});
+                }
+              }
+
               const answer = await pc.createAnswer();
               await pc.setLocalDescription(answer);
-              bc.postMessage({
+
+              sendSignal({
                 type: 'answer',
                 sdp: answer.sdp,
               });
@@ -106,9 +153,14 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
           break;
         }
         case 'candidate': {
-          if (data.candidate) {
+          if (data.candidate && typeof data.candidate === 'object') {
+            const cand = data.candidate as RTCIceCandidateInit;
             try {
-              await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+              if (pc.remoteDescription) {
+                await pc.addIceCandidate(new RTCIceCandidate(cand));
+              } else {
+                pendingCandidates.push(cand);
+              }
             } catch (err) {
               console.warn('[PipView] Error adding candidate:', err);
             }
@@ -116,8 +168,8 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
           break;
         }
         case 'stats': {
-          if (data.stats) {
-            setStats(data.stats);
+          if (data.stats && typeof data.stats === 'object') {
+            setStats(data.stats as PeerStats);
           }
           break;
         }
@@ -134,24 +186,57 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
       }
     };
 
-    // Tell the main window we are ready to receive the stream offer
-    bc.postMessage({ type: 'pip-ready' });
+    // 1. Listen via BroadcastChannel
+    if (bc) {
+      bc.onmessage = async (event) => {
+        await handleSignalData(event.data);
+      };
+    }
+
+    // 2. Listen via native Tauri Event
+    listen<Record<string, unknown>>(`pip-signal-${peerId}`, async (event) => {
+      await handleSignalData(event.payload);
+    }).then((unlisten) => {
+      unlistenSignalRef.current = unlisten;
+    }).catch(() => {});
+
+    // Proactively send 'pip-ready' and retry with exponential grace until offer is received
+    sendSignal({ type: 'pip-ready' });
+
+    let retryCount = 0;
+    const retryInterval = setInterval(() => {
+      if (hasReceivedOffer || streamRef.current) {
+        clearInterval(retryInterval);
+        return;
+      }
+      retryCount++;
+      sendSignal({ type: 'pip-ready' });
+      if (retryCount >= 20) {
+        clearInterval(retryInterval);
+      }
+    }, 350);
 
     const handleBeforeUnload = () => {
+      clearInterval(retryInterval);
       try {
-        bc.postMessage({ type: 'pip-close' });
+        sendSignal({ type: 'pip-close' });
       } catch {}
       try {
         pc.close();
       } catch {}
       try {
-        bc.close();
+        bc?.close();
       } catch {}
+      if (unlistenSignalRef.current) {
+        unlistenSignalRef.current();
+        unlistenSignalRef.current = null;
+      }
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
+      clearInterval(retryInterval);
       window.removeEventListener('beforeunload', handleBeforeUnload);
       handleBeforeUnload();
     };
@@ -186,20 +271,29 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
     if (val > 0) setLastVolume(val);
   };
 
-  const handleToggleAlwaysOnTop = async () => {
+  const handleToggleAlwaysOnTop = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     const next = !isAlwaysOnTop;
     setIsAlwaysOnTop(next);
     try {
-      const { getCurrentWindow } = await import('@tauri-apps/api/window');
-      await getCurrentWindow().setAlwaysOnTop(next);
+      await invoke('set_pip_always_on_top', {
+        peerId,
+        alwaysOnTop: next,
+      });
     } catch (err) {
-      console.warn('[PipView] Failed to toggle always-on-top:', err);
+      console.warn('[PipView] Failed to set always-on-top via Rust:', err);
+      try {
+        const { getCurrentWindow } = await import('@tauri-apps/api/window');
+        await getCurrentWindow().setAlwaysOnTop(next);
+      } catch {}
     }
   };
 
-  const handleClose = async () => {
+  const handleClose = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     try {
       bcRef.current?.postMessage({ type: 'pip-close' });
+      emit(`pip-signal-${peerId}`, { type: 'pip-close' }).catch(() => {});
     } catch {}
     try {
       const { getCurrentWindow } = await import('@tauri-apps/api/window');
@@ -220,75 +314,76 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
     }
   };
 
-  const isHudActive = isHudPinned;
-
   return (
-    <div className="pip-window-root" ref={containerRef}>
-      {/* Frameless Top Header Bar with data-tauri-drag-region */}
-      <header className="pip-header" data-tauri-drag-region>
-        <div className="pip-header-left" data-tauri-drag-region>
-          <span className="pip-status-dot" aria-hidden="true" />
-          <span className="pip-title" data-tauri-drag-region>
-            {senderName}
-          </span>
-          <span className="pip-badge-tag" data-tauri-drag-region>
-            PiP
-          </span>
+    <div
+      className="pip-window-root"
+      ref={containerRef}
+      onMouseDown={handleMouseDown}
+      onDoubleClick={handleDoubleClick}
+    >
+      {/* Edge-to-edge Video Element */}
+      <video
+        ref={videoRef}
+        className="pip-video-element"
+        autoPlay
+        playsInline
+        muted={isMuted}
+        style={{
+          transform: zoom > 1.0 ? `scale(${zoom}) translate3d(${pan.x}px, ${pan.y}px, 0)` : 'none',
+          cursor: zoom > 1.0 ? (isDragging ? 'grabbing' : 'grab') : 'default',
+        }}
+      />
+
+      {/* Loading state indicator */}
+      {!stream && (
+        <div className="pip-loading-placeholder">
+          <div className="pip-loading-spinner" />
+          <span>Conectando transmissão...</span>
         </div>
+      )}
 
-        <div className="pip-header-right">
-          {/* Always on top / Pin toggle */}
-          <button
-            type="button"
-            className={`pip-header-btn ${isAlwaysOnTop ? 'active' : ''}`}
-            onClick={handleToggleAlwaysOnTop}
-            aria-label={isAlwaysOnTop ? 'Desafixar do topo' : 'Fixar sempre no topo'}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="17" x2="12" y2="22" />
-              <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
-            </svg>
-          </button>
-
-          {/* Internal Close 'X' Button */}
-          <button
-            type="button"
-            className="pip-header-btn pip-close-btn"
-            onClick={handleClose}
-            aria-label="Fechar Picture-in-Picture e voltar ao app"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
-      </header>
-
-      {/* Main Video Presentation Body */}
-      <div
-        className={`pip-video-body ${isHudActive ? 'is-hud-active' : ''} ${isHudPinned ? 'is-hud-pinned' : ''}`}
-        onMouseDown={handleMouseDown}
-        onDoubleClick={handleDoubleClick}
-      >
-        <video
-          ref={videoRef}
-          className="pip-video-element"
-          autoPlay
-          playsInline
-          muted={isMuted}
-          style={{
-            transform: zoom > 1.0 ? `scale(${zoom}) translate3d(${pan.x}px, ${pan.y}px, 0)` : 'none',
-            cursor: zoom > 1.0 ? (isDragging ? 'grabbing' : 'grab') : 'default',
-          }}
-        />
-
-        {!stream && (
-          <div className="pip-loading-placeholder">
-            <div className="pip-loading-spinner" />
-            <span>Conectando transmissão...</span>
+      {/* Floating Hover Overlay - only shown on hover or when HUD is pinned */}
+      <div className={`pip-overlay ${isHudPinned ? 'is-hud-pinned' : ''}`}>
+        {/* Floating Top Bar with data-tauri-drag-region */}
+        <div className="pip-top-bar" data-tauri-drag-region>
+          <div className="pip-top-left" data-tauri-drag-region>
+            <span className="pip-status-dot" aria-hidden="true" />
+            <span className="pip-title" data-tauri-drag-region>
+              {senderName}
+            </span>
+            <span className="pip-badge-tag" data-tauri-drag-region>
+              PiP
+            </span>
           </div>
-        )}
+
+          <div className="pip-top-right">
+            {/* Always on top / Pin toggle */}
+            <button
+              type="button"
+              className={`pip-header-btn ${isAlwaysOnTop ? 'active' : ''}`}
+              onClick={handleToggleAlwaysOnTop}
+              aria-label={isAlwaysOnTop ? 'Desafixar do topo' : 'Fixar sempre no topo'}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill={isAlwaysOnTop ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="17" x2="12" y2="22" />
+                <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
+              </svg>
+            </button>
+
+            {/* Internal Close 'X' Button */}
+            <button
+              type="button"
+              className="pip-header-btn pip-close-btn"
+              onClick={handleClose}
+              aria-label="Fechar Picture-in-Picture e voltar ao app"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+        </div>
 
         {/* Hover / Pinned Stream Stats Badges (Top-Left) */}
         <div className="stream-stats-overlay">
@@ -316,7 +411,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
             <div className={`stream-volume-controller ${isMuted ? 'muted' : ''}`}>
               <button
                 type="button"
-                className="btn-stream-volume-toggle"
+                className="btn-stream-volume"
                 onClick={handleToggleMute}
                 aria-label={isMuted ? 'Ativar Áudio' : 'Desativar Áudio'}
               >
@@ -346,6 +441,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
                   className="stream-volume-range"
                   aria-label="Controle de volume do participante"
                 />
+                <span className="stream-volume-percent">{isMuted ? '0%' : `${volume}%`}</span>
               </div>
             </div>
           )}
@@ -360,7 +456,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
             }}
             aria-label={isHudPinned ? 'Desafixar Controles' : 'Fixar Controles'}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill={isHudPinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="17" x2="12" y2="22" />
               <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
             </svg>

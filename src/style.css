@@ -4157,39 +4157,89 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 }
 
 /* ==========================================================================
-   Frameless Multi-Window Picture-in-Picture System
+   Frameless Multi-Window Picture-in-Picture System (Full-Bleed with Hover Overlay)
    ========================================================================== */
 
 .pip-window-root {
+  position: relative;
   width: 100vw;
   height: 100vh;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  background-color: var(--bg-app);
+  background-color: #000;
   color: var(--text-primary);
   overflow: hidden;
   user-select: none;
-  border: 1px solid var(--border-subtle);
   box-sizing: border-box;
 }
 
-.pip-header {
-  height: 34px;
-  background-color: rgba(14, 14, 18, 0.88);
-  backdrop-filter: blur(16px);
-  border-bottom: 1px solid var(--border-subtle);
+.pip-video-element {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background-color: #000;
+  transition: transform var(--transition-fast);
+}
+
+.pip-loading-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+  background-color: var(--bg-surface);
+  z-index: 5;
+}
+
+.pip-loading-spinner {
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--border-subtle);
+  border-top-color: var(--accent-color);
+  border-radius: var(--radius-full);
+  animation: spin 0.8s linear infinite;
+}
+
+/* Floating Hover Overlay */
+.pip-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.22s ease-out;
+  z-index: 10;
+}
+
+.pip-window-root:hover .pip-overlay,
+.pip-overlay.is-hud-pinned {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Floating Top Bar with draggable region */
+.pip-top-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 38px;
+  background: linear-gradient(180deg, rgba(8, 10, 15, 0.88) 0%, rgba(8, 10, 15, 0.45) 70%, transparent 100%);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 10px;
-  flex-shrink: 0;
   z-index: 50;
   cursor: grab;
+  user-select: none;
 }
 
-.pip-header-left {
+.pip-top-left {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -4209,11 +4259,12 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .pip-title {
   font-size: 12px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: #f4f4f5;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 240px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
 }
 
 .pip-badge-tag {
@@ -4221,15 +4272,15 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   font-weight: 700;
   padding: 1px 5px;
   border-radius: var(--radius-xs);
-  background-color: var(--accent-subtle);
-  color: var(--accent-color);
-  border: 1px solid var(--accent-border);
+  background-color: rgba(6, 182, 212, 0.15);
+  color: var(--accent-color, #06b6d4);
+  border: 1px solid rgba(6, 182, 212, 0.35);
   letter-spacing: 0.5px;
   text-transform: uppercase;
   flex-shrink: 0;
 }
 
-.pip-header-right {
+.pip-top-right {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -4239,7 +4290,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .pip-header-btn {
   background: transparent;
   border: none;
-  color: var(--text-muted);
+  color: rgba(255, 255, 255, 0.75);
   width: 26px;
   height: 26px;
   border-radius: var(--radius-sm);
@@ -4247,87 +4298,49 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  padding: 0;
   transition: all var(--transition-fast);
 }
 
 .pip-header-btn:hover {
-  background-color: var(--bg-card-hover);
-  color: var(--text-primary);
+  background-color: rgba(255, 255, 255, 0.12);
+  color: #fff;
 }
 
 .pip-header-btn.active {
-  color: var(--accent-color);
-  background-color: var(--accent-subtle);
+  color: var(--accent-color, #06b6d4);
+  background-color: rgba(6, 182, 212, 0.2);
 }
 
 .pip-header-btn.pip-close-btn:hover {
-  background-color: var(--danger-bg, rgba(239, 68, 68, 0.15));
+  background-color: var(--danger-bg, rgba(239, 68, 68, 0.25));
   color: var(--danger-hover, #ef4444);
 }
 
-.pip-video-body {
-  position: relative;
-  flex: 1;
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  background-color: #000;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.pip-video-element {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  transition: transform var(--transition-fast);
-}
-
-.pip-loading-placeholder {
+/* Stats overlay inside PiP positioned beneath top bar */
+.pip-overlay .stream-stats-overlay {
   position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  color: var(--text-muted);
-  font-size: 13px;
-  background-color: var(--bg-surface);
+  top: 42px;
+  left: 10px;
+  z-index: 20;
 }
 
-.pip-loading-spinner {
-  width: 28px;
-  height: 28px;
-  border: 2px solid var(--border-subtle);
-  border-top-color: var(--accent-color);
-  border-radius: var(--radius-full);
-  animation: spin 0.8s linear infinite;
+/* Stream controls group inside PiP */
+.pip-overlay .stream-controls-group {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  z-index: 20;
 }
 
-/* Hover HUD controls behavior inside PiP */
-.pip-video-body .stream-stats-overlay,
-.pip-video-body .stream-controls-group,
-.pip-video-body .zoom-control-bar {
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--transition-normal);
+/* Zoom control bar inside PiP */
+.pip-overlay .stream-zoom-bar {
+  position: absolute;
+  bottom: 48px;
+  right: 10px;
+  z-index: 20;
 }
 
-.pip-video-body:hover .stream-stats-overlay,
-.pip-video-body:hover .stream-controls-group,
-.pip-video-body:hover .zoom-control-bar,
-.pip-video-body.is-hud-active .stream-stats-overlay,
-.pip-video-body.is-hud-active .stream-controls-group,
-.pip-video-body.is-hud-active .zoom-control-bar,
-.pip-video-body.is-hud-pinned .stream-stats-overlay,
-.pip-video-body.is-hud-pinned .stream-controls-group,
-.pip-video-body.is-hud-pinned .zoom-control-bar {
-  opacity: 1;
-  pointer-events: auto;
-}
 
 
 
