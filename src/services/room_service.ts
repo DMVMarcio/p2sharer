@@ -7,6 +7,7 @@ import { generateRandomRoomSlug, GroupRoomManager } from '../p2p/group_room.ts';
 import { soundEffects } from '../ui/sound_effects.ts';
 import { NativeVideoBridge } from '../video/native_video_bridge.ts';
 import { showToast } from '../hooks/useToast.ts';
+import { pipService } from './pip_service.ts';
 
 export interface ConnectingOverlayState {
   visible: boolean;
@@ -361,6 +362,10 @@ export class RoomService {
       await this.roomManager.leave();
       this.roomManager = null;
     }
+
+    try {
+      await pipService.closeAllPipWindows();
+    } catch {}
 
     audioContextManager.cleanup();
 

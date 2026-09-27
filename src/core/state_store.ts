@@ -12,6 +12,7 @@ export class StateStore {
   public layoutMode: 'grid' | 'spotlight' = 'grid';
   public pinnedPeerId: string | null = null;
   public subscribedStreams: Set<string> = new Set();
+  public activePipPeers: Set<string> = new Set();
   public roomSlots: RoomSlotInfo[] = [];
   public streamFilter: StreamFilterMode = 'all';
 
@@ -63,6 +64,19 @@ export class StateStore {
 
   public set(updater: (state: StateStore) => void): void {
     updater(this);
+    this.notify();
+  }
+
+  public isPeerInPip(peerId: string): boolean {
+    return this.activePipPeers.has(peerId);
+  }
+
+  public setPeerPipActive(peerId: string, active: boolean): void {
+    if (active) {
+      this.activePipPeers.add(peerId);
+    } else {
+      this.activePipPeers.delete(peerId);
+    }
     this.notify();
   }
 
