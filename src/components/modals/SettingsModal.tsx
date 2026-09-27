@@ -8,7 +8,7 @@ import { showToast } from '../../hooks/useToast';
 import { ThemeMode } from '../../core/types';
 
 export const SettingsModal: React.FC = () => {
-  const { closeModal, openModal, isClosing } = useModal();
+  const { closeModal, isClosing } = useModal();
   const { themeMode, accentColor, setThemeMode, setAccentColor } = useAppTheme();
 
   const [activeTab, setActiveTab] = useState<
@@ -28,6 +28,9 @@ export const SettingsModal: React.FC = () => {
   );
   const [defaultBitrate, setDefaultBitrate] = useState(
     () => localStorage.getItem('p2sharer_default_bitrate') || '15000'
+  );
+  const [defaultQuality, setDefaultQuality] = useState(
+    () => localStorage.getItem('p2sharer_default_quality') || '90'
   );
   const [defaultCursor, setDefaultCursor] = useState(
     () => localStorage.getItem('p2sharer_default_cursor') !== 'false'
@@ -68,12 +71,14 @@ export const SettingsModal: React.FC = () => {
     localStorage.setItem('p2sharer_default_res', defaultRes);
     localStorage.setItem('p2sharer_default_fps', defaultFps);
     localStorage.setItem('p2sharer_default_bitrate', defaultBitrate);
+    localStorage.setItem('p2sharer_default_quality', defaultQuality);
     localStorage.setItem('p2sharer_default_cursor', defaultCursor.toString());
 
     stateStore.set((s) => {
       s.currentResolution = s.parseResolution(defaultRes);
       s.currentFps = parseInt(defaultFps, 10);
       s.currentBitrate = parseInt(defaultBitrate, 10);
+      s.currentQuality = parseInt(defaultQuality, 10);
     });
 
     // Save TURN
@@ -504,6 +509,23 @@ export const SettingsModal: React.FC = () => {
                       <option value="1000">1 Mbps</option>
                     </select>
                   </div>
+
+                  <div className="settings-col">
+                    <label className="settings-label" htmlFor="settings-default-quality">
+                      Qualidade de Imagem:
+                    </label>
+                    <select
+                      id="settings-default-quality"
+                      className="select-input-sm"
+                      value={defaultQuality}
+                      onChange={(e) => setDefaultQuality(e.target.value)}
+                    >
+                      <option value="95">95% (Máxima Fidelidade)</option>
+                      <option value="90">90% (Muito Alta - Recomendado)</option>
+                      <option value="85">85% (Alta)</option>
+                      <option value="75">75% (Equilibrada)</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="settings-row" style={{ marginTop: '14px' }}>
@@ -687,39 +709,6 @@ export const SettingsModal: React.FC = () => {
                       <line x1="14" y1="11" x2="14" y2="17"/>
                     </svg>
                     <span>Limpar Logs</span>
-                  </button>
-                </div>
-
-                <div
-                  style={{
-                    marginTop: '20px',
-                    padding: '14px',
-                    borderRadius: '8px',
-                    backgroundColor: 'rgba(59, 130, 246, 0.08)',
-                    border: '1px solid rgba(59, 130, 246, 0.25)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <div>
-                    <strong style={{ fontSize: '0.9rem', color: '#60a5fa' }}>
-                      Monitor de Telemetria em Tempo Real (CPU, GPU, Ventoinhas)
-                    </strong>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                      Exibe o uso de cada núcleo, temperatura, processos e codificador da placa de vídeo.
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-primary"
-                    onClick={() => {
-                      closeModal();
-                      setTimeout(() => openModal('diagnostics'), 100);
-                    }}
-                    style={{ whiteSpace: 'nowrap' }}
-                  >
-                    Abrir Telemetria
                   </button>
                 </div>
               </div>

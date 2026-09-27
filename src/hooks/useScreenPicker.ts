@@ -17,6 +17,7 @@ export function useScreenPicker(onClose?: () => void) {
   const defaultRes = useStore((s) => s.currentResolution.label.toLowerCase());
   const defaultFps = useStore((s) => s.currentFps);
   const defaultBitrate = useStore((s) => s.currentBitrate);
+  const defaultQuality = useStore((s) => s.currentQuality);
 
   const initialRes = localStorage.getItem('p2sharer_default_res') || defaultRes || '1080p';
   const [resolution, setResolution] = useState<string>(initialRes);
@@ -27,6 +28,9 @@ export function useScreenPicker(onClose?: () => void) {
     parseInt(localStorage.getItem('p2sharer_default_bitrate') || '', 10) ||
       defaultBitrate ||
       stateStore.getDefaultBitrateForResolution(initialRes)
+  );
+  const [quality, setQuality] = useState<number>(
+    parseInt(localStorage.getItem('p2sharer_default_quality') || (defaultQuality ? defaultQuality.toString() : '90'), 10) || 90
   );
   const [showCursor, setShowCursor] = useState<boolean>(
     localStorage.getItem('p2sharer_default_cursor') !== 'false'
@@ -87,6 +91,7 @@ export function useScreenPicker(onClose?: () => void) {
         s.currentResolution = resConfig;
         s.currentFps = fps;
         s.currentBitrate = bitrate;
+        s.currentQuality = quality;
       });
 
       const fallbackId = currentTab === 'windows'
@@ -95,7 +100,7 @@ export function useScreenPicker(onClose?: () => void) {
       const chosen = selectedSourceId || fallbackId;
 
       if (onClose) onClose();
-      await startCapture(chosen, fps, { width: resConfig.width, height: resConfig.height }, showCursor);
+      await startCapture(chosen, fps, { width: resConfig.width, height: resConfig.height }, showCursor, quality);
     } catch (err) {
       console.error('Failed to start capture:', err);
     } finally {
@@ -107,6 +112,7 @@ export function useScreenPicker(onClose?: () => void) {
     resolution,
     fps,
     bitrate,
+    quality,
     selectedSourceId,
     currentTab,
     windows,
@@ -131,6 +137,8 @@ export function useScreenPicker(onClose?: () => void) {
     setFps,
     bitrate,
     setBitrate,
+    quality,
+    setQuality,
     showCursor,
     setShowCursor,
     loadSources,

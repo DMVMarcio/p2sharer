@@ -20,6 +20,7 @@ export class StateStore {
 
   public currentFps: number = 60;
   public currentBitrate: number = 15000;
+  public currentQuality: number = 90;
   public currentResolution: ResolutionConfig = { width: 1920, height: 1080, label: '1080p' };
 
   public isAudioFilterFullAudio: boolean = false;
@@ -77,6 +78,10 @@ export class StateStore {
 
     this.currentFps = parseInt(localStorage.getItem('p2sharer_default_fps') || '60', 10);
     this.currentBitrate = parseInt(localStorage.getItem('p2sharer_default_bitrate') || '15000', 10);
+    this.currentQuality = parseInt(localStorage.getItem('p2sharer_default_quality') || '90', 10);
+    if (isNaN(this.currentQuality) || this.currentQuality < 50 || this.currentQuality > 100) {
+      this.currentQuality = 90;
+    }
 
     const savedRes = localStorage.getItem('p2sharer_default_res') || '1080p';
     this.currentResolution = this.parseResolution(savedRes);

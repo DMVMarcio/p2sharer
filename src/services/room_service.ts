@@ -7,7 +7,6 @@ import { generateRandomRoomSlug, GroupRoomManager } from '../p2p/group_room';
 import { soundEffects } from '../ui/sound_effects';
 import { NativeVideoBridge } from '../video/native_video_bridge';
 import { showToast } from '../hooks/useToast';
-import { telemetryService } from './telemetry_service';
 
 export interface ConnectingOverlayState {
   visible: boolean;
@@ -258,19 +257,15 @@ class RoomService {
     sourceId: string,
     fps: number,
     res: { width: number; height: number },
-    mouse: boolean
+    mouse: boolean,
+    quality?: number
   ): Promise<void> {
     try {
       showToast('Iniciando transmissão...');
-      telemetryService.logEvent('CAPTURE', 'startCapture solicitado', {
-        sourceId,
-        fps,
-        res,
-        mouse,
-      });
 
       const chosenSource = !sourceId ? 'screen:0' : sourceId;
-      const videoStream = await this.nativeVideoBridge.startCapture(chosenSource, fps, res, mouse, 75);
+      const targetQuality = quality ?? stateStore.currentQuality ?? 90;
+      const videoStream = await this.nativeVideoBridge.startCapture(chosenSource, fps, res, mouse, targetQuality);
 
       const audioMode = stateStore.isAudioFilterFullAudio ? 'full' : stateStore.selectedFilterMode;
       const audioPids = stateStore.isAudioFilterFullAudio ? [] : stateStore.getActiveFilterPids();
@@ -304,25 +299,20 @@ class RoomService {
         this.roomManager.shareStream(videoStream, stateStore.currentBitrate * 1000, fps);
       }
 
-      telemetryService.logEvent('CAPTURE', 'Transmissão de tela iniciada com sucesso');
       soundEffects.playScreenShareStart();
       this.notify();
     } catch (err: unknown) {
       const errName = err && typeof err === 'object' && 'name' in err ? (err as { name: string }).name : '';
       if (errName === 'NotAllowedError' || errName === 'AbortError') {
-        telemetryService.logEvent('CAPTURE', 'Compartilhamento cancelado pelo usuário');
         showToast('Compartilhamento cancelado');
         return;
       }
-      telemetryService.logEvent('CAPTURE', `Erro ao iniciar captura: ${err}`);
       console.warn('Capture error:', err);
       showToast(`Erro ao iniciar captura: ${err}`);
     }
   }
 
   public stopScreenSharing(): void {
-    telemetryService.logEvent('CAPTURE', 'stopScreenSharing chamado: iniciando desligamento');
-
     stateStore.set((s) => {
       s.isSharingScreen = false;
       const localSlot = s.roomSlots.find((slot) => slot.isLocal);
@@ -340,13 +330,11 @@ class RoomService {
     this.audioBridge.stop();
     invoke('stop_audio_capture').catch(() => {});
 
-    telemetryService.logEvent('CAPTURE', 'Transmissão de tela parada e recursos liberados');
     soundEffects.playScreenShareStop();
     this.notify();
   }
 
   public async leaveRoom(): Promise<void> {
-    telemetryService.logEvent('ROOM', 'leaveRoom executado');
     if (this.roomConnectingTimeout) {
       clearTimeout(this.roomConnectingTimeout);
       this.roomConnectingTimeout = null;

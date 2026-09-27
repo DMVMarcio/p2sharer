@@ -13,9 +13,10 @@ export function useScreenCapture() {
       sourceId: string,
       fps: number,
       res: { width: number; height: number },
-      mouse: boolean
+      mouse: boolean,
+      quality?: number
     ) => {
-      await roomService.startCapture(sourceId, fps, res, mouse);
+      await roomService.startCapture(sourceId, fps, res, mouse, quality);
     },
     []
   );
