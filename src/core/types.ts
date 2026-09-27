@@ -53,6 +53,7 @@ export interface RoomSlotInfo {
   isStreaming: boolean;
   isLocal: boolean;
   color: string;
+  connectionState?: PeerInfo['connectionState'];
   watchers?: StreamWatcher[];
 }
 
@@ -202,4 +203,3 @@ export interface VideoCaptureBridge {
   listSources(): Promise<Array<{ id: string; name: string; thumbnail?: string }>>;
   onFallbackNeeded: ((reason: string, stream?: MediaStream) => void) | null;
 }
-

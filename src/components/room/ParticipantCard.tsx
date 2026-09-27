@@ -91,7 +91,9 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
       )}
 
       {!inTray && !slot.isLocal && !slot.isStreaming && (
-        <div className="participant-status-text">Sem transmissão</div>
+        <div className="participant-status-text">
+          {slot.connectionState === 'connecting' ? 'Conectando participante...' : 'Sem transmissão'}
+        </div>
       )}
 
       {!inTray && !slot.isLocal && slot.isStreaming && isSubscribed && !slot.stream && (
