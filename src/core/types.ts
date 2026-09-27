@@ -81,7 +81,7 @@ export interface ChatMessage {
   timestamp: number;
   isHost?: boolean;
   isSystem?: boolean;
-  systemType?: 'join' | 'leave' | 'info' | 'generic';
+  systemType?: 'join' | 'leave' | 'info' | 'generic' | 'stream-start' | 'stream-stop';
   systemActor?: string;
   systemRoom?: string;
 }
