@@ -26,6 +26,13 @@ When capture devices output 5.1, 7.1, or other multi-channel audio:
 - WebRTC expects standardized 48kHz stereo Opus.
 - `AudioResampler` maintains fractional phase accumulation across chunk boundaries to avoid audio clicks, pops, or drift during hours of streaming.
 
+### Continuous FIFO Draining & Smooth Hann Half-Cosine Fade
+- To prevent tail-end clicks ("mini-chiado") and stream stuttering ("como se fosse internet travando"):
+  - Mixing ticks calculate dynamic frame counts: `tick_frames = (sample_rate * 10) / 1000` (`tick_floats = tick_frames * 2`).
+  - Source FIFOs are never partially drained during active playback; only complete chunks are dispatched, preserving waveform continuity.
+  - When all sources have been quiet for $\ge 50\text{ ms}$, residual samples are smoothly faded to zero using a $5\text{ ms}$ (240 samples) Hann half-cosine window ($0.5 \times (1.0 + \cos(\pi \times t))$) and zero-padded to `tick_floats`. This completely eliminates high-frequency spectral clicks and prevents stale audio from contaminating subsequent sounds.
+  - WebRTC audio sender encodings are configured with `maxBitrate = 192000` (192 kbps high-fidelity stereo Opus) and `priority = 'high'`.
+
 ### Selective Process-Level Audio Filtering
 - **Modes**:
   - `full`: Captures all desktop sound via master render audio client.
