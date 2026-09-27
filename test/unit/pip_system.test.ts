@@ -128,5 +128,19 @@ describe('Picture-in-Picture (PiP) Multi-Window System', () => {
       );
     });
   });
-});
 
+  describe('PiP Readiness Lifecycle', () => {
+    it('waits for the active Tauri listener before requesting a stream', () => {
+      const pipViewPath = resolve(process.cwd(), 'src/components/room/PipView.tsx');
+      const pipView = readFileSync(pipViewPath, 'utf-8');
+
+      const listenerRegistration = pipView.indexOf('const unlisten = await listen');
+      const deferredRequest = pipView.indexOf('requestTimeout = setTimeout(beginStreamRequests, 0)');
+
+      assert.ok(listenerRegistration >= 0, 'PiP must await Tauri listener registration');
+      assert.ok(deferredRequest > listenerRegistration, 'PiP must request its stream after listener registration');
+      assert.ok(pipView.includes('if (disposed) return;'), 'PiP must ignore requests from disposed effect instances');
+      assert.ok(pipView.includes('if (requestTimeout) clearTimeout(requestTimeout);'), 'PiP cleanup must cancel deferred requests');
+    });
+  });
+});
