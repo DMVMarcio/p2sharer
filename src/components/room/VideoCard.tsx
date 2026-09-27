@@ -123,9 +123,11 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     };
 
     fetchStats();
-    const interval = setInterval(fetchStats, 2000);
+    const initialTimer = setTimeout(fetchStats, 600);
+    const interval = setInterval(fetchStats, 1500);
     return () => {
       isMounted = false;
+      clearTimeout(initialTimer);
       clearInterval(interval);
     };
   }, [slot.isLocal, slot.peerId, inTray]);
@@ -353,7 +355,41 @@ export const VideoCard: React.FC<VideoCardProps> = ({
               <span className="stat-bitrate-text">{(currentBitrate / 1000).toFixed(0)}M máx</span>
             </div>
           </Tooltip>
-        ) : null}
+        ) : (
+          <Tooltip
+            tooltipClassName="bitrate-tooltip"
+            onOpenChange={handleTooltipOpenChange}
+            content={
+              <>
+                <div className="bitrate-tooltip-header">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                  </svg>
+                  <span>Taxa de Recepção</span>
+                </div>
+                <div className="bitrate-tooltip-content">
+                  <div className="bitrate-tooltip-row">
+                    <span className="bitrate-tooltip-label">Tempo real:</span>
+                    <span className="bitrate-tooltip-value">{liveBitrate > 0 ? `${(liveBitrate / 1000).toFixed(1)} Mbps` : '0.0 Mbps'}</span>
+                  </div>
+                  <div className="bitrate-tooltip-hint">
+                    Sincronizando fluxo WebRTC em tempo real
+                  </div>
+                </div>
+              </>
+            }
+          >
+            <div
+              className="stat-badge stat-badge-bitrate"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+              </svg>
+              <span className="stat-bitrate-text">{liveBitrate > 0 ? `${(liveBitrate / 1000).toFixed(1)} Mbps` : '0.0 Mbps'}</span>
+            </div>
+          </Tooltip>
+        )}
 
         {!slot.isLocal && (
           <span className="stat-badge stat-badge-ping">

@@ -188,7 +188,7 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
 
         self.jpeg_buffer.clear();
         let mut encoder = FastJpegEncoder::new(&mut self.jpeg_buffer, self.quality);
-        encoder.set_sampling_factor(SamplingFactor::R_4_2_0);
+        encoder.set_sampling_factor(SamplingFactor::R_4_4_4);
         if encoder
             .encode(
                 final_pixels,
@@ -642,7 +642,7 @@ pub fn start_native_screen_capture(
     let width = target_width.unwrap_or(0);
     let height = target_height.unwrap_or(0);
     let should_draw_mouse = capture_mouse.unwrap_or(true);
-    let jpeg_quality = quality.unwrap_or(88).clamp(60, 95);
+    let jpeg_quality = quality.unwrap_or(90).clamp(60, 98);
 
     let sender = get_frame_sender().clone();
     let start_instant = std::time::Instant::now();
@@ -1000,7 +1000,7 @@ pub fn start_native_screen_capture(
 
                 jpeg_bytes.clear();
                 let mut encoder = FastJpegEncoder::new(&mut jpeg_bytes, jpeg_quality);
-                encoder.set_sampling_factor(SamplingFactor::R_4_2_0);
+                encoder.set_sampling_factor(SamplingFactor::R_4_4_4);
                 if encoder
                     .encode(
                         final_raw,
@@ -1063,7 +1063,7 @@ mod tests {
     use super::*;
 
     fn sanitize_quality(quality: Option<u8>) -> u8 {
-        quality.unwrap_or(88).clamp(60, 95)
+        quality.unwrap_or(90).clamp(60, 98)
     }
 
     #[test]
@@ -1075,10 +1075,10 @@ mod tests {
 
     #[test]
     fn test_quality_clamp() {
-        assert_eq!(sanitize_quality(None), 88);
+        assert_eq!(sanitize_quality(None), 90);
         assert_eq!(sanitize_quality(Some(30)), 60);
         assert_eq!(sanitize_quality(Some(75)), 75);
-        assert_eq!(sanitize_quality(Some(100)), 95);
+        assert_eq!(sanitize_quality(Some(100)), 98);
     }
 
     #[test]

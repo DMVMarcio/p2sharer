@@ -1161,7 +1161,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   height: 100%;
   object-fit: contain;
   background-color: #000;
-  image-rendering: -webkit-optimize-contrast;
+  image-rendering: auto;
 }
 
 .local-broadcaster-placeholder {

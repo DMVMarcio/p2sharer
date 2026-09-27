@@ -164,18 +164,20 @@ export const RoomVideoContainer: React.FC = () => {
         className={`streams-grid-wrapper layout-grid ${layoutMode !== 'grid' ? 'hidden' : ''}`}
         id="streams-grid-wrapper"
       >
-        {filteredSlots.length > 0 ? (
-          filteredSlots.map((slot) => renderSlotCard(slot, false, false, false))
-        ) : (
-          <div className="stream-filter-empty-state">
-            <p className="filter-empty-title">Nenhum participante com o filtro selecionado.</p>
-            <button
-              className="btn btn-sm btn-outline filter-empty-btn"
-              onClick={() => setStreamFilter('all')}
-            >
-              Mostrar todos ({roomSlots.length})
-            </button>
-          </div>
+        {layoutMode === 'grid' && (
+          filteredSlots.length > 0 ? (
+            filteredSlots.map((slot) => renderSlotCard(slot, false, false, false))
+          ) : (
+            <div className="stream-filter-empty-state">
+              <p className="filter-empty-title">Nenhum participante com o filtro selecionado.</p>
+              <button
+                className="btn btn-sm btn-outline filter-empty-btn"
+                onClick={() => setStreamFilter('all')}
+              >
+                Mostrar todos ({roomSlots.length})
+              </button>
+            </div>
+          )
         )}
       </div>
 
@@ -184,44 +186,48 @@ export const RoomVideoContainer: React.FC = () => {
         className={`spotlight-stage ${layoutMode !== 'spotlight' ? 'hidden' : ''}`}
         id="spotlight-stage"
       >
-        {/* Featured Area */}
-        <div className="spotlight-featured-area" id="spotlight-featured-area">
-          {featuredSlot ? (
-            renderSlotCard(featuredSlot, true, false, false)
-          ) : (
-            <div className="stream-filter-empty-state">
-              <p className="filter-empty-title">Nenhuma transmissão selecionada.</p>
-              <button
-                className="btn btn-sm btn-outline filter-empty-btn"
-                onClick={() => setStreamFilter('all')}
-              >
-                Mostrar todos ({roomSlots.length})
-              </button>
+        {layoutMode === 'spotlight' && (
+          <>
+            {/* Featured Area */}
+            <div className="spotlight-featured-area" id="spotlight-featured-area">
+              {featuredSlot ? (
+                renderSlotCard(featuredSlot, true, false, false)
+              ) : (
+                <div className="stream-filter-empty-state">
+                  <p className="filter-empty-title">Nenhuma transmissão selecionada.</p>
+                  <button
+                    className="btn btn-sm btn-outline filter-empty-btn"
+                    onClick={() => setStreamFilter('all')}
+                  >
+                    Mostrar todos ({roomSlots.length})
+                  </button>
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-        {/* Bottom Tray */}
-        <div
-          className={`spotlight-tray-container ${isSpotlightTrayCollapsed ? 'collapsed' : ''}`}
-          id="spotlight-tray-container"
-        >
-          <button
-            className="btn-toggle-spotlight-tray"
-            id="btn-toggle-spotlight-tray"
-            aria-label="Minimizar / Expandir miniaturas"
-            onClick={toggleSpotlightTray}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <polyline points="6 9 12 15 18 9"/>
-            </svg>
-          </button>
-          <div ref={trayStripRef} className="spotlight-tray-strip" id="spotlight-tray-strip">
-            {filteredSlots.map((slot) =>
-              renderSlotCard(slot, false, true, slot.peerId === featuredSlot?.peerId)
-            )}
-          </div>
-        </div>
+            {/* Bottom Tray */}
+            <div
+              className={`spotlight-tray-container ${isSpotlightTrayCollapsed ? 'collapsed' : ''}`}
+              id="spotlight-tray-container"
+            >
+              <button
+                className="btn-toggle-spotlight-tray"
+                id="btn-toggle-spotlight-tray"
+                aria-label="Minimizar / Expandir miniaturas"
+                onClick={toggleSpotlightTray}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+              </button>
+              <div ref={trayStripRef} className="spotlight-tray-strip" id="spotlight-tray-strip">
+                {filteredSlots.map((slot) =>
+                  renderSlotCard(slot, false, true, slot.peerId === featuredSlot?.peerId)
+                )}
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
