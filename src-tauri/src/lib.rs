@@ -5,7 +5,10 @@ pub mod screen_sources;
 
 use audio_loopback::{start_audio_capture, stop_audio_capture};
 use logger::{clear_log_file, get_log_file_path, open_latest_log, open_log_folder, write_frontend_log};
-use process_manager::list_audio_processes;
+use process_manager::{
+    check_or_create_single_instance_mutex, focus_existing_instance_window,
+    list_audio_processes, setup_job_object_for_clean_child_teardown,
+};
 use screen_sources::{
     ensure_ws_server_running, get_video_ws_port, list_screen_sources, start_native_screen_capture,
     stop_native_screen_capture,
@@ -13,6 +16,15 @@ use screen_sources::{
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // 1. Single instance check: bring existing window to focus and exit duplicate
+    if !check_or_create_single_instance_mutex() {
+        focus_existing_instance_window();
+        std::process::exit(0);
+    }
+
+    // 2. Bind process to Windows Job Object to guarantee atomic child teardown on exit
+    setup_job_object_for_clean_child_teardown();
+
     #[cfg(windows)]
     {
         // Enable GPU hardware rasterization, zero-copy video pipeline, WebCodecs & WebRTC HW acceleration in WebView2
@@ -33,6 +45,13 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .on_window_event(|_window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                let _ = stop_native_screen_capture();
+                let _ = stop_audio_capture();
+                std::process::exit(0);
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             list_audio_processes,
             list_screen_sources,

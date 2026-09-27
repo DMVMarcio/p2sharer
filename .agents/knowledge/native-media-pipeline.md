@@ -113,5 +113,19 @@ These flags force hardware-accelerated encoding/decoding via dedicated GPU video
 
 ### Pacer Heartbeat De-confliction & WebCodecs Monotonic Timestamps
 - The pacer thread monitors `last_sent_us` with a 100ms threshold (`static_timeout_us = 100_000`). While games deliver frames at 30-120 FPS, the pacer remains completely dormant and sends 0 competing WebSocket messages.
+
+---
+
+## 6. Process Lifecycle & Atomic Child Teardown via Windows Job Object (`src-tauri/src/process_manager.rs`)
+
+### Elimination of Orphan WebView2 Processes
+- In Windows, child processes spawned by an application (including all `msedgewebview2.exe` renderer, GPU, utility, and crashpad processes) are not automatically terminated when the parent process exits unless managed by a Windows Job Object.
+- At startup, P2Sharer initializes a Windows Job Object with `JOBOBJECT_EXTENDED_LIMIT_INFORMATION` and `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, assigning the main process to it via `AssignProcessToJobObject`.
+- When the parent process terminates (via window close, `std::process::exit(0)`, task manager, or unexpected crash), the Windows kernel atomically and immediately terminates all child processes in the job, guaranteeing zero lingering zombie processes.
+
+### Single-Instance Enforcement
+- Uses a local session named mutex (`Local\P2SharerSingleInstanceMutex`) via `CreateMutexW`.
+- If an instance is already active, `GetLastError() == ERROR_ALREADY_EXISTS (183)`. The secondary launcher brings the existing window to focus via `FindWindowW` and `SetForegroundWindow`, exiting immediately to prevent duplicate parallel WebRTC and WebView2 instances.
+
 - In `NativeVideoBridge` (`src/video/native_video_bridge.ts`), incoming 1-byte dummy heartbeat ticks (`byteLength <= 4`) never overwrite real video frames (`pendingBuffer.byteLength > 4`) awaiting asynchronous decoding.
 - WebCodecs `VideoFrame` timestamps are strictly checked and advanced (`nowUs > lastTimestampUs`) to prevent pipeline rejection.

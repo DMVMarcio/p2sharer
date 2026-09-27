@@ -279,3 +279,88 @@ pub fn list_audio_processes() -> Vec<ProcessItem> {
 
     results
 }
+
+#[cfg(windows)]
+static HELD_JOB_OBJECT: std::sync::atomic::AtomicIsize = std::sync::atomic::AtomicIsize::new(0);
+#[cfg(windows)]
+static HELD_SINGLE_INSTANCE_MUTEX: std::sync::atomic::AtomicIsize = std::sync::atomic::AtomicIsize::new(0);
+
+#[cfg(windows)]
+pub fn setup_job_object_for_clean_child_teardown() {
+    unsafe {
+        use windows::Win32::System::JobObjects::{
+            CreateJobObjectW, SetInformationJobObject, AssignProcessToJobObject,
+            JobObjectExtendedLimitInformation, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+            JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+        };
+        use windows::Win32::System::Threading::GetCurrentProcess;
+
+        if let Ok(job) = CreateJobObjectW(None, None) {
+            let mut info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+            info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+            let res = SetInformationJobObject(
+                job,
+                JobObjectExtendedLimitInformation,
+                &info as *const _ as *const std::ffi::c_void,
+                std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+            );
+            if res.is_ok() {
+                let assign_res = AssignProcessToJobObject(job, GetCurrentProcess());
+                if assign_res.is_ok() {
+                    HELD_JOB_OBJECT.store(job.0 as isize, std::sync::atomic::Ordering::SeqCst);
+                    println!("[Process Manager] Bound P2Sharer to Windows Job Object with KILL_ON_JOB_CLOSE.");
+                }
+            }
+        }
+    }
+}
+
+#[cfg(not(windows))]
+pub fn setup_job_object_for_clean_child_teardown() {}
+
+#[cfg(windows)]
+pub fn check_or_create_single_instance_mutex() -> bool {
+    unsafe {
+        use windows::Win32::Foundation::GetLastError;
+        use windows::Win32::System::Threading::CreateMutexW;
+        use windows::core::w;
+
+        let mutex_name = w!("Local\\P2SharerSingleInstanceMutex");
+        if let Ok(handle) = CreateMutexW(None, true, mutex_name) {
+            // ERROR_ALREADY_EXISTS = 183
+            if GetLastError().0 == 183 {
+                return false;
+            }
+            HELD_SINGLE_INSTANCE_MUTEX.store(handle.0 as isize, std::sync::atomic::Ordering::SeqCst);
+            return true;
+        }
+        true
+    }
+}
+
+#[cfg(not(windows))]
+pub fn check_or_create_single_instance_mutex() -> bool {
+    true
+}
+
+#[cfg(windows)]
+pub fn focus_existing_instance_window() {
+    unsafe {
+        use windows::Win32::UI::WindowsAndMessaging::{
+            FindWindowW, SetForegroundWindow, ShowWindow, SW_RESTORE,
+        };
+        use windows::core::w;
+
+        let title = w!("P2Sharer - Compartilhamento P2P de Tela e Áudio");
+        if let Ok(hwnd) = FindWindowW(None, title) {
+            if !hwnd.is_invalid() {
+                let _ = ShowWindow(hwnd, SW_RESTORE);
+                let _ = SetForegroundWindow(hwnd);
+            }
+        }
+    }
+}
+
+#[cfg(not(windows))]
+pub fn focus_existing_instance_window() {}
+
