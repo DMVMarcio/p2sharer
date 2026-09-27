@@ -1,6 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { ScreenSourcesResponse, VideoCaptureBridge, VideoSourceOptions } from '../core/types.ts';
-import { telemetryService } from '../services/telemetry_service.ts';
 
 export class NativeVideoBridge implements VideoCaptureBridge {
   private activeStream: MediaStream | null = null;
@@ -92,12 +91,26 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     fps: number = 60,
     resolution: { width: number; height: number } = { width: 1920, height: 1080 },
     captureMouse: boolean = true,
-    quality: number = 75
+    quality: number = 90
   ): Promise<MediaStream> {
     if (typeof optionsOrSourceId === 'object' && optionsOrSourceId !== null) {
       const opts = optionsOrSourceId as VideoSourceOptions;
-      const sId = !opts.sourceId || opts.sourceId === 'gpu_direct' ? 'screen:0' : opts.sourceId;
-      return this.startNativeCapture(sId, opts.frameRate || fps, resolution, captureMouse, quality);
+      if (opts.mode === 'gpu_direct') {
+        return this.startDisplayMediaCapture(
+          opts.frameRate || fps,
+          opts.resolution || resolution,
+          opts.cursor !== false,
+          opts.preferSurface || 'monitor'
+        );
+      }
+      const sId = !opts.sourceId ? 'screen:0' : opts.sourceId;
+      return this.startNativeCapture(
+        sId,
+        opts.frameRate || fps,
+        opts.resolution || resolution,
+        opts.cursor !== false,
+        opts.quality || quality
+      );
     }
 
     const rawId = (optionsOrSourceId as string) || 'screen:0';
@@ -171,13 +184,6 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     this.isCapturing = true;
     this.isDirectGpu = false;
 
-    telemetryService.logEvent('CAPTURE', 'Iniciando captura de tela via Rust backend', {
-      sourceId,
-      fps,
-      resolution,
-      quality,
-    });
-
     // 2. Start native Rust capture thread
     try {
       await invoke('start_native_screen_capture', {
@@ -189,7 +195,6 @@ export class NativeVideoBridge implements VideoCaptureBridge {
         quality,
       });
     } catch (err) {
-      telemetryService.logEvent('CAPTURE', 'Falha ao iniciar captura nativa', { err });
       this.isCapturing = false;
       this.isDirectGpu = false;
       const reason = err instanceof Error ? err.message : String(err);
@@ -294,7 +299,6 @@ export class NativeVideoBridge implements VideoCaptureBridge {
       this.ws.binaryType = 'arraybuffer';
 
       this.ws.onopen = () => {
-        telemetryService.logEvent('CAPTURE', `WebSocket de vídeo conectado na porta ${port}`);
         if (!resolved) {
           resolved = true;
           resolve();
@@ -407,7 +411,6 @@ export class NativeVideoBridge implements VideoCaptureBridge {
   }
 
   public async stopCapture(): Promise<void> {
-    telemetryService.logEvent('CAPTURE', 'Parando captura nativa de tela e WebSocket');
     this.isCapturing = false;
     this.isDirectGpu = false;
     this.pendingBuffer = null;

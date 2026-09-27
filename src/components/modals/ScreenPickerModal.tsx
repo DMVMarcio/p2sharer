@@ -20,6 +20,8 @@ export const ScreenPickerModal: React.FC = () => {
     setFps,
     bitrate,
     setBitrate,
+    quality,
+    setQuality,
     showCursor,
     setShowCursor,
     loadSources,
@@ -247,6 +249,21 @@ export const ScreenPickerModal: React.FC = () => {
                 <option value={8000}>8 Mbps</option>
                 <option value={3000}>3 Mbps</option>
                 <option value={1000}>1 Mbps</option>
+              </select>
+            </div>
+
+            <div className="picker-setting-item">
+              <label>Qualidade:</label>
+              <select
+                id="modal-select-quality"
+                className="select-input-sm"
+                value={quality}
+                onChange={(e) => setQuality(parseInt(e.target.value, 10))}
+              >
+                <option value={95}>95% (Máxima)</option>
+                <option value={90}>90% (Muito Alta)</option>
+                <option value={85}>85% (Alta)</option>
+                <option value={75}>75% (Equilibrada)</option>
               </select>
             </div>
 

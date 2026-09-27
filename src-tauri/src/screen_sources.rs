@@ -661,7 +661,7 @@ pub fn start_native_screen_capture(
     let width = target_width.unwrap_or(0);
     let height = target_height.unwrap_or(0);
     let should_draw_mouse = capture_mouse.unwrap_or(true);
-    let jpeg_quality = quality.unwrap_or(75).clamp(50, 95);
+    let jpeg_quality = quality.unwrap_or(90).clamp(50, 98);
 
     let sender = get_frame_sender().clone();
     let start_instant = std::time::Instant::now();

@@ -90,19 +90,6 @@ export const AppHeader: React.FC = () => {
             <circle cx="12" cy="12" r="3"/>
           </svg>
         </button>
-
-        <Tooltip content="Telemetria & Diagnóstico (Ctrl+Shift+D)">
-          <button
-            className="btn-icon-header"
-            id="btn-open-diagnostics"
-            onClick={() => openModal('diagnostics')}
-            aria-label="Telemetria e Diagnóstico"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-            </svg>
-          </button>
-        </Tooltip>
       </div>
     </header>
   );
