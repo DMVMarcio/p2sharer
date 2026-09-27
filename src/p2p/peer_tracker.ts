@@ -63,9 +63,13 @@ export class PeerTracker {
       this.peerIsCreator.set(peerId, isCreator);
       return true;
     } else {
-      // Unverified PEX rumor - do not accept as connected peer until WebRTC connects
+      // Unverified PEX rumor - track for in-mesh bridging and immediate room visibility
       if (!this.directConnectedPeers.has(peerId)) {
         this.unverifiedRumors.add(peerId);
+        this.peerLastSeen.set(peerId, Date.now());
+        if (!this.peerJoinedAt.has(peerId)) {
+          this.peerJoinedAt.set(peerId, joinedAt);
+        }
         if (username?.trim()) {
           this.watcherNames.set(peerId, username.trim());
         }
@@ -216,12 +220,53 @@ export class PeerTracker {
   }
 
   /**
+   * Returns list of all known room peers, including direct verified peers
+   * and active in-flight / bridged PEX rumors with 'connecting' state.
+   */
+  public getAllRoomPeers(): PeerInfo[] {
+    const list: PeerInfo[] = [];
+    const addedIds = new Set<string>();
+
+    this.directConnectedPeers.forEach((pId) => {
+      addedIds.add(pId);
+      const uname = this.peers.get(pId) || `Participante (${pId.slice(0, 4)})`;
+      list.push({
+        id: pId,
+        username: uname,
+        connectionState: 'connected',
+        joinedAt: this.peerJoinedAt.get(pId) || Date.now(),
+      });
+    });
+
+    this.unverifiedRumors.forEach((rId) => {
+      if (!addedIds.has(rId)) {
+        addedIds.add(rId);
+        const uname = this.watcherNames.get(rId) || this.peers.get(rId) || `Participante (${rId.slice(0, 4)})`;
+        list.push({
+          id: rId,
+          username: uname,
+          connectionState: 'connecting',
+          joinedAt: this.peerJoinedAt.get(rId) || Date.now(),
+        });
+      }
+    });
+
+    return list;
+  }
+
+  /**
    * Returns peer IDs that have not sent heartbeats or pings within timeoutMs.
    */
   public getStalePeerIds(timeoutMs = 25000): string[] {
     const now = Date.now();
     const stale: string[] = [];
     this.directConnectedPeers.forEach((peerId) => {
+      const lastSeen = this.peerLastSeen.get(peerId) || 0;
+      if (now - lastSeen > timeoutMs) {
+        stale.push(peerId);
+      }
+    });
+    this.unverifiedRumors.forEach((peerId) => {
       const lastSeen = this.peerLastSeen.get(peerId) || 0;
       if (now - lastSeen > timeoutMs) {
         stale.push(peerId);
