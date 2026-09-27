@@ -1115,11 +1115,15 @@ export class GroupRoomManager {
   }
 
   public shareStream(stream: MediaStream, targetBitrateBps: number = 25000000, targetFps: number = 60) {
+    const wasStreaming = Boolean(this.localStream);
     this.localStream = stream;
     this.currentTargetBitrate = targetBitrateBps;
     this.currentTargetFps = targetFps;
 
     this.callbacks?.onStreamStarted?.('local', this.username, true);
+    if (!wasStreaming && stream && this.room) {
+      this.sendSystemMessage(`${this.username} iniciou uma transmissão`, 'stream-start', this.username);
+    }
 
     if (this.room && stream) {
       try {
@@ -1237,6 +1241,9 @@ export class GroupRoomManager {
     }
 
     if (wasStreaming) {
+      if (this.room) {
+        this.sendSystemMessage(`${this.username} parou de transmitir`, 'stream-stop', this.username);
+      }
       this.callbacks?.onStreamStopped?.('local', this.username, true);
       this.cleanupStreamWatchers('local', this.username);
       this.cleanupStreamWatchers(selfId, this.username);
@@ -1621,6 +1628,7 @@ export class GroupRoomManager {
   }
 
   public async leave(): Promise<void> {
+    this.stopStream();
     if (this.room) {
       this.sendSystemMessage(`${this.username} saiu`, 'leave', this.username);
     }
@@ -1644,8 +1652,6 @@ export class GroupRoomManager {
         });
       } catch {}
     }
-
-    this.stopStream();
 
     // Allow a brief flush window for socket buffers before tearing down WebRTC
     await new Promise((resolve) => setTimeout(resolve, 60));

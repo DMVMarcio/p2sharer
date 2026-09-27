@@ -2397,6 +2397,14 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   color: color-mix(in srgb, var(--accent-color) 45%, var(--text-secondary));
 }
 
+.chat-system-stream-start .chat-sys-icon {
+  color: color-mix(in srgb, var(--accent-color) 55%, var(--text-secondary));
+}
+
+.chat-system-stream-stop .chat-sys-icon {
+  color: color-mix(in srgb, var(--accent-color) 30%, var(--text-secondary));
+}
+
 .chat-sys-text {
   flex: 1;
   min-width: 0;
