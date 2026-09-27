@@ -333,6 +333,19 @@ export class MediaCoordinator {
           } catch (err) {
             console.warn('Failed to apply sender bitrate parameters:', err);
           }
+        } else if (sender.track && sender.track.kind === 'audio') {
+          try {
+            const params = sender.getParameters();
+            if (!params.encodings || params.encodings.length === 0) {
+              params.encodings = [{}];
+            }
+            params.encodings.forEach((enc) => {
+              enc.maxBitrate = 192000; // 192 kbps high-fidelity stereo audio
+              enc.networkPriority = 'high';
+              enc.priority = 'high';
+            });
+            await sender.setParameters(params);
+          } catch {}
         }
       }
     } catch (err) {
