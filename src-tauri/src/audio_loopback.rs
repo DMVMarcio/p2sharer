@@ -736,6 +736,7 @@ pub(crate) mod win_audio {
         pub pid: u32,
         pub fifo: std::collections::VecDeque<f32>,
         pub is_buffering: bool,
+        pub last_packet_time: std::time::Instant,
     }
 
     pub(crate) fn init_capture_source(
@@ -784,6 +785,7 @@ pub(crate) mod win_audio {
                 pid,
                 fifo: std::collections::VecDeque::with_capacity(4096),
                 is_buffering: true,
+                last_packet_time: std::time::Instant::now(),
             })
         }
     }
@@ -1044,6 +1046,7 @@ pub(crate) mod win_audio {
                             );
 
                             if get_res.is_ok() && num_frames_read > 0 && !data_ptr.is_null() {
+                                source.last_packet_time = std::time::Instant::now();
                                 let is_silent = (flags & AUDCLNT_BUFFERFLAGS_SILENT.0 as u32) != 0;
                                 let mut packet_stereo = Vec::new();
                                 convert_and_downmix_to_stereo(
@@ -1078,7 +1081,10 @@ pub(crate) mod win_audio {
                         }
                     }
 
-                    // Periodic synchronous mixing tick: exactly 480 frames (960 floats) per 10ms
+                    let tick_frames = ((sample_rate as u64 * 10) / 1000) as usize;
+                    let tick_floats = tick_frames * 2;
+
+                    // Periodic synchronous mixing tick: exactly tick_frames frames per 10ms
                     let now = std::time::Instant::now();
                     if now >= next_mix_time {
                         let mut ticks_to_run = 0usize;
@@ -1100,27 +1106,37 @@ pub(crate) mod win_audio {
                         for _ in 0..ticks_to_run {
                             if multi_sources.len() == 1 {
                                 let source = &mut multi_sources[0];
-                                if !source.is_buffering {
-                                    if source.fifo.len() >= 960 {
-                                        raw_stereo_buffer.extend(source.fifo.drain(..960));
-                                    } else if !source.fifo.is_empty() {
-                                        raw_stereo_buffer.extend(source.fifo.drain(..));
-                                        source.is_buffering = true;
+                                if source.fifo.len() >= tick_floats {
+                                    raw_stereo_buffer.extend(source.fifo.drain(..tick_floats));
+                                    source.is_buffering = false;
+                                } else if source.last_packet_time.elapsed() >= std::time::Duration::from_millis(50) && !source.fifo.is_empty() {
+                                    // Audio stopped for >50ms: smoothly fade out residual samples with Hann window
+                                    let rem = source.fifo.len();
+                                    let fade_len = rem.min(240);
+                                    let start_idx = rem - fade_len;
+                                    for i in 0..fade_len {
+                                        let phase = std::f32::consts::PI * (i as f32 / fade_len as f32);
+                                        let factor = 0.5 * (1.0 + phase.cos());
+                                        source.fifo[start_idx + i] *= factor;
                                     }
+                                    raw_stereo_buffer.extend(source.fifo.drain(..));
+                                    if raw_stereo_buffer.len() < tick_floats {
+                                        raw_stereo_buffer.resize(tick_floats, 0.0f32);
+                                    }
+                                    source.is_buffering = false;
                                 }
                             } else if multi_sources.len() > 1 {
-                                let any_active = multi_sources.iter().any(|s| !s.is_buffering && !s.fifo.is_empty());
+                                let any_active = multi_sources.iter().any(|s| !s.fifo.is_empty());
                                 if any_active {
-                                    const FRAMES_TO_MIX: usize = 480;
-                                    raw_stereo_buffer.reserve(FRAMES_TO_MIX * 2);
+                                    raw_stereo_buffer.reserve(tick_floats);
 
-                                    for _ in 0..FRAMES_TO_MIX {
+                                    for _ in 0..tick_frames {
                                         let mut sum_l = 0.0f32;
                                         let mut sum_r = 0.0f32;
                                         let mut active_sources = 0usize;
 
                                         for s in &mut multi_sources {
-                                            if !s.is_buffering && s.fifo.len() >= 2 {
+                                            if s.fifo.len() >= 2 {
                                                 let l = s.fifo.pop_front().unwrap_or(0.0);
                                                 let r = s.fifo.pop_front().unwrap_or(0.0);
                                                 if l.abs() > 0.0001 || r.abs() > 0.0001 {
@@ -1142,8 +1158,8 @@ pub(crate) mod win_audio {
                                     }
 
                                     for s in &mut multi_sources {
-                                        if !s.is_buffering && s.fifo.is_empty() {
-                                            s.is_buffering = true;
+                                        if s.last_packet_time.elapsed() >= std::time::Duration::from_millis(50) && !s.fifo.is_empty() {
+                                            s.fifo.clear();
                                         }
                                     }
                                 }
@@ -1191,15 +1207,15 @@ pub(crate) mod win_audio {
                     standardized_buffer.drain(..min_samples);
                 }
 
-                // If all sources have been quiet for at least 2 ticks (~20ms) and residual samples (< 960) remain,
-                // smoothly fade-out and flush the residual packet to prevent tail-end clicks ("mini chiado")
-                // and stale audio contamination on subsequent sounds.
-                if silent_mix_ticks >= 2 && !standardized_buffer.is_empty() {
+                // If all sources have been quiet for at least 5 ticks (~50ms) and residual samples (< 960) remain,
+                // smoothly fade-out using a Hann half-cosine window (240 samples = 5ms) and flush to prevent tail-end clicks ("mini chiado").
+                if silent_mix_ticks >= 5 && !standardized_buffer.is_empty() {
                     let rem = standardized_buffer.len();
-                    let fade_len = rem.min(64);
+                    let fade_len = rem.min(240);
                     let start_idx = rem - fade_len;
                     for i in 0..fade_len {
-                        let factor = 1.0 - (i as f32 / fade_len as f32);
+                        let phase = std::f32::consts::PI * (i as f32 / fade_len as f32);
+                        let factor = 0.5 * (1.0 + phase.cos());
                         standardized_buffer[start_idx + i] *= factor;
                     }
                     standardized_buffer.resize(min_samples, 0.0f32);
