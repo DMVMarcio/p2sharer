@@ -83,16 +83,17 @@ describe('Picture-in-Picture (PiP) Multi-Window System', () => {
   });
 
   describe('CSS Token and Class Verification for PiP', () => {
-    it('defines .pip-window-root, .pip-header, and internal control classes in style.css', () => {
+    it('defines .pip-window-root, .pip-top-bar, .pip-overlay, and internal control classes in style.css', () => {
       const cssPath = resolve(process.cwd(), 'src/style.css');
       const css = readFileSync(cssPath, 'utf-8');
 
       assert.ok(css.includes('.pip-window-root'), 'style.css must define .pip-window-root');
-      assert.ok(css.includes('.pip-header'), 'style.css must define .pip-header');
-      assert.ok(css.includes('.pip-header-left'), 'style.css must define .pip-header-left');
-      assert.ok(css.includes('.pip-header-right'), 'style.css must define .pip-header-right');
+      assert.ok(css.includes('.pip-top-bar'), 'style.css must define .pip-top-bar');
+      assert.ok(css.includes('.pip-top-left'), 'style.css must define .pip-top-left');
+      assert.ok(css.includes('.pip-top-right'), 'style.css must define .pip-top-right');
+      assert.ok(css.includes('.pip-header-btn'), 'style.css must define .pip-header-btn');
       assert.ok(css.includes('.pip-close-btn'), 'style.css must define .pip-close-btn');
-      assert.ok(css.includes('.pip-video-body'), 'style.css must define .pip-video-body');
+      assert.ok(css.includes('.pip-overlay'), 'style.css must define .pip-overlay');
       assert.ok(css.includes('.pip-video-element'), 'style.css must define .pip-video-element');
       assert.ok(css.includes('.btn-stream-pip'), 'style.css must define .btn-stream-pip');
       assert.ok(css.includes('.btn-restore-from-pip'), 'style.css must define .btn-restore-from-pip');
@@ -114,4 +115,18 @@ describe('Picture-in-Picture (PiP) Multi-Window System', () => {
       );
     });
   });
+
+  describe('PiP WebRTC & STUN Configuration', () => {
+    it('integrates buildIceServers STUN pool to prevent mDNS loopback failures', async () => {
+      const { buildIceServers } = await import('../../src/p2p/ice_config.ts');
+      const servers = buildIceServers();
+      assert.ok(servers.length > 0, 'Must have ICE servers configured');
+      const urls = servers.flatMap((s: any) => (Array.isArray(s.urls) ? s.urls : [s.urls]));
+      assert.ok(
+        urls.some((u: string) => u.includes('stun')),
+        'Must include STUN servers to resolve host/reflexive candidates'
+      );
+    });
+  });
 });
+

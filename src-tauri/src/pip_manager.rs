@@ -67,3 +67,17 @@ pub async fn close_pip_window(app: AppHandle, peer_id: String) -> Result<(), Str
     let _ = app.emit("pip-window-closed", peer_id);
     Ok(())
 }
+
+#[tauri::command]
+pub async fn set_pip_always_on_top(app: AppHandle, peer_id: String, always_on_top: bool) -> Result<(), String> {
+    let sanitized_id: String = peer_id
+        .chars()
+        .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+        .collect();
+    let label = format!("pip-{}", sanitized_id);
+
+    if let Some(win) = app.get_webview_window(&label) {
+        win.set_always_on_top(always_on_top).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
