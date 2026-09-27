@@ -84,6 +84,51 @@ test('join and leave notices wait for the direct presence username', async () =>
   }
 });
 
+test('a joiner treats the first peer roster as existing room membership', async () => {
+  const originalJoin = signalingManager.joinRoom;
+  const originalLeave = signalingManager.leaveRoom;
+  const originalReannounce = signalingManager.reannounce;
+  const mock = mockRoom();
+  (signalingManager as any).joinRoom = () => mock.room;
+  (signalingManager as any).leaveRoom = async () => {};
+  (signalingManager as any).reannounce = async () => {};
+  const notices: Array<{ name: string; initial: boolean }> = [];
+  const manager = new GroupRoomManager('Alice', 'roster-test', '', false);
+  try {
+    await manager.join({
+      ...callbacks(),
+      onPeerJoined: (peer, initial) => notices.push({ name: peer.username, initial }),
+    });
+    const presence = mock.actions.get('presence')!.onMessage!;
+    const pex = mock.actions.get('peer_exchange')!.onMessage!;
+
+    mock.room.onPeerJoin('host');
+    presence({ username: 'Robert', isCreator: true }, { peerId: 'host' });
+    assert.deepEqual(notices, [], 'host presence can precede the initial roster');
+    pex({ peers: [
+      { peerId: 'host', username: 'Robert', isCreator: true, joinedAt: 1 },
+      { peerId: 'other', username: 'NormadM', isCreator: false, joinedAt: 2 },
+    ] }, { peerId: 'host' });
+    assert.deepEqual(notices, [{ name: 'Robert', initial: true }]);
+    assert.equal(manager.getConnectedPeers().find((peer) => peer.id === 'host')?.isCreator, true);
+
+    mock.room.onPeerJoin('other');
+    presence({ username: 'NormadM', isCreator: false }, { peerId: 'other' });
+    mock.room.onPeerJoin('late');
+    presence({ username: 'NewUser', isCreator: false }, { peerId: 'late' });
+    assert.deepEqual(notices, [
+      { name: 'Robert', initial: true },
+      { name: 'NormadM', initial: true },
+      { name: 'NewUser', initial: false },
+    ]);
+  } finally {
+    await manager.leave();
+    (signalingManager as any).joinRoom = originalJoin;
+    (signalingManager as any).leaveRoom = originalLeave;
+    (signalingManager as any).reannounce = originalReannounce;
+  }
+});
+
 test('creator and joiner both advertise so joiners can pair directly', async () => {
   const originalJoin = signalingManager.joinRoom;
   const originalLeave = signalingManager.leaveRoom;
@@ -145,6 +190,12 @@ test('PEX reveals a missing third peer and direct handshake promotes it', async 
     assert.equal(pendingSlot?.connectionState, 'connecting');
     assert.equal(pendingSlot?.stream, null);
     assert.equal(pendingSlot?.isStreaming, false);
+    let mediaDispatches = 0;
+    (mock.room as any).addStream = () => { mediaDispatches++; };
+    (manager as any).localStream = { id: 'local-test-stream' };
+    manager.sendStreamToPeer('peer-c');
+    assert.equal(mediaDispatches, 0, 'PEX rumors must never receive media before direct verification');
+    (manager as any).localStream = null;
     mock.room.onPeerJoin('peer-c');
     assert.equal(manager.getConnectedPeers().find((peer) => peer.id === 'peer-c')?.connectionState, 'connected');
     assert.equal(manager.getAllRoomSlots().find((slot) => slot.peerId === 'peer-c')?.connectionState, 'connected');

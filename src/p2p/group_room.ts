@@ -159,7 +159,9 @@ export class GroupRoomManager {
   private lastBridgeAttempts: Map<string, number> = new Map();
   private rumorIntermediaries: Map<string, string> = new Map();
   private announcedPeerNames: Map<string, string> = new Map();
-  private peerJoinWasInitial: Map<string, boolean> = new Map();
+  private initialRosterReceived: boolean = false;
+  private existingAtJoinIds: Set<string> = new Set();
+  private pendingJoinNotices: Map<string, PeerInfo> = new Map();
   private lastRumorReannounceTime: number = 0;
   private currentTargetBitrate: number = 25000000;
   private currentTargetFps: number = 60;
@@ -208,6 +210,14 @@ export class GroupRoomManager {
 
   public isRoomHost(): boolean {
     return this.peerTracker.isHost(selfId, this.myJoinedAt, this.isCreator);
+  }
+
+  private reportPeerJoined(peer: PeerInfo): void {
+    if (!this.isCreator && !this.initialRosterReceived) {
+      this.pendingJoinNotices.set(peer.id, peer);
+      return;
+    }
+    this.callbacks?.onPeerJoined?.(peer, !this.isCreator && this.existingAtJoinIds.has(peer.id));
   }
 
   private getPeersPayload(): PeerExchangeItem[] {
@@ -309,6 +319,9 @@ export class GroupRoomManager {
     // Replacing the Trystero room closes its old WebRTC channels. Old-room
     // onPeerLeave callbacks are ignored, so explicitly retire those edges.
     Array.from(this.peerTracker.directConnectedPeers).forEach((peerId) => this.removePeer(peerId));
+    this.initialRosterReceived = false;
+    this.existingAtJoinIds.clear();
+    this.pendingJoinNotices.clear();
     this.setupRoomInstance();
 
     // Re-announce presence and PEX
@@ -414,14 +427,14 @@ export class GroupRoomManager {
         const alreadyAnnounced = this.announcedPeerNames.has(peerId);
         this.announcedPeerNames.set(peerId, suppliedName);
         if (!alreadyAnnounced) {
-          this.callbacks?.onPeerJoined?.({
+          this.reportPeerJoined({
             id: peerId,
             username: suppliedName,
             connectionState: 'connected',
             joinedAt: this.peerTracker.getJoinedAt(peerId) || Date.now(),
-          }, this.peerJoinWasInitial.get(peerId) ?? !this.initialJoinComplete);
+            isCreator: Boolean(data.isCreator),
+          });
         }
-        this.peerJoinWasInitial.delete(peerId);
       }
 
       const wasStreaming = this.peerTracker.isStreaming(peerId);
@@ -575,6 +588,21 @@ export class GroupRoomManager {
       if (!data || !Array.isArray(data.peers)) return;
       this.peerTracker.touchPeer(meta.peerId);
 
+      if (!this.isCreator) {
+        this.existingAtJoinIds.add(meta.peerId);
+        data.peers.forEach((peer) => {
+          if (peer.peerId) this.existingAtJoinIds.add(peer.peerId);
+        });
+        if (!this.initialRosterReceived) {
+          this.initialRosterReceived = true;
+          this.pendingJoinNotices.forEach((peer) => {
+            this.existingAtJoinIds.add(peer.id);
+            this.callbacks?.onPeerJoined?.(peer, true);
+          });
+          this.pendingJoinNotices.clear();
+        }
+      }
+
       let hasNewRumors = false;
       data.peers.forEach((p) => {
         if (p.peerId && p.peerId !== selfId) {
@@ -706,8 +734,6 @@ export class GroupRoomManager {
     this.room.onPeerJoin = (peerId: string) => {
       if (this.room !== boundRoom) return;
       console.log(`[P2P] Direct WebRTC peer connection active: ${peerId}`);
-      const isNew = !this.peerTracker.isVerified(peerId);
-      if (isNew) this.peerJoinWasInitial.set(peerId, !this.initialJoinComplete);
 
       // Verify and record direct WebRTC connection
       this.peerTracker.receivePeerExchange(peerId, true);
@@ -897,7 +923,8 @@ export class GroupRoomManager {
   private removePeer(peerId: string) {
     const announcedName = this.announcedPeerNames.get(peerId);
     this.announcedPeerNames.delete(peerId);
-    this.peerJoinWasInitial.delete(peerId);
+    this.pendingJoinNotices.delete(peerId);
+    this.existingAtJoinIds.delete(peerId);
     this.peerTracker.removePeer(peerId);
 
     signalingManager.setPeerDisconnected(peerId);
@@ -1046,7 +1073,7 @@ export class GroupRoomManager {
    * Targeted Stream Dispatch strictly passing `{ target: peerId }` to eliminate transceiver leaks.
    */
   public sendStreamToPeer(peerId: string) {
-    if (!this.localStream || !this.room) return;
+    if (!this.localStream || !this.room || !this.peerTracker.isVerified(peerId)) return;
     try {
       const peers = this.room.getPeers?.() || {};
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1520,7 +1547,7 @@ export class GroupRoomManager {
       sender: this.username,
       text,
       timestamp: Date.now(),
-      isHost: this.isRoomHost(),
+      isHost: this.isCreator,
     };
 
     this.seenChatMsgIds.add(msg.id);
@@ -1615,7 +1642,9 @@ export class GroupRoomManager {
     this.lastBridgeAttempts.clear();
     this.rumorIntermediaries.clear();
     this.announcedPeerNames.clear();
-    this.peerJoinWasInitial.clear();
+    this.existingAtJoinIds.clear();
+    this.pendingJoinNotices.clear();
+    this.initialRosterReceived = false;
     this.lastPeerStats.clear();
     this.peerStatsCache.clear();
     this.localStatsCache = null;

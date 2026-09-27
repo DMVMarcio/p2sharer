@@ -2,7 +2,7 @@ import React from 'react';
 import { useRoom } from '../../hooks/useRoom';
 
 export const ParticipantsPane: React.FC = () => {
-  const { username, peers, roomSlots } = useRoom();
+  const { username, peers, roomSlots, isCreator } = useRoom();
 
   const getSlotColor = (peerId: string, isLocal: boolean): string => {
     const slot = roomSlots.find((s) => s.isLocal === isLocal || s.peerId === peerId);
@@ -30,6 +30,7 @@ export const ParticipantsPane: React.FC = () => {
             <div className="participant-item-text">
               <span className="participant-item-name">{username || 'Usuário'}</span>
               <span className="badge-you">VOCÊ</span>
+              {isCreator && <span className="badge-host">HOST</span>}
             </div>
           </div>
           <span className="user-status-dot online"></span>
@@ -52,10 +53,14 @@ export const ParticipantsPane: React.FC = () => {
                 </div>
                 <div className="participant-item-text">
                   <span className="participant-item-name">{p.username}</span>
+                  {p.isCreator && <span className="badge-host">HOST</span>}
                   {isStreaming && <span className="badge-live-stream-mini">AO VIVO</span>}
                 </div>
               </div>
-              <span className="user-status-dot online"></span>
+              <span
+                className={`user-status-dot ${p.connectionState === 'connected' ? 'online' : 'connecting'}`}
+                title={p.connectionState === 'connected' ? 'Conectado' : 'Conectando'}
+              ></span>
             </div>
           );
         })}
