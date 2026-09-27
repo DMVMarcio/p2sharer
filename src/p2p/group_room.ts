@@ -1077,16 +1077,71 @@ export class GroupRoomManager {
 
   public stopStream() {
     const wasStreaming = Boolean(this.localStream);
-    if (this.room && this.localStream) {
+    const streamToStop = this.localStream;
+    this.localStream = null;
+    this.lastLocalStats = null;
+
+    if (this.room) {
+      if (streamToStop) {
+        try {
+          this.room.removeStream(streamToStop);
+        } catch (err) {
+          console.warn('[P2P] Error removing stream:', err);
+        }
+      }
+
+      // Explicitly tear down all WebRTC senders and inactivate transceivers so Chromium/WebView2
+      // immediately calls encoder_->Release(), shutting down the GPU NVENC hardware pipeline!
       try {
-        this.room.removeStream(this.localStream);
+        const peers = this.room.getPeers?.() || {};
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Object.values(peers).forEach((peerObj: any) => {
+          const pc: RTCPeerConnection = peerObj?.connection || peerObj?.pc || peerObj;
+          if (pc) {
+            if (typeof pc.getSenders === 'function') {
+              pc.getSenders().forEach((sender) => {
+                try {
+                  if (sender.track) {
+                    sender.track.stop();
+                  }
+                  if (typeof sender.replaceTrack === 'function') {
+                    sender.replaceTrack(null).catch(() => {});
+                  }
+                  pc.removeTrack(sender);
+                } catch {}
+              });
+            }
+
+            if (typeof pc.getTransceivers === 'function') {
+              pc.getTransceivers().forEach((transceiver) => {
+                try {
+                  if (transceiver.sender && typeof transceiver.sender.replaceTrack === 'function') {
+                    transceiver.sender.replaceTrack(null).catch(() => {});
+                  }
+                  if (transceiver.direction === 'sendonly') {
+                    transceiver.direction = 'inactive';
+                  } else if (transceiver.direction === 'sendrecv') {
+                    transceiver.direction = 'recvonly';
+                  }
+                } catch {}
+              });
+            }
+          }
+        });
       } catch (err) {
-        console.warn('[P2P] Error removing stream:', err);
+        console.warn('[P2P] Error releasing peer transceivers:', err);
       }
     }
 
-    this.localStream = null;
-    this.lastLocalStats = null;
+    if (streamToStop) {
+      try {
+        streamToStop.getTracks().forEach((track) => {
+          try {
+            track.stop();
+          } catch {}
+        });
+      } catch {}
+    }
 
     // Screen share toggle protocol: emit stream_status with isStreaming: false
     if (this.streamStatusAction) {

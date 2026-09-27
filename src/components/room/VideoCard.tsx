@@ -80,19 +80,49 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     }
   };
 
+  const videoElementRef = useRef<HTMLVideoElement | null>(null);
+
+  const cleanupVideoElement = useCallback((el: HTMLVideoElement | null) => {
+    if (!el) return;
+    try {
+      el.pause();
+      el.srcObject = null;
+      el.removeAttribute('src');
+      el.load();
+    } catch {}
+  }, []);
+
   const videoRef = useCallback(
     (el: HTMLVideoElement | null) => {
-      if (el && slot.stream) {
-        if (el.srcObject !== slot.stream) {
-          el.srcObject = slot.stream;
-          el.play().catch(() => {});
-        } else if (el.paused) {
-          el.play().catch(() => {});
+      if (videoElementRef.current && videoElementRef.current !== el) {
+        cleanupVideoElement(videoElementRef.current);
+      }
+      videoElementRef.current = el;
+
+      if (el) {
+        if (slot.stream) {
+          if (el.srcObject !== slot.stream) {
+            el.srcObject = slot.stream;
+            el.play().catch(() => {});
+          } else if (el.paused) {
+            el.play().catch(() => {});
+          }
+        } else {
+          cleanupVideoElement(el);
         }
       }
     },
-    [slot.stream]
+    [slot.stream, cleanupVideoElement]
   );
+
+  useEffect(() => {
+    return () => {
+      if (videoElementRef.current) {
+        cleanupVideoElement(videoElementRef.current);
+        videoElementRef.current = null;
+      }
+    };
+  }, [cleanupVideoElement]);
 
   useEffect(() => {
     if (!slot.isLocal && slot.stream) {
@@ -105,10 +135,11 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   }, [slot.isLocal, slot.peerId, slot.stream]);
 
   useEffect(() => {
-    if (inTray) return;
+    if (inTray || (!slot.isStreaming && slot.isLocal)) return;
 
     let isMounted = true;
     const fetchStats = async () => {
+      if (!isMounted) return;
       const stats = await roomService.roomManager?.getPeerStats(slot.peerId);
       if (!isMounted) return;
       if (stats?.bitrateKbps !== null && stats?.bitrateKbps !== undefined) {
@@ -130,7 +161,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
       clearTimeout(initialTimer);
       clearInterval(interval);
     };
-  }, [slot.isLocal, slot.peerId, inTray]);
+  }, [slot.isLocal, slot.peerId, slot.isStreaming, inTray]);
 
   const handleCardClick = () => {
     if (didDragRef.current) {

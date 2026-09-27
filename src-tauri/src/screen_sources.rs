@@ -630,14 +630,6 @@ pub fn start_native_screen_capture(
         *guard = Some(is_capturing.clone());
     }
 
-    #[cfg(windows)]
-    unsafe {
-        use windows::Win32::System::Threading::{
-            GetCurrentProcess, SetPriorityClass, HIGH_PRIORITY_CLASS,
-        };
-        let _ = SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
-    }
-
     let fps = target_fps.unwrap_or(60).clamp(15, 120);
     let width = target_width.unwrap_or(0);
     let height = target_height.unwrap_or(0);
@@ -1044,13 +1036,6 @@ pub fn stop_native_screen_capture() -> Result<bool, String> {
                 let _ = control.stop();
             });
         }
-    }
-    #[cfg(windows)]
-    unsafe {
-        use windows::Win32::System::Threading::{
-            GetCurrentProcess, SetPriorityClass, NORMAL_PRIORITY_CLASS,
-        };
-        let _ = SetPriorityClass(GetCurrentProcess(), NORMAL_PRIORITY_CLASS);
     }
     Ok(true)
 }

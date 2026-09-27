@@ -314,13 +314,13 @@ class RoomService {
       }
     });
 
-    this.nativeVideoBridge.stop();
-    this.audioBridge.stop();
-    invoke('stop_audio_capture').catch(() => {});
-
     if (this.roomManager) {
       this.roomManager.stopStream();
     }
+
+    this.nativeVideoBridge.stop();
+    this.audioBridge.stop();
+    invoke('stop_audio_capture').catch(() => {});
 
     soundEffects.playScreenShareStop();
     this.notify();

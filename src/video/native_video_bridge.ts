@@ -17,6 +17,8 @@ export class NativeVideoBridge implements VideoCaptureBridge {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private trackWriter: any = null;
   private lastTimestampUs: number = 0;
+  private pendingBuffer: ArrayBuffer | null = null;
+  private isDecoding: boolean = false;
   public onFallbackNeeded: ((reason: string, stream?: MediaStream) => void) | null = null;
 
   public isCapturingDirectGpu(): boolean {
@@ -189,14 +191,14 @@ export class NativeVideoBridge implements VideoCaptureBridge {
 
     // 3. Connect to local binary WebSocket stream
     const port = (await invoke<number>('get_video_ws_port').catch(() => 49153)) || 49153;
-    let pendingBuffer: ArrayBuffer | null = null;
-    let isDecoding = false;
+    this.pendingBuffer = null;
+    this.isDecoding = false;
 
     const pumpNextFrame = async () => {
-      if (isDecoding || !pendingBuffer || !this.isCapturing) return;
-      isDecoding = true;
-      const buffer = pendingBuffer;
-      pendingBuffer = null;
+      if (this.isDecoding || !this.pendingBuffer || !this.isCapturing) return;
+      this.isDecoding = true;
+      const buffer = this.pendingBuffer;
+      this.pendingBuffer = null;
 
       try {
         let bitmap = this.latestBitmap;
@@ -211,7 +213,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
 
           if (!this.isCapturing) {
             newBitmap.close();
-            isDecoding = false;
+            this.isDecoding = false;
             return;
           }
 
@@ -223,7 +225,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
         }
 
         if (!bitmap || !this.isCapturing) {
-          isDecoding = false;
+          this.isDecoding = false;
           return;
         }
 
@@ -270,8 +272,8 @@ export class NativeVideoBridge implements VideoCaptureBridge {
       } catch {
         // Ignore frame decode failure
       } finally {
-        isDecoding = false;
-        if (pendingBuffer) {
+        this.isDecoding = false;
+        if (this.pendingBuffer) {
           pumpNextFrame();
         }
       }
@@ -311,10 +313,10 @@ export class NativeVideoBridge implements VideoCaptureBridge {
 
         if (evt.data instanceof ArrayBuffer) {
           // Never allow a 1-byte pacer tick to overwrite an awaiting real video frame!
-          if (evt.data.byteLength <= 4 && pendingBuffer && pendingBuffer.byteLength > 4) {
+          if (evt.data.byteLength <= 4 && this.pendingBuffer && this.pendingBuffer.byteLength > 4) {
             return;
           }
-          pendingBuffer = evt.data;
+          this.pendingBuffer = evt.data;
           pumpNextFrame();
         }
       };
@@ -398,6 +400,9 @@ export class NativeVideoBridge implements VideoCaptureBridge {
   public async stopCapture(): Promise<void> {
     this.isCapturing = false;
     this.isDirectGpu = false;
+    this.pendingBuffer = null;
+    this.isDecoding = false;
+
     await invoke('stop_native_screen_capture').catch(() => {});
 
     if (this.animationFrameId !== null) {
@@ -406,17 +411,29 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     }
 
     if (this.latestBitmap) {
-      this.latestBitmap.close();
+      try {
+        this.latestBitmap.close();
+      } catch {}
       this.latestBitmap = null;
     }
 
     if (this.ws) {
-      this.ws.close();
+      this.ws.onmessage = null;
+      this.ws.onerror = null;
+      this.ws.onopen = null;
+      this.ws.onclose = null;
+      try {
+        this.ws.close(1000);
+      } catch {}
       this.ws = null;
     }
 
     if (this.activeStream) {
-      this.activeStream.getTracks().forEach((t) => t.stop());
+      this.activeStream.getTracks().forEach((t) => {
+        try {
+          t.stop();
+        } catch {}
+      });
       this.activeStream = null;
     }
 
