@@ -10,6 +10,18 @@ export const DEFAULT_STUN_SERVERS = [
   'stun:stun.services.mozilla.com',
 ];
 
+export const DEFAULT_FALLBACK_TURN_SERVERS: RTCIceServer[] = [
+  {
+    urls: [
+      'turn:openrelay.metered.ca:80',
+      'turn:openrelay.metered.ca:443',
+      'turns:openrelay.metered.ca:443?transport=tcp',
+    ],
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  },
+];
+
 export function sanitizeTurnUrl(rawUrl: string): string {
   const trimmed = rawUrl.trim();
   if (!trimmed) return '';
@@ -38,6 +50,9 @@ export function buildIceServers(turnConfig?: TurnConfig | null): RTCIceServer[] 
       turnEntry.credential = turnConfig.credential;
     }
     iceServers.push(turnEntry);
+  } else {
+    // Automatic high-availability TURN fallback for Symmetric NAT / CGNAT traversal
+    iceServers.push(...DEFAULT_FALLBACK_TURN_SERVERS);
   }
 
   return iceServers;

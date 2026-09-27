@@ -142,12 +142,26 @@ describe('M7: P2P Mesh Connectivity, Indirect Bridging & Signaling Stability Har
       assert.equal(tracker.isVerified('peer-direct-2'), true);
       assert.deepEqual(tracker.getPendingRumors(), ['peer-indirect-1']);
 
+      // In-flight room peers list includes direct as 'connected' and rumors as 'connecting'
+      const allPeersBefore = tracker.getAllRoomPeers();
+      assert.equal(allPeersBefore.length, 2);
+      const indirectPeer = allPeersBefore.find((p) => p.id === 'peer-indirect-1');
+      assert.equal(indirectPeer?.connectionState, 'connecting');
+      assert.equal(indirectPeer?.username, 'Carlos');
+      const directPeer = allPeersBefore.find((p) => p.id === 'peer-direct-2');
+      assert.equal(directPeer?.connectionState, 'connected');
+      assert.equal(directPeer?.username, 'Ana');
+
       // Indirect peer becomes direct
       const isDirect3 = tracker.receivePeerExchange('peer-indirect-1', true);
       assert.equal(isDirect3, true);
       assert.equal(tracker.isVerified('peer-indirect-1'), true);
       assert.deepEqual(tracker.getPendingRumors(), []);
       assert.equal(tracker.getUsername('peer-indirect-1'), 'Carlos');
+
+      const allPeersAfter = tracker.getAllRoomPeers();
+      assert.equal(allPeersAfter.length, 2);
+      assert.ok(allPeersAfter.every((p) => p.connectionState === 'connected'));
     });
   });
 
@@ -155,11 +169,19 @@ describe('M7: P2P Mesh Connectivity, Indirect Bridging & Signaling Stability Har
   // Area 3: ICE / WebRTC Configuration & Diagnostics
   // =========================================================================
   describe('Area 3: ICE Pre-Gathering & Informative Join Error Formatting', () => {
-    it('3.1: buildRtcConfiguration includes iceCandidatePoolSize: 2 for rapid hole-punching', () => {
+    it('3.1: buildRtcConfiguration includes iceCandidatePoolSize: 2 and OpenRelay fallback TURN servers', () => {
       const rtcConfig = buildRtcConfiguration();
       assert.equal(rtcConfig.iceCandidatePoolSize, 2);
       assert.ok(Array.isArray(rtcConfig.iceServers));
-      assert.ok(rtcConfig.iceServers.length > 0);
+      assert.ok(rtcConfig.iceServers.length >= 2);
+      // Fallback TURN server must be present for symmetric NAT traversal
+      assert.ok(
+        rtcConfig.iceServers.some(
+          (server) =>
+            Array.isArray(server.urls) &&
+            server.urls.some((u) => u.includes('openrelay.metered.ca'))
+        )
+      );
     });
 
     it('3.2: formatJoinError provides non-alarmist explanation and maintains compatibility keywords', () => {

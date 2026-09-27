@@ -555,11 +555,13 @@ export class GroupRoomManager {
       if (!data || !Array.isArray(data.peers)) return;
       this.peerTracker.touchPeer(meta.peerId);
 
+      let hasNewRumors = false;
       data.peers.forEach((p) => {
         if (p.peerId && p.peerId !== selfId) {
           const isDirect = this.peerTracker.isVerified(p.peerId);
           if (!isDirect) {
             this.rumorIntermediaries.set(p.peerId, meta.peerId);
+            hasNewRumors = true;
           }
           this.peerTracker.receivePeerExchange(p.peerId, isDirect, p.username, p.isCreator, p.joinedAt);
 
@@ -569,6 +571,10 @@ export class GroupRoomManager {
           }
         }
       });
+
+      if (hasNewRumors) {
+        this.notifyPeersUpdate();
+      }
     };
 
     // 8. Setup In-Mesh Signaling Relay (Forwarding messages between unbridged peers)
@@ -1497,7 +1503,7 @@ export class GroupRoomManager {
   }
 
   public getConnectedPeers(): PeerInfo[] {
-    return this.peerTracker.getVerifiedPeers();
+    return this.peerTracker.getAllRoomPeers();
   }
 
   private notifyPeersUpdate() {
