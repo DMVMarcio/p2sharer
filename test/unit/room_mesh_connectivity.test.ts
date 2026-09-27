@@ -84,7 +84,7 @@ test('join and leave notices wait for the direct presence username', async () =>
   }
 });
 
-test('creator advertises and joiner waits for an active room', async () => {
+test('creator and joiner both advertise so joiners can pair directly', async () => {
   const originalJoin = signalingManager.joinRoom;
   const originalLeave = signalingManager.leaveRoom;
   const originalReannounce = signalingManager.reannounce;
@@ -103,13 +103,13 @@ test('creator advertises and joiner waits for an active room', async () => {
     await creator.join(callbacks());
     await joiner.join(callbacks());
     assert.equal(configs[0].passive, false);
-    assert.equal(configs[1].passive, true);
+    assert.equal(configs[1].passive, false);
     await new Promise((resolve) => setTimeout(resolve, 150));
-    assert.ok(announcements > 0, 'creator must announce its room');
+    assert.ok(announcements >= 2, 'both participants must announce the shared rendezvous');
     const before = announcements;
     await creator.leave();
     await new Promise((resolve) => setTimeout(resolve, 350));
-    assert.equal(announcements, before, 'an unconnected joiner must not create its own room');
+    assert.ok(announcements > before, 'a joiner must remain discoverable by other joiners');
   } finally {
     await joiner.leave();
     (signalingManager as any).joinRoom = originalJoin;
@@ -129,15 +129,25 @@ test('PEX reveals a missing third peer and direct handshake promotes it', async 
   (signalingManager as any).leaveRoom = async () => {};
   (signalingManager as any).reannounce = async () => {};
   const manager = new GroupRoomManager('Alice', 'mesh-test', '', true);
+  const slotUpdates: string[][] = [];
   try {
-    await manager.join(callbacks());
+    await manager.join({
+      ...callbacks(),
+      onSlotsUpdate: (slots) => slotUpdates.push(slots.map((slot) => slot.peerId)),
+    });
     mock.room.onPeerJoin('peer-b');
     mock.actions.get('peer_exchange')!.onMessage!({
       peers: [{ peerId: 'peer-c', username: 'Carol', isCreator: false, joinedAt: 10 }],
     }, { peerId: 'peer-b' });
     assert.equal(manager.getConnectedPeers().find((peer) => peer.id === 'peer-c')?.connectionState, 'connecting');
+    assert.ok(slotUpdates.some((ids) => ids.includes('peer-c')), 'rumor must appear in the central view immediately');
+    const pendingSlot = manager.getAllRoomSlots().find((slot) => slot.peerId === 'peer-c');
+    assert.equal(pendingSlot?.connectionState, 'connecting');
+    assert.equal(pendingSlot?.stream, null);
+    assert.equal(pendingSlot?.isStreaming, false);
     mock.room.onPeerJoin('peer-c');
     assert.equal(manager.getConnectedPeers().find((peer) => peer.id === 'peer-c')?.connectionState, 'connected');
+    assert.equal(manager.getAllRoomSlots().find((slot) => slot.peerId === 'peer-c')?.connectionState, 'connected');
 
     const oldLeave = mock.room.onPeerLeave;
     const oldPex = mock.actions.get('peer_exchange')!.onMessage!;

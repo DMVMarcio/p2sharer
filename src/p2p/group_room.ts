@@ -166,10 +166,6 @@ export class GroupRoomManager {
   private signalingTopic: string = '';
   private rtcConfig: RTCConfiguration | null = null;
 
-  private canAnnouncePresence(): boolean {
-    return this.isCreator || this.peerTracker.directConnectedPeers.size > 0;
-  }
-
   constructor(username: string, roomId: string, password = '', isCreator = false, turnConfig?: TurnConfig) {
     this.username = username;
     this.roomId = roomId.trim();
@@ -280,9 +276,9 @@ export class GroupRoomManager {
       {
         appId: APP_ID,
         rtcConfig: this.rtcConfig,
-        // A creator advertises the room. A joiner listens and activates only
-        // when an existing active participant announces this room.
-        passive: !this.isCreator,
+        // WebRTC is a full mesh: every participant must advertise so two
+        // joiners can establish their own direct edge, not only reach the creator.
+        passive: false,
       },
       this.signalingTopic,
       {
@@ -299,7 +295,7 @@ export class GroupRoomManager {
     // discover us immediately without waiting for 5.3s Trystero ticks.
     [100, 400, 1000, 2200].forEach((delay) => {
       setTimeout(() => {
-        if (this.room && this.signalingTopic && this.canAnnouncePresence()) {
+        if (this.room && this.signalingTopic) {
           signalingManager.reannounce(this.signalingTopic);
         }
       }, delay);
@@ -598,6 +594,7 @@ export class GroupRoomManager {
 
       if (hasNewRumors) {
         this.notifyPeersUpdate();
+        this.notifyStreamsUpdate();
       }
     };
 
@@ -847,7 +844,6 @@ export class GroupRoomManager {
       if (
         (hasNoDirectPeers || rumors.length > 0) &&
         this.signalingTopic &&
-        this.canAnnouncePresence() &&
         now - this.lastRumorReannounceTime > 2500
       ) {
         this.lastRumorReannounceTime = now;
@@ -1259,11 +1255,14 @@ export class GroupRoomManager {
       watchers: this.getStreamWatchers('local'),
     });
 
-    // 2. Verified Peer slots ONLY (no ghost cards from unverified PEX rumors)
-    this.peerTracker.directConnectedPeers.forEach((peerId) => {
-      const uname = this.peerTracker.getUsername(peerId) || `Participante (${peerId.slice(0, 4)})`;
-      const stream = this.remoteStreams.get(peerId) || null;
-      const isBroadcasting = this.peerTracker.isStreaming(peerId) || Boolean(stream);
+    // Keep indirect peers visible while their own WebRTC edge is negotiated.
+    // A rumor never receives media or watcher controls until directly verified.
+    this.peerTracker.getAllRoomPeers().forEach((peer) => {
+      const peerId = peer.id;
+      const isDirect = peer.connectionState === 'connected';
+      const uname = peer.username;
+      const stream = isDirect ? this.remoteStreams.get(peerId) || null : null;
+      const isBroadcasting = isDirect && (this.peerTracker.isStreaming(peerId) || Boolean(stream));
       list.push({
         peerId,
         senderName: uname,
@@ -1271,7 +1270,8 @@ export class GroupRoomManager {
         isStreaming: isBroadcasting,
         isLocal: false,
         color: generateUserColor(uname),
-        watchers: this.getStreamWatchers(peerId),
+        connectionState: peer.connectionState,
+        watchers: isDirect ? this.getStreamWatchers(peerId) : [],
       });
     });
 
@@ -1505,7 +1505,7 @@ export class GroupRoomManager {
     const slots = this.getAllRoomSlots();
 
     const hash = slots
-      .map((s) => `${s.peerId}:${s.senderName}:${s.isStreaming}:${s.stream?.id}:${s.watchers?.length || 0}`)
+      .map((s) => `${s.peerId}:${s.senderName}:${s.connectionState}:${s.isStreaming}:${s.stream?.id}:${s.watchers?.length || 0}`)
       .join('|');
     if (hash === this.lastStreamsHash) return;
     this.lastStreamsHash = hash;
