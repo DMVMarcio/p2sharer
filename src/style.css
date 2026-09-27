@@ -2377,13 +2377,24 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   width: 100%;
   font-size: 11px;
   line-height: 1.4;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 .chat-sys-icon {
   flex-shrink: 0;
-  color: var(--text-muted);
-  opacity: 0.75;
+  color: var(--text-secondary);
+}
+
+.chat-system-join .chat-sys-icon {
+  color: color-mix(in srgb, var(--success-text) 55%, var(--text-secondary));
+}
+
+.chat-system-leave .chat-sys-icon {
+  color: color-mix(in srgb, var(--danger-text) 40%, var(--text-secondary));
+}
+
+.chat-system-info .chat-sys-icon {
+  color: color-mix(in srgb, var(--accent-color) 45%, var(--text-secondary));
 }
 
 .chat-sys-text {
@@ -2394,11 +2405,15 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   white-space: nowrap;
 }
 
+.chat-sys-highlight {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
 .chat-sys-time {
   font-size: 10px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   flex-shrink: 0;
-  opacity: 0.7;
 }
 
 .chat-msg {
