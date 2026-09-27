@@ -90,8 +90,11 @@ export class MediaCoordinator {
             if (!params.encodings || params.encodings.length === 0) {
               params.encodings = [{}];
             }
+            const minBitrate = Math.round(maxBitrateBps * 0.5);
             params.encodings.forEach((enc) => {
               enc.maxBitrate = maxBitrateBps;
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              (enc as any).minBitrate = minBitrate;
               enc.maxFramerate = maxFps;
               enc.scaleResolutionDownBy = 1.0;
               enc.networkPriority = 'high';

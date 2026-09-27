@@ -89,24 +89,20 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     fps: number = 60,
     resolution: { width: number; height: number } = { width: 1920, height: 1080 },
     captureMouse: boolean = true,
-    quality: number = 95
+    quality: number = 88
   ): Promise<MediaStream> {
     if (typeof optionsOrSourceId === 'object' && optionsOrSourceId !== null) {
       const opts = optionsOrSourceId as VideoSourceOptions;
-      if (opts.mode === 'gpu_direct' || opts.sourceId === 'gpu_direct') {
-        return this.startDisplayMediaCapture(opts.frameRate || fps, resolution, captureMouse, 'monitor');
-      }
-      const sId = opts.sourceId || 'screen:0';
+      const sId = opts.sourceId === 'gpu_direct' || !opts.sourceId ? 'screen:0' : opts.sourceId;
       return this.startNativeCapture(sId, opts.frameRate || fps, resolution, captureMouse, quality);
     }
 
     const sId = (optionsOrSourceId as string) || 'screen:0';
-    if (sId === 'gpu_direct' || sId === 'direct_gpu' || sId === 'screen:direct_gpu') {
-      return this.startDisplayMediaCapture(fps, resolution, captureMouse, 'monitor');
-    }
+    const effectiveSourceId =
+      sId === 'gpu_direct' || sId === 'direct_gpu' || sId === 'screen:direct_gpu' ? 'screen:0' : sId;
 
     // In-app selected screen or window: capture directly via native GPU capture without Chromium prompt!
-    return this.startNativeCapture(sId, fps, resolution, captureMouse, quality);
+    return this.startNativeCapture(effectiveSourceId, fps, resolution, captureMouse, quality);
   }
 
   private async startNativeCapture(
@@ -247,8 +243,14 @@ export class NativeVideoBridge implements VideoCaptureBridge {
               timestamp: nowUs,
               duration: Math.round((1000 / Math.max(this.currentFps, 1)) * 1000),
             });
-            await this.trackWriter.write(videoFrame);
-            videoFrame.close();
+            const writePromise = this.trackWriter.write(videoFrame);
+            if (writePromise && typeof writePromise.finally === 'function') {
+              writePromise.finally(() => {
+                videoFrame.close();
+              });
+            } else {
+              videoFrame.close();
+            }
           } catch (writeErr) {
             console.warn('[NativeVideoBridge] VideoFrame write failed:', writeErr);
           }
