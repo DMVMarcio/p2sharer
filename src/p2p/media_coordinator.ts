@@ -53,7 +53,6 @@ export class MediaCoordinator {
     const origCreateOffer = proto.createOffer;
     const origCreateAnswer = proto.createAnswer;
     const origSetLocalDescription = proto.setLocalDescription;
-    const origSetRemoteDescription = proto.setRemoteDescription;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     proto.createOffer = async function (options?: any) {
@@ -103,19 +102,11 @@ export class MediaCoordinator {
         return origSetLocalDescription.call(this, description);
       }
     };
-
-    proto.setRemoteDescription = async function (
-      description: RTCSessionDescriptionInit
-    ) {
-      if (description && description.sdp) {
-        description.sdp = MediaCoordinator.mungeSdpBitrates(description.sdp);
-      }
-      return origSetRemoteDescription.call(this, description);
-    };
   }
 
   /**
-   * Munges SDP to enforce Google WebRTC bitrate floor and ceiling (x-google-min-bitrate, x-google-max-bitrate, b=AS, b=TIAS)
+   * Munges SDP to enforce Google WebRTC bitrate floor and ceiling (x-google-min-bitrate, x-google-max-bitrate, b=AS, b=TIAS).
+   * Confines video bitrate and fmtp parameters strictly inside the m=video section so they never bleed into m=audio or m=application.
    */
   public static mungeSdpBitrates(
     sdp: string,
@@ -125,36 +116,54 @@ export class MediaCoordinator {
     if (!sdp || typeof sdp !== 'string') return sdp;
 
     const lines = sdp.split(/\r?\n/);
-    let inVideo = false;
     const modifiedLines: string[] = [];
-    const videoPayloadTypes: string[] = [];
-    const fmtpPayloadTypes: Set<string> = new Set();
+    let inVideo = false;
+    let videoPayloadTypes: string[] = [];
+    let fmtpPayloadTypes: Set<string> = new Set();
+
+    const flushMissingVideoFmtp = () => {
+      if (videoPayloadTypes.length > 0) {
+        for (const pt of videoPayloadTypes) {
+          if (!fmtpPayloadTypes.has(pt)) {
+            modifiedLines.push(
+              `a=fmtp:${pt} x-google-min-bitrate=${minBitrateKbps};x-google-start-bitrate=${Math.round(minBitrateKbps * 1.5)};x-google-max-bitrate=${maxBitrateKbps}`
+            );
+            fmtpPayloadTypes.add(pt);
+          }
+        }
+        videoPayloadTypes = [];
+        fmtpPayloadTypes.clear();
+      }
+    };
 
     for (let i = 0; i < lines.length; i++) {
-      let line = lines[i];
+      const line = lines[i];
 
-      if (line.startsWith('m=video')) {
-        inVideo = true;
-        const parts = line.split(' ');
-        for (let p = 3; p < parts.length; p++) {
-          if (parts[p]) videoPayloadTypes.push(parts[p]);
+      if (line.startsWith('m=')) {
+        if (inVideo) {
+          flushMissingVideoFmtp();
+          inVideo = false;
         }
-        modifiedLines.push(line);
 
-        // Ensure b=AS and b=TIAS lines exist right after m=video line if not already present
-        const nextLine1 = lines[i + 1] || '';
-        const nextLine2 = lines[i + 2] || '';
-        if (!nextLine1.startsWith('b=AS:') && !nextLine2.startsWith('b=AS:')) {
-          modifiedLines.push(`b=AS:${maxBitrateKbps}`);
-        }
-        if (!nextLine1.startsWith('b=TIAS:') && !nextLine2.startsWith('b=TIAS:')) {
-          modifiedLines.push(`b=TIAS:${maxBitrateKbps * 1000}`);
-        }
-        continue;
-      }
+        if (line.startsWith('m=video')) {
+          inVideo = true;
+          const parts = line.split(' ');
+          for (let p = 3; p < parts.length; p++) {
+            if (parts[p]) videoPayloadTypes.push(parts[p]);
+          }
+          modifiedLines.push(line);
 
-      if (line.startsWith('m=audio') || line.startsWith('m=application')) {
-        inVideo = false;
+          // Ensure b=AS and b=TIAS lines exist right after m=video line if not already present
+          const nextLine1 = lines[i + 1] || '';
+          const nextLine2 = lines[i + 2] || '';
+          if (!nextLine1.startsWith('b=AS:') && !nextLine2.startsWith('b=AS:')) {
+            modifiedLines.push(`b=AS:${maxBitrateKbps}`);
+          }
+          if (!nextLine1.startsWith('b=TIAS:') && !nextLine2.startsWith('b=TIAS:')) {
+            modifiedLines.push(`b=TIAS:${maxBitrateKbps * 1000}`);
+          }
+          continue;
+        }
       }
 
       if (inVideo && line.startsWith('a=fmtp:')) {
@@ -167,22 +176,18 @@ export class MediaCoordinator {
 
         // Append x-google-min-bitrate, start-bitrate and max-bitrate if not already present
         if (!line.includes('x-google-min-bitrate')) {
-          line = `${line};x-google-min-bitrate=${minBitrateKbps};x-google-start-bitrate=${Math.round(minBitrateKbps * 1.5)};x-google-max-bitrate=${maxBitrateKbps}`;
+          modifiedLines.push(
+            `${line};x-google-min-bitrate=${minBitrateKbps};x-google-start-bitrate=${Math.round(minBitrateKbps * 1.5)};x-google-max-bitrate=${maxBitrateKbps}`
+          );
+          continue;
         }
       }
 
       modifiedLines.push(line);
     }
 
-    if (inVideo || videoPayloadTypes.length > 0) {
-      for (const pt of videoPayloadTypes) {
-        if (!fmtpPayloadTypes.has(pt)) {
-          modifiedLines.push(
-            `a=fmtp:${pt} x-google-min-bitrate=${minBitrateKbps};x-google-start-bitrate=${Math.round(minBitrateKbps * 1.5)};x-google-max-bitrate=${maxBitrateKbps}`
-          );
-          fmtpPayloadTypes.add(pt);
-        }
-      }
+    if (inVideo) {
+      flushMissingVideoFmtp();
     }
 
     return modifiedLines.join('\r\n');
@@ -278,6 +283,7 @@ export class MediaCoordinator {
     maxFps: number = 60
   ): Promise<void> {
     if (!pc || typeof pc.getSenders !== 'function') return;
+    if (pc.signalingState && pc.signalingState !== 'stable') return;
     try {
       const senders = pc.getSenders();
       for (const sender of senders) {
@@ -340,6 +346,7 @@ export class MediaCoordinator {
    */
   public static async requestKeyFrame(pc: RTCPeerConnection): Promise<void> {
     if (!pc || typeof pc.getSenders !== 'function') return;
+    if (pc.signalingState && pc.signalingState !== 'stable') return;
     try {
       const senders = pc.getSenders();
       for (const sender of senders) {

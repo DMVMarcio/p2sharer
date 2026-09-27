@@ -39,10 +39,32 @@ describe('MediaCoordinator SDP Munging and WebRTC Bitrate Floor Architecture', (
     );
   });
 
-  it('does not mutate audio or non-video lines', () => {
-    const munged = MediaCoordinator.mungeSdpBitrates(sampleSdp, 8000, 25000);
-    assert.match(munged, /m=audio 9 UDP\/TLS\/RTP\/SAVPF 111 9\r\nc=IN IP4 0\.0\.0\.0/);
-    assert.doesNotMatch(munged, /a=rtpmap:111.*x-google-min-bitrate/);
+  it('does not mutate audio or non-video lines and isolates fmtp strictly within m=video section', () => {
+    const multiSectionSdp = [
+      'v=0',
+      'm=application 9 UDP/DTLS/SCTP webrtc-datachannel',
+      'c=IN IP4 0.0.0.0',
+      'a=mid:0',
+      'm=video 9 UDP/TLS/RTP/SAVPF 96 97',
+      'c=IN IP4 0.0.0.0',
+      'a=mid:1',
+      'a=rtpmap:96 H264/90000',
+      'a=rtpmap:97 VP8/90000',
+      'm=audio 9 UDP/TLS/RTP/SAVPF 111',
+      'c=IN IP4 0.0.0.0',
+      'a=mid:2',
+      'a=rtpmap:111 opus/48000/2',
+    ].join('\r\n');
+
+    const munged = MediaCoordinator.mungeSdpBitrates(multiSectionSdp, 8000, 25000);
+    const audioIdx = munged.indexOf('m=audio');
+    const vp8FmtpIdx = munged.indexOf('a=fmtp:97');
+
+    assert.ok(audioIdx !== -1);
+    assert.ok(vp8FmtpIdx !== -1);
+    // a=fmtp:97 must occur BEFORE m=audio starts
+    assert.ok(vp8FmtpIdx < audioIdx, 'Video fmtp line must precede m=audio section');
+    assert.doesNotMatch(munged.slice(audioIdx), /a=fmtp:97/, 'm=audio must not contain video fmtp');
   });
 
   it('handles empty or non-string input safely without throwing', () => {
