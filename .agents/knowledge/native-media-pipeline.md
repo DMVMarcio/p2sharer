@@ -24,15 +24,15 @@ When capture devices output 5.1, 7.1, or other multi-channel audio:
 ### Stateful 48kHz Fractional Audio Resampler (`AudioResampler`)
 - Windows devices run at variable native sample rates (44.1kHz, 48kHz, 96kHz, 192kHz).
 - WebRTC expects standardized 48kHz stereo Opus.
-- `AudioResampler` maintains fractional phase accumulation across chunk boundaries to avoid audio clicks, pops, or drift during hours of streaming.
+- `AudioResampler` maintains fractional phase and the previous input frame across chunk boundaries. Causal interpolation produces the same PCM for whole and fragmented input.
 
-### Continuous FIFO Draining & Smooth Hann Half-Cosine Fade
-- To prevent tail-end clicks ("mini-chiado") and stream stuttering ("como se fosse internet travando"):
-  - Mixing ticks calculate dynamic frame counts: `tick_frames = (sample_rate * 10) / 1000` (`tick_floats = tick_frames * 2`).
-  - Source FIFOs are never partially drained during active playback; only complete chunks are dispatched, preserving waveform continuity.
-  - The single-source mixer waits for a 20ms preroll, then emits exact 10ms blocks on its wall clock. A short WASAPI underrun is padded with silence rather than delaying the block and releasing it later in a burst. After 100ms without packets, it returns to preroll.
-  - The Web Audio bridge begins with a 50ms playout cushion, grows it up to 120ms after underruns, and slowly returns to the baseline. It discards new chunks when more than 200ms is already scheduled; it never resets the clock over queued audio.
-  - WebRTC audio sender encodings are configured with `maxBitrate = 192000` (192 kbps high-fidelity stereo Opus) and `priority = 'high'`.
+### Capture-Clock PCM Draining & Playback Buffering
+- A single WASAPI source drains every captured frame in device-clock order. Wall-clock ticks must never insert hard zeros or discard capture samples.
+- Multiple sources mix 10ms blocks paced by the fullest capture FIFO with one block in reserve, then fade a residual tail after 50ms of packet silence. Process/session discovery runs on a separate worker, outside the capture loop.
+- WAVEFORMATEXTENSIBLE subtype selects float or integer PCM decoding; 16-, 24-, and 32-bit integer formats are handled explicitly.
+- The mixed-output soft clipper is continuous at its piecewise boundary so louder summed samples cannot create a waveform step.
+- The Web Audio bridge begins with a 50ms playout cushion, grows it up to 120ms after underruns, and slowly returns to the baseline. It discards new chunks when more than 200ms is already scheduled; it never resets the clock over queued audio.
+- WebRTC audio sender encodings use `maxBitrate = 192000` and high network priority. Video has medium priority and a low SDP bitrate floor so congestion control can preserve audio.
 
 ### Selective Process-Level Audio Filtering
 - **Modes**:
@@ -43,17 +43,16 @@ When capture devices output 5.1, 7.1, or other multi-channel audio:
   - Activated asynchronously via `ActivateAudioInterfaceAsync` using `AUDIOCLIENT_PROCESS_LOOPBACK_PARAMS` with either `PROCESS_LOOPBACK_MODE_EXCLUDE` or `PROCESS_LOOPBACK_MODE_INCLUDE`.
   - **Mandatory Flag**: `IAudioClient::Initialize` strictly requires `AUDCLNT_STREAMFLAGS_LOOPBACK` even for process loopback interfaces. Omitting this flag triggers error `0x88890021` (`AUDCLNT_E_INVALID_STREAM_FLAG`), which causes the capture thread to abort into total silence.
   - **Resilient Fallback**: If process loopback activation fails, or target PID tree returns invalid handle, the loopback thread automatically falls back to master audio (`get_default_render_audio_client()`) rather than dropping to silence.
-  - **48kHz Stereo WaveFormat Fallback**: If device mix format pointer is null or unqueryable, a canonical IEEE float 48kHz stereo `WAVEFORMATEX` is synthesized as a fallback.
+  - **48kHz Stereo WaveFormat Fallback**: If device mix format pointer is null or unqueryable, a 16-bit PCM 48kHz stereo `WAVEFORMATEX` is synthesized as a fallback.
 - **Multi-Process Include Mode Loopback (`MultiCaptureSource`)**:
   - When the user selects multiple applications to transmit in `include` mode, `resolve_target_process_roots` discovers the unique top-level root PID for each candidate.
   - Rust activates an independent `IAudioClient` loopback interface for each target root PID, initializing them with shared stream flags and mix format.
-  - In the capture loop, `WaitForMultipleObjects` waits concurrently across all client event handles with a 20ms slice.
-  - When packets arrive, each client's PCM frames are downmixed to stereo `f32` and digitally mixed: `mixed[i] = (chunk_a[i] + chunk_b[i]).clamp(-1.0, 1.0)`.
+  - In the capture loop, `WaitForMultipleObjects` waits concurrently across all client event handles with a 5ms timeout.
+  - When packets arrive, each client's PCM frames are downmixed to stereo `f32` and digitally mixed with headroom and a continuous soft clipper.
   - The mixed stream is resampled to 48kHz and dispatched as a unified audio track, allowing users to broadcast multiple apps (e.g. Game + Discord + Spotify) simultaneously.
 
 ### Monotonic Microsecond A/V Timestamps
-- Every audio chunk payload contains `timestamp_us` derived from `std::time::Instant` or `QueryPerformanceCounter`.
-- Enables monotonic audio playback synchronization in Web Audio without drifting behind video frames.
+- Every audio chunk payload contains `timestamp_us` derived from `std::time::Instant` for diagnostics. Web Audio schedules PCM against its own `AudioContext.currentTime` clock.
 
 ---
 

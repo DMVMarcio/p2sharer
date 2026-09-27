@@ -110,7 +110,7 @@ export class MediaCoordinator {
    */
   public static mungeSdpBitrates(
     sdp: string,
-    minBitrateKbps: number = 8000,
+    minBitrateKbps: number = 500,
     maxBitrateKbps: number = 25000
   ): string {
     if (!sdp || typeof sdp !== 'string') return sdp;
@@ -293,15 +293,16 @@ export class MediaCoordinator {
             if (!params.encodings || params.encodings.length === 0) {
               params.encodings = [{}];
             }
-            const minBitrate = Math.round(maxBitrateBps * 0.5);
             params.encodings.forEach((enc) => {
               enc.maxBitrate = maxBitrateBps;
+              // A high video floor prevents congestion control from yielding
+              // bandwidth to the audio track on constrained uplinks.
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              (enc as any).minBitrate = minBitrate;
+              delete (enc as any).minBitrate;
               enc.maxFramerate = maxFps;
               enc.scaleResolutionDownBy = 1.0;
-              enc.networkPriority = 'high';
-              enc.priority = 'high';
+              enc.networkPriority = 'medium';
+              enc.priority = 'medium';
             });
             // Enforce 'maintain-resolution' so WebRTC never downscales the stream resolution
             // (e.g. from 1080p down to 720p/540p/360p/270p/180p) during network fluctuations.
