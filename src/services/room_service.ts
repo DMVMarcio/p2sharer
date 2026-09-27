@@ -1,12 +1,12 @@
 import { invoke } from '@tauri-apps/api/core';
-import { AudioBridge } from '../audio/audio_bridge';
-import { audioContextManager } from '../audio/audio_context_manager';
-import { stateStore } from '../core/state_store';
-import { ChatMessage, PeerInfo, RoomSlotInfo } from '../core/types';
-import { generateRandomRoomSlug, GroupRoomManager } from '../p2p/group_room';
-import { soundEffects } from '../ui/sound_effects';
-import { NativeVideoBridge } from '../video/native_video_bridge';
-import { showToast } from '../hooks/useToast';
+import { AudioBridge } from '../audio/audio_bridge.ts';
+import { audioContextManager } from '../audio/audio_context_manager.ts';
+import { stateStore } from '../core/state_store.ts';
+import type { ChatMessage, PeerInfo, RoomSlotInfo } from '../core/types.ts';
+import { generateRandomRoomSlug, GroupRoomManager } from '../p2p/group_room.ts';
+import { soundEffects } from '../ui/sound_effects.ts';
+import { NativeVideoBridge } from '../video/native_video_bridge.ts';
+import { showToast } from '../hooks/useToast.ts';
 
 export interface ConnectingOverlayState {
   visible: boolean;
@@ -17,7 +17,7 @@ export interface ConnectingOverlayState {
 
 type Listener = () => void;
 
-class RoomService {
+export class RoomService {
   private static instance: RoomService | null = null;
 
   public roomManager: GroupRoomManager | null = null;
@@ -153,6 +153,8 @@ class RoomService {
         sender: 'Sistema',
         text: `Você entrou na sala "${code}"${pass ? ' (com senha)' : ''}. Compartilhe o código para convidar amigos.`,
         timestamp: Date.now(),
+        isSystem: true,
+        systemType: 'info',
       },
     ];
     this.peers = [];
@@ -209,10 +211,18 @@ class RoomService {
         this.hideConnecting();
         this.notify();
       },
-      onPeerJoined: (_peer, isInitial) => {
-        if (!isInitial) soundEffects.playUserJoin();
+      onPeerJoined: (peer, isInitial) => {
+        if (!isInitial) {
+          soundEffects.playUserJoin();
+          const name = peer.username || `Participante (${peer.id.slice(0, 4)})`;
+          this.addSystemChatMessage(`${name} entrou na chamada.`, 'join');
+        }
       },
-      onPeerLeft: () => soundEffects.playUserLeave(),
+      onPeerLeft: (peerId, username) => {
+        soundEffects.playUserLeave();
+        const displayName = username || `Participante (${peerId.slice(0, 4)})`;
+        this.addSystemChatMessage(`${displayName} saiu da chamada.`, 'leave');
+      },
       onStreamStarted: () => soundEffects.playScreenShareStart(),
       onStreamStopped: (peerId, _uname, isLocal) => {
         soundEffects.playScreenShareStop();
@@ -246,6 +256,7 @@ class RoomService {
           s.currentRoomPassword = newPassword;
         });
         showToast(`Senha atualizada por ${updatedBy}`);
+        this.addSystemChatMessage(`A senha da sala foi alterada por ${updatedBy}.`, 'info');
         this.notify();
       },
     });
@@ -372,6 +383,19 @@ class RoomService {
   public sendChatMessage(text: string): void {
     if (!text.trim() || !this.roomManager) return;
     const msg = this.roomManager.sendChatMessage(text.trim());
+    this.chatMessages.push(msg);
+    this.notify();
+  }
+
+  public addSystemChatMessage(text: string, systemType: 'join' | 'leave' | 'info' | 'generic' = 'generic'): void {
+    const msg: ChatMessage = {
+      id: `sys_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      sender: 'Sistema',
+      text,
+      timestamp: Date.now(),
+      isSystem: true,
+      systemType,
+    };
     this.chatMessages.push(msg);
     this.notify();
   }
