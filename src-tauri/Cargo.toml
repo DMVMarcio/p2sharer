@@ -47,7 +47,8 @@ windows = { version = "0.58", features = [
     "Win32_Graphics_Gdi",
     "Win32_Security",
     "Win32_UI_Shell",
-    "Win32_Storage_FileSystem"
+    "Win32_Storage_FileSystem",
+    "Win32_System_JobObjects"
 ] }
 windows-core = "0.58"
 
