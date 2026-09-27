@@ -82,6 +82,8 @@ export interface ChatMessage {
   isHost?: boolean;
   isSystem?: boolean;
   systemType?: 'join' | 'leave' | 'info' | 'generic';
+  systemActor?: string;
+  systemRoom?: string;
 }
 
 export interface TurnConfig {

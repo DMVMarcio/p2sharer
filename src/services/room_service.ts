@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { AudioBridge } from '../audio/audio_bridge.ts';
 import { audioContextManager } from '../audio/audio_context_manager.ts';
 import { stateStore } from '../core/state_store.ts';
+import { mergeChatHistory } from '../core/chat_history.ts';
 import type { ChatMessage, PeerInfo, RoomSlotInfo } from '../core/types.ts';
 import { generateRandomRoomSlug, GroupRoomManager } from '../p2p/group_room.ts';
 import { soundEffects } from '../ui/sound_effects.ts';
@@ -157,16 +158,7 @@ export class RoomService {
 
     soundEffects.playUserJoin();
 
-    this.chatMessages = [
-      {
-        id: `sys_${Date.now()}`,
-        sender: 'Sistema',
-        text: isCreator ? `Sala criada: ${code}` : `Entrou em ${code}`,
-        timestamp: Date.now(),
-        isSystem: true,
-        systemType: 'info',
-      },
-    ];
+    this.chatMessages = [];
     this.peers = [];
     this.roomStatusText = 'Conectando à sala...';
 
@@ -216,12 +208,12 @@ export class RoomService {
       },
       onChat: (msg: ChatMessage) => {
         if (this.roomManager !== manager) return;
-        this.chatMessages.push(msg);
+        this.chatMessages = mergeChatHistory(this.chatMessages, [msg]);
         this.notify();
       },
       onChatHistory: (messages: ChatMessage[]) => {
         if (this.roomManager !== manager) return;
-        this.chatMessages.push(...messages);
+        this.chatMessages = mergeChatHistory(this.chatMessages, messages);
         this.notify();
       },
       onPeersUpdate: (peers: PeerInfo[]) => {
@@ -235,7 +227,6 @@ export class RoomService {
         const name = peer.username.trim();
         if (!isInitial && name) {
           soundEffects.playUserJoin();
-          this.addSystemChatMessage(`${name} entrou`, 'join');
         }
       },
       onPeerLeft: (_peerId, username) => {
@@ -243,7 +234,6 @@ export class RoomService {
         const name = username.trim();
         if (!name) return;
         soundEffects.playUserLeave();
-        this.addSystemChatMessage(`${name} saiu`, 'leave');
       },
       onStreamStarted: () => soundEffects.playScreenShareStart(),
       onStreamStopped: (peerId, _uname, isLocal) => {
@@ -280,7 +270,6 @@ export class RoomService {
           s.currentRoomPassword = newPassword;
         });
         showToast(`Senha atualizada por ${updatedBy}`);
-        this.addSystemChatMessage(`Senha alterada por ${updatedBy}`, 'info');
         this.notify();
       },
     });
@@ -419,12 +408,14 @@ export class RoomService {
 
   public sendChatMessage(text: string): void {
     if (!text.trim() || !this.roomManager) return;
-    const msg = this.roomManager.sendChatMessage(text.trim());
-    this.chatMessages.push(msg);
-    this.notify();
+    this.roomManager.sendChatMessage(text.trim());
   }
 
   public addSystemChatMessage(text: string, systemType: 'join' | 'leave' | 'info' | 'generic' = 'generic'): void {
+    if (this.roomManager) {
+      this.roomManager.sendSystemMessage(text, systemType);
+      return;
+    }
     const msg: ChatMessage = {
       id: `sys_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       sender: 'Sistema',
