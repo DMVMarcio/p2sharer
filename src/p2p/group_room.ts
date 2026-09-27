@@ -158,6 +158,8 @@ export class GroupRoomManager {
   private lastStreamRecoveryRequests: Map<string, number> = new Map();
   private lastBridgeAttempts: Map<string, number> = new Map();
   private rumorIntermediaries: Map<string, string> = new Map();
+  private announcedPeerNames: Map<string, string> = new Map();
+  private peerJoinWasInitial: Map<string, boolean> = new Map();
   private lastRumorReannounceTime: number = 0;
   private currentTargetBitrate: number = 25000000;
   private currentTargetFps: number = 60;
@@ -408,8 +410,23 @@ export class GroupRoomManager {
       const peerId = meta.peerId;
       this.peerTracker.touchPeer(peerId);
 
-      const newName = data.username || `Usuário (${peerId.slice(0, 4)})`;
+      const suppliedName = typeof data.username === 'string' ? data.username.trim() : '';
+      const newName = suppliedName || this.peerTracker.getUsername(peerId) || `Usuário (${peerId.slice(0, 4)})`;
       this.peerTracker.addPeer(peerId, newName, Boolean(data.isCreator), data.joinedAt);
+
+      if (suppliedName) {
+        const alreadyAnnounced = this.announcedPeerNames.has(peerId);
+        this.announcedPeerNames.set(peerId, suppliedName);
+        if (!alreadyAnnounced) {
+          this.callbacks?.onPeerJoined?.({
+            id: peerId,
+            username: suppliedName,
+            connectionState: 'connected',
+            joinedAt: this.peerTracker.getJoinedAt(peerId) || Date.now(),
+          }, this.peerJoinWasInitial.get(peerId) ?? !this.initialJoinComplete);
+        }
+        this.peerJoinWasInitial.delete(peerId);
+      }
 
       const wasStreaming = this.peerTracker.isStreaming(peerId);
       if (data.isStreaming) {
@@ -693,6 +710,7 @@ export class GroupRoomManager {
       if (this.room !== boundRoom) return;
       console.log(`[P2P] Direct WebRTC peer connection active: ${peerId}`);
       const isNew = !this.peerTracker.isVerified(peerId);
+      if (isNew) this.peerJoinWasInitial.set(peerId, !this.initialJoinComplete);
 
       // Verify and record direct WebRTC connection
       this.peerTracker.receivePeerExchange(peerId, true);
@@ -725,17 +743,6 @@ export class GroupRoomManager {
       // If I am already sharing a stream, broadcast it to the new peer with burst bitrate
       if (this.localStream) {
         this.sendStreamToPeer(peerId);
-      }
-
-      const uname = this.peerTracker.getUsername(peerId) || `Conectado (${peerId.slice(0, 4)})`;
-      if (isNew) {
-        const peerInfo: PeerInfo = {
-          id: peerId,
-          username: uname,
-          connectionState: 'connected',
-          joinedAt: this.peerTracker.getJoinedAt(peerId) || Date.now(),
-        };
-        this.callbacks?.onPeerJoined?.(peerInfo, !this.initialJoinComplete);
       }
 
       this.notifyPeersUpdate();
@@ -892,8 +899,10 @@ export class GroupRoomManager {
   }
 
   private removePeer(peerId: string) {
-    const uname = this.peerTracker.getUsername(peerId) || `Participante (${peerId.slice(0, 4)})`;
-    const wasRemoved = this.peerTracker.removePeer(peerId);
+    const announcedName = this.announcedPeerNames.get(peerId);
+    this.announcedPeerNames.delete(peerId);
+    this.peerJoinWasInitial.delete(peerId);
+    this.peerTracker.removePeer(peerId);
 
     signalingManager.setPeerDisconnected(peerId);
 
@@ -907,8 +916,8 @@ export class GroupRoomManager {
     this.lastBridgeAttempts.delete(peerId);
     this.rumorIntermediaries.delete(peerId);
 
-    if (wasRemoved) {
-      this.callbacks?.onPeerLeft?.(peerId, uname);
+    if (announcedName) {
+      this.callbacks?.onPeerLeft?.(peerId, announcedName);
     }
 
     this.notifyPeersUpdate();
@@ -1605,6 +1614,8 @@ export class GroupRoomManager {
     this.lastStreamRecoveryRequests.clear();
     this.lastBridgeAttempts.clear();
     this.rumorIntermediaries.clear();
+    this.announcedPeerNames.clear();
+    this.peerJoinWasInitial.clear();
     this.lastPeerStats.clear();
     this.peerStatsCache.clear();
     this.localStatsCache = null;

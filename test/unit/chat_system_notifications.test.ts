@@ -38,8 +38,8 @@ describe('Chat System Notifications Architecture', () => {
     });
 
     it('correctly sets systemType for join and leave events', () => {
-      roomService.addSystemChatMessage('Alice entrou na chamada.', 'join');
-      roomService.addSystemChatMessage('Bob saiu da chamada.', 'leave');
+      roomService.addSystemChatMessage('Alice entrou', 'join');
+      roomService.addSystemChatMessage('Bob saiu', 'leave');
       roomService.addSystemChatMessage('Informação da sala', 'info');
 
       assert.strictEqual(roomService.chatMessages.length, 3);
@@ -58,28 +58,24 @@ describe('Chat System Notifications Architecture', () => {
         joinedAt: Date.now(),
       };
 
-      const name = peer.username || `Participante (${peer.id.slice(0, 4)})`;
-      roomService.addSystemChatMessage(`${name} entrou na chamada.`, 'join');
+      roomService.addSystemChatMessage(`${peer.username} entrou`, 'join');
 
       assert.strictEqual(roomService.chatMessages.length, 1);
-      assert.strictEqual(roomService.chatMessages[0].text, 'Carlos Dev entrou na chamada.');
+      assert.strictEqual(roomService.chatMessages[0].text, 'Carlos Dev entrou');
       assert.strictEqual(roomService.chatMessages[0].systemType, 'join');
       assert.strictEqual(roomService.chatMessages[0].isSystem, true);
     });
 
-    it('formats peer leave notification with fallback when username is absent', () => {
-      const peerId = 'peer-xyz-9876';
-      const username = '';
-      const displayName = username || `Participante (${peerId.slice(0, 4)})`;
-      roomService.addSystemChatMessage(`${displayName} saiu da chamada.`, 'leave');
+    it('formats peer leave notification with the resolved username', () => {
+      roomService.addSystemChatMessage('Bob saiu', 'leave');
 
       assert.strictEqual(roomService.chatMessages.length, 1);
-      assert.strictEqual(roomService.chatMessages[0].text, 'Participante (peer) saiu da chamada.');
+      assert.strictEqual(roomService.chatMessages[0].text, 'Bob saiu');
       assert.strictEqual(roomService.chatMessages[0].systemType, 'leave');
     });
 
     it('preserves regular chat messages alongside system messages', () => {
-      roomService.addSystemChatMessage('Lucas entrou na chamada.', 'join');
+      roomService.addSystemChatMessage('Lucas entrou', 'join');
 
       const regularMsg: ChatMessage = {
         id: 'user_msg_1',
@@ -89,7 +85,7 @@ describe('Chat System Notifications Architecture', () => {
       };
       roomService.chatMessages.push(regularMsg);
 
-      roomService.addSystemChatMessage('Lucas saiu da chamada.', 'leave');
+      roomService.addSystemChatMessage('Lucas saiu', 'leave');
 
       assert.strictEqual(roomService.chatMessages.length, 3);
       assert.strictEqual(roomService.chatMessages[0].isSystem, true);
@@ -99,17 +95,17 @@ describe('Chat System Notifications Architecture', () => {
   });
 
   describe('CSS Token and Class Verification', () => {
-    it('defines .chat-system-msg and variant classes in style.css', () => {
+    it('defines compact, single-line system notices in style.css', () => {
       const cssPath = resolve(process.cwd(), 'src/style.css');
       const css = readFileSync(cssPath, 'utf-8');
 
       assert.ok(css.includes('.chat-system-msg'), 'style.css must define .chat-system-msg');
       assert.ok(css.includes('.chat-system-content'), 'style.css must define .chat-system-content');
-      assert.ok(css.includes('.chat-sys-icon.join'), 'style.css must define .chat-sys-icon.join');
-      assert.ok(css.includes('.chat-sys-icon.leave'), 'style.css must define .chat-sys-icon.leave');
-      assert.ok(css.includes('.chat-sys-icon.info'), 'style.css must define .chat-sys-icon.info');
-      assert.ok(css.includes('.chat-system-join'), 'style.css must define .chat-system-join');
-      assert.ok(css.includes('.chat-system-leave'), 'style.css must define .chat-system-leave');
+      const noticeCss = css.slice(css.indexOf('.chat-system-msg {'), css.indexOf('.chat-msg {'));
+      assert.ok(noticeCss.includes('text-overflow: ellipsis'));
+      assert.ok(noticeCss.includes('white-space: nowrap'));
+      assert.ok(!noticeCss.includes('background-color:'));
+      assert.ok(!noticeCss.includes('border:'));
     });
   });
 });

@@ -161,7 +161,7 @@ export class RoomService {
       {
         id: `sys_${Date.now()}`,
         sender: 'Sistema',
-        text: `Você entrou na sala "${code}"${pass ? ' (com senha)' : ''}. Compartilhe o código para convidar amigos.`,
+        text: isCreator ? `Sala criada: ${code}` : `Entrou em ${code}`,
         timestamp: Date.now(),
         isSystem: true,
         systemType: 'info',
@@ -232,17 +232,18 @@ export class RoomService {
       },
       onPeerJoined: (peer, isInitial) => {
         if (this.roomManager !== manager) return;
-        if (!isInitial) {
+        const name = peer.username.trim();
+        if (!isInitial && name) {
           soundEffects.playUserJoin();
-          const name = peer.username || `Participante (${peer.id.slice(0, 4)})`;
-          this.addSystemChatMessage(`${name} entrou na chamada.`, 'join');
+          this.addSystemChatMessage(`${name} entrou`, 'join');
         }
       },
-      onPeerLeft: (peerId, username) => {
+      onPeerLeft: (_peerId, username) => {
         if (this.roomManager !== manager) return;
+        const name = username.trim();
+        if (!name) return;
         soundEffects.playUserLeave();
-        const displayName = username || `Participante (${peerId.slice(0, 4)})`;
-        this.addSystemChatMessage(`${displayName} saiu da chamada.`, 'leave');
+        this.addSystemChatMessage(`${name} saiu`, 'leave');
       },
       onStreamStarted: () => soundEffects.playScreenShareStart(),
       onStreamStopped: (peerId, _uname, isLocal) => {
@@ -279,7 +280,7 @@ export class RoomService {
           s.currentRoomPassword = newPassword;
         });
         showToast(`Senha atualizada por ${updatedBy}`);
-        this.addSystemChatMessage(`A senha da sala foi alterada por ${updatedBy}.`, 'info');
+        this.addSystemChatMessage(`Senha alterada por ${updatedBy}`, 'info');
         this.notify();
       },
     });
