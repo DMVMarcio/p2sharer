@@ -416,10 +416,18 @@ export class MediaCoordinator {
       pc.getReceivers().forEach((receiver) => {
         const isVideo = receiver.track && receiver.track.kind === 'video';
         if (isVideo) {
+          // Set playoutDelayHint to 0.02s (20ms) to provide a 1-frame jitter smoothing cushion,
+          // preventing dropped frames and mouse judder while keeping real-time latency imperceptible.
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (receiver as any).playoutDelayHint = 0;
+          if (typeof (receiver as any).playoutDelayHint !== 'undefined') {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (receiver as any).playoutDelayHint = 0.02;
+          }
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (receiver as any).jitterBufferTarget = 0;
+          if (typeof (receiver as any).jitterBufferTarget !== 'undefined') {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (receiver as any).jitterBufferTarget = 20;
+          }
         }
       });
     } catch {}
