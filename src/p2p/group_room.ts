@@ -1,4 +1,5 @@
 import { selfId } from '@trystero-p2p/core';
+import { mergeChatHistory } from '../core/chat_history.ts';
 import type {
   ActiveStreamInfo,
   ChatMessage,
@@ -265,6 +266,10 @@ export class GroupRoomManager {
       console.log(`[P2P] Computed signaling topic: "${this.signalingTopic}"`);
 
       this.setupRoomInstance();
+      if (this.isCreator) {
+        this.sendSystemMessage(`Sala criada: ${this.roomId}`, 'info', undefined, this.roomId);
+      }
+      this.sendSystemMessage(`${this.username} entrou`, 'join', this.username);
       this.notifyStreamsUpdate();
       this.notifyPeersUpdate();
       callbacks.onStatusChange(this.isCreator ? 'Sala Ativa' : 'Procurando Participantes...');
@@ -370,12 +375,7 @@ export class GroupRoomManager {
       if (!msg || !msg.id) return;
       if (this.seenChatMsgIds.has(msg.id)) return;
       this.seenChatMsgIds.add(msg.id);
-      if (this.seenChatMsgIds.size > 500) {
-        const firstKey = this.seenChatMsgIds.values().next().value;
-        if (firstKey) this.seenChatMsgIds.delete(firstKey);
-      }
-
-      this.chatHistory.push(msg);
+      this.chatHistory = mergeChatHistory(this.chatHistory, [msg]);
       if (this.callbacks) {
         this.callbacks.onChat(msg);
       }
@@ -394,15 +394,12 @@ export class GroupRoomManager {
     ) => {
       const peerId = meta.peerId;
       if (data.request) {
-        if (this.chatHistory.length > 0) {
-          this.historyAction.send({ history: this.chatHistory }, { target: peerId });
-        }
+        this.historyAction.send({ history: this.chatHistory }, { target: peerId });
       } else if (data.history && Array.isArray(data.history) && data.history.length > 0) {
-        const existingIds = new Set(this.chatHistory.map((m) => m.id));
-        const newMessages = data.history.filter((m) => !existingIds.has(m.id));
-        if (newMessages.length > 0) {
-          newMessages.forEach((m) => this.seenChatMsgIds.add(m.id));
-          this.chatHistory = [...this.chatHistory, ...newMessages].sort((a, b) => a.timestamp - b.timestamp);
+        const merged = mergeChatHistory(this.chatHistory, data.history);
+        if (merged.length > this.chatHistory.length) {
+          merged.forEach((m) => this.seenChatMsgIds.add(m.id));
+          this.chatHistory = merged;
           if (this.callbacks) {
             this.callbacks.onChatHistory(this.chatHistory);
           }
@@ -761,6 +758,13 @@ export class GroupRoomManager {
       // Share known peers via PEX immediately to bridge mesh
       if (this.pexAction) {
         this.pexAction.send({ peers: this.getPeersPayload() }, { target: peerId });
+      }
+
+      // A room may connect after the initial timed request. Exchange both
+      // directions so the newcomer and existing peers recover missed events.
+      if (this.historyAction) {
+        this.historyAction.send({ history: this.chatHistory }, { target: peerId });
+        this.historyAction.send({ request: true }, { target: peerId });
       }
 
       // If I am already sharing a stream, broadcast it to the new peer with burst bitrate
@@ -1550,14 +1554,26 @@ export class GroupRoomManager {
       isHost: this.isCreator,
     };
 
-    this.seenChatMsgIds.add(msg.id);
-    this.chatHistory.push(msg);
+    return this.publishChatMessage(msg);
+  }
 
-    if (this.chatAction) {
-      try {
-        this.chatAction.send(msg);
-      } catch {}
-    }
+  public sendSystemMessage(
+    text: string,
+    systemType: NonNullable<ChatMessage['systemType']>,
+    systemActor?: string,
+    systemRoom?: string,
+  ): ChatMessage {
+    return this.publishChatMessage({
+      id: crypto.randomUUID(), sender: 'Sistema', text,
+      timestamp: Date.now(), isSystem: true, systemType, systemActor, systemRoom,
+    });
+  }
+
+  private publishChatMessage(msg: ChatMessage): ChatMessage {
+    this.seenChatMsgIds.add(msg.id);
+    this.chatHistory = mergeChatHistory(this.chatHistory, [msg]);
+    this.callbacks?.onChat(msg);
+    try { this.chatAction?.send(msg); } catch {}
     return msg;
   }
 
@@ -1582,6 +1598,7 @@ export class GroupRoomManager {
     if (this.callbacks?.onPasswordChange) {
       this.callbacks.onPasswordChange(this.password, this.username);
     }
+    this.sendSystemMessage(`Senha alterada por ${this.username}`, 'info', this.username);
   }
 
   public requestStream(peerId: string): void {
@@ -1604,6 +1621,9 @@ export class GroupRoomManager {
   }
 
   public async leave(): Promise<void> {
+    if (this.room) {
+      this.sendSystemMessage(`${this.username} saiu`, 'leave', this.username);
+    }
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
