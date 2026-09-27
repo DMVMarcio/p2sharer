@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { ScreenSourcesResponse, VideoCaptureBridge, VideoSourceOptions } from '../core/types.ts';
+import { telemetryService } from '../services/telemetry_service.ts';
 
 export class NativeVideoBridge implements VideoCaptureBridge {
   private activeStream: MediaStream | null = null;
@@ -171,6 +172,13 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     this.isCapturing = true;
     this.isDirectGpu = true;
 
+    telemetryService.logEvent('CAPTURE', 'Iniciando captura de tela via Rust backend', {
+      sourceId,
+      fps,
+      resolution,
+      quality,
+    });
+
     // 2. Start native Rust capture thread
     try {
       await invoke('start_native_screen_capture', {
@@ -182,6 +190,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
         quality,
       });
     } catch (err) {
+      telemetryService.logEvent('CAPTURE', 'Falha ao iniciar captura nativa', { err });
       this.isCapturing = false;
       this.isDirectGpu = false;
       const reason = err instanceof Error ? err.message : String(err);
@@ -286,6 +295,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
       this.ws.binaryType = 'arraybuffer';
 
       this.ws.onopen = () => {
+        telemetryService.logEvent('CAPTURE', `WebSocket de vídeo conectado na porta ${port}`);
         if (!resolved) {
           resolved = true;
           resolve();
@@ -398,6 +408,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
   }
 
   public async stopCapture(): Promise<void> {
+    telemetryService.logEvent('CAPTURE', 'Parando captura nativa de tela e WebSocket');
     this.isCapturing = false;
     this.isDirectGpu = false;
     this.pendingBuffer = null;

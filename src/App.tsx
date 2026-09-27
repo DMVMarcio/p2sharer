@@ -9,6 +9,7 @@ import { AudioFilterModal } from './components/modals/AudioFilterModal';
 import { CreateRoomModal } from './components/modals/CreateRoomModal';
 import { JoinRoomModal } from './components/modals/JoinRoomModal';
 import { RoomSecurityModal } from './components/modals/RoomSecurityModal';
+import { DiagnosticsModal } from './components/modals/DiagnosticsModal';
 import { ConnectingOverlay } from './components/modals/ConnectingOverlay';
 import { ToastContainer } from './components/common/ToastContainer';
 import { useRoom } from './hooks/useRoom';
@@ -19,7 +20,7 @@ import { stateStore } from './core/state_store';
 
 export const App: React.FC = () => {
   const { isInRoom, stopScreenSharing, leaveRoom, isSharingScreen } = useRoom();
-  const { openModal, activeModal } = useModal();
+  const { openModal, closeModal, activeModal } = useModal();
   useAppTheme(); // Sets data-theme & data-accent
 
   useEffect(() => {
@@ -39,11 +40,24 @@ export const App: React.FC = () => {
       leaveRoom();
     };
 
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'D' || e.key === 'd')) {
+        e.preventDefault();
+        if (activeModal === 'diagnostics') {
+          closeModal();
+        } else {
+          openModal('diagnostics');
+        }
+      }
+    };
+
     window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [openModal, isSharingScreen, stopScreenSharing, leaveRoom]);
+  }, [openModal, closeModal, activeModal, isSharingScreen, stopScreenSharing, leaveRoom]);
 
   return (
     <>
@@ -60,6 +74,7 @@ export const App: React.FC = () => {
       {activeModal === 'createRoom' && <CreateRoomModal />}
       {activeModal === 'joinRoom' && <JoinRoomModal />}
       {activeModal === 'roomSecurity' && <RoomSecurityModal />}
+      {activeModal === 'diagnostics' && <DiagnosticsModal />}
       <ConnectingOverlay />
 
       {/* Global Notifications */}

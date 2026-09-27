@@ -7,6 +7,7 @@ import { generateRandomRoomSlug, GroupRoomManager } from '../p2p/group_room';
 import { soundEffects } from '../ui/sound_effects';
 import { NativeVideoBridge } from '../video/native_video_bridge';
 import { showToast } from '../hooks/useToast';
+import { telemetryService } from './telemetry_service';
 
 export interface ConnectingOverlayState {
   visible: boolean;
@@ -261,6 +262,13 @@ class RoomService {
   ): Promise<void> {
     try {
       showToast('Iniciando transmissão...');
+      telemetryService.logEvent('CAPTURE', 'startCapture solicitado', {
+        sourceId,
+        fps,
+        res,
+        mouse,
+      });
+
       const chosenSource = !sourceId || sourceId === 'gpu_direct' ? 'screen:0' : sourceId;
       const videoStream = await this.nativeVideoBridge.startCapture(chosenSource, fps, res, mouse, 92);
 
@@ -296,15 +304,19 @@ class RoomService {
         this.roomManager.shareStream(videoStream, stateStore.currentBitrate * 1000, fps);
       }
 
+      telemetryService.logEvent('CAPTURE', 'Transmissão de tela iniciada com sucesso');
       soundEffects.playScreenShareStart();
       this.notify();
     } catch (err) {
+      telemetryService.logEvent('CAPTURE', `Erro ao iniciar captura: ${err}`);
       console.warn('Capture error:', err);
       showToast(`Erro ao iniciar captura: ${err}`);
     }
   }
 
   public stopScreenSharing(): void {
+    telemetryService.logEvent('CAPTURE', 'stopScreenSharing chamado: iniciando desligamento');
+
     stateStore.set((s) => {
       s.isSharingScreen = false;
       const localSlot = s.roomSlots.find((slot) => slot.isLocal);
@@ -322,11 +334,13 @@ class RoomService {
     this.audioBridge.stop();
     invoke('stop_audio_capture').catch(() => {});
 
+    telemetryService.logEvent('CAPTURE', 'Transmissão de tela parada e recursos liberados');
     soundEffects.playScreenShareStop();
     this.notify();
   }
 
   public async leaveRoom(): Promise<void> {
+    telemetryService.logEvent('ROOM', 'leaveRoom executado');
     if (this.roomConnectingTimeout) {
       clearTimeout(this.roomConnectingTimeout);
       this.roomConnectingTimeout = null;

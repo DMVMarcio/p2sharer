@@ -1310,6 +1310,15 @@ pub fn stop_audio_capture() -> Result<bool, String> {
     Ok(true)
 }
 
+pub fn is_audio_capturing() -> bool {
+    if let Ok(guard) = CURRENT_STOP_FLAG.lock() {
+        if let Some(flag) = guard.as_ref() {
+            return flag.load(Ordering::Relaxed);
+        }
+    }
+    false
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

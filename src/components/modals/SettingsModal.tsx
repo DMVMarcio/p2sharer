@@ -8,7 +8,7 @@ import { showToast } from '../../hooks/useToast';
 import { ThemeMode } from '../../core/types';
 
 export const SettingsModal: React.FC = () => {
-  const { closeModal, isClosing } = useModal();
+  const { closeModal, openModal, isClosing } = useModal();
   const { themeMode, accentColor, setThemeMode, setAccentColor } = useAppTheme();
 
   const [activeTab, setActiveTab] = useState<
@@ -687,6 +687,39 @@ export const SettingsModal: React.FC = () => {
                       <line x1="14" y1="11" x2="14" y2="17"/>
                     </svg>
                     <span>Limpar Logs</span>
+                  </button>
+                </div>
+
+                <div
+                  style={{
+                    marginTop: '20px',
+                    padding: '14px',
+                    borderRadius: '8px',
+                    backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                    border: '1px solid rgba(59, 130, 246, 0.25)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <div>
+                    <strong style={{ fontSize: '0.9rem', color: '#60a5fa' }}>
+                      Monitor de Telemetria em Tempo Real (CPU, GPU, Ventoinhas)
+                    </strong>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                      Exibe o uso de cada núcleo, temperatura, processos e codificador da placa de vídeo.
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-primary"
+                    onClick={() => {
+                      closeModal();
+                      setTimeout(() => openModal('diagnostics'), 100);
+                    }}
+                    style={{ whiteSpace: 'nowrap' }}
+                  >
+                    Abrir Telemetria
                   </button>
                 </div>
               </div>

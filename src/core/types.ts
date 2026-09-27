@@ -198,3 +198,61 @@ export interface VideoCaptureBridge {
   onFallbackNeeded: ((reason: string, stream?: MediaStream) => void) | null;
 }
 
+export interface ProcessTelemetry {
+  pid: number;
+  name: string;
+  role: string;
+  cpu_pct: number;
+  memory_mb: number;
+  threads: number;
+  run_time_secs: number;
+}
+
+export interface CpuCoreTelemetry {
+  id: number;
+  usage_pct: number;
+  frequency_mhz: number;
+}
+
+export interface GpuTelemetry {
+  name: string;
+  temperature_c?: number;
+  utilization_gpu_pct?: number;
+  utilization_encoder_pct?: number;
+  utilization_decoder_pct?: number;
+  power_watts?: number;
+  fan_speed_pct?: number;
+  memory_used_mb?: number;
+  memory_total_mb?: number;
+  query_source: string;
+}
+
+export interface SubsystemTelemetry {
+  is_screen_capturing: boolean;
+  active_wgc: boolean;
+  ws_port: number;
+  is_audio_capturing: boolean;
+}
+
+export interface SystemTelemetryReport {
+  timestamp_ms: number;
+  cpu_global_pct: number;
+  cpu_cores: CpuCoreTelemetry[];
+  cpu_temperature_c?: number;
+  memory_used_mb: number;
+  memory_total_mb: number;
+  p2sharer_processes: ProcessTelemetry[];
+  total_p2sharer_cpu_pct: number;
+  total_p2sharer_memory_mb: number;
+  total_p2sharer_threads: number;
+  gpu?: GpuTelemetry;
+  subsystems: SubsystemTelemetry;
+}
+
+export interface TelemetryEvent {
+  timestamp: number;
+  category: 'CAPTURE' | 'WEBRTC' | 'AUDIO' | 'ROOM' | 'SYSTEM';
+  message: string;
+  data?: unknown;
+}
+

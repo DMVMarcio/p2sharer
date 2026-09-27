@@ -288,6 +288,20 @@ pub fn get_video_ws_port() -> u16 {
     WS_PORT.load(Ordering::SeqCst)
 }
 
+pub fn is_video_capturing() -> bool {
+    CAPTURING_VIDEO.load(Ordering::Relaxed)
+}
+
+pub fn is_wgc_active() -> bool {
+    #[cfg(windows)]
+    {
+        if let Ok(guard) = CURRENT_WGC_CONTROL.lock() {
+            return guard.is_some();
+        }
+    }
+    false
+}
+
 // Start WebSocket server dynamically in a dedicated multi-threaded runtime
 pub fn ensure_ws_server_running() {
     if WS_SERVER_INITIALIZED.swap(true, Ordering::SeqCst) {
