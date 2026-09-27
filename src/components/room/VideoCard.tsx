@@ -5,6 +5,7 @@ import { useStore } from '../../hooks/useStore';
 import { useStreamZoom } from '../../hooks/useStreamZoom';
 import { audioContextManager } from '../../audio/audio_context_manager';
 import { roomService } from '../../services/room_service';
+import { pipService } from '../../services/pip_service';
 import { ZoomControlBar } from './ZoomControlBar';
 import { Tooltip } from '../common/Tooltip';
 import { WatchersTooltipContent } from './WatchersTooltipContent';
@@ -26,6 +27,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   const currentResolution = useStore((s) => s.currentResolution);
   const currentFps = useStore((s) => s.currentFps);
   const currentBitrate = useStore((s) => s.currentBitrate);
+  const isPipActive = useStore((s) => s.isPeerInPip(slot.peerId));
 
   const [liveFps, setLiveFps] = useState<number>(() => (slot.isLocal ? currentFps : 60));
   const [liveBitrate, setLiveBitrate] = useState<number>(0);
@@ -125,14 +127,22 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   }, [cleanupVideoElement]);
 
   useEffect(() => {
-    if (!slot.isLocal && slot.stream) {
+    if (!slot.isLocal && slot.stream && !isPipActive) {
       audioContextManager.attachPeerAudio(slot.peerId, slot.stream);
       const st = audioContextManager.getPeerVolumeState(slot.peerId);
       setVolume(st.volume);
       setIsMuted(st.isMuted);
       if (st.volume > 0) setLastVolume(st.volume);
+    } else if (isPipActive) {
+      audioContextManager.setPeerVolume(slot.peerId, 0, true);
     }
-  }, [slot.isLocal, slot.peerId, slot.stream]);
+  }, [slot.isLocal, slot.peerId, slot.stream, isPipActive]);
+
+  useEffect(() => {
+    if (isPipActive) {
+      pipService.updateStream(slot.peerId, slot.stream);
+    }
+  }, [isPipActive, slot.peerId, slot.stream]);
 
   useEffect(() => {
     if (inTray || (!slot.isStreaming && slot.isLocal)) return;
@@ -243,6 +253,40 @@ export const VideoCard: React.FC<VideoCardProps> = ({
               <polygon points="5 3 19 12 5 21 5 3"/>
             </svg>
           </div>
+        ) : isPipActive ? (
+          <div className="pip-broadcaster-placeholder local-broadcaster-placeholder">
+            <div className="local-broadcaster-radar-pulse">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                <rect x="11" y="9" width="9" height="7" rx="1.5"/>
+              </svg>
+            </div>
+            {!inTray && <span className="local-broadcaster-title">Em Picture-in-Picture</span>}
+            {!inTray && (
+              <span className="local-broadcaster-subtitle">
+                {slot.isLocal ? 'Sua tela está em janela externa' : `Tela de ${slot.senderName} em janela externa`}
+              </span>
+            )}
+            {!inTray && (
+              <button
+                type="button"
+                className="btn-toggle-local-preview btn-restore-from-pip"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  pipService.restoreFromPip(slot.peerId);
+                }}
+                aria-label="Restaurar transmissão para o app"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="4 14 10 14 10 20"/>
+                  <polyline points="20 10 14 10 14 4"/>
+                  <line x1="14" y1="10" x2="21" y2="3"/>
+                  <line x1="3" y1="21" x2="10" y2="14"/>
+                </svg>
+                Restaurar para o App
+              </button>
+            )}
+          </div>
         ) : slot.isLocal && !showLocalPreview ? (
           <div className="local-broadcaster-placeholder">
             <div className="local-broadcaster-radar-pulse">
@@ -303,8 +347,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
         </span>
       )}
 
-      {/* Stats HUD on top of card - only when not in tray */}
-      {!inTray && (
+      {/* Stats HUD on top of card - only when not in tray and not in PiP */}
+      {!inTray && !isPipActive && (
         <div className="stream-card-stats-hud">
         <span className="stat-badge stat-badge-quality">
           <span className="stat-badge-dot"></span>
@@ -459,7 +503,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
       </div>
 
       {/* Remote peer controls: Stop Watching */}
-      {!slot.isLocal && (
+      {!slot.isLocal && !isPipActive && (
         <button
           className="btn-stop-watch-stream"
           onClick={handleStopWatching}
@@ -469,8 +513,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
         </button>
       )}
 
-      {/* Bottom-right stream controls: Volume (remote only) + Fullscreen */}
-      {!inTray && (
+      {/* Bottom-right stream controls: Volume (remote only) + PiP + Fullscreen */}
+      {!inTray && !isPipActive && (
         <div
           className="stream-controls-group"
           onClick={(e) => e.stopPropagation()}
@@ -572,6 +616,36 @@ export const VideoCard: React.FC<VideoCardProps> = ({
             </button>
           </Tooltip>
 
+          <Tooltip
+            content="Abrir em Picture-in-Picture (janela flutuante)"
+            onOpenChange={handleTooltipOpenChange}
+          >
+            <button
+              type="button"
+              className="btn-stream-pip"
+              id={`btn-stream-pip-${slot.peerId}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                pipService.openPip(slot.peerId, slot.senderName, slot.stream);
+              }}
+              aria-label="Abrir transmissão em Picture-in-Picture"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                <rect x="11" y="9" width="9" height="7" rx="1.5" fill="currentColor" fillOpacity="0.25" />
+              </svg>
+            </button>
+          </Tooltip>
+
           <button
             type="button"
             className="btn-stream-fullscreen"
@@ -598,8 +672,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
         </div>
       )}
 
-      {/* Precision Zoom Control Bar (visible when zoom > 1.0 and not in tray) */}
-      {!inTray && (
+      {/* Precision Zoom Control Bar (visible when zoom > 1.0 and not in tray or PiP) */}
+      {!inTray && !isPipActive && (
         <ZoomControlBar
           zoom={zoom}
           onZoomChange={setZoomDirect}

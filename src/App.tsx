@@ -16,11 +16,21 @@ import { useModal } from './hooks/useModal';
 import { useAppTheme } from './hooks/useAppTheme';
 import { initFrontendLogger } from './core/logger';
 import { stateStore } from './core/state_store';
+import { PipView } from './components/room/PipView';
 
 export const App: React.FC = () => {
+  useAppTheme(); // Sets data-theme & data-accent
+
+  const pipPeerId = typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search).get('pip')
+    : null;
+
+  if (pipPeerId) {
+    return <PipView peerId={pipPeerId} />;
+  }
+
   const { isInRoom, stopScreenSharing, leaveRoom, isSharingScreen } = useRoom();
   const { openModal, activeModal } = useModal();
-  useAppTheme(); // Sets data-theme & data-accent
 
   useEffect(() => {
     initFrontendLogger();
