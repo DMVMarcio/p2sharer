@@ -122,13 +122,15 @@ export class PipService {
       });
     }
 
-    const sendSignal = (data: unknown) => {
-      try {
-        bc?.postMessage(data);
-      } catch {}
-      try {
-        emit(`pip-signal-${peerId}`, data).catch(() => {});
-      } catch {}
+    const sendSignal = (data: Record<string, unknown>) => {
+      const payload = { ...data, sender: 'main' };
+      if (isTauri()) {
+        emit(`pip-signal-${peerId}`, payload).catch((err) => {
+          console.warn('[PipService] Failed to send PiP signal:', err);
+        });
+      } else {
+        try { bc?.postMessage(payload); } catch {}
+      }
     };
 
     pc.onicecandidate = (e) => {
@@ -142,10 +144,13 @@ export class PipService {
 
     let offerPending = false;
     let creatingOffer = false;
+    let lastOfferFailureAt = 0;
     const sendOffer = async () => {
-      offerPending = true;
       if (creatingOffer || pc.signalingState !== 'stable') return;
+      if (Date.now() - lastOfferFailureAt < 2000) return;
+      if (!session.stream?.getVideoTracks().some((track) => track.readyState !== 'ended')) return;
       creatingOffer = true;
+      offerPending = false;
       try {
         // Re-attach tracks if needed
         const senders = pc.getSenders();
@@ -159,30 +164,37 @@ export class PipService {
 
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
-        offerPending = false;
         sendSignal({
           type: 'offer',
-          sdp: offer.sdp,
+          sdp: pc.localDescription?.sdp || offer.sdp,
           senderName,
           isLocal: peerId === 'local',
         });
       } catch (err) {
         console.warn('[PipService] Error creating loopback offer:', err);
+        lastOfferFailureAt = Date.now();
+        offerPending = false;
+        sendSignal({ type: 'error', message: 'Falha ao negociar a transmissão.' });
       } finally {
         creatingOffer = false;
-        if (offerPending && pc.signalingState === 'stable') {
-          void sendOffer();
-        }
       }
     };
-    session.requestOffer = sendOffer;
+    session.requestOffer = async () => {
+      offerPending = true;
+      await sendOffer();
+    };
 
     const handleSignalData = async (data: Record<string, unknown>) => {
       if (!data || typeof data !== 'object') return;
+      if (data.sender === 'main') return;
 
       switch (data.type) {
         case 'pip-ready':
         case 'pip-request-stream': {
+          if (data.type === 'pip-request-stream' &&
+              (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected')) {
+            pc.restartIce?.();
+          }
           await sendOffer();
           break;
         }
@@ -282,6 +294,7 @@ export class PipService {
       });
     } catch (err) {
       console.warn('[PipService] Failed to invoke open_pip_window:', err);
+      if (isTauri()) this.handlePipWindowClosed(peerId);
     }
   }
 

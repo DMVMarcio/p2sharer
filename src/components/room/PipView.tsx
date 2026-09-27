@@ -7,6 +7,7 @@ import { useStreamZoom } from '../../hooks/useStreamZoom';
 import { ZoomControlBar } from './ZoomControlBar';
 import { StreamStatsOverlay } from './StreamStatsOverlay';
 import { buildIceServers } from '../../p2p/ice_config';
+import { initFrontendLogger } from '../../core/logger';
 
 interface PipViewProps {
   peerId: string;
@@ -23,7 +24,13 @@ interface PeerStats {
 }
 
 export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
+  useEffect(() => {
+    initFrontendLogger();
+  }, []);
+
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [senderName, setSenderName] = useState<string>(
     () => new URLSearchParams(window.location.search).get('name') || 'Transmissão'
   );
@@ -56,6 +63,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
   const bcRef = useRef<BroadcastChannel | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const unlistenSignalRef = useRef<UnlistenFn | null>(null);
+  const isVideoPlayingRef = useRef(false);
 
   const {
     zoom,
@@ -83,16 +91,21 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
     const pendingCandidates: RTCIceCandidateInit[] = [];
     let hasReceivedOffer = false;
 
-    const sendSignal = (data: unknown) => {
-      try {
-        bc?.postMessage(data);
-      } catch {}
-      try {
-        emit(`pip-signal-${peerId}`, data).catch(() => {});
-      } catch {}
+    const sendSignal = (data: Record<string, unknown>) => {
+      const payload = { ...data, sender: 'pip' };
+      if (isTauri()) {
+        emit(`pip-signal-${peerId}`, payload).catch((err) => {
+          console.warn('[PipView] Failed to send PiP signal:', err);
+        });
+      } else {
+        try { bc?.postMessage(payload); } catch {}
+      }
     };
 
     pc.ontrack = (event) => {
+      setConnectionError(null);
+      isVideoPlayingRef.current = false;
+      setIsVideoPlaying(false);
       let targetStream = event.streams && event.streams[0];
       if (!targetStream) {
         if (!streamRef.current) {
@@ -110,7 +123,18 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
         if (videoRef.current.srcObject !== targetStream) {
           videoRef.current.srcObject = targetStream;
         }
-        videoRef.current.play().catch(() => {});
+        videoRef.current.play().catch(() => {
+          // Secondary WebViews can block unmuted autoplay. Start video muted,
+          // then let the viewer enable audio with the existing volume control.
+          if (videoRef.current) {
+            videoRef.current.muted = true;
+            setIsMuted(true);
+            videoRef.current.play().catch((err) => {
+              console.warn('[PipView] Video playback failed:', err);
+              setConnectionError('Não foi possível reproduzir a transmissão.');
+            });
+          }
+        });
       }
 
       event.track.onunmute = () => {
@@ -131,10 +155,12 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
 
     const handleSignalData = async (data: Record<string, unknown>) => {
       if (!data || typeof data !== 'object') return;
+      if (data.sender === 'pip') return;
 
       switch (data.type) {
         case 'offer': {
           hasReceivedOffer = true;
+          setConnectionError(null);
           if (data.senderName && typeof data.senderName === 'string') {
             setSenderName(data.senderName);
           }
@@ -166,6 +192,10 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
               console.warn('[PipView] Error handling loopback offer:', err);
             }
           }
+          break;
+        }
+        case 'error': {
+          setConnectionError(typeof data.message === 'string' ? data.message : 'Falha na conexão da transmissão.');
           break;
         }
         case 'candidate': {
@@ -216,25 +246,32 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
 
     const requestStream = () => {
       if (disposed) return;
-      if (hasReceivedOffer || streamRef.current) {
+      if (isVideoPlayingRef.current) {
         if (retryInterval) clearInterval(retryInterval);
         retryInterval = null;
         return;
       }
-      sendSignal({ type: 'pip-ready' });
+      if (!hasReceivedOffer) {
+        sendSignal({ type: 'pip-ready' });
+      } else if (retryCount > 0 && retryCount % 6 === 0) {
+        sendSignal({ type: 'pip-request-stream' });
+      }
     };
 
     const beginStreamRequests = () => {
       requestStream();
-      if (hasReceivedOffer || streamRef.current || disposed) return;
+      if (isVideoPlayingRef.current || disposed) return;
       retryInterval = setInterval(() => {
         retryCount++;
         requestStream();
-        if (retryCount >= 20 && retryInterval) {
+        if (retryCount >= 30 && retryInterval) {
           clearInterval(retryInterval);
           retryInterval = null;
+          if (!isVideoPlayingRef.current) {
+            setConnectionError('A transmissão não respondeu. Feche e abra o PiP para tentar novamente.');
+          }
         }
-      }, 350);
+      }, 500);
     };
 
     const registerSignalListener = async () => {
@@ -390,6 +427,15 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
         autoPlay
         playsInline
         muted={isMuted}
+        onPlaying={() => {
+          isVideoPlayingRef.current = true;
+          setIsVideoPlaying(true);
+          setConnectionError(null);
+        }}
+        onWaiting={() => {
+          isVideoPlayingRef.current = false;
+          setIsVideoPlaying(false);
+        }}
         style={{
           transform: zoom > 1.0 ? `scale(${zoom}) translate3d(${pan.x}px, ${pan.y}px, 0)` : 'none',
           cursor: zoom > 1.0 ? (isDragging ? 'grabbing' : 'grab') : 'default',
@@ -397,10 +443,10 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
       />
 
       {/* Loading state indicator */}
-      {!stream && (
+      {!isVideoPlaying && (
         <div className="pip-loading-placeholder">
-          <div className="pip-loading-spinner" />
-          <span>Conectando transmissão...</span>
+          {!connectionError && <div className="pip-loading-spinner" />}
+          <span>{connectionError || (stream ? 'Aguardando vídeo...' : 'Conectando transmissão...')}</span>
         </div>
       )}
 
