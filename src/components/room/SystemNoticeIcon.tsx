@@ -9,5 +9,5 @@ interface SystemNoticeIconProps {
 export const SystemNoticeIcon: React.FC<SystemNoticeIconProps> = ({ type }) => {
   const Icon = type === 'join' ? LogIn : type === 'leave' ? LogOut
     : type === 'stream-start' ? MonitorPlay : type === 'stream-stop' ? MonitorOff : Info;
-  return <Icon className="chat-sys-icon" size={12} strokeWidth={1.8} aria-hidden="true" />;
+  return <Icon className="chat-sys-icon" size={14} strokeWidth={1.8} aria-hidden="true" />;
 };
