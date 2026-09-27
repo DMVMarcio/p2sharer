@@ -20,6 +20,7 @@ import {
 import { MediaCoordinator } from './media_coordinator.ts';
 import { PeerTracker } from './peer_tracker.ts';
 import { signalingManager } from './signaling_manager.ts';
+import { telemetryService } from '../services/telemetry_service.ts';
 
 const APP_ID = 'p2sharer-multi-stream-v1';
 
@@ -1032,6 +1033,11 @@ export class GroupRoomManager {
     this.currentTargetBitrate = targetBitrateBps;
     this.currentTargetFps = targetFps;
 
+    telemetryService.logEvent('WEBRTC', 'Compartilhamento de stream iniciado', {
+      targetBitrateBps,
+      targetFps,
+    });
+
     this.callbacks?.onStreamStarted?.('local', this.username, true);
 
     if (this.room && stream) {
@@ -1076,6 +1082,7 @@ export class GroupRoomManager {
   }
 
   public stopStream() {
+    telemetryService.logEvent('WEBRTC', 'Parando stream WebRTC e liberando transceivers de GPU');
     const wasStreaming = Boolean(this.localStream);
     const streamToStop = this.localStream;
     this.localStream = null;

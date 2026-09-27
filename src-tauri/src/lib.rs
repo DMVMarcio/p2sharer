@@ -2,6 +2,7 @@ pub mod audio_loopback;
 pub mod logger;
 pub mod process_manager;
 pub mod screen_sources;
+pub mod telemetry;
 
 use audio_loopback::{start_audio_capture, stop_audio_capture};
 use logger::{clear_log_file, get_log_file_path, open_latest_log, open_log_folder, write_frontend_log};
@@ -13,6 +14,7 @@ use screen_sources::{
     ensure_ws_server_running, get_video_ws_port, list_screen_sources, start_native_screen_capture,
     stop_native_screen_capture,
 };
+use telemetry::get_system_telemetry;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -64,7 +66,8 @@ pub fn run() {
             get_log_file_path,
             open_log_folder,
             open_latest_log,
-            clear_log_file
+            clear_log_file,
+            get_system_telemetry
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

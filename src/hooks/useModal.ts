@@ -8,6 +8,7 @@ export type ModalType =
   | 'createRoom'
   | 'joinRoom'
   | 'roomSecurity'
+  | 'diagnostics'
   | null;
 
 class ModalManager {
