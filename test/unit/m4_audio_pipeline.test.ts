@@ -282,7 +282,7 @@ describe('M4 Unit Tests: Audio Pipeline Subsystem & Low-Allocation AudioBridge',
     });
 
     describe('5. Smooth Scheduling Window & Jitter Compensation', () => {
-        it('should anchor initial playback at currentTime + 12ms lead time', () => {
+        it('should anchor initial playback with a 50ms jitter cushion', () => {
             const dom = setupTestDOM();
             try {
                 const bridge = new AudioBridge();
@@ -306,12 +306,12 @@ describe('M4 Unit Tests: Audio Pipeline Subsystem & Low-Allocation AudioBridge',
                     rms_level: 0.1,
                 });
 
-                // TARGET_LEAD = 0.012 -> 5.0 + 0.012 = 5.012
+                // Initial cushion leaves room for Tauri event and renderer jitter.
                 assert.ok(capturedSource);
-                assert.ok(Math.abs(capturedSource.startedAt! - 5.012) < 1e-4, `Expected start at 5.012, got ${capturedSource.startedAt}`);
+                assert.ok(Math.abs(capturedSource.startedAt! - 5.05) < 1e-4, `Expected start at 5.05, got ${capturedSource.startedAt}`);
 
                 // Next chunk should smoothly append after buffer duration (10ms = 0.010s)
-                assert.ok(Math.abs((bridge as any).nextPlayTime - (5.012 + 480 / 48000)) < 1e-4);
+                assert.ok(Math.abs((bridge as any).nextPlayTime - (5.05 + 480 / 48000)) < 1e-4);
 
                 bridge.stop();
             } finally {
@@ -353,9 +353,9 @@ describe('M4 Unit Tests: Audio Pipeline Subsystem & Low-Allocation AudioBridge',
                     rms_level: 0.1,
                 });
 
-                // nextPlayTime was ~1.022 < 2.0 -> underrun -> re-anchors to 2.0 + 0.012 = 2.012
+                // The next recovery grows the cushion from 50ms to 60ms.
                 assert.ok(capturedSource);
-                assert.ok(Math.abs(capturedSource.startedAt! - 2.012) < 1e-4);
+                assert.ok(Math.abs(capturedSource.startedAt! - 2.06) < 1e-4);
 
                 bridge.stop();
             } finally {
@@ -363,7 +363,7 @@ describe('M4 Unit Tests: Audio Pipeline Subsystem & Low-Allocation AudioBridge',
             }
         });
 
-        it('should re-anchor if audio clock experiences excessive backlog (> 60ms)', () => {
+        it('should preserve queued audio at 150ms and discard a chunk above 200ms', () => {
             const dom = setupTestDOM();
             try {
                 const bridge = new AudioBridge();
@@ -372,7 +372,7 @@ describe('M4 Unit Tests: Audio Pipeline Subsystem & Low-Allocation AudioBridge',
                 const ctx = (bridge as any).audioCtx;
                 ctx.currentTime = 1.0;
 
-                // Force backlog far in future (> 60ms backlog)
+                // A burst must keep the established timeline rather than overlap it.
                 (bridge as any).nextPlayTime = 1.0 + 0.150; // 150ms lead
 
                 let capturedSource: MockAudioBufferSourceNode | null = null;
@@ -390,9 +390,14 @@ describe('M4 Unit Tests: Audio Pipeline Subsystem & Low-Allocation AudioBridge',
                     rms_level: 0.1,
                 });
 
-                // Re-anchored to 1.0 + 0.012 = 1.012
                 assert.ok(capturedSource);
-                assert.ok(Math.abs(capturedSource.startedAt! - 1.012) < 1e-4);
+                assert.ok(Math.abs(capturedSource.startedAt! - 1.15) < 1e-4);
+
+                capturedSource = null;
+                (bridge as any).nextPlayTime = 1.21;
+                (bridge as any).playPCMChunk({ pcm_base64: b64, sample_rate: 48000, channels: 2, rms_level: 0.1 });
+                assert.equal(capturedSource, null);
+                assert.equal((bridge as any).nextPlayTime, 1.21);
 
                 bridge.stop();
             } finally {

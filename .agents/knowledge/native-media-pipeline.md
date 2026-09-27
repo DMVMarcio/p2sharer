@@ -30,7 +30,8 @@ When capture devices output 5.1, 7.1, or other multi-channel audio:
 - To prevent tail-end clicks ("mini-chiado") and stream stuttering ("como se fosse internet travando"):
   - Mixing ticks calculate dynamic frame counts: `tick_frames = (sample_rate * 10) / 1000` (`tick_floats = tick_frames * 2`).
   - Source FIFOs are never partially drained during active playback; only complete chunks are dispatched, preserving waveform continuity.
-  - When all sources have been quiet for $\ge 50\text{ ms}$, residual samples are smoothly faded to zero using a $5\text{ ms}$ (240 samples) Hann half-cosine window ($0.5 \times (1.0 + \cos(\pi \times t))$) and zero-padded to `tick_floats`. This completely eliminates high-frequency spectral clicks and prevents stale audio from contaminating subsequent sounds.
+  - The single-source mixer waits for a 20ms preroll, then emits exact 10ms blocks on its wall clock. A short WASAPI underrun is padded with silence rather than delaying the block and releasing it later in a burst. After 100ms without packets, it returns to preroll.
+  - The Web Audio bridge begins with a 50ms playout cushion, grows it up to 120ms after underruns, and slowly returns to the baseline. It discards new chunks when more than 200ms is already scheduled; it never resets the clock over queued audio.
   - WebRTC audio sender encodings are configured with `maxBitrate = 192000` (192 kbps high-fidelity stereo Opus) and `priority = 'high'`.
 
 ### Selective Process-Level Audio Filtering

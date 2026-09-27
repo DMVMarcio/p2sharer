@@ -153,7 +153,7 @@ describe('M4 Adversarial Challenge: AudioBridge Low-Allocation & Buffer Lifecycl
             }
         });
 
-        it('investigates non-4-byte-aligned payload expansion failure mode', () => {
+        it('rejects malformed PCM lengths before allocating or scheduling', () => {
             const dom = setupTestDOM();
             try {
                 const bridge = new AudioBridge();
@@ -184,13 +184,8 @@ describe('M4 Adversarial Challenge: AudioBridge Low-Allocation & Buffer Lifecycl
                     console.error = origError;
                 }
 
-                // If non-multiple-of-4 is received (> 32768), Float32Array throws RangeError
-                // Check whether the error was caught and logged
-                assert.ok(capturedError, 'RangeError should be caught and logged when byte length is not a multiple of 4');
-                assert.ok(
-                    capturedError.includes('RangeError') || capturedError.includes('multiple of 4'),
-                    `Expected RangeError in logs, got: ${capturedError}`
-                );
+                assert.equal(capturedError, null);
+                assert.equal((bridge as any).byteBuffer.buffer, initialBuffer);
 
                 bridge.stop();
             } finally {
@@ -219,6 +214,7 @@ describe('M4 Adversarial Challenge: AudioBridge Low-Allocation & Buffer Lifecycl
 
                 // Deliver 50 chunks
                 for (let i = 0; i < 50; i++) {
+                    ctx.currentTime = i * 0.01;
                     (bridge as any).playPCMChunk({
                         pcm_base64: pcm,
                         sample_rate: 48000,

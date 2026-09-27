@@ -12,6 +12,8 @@ export class AudioBridge {
   private isCapturing = false;
   private nextPlayTime = 0;
   private lastAudioTimestampUs = 0;
+  private targetLead = 0.05;
+  private stableChunks = 0;
 
   // Preallocated buffer cache to eliminate per-chunk allocations (200 allocs/sec)
   private byteBuffer: Uint8Array = new Uint8Array(16384);
@@ -35,6 +37,8 @@ export class AudioBridge {
       }
       this.destNode = this.audioCtx.createMediaStreamDestination();
       this.nextPlayTime = 0;
+      this.targetLead = 0.05;
+      this.stableChunks = 0;
       return this.destNode.stream.getAudioTracks()[0] || null;
     } catch (e) {
       console.warn('Web Audio API not initialized:', e);
@@ -100,14 +104,20 @@ export class AudioBridge {
       const len = binary.length;
       if (len === 0) return;
 
+      const channels = payload.channels || 2;
+      const sampleRate = payload.sample_rate || 48000;
+      if (channels < 1 || channels > 8 || sampleRate < 8000 || len % (channels * 4) !== 0) return;
+
+      const currentTime = this.audioCtx.currentTime;
+      // Delayed IPC bursts must not overlap audio already queued for playout.
+      if (this.nextPlayTime - currentTime > 0.2) return;
+
       this.ensureBufferCapacity(len);
 
       for (let i = 0; i < len; i++) {
         this.byteBuffer[i] = binary.charCodeAt(i);
       }
 
-      const channels = payload.channels || 2;
-      const sampleRate = payload.sample_rate || 48000;
       const totalFloats = len >> 2;
       const frames = Math.floor(totalFloats / channels);
       if (frames === 0) return;
@@ -141,17 +151,19 @@ export class AudioBridge {
         source.buffer = null;
       };
 
-      const currentTime = this.audioCtx.currentTime;
-      const TARGET_LEAD = 0.012; // 12ms target lead time
-      const MAX_BACKLOG = 0.060; // 60ms backlog ceiling
-
-      // Smooth scheduling: only re-anchor if audio clock has drifted outside allowable window
-      // Use 25ms grace window to prevent false re-anchoring on minor OS scheduling jitter
-      if (this.nextPlayTime < currentTime - 0.025 || this.nextPlayTime > currentTime + MAX_BACKLOG) {
-        this.nextPlayTime = currentTime + TARGET_LEAD;
+      // Adapt the playout cushion to IPC and renderer scheduling jitter.
+      if (this.nextPlayTime < currentTime + 0.005) {
+        if (this.nextPlayTime > 0) {
+          this.targetLead = Math.min(0.12, this.targetLead + 0.01);
+        }
+        this.stableChunks = 0;
+        this.nextPlayTime = currentTime + this.targetLead;
+      } else if (++this.stableChunks >= 500) {
+        this.targetLead = Math.max(0.05, this.targetLead - 0.005);
+        this.stableChunks = 0;
       }
 
-      const scheduleTime = Math.max(currentTime, this.nextPlayTime);
+      const scheduleTime = this.nextPlayTime;
       source.start(scheduleTime);
       this.nextPlayTime = scheduleTime + buffer.duration;
     } catch (e) {
@@ -166,6 +178,8 @@ export class AudioBridge {
   public stop(): void {
     this.isCapturing = false;
     this.nextPlayTime = 0;
+    this.targetLead = 0.05;
+    this.stableChunks = 0;
     this.lastAudioTimestampUs = 0;
     if (this.unlisten) {
       this.unlisten();

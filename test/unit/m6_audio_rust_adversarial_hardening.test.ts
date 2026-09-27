@@ -125,11 +125,11 @@ describe('Tier 5 Adversarial Hardening: AudioBridge & AudioContextManager Stress
           timestamp_us: 100000,
         });
 
-        const expectedLead = 0.012; // 12ms target lead
-        const expectedTime0 = 1.0 + expectedLead; // 1.012
+        const expectedLead = 0.05; // 50ms initial jitter cushion
+        const expectedTime0 = 1.0 + expectedLead;
         assert.ok(
           Math.abs((bridge as any).nextPlayTime - (expectedTime0 + 0.010)) < 1e-6,
-          `nextPlayTime should be 1.022 after first 10ms chunk (got ${(bridge as any).nextPlayTime})`
+          `nextPlayTime should be 1.06 after first 10ms chunk (got ${(bridge as any).nextPlayTime})`
         );
 
         // Advance currentTime by 0.010s (real-time progression)
@@ -146,7 +146,7 @@ describe('Tier 5 Adversarial Hardening: AudioBridge & AudioContextManager Stress
 
         assert.ok(
           Math.abs((bridge as any).nextPlayTime - (expectedTime0 + 0.020)) < 1e-6,
-          `nextPlayTime should be 1.032 after second 10ms chunk (got ${(bridge as any).nextPlayTime})`
+          `nextPlayTime should be 1.07 after second 10ms chunk (got ${(bridge as any).nextPlayTime})`
         );
 
         bridge.stop();
@@ -184,8 +184,8 @@ describe('Tier 5 Adversarial Hardening: AudioBridge & AudioContextManager Stress
           timestamp_us: 250000,
         });
 
-        // Must re-anchor to currentTime + TARGET_LEAD (2.600 + 0.012 = 2.612) + buffer.duration (0.010) = 2.622
-        const expectedNextTime = 2.600 + 0.012 + 0.010;
+        // The underrun grows the lead from 50ms to 60ms before scheduling the 10ms chunk.
+        const expectedNextTime = 2.600 + 0.06 + 0.010;
         assert.ok(
           Math.abs((bridge as any).nextPlayTime - expectedNextTime) < 1e-5,
           `Stall re-anchor failed: expected ${expectedNextTime}, got ${(bridge as any).nextPlayTime}`
@@ -197,7 +197,7 @@ describe('Tier 5 Adversarial Hardening: AudioBridge & AudioContextManager Stress
       }
     });
 
-    it('should clamp backlog and re-anchor when a burst of chunks exceeds the 60ms backlog ceiling', () => {
+    it('should bound a long burst without overlapping queued chunks', () => {
       const dom = setupTestDOM();
       try {
         const bridge = new AudioBridge();
@@ -208,9 +208,8 @@ describe('Tier 5 Adversarial Hardening: AudioBridge & AudioContextManager Stress
 
         const chunk = createStereoPcmBase64(Array.from({ length: 480 }, () => [0.1, 0.1]));
 
-        // Deliver 8 chunks in zero simulated time (packet burst)
-        // 8 chunks * 10ms = 80ms total queued audio (> 60ms MAX_BACKLOG)
-        for (let i = 0; i < 8; i++) {
+        // Deliver 30 chunks in zero simulated time (packet burst).
+        for (let i = 0; i < 30; i++) {
           (bridge as any).playPCMChunk({
             pcm_base64: chunk,
             sample_rate: 48000,
@@ -220,10 +219,10 @@ describe('Tier 5 Adversarial Hardening: AudioBridge & AudioContextManager Stress
           });
         }
 
-        // At chunk 6 or 7, nextPlayTime exceeded currentTime + 0.060 (5.060)
-        // So the algorithm clamped and re-anchored back to currentTime + 0.012!
+        // The queue remains bounded and its clock never jumps backward over scheduled audio.
         assert.ok(
-          (bridge as any).nextPlayTime <= ctx.currentTime + 0.060 + 0.015,
+          (bridge as any).nextPlayTime >= ctx.currentTime + 0.2 &&
+          (bridge as any).nextPlayTime <= ctx.currentTime + 0.21,
           `Burst backlog ceiling exceeded: nextPlayTime was ${(bridge as any).nextPlayTime}`
         );
 

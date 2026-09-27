@@ -1106,24 +1106,19 @@ pub(crate) mod win_audio {
                         for _ in 0..ticks_to_run {
                             if multi_sources.len() == 1 {
                                 let source = &mut multi_sources[0];
-                                if source.fifo.len() >= tick_floats {
-                                    raw_stereo_buffer.extend(source.fifo.drain(..tick_floats));
-                                    source.is_buffering = false;
-                                } else if source.last_packet_time.elapsed() >= std::time::Duration::from_millis(50) && !source.fifo.is_empty() {
-                                    // Audio stopped for >50ms: smoothly fade out residual samples with Hann window
-                                    let rem = source.fifo.len();
-                                    let fade_len = rem.min(240);
-                                    let start_idx = rem - fade_len;
-                                    for i in 0..fade_len {
-                                        let phase = std::f32::consts::PI * (i as f32 / fade_len as f32);
-                                        let factor = 0.5 * (1.0 + phase.cos());
-                                        source.fifo[start_idx + i] *= factor;
+                                if !source.is_buffering {
+                                    let available = source.fifo.len().min(tick_floats) & !1;
+                                    raw_stereo_buffer.extend(source.fifo.drain(..available));
+                                    // Keep the 10ms output clock continuous on packet underruns.
+                                    // Waiting for the next packet here creates irregular bursts.
+                                    if available < tick_floats {
+                                        raw_stereo_buffer.resize(tick_floats, 0.0);
                                     }
-                                    raw_stereo_buffer.extend(source.fifo.drain(..));
-                                    if raw_stereo_buffer.len() < tick_floats {
-                                        raw_stereo_buffer.resize(tick_floats, 0.0f32);
+                                    if source.fifo.is_empty()
+                                        && source.last_packet_time.elapsed() >= std::time::Duration::from_millis(100)
+                                    {
+                                        source.is_buffering = true;
                                     }
-                                    source.is_buffering = false;
                                 }
                             } else if multi_sources.len() > 1 {
                                 let any_active = multi_sources.iter().any(|s| !s.fifo.is_empty());
