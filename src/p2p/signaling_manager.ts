@@ -33,8 +33,9 @@ export interface SignalingFailoverEvent {
 }
 
 export const DEFAULT_MQTT_RELAY_URLS = [
-  'wss://broker.hivemq.com:8884/mqtt',
+  'wss://public:public@public.cloud.shiftr.io',
   'wss://broker.emqx.io:8084/mqtt',
+  'wss://broker-cn.emqx.io:8084/mqtt',
   'wss://test.mosquitto.org:8081/mqtt',
 ];
 
