@@ -158,6 +158,7 @@ export class GroupRoomManager {
   private lastBroadcasterStreamIds: Map<string, string> = new Map();
   private lastStreamRecoveryRequests: Map<string, number> = new Map();
   private lastBridgeAttempts: Map<string, number> = new Map();
+  private rumorIntermediaries: Map<string, string> = new Map();
   private lastRumorReannounceTime: number = 0;
   private currentTargetBitrate: number = 25000000;
   private currentTargetFps: number = 60;
@@ -557,6 +558,9 @@ export class GroupRoomManager {
       data.peers.forEach((p) => {
         if (p.peerId && p.peerId !== selfId) {
           const isDirect = this.peerTracker.isVerified(p.peerId);
+          if (!isDirect) {
+            this.rumorIntermediaries.set(p.peerId, meta.peerId);
+          }
           this.peerTracker.receivePeerExchange(p.peerId, isDirect, p.username, p.isCreator, p.joinedAt);
 
           // If peer is not yet directly connected to us, bridge via intermediary peer
@@ -581,6 +585,7 @@ export class GroupRoomManager {
         if (data.kind === 'mesh_hello') {
           console.log(`[P2P/Mesh] Received mesh_hello from indirect peer ${data.origin}`);
           const p = data.payload || {};
+          this.rumorIntermediaries.set(data.origin, meta.peerId);
           this.peerTracker.receivePeerExchange(data.origin, false, p.username, p.isCreator, p.joinedAt);
 
           // Reply with mesh_ack back through the intermediary
@@ -610,6 +615,7 @@ export class GroupRoomManager {
         } else if (data.kind === 'mesh_ack') {
           console.log(`[P2P/Mesh] Received mesh_ack from indirect peer ${data.origin}`);
           const p = data.payload || {};
+          this.rumorIntermediaries.set(data.origin, meta.peerId);
           this.peerTracker.receivePeerExchange(data.origin, false, p.username, p.isCreator, p.joinedAt);
 
           // Force signaling re-announcement on the broker
@@ -658,6 +664,7 @@ export class GroupRoomManager {
 
       // Verify and record direct WebRTC connection
       this.peerTracker.receivePeerExchange(peerId, true);
+      this.rumorIntermediaries.delete(peerId);
       signalingManager.setPeerConnected(peerId);
 
       // Instantly acknowledge peer on signaling broker to ensure both directions are open
@@ -799,10 +806,17 @@ export class GroupRoomManager {
       if (
         (hasNoDirectPeers || rumors.length > 0) &&
         this.signalingTopic &&
-        now - this.lastRumorReannounceTime > 20000
+        now - this.lastRumorReannounceTime > 2500
       ) {
         this.lastRumorReannounceTime = now;
         signalingManager.reannounce(this.signalingTopic);
+        rumors.forEach((rId) => {
+          const intermediary = this.rumorIntermediaries.get(rId);
+          if (intermediary && this.peerTracker.isVerified(intermediary)) {
+            this.bridgeIndirectPeer(rId, intermediary, this.peerTracker.getRumorUsername(rId));
+          }
+          signalingManager.reannounce(this.signalingTopic, rId);
+        });
       }
 
       // Prune ghost peers that missed heartbeats, but ONLY if their WebRTC connection is not active
@@ -856,6 +870,7 @@ export class GroupRoomManager {
     this.lastBroadcasterStreamIds.delete(peerId);
     this.lastStreamRecoveryRequests.delete(peerId);
     this.lastBridgeAttempts.delete(peerId);
+    this.rumorIntermediaries.delete(peerId);
 
     if (wasRemoved) {
       this.callbacks?.onPeerLeft?.(peerId, uname);
@@ -887,7 +902,7 @@ export class GroupRoomManager {
 
     const now = Date.now();
     const lastAttempt = this.lastBridgeAttempts.get(targetPeerId) || 0;
-    if (now - lastAttempt < 15000) {
+    if (now - lastAttempt < 2500) {
       return;
     }
     this.lastBridgeAttempts.set(targetPeerId, now);
@@ -1560,6 +1575,7 @@ export class GroupRoomManager {
     this.lastBroadcasterStreamIds.clear();
     this.lastStreamRecoveryRequests.clear();
     this.lastBridgeAttempts.clear();
+    this.rumorIntermediaries.clear();
     this.lastPeerStats.clear();
     this.peerStatsCache.clear();
     this.localStatsCache = null;

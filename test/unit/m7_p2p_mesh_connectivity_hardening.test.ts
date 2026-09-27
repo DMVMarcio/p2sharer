@@ -24,13 +24,14 @@ describe('M7: P2P Mesh Connectivity, Indirect Bridging & Signaling Stability Har
   // Area 1: High-Availability MQTT Broker Configuration & Relay Sockets
   // =========================================================================
   describe('Area 1: High-Availability MQTT Broker Configuration', () => {
-    it('1.1: DEFAULT_MQTT_RELAY_URLS includes HiveMQ and EMQX as primary brokers', () => {
+    it('1.1: DEFAULT_MQTT_RELAY_URLS includes fast verified brokers (Shiftr, EMQX, Mosquitto)', () => {
       assert.ok(Array.isArray(DEFAULT_MQTT_RELAY_URLS));
-      assert.ok(DEFAULT_MQTT_RELAY_URLS.length >= 3);
-      assert.ok(DEFAULT_MQTT_RELAY_URLS.some((u) => u.includes('hivemq.com')));
+      assert.ok(DEFAULT_MQTT_RELAY_URLS.length >= 4);
+      assert.ok(DEFAULT_MQTT_RELAY_URLS.some((u) => u.includes('shiftr.io')));
       assert.ok(DEFAULT_MQTT_RELAY_URLS.some((u) => u.includes('emqx.io')));
-      // HiveMQ should be first for lowest latency and highest uptime
-      assert.ok(DEFAULT_MQTT_RELAY_URLS[0]!.includes('hivemq.com'));
+      assert.ok(DEFAULT_MQTT_RELAY_URLS.some((u) => u.includes('mosquitto.org')));
+      // Shiftr should be first for lowest latency and highest responsiveness
+      assert.ok(DEFAULT_MQTT_RELAY_URLS[0]!.includes('shiftr.io'));
     });
 
     it('1.2: getRelaySockets provides monitored fallback sockets when MQTT room is active', () => {
