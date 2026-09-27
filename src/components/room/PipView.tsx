@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, isTauri } from '@tauri-apps/api/core';
 import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { useStreamZoom } from '../../hooks/useStreamZoom';
 import { ZoomControlBar } from './ZoomControlBar';
@@ -19,7 +19,9 @@ interface PeerStats {
 
 export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
   const [stream, setStream] = useState<MediaStream | null>(null);
-  const [senderName, setSenderName] = useState<string>('Transmissão');
+  const [senderName, setSenderName] = useState<string>(
+    () => new URLSearchParams(window.location.search).get('name') || 'Transmissão'
+  );
   const [isLocal, setIsLocal] = useState<boolean>(peerId === 'local');
   const [stats, setStats] = useState<PeerStats>({
     pingMs: null,
@@ -54,10 +56,12 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
     handleDoubleClick,
   } = useStreamZoom(containerRef, stream, true);
 
-  // Setup loopback WebRTC receiver & dual signaling on mount
+  // Set up the loopback WebRTC receiver and signaling on mount.
   useEffect(() => {
     const channelName = `p2sharer-pip-${peerId}`;
-    const bc = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel(channelName) : null;
+    const bc = !isTauri() && typeof BroadcastChannel !== 'undefined'
+      ? new BroadcastChannel(channelName)
+      : null;
     bcRef.current = bc;
 
     const iceServers = typeof RTCPeerConnection !== 'undefined' ? buildIceServers() : [];
@@ -186,19 +190,20 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
       }
     };
 
-    // 1. Listen via BroadcastChannel
+    // Use one signaling transport at a time; duplicate offers can race WebRTC state.
     if (bc) {
       bc.onmessage = async (event) => {
         await handleSignalData(event.data);
       };
     }
 
-    // 2. Listen via native Tauri Event
-    listen<Record<string, unknown>>(`pip-signal-${peerId}`, async (event) => {
-      await handleSignalData(event.payload);
-    }).then((unlisten) => {
-      unlistenSignalRef.current = unlisten;
-    }).catch(() => {});
+    if (isTauri()) {
+      listen<Record<string, unknown>>(`pip-signal-${peerId}`, async (event) => {
+        await handleSignalData(event.payload);
+      }).then((unlisten) => {
+        unlistenSignalRef.current = unlisten;
+      }).catch(() => {});
+    }
 
     // Proactively send 'pip-ready' and retry with exponential grace until offer is received
     sendSignal({ type: 'pip-ready' });
@@ -350,9 +355,6 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
             <span className="pip-status-dot" aria-hidden="true" />
             <span className="pip-title" data-tauri-drag-region>
               {senderName}
-            </span>
-            <span className="pip-badge-tag" data-tauri-drag-region>
-              PiP
             </span>
           </div>
 

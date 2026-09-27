@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, isTauri } from '@tauri-apps/api/core';
 import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { stateStore } from '../core/state_store.ts';
 import { roomService } from './room_service.ts';
@@ -11,6 +11,7 @@ interface PipSession {
   stream: MediaStream | null;
   pendingCandidates: RTCIceCandidateInit[];
   statsInterval: ReturnType<typeof setInterval> | null;
+  requestOffer: (() => Promise<void>) | null;
 }
 
 export class PipService {
@@ -77,7 +78,7 @@ export class PipService {
 
     const channelName = `p2sharer-pip-${peerId}`;
     const bc: BroadcastChannel | null =
-      typeof BroadcastChannel !== 'undefined'
+      !isTauri() && typeof BroadcastChannel !== 'undefined'
         ? new BroadcastChannel(channelName)
         : null;
 
@@ -105,6 +106,7 @@ export class PipService {
       stream: activeStream,
       pendingCandidates: [],
       statsInterval: null,
+      requestOffer: null,
     };
     this.sessions.set(peerId, session);
 
@@ -137,7 +139,12 @@ export class PipService {
       }
     };
 
+    let offerPending = false;
+    let creatingOffer = false;
     const sendOffer = async () => {
+      offerPending = true;
+      if (creatingOffer || pc.signalingState !== 'stable') return;
+      creatingOffer = true;
       try {
         // Re-attach tracks if needed
         const senders = pc.getSenders();
@@ -151,6 +158,7 @@ export class PipService {
 
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
+        offerPending = false;
         sendSignal({
           type: 'offer',
           sdp: offer.sdp,
@@ -159,8 +167,14 @@ export class PipService {
         });
       } catch (err) {
         console.warn('[PipService] Error creating loopback offer:', err);
+      } finally {
+        creatingOffer = false;
+        if (offerPending && pc.signalingState === 'stable') {
+          void sendOffer();
+        }
       }
     };
+    session.requestOffer = sendOffer;
 
     const handleSignalData = async (data: Record<string, unknown>) => {
       if (!data || typeof data !== 'object') return;
@@ -182,6 +196,7 @@ export class PipService {
                   await pc.addIceCandidate(new RTCIceCandidate(cand)).catch(() => {});
                 }
               }
+              if (offerPending) void sendOffer();
             } catch (err) {
               console.warn('[PipService] Error setting loopback remote answer:', err);
             }
@@ -210,20 +225,21 @@ export class PipService {
       }
     };
 
-    // 1. Listen via BroadcastChannel
+    // Use one signaling transport at a time; duplicate offers can race WebRTC state.
     if (bc) {
       bc.onmessage = async (event) => {
         await handleSignalData(event.data);
       };
     }
 
-    // 2. Listen via native Tauri Event
-    try {
-      session.unlistenSignal = await listen<Record<string, unknown>>(`pip-signal-${peerId}`, async (event) => {
-        await handleSignalData(event.payload);
-      });
-    } catch {
-      // In web-only test environments
+    if (isTauri()) {
+      try {
+        session.unlistenSignal = await listen<Record<string, unknown>>(`pip-signal-${peerId}`, async (event) => {
+          await handleSignalData(event.payload);
+        });
+      } catch {
+        // Tauri listener is unavailable in web-only environments.
+      }
     }
 
     // Periodic stats dispatcher
@@ -268,6 +284,7 @@ export class PipService {
     const session = this.sessions.get(peerId);
     if (!session) return;
 
+    if (session.stream === stream) return;
     session.stream = stream;
     try {
       const currentSenders = session.pc.getSenders();
@@ -285,21 +302,7 @@ export class PipService {
         });
       }
 
-      // Re-negotiate offer
-      session.pc.createOffer().then((offer) => {
-        session.pc.setLocalDescription(offer).then(() => {
-          const payload = {
-            type: 'offer',
-            sdp: offer.sdp,
-          };
-          try {
-            session.bc?.postMessage(payload);
-          } catch {}
-          try {
-            emit(`pip-signal-${peerId}`, payload).catch(() => {});
-          } catch {}
-        });
-      });
+      void session.requestOffer?.();
     } catch (err) {
       console.warn('[PipService] Error updating loopback stream:', err);
     }
