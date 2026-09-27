@@ -89,7 +89,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     fps: number = 60,
     resolution: { width: number; height: number } = { width: 1920, height: 1080 },
     captureMouse: boolean = true,
-    quality: number = 98
+    quality: number = 92
   ): Promise<MediaStream> {
     if (typeof optionsOrSourceId === 'object' && optionsOrSourceId !== null) {
       const opts = optionsOrSourceId as VideoSourceOptions;
@@ -234,7 +234,8 @@ export class NativeVideoBridge implements VideoCaptureBridge {
           try {
             let nowUs = Math.round(performance.now() * 1000);
             if (nowUs <= this.lastTimestampUs) {
-              nowUs = this.lastTimestampUs + 1000;
+              const minIntervalUs = Math.round((1_000_000 / Math.max(this.currentFps, 1)) * 0.5);
+              nowUs = this.lastTimestampUs + minIntervalUs;
             }
             this.lastTimestampUs = nowUs;
 

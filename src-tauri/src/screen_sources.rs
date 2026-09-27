@@ -188,7 +188,7 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
 
         self.jpeg_buffer.clear();
         let mut encoder = FastJpegEncoder::new(&mut self.jpeg_buffer, self.quality);
-        encoder.set_sampling_factor(SamplingFactor::R_4_4_4);
+        encoder.set_sampling_factor(SamplingFactor::R_4_2_0);
         if encoder
             .encode(
                 final_pixels,
@@ -642,7 +642,7 @@ pub fn start_native_screen_capture(
     let width = target_width.unwrap_or(0);
     let height = target_height.unwrap_or(0);
     let should_draw_mouse = capture_mouse.unwrap_or(true);
-    let jpeg_quality = quality.unwrap_or(95).clamp(60, 98);
+    let jpeg_quality = quality.unwrap_or(90).clamp(60, 95);
 
     let sender = get_frame_sender().clone();
     let start_instant = std::time::Instant::now();
@@ -657,8 +657,7 @@ pub fn start_native_screen_capture(
     let pacer_wgc_last_sent_us = last_sent_us.clone();
     let pacer_start = start_instant;
     let target_interval_us = (1_000_000 / fps as u64).max(8_000);
-    let slack_us = (target_interval_us * 35) / 100; // ~5.8ms slack window for 60fps
-    let static_timeout_us = target_interval_us + slack_us; // ~22.5ms threshold before emitting static ticks
+    let static_timeout_us = target_interval_us * 4; // ~66ms threshold before emitting static ticks
 
     std::thread::spawn(move || {
         let _timer_guard = MultimediaTimerGuard::new();
@@ -670,12 +669,10 @@ pub fn start_native_screen_capture(
             let last_wgc = pacer_wgc_last_sent_us.load(Ordering::Acquire);
 
             // If a real WGC frame arrived recently (< static_timeout_us), WGC is actively streaming:
-            // Back off next_tick_us so pacer does not compete with WGC
+            // Back off next_tick_us so pacer never competes with active screen/mouse movement
             if last_wgc > 0 && now_us.saturating_sub(last_wgc) < static_timeout_us {
                 next_tick_us = last_wgc + static_timeout_us;
-            }
-
-            if now_us >= next_tick_us {
+            } else if now_us >= next_tick_us {
                 pacer_tick_count += 1;
                 if let Ok(guard) = pacer_cache.lock() {
                     if let Some(frame) = guard.as_ref() {
@@ -1000,7 +997,7 @@ pub fn start_native_screen_capture(
 
                 jpeg_bytes.clear();
                 let mut encoder = FastJpegEncoder::new(&mut jpeg_bytes, jpeg_quality);
-                encoder.set_sampling_factor(SamplingFactor::R_4_4_4);
+                encoder.set_sampling_factor(SamplingFactor::R_4_2_0);
                 if encoder
                     .encode(
                         final_raw,
