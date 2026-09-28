@@ -6,6 +6,7 @@ import { ChatMessageContent } from '../common/ChatMessageContent';
 import { getEmojiPack, subscribeEmojiPack } from '../../core/emoji_preferences';
 import { SystemNoticeIcon } from './SystemNoticeIcon';
 import { SystemNoticeText } from './SystemNoticeText';
+import { useEmojiSelectionHighlight } from '../../hooks/useEmojiSelectionHighlight';
 
 export const ChatPane: React.FC = () => {
   const { chatMessages, sendChatMessage } = useRoom();
@@ -15,6 +16,8 @@ export const ChatPane: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<EmojiComposerHandle>(null);
   const composerRef = useRef<HTMLDivElement>(null);
+  const paneRef = useRef<HTMLDivElement>(null);
+  useEmojiSelectionHighlight(paneRef);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -54,7 +57,7 @@ export const ChatPane: React.FC = () => {
   };
 
   return (
-    <div className="sidebar-tab-content active" id="tab-content-chat">
+    <div className="sidebar-tab-content active" id="tab-content-chat" ref={paneRef}>
       <div className="chat-messages-container" id="chat-messages-container">
         {chatMessages.map((msg, index) => {
           const timeStr = new Date(msg.timestamp).toLocaleTimeString([], {

@@ -1,10 +1,9 @@
 import React from 'react';
-import { openUrl } from '@tauri-apps/plugin-opener';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { safeChatUrl } from '../../core/chat_links';
 import { EmojiPack } from '../../core/emoji_preferences';
-import { showToast } from '../../hooks/useToast';
+import { modalManager } from '../../hooks/useModal';
 import { EmojiText } from './EmojiText';
 
 const allowedElements = [
@@ -38,7 +37,12 @@ export const ChatMessageContent: React.FC<{ text: string; pack: EmojiPack }> = (
             href={href}
             onClick={(event) => {
               event.preventDefault();
-              void openUrl(href).catch(() => showToast('Não foi possível abrir o link.'));
+              modalManager.openExternalLink(href);
+            }}
+            onAuxClick={(event) => {
+              if (event.button !== 1) return;
+              event.preventDefault();
+              modalManager.openExternalLink(href);
             }}
           >
             {withEmoji(children)}

@@ -1,4 +1,5 @@
 import { useCallback, useSyncExternalStore } from 'react';
+import { safeChatUrl } from '../core/chat_links';
 
 export type ModalType =
   | 'settings'
@@ -8,6 +9,7 @@ export type ModalType =
   | 'createRoom'
   | 'joinRoom'
   | 'roomSecurity'
+  | 'externalLink'
   | null;
 
 class ModalManager {
@@ -15,6 +17,7 @@ class ModalManager {
   private isClosing: boolean = false;
   private closeTimer: ReturnType<typeof setTimeout> | null = null;
   private listeners = new Set<() => void>();
+  private externalLinkUrl: string | null = null;
 
   public getActive(): ModalType {
     return this.activeModal;
@@ -24,7 +27,19 @@ class ModalManager {
     return this.isClosing;
   }
 
+  public getExternalLinkUrl(): string | null {
+    return this.externalLinkUrl;
+  }
+
+  public openExternalLink(url: string): void {
+    const safeUrl = safeChatUrl(url);
+    if (!safeUrl) return;
+    this.externalLinkUrl = safeUrl;
+    this.open('externalLink');
+  }
+
   public open(modal: ModalType): void {
+    if (modal !== 'externalLink') this.externalLinkUrl = null;
     if (this.closeTimer) {
       clearTimeout(this.closeTimer);
       this.closeTimer = null;
@@ -41,6 +56,7 @@ class ModalManager {
 
     this.closeTimer = setTimeout(() => {
       this.activeModal = null;
+      this.externalLinkUrl = null;
       this.isClosing = false;
       this.closeTimer = null;
       this.notify();
