@@ -25,7 +25,7 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 | **Workspace Orchestration** | `project-orchestrator.md` | `project-audit/SKILL.md`, `subagent-management/SKILL.md` | Whole repository, task triage & cross-domain coordination |
 | **P2P Netcode & Signaling** | `p2p-specialist.md` | `p2p-protocol/SKILL.md` | `src/p2p/*` (SignalingManager, GroupRoomManager, MediaCoordinator, PeerTracker, IceConfig) |
 | **Native Media Pipeline** | `native-media-specialist.md` | `native-media-pipeline/SKILL.md` | `src-tauri/src/*`, `src/audio/*`, `src/video/*` (WASAPI, xcap, WS bridge, resampler, process manager) |
-| **UI, State & Components** | `ui-architect.md` | `canonical-design/SKILL.md` | `src/ui/*`, `src/core/*`, `index.html`, `src/style.css` (ModalController, HudController, ViewerRenderer, StateStore) |
+| **UI, State & Components** | `ui-architect.md` | `canonical-design/SKILL.md` | `src/components/*`, `src/hooks/*`, `src/ui/*`, `src/core/*`, `index.html`, `src/style.css` (React views, hooks, StateStore) |
 
 ---
 
@@ -38,6 +38,9 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 4. User Guidelines & Expressed Preferences
 <!-- Tagged directives captured directly or indirectly from workspace rules and user instructions -->
+- `[Chat]` **Emoji and Message UX**: Emoji pack choices must use genuine, independently sourced artwork; do not offer a pixelated recolor of another pack as a retro set. The message composer must preview the selected emoji pack, sent messages must allow mouse selection and copying, and message rendering must support simple Markdown, fenced code blocks, and safe clickable links.
+- `[Workflow]` **Central Agent Rule**: `.agents/rules/agent-persistence.md` is the primary, always-on workspace rule. Read and follow the entire file at the start of every task, then consult this knowledge base and applicable skills. Keep its persistent-memory directive active: record new user preferences and architectural choices here immediately.
+- `[Desktop]` **Tauri Is the Product Runtime**: P2Sharer is a Windows Tauri v2 desktop application, not a website. For application code or asset changes, `npm run tauri:build` and verification of the native executable and installer bundle are required before reporting validation or completion, even when no commit is requested. `npm run build` checks only TypeScript/Vite; browser-only previews do not verify native behavior. Use `npm run tauri:dev` for interactive desktop checks.
 - `[Protocol]` **Dual-Channel Language Protocol**: All interactive conversational chat must mirror the user's language (e.g. Portuguese). All code, commits, pull requests, task files, documentation, and `.agents/` artifacts must be written strictly in English.
 - `[Workflow]` **No Mandatory Task Files**: Do not create task-specific Markdown files or checklists as a prerequisite for investigation or implementation. Keep durable architectural discoveries in this knowledge base.
 - `[Git]` **Conventional Commits**: Format commit messages strictly as `type(scope): subject` in English (`feat`, `fix`, `refactor`, `chore`, `docs`, `test`).

@@ -11,8 +11,10 @@ You are the technical maintainer and continuous architect of this project. Enfor
 - **Interactive Chat**: Always mirror the user's conversational language (e.g., respond in Portuguese if addressed in Portuguese).
 - **Workspace Artifacts**: All code, comments, commit messages, task files, documentation, and files under `.agents/` must be written **strictly in English** (except explicit i18n/l10n files).
 
-## 2. Build Validation
-- **Mandatory Packaging Build**: Never consider a task validated using only `npm run build`. You MUST run `npm run tauri:build` to produce and verify the full native desktop binary and installer bundle before committing.
+## 2. Desktop Runtime & Build Validation
+- **Product Runtime**: P2Sharer is a Windows desktop application built with Tauri v2. React/Vite runs inside WebView2 and depends on the Rust host. Browser-only behavior is not a complete application check.
+- **Mandatory Packaging Build**: For application code or asset changes, run `npm run tauri:build` and verify the native executable and installer bundle before reporting the task as validated or complete. This also applies when no commit is requested.
+- **Frontend Build Scope**: `npm run build` validates TypeScript and Vite only; it does not replace the Tauri build. If native packaging is blocked, state the concrete failure and report the desktop build as unverified.
 
 ## 3. Git & Repository Baseline
 - If `.git` does not exist in the workspace, run `git init` immediately.
