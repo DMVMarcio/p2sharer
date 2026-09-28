@@ -204,6 +204,13 @@ export class NativeVideoBridge implements VideoCaptureBridge {
 
     // 3. Connect to local binary WebSocket stream
     const port = (await invoke<number>('get_video_ws_port').catch(() => 49153)) || 49153;
+    let accessToken: string;
+    try {
+      accessToken = await invoke<string>('get_video_ws_token');
+    } catch {
+      await this.stopCapture();
+      throw new Error('Não foi possível autenticar a captura de vídeo local.');
+    }
     this.pendingBuffer = null;
     this.isDecoding = false;
 
@@ -292,62 +299,71 @@ export class NativeVideoBridge implements VideoCaptureBridge {
       }
     };
 
-    await new Promise<void>((resolve) => {
-      let resolved = false;
-      const wsUrl = `ws://127.0.0.1:${port}`;
-      this.ws = new WebSocket(wsUrl);
-      this.ws.binaryType = 'arraybuffer';
-
-      this.ws.onopen = () => {
-        if (!resolved) {
-          resolved = true;
+    try {
+      await new Promise<void>((resolve, reject) => {
+        let settled = false;
+        const timeout = setTimeout(() => fail(), 3000);
+        const succeed = () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeout);
           resolve();
-        }
-      };
+        };
+        const fail = () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeout);
+          reject(new Error('A conexão com a captura de vídeo local não foi autenticada.'));
+        };
+        const wsUrl = `ws://127.0.0.1:${port}`;
+        this.ws = new WebSocket(wsUrl);
+        this.ws.binaryType = 'arraybuffer';
 
-      this.ws.onmessage = (evt: MessageEvent) => {
-        if (!this.isCapturing) return;
+        this.ws.onopen = () => {
+          try { this.ws?.send(accessToken); } catch { fail(); }
+        };
 
-        // Handle error signaling from native backend (window minimized, DRM, capture error)
-        if (typeof evt.data === 'string') {
-          let reason = 'capture_error';
-          try {
-            const parsed = JSON.parse(evt.data);
-            reason = parsed.reason || parsed.type || 'capture_error';
-          } catch {
-            reason = evt.data;
-          }
-          console.warn('[NativeVideoBridge] Received capture signal from native backend:', reason);
-          if (this.onFallbackNeeded) {
-            this.onFallbackNeeded(reason);
-          }
-          return;
-        }
+        this.ws.onmessage = (evt: MessageEvent) => {
+          if (!this.isCapturing) return;
 
-        if (evt.data instanceof ArrayBuffer) {
-          // Never allow a 1-byte pacer tick to overwrite an awaiting real video frame!
-          if (evt.data.byteLength <= 4 && this.pendingBuffer && this.pendingBuffer.byteLength > 4) {
+          if (evt.data === 'auth-ok') {
+            succeed();
             return;
           }
-          this.pendingBuffer = evt.data;
-          pumpNextFrame();
-        }
-      };
 
-      this.ws.onerror = () => {
-        if (!resolved) {
-          resolved = true;
-          resolve();
-        }
-      };
+          // Handle error signaling from native backend (window minimized, DRM, capture error)
+          if (typeof evt.data === 'string') {
+            let reason = 'capture_error';
+            try {
+              const parsed = JSON.parse(evt.data);
+              reason = parsed.reason || parsed.type || 'capture_error';
+            } catch {
+              reason = evt.data;
+            }
+            console.warn('[NativeVideoBridge] Received capture signal from native backend:', reason);
+            if (this.onFallbackNeeded) {
+              this.onFallbackNeeded(reason);
+            }
+            return;
+          }
 
-      setTimeout(() => {
-        if (!resolved) {
-          resolved = true;
-          resolve();
-        }
-      }, 500);
-    });
+          if (evt.data instanceof ArrayBuffer) {
+            // Never allow a 1-byte pacer tick to overwrite an awaiting real video frame!
+            if (evt.data.byteLength <= 4 && this.pendingBuffer && this.pendingBuffer.byteLength > 4) {
+              return;
+            }
+            this.pendingBuffer = evt.data;
+            pumpNextFrame();
+          }
+        };
+
+        this.ws.onerror = fail;
+        this.ws.onclose = fail;
+      });
+    } catch (error) {
+      await this.stopCapture();
+      throw error;
+    }
 
     let stream: MediaStream;
     if (this.trackGenerator) {

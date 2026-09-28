@@ -21,6 +21,7 @@ test('admitted peers reconcile signed commands; unauthenticated peers cannot req
   });
   const actions = new Map<string, Action>();
   const sent: Array<{ action: string; data: any; target?: string }> = [];
+  let mediaSends = 0;
   const room = {
     makeAction(name: string): Action {
       const action: Action = {
@@ -30,6 +31,7 @@ test('admitted peers reconcile signed commands; unauthenticated peers cannot req
       return action;
     },
     getPeers: () => ({}),
+    addStream: () => { mediaSends += 1; return []; },
     onPeerJoin: (_peerId: string) => {},
     onPeerLeave: (_peerId: string) => {},
     onPeerStream: (_stream: MediaStream, _peerId: string) => {},
@@ -48,6 +50,15 @@ test('admitted peers reconcile signed commands; unauthenticated peers cannot req
       onChatHistory: () => {}, onPeersUpdate: () => {}, onStatusChange: () => {},
     });
     room.onPeerJoin('unproved');
+    assert.equal(manager.getConnectedPeers().some((peer) => peer.id === 'unproved'), false);
+    (manager as any).sendRoomAction(actions.get('presence'), { username: 'Host' });
+    assert.equal(sent.some((item) => item.action === 'presence' && item.target === 'unproved'), false);
+    (manager as any).localStream = { getTracks: () => [] };
+    manager.sendStreamToPeer('unproved');
+    room.onPeerStream({ getTracks: () => [] } as unknown as MediaStream, 'unproved');
+    assert.equal(mediaSends, 0, 'a direct WebRTC edge alone must not receive media');
+    assert.equal((manager as any).remoteStreams.has('unproved'), false);
+    (manager as any).localStream = null;
     await actions.get('room_admission')!.onMessage!({ kind: 'sync-request' }, { peerId: 'unproved' });
     assert.equal(sent.some((item) => item.action === 'room_admission' &&
       item.data.kind === 'sync' && item.target === 'unproved'), false);
@@ -59,6 +70,11 @@ test('admitted peers reconcile signed commands; unauthenticated peers cannot req
     const signature = await member.signControl('identity', [invite.roomId, 'member', nonce]);
     await actions.get('peer_identity')!.onMessage!(
       { kind: 'proof', nonce, key: member.publicKey, signature }, { peerId: 'member' });
+    assert.equal(manager.getConnectedPeers().some((peer) => peer.id === 'member'), false);
+    (manager as any).localStream = { getTracks: () => [] };
+    manager.sendStreamToPeer('member');
+    assert.equal(mediaSends, 0, 'a verified identity still requires room admission');
+    (manager as any).localStream = null;
     await actions.get('room_admission')!.onMessage!(
       { kind: 'request', password: '' }, { peerId: 'member' });
 
