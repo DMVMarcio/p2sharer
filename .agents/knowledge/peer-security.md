@@ -16,6 +16,8 @@ Host authority never moves automatically. The current host signs a transfer that
 
 An administrator persists the host-signed grant with its room identity. It can re-enter while the owner is offline and issue admissions signed by its own key, attaching the host grant. Receivers verify both signatures, the direct peer identity, the current authority epoch, and their locally known grant or revocation state. Administrator admissions require the current room password or a previously admitted member key; administrators cannot transfer ownership, change the password, appoint administrators, or expel members. At least one owner or administrator must be online to admit an ordinary new participant. A saved grant does not prove that no newer revocation exists elsewhere, so offline revocation freshness is not guaranteed without a shared state service.
 
+The current administrator flow must not be considered a secure revocation mechanism. To close the gap, use one strongly consistent, reachable room-state authority for role mutations and admission checks. Keep owner-signed role changes and WebRTC media P2P, but require every client to validate fresh room-state revision before accepting an administrator or an admission signed by one. A failed state check must fail closed for new admissions. Relay replication and peer gossip remain useful caches but cannot establish that a newer revocation has not been withheld.
+
 ## Action policy
 
 | Channel | Receiver authorization |
