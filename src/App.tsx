@@ -8,6 +8,7 @@ import { UsernameModal } from './components/modals/UsernameModal';
 import { AudioFilterModal } from './components/modals/AudioFilterModal';
 import { CreateRoomModal } from './components/modals/CreateRoomModal';
 import { JoinRoomModal } from './components/modals/JoinRoomModal';
+import { SaveInviteModal } from './components/modals/SaveInviteModal';
 import { RoomSecurityModal } from './components/modals/RoomSecurityModal';
 import { ExternalLinkModal } from './components/modals/ExternalLinkModal';
 import { ConnectingOverlay } from './components/modals/ConnectingOverlay';
@@ -70,6 +71,7 @@ export const App: React.FC = () => {
       {activeModal === 'audioFilter' && <AudioFilterModal />}
       {activeModal === 'createRoom' && <CreateRoomModal />}
       {activeModal === 'joinRoom' && <JoinRoomModal />}
+      {activeModal === 'saveInvite' && <SaveInviteModal />}
       {activeModal === 'roomSecurity' && <RoomSecurityModal />}
       {activeModal === 'externalLink' && <ExternalLinkModal />}
       <ConnectingOverlay />

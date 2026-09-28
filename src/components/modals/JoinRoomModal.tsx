@@ -3,7 +3,6 @@ import { useModal } from '../../hooks/useModal';
 import { useRoom } from '../../hooks/useRoom';
 import { showToast } from '../../hooks/useToast';
 import { parseRoomInvite } from '../../core/room_invite';
-import { savedRooms } from '../../core/saved_rooms';
 import { roomService } from '../../services/room_service';
 
 export const JoinRoomModal: React.FC = () => {
@@ -13,49 +12,14 @@ export const JoinRoomModal: React.FC = () => {
   const [code, setCode] = useState(() => roomService.pendingJoinInvite);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberPassword, setRememberPassword] = useState(false);
-
-  const saveInvite = async (): Promise<boolean> => {
-    const invite = parseRoomInvite(code);
-    if (!invite) { showToast('Cole um convite autenticado válido.'); return false; }
-    try {
-      const existing = await savedRooms.get(invite.roomId);
-      if (existing && parseRoomInvite(existing.invite)?.rootKey !== invite.rootKey) {
-        showToast('Este identificador já está salvo com outra identidade de sala.');
-        return false;
-      }
-      await savedRooms.put({
-        roomId: invite.roomId, invite: code.trim(), name: existing?.name ?? invite.roomId.slice(0, 8),
-        saved: true, owned: existing?.owned ?? false, identity: existing?.identity,
-        authorityChain: existing?.authorityChain, hostCommands: existing?.hostCommands,
-        protected: existing?.protected ?? true,
-        password: rememberPassword ? password.trim() : undefined,
-      });
-      return true;
-    } catch (error) {
-      console.error('[Rooms] Could not save invitation:', error);
-      showToast('Não foi possível salvar a sala.');
-      return false;
-    }
-  };
-
   const handleConfirm = async () => {
     if (!parseRoomInvite(code)) { showToast('Cole um convite autenticado válido.'); return; }
-    if (rememberPassword && !await saveInvite()) return;
     const asOwner = roomService.pendingJoinAsOwner;
     roomService.pendingJoinInvite = '';
     roomService.pendingJoinAsOwner = false;
     closeModal();
     joinRoom(code.trim(), password.trim(), asOwner);
     showToast('Conectando à sala...');
-  };
-
-  const handleSaveOnly = async () => {
-    if (!await saveInvite()) return;
-    roomService.pendingJoinInvite = '';
-    roomService.pendingJoinAsOwner = false;
-    closeModal();
-    showToast('Sala salva sem entrar.');
   };
 
   return (
@@ -136,15 +100,9 @@ export const JoinRoomModal: React.FC = () => {
               </button>
             </div>
           </div>
-          <label className="form-label room-remember-password">
-            <input type="checkbox" checked={rememberPassword}
-              onChange={(event) => setRememberPassword(event.target.checked)} />
-            Lembrar senha neste dispositivo ao salvar
-          </label>
         </div>
 
         <div className="modal-footer">
-          <button className="btn btn-secondary" onClick={handleSaveOnly}>Salvar sem entrar</button>
           <button className="btn btn-secondary" id="btn-cancel-join-dialog" onClick={closeModal}>
             Cancelar
           </button>
