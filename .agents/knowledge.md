@@ -22,7 +22,7 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 ## 2. Technical Sectors & Active Subagents
 | Sector / Domain | Subagent (`.agents/subagents/`) | Dedicated Skill (`.agents/skills/`) | Scope / Target Files |
 | :--- | :--- | :--- | :--- |
-| **Workspace Orchestration** | `project-orchestrator.md` | `task-lifecycle/SKILL.md` | Whole repository, task triage & cross-domain coordination |
+| **Workspace Orchestration** | `project-orchestrator.md` | `project-audit/SKILL.md`, `subagent-management/SKILL.md` | Whole repository, task triage & cross-domain coordination |
 | **P2P Netcode & Signaling** | `p2p-specialist.md` | `p2p-protocol/SKILL.md` | `src/p2p/*` (SignalingManager, GroupRoomManager, MediaCoordinator, PeerTracker, IceConfig) |
 | **Native Media Pipeline** | `native-media-specialist.md` | `native-media-pipeline/SKILL.md` | `src-tauri/src/*`, `src/audio/*`, `src/video/*` (WASAPI, xcap, WS bridge, resampler, process manager) |
 | **UI, State & Components** | `ui-architect.md` | `canonical-design/SKILL.md` | `src/ui/*`, `src/core/*`, `index.html`, `src/style.css` (ModalController, HudController, ViewerRenderer, StateStore) |
@@ -39,7 +39,7 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 ## 4. User Guidelines & Expressed Preferences
 <!-- Tagged directives captured directly or indirectly from workspace rules and user instructions -->
 - `[Protocol]` **Dual-Channel Language Protocol**: All interactive conversational chat must mirror the user's language (e.g. Portuguese). All code, commits, pull requests, task files, documentation, and `.agents/` artifacts must be written strictly in English.
-- `[Task Lifecycle]` **Mandatory Gatekeeper**: Always create `.agents/tasks/<slug>/task.md` before writing code or running mutations. Maintain real-time checkboxes and atomic commits.
+- `[Workflow]` **No Mandatory Task Files**: Do not create task-specific Markdown files or checklists as a prerequisite for investigation or implementation. Keep durable architectural discoveries in this knowledge base.
 - `[Git]` **Conventional Commits**: Format commit messages strictly as `type(scope): subject` in English (`feat`, `fix`, `refactor`, `chore`, `docs`, `test`).
 - `[UI]` **Canonical Reuse**: Search `src/ui/` and `src/style.css` before authoring new elements. Never create ad-hoc inline styles or unmodular UI components. Maintain dark/light theme tokens and accent colors.
 - `[Video]` **Hardware Acceleration**: Preserve WebView2 GPU acceleration flags in `src-tauri/src/lib.rs` and SDP codec priority (H.264/AV1/VP9/VP8) in `MediaCoordinator`.

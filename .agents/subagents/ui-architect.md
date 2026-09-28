@@ -14,7 +14,6 @@ commandExecutionPolicy: auto
 permissionMode: acceptEdits
 skills:
   - skills/canonical-design
-  - skills/task-lifecycle
 ---
 
 # System Prompt
