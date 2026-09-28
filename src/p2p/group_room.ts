@@ -4,6 +4,7 @@ import { PeerAuthenticator } from '../core/peer_auth.ts';
 import { RoomAuthority, type AdminAdmission, type AuthorityTransfer, type HostCommand } from '../core/room_authority.ts';
 import { parseRoomInvite } from '../core/room_invite.ts';
 import { savedRooms } from '../core/saved_rooms.ts';
+import { latestAdminCommand, roomStateFingerprint } from '../core/room_state_sync.ts';
 import type {
   ActiveStreamInfo,
   ChatMessage,
@@ -123,6 +124,7 @@ export class GroupRoomManager {
   private adminAdmissions = new Map<string, AdminAdmission>();
   private latestPasswordCommand = -1;
   private passwordCommandEpoch = -1;
+  private lastAuthoritySummary = 0;
   private localAdmitted = false;
   private guestInOwnedRoom = false;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -240,11 +242,7 @@ export class GroupRoomManager {
 
   private hasAdminGrant(key: string): boolean {
     if (!this.authority || this.bannedKeys.has(key)) return false;
-    const latest = this.admissionHistory.filter((command) =>
-      command.epoch === this.authority?.epoch && command.targetKey === key &&
-      (command.kind === 'admin' || command.kind === 'revoke-admin'))
-      .sort((left, right) => right.sequence - left.sequence)[0];
-    return latest?.kind === 'admin';
+    return latestAdminCommand(this.admissionHistory, this.authority.epoch, key)?.kind === 'admin';
   }
 
   private adminGrant(key: string): HostCommand | undefined {
@@ -533,6 +531,8 @@ export class GroupRoomManager {
     }
     if (this.chatAuth?.getKnownKey(peerId) === key && peerId !== selfId) this.announceToPeer(peerId);
     this.notifyPeersUpdate();
+    void this.sendAuthoritySummary(peerId === selfId ? undefined : peerId).catch((error) =>
+      console.warn('[Rooms] Initial authority reconciliation failed:', error));
   }
 
   private removeKickedPeer(peerId: string, key: string): void {
@@ -603,6 +603,18 @@ export class GroupRoomManager {
     if (!this.invite) return;
     const record = await savedRooms.get(this.roomId);
     if (record?.password !== undefined) await savedRooms.put({ ...record, password: this.password });
+  }
+
+  private async sendAuthoritySummary(peerId?: string): Promise<void> {
+    if (!this.authority || !this.localAdmitted || !this.admissionAction) return;
+    const targets = peerId ? [peerId] : this.admittedTargets();
+    const fingerprint = await roomStateFingerprint(this.authority.epoch, this.admissionHistory);
+    for (const target of targets) {
+      const key = this.chatAuth?.getKnownKey(target);
+      if (!key || this.admittedPeers.get(target) !== key) continue;
+      await this.admissionAction.send({ kind: 'summary', epoch: this.authority.epoch, fingerprint },
+        { target });
+    }
   }
 
   private async acceptHostCommand(command: HostCommand): Promise<void> {
@@ -678,6 +690,9 @@ export class GroupRoomManager {
           }
         }
         if (this.admittedPeers.get(meta.peerId) === data.key) this.announceToPeer(meta.peerId);
+        if (this.admittedPeers.get(meta.peerId) === data.key) {
+          await this.sendAuthoritySummary(meta.peerId);
+        }
         if (this.authority?.isPeerHost(meta.peerId) || this.isPeerAdmin(meta.peerId)) {
           await this.admissionAction?.send({ kind: 'request', password: this.password }, { target: meta.peerId });
         } else if (this.authority?.isLocalHost() || this.isRoomAdmin()) {
@@ -700,6 +715,7 @@ export class GroupRoomManager {
       } else if (data.kind === 'chain' && data.chain && await this.authority.importChain(data.chain)) {
         if (this.room !== boundRoom) return;
         this.syncHostRole();
+        await this.admissionAction?.send({ kind: 'sync-request' }, { target: meta.peerId });
         for (const peerId of this.peerTracker.directConnectedPeers) {
           if (this.authority.isPeerHost(peerId) || this.isPeerAdmin(peerId)) {
             await this.admissionAction?.send({ kind: 'request', password: this.password }, { target: peerId });
@@ -724,9 +740,13 @@ export class GroupRoomManager {
     this.admissionAction = this.room.makeAction('room_admission');
     this.admissionAction.onMessage = async (data: {
       kind?: string; password?: string; command?: HostCommand; commands?: HostCommand[];
-      admission?: AdminAdmission;
+      admission?: AdminAdmission; epoch?: number; fingerprint?: string;
     }, meta: { peerId: string }) => {
       if (!this.authority || !this.chatAuth || !data) return;
+      const senderKey = this.chatAuth.getKnownKey(meta.peerId);
+      const trustedStateSender = Boolean(senderKey &&
+        (this.authority.isPeerHost(meta.peerId) || this.isPeerAdmin(meta.peerId) ||
+         (this.localAdmitted && this.admittedPeers.get(meta.peerId) === senderKey)));
       if (data.kind === 'request' && (this.authority.isLocalHost() || this.isRoomAdmin())) {
         const key = this.chatAuth.getKnownKey(meta.peerId);
         const returningMember = Boolean(key && !this.bannedKeys.has(key) &&
@@ -741,10 +761,21 @@ export class GroupRoomManager {
         await this.admissionAction.send({ kind: 'request', password: this.password }, { target: meta.peerId });
       } else if (data.kind === 'admin-hello-request' && this.isRoomAdmin()) {
         await this.issueAdminAdmission(selfId);
-      } else if (data.kind === 'sync-request' && (this.authority.isLocalHost() || this.isRoomAdmin()) &&
-                 this.admittedPeers.get(meta.peerId) === this.chatAuth.getKnownKey(meta.peerId)) {
+      } else if (data.kind === 'sync-request' && this.localAdmitted && senderKey &&
+                  this.admittedPeers.get(meta.peerId) === senderKey) {
         await this.admissionAction.send({ kind: 'sync', commands: this.admissionHistory }, { target: meta.peerId });
-      } else if (data.kind === 'sync' && Array.isArray(data.commands) && data.commands.length <= 200) {
+      } else if (data.kind === 'summary' && trustedStateSender && this.localAdmitted &&
+                 Number.isSafeInteger(data.epoch) && typeof data.fingerprint === 'string' &&
+                 /^[0-9a-f]{64}$/.test(data.fingerprint)) {
+        const localFingerprint = await roomStateFingerprint(this.authority.epoch, this.admissionHistory);
+        if (data.epoch !== this.authority.epoch || data.fingerprint !== localFingerprint) {
+          await this.authorityAction?.send({ kind: 'chain', chain: this.authority.history() },
+            { target: meta.peerId });
+          await this.admissionAction.send({ kind: 'sync', commands: this.admissionHistory },
+            { target: meta.peerId });
+        }
+      } else if (data.kind === 'sync' && trustedStateSender &&
+                 Array.isArray(data.commands) && data.commands.length <= 200) {
         for (const command of data.commands) await this.acceptHostCommand(command);
       } else if (data.kind === 'command' && data.command) {
         await this.acceptHostCommand(data.command);
@@ -1326,6 +1357,11 @@ export class GroupRoomManager {
       const hasNoDirectPeers = this.peerTracker.directConnectedPeers.size === 0;
       const rumors = this.peerTracker.getPendingRumors();
       const now = Date.now();
+      if (this.authority && now - this.lastAuthoritySummary >= 20_000) {
+        this.lastAuthoritySummary = now;
+        void this.sendAuthoritySummary().catch((error) =>
+          console.warn('[Rooms] Authority reconciliation failed:', error));
+      }
       if (
         (hasNoDirectPeers || rumors.length > 0) &&
         this.signalingTopic &&
