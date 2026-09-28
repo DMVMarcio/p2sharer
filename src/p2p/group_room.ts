@@ -1,5 +1,6 @@
 import { selfId } from '@trystero-p2p/core';
 import { chatHistoryChanged, chatRevision, chatRevisionKey, mergeChatHistory } from '../core/chat_history.ts';
+import { PeerAuthenticator } from '../core/peer_auth.ts';
 import type {
   ActiveStreamInfo,
   ChatMessage,
@@ -22,7 +23,7 @@ import { MediaCoordinator } from './media_coordinator.ts';
 import { PeerTracker } from './peer_tracker.ts';
 import { signalingManager } from './signaling_manager.ts';
 
-const APP_ID = 'p2sharer-multi-stream-v1';
+const APP_ID = 'p2sharer-multi-stream-v2';
 
 const ADJECTIVES = [
   'cyber', 'neon', 'rapid', 'swift', 'cosmic', 'hyper', 'solar', 'lunar',
@@ -51,24 +52,11 @@ export async function computeSignalingRoomId(roomId: string, password = ''): Pro
   if (!cleanPass) {
     return `public-${cleanRoom}`;
   }
-  // Cryptographically isolate rooms with passwords (even with identical names)
-  try {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(`p2sharer-auth:${cleanRoom}:${cleanPass}`);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('').substring(0, 16);
-    return `sec-${cleanRoom}-${hashHex}`;
-  } catch {
-    // Fallback if crypto.subtle is unavailable
-    let hash = 0;
-    const combined = `${cleanRoom}:${cleanPass}`;
-    for (let i = 0; i < combined.length; i++) {
-      hash = (hash << 5) - hash + combined.charCodeAt(i);
-      hash |= 0;
-    }
-    return `sec-${cleanRoom}-${Math.abs(hash).toString(16)}`;
-  }
+  const data = new TextEncoder().encode(`p2sharer-auth:${cleanRoom}:${cleanPass}`);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('').substring(0, 16);
+  return `sec-${cleanRoom}-${hashHex}`;
 }
 
 export function generateUserColor(name: string): string {
@@ -120,6 +108,7 @@ export class GroupRoomManager {
   private remoteStreams: Map<string, MediaStream> = new Map(); // peerId -> stream
   private chatHistory: ChatMessage[] = [];
   private seenChatRevisions: Set<string> = new Set();
+  private chatAuth: PeerAuthenticator | null = null;
 
   // Trystero action references
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -262,14 +251,15 @@ export class GroupRoomManager {
     });
 
     try {
+      this.chatAuth = await PeerAuthenticator.create(this.roomId, selfId);
       this.signalingTopic = await computeSignalingRoomId(this.roomId, this.password);
       console.log(`[P2P] Computed signaling topic: "${this.signalingTopic}"`);
 
       this.setupRoomInstance();
       if (this.isCreator) {
-        this.sendSystemMessage(`Sala criada: ${this.roomId}`, 'info', undefined, this.roomId);
+        await this.sendSystemMessage(`Sala criada: ${this.roomId}`, 'info', undefined, this.roomId);
       }
-      this.sendSystemMessage(`${this.username} entrou`, 'join', this.username);
+      await this.sendSystemMessage(`${this.username} entrou`, 'join', this.username);
       this.notifyStreamsUpdate();
       this.notifyPeersUpdate();
       callbacks.onStatusChange(this.isCreator ? 'Sala Ativa' : 'Procurando Participantes...');
@@ -354,25 +344,59 @@ export class GroupRoomManager {
     this.notifyStreamsUpdate();
   }
 
+  private isConsistentChatClaim(message: ChatMessage): boolean {
+    if (message.systemRoom && message.systemRoom !== this.roomId) return false;
+    const knownName = this.announcedPeerNames.has(message.authorId || '')
+      ? this.peerTracker.getUsername(message.authorId || '') : undefined;
+    if (message.isHost && !this.peerTracker.isPeerCreator(message.authorId || '')) return false;
+    if (!knownName) return false;
+    if (!message.isSystem) return message.sender === knownName && !message.systemType &&
+      !message.systemActor && !message.systemRoom;
+    if (message.sender !== 'Sistema' || message.revision !== 0 || message.editedAt || message.deletedAt) return false;
+    if (message.systemRoom) return message.systemType === 'info' &&
+      this.peerTracker.isPeerCreator(message.authorId || '') &&
+      message.text === `Sala criada: ${this.roomId}` && !message.systemActor;
+    if (message.systemActor !== knownName) return false;
+    const expected: Partial<Record<NonNullable<ChatMessage['systemType']>, string>> = {
+      join: `${knownName} entrou`,
+      leave: `${knownName} saiu`,
+      'stream-start': `${knownName} iniciou uma transmissão`,
+      'stream-stop': `${knownName} parou de transmitir`,
+    };
+    if (message.systemType === 'info') return this.peerTracker.getHostPeerId(selfId, this.myJoinedAt, this.isCreator) === message.authorId &&
+      message.text === `Senha alterada por ${knownName}`;
+    if (!message.systemType || !expected[message.systemType]) return false;
+    return message.text === expected[message.systemType];
+  }
+
+  private canTrackRumor(peerId: string): boolean {
+    return this.peerTracker.isVerified(peerId) ||
+      this.peerTracker.getPendingRumors().includes(peerId) ||
+      this.peerTracker.getPendingRumors().length < 64;
+  }
+
   private bindRoomActions(): void {
     if (!this.room) return;
     const boundRoom = this.room;
 
     // 0. Setup Live Room Password Sync Action
     this.passwordAction = this.room.makeAction('room_password_sync');
-    this.passwordAction.onMessage = (data: { newPassword?: string; updatedBy?: string }) => {
-      if (typeof data.newPassword === 'string') {
+    this.passwordAction.onMessage = (data: { newPassword?: string }, meta: { peerId: string }) => {
+      if (meta.peerId !== this.peerTracker.getHostPeerId(selfId, this.myJoinedAt, this.isCreator)) return;
+      if (data && typeof data.newPassword === 'string' && data.newPassword.length <= 128) {
         this.password = data.newPassword.trim();
         if (this.callbacks?.onPasswordChange) {
-          this.callbacks.onPasswordChange(this.password, data.updatedBy || 'Participante');
+          this.callbacks.onPasswordChange(this.password, this.peerTracker.getUsername(meta.peerId) || 'Participante');
         }
       }
     };
 
     // 1. Setup Chat Action with In-Mesh Forwarding & Deduplication
     this.chatAction = this.room.makeAction('chat');
-    this.chatAction.onMessage = (msg: ChatMessage) => {
-      if (!msg || !msg.id) return;
+    this.chatAction.onMessage = async (msg: ChatMessage, meta: { peerId: string }) => {
+      if (!this.chatAuth || !await this.chatAuth.verify(msg, meta.peerId)) return;
+      if (this.room !== boundRoom) return;
+      if (!this.isConsistentChatClaim(msg)) return;
       const revisionKey = chatRevisionKey(msg);
       if (this.seenChatRevisions.has(revisionKey)) return;
       const merged = mergeChatHistory(this.chatHistory, [msg]);
@@ -391,15 +415,21 @@ export class GroupRoomManager {
 
     // 2. Setup Chat History Sync Action (P2P pull from host / peers)
     this.historyAction = this.room.makeAction('history_sync');
-    this.historyAction.onMessage = (
+    this.historyAction.onMessage = async (
       data: { request?: boolean; history?: ChatMessage[] },
       meta: { peerId: string }
     ) => {
       const peerId = meta.peerId;
-      if (data.request) {
+      if (data?.request === true) {
         this.historyAction.send({ history: this.chatHistory }, { target: peerId });
-      } else if (data.history && Array.isArray(data.history) && data.history.length > 0) {
-        const merged = mergeChatHistory(this.chatHistory, data.history);
+      } else if (Array.isArray(data?.history) && data.history.length > 0 && data.history.length <= 1000) {
+        const verified: ChatMessage[] = [];
+        for (const message of data.history) {
+          if (this.chatAuth && await this.chatAuth.verify(message, peerId) &&
+              this.isConsistentChatClaim(message)) verified.push(message);
+        }
+        if (this.room !== boundRoom) return;
+        const merged = mergeChatHistory(this.chatHistory, verified);
         if (chatHistoryChanged(this.chatHistory, merged)) {
           merged.forEach((m) => this.seenChatRevisions.add(chatRevisionKey(m)));
           this.chatHistory = merged;
@@ -417,9 +447,15 @@ export class GroupRoomManager {
       meta: { peerId: string }
     ) => {
       const peerId = meta.peerId;
+      if (!data || typeof data.username !== 'string' || data.username.length > 80 ||
+          (data.joinedAt !== undefined && !Number.isFinite(data.joinedAt)) ||
+          (data.isCreator !== undefined && typeof data.isCreator !== 'boolean') ||
+          (data.isStreaming !== undefined && typeof data.isStreaming !== 'boolean')) return;
       this.peerTracker.touchPeer(peerId);
 
       const suppliedName = typeof data.username === 'string' ? data.username.trim() : '';
+      if (suppliedName && this.peerTracker.getVerifiedPeers().some((peer) =>
+        peer.id !== peerId && peer.username.toLocaleLowerCase() === suppliedName.toLocaleLowerCase())) return;
       const newName = suppliedName || this.peerTracker.getUsername(peerId) || `Usuário (${peerId.slice(0, 4)})`;
       this.peerTracker.addPeer(peerId, newName, Boolean(data.isCreator), data.joinedAt);
 
@@ -434,6 +470,9 @@ export class GroupRoomManager {
             joinedAt: this.peerTracker.getJoinedAt(peerId) || Date.now(),
             isCreator: Boolean(data.isCreator),
           });
+          // A signed history may arrive before the sender's role/name presence.
+          // Retry after identity metadata is pinned so claims can be validated.
+          try { this.historyAction?.send({ request: true }, { target: peerId }); } catch {}
         }
       }
 
@@ -477,11 +516,12 @@ export class GroupRoomManager {
     // 4. Setup Stream Status Action (Screen share toggle bug fix & stream recovery protocol)
     this.streamStatusAction = this.room.makeAction('stream_status');
     this.streamStatusAction.onMessage = (data: StreamStatusPayload, meta: { peerId: string }) => {
+      if (!data || typeof data.isStreaming !== 'boolean' ||
+          (data.streamId !== undefined && (typeof data.streamId !== 'string' || data.streamId.length > 100))) return;
       const peerId = meta.peerId;
       this.peerTracker.touchPeer(peerId);
 
-      const senderName =
-        data.senderName || this.peerTracker.getUsername(peerId) || `Participante (${peerId.slice(0, 4)})`;
+      const senderName = this.peerTracker.getUsername(peerId) || `Participante (${peerId.slice(0, 4)})`;
       const wasStreaming = this.peerTracker.isStreaming(peerId);
 
       if (data.isStreaming) {
@@ -538,10 +578,11 @@ export class GroupRoomManager {
       meta: { peerId: string }
     ) => {
       const watcherPeerId = meta.peerId;
-      const watcherName =
-        data.watcherName || this.peerTracker.getUsername(watcherPeerId) || `Participante (${watcherPeerId.slice(0, 4)})`;
+      if (!data || typeof data.isWatching !== 'boolean') return;
+      const watcherName = this.peerTracker.getUsername(watcherPeerId) || `Participante (${watcherPeerId.slice(0, 4)})`;
       const broadcasterId = data.broadcasterId;
-      if (!broadcasterId) return;
+      if (typeof broadcasterId !== 'string' ||
+          (broadcasterId !== selfId && !this.peerTracker.isVerified(broadcasterId))) return;
 
       const currentWatchers = this.peerTracker.getWatchers(broadcasterId);
       const isAlreadyWatching = currentWatchers.some((w) => w.peerId === watcherPeerId);
@@ -563,12 +604,14 @@ export class GroupRoomManager {
 
     // 5. Setup On-Demand Stream Request Action (Stream Recovery Protocol Receiver)
     this.streamReqAction = this.room.makeAction('stream_req');
-    this.streamReqAction.onMessage = (data: { request?: boolean }, meta: { peerId: string }) => {
+    this.streamReqAction.onMessage = (data: { request?: boolean; broadcasterId?: string; requesterId?: string }, meta: { peerId: string }) => {
+      if (!data || data.request !== true || (data.broadcasterId && data.broadcasterId !== selfId) ||
+          (data.requesterId && data.requesterId !== meta.peerId)) return;
       const requesterId = meta.peerId;
       this.peerTracker.touchPeer(requesterId);
 
       console.log(`[P2P] Received stream request from peer ${requesterId}`);
-      if (this.localStream && data.request) {
+      if (this.localStream) {
         this.sendStreamToPeer(requesterId);
       }
     };
@@ -577,7 +620,8 @@ export class GroupRoomManager {
     this.leaveAction = this.room.makeAction('peer_leave');
     this.leaveAction.onMessage = (data: { peerId?: string } | unknown, meta: { peerId: string }) => {
       const payloadPid = (data as { peerId?: string })?.peerId;
-      const targetPid = payloadPid || meta.peerId;
+      if (payloadPid && payloadPid !== meta.peerId) return;
+      const targetPid = meta.peerId;
       console.log(`[P2P] Received explicit leave notice for peer ${targetPid}`);
       this.removePeer(targetPid);
     };
@@ -585,13 +629,13 @@ export class GroupRoomManager {
     // 7. Setup Peer Exchange (PEX) - Distinguishes verified direct peers from unverified gossip rumors
     this.pexAction = this.room.makeAction('peer_exchange');
     this.pexAction.onMessage = (data: { peers?: PeerExchangeItem[] }, meta: { peerId: string }) => {
-      if (!data || !Array.isArray(data.peers)) return;
+      if (!data || !Array.isArray(data.peers) || data.peers.length > 32) return;
       this.peerTracker.touchPeer(meta.peerId);
 
       if (!this.isCreator) {
         this.existingAtJoinIds.add(meta.peerId);
         data.peers.forEach((peer) => {
-          if (peer.peerId) this.existingAtJoinIds.add(peer.peerId);
+          if (typeof peer?.peerId === 'string' && peer.peerId.length <= 80) this.existingAtJoinIds.add(peer.peerId);
         });
         if (!this.initialRosterReceived) {
           this.initialRosterReceived = true;
@@ -605,13 +649,16 @@ export class GroupRoomManager {
 
       let hasNewRumors = false;
       data.peers.forEach((p) => {
-        if (p.peerId && p.peerId !== selfId) {
+        if (p && typeof p.peerId === 'string' && p.peerId.length > 0 && p.peerId.length <= 80 &&
+            p.peerId !== selfId && this.canTrackRumor(p.peerId)) {
           const isDirect = this.peerTracker.isVerified(p.peerId);
+          if (isDirect) return;
           if (!isDirect) {
             this.rumorIntermediaries.set(p.peerId, meta.peerId);
             hasNewRumors = true;
           }
-          this.peerTracker.receivePeerExchange(p.peerId, isDirect, p.username, p.isCreator, p.joinedAt);
+          this.peerTracker.receivePeerExchange(p.peerId, false,
+            typeof p.username === 'string' ? p.username.slice(0, 80) : undefined);
 
           // If peer is not yet directly connected to us, bridge via intermediary peer
           if (!isDirect && !this.peerTracker.isVerified(p.peerId)) {
@@ -633,7 +680,9 @@ export class GroupRoomManager {
       data: { target: string; origin: string; kind: string; payload: any },
       meta: { peerId: string }
     ) => {
-      if (!data) return;
+      if (!data || typeof data.origin !== 'string' || !data.origin || data.origin.length > 80 ||
+          typeof data.target !== 'string' || data.target.length > 80) return;
+      if (data.origin === selfId || !this.canTrackRumor(data.origin)) return;
       this.peerTracker.touchPeer(meta.peerId);
 
       if (data.target === selfId || data.target === 'all') {
@@ -641,7 +690,7 @@ export class GroupRoomManager {
           console.log(`[P2P/Mesh] Received mesh_hello from indirect peer ${data.origin}`);
           const p = data.payload || {};
           this.rumorIntermediaries.set(data.origin, meta.peerId);
-          this.peerTracker.receivePeerExchange(data.origin, false, p.username, p.isCreator, p.joinedAt);
+          this.peerTracker.receivePeerExchange(data.origin, false, typeof p.username === 'string' ? p.username.slice(0, 80) : undefined);
 
           // Reply with mesh_ack back through the intermediary
           if (this.meshRelayAction) {
@@ -671,16 +720,14 @@ export class GroupRoomManager {
           console.log(`[P2P/Mesh] Received mesh_ack from indirect peer ${data.origin}`);
           const p = data.payload || {};
           this.rumorIntermediaries.set(data.origin, meta.peerId);
-          this.peerTracker.receivePeerExchange(data.origin, false, p.username, p.isCreator, p.joinedAt);
+          this.peerTracker.receivePeerExchange(data.origin, false, typeof p.username === 'string' ? p.username.slice(0, 80) : undefined);
 
           // Force signaling re-announcement on the broker
           if (this.signalingTopic) {
             signalingManager.reannounce(this.signalingTopic, data.origin);
           }
-        } else if (data.kind === 'stream_req' && this.localStream) {
+        } else if (data.kind === 'stream_req' && data.origin === meta.peerId && this.localStream) {
           this.sendStreamToPeer(data.origin);
-        } else if (data.kind === 'peer_leave') {
-          this.removePeer(data.origin);
         }
       } else if (data.target && this.peerTracker.hasPeer(data.target)) {
         try {
@@ -694,7 +741,7 @@ export class GroupRoomManager {
     this.pongAction = this.room.makeAction('peer_pong');
 
     this.pingAction.onMessage = (data: { t: number }, meta: { peerId: string }) => {
-      if (data?.t && this.pongAction) {
+      if (Number.isFinite(data?.t) && Math.abs(Date.now() - data.t) < 30000 && this.pongAction) {
         try {
           this.pongAction.send({ t: data.t }, { target: meta.peerId });
         } catch {}
@@ -702,7 +749,7 @@ export class GroupRoomManager {
     };
 
     this.pongAction.onMessage = (data: { t: number }, meta: { peerId: string }) => {
-      if (data?.t) {
+      if (Number.isFinite(data?.t) && Math.abs(Date.now() - data.t) < 30000) {
         const ping = Math.max(1, Date.now() - data.t);
         this.peerTracker.setPing(meta.peerId, ping);
       }
@@ -721,6 +768,7 @@ export class GroupRoomManager {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       action.onMessage = (...args: any[]) => {
         if (this.room !== boundRoom) return;
+        if (!this.peerTracker.isVerified(args[1]?.peerId)) return;
         return handler(...args);
       };
     });
@@ -793,6 +841,7 @@ export class GroupRoomManager {
     // 10. Incoming Stream Listener
     this.room.onPeerStream = (stream: MediaStream, peerId: string) => {
       if (this.room !== boundRoom) return;
+      if (!this.peerTracker.isVerified(peerId)) return;
       console.log(`[P2P] Received stream from peer: ${peerId}`);
       this.peerTracker.touchPeer(peerId);
       this.peerTracker.setStreaming(peerId, true);
@@ -1125,7 +1174,8 @@ export class GroupRoomManager {
 
     this.callbacks?.onStreamStarted?.('local', this.username, true);
     if (!wasStreaming && stream && this.room) {
-      this.sendSystemMessage(`${this.username} iniciou uma transmissão`, 'stream-start', this.username);
+      void this.sendSystemMessage(`${this.username} iniciou uma transmissão`, 'stream-start', this.username)
+        .catch((error) => console.warn('[Chat] Failed to publish stream notice:', error));
     }
 
     if (this.room && stream) {
@@ -1245,7 +1295,8 @@ export class GroupRoomManager {
 
     if (wasStreaming) {
       if (this.room) {
-        this.sendSystemMessage(`${this.username} parou de transmitir`, 'stream-stop', this.username);
+        void this.sendSystemMessage(`${this.username} parou de transmitir`, 'stream-stop', this.username)
+          .catch((error) => console.warn('[Chat] Failed to publish stream notice:', error));
       }
       this.callbacks?.onStreamStopped?.('local', this.username, true);
       this.cleanupStreamWatchers('local', this.username);
@@ -1555,7 +1606,7 @@ export class GroupRoomManager {
     this.callbacks.onSlotsUpdate(slots);
   }
 
-  public sendChatMessage(text: string, replyToId?: string): ChatMessage {
+  public sendChatMessage(text: string, replyToId?: string): Promise<ChatMessage> {
     const original = replyToId ? this.chatHistory.find((message) => message.id === replyToId) : undefined;
     const msg: ChatMessage = {
       id: crypto.randomUUID(),
@@ -1573,10 +1624,10 @@ export class GroupRoomManager {
     return this.publishChatMessage(msg);
   }
 
-  public editChatMessage(id: string, text: string): boolean {
+  public async editChatMessage(id: string, text: string): Promise<boolean> {
     const current = this.chatHistory.find((message) => message.id === id);
     if (!current || current.authorId !== selfId || current.isSystem || current.deletedAt || !text.trim()) return false;
-    this.publishChatMessage({
+    await this.publishChatMessage({
       ...current,
       text: text.trim(),
       revision: chatRevision(current) + 1,
@@ -1585,10 +1636,10 @@ export class GroupRoomManager {
     return true;
   }
 
-  public deleteChatMessage(id: string): boolean {
+  public async deleteChatMessage(id: string): Promise<boolean> {
     const current = this.chatHistory.find((message) => message.id === id);
     if (!current || current.authorId !== selfId || current.isSystem || current.deletedAt) return false;
-    this.publishChatMessage({
+    await this.publishChatMessage({
       ...current,
       text: '',
       revision: chatRevision(current) + 1,
@@ -1602,19 +1653,22 @@ export class GroupRoomManager {
     systemType: NonNullable<ChatMessage['systemType']>,
     systemActor?: string,
     systemRoom?: string,
-  ): ChatMessage {
+  ): Promise<ChatMessage> {
     return this.publishChatMessage({
       id: crypto.randomUUID(), sender: 'Sistema', text,
-      timestamp: Date.now(), isSystem: true, systemType, systemActor, systemRoom,
+      timestamp: Date.now(), authorId: selfId, revision: 0,
+      isSystem: true, systemType, systemActor, systemRoom,
     });
   }
 
-  private publishChatMessage(msg: ChatMessage): ChatMessage {
-    this.seenChatRevisions.add(chatRevisionKey(msg));
-    this.chatHistory = mergeChatHistory(this.chatHistory, [msg]);
-    this.callbacks?.onChat(msg);
-    try { this.chatAction?.send(msg); } catch {}
-    return msg;
+  private async publishChatMessage(msg: ChatMessage): Promise<ChatMessage> {
+    if (!this.chatAuth) throw new Error('Chat identity is not ready');
+    const signed = await this.chatAuth.sign(msg);
+    this.seenChatRevisions.add(chatRevisionKey(signed));
+    this.chatHistory = mergeChatHistory(this.chatHistory, [signed]);
+    this.callbacks?.onChat(signed);
+    try { await this.chatAction?.send(signed); } catch {}
+    return signed;
   }
 
   public getConnectedPeers(): PeerInfo[] {
@@ -1627,7 +1681,8 @@ export class GroupRoomManager {
     }
   }
 
-  public updateRoomPassword(newPassword: string) {
+  public updateRoomPassword(newPassword: string): boolean {
+    if (!this.isRoomHost() || newPassword.length > 128) return false;
     this.password = newPassword.trim();
     if (this.passwordAction) {
       this.passwordAction.send({
@@ -1638,7 +1693,9 @@ export class GroupRoomManager {
     if (this.callbacks?.onPasswordChange) {
       this.callbacks.onPasswordChange(this.password, this.username);
     }
-    this.sendSystemMessage(`Senha alterada por ${this.username}`, 'info', this.username);
+    void this.sendSystemMessage(`Senha alterada por ${this.username}`, 'info', this.username)
+      .catch((error) => console.warn('[Chat] Failed to publish password notice:', error));
+    return true;
   }
 
   public requestStream(peerId: string): void {
@@ -1663,7 +1720,7 @@ export class GroupRoomManager {
   public async leave(): Promise<void> {
     this.stopStream();
     if (this.room) {
-      this.sendSystemMessage(`${this.username} saiu`, 'leave', this.username);
+      await this.sendSystemMessage(`${this.username} saiu`, 'leave', this.username);
     }
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);

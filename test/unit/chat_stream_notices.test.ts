@@ -43,6 +43,10 @@ test('stream owner publishes one start and stop notice into synchronized history
     manager.stopStream();
     manager.stopStream();
 
+    for (let attempt = 0; attempt < 30 && received.filter((message) => message.systemType?.startsWith('stream-')).length < 2; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
     const notices = received.filter((message) => message.systemType?.startsWith('stream-'));
     assert.deepEqual(notices.map((message) => message.text), [
       'Márcio iniciou uma transmissão', 'Márcio parou de transmitir',

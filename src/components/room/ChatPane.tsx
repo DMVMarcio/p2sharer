@@ -94,10 +94,10 @@ export const ChatPane: React.FC = () => {
     setPickerTarget(null);
   };
 
-  const saveEdit = (id: string) => {
+  const saveEdit = async (id: string) => {
     const content = editRef.current?.getMarkdown() ?? editDraft;
     if (!content.trim()) { showToast('A mensagem não pode ficar vazia.'); return; }
-    if (!editChatMessage(id, content)) { showToast('Não foi possível editar a mensagem.'); return; }
+    if (!await editChatMessage(id, content)) { showToast('Não foi possível editar a mensagem.'); return; }
     setEditingId(null);
     setPickerTarget(null);
   };
@@ -154,7 +154,7 @@ export const ChatPane: React.FC = () => {
                   onReply={() => { setReplyToId(msg.id); setOpenMenuId(null); inputRef.current?.focus(); }}
                   onCopy={() => { copyText(msg.text); setOpenMenuId(null); }}
                   onEdit={() => { setEditingId(msg.id); setEditDraft(msg.text); setPickerTarget(null); setOpenMenuId(null); }}
-                  onDelete={() => { if (!deleteChatMessage(msg.id)) showToast('Não foi possível excluir a mensagem.'); if (editingId === msg.id) setEditingId(null); setPickerTarget(null); setOpenMenuId(null); }}
+                  onDelete={() => { void deleteChatMessage(msg.id).then((deleted) => { if (!deleted) showToast('Não foi possível excluir a mensagem.'); }); if (editingId === msg.id) setEditingId(null); setPickerTarget(null); setOpenMenuId(null); }}
                 />
               </div>
               <div className="chat-msg-bubble">

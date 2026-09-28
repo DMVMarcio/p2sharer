@@ -86,6 +86,8 @@ export interface ChatMessage {
   text: string;
   timestamp: number;
   authorId?: string;
+  authorKey?: string;
+  signature?: string;
   revision?: number;
   editedAt?: number;
   deletedAt?: number;
