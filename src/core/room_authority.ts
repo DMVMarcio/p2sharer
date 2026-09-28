@@ -14,10 +14,20 @@ export interface HostCommand {
   roomId: string;
   epoch: number;
   sequence: number;
-  kind: 'admit' | 'kick' | 'password';
+  kind: 'admit' | 'kick' | 'password' | 'admin' | 'revoke-admin';
   targetPeerId?: string;
   targetKey?: string;
   password?: string;
+  signature: string;
+}
+
+export interface AdminAdmission {
+  roomId: string;
+  epoch: number;
+  targetPeerId: string;
+  targetKey: string;
+  adminKey: string;
+  grant: HostCommand;
   signature: string;
 }
 
@@ -27,6 +37,10 @@ const transferData = (value: AuthorityTransfer) => [
 const commandData = (value: HostCommand) => [
   value.roomId, value.epoch, value.sequence, value.kind,
   value.targetPeerId ?? null, value.targetKey ?? null, value.password ?? null,
+];
+const adminAdmissionData = (value: AdminAdmission) => [
+  value.roomId, value.epoch, value.targetPeerId, value.targetKey,
+  value.adminKey, value.grant.sequence,
 ];
 
 export class RoomAuthority {
@@ -113,7 +127,7 @@ export class RoomAuthority {
   async verifyCommand(command: HostCommand): Promise<boolean> {
     if (!command || command.roomId !== this.roomId || command.epoch !== this.epoch ||
         !Number.isSafeInteger(command.sequence) || command.sequence <= 0 ||
-        !['admit', 'kick', 'password'].includes(command.kind)) return false;
+        !['admit', 'kick', 'password', 'admin', 'revoke-admin'].includes(command.kind)) return false;
     const identifier = `${command.epoch}:${command.sequence}`;
     if (this.seenCommands.has(identifier)) return false;
     if (command.kind === 'password' && (typeof command.password !== 'string' || command.password.length > 128)) return false;
@@ -122,5 +136,34 @@ export class RoomAuthority {
     this.seenCommands.add(identifier);
     this.commandSequence = Math.max(this.commandSequence, command.sequence);
     return true;
+  }
+
+  async verifyGrant(command: HostCommand): Promise<boolean> {
+    return Boolean(command && command.roomId === this.roomId && command.epoch === this.epoch &&
+      command.kind === 'admin' && Number.isSafeInteger(command.sequence) && command.sequence > 0 &&
+      typeof command.targetPeerId === 'string' && command.targetPeerId.length > 0 &&
+      typeof command.targetKey === 'string' && /^04[0-9a-f]{128}$/.test(command.targetKey) &&
+      await this.auth.verifyControl('host-command', commandData(command), command.signature, this.currentKey));
+  }
+
+  async signAdminAdmission(targetPeerId: string, targetKey: string, grant: HostCommand): Promise<AdminAdmission> {
+    if (grant.targetKey !== this.auth.publicKey || !await this.verifyGrant(grant)) {
+      throw new Error('Administrator credential is invalid');
+    }
+    const admission: AdminAdmission = {
+      roomId: this.roomId, epoch: this.epoch, targetPeerId, targetKey,
+      adminKey: this.auth.publicKey, grant, signature: '',
+    };
+    admission.signature = await this.auth.signControl('admin-admission', adminAdmissionData(admission));
+    return admission;
+  }
+
+  async verifyAdminAdmission(admission: AdminAdmission): Promise<boolean> {
+    return Boolean(admission && admission.roomId === this.roomId && admission.epoch === this.epoch &&
+      typeof admission.targetPeerId === 'string' && admission.targetPeerId.length > 0 &&
+      typeof admission.targetKey === 'string' && /^04[0-9a-f]{128}$/.test(admission.targetKey) &&
+      admission.adminKey === admission.grant?.targetKey && await this.verifyGrant(admission.grant) &&
+      await this.auth.verifyControl('admin-admission', adminAdmissionData(admission),
+        admission.signature, admission.adminKey));
   }
 }

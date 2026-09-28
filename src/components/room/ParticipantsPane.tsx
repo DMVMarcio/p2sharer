@@ -5,16 +5,22 @@ import { useRoom } from '../../hooks/useRoom';
 import { showToast } from '../../hooks/useToast';
 
 export const ParticipantsPane: React.FC = () => {
-  const { username, peers, roomSlots, isCreator, isRoomHost, transferOwnership, kickPeer } = useRoom();
+  const { username, peers, roomSlots, isCreator, isRoomHost, isRoomAdmin,
+    transferOwnership, setAdministrator, kickPeer } = useRoom();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
-  const [pendingAction, setPendingAction] = useState<{ kind: 'kick' | 'transfer'; id: string; name: string } | null>(null);
+  const [pendingAction, setPendingAction] = useState<{
+    kind: 'kick' | 'transfer' | 'admin' | 'revoke-admin'; id: string; name: string;
+  } | null>(null);
 
   const confirmAction = async () => {
     if (!pendingAction) return;
-    const success = pendingAction.kind === 'kick'
-      ? await kickPeer(pendingAction.id) : await transferOwnership(pendingAction.id);
+    const success = pendingAction.kind === 'kick' ? await kickPeer(pendingAction.id)
+      : pendingAction.kind === 'transfer' ? await transferOwnership(pendingAction.id)
+      : await setAdministrator(pendingAction.id, pendingAction.kind === 'admin');
     showToast(success
-      ? pendingAction.kind === 'kick' ? 'Participante removido.' : 'Transferência de propriedade enviada.'
+      ? pendingAction.kind === 'kick' ? 'Participante removido.'
+        : pendingAction.kind === 'transfer' ? 'Transferência de propriedade enviada.'
+          : pendingAction.kind === 'admin' ? 'Administrador adicionado.' : 'Administrador removido.'
       : 'Não foi possível concluir esta ação.');
     setPendingAction(null);
   };
@@ -46,6 +52,7 @@ export const ParticipantsPane: React.FC = () => {
               <span className="participant-item-name">{username || 'Usuário'}</span>
               <span className="badge-you">VOCÊ</span>
               {isCreator && <span className="badge-host">HOST</span>}
+              {isRoomAdmin && !isCreator && <span className="badge-host">ADMIN</span>}
             </div>
           </div>
           <span className="user-status-dot online"></span>
@@ -69,6 +76,7 @@ export const ParticipantsPane: React.FC = () => {
                 <div className="participant-item-text">
                   <span className="participant-item-name">{p.username}</span>
                   {p.isCreator && <span className="badge-host">HOST</span>}
+                  {p.isAdmin && !p.isCreator && <span className="badge-host">ADMIN</span>}
                   {isStreaming && <span className="badge-live-stream-mini">AO VIVO</span>}
                 </div>
               </div>
@@ -79,6 +87,10 @@ export const ParticipantsPane: React.FC = () => {
                     <button className="participant-menu-trigger" aria-label={`Ações para ${p.username}`}
                       onClick={() => setOpenMenu(openMenu === p.id ? null : p.id)}><MoreHorizontal size={16} /></button>
                     {openMenu === p.id && <div className="participant-menu" role="menu">
+                      <button role="menuitem" onClick={() => { setOpenMenu(null);
+                        setPendingAction({ kind: p.isAdmin ? 'revoke-admin' : 'admin', id: p.id, name: p.username }); }}>
+                        {p.isAdmin ? 'Remover administrador' : 'Tornar administrador'}
+                      </button>
                       <button role="menuitem" onClick={() => { setOpenMenu(null); setPendingAction({ kind: 'transfer', id: p.id, name: p.username }); }}>
                         Transferir propriedade
                       </button>
@@ -96,11 +108,16 @@ export const ParticipantsPane: React.FC = () => {
       </div>
       {pendingAction && createPortal(<div className="modal-overlay" role="presentation">
         <div className="modal-card participant-confirm-dialog" role="alertdialog" aria-modal="true"
-          aria-label={pendingAction.kind === 'kick' ? 'Confirmar expulsão' : 'Confirmar transferência'}>
-          <div className="modal-header"><h2>{pendingAction.kind === 'kick' ? 'Expulsar participante' : 'Transferir propriedade'}</h2></div>
+          aria-label={pendingAction.kind === 'kick' ? 'Confirmar expulsão' : 'Confirmar alteração de função'}>
+          <div className="modal-header"><h2>{pendingAction.kind === 'kick' ? 'Expulsar participante'
+            : pendingAction.kind === 'transfer' ? 'Transferir propriedade' : 'Alterar administrador'}</h2></div>
           <div className="modal-body"><p>{pendingAction.kind === 'kick'
             ? `Remover ${pendingAction.name} da sala e renovar a senha de entrada?`
-            : `Tornar ${pendingAction.name} o único host da sala? Você perderá as permissões de host.`}</p></div>
+            : pendingAction.kind === 'transfer'
+              ? `Tornar ${pendingAction.name} o único host da sala? Você perderá as permissões de host.`
+              : pendingAction.kind === 'admin'
+                ? `Permitir que ${pendingAction.name} entre e admita participantes mesmo quando você estiver ausente?`
+                : `Remover as permissões de administrador de ${pendingAction.name}?`}</p></div>
           <div className="modal-footer">
             <button className="btn btn-secondary" onClick={() => setPendingAction(null)}>Cancelar</button>
             <button className={pendingAction.kind === 'kick' ? 'btn btn-danger' : 'btn btn-primary'}
