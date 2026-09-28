@@ -5,7 +5,7 @@ import { showToast } from '../../hooks/useToast';
 
 export const RoomSecurityModal: React.FC = () => {
   const { closeModal, isClosing } = useModal();
-  const { currentRoomCode, currentRoomInvite, currentRoomPassword, updateRoomPassword, isRoomHost } = useRoom();
+  const { currentRoomCode, currentRoomPassword, updateRoomPassword, isRoomHost } = useRoom();
 
   const [password, setPassword] = useState(() => currentRoomPassword);
   const [showPassword, setShowPassword] = useState(false);
@@ -40,7 +40,7 @@ export const RoomSecurityModal: React.FC = () => {
           <div>
             <h2>Configurações da Sala</h2>
             <p className="modal-subtitle">
-              Consulte o convite e configure o acesso.
+              Configure o acesso à sala.
             </p>
           </div>
           <button className="btn-close" id="btn-close-room-security" onClick={closeModal}>
@@ -79,12 +79,6 @@ export const RoomSecurityModal: React.FC = () => {
               </span>
             </div>
           </div>
-
-          {currentRoomInvite && <div className="room-save-controls">
-            <button className="btn btn-secondary" onClick={() => {
-              void navigator.clipboard.writeText(currentRoomInvite).then(() => showToast('Convite copiado!'));
-            }}>Copiar convite</button>
-          </div>}
 
           <div className="form-group" style={{ marginTop: '16px' }}>
             <label className="form-label" htmlFor="input-room-security-password">

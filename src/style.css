@@ -612,8 +612,6 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .saved-room-remove { width: 30px; height: 30px; padding: 7px; }
 .saved-room-edit-password { margin-top: 16px; }
 .room-remember-password { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
-.room-save-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; }
-.room-save-dialog .room-remember-password { margin-top: 0; }
 
 /* ==========================================================================
    BUTTONS SYSTEM

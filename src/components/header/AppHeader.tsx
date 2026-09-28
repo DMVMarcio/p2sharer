@@ -7,13 +7,12 @@ import logoImg from '../../assets/logo.png';
 import { BookmarkCheck, BookmarkPlus } from 'lucide-react';
 import { parseRoomInvite } from '../../core/room_invite';
 import { savedRooms, type SavedRoom } from '../../core/saved_rooms';
-import { RoomSaveDialog } from '../modals/RoomSaveDialog';
 
 export const AppHeader: React.FC = () => {
   const { currentRoomCode, currentRoomInvite, currentRoomPassword, username, isInRoom } = useRoom();
   const { openModal } = useModal();
   const [savedRecord, setSavedRecord] = useState<SavedRoom | null>(null);
-  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [savingRoom, setSavingRoom] = useState(false);
 
   useEffect(() => {
     const roomId = parseRoomInvite(currentRoomInvite)?.roomId;
@@ -35,6 +34,24 @@ export const AppHeader: React.FC = () => {
       .writeText(copyText)
       .then(() => showToast('Código copiado!'))
       .catch(() => {});
+  };
+
+  const toggleSavedRoom = async () => {
+    const roomId = parseRoomInvite(currentRoomInvite)?.roomId;
+    if (!roomId || savingRoom) return;
+    setSavingRoom(true);
+    try {
+      const record = await savedRooms.get(roomId);
+      if (!record) throw new Error('Room record is missing');
+      const saved = !record.saved;
+      await savedRooms.put({ ...record, saved, password: saved ? record.password : undefined });
+      showToast(saved ? 'Sala salva neste dispositivo.' : 'Sala removida das salvas.');
+    } catch (error) {
+      console.warn('[Rooms] Could not toggle saved room:', error);
+      showToast('Não foi possível atualizar a sala salva.');
+    } finally {
+      setSavingRoom(false);
+    }
   };
 
   return (
@@ -83,11 +100,11 @@ export const AppHeader: React.FC = () => {
           </Tooltip>
         )}
         {isInRoom && currentRoomInvite && (
-          <Tooltip content={savedRecord?.saved ? 'Sala salva neste dispositivo' : 'Salvar sala neste dispositivo'}>
+          <Tooltip content={savedRecord?.saved ? 'Remover sala das salvas' : 'Salvar sala neste dispositivo'}>
             <button className={`btn-icon-header ${savedRecord?.saved ? 'is-saved' : ''}`}
-              onClick={() => setShowSaveDialog(true)}
-              aria-label={savedRecord?.saved ? 'Sala salva: editar salvamento' : 'Salvar sala'}
-              aria-pressed={Boolean(savedRecord?.saved)}>
+              onClick={() => void toggleSavedRoom()}
+              aria-label={savedRecord?.saved ? 'Remover sala das salvas' : 'Salvar sala'}
+              aria-pressed={Boolean(savedRecord?.saved)} disabled={savingRoom || !savedRecord}>
               {savedRecord?.saved ? <BookmarkCheck size={16} /> : <BookmarkPlus size={16} />}
             </button>
           </Tooltip>
@@ -115,8 +132,6 @@ export const AppHeader: React.FC = () => {
           </svg>
         </button>
       </div>
-      {showSaveDialog && currentRoomInvite && <RoomSaveDialog invite={currentRoomInvite}
-        password={currentRoomPassword} record={savedRecord} onClose={() => setShowSaveDialog(false)} />}
     </header>
   );
 };
