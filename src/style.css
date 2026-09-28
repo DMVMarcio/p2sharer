@@ -2544,9 +2544,14 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 }
 
 .emoji-glyph {
-  display: inline-block;
+  display: inline-flex;
+  position: relative;
+  align-items: center;
+  justify-content: center;
   flex: none;
-  vertical-align: -0.2em;
+  vertical-align: -0.16em;
+  line-height: 1;
+  overflow: hidden;
 }
 
 .emoji-glyph-image {
@@ -2557,6 +2562,15 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 
 .emoji-glyph-native {
   font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+}
+
+.emoji-glyph-copy {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .emoji-pack-twemoji { background-image: url('/emojis/twemoji.png'); }
@@ -2574,7 +2588,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   border-top: 1px solid var(--border-subtle);
   display: flex;
   gap: 8px;
-  align-items: flex-end;
+  align-items: flex-start;
   flex-shrink: 0;
 }
 
@@ -2584,11 +2598,11 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   min-width: 0;
 }
 
-.chat-composer-field textarea,
-.chat-composer-preview {
+.chat-composer-editor {
   display: block;
   width: 100%;
   min-height: 36px;
+  max-height: 130px;
   margin: 0;
   padding: 8px 12px;
   border-radius: var(--radius-sm);
@@ -2598,41 +2612,42 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   white-space: pre-wrap;
   overflow-wrap: break-word;
   tab-size: 4;
-}
-
-.chat-composer-preview {
-  position: absolute;
-  inset: 0;
   background-color: var(--bg-input);
   border: 1px solid var(--border-default);
   color: var(--text-primary);
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.chat-composer-field textarea {
-  position: relative;
-  z-index: 1;
-  max-height: 130px;
-  resize: none;
   overflow-y: auto;
-  background: transparent;
-  border: 1px solid var(--border-default);
-  color: transparent;
-  -webkit-text-fill-color: transparent;
   caret-color: var(--text-primary);
   outline: none;
   user-select: text;
   -webkit-user-select: text;
 }
 
-.chat-composer-field textarea::placeholder {
+.chat-composer-editor:empty::before {
+  content: attr(data-placeholder);
   color: var(--text-muted);
-  -webkit-text-fill-color: var(--text-muted);
+  pointer-events: none;
 }
 
-.chat-composer-field textarea:focus {
+.chat-composer-editor:focus {
   border-color: var(--border-focus);
+}
+
+.chat-composer-markdown-preview {
+  max-height: 108px;
+  margin-top: 5px;
+  overflow-y: auto;
+  pointer-events: none;
+}
+
+.chat-composer-preview-label {
+  display: block;
+  margin: 0 0 3px 2px;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.chat-composer-markdown-preview .chat-msg-bubble {
+  padding: 6px 9px;
 }
 
 .btn-chat-send {
@@ -2700,7 +2715,6 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   font-size: 13px;
 }
 
-.emoji-picker-header span,
 .emoji-picker-section-label {
   color: var(--text-muted);
   font-size: 11px;
@@ -2727,6 +2741,24 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   gap: 3px;
   padding-bottom: 3px;
   flex: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-default) transparent;
+}
+
+.emoji-picker-categories::-webkit-scrollbar { height: 3px; }
+.emoji-picker-categories::-webkit-scrollbar-thumb { background: var(--border-default); border-radius: 3px; }
+
+.emoji-picker-results {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.emoji-picker-section + .emoji-picker-section { margin-top: 8px; }
+
+.emoji-picker-section-label {
+  margin: 0 0 5px;
 }
 
 .emoji-picker-categories button,
@@ -2740,7 +2772,14 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .emoji-picker-categories button {
   min-width: 29px;
   height: 29px;
-  font-size: 17px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+}
+
+.emoji-picker-categories button.active {
+  color: var(--accent-color);
 }
 
 .emoji-picker-categories button:hover,
@@ -2756,8 +2795,6 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   grid-template-columns: repeat(7, minmax(0, 1fr));
   grid-auto-rows: 34px;
   gap: 2px;
-  overflow-y: auto;
-  min-height: 0;
   align-content: start;
 }
 
@@ -2779,6 +2816,10 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   display: flex;
   flex-direction: column;
   gap: 7px;
+  height: 194px;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
 }
 
 .emoji-pack-option {
@@ -2786,6 +2827,8 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   align-items: center;
   gap: 12px;
   width: 100%;
+  height: 60px;
+  flex: none;
   padding: 9px 11px;
   text-align: left;
   color: var(--text-primary);
@@ -2803,10 +2846,14 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 }
 
 .emoji-pack-preview {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, 23px);
   gap: 3px;
   align-items: center;
+  justify-items: center;
+  width: 75px;
   min-width: 75px;
+  overflow: hidden;
 }
 
 .emoji-pack-copy {

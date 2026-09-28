@@ -36,7 +36,6 @@ export const ChatMessageContent: React.FC<{ text: string; pack: EmojiPack }> = (
         a: ({ href, children }) => href ? (
           <a
             href={href}
-            title={href}
             onClick={(event) => {
               event.preventDefault();
               void openUrl(href).catch(() => showToast('Não foi possível abrir o link.'));

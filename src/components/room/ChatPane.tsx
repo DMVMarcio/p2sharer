@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useSyncExternalStore } from 'react';
 import { useRoom } from '../../hooks/useRoom';
 import { EmojiPicker } from '../common/EmojiPicker';
-import { EmojiComposerInput } from '../common/EmojiComposerInput';
+import { EmojiComposerInput, type EmojiComposerHandle } from '../common/EmojiComposerInput';
 import { ChatMessageContent } from '../common/ChatMessageContent';
 import { getEmojiPack, subscribeEmojiPack } from '../../core/emoji_preferences';
 import { SystemNoticeIcon } from './SystemNoticeIcon';
@@ -13,7 +13,7 @@ export const ChatPane: React.FC = () => {
   const [pickerOpen, setPickerOpen] = useState(false);
   const emojiPack = useSyncExternalStore(subscribeEmojiPack, getEmojiPack);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const inputRef = useRef<EmojiComposerHandle>(null);
   const composerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -37,16 +37,7 @@ export const ChatPane: React.FC = () => {
   }, [pickerOpen]);
 
   const insertEmoji = (emoji: string) => {
-    const input = inputRef.current;
-    const start = input?.selectionStart ?? inputText.length;
-    const end = input?.selectionEnd ?? start;
-    const next = inputText.slice(0, start) + emoji + inputText.slice(end);
-    if (next.length > 2000) return;
-    setInputText(next);
-    requestAnimationFrame(() => {
-      input?.focus();
-      input?.setSelectionRange(start + emoji.length, start + emoji.length);
-    });
+    inputRef.current?.insertEmoji(emoji);
   };
 
   const sendMessage = () => {
@@ -80,7 +71,7 @@ export const ChatPane: React.FC = () => {
               >
                 <div className="chat-system-content">
                   <SystemNoticeIcon type={systemType} />
-                  <span className="chat-sys-text" title={msg.text}><SystemNoticeText message={msg} /></span>
+                  <span className="chat-sys-text"><SystemNoticeText message={msg} /></span>
                   <time className="chat-sys-time" dateTime={new Date(msg.timestamp).toISOString()}>{timeStr}</time>
                 </div>
               </div>
@@ -109,7 +100,6 @@ export const ChatPane: React.FC = () => {
           className={`btn-chat-emoji ${pickerOpen ? 'active' : ''}`}
           aria-label="Selecionar emoji"
           aria-expanded={pickerOpen}
-          title="Emojis"
           onClick={() => setPickerOpen((open) => !open)}
         >
           <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -117,16 +107,11 @@ export const ChatPane: React.FC = () => {
           </svg>
         </button>
         <EmojiComposerInput
-          inputRef={inputRef}
+          ref={inputRef}
           value={inputText}
           pack={emojiPack}
           onChange={setInputText}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-              event.preventDefault();
-              sendMessage();
-            }
-          }}
+          onSend={sendMessage}
         />
         <button type="submit" className="btn-chat-send" aria-label="Enviar Mensagem">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
