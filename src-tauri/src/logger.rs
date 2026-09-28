@@ -1,6 +1,6 @@
 use std::fs::{self, File, OpenOptions};
-use std::io::Write;
-use std::path::PathBuf;
+use std::io::{Seek, SeekFrom, Write};
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -14,47 +14,54 @@ pub fn get_log_dir() -> PathBuf {
     base.join("p2sharer").join("logs")
 }
 
+fn write_log_header(file: &mut File, path: &Path, event: &str) -> std::io::Result<()> {
+    let name = path.file_name().unwrap_or_default().to_string_lossy();
+    let header = format!(
+        "================================================================================\r\n\
+         P2Sharer Execution & Diagnostics Log ({})\r\n\
+         {}: {}\r\n\
+         OS: Windows (Architecture: {})\r\n\
+         App Version: 1.0.0\r\n\
+         Log File: {}\r\n\
+         ================================================================================\r\n\r\n",
+        name,
+        event,
+        get_timestamp(),
+        std::env::consts::ARCH,
+        path.to_string_lossy()
+    );
+    file.write_all(header.as_bytes())?;
+    file.flush()
+}
+
+fn current_log_path() -> Result<PathBuf, String> {
+    LOG_PATH
+        .lock()
+        .map_err(|_| "Não foi possível acessar o caminho do log.".to_string())?
+        .clone()
+        .ok_or_else(|| "Arquivo de log ainda não foi criado.".to_string())
+}
+
 pub fn init_logger() {
     let log_dir = get_log_dir();
     let _ = fs::create_dir_all(&log_dir);
 
-    let latest_path = log_dir.join("latest.log");
-    let previous_path = log_dir.join("previous.log");
-
-    // Rotate previous log
-    if latest_path.exists() {
-        let _ = fs::remove_file(&previous_path);
-        let _ = fs::rename(&latest_path, &previous_path);
-    }
+    let started_at = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis();
+    let session_path = log_dir.join(format!("session-{}-{}.log", started_at, std::process::id()));
 
     match OpenOptions::new()
-        .create(true)
+        .create_new(true)
         .write(true)
-        .truncate(true)
-        .open(&latest_path)
+        .open(&session_path)
     {
         Ok(mut file) => {
-            let start_time = get_timestamp();
-            let header = format!(
-                "================================================================================\r\n\
-                 P2Sharer Execution & Diagnostics Log (latest.log)\r\n\
-                 Session Started: {}\r\n\
-                 OS: Windows (Architecture: {})\r\n\
-                 App Version: 1.0.0\r\n\
-                 Log File: {}\r\n\
-                 ================================================================================\r\n\r\n",
-                start_time,
-                std::env::consts::ARCH,
-                latest_path.to_string_lossy()
-            );
-            let _ = file.write_all(header.as_bytes());
-            let _ = file.flush();
+            let _ = write_log_header(&mut file, &session_path, "Session Started");
 
             if let Ok(mut lock) = LOG_FILE.lock() {
                 *lock = Some(file);
             }
             if let Ok(mut lock) = LOG_PATH.lock() {
-                *lock = Some(latest_path.clone());
+                *lock = Some(session_path.clone());
             }
         }
         Err(e) => {
@@ -173,12 +180,9 @@ pub fn write_frontend_log(level: String, message: String, context: Option<String
 
 #[tauri::command]
 pub fn get_log_file_path() -> String {
-    if let Ok(lock) = LOG_PATH.lock() {
-        if let Some(ref p) = *lock {
-            return p.to_string_lossy().to_string();
-        }
-    }
-    get_log_dir().join("latest.log").to_string_lossy().to_string()
+    current_log_path()
+        .map(|path| path.to_string_lossy().to_string())
+        .unwrap_or_default()
 }
 
 pub fn flush_log() {
@@ -193,12 +197,12 @@ pub fn flush_log() {
 pub fn open_log_folder() -> Result<(), String> {
     flush_log();
     let log_dir = get_log_dir();
-    let latest_path = log_dir.join("latest.log");
+    let current_path = current_log_path()?;
 
-    if latest_path.exists() {
+    if current_path.exists() {
         // Select the file in Windows Explorer
         let _ = std::process::Command::new("explorer.exe")
-            .arg(format!("/select,\"{}\"", latest_path.to_string_lossy()))
+            .arg(format!("/select,\"{}\"", current_path.to_string_lossy()))
             .spawn();
     } else {
         let _ = std::process::Command::new("explorer.exe")
@@ -211,14 +215,14 @@ pub fn open_log_folder() -> Result<(), String> {
 #[tauri::command]
 pub fn open_latest_log() -> Result<(), String> {
     flush_log();
-    let latest_path = get_log_dir().join("latest.log");
-    if !latest_path.exists() {
+    let current_path = current_log_path()?;
+    if !current_path.exists() {
         return Err("Arquivo de log ainda não foi criado.".into());
     }
 
     // Open directly with Notepad or default viewer
     let _ = std::process::Command::new("notepad.exe")
-        .arg(latest_path.to_string_lossy().to_string())
+        .arg(current_path.to_string_lossy().to_string())
         .spawn()
         .map_err(|e| format!("Falha ao abrir o bloco de notas: {}", e))?;
 
@@ -227,38 +231,15 @@ pub fn open_latest_log() -> Result<(), String> {
 
 #[tauri::command]
 pub fn clear_log_file() -> Result<(), String> {
-    let log_dir = get_log_dir();
-    let latest_path = log_dir.join("latest.log");
-
-    match OpenOptions::new()
-        .create(true)
-        .write(true)
-        .truncate(true)
-        .open(&latest_path)
+    let path = current_log_path()?;
     {
-        Ok(mut file) => {
-            let start_time = get_timestamp();
-            let header = format!(
-                "================================================================================\r\n\
-                 P2Sharer Execution & Diagnostics Log (latest.log)\r\n\
-                 Log Cleared: {}\r\n\
-                 OS: Windows (Architecture: {})\r\n\
-                 App Version: 1.0.0\r\n\
-                 Log File: {}\r\n\
-                 ================================================================================\r\n\r\n",
-                start_time,
-                std::env::consts::ARCH,
-                latest_path.to_string_lossy()
-            );
-            let _ = file.write_all(header.as_bytes());
-            let _ = file.flush();
-
-            if let Ok(mut lock) = LOG_FILE.lock() {
-                *lock = Some(file);
-            }
-            log_msg("INFO", "system", "Log file cleared by user request.");
-            Ok(())
-        }
-        Err(e) => Err(format!("Falha ao limpar arquivo de log: {}", e)),
+        let mut lock = LOG_FILE.lock().map_err(|_| "Não foi possível acessar o log.".to_string())?;
+        let file = lock.as_mut().ok_or_else(|| "Arquivo de log ainda não foi criado.".to_string())?;
+        file.set_len(0).map_err(|e| format!("Falha ao limpar arquivo de log: {}", e))?;
+        file.seek(SeekFrom::Start(0)).map_err(|e| format!("Falha ao reiniciar o log: {}", e))?;
+        write_log_header(file, &path, "Log Cleared")
+            .map_err(|e| format!("Falha ao reescrever o log: {}", e))?;
     }
+    log_msg("INFO", "system", "Log file cleared by user request.");
+    Ok(())
 }

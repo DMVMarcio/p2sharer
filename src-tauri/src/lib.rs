@@ -8,7 +8,6 @@ use audio_loopback::{start_audio_capture, stop_audio_capture};
 use logger::{clear_log_file, get_log_file_path, open_latest_log, open_log_folder, write_frontend_log};
 use pip_manager::{close_pip_window, open_pip_window, set_pip_always_on_top};
 use process_manager::{
-    check_or_create_single_instance_mutex, focus_existing_instance_window,
     list_audio_processes, setup_job_object_for_clean_child_teardown,
 };
 use screen_sources::{
@@ -20,13 +19,7 @@ use tauri::{Emitter, Manager};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // 1. Single instance check: bring existing window to focus and exit duplicate
-    if !check_or_create_single_instance_mutex() {
-        focus_existing_instance_window();
-        std::process::exit(0);
-    }
-
-    // 2. Bind process to Windows Job Object to guarantee atomic child teardown on exit
+    // Bind process to Windows Job Object to guarantee atomic child teardown on exit.
     setup_job_object_for_clean_child_teardown();
 
     #[cfg(windows)]

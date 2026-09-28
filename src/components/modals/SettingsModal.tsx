@@ -706,7 +706,7 @@ export const SettingsModal: React.FC = () => {
                 <div className="settings-pane-header">
                   <h3 className="settings-pane-title">Diagnóstico & Logs de Execução</h3>
                   <p className="settings-pane-desc">
-                    O arquivo <code>latest.log</code> armazena todos os eventos, erros e dados de WebRTC em tempo real.
+                    Cada instância tem seu próprio arquivo de log com eventos, erros e dados de WebRTC em tempo real.
                   </p>
                 </div>
 
@@ -734,7 +734,7 @@ export const SettingsModal: React.FC = () => {
                       <polyline points="15 3 21 3 21 9"/>
                       <line x1="10" y1="14" x2="21" y2="3"/>
                     </svg>
-                    <span>Abrir Log (latest.log)</span>
+                    <span>Abrir log desta instância</span>
                   </button>
 
                   <button
