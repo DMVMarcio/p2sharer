@@ -9,6 +9,7 @@ import { AudioFilterModal } from './components/modals/AudioFilterModal';
 import { CreateRoomModal } from './components/modals/CreateRoomModal';
 import { JoinRoomModal } from './components/modals/JoinRoomModal';
 import { RoomSecurityModal } from './components/modals/RoomSecurityModal';
+import { ExternalLinkModal } from './components/modals/ExternalLinkModal';
 import { ConnectingOverlay } from './components/modals/ConnectingOverlay';
 import { ToastContainer } from './components/common/ToastContainer';
 import { useRoom } from './hooks/useRoom';
@@ -70,6 +71,7 @@ export const App: React.FC = () => {
       {activeModal === 'createRoom' && <CreateRoomModal />}
       {activeModal === 'joinRoom' && <JoinRoomModal />}
       {activeModal === 'roomSecurity' && <RoomSecurityModal />}
+      {activeModal === 'externalLink' && <ExternalLinkModal />}
       <ConnectingOverlay />
 
       {/* Global Notifications */}

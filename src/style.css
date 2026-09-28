@@ -2573,6 +2573,18 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   white-space: nowrap;
 }
 
+.chat-messages-container ::selection,
+.chat-composer-editor ::selection { background: rgba(67, 137, 255, 0.43); }
+
+.emoji-glyph.emoji-selected::after,
+.chat-editor-emoji.emoji-selected::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(67, 137, 255, 0.43);
+  pointer-events: none;
+}
+
 .emoji-pack-twemoji { background-image: url('/emojis/twemoji.png'); }
 .emoji-pack-noto { background-image: url('/emojis/noto.png'); }
 .emoji-pack-openmoji { background-image: url('/emojis/openmoji.png'); }
@@ -2670,13 +2682,16 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 
 .chat-editor-emoji {
   display: inline-block;
+  position: relative;
   flex: none;
   overflow: hidden;
   color: transparent;
-  font-size: 0;
+  -webkit-text-fill-color: transparent;
+  font-size: 13px;
   line-height: 16px;
   vertical-align: -2px;
   background-repeat: no-repeat;
+  caret-color: var(--text-primary);
 }
 
 .chat-format-bubble {
@@ -3216,6 +3231,20 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   font-size: 13px;
   color: var(--text-secondary);
   line-height: 1.5;
+}
+
+.external-link-address {
+  padding: 10px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  background: var(--bg-input);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .form-group {
