@@ -40,7 +40,7 @@ export function useRoom() {
   const deleteChatMessage = useCallback((id: string) => roomService.deleteChatMessage(id), []);
 
   const updateRoomPassword = useCallback((newPassword: string) => {
-    roomService.updateRoomPassword(newPassword);
+    return roomService.updateRoomPassword(newPassword);
   }, []);
 
   const requestStream = useCallback((peerId: string) => {
@@ -107,6 +107,7 @@ export function useRoom() {
     roomStatusText: roomService.roomStatusText,
     connectingOverlay: roomService.connectingOverlay,
     isInRoom: roomSlots.length > 0 && Boolean(currentRoomCode),
+    isRoomHost: roomService.isRoomHost(),
 
     // Actions
     joinRoom,

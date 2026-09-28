@@ -5,16 +5,17 @@ import { showToast } from '../../hooks/useToast';
 
 export const RoomSecurityModal: React.FC = () => {
   const { closeModal, isClosing } = useModal();
-  const { currentRoomCode, currentRoomPassword, updateRoomPassword } = useRoom();
+  const { currentRoomCode, currentRoomPassword, updateRoomPassword, isRoomHost } = useRoom();
 
   const [password, setPassword] = useState(() => currentRoomPassword);
   const [showPassword, setShowPassword] = useState(false);
 
   const handleSave = () => {
+    if (!isRoomHost) { showToast('Somente o anfitrião pode alterar a senha da sala.'); return; }
     const finalPass = password.trim();
     const oldPassword = currentRoomPassword;
 
-    updateRoomPassword(finalPass);
+    if (!updateRoomPassword(finalPass)) { showToast('Não foi possível alterar a senha da sala.'); return; }
     closeModal();
 
     if (finalPass) {
@@ -91,6 +92,7 @@ export const RoomSecurityModal: React.FC = () => {
                 className="text-input"
                 placeholder="Digite uma nova senha..."
                 maxLength={40}
+                disabled={!isRoomHost}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onKeyDown={(e) => {
@@ -126,7 +128,9 @@ export const RoomSecurityModal: React.FC = () => {
                 <line x1="12" y1="16" x2="12" y2="12"/>
                 <line x1="12" y1="8" x2="12.01" y2="8"/>
               </svg>
-              Ao salvar, todos os participantes conectados serão notificados e atualizados automaticamente.
+              {isRoomHost
+                ? 'Ao salvar, todos os participantes conectados serão notificados e atualizados automaticamente.'
+                : 'Somente o anfitrião pode alterar a senha da sala.'}
             </p>
           </div>
         </div>
@@ -135,7 +139,7 @@ export const RoomSecurityModal: React.FC = () => {
           <button className="btn btn-secondary" id="btn-cancel-room-security" onClick={closeModal}>
             Fechar
           </button>
-          <button className="btn btn-primary" id="btn-save-room-security" onClick={handleSave}>
+          <button className="btn btn-primary" id="btn-save-room-security" onClick={handleSave} disabled={!isRoomHost}>
             <span>Atualizar Senha da Sala</span>
           </button>
         </div>

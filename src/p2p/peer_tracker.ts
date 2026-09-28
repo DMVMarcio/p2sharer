@@ -46,6 +46,7 @@ export class PeerTracker {
     if (!peerId) return false;
 
     if (isDirectWebRtc) {
+      const wasDirect = this.directConnectedPeers.has(peerId);
       this.directConnectedPeers.add(peerId);
       this.unverifiedRumors.delete(peerId);
 
@@ -57,10 +58,10 @@ export class PeerTracker {
       this.peers.set(peerId, resolvedName);
       this.peerLastSeen.set(peerId, Date.now());
 
-      if (!this.peerJoinedAt.has(peerId)) {
+      if (!wasDirect) {
         this.peerJoinedAt.set(peerId, joinedAt);
       }
-      if (isCreator !== undefined) {
+      if (isCreator !== undefined && !this.peerIsCreator.has(peerId)) {
         this.peerIsCreator.set(peerId, isCreator);
       }
       return true;
@@ -95,7 +96,9 @@ export class PeerTracker {
    * Directly adds and verifies a connected peer (e.g. from onPeerJoin).
    */
   public addPeer(peerId: string, username: string, isCreator = false, joinedAt = Date.now()): void {
+    const firstPresence = !this.peerIsCreator.has(peerId);
     this.receivePeerExchange(peerId, true, username, isCreator, joinedAt);
+    if (firstPresence) this.peerJoinedAt.set(peerId, joinedAt);
   }
 
   /**
@@ -299,29 +302,18 @@ export class PeerTracker {
    * 3. Lowest joinedAt timestamp, with tie-break on lexicographically lowest peerId.
    */
   public isHost(selfId: string, myJoinedAt: number, isCreator: boolean): boolean {
-    if (isCreator) return true;
+    return this.getHostPeerId(selfId, myJoinedAt, isCreator) === selfId;
+  }
 
-    // Check if creator is present among verified peers
-    let hasCreatorPeer = false;
-    this.directConnectedPeers.forEach((pId) => {
-      if (this.peerIsCreator.get(pId)) {
-        hasCreatorPeer = true;
-      }
-    });
-    if (hasCreatorPeer) return false;
-
-    let oldestPeerId = selfId;
-    let oldestJoin = myJoinedAt;
-
-    this.directConnectedPeers.forEach((pId) => {
-      const joinTime = this.peerJoinedAt.get(pId) || Date.now();
-      if (joinTime < oldestJoin || (joinTime === oldestJoin && pId < oldestPeerId)) {
-        oldestJoin = joinTime;
-        oldestPeerId = pId;
-      }
-    });
-
-    return oldestPeerId === selfId;
+  public getHostPeerId(selfId: string, myJoinedAt: number, isCreator: boolean): string {
+    if (isCreator) return selfId;
+    const creators = [...this.directConnectedPeers].filter((id) => this.peerIsCreator.get(id));
+    if (creators.length) {
+      return creators.sort((a, b) => (this.peerJoinedAt.get(a) || 0) - (this.peerJoinedAt.get(b) || 0) || a.localeCompare(b))[0];
+    }
+    return [selfId, ...this.directConnectedPeers].sort((a, b) =>
+      (a === selfId ? myJoinedAt : this.peerJoinedAt.get(a) || 0) -
+      (b === selfId ? myJoinedAt : this.peerJoinedAt.get(b) || 0) || a.localeCompare(b))[0];
   }
 
   public getJoinedAt(peerId: string): number | undefined {

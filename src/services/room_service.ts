@@ -408,20 +408,22 @@ export class RoomService {
 
   public sendChatMessage(text: string, replyToId?: string): void {
     if (!text.trim() || !this.roomManager) return;
-    this.roomManager.sendChatMessage(text.trim(), replyToId);
+    void this.roomManager.sendChatMessage(text.trim(), replyToId).catch((error) =>
+      console.warn('[Chat] Failed to sign or send message:', error));
   }
 
-  public editChatMessage(id: string, text: string): boolean {
-    return this.roomManager?.editChatMessage(id, text) ?? false;
+  public editChatMessage(id: string, text: string): Promise<boolean> {
+    return this.roomManager?.editChatMessage(id, text) ?? Promise.resolve(false);
   }
 
-  public deleteChatMessage(id: string): boolean {
-    return this.roomManager?.deleteChatMessage(id) ?? false;
+  public deleteChatMessage(id: string): Promise<boolean> {
+    return this.roomManager?.deleteChatMessage(id) ?? Promise.resolve(false);
   }
 
   public addSystemChatMessage(text: string, systemType: 'join' | 'leave' | 'info' | 'generic' = 'generic'): void {
     if (this.roomManager) {
-      this.roomManager.sendSystemMessage(text, systemType);
+      void this.roomManager.sendSystemMessage(text, systemType).catch((error) =>
+        console.warn('[Chat] Failed to sign or send system notice:', error));
       return;
     }
     const msg: ChatMessage = {
@@ -436,14 +438,17 @@ export class RoomService {
     this.notify();
   }
 
-  public updateRoomPassword(newPassword: string): void {
+  public updateRoomPassword(newPassword: string): boolean {
+    if (!this.roomManager?.updateRoomPassword(newPassword)) return false;
     stateStore.set((s) => {
       s.currentRoomPassword = newPassword;
     });
-    if (this.roomManager) {
-      this.roomManager.updateRoomPassword(newPassword);
-    }
     this.notify();
+    return true;
+  }
+
+  public isRoomHost(): boolean {
+    return this.roomManager?.isRoomHost() ?? false;
   }
 
   public requestStream(peerId: string): void {

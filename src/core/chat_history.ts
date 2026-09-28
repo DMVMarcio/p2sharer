@@ -23,6 +23,7 @@ export function mergeChatHistory(current: ChatMessage[], incoming: ChatMessage[]
       if (!existing) {
         byId.set(message.id, message);
       } else if (existing.authorId === message.authorId &&
+                 existing.authorKey === message.authorKey &&
                  existing.deletedAt === undefined &&
                  chatRevision(message) > chatRevision(existing)) {
         byId.set(message.id, message);
