@@ -32,9 +32,12 @@ export function useRoom() {
     roomService.leaveRoom();
   }, []);
 
-  const sendChatMessage = useCallback((text: string) => {
-    roomService.sendChatMessage(text);
+  const sendChatMessage = useCallback((text: string, replyToId?: string) => {
+    roomService.sendChatMessage(text, replyToId);
   }, []);
+
+  const editChatMessage = useCallback((id: string, text: string) => roomService.editChatMessage(id, text), []);
+  const deleteChatMessage = useCallback((id: string) => roomService.deleteChatMessage(id), []);
 
   const updateRoomPassword = useCallback((newPassword: string) => {
     roomService.updateRoomPassword(newPassword);
@@ -109,6 +112,8 @@ export function useRoom() {
     joinRoom,
     leaveRoom,
     sendChatMessage,
+    editChatMessage,
+    deleteChatMessage,
     updateRoomPassword,
     requestStream,
     stopWatchingStream,

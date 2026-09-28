@@ -1,5 +1,5 @@
 import { selfId } from '@trystero-p2p/core';
-import { mergeChatHistory } from '../core/chat_history.ts';
+import { chatHistoryChanged, chatRevision, chatRevisionKey, mergeChatHistory } from '../core/chat_history.ts';
 import type {
   ActiveStreamInfo,
   ChatMessage,
@@ -119,7 +119,7 @@ export class GroupRoomManager {
   private peerTracker = new PeerTracker();
   private remoteStreams: Map<string, MediaStream> = new Map(); // peerId -> stream
   private chatHistory: ChatMessage[] = [];
-  private seenChatMsgIds: Set<string> = new Set();
+  private seenChatRevisions: Set<string> = new Set();
 
   // Trystero action references
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -373,9 +373,12 @@ export class GroupRoomManager {
     this.chatAction = this.room.makeAction('chat');
     this.chatAction.onMessage = (msg: ChatMessage) => {
       if (!msg || !msg.id) return;
-      if (this.seenChatMsgIds.has(msg.id)) return;
-      this.seenChatMsgIds.add(msg.id);
-      this.chatHistory = mergeChatHistory(this.chatHistory, [msg]);
+      const revisionKey = chatRevisionKey(msg);
+      if (this.seenChatRevisions.has(revisionKey)) return;
+      const merged = mergeChatHistory(this.chatHistory, [msg]);
+      if (!chatHistoryChanged(this.chatHistory, merged)) return;
+      this.seenChatRevisions.add(revisionKey);
+      this.chatHistory = merged;
       if (this.callbacks) {
         this.callbacks.onChat(msg);
       }
@@ -397,8 +400,8 @@ export class GroupRoomManager {
         this.historyAction.send({ history: this.chatHistory }, { target: peerId });
       } else if (data.history && Array.isArray(data.history) && data.history.length > 0) {
         const merged = mergeChatHistory(this.chatHistory, data.history);
-        if (merged.length > this.chatHistory.length) {
-          merged.forEach((m) => this.seenChatMsgIds.add(m.id));
+        if (chatHistoryChanged(this.chatHistory, merged)) {
+          merged.forEach((m) => this.seenChatRevisions.add(chatRevisionKey(m)));
           this.chatHistory = merged;
           if (this.callbacks) {
             this.callbacks.onChatHistory(this.chatHistory);
@@ -1552,16 +1555,46 @@ export class GroupRoomManager {
     this.callbacks.onSlotsUpdate(slots);
   }
 
-  public sendChatMessage(text: string): ChatMessage {
+  public sendChatMessage(text: string, replyToId?: string): ChatMessage {
+    const original = replyToId ? this.chatHistory.find((message) => message.id === replyToId) : undefined;
     const msg: ChatMessage = {
       id: crypto.randomUUID(),
       sender: this.username,
       text,
       timestamp: Date.now(),
+      authorId: selfId,
+      revision: 0,
       isHost: this.isCreator,
+      replyTo: original && !original.deletedAt && !original.isSystem
+        ? { id: original.id, sender: original.sender, text: original.text.slice(0, 200) }
+        : undefined,
     };
 
     return this.publishChatMessage(msg);
+  }
+
+  public editChatMessage(id: string, text: string): boolean {
+    const current = this.chatHistory.find((message) => message.id === id);
+    if (!current || current.authorId !== selfId || current.isSystem || current.deletedAt || !text.trim()) return false;
+    this.publishChatMessage({
+      ...current,
+      text: text.trim(),
+      revision: chatRevision(current) + 1,
+      editedAt: Date.now(),
+    });
+    return true;
+  }
+
+  public deleteChatMessage(id: string): boolean {
+    const current = this.chatHistory.find((message) => message.id === id);
+    if (!current || current.authorId !== selfId || current.isSystem || current.deletedAt) return false;
+    this.publishChatMessage({
+      ...current,
+      text: '',
+      revision: chatRevision(current) + 1,
+      deletedAt: Date.now(),
+    });
+    return true;
   }
 
   public sendSystemMessage(
@@ -1577,7 +1610,7 @@ export class GroupRoomManager {
   }
 
   private publishChatMessage(msg: ChatMessage): ChatMessage {
-    this.seenChatMsgIds.add(msg.id);
+    this.seenChatRevisions.add(chatRevisionKey(msg));
     this.chatHistory = mergeChatHistory(this.chatHistory, [msg]);
     this.callbacks?.onChat(msg);
     try { this.chatAction?.send(msg); } catch {}
@@ -1676,7 +1709,7 @@ export class GroupRoomManager {
     this.localStatsCache = null;
     this.initialJoinComplete = false;
     this.chatHistory = [];
-    this.seenChatMsgIds.clear();
+    this.seenChatRevisions.clear();
     this.lastStreamsHash = '';
   }
 }
