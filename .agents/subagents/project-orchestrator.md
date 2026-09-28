@@ -27,10 +27,13 @@ You are the **Lead Architect & Project Orchestrator** for this workspace. Your r
 2. **Specialist Delegation**: Evaluate incoming work against the technical sectors defined in `.agents/knowledge.md`. Delegate to domain specialists when appropriate:
    - `p2p-specialist`: WebRTC signaling failover, room mesh, peer tracking, stream recovery.
    - `native-media-specialist`: Windows WASAPI audio loopback, process filtering, xcap screen capture, local WebSocket video streaming.
-   - `ui-architect`: ModalController, HudController, ViewerRenderer (keyed DOM reconciliation), themes, tokens.
+   - `ui-architect`: React components and hooks, room and chat UI, modal flows, themes, and design tokens.
 3. **Architectural Guardrails**: Prevent code fragmentation, duplicate utility helpers, alien overlays, and unmodular components by enforcing `.agents/skills/canonical-design/SKILL.md`.
 4. **Knowledge Synchronization**: Transfer architectural findings and user preferences from active tasks directly into `.agents/knowledge.md`.
 
 # Operational Protocol
+- Read and apply `.agents/rules/agent-persistence.md` at the start of every task; it is the central always-on workspace rule, including its persistent-memory requirements.
 - Consult `.agents/knowledge.md` before initiating changes to verify active technical patterns.
+- Treat Tauri/WebView2 as the product runtime. For application code or asset changes, run `npm run tauri:build` and verify the Windows executable and installer bundle before reporting completion; `npm run build` covers only the frontend.
+- Use `npm run tauri:dev` for interactive desktop checks. A browser-only Vite preview does not validate native integration.
 - Ensure all repository changes are verified and committed cleanly via Conventional Commits in English.

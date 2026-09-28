@@ -6,17 +6,20 @@ import { stateStore } from '../../core/state_store';
 import { soundEffects } from '../../ui/sound_effects';
 import { showToast } from '../../hooks/useToast';
 import { ThemeMode } from '../../core/types';
+import { EMOJI_PACKS, EmojiPack, getEmojiPack, saveEmojiPack } from '../../core/emoji_preferences';
+import { EmojiGlyph } from '../common/EmojiGlyph';
 
 export const SettingsModal: React.FC = () => {
   const { closeModal, isClosing } = useModal();
   const { themeMode, accentColor, setThemeMode, setAccentColor } = useAppTheme();
 
   const [activeTab, setActiveTab] = useState<
-    'profile' | 'appearance' | 'audio' | 'stream' | 'network' | 'diagnostics'
+    'profile' | 'conversations' | 'appearance' | 'audio' | 'stream' | 'network' | 'diagnostics'
   >('profile');
 
   // Form states initialized once upon mounting
   const [nick, setNick] = useState(() => stateStore.username);
+  const [emojiPack, setEmojiPack] = useState<EmojiPack>(getEmojiPack);
   const [sfxEnabled, setSfxEnabled] = useState(() => soundEffects.getEnabled());
   const [sfxVolume, setSfxVolume] = useState(() => Math.round(soundEffects.getVolume() * 100));
 
@@ -64,6 +67,7 @@ export const SettingsModal: React.FC = () => {
     }
 
     // Save SFX
+    saveEmojiPack(emojiPack);
     soundEffects.setEnabled(sfxEnabled);
     soundEffects.setVolume(sfxVolume / 100);
 
@@ -138,7 +142,7 @@ export const SettingsModal: React.FC = () => {
           </div>
           <div>
             <h2>Configurações</h2>
-            <p className="modal-subtitle">Personalize a aparência, áudio, transmissão e rede.</p>
+            <p className="modal-subtitle">Personalize suas conversas, aparência, áudio, transmissão e rede.</p>
           </div>
           <button className="btn-close" id="btn-close-settings" onClick={closeModal}>
             &times;
@@ -158,6 +162,17 @@ export const SettingsModal: React.FC = () => {
                 <circle cx="12" cy="7" r="4"/>
               </svg>
               <span>Perfil</span>
+            </button>
+
+            <button
+              type="button"
+              className={`settings-nav-item ${activeTab === 'conversations' ? 'active' : ''}`}
+              onClick={() => setActiveTab('conversations')}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8A8.5 8.5 0 0 1 8.7 3.9a8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+              </svg>
+              <span>Conversas</span>
             </button>
 
             <button
@@ -259,6 +274,42 @@ export const SettingsModal: React.FC = () => {
                   <p className="field-info-text" style={{ marginTop: '4px' }}>
                     Este nome será enviado aos outros participantes assim que você se conectar à sala.
                   </p>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'conversations' && (
+              <div className="settings-tab-pane active" id="settings-pane-conversations">
+                <div className="settings-pane-header">
+                  <h3 className="settings-pane-title">Conversas</h3>
+                  <p className="settings-pane-desc">Escolha como os emojis aparecem nas mensagens, na digitação e no seletor deste dispositivo.</p>
+                </div>
+                <div className="settings-row">
+                  <span className="settings-label" id="settings-emoji-pack-label">Pacote de emojis padrão:</span>
+                  <div className="emoji-pack-options" role="radiogroup" aria-labelledby="settings-emoji-pack-label">
+                    {EMOJI_PACKS.map((pack) => (
+                      <button
+                        key={pack.id}
+                        type="button"
+                        className={`emoji-pack-option ${emojiPack === pack.id ? 'active' : ''}`}
+                        role="radio"
+                        aria-checked={emojiPack === pack.id}
+                        onClick={() => setEmojiPack(pack.id)}
+                      >
+                        <span className="emoji-pack-preview" aria-hidden="true">
+                          <EmojiGlyph emoji="😀" pack={pack.id} size={23} />
+                          <EmojiGlyph emoji="❤️" pack={pack.id} size={23} />
+                          <EmojiGlyph emoji="🎉" pack={pack.id} size={23} />
+                        </span>
+                        <span className="emoji-pack-copy">
+                          <strong>{pack.name}</strong>
+                          <small>{pack.description}</small>
+                        </span>
+                        <span className="emoji-pack-radio" aria-hidden="true" />
+                      </button>
+                    ))}
+                  </div>
+                  <p className="field-info-text">A escolha muda a aparência local dos emojis. As mensagens continuam compatíveis entre participantes.</p>
                 </div>
               </div>
             )}

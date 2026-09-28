@@ -1,0 +1,21 @@
+# P2Sharer agent instructions
+
+## Primary workspace rule
+
+Read `.agents/rules/agent-persistence.md` at the beginning of every task and follow it throughout the work. It is the central, always-on workspace rule. Its requirements cover language, Tauri validation, Git, persistent memory, canonical reuse, and agent management. Consult `.agents/knowledge.md` for the project context and recorded user preferences; apply relevant skills in addition to the central rule.
+
+P2Sharer is a Windows desktop application built with Tauri v2. The React/Vite frontend runs inside WebView2 and depends on native Rust commands, local media capture, and desktop packaging. Treat Vite browser mode as a frontend development aid, not as the product runtime.
+
+## Build and validation
+
+- For code or asset changes intended for the application, run `npm run tauri:build` before reporting the work as validated or complete. This command runs the frontend build through Tauri's `beforeBuildCommand`, compiles the Rust application, and creates desktop bundles.
+- `npm run build` checks only TypeScript and Vite. It does not replace `npm run tauri:build`.
+- Inspect the build result and verify the native executable and installer bundle under `src-tauri/target/release/` and `src-tauri/target/release/bundle/`.
+- If the desktop build cannot finish, report the specific failure and treat native packaging as unverified.
+- Use `npm run tauri:dev` for interactive app checks when needed. Do not describe a browser-only preview as a desktop app check.
+
+## Workspace conventions
+
+- Consult `.agents/knowledge.md` and the applicable `.agents/skills/` files before changing subsystems.
+- Follow the component and design token rules in `.agents/skills/canonical-design/SKILL.md` for UI work.
+- Write code, comments, documentation, and agent files in English. Match the user's language in conversation and user-facing localized strings.

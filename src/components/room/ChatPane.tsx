@@ -1,22 +1,64 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useSyncExternalStore } from 'react';
 import { useRoom } from '../../hooks/useRoom';
+import { EmojiPicker } from '../common/EmojiPicker';
+import { EmojiComposerInput } from '../common/EmojiComposerInput';
+import { ChatMessageContent } from '../common/ChatMessageContent';
+import { getEmojiPack, subscribeEmojiPack } from '../../core/emoji_preferences';
 import { SystemNoticeIcon } from './SystemNoticeIcon';
 import { SystemNoticeText } from './SystemNoticeText';
 
 export const ChatPane: React.FC = () => {
   const { chatMessages, sendChatMessage } = useRoom();
   const [inputText, setInputText] = useState('');
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const emojiPack = useSyncExternalStore(subscribeEmojiPack, getEmojiPack);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const composerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!composerRef.current?.contains(event.target as Node)) setPickerOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPickerOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [pickerOpen]);
+
+  const insertEmoji = (emoji: string) => {
+    const input = inputRef.current;
+    const start = input?.selectionStart ?? inputText.length;
+    const end = input?.selectionEnd ?? start;
+    const next = inputText.slice(0, start) + emoji + inputText.slice(end);
+    if (next.length > 2000) return;
+    setInputText(next);
+    requestAnimationFrame(() => {
+      input?.focus();
+      input?.setSelectionRange(start + emoji.length, start + emoji.length);
+    });
+  };
+
+  const sendMessage = () => {
     if (!inputText.trim()) return;
     sendChatMessage(inputText);
     setInputText('');
+    setPickerOpen(false);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    sendMessage();
   };
 
   return (
@@ -52,22 +94,39 @@ export const ChatPane: React.FC = () => {
                 {msg.isHost && <span className="badge-host">HOST</span>}
                 <span className="chat-msg-time">{timeStr}</span>
               </div>
-              <div className="chat-msg-bubble">{msg.text}</div>
+              <div className="chat-msg-bubble"><ChatMessageContent text={msg.text} pack={emojiPack} /></div>
             </div>
           );
         })}
         <div ref={messagesEndRef} />
       </div>
 
+      <div className="chat-composer" ref={composerRef}>
+      {pickerOpen && <EmojiPicker pack={emojiPack} onSelect={insertEmoji} />}
       <form className="chat-input-bar" id="chat-input-form" onSubmit={handleSubmit}>
-        <input
-          type="text"
-          id="chat-input-field"
-          placeholder="Digite uma mensagem..."
-          autoComplete="off"
-          maxLength={300}
+        <button
+          type="button"
+          className={`btn-chat-emoji ${pickerOpen ? 'active' : ''}`}
+          aria-label="Selecionar emoji"
+          aria-expanded={pickerOpen}
+          title="Emojis"
+          onClick={() => setPickerOpen((open) => !open)}
+        >
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01M15 9h.01" strokeWidth="2.5"/>
+          </svg>
+        </button>
+        <EmojiComposerInput
+          inputRef={inputRef}
           value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
+          pack={emojiPack}
+          onChange={setInputText}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+              event.preventDefault();
+              sendMessage();
+            }
+          }}
         />
         <button type="submit" className="btn-chat-send" aria-label="Enviar Mensagem">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -76,6 +135,7 @@ export const ChatPane: React.FC = () => {
           </svg>
         </button>
       </form>
+      </div>
     </div>
   );
 };
