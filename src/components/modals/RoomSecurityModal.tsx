@@ -1,25 +1,51 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useModal } from '../../hooks/useModal';
 import { useRoom } from '../../hooks/useRoom';
 import { showToast } from '../../hooks/useToast';
+import { parseRoomInvite } from '../../core/room_invite';
+import { savedRooms } from '../../core/saved_rooms';
 
 export const RoomSecurityModal: React.FC = () => {
   const { closeModal, isClosing } = useModal();
-  const { currentRoomCode, currentRoomPassword, updateRoomPassword, isRoomHost } = useRoom();
+  const { currentRoomCode, currentRoomInvite, currentRoomPassword, updateRoomPassword, isRoomHost } = useRoom();
 
   const [password, setPassword] = useState(() => currentRoomPassword);
   const [showPassword, setShowPassword] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const [rememberPassword, setRememberPassword] = useState(false);
 
-  const handleSave = () => {
+  useEffect(() => {
+    const roomId = parseRoomInvite(currentRoomInvite)?.roomId;
+    if (!roomId) return;
+    void savedRooms.get(roomId).then((record) => {
+      setIsSaved(Boolean(record?.saved));
+      setRememberPassword(record?.password !== undefined);
+    });
+  }, [currentRoomInvite]);
+
+  const handleSaveRoom = async () => {
+    const roomId = parseRoomInvite(currentRoomInvite)?.roomId;
+    if (!roomId) return;
+    try {
+      const record = await savedRooms.get(roomId);
+      if (!record) return;
+      await savedRooms.put({ ...record, saved: !isSaved,
+        password: !isSaved && rememberPassword ? currentRoomPassword : undefined });
+      setIsSaved(!isSaved);
+      showToast(isSaved ? 'Sala removida das salas salvas.' : 'Sala salva.');
+    } catch { showToast('Não foi possível atualizar a sala salva.'); }
+  };
+
+  const handleSave = async () => {
     if (!isRoomHost) { showToast('Somente o anfitrião pode alterar a senha da sala.'); return; }
     const finalPass = password.trim();
     const oldPassword = currentRoomPassword;
 
-    if (!updateRoomPassword(finalPass)) { showToast('Não foi possível alterar a senha da sala.'); return; }
+    if (!await updateRoomPassword(finalPass)) { showToast('Não foi possível alterar a senha da sala.'); return; }
     closeModal();
 
     if (finalPass) {
-      showToast(`Senha da sala alterada para "${finalPass}" e sincronizada com todos!`, 4000);
+      showToast('Senha da sala alterada e sincronizada com os participantes.', 4000);
     } else if (oldPassword && !finalPass) {
       showToast('Senha removida: a sala agora é pública.', 4000);
     } else {
@@ -38,9 +64,9 @@ export const RoomSecurityModal: React.FC = () => {
             </svg>
           </div>
           <div>
-            <h2>Segurança da Sala</h2>
+            <h2>Configurações da Sala</h2>
             <p className="modal-subtitle">
-              Altere a senha da sala a qualquer momento e sincronize com todos os participantes.
+              Consulte o convite, salve a sala e configure o acesso.
             </p>
           </div>
           <button className="btn-close" id="btn-close-room-security" onClick={closeModal}>
@@ -51,7 +77,7 @@ export const RoomSecurityModal: React.FC = () => {
         <div className="modal-body">
           <div className="room-security-info-box">
             <div className="security-info-row">
-              <span className="security-info-label">Código da Sala:</span>
+              <span className="security-info-label">Identificador:</span>
               <span className="security-info-value" id="sec-modal-room-code">
                 {currentRoomCode}
               </span>
@@ -65,7 +91,7 @@ export const RoomSecurityModal: React.FC = () => {
                       <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                       <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                     </svg>
-                    <span>Protegida por Senha ("{currentRoomPassword}")</span>
+                    <span>Protegida por senha</span>
                   </>
                 ) : (
                   <>
@@ -79,6 +105,27 @@ export const RoomSecurityModal: React.FC = () => {
               </span>
             </div>
           </div>
+
+          {currentRoomInvite && <div className="room-save-controls">
+            <button className="btn btn-secondary" onClick={() => {
+              void navigator.clipboard.writeText(currentRoomInvite).then(() => showToast('Convite copiado!'));
+            }}>Copiar convite</button>
+            <button className="btn btn-secondary" onClick={() => void handleSaveRoom()}>
+              {isSaved ? 'Remover das salvas' : 'Salvar sala'}
+            </button>
+            <label className="form-label room-remember-password">
+              <input type="checkbox" checked={rememberPassword}
+                onChange={(event) => {
+                  const checked = event.target.checked;
+                  setRememberPassword(checked);
+                  const roomId = parseRoomInvite(currentRoomInvite)?.roomId;
+                  if (isSaved && roomId) void savedRooms.get(roomId).then((record) => {
+                    if (record) return savedRooms.put({ ...record, password: checked ? currentRoomPassword : undefined });
+                  });
+                }} />
+              Lembrar senha neste dispositivo
+            </label>
+          </div>}
 
           <div className="form-group" style={{ marginTop: '16px' }}>
             <label className="form-label" htmlFor="input-room-security-password">
@@ -139,7 +186,7 @@ export const RoomSecurityModal: React.FC = () => {
           <button className="btn btn-secondary" id="btn-cancel-room-security" onClick={closeModal}>
             Fechar
           </button>
-          <button className="btn btn-primary" id="btn-save-room-security" onClick={handleSave} disabled={!isRoomHost}>
+          <button className="btn btn-primary" id="btn-save-room-security" onClick={() => void handleSave()} disabled={!isRoomHost}>
             <span>Atualizar Senha da Sala</span>
           </button>
         </div>

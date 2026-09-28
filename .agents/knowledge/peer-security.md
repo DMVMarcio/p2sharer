@@ -1,26 +1,30 @@
-# P2P Message Authorization and Threat Model
+# P2P Room Authorization and Threat Model
 
-## Trust boundary
+## Authenticated invitations
 
-`GroupRoomManager` is the only peer action receiver. Trystero supplies `meta.peerId` from the direct WebRTC channel; payload identity fields are untrusted. The room action wrapper rejects senders without a verified direct edge. The app ID `p2sharer-multi-stream-v2` prevents mixed rooms with clients that do not enforce this protocol.
+New desktop rooms use a `p2s3.` invitation that carries a random room identifier and the creator's P-256 public key. The signaling topic depends only on the room identifier. The optional password is entered at join time and is independent of discovery. The invitation key is the authority root; a claimed host flag, display name, or old room slug cannot replace it. Production Tauri joining requires this invitation. The Trystero app ID is `p2sharer-multi-stream-v3`, so older protocol clients cannot enter the same mesh.
 
-Every chat message, including system notices, is signed with a non-exportable per-room ECDSA P-256 key. The canonical signed data includes the room ID, author peer ID, sender label, message ID, text, timestamp, revision, edit/deletion timestamps, reply reference, and system fields. A receiver pins a key to an author only when the message arrives directly from that author's peer ID. Forwarded chat and history require a previously pinned key; otherwise they are rejected. `mergeChatHistory` also requires matching author ID and key and will not revive a deleted revision.
+Each installation stores its per-room signing identity in a Tauri Rust vault encrypted with Windows DPAPI for the current user. The vault also holds optional remembered passwords, saved invitations, and the verified authority chain. The frontend fallback is an in-memory map used by tests and browser development only. An invitation authenticates the room creator's key, not the human identity behind that key; sharing the invitation gives another person a copy of the trust anchor.
+
+Two Windows processes under the same account share the vault. Opening an owned room from the saved-room list restores the owner key; manually joining that invitation as a participant creates a separate session identity and leaves the stored owner key intact. This supports local two-process testing without granting the second process host authority by default.
+
+## Peer and host authentication
+
+On each direct WebRTC edge, peers exchange fresh nonces and sign the room ID, peer ID, and nonce. The receiver pins the resulting public key to that direct peer ID. `GroupRoomManager` rejects ordinary actions and incoming media until both the local client and sender have a signed host admission. The host key is checked against the invitation or the verified transfer chain. Chat messages and history revisions remain independently signed, including edits, deletions, and system notices; unknown forwarded authors are rejected.
+
+Host authority never moves automatically. The current host signs a transfer that names the successor key and peer ID and increases the authority epoch. The successor countersigns acceptance. Every client verifies the chain from the invitation root, including late joiners. Signed host commands admit or expel peers and update the password. Commands are room and epoch scoped, uniquely numbered, signature checked, and deduplicated. Commands can arrive out of order; newer signed password updates take precedence. Expulsion bans the current signing key, disconnects the edge, and rotates the join password for remaining admitted peers. If the host disconnects without transfer, nobody can admit newcomers or issue privileged commands.
 
 ## Action policy
 
 | Channel | Receiver authorization |
 | --- | --- |
-| `chat` | Valid signed author; direct key binding or known forwarded key; consistent actor claim; monotonic revision merge. |
-| `history_sync` | Direct verified sender; each item independently signed and verified; unknown forwarded authors rejected; 1,000-item cap. |
-| `room_password_sync` | Direct verified elected host; the actor label comes from tracked presence, not the payload. Local UI and service also enforce host-only updates. |
-| `presence` | Applies only to `meta.peerId`; schema checked, duplicate active names rejected, creator role pinned on first direct presence. |
-| `stream_status`, `watch_status`, `stream_req` | Status and watcher identity come from `meta.peerId`; stream requests must target the local broadcaster and identify the actual requester. |
-| `peer_leave` | Can remove only `meta.peerId`; a payload cannot name another peer. Relayed leave commands do not remove peers. |
-| `peer_exchange`, `mesh_relay` | Remain unverified hints for connectivity only. PEX cannot change an already verified peer's identity or role. Batches and rumor counts are capped. |
-| `peer_ping`, `peer_pong` | Direct verified sender and bounded timestamp. |
+| `peer_identity` | Fresh challenge and P-256 signature bind a key to the direct `meta.peerId`. |
+| `room_authority` | Transfer signatures and full root-anchored chain are verified; only the named successor may accept an offer. |
+| `room_admission` | Only signed current-host commands change membership, expulsion, or password; password requests go to the authenticated host. |
+| `chat` / `history_sync` | Every revision is signed; author key and sender claims must match pinned identity and room membership. |
+| Other room actions / WebRTC streams | Direct verified peer, admitted signing key, and local admission are required; room broadcasts are addressed only to admitted peers. |
+| `peer_exchange` / `mesh_relay` | Connectivity hints remain untrusted and cannot confer identity, membership, or host authority. |
 
-## Limits that require a stronger invite protocol
+## Security limits
 
-Peer IDs and creator status are ephemeral and self-declared at room entry. A signature proves continuity of the key observed on a direct channel, not the human behind a display name. A malicious participant can still claim to be the room creator before the genuine creator is observed by a new joiner. Preventing that requires an out-of-band creator public-key fingerprint in the room invite (or another trusted identity service). The current room code has no such trust anchor, so host authority cannot be described as cryptographically proven. Active peers cannot reuse another known author's signing key; however historical messages from authors never directly observed by this client are rejected rather than attributed from an untrusted relay.
-
-All participants need the v2 client. An older client cannot join the same Trystero room, and unsigned legacy chat is rejected. The ordinary WebRTC media channel relies on Trystero's direct peer metadata and DTLS session; this layer does not authenticate real-world identities or encrypt against an already admitted room participant.
+The password is submitted to the authenticated host over the direct WebRTC data channel, which is protected by WebRTC DTLS. This is not a password-authenticated key exchange protocol. The host learns the password, and a malicious host can disclose it. The invitation itself is a bearer capability for locating the room. A removed member who retains the invite can attempt a new connection with another identity, but the rotated password blocks admission until a current member discloses it. The protocol does not provide a globally trusted name, server-side moderation, or historical revocation independent of online peers. A host must be online for new admissions. Native two-process behavior still needs live desktop validation; unit tests cover signature and replay checks.

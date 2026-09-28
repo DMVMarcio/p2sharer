@@ -128,7 +128,7 @@ test('join creates own notice and direct handshake exchanges history both ways',
     assert.equal(manager.getConnectedPeers().find((peer) => peer.id === 'host')?.username, 'Host');
     assert.equal(manager.getConnectedPeers().find((peer) => peer.id === 'host')?.isCreator, true);
 
-    assert.equal(manager.updateRoomPassword('unauthorized'), false);
+    assert.equal(await manager.updateRoomPassword('unauthorized'), false);
     actions.get('room_password_sync')!.onMessage!({ newPassword: 'forged', updatedBy: 'Host' }, { peerId: 'mallory' });
     actions.get('room_password_sync')!.onMessage!({ newPassword: 'accepted', updatedBy: 'Mallory' }, { peerId: 'host' });
     assert.deepEqual(passwordChanges, [{ password: 'accepted', actor: 'Host' }]);

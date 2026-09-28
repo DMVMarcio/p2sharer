@@ -9,6 +9,7 @@ export function useRoom() {
   const pinnedPeerId = useStore((s) => s.pinnedPeerId);
   const isSharingScreen = useStore((s) => s.isSharingScreen);
   const currentRoomCode = useStore((s) => s.currentRoomCode);
+  const currentRoomInvite = useStore((s) => s.currentRoomInvite);
   const currentRoomPassword = useStore((s) => s.currentRoomPassword);
   const isCreator = useStore((s) => s.isCreator);
   const username = useStore((s) => s.username);
@@ -42,6 +43,8 @@ export function useRoom() {
   const updateRoomPassword = useCallback((newPassword: string) => {
     return roomService.updateRoomPassword(newPassword);
   }, []);
+  const transferOwnership = useCallback((peerId: string) => roomService.transferOwnership(peerId), []);
+  const kickPeer = useCallback((peerId: string) => roomService.kickPeer(peerId), []);
 
   const requestStream = useCallback((peerId: string) => {
     roomService.requestStream(peerId);
@@ -96,6 +99,7 @@ export function useRoom() {
     pinnedPeerId,
     isSharingScreen,
     currentRoomCode,
+    currentRoomInvite,
     currentRoomPassword,
     isCreator,
     username,
@@ -116,6 +120,8 @@ export function useRoom() {
     editChatMessage,
     deleteChatMessage,
     updateRoomPassword,
+    transferOwnership,
+    kickPeer,
     requestStream,
     stopWatchingStream,
     stopScreenSharing,

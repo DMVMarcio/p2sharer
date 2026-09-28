@@ -5,6 +5,7 @@ export class StateStore {
 
   public username: string = '';
   public currentRoomCode: string = '';
+  public currentRoomInvite: string = '';
   public currentRoomPassword: string = '';
   public isCreator: boolean = false;
   public isSharingScreen: boolean = false;

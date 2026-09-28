@@ -1,4 +1,5 @@
 import type { ChatMessage } from './types.ts';
+import { createRoomIdentity, hexToBytes, type RoomIdentity } from './room_invite.ts';
 
 const encoder = new TextEncoder();
 const hex = (bytes: Uint8Array): string => Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
@@ -46,40 +47,76 @@ function hasSafeChatShape(value: unknown): value is SignedChatMessage {
 }
 
 export class PeerAuthenticator {
-  private static readonly localKeys = new Map<string, CryptoKeyPair>();
+  private static readonly localKeys = new Map<string, { keys: CryptoKeyPair; identity: RoomIdentity }>();
   private readonly knownKeys = new Map<string, string>();
   private readonly importedKeys = new Map<string, CryptoKey>();
   private readonly roomId: string;
   private readonly peerId: string;
   private readonly keys: CryptoKeyPair;
   readonly publicKey: string;
+  private readonly identity: RoomIdentity;
 
   private constructor(
     roomId: string,
     peerId: string,
     keys: CryptoKeyPair,
-    publicKey: string,
+    identity: RoomIdentity,
   ) {
     this.roomId = roomId;
     this.peerId = peerId;
     this.keys = keys;
-    this.publicKey = publicKey;
-    this.knownKeys.set(peerId, publicKey);
+    this.publicKey = identity.publicKey;
+    this.identity = identity;
+    this.knownKeys.set(peerId, identity.publicKey);
   }
 
-  static async create(roomId: string, peerId: string): Promise<PeerAuthenticator> {
+  static async create(roomId: string, peerId: string, savedIdentity?: RoomIdentity): Promise<PeerAuthenticator> {
     // Keep the same identity when this app reconnects to a room. Other peers
     // pin our public key for the lifetime of their session.
     const cacheKey = JSON.stringify([roomId.toLowerCase(), peerId]);
-    let keys = this.localKeys.get(cacheKey);
-    if (!keys) {
-      keys = await crypto.subtle.generateKey(
-        { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign', 'verify'],
-      ) as CryptoKeyPair;
-      this.localKeys.set(cacheKey, keys);
+    let cached = this.localKeys.get(cacheKey);
+    if (!cached || (savedIdentity && cached.identity.publicKey !== savedIdentity.publicKey)) {
+      const identity = savedIdentity ?? await createRoomIdentity();
+      const privateKey = await crypto.subtle.importKey('pkcs8', hexToBytes(identity.privateKey),
+        { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+      const publicKey = await crypto.subtle.importKey('raw', hexToBytes(identity.publicKey),
+        { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
+      cached = { keys: { privateKey, publicKey }, identity };
+      this.localKeys.set(cacheKey, cached);
     }
-    const publicKey = hex(new Uint8Array(await crypto.subtle.exportKey('raw', keys.publicKey)));
-    return new PeerAuthenticator(roomId, peerId, keys, publicKey);
+    return new PeerAuthenticator(roomId, peerId, cached.keys, cached.identity);
+  }
+
+  exportIdentity(): RoomIdentity { return { ...this.identity }; }
+
+  getKnownKey(peerId: string): string | undefined { return this.knownKeys.get(peerId); }
+
+  async signControl(purpose: string, payload: unknown): Promise<string> {
+    const data = encoder.encode(JSON.stringify(['p2sharer-control-v1', this.roomId, purpose, payload]));
+    return hex(new Uint8Array(await crypto.subtle.sign(
+      { name: 'ECDSA', hash: 'SHA-256' }, this.keys.privateKey, data,
+    )));
+  }
+
+  async verifyControl(purpose: string, payload: unknown, signature: string, publicKey: string): Promise<boolean> {
+    if (!/^[0-9a-f]{128}$/.test(signature) || !/^04[0-9a-f]{128}$/.test(publicKey)) return false;
+    try {
+      let key = this.importedKeys.get(publicKey);
+      if (!key) {
+        key = await crypto.subtle.importKey('raw', hexToBytes(publicKey),
+          { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
+        this.importedKeys.set(publicKey, key);
+      }
+      return await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, key,
+        hexToBytes(signature), encoder.encode(JSON.stringify(['p2sharer-control-v1', this.roomId, purpose, payload])));
+    } catch { return false; }
+  }
+
+  pinDirect(peerId: string, publicKey: string): boolean {
+    const current = this.knownKeys.get(peerId);
+    if (current && current !== publicKey) return false;
+    this.knownKeys.set(peerId, publicKey);
+    return true;
   }
 
   async sign(message: ChatMessage): Promise<ChatMessage> {

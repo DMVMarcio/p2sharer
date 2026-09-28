@@ -1,8 +1,23 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
+import { MoreHorizontal } from 'lucide-react';
 import { useRoom } from '../../hooks/useRoom';
+import { showToast } from '../../hooks/useToast';
 
 export const ParticipantsPane: React.FC = () => {
-  const { username, peers, roomSlots, isCreator } = useRoom();
+  const { username, peers, roomSlots, isCreator, isRoomHost, transferOwnership, kickPeer } = useRoom();
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<{ kind: 'kick' | 'transfer'; id: string; name: string } | null>(null);
+
+  const confirmAction = async () => {
+    if (!pendingAction) return;
+    const success = pendingAction.kind === 'kick'
+      ? await kickPeer(pendingAction.id) : await transferOwnership(pendingAction.id);
+    showToast(success
+      ? pendingAction.kind === 'kick' ? 'Participante removido.' : 'Transferência de propriedade enviada.'
+      : 'Não foi possível concluir esta ação.');
+    setPendingAction(null);
+  };
 
   const getSlotColor = (peerId: string, isLocal: boolean): string => {
     const slot = roomSlots.find((s) => s.isLocal === isLocal || s.peerId === peerId);
@@ -57,14 +72,42 @@ export const ParticipantsPane: React.FC = () => {
                   {isStreaming && <span className="badge-live-stream-mini">AO VIVO</span>}
                 </div>
               </div>
-              <span
-                className={`user-status-dot ${p.connectionState === 'connected' ? 'online' : 'connecting'}`}
-                title={p.connectionState === 'connected' ? 'Conectado' : 'Conectando'}
-              ></span>
+              <div className="participant-end-actions">
+                <span className={`user-status-dot ${p.connectionState === 'connected' ? 'online' : 'connecting'}`}></span>
+                {isRoomHost && p.connectionState === 'connected' && !p.isCreator && (
+                  <div className="participant-menu-wrap">
+                    <button className="participant-menu-trigger" aria-label={`Ações para ${p.username}`}
+                      onClick={() => setOpenMenu(openMenu === p.id ? null : p.id)}><MoreHorizontal size={16} /></button>
+                    {openMenu === p.id && <div className="participant-menu" role="menu">
+                      <button role="menuitem" onClick={() => { setOpenMenu(null); setPendingAction({ kind: 'transfer', id: p.id, name: p.username }); }}>
+                        Transferir propriedade
+                      </button>
+                      <button role="menuitem" className="participant-menu-danger"
+                        onClick={() => { setOpenMenu(null); setPendingAction({ kind: 'kick', id: p.id, name: p.username }); }}>
+                        Expulsar
+                      </button>
+                    </div>}
+                  </div>
+                )}
+              </div>
             </div>
           );
         })}
       </div>
+      {pendingAction && createPortal(<div className="modal-overlay" role="presentation">
+        <div className="modal-card participant-confirm-dialog" role="alertdialog" aria-modal="true"
+          aria-label={pendingAction.kind === 'kick' ? 'Confirmar expulsão' : 'Confirmar transferência'}>
+          <div className="modal-header"><h2>{pendingAction.kind === 'kick' ? 'Expulsar participante' : 'Transferir propriedade'}</h2></div>
+          <div className="modal-body"><p>{pendingAction.kind === 'kick'
+            ? `Remover ${pendingAction.name} da sala e renovar a senha de entrada?`
+            : `Tornar ${pendingAction.name} o único host da sala? Você perderá as permissões de host.`}</p></div>
+          <div className="modal-footer">
+            <button className="btn btn-secondary" onClick={() => setPendingAction(null)}>Cancelar</button>
+            <button className={pendingAction.kind === 'kick' ? 'btn btn-danger' : 'btn btn-primary'}
+              onClick={() => void confirmAction()}>Confirmar</button>
+          </div>
+        </div>
+      </div>, document.body)}
     </div>
   );
 };

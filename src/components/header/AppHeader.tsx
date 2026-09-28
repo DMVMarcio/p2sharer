@@ -4,19 +4,31 @@ import { useModal } from '../../hooks/useModal';
 import { showToast } from '../../hooks/useToast';
 import { Tooltip } from '../common/Tooltip';
 import logoImg from '../../assets/logo.png';
+import { BookmarkPlus } from 'lucide-react';
+import { parseRoomInvite } from '../../core/room_invite';
+import { savedRooms } from '../../core/saved_rooms';
 
 export const AppHeader: React.FC = () => {
-  const { currentRoomCode, currentRoomPassword, username, isInRoom } = useRoom();
+  const { currentRoomCode, currentRoomInvite, currentRoomPassword, username, isInRoom } = useRoom();
   const { openModal } = useModal();
 
   const handleCopyRoomCode = () => {
-    const copyText = currentRoomPassword
-      ? `Sala: ${currentRoomCode} | Senha: ${currentRoomPassword}`
-      : currentRoomCode;
+    const copyText = currentRoomInvite || currentRoomCode;
     navigator.clipboard
       .writeText(copyText)
       .then(() => showToast('Código copiado!'))
       .catch(() => {});
+  };
+
+  const handleSaveRoom = async () => {
+    const parsed = parseRoomInvite(currentRoomInvite);
+    if (!parsed) return;
+    try {
+      const record = await savedRooms.get(parsed.roomId);
+      if (!record) return;
+      await savedRooms.put({ ...record, saved: true });
+      showToast('Sala salva neste dispositivo.');
+    } catch { showToast('Não foi possível salvar a sala.'); }
   };
 
   return (
@@ -31,17 +43,13 @@ export const AppHeader: React.FC = () => {
       <div className="header-user-info">
         {isInRoom && (
           <Tooltip
-            content={
-              currentRoomPassword
-                ? `Copiar código e senha (${currentRoomCode})`
-                : `Copiar código da sala (${currentRoomCode})`
-            }
+            content={`Copiar convite autenticado (${currentRoomCode})`}
           >
             <button
               className="room-code-header-pill"
               id="header-room-code-pill"
               onClick={handleCopyRoomCode}
-              aria-label="Copiar código da sala"
+              aria-label="Copiar convite da sala"
             >
               <span className="header-pill-label">SALA</span>
               <strong id="display-room-code">{currentRoomCode}</strong>
@@ -65,6 +73,13 @@ export const AppHeader: React.FC = () => {
                 <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
                 <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
               </svg>
+            </button>
+          </Tooltip>
+        )}
+        {isInRoom && currentRoomInvite && (
+          <Tooltip content="Salvar sala neste dispositivo">
+            <button className="btn-icon-header" onClick={() => void handleSaveRoom()} aria-label="Salvar sala">
+              <BookmarkPlus size={16} />
             </button>
           </Tooltip>
         )}
