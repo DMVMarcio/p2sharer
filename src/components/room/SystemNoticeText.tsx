@@ -6,7 +6,9 @@ interface SystemNoticeTextProps {
 }
 
 export const SystemNoticeText: React.FC<SystemNoticeTextProps> = ({ message }) => {
-  const terms = [message.systemActor, message.systemRoom]
+  const roomName = message.systemRoom && message.text.startsWith('Sala criada: ')
+    ? message.text.slice('Sala criada: '.length) : message.systemRoom;
+  const terms = [message.systemActor, roomName]
     .filter((term): term is string => Boolean(term))
     .sort((a, b) => b.length - a.length);
   if (!terms.length) return <>{message.text}</>;
