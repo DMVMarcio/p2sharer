@@ -3,7 +3,7 @@ import { getEmojiIndex } from '../../core/emoji_catalog';
 import { EmojiPack } from '../../core/emoji_preferences';
 import { EmojiGlyph } from './EmojiGlyph';
 
-export const EmojiText: React.FC<{ text: string; pack: EmojiPack; size?: number }> = ({ text, pack, size = 19 }) => {
+export const EmojiText: React.FC<{ text: string; pack: EmojiPack; size?: number }> = ({ text, pack, size = 16 }) => {
   const parts: React.ReactNode[] = [];
   let plainText = '';
   const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });

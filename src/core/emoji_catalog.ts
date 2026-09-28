@@ -1,15 +1,15 @@
 import rawCatalog from './emoji_catalog.json';
 
 export const EMOJI_CATEGORIES = [
-  { id: 'Smileys & Emotion', label: 'Rostos e emoções', icon: '😀' },
-  { id: 'People & Body', label: 'Pessoas e gestos', icon: '👋' },
-  { id: 'Animals & Nature', label: 'Animais e natureza', icon: '🐶' },
-  { id: 'Food & Drink', label: 'Comidas e bebidas', icon: '🍕' },
-  { id: 'Travel & Places', label: 'Viagem e lugares', icon: '🚗' },
-  { id: 'Activities', label: 'Atividades', icon: '⚽' },
-  { id: 'Objects', label: 'Objetos', icon: '💡' },
-  { id: 'Symbols', label: 'Símbolos', icon: '❤️' },
-  { id: 'Flags', label: 'Bandeiras', icon: '🏳️' },
+  { id: 'Smileys & Emotion', label: 'Rostos e emoções' },
+  { id: 'People & Body', label: 'Pessoas e gestos' },
+  { id: 'Animals & Nature', label: 'Animais e natureza' },
+  { id: 'Food & Drink', label: 'Comidas e bebidas' },
+  { id: 'Travel & Places', label: 'Viagem e lugares' },
+  { id: 'Activities', label: 'Atividades' },
+  { id: 'Objects', label: 'Objetos' },
+  { id: 'Symbols', label: 'Símbolos' },
+  { id: 'Flags', label: 'Bandeiras' },
 ] as const;
 
 export type EmojiCategory = (typeof EMOJI_CATEGORIES)[number]['id'];
