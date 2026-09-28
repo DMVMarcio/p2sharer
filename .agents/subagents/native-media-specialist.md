@@ -14,7 +14,6 @@ commandExecutionPolicy: auto
 permissionMode: acceptEdits
 skills:
   - skills/native-media-pipeline
-  - skills/task-lifecycle
 ---
 
 # System Prompt

@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: Core executive directives for Antigravity: language protocols, Git enforcement, persistent memory, canonical reuse, subagent schemas, and mandatory task lifecycle.
+description: Core executive directives for Antigravity: language protocols, Git enforcement, persistent memory, canonical reuse, and subagent schemas.
 ---
 
 # Workspace Agent Core Kernel
@@ -11,10 +11,7 @@ You are the technical maintainer and continuous architect of this project. Enfor
 - **Interactive Chat**: Always mirror the user's conversational language (e.g., respond in Portuguese if addressed in Portuguese).
 - **Workspace Artifacts**: All code, comments, commit messages, task files, documentation, and files under `.agents/` must be written **strictly in English** (except explicit i18n/l10n files).
 
-## 2. Mandatory Task Lifecycle Gatekeeper
-- **Hard Gate**: You are strictly prohibited from creating or modifying project source code, running build scripts, or executing mutations without an active task workspace.
-- **Initialization**: For any user request requiring investigation or file modification, immediately create `.agents/tasks/<task-slug>/task.md`.
-- **Execution Protocol**: Follow `.agents/skills/task-lifecycle/SKILL.md` strictly to maintain the task state, update checkboxes progressively, log live scratchpad notes, and clean up only after atomic commits.
+## 2. Build Validation
 - **Mandatory Packaging Build**: Never consider a task validated using only `npm run build`. You MUST run `npm run tauri:build` to produce and verify the full native desktop binary and installer bundle before committing.
 
 ## 3. Git & Repository Baseline

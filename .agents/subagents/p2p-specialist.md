@@ -14,7 +14,6 @@ commandExecutionPolicy: auto
 permissionMode: acceptEdits
 skills:
   - skills/p2p-protocol
-  - skills/task-lifecycle
 ---
 
 # System Prompt

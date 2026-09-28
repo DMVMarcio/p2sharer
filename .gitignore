@@ -27,6 +27,3 @@ coverage/
 *.njsproj
 *.sln
 *.sw?
-
-# Agent ephemeral task tracking
-.agents/tasks/
