@@ -16,9 +16,10 @@ export const CreateRoomModal: React.FC = () => {
   const handleConfirm = async () => {
     const finalPass = password.trim();
     try {
-      const { invite, identity } = await createAuthenticatedInvite();
+      const roomName = name.trim() || 'Minha sala';
+      const { invite, identity } = await createAuthenticatedInvite(roomName);
       const roomId = parseRoomInvite(invite)!.roomId;
-      await savedRooms.put({ roomId, invite, name: name.trim() || 'Minha sala',
+      await savedRooms.put({ roomId, invite, name: roomName,
         saved: true, owned: true, protected: Boolean(finalPass), password: finalPass || undefined, identity });
       closeModal();
       joinRoom(invite, finalPass, true);

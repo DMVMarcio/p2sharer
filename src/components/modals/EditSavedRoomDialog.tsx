@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import { savedRooms, type SavedRoom } from '../../core/saved_rooms';
-import { parseRoomInvite } from '../../core/room_invite';
+import { compareRoomInvites, parseRoomInvite } from '../../core/room_invite';
+import { verifyRoomInvite } from '../../core/room_invite_validation';
 import { showToast } from '../../hooks/useToast';
 
 interface EditSavedRoomDialogProps {
@@ -11,7 +12,8 @@ interface EditSavedRoomDialogProps {
 }
 
 export const EditSavedRoomDialog: React.FC<EditSavedRoomDialogProps> = ({ room, onClose }) => {
-  const [name, setName] = useState(room.name);
+  const [name, setName] = useState(room.customName ?? room.name);
+  const [nameCustomized, setNameCustomized] = useState(Boolean(room.customName));
   const [inviteCode, setInviteCode] = useState(room.invite);
   const [password, setPassword] = useState(room.password ?? '');
   const [showPassword, setShowPassword] = useState(false);
@@ -21,7 +23,7 @@ export const EditSavedRoomDialog: React.FC<EditSavedRoomDialogProps> = ({ room, 
     if (busy) return;
     const nextName = name.trim();
     if (!nextName) { showToast('Digite um nome para a sala.'); return; }
-    const nextInvite = parseRoomInvite(inviteCode);
+    const nextInvite = await verifyRoomInvite(inviteCode);
     if (!nextInvite) { showToast('Cole um convite autenticado válido.'); return; }
     if (nextInvite.roomId === room.roomId &&
         nextInvite.rootKey !== parseRoomInvite(room.invite)?.rootKey) {
@@ -32,6 +34,13 @@ export const EditSavedRoomDialog: React.FC<EditSavedRoomDialogProps> = ({ room, 
     try {
       const current = await savedRooms.get(room.roomId);
       if (!current) throw new Error('Room record is missing');
+      const currentInvite = parseRoomInvite(current.invite)!;
+      const versionOrder = compareRoomInvites(nextInvite, currentInvite);
+      if (nextInvite.roomId === room.roomId && (versionOrder < 0 ||
+          (versionOrder === 0 && inviteCode.trim() !== current.invite))) {
+        showToast('Este convite é anterior à versão salva neste dispositivo.');
+        return;
+      }
       const nextPassword = password.trim();
       if (nextInvite.roomId !== room.roomId) {
         if (await savedRooms.get(nextInvite.roomId)) {
@@ -39,7 +48,9 @@ export const EditSavedRoomDialog: React.FC<EditSavedRoomDialogProps> = ({ room, 
           return;
         }
         await savedRooms.put({ roomId: nextInvite.roomId, invite: inviteCode.trim(),
-          name: nextName, saved: true, owned: false, protected: true,
+          name: nextInvite.version === 4 ? nextInvite.name : nextInvite.roomId.slice(0, 8),
+          customName: nameCustomized ? nextName : undefined,
+          saved: true, owned: false, protected: true,
           password: nextPassword || undefined });
         if (current.owned) {
           await savedRooms.put({ ...current, saved: false });
@@ -47,7 +58,9 @@ export const EditSavedRoomDialog: React.FC<EditSavedRoomDialogProps> = ({ room, 
           await savedRooms.remove(current.roomId);
         }
       } else {
-        await savedRooms.put({ ...current, invite: inviteCode.trim(), name: nextName,
+        await savedRooms.put({ ...current, invite: inviteCode.trim(),
+          name: nextInvite.version === 4 ? nextInvite.name : current.name,
+          customName: nameCustomized ? nextName : undefined,
           password: nextPassword || undefined,
           protected: Boolean(nextPassword) || current.protected });
       }
@@ -74,7 +87,10 @@ export const EditSavedRoomDialog: React.FC<EditSavedRoomDialogProps> = ({ room, 
           <div className="form-group">
             <label className="form-label" htmlFor="saved-room-name">Nome</label>
             <input className="text-input" id="saved-room-name" maxLength={80}
-              value={name} onChange={(event) => setName(event.target.value)} autoFocus />
+              value={name} onChange={(event) => {
+                setName(event.target.value);
+                setNameCustomized(true);
+              }} autoFocus />
           </div>
           <div className="form-group saved-room-form-field">
             <label className="form-label" htmlFor="saved-room-invite">Código de convite</label>

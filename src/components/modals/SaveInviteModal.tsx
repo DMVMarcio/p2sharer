@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { BookmarkPlus, Eye, EyeOff } from 'lucide-react';
-import { parseRoomInvite } from '../../core/room_invite';
+import { compareRoomInvites, parseRoomInvite } from '../../core/room_invite';
+import { verifyRoomInvite } from '../../core/room_invite_validation';
 import { savedRooms } from '../../core/saved_rooms';
 import { useModal } from '../../hooks/useModal';
 import { showToast } from '../../hooks/useToast';
@@ -15,7 +16,7 @@ export const SaveInviteModal: React.FC = () => {
 
   const save = async () => {
     if (busy) return;
-    const invite = parseRoomInvite(code);
+    const invite = await verifyRoomInvite(code);
     if (!invite) { showToast('Cole um convite autenticado válido.'); return; }
     setBusy(true);
     try {
@@ -25,11 +26,19 @@ export const SaveInviteModal: React.FC = () => {
         return;
       }
       const remembered = password.trim() || existing?.password;
+      const existingInvite = existing ? parseRoomInvite(existing.invite) : null;
+      const versionOrder = existingInvite ? compareRoomInvites(existingInvite, invite) : -1;
+      if (versionOrder === 0 && existing?.invite !== code.trim()) {
+        showToast('Esta versão do convite não corresponde à sala salva.');
+        return;
+      }
+      const retainNewer = versionOrder >= 0;
       await savedRooms.put({
         ...existing,
         roomId: invite.roomId,
-        invite: code.trim(),
-        name: name.trim() || existing?.name || invite.roomId.slice(0, 8),
+        invite: retainNewer ? existing!.invite : code.trim(),
+        name: retainNewer ? existing!.name : invite.version === 4 ? invite.name : existing?.name ?? invite.roomId.slice(0, 8),
+        customName: name.trim() || existing?.customName,
         saved: true,
         owned: existing?.owned ?? false,
         protected: existing?.protected ?? true,
@@ -60,7 +69,7 @@ export const SaveInviteModal: React.FC = () => {
           <div className="form-group">
             <label className="form-label" htmlFor="save-invite-code">Código de convite</label>
             <input className="text-input" id="save-invite-code" value={code}
-              placeholder="Cole o convite p2s3..." autoFocus
+              placeholder="Cole o convite p2s4..." autoFocus
               onChange={(event) => setCode(event.target.value)} />
           </div>
           <div className="form-group saved-room-form-field">

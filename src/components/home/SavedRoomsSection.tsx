@@ -16,7 +16,7 @@ export const SavedRoomsSection: React.FC = () => {
   useEffect(() => {
     const reload = () => {
       void savedRooms.list().then((records) => setRooms(records.filter((room) => room.saved)
-        .sort((a, b) => a.name.localeCompare(b.name))))
+        .sort((a, b) => (a.customName ?? a.name).localeCompare(b.customName ?? b.name))))
         .catch((error) => console.warn('[Rooms] Could not load saved rooms:', error));
     };
     reload();
@@ -58,7 +58,7 @@ export const SavedRoomsSection: React.FC = () => {
           {rooms.map((room) => (
             <article className="saved-room-card" key={room.roomId}>
               <div className="saved-room-details">
-                <strong>{room.name}</strong>
+                <strong>{room.customName ?? room.name}</strong>
                 <span>{room.owned ? 'Sua sala' : 'Participante'} · {room.roomId.slice(0, 8)}
                   {room.password !== undefined && <LockKeyhole size={12} aria-label="Senha lembrada" />}</span>
               </div>
