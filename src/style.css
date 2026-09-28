@@ -371,6 +371,8 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .room-code-header-pill {
   display: inline-flex;
   align-items: center;
+  min-width: 0;
+  max-width: min(35vw, 340px);
   gap: 6px;
   background-color: var(--accent-subtle);
   border: 1px solid var(--accent-border);
@@ -391,8 +393,12 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 }
 
 .room-code-header-pill strong {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .header-pill-label {

@@ -9,7 +9,7 @@ import { parseRoomInvite } from '../../core/room_invite';
 import { savedRooms, type SavedRoom } from '../../core/saved_rooms';
 
 export const AppHeader: React.FC = () => {
-  const { currentRoomCode, currentRoomInvite, currentRoomPassword, username, isInRoom } = useRoom();
+  const { currentRoomCode, currentRoomInvite, currentRoomName, currentRoomPassword, username, isInRoom } = useRoom();
   const { openModal } = useModal();
   const [savedRecord, setSavedRecord] = useState<SavedRoom | null>(null);
   const [savingRoom, setSavingRoom] = useState(false);
@@ -66,7 +66,7 @@ export const AppHeader: React.FC = () => {
       <div className="header-user-info">
         {isInRoom && (
           <Tooltip
-            content={`Copiar convite autenticado (${currentRoomCode})`}
+            content={`Copiar convite autenticado (${currentRoomName || currentRoomCode})`}
           >
             <button
               className="room-code-header-pill"
@@ -75,7 +75,7 @@ export const AppHeader: React.FC = () => {
               aria-label="Copiar convite da sala"
             >
               <span className="header-pill-label">SALA</span>
-              <strong id="display-room-code">{currentRoomCode}</strong>
+              <strong id="display-room-code">{currentRoomName || currentRoomCode}</strong>
               <span
                 className="room-lock-icon"
                 id="header-room-lock-icon"

@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { PeerAuthenticator } from '../../src/core/peer_auth.ts';
-import { createAuthenticatedInvite, parseRoomInvite } from '../../src/core/room_invite.ts';
+import { createAuthenticatedInvite, formatRoomInvite, parseRoomInvite,
+  signRoomInvite } from '../../src/core/room_invite.ts';
 import { roomStateFingerprint } from '../../src/core/room_state_sync.ts';
 import { savedRooms } from '../../src/core/saved_rooms.ts';
 import { GroupRoomManager } from '../../src/p2p/group_room.ts';
@@ -22,6 +23,7 @@ test('admitted peers reconcile signed commands; unauthenticated peers cannot req
   const actions = new Map<string, Action>();
   const sent: Array<{ action: string; data: any; target?: string }> = [];
   let mediaSends = 0;
+  const inviteUpdates: string[] = [];
   const room = {
     makeAction(name: string): Action {
       const action: Action = {
@@ -48,6 +50,7 @@ test('admitted peers reconcile signed commands; unauthenticated peers cannot req
     await manager.join({
       onStreamsUpdate: () => {}, onSlotsUpdate: () => {}, onChat: () => {},
       onChatHistory: () => {}, onPeersUpdate: () => {}, onStatusChange: () => {},
+      onInviteChange: (_invite, name) => { inviteUpdates.push(name); },
     });
     room.onPeerJoin('unproved');
     assert.equal(manager.getConnectedPeers().some((peer) => peer.id === 'unproved'), false);
@@ -92,7 +95,25 @@ test('admitted peers reconcile signed commands; unauthenticated peers cannot req
       item.data.commands.some((command: { kind: string }) => command.kind === 'admit')));
 
     assert.equal(await manager.setAdministrator('member', true), true);
+    const updatedInvite = parseRoomInvite(manager.getInvite()!);
+    assert.ok(updatedInvite && updatedInvite.version === 4);
+    assert.equal(updatedInvite.adminKeys.length, 1);
+    assert.equal(updatedInvite.adminKeys[0], member.publicKey);
+    assert.equal((await savedRooms.get(invite.roomId))?.invite, manager.getInvite());
     const authority = (manager as any).authority;
+    const signer = await PeerAuthenticator.create(invite.roomId, 'snapshot-signer', created.identity);
+    const renamed = await signRoomInvite({ ...updatedInvite,
+      name: 'Sala Renomeada', revision: authority.nextSnapshotRevision() }, signer);
+    const renamedCode = formatRoomInvite(renamed);
+    await actions.get('room_invite_sync')!.onMessage!(
+      { invite: renamedCode }, { peerId: 'member' });
+    assert.equal(manager.getRoomName(), 'Sala Renomeada');
+    assert.equal((await savedRooms.get(invite.roomId))?.invite, renamedCode);
+    assert.ok(inviteUpdates.includes('Sala Renomeada'));
+    await actions.get('room_invite_sync')!.onMessage!(
+      { invite: created.invite }, { peerId: 'member' });
+    assert.equal(manager.getInvite(), renamedCode,
+      'an older signed invitation must not replace the saved snapshot');
     const revoke = await authority.makeCommand('revoke-admin',
       { targetPeerId: 'member', targetKey: member.publicKey });
     await actions.get('room_admission')!.onMessage!(

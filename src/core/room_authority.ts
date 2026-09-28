@@ -64,6 +64,16 @@ export class RoomAuthority {
   isPeerHost(peerId: string): boolean { return this.auth.getKnownKey(peerId) === this.currentKey; }
   history(): AuthorityTransfer[] { return [...this.chain]; }
 
+  nextSnapshotRevision(): number {
+    if (!this.isLocalHost()) throw new Error('Only the authenticated host may update room metadata');
+    this.commandSequence = Math.max(this.commandSequence + 1, Date.now() * 1000);
+    return this.commandSequence;
+  }
+
+  observeRevision(revision: number): void {
+    if (Number.isSafeInteger(revision) && revision > this.commandSequence) this.commandSequence = revision;
+  }
+
   async proposeTransfer(nextKey: string, nextPeerId: string): Promise<Omit<AuthorityTransfer, 'nextSignature'>> {
     if (!this.isLocalHost() || !/^04[0-9a-f]{128}$/.test(nextKey) || !nextPeerId) {
       throw new Error('Only the authenticated host may transfer authority');

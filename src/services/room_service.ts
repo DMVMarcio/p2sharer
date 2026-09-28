@@ -3,7 +3,7 @@ import { AudioBridge } from '../audio/audio_bridge.ts';
 import { audioContextManager } from '../audio/audio_context_manager.ts';
 import { stateStore } from '../core/state_store.ts';
 import { mergeChatHistory } from '../core/chat_history.ts';
-import { parseRoomInvite } from '../core/room_invite.ts';
+import { verifyRoomInvite } from '../core/room_invite_validation.ts';
 import { savedRooms } from '../core/saved_rooms.ts';
 import type { ChatMessage, PeerInfo, RoomSlotInfo } from '../core/types.ts';
 import { generateRandomRoomSlug, GroupRoomManager } from '../p2p/group_room.ts';
@@ -144,13 +144,14 @@ export class RoomService {
   }
 
   private async joinRoomNow(code: string, pass: string, isCreator: boolean): Promise<void> {
-    const parsed = parseRoomInvite(code);
+    const parsed = await verifyRoomInvite(code);
     if (!parsed && typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
       throw new Error('Um convite autenticado é necessário para entrar na sala');
     }
     stateStore.set((s) => {
       s.currentRoomCode = parsed ? parsed.roomId.slice(0, 8) : code;
       s.currentRoomInvite = parsed ? code : '';
+      s.currentRoomName = parsed?.version === 4 ? parsed.name : parsed?.roomId.slice(0, 8) ?? code;
       s.currentRoomPassword = pass;
       s.isCreator = isCreator;
       s.roomSlots = [
@@ -293,6 +294,13 @@ export class RoomService {
         stateStore.set((s) => { s.isCreator = isLocalHost; });
         this.notify();
       },
+      onInviteChange: (invite, name) => {
+        if (this.roomManager !== manager) return;
+        stateStore.set((s) => {
+          s.currentRoomInvite = invite;
+          s.currentRoomName = name;
+        });
+      },
     });
 
     this.notify();
@@ -416,6 +424,7 @@ export class RoomService {
       s.roomSlots = [];
       s.currentRoomCode = generateRandomRoomSlug();
       s.currentRoomInvite = '';
+      s.currentRoomName = '';
       s.currentRoomPassword = '';
       s.layoutMode = 'grid';
       s.pinnedPeerId = null;
@@ -474,6 +483,10 @@ export class RoomService {
   }
 
   public getCurrentInvite(): string { return this.roomManager?.getInvite() ?? ''; }
+
+  public updateRoomName(name: string): Promise<boolean> {
+    return this.roomManager?.updateRoomName(name) ?? Promise.resolve(false);
+  }
 
   public transferOwnership(peerId: string): Promise<boolean> {
     return this.roomManager?.transferOwnership(peerId) ?? Promise.resolve(false);

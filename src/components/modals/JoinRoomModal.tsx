@@ -3,6 +3,7 @@ import { useModal } from '../../hooks/useModal';
 import { useRoom } from '../../hooks/useRoom';
 import { showToast } from '../../hooks/useToast';
 import { parseRoomInvite } from '../../core/room_invite';
+import { verifyRoomInvite } from '../../core/room_invite_validation';
 import { roomService } from '../../services/room_service';
 
 export const JoinRoomModal: React.FC = () => {
@@ -13,7 +14,9 @@ export const JoinRoomModal: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const handleConfirm = async () => {
-    if (!parseRoomInvite(code)) { showToast('Cole um convite autenticado válido.'); return; }
+    if (!parseRoomInvite(code) || !await verifyRoomInvite(code)) {
+      showToast('Cole um convite autenticado válido.'); return;
+    }
     const asOwner = roomService.pendingJoinAsOwner;
     roomService.pendingJoinInvite = '';
     roomService.pendingJoinAsOwner = false;
@@ -51,7 +54,7 @@ export const JoinRoomModal: React.FC = () => {
               type="text"
               id="input-join-room-code-dialog"
               className="text-input"
-              placeholder="Cole o convite p2s3..."
+              placeholder="Cole o convite p2s4..."
               style={{ fontFamily: 'var(--font-mono)', fontSize: '15px', fontWeight: 700 }}
               value={code}
               onChange={(e) => setCode(e.target.value)}

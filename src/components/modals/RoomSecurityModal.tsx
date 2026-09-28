@@ -5,17 +5,26 @@ import { showToast } from '../../hooks/useToast';
 
 export const RoomSecurityModal: React.FC = () => {
   const { closeModal, isClosing } = useModal();
-  const { currentRoomCode, currentRoomPassword, updateRoomPassword, isRoomHost } = useRoom();
+  const { currentRoomCode, currentRoomName, currentRoomPassword,
+    updateRoomName, updateRoomPassword, isRoomHost } = useRoom();
 
+  const [name, setName] = useState(() => currentRoomName);
   const [password, setPassword] = useState(() => currentRoomPassword);
   const [showPassword, setShowPassword] = useState(false);
 
   const handleSave = async () => {
-    if (!isRoomHost) { showToast('Somente o anfitrião pode alterar a senha da sala.'); return; }
+    if (!isRoomHost) { showToast('Somente o anfitrião pode alterar a sala.'); return; }
+    const finalName = name.trim();
+    if (!finalName || finalName.length > 80) { showToast('Digite um nome válido para a sala.'); return; }
     const finalPass = password.trim();
     const oldPassword = currentRoomPassword;
 
-    if (!await updateRoomPassword(finalPass)) { showToast('Não foi possível alterar a senha da sala.'); return; }
+    if (finalName !== currentRoomName && !await updateRoomName(finalName)) {
+      showToast('Não foi possível alterar o nome da sala.'); return;
+    }
+    if (finalPass !== oldPassword && !await updateRoomPassword(finalPass)) {
+      showToast('Não foi possível alterar a senha da sala.'); return;
+    }
     closeModal();
 
     if (finalPass) {
@@ -81,6 +90,13 @@ export const RoomSecurityModal: React.FC = () => {
           </div>
 
           <div className="form-group" style={{ marginTop: '16px' }}>
+            <label className="form-label" htmlFor="input-room-security-name">Nome da sala</label>
+            <input id="input-room-security-name" className="text-input" maxLength={80}
+              value={name} disabled={!isRoomHost}
+              onChange={(event) => setName(event.target.value)} />
+          </div>
+
+          <div className="form-group" style={{ marginTop: '16px' }}>
             <label className="form-label" htmlFor="input-room-security-password">
               <span>Nova Senha da Sala:</span>
               <span className="label-hint">Deixe vazio para tornar pública</span>
@@ -122,7 +138,7 @@ export const RoomSecurityModal: React.FC = () => {
                 </span>
               </button>
             </div>
-            {!isRoomHost && <p className="field-info-text">Somente o anfitrião pode alterar a senha da sala.</p>}
+            {!isRoomHost && <p className="field-info-text">Somente o anfitrião pode alterar a sala.</p>}
           </div>
         </div>
 
@@ -131,7 +147,7 @@ export const RoomSecurityModal: React.FC = () => {
             Fechar
           </button>
           <button className="btn btn-primary" id="btn-save-room-security" onClick={() => void handleSave()} disabled={!isRoomHost}>
-            <span>Atualizar Senha da Sala</span>
+            <span>Salvar configurações</span>
           </button>
         </div>
       </div>

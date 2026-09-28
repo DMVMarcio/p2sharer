@@ -10,6 +10,7 @@ export function useRoom() {
   const isSharingScreen = useStore((s) => s.isSharingScreen);
   const currentRoomCode = useStore((s) => s.currentRoomCode);
   const currentRoomInvite = useStore((s) => s.currentRoomInvite);
+  const currentRoomName = useStore((s) => s.currentRoomName);
   const currentRoomPassword = useStore((s) => s.currentRoomPassword);
   const isCreator = useStore((s) => s.isCreator);
   const username = useStore((s) => s.username);
@@ -43,6 +44,7 @@ export function useRoom() {
   const updateRoomPassword = useCallback((newPassword: string) => {
     return roomService.updateRoomPassword(newPassword);
   }, []);
+  const updateRoomName = useCallback((name: string) => roomService.updateRoomName(name), []);
   const transferOwnership = useCallback((peerId: string) => roomService.transferOwnership(peerId), []);
   const setAdministrator = useCallback((peerId: string, enabled: boolean) =>
     roomService.setAdministrator(peerId, enabled), []);
@@ -102,6 +104,7 @@ export function useRoom() {
     isSharingScreen,
     currentRoomCode,
     currentRoomInvite,
+    currentRoomName,
     currentRoomPassword,
     isCreator,
     username,
@@ -123,6 +126,7 @@ export function useRoom() {
     editChatMessage,
     deleteChatMessage,
     updateRoomPassword,
+    updateRoomName,
     transferOwnership,
     setAdministrator,
     kickPeer,

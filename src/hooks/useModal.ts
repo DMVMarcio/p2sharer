@@ -1,5 +1,5 @@
 import { useCallback, useSyncExternalStore } from 'react';
-import { safeChatUrl } from '../core/chat_links';
+import { safeChatUrl } from '../core/chat_links.ts';
 
 export type ModalType =
   | 'settings'
