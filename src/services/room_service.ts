@@ -3,6 +3,8 @@ import { AudioBridge } from '../audio/audio_bridge.ts';
 import { audioContextManager } from '../audio/audio_context_manager.ts';
 import { stateStore } from '../core/state_store.ts';
 import { mergeChatHistory } from '../core/chat_history.ts';
+import { parseRoomInvite } from '../core/room_invite.ts';
+import { savedRooms } from '../core/saved_rooms.ts';
 import type { ChatMessage, PeerInfo, RoomSlotInfo } from '../core/types.ts';
 import { generateRandomRoomSlug, GroupRoomManager } from '../p2p/group_room.ts';
 import { soundEffects } from '../ui/sound_effects.ts';
@@ -23,6 +25,8 @@ export class RoomService {
   private static instance: RoomService | null = null;
 
   public roomManager: GroupRoomManager | null = null;
+  public pendingJoinInvite = '';
+  public pendingJoinAsOwner = false;
   public nativeVideoBridge = new NativeVideoBridge();
   public audioBridge = new AudioBridge();
 
@@ -140,8 +144,13 @@ export class RoomService {
   }
 
   private async joinRoomNow(code: string, pass: string, isCreator: boolean): Promise<void> {
+    const parsed = parseRoomInvite(code);
+    if (!parsed && typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+      throw new Error('Um convite autenticado é necessário para entrar na sala');
+    }
     stateStore.set((s) => {
-      s.currentRoomCode = code;
+      s.currentRoomCode = parsed ? parsed.roomId.slice(0, 8) : code;
+      s.currentRoomInvite = parsed ? code : '';
       s.currentRoomPassword = pass;
       s.isCreator = isCreator;
       s.roomSlots = [
@@ -162,7 +171,8 @@ export class RoomService {
     this.peers = [];
     this.roomStatusText = 'Conectando à sala...';
 
-    this.showConnecting(code, isCreator ? 'Criando sala P2P...' : 'Entrando na sala...');
+    this.showConnecting(parsed ? parsed.roomId.slice(0, 8) : code,
+      isCreator ? 'Criando sala P2P...' : 'Entrando na sala...');
 
     if (this.roomConnectingTimeout) {
       clearTimeout(this.roomConnectingTimeout);
@@ -258,7 +268,7 @@ export class RoomService {
           status.includes('Participante')
         ) {
           this.hideConnecting();
-        } else if (status.startsWith('Erro')) {
+        } else if (status.startsWith('Erro') || status.startsWith('Senha incorreta')) {
           this.hideConnecting();
           showToast(status, 5000);
         }
@@ -270,6 +280,17 @@ export class RoomService {
           s.currentRoomPassword = newPassword;
         });
         showToast(`Senha atualizada por ${updatedBy}`);
+        if (parsed) {
+          void savedRooms.get(parsed.roomId).then((record) => {
+            if (record) return savedRooms.put({ ...record, protected: Boolean(newPassword),
+              password: record.password !== undefined ? newPassword : undefined });
+          }).catch((error) => console.warn('[Rooms] Failed to refresh saved password:', error));
+        }
+        this.notify();
+      },
+      onHostChange: (isLocalHost) => {
+        if (this.roomManager !== manager) return;
+        stateStore.set((s) => { s.isCreator = isLocalHost; });
         this.notify();
       },
     });
@@ -394,6 +415,7 @@ export class RoomService {
       s.subscribedStreams.clear();
       s.roomSlots = [];
       s.currentRoomCode = generateRandomRoomSlug();
+      s.currentRoomInvite = '';
       s.currentRoomPassword = '';
       s.layoutMode = 'grid';
       s.pinnedPeerId = null;
@@ -438,8 +460,8 @@ export class RoomService {
     this.notify();
   }
 
-  public updateRoomPassword(newPassword: string): boolean {
-    if (!this.roomManager?.updateRoomPassword(newPassword)) return false;
+  public async updateRoomPassword(newPassword: string): Promise<boolean> {
+    if (!this.roomManager || !await this.roomManager.updateRoomPassword(newPassword)) return false;
     stateStore.set((s) => {
       s.currentRoomPassword = newPassword;
     });
@@ -449,6 +471,16 @@ export class RoomService {
 
   public isRoomHost(): boolean {
     return this.roomManager?.isRoomHost() ?? false;
+  }
+
+  public getCurrentInvite(): string { return this.roomManager?.getInvite() ?? ''; }
+
+  public transferOwnership(peerId: string): Promise<boolean> {
+    return this.roomManager?.transferOwnership(peerId) ?? Promise.resolve(false);
+  }
+
+  public kickPeer(peerId: string): Promise<boolean> {
+    return this.roomManager?.kickPeer(peerId) ?? Promise.resolve(false);
   }
 
   public requestStream(peerId: string): void {

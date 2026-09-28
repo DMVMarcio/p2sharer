@@ -1,6 +1,7 @@
 import React from 'react';
 import { useModal } from '../../hooks/useModal';
 import { useRoom } from '../../hooks/useRoom';
+import { SavedRoomsSection } from './SavedRoomsSection';
 
 export const HomeView: React.FC = () => {
   const { openModal } = useModal();
@@ -82,6 +83,7 @@ export const HomeView: React.FC = () => {
             </div>
           </div>
         </div>
+        <SavedRoomsSection />
       </div>
     </section>
   );

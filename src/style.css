@@ -573,6 +573,40 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   width: 100%;
 }
 
+.saved-rooms-section {
+  width: 100%;
+  margin-top: 34px;
+  text-align: left;
+}
+
+.saved-rooms-heading,
+.saved-room-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.saved-rooms-heading { margin-bottom: 14px; }
+.saved-rooms-heading h2 { color: var(--text-primary); font-size: 17px; margin: 0 0 4px; }
+.saved-rooms-heading p,
+.saved-rooms-empty { color: var(--text-muted); font-size: 12px; margin: 0; }
+
+.saved-rooms-list { display: flex; flex-direction: column; gap: 8px; }
+.saved-room-row {
+  padding: 12px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+.saved-room-details { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 4px; }
+.saved-room-details strong { color: var(--text-primary); font-size: 13px; overflow: hidden; text-overflow: ellipsis; }
+.saved-room-details span { color: var(--text-muted); font-size: 11px; display: flex; align-items: center; gap: 5px; }
+.saved-room-remove { padding: 7px; }
+.room-remember-password { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+.room-save-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; }
+.room-save-controls .room-remember-password { width: 100%; }
+
 /* ==========================================================================
    BUTTONS SYSTEM
    ========================================================================== */
@@ -3064,6 +3098,27 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   flex: 1;
   overflow: hidden;
 }
+
+.participant-end-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.participant-menu-wrap { position: relative; }
+.participant-menu-trigger {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border: 0; border-radius: var(--radius-sm);
+  background: transparent; color: var(--text-secondary); cursor: pointer;
+}
+.participant-menu-trigger:hover { background: var(--bg-card-hover); color: var(--text-primary); }
+.participant-menu {
+  position: absolute; right: 0; top: 28px; z-index: 30; min-width: 174px;
+  padding: 4px; background: var(--bg-card); border: 1px solid var(--border-default);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-md);
+}
+.participant-menu button {
+  display: block; width: 100%; padding: 8px; border: 0; border-radius: var(--radius-sm);
+  text-align: left; background: transparent; color: var(--text-primary); cursor: pointer;
+}
+.participant-menu button:hover { background: var(--bg-card-hover); }
+.participant-menu .participant-menu-danger { color: var(--danger-text); }
+.participant-confirm-dialog { max-width: 430px; }
 
 .participant-item-name {
   min-width: 0;

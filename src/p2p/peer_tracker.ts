@@ -316,6 +316,10 @@ export class PeerTracker {
       (b === selfId ? myJoinedAt : this.peerJoinedAt.get(b) || 0) || a.localeCompare(b))[0];
   }
 
+  public setAuthenticatedHost(peerId: string | null): void {
+    for (const id of this.directConnectedPeers) this.peerIsCreator.set(id, id === peerId);
+  }
+
   public getJoinedAt(peerId: string): number | undefined {
     return this.peerJoinedAt.get(peerId);
   }

@@ -122,19 +122,19 @@ export const StreamHeaderBar: React.FC = () => {
           </button>
         </Tooltip>
 
-        {/* Room Security / Password Button */}
-        <Tooltip content="Segurança da Sala (Definir / Alterar Senha)">
+        {/* Room settings */}
+        <Tooltip content="Configurações da Sala">
           <button
             className="btn btn-sm btn-outline btn-compact"
             id="btn-open-room-security"
             onClick={() => openModal('roomSecurity')}
-            aria-label="Segurança da Sala"
+            aria-label="Configurações da Sala"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
               <path d="M7 11V7a5 5 0 0 1 10 0v4" />
             </svg>
-            <span className="btn-text" id="label-room-security">Senha</span>
+            <span className="btn-text" id="label-room-security">Sala</span>
           </button>
         </Tooltip>
 

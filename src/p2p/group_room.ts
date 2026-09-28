@@ -1,6 +1,9 @@
 import { selfId } from '@trystero-p2p/core';
 import { chatHistoryChanged, chatRevision, chatRevisionKey, mergeChatHistory } from '../core/chat_history.ts';
 import { PeerAuthenticator } from '../core/peer_auth.ts';
+import { RoomAuthority, type AuthorityTransfer, type HostCommand } from '../core/room_authority.ts';
+import { parseRoomInvite } from '../core/room_invite.ts';
+import { savedRooms } from '../core/saved_rooms.ts';
 import type {
   ActiveStreamInfo,
   ChatMessage,
@@ -23,7 +26,7 @@ import { MediaCoordinator } from './media_coordinator.ts';
 import { PeerTracker } from './peer_tracker.ts';
 import { signalingManager } from './signaling_manager.ts';
 
-const APP_ID = 'p2sharer-multi-stream-v2';
+const APP_ID = 'p2sharer-multi-stream-v3';
 
 const ADJECTIVES = [
   'cyber', 'neon', 'rapid', 'swift', 'cosmic', 'hyper', 'solar', 'lunar',
@@ -76,6 +79,7 @@ export interface RoomCallbacks {
   onPeersUpdate: (peers: PeerInfo[]) => void;
   onStatusChange: (status: string) => void;
   onPasswordChange?: (newPassword: string, updatedBy: string) => void;
+  onHostChange?: (isLocalHost: boolean) => void;
   onPeerJoined?: (peer: PeerInfo, isInitial: boolean) => void;
   onPeerLeft?: (peerId: string, username: string) => void;
   onStreamStarted?: (peerId: string, username: string, isLocal: boolean) => void;
@@ -109,6 +113,23 @@ export class GroupRoomManager {
   private chatHistory: ChatMessage[] = [];
   private seenChatRevisions: Set<string> = new Set();
   private chatAuth: PeerAuthenticator | null = null;
+  private authority: RoomAuthority | null = null;
+  private invite: string | null = null;
+  private rootKey: string | null = null;
+  private admittedPeers = new Map<string, string>();
+  private bannedKeys = new Set<string>();
+  private pendingChallenges = new Map<string, string>();
+  private admissionHistory: HostCommand[] = [];
+  private latestPasswordCommand = -1;
+  private passwordCommandEpoch = -1;
+  private localAdmitted = false;
+  private guestInOwnedRoom = false;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private identityAction: any = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private authorityAction: any = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private admissionAction: any = null;
 
   // Trystero action references
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -160,7 +181,10 @@ export class GroupRoomManager {
 
   constructor(username: string, roomId: string, password = '', isCreator = false, turnConfig?: TurnConfig) {
     this.username = username;
-    this.roomId = roomId.trim();
+    const parsedInvite = parseRoomInvite(roomId);
+    this.roomId = parsedInvite?.roomId ?? roomId.trim();
+    this.invite = parsedInvite ? roomId.trim() : null;
+    this.rootKey = parsedInvite?.rootKey ?? null;
     this.password = password.trim();
     this.isCreator = isCreator;
     this.myJoinedAt = Date.now();
@@ -182,6 +206,8 @@ export class GroupRoomManager {
     return this.roomId;
   }
 
+  public getInvite(): string | null { return this.invite; }
+
   public getPassword(): string {
     return this.password;
   }
@@ -199,7 +225,7 @@ export class GroupRoomManager {
   }
 
   public isRoomHost(): boolean {
-    return this.peerTracker.isHost(selfId, this.myJoinedAt, this.isCreator);
+    return this.authority ? this.authority.isLocalHost() : this.peerTracker.isHost(selfId, this.myJoinedAt, this.isCreator);
   }
 
   private reportPeerJoined(peer: PeerInfo): void {
@@ -221,7 +247,8 @@ export class GroupRoomManager {
       },
     ];
 
-    const verifiedPeers = this.peerTracker.getVerifiedPeers();
+    const verifiedPeers = this.peerTracker.getVerifiedPeers().filter((peer) =>
+      !this.authority || this.admittedPeers.get(peer.id) === this.chatAuth?.getKnownKey(peer.id));
     verifiedPeers.forEach((p) => {
       list.push({
         peerId: p.id,
@@ -233,6 +260,24 @@ export class GroupRoomManager {
     });
 
     return list;
+  }
+
+  private admittedTargets(): string[] {
+    return Array.from(this.peerTracker.directConnectedPeers).filter((peerId) =>
+      !this.authority || (this.localAdmitted &&
+        this.admittedPeers.get(peerId) === this.chatAuth?.getKnownKey(peerId)));
+  }
+
+  // Trystero broadcasts to every connected edge, including peers awaiting admission.
+  // Room content must be addressed only to established members.
+  private sendRoomAction(action: { send: (data: unknown, options?: { target: string }) => unknown } | null,
+    data: unknown): void {
+    if (!action) return;
+    if (!this.authority) {
+      void action.send(data);
+      return;
+    }
+    for (const peerId of this.admittedTargets()) void action.send(data, { target: peerId });
   }
 
   public async join(callbacks: RoomCallbacks) {
@@ -251,8 +296,34 @@ export class GroupRoomManager {
     });
 
     try {
-      this.chatAuth = await PeerAuthenticator.create(this.roomId, selfId);
-      this.signalingTopic = await computeSignalingRoomId(this.roomId, this.password);
+      const saved = this.invite ? await savedRooms.get(this.roomId) : undefined;
+      if (saved && parseRoomInvite(saved.invite)?.rootKey !== this.rootKey) {
+        throw new Error('Room identifier is pinned to another creator key');
+      }
+      this.guestInOwnedRoom = Boolean(saved?.owned && !this.isCreator);
+      this.chatAuth = await PeerAuthenticator.create(this.roomId, selfId,
+        this.guestInOwnedRoom ? undefined : saved?.identity);
+      if (this.rootKey) {
+        this.authority = new RoomAuthority(this.roomId, this.rootKey, this.chatAuth);
+        if (saved?.authorityChain && !await this.authority.importChain(saved.authorityChain)) {
+          throw new Error('Saved room authority chain is invalid');
+        }
+        if (this.isCreator && !this.authority.isLocalHost()) throw new Error('Creator key does not match invitation');
+        this.isCreator = this.authority.isLocalHost();
+        this.localAdmitted = this.authority.isLocalHost();
+        if (saved?.hostCommands) {
+          for (const command of saved.hostCommands) await this.acceptHostCommand(command);
+        }
+        if (!this.guestInOwnedRoom) await savedRooms.put({
+          roomId: this.roomId, invite: this.invite!, name: saved?.name ?? this.roomId.slice(0, 8),
+          saved: saved?.saved ?? this.isCreator, owned: this.isCreator,
+          protected: saved?.protected ?? Boolean(this.password),
+          password: saved?.password, identity: this.chatAuth.exportIdentity(),
+          authorityChain: this.authority.history(),
+          hostCommands: saved?.hostCommands,
+        });
+      }
+      this.signalingTopic = this.invite ? `public-${this.roomId}` : await computeSignalingRoomId(this.roomId, this.password);
       console.log(`[P2P] Computed signaling topic: "${this.signalingTopic}"`);
 
       this.setupRoomInstance();
@@ -321,7 +392,7 @@ export class GroupRoomManager {
 
     // Re-announce presence and PEX
     if (this.presenceAction) {
-      this.presenceAction.send({
+      this.sendRoomAction(this.presenceAction, {
         username: this.username,
         isCreator: this.isCreator,
         isStreaming: Boolean(this.localStream),
@@ -332,7 +403,7 @@ export class GroupRoomManager {
     // Re-announce active stream if currently sharing
     if (this.localStream && this.streamStatusAction) {
       const payload = MediaCoordinator.buildStreamStatusPayload(this.localStream, true, this.username);
-      this.streamStatusAction.send(payload);
+      this.sendRoomAction(this.streamStatusAction, payload);
 
       const verified = Array.from(this.peerTracker.directConnectedPeers);
       if (verified.length > 0) {
@@ -375,13 +446,213 @@ export class GroupRoomManager {
       this.peerTracker.getPendingRumors().length < 64;
   }
 
+  private syncHostRole(): void {
+    if (!this.authority || !this.chatAuth) return;
+    this.isCreator = this.authority.isLocalHost();
+    const host = this.peerTracker.getVerifiedPeers().find((peer) =>
+      this.chatAuth?.getKnownKey(peer.id) === this.authority?.currentKey);
+    if (host) this.admittedPeers.set(host.id, this.authority.currentKey);
+    this.peerTracker.setAuthenticatedHost(host?.id ?? null);
+    this.callbacks?.onHostChange?.(this.isCreator);
+    if (this.invite && (!this.guestInOwnedRoom || this.authority.isLocalHost())) {
+      void savedRooms.get(this.roomId).then((record) => {
+        if (record && this.authority && this.chatAuth) {
+          if (this.authority.isLocalHost()) this.guestInOwnedRoom = false;
+          return savedRooms.put({ ...record, owned: this.authority.isLocalHost(),
+            identity: this.authority.isLocalHost() ? this.chatAuth.exportIdentity() : record.identity,
+            authorityChain: this.authority.history() });
+        }
+      }).catch((error) => console.warn('[Rooms] Failed to persist host transition:', error));
+    }
+    this.notifyPeersUpdate();
+  }
+
+  private announceToPeer(peerId: string): void {
+    if (!this.room || !this.peerTracker.isVerified(peerId)) return;
+    if (this.authority && (!this.localAdmitted ||
+        this.admittedPeers.get(peerId) !== this.chatAuth?.getKnownKey(peerId))) return;
+    this.presenceAction?.send({
+      username: this.username, isCreator: this.isRoomHost(),
+      isStreaming: Boolean(this.localStream), joinedAt: this.myJoinedAt,
+    }, { target: peerId });
+    this.pexAction?.send({ peers: this.getPeersPayload() }, { target: peerId });
+    this.historyAction?.send({ history: this.chatHistory }, { target: peerId });
+    this.historyAction?.send({ request: true }, { target: peerId });
+    if (this.localStream) this.sendStreamToPeer(peerId);
+  }
+
+  private applyAdmittedPeer(peerId: string, key: string): void {
+    if (this.bannedKeys.has(key)) return;
+    this.admittedPeers.set(peerId, key);
+    if (peerId === selfId) {
+      this.localAdmitted = true;
+      this.callbacks?.onStatusChange(this.turnConfig?.forceRelay
+        ? 'P2P (Relay Seguro)'
+        : `P2P Conectado (${signalingManager.getActiveTransport().toUpperCase()})`);
+    }
+    if (this.chatAuth?.getKnownKey(peerId) === key && peerId !== selfId) this.announceToPeer(peerId);
+    this.notifyPeersUpdate();
+  }
+
+  private removeKickedPeer(peerId: string, key: string): void {
+    this.bannedKeys.add(key);
+    this.admittedPeers.delete(peerId);
+    if (peerId === selfId && this.chatAuth?.publicKey === key) {
+      this.localAdmitted = false;
+      this.callbacks?.onStatusChange('Você foi removido da sala');
+      void this.leave();
+      return;
+    }
+    const connection = this.room?.getPeers?.()?.[peerId] as RTCPeerConnection | undefined;
+    connection?.close();
+    this.removePeer(peerId);
+  }
+
+  private async issueAdmission(peerId: string): Promise<void> {
+    if (!this.authority?.isLocalHost() || !this.chatAuth) return;
+    const key = this.chatAuth.getKnownKey(peerId);
+    if (!key || this.bannedKeys.has(key) || this.admissionHistory.some((item) =>
+      item.epoch === this.authority?.epoch && item.kind === 'admit' && item.targetPeerId === peerId && item.targetKey === key)) return;
+    const command = await this.authority.makeCommand('admit', { targetPeerId: peerId, targetKey: key });
+    this.admissionHistory.push(command);
+    this.admissionHistory = this.admissionHistory.slice(-200);
+    await this.persistHostCommands();
+    this.applyAdmittedPeer(peerId, key);
+    await this.admissionAction?.send({ kind: 'command', command });
+    await this.admissionAction?.send({ kind: 'sync', commands: this.admissionHistory }, { target: peerId });
+  }
+
+  private async persistHostCommands(): Promise<void> {
+    if (!this.invite || !this.authority?.isLocalHost()) return;
+    const record = await savedRooms.get(this.roomId);
+    if (record) await savedRooms.put({ ...record, hostCommands: this.admissionHistory.slice(-200) });
+  }
+
+  private async acceptHostCommand(command: HostCommand): Promise<void> {
+    if (!this.authority || !await this.authority.verifyCommand(command)) return;
+    if (command.kind === 'admit' && command.targetPeerId && command.targetKey) {
+      if (!this.admissionHistory.some((item) => item.epoch === command.epoch && item.sequence === command.sequence)) {
+        this.admissionHistory.push(command);
+        this.admissionHistory = this.admissionHistory.slice(-200);
+      }
+      this.applyAdmittedPeer(command.targetPeerId, command.targetKey);
+      if (command.targetPeerId === selfId) {
+        for (const peerId of this.peerTracker.directConnectedPeers) {
+          if (this.admittedPeers.has(peerId)) this.announceToPeer(peerId);
+        }
+      }
+    } else if (command.kind === 'kick' && command.targetPeerId && command.targetKey) {
+      this.removeKickedPeer(command.targetPeerId, command.targetKey);
+    } else if (command.kind === 'password' && typeof command.password === 'string' &&
+               (command.epoch > this.passwordCommandEpoch ||
+                (command.epoch === this.passwordCommandEpoch &&
+                 command.sequence > this.latestPasswordCommand))) {
+      this.passwordCommandEpoch = command.epoch;
+      this.latestPasswordCommand = command.sequence;
+      this.password = command.password;
+      this.callbacks?.onPasswordChange?.(this.password, 'Anfitrião');
+    }
+  }
+
   private bindRoomActions(): void {
     if (!this.room) return;
     const boundRoom = this.room;
 
+    this.identityAction = this.room.makeAction('peer_identity');
+    this.identityAction.onMessage = async (data: {
+      kind?: string; nonce?: string; key?: string; signature?: string;
+    }, meta: { peerId: string }) => {
+      if (!this.chatAuth || !data || typeof data.nonce !== 'string' ||
+          !/^[0-9a-f-]{20,50}$/.test(data.nonce)) return;
+      if (data.kind === 'challenge') {
+        const signature = await this.chatAuth.signControl('identity', [this.roomId, selfId, data.nonce]);
+        if (this.room === boundRoom) await this.identityAction.send({
+          kind: 'proof', nonce: data.nonce, key: this.chatAuth.publicKey, signature,
+        }, { target: meta.peerId });
+      } else if (data.kind === 'proof' && data.key && data.signature &&
+                 this.pendingChallenges.get(meta.peerId) === data.nonce &&
+                 !this.bannedKeys.has(data.key) &&
+                 await this.chatAuth.verifyControl('identity',
+                   [this.roomId, meta.peerId, data.nonce], data.signature, data.key)) {
+        if (this.room !== boundRoom || !this.chatAuth.pinDirect(meta.peerId, data.key)) return;
+        this.pendingChallenges.delete(meta.peerId);
+        this.syncHostRole();
+        if (this.authority?.isPeerHost(meta.peerId)) {
+          this.admittedPeers.set(meta.peerId, data.key);
+        }
+        if (this.admittedPeers.get(meta.peerId) === data.key) this.announceToPeer(meta.peerId);
+        if (this.authority?.isPeerHost(meta.peerId)) {
+          await this.admissionAction?.send({ kind: 'request', password: this.password }, { target: meta.peerId });
+        } else if (this.authority?.isLocalHost()) {
+          await this.admissionAction?.send({ kind: 'prompt' }, { target: meta.peerId });
+        }
+      }
+    };
+
+    this.authorityAction = this.room.makeAction('room_authority');
+    this.authorityAction.onMessage = async (data: {
+      kind?: string; chain?: AuthorityTransfer[];
+      proposal?: Omit<AuthorityTransfer, 'nextSignature'>; transfer?: AuthorityTransfer;
+    }, meta: { peerId: string }) => {
+      if (!this.authority || !data) return;
+      if (data.kind === 'request') {
+        await this.authorityAction.send({ kind: 'chain', chain: this.authority.history() }, { target: meta.peerId });
+      } else if (data.kind === 'chain' && data.chain && await this.authority.importChain(data.chain)) {
+        if (this.room !== boundRoom) return;
+        this.syncHostRole();
+        for (const peerId of this.peerTracker.directConnectedPeers) {
+          if (this.authority.isPeerHost(peerId)) {
+            await this.admissionAction?.send({ kind: 'request', password: this.password }, { target: peerId });
+          }
+        }
+      } else if (data.kind === 'offer' && data.proposal?.nextPeerId === selfId) {
+        try {
+          const transfer = await this.authority.acceptTransfer(data.proposal);
+          if (this.room === boundRoom) await this.authorityAction.send({ kind: 'commit', transfer });
+        } catch {}
+      } else if (data.kind === 'commit' && data.transfer) {
+        if (await this.authority.applyTransfer(data.transfer) && this.room === boundRoom) {
+          this.syncHostRole();
+          if (this.isRoomHost()) {
+            await this.authorityAction.send({ kind: 'chain', chain: this.authority.history() });
+            for (const peerId of this.peerTracker.directConnectedPeers) await this.issueAdmission(peerId);
+          }
+        }
+      }
+    };
+
+    this.admissionAction = this.room.makeAction('room_admission');
+    this.admissionAction.onMessage = async (data: {
+      kind?: string; password?: string; command?: HostCommand; commands?: HostCommand[];
+    }, meta: { peerId: string }) => {
+      if (!this.authority || !this.chatAuth || !data) return;
+      if (data.kind === 'request' && this.authority.isLocalHost()) {
+        const key = this.chatAuth.getKnownKey(meta.peerId);
+        const returningMember = Boolean(key && !this.bannedKeys.has(key) &&
+          this.admissionHistory.some((command) => command.kind === 'admit' && command.targetKey === key));
+        if (key && (data.password === this.password || returningMember)) {
+          await this.issueAdmission(meta.peerId);
+        } else if (key) {
+          await this.admissionAction.send({ kind: 'denied' }, { target: meta.peerId });
+        }
+      } else if (data.kind === 'prompt' && this.authority.isPeerHost(meta.peerId)) {
+        await this.admissionAction.send({ kind: 'request', password: this.password }, { target: meta.peerId });
+      } else if (data.kind === 'sync-request' && this.authority.isLocalHost() &&
+                 this.admittedPeers.get(meta.peerId) === this.chatAuth.getKnownKey(meta.peerId)) {
+        await this.admissionAction.send({ kind: 'sync', commands: this.admissionHistory }, { target: meta.peerId });
+      } else if (data.kind === 'sync' && Array.isArray(data.commands) && data.commands.length <= 200) {
+        for (const command of data.commands) await this.acceptHostCommand(command);
+      } else if (data.kind === 'command' && data.command) {
+        await this.acceptHostCommand(data.command);
+      } else if (data.kind === 'denied' && this.authority.isPeerHost(meta.peerId)) {
+        this.callbacks?.onStatusChange('Senha incorreta para esta sala');
+      }
+    };
+
     // 0. Setup Live Room Password Sync Action
     this.passwordAction = this.room.makeAction('room_password_sync');
     this.passwordAction.onMessage = (data: { newPassword?: string }, meta: { peerId: string }) => {
+      if (this.authority) return;
       if (meta.peerId !== this.peerTracker.getHostPeerId(selfId, this.myJoinedAt, this.isCreator)) return;
       if (data && typeof data.newPassword === 'string' && data.newPassword.length <= 128) {
         this.password = data.newPassword.trim();
@@ -409,7 +680,7 @@ export class GroupRoomManager {
 
       // Mesh forward to guarantee 100% room delivery across mesh
       try {
-        this.chatAction.send(msg);
+        this.sendRoomAction(this.chatAction, msg);
       } catch {}
     };
 
@@ -457,7 +728,8 @@ export class GroupRoomManager {
       if (suppliedName && this.peerTracker.getVerifiedPeers().some((peer) =>
         peer.id !== peerId && peer.username.toLocaleLowerCase() === suppliedName.toLocaleLowerCase())) return;
       const newName = suppliedName || this.peerTracker.getUsername(peerId) || `Usuário (${peerId.slice(0, 4)})`;
-      this.peerTracker.addPeer(peerId, newName, Boolean(data.isCreator), data.joinedAt);
+      this.peerTracker.addPeer(peerId, newName,
+        this.authority ? this.authority.isPeerHost(peerId) : Boolean(data.isCreator), data.joinedAt);
 
       if (suppliedName) {
         const alreadyAnnounced = this.announcedPeerNames.has(peerId);
@@ -468,7 +740,7 @@ export class GroupRoomManager {
             username: suppliedName,
             connectionState: 'connected',
             joinedAt: this.peerTracker.getJoinedAt(peerId) || Date.now(),
-            isCreator: Boolean(data.isCreator),
+            isCreator: this.authority ? this.authority.isPeerHost(peerId) : Boolean(data.isCreator),
           });
           // A signed history may arrive before the sender's role/name presence.
           // Retry after identity metadata is pinned so claims can be validated.
@@ -761,7 +1033,8 @@ export class GroupRoomManager {
       this.passwordAction, this.chatAction, this.historyAction, this.presenceAction,
       this.streamStatusAction, this.streamReqAction, this.leaveAction,
       this.pexAction, this.meshRelayAction, this.watchAction,
-      this.pingAction, this.pongAction,
+      this.pingAction, this.pongAction, this.identityAction,
+      this.authorityAction, this.admissionAction,
     ].forEach((action) => {
       if (!action?.onMessage) return;
       const handler = action.onMessage;
@@ -769,6 +1042,11 @@ export class GroupRoomManager {
       action.onMessage = (...args: any[]) => {
         if (this.room !== boundRoom) return;
         if (!this.peerTracker.isVerified(args[1]?.peerId)) return;
+        if (this.authority && ![this.identityAction, this.authorityAction, this.admissionAction].includes(action)) {
+          const peerId = args[1]?.peerId;
+          if (!this.localAdmitted || !this.chatAuth?.getKnownKey(peerId) ||
+              this.admittedPeers.get(peerId) !== this.chatAuth.getKnownKey(peerId)) return;
+        }
         return handler(...args);
       };
     });
@@ -791,6 +1069,16 @@ export class GroupRoomManager {
       // Instantly acknowledge peer on signaling broker to ensure both directions are open
       if (this.signalingTopic) {
         signalingManager.reannounce(this.signalingTopic, peerId);
+      }
+
+      if (this.authority) {
+        const nonce = crypto.randomUUID();
+        this.pendingChallenges.set(peerId, nonce);
+        this.identityAction?.send({ kind: 'challenge', nonce }, { target: peerId });
+        this.authorityAction?.send({ kind: 'request' }, { target: peerId });
+        this.admissionAction?.send({ kind: 'sync-request' }, { target: peerId });
+        this.notifyPeersUpdate();
+        return;
       }
 
       // Send presence immediately to new peer
@@ -842,6 +1130,8 @@ export class GroupRoomManager {
     this.room.onPeerStream = (stream: MediaStream, peerId: string) => {
       if (this.room !== boundRoom) return;
       if (!this.peerTracker.isVerified(peerId)) return;
+      if (this.authority && (!this.localAdmitted ||
+          this.admittedPeers.get(peerId) !== this.chatAuth?.getKnownKey(peerId))) return;
       console.log(`[P2P] Received stream from peer: ${peerId}`);
       this.peerTracker.touchPeer(peerId);
       this.peerTracker.setStreaming(peerId, true);
@@ -885,7 +1175,7 @@ export class GroupRoomManager {
 
       // Broadcast presence
       if (this.presenceAction) {
-        this.presenceAction.send({
+        this.sendRoomAction(this.presenceAction, {
           username: this.username,
           isCreator: this.isCreator,
           isStreaming: Boolean(this.localStream),
@@ -895,14 +1185,16 @@ export class GroupRoomManager {
 
       // Broadcast PEX to bridge any disconnected pairs in the mesh
       if (this.pexAction) {
-        this.pexAction.send({ peers: this.getPeersPayload() });
+        this.sendRoomAction(this.pexAction, { peers: this.getPeersPayload() });
       }
 
       // Ping all active verified peers for live latency calculation
       if (this.pingAction) {
         this.peerTracker.directConnectedPeers.forEach((pid) => {
           try {
-            this.pingAction.send({ t: Date.now() }, { target: pid });
+            if (!this.authority || this.admittedTargets().includes(pid)) {
+              this.pingAction.send({ t: Date.now() }, { target: pid });
+            }
           } catch {}
         });
       }
@@ -963,10 +1255,10 @@ export class GroupRoomManager {
     setTimeout(() => {
       this.initialJoinComplete = true;
       if (this.historyAction) {
-        this.historyAction.send({ request: true });
+        this.sendRoomAction(this.historyAction, { request: true });
       }
       if (this.presenceAction) {
-        this.presenceAction.send({
+        this.sendRoomAction(this.presenceAction, {
           username: this.username,
           isCreator: this.isCreator,
           isStreaming: Boolean(this.localStream),
@@ -1070,7 +1362,7 @@ export class GroupRoomManager {
 
     if (this.watchAction) {
       try {
-        this.watchAction.send({
+        this.sendRoomAction(this.watchAction, {
           broadcasterId,
           isWatching: true,
           watcherName: this.username,
@@ -1091,7 +1383,7 @@ export class GroupRoomManager {
 
     if (this.watchAction) {
       try {
-        this.watchAction.send({
+        this.sendRoomAction(this.watchAction, {
           broadcasterId,
           isWatching: false,
           watcherName: this.username,
@@ -1116,7 +1408,7 @@ export class GroupRoomManager {
       this.streamReqAction.send(payload, { target: peerId });
     }
     if (this.meshRelayAction) {
-      this.meshRelayAction.send({
+      this.sendRoomAction(this.meshRelayAction, {
         target: peerId,
         origin: selfId,
         kind: 'stream_req',
@@ -1130,6 +1422,8 @@ export class GroupRoomManager {
    */
   public sendStreamToPeer(peerId: string) {
     if (!this.localStream || !this.room || !this.peerTracker.isVerified(peerId)) return;
+    if (this.authority && (!this.localAdmitted ||
+        this.admittedPeers.get(peerId) !== this.chatAuth?.getKnownKey(peerId))) return;
     try {
       const peers = this.room.getPeers?.() || {};
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1184,7 +1478,7 @@ export class GroupRoomManager {
         if (verifiedPeers.length > 0) {
           verifiedPeers.forEach((pId) => this.sendStreamToPeer(pId));
         } else {
-          MediaCoordinator.broadcastStream(this.room, stream);
+          if (!this.authority) MediaCoordinator.broadcastStream(this.room, stream);
         }
         [0, 30, 80, 150, 300, 600, 1200, 2000].forEach((delay) => {
           setTimeout(() => this.boostSenders(targetBitrateBps, targetFps), delay);
@@ -1196,7 +1490,7 @@ export class GroupRoomManager {
       // Screen share toggle protocol: emit stream_status with streamId
       if (this.streamStatusAction) {
         const payload = MediaCoordinator.buildStreamStatusPayload(stream, true, this.username);
-        this.streamStatusAction.send(payload);
+        this.sendRoomAction(this.streamStatusAction, payload);
       }
 
       this.notifyStreamsUpdate();
@@ -1290,7 +1584,7 @@ export class GroupRoomManager {
     // Screen share toggle protocol: emit stream_status with isStreaming: false
     if (this.streamStatusAction) {
       const payload = MediaCoordinator.buildStreamStatusPayload(null, false, this.username);
-      this.streamStatusAction.send(payload);
+      this.sendRoomAction(this.streamStatusAction, payload);
     }
 
     if (wasStreaming) {
@@ -1667,12 +1961,13 @@ export class GroupRoomManager {
     this.seenChatRevisions.add(chatRevisionKey(signed));
     this.chatHistory = mergeChatHistory(this.chatHistory, [signed]);
     this.callbacks?.onChat(signed);
-    try { await this.chatAction?.send(signed); } catch {}
+    try { this.sendRoomAction(this.chatAction, signed); } catch {}
     return signed;
   }
 
   public getConnectedPeers(): PeerInfo[] {
-    return this.peerTracker.getAllRoomPeers();
+    return this.peerTracker.getAllRoomPeers().filter((peer) =>
+      !this.authority || this.admittedPeers.get(peer.id) === this.chatAuth?.getKnownKey(peer.id));
   }
 
   private notifyPeersUpdate() {
@@ -1681,8 +1976,17 @@ export class GroupRoomManager {
     }
   }
 
-  public updateRoomPassword(newPassword: string): boolean {
+  public async updateRoomPassword(newPassword: string): Promise<boolean> {
     if (!this.isRoomHost() || newPassword.length > 128) return false;
+    if (this.authority) {
+      const command = await this.authority.makeCommand('password', { password: newPassword.trim() });
+      this.password = newPassword.trim();
+      for (const peerId of this.admittedTargets()) {
+        await this.admissionAction?.send({ kind: 'command', command }, { target: peerId });
+      }
+      this.callbacks?.onPasswordChange?.(this.password, this.username);
+      return true;
+    }
     this.password = newPassword.trim();
     if (this.passwordAction) {
       this.passwordAction.send({
@@ -1695,6 +1999,43 @@ export class GroupRoomManager {
     }
     void this.sendSystemMessage(`Senha alterada por ${this.username}`, 'info', this.username)
       .catch((error) => console.warn('[Chat] Failed to publish password notice:', error));
+    return true;
+  }
+
+  public async transferOwnership(peerId: string): Promise<boolean> {
+    if (!this.authority?.isLocalHost() || !this.chatAuth || !this.peerTracker.isVerified(peerId) ||
+        this.admittedPeers.get(peerId) !== this.chatAuth.getKnownKey(peerId)) return false;
+    const key = this.chatAuth.getKnownKey(peerId);
+    if (!key) return false;
+    const proposal = await this.authority.proposeTransfer(key, peerId);
+    await this.authorityAction?.send({ kind: 'offer', proposal }, { target: peerId });
+    return true;
+  }
+
+  public async kickPeer(peerId: string): Promise<boolean> {
+    if (!this.authority?.isLocalHost() || !this.chatAuth || !this.peerTracker.isVerified(peerId)) return false;
+    const key = this.chatAuth.getKnownKey(peerId);
+    if (!key || this.admittedPeers.get(peerId) !== key) return false;
+    const command = await this.authority.makeCommand('kick', { targetPeerId: peerId, targetKey: key });
+    this.admissionHistory.push(command);
+    this.admissionHistory = this.admissionHistory.slice(-200);
+    await this.persistHostCommands();
+    const rotatedPassword = Array.from(crypto.getRandomValues(new Uint8Array(16)),
+      (byte) => byte.toString(16).padStart(2, '0')).join('');
+    this.password = rotatedPassword;
+    if (this.invite) {
+      const record = await savedRooms.get(this.roomId);
+      if (record) await savedRooms.put({ ...record, protected: true, password: rotatedPassword });
+    }
+    await this.admissionAction?.send({ kind: 'command', command });
+    this.removeKickedPeer(peerId, key);
+    const rotation = await this.authority.makeCommand('password', { password: rotatedPassword });
+    for (const remaining of this.peerTracker.directConnectedPeers) {
+      if (this.admittedPeers.get(remaining) === this.chatAuth.getKnownKey(remaining)) {
+        await this.admissionAction?.send({ kind: 'command', command: rotation }, { target: remaining });
+      }
+    }
+    this.callbacks?.onPasswordChange?.(rotatedPassword, this.username);
     return true;
   }
 
@@ -1729,12 +2070,12 @@ export class GroupRoomManager {
 
     if (this.leaveAction) {
       try {
-        this.leaveAction.send({ peerId: selfId, username: this.username });
+        this.sendRoomAction(this.leaveAction, { peerId: selfId, username: this.username });
       } catch {}
     }
     if (this.meshRelayAction) {
       try {
-        this.meshRelayAction.send({
+        this.sendRoomAction(this.meshRelayAction, {
           target: 'all',
           origin: selfId,
           kind: 'peer_leave',
