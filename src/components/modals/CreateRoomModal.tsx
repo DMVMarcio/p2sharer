@@ -60,7 +60,6 @@ export const CreateRoomModal: React.FC = () => {
           <div className="form-group" style={{ marginTop: '14px' }}>
             <label className="form-label" htmlFor="input-create-room-password-dialog">
               <span>Senha de Proteção (Opcional):</span>
-              <span className="label-hint">Será solicitada na entrada, separada do convite</span>
             </label>
             <div className="input-with-action">
               <input
@@ -94,14 +93,6 @@ export const CreateRoomModal: React.FC = () => {
                 </span>
               </button>
             </div>
-            <p className="field-info-text">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10"/>
-                <line x1="12" y1="16" x2="12" y2="12"/>
-                <line x1="12" y1="8" x2="12.01" y2="8"/>
-              </svg>
-              O convite identifica o host; a senha opcional controla a entrada.
-            </p>
           </div>
         </div>
 

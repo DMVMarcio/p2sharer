@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowRight, BookmarkPlus, LockKeyhole, Trash2 } from 'lucide-react';
+import { ArrowRight, BookmarkPlus, LockKeyhole, Pencil, Trash2 } from 'lucide-react';
 import { savedRooms, type SavedRoom } from '../../core/saved_rooms';
 import { useModal } from '../../hooks/useModal';
 import { useRoom } from '../../hooks/useRoom';
 import { showToast } from '../../hooks/useToast';
 import { roomService } from '../../services/room_service';
+import { EditSavedRoomDialog } from '../modals/EditSavedRoomDialog';
 
 export const SavedRoomsSection: React.FC = () => {
   const [rooms, setRooms] = useState<SavedRoom[]>([]);
+  const [editingRoom, setEditingRoom] = useState<SavedRoom | null>(null);
   const { openModal } = useModal();
   const { joinRoom, username } = useRoom();
 
@@ -44,7 +46,6 @@ export const SavedRoomsSection: React.FC = () => {
       <div className="saved-rooms-heading">
         <div>
           <h2 id="saved-rooms-title">Salas salvas</h2>
-          <p>Seus convites autenticados neste dispositivo</p>
         </div>
         <button className="btn btn-secondary" onClick={() => {
           roomService.pendingJoinInvite = '';
@@ -68,12 +69,17 @@ export const SavedRoomsSection: React.FC = () => {
               <button className="btn btn-secondary btn-sm" onClick={() => openSaved(room)}>
                 Entrar <ArrowRight size={14} />
               </button>
+              <button className="btn btn-outline btn-sm saved-room-icon-button"
+                onClick={() => setEditingRoom(room)} aria-label={`Editar ${room.name}`}>
+                <Pencil size={14} />
+              </button>
               <button className="btn btn-outline btn-sm saved-room-remove" onClick={() => void removeSaved(room)}
                 aria-label={`Remover ${room.name} das salas salvas`}><Trash2 size={14} /></button>
             </div>
           ))}
         </div>
       )}
+      {editingRoom && <EditSavedRoomDialog room={editingRoom} onClose={() => setEditingRoom(null)} />}
     </section>
   );
 };

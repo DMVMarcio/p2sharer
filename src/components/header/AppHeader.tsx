@@ -1,16 +1,33 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRoom } from '../../hooks/useRoom';
 import { useModal } from '../../hooks/useModal';
 import { showToast } from '../../hooks/useToast';
 import { Tooltip } from '../common/Tooltip';
 import logoImg from '../../assets/logo.png';
-import { BookmarkPlus } from 'lucide-react';
+import { BookmarkCheck, BookmarkPlus } from 'lucide-react';
 import { parseRoomInvite } from '../../core/room_invite';
-import { savedRooms } from '../../core/saved_rooms';
+import { savedRooms, type SavedRoom } from '../../core/saved_rooms';
+import { RoomSaveDialog } from '../modals/RoomSaveDialog';
 
 export const AppHeader: React.FC = () => {
   const { currentRoomCode, currentRoomInvite, currentRoomPassword, username, isInRoom } = useRoom();
   const { openModal } = useModal();
+  const [savedRecord, setSavedRecord] = useState<SavedRoom | null>(null);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+
+  useEffect(() => {
+    const roomId = parseRoomInvite(currentRoomInvite)?.roomId;
+    let active = true;
+    const reload = () => {
+      if (!roomId) { setSavedRecord(null); return; }
+      void savedRooms.get(roomId).then((record) => {
+        if (active) setSavedRecord(record ?? null);
+      }).catch((error) => console.warn('[Rooms] Could not load room save state:', error));
+    };
+    reload();
+    const unsubscribe = savedRooms.subscribe(reload);
+    return () => { active = false; unsubscribe(); };
+  }, [currentRoomInvite]);
 
   const handleCopyRoomCode = () => {
     const copyText = currentRoomInvite || currentRoomCode;
@@ -18,17 +35,6 @@ export const AppHeader: React.FC = () => {
       .writeText(copyText)
       .then(() => showToast('Código copiado!'))
       .catch(() => {});
-  };
-
-  const handleSaveRoom = async () => {
-    const parsed = parseRoomInvite(currentRoomInvite);
-    if (!parsed) return;
-    try {
-      const record = await savedRooms.get(parsed.roomId);
-      if (!record) return;
-      await savedRooms.put({ ...record, saved: true });
-      showToast('Sala salva neste dispositivo.');
-    } catch { showToast('Não foi possível salvar a sala.'); }
   };
 
   return (
@@ -77,9 +83,12 @@ export const AppHeader: React.FC = () => {
           </Tooltip>
         )}
         {isInRoom && currentRoomInvite && (
-          <Tooltip content="Salvar sala neste dispositivo">
-            <button className="btn-icon-header" onClick={() => void handleSaveRoom()} aria-label="Salvar sala">
-              <BookmarkPlus size={16} />
+          <Tooltip content={savedRecord?.saved ? 'Sala salva neste dispositivo' : 'Salvar sala neste dispositivo'}>
+            <button className={`btn-icon-header ${savedRecord?.saved ? 'is-saved' : ''}`}
+              onClick={() => setShowSaveDialog(true)}
+              aria-label={savedRecord?.saved ? 'Sala salva: editar salvamento' : 'Salvar sala'}
+              aria-pressed={Boolean(savedRecord?.saved)}>
+              {savedRecord?.saved ? <BookmarkCheck size={16} /> : <BookmarkPlus size={16} />}
             </button>
           </Tooltip>
         )}
@@ -106,6 +115,8 @@ export const AppHeader: React.FC = () => {
           </svg>
         </button>
       </div>
+      {showSaveDialog && currentRoomInvite && <RoomSaveDialog invite={currentRoomInvite}
+        password={currentRoomPassword} record={savedRecord} onClose={() => setShowSaveDialog(false)} />}
     </header>
   );
 };

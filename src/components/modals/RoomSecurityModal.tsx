@@ -1,9 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useModal } from '../../hooks/useModal';
 import { useRoom } from '../../hooks/useRoom';
 import { showToast } from '../../hooks/useToast';
-import { parseRoomInvite } from '../../core/room_invite';
-import { savedRooms } from '../../core/saved_rooms';
 
 export const RoomSecurityModal: React.FC = () => {
   const { closeModal, isClosing } = useModal();
@@ -11,30 +9,6 @@ export const RoomSecurityModal: React.FC = () => {
 
   const [password, setPassword] = useState(() => currentRoomPassword);
   const [showPassword, setShowPassword] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
-  const [rememberPassword, setRememberPassword] = useState(false);
-
-  useEffect(() => {
-    const roomId = parseRoomInvite(currentRoomInvite)?.roomId;
-    if (!roomId) return;
-    void savedRooms.get(roomId).then((record) => {
-      setIsSaved(Boolean(record?.saved));
-      setRememberPassword(record?.password !== undefined);
-    });
-  }, [currentRoomInvite]);
-
-  const handleSaveRoom = async () => {
-    const roomId = parseRoomInvite(currentRoomInvite)?.roomId;
-    if (!roomId) return;
-    try {
-      const record = await savedRooms.get(roomId);
-      if (!record) return;
-      await savedRooms.put({ ...record, saved: !isSaved,
-        password: !isSaved && rememberPassword ? currentRoomPassword : undefined });
-      setIsSaved(!isSaved);
-      showToast(isSaved ? 'Sala removida das salas salvas.' : 'Sala salva.');
-    } catch { showToast('Não foi possível atualizar a sala salva.'); }
-  };
 
   const handleSave = async () => {
     if (!isRoomHost) { showToast('Somente o anfitrião pode alterar a senha da sala.'); return; }
@@ -66,7 +40,7 @@ export const RoomSecurityModal: React.FC = () => {
           <div>
             <h2>Configurações da Sala</h2>
             <p className="modal-subtitle">
-              Consulte o convite, salve a sala e configure o acesso.
+              Consulte o convite e configure o acesso.
             </p>
           </div>
           <button className="btn-close" id="btn-close-room-security" onClick={closeModal}>
@@ -110,21 +84,6 @@ export const RoomSecurityModal: React.FC = () => {
             <button className="btn btn-secondary" onClick={() => {
               void navigator.clipboard.writeText(currentRoomInvite).then(() => showToast('Convite copiado!'));
             }}>Copiar convite</button>
-            <button className="btn btn-secondary" onClick={() => void handleSaveRoom()}>
-              {isSaved ? 'Remover das salvas' : 'Salvar sala'}
-            </button>
-            <label className="form-label room-remember-password">
-              <input type="checkbox" checked={rememberPassword}
-                onChange={(event) => {
-                  const checked = event.target.checked;
-                  setRememberPassword(checked);
-                  const roomId = parseRoomInvite(currentRoomInvite)?.roomId;
-                  if (isSaved && roomId) void savedRooms.get(roomId).then((record) => {
-                    if (record) return savedRooms.put({ ...record, password: checked ? currentRoomPassword : undefined });
-                  });
-                }} />
-              Lembrar senha neste dispositivo
-            </label>
           </div>}
 
           <div className="form-group" style={{ marginTop: '16px' }}>
@@ -169,16 +128,7 @@ export const RoomSecurityModal: React.FC = () => {
                 </span>
               </button>
             </div>
-            <p className="field-info-text">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10"/>
-                <line x1="12" y1="16" x2="12" y2="12"/>
-                <line x1="12" y1="8" x2="12.01" y2="8"/>
-              </svg>
-              {isRoomHost
-                ? 'Ao salvar, todos os participantes conectados serão notificados e atualizados automaticamente.'
-                : 'Somente o anfitrião pode alterar a senha da sala.'}
-            </p>
+            {!isRoomHost && <p className="field-info-text">Somente o anfitrião pode alterar a senha da sala.</p>}
           </div>
         </div>
 

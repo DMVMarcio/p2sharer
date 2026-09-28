@@ -573,6 +573,12 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   width: 100%;
 }
 
+.btn-icon-header.is-saved {
+  color: var(--accent-color);
+  border-color: var(--accent-color);
+  background-color: var(--bg-elevated);
+}
+
 .saved-rooms-section {
   width: 100%;
   margin-top: 34px;
@@ -602,10 +608,12 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .saved-room-details { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 4px; }
 .saved-room-details strong { color: var(--text-primary); font-size: 13px; overflow: hidden; text-overflow: ellipsis; }
 .saved-room-details span { color: var(--text-muted); font-size: 11px; display: flex; align-items: center; gap: 5px; }
-.saved-room-remove { padding: 7px; }
+.saved-room-icon-button,
+.saved-room-remove { width: 30px; height: 30px; padding: 7px; }
+.saved-room-edit-password { margin-top: 16px; }
 .room-remember-password { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
 .room-save-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; }
-.room-save-controls .room-remember-password { width: 100%; }
+.room-save-dialog .room-remember-password { margin-top: 0; }
 
 /* ==========================================================================
    BUTTONS SYSTEM
