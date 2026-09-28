@@ -13,7 +13,7 @@ use process_manager::{
 };
 use room_vault::{delete_room_record, list_room_records, save_room_record};
 use screen_sources::{
-    ensure_ws_server_running, get_video_ws_port, list_screen_sources, start_native_screen_capture,
+    ensure_ws_server_running, get_video_ws_port, get_video_ws_token, list_screen_sources, start_native_screen_capture,
     stop_native_screen_capture,
 };
 
@@ -65,6 +65,7 @@ pub fn run() {
             start_audio_capture,
             stop_audio_capture,
             get_video_ws_port,
+            get_video_ws_token,
             write_frontend_log,
             get_log_file_path,
             open_log_folder,

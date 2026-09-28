@@ -286,7 +286,7 @@ export class GroupRoomManager {
     ];
 
     const verifiedPeers = this.peerTracker.getVerifiedPeers().filter((peer) =>
-      !this.authority || this.admittedPeers.get(peer.id) === this.chatAuth?.getKnownKey(peer.id));
+      !this.authority || this.isAdmittedPeer(peer.id));
     verifiedPeers.forEach((p) => {
       list.push({
         peerId: p.id,
@@ -302,8 +302,13 @@ export class GroupRoomManager {
 
   private admittedTargets(): string[] {
     return Array.from(this.peerTracker.directConnectedPeers).filter((peerId) =>
-      !this.authority || (this.localAdmitted &&
-        this.admittedPeers.get(peerId) === this.chatAuth?.getKnownKey(peerId)));
+      !this.authority || (this.localAdmitted && this.isAdmittedPeer(peerId)));
+  }
+
+  private isAdmittedPeer(peerId: string): boolean {
+    const key = this.chatAuth?.getKnownKey(peerId);
+    return Boolean(this.peerTracker.isVerified(peerId) && key && !this.bannedKeys.has(key) &&
+      this.admittedPeers.get(peerId) === key);
   }
 
   // Trystero broadcasts to every connected edge, including peers awaiting admission.
@@ -508,8 +513,7 @@ export class GroupRoomManager {
 
   private announceToPeer(peerId: string): void {
     if (!this.room || !this.peerTracker.isVerified(peerId)) return;
-    if (this.authority && (!this.localAdmitted ||
-        this.admittedPeers.get(peerId) !== this.chatAuth?.getKnownKey(peerId))) return;
+    if (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(peerId))) return;
     this.presenceAction?.send({
       username: this.username, isCreator: this.isRoomHost(),
       isStreaming: Boolean(this.localStream), joinedAt: this.myJoinedAt,
@@ -1272,8 +1276,7 @@ export class GroupRoomManager {
     this.room.onPeerStream = (stream: MediaStream, peerId: string) => {
       if (this.room !== boundRoom) return;
       if (!this.peerTracker.isVerified(peerId)) return;
-      if (this.authority && (!this.localAdmitted ||
-          this.admittedPeers.get(peerId) !== this.chatAuth?.getKnownKey(peerId))) return;
+      if (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(peerId))) return;
       console.log(`[P2P] Received stream from peer: ${peerId}`);
       this.peerTracker.touchPeer(peerId);
       this.peerTracker.setStreaming(peerId, true);
@@ -1569,8 +1572,7 @@ export class GroupRoomManager {
    */
   public sendStreamToPeer(peerId: string) {
     if (!this.localStream || !this.room || !this.peerTracker.isVerified(peerId)) return;
-    if (this.authority && (!this.localAdmitted ||
-        this.admittedPeers.get(peerId) !== this.chatAuth?.getKnownKey(peerId))) return;
+    if (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(peerId))) return;
     try {
       const peers = this.room.getPeers?.() || {};
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2114,7 +2116,7 @@ export class GroupRoomManager {
 
   public getConnectedPeers(): PeerInfo[] {
     return this.peerTracker.getAllRoomPeers().filter((peer) =>
-      !this.authority || this.admittedPeers.get(peer.id) === this.chatAuth?.getKnownKey(peer.id))
+      !this.authority || this.isAdmittedPeer(peer.id))
       .map((peer) => ({ ...peer, isAdmin: this.isPeerAdmin(peer.id) }));
   }
 
@@ -2155,8 +2157,7 @@ export class GroupRoomManager {
   }
 
   public async transferOwnership(peerId: string): Promise<boolean> {
-    if (!this.authority?.isLocalHost() || !this.chatAuth || !this.peerTracker.isVerified(peerId) ||
-        this.admittedPeers.get(peerId) !== this.chatAuth.getKnownKey(peerId)) return false;
+    if (!this.authority?.isLocalHost() || !this.chatAuth || !this.isAdmittedPeer(peerId)) return false;
     const key = this.chatAuth.getKnownKey(peerId);
     if (!key) return false;
     const proposal = await this.authority.proposeTransfer(key, peerId);
@@ -2197,7 +2198,7 @@ export class GroupRoomManager {
     this.retainAdmissionHistory();
     await this.persistHostCommands();
     for (const remaining of this.peerTracker.directConnectedPeers) {
-      if (this.admittedPeers.get(remaining) === this.chatAuth.getKnownKey(remaining)) {
+      if (this.isAdmittedPeer(remaining)) {
         await this.admissionAction?.send({ kind: 'command', command: rotation }, { target: remaining });
       }
     }

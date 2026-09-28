@@ -70,6 +70,13 @@ export const TAURI_IPC_COMMANDS: Record<string, IpcCommandDef> = {
     argTypes: {},
     returnType: 'number',
   },
+  get_video_ws_token: {
+    name: 'get_video_ws_token',
+    requiredArgs: [],
+    optionalArgs: [],
+    argTypes: {},
+    returnType: 'string',
+  },
   write_frontend_log: {
     name: 'write_frontend_log',
     requiredArgs: ['level', 'message'],

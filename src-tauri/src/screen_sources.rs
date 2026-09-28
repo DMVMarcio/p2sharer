@@ -56,6 +56,7 @@ pub struct ScreenSourcesResponse {
 static CAPTURING_VIDEO: AtomicBool = AtomicBool::new(false);
 static WS_SERVER_INITIALIZED: AtomicBool = AtomicBool::new(false);
 static WS_PORT: std::sync::atomic::AtomicU16 = std::sync::atomic::AtomicU16::new(0);
+static WS_TOKEN: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 static FRAME_SENDER: std::sync::OnceLock<broadcast::Sender<Message>> = std::sync::OnceLock::new();
 static CURRENT_CAPTURE_FLAG: std::sync::Mutex<Option<Arc<AtomicBool>>> = std::sync::Mutex::new(None);
 
@@ -289,6 +290,19 @@ pub fn get_video_ws_port() -> u16 {
     WS_PORT.load(Ordering::SeqCst)
 }
 
+fn video_ws_token() -> &'static str {
+    WS_TOKEN.get_or_init(|| {
+        let mut bytes = [0u8; 32];
+        getrandom::getrandom(&mut bytes).expect("secure randomness is required for video capture");
+        bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+    })
+}
+
+#[tauri::command]
+pub fn get_video_ws_token() -> String {
+    video_ws_token().to_owned()
+}
+
 pub fn is_video_capturing() -> bool {
     CAPTURING_VIDEO.load(Ordering::Relaxed)
 }
@@ -309,7 +323,9 @@ pub fn ensure_ws_server_running() {
         return;
     }
 
-    std::thread::spawn(|| {
+    let token = video_ws_token().to_owned();
+
+    std::thread::spawn(move || {
         let rt = match tokio::runtime::Builder::new_current_thread().enable_all().build() {
             Ok(r) => r,
             Err(e) => {
@@ -338,12 +354,26 @@ pub fn ensure_ws_server_running() {
             }
 
             while let Ok((stream, _)) = listener.accept().await {
-                let sender = get_frame_sender();
-                let mut rx = sender.subscribe();
+                let token = token.clone();
 
                 tokio::spawn(async move {
-                    if let Ok(ws_stream) = tokio_tungstenite::accept_async(stream).await {
+                    if let Ok(Ok(ws_stream)) = tokio::time::timeout(
+                        std::time::Duration::from_secs(3),
+                        tokio_tungstenite::accept_async(stream),
+                    ).await {
                         let (mut write, mut read) = ws_stream.split();
+                        let authorized = matches!(
+                            tokio::time::timeout(std::time::Duration::from_secs(3), read.next()).await,
+                            Ok(Some(Ok(Message::Text(candidate)))) if candidate == token
+                        );
+                        if !authorized {
+                            let _ = write.send(Message::Close(None)).await;
+                            return;
+                        }
+                        if write.send(Message::Text("auth-ok".into())).await.is_err() {
+                            return;
+                        }
+                        let mut rx = get_frame_sender().subscribe();
                         loop {
                             tokio::select! {
                                 msg = rx.recv() => {
@@ -1118,6 +1148,36 @@ pub fn stop_native_screen_capture() -> Result<bool, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn video_websocket_requires_process_token_before_streaming() {
+        ensure_ws_server_running();
+        let port = tokio::time::timeout(std::time::Duration::from_secs(3), async {
+            loop {
+                let port = get_video_ws_port();
+                if port != 0 { break port; }
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            }
+        }).await.expect("video WebSocket did not start");
+        let url = format!("ws://127.0.0.1:{port}");
+
+        let (mut unauthorized, _) = tokio_tungstenite::connect_async(&url).await.unwrap();
+        unauthorized.send(Message::Text("invalid".into())).await.unwrap();
+        let rejected = tokio::time::timeout(std::time::Duration::from_secs(2), unauthorized.next())
+            .await.expect("unauthorized client was not disconnected");
+        assert!(matches!(rejected, Some(Ok(Message::Close(_)))));
+
+        let (mut authorized, _) = tokio_tungstenite::connect_async(&url).await.unwrap();
+        authorized.send(Message::Text(video_ws_token().into())).await.unwrap();
+        let acknowledgement = tokio::time::timeout(std::time::Duration::from_secs(2), authorized.next())
+            .await.unwrap().unwrap().unwrap();
+        assert_eq!(acknowledgement.into_text().unwrap(), "auth-ok");
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        get_frame_sender().send(Message::Binary(vec![1, 2, 3])).unwrap();
+        let frame = tokio::time::timeout(std::time::Duration::from_secs(2), authorized.next())
+            .await.unwrap().unwrap().unwrap();
+        assert_eq!(frame.into_data(), vec![1, 2, 3]);
+    }
 
     fn sanitize_quality(quality: Option<u8>) -> u8 {
         quality.unwrap_or(90).clamp(60, 98)

@@ -25,6 +25,7 @@ image = { version = "0.25", default-features = false, features = ["jpeg", "png"]
 xcap = "0.9.8"
 tokio-tungstenite = "0.24"
 futures-util = "0.3"
+getrandom = "0.2"
 rayon = "1.10"
 jpeg-encoder = { version = "0.7.1", features = ["simd"] }
 windows-capture = "2.0.1"
@@ -53,4 +54,3 @@ windows = { version = "0.58", features = [
     "Win32_System_Diagnostics_ToolHelp"
 ] }
 windows-core = "0.58"
-

@@ -88,6 +88,8 @@ describe('Tier 1: R1 Video Pipeline & Screen Capture Coverage', () => {
 
     const portResult = validateIpcInvoke('get_video_ws_port', {});
     assert.equal(portResult.valid, true);
+    const tokenResult = validateIpcInvoke('get_video_ws_token', {});
+    assert.equal(tokenResult.valid, true);
   });
 
   it('R1-T1-5: Should initialize offscreen canvas and verify bitmaprenderer context', () => {
