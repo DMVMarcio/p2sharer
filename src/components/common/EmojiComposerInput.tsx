@@ -1,15 +1,20 @@
-import { forwardRef, useImperativeHandle, useLayoutEffect, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type ReactNode } from 'react';
+import { useEditor, EditorContent } from '@tiptap/react';
+import { BubbleMenu } from '@tiptap/react/menus';
+import StarterKit from '@tiptap/starter-kit';
+import { Markdown } from '@tiptap/markdown';
+import CharacterCount from '@tiptap/extension-character-count';
+import Placeholder from '@tiptap/extension-placeholder';
+import { Bold, Italic, Strikethrough, Code, Code2, Link2, Quote, List, ListOrdered, Check, X } from 'lucide-react';
 import type { EmojiPack } from '../../core/emoji_preferences';
-import { getEmojiIndex } from '../../core/emoji_catalog';
-import { getEmojiVisual } from '../../core/emoji_visual';
-import { ChatMessageContent } from './ChatMessageContent';
-
-const MAX_LENGTH = 2000;
-const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+import { safeChatUrl } from '../../core/chat_links';
+import { ChatEmojiDecorations } from './ChatEmojiDecorations';
 
 export type EmojiComposerHandle = {
   insertEmoji: (emoji: string) => void;
   focus: () => void;
+  getMarkdown: () => string;
+  hasText: () => boolean;
 };
 
 type Props = {
@@ -19,180 +24,146 @@ type Props = {
   onSend: () => void;
 };
 
-type SelectionOffsets = { start: number; end: number };
-
-function selectionOffsets(root: HTMLElement): SelectionOffsets | null {
-  const selection = window.getSelection();
-  if (!selection?.rangeCount || !root.contains(selection.anchorNode) || !root.contains(selection.focusNode)) return null;
-  const range = selection.getRangeAt(0);
-  const start = range.cloneRange();
-  start.selectNodeContents(root);
-  start.setEnd(range.startContainer, range.startOffset);
-  const end = range.cloneRange();
-  end.selectNodeContents(root);
-  end.setEnd(range.endContainer, range.endOffset);
-  return { start: start.toString().length, end: end.toString().length };
-}
-
-function textPosition(root: HTMLElement, offset: number): { node: Node; offset: number } {
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  let node = walker.nextNode();
-  let remaining = offset;
-  while (node) {
-    const length = node.textContent?.length ?? 0;
-    if (remaining <= length) {
-      const atomic = node.parentElement?.closest('[contenteditable="false"]');
-      if (atomic?.parentNode) {
-        const index = Array.prototype.indexOf.call(atomic.parentNode.childNodes, atomic) as number;
-        return { node: atomic.parentNode, offset: index + (remaining > 0 ? 1 : 0) };
-      }
-      return { node, offset: remaining };
-    }
-    remaining -= length;
-    node = walker.nextNode();
-  }
-  return { node: root, offset: root.childNodes.length };
-}
-
-function restoreSelection(root: HTMLElement, offsets: SelectionOffsets) {
-  const selection = window.getSelection();
-  if (!selection) return;
-  const start = textPosition(root, offsets.start);
-  const end = textPosition(root, offsets.end);
-  const range = document.createRange();
-  range.setStart(start.node, start.offset);
-  range.setEnd(end.node, end.offset);
-  selection.removeAllRanges();
-  selection.addRange(range);
-}
-
-function renderContent(root: HTMLElement, value: string, pack: EmojiPack) {
-  const fragment = document.createDocumentFragment();
-  let plain = '';
-  const flushPlain = () => {
-    if (plain) fragment.append(document.createTextNode(plain));
-    plain = '';
-  };
-  for (const { segment } of segmenter.segment(value)) {
-    if (getEmojiIndex(segment) === undefined) {
-      plain += segment;
-      continue;
-    }
-    flushPlain();
-    const visual = getEmojiVisual(segment, pack, 16);
-    const glyph = document.createElement('span');
-    glyph.className = visual.className;
-    Object.assign(glyph.style, visual.style);
-    glyph.contentEditable = 'false';
-    if (visual.native) glyph.textContent = segment;
-    else {
-      const copy = document.createElement('span');
-      copy.className = 'emoji-glyph-copy';
-      copy.textContent = segment;
-      glyph.append(copy);
-    }
-    fragment.append(glyph);
-  }
-  flushPlain();
-  root.replaceChildren(fragment);
+function FormatButton({ label, active, onClick, children }: { label: string; active?: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      className={`chat-format-button ${active ? 'active' : ''}`}
+      aria-label={label}
+      aria-pressed={active}
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={onClick}
+    >{children}</button>
+  );
 }
 
 export const EmojiComposerInput = forwardRef<EmojiComposerHandle, Props>(function EmojiComposerInput({ value, pack, onChange, onSend }, ref) {
-  const editorRef = useRef<HTMLDivElement>(null);
-  const selectionRef = useRef<SelectionOffsets>({ start: value.length, end: value.length });
-  const composingRef = useRef(false);
-  const valueRef = useRef(value);
-  valueRef.current = value;
+  const packRef = useRef(pack);
+  const onChangeRef = useRef(onChange);
+  const onSendRef = useRef(onSend);
+  const editingLinkRef = useRef(false);
+  const linkInputRef = useRef<HTMLInputElement>(null);
+  const [editingLink, setEditingLink] = useState(false);
+  const [linkUrl, setLinkUrl] = useState('');
+  const [linkError, setLinkError] = useState(false);
+  packRef.current = pack;
+  onChangeRef.current = onChange;
+  onSendRef.current = onSend;
+  editingLinkRef.current = editingLink;
 
-  const updateEditor = (next: string, offsets: SelectionOffsets, notify = true) => {
-    const root = editorRef.current;
-    if (!root) return;
-    const bounded = next.slice(0, MAX_LENGTH);
-    renderContent(root, bounded, pack);
-    root.dataset.pack = pack;
-    valueRef.current = bounded;
-    const position = Math.min(offsets.start, bounded.length);
-    const end = Math.min(offsets.end, bounded.length);
-    selectionRef.current = { start: position, end };
-    restoreSelection(root, selectionRef.current);
-    if (notify) onChange(bounded);
-  };
+  const editor = useEditor({
+    immediatelyRender: false,
+    content: value,
+    contentType: 'markdown',
+    extensions: [
+      StarterKit.configure({ link: { openOnClick: false, autolink: true, linkOnPaste: true } }),
+      Markdown,
+      CharacterCount.configure({ limit: 2000 }),
+      Placeholder.configure({ placeholder: 'Digite uma mensagem...' }),
+      ChatEmojiDecorations.configure({ getPack: () => packRef.current }),
+    ],
+    editorProps: {
+      attributes: {
+        id: 'chat-input-field',
+        class: 'chat-composer-editor',
+        'aria-label': 'Mensagem',
+        'aria-multiline': 'true',
+        'data-placeholder': 'Digite uma mensagem...',
+      },
+      handleKeyDown: (_view, event) => {
+        if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+          event.preventDefault();
+          onSendRef.current();
+          return true;
+        }
+        return false;
+      },
+    },
+    onUpdate: ({ editor: current }) => onChangeRef.current(current.getMarkdown()),
+  }, []);
 
-  useLayoutEffect(() => {
-    const root = editorRef.current;
-    if (!root || composingRef.current || root.textContent === value && root.dataset.pack === pack) return;
-    const offsets = document.activeElement === root ? selectionOffsets(root) ?? selectionRef.current : selectionRef.current;
-    renderContent(root, value, pack);
-    root.dataset.pack = pack;
-    if (document.activeElement === root) restoreSelection(root, offsets);
-  }, [value, pack]);
+  useEffect(() => {
+    if (!editor) return;
+    if (editor.getMarkdown() !== value) editor.commands.setContent(value, { contentType: 'markdown', emitUpdate: false });
+  }, [editor, value]);
+
+  useEffect(() => {
+    if (editor) editor.view.dispatch(editor.state.tr.setMeta('emoji-pack', pack));
+  }, [editor, pack]);
 
   useImperativeHandle(ref, () => ({
-    insertEmoji(emoji) {
-      const root = editorRef.current;
-      if (!root) return;
-      const { start, end } = selectionOffsets(root) ?? selectionRef.current;
-      const next = valueRef.current.slice(0, start) + emoji + valueRef.current.slice(end);
-      if (next.length > MAX_LENGTH) return;
-      root.focus();
-      updateEditor(next, { start: start + emoji.length, end: start + emoji.length });
-    },
-    focus() { editorRef.current?.focus(); },
-  }));
+    insertEmoji(emoji) { editor?.chain().focus().insertContent(emoji).run(); },
+    focus() { editor?.commands.focus(); },
+    getMarkdown() { return editor?.getMarkdown() ?? ''; },
+    hasText() { return Boolean(editor?.getText().trim()); },
+  }), [editor]);
 
-  const syncFromDom = () => {
-    if (composingRef.current) return;
-    const root = editorRef.current;
-    if (!root) return;
-    const next = (root.textContent ?? '').replace(/\u00a0/g, ' ');
-    const offsets = selectionOffsets(root) ?? selectionRef.current;
-    updateEditor(next, offsets);
+  const startLink = () => {
+    if (!editor) return;
+    setLinkUrl(editor.getAttributes('link').href ?? '');
+    setLinkError(false);
+    editingLinkRef.current = true;
+    setEditingLink(true);
+    requestAnimationFrame(() => linkInputRef.current?.focus());
   };
 
-  const insertText = (text: string) => {
-    const root = editorRef.current;
-    if (!root) return;
-    const { start, end } = selectionOffsets(root) ?? selectionRef.current;
-    const available = MAX_LENGTH - (valueRef.current.length - (end - start));
-    const inserted = text.replace(/\r\n?/g, '\n').slice(0, available);
-    const next = valueRef.current.slice(0, start) + inserted + valueRef.current.slice(end);
-    updateEditor(next, { start: start + inserted.length, end: start + inserted.length });
+  const applyLink = () => {
+    if (!editor) return;
+    if (!linkUrl.trim()) editor.chain().focus().unsetLink().run();
+    else {
+      const href = safeChatUrl(linkUrl.trim());
+      if (!href) { setLinkError(true); return; }
+      editor.chain().focus().setLink({ href }).run();
+    }
+    editingLinkRef.current = false;
+    setEditingLink(false);
+    setLinkError(false);
   };
 
   return (
     <div className="chat-composer-field">
-      <div
-        ref={editorRef}
-        id="chat-input-field"
-        className="chat-composer-editor"
-        role="textbox"
-        aria-label="Mensagem"
-        aria-multiline="true"
-        contentEditable
-        suppressContentEditableWarning
-        data-placeholder="Digite uma mensagem..."
-        onInput={syncFromDom}
-        onKeyUp={() => { const root = editorRef.current; if (root) selectionRef.current = selectionOffsets(root) ?? selectionRef.current; }}
-        onMouseUp={() => { const root = editorRef.current; if (root) selectionRef.current = selectionOffsets(root) ?? selectionRef.current; }}
-        onBlur={() => { const root = editorRef.current; if (root) selectionRef.current = selectionOffsets(root) ?? selectionRef.current; }}
-        onCompositionStart={() => { composingRef.current = true; }}
-        onCompositionEnd={() => { composingRef.current = false; syncFromDom(); }}
-        onKeyDown={(event) => {
-          if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
-          event.preventDefault();
-          if (event.shiftKey) insertText('\n');
-          else onSend();
-        }}
-        onPaste={(event) => {
-          event.preventDefault();
-          insertText(event.clipboardData.getData('text/plain'));
-        }}
-      />
-      {value.trim() && (
-        <div className="chat-composer-markdown-preview" aria-label="Prévia da mensagem">
-          <span className="chat-composer-preview-label">Prévia</span>
-          <div className="chat-msg-bubble"><ChatMessageContent text={value} pack={pack} /></div>
-        </div>
+      <EditorContent editor={editor} />
+      {editor && (
+        <BubbleMenu
+          editor={editor}
+          className="chat-format-bubble"
+          appendTo={() => document.body}
+          shouldShow={({ editor: current, state }) => !state.selection.empty && (current.isFocused || editingLinkRef.current)}
+          options={{ placement: 'top', offset: 8, flip: true, shift: true }}
+        >
+          {editingLink ? (
+            <div className="chat-format-link">
+              <input
+                ref={linkInputRef}
+                type="url"
+                value={linkUrl}
+                placeholder="https://..."
+                aria-label="Endereço do link"
+                aria-invalid={linkError}
+                onChange={(event) => { setLinkUrl(event.target.value); setLinkError(false); }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') { event.preventDefault(); applyLink(); }
+                  if (event.key === 'Escape') { editingLinkRef.current = false; setEditingLink(false); editor.commands.focus(); }
+                }}
+              />
+              <FormatButton label="Aplicar link" onClick={applyLink}><Check size={15} /></FormatButton>
+              <FormatButton label="Cancelar" onClick={() => { editingLinkRef.current = false; setEditingLink(false); editor.commands.focus(); }}><X size={15} /></FormatButton>
+            </div>
+          ) : (
+            <div className="chat-format-actions">
+              <FormatButton label="Negrito" active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}><Bold size={15} /></FormatButton>
+              <FormatButton label="Itálico" active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()}><Italic size={15} /></FormatButton>
+              <FormatButton label="Riscado" active={editor.isActive('strike')} onClick={() => editor.chain().focus().toggleStrike().run()}><Strikethrough size={15} /></FormatButton>
+              <FormatButton label="Código" active={editor.isActive('code')} onClick={() => editor.chain().focus().toggleCode().run()}><Code size={15} /></FormatButton>
+              <FormatButton label="Link" active={editor.isActive('link')} onClick={startLink}><Link2 size={15} /></FormatButton>
+              <span className="chat-format-divider" aria-hidden="true" />
+              <FormatButton label="Citação" active={editor.isActive('blockquote')} onClick={() => editor.chain().focus().toggleBlockquote().run()}><Quote size={15} /></FormatButton>
+              <FormatButton label="Lista" active={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()}><List size={15} /></FormatButton>
+              <FormatButton label="Lista numerada" active={editor.isActive('orderedList')} onClick={() => editor.chain().focus().toggleOrderedList().run()}><ListOrdered size={15} /></FormatButton>
+              <FormatButton label="Bloco de código" active={editor.isActive('codeBlock')} onClick={() => editor.chain().focus().toggleCodeBlock().run()}><Code2 size={15} /></FormatButton>
+            </div>
+          )}
+        </BubbleMenu>
       )}
     </div>
   );
