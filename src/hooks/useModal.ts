@@ -8,6 +8,7 @@ export type ModalType =
   | 'audioFilter'
   | 'createRoom'
   | 'joinRoom'
+  | 'saveInvite'
   | 'roomSecurity'
   | 'externalLink'
   | null;

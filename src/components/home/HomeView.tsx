@@ -2,6 +2,7 @@ import React from 'react';
 import { useModal } from '../../hooks/useModal';
 import { useRoom } from '../../hooks/useRoom';
 import { SavedRoomsSection } from './SavedRoomsSection';
+import { roomService } from '../../services/room_service';
 
 export const HomeView: React.FC = () => {
   const { openModal } = useModal();
@@ -16,6 +17,8 @@ export const HomeView: React.FC = () => {
   };
 
   const handleJoinRoom = () => {
+    roomService.pendingJoinInvite = '';
+    roomService.pendingJoinAsOwner = false;
     if (!username) {
       openModal('username');
     } else {

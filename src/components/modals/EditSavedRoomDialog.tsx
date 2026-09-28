@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import { savedRooms, type SavedRoom } from '../../core/saved_rooms';
+import { parseRoomInvite } from '../../core/room_invite';
 import { showToast } from '../../hooks/useToast';
 
 interface EditSavedRoomDialogProps {
@@ -11,6 +12,7 @@ interface EditSavedRoomDialogProps {
 
 export const EditSavedRoomDialog: React.FC<EditSavedRoomDialogProps> = ({ room, onClose }) => {
   const [name, setName] = useState(room.name);
+  const [inviteCode, setInviteCode] = useState(room.invite);
   const [password, setPassword] = useState(room.password ?? '');
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -19,14 +21,36 @@ export const EditSavedRoomDialog: React.FC<EditSavedRoomDialogProps> = ({ room, 
     if (busy) return;
     const nextName = name.trim();
     if (!nextName) { showToast('Digite um nome para a sala.'); return; }
+    const nextInvite = parseRoomInvite(inviteCode);
+    if (!nextInvite) { showToast('Cole um convite autenticado válido.'); return; }
+    if (nextInvite.roomId === room.roomId &&
+        nextInvite.rootKey !== parseRoomInvite(room.invite)?.rootKey) {
+      showToast('Este identificador pertence a outra identidade de sala.');
+      return;
+    }
     setBusy(true);
     try {
       const current = await savedRooms.get(room.roomId);
       if (!current) throw new Error('Room record is missing');
       const nextPassword = password.trim();
-      await savedRooms.put({ ...current, name: nextName,
-        password: nextPassword || undefined,
-        protected: Boolean(nextPassword) || current.protected });
+      if (nextInvite.roomId !== room.roomId) {
+        if (await savedRooms.get(nextInvite.roomId)) {
+          showToast('Este convite já pertence a outra sala salva.');
+          return;
+        }
+        await savedRooms.put({ roomId: nextInvite.roomId, invite: inviteCode.trim(),
+          name: nextName, saved: true, owned: false, protected: true,
+          password: nextPassword || undefined });
+        if (current.owned) {
+          await savedRooms.put({ ...current, saved: false });
+        } else {
+          await savedRooms.remove(current.roomId);
+        }
+      } else {
+        await savedRooms.put({ ...current, invite: inviteCode.trim(), name: nextName,
+          password: nextPassword || undefined,
+          protected: Boolean(nextPassword) || current.protected });
+      }
       showToast('Sala salva atualizada.');
       onClose();
     } catch (error) {
@@ -51,6 +75,11 @@ export const EditSavedRoomDialog: React.FC<EditSavedRoomDialogProps> = ({ room, 
             <label className="form-label" htmlFor="saved-room-name">Nome</label>
             <input className="text-input" id="saved-room-name" maxLength={80}
               value={name} onChange={(event) => setName(event.target.value)} autoFocus />
+          </div>
+          <div className="form-group saved-room-form-field">
+            <label className="form-label" htmlFor="saved-room-invite">Código de convite</label>
+            <input className="text-input" id="saved-room-invite" value={inviteCode}
+              onChange={(event) => setInviteCode(event.target.value)} />
           </div>
           <div className="form-group saved-room-edit-password">
             <label className="form-label" htmlFor="saved-room-password">Senha salva para entrar</label>

@@ -47,35 +47,33 @@ export const SavedRoomsSection: React.FC = () => {
         <div>
           <h2 id="saved-rooms-title">Salas salvas</h2>
         </div>
-        <button className="btn btn-secondary" onClick={() => {
-          roomService.pendingJoinInvite = '';
-          roomService.pendingJoinAsOwner = false;
-          openModal('joinRoom');
-        }}>
+        <button className="btn btn-secondary saved-rooms-add" onClick={() => openModal('saveInvite')}>
           <BookmarkPlus size={16} /> Salvar convite
         </button>
       </div>
       {rooms.length === 0 ? (
         <p className="saved-rooms-empty">Nenhuma sala salva ainda.</p>
       ) : (
-        <div className="saved-rooms-list">
+        <div className="saved-rooms-grid">
           {rooms.map((room) => (
-            <div className="saved-room-row" key={room.roomId}>
+            <article className="saved-room-card" key={room.roomId}>
               <div className="saved-room-details">
                 <strong>{room.name}</strong>
                 <span>{room.owned ? 'Sua sala' : 'Participante'} · {room.roomId.slice(0, 8)}
                   {room.password !== undefined && <LockKeyhole size={12} aria-label="Senha lembrada" />}</span>
               </div>
-              <button className="btn btn-secondary btn-sm" onClick={() => openSaved(room)}>
-                Entrar <ArrowRight size={14} />
-              </button>
-              <button className="btn btn-outline btn-sm saved-room-icon-button"
-                onClick={() => setEditingRoom(room)} aria-label={`Editar ${room.name}`}>
-                <Pencil size={14} />
-              </button>
-              <button className="btn btn-outline btn-sm saved-room-remove" onClick={() => void removeSaved(room)}
-                aria-label={`Remover ${room.name} das salas salvas`}><Trash2 size={14} /></button>
-            </div>
+              <div className="saved-room-actions">
+                <button className="btn btn-primary btn-sm saved-room-enter" onClick={() => openSaved(room)}>
+                  Entrar <ArrowRight size={14} />
+                </button>
+                <button className="btn btn-outline btn-sm saved-room-icon-button"
+                  onClick={() => setEditingRoom(room)} aria-label={`Editar ${room.name}`}>
+                  <Pencil size={14} />
+                </button>
+                <button className="btn btn-outline btn-sm saved-room-remove" onClick={() => void removeSaved(room)}
+                  aria-label={`Remover ${room.name} das salas salvas`}><Trash2 size={14} /></button>
+              </div>
+            </article>
           ))}
         </div>
       )}
