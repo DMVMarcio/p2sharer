@@ -18,6 +18,7 @@ export type EmojiComposerHandle = {
 };
 
 type Props = {
+  id?: string;
   value: string;
   pack: EmojiPack;
   onChange: (value: string) => void;
@@ -37,7 +38,7 @@ function FormatButton({ label, active, onClick, children }: { label: string; act
   );
 }
 
-export const EmojiComposerInput = forwardRef<EmojiComposerHandle, Props>(function EmojiComposerInput({ value, pack, onChange, onSend }, ref) {
+export const EmojiComposerInput = forwardRef<EmojiComposerHandle, Props>(function EmojiComposerInput({ id = 'chat-input-field', value, pack, onChange, onSend }, ref) {
   const packRef = useRef(pack);
   const onChangeRef = useRef(onChange);
   const onSendRef = useRef(onSend);
@@ -64,7 +65,7 @@ export const EmojiComposerInput = forwardRef<EmojiComposerHandle, Props>(functio
     ],
     editorProps: {
       attributes: {
-        id: 'chat-input-field',
+        id,
         class: 'chat-composer-editor',
         'aria-label': 'Mensagem',
         'aria-multiline': 'true',

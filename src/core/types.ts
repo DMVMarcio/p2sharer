@@ -74,11 +74,22 @@ export interface PeerStatsInfo {
   connectionType: string;
 }
 
+export interface ChatReplyReference {
+  id: string;
+  sender: string;
+  text: string;
+}
+
 export interface ChatMessage {
   id: string;
   sender: string;
   text: string;
   timestamp: number;
+  authorId?: string;
+  revision?: number;
+  editedAt?: number;
+  deletedAt?: number;
+  replyTo?: ChatReplyReference;
   isHost?: boolean;
   isSystem?: boolean;
   systemType?: 'join' | 'leave' | 'info' | 'generic' | 'stream-start' | 'stream-stop';

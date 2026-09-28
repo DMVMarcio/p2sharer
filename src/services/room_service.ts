@@ -406,9 +406,17 @@ export class RoomService {
     this.notify();
   }
 
-  public sendChatMessage(text: string): void {
+  public sendChatMessage(text: string, replyToId?: string): void {
     if (!text.trim() || !this.roomManager) return;
-    this.roomManager.sendChatMessage(text.trim());
+    this.roomManager.sendChatMessage(text.trim(), replyToId);
+  }
+
+  public editChatMessage(id: string, text: string): boolean {
+    return this.roomManager?.editChatMessage(id, text) ?? false;
+  }
+
+  public deleteChatMessage(id: string): boolean {
+    return this.roomManager?.deleteChatMessage(id) ?? false;
   }
 
   public addSystemChatMessage(text: string, systemType: 'join' | 'leave' | 'info' | 'generic' = 'generic'): void {

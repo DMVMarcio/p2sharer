@@ -18,6 +18,15 @@ test('history merge orders chat and notices while ignoring repeated IDs', () => 
   assert.equal(mergeChatHistory(result, [old]).length, 3);
 });
 
+test('history merge keeps the latest authored revision and never revives deleted text', () => {
+  const original: ChatMessage = { id: 'message', timestamp: 10, sender: 'Alice', authorId: 'alice', text: '**hello**', revision: 0 };
+  const edited: ChatMessage = { ...original, text: '**updated**', revision: 1, editedAt: 11 };
+  const deleted: ChatMessage = { ...edited, text: '', revision: 2, deletedAt: 12 };
+  assert.equal(mergeChatHistory([original], [edited])[0].text, '**updated**');
+  assert.deepEqual(mergeChatHistory([deleted], [original, edited]), [deleted]);
+  assert.deepEqual(mergeChatHistory([original], [{ ...edited, authorId: 'intruder' }]), [original]);
+});
+
 test('join creates own notice and direct handshake exchanges history both ways', async () => {
   const originalJoin = signalingManager.joinRoom;
   const originalLeave = signalingManager.leaveRoom;
@@ -59,6 +68,25 @@ test('join creates own notice and direct handshake exchanges history both ways',
     historyHandler({ history: [older, local[0]] }, { peerId: 'host' });
     assert.equal(histories.length, 1);
     assert.deepEqual(histories[0].map((item) => item.id), [older.id, local[0].id]);
+
+    const sentMessage = manager.sendChatMessage('**first**');
+    assert.ok(sentMessage.authorId);
+    assert.equal(manager.editChatMessage(sentMessage.id, '*changed*'), true);
+    assert.equal(local.at(-1)?.text, '*changed*');
+    assert.equal(local.at(-1)?.revision, 1);
+    const reply = manager.sendChatMessage('answer', sentMessage.id);
+    assert.deepEqual(reply.replyTo, { id: sentMessage.id, sender: sentMessage.sender, text: '*changed*' });
+    assert.equal(manager.deleteChatMessage(sentMessage.id), true);
+    assert.equal(local.at(-1)?.deletedAt !== undefined, true);
+    assert.equal(manager.editChatMessage(sentMessage.id, 'revive'), false);
+    assert.equal(manager.deleteChatMessage(sentMessage.id), false);
+
+    const remote: ChatMessage = { id: 'remote', timestamp: Date.now(), sender: 'Remote', authorId: 'remote-id', text: 'first', revision: 0 };
+    const chatHandler = actions.get('chat')!.onMessage!;
+    chatHandler(remote, { peerId: 'host' });
+    chatHandler({ ...remote, text: 'second', revision: 1, editedAt: Date.now() }, { peerId: 'host' });
+    assert.equal(local.at(-1)?.text, 'second');
+    assert.equal(manager.deleteChatMessage(remote.id), false);
   } finally {
     await manager.leave();
     (signalingManager as any).joinRoom = originalJoin;
