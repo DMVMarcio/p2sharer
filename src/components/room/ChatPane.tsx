@@ -41,8 +41,9 @@ export const ChatPane: React.FC = () => {
   };
 
   const sendMessage = () => {
-    if (!inputText.trim()) return;
-    sendChatMessage(inputText);
+    const composer = inputRef.current;
+    if (!composer?.hasText()) return;
+    sendChatMessage(composer.getMarkdown());
     setInputText('');
     setPickerOpen(false);
   };
