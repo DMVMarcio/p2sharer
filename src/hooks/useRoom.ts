@@ -44,6 +44,8 @@ export function useRoom() {
     return roomService.updateRoomPassword(newPassword);
   }, []);
   const transferOwnership = useCallback((peerId: string) => roomService.transferOwnership(peerId), []);
+  const setAdministrator = useCallback((peerId: string, enabled: boolean) =>
+    roomService.setAdministrator(peerId, enabled), []);
   const kickPeer = useCallback((peerId: string) => roomService.kickPeer(peerId), []);
 
   const requestStream = useCallback((peerId: string) => {
@@ -112,6 +114,7 @@ export function useRoom() {
     connectingOverlay: roomService.connectingOverlay,
     isInRoom: roomSlots.length > 0 && Boolean(currentRoomCode),
     isRoomHost: roomService.isRoomHost(),
+    isRoomAdmin: roomService.isRoomAdmin(),
 
     // Actions
     joinRoom,
@@ -121,6 +124,7 @@ export function useRoom() {
     deleteChatMessage,
     updateRoomPassword,
     transferOwnership,
+    setAdministrator,
     kickPeer,
     requestStream,
     stopWatchingStream,

@@ -40,6 +40,7 @@ export interface PeerInfo {
   connectionState: 'connected' | 'connecting' | 'disconnected';
   joinedAt: number;
   isCreator?: boolean;
+  isAdmin?: boolean;
 }
 
 export interface StreamWatcher {

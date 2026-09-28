@@ -479,6 +479,12 @@ export class RoomService {
     return this.roomManager?.transferOwnership(peerId) ?? Promise.resolve(false);
   }
 
+  public setAdministrator(peerId: string, enabled: boolean): Promise<boolean> {
+    return this.roomManager?.setAdministrator(peerId, enabled) ?? Promise.resolve(false);
+  }
+
+  public isRoomAdmin(): boolean { return this.roomManager?.isRoomAdmin() ?? false; }
+
   public kickPeer(peerId: string): Promise<boolean> {
     return this.roomManager?.kickPeer(peerId) ?? Promise.resolve(false);
   }

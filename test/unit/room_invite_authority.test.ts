@@ -55,3 +55,24 @@ test('signed commands remain verifiable out of order but cannot be replayed', as
   assert.equal(await receiver.verifyCommand(changedPassword), false);
   assert.equal(await receiver.verifyCommand({ ...admitted, targetKey: host.publicKey }), false);
 });
+
+test('only a host-granted administrator can sign room-scoped admissions', async () => {
+  const created = await createAuthenticatedInvite();
+  const invite = parseRoomInvite(created.invite)!;
+  const host = await PeerAuthenticator.create(invite.roomId, 'admin-test-host', created.identity);
+  const admin = await PeerAuthenticator.create(invite.roomId, 'admin-test-admin');
+  const guest = await PeerAuthenticator.create(invite.roomId, 'admin-test-guest');
+  const attacker = await PeerAuthenticator.create(invite.roomId, 'admin-test-attacker');
+  const issuer = new RoomAuthority(invite.roomId, invite.rootKey, host);
+  const adminAuthority = new RoomAuthority(invite.roomId, invite.rootKey, admin);
+  const receiver = new RoomAuthority(invite.roomId, invite.rootKey, guest);
+  const grant = await issuer.makeCommand('admin', { targetPeerId: 'admin-test-admin', targetKey: admin.publicKey });
+  assert.equal(await receiver.verifyGrant(grant), true);
+  assert.equal(await receiver.verifyGrant({ ...grant, targetKey: attacker.publicKey }), false);
+  const admission = await adminAuthority.signAdminAdmission('admin-test-guest', guest.publicKey, grant);
+  assert.equal(await receiver.verifyAdminAdmission(admission), true);
+  assert.equal(await receiver.verifyAdminAdmission({ ...admission, targetPeerId: 'other-device' }), false);
+  assert.equal(await receiver.verifyAdminAdmission({ ...admission, targetKey: attacker.publicKey }), false);
+  await assert.rejects(() => new RoomAuthority(invite.roomId, invite.rootKey, attacker)
+    .signAdminAdmission('admin-test-guest', guest.publicKey, grant));
+});
