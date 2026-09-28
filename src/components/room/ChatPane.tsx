@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useSyncExternalStore } from 'react';
 import { useRoom } from '../../hooks/useRoom';
 import { EmojiPicker } from '../common/EmojiPicker';
+import { EmojiPickerPopover } from '../common/EmojiPickerPopover';
 import { EmojiComposerInput, type EmojiComposerHandle } from '../common/EmojiComposerInput';
 import { ChatMessageContent } from '../common/ChatMessageContent';
 import { getEmojiPack, subscribeEmojiPack } from '../../core/emoji_preferences';
@@ -8,14 +9,15 @@ import { SystemNoticeIcon } from './SystemNoticeIcon';
 import { SystemNoticeText } from './SystemNoticeText';
 import { useEmojiSelectionHighlight } from '../../hooks/useEmojiSelectionHighlight';
 import { ChatMessageMenu } from './ChatMessageMenu';
-import { Reply, X } from 'lucide-react';
+import { EditedMessageMarker } from './EditedMessageMarker';
+import { Reply, Smile, X } from 'lucide-react';
 import { selfId } from '@trystero-p2p/core';
 import { showToast } from '../../hooks/useToast';
 
 export const ChatPane: React.FC = () => {
   const { chatMessages, sendChatMessage, editChatMessage, deleteChatMessage } = useRoom();
   const [inputText, setInputText] = useState('');
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerTarget, setPickerTarget] = useState<'compose' | 'edit' | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [replyToId, setReplyToId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -25,11 +27,13 @@ export const ChatPane: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<EmojiComposerHandle>(null);
   const editRef = useRef<EmojiComposerHandle>(null);
+  const editEmojiButtonRef = useRef<HTMLButtonElement>(null);
   const messageRefs = useRef(new Map<string, HTMLDivElement>());
   const composerRef = useRef<HTMLDivElement>(null);
   const paneRef = useRef<HTMLDivElement>(null);
   useEmojiSelectionHighlight(paneRef);
 
+  const visibleMessages = chatMessages.filter((message) => !message.deletedAt);
   const latestMessageId = chatMessages[chatMessages.length - 1]?.id;
   const replyMessage = chatMessages.find((message) => message.id === replyToId && !message.deletedAt);
 
@@ -60,12 +64,14 @@ export const ChatPane: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!pickerOpen) return;
+    if (!pickerTarget) return;
     const onPointerDown = (event: PointerEvent) => {
-      if (!composerRef.current?.contains(event.target as Node)) setPickerOpen(false);
+      if (!composerRef.current?.contains(event.target as Node) &&
+          !(event.target as Element).closest('.emoji-picker-popover') &&
+          !(event.target as Element).closest('.chat-msg-edit-emoji')) setPickerTarget(null);
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setPickerOpen(false);
+      if (event.key === 'Escape') setPickerTarget(null);
     };
     document.addEventListener('pointerdown', onPointerDown);
     document.addEventListener('keydown', onKeyDown);
@@ -73,10 +79,10 @@ export const ChatPane: React.FC = () => {
       document.removeEventListener('pointerdown', onPointerDown);
       document.removeEventListener('keydown', onKeyDown);
     };
-  }, [pickerOpen]);
+  }, [pickerTarget]);
 
   const insertEmoji = (emoji: string) => {
-    inputRef.current?.insertEmoji(emoji);
+    (pickerTarget === 'edit' ? editRef : inputRef).current?.insertEmoji(emoji);
   };
 
   const sendMessage = () => {
@@ -85,7 +91,7 @@ export const ChatPane: React.FC = () => {
     sendChatMessage(composer.getMarkdown(), replyMessage?.id);
     setInputText('');
     setReplyToId(null);
-    setPickerOpen(false);
+    setPickerTarget(null);
   };
 
   const saveEdit = (id: string) => {
@@ -93,6 +99,7 @@ export const ChatPane: React.FC = () => {
     if (!content.trim()) { showToast('A mensagem não pode ficar vazia.'); return; }
     if (!editChatMessage(id, content)) { showToast('Não foi possível editar a mensagem.'); return; }
     setEditingId(null);
+    setPickerTarget(null);
   };
 
   const copyText = (text: string) => {
@@ -109,7 +116,7 @@ export const ChatPane: React.FC = () => {
   return (
     <div className="sidebar-tab-content active" id="tab-content-chat" ref={paneRef}>
       <div className="chat-messages-container" id="chat-messages-container">
-        {chatMessages.map((msg, index) => {
+        {visibleMessages.map((msg, index) => {
           const timeStr = new Date(msg.timestamp).toLocaleTimeString([], {
             hour: '2-digit',
             minute: '2-digit',
@@ -138,27 +145,28 @@ export const ChatPane: React.FC = () => {
               <div className="chat-msg-header">
                 <span className="chat-msg-sender">{msg.sender}</span>
                 {msg.isHost && <span className="badge-host">HOST</span>}
-                {msg.editedAt && !msg.deletedAt && <span className="chat-msg-edited">editada</span>}
+                {msg.editedAt && <EditedMessageMarker editedAt={msg.editedAt} />}
                 <span className="chat-msg-time">{timeStr}</span>
-                {!msg.deletedAt && <ChatMessageMenu
+                <ChatMessageMenu
                   open={openMenuId === msg.id}
                   own={msg.authorId === selfId}
                   onToggle={() => setOpenMenuId((current) => current === msg.id ? null : msg.id)}
                   onReply={() => { setReplyToId(msg.id); setOpenMenuId(null); inputRef.current?.focus(); }}
                   onCopy={() => { copyText(msg.text); setOpenMenuId(null); }}
-                  onEdit={() => { setEditingId(msg.id); setEditDraft(msg.text); setOpenMenuId(null); }}
-                  onDelete={() => { if (!deleteChatMessage(msg.id)) showToast('Não foi possível excluir a mensagem.'); setOpenMenuId(null); }}
-                />}
+                  onEdit={() => { setEditingId(msg.id); setEditDraft(msg.text); setPickerTarget(null); setOpenMenuId(null); }}
+                  onDelete={() => { if (!deleteChatMessage(msg.id)) showToast('Não foi possível excluir a mensagem.'); if (editingId === msg.id) setEditingId(null); setPickerTarget(null); setOpenMenuId(null); }}
+                />
               </div>
-              <div className={`chat-msg-bubble ${msg.deletedAt ? 'chat-msg-deleted' : ''}`}>
-                {!msg.deletedAt && msg.replyTo && <button type="button" className="chat-msg-reply" onClick={() => jumpToMessage(msg.replyTo!.id)}>
+              <div className="chat-msg-bubble">
+                {msg.replyTo && !repliedMessage?.deletedAt && <button type="button" className="chat-msg-reply" onClick={() => jumpToMessage(msg.replyTo!.id)}>
                   <span>{msg.replyTo.sender}</span>
-                  <span>{repliedMessage?.deletedAt ? 'Mensagem excluída' : repliedMessage?.text ?? msg.replyTo.text}</span>
+                  <span>{repliedMessage?.text ?? msg.replyTo.text}</span>
                 </button>}
-                {msg.deletedAt ? <span>Mensagem excluída</span> : editingId === msg.id ? <div className="chat-msg-edit">
+                {editingId === msg.id ? <div className="chat-msg-edit">
                   <EmojiComposerInput id={`chat-edit-${msg.id}`} ref={editRef} value={editDraft} pack={emojiPack} onChange={setEditDraft} onSend={() => saveEdit(msg.id)} />
                   <div className="chat-msg-edit-actions">
-                    <button type="button" onClick={() => setEditingId(null)}>Cancelar</button>
+                    <button ref={editEmojiButtonRef} type="button" className={`chat-msg-edit-emoji ${pickerTarget === 'edit' ? 'active' : ''}`} aria-label="Selecionar emoji" aria-expanded={pickerTarget === 'edit'} onClick={() => setPickerTarget((current) => current === 'edit' ? null : 'edit')}><Smile size={15} /></button>
+                    <button type="button" onClick={() => { setEditingId(null); setPickerTarget(null); }}>Cancelar</button>
                     <button type="button" onClick={() => saveEdit(msg.id)}>Salvar</button>
                   </div>
                 </div> : <ChatMessageContent text={msg.text} pack={emojiPack} />}
@@ -170,7 +178,7 @@ export const ChatPane: React.FC = () => {
       </div>
 
       <div className="chat-composer" ref={composerRef}>
-      {pickerOpen && <EmojiPicker pack={emojiPack} onSelect={insertEmoji} />}
+      {pickerTarget === 'compose' && <EmojiPicker pack={emojiPack} onSelect={insertEmoji} />}
       {replyMessage && <div className="chat-composer-reply">
         <Reply size={15} />
         <div><strong>Respondendo a {replyMessage.sender}</strong><span>{replyMessage.text}</span></div>
@@ -179,10 +187,10 @@ export const ChatPane: React.FC = () => {
       <form className="chat-input-bar" id="chat-input-form" onSubmit={handleSubmit}>
         <button
           type="button"
-          className={`btn-chat-emoji ${pickerOpen ? 'active' : ''}`}
+          className={`btn-chat-emoji ${pickerTarget === 'compose' ? 'active' : ''}`}
           aria-label="Selecionar emoji"
-          aria-expanded={pickerOpen}
-          onClick={() => setPickerOpen((open) => !open)}
+          aria-expanded={pickerTarget === 'compose'}
+          onClick={() => setPickerTarget((current) => current === 'compose' ? null : 'compose')}
         >
           <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01M15 9h.01" strokeWidth="2.5"/>
@@ -203,6 +211,7 @@ export const ChatPane: React.FC = () => {
         </button>
       </form>
       </div>
+      {pickerTarget === 'edit' && <EmojiPickerPopover anchor={editEmojiButtonRef.current} pack={emojiPack} onSelect={insertEmoji} />}
     </div>
   );
 };
