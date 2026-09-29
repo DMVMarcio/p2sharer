@@ -95,9 +95,10 @@ export interface ChatMessage {
   replyTo?: ChatReplyReference;
   isHost?: boolean;
   isSystem?: boolean;
-  systemType?: 'join' | 'leave' | 'info' | 'generic' | 'stream-start' | 'stream-stop';
+  systemType?: 'join' | 'leave' | 'info' | 'generic' | 'stream-start' | 'stream-stop' | 'app-start' | 'app-stop';
   systemActor?: string;
   systemRoom?: string;
+  systemAppKind?: string;
 }
 
 export interface TurnConfig {

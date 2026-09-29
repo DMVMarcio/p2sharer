@@ -11,6 +11,7 @@ import { JoinRoomModal } from './components/modals/JoinRoomModal';
 import { SaveInviteModal } from './components/modals/SaveInviteModal';
 import { RoomSecurityModal } from './components/modals/RoomSecurityModal';
 import { ExternalLinkModal } from './components/modals/ExternalLinkModal';
+import { AppsModal } from './components/modals/AppsModal';
 import { ConnectingOverlay } from './components/modals/ConnectingOverlay';
 import { ToastContainer } from './components/common/ToastContainer';
 import { useRoom } from './hooks/useRoom';
@@ -74,6 +75,7 @@ export const App: React.FC = () => {
       {activeModal === 'saveInvite' && <SaveInviteModal />}
       {activeModal === 'roomSecurity' && <RoomSecurityModal />}
       {activeModal === 'externalLink' && <ExternalLinkModal />}
+      {activeModal === 'apps' && <AppsModal />}
       <ConnectingOverlay />
 
       {/* Global Notifications */}

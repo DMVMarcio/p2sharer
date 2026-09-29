@@ -11,6 +11,7 @@ export type ModalType =
   | 'saveInvite'
   | 'roomSecurity'
   | 'externalLink'
+  | 'apps'
   | null;
 
 class ModalManager {

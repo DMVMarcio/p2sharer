@@ -1,4 +1,8 @@
-import React, { useMemo, useRef, useLayoutEffect } from 'react';
+import React, { useMemo, useRef, useLayoutEffect, useEffect, useState } from 'react';
+import { roomAppsService } from '../../apps/room_apps_service';
+import { RoomAppSlot } from '../../apps/RoomAppSlot';
+import { PersistentRoomApps } from '../../apps/PersistentRoomApps';
+import type { RoomAppInstance } from '../../apps/types';
 import { useRoom } from '../../hooks/useRoom';
 import { useStore } from '../../hooks/useStore';
 import { VideoCard } from './VideoCard';
@@ -6,6 +10,16 @@ import { ParticipantCard } from './ParticipantCard';
 import { RoomSlotInfo } from '../../core/types';
 
 export const RoomVideoContainer: React.FC = () => {
+  const [, setAppsTick] = useState(0);
+  const appIdsRef = useRef('');
+  useEffect(() => roomAppsService.subscribe(() => {
+    const ids = roomAppsService.getInstances().map((instance) => instance.id).join(',');
+    if (ids !== appIdsRef.current) {
+      appIdsRef.current = ids;
+      setAppsTick((tick) => tick + 1);
+    }
+  }), []);
+  const appInstances = roomAppsService.getInstances();
   const {
     roomSlots,
     layoutMode,
@@ -18,6 +32,7 @@ export const RoomVideoContainer: React.FC = () => {
   const subscribedStreams = useStore((s) => s.subscribedStreams);
 
   const gridWrapperRef = useRef<HTMLDivElement | null>(null);
+  const videoContainerRef = useRef<HTMLDivElement | null>(null);
   const trayStripRef = useRef<HTMLDivElement | null>(null);
   const prevGridRectsRef = useRef<Map<string, DOMRect>>(new Map());
   const prevTrayRectsRef = useRef<Map<string, DOMRect>>(new Map());
@@ -92,9 +107,9 @@ export const RoomVideoContainer: React.FC = () => {
     });
   }, [roomSlots, streamFilter, subscribedStreams]);
 
-  const slotIdsKey = useMemo(() => {
-    return filteredSlots.map((s) => s.peerId).join(',');
-  }, [filteredSlots]);
+  const entries: Array<RoomSlotInfo | RoomAppInstance> = [...filteredSlots, ...appInstances];
+  const entryId = (entry: RoomSlotInfo | RoomAppInstance) => 'peerId' in entry ? entry.peerId : `app:${entry.id}`;
+  const slotIdsKey = entries.map(entryId).join(',');
 
   const prevSlotIdsKeyRef = useRef(slotIdsKey);
   const prevLayoutModeRef = useRef(layoutMode);
@@ -122,18 +137,16 @@ export const RoomVideoContainer: React.FC = () => {
     }
   }, [slotIdsKey, layoutMode]);
 
-  const featuredSlot =
-    filteredSlots.find((s) => s.peerId === pinnedPeerId) ||
-    filteredSlots[0] ||
-    roomSlots.find((s) => s.peerId === pinnedPeerId) ||
-    roomSlots[0];
+  const featuredSlot = entries.find((s) => entryId(s) === pinnedPeerId) || entries[0];
 
   const renderSlotCard = (
-    slot: RoomSlotInfo,
+    slot: RoomSlotInfo | RoomAppInstance,
     isFeatured = false,
     inTray = false,
     isSelectedFeatured = false
   ) => {
+    if (!('peerId' in slot)) return <RoomAppSlot key={slot.id} instance={slot}
+      role={inTray ? 'tray' : isFeatured ? 'featured' : 'grid'} selected={isSelectedFeatured} />;
     if (shouldRenderVideo(slot)) {
       return (
         <VideoCard
@@ -157,7 +170,7 @@ export const RoomVideoContainer: React.FC = () => {
   };
 
   return (
-    <div className="video-container" id="room-video-container">
+    <div className="video-container" id="room-video-container" ref={videoContainerRef}>
       {/* GRID VIEW */}
       <div
         ref={gridWrapperRef}
@@ -165,8 +178,8 @@ export const RoomVideoContainer: React.FC = () => {
         id="streams-grid-wrapper"
       >
         {layoutMode === 'grid' && (
-          filteredSlots.length > 0 ? (
-            filteredSlots.map((slot) => renderSlotCard(slot, false, false, false))
+          entries.length > 0 ? (
+            entries.map((slot) => renderSlotCard(slot, false, false, false))
           ) : (
             <div className="stream-filter-empty-state">
               <p className="filter-empty-title">Nenhum participante com o filtro selecionado.</p>
@@ -221,14 +234,18 @@ export const RoomVideoContainer: React.FC = () => {
                 </svg>
               </button>
               <div ref={trayStripRef} className="spotlight-tray-strip" id="spotlight-tray-strip">
-                {filteredSlots.map((slot) =>
-                  renderSlotCard(slot, false, true, slot.peerId === featuredSlot?.peerId)
+                {entries.map((slot) =>
+                  renderSlotCard(slot, false, true, entryId(slot) === (featuredSlot && entryId(featuredSlot)))
                 )}
               </div>
             </div>
           </>
         )}
       </div>
+      <PersistentRoomApps instances={appInstances} layoutMode={layoutMode}
+        featuredId={layoutMode === 'spotlight' && featuredSlot ? entryId(featuredSlot) : undefined}
+        layoutKey={`${slotIdsKey}:${layoutMode}:${pinnedPeerId}:${isSpotlightTrayCollapsed}:${streamFilter}`}
+        rootRef={videoContainerRef} />
     </div>
   );
 };

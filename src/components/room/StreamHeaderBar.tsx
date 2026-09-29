@@ -1,10 +1,17 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { roomAppsService } from '../../apps/room_apps_service';
 import { useRoom } from '../../hooks/useRoom';
 import { useModal } from '../../hooks/useModal';
 import { useStore } from '../../hooks/useStore';
 import { Tooltip } from '../common/Tooltip';
+import { AppWindow } from 'lucide-react';
 
 export const StreamHeaderBar: React.FC = () => {
+  const [appsCount, setAppsCount] = useState(() => roomAppsService.getInstances().length);
+  useEffect(() => roomAppsService.subscribe(() => {
+    const count = roomAppsService.getInstances().length;
+    setAppsCount((previous) => previous === count ? previous : count);
+  }), []);
   const {
     roomSlots,
     isSharingScreen,
@@ -16,8 +23,8 @@ export const StreamHeaderBar: React.FC = () => {
   const { openModal } = useModal();
   const subscribedStreams = useStore((s) => s.subscribedStreams);
 
-  const totalCount = roomSlots.length;
-  const streamingCount = roomSlots.filter((s) => s.isStreaming).length;
+  const totalCount = roomSlots.length + appsCount;
+  const streamingCount = roomSlots.filter((s) => s.isStreaming).length + appsCount;
   const watchingCount = roomSlots.filter(
     (s) => !s.isLocal && s.isStreaming && subscribedStreams.has(s.peerId)
   ).length;
@@ -77,6 +84,10 @@ export const StreamHeaderBar: React.FC = () => {
       </div>
 
       <div className="stream-actions">
+        <Tooltip content="Abrir biblioteca de Apps">
+          <button className="btn btn-sm btn-outline btn-compact" aria-label="Abrir Apps"
+            onClick={() => openModal('apps')}><AppWindow size={14} strokeWidth={2} /><span className="btn-text">Apps</span></button>
+        </Tooltip>
         {/* Transmission Button */}
         <Tooltip content={isSharingScreen ? 'Parar transmissão de tela' : 'Compartilhar Tela ou Janela'}>
           <button

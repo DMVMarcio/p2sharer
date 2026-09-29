@@ -55,6 +55,17 @@ test('stream owner publishes one start and stop notice into synchronized history
     assert.equal(sent.filter(({ action, data }) => action === 'chat' &&
       data.systemType?.startsWith('stream-')).length, 2);
 
+    await manager.sendAppLifecycleNotice('start', 'youtube');
+    await manager.sendAppLifecycleNotice('stop', 'youtube');
+    const appNotices = received.filter((message) => message.systemType?.startsWith('app-'));
+    assert.deepEqual(appNotices.map((message) => message.text), [
+      'Márcio iniciou YouTube', 'Márcio encerrou YouTube',
+    ]);
+    assert.ok(appNotices.every((message) => message.systemActor === 'Márcio' &&
+      message.systemAppKind === 'youtube' && typeof message.signature === 'string'));
+    assert.equal(sent.filter(({ action, data }) => action === 'chat' &&
+      data.systemType?.startsWith('app-')).length, 2);
+
     room.onPeerJoin('late-peer');
     const history = sent.findLast(({ action, data, options }) => action === 'history_sync' &&
       options?.target === 'late-peer' && Array.isArray(data.history))?.data.history as ChatMessage[];
