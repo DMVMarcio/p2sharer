@@ -1,22 +1,26 @@
 import { useEffect, useRef, useState } from 'react';
-import { Download, File, Image as ImageIcon, Square, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { Download, File, Image as ImageIcon, X, ZoomIn, ZoomOut } from 'lucide-react';
 import type { ChatMessage } from '../../core/types';
 import type { FileProgress } from '../../p2p/group_room';
 import { selfId } from '@trystero-p2p/core';
+import { formatFileSize } from '../../core/file_size';
+import { FileProgressRing } from './FileProgressRing';
 
 interface Props { message: ChatMessage; transfers: FileProgress[]; preview?: string;
-  onRequest: (saveAs: boolean) => void; onCancel: (id: string) => void }
+  onRequest: (saveAs: boolean) => void; onPreview: () => void; onCancel: (id: string) => void }
 
-export function ChatFileAttachment({ message, transfers, preview, onRequest, onCancel }: Props) {
+export function ChatFileAttachment({ message, transfers, preview, onRequest, onPreview, onCancel }: Props) {
   const [menu, setMenu] = useState(false);
   const [viewer, setViewer] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const drag = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const file = message.file!;
-  const receiving = transfers.find((transfer) => transfer.direction === 'receive' &&
+  const receiving = transfers.find((transfer) => transfer.direction === 'receive' && !transfer.previewOnly &&
     (transfer.status === 'pending' || transfer.status === 'active'));
-  const completed = transfers.find((transfer) => transfer.direction === 'receive' && transfer.status === 'complete');
+  const previewTransfer = transfers.find((transfer) => transfer.direction === 'receive' && transfer.previewOnly &&
+    (transfer.status === 'pending' || transfer.status === 'active'));
+  const completed = transfers.find((transfer) => transfer.direction === 'receive' && transfer.previewOnly && transfer.status === 'complete');
   const image = preview ?? completed?.preview;
   const own = message.authorId === selfId;
   useEffect(() => {
@@ -28,13 +32,26 @@ export function ChatFileAttachment({ message, transfers, preview, onRequest, onC
   return <div className="chat-file-card">
     {file.isImage && image && <button className="chat-file-image-button" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); setViewer(true); }} aria-label={`Ampliar ${file.name}`}>
       <img src={image} alt={file.name} /></button>}
+    {file.isImage && !image && <div className="chat-file-preview-placeholder">
+      {previewTransfer ? <FileProgressRing pending={previewTransfer.status === 'pending'}
+        progress={previewTransfer.total ? previewTransfer.bytes / previewTransfer.total : 0}
+        label="Cancelar solicitação de prévia" onCancel={() => onCancel(previewTransfer.requestId)} /> :
+        !own && file.size <= 10 * 1024 * 1024 ? <button type="button" className="chat-file-preview-request"
+          aria-label={`Baixar prévia de ${file.name}`} onClick={onPreview}><Download size={20} /></button> :
+          <ImageIcon size={22} aria-hidden="true" />}
+      <span>{previewTransfer?.status === 'pending' ? 'Solicitação enviada' :
+        previewTransfer?.status === 'active' ? 'Baixando prévia...' :
+        file.size > 10 * 1024 * 1024 ? 'Prévia indisponível' : 'Baixar prévia'}</span>
+    </div>}
     <div className="chat-file-card-row">
       {file.isImage ? <ImageIcon size={19} /> : <File size={19} />}
-      <div className="chat-file-card-info"><strong>{file.name}</strong><span>{(file.size / 1024).toFixed(1)} KB · SHA-256 {file.sha256}</span></div>
+      <div className="chat-file-card-info"><strong>{file.name}</strong><span>{formatFileSize(file.size)} · SHA-256 {file.sha256}</span>
+        {receiving && <small>{receiving.status === 'pending' ? 'Solicitação enviada' :
+          `${Math.round(receiving.total ? receiving.bytes / receiving.total * 100 : 100)}% recebido`}</small>}</div>
       {!own && <div className="chat-file-download-wrap">
-        {receiving ? <button className="chat-file-progress-button" aria-label="Cancelar download" onClick={() => onCancel(receiving.requestId)}
-          style={{ background: `conic-gradient(var(--accent-color) ${receiving.total ? receiving.bytes / receiving.total * 360 : 0}deg, var(--border-default) 0)` }}>
-          <Square size={12} fill="currentColor" /></button> :
+        {receiving ? <FileProgressRing pending={receiving.status === 'pending'}
+          progress={receiving.total ? receiving.bytes / receiving.total : 0}
+          label="Cancelar download" onCancel={() => onCancel(receiving.requestId)} /> :
           <button className="chat-file-download-button" aria-label="Download" aria-expanded={menu} onClick={() => setMenu(!menu)}><Download size={17} /></button>}
         {menu && !receiving && <div className="chat-file-download-menu">
           <button onClick={() => { setMenu(false); onRequest(false); }}>Salvar</button>
