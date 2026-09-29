@@ -32,6 +32,7 @@ import {
   buildRtcConfiguration,
   createJoinErrorHandler,
 } from './ice_config.ts';
+import { FileOptimizedPeerConnection } from './file_data_channel.ts';
 import { MediaCoordinator } from './media_coordinator.ts';
 import { PeerTracker } from './peer_tracker.ts';
 import { signalingManager } from './signaling_manager.ts';
@@ -475,6 +476,7 @@ export class GroupRoomManager {
       {
         appId: APP_ID,
         rtcConfig: this.rtcConfig,
+        rtcPolyfill: FileOptimizedPeerConnection,
         // WebRTC is a full mesh: every participant must advertise so two
         // joiners can establish their own direct edge, not only reach the creator.
         passive: false,
