@@ -17,6 +17,15 @@ function statusText(transfer: FileProgress, unit: TransferSpeedUnit): string {
   }
 }
 
+function timingText(transfer: FileProgress): string | null {
+  const timings = transfer.timings;
+  if (!timings || transfer.status === 'pending') return null;
+  const seconds = (value: number) => `${(value / 1000).toFixed(1)} s`;
+  return transfer.direction === 'send' ?
+    `Leitura ${seconds(timings.readMs)} · Preparação ${seconds(timings.prepareMs)} · Canal ${seconds(timings.wireMs)}` :
+    `Verificação ${seconds(timings.verifyMs)} · Escrita ${seconds(timings.writeMs)} · ACK ${seconds(timings.ackMs)}`;
+}
+
 export function ChatTransferCenter() {
   const { fileProgress, cancelFileTransfer, dismissFileProgress, revealSavedFile } = useRoom();
   const [open, setOpen] = useState<'send' | 'receive' | null>(null);
@@ -58,6 +67,7 @@ export function ChatTransferCenter() {
             <small>{statusText(transfer, speedUnit)}</small>
             {transfer.connectionType && <small>{transfer.connectionType}
               {transfer.rttMs !== null && transfer.rttMs !== undefined ? ` · ${transfer.rttMs} ms` : ''}</small>}
+            {timingText(transfer) && <small>{timingText(transfer)}</small>}
           </div>
           {transfer.status === 'complete' && transfer.direction === 'receive' && transfer.saved &&
             <button type="button" aria-label="Mostrar arquivo na pasta" title="Mostrar na pasta"
