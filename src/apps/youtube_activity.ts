@@ -9,6 +9,23 @@ export function describeYouTubeActivity(previous: YouTubeState, next: YouTubeSta
   if (added === 1) return `adicionou “${next.queue[next.queue.length - 1].title}” à fila`;
   if (added > 1) return `adicionou ${added} vídeos à fila`;
 
+  if (previous.repeat !== next.repeat) return next.repeat === 'all'
+    ? 'ativou a repetição da fila' : next.repeat === 'one'
+      ? 'ativou a repetição de um vídeo' : 'desativou a repetição';
+  if (previous.shuffle !== next.shuffle) return next.shuffle
+    ? 'ativou a ordem aleatória' : 'desativou a ordem aleatória';
+  if (previous.removePlayed !== next.removePlayed) return next.removePlayed
+    ? 'ativou a remoção automática' : 'desativou a remoção automática';
+
+  if (next.syncReason === 'update' && next.queue.length < previous.queue.length) {
+    const removedCount = previous.queue.length - next.queue.length;
+    if (removedCount > 1) return `removeu ${removedCount} vídeos da fila`;
+    const removedIndex = previous.queue.findIndex((entry, index) =>
+      next.queue[index]?.videoId !== entry.videoId);
+    const removed = previous.queue[removedIndex];
+    if (removed) return `removeu “${removed.title}” da fila`;
+  }
+
   const before = previous.queue[previous.index];
   const after = next.queue[next.index];
   if (before && after && before.videoId !== after.videoId)

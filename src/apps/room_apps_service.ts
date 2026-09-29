@@ -31,6 +31,7 @@ export class RoomAppsService {
   }
   private notify(): void { this.listeners.forEach((listener) => listener()); }
   getInstances(): RoomAppInstance[] { return [...this.instances.values()].sort((a, b) => a.createdAt - b.createdAt); }
+  getJoinedInstances(): RoomAppInstance[] { return this.getInstances().filter((instance) => this.isJoined(instance.id)); }
   getInstance(id: string): RoomAppInstance | undefined { return this.instances.get(id); }
   getModel<T extends RoomAppModel>(id: string): T | undefined { return this.models.get(id) as T | undefined; }
   getLocalActor(): string { return this.localActor; }

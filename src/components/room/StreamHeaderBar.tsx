@@ -7,10 +7,15 @@ import { Tooltip } from '../common/Tooltip';
 import { AppWindow } from 'lucide-react';
 
 export const StreamHeaderBar: React.FC = () => {
-  const [appsCount, setAppsCount] = useState(() => roomAppsService.getInstances().length);
+  const [appCounts, setAppCounts] = useState(() => ({
+    total: roomAppsService.getInstances().length,
+    joined: roomAppsService.getJoinedInstances().length,
+  }));
   useEffect(() => roomAppsService.subscribe(() => {
-    const count = roomAppsService.getInstances().length;
-    setAppsCount((previous) => previous === count ? previous : count);
+    const total = roomAppsService.getInstances().length;
+    const joined = roomAppsService.getJoinedInstances().length;
+    setAppCounts((previous) => previous.total === total && previous.joined === joined
+      ? previous : { total, joined });
   }), []);
   const {
     roomSlots,
@@ -23,11 +28,11 @@ export const StreamHeaderBar: React.FC = () => {
   const { openModal } = useModal();
   const subscribedStreams = useStore((s) => s.subscribedStreams);
 
-  const totalCount = roomSlots.length + appsCount;
-  const streamingCount = roomSlots.filter((s) => s.isStreaming).length + appsCount;
+  const totalCount = roomSlots.length + appCounts.total;
+  const streamingCount = roomSlots.filter((s) => s.isStreaming).length + appCounts.total;
   const watchingCount = roomSlots.filter(
     (s) => !s.isLocal && s.isStreaming && subscribedStreams.has(s.peerId)
-  ).length;
+  ).length + appCounts.joined;
 
   const handleToggleTransmission = () => {
     if (isSharingScreen) {
@@ -66,12 +71,12 @@ export const StreamHeaderBar: React.FC = () => {
           </button>
         </Tooltip>
 
-        <Tooltip content={`Mostrar telas que você assiste (${watchingCount})`}>
+        <Tooltip content={`Mostrar telas e atividades que você acompanha (${watchingCount})`}>
           <button
             type="button"
             className={`btn-stream-filter ${streamFilter === 'watching' ? 'active' : ''}`}
             onClick={() => setStreamFilter(streamFilter === 'watching' ? 'all' : 'watching')}
-            aria-label="Mostrar apenas telas que você está assistindo"
+            aria-label="Mostrar apenas telas e atividades que você acompanha"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z" />

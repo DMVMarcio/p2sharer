@@ -7,6 +7,7 @@ export interface YouTubePlayer {
   cueVideoById(id: string, startSeconds?: number): void;
   playVideo(): void;
   pauseVideo(): void;
+  stopVideo(): void;
   seekTo(seconds: number, allowSeekAhead: boolean): void;
   getCurrentTime(): number;
   getDuration(): number;
@@ -37,7 +38,12 @@ export function reconcileYouTubePlayer(player: YouTubePlayer, state: YouTubeStat
   tracker: YouTubePlaybackTracker, receivedAt: number, now: number,
   mode: 'urgent' | 'update' | 'periodic' | 'resume'): { corrected: boolean; loaded: boolean; position: number } {
   const entry = state.queue[state.index];
-  if (!entry || (mode === 'periodic' && now - receivedAt > MEDIA_SYNC_MAX_SAMPLE_AGE_MS))
+  if (!entry) {
+    if (tracker.videoId) player.stopVideo();
+    tracker.videoId = '';
+    return { corrected: false, loaded: false, position: 0 };
+  }
+  if (mode === 'periodic' && now - receivedAt > MEDIA_SYNC_MAX_SAMPLE_AGE_MS)
     return { corrected: false, loaded: false, position: state.position };
 
   const position = projectMediaPosition(state.position, state.playing, receivedAt, now);

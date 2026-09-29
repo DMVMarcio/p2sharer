@@ -11,11 +11,13 @@ import { RoomSlotInfo } from '../../core/types';
 
 export const RoomVideoContainer: React.FC = () => {
   const [, setAppsTick] = useState(0);
-  const appIdsRef = useRef('');
+  const appVisibilityRef = useRef('');
   useEffect(() => roomAppsService.subscribe(() => {
     const ids = roomAppsService.getInstances().map((instance) => instance.id).join(',');
-    if (ids !== appIdsRef.current) {
-      appIdsRef.current = ids;
+    const joinedIds = roomAppsService.getJoinedInstances().map((instance) => instance.id).join(',');
+    const visibility = `${ids}|${joinedIds}`;
+    if (visibility !== appVisibilityRef.current) {
+      appVisibilityRef.current = visibility;
       setAppsTick((tick) => tick + 1);
     }
   }), []);
@@ -107,7 +109,8 @@ export const RoomVideoContainer: React.FC = () => {
     });
   }, [roomSlots, streamFilter, subscribedStreams]);
 
-  const entries: Array<RoomSlotInfo | RoomAppInstance> = [...filteredSlots, ...appInstances];
+  const visibleApps = streamFilter === 'watching' ? roomAppsService.getJoinedInstances() : appInstances;
+  const entries: Array<RoomSlotInfo | RoomAppInstance> = [...filteredSlots, ...visibleApps];
   const entryId = (entry: RoomSlotInfo | RoomAppInstance) => 'peerId' in entry ? entry.peerId : `app:${entry.id}`;
   const slotIdsKey = entries.map(entryId).join(',');
 

@@ -20,6 +20,7 @@ import { useAppTheme } from './hooks/useAppTheme';
 import { initFrontendLogger } from './core/logger';
 import { stateStore } from './core/state_store';
 import { PipView } from './components/room/PipView';
+import { YouTubePipView } from './apps/YouTubePipView';
 
 export const App: React.FC = () => {
   useAppTheme(); // Sets data-theme & data-accent
@@ -29,6 +30,8 @@ export const App: React.FC = () => {
     : null;
 
   if (pipPeerId) {
+    if (pipPeerId.startsWith('youtube-'))
+      return <YouTubePipView instanceId={pipPeerId.slice('youtube-'.length)} />;
     return <PipView peerId={pipPeerId} />;
   }
 
