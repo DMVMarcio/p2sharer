@@ -7,7 +7,7 @@ import { CHAT_FILE_CHUNK_BYTES, CHAT_FILE_IN_FLIGHT_CHUNKS, MAX_IMAGE_PREVIEW_BY
 import { decodeFileBase64, decodeSignedFileChunk, encodeFileBase64, encodeSignedFileChunk,
   fileChunkSignatureData, hashFileChunk } from '../core/chat_file_wire.ts';
 import { PeerAuthenticator } from '../core/peer_auth.ts';
-import { selectedIceRoute, type IceStat } from '../core/ice_route.ts';
+import { selectedIcePair, selectedIceRoute, type IceStat } from '../core/ice_route.ts';
 import { RoomAuthority, type AdminAdmission, type AuthorityTransfer, type HostCommand } from '../core/room_authority.ts';
 import { compareRoomInvites, formatRoomInvite, parseRoomInvite, signRoomInvite, validRoomName,
   type NamedRoomInvite } from '../core/room_invite.ts';
@@ -32,7 +32,7 @@ import {
   buildRtcConfiguration,
   createJoinErrorHandler,
 } from './ice_config.ts';
-import { FileOptimizedPeerConnection } from './file_data_channel.ts';
+import { createFileOptimizedPeerConnection, type FileOptimizedConnection } from './file_data_channel.ts';
 import { MediaCoordinator } from './media_coordinator.ts';
 import { PeerTracker } from './peer_tracker.ts';
 import { signalingManager } from './signaling_manager.ts';
@@ -107,7 +107,8 @@ export interface RoomCallbacks {
 export interface NativeChatFile { id: string; name: string; path: string; size: number; hash: string; isImage: boolean }
 export interface FileRequest { requestId: string; messageId: string; peerId: string; peerName: string; path: string; name: string; preview: boolean }
 export interface FileTimings { readMs: number; prepareMs: number; wireMs: number; verifyMs: number; writeMs: number; ackMs: number }
-export interface FileProgress { requestId: string; messageId: string; direction: 'send' | 'receive'; bytes: number; total: number; status: 'pending' | 'active' | 'complete' | 'cancelled' | 'error'; error?: string; preview?: string; previewBytes?: Uint8Array; saved?: boolean; previewOnly?: boolean; peerId?: string; fileName?: string; peerName?: string; startedAt?: number; isImage?: boolean; bytesPerSecond?: number; connectionType?: string; rttMs?: number | null; timings?: FileTimings }
+export interface FileTransportDiagnostics { protocol?: string; localCandidateType?: string; remoteCandidateType?: string; queuedBytes?: number; queueLimitBytes?: number; pairBytesSent?: number; pairBytesReceived?: number; pairTimestamp?: number; pairBytesPerSecond?: number; availableOutgoingBitsPerSecond?: number; packetsDiscardedOnSend?: number }
+export interface FileProgress { requestId: string; messageId: string; direction: 'send' | 'receive'; bytes: number; total: number; status: 'pending' | 'active' | 'complete' | 'cancelled' | 'error'; error?: string; preview?: string; previewBytes?: Uint8Array; saved?: boolean; previewOnly?: boolean; peerId?: string; fileName?: string; peerName?: string; startedAt?: number; isImage?: boolean; bytesPerSecond?: number; connectionType?: string; rttMs?: number | null; timings?: FileTimings; transport?: FileTransportDiagnostics }
 type FilePacket = { kind: 'request' | 'accept' | 'deny' | 'ack' | 'cancel'; requestId: string; messageId: string; offset?: number; preview?: boolean; signature: string };
 type FileSession = { messageId: string; peerId: string; peerName?: string; sourceId?: string; offset: number; sentOffset?: number; sending?: boolean; receiving?: boolean; pendingChunks?: Map<number, Uint8Array>; total: number; direction: 'send' | 'receive'; preview?: boolean; chunks?: Uint8Array[]; timings: FileTimings };
 
@@ -476,7 +477,7 @@ export class GroupRoomManager {
       {
         appId: APP_ID,
         rtcConfig: this.rtcConfig,
-        rtcPolyfill: FileOptimizedPeerConnection,
+        rtcPolyfill: createFileOptimizedPeerConnection(),
         // WebRTC is a full mesh: every participant must advertise so two
         // joiners can establish their own direct edge, not only reach the creator.
         passive: false,
@@ -2222,6 +2223,38 @@ export class GroupRoomManager {
     };
     this.peerStatsCache.set(peerId, { stats: fallbackResult, timestamp: Date.now() });
     return fallbackResult;
+  }
+
+  public async getFileTransportDiagnostics(peerId: string): Promise<{
+    connectionType: string; rttMs: number | null; transport: FileTransportDiagnostics;
+  } | null> {
+    const pc = this.room?.getPeers?.()?.[peerId] as FileOptimizedConnection | undefined;
+    if (!pc || pc.connectionState !== 'connected') return null;
+    try {
+      const reports = Array.from((await pc.getStats()).values()) as IceStat[];
+      const route = selectedIceRoute(reports);
+      const selected = selectedIcePair(reports);
+      const channel = pc.roomDataChannel;
+      return {
+        connectionType: route.connectionType,
+        rttMs: route.pingMs,
+        transport: {
+          protocol: selected?.local?.protocol ?? selected?.remote?.protocol,
+          localCandidateType: selected?.local?.candidateType,
+          remoteCandidateType: selected?.remote?.candidateType,
+          queuedBytes: channel?.bufferedAmount,
+          queueLimitBytes: channel?.bufferedAmountLowThreshold,
+          pairBytesSent: selected?.pair.bytesSent,
+          pairBytesReceived: selected?.pair.bytesReceived,
+          pairTimestamp: performance.now(),
+          availableOutgoingBitsPerSecond: selected?.pair.availableOutgoingBitrate,
+          packetsDiscardedOnSend: selected?.pair.packetsDiscardedOnSend,
+        },
+      };
+    } catch (error) {
+      console.warn('[Files] Could not sample WebRTC transport:', error);
+      return null;
+    }
   }
 
   public notifyStreamsUpdate() {

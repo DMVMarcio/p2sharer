@@ -569,11 +569,20 @@ export class RoomService {
       const last = this.transferRouteChecks.get(entry.requestId);
       if (last === undefined || now - last >= 5000) {
         this.transferRouteChecks.set(entry.requestId, now);
-        void this.roomManager.getPeerStats(entry.peerId).then((stats) => {
+        void this.roomManager.getFileTransportDiagnostics(entry.peerId).then((stats) => {
           const current = this.fileProgress[entry.requestId];
           if (!stats || !current || current.status !== 'active' || current.peerId !== entry.peerId) return;
+          const previous = current.transport;
+          const transport = { ...stats.transport };
+          const currentBytes = current.direction === 'send' ? transport.pairBytesSent : transport.pairBytesReceived;
+          const previousBytes = current.direction === 'send' ? previous?.pairBytesSent : previous?.pairBytesReceived;
+          const elapsedMs = transport.pairTimestamp !== undefined && previous?.pairTimestamp !== undefined ?
+            transport.pairTimestamp - previous.pairTimestamp : 0;
+          if (currentBytes !== undefined && previousBytes !== undefined && currentBytes >= previousBytes && elapsedMs > 0) {
+            transport.pairBytesPerSecond = (currentBytes - previousBytes) * 1000 / elapsedMs;
+          }
           this.fileProgress = { ...this.fileProgress, [entry.requestId]: {
-            ...current, connectionType: stats.connectionType, rttMs: stats.pingMs } };
+            ...current, connectionType: stats.connectionType, rttMs: stats.rttMs, transport } };
           this.notify();
         });
       }

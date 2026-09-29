@@ -9,6 +9,11 @@ export interface IceStat {
   remoteCandidateId?: string;
   currentRoundTripTime?: number;
   candidateType?: string;
+  protocol?: string;
+  bytesSent?: number;
+  bytesReceived?: number;
+  availableOutgoingBitrate?: number;
+  packetsDiscardedOnSend?: number;
 }
 
 export interface IceRoute {
@@ -16,7 +21,7 @@ export interface IceRoute {
   pingMs: number | null;
 }
 
-export function selectedIceRoute(reports: Iterable<IceStat>): IceRoute {
+export function selectedIcePair(reports: Iterable<IceStat>): { pair: IceStat; local?: IceStat; remote?: IceStat } | null {
   const byId = new Map<string, IceStat>();
   let selectedPairId: string | undefined;
   let selectedPair: IceStat | undefined;
@@ -31,11 +36,17 @@ export function selectedIceRoute(reports: Iterable<IceStat>): IceRoute {
     }
   }
   const pair = (selectedPairId && byId.get(selectedPairId)) || selectedPair || nominatedPair;
-  if (!pair || !pair.localCandidateId || !pair.remoteCandidateId) {
+  if (!pair) return null;
+  return { pair, local: pair.localCandidateId ? byId.get(pair.localCandidateId) : undefined,
+    remote: pair.remoteCandidateId ? byId.get(pair.remoteCandidateId) : undefined };
+}
+
+export function selectedIceRoute(reports: Iterable<IceStat>): IceRoute {
+  const selected = selectedIcePair(reports);
+  if (!selected?.pair.localCandidateId || !selected.pair.remoteCandidateId) {
     return { connectionType: 'Rota desconhecida', pingMs: null };
   }
-  const local = byId.get(pair.localCandidateId);
-  const remote = byId.get(pair.remoteCandidateId);
+  const { pair, local, remote } = selected;
   const connectionType = !local || !remote ? 'Rota desconhecida' :
     local.candidateType === 'relay' || remote.candidateType === 'relay' ? 'TURN Relay' : 'P2P Direto';
   return { connectionType, pingMs: typeof pair.currentRoundTripTime === 'number' ?
