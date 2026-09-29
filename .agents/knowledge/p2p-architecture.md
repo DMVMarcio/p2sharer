@@ -7,12 +7,20 @@ P2Sharer operates as a serverless, peer-to-peer screen and audio streaming deskt
 
 ## 1. Multi-Transport Signaling Failover (`src/p2p/signaling_manager.ts`)
 
+### User-managed rendezvous servers
+
+`src/p2p/relay_preferences.ts` stores separate MQTT, Nostr, and WebTorrent server lists in local storage. Each entry has a secure WebSocket URL and an enabled flag. The network settings editor can add, remove, and toggle entries. At room join, `SignalingManager` loads the saved lists, passes only enabled URLs to Trystero's `relayConfig`, and starts MQTT probe clients only for enabled brokers. Transports with no enabled servers are omitted from the failover chain. At least one enabled server across all transports is required. Changes made while a room is active apply on the next join to preserve existing peer channels.
+
 WebRTC signaling is handled through Trystero multi-transport adapters in strict prioritized order:
 1. **MQTT (`@trystero-p2p/mqtt`)**: Primary transport (~50–150ms connection latency). Uses prioritized high-availability public brokers: `wss://public.cloud.shiftr.io`, `wss://broker.emqx.io:8084/mqtt`, `wss://broker-cn.emqx.io:8084/mqtt`, and `wss://test.mosquitto.org:8081/mqtt` (unresponsive endpoints like `broker.hivemq.com:8884` are strictly excluded).
 2. **Nostr (`@trystero-p2p/nostr`)**: Secondary transport (~200–500ms connection latency). Relies on decentralized Nostr relay servers (`wss://relay.damus.io`, etc.).
 3. **WebTorrent (`@trystero-p2p/torrent`)**: Tertiary fallback (~1–3s latency). Employs public BitTorrent trackers (`wss://tracker.openwebtorrent.com`, etc.).
 
 ### Watchdog, Health Probing & Failover Protocol
+
+- **Current MQTT rendezvous topics**: Broker beacons must hash `Trystero@${appId}@${roomTopic}` and its per-peer variant using the actual `appId` passed to the active Trystero room. A stale hard-coded `v1` app ID silently publishes to the wrong topic when the active room uses `v5`, breaking rapid rediscovery and mesh bridging. Ignore delayed beacons from a previous room.
+- **Identity handshake recovery**: An authenticated room retries a stable per-peer identity challenge while a direct WebRTC peer has no pinned public key. This covers an initial action sent before the receiving peer finished binding its handlers. Presence names are not required to be unique; cryptographic peer keys, rather than display names, anchor admission.
+- **ICE diagnosis**: Trystero's `after exchanging SDP` error with a TURN hint reports a failed ICE route, not proof that the configured TURN endpoint is unreachable. Describe the failure without assigning an unverified cause. Remote-network testing is necessary to confirm candidate gathering and reachability.
 - **Real MQTT Probe Keep-Alives**: In MQTT.js v5, internal WebSocket stream sockets are encapsulated and invisible to `getMqttRelaySockets()`. Public MQTT brokers (Shiftr, Mosquitto, EMQX) enforce strict handshake timeouts, dropping idle raw WebSockets after 5.0 seconds (code 1006) if no MQTT `CONNECT` packet is received. `SignalingManager` maintains dedicated lightweight `mqtt.connect` probe clients with 20s keep-alives (`PINGREQ`/`PINGRESP`) to each broker endpoint. This ensures accurate socket status without broker disconnects and prevents false zero-socket stalls.
 - **Health Polling & Grace Window**: A watchdog runs every 1.5 seconds checking socket readiness states. During the initial 4.0 seconds after room join, watchdog failover is suppressed to allow WebSocket handshakes and TLS negotiation to complete.
 - **Failover Safety with Active Peers**: The watchdog will never trigger transport failover when direct WebRTC peers are actively connected (`directConnectedPeers.size > 0`), protecting running voice and video sessions from unexpected teardown during brief broker hiccups.

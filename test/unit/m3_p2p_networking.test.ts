@@ -328,7 +328,7 @@ describe('M3 Unit Tests: Robust P2P Networking & Signaling Failover', () => {
         error: 'could not connect to peer after exchanging SDP; check that your TURN server URLs and credentials are reachable',
         peerId: 'peer-abc12345',
       });
-      assert.ok(turnUnreachableMsg.includes('servidor TURN configurado inacessível'));
+      assert.ok(turnUnreachableMsg.includes('nenhuma rota ICE foi estabelecida'));
 
       const symmetricNatMsg = formatJoinError({
         error: 'could not connect to peer after exchanging SDP; configure TURN servers with turnConfig',

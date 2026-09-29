@@ -1,17 +1,14 @@
 import mqtt from 'mqtt';
 import {
-  defaultRelayUrls as defaultMqttUrls,
   getRelaySockets as getMqttRelaySockets,
   joinRoom as joinMqttRoom,
   selfId as mqttSelfId,
 } from '@trystero-p2p/mqtt';
 import {
-  defaultRelayUrls as defaultNostrUrls,
   getRelaySockets as getNostrRelaySockets,
   joinRoom as joinNostrRoom,
 } from '@trystero-p2p/nostr';
 import {
-  defaultRelayUrls as defaultTorrentUrls,
   getRelaySockets as getTorrentRelaySockets,
   joinRoom as joinTorrentRoom,
 } from '@trystero-p2p/torrent';
@@ -20,6 +17,8 @@ import type {
   SignalingTransport,
   TransportStatusInfo,
 } from '../core/types.ts';
+import { enabledRendezvousUrls, loadRendezvousPreferences, type RendezvousPreferences } from './relay_preferences.ts';
+export { DEFAULT_MQTT_RELAY_URLS } from './relay_preferences.ts';
 
 export interface RoomReconnectionHandler {
   (newTransport: SignalingTransport, previousTransport: SignalingTransport): Promise<void> | void;
@@ -31,13 +30,6 @@ export interface SignalingFailoverEvent {
   reason: string;
   timestamp: number;
 }
-
-export const DEFAULT_MQTT_RELAY_URLS = [
-  'wss://public:public@public.cloud.shiftr.io',
-  'wss://broker.emqx.io:8084/mqtt',
-  'wss://broker-cn.emqx.io:8084/mqtt',
-  'wss://test.mosquitto.org:8081/mqtt',
-];
 
 export async function computeTrysteroSha1(str: string): Promise<string> {
   try {
@@ -68,6 +60,7 @@ export async function computeTrysteroSha1(str: string): Promise<string> {
 export class SignalingManager {
   private activeTransport: SignalingTransport = 'mqtt';
   private availableTransports: SignalingTransport[] = ['mqtt', 'nostr', 'torrent'];
+  private roomPreferences: RendezvousPreferences = loadRendezvousPreferences();
   private statusListeners: Array<(status: SignalingStatus) => void> = [];
   private failoverListeners: Array<(event: SignalingFailoverEvent) => void> = [];
   public failoverHistory: Array<{ from: SignalingTransport; to: SignalingTransport; timestamp: number }> = [];
@@ -129,7 +122,7 @@ export class SignalingManager {
   private startMqttRelayMonitoring(): void {
     this.stopMqttRelayMonitoring();
 
-    DEFAULT_MQTT_RELAY_URLS.forEach((url) => {
+    enabledRendezvousUrls(this.roomPreferences, 'mqtt').forEach((url) => {
       this.initMqttProbeSocket(url);
     });
   }
@@ -186,7 +179,7 @@ export class SignalingManager {
         this.mqttSocketStatuses.set(url, { readyState: 3, connected: false });
         if (this.activeRoom && this.activeTransport === 'mqtt') {
           setTimeout(() => {
-            if (this.activeRoom && this.activeTransport === 'mqtt') {
+            if (this.activeRoom && this.activeTransport === 'mqtt' && this.monitoredMqttSockets.has(url)) {
               this.initMqttProbeSocket(url);
             }
           }, 3000);
@@ -266,12 +259,7 @@ export class SignalingManager {
       }
     }
 
-    const defaultUrlsCount =
-      transport === 'mqtt'
-        ? Math.max(defaultMqttUrls.length, DEFAULT_MQTT_RELAY_URLS.length)
-        : transport === 'nostr'
-        ? defaultNostrUrls.length
-        : defaultTorrentUrls.length;
+    const defaultUrlsCount = enabledRendezvousUrls(this.roomPreferences, transport).length;
 
     const effectiveTotal = Math.max(total, defaultUrlsCount);
     const ratio = effectiveTotal > 0 ? connected / effectiveTotal : 0;
@@ -310,25 +298,25 @@ export class SignalingManager {
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   protected createRoomForTransport(transport: SignalingTransport, config: any, topic: string, callbacks?: any): any {
+    const urls = enabledRendezvousUrls(this.roomPreferences, transport);
+    const redundancy = transport === 'mqtt' ? urls.length : Math.min(urls.length, transport === 'nostr' ? 5 : 3);
+    const relayConfig = { ...config.relayConfig, urls, redundancy };
     if (transport === 'mqtt') {
       const mqttConfig = {
         ...config,
-        relayConfig: {
-          urls: DEFAULT_MQTT_RELAY_URLS,
-          redundancy: DEFAULT_MQTT_RELAY_URLS.length,
-        },
+        relayConfig,
       };
       this.startMqttRelayMonitoring();
       return joinMqttRoom(mqttConfig, topic, callbacks);
     } else if (transport === 'nostr') {
       this.stopMqttRelayMonitoring();
-      return joinNostrRoom(config, topic, callbacks);
+      return joinNostrRoom({ ...config, relayConfig }, topic, callbacks);
     } else if (transport === 'torrent') {
       this.stopMqttRelayMonitoring();
-      return joinTorrentRoom(config, topic, callbacks);
+      return joinTorrentRoom({ ...config, relayConfig }, topic, callbacks);
     } else {
       this.startMqttRelayMonitoring();
-      return joinMqttRoom(config, topic, callbacks);
+      return joinMqttRoom({ ...config, relayConfig }, topic, callbacks);
     }
   }
 
@@ -338,7 +326,10 @@ export class SignalingManager {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public joinRoom(config: any, topic: string, callbacks?: any): any {
     if (!this.isFailingOver) {
-      this.activeTransport = 'mqtt';
+      this.roomPreferences = loadRendezvousPreferences();
+      this.availableTransports = (['mqtt', 'nostr', 'torrent'] as const)
+        .filter((transport) => enabledRendezvousUrls(this.roomPreferences, transport).length > 0);
+      this.activeTransport = this.availableTransports[0] ?? 'mqtt';
     }
     this.lastRoomParams = { config, topic, callbacks };
     this.roomJoinedTimestamp = Date.now();
@@ -388,6 +379,9 @@ export class SignalingManager {
     this.directConnectedPeers.clear();
     this.consecutiveStalls = 0;
     this.activeTransport = 'mqtt';
+    this.roomPreferences = loadRendezvousPreferences();
+    this.availableTransports = (['mqtt', 'nostr', 'torrent'] as const)
+      .filter((transport) => enabledRendezvousUrls(this.roomPreferences, transport).length > 0);
     this.isFailingOver = false;
     this.notifyStatusChange();
   }
@@ -398,9 +392,13 @@ export class SignalingManager {
    * Used by in-mesh bridging to force immediate WebRTC handshake between indirect pairs.
    */
   public async reannounce(topic: string, targetPeerId?: string): Promise<void> {
-    if (this.activeTransport !== 'mqtt') return;
+    const appId = this.lastRoomParams?.config?.appId;
+    if (this.activeTransport !== 'mqtt' || !this.activeRoom ||
+        topic !== this.lastRoomParams?.topic || typeof appId !== 'string') return;
+    const room = this.activeRoom;
     try {
-      const rootTopic = await computeTrysteroSha1(`Trystero@p2sharer-multi-stream-v1@${topic}`);
+      const rootTopic = await computeTrysteroSha1(`Trystero@${appId}@${topic}`);
+      if (this.activeRoom !== room || this.activeTransport !== 'mqtt') return;
       const payload = JSON.stringify({ peerId: this.getSelfId() });
 
       this.monitoredMqttSockets.forEach((client) => {
@@ -413,8 +411,9 @@ export class SignalingManager {
 
       if (targetPeerId) {
         const peerTopic = await computeTrysteroSha1(
-          `Trystero@p2sharer-multi-stream-v1@${topic}@${targetPeerId}`
+          `Trystero@${appId}@${topic}@${targetPeerId}`
         );
+        if (this.activeRoom !== room || this.activeTransport !== 'mqtt') return;
         this.monitoredMqttSockets.forEach((client) => {
           if (client && (client.connected || client.readyState === 1) && typeof client.publish === 'function') {
             try {
@@ -433,7 +432,7 @@ export class SignalingManager {
    * MQTT -> Nostr -> Torrent -> MQTT
    */
   public recordWatchdogFailure(reason = 'relay_connectivity_loss'): SignalingTransport {
-    if (this.isFailingOver) return this.activeTransport;
+    if (this.isFailingOver || this.availableTransports.length < 2) return this.activeTransport;
     const previousTransport = this.activeTransport;
     const currentIdx = this.availableTransports.indexOf(this.activeTransport);
     const nextIdx = (currentIdx + 1) % this.availableTransports.length;
@@ -561,6 +560,15 @@ export class SignalingManager {
     }
 
     const relay = this.getRelayStatus(this.activeTransport);
+
+    // MQTT.js can hide Trystero's internal WebSocket. A connected MQTT probe
+    // means the broker is reachable, so let Trystero reconnect instead of
+    // moving only this client to another signaling network.
+    if (this.activeTransport === 'mqtt' && relay.connected === 0 &&
+        [...this.mqttSocketStatuses.values()].some((status) => status.connected)) {
+      this.consecutiveStalls = 0;
+      return;
+    }
 
     // Keep established media/data channels alive. Peers on different signaling
     // transports cannot discover each other, so defer automatic migration while

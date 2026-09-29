@@ -492,6 +492,7 @@ export class GroupRoomManager {
         onJoinError: joinErrorHandler,
       }
     );
+    const joinedRoom = this.room;
 
     this.bindRoomActions();
     this.bindRoomListeners();
@@ -502,7 +503,7 @@ export class GroupRoomManager {
     // discover us immediately without waiting for 5.3s Trystero ticks.
     [100, 400, 1000, 2200].forEach((delay) => {
       setTimeout(() => {
-        if (this.room && this.signalingTopic) {
+        if (this.room === joinedRoom && this.signalingTopic) {
           signalingManager.reannounce(this.signalingTopic);
         }
       }, delay);
@@ -1065,8 +1066,6 @@ export class GroupRoomManager {
       this.peerTracker.touchPeer(peerId);
 
       const suppliedName = typeof data.username === 'string' ? data.username.trim() : '';
-      if (suppliedName && this.peerTracker.getVerifiedPeers().some((peer) =>
-        peer.id !== peerId && peer.username.toLocaleLowerCase() === suppliedName.toLocaleLowerCase())) return;
       const newName = suppliedName || this.peerTracker.getUsername(peerId) || `Usuário (${peerId.slice(0, 4)})`;
       this.peerTracker.addPeer(peerId, newName,
         this.authority ? this.authority.isPeerHost(peerId) : Boolean(data.isCreator), data.joinedAt);
@@ -1394,6 +1393,18 @@ export class GroupRoomManager {
     });
   }
 
+  private sendIdentityChallenge(peerId: string): void {
+    if (!this.room || !this.identityAction) return;
+    let nonce = this.pendingChallenges.get(peerId);
+    if (!nonce) {
+      nonce = crypto.randomUUID();
+      this.pendingChallenges.set(peerId, nonce);
+    }
+    try {
+      void Promise.resolve(this.identityAction.send({ kind: 'challenge', nonce }, { target: peerId })).catch(() => {});
+    } catch {}
+  }
+
   private bindRoomListeners(): void {
     if (!this.room) return;
     const boundRoom = this.room;
@@ -1414,9 +1425,7 @@ export class GroupRoomManager {
       }
 
       if (this.authority) {
-        const nonce = crypto.randomUUID();
-        this.pendingChallenges.set(peerId, nonce);
-        this.identityAction?.send({ kind: 'challenge', nonce }, { target: peerId });
+        this.sendIdentityChallenge(peerId);
         this.authorityAction?.send({ kind: 'request' }, { target: peerId });
         this.admissionAction?.send({ kind: 'sync-request' }, { target: peerId });
         this.notifyPeersUpdate();
@@ -1513,6 +1522,14 @@ export class GroupRoomManager {
     // Continuous presence heartbeat, PEX sync & Ghost Peer Pruner (every 2.0s)
     this.heartbeatTimer = setInterval(() => {
       if (!this.room) return;
+
+      // A peer may connect before the other side finishes binding its action
+      // handlers. Retry the challenge until its key is pinned.
+      if (this.authority && this.chatAuth) {
+        for (const peerId of this.peerTracker.directConnectedPeers) {
+          if (!this.chatAuth.getKnownKey(peerId)) this.sendIdentityChallenge(peerId);
+        }
+      }
 
       // Broadcast presence
       if (this.presenceAction) {
@@ -1615,6 +1632,7 @@ export class GroupRoomManager {
   }
 
   private removePeer(peerId: string) {
+    this.pendingChallenges.delete(peerId);
     this.fileBulk.close(peerId);
     for (const [requestId, session] of this.fileSessions) {
       if (session.peerId !== peerId) continue;
