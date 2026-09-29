@@ -5,6 +5,7 @@ import { EmojiPickerPopover } from '../common/EmojiPickerPopover';
 import { EmojiComposerInput, type EmojiComposerHandle } from '../common/EmojiComposerInput';
 import { ChatMessageContent } from '../common/ChatMessageContent';
 import { getEmojiPack, subscribeEmojiPack } from '../../core/emoji_preferences';
+import { getTransferSpeedUnit, subscribeTransferSpeedUnit } from '../../core/transfer_speed';
 import { SystemNoticeIcon } from './SystemNoticeIcon';
 import { SystemNoticeText } from './SystemNoticeText';
 import { useEmojiSelectionHighlight } from '../../hooks/useEmojiSelectionHighlight';
@@ -32,6 +33,7 @@ export const ChatPane: React.FC = () => {
   const [editDraft, setEditDraft] = useState('');
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const emojiPack = useSyncExternalStore(subscribeEmojiPack, getEmojiPack);
+  const transferSpeedUnit = useSyncExternalStore(subscribeTransferSpeedUnit, getTransferSpeedUnit);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<EmojiComposerHandle>(null);
   const editRef = useRef<EmojiComposerHandle>(null);
@@ -194,6 +196,7 @@ export const ChatPane: React.FC = () => {
                     <button type="button" onClick={() => saveEdit(msg.id)}>Salvar</button>
                   </div>
                 </div> : msg.file ? <ChatFileAttachment message={msg}
+                  speedUnit={transferSpeedUnit}
                   transfers={Object.values(fileProgress).filter((transfer) => transfer.messageId === msg.id)}
                   preview={localFilePreviews[msg.id] ?? imagePreviews[msg.id]}
                   savedRequestId={savedDownloads[msg.id]}

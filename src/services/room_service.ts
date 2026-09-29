@@ -39,6 +39,7 @@ export class RoomService {
   public imagePreviews: Record<string, string> = {};
   public savedDownloads: Record<string, string> = {};
   private imagePreviewBytes: Record<string, Uint8Array> = {};
+  private transferRates = new Map<string, { at: number; bytes: number; speed: number }>();
   private localSaveIds = new Set<string>();
   private cancelledLocalSaves = new Set<string>();
   public peers: PeerInfo[] = [];
@@ -183,6 +184,7 @@ export class RoomService {
     this.chatMessages = [];
     this.fileRequests = [];
     this.fileProgress = {};
+    this.transferRates.clear();
     this.savedDownloads = {};
     this.localFilePreviews = {};
     this.peers = [];
@@ -485,6 +487,7 @@ export class RoomService {
     this.chatMessages = [];
     this.fileRequests = [];
     this.fileProgress = {};
+    this.transferRates.clear();
     this.savedDownloads = {};
     this.localFilePreviews = {};
     this.clearImagePreviews();
@@ -534,6 +537,17 @@ export class RoomService {
     const previous = this.fileProgress[progress.requestId];
     const message = this.chatMessages.find((item) => item.id === progress.messageId);
     const peer = this.peers.find((item) => item.id === progress.peerId);
+    let bytesPerSecond = previous?.bytesPerSecond ?? 0;
+    if (progress.status === 'active') {
+      const now = performance.now();
+      const sample = this.transferRates.get(progress.requestId);
+      if (!sample) this.transferRates.set(progress.requestId, { at: now, bytes: progress.bytes, speed: 0 });
+      else if (now - sample.at >= 100 && progress.bytes >= sample.bytes) {
+        const instant = (progress.bytes - sample.bytes) * 1000 / (now - sample.at);
+        bytesPerSecond = sample.speed ? sample.speed * 0.65 + instant * 0.35 : instant;
+        this.transferRates.set(progress.requestId, { at: now, bytes: progress.bytes, speed: bytesPerSecond });
+      }
+    } else if (progress.status !== 'pending') this.transferRates.delete(progress.requestId);
     const entry: FileProgress = {
       ...previous, ...reported,
       fileName: progress.fileName ?? previous?.fileName ?? message?.file?.name ?? 'Arquivo',
@@ -542,6 +556,8 @@ export class RoomService {
       peerId: progress.peerId ?? previous?.peerId,
       previewOnly: progress.previewOnly ?? previous?.previewOnly,
       startedAt: previous?.startedAt ?? Date.now(),
+      isImage: progress.isImage ?? previous?.isImage ?? message?.file?.isImage ?? false,
+      bytesPerSecond,
     };
     this.fileProgress = { ...this.fileProgress, [entry.requestId]: entry };
     if (entry.status === 'complete' && entry.previewOnly && entry.preview) {
