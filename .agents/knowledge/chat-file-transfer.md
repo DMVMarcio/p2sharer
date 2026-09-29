@@ -10,7 +10,7 @@ A recipient chooses the automatic Downloads/P2Sharer Downloads destination or a 
 
 The sender reads 48 KiB blocks from its locally selected source. One block is outstanding at a time; the recipient acknowledges only after writing it. The receiver writes to a temporary file and checks total size and SHA-256 before renaming it to the chosen destination. Either side can cancel. Incoming requests do not contain paths and cannot invoke native source reads or destination writes directly.
 
-For images up to 10 MiB, peers may request an in-memory preview after an offer arrives. This request follows the same sender consent gate. The receiver checks the full SHA-256 before exposing a blob URL to the chat viewer, and revokes that URL when leaving the room. Saving the image still uses the explicit download flow.
+For images up to 10 MiB, the viewer may request an in-memory preview by clicking its placeholder control. This request follows the same sender consent gate. The receiver checks the full SHA-256 before exposing a blob URL to the chat viewer, and revokes that URL when leaving the room. The verified preview can be saved locally without a second peer request.
 
 ## Limits
 
