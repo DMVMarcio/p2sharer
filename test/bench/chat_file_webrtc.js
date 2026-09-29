@@ -4,6 +4,7 @@ import { decodeFileBase64, decodeSignedFileChunk, encodeFileBase64, encodeSigned
   fileChunkSignatureData, hashFileChunk } from '../../src/core/chat_file_wire.ts';
 import { selectedIceRoute } from '../../src/core/ice_route.ts';
 import { createFileOptimizedPeerConnection, ensureFileDataChannelWindow } from '../../src/p2p/file_data_channel.ts';
+import { FileBulkChannelManager } from '../../src/p2p/file_bulk_channel.ts';
 
 const output = document.querySelector('#result');
 const benchmarkMiB = Number(new URLSearchParams(location.search).get('mib') || 16);
@@ -16,7 +17,14 @@ let pcA;
 let pcB;
 
 function now() { return performance.now(); }
-function show(value) { output.textContent = JSON.stringify(value, null, 2); window.__benchResult = value; }
+function show(value) {
+  output.textContent = JSON.stringify(value, null, 2);
+  window.__benchResult = value;
+  if (value.status === 'complete' || value.status === 'error') {
+    void fetch('http://127.0.0.1:1421/', { method: 'POST', mode: 'no-cors',
+      headers: { 'content-type': 'text/plain' }, body: JSON.stringify(value) }).catch(() => {});
+  }
+}
 async function waitIce(pc) {
   if (pc.iceGatheringState === 'complete') return;
   await new Promise((resolve, reject) => {
@@ -96,9 +104,11 @@ async function signedChunk(keys, offset, bytes) {
   timings.senderPrepareMs += now() - start;
   return packet;
 }
-async function fullTransfer(outgoing, incoming) {
-  const sender = wire(outgoing, 'b');
-  const receiver = wire(incoming, 'a');
+async function fullTransfer(outgoing, incoming, bulk = null) {
+  const senderControl = wire(outgoing, 'b');
+  const receiverControl = wire(incoming, 'a');
+  const sender = bulk ? { send: (packet) => bulk.send(packet), onMessage: senderControl.onMessage } : senderControl;
+  const receiver = bulk ? { send: receiverControl.send, onMessage: bulk.onMessage } : receiverControl;
   const keys = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign', 'verify']);
   const destination = new Uint8Array(totalBytes);
   let acknowledged = 0;
@@ -188,6 +198,16 @@ try {
   ensureFileDataChannelWindow(pcA);
   const tunedThreshold = outgoing.bufferedAmountLowThreshold;
   const fullTuned = await fullTransfer(outgoing, incoming);
+  let onBulkPacket = () => {};
+  const bulkSender = new FileBulkChannelManager(() => pcA, () => {});
+  const bulkReceiver = new FileBulkChannelManager(() => pcB, (_peerId, packet) => onBulkPacket(packet));
+  bulkSender.ensure('b');
+  bulkReceiver.ensure('a');
+  await Promise.all([bulkSender.ready('b'), bulkReceiver.ready('a')]);
+  const fullBulk = await fullTransfer(outgoing, incoming, {
+    send: (packet) => bulkSender.send('b', packet, () => true),
+    onMessage: (callback) => { onBulkPacket = callback; },
+  });
   const stats = await pcA.getStats();
   const reports = [];
   stats.forEach((report) => reports.push(report));
@@ -195,6 +215,7 @@ try {
     rawHighBuffer: { ...rawHighBuffer, mbps: totalBytes / rawHighBuffer.seconds / 1e6 },
     full: { ...full, mbps: totalBytes / full.seconds / 1e6 }, timings,
     fullTuned: { ...fullTuned, mbps: totalBytes / fullTuned.seconds / 1e6, thresholdBytes: tunedThreshold },
+    fullBulk: { ...fullBulk, mbps: totalBytes / fullBulk.seconds / 1e6 },
     route: selectedIceRoute(reports) });
 } catch (error) {
   show({ status: 'error', benchmarkMiB, error: String(error), stack: error?.stack });
