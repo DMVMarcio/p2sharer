@@ -2,6 +2,7 @@ import React from 'react';
 import { StreamHeaderBar } from './StreamHeaderBar';
 import { RoomVideoContainer } from './RoomVideoContainer';
 import { RoomSidebar } from './RoomSidebar';
+import { ChatFileRequests } from './ChatFileRequests';
 import { useRoom } from '../../hooks/useRoom';
 
 export const RoomView: React.FC = () => {
@@ -47,6 +48,7 @@ export const RoomView: React.FC = () => {
 
         <RoomSidebar />
       </div>
+      <ChatFileRequests />
     </section>
   );
 };

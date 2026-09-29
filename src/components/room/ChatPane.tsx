@@ -10,12 +10,18 @@ import { SystemNoticeText } from './SystemNoticeText';
 import { useEmojiSelectionHighlight } from '../../hooks/useEmojiSelectionHighlight';
 import { ChatMessageMenu } from './ChatMessageMenu';
 import { EditedMessageMarker } from './EditedMessageMarker';
-import { Reply, Smile, X } from 'lucide-react';
+import { Paperclip, Reply, Smile, X } from 'lucide-react';
+import { invoke } from '@tauri-apps/api/core';
+import type { NativeChatFile } from '../../p2p/group_room';
+import { ChatFileOfferDialog } from './ChatFileOfferDialog';
+import { ChatFileAttachment } from './ChatFileAttachment';
 import { selfId } from '@trystero-p2p/core';
 import { showToast } from '../../hooks/useToast';
 
 export const ChatPane: React.FC = () => {
-  const { chatMessages, sendChatMessage, editChatMessage, deleteChatMessage } = useRoom();
+  const { chatMessages, sendChatMessage, editChatMessage, deleteChatMessage, offerFile,
+    requestFile, cancelFileTransfer, fileProgress, localFilePreviews } = useRoom();
+  const [selectedFile, setSelectedFile] = useState<NativeChatFile | null>(null);
   const [inputText, setInputText] = useState('');
   const [pickerTarget, setPickerTarget] = useState<'compose' | 'edit' | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -113,6 +119,14 @@ export const ChatPane: React.FC = () => {
     sendMessage();
   };
 
+  const pickFile = async () => {
+    try { setSelectedFile(await invoke<NativeChatFile | null>('pick_chat_file')); }
+    catch { showToast('Não foi possível abrir o arquivo.'); }
+  };
+  const startDownload = (messageId: string, saveAs: boolean) => {
+    void requestFile(messageId, saveAs).catch(() => showToast('Download indisponível. Verifique se o autor está conectado.'));
+  };
+
   return (
     <div className="sidebar-tab-content active" id="tab-content-chat" ref={paneRef}>
       <div className="chat-messages-container" id="chat-messages-container">
@@ -155,6 +169,8 @@ export const ChatPane: React.FC = () => {
                   onCopy={() => { copyText(msg.text); setOpenMenuId(null); }}
                   onEdit={() => { setEditingId(msg.id); setEditDraft(msg.text); setPickerTarget(null); setOpenMenuId(null); }}
                   onDelete={() => { void deleteChatMessage(msg.id).then((deleted) => { if (!deleted) showToast('Não foi possível excluir a mensagem.'); }); if (editingId === msg.id) setEditingId(null); setPickerTarget(null); setOpenMenuId(null); }}
+                  isFile={Boolean(msg.file)}
+                  onSaveAs={() => { startDownload(msg.id, true); setOpenMenuId(null); }}
                 />
               </div>
               <div className="chat-msg-bubble">
@@ -169,7 +185,11 @@ export const ChatPane: React.FC = () => {
                     <button type="button" onClick={() => { setEditingId(null); setPickerTarget(null); }}>Cancelar</button>
                     <button type="button" onClick={() => saveEdit(msg.id)}>Salvar</button>
                   </div>
-                </div> : <ChatMessageContent text={msg.text} pack={emojiPack} />}
+                </div> : msg.file ? <ChatFileAttachment message={msg}
+                  transfers={Object.values(fileProgress).filter((transfer) => transfer.messageId === msg.id)}
+                  preview={localFilePreviews[msg.id]}
+                  onRequest={(saveAs) => startDownload(msg.id, saveAs)}
+                  onCancel={(id) => void cancelFileTransfer(id)} /> : <ChatMessageContent text={msg.text} pack={emojiPack} />}
               </div>
             </div>
           );
@@ -185,6 +205,7 @@ export const ChatPane: React.FC = () => {
         <button type="button" aria-label="Cancelar resposta" onClick={() => setReplyToId(null)}><X size={16} /></button>
       </div>}
       <form className="chat-input-bar" id="chat-input-form" onSubmit={handleSubmit}>
+        <button type="button" className="btn-chat-emoji" aria-label="Anexar arquivo" onClick={() => void pickFile()}><Paperclip size={18} /></button>
         <button
           type="button"
           className={`btn-chat-emoji ${pickerTarget === 'compose' ? 'active' : ''}`}
@@ -212,6 +233,7 @@ export const ChatPane: React.FC = () => {
       </form>
       </div>
       {pickerTarget === 'edit' && <EmojiPickerPopover anchor={editEmojiButtonRef.current} pack={emojiPack} onSelect={insertEmoji} />}
+      {selectedFile && <ChatFileOfferDialog file={selectedFile} onClose={() => setSelectedFile(null)} onOffer={(name, autoAccept) => offerFile(selectedFile, name, autoAccept)} />}
     </div>
   );
 };

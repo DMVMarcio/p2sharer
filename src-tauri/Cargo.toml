@@ -27,6 +27,8 @@ xcap = "0.9.8"
 tokio-tungstenite = "0.24"
 futures-util = "0.3"
 getrandom = "0.2"
+sha2 = "0.10"
+dirs = "6"
 rayon = "1.10"
 jpeg-encoder = { version = "0.7.1", features = ["simd"] }
 windows-capture = "2.0.1"

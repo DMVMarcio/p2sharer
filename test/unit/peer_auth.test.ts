@@ -52,3 +52,30 @@ test('forged edits, deletions, relays, history and replay cannot change another 
   });
   assert.equal(await bob.verify(unknownMessage, 'mallory'), false);
 });
+
+test('file offers bind name, size, hash and image type to the author signature', async () => {
+  const alice = await PeerAuthenticator.create('files-room', 'file-alice');
+  const bob = await PeerAuthenticator.create('files-room', 'file-bob');
+  const file = { name: 'picture.png', size: 1234, sha256: 'a'.repeat(64), isImage: true };
+  const message = await alice.sign({ id: 'file-1', authorId: 'file-alice', sender: 'Alice', text: '',
+    timestamp: 1000, revision: 0, file });
+  assert.equal(await bob.verify(message, 'file-alice'), true);
+  assert.equal(await bob.verify({ ...message, file: { ...file, name: 'other.png' } }, 'file-alice'), false);
+  assert.equal(await bob.verify({ ...message, file: { ...file, size: 1235 } }, 'file-alice'), false);
+  assert.equal(await bob.verify({ ...message, file: { ...file, sha256: 'b'.repeat(64) } }, 'file-alice'), false);
+  assert.equal(await bob.verify({ ...message, file: { ...file, isImage: false } }, 'file-alice'), false);
+  assert.equal(await bob.verify({ ...message, file: { ...file, name: '../escape.png' } }, 'file-alice'), false);
+  assert.equal(await bob.verify({ ...message, file: null }, 'file-alice'), false);
+});
+
+test('file control signatures bind requests to their transfer and message', async () => {
+  const sender = await PeerAuthenticator.create('control-room', 'control-sender');
+  const receiver = await PeerAuthenticator.create('control-room', 'control-receiver');
+  const payload = ['request', 'request-1', 'message-1', null, null, true];
+  const signature = await sender.signControl('chat-file-v1', payload);
+  assert.equal(await receiver.verifyControl('chat-file-v1', payload, signature, sender.publicKey), true);
+  assert.equal(await receiver.verifyControl('chat-file-v1',
+    ['request', 'request-1', 'message-2', null, null, true], signature, sender.publicKey), false);
+  assert.equal(await receiver.verifyControl('chat-file-v1',
+    ['request', 'request-1', 'message-1', null, null, false], signature, sender.publicKey), false);
+});

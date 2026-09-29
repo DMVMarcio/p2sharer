@@ -7,7 +7,7 @@ import { mergeChatHistory } from '../core/chat_history.ts';
 import { verifyRoomInvite } from '../core/room_invite_validation.ts';
 import { savedRooms } from '../core/saved_rooms.ts';
 import type { ChatMessage, PeerInfo, RoomSlotInfo } from '../core/types.ts';
-import { generateRandomRoomSlug, GroupRoomManager } from '../p2p/group_room.ts';
+import { generateRandomRoomSlug, GroupRoomManager, type FileProgress, type FileRequest, type NativeChatFile } from '../p2p/group_room.ts';
 import { soundEffects } from '../ui/sound_effects.ts';
 import { NativeVideoBridge } from '../video/native_video_bridge.ts';
 import { showToast } from '../hooks/useToast.ts';
@@ -32,6 +32,9 @@ export class RoomService {
   public audioBridge = new AudioBridge();
 
   public chatMessages: ChatMessage[] = [];
+  public fileRequests: FileRequest[] = [];
+  public fileProgress: Record<string, FileProgress> = {};
+  public localFilePreviews: Record<string, string> = {};
   public peers: PeerInfo[] = [];
   public roomStatusText: string = 'Sala Ativa';
   public connectingOverlay: ConnectingOverlayState = {
@@ -170,6 +173,9 @@ export class RoomService {
 
     soundEffects.playUserJoin();
 
+    for (const transfer of Object.values(this.fileProgress)) {
+      if (transfer.preview?.startsWith('blob:')) URL.revokeObjectURL(transfer.preview);
+    }
     this.chatMessages = [];
     this.peers = [];
     this.roomStatusText = 'Conectando à sala...';
@@ -214,6 +220,17 @@ export class RoomService {
       });
 
     await manager.join({
+      onFileRequest: (request) => {
+        if (this.roomManager !== manager) return;
+        this.fileRequests = [...this.fileRequests, request];
+        this.notify();
+      },
+      onFileProgress: (progress) => {
+        if (this.roomManager !== manager) return;
+        this.fileProgress = { ...this.fileProgress, [progress.requestId]: progress };
+        if (progress.status === 'error') showToast('Não foi possível concluir a transferência do arquivo.');
+        this.notify();
+      },
       onAppEvent: (event, peerId) => {
         if (this.roomManager === manager) roomAppsService.receive(event, peerId);
       },
@@ -254,6 +271,8 @@ export class RoomService {
       },
       onPeerLeft: (_peerId, username) => {
         if (this.roomManager !== manager) return;
+        this.fileRequests = this.fileRequests.filter((request) => request.peerId !== _peerId);
+        this.notify();
         roomAppsService.forgetPeer(_peerId);
         const name = username.trim();
         if (!name) return;
@@ -445,6 +464,9 @@ export class RoomService {
     });
 
     this.chatMessages = [];
+    this.fileRequests = [];
+    this.fileProgress = {};
+    this.localFilePreviews = {};
     this.peers = [];
     this.hideConnecting();
     showToast('Você saiu da sala.');
@@ -455,6 +477,37 @@ export class RoomService {
     if (!text.trim() || !this.roomManager) return;
     void this.roomManager.sendChatMessage(text.trim(), replyToId).catch((error) =>
       console.warn('[Chat] Failed to sign or send message:', error));
+  }
+
+  public async offerFile(file: NativeChatFile, name: string, autoAccept: boolean): Promise<void> {
+    if (!this.roomManager) throw new Error('Room unavailable');
+    const message = await this.roomManager.offerFile(file, name, autoAccept);
+    if (message.file?.isImage && file.size <= 10 * 1024 * 1024) {
+      try {
+        const data = await invoke<string>('read_chat_image_preview', { id: file.id });
+        const extension = file.name.split('.').pop()?.toLowerCase();
+        const mime = extension === 'jpg' || extension === 'jpeg' ? 'image/jpeg' :
+          extension === 'png' ? 'image/png' : extension === 'gif' ? 'image/gif' :
+          extension === 'webp' ? 'image/webp' : 'image/bmp';
+        this.localFilePreviews = { ...this.localFilePreviews, [message.id]: `data:${mime};base64,${data}` };
+        this.notify();
+      } catch {}
+    }
+  }
+
+  public requestFile(messageId: string, saveAs: boolean): Promise<string | null> {
+    if (!this.roomManager) throw new Error('Room unavailable');
+    return this.roomManager.requestFile(messageId, saveAs);
+  }
+
+  public async answerFileRequest(requestId: string, accept: boolean): Promise<void> {
+    this.fileRequests = this.fileRequests.filter((request) => request.requestId !== requestId);
+    this.notify();
+    await this.roomManager?.answerFileRequest(requestId, accept);
+  }
+
+  public cancelFileTransfer(requestId: string): Promise<void> {
+    return this.roomManager?.cancelFileTransfer(requestId) ?? Promise.resolve();
   }
 
   public editChatMessage(id: string, text: string): Promise<boolean> {

@@ -85,6 +85,7 @@ export interface ChatMessage {
   id: string;
   sender: string;
   text: string;
+  file?: { name: string; size: number; sha256: string; isImage: boolean };
   timestamp: number;
   authorId?: string;
   authorKey?: string;

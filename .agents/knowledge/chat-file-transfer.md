@@ -1,0 +1,17 @@
+# Consent-Based Chat File Transfer
+
+## Offer and identity
+
+`GroupRoomManager.offerFile` publishes a signed chat message containing only the display name, byte size, SHA-256 digest, and image flag. `PeerAuthenticator.signedChatData` binds those fields to the room, message author, and revision. The native `chat_files.rs` module retains the selected path behind a random local source ID and remembers the path under the room and message IDs in the user's local app data. The path is never included in chat or history.
+
+## Request and transfer
+
+A recipient chooses the automatic Downloads/P2Sharer Downloads destination or a native Save As dialog before sending a request. The request and every file protocol packet are signed with the sender's room identity and targeted to one verified, admitted direct WebRTC peer whose pinned public key matches the offer's author key. This key binding also works when a returning author has a new transport peer ID. The author sees the original source path and requester name and must accept, unless the offer's local ten-minute auto-accept period remains active. Before acceptance, native code rescans the source and compares its size and SHA-256 with the signed offer. A source restored from an earlier app session follows the same check.
+
+The sender reads 48 KiB blocks from its locally selected source. One block is outstanding at a time; the recipient acknowledges only after writing it. The receiver writes to a temporary file and checks total size and SHA-256 before renaming it to the chosen destination. Either side can cancel. Incoming requests do not contain paths and cannot invoke native source reads or destination writes directly.
+
+For images up to 10 MiB, peers may request an in-memory preview after an offer arrives. This request follows the same sender consent gate. The receiver checks the full SHA-256 before exposing a blob URL to the chat viewer, and revokes that URL when leaving the room. Saving the image still uses the explicit download flow.
+
+## Limits
+
+An offer contains no file bytes and historical offers need the original author online with the original file present. A disconnected peer cannot prove it has seen every later room revocation; this is an existing P2P room authorization limit. A modified local client can always choose to share its own data or decline requests, but cannot impersonate another admitted author's signed offer or pass a changed file through the recipient's SHA-256 check. End-to-end transfer behavior needs a two-instance desktop check; unit tests cover message and control signatures plus native digest and name validation.
