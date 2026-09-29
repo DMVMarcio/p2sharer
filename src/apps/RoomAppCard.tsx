@@ -3,7 +3,8 @@ import type { RoomAppInstance } from './types';
 import { getRoomApp, type RoomAppViewProps } from './registry';
 import { roomAppsService } from './room_apps_service';
 import { useRoom } from '../hooks/useRoom';
-import { AppWindow, ArrowLeft, MoreHorizontal, SquareX } from 'lucide-react';
+import { ArrowLeft, MoreHorizontal, SquareX } from 'lucide-react';
+import { RoomAppIcon } from './RoomAppIcon';
 import { ActivityParticipants } from '../components/common/ActivityParticipants';
 import { Tooltip } from '../components/common/Tooltip';
 import { stateStore } from '../core/state_store';
@@ -54,12 +55,11 @@ export const RoomAppCard: React.FC<Props> = ({ instance, isFeatured = false, com
   };
   const definition = getRoomApp(instance.kind);
   const label = definition?.label || instance.kind;
-  const Icon = definition?.icon || AppWindow;
   const View = viewFor(instance.kind);
   return <div className={`room-app-card room-app-kind-${instance.kind} ${isFeatured ? 'featured' : ''} ${compact ? 'compact' : ''}`}
     style={style} data-peer-id={`app:${instance.id}`}>
     <div className="room-app-card-header">
-      <span className="room-app-card-title"><Icon size={16} strokeWidth={1.8} />{label}
+      <span className="room-app-card-title"><RoomAppIcon kind={instance.kind} size={20} />{label}
         <span className="room-app-shared-label">na sala</span></span>
       <div className="room-app-toolbar-actions">
         <ActivityParticipants people={people} />
@@ -81,7 +81,7 @@ export const RoomAppCard: React.FC<Props> = ({ instance, isFeatured = false, com
       {joined ? <Suspense fallback={<div className="room-app-player-placeholder">Carregando App...</div>}>
         {View && <View instanceId={instance.id} compact={compact} />}
       </Suspense> : <div className="room-app-join-panel">
-        <Icon size={compact ? 25 : 32} strokeWidth={1.5} />
+        <RoomAppIcon kind={instance.kind} size={compact ? 25 : 32} strokeWidth={1.5} />
         {!compact && <><strong>{label}</strong><span>Atividade compartilhada na sala</span></>}
         <button onClick={enter}>Entrar na atividade</button>
         {!compact && <ActivityParticipants people={people} />}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Captions, CaptionsOff, Pause, Play, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react';
+import { Captions, CaptionsOff, Pause, PictureInPicture2, Play, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react';
 import { MediaSeekBar } from '../components/common/MediaSeekBar';
 import { TooltipButton } from '../components/common/TooltipButton';
 import { formatMediaTime } from '../core/media_time';
@@ -22,11 +22,12 @@ interface Props {
   onVolume: (volume: number) => void;
   onToggleMute: () => void;
   onToggleCaptions: () => void;
+  onPictureInPicture?: () => void;
 }
 
 export const YouTubeControls: React.FC<Props> = ({ hasVideo, playing, hasPrevious, hasNext,
   position, duration, buffered, volume, muted, onTogglePlayback, onPrevious, onNext, onSeek,
-  onVolume, onToggleMute, captions, onToggleCaptions }) => {
+  onVolume, onToggleMute, captions, onToggleCaptions, onPictureInPicture }) => {
   return <div className="youtube-control-deck" aria-label="Controles de reprodução compartilhada">
     <MediaSeekBar value={position} duration={duration} buffered={buffered} onCommit={onSeek}
       disabled={!hasVideo || duration <= 0} />
@@ -49,6 +50,10 @@ export const YouTubeControls: React.FC<Props> = ({ hasVideo, playing, hasPreviou
           aria-pressed={captions} onClick={onToggleCaptions}>
           {captions ? <Captions size={18} /> : <CaptionsOff size={18} />}
         </TooltipButton>
+        {onPictureInPicture && <TooltipButton tooltip="Picture-in-Picture"
+          className="youtube-control-button" onClick={onPictureInPicture}>
+          <PictureInPicture2 size={17} />
+        </TooltipButton>}
         <TooltipButton tooltip={muted ? 'Ativar som' : 'Silenciar'} className="youtube-control-button"
           onClick={onToggleMute}>
           {muted || volume === 0 ? <VolumeX size={17} /> : <Volume2 size={17} />}

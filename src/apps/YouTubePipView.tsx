@@ -195,8 +195,7 @@ export const YouTubePipView: React.FC<{ instanceId: string }> = ({ instanceId })
   };
   const close = async () => {
     try {
-      const { getCurrentWindow } = await import('@tauri-apps/api/window');
-      await getCurrentWindow().close();
+      await invoke('close_pip_window', { peerId: youtubePipPeerId(instanceId) });
     } catch (reason) { setError(`Não foi possível fechar o Picture-in-Picture: ${String(reason)}`); }
   };
 

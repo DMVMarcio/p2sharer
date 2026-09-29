@@ -21,7 +21,7 @@ test('a rejected PiP offer does not recurse and ignores same-window signals', as
   (globalThis as any).RTCPeerConnection = MockPeerConnection;
   const track = { kind: 'video', readyState: 'live' };
   const stream = {
-    getTracks: () => [track], getVideoTracks: () => [track],
+    getTracks: () => [track], getVideoTracks: () => [track], getAudioTracks: () => [],
   } as unknown as MediaStream;
   const peerId = `pip-offer-test-${Date.now()}`;
   const service = new PipService();

@@ -8,7 +8,8 @@ export interface RoomAppDefinition {
   kind: string;
   label: string;
   description?: string;
-  icon?: React.ComponentType<{ size?: number; strokeWidth?: number }>;
+  icon?: React.ComponentType<{ size?: number; strokeWidth?: number; 'aria-hidden'?: boolean }>;
+  iconStyle?: 'outline' | 'filled';
   bannerClass?: string;
   bannerImage?: string;
   createModel(context: RoomAppModelContext): RoomAppModel;
@@ -42,5 +43,5 @@ registerRoomApp({ kind: 'notepad', label: 'Bloco de notas',
   loadView: () => import('./NotepadApp').then((module) => ({ default: module.NotepadApp })) });
 registerRoomApp({ kind: 'youtube', label: 'YouTube',
   description: 'Monte uma fila de vídeos e playlists para assistir em sincronia.',
-  icon: SiYoutube, bannerClass: 'youtube', createModel: (context) => new YouTubeModel(context),
+  icon: SiYoutube, iconStyle: 'filled', bannerClass: 'youtube', createModel: (context) => new YouTubeModel(context),
   loadView: () => import('./YouTubeApp').then((module) => ({ default: module.YouTubeApp })) });

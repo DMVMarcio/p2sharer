@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { AppWindow, Plus } from 'lucide-react';
 import { listRoomApps, onRoomAppRegistryChange } from '../../apps/registry';
+import { RoomAppIcon } from '../../apps/RoomAppIcon';
 import { roomAppsService } from '../../apps/room_apps_service';
 import { useModal } from '../../hooks/useModal';
 import { showToast } from '../../hooks/useToast';
@@ -39,13 +40,12 @@ export const AppsModal: React.FC = () => {
       <div className="modal-body apps-library-body">
         <div className="apps-library-grid">
           {listRoomApps().map((app) => {
-            const Icon = app.icon || AppWindow;
             return <div className="apps-library-card" key={app.kind}>
               <div className={`apps-library-banner ${app.bannerClass || ''} ${app.bannerImage ? 'has-image' : ''}`}
                 style={app.bannerImage ? { backgroundImage: `url("${app.bannerImage}")` } : undefined}
                 aria-hidden="true">
                 {!app.bannerImage && <div className="apps-library-banner-glow" />}
-                <Icon size={34} strokeWidth={1.7} />
+                <RoomAppIcon kind={app.kind} size={34} strokeWidth={1.7} />
               </div>
               <div className="apps-library-card-content">
                 <h3>{app.label}</h3>

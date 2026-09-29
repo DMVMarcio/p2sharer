@@ -4,6 +4,8 @@ import { stateStore } from '../core/state_store.ts';
 import type { StreamWatcher } from '../core/types.ts';
 import { roomService } from './room_service.ts';
 import { buildIceServers } from '../p2p/ice_config.ts';
+import { audioContextManager } from '../audio/audio_context_manager.ts';
+import { validPipAudioSettings } from './pip_audio.ts';
 
 interface PipSession {
   pc: RTCPeerConnection;
@@ -76,6 +78,9 @@ export class PipService {
         (roomService as unknown as { nativeVideoBridge?: { activeStream?: MediaStream | null } })?.nativeVideoBridge?.activeStream ||
         null;
     }
+    if (peerId !== 'local' && activeStream?.getAudioTracks().length) {
+      audioContextManager.attachPeerAudio(peerId, activeStream);
+    }
 
     const channelName = `p2sharer-pip-${peerId}`;
     const bc: BroadcastChannel | null =
@@ -111,9 +116,9 @@ export class PipService {
     };
     this.sessions.set(peerId, session);
 
-    // Attach stream tracks
+    // The main WebView retains the audio sink; the PiP WebView only renders video.
     if (activeStream) {
-      activeStream.getTracks().forEach((track) => {
+      activeStream.getVideoTracks().forEach((track) => {
         try {
           pc.addTrack(track, activeStream!);
         } catch (err) {
@@ -155,7 +160,7 @@ export class PipService {
         // Re-attach tracks if needed
         const senders = pc.getSenders();
         if (senders.length === 0 && session.stream) {
-          session.stream.getTracks().forEach((t) => {
+          session.stream.getVideoTracks().forEach((t) => {
             try {
               pc.addTrack(t, session.stream!);
             } catch {}
@@ -164,11 +169,14 @@ export class PipService {
 
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
+        const audioState = audioContextManager.getPeerVolumeState(peerId);
         sendSignal({
           type: 'offer',
           sdp: pc.localDescription?.sdp || offer.sdp,
           senderName,
           isLocal: peerId === 'local',
+          audioSettings: peerId === 'local' ? { volume: 0, muted: true }
+            : { volume: audioState.volume, muted: audioState.isMuted },
         });
       } catch (err) {
         console.warn('[PipService] Error creating loopback offer:', err);
@@ -233,6 +241,12 @@ export class PipService {
         }
         case 'pip-close': {
           await this.restoreFromPip(peerId);
+          break;
+        }
+        case 'audio-settings': {
+          if (peerId !== 'local' && validPipAudioSettings(data)) {
+            audioContextManager.setPeerVolume(peerId, data.volume, data.muted);
+          }
           break;
         }
       }
@@ -305,6 +319,9 @@ export class PipService {
     if (session.stream === stream) return;
     session.stream = stream;
     try {
+      if (peerId !== 'local' && stream?.getAudioTracks().length) {
+        audioContextManager.attachPeerAudio(peerId, stream);
+      }
       const currentSenders = session.pc.getSenders();
       currentSenders.forEach((sender) => {
         try {
@@ -313,7 +330,7 @@ export class PipService {
       });
 
       if (stream) {
-        stream.getTracks().forEach((track) => {
+        stream.getVideoTracks().forEach((track) => {
           try {
             session.pc.addTrack(track, stream);
           } catch {}
