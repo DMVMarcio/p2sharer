@@ -3,6 +3,7 @@ import { CHAT_FILE_CHUNK_BYTES, CHAT_FILE_IN_FLIGHT_CHUNKS } from '../../src/cor
 import { decodeFileBase64, decodeSignedFileChunk, encodeFileBase64, encodeSignedFileChunk,
   fileChunkSignatureData, hashFileChunk } from '../../src/core/chat_file_wire.ts';
 import { selectedIceRoute } from '../../src/core/ice_route.ts';
+import { createFileOptimizedPeerConnection, ensureFileDataChannelWindow } from '../../src/p2p/file_data_channel.ts';
 
 const output = document.querySelector('#result');
 const benchmarkMiB = Number(new URLSearchParams(location.search).get('mib') || 16);
@@ -26,9 +27,10 @@ async function waitIce(pc) {
   });
 }
 async function connect() {
-  pcA = new RTCPeerConnection({ iceServers: [] });
-  pcB = new RTCPeerConnection({ iceServers: [] });
-  const outgoing = pcA.createDataChannel('chat-file', { ordered: true });
+  const PeerConnection = createFileOptimizedPeerConnection();
+  pcA = new PeerConnection({ iceServers: [] });
+  pcB = new PeerConnection({ iceServers: [] });
+  const outgoing = pcA.createDataChannel('data', { ordered: true });
   const incomingPromise = new Promise((resolve) => { pcB.ondatachannel = (event) => resolve(event.channel); });
   await pcA.setLocalDescription(await pcA.createOffer());
   await waitIce(pcA);
@@ -183,12 +185,16 @@ try {
   outgoing.bufferedAmountLowThreshold = 65535;
   show({ status: 'full transfer', benchmarkMiB, raw, rawHighBuffer });
   const full = await fullTransfer(outgoing, incoming);
+  ensureFileDataChannelWindow(pcA);
+  const tunedThreshold = outgoing.bufferedAmountLowThreshold;
+  const fullTuned = await fullTransfer(outgoing, incoming);
   const stats = await pcA.getStats();
   const reports = [];
   stats.forEach((report) => reports.push(report));
   show({ status: 'complete', benchmarkMiB, raw: { ...raw, mbps: totalBytes / raw.seconds / 1e6 },
     rawHighBuffer: { ...rawHighBuffer, mbps: totalBytes / rawHighBuffer.seconds / 1e6 },
     full: { ...full, mbps: totalBytes / full.seconds / 1e6 }, timings,
+    fullTuned: { ...fullTuned, mbps: totalBytes / fullTuned.seconds / 1e6, thresholdBytes: tunedThreshold },
     route: selectedIceRoute(reports) });
 } catch (error) {
   show({ status: 'error', benchmarkMiB, error: String(error), stack: error?.stack });
