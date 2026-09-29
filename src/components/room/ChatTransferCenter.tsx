@@ -56,6 +56,8 @@ export function ChatTransferCenter() {
             <strong>{transfer.fileName ?? 'Arquivo'}{transfer.previewOnly ? ' · Prévia' : ''}</strong>
             <span>{open === 'send' ? 'Para' : 'De'} {transfer.peerName ?? 'Participante'}</span>
             <small>{statusText(transfer, speedUnit)}</small>
+            {transfer.connectionType && <small>{transfer.connectionType}
+              {transfer.rttMs !== null && transfer.rttMs !== undefined ? ` · ${transfer.rttMs} ms` : ''}</small>}
           </div>
           {transfer.status === 'complete' && transfer.direction === 'receive' && transfer.saved &&
             <button type="button" aria-label="Mostrar arquivo na pasta" title="Mostrar na pasta"
