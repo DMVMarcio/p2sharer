@@ -18,12 +18,12 @@ test('pipelined image chunks are assembled in offset order before acknowledgment
   manager.finishReceivedFile = async () => { manager.fileSessions.delete('request'); };
   const message = { id: 'file-message', file: { name: 'photo.png', size: session.total } };
 
-  session.pendingChunks.set(first.length, second.toString('base64'));
+  session.pendingChunks.set(first.length, new Uint8Array(second));
   await manager.processReceivedFileChunks('request', session, message);
   assert.equal(session.offset, 0);
   assert.deepEqual(acknowledgments, []);
 
-  session.pendingChunks.set(0, first.toString('base64'));
+  session.pendingChunks.set(0, new Uint8Array(first));
   await manager.processReceivedFileChunks('request', session, message);
   assert.deepEqual(acknowledgments, [first.length, session.total]);
   assert.deepEqual(Buffer.concat(session.chunks), Buffer.concat([first, second]));

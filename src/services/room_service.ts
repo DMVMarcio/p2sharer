@@ -40,6 +40,7 @@ export class RoomService {
   public savedDownloads: Record<string, string> = {};
   private imagePreviewBytes: Record<string, Uint8Array> = {};
   private transferRates = new Map<string, { at: number; bytes: number; speed: number }>();
+  private transferRouteChecks = new Map<string, number>();
   private localSaveIds = new Set<string>();
   private cancelledLocalSaves = new Set<string>();
   public peers: PeerInfo[] = [];
@@ -185,6 +186,7 @@ export class RoomService {
     this.fileRequests = [];
     this.fileProgress = {};
     this.transferRates.clear();
+    this.transferRouteChecks.clear();
     this.savedDownloads = {};
     this.localFilePreviews = {};
     this.peers = [];
@@ -488,6 +490,7 @@ export class RoomService {
     this.fileRequests = [];
     this.fileProgress = {};
     this.transferRates.clear();
+    this.transferRouteChecks.clear();
     this.savedDownloads = {};
     this.localFilePreviews = {};
     this.clearImagePreviews();
@@ -560,6 +563,20 @@ export class RoomService {
       bytesPerSecond,
     };
     this.fileProgress = { ...this.fileProgress, [entry.requestId]: entry };
+    if (entry.status === 'active' && entry.peerId && this.roomManager) {
+      const now = performance.now();
+      const last = this.transferRouteChecks.get(entry.requestId);
+      if (last === undefined || now - last >= 5000) {
+        this.transferRouteChecks.set(entry.requestId, now);
+        void this.roomManager.getPeerStats(entry.peerId).then((stats) => {
+          const current = this.fileProgress[entry.requestId];
+          if (!stats || !current || current.status !== 'active' || current.peerId !== entry.peerId) return;
+          this.fileProgress = { ...this.fileProgress, [entry.requestId]: {
+            ...current, connectionType: stats.connectionType, rttMs: stats.pingMs } };
+          this.notify();
+        });
+      }
+    } else if (entry.status !== 'pending') this.transferRouteChecks.delete(entry.requestId);
     if (entry.status === 'complete' && entry.previewOnly && entry.preview) {
       this.imagePreviews = { ...this.imagePreviews, [entry.messageId]: entry.preview };
       if (previewBytes) this.imagePreviewBytes[entry.messageId] = previewBytes;
