@@ -11,6 +11,7 @@ test('pipelined image chunks are assembled in offset order before acknowledgment
   const session = {
     messageId: 'file-message', peerId: 'sender', offset: 0, total: first.length + second.length,
     direction: 'receive', preview: true, chunks: [], pendingChunks: new Map(),
+    timings: { readMs: 0, prepareMs: 0, wireMs: 0, verifyMs: 0, writeMs: 0, ackMs: 0 },
   };
   manager.fileSessions.set('request', session);
   manager.sendFilePacket = async (_peerId: string, packet: { offset: number }) => { acknowledgments.push(packet.offset); };

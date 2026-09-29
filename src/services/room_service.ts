@@ -561,6 +561,7 @@ export class RoomService {
       startedAt: previous?.startedAt ?? Date.now(),
       isImage: progress.isImage ?? previous?.isImage ?? message?.file?.isImage ?? false,
       bytesPerSecond,
+      timings: progress.timings ?? previous?.timings,
     };
     this.fileProgress = { ...this.fileProgress, [entry.requestId]: entry };
     if (entry.status === 'active' && entry.peerId && this.roomManager) {
