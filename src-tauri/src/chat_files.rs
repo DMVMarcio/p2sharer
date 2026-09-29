@@ -192,8 +192,18 @@ pub fn read_chat_image_preview(state: State<'_, ChatFileState>, id: String) -> R
     let path = state.completed.lock().map_err(|e| e.to_string())?.get(&id).cloned()
         .or_else(|| state.sources.lock().ok()?.get(&id).cloned()).ok_or("Image unavailable")?;
     let bytes = fs::read(path).map_err(|e| e.to_string())?;
-    if bytes.len() > 10 * 1024 * 1024 || image::guess_format(&bytes).is_err() { return Err("Invalid image preview".into()); }
+    if bytes.len() > 16 * 1024 * 1024 || image::guess_format(&bytes).is_err() { return Err("Invalid image preview".into()); }
     Ok(STANDARD.encode(bytes))
+}
+
+#[tauri::command]
+pub fn reveal_chat_download(state: State<'_, ChatFileState>, id: String) -> Result<(), String> {
+    let path = state.completed.lock().map_err(|e| e.to_string())?.get(&id).cloned()
+        .ok_or("Download unavailable")?;
+    if !path.is_file() { return Err("Downloaded file is no longer available".into()); }
+    std::process::Command::new("explorer.exe").arg("/select,").arg(path)
+        .spawn().map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[cfg(test)]

@@ -25,12 +25,12 @@ export function ChatFileOfferDialog({ file, onClose, onOffer }: Props) {
         <div className="form-group"><label className="form-label" htmlFor="chat-file-name">Nome exibido</label>
           <input className="text-input" id="chat-file-name" value={name} maxLength={180}
             onChange={(event) => setName(event.target.value)} /></div>
+        <div className="chat-file-detail"><span>{formatFileSize(file.size)}</span><span>SHA-256 {file.hash}</span></div>
         <div className="chat-file-switch"><span>Aceitar solicitações</span>
           <label className="modern-switch"><input type="checkbox" checked={autoAccept}
             aria-label="Aceitar solicitações"
             onChange={(event) => setAutoAccept(event.target.checked)} /><span className="switch-slider" /></label></div>
         <p className="chat-file-observation"><strong>Obs:</strong> Ao ativar, todas as solicitações de download deste arquivo serão aceitas automaticamente pelos próximos 10 minutos.</p>
-        <div className="chat-file-detail"><span>{formatFileSize(file.size)}</span><span>SHA-256 {file.hash}</span></div>
         {error && <p className="chat-file-error">{error}</p>}
       </div>
       <div className="modal-footer"><button className="btn btn-secondary" onClick={onClose}>Cancelar</button>
