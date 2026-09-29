@@ -1,3 +1,5 @@
+import { attachIceDiagnostics } from './ice_config.ts';
+
 const FILE_CHANNEL_LOW_WATER_BYTES = 1024 * 1024;
 
 export interface FileOptimizedConnection extends RTCPeerConnection {
@@ -19,6 +21,7 @@ export function createFileOptimizedPeerConnection(): (new (configuration?: RTCCo
 
     constructor(configuration?: RTCConfiguration) {
       super(configuration);
+      attachIceDiagnostics(this);
       this.addEventListener('datachannel', ({ channel }) => {
         this.tuneChannel(channel);
       });

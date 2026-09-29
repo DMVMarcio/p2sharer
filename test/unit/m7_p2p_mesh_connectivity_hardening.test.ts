@@ -201,19 +201,14 @@ describe('M7: P2P Mesh Connectivity, Indirect Bridging & Signaling Stability Har
   // Area 3: ICE / WebRTC Configuration & Diagnostics
   // =========================================================================
   describe('Area 3: ICE Pre-Gathering & Informative Join Error Formatting', () => {
-    it('3.1: buildRtcConfiguration includes iceCandidatePoolSize: 2 and OpenRelay fallback TURN servers', () => {
+    it('3.1: default ICE configuration does not use failed public TURN credentials', () => {
       const rtcConfig = buildRtcConfiguration();
-      assert.equal(rtcConfig.iceCandidatePoolSize, 2);
+      assert.equal(rtcConfig.iceCandidatePoolSize, 0);
       assert.ok(Array.isArray(rtcConfig.iceServers));
-      assert.ok(rtcConfig.iceServers.length >= 2);
-      // Fallback TURN server must be present for symmetric NAT traversal
-      assert.ok(
-        rtcConfig.iceServers.some(
-          (server) =>
-            Array.isArray(server.urls) &&
-            server.urls.some((u) => u.includes('openrelay.metered.ca'))
-        )
-      );
+      assert.ok(rtcConfig.iceServers.length >= 1);
+      assert.ok(rtcConfig.iceServers.every((server) =>
+        (Array.isArray(server.urls) ? server.urls : [server.urls]).every((url) => !url.includes('openrelay.metered.ca'))
+      ));
     });
 
     it('3.2: formatJoinError provides non-alarmist explanation and maintains compatibility keywords', () => {

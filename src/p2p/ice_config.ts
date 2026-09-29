@@ -10,25 +10,23 @@ export const DEFAULT_STUN_SERVERS = [
   'stun:stun.services.mozilla.com',
 ];
 
-export const DEFAULT_FALLBACK_TURN_SERVERS: RTCIceServer[] = [
-  {
-    urls: [
-      'turn:openrelay.metered.ca:80',
-      'turn:openrelay.metered.ca:443',
-      'turns:openrelay.metered.ca:443?transport=tcp',
-    ],
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
-  },
-];
+const reportedIceServerErrors = new Map<string, number>();
 
 export function sanitizeTurnUrl(rawUrl: string): string {
   const trimmed = rawUrl.trim();
   if (!trimmed) return '';
-  if (trimmed.startsWith('turn:') || trimmed.startsWith('turns:') || trimmed.startsWith('stun:')) {
+  if (trimmed.startsWith('turn:') || trimmed.startsWith('turns:')) {
     return trimmed;
   }
   return `turn:${trimmed}`;
+}
+
+export function parseTurnUrls(rawUrls: string): string[] {
+  return [...new Set(rawUrls.split(/[\n,]+/).map(sanitizeTurnUrl).filter(Boolean))];
+}
+
+export function isValidTurnUrl(url: string): boolean {
+  return /^turns?:(?:\[[0-9a-f:.]+\]|[a-z0-9.-]+)(?::\d{1,5})?(?:\?transport=(?:udp|tcp))?$/i.test(url);
 }
 
 export function buildIceServers(turnConfig?: TurnConfig | null): RTCIceServer[] {
@@ -39,9 +37,10 @@ export function buildIceServers(turnConfig?: TurnConfig | null): RTCIceServer[] 
   ];
 
   if (turnConfig && turnConfig.enabled && turnConfig.url) {
-    const sanitizedUrl = sanitizeTurnUrl(turnConfig.url);
+    const urls = parseTurnUrls(turnConfig.url).filter(isValidTurnUrl);
+    if (urls.length === 0) return iceServers;
     const turnEntry: RTCIceServer = {
-      urls: sanitizedUrl,
+      urls,
     };
     if (turnConfig.username) {
       turnEntry.username = turnConfig.username;
@@ -50,9 +49,6 @@ export function buildIceServers(turnConfig?: TurnConfig | null): RTCIceServer[] 
       turnEntry.credential = turnConfig.credential;
     }
     iceServers.push(turnEntry);
-  } else {
-    // Automatic high-availability TURN fallback for Symmetric NAT / CGNAT traversal
-    iceServers.push(...DEFAULT_FALLBACK_TURN_SERVERS);
   }
 
   return iceServers;
@@ -62,8 +58,38 @@ export function buildRtcConfiguration(turnConfig?: TurnConfig | null): RTCConfig
   return {
     iceServers: buildIceServers(turnConfig),
     iceTransportPolicy: turnConfig?.forceRelay ? 'relay' : 'all',
-    iceCandidatePoolSize: 2,
+    iceCandidatePoolSize: 0,
   };
+}
+
+export function attachIceDiagnostics(connection: RTCPeerConnection): void {
+  connection.addEventListener('icecandidateerror', (event) => {
+    const error = event as RTCPeerConnectionIceErrorEvent;
+    const server = error.url.replace(/^([^:]+:)[^@]+@/, '$1***@');
+    const key = `${server}:${error.errorCode}`;
+    const now = Date.now();
+    if (now - (reportedIceServerErrors.get(key) ?? 0) < 60_000) return;
+    reportedIceServerErrors.set(key, now);
+    console.warn('[P2P/ICE] Candidate server error', {
+      server, code: error.errorCode, message: error.errorText,
+    });
+  });
+
+  connection.addEventListener('iceconnectionstatechange', () => {
+    if (connection.iceConnectionState !== 'failed') return;
+    void connection.getStats().then((stats) => {
+      const candidates = { local: { host: 0, srflx: 0, relay: 0 }, remote: { host: 0, srflx: 0, relay: 0 } };
+      stats.forEach((report) => {
+        if (report.type !== 'local-candidate' && report.type !== 'remote-candidate') return;
+        const side = report.type === 'local-candidate' ? candidates.local : candidates.remote;
+        const type = report.candidateType as keyof typeof side;
+        if (type in side) side[type]++;
+      });
+      console.warn('[P2P/ICE] Connection failed candidate summary', candidates);
+    }).catch((error) => {
+      console.warn('[P2P/ICE] Could not collect failed connection stats', error);
+    });
+  });
 }
 
 export interface JoinErrorDetails {

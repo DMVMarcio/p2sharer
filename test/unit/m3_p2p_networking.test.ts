@@ -310,9 +310,21 @@ describe('M3 Unit Tests: Robust P2P Networking & Signaling Failover', () => {
       const servers = buildIceServers(turnConfig);
       assert.equal(servers.length, 2);
       assert.deepEqual(servers[0]!.urls, DEFAULT_STUN_SERVERS);
-      assert.equal(servers[1]!.urls, 'turns:custom-turn.net:5349');
+      assert.deepEqual(servers[1]!.urls, ['turns:custom-turn.net:5349']);
       assert.equal(servers[1]!.username, 'user1');
       assert.equal(servers[1]!.credential, 'secret-password');
+    });
+
+    it('uses UDP and TCP TURN routes with one credential set', () => {
+      const servers = buildIceServers({
+        enabled: true,
+        url: 'turn:relay.example:3478?transport=udp\nturn:relay.example:3478?transport=tcp',
+        username: 'tester', credential: 'secret',
+      });
+      assert.deepEqual(servers[1]!.urls, [
+        'turn:relay.example:3478?transport=udp',
+        'turn:relay.example:3478?transport=tcp',
+      ]);
     });
 
     it('buildRtcConfiguration should enforce relay-only policy when forceRelay is true', () => {
