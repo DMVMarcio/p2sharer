@@ -9,6 +9,8 @@ import { ThemeMode } from '../../core/types';
 import { EMOJI_PACKS, EmojiPack, getEmojiPack, saveEmojiPack } from '../../core/emoji_preferences';
 import { getTransferSpeedUnit, saveTransferSpeedUnit, type TransferSpeedUnit } from '../../core/transfer_speed';
 import { EmojiGlyph } from '../common/EmojiGlyph';
+import { RendezvousServerEditor } from '../common/RendezvousServerEditor';
+import { loadRendezvousPreferences, saveRendezvousPreferences, validateRendezvousPreferences } from '../../p2p/relay_preferences.ts';
 
 export const SettingsModal: React.FC = () => {
   const { closeModal, isClosing } = useModal();
@@ -50,6 +52,7 @@ export const SettingsModal: React.FC = () => {
   const [turnForceRelay, setTurnForceRelay] = useState(
     () => localStorage.getItem('p2sharer_turn_force_relay') === 'true'
   );
+  const [rendezvousPreferences, setRendezvousPreferences] = useState(loadRendezvousPreferences);
 
   const [logPath, setLogPath] = useState('Carregando caminho do log...');
 
@@ -60,6 +63,12 @@ export const SettingsModal: React.FC = () => {
   }, []);
 
   const handleSave = () => {
+    const rendezvousError = validateRendezvousPreferences(rendezvousPreferences);
+    if (rendezvousError) {
+      setActiveTab('network');
+      showToast(rendezvousError);
+      return;
+    }
     // Save username
     if (nick.trim()) {
       stateStore.set((s) => {
@@ -103,6 +112,7 @@ export const SettingsModal: React.FC = () => {
     localStorage.setItem('p2sharer_turn_user', turnUser.trim());
     localStorage.setItem('p2sharer_turn_cred', turnCred.trim());
     localStorage.setItem('p2sharer_turn_force_relay', turnForceRelay ? 'true' : 'false');
+    saveRendezvousPreferences(rendezvousPreferences);
 
     closeModal();
     showToast('Configurações salvas com sucesso!');
@@ -233,7 +243,7 @@ export const SettingsModal: React.FC = () => {
                 <line x1="2" x2="22" y1="12" y2="12"/>
                 <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
               </svg>
-              <span>Rede & TURN</span>
+              <span>Rede & P2P</span>
             </button>
 
             <button
@@ -708,6 +718,14 @@ export const SettingsModal: React.FC = () => {
                     </div>
                   </div>
                 )}
+                <div className="settings-pane-header rendezvous-header">
+                  <h3 className="settings-pane-title">Servidores de encontro P2P</h3>
+                  <p className="settings-pane-desc">
+                    Escolha os servidores usados para localizar outros participantes. As alterações são aplicadas
+                    ao entrar novamente em uma sala.
+                  </p>
+                </div>
+                <RendezvousServerEditor preferences={rendezvousPreferences} onChange={setRendezvousPreferences} />
               </div>
             )}
 

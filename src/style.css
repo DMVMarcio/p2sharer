@@ -5035,3 +5035,12 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 
 
 
+.rendezvous-header { margin-top: 22px; }
+.rendezvous-editor { display: flex; flex-direction: column; gap: 10px; }
+.rendezvous-tabs, .rendezvous-add { display: flex; flex-wrap: wrap; gap: 8px; }
+.rendezvous-bulk-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.rendezvous-add .text-input-sm { flex: 1; min-width: 180px; }
+.rendezvous-list { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; }
+.rendezvous-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--border-default); border-radius: var(--radius-sm); }
+.rendezvous-server-url { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.rendezvous-error { color: var(--danger-text); font-size: 12px; }

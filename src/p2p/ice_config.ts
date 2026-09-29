@@ -79,7 +79,7 @@ export function formatJoinError(details: JoinErrorDetails): string {
 
   if (err.includes('after exchanging SDP') || err.includes('TURN')) {
     if (err.includes('check that your TURN server')) {
-      return `Falha de conexão WebRTC${peer}: servidor TURN configurado inacessível por ambos os peers.`;
+      return `Falha de conexão WebRTC${peer}: a troca de SDP terminou, mas nenhuma rota ICE foi estabelecida. Verifique a conectividade STUN/TURN e as credenciais do TURN, se configurado.`;
     }
     return `Falha de conexão WebRTC${peer} (NAT Simétrico / Timeout de ICE): rota direta não estabelecida a tempo. Configure um servidor TURN nas opções de rede se persistir.`;
   }
@@ -106,4 +106,3 @@ export function createJoinErrorHandler(
     }
   };
 }
-
