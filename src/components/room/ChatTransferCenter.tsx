@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Download, Square, Upload, X } from 'lucide-react';
+import { Download, FolderSearch, Square, Upload, X } from 'lucide-react';
 import { useRoom } from '../../hooks/useRoom';
+import { showToast } from '../../hooks/useToast';
 import { formatFileSize } from '../../core/file_size';
 import type { FileProgress } from '../../p2p/group_room';
 
@@ -15,7 +16,7 @@ function statusText(transfer: FileProgress): string {
 }
 
 export function ChatTransferCenter() {
-  const { fileProgress, cancelFileTransfer, dismissFileProgress } = useRoom();
+  const { fileProgress, cancelFileTransfer, dismissFileProgress, revealSavedFile } = useRoom();
   const [open, setOpen] = useState<'send' | 'receive' | null>(null);
   const root = useRef<HTMLDivElement>(null);
   const all = Object.values(fileProgress);
@@ -50,6 +51,10 @@ export function ChatTransferCenter() {
             <span>{open === 'send' ? 'Para' : 'De'} {transfer.peerName ?? 'Participante'}</span>
             <small>{statusText(transfer)}</small>
           </div>
+          {transfer.status === 'complete' && transfer.direction === 'receive' && transfer.saved &&
+            <button type="button" aria-label="Mostrar arquivo na pasta" title="Mostrar na pasta"
+              onClick={() => void revealSavedFile(transfer.messageId, transfer.requestId)
+                .catch(() => showToast('O arquivo não está mais disponível na pasta.'))}><FolderSearch size={15} /></button>}
           {transfer.status === 'pending' || transfer.status === 'active' ?
             <button type="button" aria-label="Cancelar transferência" onClick={() => void cancelFileTransfer(transfer.requestId)}><Square size={13} fill="currentColor" /></button> :
             <button type="button" aria-label="Remover do histórico" onClick={() => dismissFileProgress(transfer.requestId)}><X size={14} /></button>}

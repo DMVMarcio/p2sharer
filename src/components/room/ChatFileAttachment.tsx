@@ -1,15 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
-import { Download, File, Image as ImageIcon, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { Copy, Download, File, FolderSearch, Image as ImageIcon, X, ZoomIn, ZoomOut } from 'lucide-react';
 import type { ChatMessage } from '../../core/types';
 import type { FileProgress } from '../../p2p/group_room';
 import { selfId } from '@trystero-p2p/core';
 import { formatFileSize } from '../../core/file_size';
 import { FileProgressRing } from './FileProgressRing';
+import { MAX_IMAGE_PREVIEW_BYTES } from '../../core/chat_file_limits';
+import { Tooltip } from '../common/Tooltip';
+import { showToast } from '../../hooks/useToast';
 
-interface Props { message: ChatMessage; transfers: FileProgress[]; preview?: string;
-  onRequest: (saveAs: boolean) => void; onPreview: () => void; onCancel: (id: string) => void }
+interface Props { message: ChatMessage; transfers: FileProgress[]; preview?: string; savedRequestId?: string;
+  onRequest: (saveAs: boolean) => void; onPreview: () => void; onCancel: (id: string) => void;
+  onReveal: (id: string) => void }
 
-export function ChatFileAttachment({ message, transfers, preview, onRequest, onPreview, onCancel }: Props) {
+export function ChatFileAttachment({ message, transfers, preview, savedRequestId, onRequest, onPreview, onCancel, onReveal }: Props) {
   const [menu, setMenu] = useState(false);
   const [viewer, setViewer] = useState(false);
   const [zoom, setZoom] = useState(1);
@@ -23,6 +27,16 @@ export function ChatFileAttachment({ message, transfers, preview, onRequest, onP
   const completed = transfers.find((transfer) => transfer.direction === 'receive' && transfer.previewOnly && transfer.status === 'complete');
   const image = preview ?? completed?.preview;
   const own = message.authorId === selfId;
+  const setImageZoom = (next: number) => {
+    const bounded = Math.min(5, Math.max(1, next));
+    setZoom(bounded);
+    if (bounded === 1) { setPan({ x: 0, y: 0 }); drag.current = null; }
+  };
+  const copyHash = () => {
+    void navigator.clipboard.writeText(file.sha256)
+      .then(() => showToast('Assinatura copiada!'))
+      .catch(() => showToast('Não foi possível copiar a assinatura.'));
+  };
   useEffect(() => {
     if (!viewer) return;
     const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') setViewer(false); };
@@ -36,19 +50,25 @@ export function ChatFileAttachment({ message, transfers, preview, onRequest, onP
       {previewTransfer ? <FileProgressRing pending={previewTransfer.status === 'pending'}
         progress={previewTransfer.total ? previewTransfer.bytes / previewTransfer.total : 0}
         label="Cancelar solicitação de prévia" onCancel={() => onCancel(previewTransfer.requestId)} /> :
-        !own && file.size <= 10 * 1024 * 1024 ? <button type="button" className="chat-file-preview-request"
+        !own && file.size <= MAX_IMAGE_PREVIEW_BYTES ? <button type="button" className="chat-file-preview-request"
           aria-label={`Baixar prévia de ${file.name}`} onClick={onPreview}><Download size={20} /></button> :
           <ImageIcon size={22} aria-hidden="true" />}
       <span>{previewTransfer?.status === 'pending' ? 'Solicitação enviada' :
         previewTransfer?.status === 'active' ? 'Baixando prévia...' :
-        file.size > 10 * 1024 * 1024 ? 'Prévia indisponível' : 'Baixar prévia'}</span>
+        file.size > MAX_IMAGE_PREVIEW_BYTES ? 'Prévia indisponível' : 'Baixar prévia'}</span>
     </div>}
     <div className="chat-file-card-row">
       {file.isImage ? <ImageIcon size={19} /> : <File size={19} />}
-      <div className="chat-file-card-info"><strong>{file.name}</strong><span>{formatFileSize(file.size)} · SHA-256 {file.sha256}</span>
+      <div className="chat-file-card-info"><strong>{file.name}</strong>
+        <span className="chat-file-meta">{formatFileSize(file.size)} · <span className="chat-file-hash">{file.sha256.slice(0, 16)}…</span>
+          <Tooltip content={file.sha256} tooltipClassName="chat-file-hash-tooltip"><button type="button"
+            className="chat-file-copy-hash" aria-label="Copiar assinatura completa" onClick={copyHash}><Copy size={12} /></button></Tooltip></span>
         {receiving && <small>{receiving.status === 'pending' ? 'Solicitação enviada' :
-          `${Math.round(receiving.total ? receiving.bytes / receiving.total * 100 : 100)}% recebido`}</small>}</div>
+          `${Math.round(receiving.total ? receiving.bytes / receiving.total * 100 : 100)}% · ${formatFileSize(receiving.bytes)} de ${formatFileSize(receiving.total)}`}</small>}
+        {!receiving && savedRequestId && <small>Download concluído</small>}</div>
       {!own && <div className="chat-file-download-wrap">
+        {savedRequestId && <Tooltip content="Mostrar na pasta"><button type="button" className="chat-file-reveal-button"
+          aria-label="Mostrar arquivo na pasta" onClick={() => onReveal(savedRequestId)}><FolderSearch size={16} /></button></Tooltip>}
         {receiving ? <FileProgressRing pending={receiving.status === 'pending'}
           progress={receiving.total ? receiving.bytes / receiving.total : 0}
           label="Cancelar download" onCancel={() => onCancel(receiving.requestId)} /> :
@@ -61,13 +81,13 @@ export function ChatFileAttachment({ message, transfers, preview, onRequest, onP
     </div>
     {viewer && image && <div className="chat-image-viewer" role="dialog" aria-modal="true" aria-label={file.name}
       onClick={(event) => { if (event.target === event.currentTarget) setViewer(false); }}
-      onWheel={(event) => { event.preventDefault(); setZoom((value) => Math.min(5, Math.max(1, value + (event.deltaY < 0 ? .25 : -.25)))); }}>
+      onWheel={(event) => { event.preventDefault(); setImageZoom(zoom + (event.deltaY < 0 ? .25 : -.25)); }}>
       <div className="chat-image-viewer-toolbar"><span>{file.name}</span>
-        <button aria-label="Reduzir" onClick={() => setZoom((value) => Math.max(1, value - .25))}><ZoomOut size={18} /></button>
+        <button className="btn-stream-fullscreen" aria-label="Reduzir" onClick={() => setImageZoom(zoom - .25)}><ZoomOut size={16} /></button>
         <span>{Math.round(zoom * 100)}%</span>
-        <button aria-label="Ampliar" onClick={() => setZoom((value) => Math.min(5, value + .25))}><ZoomIn size={18} /></button>
-        <button aria-label="Fechar" onClick={() => setViewer(false)}><X size={18} /></button></div>
-      <div className="chat-image-viewer-stage"><img src={image} alt={file.name}
+        <button className="btn-stream-fullscreen" aria-label="Ampliar" onClick={() => setImageZoom(zoom + .25)}><ZoomIn size={16} /></button>
+        <button className="btn-stream-fullscreen" aria-label="Fechar" onClick={() => setViewer(false)}><X size={16} /></button></div>
+      <div className="chat-image-viewer-stage" onClick={(event) => { if (event.target === event.currentTarget) setViewer(false); }}><img src={image} alt={file.name}
         draggable={false} className={zoom > 1 ? 'is-zoomed' : ''}
         style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}
         onPointerDown={(event) => { if (zoom <= 1) return; event.currentTarget.setPointerCapture(event.pointerId);

@@ -22,7 +22,7 @@ import { showToast } from '../../hooks/useToast';
 export const ChatPane: React.FC = () => {
   const { chatMessages, sendChatMessage, editChatMessage, deleteChatMessage, offerFile,
     requestFile, requestFilePreview, cancelFileTransfer, fileProgress,
-    localFilePreviews, imagePreviews } = useRoom();
+    localFilePreviews, imagePreviews, savedDownloads, revealSavedFile } = useRoom();
   const [selectedFile, setSelectedFile] = useState<NativeChatFile | null>(null);
   const [inputText, setInputText] = useState('');
   const [pickerTarget, setPickerTarget] = useState<'compose' | 'edit' | null>(null);
@@ -126,7 +126,13 @@ export const ChatPane: React.FC = () => {
     catch { showToast('Não foi possível abrir o arquivo.'); }
   };
   const startDownload = (messageId: string, saveAs: boolean) => {
-    void requestFile(messageId, saveAs).catch(() => showToast('Download indisponível. Verifique se o autor está conectado.'));
+    void requestFile(messageId, saveAs).catch((error) => {
+      console.warn('[Files] Could not save download:', error);
+      showToast('Não foi possível salvar o arquivo.');
+    });
+  };
+  const revealDownload = (messageId: string, requestId: string) => {
+    void revealSavedFile(messageId, requestId).catch(() => showToast('O arquivo não está mais disponível na pasta.'));
   };
 
   return (
@@ -190,9 +196,11 @@ export const ChatPane: React.FC = () => {
                 </div> : msg.file ? <ChatFileAttachment message={msg}
                   transfers={Object.values(fileProgress).filter((transfer) => transfer.messageId === msg.id)}
                   preview={localFilePreviews[msg.id] ?? imagePreviews[msg.id]}
+                  savedRequestId={savedDownloads[msg.id]}
                   onRequest={(saveAs) => startDownload(msg.id, saveAs)}
                   onPreview={() => void requestFilePreview(msg.id).catch(() => showToast('Prévia indisponível. Verifique se o autor está conectado.'))}
-                  onCancel={(id) => void cancelFileTransfer(id)} /> : <ChatMessageContent text={msg.text} pack={emojiPack} />}
+                  onCancel={(id) => void cancelFileTransfer(id)}
+                  onReveal={(id) => revealDownload(msg.id, id)} /> : <ChatMessageContent text={msg.text} pack={emojiPack} />}
               </div>
             </div>
           );
