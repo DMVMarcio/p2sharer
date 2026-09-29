@@ -30,6 +30,7 @@ function transportText(transfer: FileProgress, unit: TransferSpeedUnit): string 
   const details = transfer.transport;
   if (!details) return null;
   const parts: string[] = [];
+  if (details.channelLabel === 'chat_file_bulk_v1') parts.push('Canal dedicado');
   if (details.protocol) parts.push(details.protocol.toUpperCase());
   if (details.localCandidateType && details.remoteCandidateType) {
     parts.push(`${details.localCandidateType} → ${details.remoteCandidateType}`);
