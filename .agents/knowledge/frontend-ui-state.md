@@ -1,5 +1,9 @@
 # Deep Dive: Frontend Architecture, State & UI System
 
+## Remote Screen PiP Audio
+
+Remote screen PiP keeps audio in the main window's `AudioContextManager` sink, where remote stream playback already works, while its loopback WebRTC connection carries only the video track. The PiP video element stays muted for reliable autoplay in WebView2. Initial audio volume and mute state travel with the offer, and PiP control changes return as validated `audio-settings` signals to update the main sink. The sink remains active when PiP closes so the regular stream card inherits the latest volume.
+
 ## Overview
 The frontend is built using TypeScript 5.6, HTML5, and CSS3, bundled via Vite 6. It follows a modular structure without heavy single-page application framework overhead, achieving sub-millisecond DOM updates and minimal memory consumption.
 

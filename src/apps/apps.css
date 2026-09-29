@@ -184,7 +184,6 @@
   cursor: pointer; opacity: 0; pointer-events: none;
   transition: opacity 340ms ease-in-out 180ms, background var(--transition-fast); }
 .youtube-theater-toggle { right: 10px; }
-.youtube-pip-toggle { right: 150px; }
 .youtube-player-frame:hover .youtube-theater-toggle, .youtube-player-frame:focus-within .youtube-theater-toggle {
   opacity: 1; pointer-events: auto; transition-delay: 120ms, 0ms; }
 .youtube-theater-toggle:hover { background: #333337; }

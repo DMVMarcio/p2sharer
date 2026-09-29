@@ -8,6 +8,7 @@ import { ZoomControlBar } from './ZoomControlBar';
 import { StreamStatsOverlay } from './StreamStatsOverlay';
 import { buildIceServers } from '../../p2p/ice_config';
 import { initFrontendLogger } from '../../core/logger';
+import { validPipAudioSettings } from '../../services/pip_audio';
 
 interface PipViewProps {
   peerId: string;
@@ -63,6 +64,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
   const bcRef = useRef<BroadcastChannel | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const unlistenSignalRef = useRef<UnlistenFn | null>(null);
+  const sendSignalRef = useRef<((data: Record<string, unknown>) => void) | null>(null);
   const isVideoPlayingRef = useRef(false);
 
   const {
@@ -101,6 +103,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
         try { bc?.postMessage(payload); } catch {}
       }
     };
+    sendSignalRef.current = sendSignal;
 
     pc.ontrack = (event) => {
       setConnectionError(null);
@@ -123,17 +126,10 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
         if (videoRef.current.srcObject !== targetStream) {
           videoRef.current.srcObject = targetStream;
         }
-        videoRef.current.play().catch(() => {
-          // Secondary WebViews can block unmuted autoplay. Start video muted,
-          // then let the viewer enable audio with the existing volume control.
-          if (videoRef.current) {
-            videoRef.current.muted = true;
-            setIsMuted(true);
-            videoRef.current.play().catch((err) => {
-              console.warn('[PipView] Video playback failed:', err);
-              setConnectionError('Não foi possível reproduzir a transmissão.');
-            });
-          }
+        videoRef.current.muted = true;
+        videoRef.current.play().catch((err) => {
+          console.warn('[PipView] Video playback failed:', err);
+          setConnectionError('Não foi possível reproduzir a transmissão.');
         });
       }
 
@@ -167,6 +163,11 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
           if (typeof data.isLocal === 'boolean') {
             setIsLocal(data.isLocal);
             if (data.isLocal) setIsMuted(true);
+          }
+          if (!data.isLocal && validPipAudioSettings(data.audioSettings)) {
+            setVolume(data.audioSettings.volume);
+            setIsMuted(data.audioSettings.muted);
+            if (data.audioSettings.volume > 0) setLastVolume(data.audioSettings.volume);
           }
 
           if (data.sdp && typeof data.sdp === 'string') {
@@ -222,8 +223,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
         case 'main-closed': {
           // Main window closed or stream restored; close this window
           try {
-            const { getCurrentWindow } = await import('@tauri-apps/api/window');
-            await getCurrentWindow().close();
+            await invoke('close_pip_window', { peerId });
           } catch {
             window.close();
           }
@@ -321,6 +321,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
         unlistenSignalRef.current();
         unlistenSignalRef.current = null;
       }
+      if (sendSignalRef.current === sendSignal) sendSignalRef.current = null;
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -338,16 +339,9 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
         unlistenSignalRef.current();
         unlistenSignalRef.current = null;
       }
+      if (sendSignalRef.current === sendSignal) sendSignalRef.current = null;
     };
   }, [peerId]);
-
-  // Sync video element audio volume
-  useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.volume = volume / 100;
-      videoRef.current.muted = isMuted;
-    }
-  }, [volume, isMuted]);
 
   const handleToggleMute = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -355,10 +349,12 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
       const targetVol = lastVolume || 100;
       setVolume(targetVol);
       setIsMuted(false);
+      sendSignalRef.current?.({ type: 'audio-settings', volume: targetVol, muted: false });
     } else {
       setLastVolume(volume || 100);
       setVolume(0);
       setIsMuted(true);
+      sendSignalRef.current?.({ type: 'audio-settings', volume: 0, muted: true });
     }
   };
 
@@ -368,6 +364,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
     setVolume(val);
     setIsMuted(val === 0);
     if (val > 0) setLastVolume(val);
+    sendSignalRef.current?.({ type: 'audio-settings', volume: val, muted: val === 0 });
   };
 
   const handleToggleAlwaysOnTop = async (e: React.MouseEvent) => {
@@ -395,8 +392,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
       emit(`pip-signal-${peerId}`, { type: 'pip-close' }).catch(() => {});
     } catch {}
     try {
-      const { getCurrentWindow } = await import('@tauri-apps/api/window');
-      await getCurrentWindow().close();
+      await invoke('close_pip_window', { peerId });
     } catch {
       window.close();
     }
@@ -426,7 +422,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
         className="pip-video-element"
         autoPlay
         playsInline
-        muted={isMuted}
+        muted
         onPlaying={() => {
           isVideoPlayingRef.current = true;
           setIsVideoPlaying(true);

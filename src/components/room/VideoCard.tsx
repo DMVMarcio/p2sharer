@@ -127,14 +127,12 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   }, [cleanupVideoElement]);
 
   useEffect(() => {
-    if (!slot.isLocal && slot.stream && !isPipActive) {
+    if (!slot.isLocal && slot.stream) {
       audioContextManager.attachPeerAudio(slot.peerId, slot.stream);
       const st = audioContextManager.getPeerVolumeState(slot.peerId);
       setVolume(st.volume);
       setIsMuted(st.isMuted);
       if (st.volume > 0) setLastVolume(st.volume);
-    } else if (isPipActive) {
-      audioContextManager.setPeerVolume(slot.peerId, 0, true);
     }
   }, [slot.isLocal, slot.peerId, slot.stream, isPipActive]);
 

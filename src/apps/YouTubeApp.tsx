@@ -511,10 +511,6 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
           <SquarePlay size={30} strokeWidth={1.5} />
           <span>Adicione um vídeo para começar</span>
         </div>}
-        {isTauri() && current && !pipActive && !compact && <TooltipButton tooltip="Picture-in-Picture"
-          className="youtube-theater-toggle youtube-pip-toggle" onClick={() => void openPip()}>
-          <PictureInPicture2 size={16} /><span>PiP</span>
-        </TooltipButton>}
         {!pipActive && <TooltipButton tooltip={theater ? 'Sair do modo teatro' : 'Modo teatro'} className="youtube-theater-toggle"
           onClick={() => setTheater(!theater)}>
           {theater ? <Minimize2 size={16} /> : <Expand size={16} />}
@@ -535,7 +531,8 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
         onTogglePlayback={togglePlayback}
         onPrevious={() => state.index > 0 ? select(state.index - 1) : seek(0)}
         onNext={next} onSeek={seek} onVolume={setLocalVolume}
-        onToggleMute={toggleMute} onToggleCaptions={toggleCaptions} />
+        onToggleMute={toggleMute} onToggleCaptions={toggleCaptions}
+        onPictureInPicture={isTauri() && current && !pipActive ? () => void openPip() : undefined} />
       <div className="youtube-queue-header">
         <div><ListVideo size={16} /><strong>Fila de reprodução</strong><span>{state.queue.length}</span></div>
         <div className="youtube-queue-modes" aria-label="Opções da fila">
