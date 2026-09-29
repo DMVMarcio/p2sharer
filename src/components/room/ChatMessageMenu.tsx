@@ -1,4 +1,4 @@
-import { Copy, MoreHorizontal, Pencil, Reply, Trash2 } from 'lucide-react';
+import { Copy, Download, MoreHorizontal, Pencil, Reply, Trash2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 
 type Props = {
@@ -9,9 +9,11 @@ type Props = {
   onCopy: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onSaveAs?: () => void;
+  isFile?: boolean;
 };
 
-export function ChatMessageMenu({ open, own, onToggle, onReply, onCopy, onEdit, onDelete }: Props) {
+export function ChatMessageMenu({ open, own, onToggle, onReply, onCopy, onEdit, onDelete, onSaveAs, isFile }: Props) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [up, setUp] = useState(false);
   const toggle = () => {
@@ -24,9 +26,10 @@ export function ChatMessageMenu({ open, own, onToggle, onReply, onCopy, onEdit, 
     <button ref={triggerRef} type="button" className="chat-msg-menu-trigger" aria-label="Ações da mensagem" aria-expanded={open} onClick={toggle}><MoreHorizontal size={17} /></button>
     {open && <div className={`chat-msg-menu ${up ? 'chat-msg-menu-up' : ''}`} role="menu">
       <button type="button" role="menuitem" onClick={onReply}><Reply size={15} /> Responder</button>
-      <button type="button" role="menuitem" onClick={onCopy}><Copy size={15} /> Copiar Texto</button>
+      {isFile && onSaveAs && !own && <button type="button" role="menuitem" onClick={onSaveAs}><Download size={15} /> Salvar Como</button>}
+      {!isFile && <button type="button" role="menuitem" onClick={onCopy}><Copy size={15} /> Copiar Texto</button>}
       {own && <>
-        <button type="button" role="menuitem" onClick={onEdit}><Pencil size={15} /> Editar</button>
+        {!isFile && <button type="button" role="menuitem" onClick={onEdit}><Pencil size={15} /> Editar</button>}
         <button type="button" role="menuitem" className="chat-msg-delete" onClick={onDelete}><Trash2 size={15} /> Excluir</button>
       </>}
     </div>}

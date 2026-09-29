@@ -3013,6 +3013,7 @@ version = "1.0.0"
 dependencies = [
  "base64 0.22.1",
  "byteorder",
+ "dirs",
  "fast_image_resize",
  "futures-util",
  "getrandom 0.2.17",
@@ -3022,6 +3023,7 @@ dependencies = [
  "rfd",
  "serde",
  "serde_json",
+ "sha2",
  "sysinfo",
  "tauri",
  "tauri-build",

@@ -1,6 +1,7 @@
 pub mod audio_loopback;
 pub mod logger;
 pub mod note_files;
+pub mod chat_files;
 pub mod pip_manager;
 pub mod process_manager;
 pub mod room_vault;
@@ -9,6 +10,7 @@ pub mod screen_sources;
 use audio_loopback::{start_audio_capture, stop_audio_capture};
 use logger::{clear_log_file, get_log_file_path, open_latest_log, open_log_folder, write_frontend_log};
 use note_files::{open_note_file, save_note_file};
+use chat_files::{ChatFileState, pick_chat_file, inspect_chat_file, read_chat_file_chunk, choose_chat_download, write_chat_download_chunk, finish_chat_download, cancel_chat_download, read_chat_image_preview, remember_chat_file_source, restore_chat_file_source};
 use pip_manager::{close_pip_window, open_pip_window, set_pip_always_on_top};
 use process_manager::{
     list_audio_processes, setup_job_object_for_clean_child_teardown,
@@ -45,6 +47,7 @@ pub fn run() {
     ensure_ws_server_running();
 
     tauri::Builder::default()
+        .manage(ChatFileState::default())
         .plugin(tauri_plugin_opener::init())
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
@@ -80,7 +83,17 @@ pub fn run() {
             list_room_records,
             delete_room_record,
             open_note_file,
-            save_note_file
+            save_note_file,
+            pick_chat_file,
+            inspect_chat_file,
+            read_chat_file_chunk,
+            choose_chat_download,
+            write_chat_download_chunk,
+            finish_chat_download,
+            cancel_chat_download,
+            read_chat_image_preview,
+            remember_chat_file_source,
+            restore_chat_file_source
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

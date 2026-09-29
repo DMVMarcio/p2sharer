@@ -9,6 +9,7 @@ function signedChatData(roomId: string, message: ChatMessage): Uint8Array {
   return encoder.encode(JSON.stringify([
     'p2sharer-chat-v1', roomId.toLowerCase(), message.id, message.authorId,
     message.sender, message.text, message.timestamp, message.revision ?? 0,
+    message.file ? [message.file.name, message.file.size, message.file.sha256, message.file.isImage] : null,
     message.editedAt ?? null, message.deletedAt ?? null,
     message.replyTo ? [message.replyTo.id, message.replyTo.sender, message.replyTo.text] : null,
     Boolean(message.isHost), Boolean(message.isSystem), message.systemType ?? null,
@@ -25,6 +26,14 @@ function hasSafeChatShape(value: unknown): value is SignedChatMessage {
     typeof message.authorId === 'string' && message.authorId.length > 0 && message.authorId.length <= 80 &&
     typeof message.sender === 'string' && message.sender.length <= 80 &&
     typeof message.text === 'string' && message.text.length <= 4000 &&
+    (message.file === undefined || (message.file !== null && typeof message.file === 'object' &&
+      typeof message.file.name === 'string' &&
+      message.file.name.length > 0 && message.file.name.length <= 180 &&
+      !/[\\/:*?"<>|\x00-\x1f]/.test(message.file.name) &&
+      Number.isSafeInteger(message.file.size) && message.file.size >= 0 && message.file.size <= 2 * 1024 ** 3 &&
+      typeof message.file.sha256 === 'string' && /^[0-9a-f]{64}$/.test(message.file.sha256) &&
+      typeof message.file.isImage === 'boolean' &&
+      (!message.file.isImage || /\.(png|jpe?g|gif|webp|bmp)$/i.test(message.file.name)))) &&
     Number.isFinite(message.timestamp) &&
     Number.isInteger(message.revision) && (message.revision ?? -1) >= 0 && (message.revision ?? 0) <= 100000 &&
     (message.editedAt === undefined || Number.isFinite(message.editedAt)) &&

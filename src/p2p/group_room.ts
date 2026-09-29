@@ -1,4 +1,5 @@
 import { selfId } from '@trystero-p2p/core';
+import { invoke } from '@tauri-apps/api/core';
 import type { AppWireEvent } from '../apps/types.ts';
 import { getRoomApp } from '../apps/registry.ts';
 import { chatHistoryChanged, chatRevision, chatRevisionKey, mergeChatHistory } from '../core/chat_history.ts';
@@ -77,6 +78,8 @@ export function generateUserColor(name: string): string {
 }
 
 export interface RoomCallbacks {
+  onFileRequest?: (request: FileRequest) => void;
+  onFileProgress?: (transfer: FileProgress) => void;
   onAppEvent?: (event: AppWireEvent, peerId: string) => void;
   onStreamsUpdate: (streams: ActiveStreamInfo[]) => void;
   onSlotsUpdate: (slots: RoomSlotInfo[]) => void;
@@ -94,6 +97,12 @@ export interface RoomCallbacks {
   onWatchStarted?: (watcherPeerId: string, watcherName: string, broadcasterPeerId: string) => void;
   onWatchStopped?: (watcherPeerId: string, watcherName: string, broadcasterPeerId: string) => void;
 }
+
+export interface NativeChatFile { id: string; name: string; path: string; size: number; hash: string; isImage: boolean }
+export interface FileRequest { requestId: string; messageId: string; peerId: string; peerName: string; path: string; name: string; preview: boolean }
+export interface FileProgress { requestId: string; messageId: string; direction: 'send' | 'receive'; bytes: number; total: number; status: 'pending' | 'active' | 'complete' | 'cancelled' | 'error'; error?: string; preview?: string }
+type FilePacket = { kind: 'request' | 'accept' | 'deny' | 'chunk' | 'ack' | 'cancel'; requestId: string; messageId: string; offset?: number; data?: string; preview?: boolean; signature: string };
+type FileSession = { messageId: string; peerId: string; sourceId?: string; offset: number; total: number; direction: 'send' | 'receive'; preview?: boolean; chunks?: Uint8Array[] };
 
 interface PeerExchangeItem {
   peerId: string;
@@ -118,6 +127,11 @@ export class GroupRoomManager {
   private peerTracker = new PeerTracker();
   private remoteStreams: Map<string, MediaStream> = new Map(); // peerId -> stream
   private chatHistory: ChatMessage[] = [];
+  private fileSources = new Map<string, { file: NativeChatFile; autoAcceptUntil: number }>();
+  private fileSessions = new Map<string, FileSession>();
+  private pendingFileRequests = new Map<string, FileRequest>();
+  private requestedImagePreviews = new Set<string>();
+  private fileAction: any = null;
   private seenChatRevisions: Set<string> = new Set();
   private chatAuth: PeerAuthenticator | null = null;
   private authority: RoomAuthority | null = null;
@@ -577,6 +591,9 @@ export class GroupRoomManager {
   private announceToPeer(peerId: string): void {
     if (!this.room || !this.peerTracker.isVerified(peerId)) return;
     if (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(peerId))) return;
+    for (const message of this.chatHistory) {
+      if (message.authorKey === this.chatAuth?.getKnownKey(peerId) && message.file?.isImage) void this.requestFilePreview(message.id);
+    }
     this.presenceAction?.send({
       username: this.username, isCreator: this.isRoomHost(),
       isStreaming: Boolean(this.localStream), joinedAt: this.myJoinedAt,
@@ -970,6 +987,12 @@ export class GroupRoomManager {
       if (!chatHistoryChanged(this.chatHistory, merged)) return;
       this.seenChatRevisions.add(revisionKey);
       this.chatHistory = merged;
+      if (msg.deletedAt && msg.file) {
+        for (const [requestId, session] of this.fileSessions) {
+          if (session.messageId === msg.id) void this.cancelFileTransfer(requestId);
+        }
+      }
+      if (msg.file?.isImage) void this.requestFilePreview(msg.id);
       if (this.callbacks) {
         this.callbacks.onChat(msg);
       }
@@ -978,6 +1001,11 @@ export class GroupRoomManager {
       try {
         this.sendRoomAction(this.chatAction, msg);
       } catch {}
+    };
+
+    this.fileAction = this.room.makeAction('chat_file_v1');
+    this.fileAction.onMessage = (packet: FilePacket, meta: { peerId: string }) => {
+      void this.handleFilePacket(packet, meta.peerId);
     };
 
     // 2. Setup Chat History Sync Action (P2P pull from host / peers)
@@ -1000,6 +1028,7 @@ export class GroupRoomManager {
         if (chatHistoryChanged(this.chatHistory, merged)) {
           merged.forEach((m) => this.seenChatRevisions.add(chatRevisionKey(m)));
           this.chatHistory = merged;
+          for (const message of verified) if (message.file?.isImage) void this.requestFilePreview(message.id);
           if (this.callbacks) {
             this.callbacks.onChatHistory(this.chatHistory);
           }
@@ -1331,7 +1360,7 @@ export class GroupRoomManager {
       this.pexAction, this.meshRelayAction, this.watchAction,
       this.pingAction, this.pongAction, this.identityAction,
       this.authorityAction, this.admissionAction, this.inviteAction,
-      this.appAction,
+      this.appAction, this.fileAction,
     ].forEach((action) => {
       if (!action?.onMessage) return;
       const handler = action.onMessage;
@@ -1571,6 +1600,16 @@ export class GroupRoomManager {
   }
 
   private removePeer(peerId: string) {
+    for (const [requestId, session] of this.fileSessions) {
+      if (session.peerId !== peerId) continue;
+      this.fileSessions.delete(requestId);
+      if (session.preview) this.requestedImagePreviews.delete(session.messageId);
+      if (session.direction === 'receive' && !session.preview) void invoke('cancel_chat_download', { id: requestId });
+      this.emitFileProgress(requestId, 'cancelled', session.offset, session.messageId, session.direction, session.total);
+    }
+    for (const [requestId, request] of this.pendingFileRequests) {
+      if (request.peerId === peerId) this.pendingFileRequests.delete(requestId);
+    }
     const announcedName = this.announcedPeerNames.get(peerId);
     this.announcedPeerNames.delete(peerId);
     this.pendingJoinNotices.delete(peerId);
@@ -2219,9 +2258,251 @@ export class GroupRoomManager {
     return this.publishChatMessage(msg);
   }
 
+  public async offerFile(file: NativeChatFile, name: string, autoAccept: boolean): Promise<ChatMessage> {
+    if (!name || name.length > 180 || /[\\/:*?"<>|\x00-\x1f]/.test(name)) throw new Error('Invalid file name');
+    const checked = await invoke<NativeChatFile>('inspect_chat_file', { id: file.id });
+    if (checked.hash !== file.hash || checked.size !== file.size) throw new Error('Source file changed');
+    const id = crypto.randomUUID();
+    this.fileSources.set(id, { file, autoAcceptUntil: autoAccept ? Date.now() + 10 * 60_000 : 0 });
+    try { const message = await this.publishChatMessage({ id, sender: this.username,
+      text: '', timestamp: Date.now(), authorId: selfId, revision: 0, isHost: this.isCreator,
+      file: { name, size: file.size, sha256: file.hash,
+        isImage: file.isImage && /\.(png|jpe?g|gif|webp|bmp)$/i.test(name) } });
+      try { await invoke('remember_chat_file_source', { roomId: this.roomId, messageId: id, sourceId: file.id }); }
+      catch (error) { console.warn('[Files] Could not remember source for a future session:', error); }
+      return message; }
+    catch (error) { this.fileSources.delete(id); throw error; }
+  }
+
+  public async requestFile(messageId: string, saveAs: boolean): Promise<string | null> {
+    const message = this.chatHistory.find((item) => item.id === messageId && !item.deletedAt);
+    const authorPeerId = message?.authorKey && this.peerTracker.getVerifiedPeers().find((peer) =>
+      this.chatAuth?.getKnownKey(peer.id) === message.authorKey)?.id;
+    if (!message?.file || !authorPeerId || message.authorKey === this.chatAuth?.publicKey ||
+        (this.authority && !this.isAdmittedPeer(authorPeerId))) {
+      throw new Error('File author is not directly connected');
+    }
+    const requestId = crypto.randomUUID();
+    if (this.fileSessions.size >= 8) throw new Error('Too many active transfers');
+    if (!await invoke<boolean>('choose_chat_download', { id: requestId, name: message.file.name,
+      size: message.file.size, hash: message.file.sha256, saveAs })) return null;
+    this.fileSessions.set(requestId, { messageId, peerId: authorPeerId, offset: 0,
+      total: message.file.size, direction: 'receive' });
+    this.emitFileProgress(requestId, 'pending');
+    try { await this.sendFilePacket(authorPeerId, { kind: 'request', requestId, messageId }); }
+    catch (error) {
+      this.fileSessions.delete(requestId);
+      await invoke('cancel_chat_download', { id: requestId });
+      throw error;
+    }
+    return requestId;
+  }
+
+  private async requestFilePreview(messageId: string): Promise<void> {
+    const message = this.chatHistory.find((item) => item.id === messageId && !item.deletedAt);
+    const authorPeerId = message?.authorKey && this.peerTracker.getVerifiedPeers().find((peer) =>
+      this.chatAuth?.getKnownKey(peer.id) === message.authorKey)?.id;
+    if (!message?.file?.isImage || message.file.size > 10 * 1024 * 1024 ||
+        !authorPeerId || message.authorKey === this.chatAuth?.publicKey ||
+        this.requestedImagePreviews.has(messageId) ||
+        (this.authority && !this.isAdmittedPeer(authorPeerId)) || this.fileSessions.size >= 8) return;
+    this.requestedImagePreviews.add(messageId);
+    const requestId = crypto.randomUUID();
+    this.fileSessions.set(requestId, { messageId, peerId: authorPeerId, offset: 0,
+      total: message.file.size, direction: 'receive', preview: true, chunks: [] });
+    try { await this.sendFilePacket(authorPeerId, { kind: 'request', requestId, messageId, preview: true }); }
+    catch { this.fileSessions.delete(requestId); this.requestedImagePreviews.delete(messageId); }
+  }
+
+  public async answerFileRequest(requestId: string, accept: boolean): Promise<void> {
+    const request = this.pendingFileRequests.get(requestId);
+    if (!request) return;
+    this.pendingFileRequests.delete(requestId);
+    const source = this.fileSources.get(request.messageId);
+    const message = this.chatHistory.find((item) => item.id === request.messageId && !item.deletedAt);
+    if (!accept || !source || !message?.file) {
+      await this.sendFilePacket(request.peerId, { kind: 'deny', requestId, messageId: request.messageId });
+      return;
+    }
+    try {
+      const checked = await invoke<NativeChatFile>('inspect_chat_file', { id: source.file.id });
+      if (checked.hash !== message.file.sha256 || checked.size !== message.file.size || checked.path !== source.file.path) {
+        throw new Error('Source file changed or moved');
+      }
+      this.fileSessions.set(requestId, { messageId: request.messageId, peerId: request.peerId,
+        sourceId: source.file.id, offset: 0, total: checked.size, direction: 'send' });
+      this.emitFileProgress(requestId, 'active');
+      await this.sendFilePacket(request.peerId, { kind: 'accept', requestId, messageId: request.messageId });
+      if (checked.size > 0) await this.sendNextFileChunk(requestId);
+      else { this.fileSessions.delete(requestId); this.emitFileProgress(requestId, 'complete', 0, request.messageId, 'send', 0); }
+    } catch (error) {
+      await this.sendFilePacket(request.peerId, { kind: 'deny', requestId, messageId: request.messageId });
+      this.callbacks?.onFileProgress?.({ requestId, messageId: request.messageId, direction: 'send',
+        bytes: 0, total: message.file.size, status: 'error', error: String(error) });
+    }
+  }
+
+  public async cancelFileTransfer(requestId: string): Promise<void> {
+    const session = this.fileSessions.get(requestId);
+    if (!session) return;
+    this.fileSessions.delete(requestId);
+    if (session.direction === 'receive' && !session.preview) await invoke('cancel_chat_download', { id: requestId });
+    try { await this.sendFilePacket(session.peerId, { kind: 'cancel', requestId, messageId: session.messageId }); } catch {}
+    this.emitFileProgress(requestId, 'cancelled', session.offset, session.messageId, session.direction, session.total);
+  }
+
+  private emitFileProgress(requestId: string, status: FileProgress['status'], bytes?: number,
+    messageId?: string, direction?: FileProgress['direction'], total?: number, preview?: string): void {
+    const session = this.fileSessions.get(requestId);
+    if (!session && (!messageId || !direction || total === undefined)) return;
+    this.callbacks?.onFileProgress?.({ requestId, messageId: messageId ?? session!.messageId,
+      direction: direction ?? session!.direction, bytes: bytes ?? session!.offset,
+      total: total ?? session!.total, status, preview });
+  }
+
+  private async sendFilePacket(peerId: string, payload: Omit<FilePacket, 'signature'>): Promise<void> {
+    if (!this.fileAction || !this.chatAuth || !this.peerTracker.isVerified(peerId) ||
+        (this.authority && !this.isAdmittedPeer(peerId))) throw new Error('Peer unavailable');
+    const signed = [payload.kind, payload.requestId, payload.messageId, payload.offset ?? null, payload.data ?? null, Boolean(payload.preview)];
+    const signature = await this.chatAuth.signControl('chat-file-v1', signed);
+    await this.fileAction.send({ ...payload, signature }, { target: peerId });
+  }
+
+  private async sendNextFileChunk(requestId: string): Promise<void> {
+    const session = this.fileSessions.get(requestId);
+    if (!session || session.direction !== 'send' || !session.sourceId || session.offset >= session.total) return;
+    try {
+      const data = await invoke<string>('read_chat_file_chunk', { id: session.sourceId, offset: session.offset });
+      if (this.fileSessions.get(requestId) !== session) return;
+      await this.sendFilePacket(session.peerId, { kind: 'chunk', requestId, messageId: session.messageId,
+        offset: session.offset, data });
+    } catch (error) {
+      await this.cancelFileTransfer(requestId);
+      this.emitFileProgress(requestId, 'error', session.offset, session.messageId, 'send', session.total);
+      console.warn('[Files] Failed to send chunk:', error);
+    }
+  }
+
+  private async handleFilePacket(packet: FilePacket, peerId: string): Promise<void> {
+    if (!packet || typeof packet.requestId !== 'string' || packet.requestId.length > 80 ||
+        typeof packet.messageId !== 'string' || packet.messageId.length > 80 ||
+        !['request', 'accept', 'deny', 'chunk', 'ack', 'cancel'].includes(packet.kind) ||
+        (packet.offset !== undefined && (!Number.isSafeInteger(packet.offset) || packet.offset < 0)) ||
+        (packet.data !== undefined && (typeof packet.data !== 'string' || packet.data.length > 70_000)) ||
+        (packet.preview !== undefined && typeof packet.preview !== 'boolean')) return;
+    const key = this.chatAuth?.getKnownKey(peerId);
+    if (!key || !await this.chatAuth!.verifyControl('chat-file-v1',
+      [packet.kind, packet.requestId, packet.messageId, packet.offset ?? null, packet.data ?? null, Boolean(packet.preview)], packet.signature, key)) return;
+    const message = this.chatHistory.find((item) => item.id === packet.messageId);
+    if (!message?.file) return;
+    if (packet.kind === 'request') {
+      if (message.deletedAt || message.authorKey !== this.chatAuth?.publicKey ||
+          this.pendingFileRequests.size >= 8 || this.fileSessions.size >= 8 ||
+          this.pendingFileRequests.has(packet.requestId) ||
+          this.fileSessions.has(packet.requestId)) return;
+      let source = this.fileSources.get(message.id);
+      if (!source) {
+        try {
+          const file = await invoke<NativeChatFile | null>('restore_chat_file_source',
+            { roomId: this.roomId, messageId: message.id });
+          if (file) {
+            source = { file, autoAcceptUntil: 0 };
+            this.fileSources.set(message.id, source);
+          }
+        } catch {}
+      }
+      if (!source) {
+        await this.sendFilePacket(peerId, { kind: 'deny', requestId: packet.requestId, messageId: message.id });
+        return;
+      }
+      const request: FileRequest = { requestId: packet.requestId, messageId: message.id, peerId,
+        peerName: this.peerTracker.getUsername(peerId) || 'Participante', path: source.file.path,
+        name: message.file.name, preview: Boolean(packet.preview && message.file.isImage && message.file.size <= 10 * 1024 * 1024) };
+      this.pendingFileRequests.set(packet.requestId, request);
+      if (Date.now() < source.autoAcceptUntil) void this.answerFileRequest(packet.requestId, true);
+      else this.callbacks?.onFileRequest?.(request);
+      return;
+    }
+    const session = this.fileSessions.get(packet.requestId);
+    if (!session || session.peerId !== peerId || session.messageId !== packet.messageId) return;
+    if (packet.kind === 'cancel' || packet.kind === 'deny') {
+      this.fileSessions.delete(packet.requestId);
+      if (session.direction === 'receive' && !session.preview) await invoke('cancel_chat_download', { id: packet.requestId });
+      this.emitFileProgress(packet.requestId, 'cancelled', session.offset, session.messageId, session.direction, session.total);
+      return;
+    }
+    if (session.direction === 'receive' && message.authorKey === this.chatAuth?.getKnownKey(peerId)) {
+      if (packet.kind === 'accept') {
+        if (session.total === 0) await this.finishReceivedFile(packet.requestId, session, message);
+        else this.emitFileProgress(packet.requestId, 'active');
+      } else if (packet.kind === 'chunk' && packet.offset === session.offset && packet.data) {
+        try {
+          if (session.preview) {
+            const decoded = Uint8Array.from(atob(packet.data), (character) => character.charCodeAt(0));
+            if (decoded.length === 0 || decoded.length > 48 * 1024 || session.offset + decoded.length > session.total) throw new Error('Invalid image chunk');
+            session.chunks!.push(decoded);
+            session.offset += decoded.length;
+          } else {
+            session.offset = await invoke<number>('write_chat_download_chunk', { id: packet.requestId,
+              offset: packet.offset, data: packet.data });
+          }
+          this.emitFileProgress(packet.requestId, 'active');
+          if (session.offset === session.total) await this.finishReceivedFile(packet.requestId, session, message);
+          await this.sendFilePacket(peerId, { kind: 'ack', requestId: packet.requestId,
+            messageId: packet.messageId, offset: session.offset });
+        } catch (error) {
+          await this.cancelFileTransfer(packet.requestId);
+          this.emitFileProgress(packet.requestId, 'error', session.offset, session.messageId, 'receive', session.total);
+          console.warn('[Files] Rejected received chunk:', error);
+        }
+      }
+    } else if (session.direction === 'send' && packet.kind === 'ack' && packet.offset !== undefined &&
+               packet.offset === session.offset + Math.min(48 * 1024, session.total - session.offset)) {
+      session.offset = packet.offset;
+      this.emitFileProgress(packet.requestId, 'active');
+      if (session.offset === session.total) {
+        this.fileSessions.delete(packet.requestId);
+        this.emitFileProgress(packet.requestId, 'complete', session.offset, session.messageId, 'send', session.total);
+      } else await this.sendNextFileChunk(packet.requestId);
+    }
+  }
+
+  private async finishReceivedFile(requestId: string, session: FileSession, message: ChatMessage): Promise<void> {
+    if (session.preview) {
+      const bytes = new Uint8Array(session.total);
+      let offset = 0;
+      for (const chunk of session.chunks ?? []) { bytes.set(chunk, offset); offset += chunk.length; }
+      if (offset !== session.total) throw new Error('Incomplete image preview');
+      const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)),
+        (value) => value.toString(16).padStart(2, '0')).join('');
+      if (hash !== message.file?.sha256) throw new Error('Image signature mismatch');
+      const extension = message.file.name.split('.').pop()?.toLowerCase();
+      const mime = extension === 'jpg' || extension === 'jpeg' ? 'image/jpeg' :
+        extension === 'png' ? 'image/png' : extension === 'webp' ? 'image/webp' :
+        extension === 'gif' ? 'image/gif' : 'image/bmp';
+      const preview = URL.createObjectURL(new Blob([bytes], { type: mime }));
+      this.fileSessions.delete(requestId);
+      this.emitFileProgress(requestId, 'complete', session.total, session.messageId, 'receive', session.total, preview);
+      return;
+    }
+    await invoke<string>('finish_chat_download', { id: requestId });
+    this.fileSessions.delete(requestId);
+    let preview: string | undefined;
+    if (message.file?.isImage && session.total <= 10 * 1024 * 1024) {
+      try {
+        const data = await invoke<string>('read_chat_image_preview', { id: requestId });
+        const ext = message.file.name.split('.').pop()?.toLowerCase();
+        const mime = ext === 'jpg' ? 'image/jpeg' : ext === 'jpeg' ? 'image/jpeg' :
+          ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : ext === 'gif' ? 'image/gif' : 'image/bmp';
+        preview = `data:${mime};base64,${data}`;
+      } catch {}
+    }
+    this.emitFileProgress(requestId, 'complete', session.total, session.messageId, 'receive', session.total, preview);
+  }
+
   public async editChatMessage(id: string, text: string): Promise<boolean> {
     const current = this.chatHistory.find((message) => message.id === id);
-    if (!current || current.authorId !== selfId || current.isSystem || current.deletedAt || !text.trim()) return false;
+    if (!current || current.authorId !== selfId || current.isSystem || current.file || current.deletedAt || !text.trim()) return false;
     await this.publishChatMessage({
       ...current,
       text: text.trim(),
@@ -2234,6 +2515,18 @@ export class GroupRoomManager {
   public async deleteChatMessage(id: string): Promise<boolean> {
     const current = this.chatHistory.find((message) => message.id === id);
     if (!current || current.authorId !== selfId || current.isSystem || current.deletedAt) return false;
+    if (current.file) {
+      for (const [requestId, session] of this.fileSessions) {
+        if (session.messageId === id) await this.cancelFileTransfer(requestId);
+      }
+      for (const [requestId, request] of this.pendingFileRequests) {
+        if (request.messageId === id) {
+          this.pendingFileRequests.delete(requestId);
+          try { await this.sendFilePacket(request.peerId, { kind: 'deny', requestId, messageId: id }); } catch {}
+        }
+      }
+      this.fileSources.delete(id);
+    }
     await this.publishChatMessage({
       ...current,
       text: '',
@@ -2437,6 +2730,13 @@ export class GroupRoomManager {
     this.localStatsCache = null;
     this.initialJoinComplete = false;
     this.chatHistory = [];
+    this.fileSources.clear();
+    await Promise.allSettled([...this.fileSessions].filter(([, session]) =>
+      session.direction === 'receive' && !session.preview).map(([id]) =>
+      invoke('cancel_chat_download', { id })));
+    this.fileSessions.clear();
+    this.pendingFileRequests.clear();
+    this.requestedImagePreviews.clear();
     this.seenChatRevisions.clear();
     this.lastStreamsHash = '';
   }

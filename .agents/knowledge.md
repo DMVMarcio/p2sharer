@@ -35,10 +35,13 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 - [Frontend Architecture, Keyed DOM Reconciliation & State Management](.agents/knowledge/frontend-ui-state.md)
 - [P2P Message Authorization and Threat Model](.agents/knowledge/peer-security.md)
 - [Room Apps: Modular Instances and Synchronized State](.agents/knowledge/room-apps.md)
+- [Consent-Based Chat File Transfer](.agents/knowledge/chat-file-transfer.md)
 
 ---
 
 ## 4. User Guidelines & Expressed Preferences
+
+- `[Chat Files]` **Consent-Based Direct File Sharing**: A room chat attachment publishes only signed name, byte size, and SHA-256 metadata. The selected local source stays with its author. Recipients choose default Downloads/P2Sharer Downloads or Save As before requesting a direct peer transfer; the author sees the source path and explicitly accepts, except for an optional ten-minute auto-accept window. Both sides can monitor and cancel. Verify source presence and content before consent, bind every request to the signed message author, and verify the complete received hash before exposing the file. Images should be viewable in chat and in an interactive full-screen viewer after authorized receipt, with Save As in the message menu.
 - `[Apps Filters]` **Watching Means Locally Joined Activities**: The "Watching" filter includes only room app instances that the local participant explicitly joined, and removes them from that view immediately after leaving. Keep its count consistent with the visible activities. A 600 × 250 pixel custom banner is an acceptable 12:5 source for the app library.
 - `[Apps Branding]` **Consistent YouTube Icon and Custom Banners**: Reuse the correctly rendered YouTube brand icon from spotlight activity cards in the Apps library and activity header. Support user-created app banners with a clear documented canvas size and aspect ratio.
 - `[Apps Player UX]` **Empty Queue and Activity Feedback**: When automatic removal empties the YouTube queue, stop and conceal the old player so it cannot replay locally, and show only the add-video prompt. Give the search input a full-height click target, animate the queue thumbnail play overlay and entire row hover smoothly, place activity toasts at the bottom right, and announce repeat, shuffle, auto-removal, and manual queue removal changes with actor avatars.
