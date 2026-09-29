@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { decodeFileBase64, decodeSignedFileChunk, encodeFileBase64, encodeSignedFileChunk,
   hashFileChunk } from '../../src/core/chat_file_wire.ts';
-import { CHAT_FILE_CHUNK_BYTES } from '../../src/core/chat_file_limits.ts';
+import { CHAT_FILE_CHUNK_BYTES, CHAT_FILE_IN_FLIGHT_CHUNKS } from '../../src/core/chat_file_limits.ts';
 import { selectedIceRoute } from '../../src/core/ice_route.ts';
 
 test('binary file chunk preserves metadata and bytes within the protocol limit', async () => {
@@ -21,6 +21,14 @@ test('a full native chunk survives base64 IPC and binary wire conversion', () =>
   const bytes = new Uint8Array(CHAT_FILE_CHUNK_BYTES);
   for (let index = 0; index < bytes.length; index++) bytes[index] = index % 251;
   assert.deepEqual(decodeFileBase64(encodeFileBase64(bytes)), bytes);
+});
+
+test('a full signed chunk fits a 16 KiB WebRTC message while retaining the transfer window', async () => {
+  const bytes = new Uint8Array(CHAT_FILE_CHUNK_BYTES);
+  const packet = encodeSignedFileChunk({ requestId: 'r'.repeat(80), messageId: 'm'.repeat(80),
+    offset: Number.MAX_SAFE_INTEGER, hash: await hashFileChunk(bytes), signature: 'a'.repeat(128) }, bytes);
+  assert.ok(packet.byteLength < 16 * 1024);
+  assert.ok(CHAT_FILE_CHUNK_BYTES * CHAT_FILE_IN_FLIGHT_CHUNKS >= 2 * 1024 * 1024);
 });
 
 test('ICE route uses only the selected candidate pair', () => {
