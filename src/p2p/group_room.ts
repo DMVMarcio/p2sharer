@@ -1,4 +1,6 @@
 import { selfId } from '@trystero-p2p/core';
+import type { AppWireEvent } from '../apps/types.ts';
+import { getRoomApp } from '../apps/registry.ts';
 import { chatHistoryChanged, chatRevision, chatRevisionKey, mergeChatHistory } from '../core/chat_history.ts';
 import { PeerAuthenticator } from '../core/peer_auth.ts';
 import { RoomAuthority, type AdminAdmission, type AuthorityTransfer, type HostCommand } from '../core/room_authority.ts';
@@ -29,7 +31,7 @@ import { MediaCoordinator } from './media_coordinator.ts';
 import { PeerTracker } from './peer_tracker.ts';
 import { signalingManager } from './signaling_manager.ts';
 
-const APP_ID = 'p2sharer-multi-stream-v4';
+const APP_ID = 'p2sharer-multi-stream-v5';
 
 const ADJECTIVES = [
   'cyber', 'neon', 'rapid', 'swift', 'cosmic', 'hyper', 'solar', 'lunar',
@@ -75,6 +77,7 @@ export function generateUserColor(name: string): string {
 }
 
 export interface RoomCallbacks {
+  onAppEvent?: (event: AppWireEvent, peerId: string) => void;
   onStreamsUpdate: (streams: ActiveStreamInfo[]) => void;
   onSlotsUpdate: (slots: RoomSlotInfo[]) => void;
   onChat: (msg: ChatMessage) => void;
@@ -166,6 +169,8 @@ export class GroupRoomManager {
   private pingAction: any = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private pongAction: any = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private appAction: any = null;
 
   private lastPeerStats: Map<string, { bytesReceived: number; timestamp: number }> = new Map();
   private lastLocalStats: { bytesSent: number; timestamp: number } | null = null;
@@ -215,6 +220,20 @@ export class GroupRoomManager {
 
   public getDisplayRoomId(): string {
     return this.roomId;
+  }
+
+  public getLocalPeerId(): string { return selfId; }
+
+  public sendAppEvent(event: AppWireEvent, target?: string): void {
+    if (!this.appAction || (this.authority && !this.localAdmitted)) return;
+    if (target) {
+      const key = this.chatAuth?.getKnownKey(target);
+      if (this.peerTracker.isVerified(target) &&
+          (!this.authority || (key && this.admittedPeers.get(target) === key)))
+        void this.appAction.send(event, { target });
+    } else {
+      this.sendRoomAction(this.appAction, event);
+    }
   }
 
   public getInvite(): string | null { return this.invite; }
@@ -501,13 +520,20 @@ export class GroupRoomManager {
     if (message.isHost && !this.peerTracker.isPeerCreator(message.authorId || '')) return false;
     if (!knownName) return false;
     if (!message.isSystem) return message.sender === knownName && !message.systemType &&
-      !message.systemActor && !message.systemRoom;
+      !message.systemActor && !message.systemRoom && !message.systemAppKind;
     if (message.sender !== 'Sistema' || message.revision !== 0 || message.editedAt || message.deletedAt) return false;
     if (message.systemRoom) return message.systemType === 'info' &&
       (this.rootKey ? message.authorKey === this.rootKey :
         this.peerTracker.isPeerCreator(message.authorId || '')) &&
-      message.text.startsWith('Sala criada: ') && message.text.length <= 95 && !message.systemActor;
+      message.text.startsWith('Sala criada: ') && message.text.length <= 95 &&
+      !message.systemActor && !message.systemAppKind;
     if (message.systemActor !== knownName) return false;
+    if (message.systemType === 'app-start' || message.systemType === 'app-stop') {
+      const app = message.systemAppKind && getRoomApp(message.systemAppKind);
+      return Boolean(app && message.text === (message.systemType === 'app-start'
+        ? `${knownName} iniciou ${app.label}` : `${knownName} encerrou ${app.label}`));
+    }
+    if (message.systemAppKind) return false;
     const expected: Partial<Record<NonNullable<ChatMessage['systemType']>, string>> = {
       join: `${knownName} entrou`,
       leave: `${knownName} saiu`,
@@ -771,6 +797,12 @@ export class GroupRoomManager {
   private bindRoomActions(): void {
     if (!this.room) return;
     const boundRoom = this.room;
+
+    this.appAction = this.room.makeAction('room_apps');
+    this.appAction.onMessage = (event: AppWireEvent, meta: { peerId: string }) => {
+      if (!event || typeof event !== 'object' || JSON.stringify(event).length > 4_000_000) return;
+      this.callbacks?.onAppEvent?.(event, meta.peerId);
+    };
 
     this.inviteAction = this.room.makeAction('room_invite_sync');
     this.inviteAction.onMessage = async (data: { invite?: string }, meta: { peerId: string }) => {
@@ -1299,6 +1331,7 @@ export class GroupRoomManager {
       this.pexAction, this.meshRelayAction, this.watchAction,
       this.pingAction, this.pongAction, this.identityAction,
       this.authorityAction, this.admissionAction, this.inviteAction,
+      this.appAction,
     ].forEach((action) => {
       if (!action?.onMessage) return;
       const handler = action.onMessage;
@@ -2215,12 +2248,21 @@ export class GroupRoomManager {
     systemType: NonNullable<ChatMessage['systemType']>,
     systemActor?: string,
     systemRoom?: string,
+    systemAppKind?: string,
   ): Promise<ChatMessage> {
     return this.publishChatMessage({
       id: crypto.randomUUID(), sender: 'Sistema', text,
       timestamp: Date.now(), authorId: selfId, revision: 0,
-      isSystem: true, systemType, systemActor, systemRoom,
+      isSystem: true, systemType, systemActor, systemRoom, systemAppKind,
     });
+  }
+
+  public sendAppLifecycleNotice(action: 'start' | 'stop', kind: string): Promise<ChatMessage> {
+    const app = getRoomApp(kind);
+    if (!app) return Promise.reject(new Error('Unknown room app'));
+    return this.sendSystemMessage(action === 'start' ? `${this.username} iniciou ${app.label}` :
+      `${this.username} encerrou ${app.label}`, action === 'start' ? 'app-start' : 'app-stop',
+    this.username, undefined, kind);
   }
 
   private async publishChatMessage(msg: ChatMessage): Promise<ChatMessage> {

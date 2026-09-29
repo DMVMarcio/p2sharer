@@ -1,5 +1,6 @@
 import React from 'react';
 import type { ChatMessage } from '../../core/types.ts';
+import { getRoomApp } from '../../apps/registry';
 
 interface SystemNoticeTextProps {
   message: ChatMessage;
@@ -8,7 +9,8 @@ interface SystemNoticeTextProps {
 export const SystemNoticeText: React.FC<SystemNoticeTextProps> = ({ message }) => {
   const roomName = message.systemRoom && message.text.startsWith('Sala criada: ')
     ? message.text.slice('Sala criada: '.length) : message.systemRoom;
-  const terms = [message.systemActor, roomName]
+  const appName = message.systemAppKind ? getRoomApp(message.systemAppKind)?.label : undefined;
+  const terms = [message.systemActor, roomName, appName]
     .filter((term): term is string => Boolean(term))
     .sort((a, b) => b.length - a.length);
   if (!terms.length) return <>{message.text}</>;

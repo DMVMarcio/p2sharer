@@ -20,6 +20,14 @@ test('forged edits, deletions, relays, history and replay cannot change another 
   assert.equal(await bob.verify({ ...original, replyTo: null }, 'alice'), false);
   assert.equal(await bob.verify({ ...original, isSystem: 'true' }, 'alice'), false);
 
+  const appNotice = await alice.sign({
+    id: 'app-notice', authorId: 'alice', sender: 'Sistema', text: 'Alice iniciou YouTube',
+    timestamp: 1100, revision: 0, isSystem: true, systemType: 'app-start',
+    systemActor: 'Alice', systemAppKind: 'youtube',
+  });
+  assert.equal(await bob.verify(appNotice, 'alice'), true);
+  assert.equal(await bob.verify({ ...appNotice, systemAppKind: 'notepad' }, 'alice'), false);
+
   const forgedIdentity = await mallory.sign({
     ...original, authorId: 'mallory', text: 'Forged', revision: 9,
   });

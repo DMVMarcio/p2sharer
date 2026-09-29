@@ -12,7 +12,7 @@ function signedChatData(roomId: string, message: ChatMessage): Uint8Array {
     message.editedAt ?? null, message.deletedAt ?? null,
     message.replyTo ? [message.replyTo.id, message.replyTo.sender, message.replyTo.text] : null,
     Boolean(message.isHost), Boolean(message.isSystem), message.systemType ?? null,
-    message.systemActor ?? null, message.systemRoom ?? null,
+    message.systemActor ?? null, message.systemRoom ?? null, message.systemAppKind ?? null,
   ]));
 }
 
@@ -35,8 +35,10 @@ function hasSafeChatShape(value: unknown): value is SignedChatMessage {
       (typeof message.systemActor === 'string' && message.systemActor.length <= 80)) &&
     (message.systemRoom === undefined ||
       (typeof message.systemRoom === 'string' && message.systemRoom.length <= 80)) &&
+    (message.systemAppKind === undefined ||
+      (typeof message.systemAppKind === 'string' && /^[a-z][a-z0-9-]{0,39}$/.test(message.systemAppKind))) &&
     (message.systemType === undefined ||
-      ['join', 'leave', 'info', 'generic', 'stream-start', 'stream-stop'].includes(message.systemType)) &&
+      ['join', 'leave', 'info', 'generic', 'stream-start', 'stream-stop', 'app-start', 'app-stop'].includes(message.systemType)) &&
     (message.replyTo === undefined ||
       (message.replyTo !== null && typeof message.replyTo === 'object' &&
        typeof message.replyTo.id === 'string' && message.replyTo.id.length <= 80 &&

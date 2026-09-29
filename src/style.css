@@ -2463,6 +2463,14 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   color: color-mix(in srgb, var(--accent-color) 45%, var(--text-secondary));
 }
 
+.chat-system-app-start .chat-sys-icon {
+  color: color-mix(in srgb, var(--accent-color) 65%, var(--text-secondary));
+}
+
+.chat-system-app-stop .chat-sys-icon {
+  color: color-mix(in srgb, var(--danger-text) 45%, var(--text-secondary));
+}
+
 .chat-system-stream-start .chat-sys-icon {
   color: color-mix(in srgb, var(--accent-color) 55%, var(--text-secondary));
 }

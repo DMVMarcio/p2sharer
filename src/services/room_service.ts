@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { roomAppsService } from '../apps/room_apps_service.ts';
 import { AudioBridge } from '../audio/audio_bridge.ts';
 import { audioContextManager } from '../audio/audio_context_manager.ts';
 import { stateStore } from '../core/state_store.ts';
@@ -144,6 +145,7 @@ export class RoomService {
   }
 
   private async joinRoomNow(code: string, pass: string, isCreator: boolean): Promise<void> {
+    roomAppsService.reset();
     const parsed = await verifyRoomInvite(code);
     if (!parsed && typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
       throw new Error('Um convite autenticado é necessário para entrar na sala');
@@ -205,8 +207,16 @@ export class RoomService {
       stateStore.getTurnConfig()
     );
     this.roomManager = manager;
+    roomAppsService.attach((event, target) => manager.sendAppEvent(event, target), manager.getLocalPeerId(),
+      (action, instance) => {
+        void manager.sendAppLifecycleNotice(action, instance.kind).catch((error) =>
+          console.warn('[Chat] Failed to publish app notice:', error));
+      });
 
     await manager.join({
+      onAppEvent: (event, peerId) => {
+        if (this.roomManager === manager) roomAppsService.receive(event, peerId);
+      },
       onStreamsUpdate: () => {
         // Handled via onSlotsUpdate to prevent double notification cascades
       },
@@ -235,6 +245,8 @@ export class RoomService {
       },
       onPeerJoined: (peer, isInitial) => {
         if (this.roomManager !== manager) return;
+        roomAppsService.sendSync(peer.id);
+        roomAppsService.requestSync();
         const name = peer.username.trim();
         if (!isInitial && name) {
           soundEffects.playUserJoin();
@@ -242,6 +254,7 @@ export class RoomService {
       },
       onPeerLeft: (_peerId, username) => {
         if (this.roomManager !== manager) return;
+        roomAppsService.forgetPeer(_peerId);
         const name = username.trim();
         if (!name) return;
         soundEffects.playUserLeave();
@@ -396,6 +409,7 @@ export class RoomService {
   }
 
   private async leaveRoomNow(): Promise<void> {
+    roomAppsService.reset();
     if (this.roomConnectingTimeout) {
       clearTimeout(this.roomConnectingTimeout);
       this.roomConnectingTimeout = null;

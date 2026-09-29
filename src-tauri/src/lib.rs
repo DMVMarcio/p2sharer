@@ -1,5 +1,6 @@
 pub mod audio_loopback;
 pub mod logger;
+pub mod note_files;
 pub mod pip_manager;
 pub mod process_manager;
 pub mod room_vault;
@@ -7,6 +8,7 @@ pub mod screen_sources;
 
 use audio_loopback::{start_audio_capture, stop_audio_capture};
 use logger::{clear_log_file, get_log_file_path, open_latest_log, open_log_folder, write_frontend_log};
+use note_files::{open_note_file, save_note_file};
 use pip_manager::{close_pip_window, open_pip_window, set_pip_always_on_top};
 use process_manager::{
     list_audio_processes, setup_job_object_for_clean_child_teardown,
@@ -76,7 +78,9 @@ pub fn run() {
             set_pip_always_on_top,
             save_room_record,
             list_room_records,
-            delete_room_record
+            delete_room_record,
+            open_note_file,
+            save_note_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
