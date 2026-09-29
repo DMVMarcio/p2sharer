@@ -26,6 +26,24 @@ function timingText(transfer: FileProgress): string | null {
     `Verificação ${seconds(timings.verifyMs)} · Escrita ${seconds(timings.writeMs)} · ACK ${seconds(timings.ackMs)}`;
 }
 
+function transportText(transfer: FileProgress, unit: TransferSpeedUnit): string | null {
+  const details = transfer.transport;
+  if (!details) return null;
+  const parts: string[] = [];
+  if (details.protocol) parts.push(details.protocol.toUpperCase());
+  if (details.localCandidateType && details.remoteCandidateType) {
+    parts.push(`${details.localCandidateType} → ${details.remoteCandidateType}`);
+  }
+  if (details.pairBytesPerSecond !== undefined) {
+    parts.push(`WebRTC ${formatTransferSpeed(details.pairBytesPerSecond, unit)}`);
+  }
+  if (transfer.direction === 'send' && details.queuedBytes !== undefined && details.queueLimitBytes !== undefined) {
+    parts.push(`Fila ${formatFileSize(details.queuedBytes)} · limiar ${formatFileSize(details.queueLimitBytes)}`);
+  }
+  if (details.packetsDiscardedOnSend) parts.push(`${details.packetsDiscardedOnSend} pacotes descartados`);
+  return parts.length ? parts.join(' · ') : null;
+}
+
 export function ChatTransferCenter() {
   const { fileProgress, cancelFileTransfer, dismissFileProgress, revealSavedFile } = useRoom();
   const [open, setOpen] = useState<'send' | 'receive' | null>(null);
@@ -67,6 +85,7 @@ export function ChatTransferCenter() {
             <small>{statusText(transfer, speedUnit)}</small>
             {transfer.connectionType && <small>{transfer.connectionType}
               {transfer.rttMs !== null && transfer.rttMs !== undefined ? ` · ${transfer.rttMs} ms` : ''}</small>}
+            {transportText(transfer, speedUnit) && <small>{transportText(transfer, speedUnit)}</small>}
             {timingText(transfer) && <small>{timingText(transfer)}</small>}
           </div>
           {transfer.status === 'complete' && transfer.direction === 'receive' && transfer.saved &&
