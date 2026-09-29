@@ -104,7 +104,7 @@ export interface NativeChatFile { id: string; name: string; path: string; size: 
 export interface FileRequest { requestId: string; messageId: string; peerId: string; peerName: string; path: string; name: string; preview: boolean }
 export interface FileProgress { requestId: string; messageId: string; direction: 'send' | 'receive'; bytes: number; total: number; status: 'pending' | 'active' | 'complete' | 'cancelled' | 'error'; error?: string; preview?: string; previewBytes?: Uint8Array; saved?: boolean; previewOnly?: boolean; peerId?: string; fileName?: string; peerName?: string; startedAt?: number }
 type FilePacket = { kind: 'request' | 'accept' | 'deny' | 'chunk' | 'ack' | 'cancel'; requestId: string; messageId: string; offset?: number; data?: string; preview?: boolean; signature: string };
-type FileSession = { messageId: string; peerId: string; peerName?: string; sourceId?: string; offset: number; sentOffset?: number; sending?: boolean; total: number; direction: 'send' | 'receive'; preview?: boolean; chunks?: Uint8Array[] };
+type FileSession = { messageId: string; peerId: string; peerName?: string; sourceId?: string; offset: number; sentOffset?: number; sending?: boolean; receiving?: boolean; pendingChunks?: Map<number, string>; total: number; direction: 'send' | 'receive'; preview?: boolean; chunks?: Uint8Array[] };
 
 interface PeerExchangeItem {
   peerId: string;
@@ -2474,25 +2474,13 @@ export class GroupRoomManager {
       if (packet.kind === 'accept') {
         if (session.total === 0) await this.finishReceivedFile(packet.requestId, session, message);
         else this.emitFileProgress(packet.requestId, 'active');
-      } else if (packet.kind === 'chunk' && packet.offset === session.offset && packet.data) {
-        try {
-          if (session.preview) {
-            const decoded = Uint8Array.from(atob(packet.data), (character) => character.charCodeAt(0));
-            if (decoded.length === 0 || decoded.length > CHAT_FILE_CHUNK_BYTES || session.offset + decoded.length > session.total) throw new Error('Invalid image chunk');
-            session.chunks!.push(decoded);
-            session.offset += decoded.length;
-          } else {
-            session.offset = await invoke<number>('write_chat_download_chunk', { id: packet.requestId,
-              offset: packet.offset, data: packet.data });
-          }
-          this.emitFileProgress(packet.requestId, 'active');
-          if (session.offset === session.total) await this.finishReceivedFile(packet.requestId, session, message);
-          await this.sendFilePacket(peerId, { kind: 'ack', requestId: packet.requestId,
-            messageId: packet.messageId, offset: session.offset });
-        } catch (error) {
-          await this.cancelFileTransfer(packet.requestId);
-          this.emitFileProgress(packet.requestId, 'error', session.offset, session.messageId, 'receive', session.total);
-          console.warn('[Files] Rejected received chunk:', error);
+      } else if (packet.kind === 'chunk' && packet.offset !== undefined && packet.data &&
+                 packet.offset >= session.offset && packet.offset < session.total &&
+                 packet.offset - session.offset <= CHAT_FILE_IN_FLIGHT_CHUNKS * CHAT_FILE_CHUNK_BYTES) {
+        session.pendingChunks ??= new Map();
+        if (!session.pendingChunks.has(packet.offset) && session.pendingChunks.size < CHAT_FILE_IN_FLIGHT_CHUNKS + 1) {
+          session.pendingChunks.set(packet.offset, packet.data);
+          await this.processReceivedFileChunks(packet.requestId, session, message);
         }
       }
     } else if (session.direction === 'send' && packet.kind === 'ack' && packet.offset !== undefined &&
@@ -2503,6 +2491,46 @@ export class GroupRoomManager {
         this.fileSessions.delete(packet.requestId);
         this.emitFileProgress(packet.requestId, 'complete', session.offset, session.messageId, 'send', session.total);
       } else await this.sendNextFileChunks(packet.requestId);
+    }
+  }
+
+  private async processReceivedFileChunks(requestId: string, session: FileSession, message: ChatMessage): Promise<void> {
+    if (session.receiving) return;
+    session.receiving = true;
+    try {
+      while (this.fileSessions.get(requestId) === session) {
+        const offset = session.offset;
+        const data = session.pendingChunks?.get(offset);
+        if (!data) break;
+        session.pendingChunks!.delete(offset);
+        if (session.preview) {
+          const decoded = Uint8Array.from(atob(data), (character) => character.charCodeAt(0));
+          if (decoded.length === 0 || decoded.length > CHAT_FILE_CHUNK_BYTES || offset + decoded.length > session.total) {
+            throw new Error('Invalid image chunk');
+          }
+          session.chunks!.push(decoded);
+          session.offset += decoded.length;
+        } else {
+          const written = await invoke<number>('write_chat_download_chunk', { id: requestId, offset, data });
+          if (this.fileSessions.get(requestId) !== session) return;
+          session.offset = written;
+        }
+        this.emitFileProgress(requestId, 'active');
+        if (session.offset === session.total) await this.finishReceivedFile(requestId, session, message);
+        await this.sendFilePacket(session.peerId, { kind: 'ack', requestId,
+          messageId: session.messageId, offset: session.offset });
+      }
+    } catch (error) {
+      if (this.fileSessions.get(requestId) === session) {
+        await this.cancelFileTransfer(requestId);
+        this.emitFileProgress(requestId, 'error', session.offset, session.messageId, 'receive', session.total);
+        console.warn('[Files] Rejected received chunk:', error);
+      }
+    } finally {
+      session.receiving = false;
+      if (this.fileSessions.get(requestId) === session && session.pendingChunks?.has(session.offset)) {
+        void this.processReceivedFileChunks(requestId, session, message);
+      }
     }
   }
 
