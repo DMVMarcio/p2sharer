@@ -15,10 +15,12 @@ interface Props { message: ChatMessage; transfers: FileProgress[]; preview?: str
 
 export function ChatFileAttachment({ message, transfers, preview, savedRequestId, onRequest, onPreview, onCancel, onReveal }: Props) {
   const [menu, setMenu] = useState(false);
+  const [menuBelow, setMenuBelow] = useState(false);
   const [viewer, setViewer] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const drag = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
+  const downloadWrap = useRef<HTMLDivElement>(null);
   const file = message.file!;
   const receiving = transfers.find((transfer) => transfer.direction === 'receive' && !transfer.previewOnly &&
     (transfer.status === 'pending' || transfer.status === 'active'));
@@ -66,14 +68,17 @@ export function ChatFileAttachment({ message, transfers, preview, savedRequestId
         {receiving && <small>{receiving.status === 'pending' ? 'Solicitação enviada' :
           `${Math.round(receiving.total ? receiving.bytes / receiving.total * 100 : 100)}% · ${formatFileSize(receiving.bytes)} de ${formatFileSize(receiving.total)}`}</small>}
         {!receiving && savedRequestId && <small>Download concluído</small>}</div>
-      {!own && <div className="chat-file-download-wrap">
+      {!own && <div className="chat-file-download-wrap" ref={downloadWrap}>
         {savedRequestId && <Tooltip content="Mostrar na pasta"><button type="button" className="chat-file-reveal-button"
           aria-label="Mostrar arquivo na pasta" onClick={() => onReveal(savedRequestId)}><FolderSearch size={16} /></button></Tooltip>}
         {receiving ? <FileProgressRing pending={receiving.status === 'pending'}
           progress={receiving.total ? receiving.bytes / receiving.total : 0}
           label="Cancelar download" onCancel={() => onCancel(receiving.requestId)} /> :
-          <button className="chat-file-download-button" aria-label="Download" aria-expanded={menu} onClick={() => setMenu(!menu)}><Download size={17} /></button>}
-        {menu && !receiving && <div className="chat-file-download-menu">
+          <button className="chat-file-download-button" aria-label="Download" aria-expanded={menu} onClick={() => {
+            setMenuBelow((downloadWrap.current?.getBoundingClientRect().top ?? 0) < 130);
+            setMenu(!menu);
+          }}><Download size={17} /></button>}
+        {menu && !receiving && <div className={`chat-file-download-menu ${menuBelow ? 'is-below' : ''}`}>
           <button onClick={() => { setMenu(false); onRequest(false); }}>Salvar</button>
           <button onClick={() => { setMenu(false); onRequest(true); }}>Salvar Como</button>
         </div>}
