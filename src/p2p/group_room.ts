@@ -3,7 +3,8 @@ import { invoke } from '@tauri-apps/api/core';
 import type { AppWireEvent } from '../apps/types.ts';
 import { getRoomApp } from '../apps/registry.ts';
 import { chatHistoryChanged, chatRevision, chatRevisionKey, mergeChatHistory } from '../core/chat_history.ts';
-import { CHAT_FILE_CHUNK_BYTES, CHAT_FILE_IN_FLIGHT_CHUNKS, MAX_IMAGE_PREVIEW_BYTES } from '../core/chat_file_limits.ts';
+import { CHAT_FILE_CHUNK_BYTES, CHAT_FILE_IN_FLIGHT_CHUNKS, CHAT_FILE_LARGE_CHUNK_CAPABILITY,
+  CHAT_FILE_LEGACY_CHUNK_BYTES, MAX_IMAGE_PREVIEW_BYTES } from '../core/chat_file_limits.ts';
 import { PeerAuthenticator } from '../core/peer_auth.ts';
 import { RoomAuthority, type AdminAdmission, type AuthorityTransfer, type HostCommand } from '../core/room_authority.ts';
 import { compareRoomInvites, formatRoomInvite, parseRoomInvite, signRoomInvite, validRoomName,
@@ -101,10 +102,10 @@ export interface RoomCallbacks {
 }
 
 export interface NativeChatFile { id: string; name: string; path: string; size: number; hash: string; isImage: boolean }
-export interface FileRequest { requestId: string; messageId: string; peerId: string; peerName: string; path: string; name: string; preview: boolean }
-export interface FileProgress { requestId: string; messageId: string; direction: 'send' | 'receive'; bytes: number; total: number; status: 'pending' | 'active' | 'complete' | 'cancelled' | 'error'; error?: string; preview?: string; previewBytes?: Uint8Array; saved?: boolean; previewOnly?: boolean; peerId?: string; fileName?: string; peerName?: string; startedAt?: number }
+export interface FileRequest { requestId: string; messageId: string; peerId: string; peerName: string; path: string; name: string; preview: boolean; largeChunks?: boolean }
+export interface FileProgress { requestId: string; messageId: string; direction: 'send' | 'receive'; bytes: number; total: number; status: 'pending' | 'active' | 'complete' | 'cancelled' | 'error'; error?: string; preview?: string; previewBytes?: Uint8Array; saved?: boolean; previewOnly?: boolean; peerId?: string; fileName?: string; peerName?: string; startedAt?: number; isImage?: boolean; bytesPerSecond?: number }
 type FilePacket = { kind: 'request' | 'accept' | 'deny' | 'chunk' | 'ack' | 'cancel'; requestId: string; messageId: string; offset?: number; data?: string; preview?: boolean; signature: string };
-type FileSession = { messageId: string; peerId: string; peerName?: string; sourceId?: string; offset: number; sentOffset?: number; sending?: boolean; receiving?: boolean; pendingChunks?: Map<number, string>; total: number; direction: 'send' | 'receive'; preview?: boolean; chunks?: Uint8Array[] };
+type FileSession = { messageId: string; peerId: string; peerName?: string; sourceId?: string; offset: number; sentOffset?: number; chunkBytes?: number; windowChunks?: number; sending?: boolean; receiving?: boolean; pendingChunks?: Map<number, string>; total: number; direction: 'send' | 'receive'; preview?: boolean; chunks?: Uint8Array[] };
 
 interface PeerExchangeItem {
   peerId: string;
@@ -2287,7 +2288,8 @@ export class GroupRoomManager {
     this.fileSessions.set(requestId, { messageId, peerId: authorPeerId, peerName: message.sender,
       offset: 0, total: message.file.size, direction: 'receive' });
     this.emitFileProgress(requestId, 'pending');
-    try { await this.sendFilePacket(authorPeerId, { kind: 'request', requestId, messageId }); }
+    try { await this.sendFilePacket(authorPeerId, { kind: 'request', requestId, messageId,
+      data: CHAT_FILE_LARGE_CHUNK_CAPABILITY }); }
     catch (error) {
       this.fileSessions.delete(requestId);
       await invoke('cancel_chat_download', { id: requestId });
@@ -2312,7 +2314,8 @@ export class GroupRoomManager {
     this.fileSessions.set(requestId, { messageId, peerId: authorPeerId, peerName: message.sender,
       offset: 0, total: message.file.size, direction: 'receive', preview: true, chunks: [] });
     this.emitFileProgress(requestId, 'pending');
-    try { await this.sendFilePacket(authorPeerId, { kind: 'request', requestId, messageId, preview: true }); }
+    try { await this.sendFilePacket(authorPeerId, { kind: 'request', requestId, messageId,
+      preview: true, data: CHAT_FILE_LARGE_CHUNK_CAPABILITY }); }
     catch (error) { this.fileSessions.delete(requestId); this.requestedImagePreviews.delete(messageId);
       this.emitFileProgress(requestId, 'error', 0, messageId, 'receive', message.file.size); throw error; }
   }
@@ -2339,7 +2342,9 @@ export class GroupRoomManager {
       if (this.revokedFileMessages.has(request.messageId)) throw new Error('File offer was revoked');
       this.fileSessions.set(requestId, { messageId: request.messageId, peerId: request.peerId,
         peerName: request.peerName, sourceId: source.file.id, offset: 0, total: checked.size,
-        direction: 'send', preview: request.preview, sentOffset: 0 });
+        direction: 'send', preview: request.preview, sentOffset: 0,
+        chunkBytes: request.largeChunks ? CHAT_FILE_CHUNK_BYTES : CHAT_FILE_LEGACY_CHUNK_BYTES,
+        windowChunks: request.largeChunks ? CHAT_FILE_IN_FLIGHT_CHUNKS : 1 });
       this.emitFileProgress(requestId, 'active');
       await this.sendFilePacket(request.peerId, { kind: 'accept', requestId, messageId: request.messageId });
       if (checked.size > 0) await this.sendNextFileChunks(requestId);
@@ -2388,11 +2393,12 @@ export class GroupRoomManager {
     session.sending = true;
     try {
       while (this.fileSessions.get(requestId) === session && (session.sentOffset ?? 0) < session.total &&
-          (session.sentOffset ?? 0) - session.offset < CHAT_FILE_IN_FLIGHT_CHUNKS * CHAT_FILE_CHUNK_BYTES) {
+          (session.sentOffset ?? 0) - session.offset < (session.windowChunks ?? 1) * (session.chunkBytes ?? CHAT_FILE_LEGACY_CHUNK_BYTES)) {
         const offset = session.sentOffset ?? 0;
-        const data = await invoke<string>('read_chat_file_chunk', { id: session.sourceId, offset });
+        const data = await invoke<string>('read_chat_file_chunk', { id: session.sourceId, offset,
+          length: session.chunkBytes ?? CHAT_FILE_LEGACY_CHUNK_BYTES });
         if (this.fileSessions.get(requestId) !== session) return;
-        session.sentOffset = offset + Math.min(CHAT_FILE_CHUNK_BYTES, session.total - offset);
+        session.sentOffset = offset + Math.min(session.chunkBytes ?? CHAT_FILE_LEGACY_CHUNK_BYTES, session.total - offset);
         await this.sendFilePacket(session.peerId, { kind: 'chunk', requestId, messageId: session.messageId,
           offset, data });
       }
@@ -2403,7 +2409,7 @@ export class GroupRoomManager {
     } finally {
       session.sending = false;
       if (this.fileSessions.get(requestId) === session && (session.sentOffset ?? 0) < session.total &&
-          (session.sentOffset ?? 0) - session.offset < CHAT_FILE_IN_FLIGHT_CHUNKS * CHAT_FILE_CHUNK_BYTES) {
+          (session.sentOffset ?? 0) - session.offset < (session.windowChunks ?? 1) * (session.chunkBytes ?? CHAT_FILE_LEGACY_CHUNK_BYTES)) {
         void this.sendNextFileChunks(requestId);
       }
     }
@@ -2414,7 +2420,8 @@ export class GroupRoomManager {
         typeof packet.messageId !== 'string' || packet.messageId.length > 80 ||
         !['request', 'accept', 'deny', 'chunk', 'ack', 'cancel'].includes(packet.kind) ||
         (packet.offset !== undefined && (!Number.isSafeInteger(packet.offset) || packet.offset < 0)) ||
-        (packet.data !== undefined && (typeof packet.data !== 'string' || packet.data.length > 70_000)) ||
+        (packet.data !== undefined && (typeof packet.data !== 'string' ||
+          packet.data.length > Math.ceil(CHAT_FILE_CHUNK_BYTES * 4 / 3) + 16)) ||
         (packet.preview !== undefined && typeof packet.preview !== 'boolean')) return;
     const key = this.chatAuth?.getKnownKey(peerId);
     if (!key || !await this.chatAuth!.verifyControl('chat-file-v1',
@@ -2448,7 +2455,8 @@ export class GroupRoomManager {
       }
       const request: FileRequest = { requestId: packet.requestId, messageId: message.id, peerId,
         peerName: this.peerTracker.getUsername(peerId) || 'Participante', path: source.file.path,
-        name: message.file.name, preview: Boolean(packet.preview && message.file.isImage && message.file.size <= MAX_IMAGE_PREVIEW_BYTES) };
+        name: message.file.name, preview: Boolean(packet.preview && message.file.isImage && message.file.size <= MAX_IMAGE_PREVIEW_BYTES),
+        largeChunks: packet.data === CHAT_FILE_LARGE_CHUNK_CAPABILITY };
       this.pendingFileRequests.set(packet.requestId, request);
       if (Date.now() < source.autoAcceptUntil) void this.answerFileRequest(packet.requestId, true);
       else this.callbacks?.onFileRequest?.(request);

@@ -1,14 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
-import { Download, FolderSearch, Square, Upload, X } from 'lucide-react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { Download, File, FolderSearch, Image as ImageIcon, Square, Upload, X } from 'lucide-react';
 import { useRoom } from '../../hooks/useRoom';
 import { showToast } from '../../hooks/useToast';
 import { formatFileSize } from '../../core/file_size';
 import type { FileProgress } from '../../p2p/group_room';
+import { formatTransferSpeed, getTransferSpeedUnit, subscribeTransferSpeedUnit,
+  type TransferSpeedUnit } from '../../core/transfer_speed';
 
-function statusText(transfer: FileProgress): string {
+function statusText(transfer: FileProgress, unit: TransferSpeedUnit): string {
   switch (transfer.status) {
     case 'pending': return 'Solicitação enviada';
-    case 'active': return `${Math.round(transfer.total ? transfer.bytes / transfer.total * 100 : 100)}% · ${formatFileSize(transfer.bytes)} de ${formatFileSize(transfer.total)}`;
+    case 'active': return `${Math.round(transfer.total ? transfer.bytes / transfer.total * 100 : 100)}% · ${formatFileSize(transfer.bytes)} de ${formatFileSize(transfer.total)} · ${formatTransferSpeed(transfer.bytesPerSecond ?? 0, unit)}`;
     case 'complete': return 'Concluído';
     case 'cancelled': return 'Cancelado';
     case 'error': return 'Falhou';
@@ -18,6 +20,7 @@ function statusText(transfer: FileProgress): string {
 export function ChatTransferCenter() {
   const { fileProgress, cancelFileTransfer, dismissFileProgress, revealSavedFile } = useRoom();
   const [open, setOpen] = useState<'send' | 'receive' | null>(null);
+  const speedUnit = useSyncExternalStore(subscribeTransferSpeedUnit, getTransferSpeedUnit);
   const root = useRef<HTMLDivElement>(null);
   const all = Object.values(fileProgress);
   const visible = all.filter((item) => item.direction === open)
@@ -46,10 +49,13 @@ export function ChatTransferCenter() {
       <strong className="chat-transfer-title">{open === 'send' ? 'Envios' : 'Downloads'}</strong>
       {visible.length === 0 ? <p className="chat-transfer-empty">Nenhum arquivo nesta sala.</p> :
         <div className="chat-transfer-list">{visible.map((transfer) => <div className="chat-transfer-item" key={transfer.requestId}>
+          <span className="chat-transfer-file-icon" aria-hidden="true">
+            {transfer.isImage || transfer.previewOnly ? <ImageIcon size={18} /> : <File size={18} />}
+          </span>
           <div className="chat-transfer-item-copy">
             <strong>{transfer.fileName ?? 'Arquivo'}{transfer.previewOnly ? ' · Prévia' : ''}</strong>
             <span>{open === 'send' ? 'Para' : 'De'} {transfer.peerName ?? 'Participante'}</span>
-            <small>{statusText(transfer)}</small>
+            <small>{statusText(transfer, speedUnit)}</small>
           </div>
           {transfer.status === 'complete' && transfer.direction === 'receive' && transfer.saved &&
             <button type="button" aria-label="Mostrar arquivo na pasta" title="Mostrar na pasta"

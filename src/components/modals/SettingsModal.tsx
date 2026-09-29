@@ -7,6 +7,7 @@ import { soundEffects } from '../../ui/sound_effects';
 import { showToast } from '../../hooks/useToast';
 import { ThemeMode } from '../../core/types';
 import { EMOJI_PACKS, EmojiPack, getEmojiPack, saveEmojiPack } from '../../core/emoji_preferences';
+import { getTransferSpeedUnit, saveTransferSpeedUnit, type TransferSpeedUnit } from '../../core/transfer_speed';
 import { EmojiGlyph } from '../common/EmojiGlyph';
 
 export const SettingsModal: React.FC = () => {
@@ -20,6 +21,7 @@ export const SettingsModal: React.FC = () => {
   // Form states initialized once upon mounting
   const [nick, setNick] = useState(() => stateStore.username);
   const [emojiPack, setEmojiPack] = useState<EmojiPack>(getEmojiPack);
+  const [transferSpeedUnit, setTransferSpeedUnit] = useState<TransferSpeedUnit>(getTransferSpeedUnit);
   const [sfxEnabled, setSfxEnabled] = useState(() => soundEffects.getEnabled());
   const [sfxVolume, setSfxVolume] = useState(() => Math.round(soundEffects.getVolume() * 100));
 
@@ -68,6 +70,7 @@ export const SettingsModal: React.FC = () => {
 
     // Save SFX
     saveEmojiPack(emojiPack);
+    saveTransferSpeedUnit(transferSpeedUnit);
     soundEffects.setEnabled(sfxEnabled);
     soundEffects.setVolume(sfxVolume / 100);
 
@@ -310,6 +313,14 @@ export const SettingsModal: React.FC = () => {
                     ))}
                   </div>
                   <p className="field-info-text">A escolha muda a aparência local dos emojis. As mensagens continuam compatíveis entre participantes.</p>
+                </div>
+                <div className="settings-row">
+                  <label className="settings-label" htmlFor="settings-transfer-speed-unit">Velocidade das transferências:</label>
+                  <select id="settings-transfer-speed-unit" className="select-input-sm"
+                    value={transferSpeedUnit} onChange={(event) => setTransferSpeedUnit(event.target.value as TransferSpeedUnit)}>
+                    <option value="MB">MB/s (megabytes por segundo)</option>
+                    <option value="Mb">Mb/s (megabits por segundo)</option>
+                  </select>
                 </div>
               </div>
             )}

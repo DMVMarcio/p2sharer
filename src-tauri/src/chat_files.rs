@@ -4,7 +4,7 @@ use sha2::{Digest, Sha256};
 use std::{collections::HashMap, fs::{self, File, OpenOptions}, io::{Read, Seek, SeekFrom, Write}, path::{Path, PathBuf}, sync::Mutex};
 use tauri::State;
 
-const CHUNK: usize = 48 * 1024;
+const CHUNK: usize = 256 * 1024;
 const MAX_FILE: u64 = 2 * 1024 * 1024 * 1024;
 
 #[derive(Default)]
@@ -114,14 +114,17 @@ pub async fn inspect_chat_file(state: State<'_, ChatFileState>, id: String) -> R
 }
 
 #[tauri::command]
-pub async fn read_chat_file_chunk(state: State<'_, ChatFileState>, id: String, offset: u64) -> Result<String, String> {
+pub async fn read_chat_file_chunk(state: State<'_, ChatFileState>, id: String, offset: u64,
+    length: Option<usize>) -> Result<String, String> {
+    let length = length.unwrap_or(CHUNK);
+    if length == 0 || length > CHUNK { return Err("Invalid chunk size".into()); }
     let path = state.sources.lock().map_err(|e| e.to_string())?.get(&id).cloned().ok_or("Source unavailable")?;
     tauri::async_runtime::spawn_blocking(move || {
         let mut file = File::open(path).map_err(|e| e.to_string())?;
         let size = file.metadata().map_err(|e| e.to_string())?.len();
         if size > MAX_FILE || offset > size { return Err("Invalid source offset".into()); }
         file.seek(SeekFrom::Start(offset)).map_err(|e| e.to_string())?;
-        let mut buffer = vec![0u8; CHUNK.min((size - offset) as usize)];
+        let mut buffer = vec![0u8; length.min((size - offset) as usize)];
         file.read_exact(&mut buffer).map_err(|e| e.to_string())?;
         Ok(STANDARD.encode(buffer))
     }).await.map_err(|e| e.to_string())?

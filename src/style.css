@@ -2551,7 +2551,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .chat-file-hash { font-family: var(--font-mono); }
 .chat-file-copy-hash { display: grid; place-items: center; width: 18px; height: 18px; padding: 0; border: 0; border-radius: var(--radius-xs); background: transparent; color: var(--text-secondary); cursor: pointer; }
 .chat-file-copy-hash:hover { color: var(--accent-color); background: var(--bg-card-hover); }
-.chat-file-hash-tooltip { max-width: 270px; width: auto; overflow-wrap: anywhere; word-break: break-all; white-space: normal; }
+.custom-tooltip.chat-file-hash-tooltip { max-width: 270px; width: auto; overflow-wrap: anywhere; word-break: break-all; white-space: normal; font-family: var(--font-sans); font-size: 11px; font-weight: 500; line-height: 1.45; }
 .chat-file-download-wrap { position: relative; display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
 .chat-file-download-button, .chat-file-reveal-button { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; line-height: 0; border: 1px solid var(--border-default); border-radius: 50%; background: var(--bg-card); color: var(--accent-color); cursor: pointer; }
 .chat-file-reveal-button { color: var(--text-secondary); }
@@ -2587,14 +2587,17 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .chat-file-detail { display: flex; flex-direction: column; gap: 4px; padding: 8px 0; border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); overflow-wrap: anywhere; font-size: 11px; color: var(--text-secondary); }
 .chat-file-detail span:last-child { font-family: var(--font-mono); font-size: 10px; }
 .chat-file-error { color: #ef4444; }
-.chat-file-toasts { position: fixed; z-index: 1200; right: 340px; top: 66px; display: flex; flex-direction: column; gap: 10px; width: min(300px, calc(100vw - 40px)); }
+.chat-file-toasts { position: fixed; z-index: 1200; right: 340px; top: 118px; display: flex; flex-direction: column; gap: 10px; width: min(300px, calc(100vw - 40px)); }
 .chat-file-toast { display: flex; flex-direction: column; gap: 8px; padding: 13px; border: 1px solid var(--border-default); border-radius: var(--radius-sm); background: var(--bg-card); box-shadow: 0 12px 30px rgba(0,0,0,.3); overflow-wrap: anywhere; }
+.chat-file-toast-title { margin: 0; color: var(--text-primary); font-size: 12px; line-height: 1.5; font-weight: 400; }
+.chat-file-toast-title .chat-file-toast-person { color: var(--accent-color); font-weight: 700; }
+.chat-file-toast-title .chat-file-toast-name { color: var(--text-primary); font-weight: 700; }
 .chat-file-toast span { font-size: 11px; color: var(--text-secondary); }
 .chat-file-toast > div { display: flex; justify-content: flex-end; gap: 8px; }
 .chat-file-toast button { padding: 6px 10px; border: 1px solid var(--border-default); border-radius: var(--radius-sm); background: var(--bg-elevated); color: var(--text-primary); cursor: pointer; }
 .chat-file-toast button.btn-primary { background: var(--accent-color); color: var(--accent-text-on-accent); }
 .chat-file-toast progress { width: 100%; accent-color: var(--accent-color); }
-@media (max-width: 800px) { .chat-file-toasts { right: 16px; top: 66px; } }
+@media (max-width: 800px) { .chat-file-toasts { right: 16px; top: 118px; } }
 .chat-transfer-center { position: relative; display: flex; align-items: center; justify-content: center; gap: 5px; }
 .btn-chat-transfer { position: relative; display: grid; place-items: center; width: 34px; height: 34px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-secondary); cursor: pointer; }
 .btn-chat-transfer:hover, .btn-chat-transfer.active { background: var(--bg-card-hover); color: var(--accent-color); }
@@ -2604,6 +2607,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .chat-transfer-empty { padding: 14px 2px; color: var(--text-muted); font-size: 11px; text-align: center; }
 .chat-transfer-list { display: flex; flex-direction: column; gap: 4px; }
 .chat-transfer-item { display: flex; align-items: center; gap: 6px; padding: 8px 5px; border-top: 1px solid var(--border-subtle); }
+.chat-transfer-file-icon { display: grid; flex: none; place-items: center; width: 24px; height: 24px; color: var(--accent-color); }
 .chat-transfer-item-copy { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 3px; }
 .chat-transfer-item-copy strong { overflow: hidden; color: var(--text-primary); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .chat-transfer-item-copy span, .chat-transfer-item-copy small { color: var(--text-secondary); font-size: 10px; }
