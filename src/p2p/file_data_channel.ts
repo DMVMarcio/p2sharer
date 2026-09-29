@@ -4,6 +4,13 @@ export interface FileOptimizedConnection extends RTCPeerConnection {
   roomDataChannel: RTCDataChannel | null;
 }
 
+export function ensureFileDataChannelWindow(connection: FileOptimizedConnection | null | undefined): boolean {
+  const channel = connection?.roomDataChannel;
+  if (!channel || channel.readyState !== 'open') return false;
+  channel.bufferedAmountLowThreshold = FILE_CHANNEL_LOW_WATER_BYTES;
+  return channel.bufferedAmountLowThreshold === FILE_CHANNEL_LOW_WATER_BYTES;
+}
+
 /** Keep enough data queued to fill a typical direct WAN path. */
 export function createFileOptimizedPeerConnection(): (new (configuration?: RTCConfiguration) => FileOptimizedConnection) | undefined {
   if (typeof RTCPeerConnection === 'undefined') return undefined;
@@ -26,12 +33,14 @@ export function createFileOptimizedPeerConnection(): (new (configuration?: RTCCo
     private tuneChannel(channel: RTCDataChannel): void {
       if (channel.label !== 'data') return;
       this.roomDataChannel = channel;
-      // Trystero assigns its default after createDataChannel/ondatachannel returns.
-      queueMicrotask(() => {
+      // The inbound event may run this listener before Trystero sets its default.
+      const apply = () => {
         if (channel.readyState !== 'closed') {
           channel.bufferedAmountLowThreshold = FILE_CHANNEL_LOW_WATER_BYTES;
         }
-      });
+      };
+      channel.addEventListener('open', apply);
+      setTimeout(apply, 0);
     }
   };
 }

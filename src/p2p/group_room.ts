@@ -32,7 +32,8 @@ import {
   buildRtcConfiguration,
   createJoinErrorHandler,
 } from './ice_config.ts';
-import { createFileOptimizedPeerConnection, type FileOptimizedConnection } from './file_data_channel.ts';
+import { createFileOptimizedPeerConnection, ensureFileDataChannelWindow,
+  type FileOptimizedConnection } from './file_data_channel.ts';
 import { MediaCoordinator } from './media_coordinator.ts';
 import { PeerTracker } from './peer_tracker.ts';
 import { signalingManager } from './signaling_manager.ts';
@@ -2429,6 +2430,8 @@ export class GroupRoomManager {
     const signature = await this.chatAuth.signControl('chat-file-chunk-v2', fileChunkSignatureData(unsigned));
     const packet = encodeSignedFileChunk({ ...unsigned, signature }, bytes);
     session.timings.prepareMs += performance.now() - prepareStart;
+    const pc = this.room?.getPeers?.()?.[peerId] as FileOptimizedConnection | undefined;
+    ensureFileDataChannelWindow(pc);
     const wireStart = performance.now();
     await this.fileAction.send(packet, { target: peerId });
     session.timings.wireMs += performance.now() - wireStart;
