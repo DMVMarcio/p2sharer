@@ -10,6 +10,7 @@ export interface RoomAppDefinition {
   description?: string;
   icon?: React.ComponentType<{ size?: number; strokeWidth?: number }>;
   bannerClass?: string;
+  bannerImage?: string;
   createModel(context: RoomAppModelContext): RoomAppModel;
   loadView(): Promise<{ default: React.ComponentType<RoomAppViewProps> }>;
 }

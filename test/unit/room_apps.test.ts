@@ -105,9 +105,12 @@ test('activity presence is opt-in, synced per instance, and cleared on leave or 
   }, 'bob');
   const note = first.start('notepad');
   assert.equal(first.isJoined(note), false);
+  assert.deepEqual(first.getJoinedInstances(), []);
   assert.deepEqual(second.getParticipants(note), []);
   first.join(note);
   assert.equal(first.isJoined(note), true);
+  assert.deepEqual(first.getJoinedInstances().map((instance) => instance.id), [note]);
+  assert.deepEqual(second.getJoinedInstances(), []);
   assert.deepEqual(second.getParticipants(note), ['alice']);
   second.join(note);
   assert.deepEqual(first.getParticipants(note), ['alice', 'bob']);
@@ -118,6 +121,7 @@ test('activity presence is opt-in, synced per instance, and cleared on leave or 
   second.sendSync('charlie');
   assert.deepEqual(late.getParticipants(note), ['alice', 'bob']);
   first.leave(note);
+  assert.deepEqual(first.getJoinedInstances(), []);
   assert.deepEqual(late.getParticipants(note), ['bob']);
   late.forgetPeer('bob');
   assert.deepEqual(late.getParticipants(note), []);

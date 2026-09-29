@@ -41,8 +41,10 @@ export const AppsModal: React.FC = () => {
           {listRoomApps().map((app) => {
             const Icon = app.icon || AppWindow;
             return <div className="apps-library-card" key={app.kind}>
-              <div className={`apps-library-banner ${app.bannerClass || ''}`} aria-hidden="true">
-                <div className="apps-library-banner-glow" />
+              <div className={`apps-library-banner ${app.bannerClass || ''} ${app.bannerImage ? 'has-image' : ''}`}
+                style={app.bannerImage ? { backgroundImage: `url("${app.bannerImage}")` } : undefined}
+                aria-hidden="true">
+                {!app.bannerImage && <div className="apps-library-banner-glow" />}
                 <Icon size={34} strokeWidth={1.7} />
               </div>
               <div className="apps-library-card-content">

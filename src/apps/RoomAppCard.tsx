@@ -56,7 +56,7 @@ export const RoomAppCard: React.FC<Props> = ({ instance, isFeatured = false, com
   const label = definition?.label || instance.kind;
   const Icon = definition?.icon || AppWindow;
   const View = viewFor(instance.kind);
-  return <div className={`room-app-card ${isFeatured ? 'featured' : ''} ${compact ? 'compact' : ''}`}
+  return <div className={`room-app-card room-app-kind-${instance.kind} ${isFeatured ? 'featured' : ''} ${compact ? 'compact' : ''}`}
     style={style} data-peer-id={`app:${instance.id}`}>
     <div className="room-app-card-header">
       <span className="room-app-card-title"><Icon size={16} strokeWidth={1.8} />{label}

@@ -62,3 +62,24 @@ test('repeating the same video seeks to its start even during the correction coo
   reconcileYouTubePlayer(player, state, tracker, 10_000, 10_000, 'urgent');
   assert.deepEqual(calls, ['seek:0', 'play']);
 });
+
+test('emptying the queue stops the old video and reloads it if later added again', () => {
+  const calls: string[] = [];
+  const player = {
+    getVideoData: () => ({ video_id: 'bbbbbbbbbbb' }),
+    stopVideo: () => calls.push('stop'),
+    loadVideoById: (id: string) => calls.push(`load:${id}`),
+  } as unknown as YouTubePlayer;
+  const tracker: YouTubePlaybackTracker = { videoId: 'bbbbbbbbbbb', lastLoadAt: 0,
+    lastPlayAttemptAt: 0, lastCorrectionAt: 0 };
+  const empty = { ...state, queue: [], index: 0, playing: false };
+
+  reconcileYouTubePlayer(player, empty, tracker, 10_000, 10_000, 'urgent');
+  reconcileYouTubePlayer(player, empty, tracker, 10_000, 10_100, 'update');
+  assert.deepEqual(calls, ['stop']);
+  assert.equal(tracker.videoId, '');
+
+  reconcileYouTubePlayer(player, { ...state, queue: [state.queue[1]], index: 0 },
+    tracker, 10_200, 10_200, 'urgent');
+  assert.deepEqual(calls, ['stop', 'load:bbbbbbbbbbb']);
+});

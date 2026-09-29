@@ -31,6 +31,27 @@ test('timing heartbeats and small adjustments do not create activity toasts', ()
     'voltou no vídeo');
 });
 
+test('queue options and manual removals announce meaningful changes', () => {
+  assert.equal(describeYouTubeActivity(state, { ...state, repeat: 'all' }),
+    'ativou a repetição da fila');
+  assert.equal(describeYouTubeActivity({ ...state, repeat: 'all' }, { ...state, repeat: 'one' }),
+    'ativou a repetição de um vídeo');
+  assert.equal(describeYouTubeActivity({ ...state, repeat: 'one' }, state),
+    'desativou a repetição');
+  assert.equal(describeYouTubeActivity(state, { ...state, shuffle: true }),
+    'ativou a ordem aleatória');
+  assert.equal(describeYouTubeActivity({ ...state, shuffle: true }, state),
+    'desativou a ordem aleatória');
+  assert.equal(describeYouTubeActivity(state, { ...state, removePlayed: true }),
+    'ativou a remoção automática');
+  assert.equal(describeYouTubeActivity({ ...state, removePlayed: true }, state),
+    'desativou a remoção automática');
+  assert.equal(describeYouTubeActivity(state, { ...state, queue: [], playing: false,
+    syncReason: 'update' }), 'removeu “First” da fila');
+  assert.equal(describeYouTubeActivity(state, { ...state, queue: [], playing: false,
+    syncReason: 'seek' }), null);
+});
+
 test('queue attribution metadata is validated without rejecting older entries', () => {
   assert.equal(validYouTubeState(state), true);
   assert.equal(validYouTubeState({ ...state, queue: [{ videoId: 'aaaaaaaaaaa', title: 'First' }] }), true);
