@@ -11,6 +11,7 @@ import { getTransferSpeedUnit, saveTransferSpeedUnit, type TransferSpeedUnit } f
 import { EmojiGlyph } from '../common/EmojiGlyph';
 import { RendezvousServerEditor } from '../common/RendezvousServerEditor';
 import { loadRendezvousPreferences, saveRendezvousPreferences, validateRendezvousPreferences } from '../../p2p/relay_preferences.ts';
+import { isValidTurnUrl, parseTurnUrls } from '../../p2p/ice_config.ts';
 
 export const SettingsModal: React.FC = () => {
   const { closeModal, isClosing } = useModal();
@@ -63,6 +64,17 @@ export const SettingsModal: React.FC = () => {
   }, []);
 
   const handleSave = () => {
+    const turnUrls = parseTurnUrls(turnUrl);
+    if (turnEnabled && (turnUrls.length === 0 || turnUrls.some((url) => !isValidTurnUrl(url)))) {
+      setActiveTab('network');
+      showToast('Informe endereços TURN válidos, um por linha.');
+      return;
+    }
+    if (turnEnabled && (!turnUser.trim() || !turnCred.trim())) {
+      setActiveTab('network');
+      showToast('Informe o usuário e a senha do servidor TURN.');
+      return;
+    }
     const rendezvousError = validateRendezvousPreferences(rendezvousPreferences);
     if (rendezvousError) {
       setActiveTab('network');
@@ -99,16 +111,7 @@ export const SettingsModal: React.FC = () => {
 
     // Save TURN
     localStorage.setItem('p2sharer_turn_enabled', turnEnabled ? 'true' : 'false');
-    let sanitizedTurn = turnUrl.trim();
-    if (
-      sanitizedTurn &&
-      !sanitizedTurn.startsWith('turn:') &&
-      !sanitizedTurn.startsWith('turns:') &&
-      !sanitizedTurn.startsWith('stun:')
-    ) {
-      sanitizedTurn = `turn:${sanitizedTurn}`;
-    }
-    localStorage.setItem('p2sharer_turn_url', sanitizedTurn);
+    localStorage.setItem('p2sharer_turn_url', turnUrls.join('\n'));
     localStorage.setItem('p2sharer_turn_user', turnUser.trim());
     localStorage.setItem('p2sharer_turn_cred', turnCred.trim());
     localStorage.setItem('p2sharer_turn_force_relay', turnForceRelay ? 'true' : 'false');
@@ -626,18 +629,18 @@ export const SettingsModal: React.FC = () => {
             {activeTab === 'network' && (
               <div className="settings-tab-pane active" id="settings-pane-network">
                 <div className="settings-pane-header">
-                  <h3 className="settings-pane-title">Rede & Proteção de IP (TURN Relay)</h3>
+                  <h3 className="settings-pane-title">Conexão P2P e relay TURN</h3>
                   <p className="settings-pane-desc">
-                    Opcional: Oculte seu IP residencial encaminhando o tráfego P2P por um servidor relay.
+                    Configure um relay TURN para conectar participantes quando a rota direta falhar.
                   </p>
                 </div>
 
                 <div className="settings-row">
                   <label className="settings-switch-row" htmlFor="settings-enable-turn">
                     <div className="settings-switch-label-group">
-                      <span className="settings-switch-title">Servidor TURN / Proxy de IP</span>
+                      <span className="settings-switch-title">Servidor TURN</span>
                       <span className="settings-switch-subtitle">
-                        Encaminhar conexões por um servidor relay para proteger seu IP residencial
+                        Permitir conexões por relay quando necessário
                       </span>
                     </div>
                     <div className="modern-switch">
@@ -656,13 +659,13 @@ export const SettingsModal: React.FC = () => {
                   <div className="turn-config-box" id="turn-config-fields" style={{ display: 'flex', marginTop: '10px' }}>
                     <div className="settings-row">
                       <label className="settings-label" htmlFor="settings-turn-url">
-                        URL do Servidor TURN:
+                        Endereços TURN (um por linha):
                       </label>
-                      <input
-                        type="text"
+                      <textarea
                         id="settings-turn-url"
                         className="text-input-sm"
-                        placeholder="turn:turn.exemplo.com:3478?transport=udp"
+                        rows={3}
+                        placeholder={'turn:turn.exemplo.com:3478?transport=udp\nturn:turn.exemplo.com:3478?transport=tcp'}
                         value={turnUrl}
                         onChange={(e) => setTurnUrl(e.target.value)}
                       />

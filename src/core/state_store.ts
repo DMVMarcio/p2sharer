@@ -1,4 +1,5 @@
 import type { ResolutionConfig, RoomSlotInfo, StreamFilterMode, ThemeMode, TurnConfig } from './types.ts';
+import { parseTurnUrls } from '../p2p/ice_config.ts';
 
 export class StateStore {
   private static instance: StateStore | null = null;
@@ -179,17 +180,11 @@ export class StateStore {
       return { enabled: false, forceRelay: false };
     }
     const isTurnEnabled = localStorage.getItem('p2sharer_turn_enabled') === 'true';
-    const rawTurnUrl = (localStorage.getItem('p2sharer_turn_url') || '').trim();
-    let sanitizedTurnUrl: string | undefined = undefined;
-    if (isTurnEnabled && rawTurnUrl) {
-      sanitizedTurnUrl = (rawTurnUrl.startsWith('turn:') || rawTurnUrl.startsWith('turns:') || rawTurnUrl.startsWith('stun:'))
-        ? rawTurnUrl
-        : `turn:${rawTurnUrl}`;
-    }
+    const rawTurnUrl = parseTurnUrls(localStorage.getItem('p2sharer_turn_url') || '').join('\n');
 
     return {
-      enabled: isTurnEnabled && Boolean(sanitizedTurnUrl),
-      url: isTurnEnabled ? sanitizedTurnUrl : undefined,
+      enabled: isTurnEnabled && Boolean(rawTurnUrl),
+      url: isTurnEnabled ? rawTurnUrl : undefined,
       username: isTurnEnabled ? (localStorage.getItem('p2sharer_turn_user') || undefined) : undefined,
       credential: isTurnEnabled ? (localStorage.getItem('p2sharer_turn_cred') || undefined) : undefined,
       forceRelay: isTurnEnabled && localStorage.getItem('p2sharer_turn_force_relay') === 'true',
