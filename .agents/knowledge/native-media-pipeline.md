@@ -71,9 +71,7 @@ When capture devices output 5.1, 7.1, or other multi-channel audio:
 - Transmits compressed/raw frame buffers directly to the frontend's `NativeVideoBridge` without blocking Tauri's main IPC channel.
 - Direct GPU capture is the official application pipeline: in-app screen and window selection dispatches directly via `NativeVideoBridge` without triggering Chromium's browser dialog (`getDisplayMedia`).
 - Capture lifecycle signals (window minimized or closed) trigger native in-app toast alerts and clean teardown instead of spawning unexpected browser popups.
-- The screen picker offers an explicit compatibility mode for display composition artifacts. It bypasses the WGC session and uses xcap's Windows GDI capture path, while keeping the same JPEG/WebSocket/WebRTC pipeline. This mode may reduce capture FPS and is intended for diagnosing or working around driver-specific composition problems.
-- On tested AMD hardware, wallpaper images can appear above board content in P2Sharer's local preview and transmitted frame while the actual Windows desktop remains correctly composed. This places the observed defect in the capture path rather than the remote WebRTC receiver.
-- The user confirmed that the GDI compatibility mode resolves the wallpaper-over-window capture artifact on the RX 5500 XT.
+- On tested AMD hardware, wallpaper images appeared above board content in P2Sharer's local preview and transmitted frame while the actual Windows desktop remained correctly composed. Later validation confirmed that the normal WGC mode works after the capture and frame-queue changes, while the optional GDI compatibility mode flickers. Keep WGC as the normal capture path and do not expose the GDI mode.
 
 ---
 

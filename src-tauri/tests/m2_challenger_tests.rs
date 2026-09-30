@@ -229,11 +229,11 @@ fn test_multimedia_timer_concurrent_stress() {
 #[test]
 fn test_native_screen_capture_lifecycle() {
     // Empty source ID should fail
-    let err_res = start_native_screen_capture("".to_string(), None, None, None, None, None, None);
+    let err_res = start_native_screen_capture("".to_string(), None, None, None, None, None);
     assert!(err_res.is_err());
 
     // Valid start on screen:0
-    let start_res = start_native_screen_capture("screen:0".to_string(), Some(30), Some(320), Some(180), Some(false), Some(60), Some("compatibility".to_string()));
+    let start_res = start_native_screen_capture("screen:0".to_string(), Some(30), Some(320), Some(180), Some(false), Some(60));
     assert!(start_res.is_ok(), "Failed to start capture: {:?}", start_res);
 
     // Sleep briefly to let capture thread initialize

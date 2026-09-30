@@ -35,9 +35,6 @@ export function useScreenPicker(onClose?: () => void) {
   const [showCursor, setShowCursor] = useState<boolean>(
     localStorage.getItem('p2sharer_default_cursor') !== 'false'
   );
-  const [captureMode, setCaptureMode] = useState<'wgc' | 'compatibility'>(
-    localStorage.getItem('p2sharer_capture_mode') === 'compatibility' ? 'compatibility' : 'wgc'
-  );
 
   const handleResolutionChange = useCallback((newRes: string) => {
     setResolution(newRes);
@@ -101,10 +98,8 @@ export function useScreenPicker(onClose?: () => void) {
         ? (windows[0]?.id || 'window:0')
         : (monitors[0]?.id || 'screen:0');
       const chosen = selectedSourceId || fallbackId;
-      localStorage.setItem('p2sharer_capture_mode', captureMode);
-
       if (onClose) onClose();
-      await startCapture(chosen, fps, { width: resConfig.width, height: resConfig.height }, showCursor, quality, captureMode);
+      await startCapture(chosen, fps, { width: resConfig.width, height: resConfig.height }, showCursor, quality);
     } catch (err) {
       console.error('Failed to start capture:', err);
     } finally {
@@ -117,7 +112,6 @@ export function useScreenPicker(onClose?: () => void) {
     fps,
     bitrate,
     quality,
-    captureMode,
     selectedSourceId,
     currentTab,
     windows,
@@ -146,8 +140,6 @@ export function useScreenPicker(onClose?: () => void) {
     setQuality,
     showCursor,
     setShowCursor,
-    captureMode,
-    setCaptureMode,
     loadSources,
     confirmPicker,
   };

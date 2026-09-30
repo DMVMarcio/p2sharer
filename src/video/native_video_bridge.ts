@@ -90,8 +90,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     fps: number = 60,
     resolution: { width: number; height: number } = { width: 1920, height: 1080 },
     captureMouse: boolean = true,
-    quality: number = 90,
-    captureMode: 'wgc' | 'compatibility' = 'wgc'
+    quality: number = 90
   ): Promise<MediaStream> {
     if (typeof optionsOrSourceId === 'object' && optionsOrSourceId !== null) {
       const opts = optionsOrSourceId as VideoSourceOptions;
@@ -117,7 +116,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     const sId = rawId === 'gpu_direct' || rawId === 'direct_gpu' || rawId === 'screen:direct_gpu' ? 'screen:0' : rawId;
 
     // Official native in-app capture with hardware WGC
-    return this.startNativeCapture(sId, fps, resolution, captureMouse, quality, captureMode);
+    return this.startNativeCapture(sId, fps, resolution, captureMouse, quality);
   }
 
   private async startNativeCapture(
@@ -125,8 +124,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     fps: number,
     resolution: { width: number; height: number },
     captureMouse: boolean,
-    quality: number,
-    captureMode: 'wgc' | 'compatibility' = 'wgc'
+    quality: number
   ): Promise<MediaStream> {
     await this.stopCapture();
     this.currentFps = fps;
@@ -186,7 +184,6 @@ export class NativeVideoBridge implements VideoCaptureBridge {
         targetHeight: resolution.height,
         captureMouse,
         quality,
-        captureMode,
       });
     } catch (err) {
       this.isCapturing = false;

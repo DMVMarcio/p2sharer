@@ -343,15 +343,14 @@ export class RoomService {
     fps: number,
     res: { width: number; height: number },
     mouse: boolean,
-    quality?: number,
-    captureMode: 'wgc' | 'compatibility' = 'wgc'
+    quality?: number
   ): Promise<void> {
     try {
       showToast('Iniciando transmissão...');
 
       const chosenSource = !sourceId ? 'screen:0' : sourceId;
       const targetQuality = quality ?? stateStore.currentQuality ?? 90;
-      const videoStream = await this.nativeVideoBridge.startCapture(chosenSource, fps, res, mouse, targetQuality, captureMode);
+      const videoStream = await this.nativeVideoBridge.startCapture(chosenSource, fps, res, mouse, targetQuality);
 
       const audioMode = stateStore.isAudioFilterFullAudio ? 'full' : stateStore.selectedFilterMode;
       const audioPids = stateStore.isAudioFilterFullAudio ? [] : stateStore.getActiveFilterPids();
