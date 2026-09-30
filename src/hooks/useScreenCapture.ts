@@ -14,9 +14,10 @@ export function useScreenCapture() {
       fps: number,
       res: { width: number; height: number },
       mouse: boolean,
-      quality?: number
+      quality?: number,
+      captureMode: 'wgc' | 'compatibility' = 'wgc'
     ) => {
-      await roomService.startCapture(sourceId, fps, res, mouse, quality);
+      await roomService.startCapture(sourceId, fps, res, mouse, quality, captureMode);
     },
     []
   );
