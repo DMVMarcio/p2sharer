@@ -4,7 +4,7 @@ This coturn instance is for controlled connection testing. It is optional and is
 
 1. Copy `.env.example` to `.env` and set the VPS public IPv4, a private realm name, a username, and a random password. Keep `.env` out of version control.
 2. Allow inbound UDP and TCP port `3478`, plus inbound UDP ports `49160-49360`, in the provider firewall and host firewall.
-3. Run `docker compose up -d` in this directory on the VPS. Check `docker compose logs turn` for startup errors.
+3. Run `docker compose up -d --force-recreate` in this directory on the VPS. Check `docker compose logs turn` for startup errors. The startup log should show only the configured public IPv4 as the listener and relay address. If it reports Docker bridge or private addresses as relay addresses, confirm the updated `start.sh` is mounted and recreate the container again.
 4. On both P2Sharer clients, enable the TURN server in network settings and enter these two addresses, one per line:
 
    ```text

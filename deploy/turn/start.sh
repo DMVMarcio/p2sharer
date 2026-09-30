@@ -9,6 +9,8 @@ set -eu
 umask 077
 cat > /run/turnserver.conf <<EOF
 listening-port=3478
+listening-ip=${TURN_PUBLIC_IP}
+relay-ip=${TURN_PUBLIC_IP}
 external-ip=${TURN_PUBLIC_IP}
 realm=${TURN_REALM}
 fingerprint
