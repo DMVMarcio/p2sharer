@@ -7,10 +7,26 @@ export const DEFAULT_STUN_SERVERS = [
   'stun:stun2.l.google.com:19302',
   'stun:stun3.l.google.com:19302',
   'stun:stun4.l.google.com:19302',
-  'stun:stun.services.mozilla.com',
 ];
 
 const reportedIceServerErrors = new Map<string, number>();
+let reportedRelayCandidate = false;
+let pendingIceSnapshots = 0;
+
+async function summarizeIceCandidates(connection: RTCPeerConnection): Promise<{
+  local: Record<string, number>;
+  remote: Record<string, number>;
+}> {
+  const candidates = { local: { host: 0, srflx: 0, relay: 0 }, remote: { host: 0, srflx: 0, relay: 0 } };
+  const stats = await connection.getStats();
+  stats.forEach((report) => {
+    if (report.type !== 'local-candidate' && report.type !== 'remote-candidate') return;
+    const side = report.type === 'local-candidate' ? candidates.local : candidates.remote;
+    const type = report.candidateType as keyof typeof side;
+    if (type in side) side[type]++;
+  });
+  return candidates;
+}
 
 export function sanitizeTurnUrl(rawUrl: string): string {
   const trimmed = rawUrl.trim();
@@ -55,14 +71,42 @@ export function buildIceServers(turnConfig?: TurnConfig | null): RTCIceServer[] 
 }
 
 export function buildRtcConfiguration(turnConfig?: TurnConfig | null): RTCConfiguration {
+  const servers = buildIceServers(turnConfig);
+  const relayOnly = Boolean(turnConfig?.forceRelay && servers.some((server) =>
+    (Array.isArray(server.urls) ? server.urls : [server.urls]).some((url) => /^turns?:/i.test(url))));
   return {
-    iceServers: buildIceServers(turnConfig),
-    iceTransportPolicy: turnConfig?.forceRelay ? 'relay' : 'all',
+    iceServers: relayOnly ? servers.filter((server) =>
+      (Array.isArray(server.urls) ? server.urls : [server.urls]).some((url) => /^turns?:/i.test(url))) : servers,
+    iceTransportPolicy: relayOnly ? 'relay' : 'all',
     iceCandidatePoolSize: 0,
   };
 }
 
 export function attachIceDiagnostics(connection: RTCPeerConnection): void {
+  connection.addEventListener('icecandidate', (event) => {
+    if (reportedRelayCandidate || !event.candidate?.candidate.includes(' typ relay')) return;
+    reportedRelayCandidate = true;
+    console.warn('[P2P/ICE] Relay candidate gathered');
+  });
+
+  connection.addEventListener('signalingstatechange', () => {
+    if (connection.signalingState !== 'stable' || !connection.remoteDescription || pendingIceSnapshots >= 4) return;
+    pendingIceSnapshots++;
+    setTimeout(() => {
+      if (connection.connectionState === 'connected' || connection.connectionState === 'closed') return;
+      void summarizeIceCandidates(connection).then((candidates) => {
+        console.warn('[P2P/ICE] Pending connection candidate summary', {
+          gathering: connection.iceGatheringState,
+          ice: connection.iceConnectionState,
+          connection: connection.connectionState,
+          localDescription: Boolean(connection.localDescription),
+          remoteDescription: Boolean(connection.remoteDescription),
+          candidates,
+        });
+      }).catch(() => {});
+    }, 5_000);
+  });
+
   connection.addEventListener('icecandidateerror', (event) => {
     const error = event as RTCPeerConnectionIceErrorEvent;
     const server = error.url.replace(/^([^:]+:)[^@]+@/, '$1***@');
@@ -77,14 +121,7 @@ export function attachIceDiagnostics(connection: RTCPeerConnection): void {
 
   connection.addEventListener('iceconnectionstatechange', () => {
     if (connection.iceConnectionState !== 'failed') return;
-    void connection.getStats().then((stats) => {
-      const candidates = { local: { host: 0, srflx: 0, relay: 0 }, remote: { host: 0, srflx: 0, relay: 0 } };
-      stats.forEach((report) => {
-        if (report.type !== 'local-candidate' && report.type !== 'remote-candidate') return;
-        const side = report.type === 'local-candidate' ? candidates.local : candidates.remote;
-        const type = report.candidateType as keyof typeof side;
-        if (type in side) side[type]++;
-      });
+    void summarizeIceCandidates(connection).then((candidates) => {
       console.warn('[P2P/ICE] Connection failed candidate summary', candidates);
     }).catch((error) => {
       console.warn('[P2P/ICE] Could not collect failed connection stats', error);

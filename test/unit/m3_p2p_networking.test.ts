@@ -333,6 +333,11 @@ describe('M3 Unit Tests: Robust P2P Networking & Signaling Failover', () => {
 
       const forceRelayConfig = buildRtcConfiguration({ enabled: true, url: 'turn:relay.net:3478', forceRelay: true });
       assert.equal(forceRelayConfig.iceTransportPolicy, 'relay');
+      assert.equal(forceRelayConfig.iceServers?.length, 1);
+      assert.deepEqual(forceRelayConfig.iceServers?.[0]?.urls, ['turn:relay.net:3478']);
+
+      const missingTurnConfig = buildRtcConfiguration({ enabled: false, url: 'turn:relay.net:3478', forceRelay: true });
+      assert.equal(missingTurnConfig.iceTransportPolicy, 'all');
     });
 
     it('formatJoinError should translate SDP/TURN errors into actionable messages', () => {
