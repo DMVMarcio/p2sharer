@@ -5,7 +5,6 @@ export class NativeVideoBridge implements VideoCaptureBridge {
   private activeStream: MediaStream | null = null;
   private canvas: HTMLCanvasElement | null = null;
   private ctx: CanvasRenderingContext2D | null = null;
-  private bitmapCtx: ImageBitmapRenderingContext | null = null;
   private ws: WebSocket | null = null;
   private isCapturing: boolean = false;
   private isDirectGpu: boolean = false;
@@ -91,7 +90,8 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     fps: number = 60,
     resolution: { width: number; height: number } = { width: 1920, height: 1080 },
     captureMouse: boolean = true,
-    quality: number = 90
+    quality: number = 90,
+    captureMode: 'wgc' | 'compatibility' = 'wgc'
   ): Promise<MediaStream> {
     if (typeof optionsOrSourceId === 'object' && optionsOrSourceId !== null) {
       const opts = optionsOrSourceId as VideoSourceOptions;
@@ -117,7 +117,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     const sId = rawId === 'gpu_direct' || rawId === 'direct_gpu' || rawId === 'screen:direct_gpu' ? 'screen:0' : rawId;
 
     // Official native in-app capture with hardware WGC
-    return this.startNativeCapture(sId, fps, resolution, captureMouse, quality);
+    return this.startNativeCapture(sId, fps, resolution, captureMouse, quality, captureMode);
   }
 
   private async startNativeCapture(
@@ -125,7 +125,8 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     fps: number,
     resolution: { width: number; height: number },
     captureMouse: boolean,
-    quality: number
+    quality: number,
+    captureMode: 'wgc' | 'compatibility' = 'wgc'
   ): Promise<MediaStream> {
     await this.stopCapture();
     this.currentFps = fps;
@@ -165,19 +166,11 @@ export class NativeVideoBridge implements VideoCaptureBridge {
         document.body.appendChild(this.canvas);
       }
 
-      try {
-        this.bitmapCtx = this.canvas.getContext('bitmaprenderer') as ImageBitmapRenderingContext | null;
-      } catch {
-        this.bitmapCtx = null;
-      }
-
-      if (!this.bitmapCtx) {
-        this.ctx = this.canvas.getContext('2d', { alpha: false, desynchronized: true });
-        if (this.ctx) {
-          this.ctx.imageSmoothingEnabled = false;
-          this.ctx.fillStyle = '#000000';
-          this.ctx.fillRect(0, 0, resolution.width, resolution.height);
-        }
+      this.ctx = this.canvas.getContext('2d', { alpha: false, desynchronized: true });
+      if (this.ctx) {
+        this.ctx.imageSmoothingEnabled = false;
+        this.ctx.fillStyle = '#000000';
+        this.ctx.fillRect(0, 0, resolution.width, resolution.height);
       }
     }
 
@@ -193,6 +186,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
         targetHeight: resolution.height,
         captureMouse,
         quality,
+        captureMode,
       });
     } catch (err) {
       this.isCapturing = false;
@@ -265,12 +259,14 @@ export class NativeVideoBridge implements VideoCaptureBridge {
               timestamp: nowUs,
               duration: Math.round((1000 / Math.max(this.currentFps, 1)) * 1000),
             });
-            const writePromise = this.trackWriter.write(videoFrame);
-            if (writePromise && typeof writePromise.finally === 'function') {
-              writePromise.finally(() => {
-                videoFrame.close();
-              });
-            } else {
+            try {
+              // Keep only the newest pending JPEG while the encoder consumes this frame.
+              // Unawaited writes build an unbounded queue on slower GPU encoders.
+              await this.trackWriter.ready;
+              if (this.isCapturing) {
+                await this.trackWriter.write(videoFrame);
+              }
+            } finally {
               videoFrame.close();
             }
           } catch (writeErr) {
@@ -487,6 +483,5 @@ export class NativeVideoBridge implements VideoCaptureBridge {
       this.canvas = null;
     }
     this.ctx = null;
-    this.bitmapCtx = null;
   }
 }

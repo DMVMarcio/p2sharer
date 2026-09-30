@@ -24,6 +24,8 @@ export const ScreenPickerModal: React.FC = () => {
     setQuality,
     showCursor,
     setShowCursor,
+    captureMode,
+    setCaptureMode,
     loadSources,
     confirmPicker,
   } = useScreenPicker(closeModal);
@@ -264,6 +266,19 @@ export const ScreenPickerModal: React.FC = () => {
                 <option value={90}>90% (Muito Alta)</option>
                 <option value={85}>85% (Alta)</option>
                 <option value={75}>75% (Equilibrada)</option>
+              </select>
+            </div>
+
+            <div className="picker-setting-item">
+              <label htmlFor="modal-select-capture-mode">Captura:</label>
+              <select
+                id="modal-select-capture-mode"
+                className="select-input-sm"
+                value={captureMode}
+                onChange={(e) => setCaptureMode(e.target.value as 'wgc' | 'compatibility')}
+              >
+                <option value="wgc">Padrão (WGC)</option>
+                <option value="compatibility">Compatibilidade (GDI)</option>
               </select>
             </div>
 

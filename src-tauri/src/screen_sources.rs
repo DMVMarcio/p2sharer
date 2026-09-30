@@ -669,10 +669,16 @@ pub fn start_native_screen_capture(
     target_height: Option<u32>,
     capture_mouse: Option<bool>,
     quality: Option<u8>,
+    capture_mode: Option<String>,
 ) -> Result<bool, String> {
     if source_id.trim().is_empty() {
         return Err("sourceId cannot be empty".to_string());
     }
+    let use_wgc = match capture_mode.as_deref().unwrap_or("wgc") {
+        "wgc" => true,
+        "compatibility" => false,
+        _ => return Err("Unsupported capture mode".to_string()),
+    };
 
     ensure_ws_server_running();
 
@@ -748,7 +754,7 @@ pub fn start_native_screen_capture(
     });
 
     #[cfg(windows)]
-    {
+    if use_wgc {
         let flags = CaptureFlags {
             sender: sender.clone(),
             target_fps: fps,
@@ -796,17 +802,13 @@ pub fn start_native_screen_capture(
                 }
             });
 
-            let min_interval = std::time::Duration::from_nanos(
-                1_000_000_000 / (flags.target_fps.clamp(15, 120) as u64),
-            );
-
             if let Some(win) = wgc_window {
                 let settings = Settings::new(
                     win,
                     cursor_settings,
                     DrawBorderSettings::WithoutBorder,
                     SecondaryWindowSettings::Default,
-                    MinimumUpdateIntervalSettings::Custom(min_interval),
+                    MinimumUpdateIntervalSettings::Default,
                     DirtyRegionSettings::Default,
                     ColorFormat::Rgba8,
                     flags.clone(),
@@ -828,9 +830,6 @@ pub fn start_native_screen_capture(
                 }
             }
         } else {
-            let min_interval = std::time::Duration::from_nanos(
-                1_000_000_000 / (flags.target_fps.clamp(15, 120) as u64),
-            );
             let target_mon_idx: usize = raw_id.parse().unwrap_or(0);
             let wgc_monitor =
                 WgcMonitor::from_index(target_mon_idx + 1).or_else(|_| WgcMonitor::primary());
@@ -841,7 +840,7 @@ pub fn start_native_screen_capture(
                     cursor_settings,
                     DrawBorderSettings::WithoutBorder,
                     SecondaryWindowSettings::Default,
-                    MinimumUpdateIntervalSettings::Custom(min_interval),
+                    MinimumUpdateIntervalSettings::Default,
                     DirtyRegionSettings::Default,
                     ColorFormat::Rgba8,
                     flags.clone(),
@@ -869,7 +868,7 @@ pub fn start_native_screen_capture(
         }
     }
 
-    // Fallback capture thread (xcap) if WGC is unsupported or failed
+    // xcap uses GDI on Windows and is also the explicit compatibility path.
     let frame_interval =
         std::time::Duration::from_nanos((1_000_000_000 / fps as u64).max(8_000_000));
     let xcap_latest_cache = latest_frame_cache.clone();
@@ -1206,9 +1205,33 @@ mod tests {
 
     #[test]
     fn test_start_native_screen_capture_empty_source_id() {
-        let res = start_native_screen_capture("".to_string(), None, None, None, None, None);
+        let res = start_native_screen_capture("".to_string(), None, None, None, None, None, None);
         assert!(res.is_err());
         assert_eq!(res.unwrap_err(), "sourceId cannot be empty");
+    }
+
+    #[test]
+    fn test_compatibility_capture_produces_image() {
+        let mut rx = get_frame_sender().subscribe();
+        start_native_screen_capture(
+            "screen:0".to_string(), Some(15), Some(640), Some(360),
+            Some(false), Some(60), Some("compatibility".to_string()),
+        ).unwrap();
+
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+        let mut has_image = false;
+        while std::time::Instant::now() < deadline {
+            if let Ok(Message::Binary(bytes)) = rx.try_recv() {
+                if bytes.len() > 4 {
+                    has_image = true;
+                    break;
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+
+        stop_native_screen_capture().unwrap();
+        assert!(has_image, "Compatibility capture produced no image");
     }
 
     #[test]
@@ -1230,13 +1253,15 @@ mod tests {
     #[test]
     fn test_wgc_live_fps() {
         let mut rx = get_frame_sender().subscribe();
-        let res = start_native_screen_capture("screen:0".to_string(), Some(60), Some(1920), Some(1080), Some(true), Some(80));
+        let res = start_native_screen_capture("screen:0".to_string(), Some(60), Some(1920), Some(1080), Some(true), Some(80), None);
         println!("start_native_screen_capture result: {:?}", res);
         assert!(res.is_ok());
 
         let timeout = std::time::Instant::now();
         let mut first_frame_time = None;
         let mut frame_count = 0;
+        let mut image_frame_count = 0;
+        let mut heartbeat_count = 0;
         let measure_duration = std::time::Duration::from_millis(2000);
 
         while timeout.elapsed().as_millis() < 4000 {
@@ -1245,6 +1270,11 @@ mod tests {
                     if first_frame_time.is_none() {
                         first_frame_time = Some(std::time::Instant::now());
                         println!("First frame received! size = {} bytes", bytes.len());
+                    }
+                    if bytes.len() > 4 {
+                        image_frame_count += 1;
+                    } else {
+                        heartbeat_count += 1;
                     }
                     frame_count += 1;
                 }
@@ -1270,11 +1300,12 @@ mod tests {
 
         let elapsed_sec = first_frame_time.map_or(0.0, |t| t.elapsed().as_secs_f64());
         let fps = if elapsed_sec > 0.0 { frame_count as f64 / elapsed_sec } else { 0.0 };
-        println!("Captured {} frames in {:.2}s = {:.1} FPS", frame_count, elapsed_sec, fps);
+        println!("Captured {} messages in {:.2}s = {:.1} messages/s ({} images, {} heartbeats)", frame_count, elapsed_sec, fps, image_frame_count, heartbeat_count);
 
         let stop_res = stop_native_screen_capture();
         println!("stop_native_screen_capture result: {:?}", stop_res);
         assert!(fps >= 55.0, "Expected at least 55 FPS, got {:.1}", fps);
+        assert!(image_frame_count > 0, "Capture produced only heartbeat messages");
     }
 }
 

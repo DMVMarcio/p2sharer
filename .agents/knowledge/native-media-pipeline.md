@@ -71,6 +71,9 @@ When capture devices output 5.1, 7.1, or other multi-channel audio:
 - Transmits compressed/raw frame buffers directly to the frontend's `NativeVideoBridge` without blocking Tauri's main IPC channel.
 - Direct GPU capture is the official application pipeline: in-app screen and window selection dispatches directly via `NativeVideoBridge` without triggering Chromium's browser dialog (`getDisplayMedia`).
 - Capture lifecycle signals (window minimized or closed) trigger native in-app toast alerts and clean teardown instead of spawning unexpected browser popups.
+- The screen picker offers an explicit compatibility mode for display composition artifacts. It bypasses the WGC session and uses xcap's Windows GDI capture path, while keeping the same JPEG/WebSocket/WebRTC pipeline. This mode may reduce capture FPS and is intended for diagnosing or working around driver-specific composition problems.
+- On the user's AMD RX 5500 XT, wallpaper images can appear above board content in P2Sharer's local preview and transmitted frame while the actual Windows desktop remains correctly composed. This places the observed defect in the capture path rather than the remote WebRTC receiver.
+- The user confirmed that the GDI compatibility mode resolves the wallpaper-over-window capture artifact on the RX 5500 XT.
 
 ---
 
@@ -100,7 +103,8 @@ These flags force hardware-accelerated encoding/decoding via dedicated GPU video
 ### DirectFlip / Independent Flip & MinimumUpdateInterval
 - DirectX 11/12 and Vulkan games running in exclusive fullscreen or borderless window engage DirectFlip / Independent Flip (MPO hardware scanout bypass), bypassing DWM desktop composition.
 - Setting `MinimumUpdateIntervalSettings::Custom(...)` calls WinRT `SetMinUpdateInterval`, which relies on DWM compositor ticks. Under DirectFlip, DWM composition is dormant, causing frame arrival callbacks to stall or drop to ~0-1 FPS.
-- Always use `MinimumUpdateIntervalSettings::Default` on WGC capture sessions. Software rate-limiting (`min_frame_interval = 1s / (fps * 2)`) inside `on_frame_arrived` handles framerate capping without DWM dependencies.
+- Always use `MinimumUpdateIntervalSettings::Default` on WGC capture sessions. Software rate-limiting (90% of the requested frame interval) inside `on_frame_arrived` handles framerate capping without DWM dependencies.
+- The capture test must report JPEG image frames separately from one-byte static heartbeat messages. Heartbeat throughput is not evidence of live capture FPS; a static desktop can produce many heartbeats and few new images.
 
 ### Transient DXGI Error Recovery in `on_frame_arrived`
 - When a game launches, switches resolutions, or alters swapchain presentation formats, mapping Direct3D11 staging textures via `frame.buffer()` can temporarily fail with transient DXGI errors (`DXGI_ERROR_INVALID_CALL` or surface lock contention).
