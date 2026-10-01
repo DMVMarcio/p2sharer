@@ -1,4 +1,5 @@
 import { useStreamPointer } from '../../hooks/useStreamPointer';
+import { streamOwner } from '../../core/media_streams';
 import { StreamPointerToggle } from './StreamPointerToggle';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { invoke, isTauri } from '@tauri-apps/api/core';
@@ -40,7 +41,8 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
   const [senderName, setSenderName] = useState<string>(
     () => new URLSearchParams(window.location.search).get('name') || 'Transmissão'
   );
-  const [isLocal, setIsLocal] = useState<boolean>(peerId === 'local');
+  const [isLocal, setIsLocal] = useState<boolean>(streamOwner(peerId) === 'local');
+  const [pointerEligible, setPointerEligible] = useState(true);
   const [stats, setStats] = useState<PeerStats>({
     pingMs: null,
     fps: 60,
@@ -65,7 +67,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const pointer = useStreamPointer(containerRef, videoRef, peerId, !isLocal && !!stream && isVideoPlaying, stream, true, !!stream && isVideoPlaying);
+  const pointer = useStreamPointer(containerRef, videoRef, peerId, pointerEligible && !isLocal && !!stream && isVideoPlaying, stream, true, pointerEligible && !!stream && isVideoPlaying);
   const streamRef = useRef<MediaStream | null>(null);
   const bcRef = useRef<BroadcastChannel | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
@@ -161,6 +163,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
 
       switch (data.type) {
         case 'offer': {
+          setPointerEligible(data.pointerEligible !== false);
           hasReceivedOffer = true;
           setConnectionError(null);
           if (data.senderName && typeof data.senderName === 'string') {
@@ -521,7 +524,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
 
         {/* Hover / Pinned Controls Pill (Bottom-Right) */}
         <div className="stream-controls-group">
-          {!isLocal && <StreamPointerToggle enabled={pointer.enabled} onToggle={pointer.toggle} />}
+          {!isLocal && pointerEligible && <StreamPointerToggle enabled={pointer.enabled} onToggle={pointer.toggle} />}
           {/* Audio Volume Controller */}
           {!isLocal && (
             <div className={`stream-volume-controller ${isMuted ? 'muted' : ''}`}>

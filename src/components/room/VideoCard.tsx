@@ -1,3 +1,4 @@
+import { useModal } from '../../hooks/useModal';
 import { useStreamPointer } from '../../hooks/useStreamPointer';
 import { StreamPointerToggle } from './StreamPointerToggle';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -11,10 +12,11 @@ import { pipService } from '../../services/pip_service';
 import { ZoomControlBar } from './ZoomControlBar';
 import { Tooltip } from '../common/Tooltip';
 import { StreamStatsOverlay } from './StreamStatsOverlay';
-import { Grid2X2, Focus, Eye, EyeOff, Maximize, Pin, PictureInPicture2, RotateCcw, Volume2, VolumeX, Square } from 'lucide-react';
+import { Grid2X2, Focus, Eye, EyeOff, Maximize, Pin, PictureInPicture2, RotateCcw, Volume2, VolumeX, Square, MonitorUp } from 'lucide-react';
 import { useContextMenu, type ContextMenuAction } from '../common/ContextMenu';
 
 interface VideoCardProps {
+  children?: React.ReactNode;
   slot: RoomSlotInfo;
   isFeatured?: boolean;
   inTray?: boolean;
@@ -22,16 +24,22 @@ interface VideoCardProps {
 }
 
 export const VideoCard: React.FC<VideoCardProps> = ({
+  children,
   slot,
   isFeatured = false,
   inTray = false,
   isSelectedFeatured = false,
 }) => {
-  const { togglePin, stopWatchingStream, stopScreenSharing, getPeerPing, username, layoutMode, returnToGrid } = useRoom();
+  const { togglePin, stopWatchingStream, getPeerPing, username, layoutMode, returnToGrid } = useRoom();
   const openContextMenu = useContextMenu();
-  const currentResolution = useStore((s) => s.currentResolution);
-  const currentFps = useStore((s) => s.currentFps);
-  const currentBitrate = useStore((s) => s.currentBitrate);
+  const { openModal } = useModal();
+  const defaultResolution = useStore((s) => s.currentResolution);
+  const defaultFps = useStore((s) => s.currentFps);
+  const defaultBitrate = useStore((s) => s.currentBitrate);
+  const capture = slot.mediaId ? roomService.localCaptures.get(slot.mediaId) : undefined;
+  const currentResolution = capture ? { ...capture.resolution, label: `${capture.resolution.height}p` } : defaultResolution;
+  const currentFps = capture?.fps || defaultFps;
+  const currentBitrate = capture?.bitrate || defaultBitrate;
   const isPipActive = useStore((s) => s.isPeerInPip(slot.peerId));
 
   const [liveFps, setLiveFps] = useState<number>(() => (slot.isLocal ? currentFps : 60));
@@ -42,7 +50,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [lastVolume, setLastVolume] = useState<number>(100);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
-  const [showLocalPreview, setShowLocalPreview] = useState<boolean>(false);
+  const [showLocalPreview, setShowLocalPreview] = useState<boolean>(slot.mediaKind === 'camera');
   const [isHudPinned, setIsHudPinned] = useState<boolean>(false);
   const [activeTooltips, setActiveTooltips] = useState<number>(0);
 
@@ -89,8 +97,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
 
   const videoElementRef = useRef<HTMLVideoElement | null>(null);
 
-  const pointer = useStreamPointer(cardRef, videoElementRef, slot.peerId, !slot.isLocal && !inTray && !isPipActive && !!slot.stream,
-    slot.stream, false, !isPipActive && !!slot.stream && !(inTray && isSelectedFeatured) && (!slot.isLocal || showLocalPreview));
+  const pointer = useStreamPointer(cardRef, videoElementRef, slot.peerId, slot.pointerEligible !== false && !slot.isLocal && !inTray && !isPipActive && !!slot.stream,
+    slot.stream, false, slot.pointerEligible !== false && !isPipActive && !!slot.stream && !(inTray && isSelectedFeatured) && (!slot.isLocal || showLocalPreview));
 
 
   const cleanupVideoElement = useCallback((el: HTMLVideoElement | null) => {
@@ -224,6 +232,10 @@ export const VideoCard: React.FC<VideoCardProps> = ({
 
   const handleContextMenu = (event: React.MouseEvent) => {
     const actions: ContextMenuAction[] = [];
+    if (layoutMode === 'spotlight' && inTray && !isSelectedFeatured) actions.push({ id: 'overlay', label: 'Sobrepor na transmissão atual',
+      icon: <PictureInPicture2 size={15} />, onSelect: () => roomService.overlayStream(slot.peerId) });
+    if (slot.isLocal && slot.mediaId) actions.push({ id: 'edit', label: 'Editar transmissão', icon: <MonitorUp size={15} />,
+      onSelect: () => { roomService.editTransmission(slot.mediaId!); openModal('screenPicker'); } });
     if (!isFeatured && !isSelectedFeatured) actions.push({ id: 'feature', label: 'Destacar transmissão', icon: <Focus size={15} />, onSelect: () => togglePin(slot.peerId) });
     if (layoutMode === 'spotlight') actions.push({ id: 'grid', label: 'Voltar à grade', icon: <Grid2X2 size={15} />,
       onSelect: returnToGrid });
@@ -242,7 +254,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
         disabled: !slot.stream, onSelect: () => pipService.openPip(slot.peerId, slot.senderName, slot.stream) });
     }
     actions.push({ id: 'stop', label: slot.isLocal ? 'Parar transmissão' : 'Parar de assistir', icon: <Square size={15} />, separator: true,
-      onSelect: slot.isLocal ? stopScreenSharing : () => stopWatchingStream(slot.peerId) });
+      onSelect: slot.isLocal ? () => { if (slot.mediaId) roomService.stopTransmission(slot.mediaId); } : () => stopWatchingStream(slot.peerId) });
     openContextMenu(event, actions);
   };
 
@@ -401,7 +413,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
       {/* User overlay at bottom-left */}
       <div className="stream-card-overlay">
         <span className="user-status-dot"></span>
-        <span className="stream-user-name">{slot.senderName}</span>
+        <span className="stream-user-name">{slot.senderName}{slot.mediaLabel ? ` · ${slot.mediaLabel}` : ""}</span>
         {slot.isLocal && <span className="badge-you">VOCÊ</span>}
       </div>
 
@@ -422,7 +434,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           className="stream-controls-group"
           onClick={(e) => e.stopPropagation()}
         >
-          {!slot.isLocal && <StreamPointerToggle enabled={pointer.enabled} onToggle={pointer.toggle} onTooltipOpenChange={handleTooltipOpenChange} />}
+          {!slot.isLocal && slot.pointerEligible !== false && <StreamPointerToggle enabled={pointer.enabled} onToggle={pointer.toggle} onTooltipOpenChange={handleTooltipOpenChange} />}
           {slot.isLocal && showLocalPreview && (
             <button
               type="button"
@@ -586,6 +598,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           hasVolumeControl={!slot.isLocal}
         />
       )}
+      {children}
     </div>
   );
 };

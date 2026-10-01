@@ -1,5 +1,6 @@
 import { useCallback, useSyncExternalStore } from 'react';
 import { safeChatUrl } from '../core/chat_links.ts';
+import { stateStore } from '../core/state_store.ts';
 
 export type ModalType =
   | 'settings'
@@ -57,6 +58,7 @@ class ModalManager {
     this.notify();
 
     this.closeTimer = setTimeout(() => {
+      if (this.activeModal === 'screenPicker') stateStore.set((state) => { state.editingStreamId = null; });
       this.activeModal = null;
       this.externalLinkUrl = null;
       this.isClosing = false;

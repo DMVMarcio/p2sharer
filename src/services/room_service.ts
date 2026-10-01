@@ -1,3 +1,4 @@
+import { streamOwner, type MediaKind, type StreamDescriptor } from "../core/media_streams.ts";
 import { StreamPointerReceiver } from './stream_pointer_receiver.ts';
 import { generateUserColor } from '../p2p/group_room.ts';
 import { validStreamPointer, validStreamPointerState, type StreamPointerState, type StreamPointerPacket } from '../core/stream_pointer.ts';
@@ -15,8 +16,8 @@ import { savedRooms } from '../core/saved_rooms.ts';
 import type { ChatMessage, PeerInfo, RoomSlotInfo } from '../core/types.ts';
 import { generateRandomRoomSlug, GroupRoomManager, type FileProgress, type FileRequest, type NativeChatFile } from '../p2p/group_room.ts';
 import { soundEffects } from '../ui/sound_effects.ts';
-import { MediaCoordinator } from '../p2p/media_coordinator.ts';
 import { NativeVideoBridge } from '../video/native_video_bridge.ts';
+import { MediaCoordinator } from '../p2p/media_coordinator.ts';
 import { showToast } from '../hooks/useToast.ts';
 import { pipService } from './pip_service.ts';
 
@@ -37,6 +38,9 @@ export class RoomService {
   public pendingJoinAsOwner = false;
   public nativeVideoBridge = new NativeVideoBridge();
   public audioBridge = new AudioBridge();
+  public localCaptures = new Map<string, { sourceId: string; kind: MediaKind; stream: MediaStream;
+    bridge?: NativeVideoBridge; fps: number; resolution: { width: number; height: number }; mouse: boolean; quality: number; bitrate: number }>();
+  private captureTransition: Promise<void> = Promise.resolve();
 
   public chatMessages: ChatMessage[] = [];
   public fileRequests: FileRequest[] = [];
@@ -224,6 +228,7 @@ export class RoomService {
 
     if (this.roomManager) {
       const oldManager = this.roomManager;
+      this.stopScreenSharing();
       this.roomManager = null;
       try {
         await oldManager.leave();
@@ -263,7 +268,8 @@ export class RoomService {
         if (progress.status === 'error') showToast('Não foi possível concluir a transferência do arquivo.');
       },
       onStreamPointerState: (snapshot, broadcasterId) => {
-        if (this.roomManager === manager && stateStore.subscribedStreams.has(broadcasterId)) this.publishPointerView(broadcasterId, snapshot);
+        const slot = stateStore.roomSlots.find((slot) => (slot.ownerPeerId || slot.peerId) === broadcasterId && slot.pointerEligible !== false);
+        if (this.roomManager === manager && slot && stateStore.subscribedStreams.has(slot.peerId)) this.publishPointerView(slot.peerId, snapshot);
       },
       onStreamPointer: (packet, peerId) => {
         if (this.roomManager !== manager) return;
@@ -278,8 +284,14 @@ export class RoomService {
       },
       onSlotsUpdate: (slots: RoomSlotInfo[]) => {
         if (this.roomManager !== manager) return;
+        const currentKeys = new Set(slots.map((slot) => slot.peerId));
+        for (const key of stateStore.subscribedStreams) if (!currentKeys.has(key)) audioContextManager.detachPeerAudio(key);
+        for (const key of stateStore.activePipPeers) if (!currentKeys.has(key)) void pipService.restoreFromPip(key);
         stateStore.set((s) => {
           s.roomSlots = slots;
+          s.subscribedStreams = new Set([...s.subscribedStreams].filter((key) => currentKeys.has(key)));
+          s.streamOverlays = Object.fromEntries(Object.entries(s.streamOverlays).filter(([target]) => currentKeys.has(target))
+            .map(([target, keys]) => [target, keys.filter((key) => currentKeys.has(key))]));
         });
         if (isCreator || slots.some((slot) => !slot.isLocal)) this.hideConnecting();
       },
@@ -390,7 +402,8 @@ export class RoomService {
 
   private pointerReceiver = new StreamPointerReceiver((snapshot) => {
     this.roomManager?.sendStreamPointerState(snapshot);
-    this.publishPointerView('local', snapshot);
+    const slot = stateStore.roomSlots.find((slot) => slot.isLocal && slot.pointerEligible !== false);
+    this.publishPointerView(slot?.peerId || 'local', snapshot);
   });
 
   public refreshStreamPointerView(peerId: string): void {
@@ -407,93 +420,134 @@ export class RoomService {
   }
 
   public sendStreamPointer(packet: StreamPointerPacket, peerId: string): void {
-    if (validStreamPointer(packet) && stateStore.subscribedStreams.has(peerId)) {
-      this.roomManager?.sendStreamPointer(packet, peerId);
+    const slot = stateStore.roomSlots.find((slot) => slot.peerId === peerId);
+    if (validStreamPointer(packet) && slot?.pointerEligible !== false && stateStore.subscribedStreams.has(peerId)) {
+      this.roomManager?.sendStreamPointer(packet, streamOwner(peerId));
     }
   }
 
-  public async startCapture(
-    sourceId: string,
-    fps: number,
-    res: { width: number; height: number },
-    mouse: boolean,
-    quality?: number
-  ): Promise<void> {
-    try {
-      this.pointerReceiver.clear();
-      showToast('Iniciando transmissão...');
-
-      const chosenSource = !sourceId ? 'screen:0' : sourceId;
-      const targetQuality = quality ?? stateStore.currentQuality ?? 90;
-      await MediaCoordinator.prepareCodecPreferences(res.width, res.height, fps, stateStore.currentBitrate * 1000);
-      const videoStream = await this.nativeVideoBridge.startCapture(chosenSource, fps, res, mouse, targetQuality);
-
-      const audioMode = stateStore.isAudioFilterFullAudio ? 'full' : stateStore.selectedFilterMode;
-      const audioPids = stateStore.isAudioFilterFullAudio ? [] : stateStore.getActiveFilterPids();
-      const audioNames = stateStore.isAudioFilterFullAudio ? [] : stateStore.getActiveFilterNames();
-
-      const audioTrack = await this.audioBridge.startCapture(
-        audioMode,
-        audioPids,
-        audioNames
-      );
-
-      if (audioTrack) {
-        videoStream.addTrack(audioTrack);
-      }
-
-      const videoTrack = videoStream.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.onended = () => this.stopScreenSharing();
-      }
-
-      stateStore.set((s) => {
-        s.isSharingScreen = true;
-        const localSlot = s.roomSlots.find((slot) => slot.isLocal);
-        if (localSlot) {
-          localSlot.stream = videoStream;
-          localSlot.isStreaming = true;
-        }
-      });
-
-      if (this.roomManager) {
-        this.roomManager.shareStream(videoStream, stateStore.currentBitrate * 1000, fps);
-      }
-
-      soundEffects.playScreenShareStart();
-      this.notify();
-    } catch (err: unknown) {
-      const errName = err && typeof err === 'object' && 'name' in err ? (err as { name: string }).name : '';
-      if (errName === 'NotAllowedError' || errName === 'AbortError') {
-        showToast('Compartilhamento cancelado');
+  public startCapture(sourceId: string, fps: number, res: { width: number; height: number },
+    mouse: boolean, quality = 90, label?: string): Promise<void> {
+    const editingId = stateStore.editingStreamId;
+    const bitrate = stateStore.currentBitrate;
+    const manager = this.roomManager;
+    const task = this.captureTransition.then(async () => {
+      if (!manager || manager !== this.roomManager) throw new Error('A sala foi encerrada.');
+      const previous = editingId ? this.localCaptures.get(editingId) : undefined;
+      if (editingId && !previous) throw new Error('A transmissão foi encerrada.');
+      if (!previous && this.localCaptures.size >= 16) throw new Error('Limite de 16 transmissões simultâneas.');
+      const kind: MediaKind = sourceId.startsWith('camera:') ? 'camera' : 'screen';
+      if (previous && kind !== previous.kind) throw new Error('Escolha outra fonte do mesmo tipo de transmissão.');
+      if (previous && kind === 'camera' && sourceId === previous.sourceId) {
+        await previous.stream.getVideoTracks()[0].applyConstraints({ width: { ideal: res.width }, height: { ideal: res.height },
+          frameRate: { ideal: fps, max: fps } });
+        manager.updateMediaSettings(editingId!, fps, bitrate);
+        Object.assign(previous, { fps, bitrate, resolution: res, quality, mouse });
+        this.syncCaptureState();
+        showToast('Transmissão atualizada');
         return;
       }
-      console.warn('Capture error:', err);
-      showToast(`Erro ao iniciar captura: ${err}`);
+      const id = editingId || crypto.randomUUID();
+      const bridge = kind === 'screen' ? new NativeVideoBridge(crypto.randomUUID()) : undefined;
+      let stream: MediaStream | undefined;
+      try {
+        if (!this.localCaptures.size) await MediaCoordinator.prepareCodecPreferences(res.width, res.height, fps, bitrate * 1000);
+        stream = bridge ? await bridge.startCapture(sourceId, fps, res, mouse, quality) :
+          await navigator.mediaDevices.getUserMedia({ audio: false, video: {
+            ...(sourceId.slice(7) ? { deviceId: { exact: sourceId.slice(7) } } : {}),
+            width: { ideal: res.width }, height: { ideal: res.height }, frameRate: { ideal: fps, max: fps },
+          } });
+        if (manager !== this.roomManager) throw new Error('A sala foi encerrada.');
+        const track = stream.getVideoTracks()[0];
+        if (!track) throw new Error('A fonte não forneceu vídeo.');
+        // Keep the capture bridge's track container separate from the broadcast container.
+        // Live replacement mutates only the latter; disposing the old bridge must not stop the new track.
+        if (!previous) stream = new MediaStream(stream.getTracks());
+        track.contentHint = kind === 'camera' ? 'motion' : 'detail';
+        const descriptor: StreamDescriptor = { id, kind, label: (label || (kind === 'camera' ? 'Câmera' :
+          sourceId.startsWith('window:') ? 'Janela' : 'Tela')).slice(0, 200), videoTrackId: track.id, fps, bitrate };
+        if (previous) {
+          await manager.replaceMediaTrack(id, track, descriptor);
+          stream = previous.stream;
+          const slot = stateStore.roomSlots.find((slot) => slot.isLocal && slot.mediaId === id);
+          if (slot) pipService.updateStream(slot.peerId, stream);
+        } else {
+          if (kind === 'screen' && !Array.from(this.localCaptures.values()).some((entry) => entry.kind === 'screen')) {
+            const audio = await this.audioBridge.startCapture(stateStore.isAudioFilterFullAudio ? 'full' : stateStore.selectedFilterMode,
+              stateStore.isAudioFilterFullAudio ? [] : stateStore.getActiveFilterPids(),
+              stateStore.isAudioFilterFullAudio ? [] : stateStore.getActiveFilterNames());
+            if (audio) stream.addTrack(audio);
+          }
+          manager.shareStream(stream, bitrate * 1000, fps, descriptor);
+        }
+        const capture = { sourceId, kind, stream, bridge, fps, resolution: res, mouse, quality, bitrate };
+        this.localCaptures.set(id, capture);
+        track.onended = () => { if (this.localCaptures.get(id) === capture) this.stopTransmission(id); };
+        if (bridge) bridge.onFallbackNeeded = () => {
+          if (this.localCaptures.get(id) === capture) { showToast('A fonte de vídeo foi encerrada.'); this.stopTransmission(id); }
+        };
+        if (previous?.bridge) await previous.bridge.stopCapture();
+        if (previous && !previous.bridge) previous.stream.getVideoTracks().filter((item) => item !== track).forEach((item) => item.stop());
+        this.syncCaptureState();
+        showToast(previous ? 'Transmissão atualizada' : 'Transmissão iniciada');
+      } catch (error) {
+        if (bridge) await bridge.stopCapture();
+        else if (stream && stream !== previous?.stream) stream.getTracks().forEach((track) => track.stop());
+        showToast(`Não foi possível iniciar a captura: ${error}`);
+        throw error;
+      }
+    });
+    this.captureTransition = task.catch(() => {});
+    return task;
+  }
+
+  private syncCaptureState() {
+    stateStore.set((state) => { state.isSharingScreen = Array.from(this.localCaptures.values()).some((entry) => entry.kind === 'screen'); });
+    const screen = Array.from(this.localCaptures.values()).find((entry) => entry.kind === 'screen');
+    void invoke('select_pointer_capture', { sessionId: screen?.bridge?.sessionId || null }).catch(console.warn);
+    this.notify();
+  }
+
+  public stopTransmission(id: string, notifyManager = true) {
+    const entry = this.localCaptures.get(id);
+    if (!entry) return;
+    this.localCaptures.delete(id);
+    if (notifyManager) this.roomManager?.stopStream(id);
+    if (entry.bridge) void entry.bridge.stopCapture();
+    else entry.stream.getTracks().forEach((track) => track.stop());
+    if (!Array.from(this.localCaptures.values()).some((capture) => capture.kind === 'screen')) {
+      this.audioBridge.stop();
+      this.pointerReceiver.clear();
     }
+    this.syncCaptureState();
   }
 
   public stopScreenSharing(): void {
+    this.roomManager?.stopStream();
+    for (const id of [...this.localCaptures.keys()]) this.stopTransmission(id, false);
     this.pointerReceiver.clear();
-    stateStore.set((s) => {
-      s.isSharingScreen = false;
-      const localSlot = s.roomSlots.find((slot) => slot.isLocal);
-      if (localSlot) {
-        localSlot.stream = null;
-        localSlot.isStreaming = false;
-      }
-    });
-
-    if (this.roomManager) {
-      this.roomManager.stopStream();
-    }
-
-    this.nativeVideoBridge.stop();
     this.audioBridge.stop();
-    invoke('stop_audio_capture').catch(() => {});
+    this.syncCaptureState();
+  }
 
-    soundEffects.playScreenShareStop();
-    this.notify();
+  public editTransmission(id: string) {
+    stateStore.set((state) => { state.editingStreamId = id; });
+  }
+
+  public overlayStream(key: string) {
+    const target = stateStore.pinnedPeerId || stateStore.roomSlots[0]?.peerId;
+    if (stateStore.layoutMode !== 'spotlight' || !target || target === key) return;
+    if (!stateStore.roomSlots.find((slot) => slot.peerId === target)?.isStreaming) return;
+    if (!stateStore.roomSlots.find((slot) => slot.peerId === key)?.isLocal) this.requestStream(key);
+    stateStore.set((state) => { state.streamOverlays = { ...state.streamOverlays,
+      [target]: [...new Set([...(state.streamOverlays[target] || []), key])] }; });
+  }
+
+  public removeOverlay(target: string, key: string) {
+    stateStore.set((state) => {
+      state.streamOverlays = { ...state.streamOverlays, [target]: (state.streamOverlays[target] || []).filter((id) => id !== key) };
+      state.dismissedAutoOverlays = { ...state.dismissedAutoOverlays, [target]: [...new Set([...(state.dismissedAutoOverlays[target] || []), key])] };
+    });
   }
 
   public async leaveRoom(): Promise<void> {
@@ -515,9 +569,7 @@ export class RoomService {
 
     soundEffects.playUserLeave();
 
-    if (stateStore.isSharingScreen) {
-      this.stopScreenSharing();
-    }
+    this.stopScreenSharing();
 
     if (this.roomManager) {
       const oldManager = this.roomManager;
@@ -533,6 +585,10 @@ export class RoomService {
 
     stateStore.set((s) => {
       s.subscribedStreams.clear();
+      s.streamOverlays = {};
+      s.dismissedAutoOverlays = {};
+      s.overlayPositions = {};
+      s.editingStreamId = null;
       s.roomSlots = [];
       s.currentRoomCode = generateRandomRoomSlug();
       s.currentRoomInvite = '';
@@ -803,7 +859,7 @@ export class RoomService {
       s.subscribedStreams.add(peerId);
     });
     if (this.roomManager) {
-      this.roomManager.requestStream(peerId);
+      this.roomManager.requestStream(streamOwner(peerId));
     }
     this.notify();
   }
@@ -813,15 +869,21 @@ export class RoomService {
     audioContextManager.detachPeerAudio(peerId);
     stateStore.set((s) => {
       s.subscribedStreams.delete(peerId);
+      for (const target of Object.keys(s.streamOverlays)) s.streamOverlays[target] = s.streamOverlays[target].filter((key) => key !== peerId);
+      for (const slot of s.roomSlots) if (slot.mediaKind === 'screen') {
+        s.dismissedAutoOverlays[slot.peerId] = [...new Set([...(s.dismissedAutoOverlays[slot.peerId] || []), peerId])];
+      }
     });
     if (this.roomManager) {
-      this.roomManager.stopWatching(peerId);
+      if (!stateStore.roomSlots.some((slot) => streamOwner(slot.peerId) === streamOwner(peerId) && stateStore.subscribedStreams.has(slot.peerId))) {
+        this.roomManager.stopWatching(streamOwner(peerId));
+      }
     }
     this.notify();
   }
 
   public getPeerPing(peerId: string): number | null | undefined {
-    return this.roomManager?.getPeerPing(peerId);
+    return this.roomManager?.getPeerPing(streamOwner(peerId));
   }
 }
 

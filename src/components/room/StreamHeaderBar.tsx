@@ -1,3 +1,4 @@
+import { stateStore } from '../../core/state_store';
 import React, { useEffect, useState } from 'react';
 import { roomAppsService } from '../../apps/room_apps_service';
 import { useRoom } from '../../hooks/useRoom';
@@ -19,7 +20,6 @@ export const StreamHeaderBar: React.FC = () => {
   }), []);
   const {
     roomSlots,
-    isSharingScreen,
     stopScreenSharing,
     leaveRoom,
     streamFilter,
@@ -29,17 +29,15 @@ export const StreamHeaderBar: React.FC = () => {
   const subscribedStreams = useStore((s) => s.subscribedStreams);
 
   const totalCount = roomSlots.length + appCounts.total;
+  const isBroadcasting = roomSlots.some((slot) => slot.isLocal && slot.isStreaming);
   const streamingCount = roomSlots.filter((s) => s.isStreaming).length + appCounts.total;
   const watchingCount = roomSlots.filter(
     (s) => !s.isLocal && s.isStreaming && subscribedStreams.has(s.peerId)
   ).length + appCounts.joined;
 
   const handleToggleTransmission = () => {
-    if (isSharingScreen) {
-      stopScreenSharing();
-    } else {
-      openModal('screenPicker');
-    }
+    stateStore.set((state) => { state.editingStreamId = null; });
+    openModal('screenPicker');
   };
 
   return (
@@ -94,14 +92,14 @@ export const StreamHeaderBar: React.FC = () => {
             onClick={() => openModal('apps')}><AppWindow size={14} strokeWidth={2} /><span className="btn-text">Apps</span></button>
         </Tooltip>
         {/* Transmission Button */}
-        <Tooltip content={isSharingScreen ? 'Parar transmissão de tela' : 'Compartilhar Tela ou Janela'}>
+        <Tooltip content="Compartilhar tela, janela ou câmera">
           <button
-            className={`btn btn-sm btn-compact ${isSharingScreen ? 'btn-danger' : 'btn-outline'}`}
+            className="btn btn-sm btn-compact btn-outline"
             id="btn-toggle-share-screen"
             onClick={handleToggleTransmission}
-            aria-label={isSharingScreen ? 'Parar Transmissão' : 'Transmitir'}
+            aria-label={'Transmitir'}
           >
-            <span className={`stream-sharing-indicator ${isSharingScreen ? 'active' : ''}`} id="stream-sharing-dot"></span>
+            <span className={`stream-sharing-indicator ${isBroadcasting ? 'active' : ''}`} id="stream-sharing-dot"></span>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M13 3H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-3" />
               <path d="M8 21h8" />
@@ -110,11 +108,13 @@ export const StreamHeaderBar: React.FC = () => {
               <path d="M17 3h5v5" />
             </svg>
             <span className="btn-text" id="label-share-screen">
-              {isSharingScreen ? 'Parar Transmissão' : 'Transmitir'}
+              {'Transmitir'}
             </span>
           </button>
         </Tooltip>
 
+        {isBroadcasting && <button className="btn btn-sm btn-danger"
+          onClick={stopScreenSharing}>Parar todas</button>}
         {/* Audio Filter Config */}
         <Tooltip content="Configurar filtros de áudio">
           <button

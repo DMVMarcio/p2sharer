@@ -1,3 +1,4 @@
+import { validStreamDescriptors, streamSlotKey, streamOwner, type StreamDescriptor } from "../core/media_streams.ts";
 import { validStreamPointer, validStreamPointerState, type StreamPointerState, type StreamPointerPacket } from '../core/stream_pointer.ts';
 import { selfId } from '@trystero-p2p/core';
 import { invoke } from '@tauri-apps/api/core';
@@ -137,6 +138,12 @@ export class GroupRoomManager {
   private turnConfig: TurnConfig | null = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private room: any = null;
+  private localMedia = new Map<string, { descriptor: StreamDescriptor; stream: MediaStream }>();
+  private remoteMedia = new Map<string, Map<string, MediaStream>>();
+  private remoteDescriptors = new Map<string, StreamDescriptor[]>();
+  private remoteMediaRevisions = new Map<string, number>();
+  private mediaRevision = 0;
+  private mediaStatsSamples = new Map<string, { bytes: number; at: number }>();
   private localStream: MediaStream | null = null;
 
   // Single source of truth for peer states and verified connections
@@ -1163,6 +1170,31 @@ export class GroupRoomManager {
       this.peerTracker.touchPeer(peerId);
 
       const senderName = this.peerTracker.getUsername(peerId) || `Participante (${peerId.slice(0, 4)})`;
+      if (data.streams !== undefined) {
+        if (!validStreamDescriptors(data.streams)) return;
+        if (!Number.isSafeInteger(data.revision) || data.revision! < (this.remoteMediaRevisions.get(peerId) ?? -1)) return;
+        const wasStreaming = this.peerTracker.isStreaming(peerId);
+        this.remoteMediaRevisions.set(peerId, data.revision!);
+        this.remoteDescriptors.set(peerId, data.streams);
+        const media = this.remoteMedia.get(peerId);
+        if (media) for (const id of media.keys()) if (!data.streams.some((entry) => entry.id === id)) media.delete(id);
+        this.peerTracker.setStreaming(peerId, data.streams.length > 0);
+        if (!wasStreaming && data.streams.length) this.callbacks?.onStreamStarted?.(peerId, senderName, false);
+        if (wasStreaming && !data.streams.length) {
+          this.callbacks?.onStreamStopped?.(peerId, senderName, false);
+          this.cleanupStreamWatchers(peerId, senderName);
+        }
+        if (data.streams.length && data.streams.some((entry) => !media?.get(entry.id)?.getVideoTracks().some((track) => track.readyState === 'live'))) {
+          const now = Date.now();
+          if (now - (this.lastStreamRecoveryRequests.get(peerId) || 0) > 8000) {
+            this.lastStreamRecoveryRequests.set(peerId, now);
+            this.requestStreamFromPeer(peerId);
+          }
+        }
+        if (!data.streams.length) this.remoteStreams.delete(peerId);
+        this.notifyStreamsUpdate();
+        return;
+      }
       const wasStreaming = this.peerTracker.isStreaming(peerId);
 
       if (data.isStreaming) {
@@ -1508,21 +1540,41 @@ export class GroupRoomManager {
     };
 
     // 10. Incoming Stream Listener
-    this.room.onPeerStream = (stream: MediaStream, peerId: string) => {
+    this.room.onPeerStream = (stream: MediaStream, peerId: string, metadata?: StreamDescriptor) => {
       if (this.room !== boundRoom) return;
       if (!this.peerTracker.isVerified(peerId)) return;
       if (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(peerId))) return;
+      if (metadata !== undefined && !validStreamDescriptors([metadata])) return;
       console.log(`[P2P] Received stream from peer: ${peerId}`);
       this.peerTracker.touchPeer(peerId);
       this.peerTracker.setStreaming(peerId, true);
+      if (metadata && validStreamDescriptors([metadata])) {
+        const entries = this.remoteDescriptors.get(peerId) || [];
+        if (this.remoteMediaRevisions.has(peerId) && !entries.some((entry) => entry.id === metadata.id)) return;
+        if (!entries.some((entry) => entry.id === metadata.id)) {
+          if (entries.length >= 16) return;
+          this.remoteDescriptors.set(peerId, [...entries, metadata]);
+        }
+        const media = this.remoteMedia.get(peerId) || new Map<string, MediaStream>();
+        media.set(metadata.id, stream);
+        this.remoteMedia.set(peerId, media);
+      }
       this.remoteStreams.set(peerId, stream);
+      if (metadata && stream.addEventListener) stream.addEventListener('addtrack', () => {
+        if (this.remoteDescriptors.get(peerId)?.some((entry) => entry.id === metadata.id)) {
+          this.remoteMedia.get(peerId)?.set(metadata.id, new MediaStream(stream.getTracks()));
+          this.lastStreamsHash = '';
+          this.notifyStreamsUpdate();
+        }
+      });
       this.lastStreamRecoveryRequests.delete(peerId);
       this.watchStream(peerId);
 
       // Listen to track state so if host stops, remote stream clears cleanly
-      stream.getTracks().forEach((track) => {
+      stream.getVideoTracks().forEach((track) => {
         track.onended = () => {
           console.log(`[P2P] Track ended for peer: ${peerId}`);
+          if (metadata && this.remoteMedia.get(peerId)?.get(metadata.id) === stream) this.remoteMedia.get(peerId)?.delete(metadata.id);
           if (this.remoteStreams.get(peerId)?.id === stream.id) {
             this.remoteStreams.delete(peerId);
             this.notifyStreamsUpdate();
@@ -1561,6 +1613,7 @@ export class GroupRoomManager {
         }
       }
 
+      this.publishMediaManifest();
       // Broadcast presence
       if (this.presenceAction) {
         this.sendRoomAction(this.presenceAction, {
@@ -1687,6 +1740,9 @@ export class GroupRoomManager {
     }
     this.lastPeerStats.delete(peerId);
     this.peerStatsCache.delete(peerId);
+    this.remoteMedia.delete(peerId);
+    this.remoteDescriptors.delete(peerId);
+    this.remoteMediaRevisions.delete(peerId);
     this.lastBroadcasterStreamIds.delete(peerId);
     this.lastStreamRecoveryRequests.delete(peerId);
     this.lastBridgeAttempts.delete(peerId);
@@ -1828,6 +1884,7 @@ export class GroupRoomManager {
   public sendStreamToPeer(peerId: string) {
     if (!this.localStream || !this.room || !this.peerTracker.isVerified(peerId)) return;
     if (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(peerId))) return;
+    this.publishMediaManifest(peerId);
     try {
       const peers = this.room.getPeers?.() || {};
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1843,7 +1900,7 @@ export class GroupRoomManager {
           (pc as any).__p2_stable_listener_attached = true;
           pc.addEventListener('signalingstatechange', () => {
             if (pc.signalingState === 'stable') {
-              MediaCoordinator.applySenderBitrate(pc, this.currentTargetBitrate, this.currentTargetFps);
+              this.applyMediaParameters(pc);
               MediaCoordinator.requestKeyFrame(pc);
             }
           });
@@ -1851,7 +1908,7 @@ export class GroupRoomManager {
       }
 
       // Targeted addStream dispatch passing `{ target: peerId }` object option
-      MediaCoordinator.targetedAddStream(this.room, this.localStream, peerId);
+      for (const entry of this.localMedia.values()) this.room.addStream(entry.stream, { target: peerId, metadata: entry.descriptor });
 
       [0, 30, 80, 150, 300, 600, 1200, 2000].forEach((delay) => {
         setTimeout(() => this.boostSenders(this.currentTargetBitrate, this.currentTargetFps), delay);
@@ -1859,49 +1916,83 @@ export class GroupRoomManager {
     } catch (err) {
       console.warn('[P2P] Error sending stream to peer, fallback:', err);
       try {
-        MediaCoordinator.targetedAddStream(this.room, this.localStream, peerId);
+        for (const entry of this.localMedia.values()) this.room.addStream(entry.stream, { target: peerId, metadata: entry.descriptor });
       } catch {}
     }
   }
 
-  public shareStream(stream: MediaStream, targetBitrateBps: number = 25000000, targetFps: number = 60) {
-    const wasStreaming = Boolean(this.localStream);
-    this.localStream = stream;
-    this.currentTargetBitrate = targetBitrateBps;
-    this.currentTargetFps = targetFps;
-
-    this.callbacks?.onStreamStarted?.('local', this.username, true);
-    if (!wasStreaming && stream && this.room) {
-      void this.sendSystemMessage(`${this.username} iniciou uma transmissão`, 'stream-start', this.username)
-        .catch((error) => console.warn('[Chat] Failed to publish stream notice:', error));
-    }
-
-    if (this.room && stream) {
-      try {
-        const verifiedPeers = Array.from(this.peerTracker.directConnectedPeers);
-        if (verifiedPeers.length > 0) {
-          verifiedPeers.forEach((pId) => this.sendStreamToPeer(pId));
-        } else {
-          if (!this.authority) MediaCoordinator.broadcastStream(this.room, stream);
-        }
-        [0, 30, 80, 150, 300, 600, 1200, 2000].forEach((delay) => {
-          setTimeout(() => this.boostSenders(targetBitrateBps, targetFps), delay);
-        });
-      } catch (err) {
-        console.warn('[P2P] Error adding broadcast stream:', err);
-      }
-
-      // Screen share toggle protocol: emit stream_status with streamId
-      if (this.streamStatusAction) {
-        const payload = MediaCoordinator.buildStreamStatusPayload(stream, true, this.username);
-        this.sendRoomAction(this.streamStatusAction, payload);
-      }
-
-      this.notifyStreamsUpdate();
-    }
+  private publishMediaManifest(target?: string) {
+    if (!this.streamStatusAction) return;
+    const payload = { ...MediaCoordinator.buildStreamStatusPayload(this.localStream, !!this.localStream, this.username),
+      revision: this.mediaRevision,
+      streams: Array.from(this.localMedia.values(), (entry) => entry.descriptor) };
+    if (target) this.streamStatusAction.send(payload, { target });
+    else this.sendRoomAction(this.streamStatusAction, payload);
   }
 
-  public boostSenders(maxBitrateBps: number = 25000000, maxFps: number = 60) {
+  public shareStream(stream: MediaStream, targetBitrateBps = 15000000, targetFps = 60,
+    descriptor?: StreamDescriptor) {
+    const wasStreaming = this.localMedia.size > 0;
+    const entry = descriptor || { id: stream.id, kind: 'screen' as const, label: 'Tela',
+      videoTrackId: stream.getVideoTracks()[0]?.id || '', fps: targetFps, bitrate: targetBitrateBps / 1000 };
+    this.localMedia.set(entry.id, { descriptor: entry, stream });
+    this.mediaRevision++;
+    this.localStream = Array.from(this.localMedia.values()).find((item) => item.descriptor.kind === 'screen')?.stream || stream;
+    this.currentTargetBitrate = targetBitrateBps;
+    this.currentTargetFps = targetFps;
+    this.publishMediaManifest();
+    for (const peerId of this.peerTracker.directConnectedPeers) this.sendStreamToPeer(peerId);
+    this.callbacks?.onStreamStarted?.('local', this.username, true);
+    if (!wasStreaming && this.room) void this.sendSystemMessage(`${this.username} iniciou uma transmissão`, 'stream-start', this.username)
+      .catch((error) => console.warn('[Chat] Failed to publish stream notice:', error));
+    this.notifyStreamsUpdate();
+  }
+
+  public async replaceMediaTrack(id: string, replacement: MediaStreamTrack, descriptor: StreamDescriptor) {
+    const entry = this.localMedia.get(id);
+    if (!entry) throw new Error('Transmission no longer exists');
+    const old = entry.stream.getVideoTracks()[0];
+    const peers = this.room?.getPeers?.() || {};
+    const replaced: RTCRtpSender[] = [];
+    try {
+      for (const peer of Object.values(peers) as any[]) {
+        const pc: RTCPeerConnection = peer?.connection || peer?.pc || peer;
+        for (const sender of pc?.getSenders?.() || []) if (sender.track === old) {
+          await sender.replaceTrack(replacement);
+          replaced.push(sender);
+        }
+      }
+    } catch (error) {
+      await Promise.allSettled(replaced.map((sender) => sender.replaceTrack(old)));
+      throw error;
+    }
+    entry.stream.addTrack(replacement);
+    if (old) entry.stream.removeTrack(old);
+    entry.descriptor = descriptor;
+    this.mediaRevision++;
+    old?.stop();
+    this.publishMediaManifest();
+    this.boostSenders();
+    this.lastStreamsHash = '';
+    this.notifyStreamsUpdate();
+  }
+
+  public updateMediaSettings(id: string, fps: number, bitrate: number) {
+    const entry = this.localMedia.get(id);
+    if (!entry) throw new Error('Transmission no longer exists');
+    entry.descriptor = { ...entry.descriptor, fps, bitrate };
+    this.mediaRevision++;
+    this.publishMediaManifest();
+    this.boostSenders();
+    this.notifyStreamsUpdate();
+  }
+
+  private applyMediaParameters(pc: RTCPeerConnection) {
+    for (const entry of this.localMedia.values()) void MediaCoordinator.applySenderBitrate(pc,
+      entry.descriptor.bitrate * 1000, entry.descriptor.fps, entry.stream.getVideoTracks()[0]?.id);
+  }
+
+  public boostSenders(_maxBitrateBps: number = 25000000, _maxFps: number = 60) {
     try {
       const peers = this.room?.getPeers?.() || {};
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1910,125 +2001,54 @@ export class GroupRoomManager {
         if (pc) {
           MediaCoordinator.patchPeerConnectionSdp(pc);
           MediaCoordinator.configureCodecPreferences(pc);
-          MediaCoordinator.applySenderBitrate(pc, maxBitrateBps, maxFps);
+          this.applyMediaParameters(pc);
           MediaCoordinator.requestKeyFrame(pc);
         }
       });
     } catch {}
   }
 
-  public stopStream() {
-    const wasStreaming = Boolean(this.localStream);
-    const streamToStop = this.localStream;
-    this.localStream = null;
-    this.lastLocalStats = null;
-
-    if (this.room) {
-      if (streamToStop) {
-        try {
-          this.room.removeStream(streamToStop);
-        } catch (err) {
-          console.warn('[P2P] Error removing stream:', err);
+  public stopStream(id?: string) {
+    const wasStreaming = this.localMedia.size > 0;
+    this.mediaRevision++;
+    const entries = id ? [this.localMedia.get(id)].filter(Boolean) : [...this.localMedia.values()];
+    for (const entry of entries) {
+      if (!entry) continue;
+      const audio = entry.stream.getAudioTracks()[0];
+      const nextScreen = id && audio ? Array.from(this.localMedia.values()).find((other) =>
+        other.descriptor.id !== id && other.descriptor.kind === 'screen') : undefined;
+      if (audio && nextScreen) {
+        const transferredAudio = audio.clone();
+        nextScreen.stream.addTrack(transferredAudio);
+        for (const peerId of this.peerTracker.directConnectedPeers) {
+          if (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(peerId))) continue;
+          for (const pending of this.room?.addTrack(transferredAudio, nextScreen.stream, { target: peerId, metadata: nextScreen.descriptor }) || []) {
+            void Promise.resolve(pending).then(() => {
+              if (!this.localMedia.has(nextScreen.descriptor.id)) this.room?.removeTrack(transferredAudio, { target: peerId });
+            }).catch((error) => console.warn('[Media] Audio transfer failed:', error));
+          }
         }
       }
-
-      // Explicitly tear down all WebRTC senders and inactivate transceivers so Chromium/WebView2
-      // immediately calls encoder_->Release(), shutting down the GPU NVENC hardware pipeline!
-      try {
-        const peers = this.room.getPeers?.() || {};
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        Object.values(peers).forEach((peerObj: any) => {
-          const pc: RTCPeerConnection = peerObj?.connection || peerObj?.pc || peerObj;
-          if (pc) {
-            if (typeof pc.getSenders === 'function') {
-              pc.getSenders().forEach((sender) => {
-                try {
-                  if (sender.track) {
-                    sender.track.stop();
-                  }
-                  if (typeof sender.replaceTrack === 'function') {
-                    sender.replaceTrack(null).catch(() => {});
-                  }
-                  pc.removeTrack(sender);
-                } catch {}
-              });
-            }
-
-            if (typeof pc.getTransceivers === 'function') {
-              pc.getTransceivers().forEach((transceiver) => {
-                try {
-                  if (transceiver.sender && typeof transceiver.sender.replaceTrack === 'function') {
-                    transceiver.sender.replaceTrack(null).catch(() => {});
-                  }
-                  if (transceiver.direction === 'sendonly') {
-                    transceiver.direction = 'inactive';
-                  } else if (transceiver.direction === 'sendrecv') {
-                    transceiver.direction = 'recvonly';
-                  }
-                } catch {}
-              });
-            }
-          }
-        });
-      } catch (err) {
-        console.warn('[P2P] Error releasing peer transceivers:', err);
-      }
+      this.room?.removeStream(entry.stream);
+      for (const track of entry.stream.getTracks()) track.stop();
+      this.localMedia.delete(entry.descriptor.id);
     }
-
-    if (streamToStop) {
-      try {
-        streamToStop.getTracks().forEach((track) => {
-          try {
-            track.stop();
-          } catch {}
-        });
-      } catch {}
-    }
-
-    // Screen share toggle protocol: emit stream_status with isStreaming: false
-    if (this.streamStatusAction) {
-      const payload = MediaCoordinator.buildStreamStatusPayload(null, false, this.username);
-      this.sendRoomAction(this.streamStatusAction, payload);
-    }
-
-    if (wasStreaming) {
-      if (this.room) {
-        void this.sendSystemMessage(`${this.username} parou de transmitir`, 'stream-stop', this.username)
-          .catch((error) => console.warn('[Chat] Failed to publish stream notice:', error));
-      }
+    this.localStream = Array.from(this.localMedia.values()).find((entry) => entry.descriptor.kind === 'screen')?.stream ||
+      this.localMedia.values().next().value?.stream || null;
+    this.publishMediaManifest();
+    if (wasStreaming && !this.localStream) {
+      if (this.room) void this.sendSystemMessage(`${this.username} parou de transmitir`, 'stream-stop', this.username)
+        .catch((error) => console.warn('[Chat] Failed to publish stream notice:', error));
       this.callbacks?.onStreamStopped?.('local', this.username, true);
       this.cleanupStreamWatchers('local', this.username);
-      this.cleanupStreamWatchers(selfId, this.username);
     }
-
     this.notifyStreamsUpdate();
   }
 
   public getAllActiveStreams(): ActiveStreamInfo[] {
-    const list: ActiveStreamInfo[] = [];
-
-    // Local stream (if sharing)
-    if (this.localStream) {
-      list.push({
-        peerId: 'local',
-        senderName: this.username,
-        stream: this.localStream,
-        isLocal: true,
-      });
-    }
-
-    // Remote streams from verified peers
-    this.remoteStreams.forEach((stream, peerId) => {
-      const senderName = this.peerTracker.getUsername(peerId) || `Participante (${peerId.slice(0, 4)})`;
-      list.push({
-        peerId,
-        senderName,
-        stream,
-        isLocal: false,
-      });
-    });
-
-    return list;
+    return this.getAllRoomSlots().filter((slot) => slot.stream).map((slot) => ({
+      peerId: slot.peerId, senderName: slot.senderName, stream: slot.stream!, isLocal: slot.isLocal,
+    }));
   }
 
   public getAllRoomSlots(): RoomSlotInfo[] {
@@ -2065,7 +2085,18 @@ export class GroupRoomManager {
       });
     });
 
-    return list;
+    return list.flatMap((slot) => {
+      const descriptors = slot.isLocal ? Array.from(this.localMedia.values(), (entry) => entry.descriptor) : this.remoteDescriptors.get(slot.peerId);
+      if (!descriptors?.length) return [slot];
+      const ordered = [...descriptors].sort((a, b) => Number(b.kind === 'screen') - Number(a.kind === 'screen'));
+      return ordered.map((entry, index) => ({ ...slot, ownerPeerId: slot.peerId,
+        peerId: streamSlotKey(slot.peerId, entry.id, index === 0), mediaId: entry.id,
+        mediaKind: entry.kind, mediaLabel: entry.label, isStreaming: true,
+        pointerEligible: index === 0 && entry.kind === 'screen',
+        stream: slot.isLocal ? this.localMedia.get(entry.id)?.stream || null : this.remoteMedia.get(slot.peerId)?.get(entry.id) || null,
+      }));
+    });
+
   }
 
   public getStreamWatchers(broadcasterId: string): StreamWatcher[] {
@@ -2093,6 +2124,7 @@ export class GroupRoomManager {
   }
 
   public getPeerPing(peerId: string): number | null {
+    peerId = streamOwner(peerId);
     if (peerId === 'local' || peerId === selfId) return 0;
     return this.peerTracker.getPing(peerId) ?? null;
   }
@@ -2192,6 +2224,9 @@ export class GroupRoomManager {
   }
 
   public async getPeerStats(peerId: string): Promise<PeerStatsInfo | null> {
+    const slot = this.getAllRoomSlots().find((slot) => slot.peerId === peerId);
+    if (slot?.mediaId) return this.getMediaStats(slot);
+    peerId = streamOwner(peerId);
     if (peerId === 'local' || peerId === selfId) {
       return this.getLocalBroadcasterStats();
     }
@@ -2279,6 +2314,54 @@ export class GroupRoomManager {
     return fallbackResult;
   }
 
+  private async getMediaStats(slot: RoomSlotInfo): Promise<PeerStatsInfo> {
+    const key = slot.peerId;
+    const cached = this.peerStatsCache.get(key);
+    if (cached && Date.now() - cached.timestamp < 800) return cached.stats;
+    const track = slot.stream?.getVideoTracks()[0];
+    const settings = track?.getSettings?.();
+    const result: PeerStatsInfo = { pingMs: slot.isLocal ? 0 : this.getPeerPing(slot.ownerPeerId || key),
+      fps: settings?.frameRate ? Math.round(settings.frameRate) : null, width: settings?.width || null,
+      height: settings?.height || null, bitrateKbps: cached?.stats.bitrateKbps ?? null, connectionType: 'P2P Direto' };
+    let bytes = 0;
+    let timestamp = 0;
+    let connections = 0;
+    const peers = this.room?.getPeers?.() || {};
+    try {
+      for (const [owner, peer] of Object.entries(peers) as Array<[string, any]>) {
+        if (!slot.isLocal && owner !== slot.ownerPeerId) continue;
+        const pc: RTCPeerConnection = peer?.connection || peer?.pc || peer;
+        const endpoint = slot.isLocal ? pc?.getSenders?.().find((sender) => sender.track === track) :
+          pc?.getReceivers?.().find((receiver) => receiver.track === track);
+        if (!endpoint?.getStats) continue;
+        const reports = await endpoint.getStats();
+        reports.forEach((report) => {
+          if (report.type !== (slot.isLocal ? 'outbound-rtp' : 'inbound-rtp') || report.kind !== 'video') return;
+          if (typeof report.framesPerSecond === 'number') result.fps = Math.round(report.framesPerSecond);
+          if (report.frameWidth) result.width = report.frameWidth;
+          if (report.frameHeight) result.height = report.frameHeight;
+          bytes += (slot.isLocal ? report.bytesSent : report.bytesReceived) || 0;
+          timestamp = Math.max(timestamp, report.timestamp || 0);
+        });
+        connections++;
+        if (!slot.isLocal) {
+          const routeReports: IceStat[] = [];
+          (await pc.getStats()).forEach((report) => routeReports.push(report));
+          const route = selectedIceRoute(routeReports);
+          result.connectionType = route.connectionType;
+          if (route.pingMs !== null) result.pingMs = route.pingMs;
+        }
+      }
+      const previous = this.mediaStatsSamples.get(key);
+      if (timestamp && previous && timestamp - previous.at >= 500 && bytes >= previous.bytes) {
+        result.bitrateKbps = Math.round((bytes - previous.bytes) * 8 / (timestamp - previous.at) / Math.max(1, connections));
+      }
+      if (timestamp && (!previous || timestamp - previous.at >= 500)) this.mediaStatsSamples.set(key, { bytes, at: timestamp });
+    } catch (error) { console.warn('[Media] Could not sample transmission stats:', error); }
+    this.peerStatsCache.set(key, { stats: result, timestamp: Date.now() });
+    return result;
+  }
+
   public async getFileTransportDiagnostics(peerId: string): Promise<{
     connectionType: string; rttMs: number | null; transport: FileTransportDiagnostics;
   } | null> {
@@ -2318,7 +2401,7 @@ export class GroupRoomManager {
     const slots = this.getAllRoomSlots();
 
     const hash = slots
-      .map((s) => `${s.peerId}:${s.senderName}:${s.connectionState}:${s.isStreaming}:${s.stream?.id}:${s.watchers?.length || 0}`)
+      .map((s) => `${s.peerId}:${s.senderName}:${s.mediaKind}:${s.mediaLabel}:${s.connectionState}:${s.isStreaming}:${s.stream?.id}:${s.watchers?.length || 0}`)
       .join('|');
     if (hash === this.lastStreamsHash) return;
     this.lastStreamsHash = hash;
@@ -2945,6 +3028,11 @@ export class GroupRoomManager {
 
     this.peerTracker.clear();
     this.remoteStreams.clear();
+    this.remoteMedia.clear();
+    this.remoteDescriptors.clear();
+    this.remoteMediaRevisions.clear();
+    this.mediaStatsSamples.clear();
+    this.localMedia.clear();
     this.lastBroadcasterStreamIds.clear();
     this.lastStreamRecoveryRequests.clear();
     this.lastBridgeAttempts.clear();

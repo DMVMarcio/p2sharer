@@ -6,6 +6,8 @@ import type { RoomAppInstance } from '../../apps/types';
 import { useRoom } from '../../hooks/useRoom';
 import { useStore } from '../../hooks/useStore';
 import { VideoCard } from './VideoCard';
+import { StreamOverlay } from './StreamOverlay';
+import { roomService } from '../../services/room_service';
 import { ParticipantCard } from './ParticipantCard';
 import { RoomSlotInfo } from '../../core/types';
 
@@ -32,6 +34,8 @@ export const RoomVideoContainer: React.FC = () => {
     setStreamFilter,
   } = useRoom();
   const subscribedStreams = useStore((s) => s.subscribedStreams);
+  const streamOverlays = useStore((s) => s.streamOverlays);
+  const dismissedAutoOverlays = useStore((s) => s.dismissedAutoOverlays);
 
   const gridWrapperRef = useRef<HTMLDivElement | null>(null);
   const videoContainerRef = useRef<HTMLDivElement | null>(null);
@@ -141,6 +145,19 @@ export const RoomVideoContainer: React.FC = () => {
   }, [slotIdsKey, layoutMode]);
 
   const featuredSlot = entries.find((s) => entryId(s) === pinnedPeerId) || entries[0];
+  const featuredMedia = featuredSlot && 'peerId' in featuredSlot ? featuredSlot : undefined;
+  const automaticCameras = featuredMedia?.mediaKind === 'screen' && shouldRenderVideo(featuredMedia)
+    ? roomSlots.filter((slot) => slot.mediaKind === 'camera' && slot.isStreaming &&
+      slot.ownerPeerId === featuredMedia.ownerPeerId &&
+      !(dismissedAutoOverlays[featuredMedia.peerId] || []).includes(slot.peerId)) : [];
+  const overlayKeys = featuredMedia ? [...new Set([...(streamOverlays[featuredMedia.peerId] || []), ...automaticCameras.map((slot) => slot.peerId)])] : [];
+  const overlays = overlayKeys.map((key) => roomSlots.find((slot) => slot.peerId === key))
+    .filter((slot): slot is RoomSlotInfo => !!slot && slot.isStreaming && slot.peerId !== featuredMedia?.peerId);
+  const overlayKey = overlays.map((slot) => slot.peerId).join('|');
+  useEffect(() => {
+    if (layoutMode !== 'spotlight') return;
+    for (const slot of overlays) if (!slot.isLocal && !subscribedStreams.has(slot.peerId)) roomService.requestStream(slot.peerId);
+  }, [layoutMode, overlayKey, subscribedStreams]);
 
   const renderSlotCard = (
     slot: RoomSlotInfo | RoomAppInstance,
@@ -158,7 +175,10 @@ export const RoomVideoContainer: React.FC = () => {
           isFeatured={isFeatured}
           inTray={inTray}
           isSelectedFeatured={isSelectedFeatured}
-        />
+        >
+          {isFeatured && featuredMedia && overlays.map((overlay, index) => <StreamOverlay key={overlay.peerId}
+            slot={overlay} target={featuredMedia.peerId} index={index} />)}
+        </VideoCard>
       );
     }
     return (

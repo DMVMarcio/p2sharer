@@ -60,7 +60,15 @@ static WS_SERVER_INITIALIZED: AtomicBool = AtomicBool::new(false);
 static WS_PORT: std::sync::atomic::AtomicU16 = std::sync::atomic::AtomicU16::new(0);
 static WS_TOKEN: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 static FRAME_SENDER: std::sync::OnceLock<broadcast::Sender<Message>> = std::sync::OnceLock::new();
-static CURRENT_CAPTURE_FLAG: std::sync::Mutex<Option<Arc<AtomicBool>>> = std::sync::Mutex::new(None);
+struct CaptureSession {
+    source: String,
+    active: Arc<AtomicBool>,
+    sender: broadcast::Sender<Message>,
+    #[cfg(windows)]
+    control: Option<ActiveCaptureControl>,
+}
+static SESSIONS: std::sync::LazyLock<std::sync::Mutex<std::collections::HashMap<String, CaptureSession>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
 
 #[derive(Clone)]
 pub struct CaptureFlags {
@@ -122,7 +130,7 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
         frame: &mut Frame,
         capture_control: InternalCaptureControl,
     ) -> Result<(), Self::Error> {
-        if !self.active_flag.load(Ordering::Relaxed) || !CAPTURING_VIDEO.load(Ordering::Relaxed) {
+        if !self.active_flag.load(Ordering::Relaxed) {
             capture_control.stop();
             return Ok(());
         }
@@ -218,9 +226,6 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
 type ActiveCaptureControl =
     CaptureControl<NativeWgcHandler, Box<dyn std::error::Error + Send + Sync>>;
 
-#[cfg(windows)]
-static CURRENT_WGC_CONTROL: std::sync::Mutex<Option<ActiveCaptureControl>> =
-    std::sync::Mutex::new(None);
 
 
 fn get_frame_sender() -> &'static broadcast::Sender<Message> {
@@ -301,8 +306,8 @@ pub fn is_video_capturing() -> bool {
 pub fn is_wgc_active() -> bool {
     #[cfg(windows)]
     {
-        if let Ok(guard) = CURRENT_WGC_CONTROL.lock() {
-            return guard.is_some();
+        if let Ok(guard) = SESSIONS.lock() {
+            return guard.values().any(|session| session.control.is_some());
         }
     }
     false
@@ -355,18 +360,23 @@ pub fn ensure_ws_server_running() {
                         tokio_tungstenite::accept_async(stream),
                     ).await {
                         let (mut write, mut read) = ws_stream.split();
-                        let authorized = matches!(
-                            tokio::time::timeout(std::time::Duration::from_secs(3), read.next()).await,
-                            Ok(Some(Ok(Message::Text(candidate)))) if candidate == token
-                        );
-                        if !authorized {
+                        let candidate = match tokio::time::timeout(std::time::Duration::from_secs(3), read.next()).await {
+                            Ok(Some(Ok(Message::Text(candidate)))) => candidate,
+                            _ => String::new(),
+                        };
+                        let (credential, session_id) = candidate.split_once(':').unwrap_or((&candidate, "default"));
+                        let authorized = credential == token;
+                        let sender = if session_id == "default" { Some(get_frame_sender().clone()) } else {
+                            SESSIONS.lock().ok().and_then(|sessions| sessions.get(session_id).map(|session| session.sender.clone()))
+                        };
+                        if !authorized || sender.is_none() {
                             let _ = write.send(Message::Close(None)).await;
                             return;
                         }
                         if write.send(Message::Text("auth-ok".into())).await.is_err() {
                             return;
                         }
-                        let mut rx = get_frame_sender().subscribe();
+                        let mut rx = sender.unwrap().subscribe();
                         loop {
                             tokio::select! {
                                 msg = rx.recv() => {
@@ -663,22 +673,29 @@ pub fn start_native_screen_capture(
     capture_mouse: Option<bool>,
     quality: Option<u8>,
 ) -> Result<bool, String> {
+    start_capture_session("default".into(), source_id, target_fps, target_width, target_height, capture_mouse, quality)
+}
+
+#[tauri::command]
+pub fn start_capture_session(
+    session_id: String, source_id: String, target_fps: Option<u32>, target_width: Option<u32>,
+    target_height: Option<u32>, capture_mouse: Option<bool>, quality: Option<u8>,
+) -> Result<bool, String> {
+    if session_id.is_empty() || session_id.len() > 100 { return Err("Invalid capture session".into()); }
     if source_id.trim().is_empty() {
         return Err("sourceId cannot be empty".to_string());
     }
     ensure_ws_server_running();
 
     // Stop any existing capture session first
-    let _ = stop_native_screen_capture();
+    let _ = stop_capture_session(session_id.clone());
 
-    crate::stream_pointer::set_source(Some(source_id.clone()));
+    if session_id == "default" { crate::stream_pointer::set_source(Some(source_id.clone())); }
     CAPTURING_VIDEO.store(true, Ordering::SeqCst);
     let is_capturing = Arc::new(AtomicBool::new(true));
     let is_capturing_clone = is_capturing.clone();
 
-    if let Ok(mut guard) = CURRENT_CAPTURE_FLAG.lock() {
-        *guard = Some(is_capturing.clone());
-    }
+
 
     let fps = target_fps.unwrap_or(60).clamp(15, 120);
     let width = target_width.unwrap_or(0);
@@ -686,7 +703,13 @@ pub fn start_native_screen_capture(
     let should_draw_mouse = capture_mouse.unwrap_or(true);
     let jpeg_quality = quality.unwrap_or(90).clamp(50, 98);
 
-    let sender = get_frame_sender().clone();
+    let sender = if session_id == "default" { get_frame_sender().clone() } else { broadcast::channel(32).0 };
+    SESSIONS.lock().map_err(|_| "Capture session lock poisoned")?.insert(session_id.clone(), CaptureSession {
+        source: source_id.clone(),
+        active: is_capturing.clone(), sender: sender.clone(),
+        #[cfg(windows)]
+        control: None,
+    });
     let start_instant = std::time::Instant::now();
     let latest_frame_cache: Arc<std::sync::Mutex<Option<Arc<Vec<u8>>>>> =
         Arc::new(std::sync::Mutex::new(None));
@@ -706,7 +729,7 @@ pub fn start_native_screen_capture(
         let mut next_tick_us = pacer_start.elapsed().as_micros() as u64 + target_interval_us;
         let mut pacer_tick_count: u64 = 0;
 
-        while pacer_active.load(Ordering::Relaxed) && CAPTURING_VIDEO.load(Ordering::Relaxed) {
+        while pacer_active.load(Ordering::Relaxed) {
             let now_us = pacer_start.elapsed().as_micros() as u64;
             let last_wgc = pacer_wgc_last_sent_us.load(Ordering::Acquire);
 
@@ -803,8 +826,8 @@ pub fn start_native_screen_capture(
 
                 match NativeWgcHandler::start_free_threaded(settings) {
                     Ok(control) => {
-                        if let Ok(mut guard) = CURRENT_WGC_CONTROL.lock() {
-                            *guard = Some(control);
+                        if let Ok(mut guard) = SESSIONS.lock() {
+                            if let Some(session) = guard.get_mut(&session_id) { session.control = Some(control); }
                         }
                         wgc_started = true;
                     }
@@ -835,8 +858,8 @@ pub fn start_native_screen_capture(
 
                 match NativeWgcHandler::start_free_threaded(settings) {
                     Ok(control) => {
-                        if let Ok(mut guard) = CURRENT_WGC_CONTROL.lock() {
-                            *guard = Some(control);
+                        if let Ok(mut guard) = SESSIONS.lock() {
+                            if let Some(session) = guard.get_mut(&session_id) { session.control = Some(control); }
                         }
                         wgc_started = true;
                     }
@@ -906,7 +929,7 @@ pub fn start_native_screen_capture(
         let mut resizer = fast_image_resize::Resizer::new();
         let mut resized_img_buf: Option<fast_image_resize::images::Image<'static>> = None;
 
-        while is_capturing_clone.load(Ordering::Relaxed) && CAPTURING_VIDEO.load(Ordering::Relaxed)
+        while is_capturing_clone.load(Ordering::Relaxed)
         {
             let loop_start = std::time::Instant::now();
 
@@ -1113,25 +1136,106 @@ fn safely_stop_wgc_control(control: ActiveCaptureControl) {
 
 #[tauri::command]
 pub fn stop_native_screen_capture() -> Result<bool, String> {
-    crate::stream_pointer::set_source(None);
-    CAPTURING_VIDEO.store(false, Ordering::SeqCst);
-    if let Ok(mut guard) = CURRENT_CAPTURE_FLAG.lock() {
-        if let Some(flag) = guard.take() {
-            flag.store(false, Ordering::SeqCst);
-        }
-    }
-    #[cfg(windows)]
-    if let Ok(mut guard) = CURRENT_WGC_CONTROL.lock() {
-        if let Some(control) = guard.take() {
-            safely_stop_wgc_control(control);
-        }
-    }
+    let ids: Vec<String> = SESSIONS.lock().map_err(|_| "Capture session lock poisoned")?.keys().cloned().collect();
+    for id in ids { stop_capture_session(id)?; }
     Ok(true)
+}
+
+#[tauri::command]
+pub fn stop_capture_session(session_id: String) -> Result<bool, String> {
+    let session = SESSIONS.lock().map_err(|_| "Capture session lock poisoned")?.remove(&session_id);
+    if let Some(session) = session {
+        session.active.store(false, Ordering::SeqCst);
+        #[cfg(windows)]
+        if let Some(control) = session.control { safely_stop_wgc_control(control); }
+    }
+    let empty = SESSIONS.lock().map_err(|_| "Capture session lock poisoned")?.is_empty();
+    CAPTURING_VIDEO.store(!empty, Ordering::SeqCst);
+    if empty { crate::stream_pointer::set_source(None); }
+    Ok(true)
+}
+
+#[tauri::command]
+pub fn select_pointer_capture(session_id: Option<String>) -> Result<(), String> {
+    let source = match session_id {
+        Some(id) => Some(SESSIONS.lock().map_err(|_| "Capture session lock poisoned")?
+            .get(&id).ok_or("Capture session is no longer active")?.source.clone()),
+        None => None,
+    };
+    crate::stream_pointer::set_source(source);
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn video_websocket_routes_only_the_authenticated_capture_session() {
+        ensure_ws_server_running();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+        while get_video_ws_port() == 0 && std::time::Instant::now() < deadline {
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+        let (a, _) = broadcast::channel(32);
+        let (b, _) = broadcast::channel(32);
+        for (id, sender) in [("socket-test-a", a.clone()), ("socket-test-b", b.clone())] {
+            SESSIONS.lock().unwrap().insert(id.into(), CaptureSession {
+                source: "screen:0".into(), active: Arc::new(AtomicBool::new(true)), sender,
+                #[cfg(windows)]
+                control: None,
+            });
+        }
+        let url = format!("ws://127.0.0.1:{}", get_video_ws_port());
+        let (mut first, _) = tokio_tungstenite::connect_async(&url).await.unwrap();
+        let (mut second, _) = tokio_tungstenite::connect_async(&url).await.unwrap();
+        first.send(Message::Text(format!("{}:socket-test-a", video_ws_token()))).await.unwrap();
+        second.send(Message::Text(format!("{}:socket-test-b", video_ws_token()))).await.unwrap();
+        assert_eq!(first.next().await.unwrap().unwrap().into_text().unwrap(), "auth-ok");
+        assert_eq!(second.next().await.unwrap().unwrap().into_text().unwrap(), "auth-ok");
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        a.send(Message::Binary(vec![11, 11, 11, 11, 11])).unwrap();
+        b.send(Message::Binary(vec![22, 22, 22, 22, 22])).unwrap();
+        assert_eq!(tokio::time::timeout(std::time::Duration::from_secs(2), first.next()).await.unwrap().unwrap().unwrap().into_data(), vec![11; 5]);
+        assert_eq!(tokio::time::timeout(std::time::Duration::from_secs(2), second.next()).await.unwrap().unwrap().unwrap().into_data(), vec![22; 5]);
+        stop_capture_session("socket-test-a".into()).unwrap();
+        b.send(Message::Binary(vec![33; 5])).unwrap();
+        assert_eq!(tokio::time::timeout(std::time::Duration::from_secs(2), second.next()).await.unwrap().unwrap().unwrap().into_data(), vec![33; 5]);
+        stop_capture_session("socket-test-b".into()).unwrap();
+    }
+
+    #[test]
+    fn simultaneous_native_sessions_keep_frames_and_teardown_independent() {
+        start_capture_session("capture-test-a".into(), "screen:0".into(), Some(30), Some(640), Some(360), Some(true), Some(75)).unwrap();
+        start_capture_session("capture-test-b".into(), "screen:0".into(), Some(30), Some(320), Some(180), Some(true), Some(85)).unwrap();
+        let (mut first, mut second, second_active) = {
+            let sessions = SESSIONS.lock().unwrap();
+            let a = sessions.get("capture-test-a").unwrap();
+            let b = sessions.get("capture-test-b").unwrap();
+            (a.sender.subscribe(), b.sender.subscribe(), b.active.clone())
+        };
+        fn next_image(rx: &mut broadcast::Receiver<Message>) -> (u32, u32) {
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+            while std::time::Instant::now() < deadline {
+                match rx.try_recv() {
+                    Ok(Message::Binary(bytes)) if bytes.len() > 4 => {
+                        let image = image::load_from_memory(&bytes).unwrap();
+                        return (image.width(), image.height());
+                    }
+                    _ => std::thread::sleep(std::time::Duration::from_millis(5)),
+                }
+            }
+            panic!("Capture did not produce an image frame");
+        }
+        assert_eq!(next_image(&mut first), (640, 360));
+        assert_eq!(next_image(&mut second), (320, 180));
+        stop_capture_session("capture-test-a".into()).unwrap();
+        assert!(second_active.load(Ordering::SeqCst));
+        assert!(is_video_capturing());
+        assert_eq!(next_image(&mut second), (320, 180));
+        stop_capture_session("capture-test-b".into()).unwrap();
+        assert!(!second_active.load(Ordering::SeqCst));
+    }
 
     #[tokio::test]
     async fn video_websocket_requires_process_token_before_streaming() {

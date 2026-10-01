@@ -323,12 +323,13 @@ export class MediaCoordinator {
   public static async applySenderBitrate(
     pc: RTCPeerConnection,
     maxBitrateBps: number,
-    maxFps: number = 60
+    maxFps: number = 60,
+    trackId?: string
   ): Promise<void> {
     if (!pc || typeof pc.getSenders !== 'function') return;
     const previous = MediaCoordinator.senderUpdates.get(pc) ?? Promise.resolve();
     const update = previous.catch(() => {}).then(() =>
-      MediaCoordinator.applySenderParameters(pc, maxBitrateBps, maxFps));
+      MediaCoordinator.applySenderParameters(pc, maxBitrateBps, maxFps, trackId));
     MediaCoordinator.senderUpdates.set(pc, update);
     try {
       await update;
@@ -338,12 +339,13 @@ export class MediaCoordinator {
   }
 
   private static async applySenderParameters(
-    pc: RTCPeerConnection, maxBitrateBps: number, maxFps: number
+    pc: RTCPeerConnection, maxBitrateBps: number, maxFps: number, trackId?: string
   ): Promise<void> {
     if (pc.connectionState === 'closed' || (pc.signalingState && pc.signalingState !== 'stable')) return;
     try {
       const senders = pc.getSenders();
       for (const sender of senders) {
+        if (trackId && sender.track?.kind === "video" && sender.track.id !== trackId) continue;
         if (sender.track && sender.track.kind === 'video') {
           try {
             const params = sender.getParameters();
@@ -378,7 +380,7 @@ export class MediaCoordinator {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             if (sender.track && 'contentHint' in sender.track) {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              (sender.track as any).contentHint = 'detail';
+              if (!sender.track.contentHint) (sender.track as any).contentHint = 'detail';
             }
 
             // Immediately trigger an intra-keyframe to prevent encoder QP lock at low start bitrate
