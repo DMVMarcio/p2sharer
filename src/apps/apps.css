@@ -73,7 +73,7 @@
 .room-app-options-menu button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 8px;
   border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-primary);
   font-size: 11px; text-align: left; white-space: nowrap; cursor: pointer; }
-.room-app-options-menu button:hover { background: var(--bg-card-hover); }
+.room-app-options-menu button:hover { background: var(--dropdown-hover-bg); }
 .room-app-icon-button { display: grid; place-items: center; width: 25px; height: 25px; border: 0;
   border-radius: var(--radius-sm); background: transparent; color: var(--text-secondary); cursor: pointer; font-size: 17px; }
 .room-app-icon-button:hover { background: var(--bg-card-hover); color: var(--text-primary); }
