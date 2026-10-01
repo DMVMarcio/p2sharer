@@ -427,18 +427,20 @@ export class RoomService {
   }
 
   public startCapture(sourceId: string, fps: number, res: { width: number; height: number },
-    mouse: boolean, quality = 90, label?: string): Promise<void> {
+    mouse: boolean, quality = 90, label?: string,
+    prepared?: { sourceId: string; stream: MediaStream; bridge?: NativeVideoBridge }): Promise<void> {
     const editingId = stateStore.editingStreamId;
     const bitrate = stateStore.currentBitrate;
     const manager = this.roomManager;
     const task = this.captureTransition.then(async () => {
       if (!manager || manager !== this.roomManager) throw new Error('A sala foi encerrada.');
+      if (prepared && prepared.sourceId !== sourceId) throw new Error('A fonte da prévia foi alterada.');
       const previous = editingId ? this.localCaptures.get(editingId) : undefined;
       if (editingId && !previous) throw new Error('A transmissão foi encerrada.');
       if (!previous && this.localCaptures.size >= 16) throw new Error('Limite de 16 transmissões simultâneas.');
       const kind: MediaKind = sourceId.startsWith('camera:') ? 'camera' : 'screen';
       if (previous && kind !== previous.kind) throw new Error('Escolha outra fonte do mesmo tipo de transmissão.');
-      if (previous && kind === 'camera' && sourceId === previous.sourceId) {
+      if (previous && kind === 'camera' && sourceId === previous.sourceId && !prepared) {
         await previous.stream.getVideoTracks()[0].applyConstraints({ width: { ideal: res.width }, height: { ideal: res.height },
           frameRate: { ideal: fps, max: fps } });
         manager.updateMediaSettings(editingId!, fps, bitrate);
@@ -448,18 +450,18 @@ export class RoomService {
         return;
       }
       const id = editingId || crypto.randomUUID();
-      const bridge = kind === 'screen' ? new NativeVideoBridge(crypto.randomUUID()) : undefined;
+      const bridge = prepared?.bridge || (kind === 'screen' ? new NativeVideoBridge(crypto.randomUUID()) : undefined);
       let stream: MediaStream | undefined;
       try {
         if (!this.localCaptures.size) await MediaCoordinator.prepareCodecPreferences(res.width, res.height, fps, bitrate * 1000);
-        stream = bridge ? await bridge.startCapture(sourceId, fps, res, mouse, quality) :
+        stream = prepared?.stream || (bridge ? await bridge.startCapture(sourceId, fps, res, mouse, quality) :
           await navigator.mediaDevices.getUserMedia({ audio: false, video: {
             ...(sourceId.slice(7) ? { deviceId: { exact: sourceId.slice(7) } } : {}),
             width: { ideal: res.width }, height: { ideal: res.height }, frameRate: { ideal: fps, max: fps },
-          } });
+          } }));
         if (manager !== this.roomManager) throw new Error('A sala foi encerrada.');
         const track = stream.getVideoTracks()[0];
-        if (!track) throw new Error('A fonte não forneceu vídeo.');
+        if (!track || track.readyState === 'ended') throw new Error('A fonte não forneceu vídeo.');
         // Keep the capture bridge's track container separate from the broadcast container.
         // Live replacement mutates only the latter; disposing the old bridge must not stop the new track.
         if (!previous) stream = new MediaStream(stream.getTracks());
@@ -497,7 +499,10 @@ export class RoomService {
         throw error;
       }
     });
-    this.captureTransition = task.catch(() => {});
+    this.captureTransition = task.catch(async () => {
+      if (prepared?.bridge) await prepared.bridge.stopCapture();
+      else prepared?.stream.getTracks().forEach((track) => track.stop());
+    });
     return task;
   }
 

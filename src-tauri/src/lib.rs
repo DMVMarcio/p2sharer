@@ -9,6 +9,7 @@ pub mod process_manager;
 pub mod room_vault;
 pub mod screen_sources;
 mod video_jpeg;
+mod camera_permission;
 
 use audio_loopback::{start_audio_capture, stop_audio_capture};
 use logger::{clear_log_file, get_log_file_path, open_latest_log, open_log_folder, write_frontend_log};
@@ -53,6 +54,10 @@ pub fn run() {
     tauri::Builder::default()
         .manage(ChatFileState::default())
         .plugin(tauri_plugin_opener::init())
+        .setup(|app| {
+            camera_permission::install(app)?;
+            Ok(())
+        })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 let label = window.label();

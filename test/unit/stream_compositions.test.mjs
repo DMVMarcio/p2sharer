@@ -21,6 +21,7 @@ const require = createRequire(import.meta.url);
 const bundle = await build({ stdin: { contents: `
 export * from './src/components/room/RoomVideoContainer.tsx';
 export * from './src/components/common/ContextMenu.tsx';
+export { StreamHeaderBar } from './src/components/room/StreamHeaderBar.tsx';
 export { stateStore } from './src/core/state_store.ts';
 export { roomService } from './src/services/room_service.ts';
 export { audioContextManager } from './src/audio/audio_context_manager.ts';
@@ -28,7 +29,7 @@ export { audioContextManager } from './src/audio/audio_context_manager.ts';
   loader: { '.css': 'empty', '.png': 'dataurl' }, plugins: [{ name: 'packages', setup(builder) {
     builder.onResolve({ filter: /^[^./]/ }, (args) => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
   } }] });
-const { RoomVideoContainer, ContextMenuProvider, stateStore, roomService, audioContextManager } =
+const { RoomVideoContainer, StreamHeaderBar, ContextMenuProvider, stateStore, roomService, audioContextManager } =
   await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
 audioContextManager.attachPeerAudio = () => ({ volume: 100, isMuted: false });
 audioContextManager.getPeerVolumeState = () => ({ volume: 100, isMuted: false });
@@ -46,6 +47,24 @@ const render = async (mode = 'spotlight', featured = screen.peerId) => {
     root.render(React.createElement(ContextMenuProvider, null, React.createElement(RoomVideoContainer)));
   });
 };
+test('transmission split menu lists only local sources and stops the chosen stream', async () => {
+  const stopped = [];
+  const original = roomService.stopTransmission;
+  roomService.stopTransmission = (id) => stopped.push(id);
+  try {
+    await act(async () => {
+      stateStore.set((state) => { state.roomSlots = [{ ...screen, isLocal: true }, { ...camera, isLocal: true }, other]; });
+      root.render(React.createElement(ContextMenuProvider, null, React.createElement(StreamHeaderBar)));
+    });
+    assert.equal(document.querySelector('#label-share-screen').textContent, 'Transmissão');
+    await act(async () => document.querySelector('.transmission-stop-menu').click());
+    const actions = [...document.querySelectorAll('[role="menuitem"]')];
+    assert.equal(actions.length, 2);
+    await act(async () => actions.find((action) => action.textContent.includes('camera')).click());
+    assert.deepEqual(stopped, ['camera']);
+  } finally { roomService.stopTransmission = original; }
+});
+
 after(async () => { await act(async () => root.unmount()); browser.window.close(); });
 
 test('spotlight automatically subscribes the owner camera and grid mounts no overlays', async () => {

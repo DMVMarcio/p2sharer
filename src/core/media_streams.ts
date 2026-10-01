@@ -1,4 +1,5 @@
 export type MediaKind = 'screen' | 'camera';
+export const MAX_MEDIA_FPS = 120;
 
 export interface StreamDescriptor {
   id: string;
@@ -14,7 +15,7 @@ export function validStreamDescriptors(value: unknown): value is StreamDescripto
     s && typeof s.id === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(s.id) &&
     (s.kind === 'screen' || s.kind === 'camera') && typeof s.label === 'string' && s.label.length <= 200 &&
     typeof s.videoTrackId === 'string' && s.videoTrackId.length <= 100 &&
-    Number.isFinite(s.fps) && s.fps >= 1 && s.fps <= 120 &&
+    Number.isFinite(s.fps) && s.fps >= 1 && s.fps <= MAX_MEDIA_FPS &&
     Number.isFinite(s.bitrate) && s.bitrate >= 100 && s.bitrate <= 50000);
 }
 
