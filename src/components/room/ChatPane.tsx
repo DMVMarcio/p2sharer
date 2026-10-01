@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useSyncExternalStore } from 'react';
+import { useDropdownPresence } from '../../hooks/useDropdownPresence';
 import { useRoom } from '../../hooks/useRoom';
 import { EmojiPicker } from '../common/EmojiPicker';
 import { EmojiPickerPopover } from '../common/EmojiPickerPopover';
@@ -12,8 +13,8 @@ import { useEmojiSelectionHighlight } from '../../hooks/useEmojiSelectionHighlig
 import { ChatMessageMenu } from './ChatMessageMenu';
 import { EditedMessageMarker } from './EditedMessageMarker';
 import { Paperclip, Reply, Smile, X } from 'lucide-react';
-import { invoke } from '@tauri-apps/api/core';
-import type { NativeChatFile } from '../../p2p/group_room';
+import { useChatFileInput } from '../../hooks/useChatFileInput';
+import { ChatFileDropOverlay } from './ChatFileDropOverlay';
 import { ChatFileOfferDialog } from './ChatFileOfferDialog';
 import { ChatFileAttachment } from './ChatFileAttachment';
 import { ChatTransferCenter } from './ChatTransferCenter';
@@ -24,9 +25,10 @@ export const ChatPane: React.FC = () => {
   const { chatMessages, sendChatMessage, editChatMessage, deleteChatMessage, offerFile,
     requestFile, requestFilePreview, cancelFileTransfer, fileProgress,
     localFilePreviews, imagePreviews, savedDownloads, revealSavedFile } = useRoom();
-  const [selectedFile, setSelectedFile] = useState<NativeChatFile | null>(null);
   const [inputText, setInputText] = useState('');
   const [pickerTarget, setPickerTarget] = useState<'compose' | 'edit' | null>(null);
+  const composePicker = useDropdownPresence(pickerTarget === 'compose' ? true : null);
+  const editPicker = useDropdownPresence(pickerTarget === 'edit' ? true : null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [replyToId, setReplyToId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -41,6 +43,7 @@ export const ChatPane: React.FC = () => {
   const messageRefs = useRef(new Map<string, HTMLDivElement>());
   const composerRef = useRef<HTMLDivElement>(null);
   const paneRef = useRef<HTMLDivElement>(null);
+  const { selectedFile, dragging, close: closeFile, markOffered, pickFile } = useChatFileInput(paneRef);
   useEmojiSelectionHighlight(paneRef);
 
   const visibleMessages = chatMessages.filter((message) => !message.deletedAt);
@@ -123,10 +126,6 @@ export const ChatPane: React.FC = () => {
     sendMessage();
   };
 
-  const pickFile = async () => {
-    try { setSelectedFile(await invoke<NativeChatFile | null>('pick_chat_file')); }
-    catch { showToast('Não foi possível abrir o arquivo.'); }
-  };
   const startDownload = (messageId: string, saveAs: boolean) => {
     void requestFile(messageId, saveAs).catch((error) => {
       console.warn('[Files] Could not save download:', error);
@@ -139,6 +138,7 @@ export const ChatPane: React.FC = () => {
 
   return (
     <div className="sidebar-tab-content active" id="tab-content-chat" ref={paneRef}>
+      {dragging && <ChatFileDropOverlay />}
       <div className="chat-messages-container" id="chat-messages-container">
         {visibleMessages.map((msg, index) => {
           const timeStr = new Date(msg.timestamp).toLocaleTimeString([], {
@@ -212,7 +212,7 @@ export const ChatPane: React.FC = () => {
       </div>
 
       <div className="chat-composer" ref={composerRef}>
-      {pickerTarget === 'compose' && <EmojiPicker pack={emojiPack} onSelect={insertEmoji} />}
+      {composePicker.value && <EmojiPicker pack={emojiPack} onSelect={insertEmoji} closing={composePicker.closing} />}
       {replyMessage && <div className="chat-composer-reply">
         <Reply size={15} />
         <div><strong>Respondendo a {replyMessage.sender}</strong><span>{replyMessage.text}</span></div>
@@ -247,8 +247,8 @@ export const ChatPane: React.FC = () => {
         </div>
       </form>
       </div>
-      {pickerTarget === 'edit' && <EmojiPickerPopover anchor={editEmojiButtonRef.current} pack={emojiPack} onSelect={insertEmoji} />}
-      {selectedFile && <ChatFileOfferDialog file={selectedFile} onClose={() => setSelectedFile(null)} onOffer={(name, autoAccept) => offerFile(selectedFile, name, autoAccept)} />}
+      {editPicker.value && <EmojiPickerPopover anchor={editEmojiButtonRef.current} pack={emojiPack} onSelect={insertEmoji} closing={editPicker.closing} />}
+      {selectedFile && <ChatFileOfferDialog key={selectedFile.id} file={selectedFile} onClose={closeFile} onOffer={async (name, autoAccept) => { await offerFile(selectedFile, name, autoAccept); markOffered(); }} />}
     </div>
   );
 };

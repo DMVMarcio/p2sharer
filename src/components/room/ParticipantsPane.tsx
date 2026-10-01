@@ -1,3 +1,4 @@
+import { useDropdownPresence } from '../../hooks/useDropdownPresence';
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { MoreHorizontal } from 'lucide-react';
@@ -8,6 +9,7 @@ export const ParticipantsPane: React.FC = () => {
   const { username, peers, roomSlots, isCreator, isRoomHost, isRoomAdmin,
     transferOwnership, setAdministrator, kickPeer } = useRoom();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const menuPresence = useDropdownPresence(openMenu);
   const [pendingAction, setPendingAction] = useState<{
     kind: 'kick' | 'transfer' | 'admin' | 'revoke-admin'; id: string; name: string;
   } | null>(null);
@@ -86,7 +88,7 @@ export const ParticipantsPane: React.FC = () => {
                   <div className="participant-menu-wrap">
                     <button className="participant-menu-trigger" aria-label={`Ações para ${p.username}`}
                       onClick={() => setOpenMenu(openMenu === p.id ? null : p.id)}><MoreHorizontal size={16} /></button>
-                    {openMenu === p.id && <div className="participant-menu" role="menu">
+                    {menuPresence.value === p.id && <div className={`participant-menu ${menuPresence.closing ? 'dropdown-closing' : ''}`} inert={menuPresence.closing} aria-hidden={menuPresence.closing} role="menu">
                       <button role="menuitem" onClick={() => { setOpenMenu(null);
                         setPendingAction({ kind: p.isAdmin ? 'revoke-admin' : 'admin', id: p.id, name: p.username }); }}>
                         {p.isAdmin ? 'Remover administrador' : 'Tornar administrador'}

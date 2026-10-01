@@ -5,6 +5,7 @@ import { savedRooms, type SavedRoom } from '../../core/saved_rooms';
 import { compareRoomInvites, parseRoomInvite } from '../../core/room_invite';
 import { verifyRoomInvite } from '../../core/room_invite_validation';
 import { showToast } from '../../hooks/useToast';
+import { useFormSubmit } from '../../hooks/useFormSubmit';
 
 interface EditSavedRoomDialogProps {
   room: SavedRoom;
@@ -74,11 +75,13 @@ export const EditSavedRoomDialog: React.FC<EditSavedRoomDialogProps> = ({ room, 
     }
   };
 
+  const { submit, pending } = useFormSubmit(save);
+
   return createPortal(
     <div className="modal-overlay" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget) onClose();
     }}>
-      <div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="edit-saved-room-title">
+      <form onSubmit={submit} aria-busy={pending} className="modal-card" role="dialog" aria-modal="true" aria-labelledby="edit-saved-room-title">
         <div className="modal-header">
           <div><h2 id="edit-saved-room-title">Editar sala salva</h2></div>
           <button type="button" className="btn-close" aria-label="Fechar" onClick={onClose}>&times;</button>
@@ -103,8 +106,7 @@ export const EditSavedRoomDialog: React.FC<EditSavedRoomDialogProps> = ({ room, 
               <input className="text-input" id="saved-room-password" maxLength={128}
                 type={showPassword ? 'text' : 'password'} value={password}
                 placeholder="Deixe vazio para não lembrar"
-                onChange={(event) => setPassword(event.target.value)}
-                onKeyDown={(event) => { if (event.key === 'Enter') void save(); }} />
+                onChange={(event) => setPassword(event.target.value)} />
               <button type="button" className="btn btn-sm btn-outline btn-inline-action btn-inline-action-icon"
                 aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                 onClick={() => setShowPassword(!showPassword)}>
@@ -115,9 +117,9 @@ export const EditSavedRoomDialog: React.FC<EditSavedRoomDialogProps> = ({ room, 
         </div>
         <div className="modal-footer">
           <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
-          <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void save()}>Salvar</button>
+          <button type="submit" className="btn btn-primary" disabled={busy || pending}>Salvar</button>
         </div>
-      </div>
+      </form>
     </div>, document.body,
   );
 };

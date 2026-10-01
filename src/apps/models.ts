@@ -2,6 +2,7 @@ import * as Y from 'yjs';
 import { Awareness, applyAwarenessUpdate, encodeAwarenessUpdate } from 'y-protocols/awareness';
 import * as decoding from 'lib0/decoding';
 import type { YouTubeState } from './types.ts';
+import { preserveYouTubeTimeline, YOUTUBE_MAX_POSITION_SECONDS } from './youtube_timeline.ts';
 
 export interface RoomAppModel {
   snapshot(): unknown;
@@ -98,15 +99,17 @@ export function validYouTubeState(value: unknown): value is YouTubeState {
   return Array.isArray(state.queue) && state.queue.length <= 200 && state.queue.every((entry) =>
     typeof entry?.videoId === 'string' && /^[\w-]{11}$/.test(entry.videoId) &&
     typeof entry.title === 'string' && entry.title.length <= 300 &&
+    (entry.isLive === undefined || typeof entry.isLive === 'boolean') &&
     (entry.addedBy === undefined || (typeof entry.addedBy === 'string' && entry.addedBy.length <= 100)) &&
     (entry.addedByName === undefined || (typeof entry.addedByName === 'string' && entry.addedByName.length <= 80))) &&
     Number.isInteger(state.index) && state.index >= 0 &&
     (state.queue.length === 0 ? state.index === 0 : state.index < state.queue.length) &&
-    typeof state.playing === 'boolean' && Number.isFinite(state.position) && state.position >= 0 &&
-    state.position < 86400 && ['off', 'all', 'one'].includes(state.repeat) &&
+    typeof state.playing === 'boolean' && (state.ended === undefined || typeof state.ended === 'boolean') &&
+    !(state.ended && state.playing) && Number.isFinite(state.position) && state.position >= 0 &&
+    state.position < YOUTUBE_MAX_POSITION_SECONDS && ['off', 'all', 'one'].includes(state.repeat) &&
     typeof state.shuffle === 'boolean' && typeof state.removePlayed === 'boolean' &&
     Number.isFinite(state.updatedAt) && state.updatedAt > 0 &&
-    (state.syncReason === undefined || ['heartbeat', 'playback', 'seek', 'update'].includes(state.syncReason));
+    (state.syncReason === undefined || ['heartbeat', 'playback', 'seek', 'update', 'queue-replace', 'auto-advance'].includes(state.syncReason));
 }
 
 export class YouTubeModel implements RoomAppModel {
@@ -125,7 +128,7 @@ export class YouTubeModel implements RoomAppModel {
   update(state: YouTubeState): void {
     if (!validYouTubeState(state)) return;
     this.clock++;
-    this.stateValue = state;
+    this.stateValue = preserveYouTubeTimeline(this.stateValue, state, this.receivedAtValue, Date.now());
     this.actorValue = this.context.localActor;
     this.snapshotValue = false;
     this.receivedAtValue = Date.now();

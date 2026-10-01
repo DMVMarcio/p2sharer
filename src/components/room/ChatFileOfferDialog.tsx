@@ -16,11 +16,11 @@ export function ChatFileOfferDialog({ file, onClose, onOffer }: Props) {
     catch { setError('Confira o nome e se o arquivo ainda está acessível.'); }
     finally { setBusy(false); }
   };
-  return <div className="modal-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+  return <div className="modal-overlay" onMouseDown={(event) => { if (!busy && event.target === event.currentTarget) onClose(); }}>
     <div className="modal-card chat-file-dialog" role="dialog" aria-modal="true" aria-labelledby="chat-file-dialog-title">
       <div className="modal-header"><div className="modal-header-icon"><Paperclip size={19} /></div><div><h2 id="chat-file-dialog-title">Anexar arquivo</h2>
         <p className="modal-subtitle">O arquivo será oferecido no chat. Você decide quando enviá-lo.</p></div>
-        <button className="btn-close" aria-label="Fechar" onClick={onClose}>&times;</button></div>
+        <button className="btn-close" aria-label="Fechar" disabled={busy} onClick={onClose}>&times;</button></div>
       <div className="modal-body chat-file-dialog-body">
         <div className="form-group"><label className="form-label" htmlFor="chat-file-name">Nome exibido</label>
           <input className="text-input" id="chat-file-name" value={name} maxLength={180}
@@ -33,7 +33,7 @@ export function ChatFileOfferDialog({ file, onClose, onOffer }: Props) {
         <p className="chat-file-observation"><strong>Obs:</strong> Ao ativar, todas as solicitações de download deste arquivo serão aceitas automaticamente pelos próximos 10 minutos.</p>
         {error && <p className="chat-file-error">{error}</p>}
       </div>
-      <div className="modal-footer"><button className="btn btn-secondary" onClick={onClose}>Cancelar</button>
+      <div className="modal-footer"><button className="btn btn-secondary" disabled={busy} onClick={onClose}>Cancelar</button>
         <button className="btn btn-primary" disabled={busy || !name.trim()} onClick={() => void submit()}>Anexar</button></div>
     </div>
   </div>;

@@ -6,7 +6,7 @@ import { TooltipButton } from '../components/common/TooltipButton';
 import { initFrontendLogger } from '../core/logger';
 import { YouTubeControls } from './YouTubeControls';
 import { canAdvanceYouTubeQueue } from './youtube_queue';
-import { createYouTubePlayer, loadYouTubePlayerApi, reconcileYouTubePlayer, setYouTubeCaptions,
+import { createYouTubePlayer, loadYouTubePlayerApi, reconcileYouTubePlayer, setYouTubeCaptions, sampleYouTubeLive,
   type YouTubePlaybackTracker, type YouTubePlayer } from './youtube_player';
 import { validYouTubeState } from './models.ts';
 import { validYouTubePipSettings, youtubePipEvent, youtubePipPeerId,
@@ -21,6 +21,7 @@ export const YouTubePipView: React.FC<{ instanceId: string }> = ({ instanceId })
   const [playerReady, setPlayerReady] = useState(false);
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [liveVideoId, setLiveVideoId] = useState('');
   const [buffered, setBuffered] = useState(0);
   const [error, setError] = useState('');
   const [alwaysOnTop, setAlwaysOnTop] = useState(true);
@@ -131,7 +132,7 @@ export const YouTubePipView: React.FC<{ instanceId: string }> = ({ instanceId })
 
   useEffect(() => {
     if (!playerReady || !state) return;
-    reconcile(state.syncReason === 'seek' || state.syncReason === 'playback' ? 'urgent' : 'update');
+    reconcile(state.syncReason === 'seek' || state.syncReason === 'playback' || state.syncReason === 'queue-replace' || state.syncReason === 'auto-advance' ? 'urgent' : 'update');
     if (!state.queue[state.index]) {
       setPosition(0);
       setDuration(0);
@@ -149,13 +150,15 @@ export const YouTubePipView: React.FC<{ instanceId: string }> = ({ instanceId })
       const time = player.getCurrentTime();
       const length = player.getDuration();
       const loaded = player.getVideoLoadedFraction();
+      const live = sampleYouTubeLive(player, trackerRef.current, Date.now());
+      if (live) setLiveVideoId(current.queue[current.index].videoId);
       if (Number.isFinite(time) && time >= 0) setPosition(time);
       if (Number.isFinite(length) && length >= 0) setDuration(length);
       if (Number.isFinite(loaded) && loaded >= 0) setBuffered(loaded);
       const entry = current.queue[current.index];
       if (entry && player.getVideoData().video_id === entry.videoId && Number.isFinite(time) && time >= 0)
         send({ source: 'pip', type: 'progress', videoId: entry.videoId, position: time,
-          duration: Number.isFinite(length) ? length : 0, playing: player.getPlayerState() === 1 });
+          duration: Number.isFinite(length) ? length : 0, playing: player.getPlayerState() === 1, live });
       if (entry && current.playing && ![0, 1, 3].includes(player.getPlayerState())) reconcile('update');
     }, 1000);
     return () => clearInterval(timer);
@@ -221,6 +224,7 @@ export const YouTubePipView: React.FC<{ instanceId: string }> = ({ instanceId })
       <YouTubeControls hasVideo={Boolean(current)} playing={Boolean(state?.playing)}
         hasPrevious={Boolean(state && state.index > 0)} hasNext={Boolean(state && canAdvanceYouTubeQueue(state))}
         position={position} duration={duration} buffered={buffered} volume={volume} muted={muted} captions={captions}
+        live={Boolean(current && (current.isLive || liveVideoId === current.videoId))}
         onTogglePlayback={() => command({ action: 'toggle' })}
         onPrevious={() => command({ action: 'previous' })} onNext={() => command({ action: 'next' })}
         onSeek={(next) => command({ action: 'seek', position: next })}

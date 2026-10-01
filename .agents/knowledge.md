@@ -45,6 +45,25 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 - `[External Repositories]` **zkTrackier Is Read-Only**: When investigating P2Sharer screen sharing with zkTrackier, inspect `D:\Projetos\zkTrackier\` only for context. Never modify files in that directory.
 - `[Video Capture]` **Use Normal WGC Capture**: The user confirmed that the normal capture mode works on the AMD RX 5500 XT after the capture fixes, while the optional GDI compatibility mode flickers. Do not expose the GDI compatibility mode in the screen picker.
+- `[UI Copy & Density]` Remove redundant explanatory labels such as "Shared editing" in the notepad. Prefer existing action rows over separate rows that add no useful information. Keep the notepad's Open and Save buttons aligned to the right of its formatting toolbar.
+
+- `[Menu Motion]` Dropdowns and both emoji pickers must open and close smoothly with slightly longer timing (320 ms enter, 260 ms exit). Retain closing content until its animation finishes and make it noninteractive during exit. Emoji list scrollbars must use the app's narrow themed styling with a transparent track, including WebView2.
+
+
+- `[Desktop Build Hygiene]` Always use the normal Tauri output directory (`src-tauri/target/release` and its `bundle` subdirectory). Do not create alternate target trees or scatter executable/installer copies across the repository. If a running app locks the normal output, report the blocker instead of duplicating build directories. Remove obsolete alternate build trees when authorized, retaining normal Cargo build artifacts.
+- `[Home UI]` The home page must scroll vertically when saved rooms or a small window make its content taller than the available area; every saved room must remain accessible.
+
+- `[UI Polish]` Submit room creation, room joining, and similar single-line modal forms with Enter from any editable field. Keep enlarged volume thumbs fully visible, wrap long tooltip content without truncation, and animate dropdown opening smoothly. The logs-folder action must open the actual logs directory in Windows Explorer.
+
+
+- `[YouTube Live]` Live broadcasts must play continuously without repeated rewinds, seeks, or loading loops. The displayed time and growing live duration should follow playback; users may seek manually when the stream supports DVR.
+
+- `[YouTube Playback Continuity]` Queue additions and playback-option changes must never rewind or seek the current video. Automatic advances/repeats must show a separate toast without attributing them to a participant. Adding videos after playback has ended should start the first newly added video automatically, while additions during playback or an intentional pause preserve the current selection and playback.
+
+- `[YouTube Saved Queues]` Add a saved-queues button beside the playback queue count. Persist named queues locally, list them in a popup, support rename and confirmed deletion, import by replacing or appending with cancellation, and make overwriting an existing saved queue practical.
+
+- `[Chat Files Input]` Support native file drag-and-drop over the chat with a drop overlay, and Ctrl+V for copied files, browser images, and screenshots. Every attachment must use the existing offer/auto-accept consent dialog before publication. Multiple files are confirmed individually.
+
 - `[Diagnostics Logs]` Keep at most eight per-instance session logs, removing the oldest when a new instance starts while preserving logs in use.
 - `[P2P Diagnostics]` Allow users to add, remove, enable, and disable rendezvous servers in settings for connection troubleshooting. Keep the configuration persistent and apply it to actual signaling connections.
 - `[P2P Settings UI]` Write rendezvous settings copy for end users without testing or debugging instructions. Show each server's enable control as the canonical switch aligned at the right edge of its row.

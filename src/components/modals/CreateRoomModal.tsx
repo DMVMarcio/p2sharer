@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useFormSubmit } from '../../hooks/useFormSubmit';
 import { useModal } from '../../hooks/useModal';
 import { useRoom } from '../../hooks/useRoom';
 import { showToast } from '../../hooks/useToast';
@@ -30,9 +31,11 @@ export const CreateRoomModal: React.FC = () => {
     }
   };
 
+  const { submit, pending } = useFormSubmit(handleConfirm, isClosing);
+
   return (
     <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} id="modal-create-room-dialog">
-      <div className="modal-card">
+      <form onSubmit={submit} aria-busy={pending} className="modal-card">
         <div className="modal-header">
           <div className="modal-header-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -46,7 +49,7 @@ export const CreateRoomModal: React.FC = () => {
             <h2>Criar Nova Sala</h2>
             <p className="modal-subtitle">O convite autenticado será gerado ao criar a sala.</p>
           </div>
-          <button className="btn-close" id="btn-close-create-dialog" onClick={closeModal}>
+          <button type="button" className="btn-close" id="btn-close-create-dialog" onClick={closeModal}>
             &times;
           </button>
         </div>
@@ -55,7 +58,7 @@ export const CreateRoomModal: React.FC = () => {
           <div className="form-group">
             <label className="form-label" htmlFor="input-create-room-name-dialog">Nome da sala neste dispositivo:</label>
             <input id="input-create-room-name-dialog" className="text-input" maxLength={80}
-              value={name} onChange={(event) => setName(event.target.value)} />
+              autoFocus value={name} onChange={(event) => setName(event.target.value)} />
           </div>
 
           <div className="form-group" style={{ marginTop: '14px' }}>
@@ -98,10 +101,10 @@ export const CreateRoomModal: React.FC = () => {
         </div>
 
         <div className="modal-footer">
-          <button className="btn btn-secondary" id="btn-cancel-create-dialog" onClick={closeModal}>
+          <button type="button" className="btn btn-secondary" id="btn-cancel-create-dialog" onClick={closeModal}>
             Cancelar
           </button>
-          <button className="btn btn-primary" id="btn-confirm-create-dialog" onClick={handleConfirm}>
+          <button className="btn btn-primary" id="btn-confirm-create-dialog" type="submit" disabled={pending || isClosing}>
             <span>Criar Sala e Entrar</span>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="5" x2="19" y1="12" y2="12"/>
@@ -109,7 +112,7 @@ export const CreateRoomModal: React.FC = () => {
             </svg>
           </button>
         </div>
-      </div>
+      </form>
     </div>
   );
 };

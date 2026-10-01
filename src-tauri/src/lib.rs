@@ -23,6 +23,7 @@ use screen_sources::{
 };
 
 use tauri::{Emitter, Manager};
+use chat_files::{import_chat_files, paste_chat_files, discard_chat_file};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -86,6 +87,9 @@ pub fn run() {
             open_note_file,
             save_note_file,
             pick_chat_file,
+            import_chat_files,
+            paste_chat_files,
+            discard_chat_file,
             inspect_chat_file,
             read_chat_file_chunk,
             choose_chat_download,
