@@ -47,7 +47,7 @@ const render = async (mode = 'spotlight', featured = screen.peerId) => {
     root.render(React.createElement(ContextMenuProvider, null, React.createElement(RoomVideoContainer)));
   });
 };
-test('transmission split menu lists only local sources and stops the chosen stream', async () => {
+test('transmission menu edits sources, stops only the chosen source, and starts another capture', async () => {
   const stopped = [];
   const original = roomService.stopTransmission;
   roomService.stopTransmission = (id) => stopped.push(id);
@@ -57,10 +57,20 @@ test('transmission split menu lists only local sources and stops the chosen stre
       root.render(React.createElement(ContextMenuProvider, null, React.createElement(StreamHeaderBar)));
     });
     assert.equal(document.querySelector('#label-share-screen').textContent, 'Transmissão');
-    await act(async () => document.querySelector('.transmission-stop-menu').click());
+    assert.equal(document.querySelector('.transmission-stop-menu'), null);
+    await act(async () => document.querySelector('#btn-toggle-share-screen').click());
     const actions = [...document.querySelectorAll('[role="menuitem"]')];
-    assert.equal(actions.length, 2);
-    await act(async () => actions.find((action) => action.textContent.includes('camera')).click());
+    assert.equal(actions.length, 5);
+    assert.equal(document.querySelectorAll('.context-menu-row').length, 2);
+    await act(async () => document.querySelector('[aria-label="Parar camera"]').click());
+    assert.deepEqual(stopped, ['camera']);
+    assert.equal(stateStore.editingStreamId, null);
+    await act(async () => document.querySelector('#btn-toggle-share-screen').click());
+    await act(async () => [...document.querySelectorAll('.context-menu-row > button:first-child')].find((button) => button.textContent === 'camera').click());
+    assert.equal(stateStore.editingStreamId, 'camera');
+    await act(async () => document.querySelector('#btn-toggle-share-screen').click());
+    await act(async () => [...document.querySelectorAll('[role="menuitem"]')].find((button) => button.textContent === 'Iniciar nova transmissão').click());
+    assert.equal(stateStore.editingStreamId, null);
     assert.deepEqual(stopped, ['camera']);
   } finally { roomService.stopTransmission = original; }
 });

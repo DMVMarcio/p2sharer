@@ -5,6 +5,7 @@ import { useDropdownPresence } from '../../hooks/useDropdownPresence';
 import { showToast } from '../../hooks/useToast';
 import { captureTextEditing, TEXT_EDITOR_SELECTOR } from '../../core/text_editing';
 import { getTextEditingActions } from './text_editing_actions';
+import { Tooltip } from './Tooltip';
 
 export interface ContextMenuAction {
   id: string;
@@ -14,6 +15,7 @@ export interface ContextMenuAction {
   danger?: boolean;
   separator?: boolean;
   onSelect: () => void | Promise<unknown>;
+  secondary?: Pick<ContextMenuAction, 'label' | 'icon' | 'disabled' | 'danger' | 'onSelect'>;
 }
 
 interface MenuState {
@@ -134,6 +136,11 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
   }, [menu, close]);
 
   const retained = presence.value;
+  const select = (action: Pick<ContextMenuAction, 'onSelect'>) => {
+    close(true);
+    try { Promise.resolve(action.onSelect()).catch(() => showToast('Não foi possível concluir esta ação.')); }
+    catch { showToast('Não foi possível concluir esta ação.'); }
+  };
   return <MenuContext.Provider value={open}>
     {children}
     {retained && createPortal(<div ref={menuRef} role="menu" aria-label="Ações de contexto"
@@ -142,13 +149,17 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
       style={{ left: position.x, top: position.y }}
       onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); }}
       onClick={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()}>
-      {retained.actions.map((action) => <button key={action.id} type="button" role="menuitem"
+      {retained.actions.map((action) => {
+        const primary = <button key={action.id} type="button" role="menuitem"
         disabled={action.disabled} className={`${action.danger ? 'context-menu-danger' : ''} ${action.separator ? 'context-menu-separated' : ''}`}
-        onClick={() => {
-          close(true);
-          try { Promise.resolve(action.onSelect()).catch(() => showToast('Não foi possível concluir esta ação.')); }
-          catch { showToast('Não foi possível concluir esta ação.'); }
-        }}>{action.icon && <span className="context-menu-icon">{action.icon}</span>}<span>{action.label}</span></button>)}
+        onClick={() => select(action)}>{action.icon && <span className="context-menu-icon">{action.icon}</span>}<span>{action.label}</span></button>;
+        const secondary = action.secondary;
+        return secondary ? <div key={action.id} className="context-menu-row" role="none">{primary}
+          <Tooltip content={secondary.label}><button type="button" role="menuitem" aria-label={secondary.label}
+            disabled={secondary.disabled} className={`context-menu-secondary ${secondary.danger ? 'context-menu-danger' : ''}`}
+            onClick={() => select(secondary)}>{secondary.icon || secondary.label}</button></Tooltip>
+        </div> : primary;
+      })}
     </div>, document.fullscreenElement ?? document.body)}
   </MenuContext.Provider>;
 }

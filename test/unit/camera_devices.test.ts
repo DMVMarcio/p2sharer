@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { listCameras, cameraResolutions, cameraFrameRates, configureCamera } from '../../src/video/camera_devices.ts';
+import { listCameras, cameraResolutions, cameraFrameRates, configureCamera, preferredCameraFrameRate } from '../../src/video/camera_devices.ts';
+import { formatFrameRate } from '../../src/core/media_streams.ts';
 
 test('camera enumeration unlocks identities with one temporary device and always releases it', async () => {
   let enumerations = 0, opened = 0, stopped = 0;
@@ -42,6 +43,22 @@ test('cancelled probing does not configure another camera mode', async () => {
   const track = { getCapabilities: () => ({}), getSettings: () => ({}), applyConstraints: async () => { applied++; } } as unknown as MediaStreamTrack;
   assert.deepEqual(await cameraResolutions(track, () => true), []);
   assert.equal(applied, 0);
+});
+
+test('camera floating-point noise is hidden without rounding the selected constraints', async () => {
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { mediaDevices: { getSupportedConstraints: () => ({}) } } });
+  const maximum = 30.000030517;
+  let actual = maximum;
+  const track = { getCapabilities: () => ({ frameRate: { min: 15, max: maximum } }),
+    getSettings: () => ({ width: 640, height: 480, frameRate: actual }),
+    applyConstraints: async (constraints: MediaTrackConstraints) => { actual = (constraints.frameRate as ConstrainDoubleRange).exact!; },
+  } as unknown as MediaStreamTrack;
+  const rates = await cameraFrameRates(track, { value: '', label: '', width: 640, height: 480 }, () => false);
+  assert.equal(rates[0], maximum);
+  assert.equal(preferredCameraFrameRate(rates, 30), maximum);
+  assert.deepEqual(rates.map(formatFrameRate), ['30', '24', '15']);
+  assert.equal(formatFrameRate(29.96999), '29,97');
+  assert.equal((await configureCamera(track, { value: '', label: '', width: 640, height: 480 }, rates[0])).frameRate, maximum);
 });
 
 test('high-speed camera choices stay within the stream protocol limit', async () => {

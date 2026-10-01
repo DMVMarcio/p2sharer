@@ -1,5 +1,11 @@
 export type MediaKind = 'screen' | 'camera';
 export const MAX_MEDIA_FPS = 120;
+const frameRateFormatter = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2, useGrouping: false });
+
+/** Hide device floating-point noise without changing capture constraints. */
+export function formatFrameRate(fps: number): string {
+  return Number.isFinite(fps) ? frameRateFormatter.format(fps) : '0';
+}
 
 export interface StreamDescriptor {
   id: string;

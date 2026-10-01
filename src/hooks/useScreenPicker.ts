@@ -4,7 +4,7 @@ import { stateStore } from '../core/state_store';
 import { MonitorSource, ScreenSourcesResponse, WindowSource } from '../core/types';
 import { useStore } from './useStore';
 import { roomService } from '../services/room_service';
-import { listCameras, type CameraResolution } from '../video/camera_devices';
+import { listCameras, preferredCameraFrameRate, type CameraResolution } from '../video/camera_devices';
 import { useCapturePreview } from './useCapturePreview';
 
 export function useScreenPicker(onClose?: () => void, isClosing = false) {
@@ -53,7 +53,7 @@ export function useScreenPicker(onClose?: () => void, isClosing = false) {
   }, []);
   const receiveRates = useCallback((rates: number[]) => {
     setCameraRates(rates);
-    setFps((current) => rates.includes(current) ? current : rates.find((rate) => rate <= current) || rates[rates.length - 1] || current);
+    setFps((current) => preferredCameraFrameRate(rates, current));
   }, []);
   const selectedMode = cameraModes.find((mode) => mode.value === resolution);
   const resConfig = selectedSourceId.startsWith('camera:') && selectedMode ? selectedMode : stateStore.parseResolution(resolution);

@@ -1,4 +1,4 @@
-import { MAX_MEDIA_FPS } from '../core/media_streams.ts';
+import { MAX_MEDIA_FPS, formatFrameRate } from '../core/media_streams.ts';
 
 export interface CameraResolution { value: string; label: string; width: number; height: number }
 
@@ -18,6 +18,12 @@ export async function listCameras(): Promise<MediaDeviceInfo[]> {
 export const cameraResolution = (width: number, height: number): CameraResolution => ({
   value: `${width}x${height}`, label: `${width} × ${height}`, width, height,
 });
+
+/** Match nominal preferences to the verified device rate behind their displayed label. */
+export function preferredCameraFrameRate(rates: number[], preferred: number): number {
+  return rates.find((rate) => formatFrameRate(rate) === formatFrameRate(preferred)) ||
+    rates.find((rate) => rate <= preferred) || rates[rates.length - 1] || preferred;
+}
 
 function within(value: number, range?: { min?: number; max?: number }) {
   return !range || (value >= (range.min ?? 0) && value <= (range.max ?? Infinity));
@@ -60,7 +66,8 @@ export async function cameraFrameRates(track: MediaStreamTrack, mode: CameraReso
     try {
       await track.applyConstraints(constraints(mode.width, mode.height, fps));
       const actual = track.getSettings();
-      if (actual.width === mode.width && actual.height === mode.height && Math.abs((actual.frameRate || 0) - fps) < 0.1) result.push(fps);
+      if (actual.width === mode.width && actual.height === mode.height && Math.abs((actual.frameRate || 0) - fps) < 0.1 &&
+        !result.some((rate) => formatFrameRate(rate) === formatFrameRate(fps))) result.push(fps);
     } catch { /* Probe the selected resolution, not a different camera mode. */ }
   }
   return result;
