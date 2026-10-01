@@ -1,3 +1,4 @@
+import { streamOwner } from "../core/media_streams.ts";
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { stateStore } from '../core/state_store.ts';
@@ -38,7 +39,7 @@ export class PipService {
       this.unlistenCloseEvent = await listen<string>('pip-window-closed', (event) => {
         const peerId = event.payload;
         if (peerId) {
-          this.handlePipWindowClosed(peerId);
+          this.handlePipWindowClosed([...this.sessions.keys()].find((key) => key.replace(/[^a-zA-Z0-9_-]/g, "_") === peerId) || peerId);
         }
       });
     } catch {
@@ -72,13 +73,13 @@ export class PipService {
       const slot = stateStore.roomSlots.find((s) => s.peerId === peerId);
       activeStream = slot?.stream || null;
     }
-    if (!activeStream && peerId === 'local') {
+    if (!activeStream && streamOwner(peerId) === 'local') {
       activeStream =
         (roomService.roomManager as unknown as { localStream?: MediaStream | null })?.localStream ||
         (roomService as unknown as { nativeVideoBridge?: { activeStream?: MediaStream | null } })?.nativeVideoBridge?.activeStream ||
         null;
     }
-    if (peerId !== 'local' && activeStream?.getAudioTracks().length) {
+    if (streamOwner(peerId) !== 'local' && activeStream?.getAudioTracks().length) {
       audioContextManager.attachPeerAudio(peerId, activeStream);
     }
 
@@ -174,8 +175,9 @@ export class PipService {
           type: 'offer',
           sdp: pc.localDescription?.sdp || offer.sdp,
           senderName,
-          isLocal: peerId === 'local',
-          audioSettings: peerId === 'local' ? { volume: 0, muted: true }
+          isLocal: streamOwner(peerId) === 'local',
+          pointerEligible: stateStore.roomSlots.find((slot) => slot.peerId === peerId)?.pointerEligible !== false,
+          audioSettings: streamOwner(peerId) === 'local' ? { volume: 0, muted: true }
             : { volume: audioState.volume, muted: audioState.isMuted },
         });
       } catch (err) {
@@ -244,7 +246,7 @@ export class PipService {
           break;
         }
         case 'audio-settings': {
-          if (peerId !== 'local' && validPipAudioSettings(data)) {
+          if (streamOwner(peerId) !== 'local' && validPipAudioSettings(data)) {
             audioContextManager.setPeerVolume(peerId, data.volume, data.muted);
           }
           break;
@@ -281,7 +283,7 @@ export class PipService {
           type: 'stats',
           stats: {
             pingMs: ping ?? null,
-            fps: stats?.fps ?? (peerId === 'local' ? stateStore.currentFps : 60),
+            fps: stats?.fps ?? (streamOwner(peerId) === 'local' ? stateStore.currentFps : 60),
             bitrateKbps: stats?.bitrateKbps ?? 0,
             height: stats?.height ? `${stats.height}p` : '1080p',
             watchers: (slot?.watchers ?? []) as StreamWatcher[],
@@ -308,7 +310,7 @@ export class PipService {
       });
     } catch (err) {
       console.warn('[PipService] Failed to invoke open_pip_window:', err);
-      if (isTauri()) this.handlePipWindowClosed(peerId);
+      if (isTauri()) this.handlePipWindowClosed([...this.sessions.keys()].find((key) => key.replace(/[^a-zA-Z0-9_-]/g, "_") === peerId) || peerId);
     }
   }
 
@@ -316,11 +318,17 @@ export class PipService {
     const session = this.sessions.get(peerId);
     if (!session) return;
 
-    if (session.stream === stream) return;
+    const newVideoTrack = stream?.getVideoTracks()[0];
+    const videoSender = session.pc.getSenders().find((sender) => sender.track?.kind === 'video');
+    if (session.stream === stream && videoSender?.track === newVideoTrack) return;
     session.stream = stream;
     try {
-      if (peerId !== 'local' && stream?.getAudioTracks().length) {
+      if (streamOwner(peerId) !== 'local' && stream?.getAudioTracks().length) {
         audioContextManager.attachPeerAudio(peerId, stream);
+      }
+      if (videoSender && newVideoTrack) {
+        void videoSender.replaceTrack(newVideoTrack).catch((error) => console.warn('[PiP] Live video replacement failed:', error));
+        return;
       }
       const currentSenders = session.pc.getSenders();
       currentSenders.forEach((sender) => {

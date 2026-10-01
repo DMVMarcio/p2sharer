@@ -49,6 +49,11 @@ export interface StreamWatcher {
 }
 
 export interface RoomSlotInfo {
+  ownerPeerId?: string;
+  mediaId?: string;
+  mediaKind?: import("./media_streams").MediaKind;
+  mediaLabel?: string;
+  pointerEligible?: boolean;
   peerId: string;
   senderName: string;
   stream: MediaStream | null;
@@ -179,6 +184,8 @@ export interface TransportStatusInfo {
 }
 
 export interface StreamStatusPayload {
+  revision?: number;
+  streams?: import("./media_streams").StreamDescriptor[];
   isStreaming: boolean;
   senderName?: string;
   streamId?: string;

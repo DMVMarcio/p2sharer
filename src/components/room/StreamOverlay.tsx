@@ -1,0 +1,106 @@
+import React, { useEffect, useRef, useState } from 'react';
+import { clampOverlay, snapOverlay, type OverlayPosition } from '../../core/media_streams';
+import type { RoomSlotInfo } from '../../core/types';
+import { roomService } from '../../services/room_service';
+import { stateStore } from '../../core/state_store';
+import { TooltipButton } from '../common/TooltipButton';
+import { useContextMenu } from '../common/ContextMenu';
+import { X } from 'lucide-react';
+import './stream_overlays.css';
+
+interface Props { slot: RoomSlotInfo; target: string; index: number }
+let overlayOrder = 100;
+
+export function StreamOverlay({ slot, target, index }: Props) {
+  const frameRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const openContextMenu = useContextMenu();
+  const positionKey = `${target}:${slot.peerId}`;
+  const [position, setPosition] = useState<OverlayPosition>(() => stateStore.overlayPositions[positionKey] ||
+    { x: 0.72, y: Math.max(0, 0.72 - index * 0.24), width: 0.26 });
+  const [moving, setMoving] = useState(false);
+  const gesture = useRef<{ x: number; y: number; position: OverlayPosition; resizing: boolean } | null>(null);
+  const [aspect, setAspect] = useState(16 / 9);
+  const [order, setOrder] = useState(20 + index);
+  useEffect(() => { stateStore.overlayPositions[positionKey] = position; }, [positionKey, position]);
+
+  useEffect(() => {
+    const parent = frameRef.current?.parentElement;
+    if (!parent) return;
+    const observer = new ResizeObserver(() => {
+      const bounds = parent.getBoundingClientRect();
+      if (bounds.width && bounds.height) setPosition((current) => clampOverlay(current, aspect, bounds.width / bounds.height));
+    });
+    observer.observe(parent);
+    return () => observer.disconnect();
+  }, [aspect]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !slot.stream) return;
+    video.srcObject = slot.stream;
+    void video.play().catch(() => {});
+    return () => { video.srcObject = null; };
+  }, [slot.stream]);
+
+  const geometry = () => {
+    const bounds = frameRef.current?.parentElement?.getBoundingClientRect();
+    return bounds && bounds.width > 0 && bounds.height > 0 ? bounds : null;
+  };
+  const start = (event: React.PointerEvent, resizing = false) => {
+    if (event.button !== 0 || (event.target as HTMLElement).closest('button')) return;
+    event.preventDefault();
+    event.stopPropagation();
+    frameRef.current?.setPointerCapture(event.pointerId);
+    gesture.current = { x: event.clientX, y: event.clientY, position, resizing };
+    setOrder(++overlayOrder);
+    setMoving(true);
+  };
+  const move = (event: React.PointerEvent) => {
+    const current = gesture.current;
+    const bounds = geometry();
+    if (!current || !bounds) return;
+    event.stopPropagation();
+    const dx = (event.clientX - current.x) / bounds.width;
+    const dy = (event.clientY - current.y) / bounds.height;
+    const next = current.resizing ? { ...current.position, width: Math.max(0.14, Math.min(0.6, current.position.width + dx)) } :
+      { ...current.position, x: current.position.x + dx, y: current.position.y + dy };
+    setPosition(clampOverlay(next, aspect, bounds.width / bounds.height));
+  };
+  const finish = (event: React.PointerEvent) => {
+    if (!gesture.current) return;
+    event.stopPropagation();
+    gesture.current = null;
+    setMoving(false);
+    const bounds = geometry();
+    if (bounds) setPosition((current) => snapOverlay(current, aspect, bounds.width / bounds.height));
+  };
+  const remove = () => roomService.removeOverlay(target, slot.peerId);
+
+  return <div ref={frameRef} className={`stream-overlay ${moving ? 'is-moving' : ''}`} style={{
+    left: `${position.x * 100}%`, top: `${position.y * 100}%`, width: `${position.width * 100}%`, aspectRatio: aspect,
+    zIndex: order,
+  }} onPointerDown={start} onPointerMove={move} onPointerUp={finish} onPointerCancel={finish}
+    onLostPointerCapture={finish} onClick={(event) => event.stopPropagation()} onDoubleClick={(event) => event.stopPropagation()}
+    onContextMenu={(event) => openContextMenu(event, [{ id: 'remove-overlay', label: 'Remover sobreposição', onSelect: remove }])}
+    tabIndex={0} aria-label={`Sobreposição de ${slot.senderName}. Use as setas para mover e + ou - para redimensionar.`}
+    onKeyDown={(event) => {
+      if (event.key === 'Delete' || event.key === 'Escape') { event.stopPropagation(); remove(); return; }
+      if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', '+', '-', '='].includes(event.key)) return;
+      event.preventDefault(); event.stopPropagation();
+      const bounds = geometry();
+      if (!bounds) return;
+      setPosition((current) => clampOverlay({ x: current.x + (event.key === 'ArrowLeft' ? -0.04 : event.key === 'ArrowRight' ? 0.04 : 0),
+        y: current.y + (event.key === 'ArrowUp' ? -0.04 : event.key === 'ArrowDown' ? 0.04 : 0),
+        width: current.width + (event.key === '-' ? -0.02 : ['+', '='].includes(event.key) ? 0.02 : 0) }, aspect, bounds.width / bounds.height));
+    }}>
+    {slot.stream ? <video ref={videoRef} autoPlay playsInline muted onLoadedMetadata={() => {
+      const video = videoRef.current;
+      if (video?.videoWidth && video.videoHeight) setAspect(video.videoWidth / video.videoHeight);
+    }} /> : <div className="stream-overlay-loading">Conectando vídeo…</div>}
+    <div className="stream-overlay-toolbar"><span>{slot.senderName} · {slot.mediaLabel || 'Vídeo'}</span>
+      <TooltipButton tooltip="Remover sobreposição" className="btn btn-sm btn-outline" aria-label="Remover sobreposição" onClick={remove}><X size={14} /></TooltipButton>
+    </div>
+    <div className="stream-overlay-resize" onPointerDown={(event) => start(event, true)} aria-hidden="true" />
+  </div>;
+}

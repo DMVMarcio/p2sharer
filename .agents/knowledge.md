@@ -33,6 +33,7 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 - [P2P Networking, Signaling Failover & WebRTC Mesh](.agents/knowledge/p2p-architecture.md)
 - [Native Media Pipeline: Audio Loopback, Video Capture & Web Bridges](.agents/knowledge/native-media-pipeline.md)
 - [Frontend Architecture, Keyed DOM Reconciliation & State Management](.agents/knowledge/frontend-ui-state.md)
+- [Multiple Screen/Camera Sessions and Viewer Compositions](.agents/knowledge/multiple-media-streams.md)
 - [P2P Message Authorization and Threat Model](.agents/knowledge/peer-security.md)
 - [Room Apps: Modular Instances and Synchronized State](.agents/knowledge/room-apps.md)
 - [Consent-Based Chat File Transfer](.agents/knowledge/chat-file-transfer.md)
@@ -40,6 +41,9 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 ---
 
 ## 4. User Guidelines & Expressed Preferences
+
+- `[Multiple Media Streams]` Each participant can broadcast multiple independent native screen/window sessions and multiple cameras. Preserve stream identities, ownership, subscriptions, and peer connections while editing FPS, resolution/quality, bitrate, or the selected monitor/application. A camera occupies the participant's primary media card when there is no screen; with screen sharing it appears as a separate owned media card, without creating a fake room participant.
+- `[Viewer Compositions]` Treat screen and camera streams uniformly for spotlight overlays. Allow multiple draggable/resizable overlays, magnetic snapping to corners and side centers, and the tray context action "Sobrepor na transmissão atual". Automatically overlay the screen owner's cameras when watching their spotlight screen, allow dismissal and arbitrary owners/types, and never render overlays in grid mode. Composition choices are local to each viewer.
 
 - `[Git]` Commit completed task changes automatically after required validation and before the final response, using English Conventional Commits. Report the commit hash and any remaining pending changes. The user explicitly authorized committing all currently pending workspace changes on 2026-10-01. Future tasks should preserve unrelated pre-existing edits unless their inclusion is authorized; pushing requires separate authorization.
 

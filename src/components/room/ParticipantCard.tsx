@@ -1,3 +1,5 @@
+import { roomService } from '../../services/room_service';
+import { stateStore } from '../../core/state_store';
 import React from 'react';
 import { RoomSlotInfo } from '../../core/types';
 import { useRoom } from '../../hooks/useRoom';
@@ -48,11 +50,12 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
       tabIndex={0}
       onContextMenu={(event) => {
         const actions: ContextMenuAction[] = [];
+        if (layoutMode === 'spotlight' && inTray && !isSelectedFeatured && slot.isStreaming) actions.push({ id: 'overlay', label: 'Sobrepor na transmissão atual', onSelect: () => roomService.overlayStream(slot.peerId) });
         if (!isFeatured && !isSelectedFeatured) actions.push({ id: 'feature', label: 'Destacar participante', icon: <Focus size={15} />, onSelect: () => togglePin(slot.peerId) });
         if (layoutMode === 'spotlight') actions.push({ id: 'grid', label: 'Voltar à grade', icon: <Grid2X2 size={15} />,
           onSelect: returnToGrid });
         if (!slot.isLocal && slot.isStreaming && !isSubscribed) actions.push({ id: 'watch', label: 'Assistir transmissão', icon: <Play size={15} />, onSelect: () => requestStream(slot.peerId) });
-        if (slot.isLocal && !slot.isStreaming) actions.push({ id: 'share', label: 'Transmitir', icon: <MonitorUp size={15} />, onSelect: () => openModal('screenPicker') });
+        if (slot.isLocal && !slot.isStreaming) actions.push({ id: 'share', label: 'Transmitir', icon: <MonitorUp size={15} />, onSelect: () => { stateStore.set((state) => { state.editingStreamId = null; }); openModal('screenPicker'); } });
         openContextMenu(event, actions);
       }}
     >
@@ -97,7 +100,7 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
       </div>
 
       <div className="participant-name-row">
-        <span className="participant-avatar-label">{slot.senderName}</span>
+        <span className="participant-avatar-label">{slot.senderName}{slot.mediaLabel ? ` · ${slot.mediaLabel}` : ""}</span>
         {slot.isLocal && <span className="badge-you">VOCÊ</span>}
       </div>
 

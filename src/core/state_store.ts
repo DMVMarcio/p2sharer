@@ -19,6 +19,10 @@ export class StateStore {
   public subscribedStreams: Set<string> = new Set();
   public activePipPeers: Set<string> = new Set();
   public roomSlots: RoomSlotInfo[] = [];
+  public editingStreamId: string | null = null;
+  public streamOverlays: Record<string, string[]> = {};
+  public dismissedAutoOverlays: Record<string, string[]> = {};
+  public overlayPositions: Record<string, import('./media_streams').OverlayPosition> = {};
   public streamFilter: StreamFilterMode = 'all';
 
   public currentThemeMode: ThemeMode = 'dark';

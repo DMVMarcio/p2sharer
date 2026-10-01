@@ -7,6 +7,10 @@ import { getSkeletonCountForTab } from './screen_picker_utils';
 export const ScreenPickerModal: React.FC = () => {
   const { closeModal, isClosing } = useModal();
   const {
+    cameras,
+    editingId,
+    editingKind,
+    error,
     monitors,
     windows,
     currentTab,
@@ -33,8 +37,8 @@ export const ScreenPickerModal: React.FC = () => {
   const [isFadingOut, setIsFadingOut] = useState(false);
 
   useEffect(() => {
-    loadSources();
-  }, [loadSources]);
+    if (!isClosing) void loadSources();
+  }, [loadSources, isClosing]);
 
   useEffect(() => {
     if (!isLoading && displaySkeleton) {
@@ -50,7 +54,7 @@ export const ScreenPickerModal: React.FC = () => {
     }
   }, [isLoading, displaySkeleton]);
 
-  const skeletonCount = getSkeletonCountForTab(currentTab, monitors.length);
+  const skeletonCount = getSkeletonCountForTab(currentTab === 'cameras' ? 'screens' : currentTab, monitors.length);
 
   return (
     <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} id="modal-screen-picker">
@@ -64,8 +68,8 @@ export const ScreenPickerModal: React.FC = () => {
             </svg>
           </div>
           <div>
-            <h2>Compartilhar Tela</h2>
-            <p className="modal-subtitle">Escolha uma tela inteira ou janela para transmitir.</p>
+            <h2>{editingId ? 'Editar transmissão' : 'Iniciar transmissão'}</h2>
+            <p className="modal-subtitle">Escolha uma tela, janela ou câmera.</p>
           </div>
           <button className="btn-close" id="btn-close-screen-picker" onClick={closeModal}>
             &times;
@@ -74,10 +78,12 @@ export const ScreenPickerModal: React.FC = () => {
 
         <div className="modal-body">
 
+          {error && <p role="alert">{error}</p>}
           <div className="picker-tabs">
             <button
               className={`picker-tab-btn ${currentTab === 'screens' ? 'active' : ''}`}
               id="picker-tab-screens"
+              disabled={editingKind === 'camera'}
               onClick={() => setCurrentTab('screens')}
             >
               Telas Inteiras
@@ -85,10 +91,14 @@ export const ScreenPickerModal: React.FC = () => {
             <button
               className={`picker-tab-btn ${currentTab === 'windows' ? 'active' : ''}`}
               id="picker-tab-windows"
+              disabled={editingKind === 'camera'}
               onClick={() => setCurrentTab('windows')}
             >
               Janelas de Apps
             </button>
+            <button className={`picker-tab-btn ${currentTab === 'cameras' ? 'active' : ''}`}
+              disabled={editingKind === 'screen'}
+              onClick={() => setCurrentTab('cameras')}>Câmeras</button>
           </div>
 
           <div className="picker-sources-container-wrapper" id="picker-sources-container">
@@ -132,6 +142,13 @@ export const ScreenPickerModal: React.FC = () => {
 
             {!isLoading && (
               <div className="source-cards-grid source-cards-content-layer">
+                {currentTab === 'cameras' && cameras.length === 0 && <div className="source-cards-empty-state">Nenhuma câmera detectada.</div>}
+                {currentTab === 'cameras' && cameras.map((camera, index) => <button type="button" key={camera.deviceId || index}
+                  className={`source-card ${selectedSourceId === `camera:${camera.deviceId}` ? 'selected' : ''}`}
+                  onClick={() => setSelectedSourceId(`camera:${camera.deviceId}`)}>
+                  <div className="source-card-thumb"><div className="source-card-thumb-placeholder">Câmera</div></div>
+                  <div className="source-card-info"><div className="source-card-title">{camera.label || `Câmera ${index + 1}`}</div></div>
+                </button>)}
                 {currentTab === 'screens' && monitors.length === 0 && (
                   <div className="source-cards-empty-state">
                     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -256,7 +273,7 @@ export const ScreenPickerModal: React.FC = () => {
               />
             </div>
 
-            <div className="picker-setting-item">
+            {currentTab !== 'cameras' && <div className="picker-setting-item">
               <label htmlFor="modal-select-quality">Qualidade:</label>
               <Select
                 id="modal-select-quality"
@@ -270,9 +287,9 @@ export const ScreenPickerModal: React.FC = () => {
                   { value: '75', label: '75% (Equilibrada)' },
                 ]}
               />
-            </div>
+            </div>}
 
-            <label className="picker-checkbox-label">
+            {currentTab !== 'cameras' && <label className="picker-checkbox-label">
               <input autoComplete="off"
                 type="checkbox"
                 id="modal-check-cursor"
@@ -280,7 +297,7 @@ export const ScreenPickerModal: React.FC = () => {
                 onChange={(e) => setShowCursor(e.target.checked)}
               />
               <span>Exibir Cursor</span>
-            </label>
+            </label>}
           </div>
         </div>
 
@@ -289,7 +306,7 @@ export const ScreenPickerModal: React.FC = () => {
             Cancelar
           </button>
           {(() => {
-            const hasAvailableSources = currentTab === 'screens' ? monitors.length > 0 : windows.length > 0;
+            const hasAvailableSources = currentTab === 'cameras' ? cameras.length > 0 : currentTab === 'screens' ? monitors.length > 0 : windows.length > 0;
             const isConfirmDisabled = isLoading || isStarting || !selectedSourceId || !hasAvailableSources;
             return (
               <button
@@ -299,7 +316,7 @@ export const ScreenPickerModal: React.FC = () => {
                 disabled={isConfirmDisabled}
                 onClick={confirmPicker}
               >
-                <span>{isStarting ? 'Iniciando...' : 'Iniciar Transmissão'}</span>
+                <span>{isStarting ? 'Aplicando...' : editingId ? 'Aplicar alterações' : 'Iniciar Transmissão'}</span>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <polygon points="5 3 19 12 5 21 5 3"/>
                 </svg>

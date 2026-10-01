@@ -2,6 +2,8 @@ import { invoke } from '@tauri-apps/api/core';
 import type { ScreenSourcesResponse, VideoCaptureBridge, VideoSourceOptions } from '../core/types.ts';
 
 export class NativeVideoBridge implements VideoCaptureBridge {
+  public readonly sessionId: string;
+  constructor(sessionId = 'default') { this.sessionId = sessionId; }
   private activeStream: MediaStream | null = null;
   private canvas: HTMLCanvasElement | null = null;
   private ctx: CanvasRenderingContext2D | null = null;
@@ -177,7 +179,8 @@ export class NativeVideoBridge implements VideoCaptureBridge {
 
     // 2. Start native Rust capture thread
     try {
-      await invoke('start_native_screen_capture', {
+      await invoke('start_capture_session', {
+        sessionId: this.sessionId,
         sourceId,
         targetFps: fps,
         targetWidth: resolution.width,
@@ -313,7 +316,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
         this.ws.binaryType = 'arraybuffer';
 
         this.ws.onopen = () => {
-          try { this.ws?.send(accessToken); } catch { fail(); }
+          try { this.ws?.send(`${accessToken}:${this.sessionId}`); } catch { fail(); }
         };
 
         this.ws.onmessage = (evt: MessageEvent) => {
@@ -372,6 +375,23 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     }
 
     this.activeStream = stream;
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const started = performance.now();
+        const check = () => {
+          if (this.latestBitmap) { resolve(); return; }
+          if (!this.isCapturing || performance.now() - started > 6000) {
+            reject(new Error('A fonte selecionada não forneceu quadros de vídeo.'));
+            return;
+          }
+          setTimeout(check, 50);
+        };
+        check();
+      });
+    } catch (error) {
+      await this.stopCapture();
+      throw error;
+    }
     return stream;
   }
 
@@ -425,7 +445,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     this.pendingBuffer = null;
     this.isDecoding = false;
 
-    await invoke('stop_native_screen_capture').catch(() => {});
+    await invoke('stop_capture_session', { sessionId: this.sessionId }).catch(() => {});
 
     if (this.animationFrameId !== null) {
       cancelAnimationFrame(this.animationFrameId);
