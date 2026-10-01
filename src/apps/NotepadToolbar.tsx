@@ -6,9 +6,9 @@ import { AlignCenter, AlignLeft, AlignRight, Bold, Code, Highlighter, Italic, Li
   TableRowsSplit, Trash2, Underline as UnderlineIcon, Undo2 } from 'lucide-react';
 import { TooltipButton } from '../components/common/TooltipButton';
 
-interface Props { editor: Editor; onLink(): void }
+interface Props { editor: Editor; onLink(): void; fileActions?: React.ReactNode }
 
-export const NotepadToolbar: React.FC<Props> = ({ editor, onLink }) => {
+export const NotepadToolbar: React.FC<Props> = ({ editor, onLink, fileActions }) => {
   const active = useEditorState({ editor, selector: ({ editor: current }) => ({
     bold: current.isActive('bold'), italic: current.isActive('italic'), underline: current.isActive('underline'),
     strike: current.isActive('strike'), highlight: current.isActive('highlight'),
@@ -58,5 +58,6 @@ export const NotepadToolbar: React.FC<Props> = ({ editor, onLink }) => {
     <span className="room-app-notepad-tools-divider" />
     {tool('Desfazer', <Undo2 size={15} />, false, () => editor.chain().focus().undo().run())}
     {tool('Refazer', <Redo2 size={15} />, false, () => editor.chain().focus().redo().run())}
+    {fileActions && <div className="room-app-toolbar-actions room-app-notepad-file-actions">{fileActions}</div>}
   </div>;
 };

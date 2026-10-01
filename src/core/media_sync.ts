@@ -5,10 +5,10 @@ export const MEDIA_SYNC_SEEK_COOLDOWN_MS = 8_000;
 export const MEDIA_SYNC_MAX_SAMPLE_AGE_MS = 30_000;
 
 export function projectMediaPosition(position: number, playing: boolean,
-  receivedAt: number, now: number): number {
+  receivedAt: number, now: number, maxPosition = 86_400): number {
   const elapsed = Number.isFinite(receivedAt) && Number.isFinite(now)
     ? Math.max(0, now - receivedAt) / 1000 : 0;
-  return Math.max(0, Math.min(86_400, position + (playing ? elapsed : 0)));
+  return Math.max(0, Math.min(maxPosition, position + (playing ? elapsed : 0)));
 }
 
 export function shouldCorrectMediaPosition(actual: number, expected: number,

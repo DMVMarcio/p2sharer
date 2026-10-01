@@ -8,6 +8,7 @@ export interface RoomAppInstance {
 export interface YouTubeEntry {
   videoId: string;
   title: string;
+  isLive?: boolean;
   addedBy?: string;
   addedByName?: string;
 }
@@ -16,12 +17,13 @@ export interface YouTubeState {
   queue: YouTubeEntry[];
   index: number;
   playing: boolean;
+  ended?: boolean;
   position: number;
   repeat: 'off' | 'all' | 'one';
   shuffle: boolean;
   removePlayed: boolean;
   updatedAt: number;
-  syncReason?: 'heartbeat' | 'playback' | 'seek' | 'update';
+  syncReason?: 'heartbeat' | 'playback' | 'seek' | 'update' | 'queue-replace' | 'auto-advance';
 }
 
 export type AppWireEvent =

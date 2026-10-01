@@ -8,9 +8,10 @@ type Props = {
   anchor: HTMLElement | null;
   pack: EmojiPack;
   onSelect: (emoji: string) => void;
+  closing?: boolean;
 };
 
-export function EmojiPickerPopover({ anchor, pack, onSelect }: Props) {
+export function EmojiPickerPopover({ anchor, pack, onSelect, closing }: Props) {
   const [position, setPosition] = useState<{ top: number; left: number; width: number } | null>(null);
 
   useLayoutEffect(() => {
@@ -37,7 +38,7 @@ export function EmojiPickerPopover({ anchor, pack, onSelect }: Props) {
 
   if (!position) return null;
   return createPortal(
-    <div className="emoji-picker-popover" style={position}><EmojiPicker pack={pack} onSelect={onSelect} /></div>,
+    <div className="emoji-picker-popover" style={position}><EmojiPicker pack={pack} onSelect={onSelect} closing={closing} /></div>,
     document.body,
   );
 }

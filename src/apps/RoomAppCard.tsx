@@ -1,3 +1,4 @@
+import { useDropdownPresence } from '../hooks/useDropdownPresence';
 import React, { Suspense, lazy, useEffect, useState } from 'react';
 import type { RoomAppInstance } from './types';
 import { getRoomApp, type RoomAppViewProps } from './registry';
@@ -29,6 +30,8 @@ interface Props {
 
 export const RoomAppCard: React.FC<Props> = ({ instance, isFeatured = false, compact = false, style }) => {
   const { togglePin, peers, roomSlots, username } = useRoom();
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const optionsPresence = useDropdownPresence(optionsOpen ? true : null);
   const [, setPresenceTick] = useState(0);
   useEffect(() => roomAppsService.subscribe(() => setPresenceTick((tick) => tick + 1)), []);
   const joined = roomAppsService.isJoined(instance.id);
@@ -66,14 +69,14 @@ export const RoomAppCard: React.FC<Props> = ({ instance, isFeatured = false, com
         {isFeatured && <button className="room-app-leave-button" onClick={backToGrid}>
           <ArrowLeft size={14} /> Voltar para grade
         </button>}
-        <details className="room-app-options">
+        <details className="room-app-options" open={Boolean(optionsPresence.value)} onKeyDown={(event) => { if (event.key === 'Escape') setOptionsOpen(false); }}>
           <Tooltip content="Opções do App">
-            <summary aria-label={`Opções de ${label}`}><MoreHorizontal size={18} /></summary>
+            <summary aria-label={`Opções de ${label}`} aria-expanded={optionsOpen} onClick={(event) => { event.preventDefault(); setOptionsOpen((open) => !open); }}><MoreHorizontal size={18} /></summary>
           </Tooltip>
-          <div className="room-app-options-menu">
+          {optionsPresence.value && <div className={`room-app-options-menu ${optionsPresence.closing ? 'dropdown-closing' : ''}`} inert={optionsPresence.closing} aria-hidden={optionsPresence.closing}>
             {joined && <button onClick={leave}><ArrowLeft size={15} /> Sair da atividade</button>}
             <button onClick={() => roomAppsService.stop(instance.id)}><SquareX size={15} /> Encerrar para todos</button>
-          </div>
+          </div>}
         </details>
       </div>
     </div>

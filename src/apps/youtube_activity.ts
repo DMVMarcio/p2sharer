@@ -1,9 +1,19 @@
 import type { YouTubeState } from './types';
-import { projectMediaPosition } from '../core/media_sync.ts';
+import { projectYouTubePosition } from './youtube_timeline.ts';
+
+export function describeAutomaticYouTubeActivity(previous: YouTubeState, next: YouTubeState): string | null {
+  if (next.syncReason !== 'auto-advance') return null;
+  const entry = next.queue[next.index];
+  if (!entry || next.ended || !next.playing) return 'Fila de reprodução concluída.';
+  if (previous.repeat === 'one') return `Repetindo automaticamente “${entry.title}”.`;
+  return `Reprodução automática: “${entry.title}”.`;
+}
 
 export function describeYouTubeActivity(previous: YouTubeState, next: YouTubeState,
   previousReceivedAt = Date.now(), now = Date.now()): string | null {
   if (next.syncReason === 'heartbeat') return null;
+  if (next.syncReason === 'auto-advance') return null;
+  if (next.syncReason === 'queue-replace') return `substituiu a fila por ${next.queue.length} vídeos`;
 
   const added = Math.max(0, next.queue.length - previous.queue.length);
   if (added === 1) return `adicionou “${next.queue[next.queue.length - 1].title}” à fila`;
@@ -31,7 +41,7 @@ export function describeYouTubeActivity(previous: YouTubeState, next: YouTubeSta
   if (before && after && before.videoId !== after.videoId)
     return `reproduziu “${after.title}”`;
 
-  const previousPosition = projectMediaPosition(previous.position, previous.playing, previousReceivedAt, now);
+  const previousPosition = projectYouTubePosition(previous.position, previous.playing, previousReceivedAt, now);
   if (before && after && next.syncReason === 'seek' && Math.abs(next.position - previousPosition) >= 1)
     return next.position > previousPosition ? 'avançou o vídeo' : 'voltou no vídeo';
 

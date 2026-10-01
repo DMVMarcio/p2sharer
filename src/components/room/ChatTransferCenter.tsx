@@ -1,3 +1,4 @@
+import { useDropdownPresence } from '../../hooks/useDropdownPresence';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Download, File, FolderSearch, Image as ImageIcon, Square, Upload, X } from 'lucide-react';
 import { useRoom } from '../../hooks/useRoom';
@@ -48,10 +49,11 @@ function transportText(transfer: FileProgress, unit: TransferSpeedUnit): string 
 export function ChatTransferCenter() {
   const { fileProgress, cancelFileTransfer, dismissFileProgress, revealSavedFile } = useRoom();
   const [open, setOpen] = useState<'send' | 'receive' | null>(null);
+  const presence = useDropdownPresence(open);
   const speedUnit = useSyncExternalStore(subscribeTransferSpeedUnit, getTransferSpeedUnit);
   const root = useRef<HTMLDivElement>(null);
   const all = Object.values(fileProgress);
-  const visible = all.filter((item) => item.direction === open)
+  const visible = all.filter((item) => item.direction === presence.value)
     .sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0));
   useEffect(() => {
     if (!open) return;
@@ -73,8 +75,8 @@ export function ChatTransferCenter() {
         {active > 0 && <span className="chat-transfer-count">{active}</span>}
       </button>;
     })}
-    {open && <div className="chat-transfer-menu" role="dialog" aria-label={open === 'send' ? 'Envios de arquivos' : 'Downloads de arquivos'}>
-      <strong className="chat-transfer-title">{open === 'send' ? 'Envios' : 'Downloads'}</strong>
+    {presence.value && <div key={presence.value} className={`chat-transfer-menu ${presence.closing ? 'dropdown-closing' : ''}`} inert={presence.closing} aria-hidden={presence.closing} role="dialog" aria-label={presence.value === 'send' ? 'Envios de arquivos' : 'Downloads de arquivos'}>
+      <strong className="chat-transfer-title">{presence.value === 'send' ? 'Envios' : 'Downloads'}</strong>
       {visible.length === 0 ? <p className="chat-transfer-empty">Nenhum arquivo nesta sala.</p> :
         <div className="chat-transfer-list">{visible.map((transfer) => <div className="chat-transfer-item" key={transfer.requestId}>
           <span className="chat-transfer-file-icon" aria-hidden="true">
@@ -82,7 +84,7 @@ export function ChatTransferCenter() {
           </span>
           <div className="chat-transfer-item-copy">
             <strong>{transfer.fileName ?? 'Arquivo'}{transfer.previewOnly ? ' · Prévia' : ''}</strong>
-            <span>{open === 'send' ? 'Para' : 'De'} {transfer.peerName ?? 'Participante'}</span>
+            <span>{presence.value === 'send' ? 'Para' : 'De'} {transfer.peerName ?? 'Participante'}</span>
             <small>{statusText(transfer, speedUnit)}</small>
             {transfer.connectionType && <small>{transfer.connectionType}
               {transfer.rttMs !== null && transfer.rttMs !== undefined ? ` · ${transfer.rttMs} ms` : ''}</small>}

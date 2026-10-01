@@ -17,6 +17,8 @@
   /* Base Transitions */
   --transition-fast: 0.15s cubic-bezier(0.16, 1, 0.3, 1);
   --transition-normal: 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  --dropdown-enter-duration: 320ms;
+  --dropdown-exit-duration: 260ms;
 
   /* Shadows */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
@@ -487,8 +489,16 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
    VIEW 1: HOME / DASHBOARD
    ========================================================================== */
 
+#view-home {
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+}
+
 .hero-container {
+  width: 100%;
   max-width: 860px;
+  flex-shrink: 0;
   margin: auto;
   padding: 40px 24px;
   display: flex;
@@ -1713,17 +1723,19 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   transform: translateX(-50%) translateY(0);
 }
 
-/* Compact / Single-line Custom Tooltips (Buttons, Header, Actions) */
+/* Compact custom tooltips wrap long labels without discarding content. */
 .custom-tooltip.tooltip-compact {
   min-width: auto;
-  max-width: 280px;
+  max-width: min(280px, calc(100vw - 16px));
   width: max-content;
   padding: 5px 9px;
   font-size: 11px;
   font-weight: 500;
   font-family: var(--font-sans);
   color: var(--text-primary);
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
   text-align: center;
   border-radius: var(--radius-sm);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
@@ -1751,6 +1763,9 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 /* Portal-based Custom Tooltip (immune to card overflow clipping and viewport boundary leaks) */
 .custom-tooltip.custom-tooltip-portal {
   position: fixed !important;
+  min-width: 0;
+  max-width: min(280px, calc(100vw - 16px));
+  overflow-wrap: anywhere;
   left: auto;
   right: auto;
   top: auto;
@@ -1824,9 +1839,9 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 }
 
 .watchers-tooltip-name {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .watchers-tooltip-empty {
@@ -2036,6 +2051,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   display: flex;
   align-items: center;
   gap: 6px;
+  height: 24px;
   max-width: 0;
   opacity: 0;
   overflow: hidden;
@@ -2061,13 +2077,19 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   appearance: none;
   width: 70px;
   min-width: 70px;
-  height: 4px;
+  height: 20px;
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.25);
+  background: transparent;
   outline: none;
   cursor: pointer;
   margin: 0;
   flex-shrink: 0;
+}
+
+.stream-volume-range::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.25);
 }
 
 .stream-volume-range::-webkit-slider-thumb {
@@ -2075,6 +2097,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   appearance: none;
   width: 12px;
   height: 12px;
+  margin-top: -4px;
   border-radius: 50%;
   background: var(--accent-color, #06b6d4);
   cursor: pointer;
@@ -2082,7 +2105,8 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   transition: transform var(--transition-fast);
 }
 
-.stream-volume-range::-webkit-slider-thumb:hover {
+.stream-volume-range::-webkit-slider-thumb:hover,
+.stream-volume-range:active::-webkit-slider-thumb {
   transform: scale(1.25);
 }
 
@@ -2411,6 +2435,30 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .sidebar-tab-content.active {
   display: flex;
 }
+
+#tab-content-chat { position: relative; }
+
+.chat-file-drop-overlay {
+  position: absolute;
+  inset: 8px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  border: 2px dashed var(--accent-color);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  color: var(--accent-color);
+  pointer-events: none;
+  text-align: center;
+  animation: modalFadeIn 0.2s ease;
+}
+
+.chat-file-drop-overlay strong { font-size: 16px; }
+.chat-file-drop-overlay span { color: var(--text-secondary); font-size: 12px; }
 
 .chat-messages-container {
   flex: 1;
@@ -3018,8 +3066,8 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   gap: 3px;
   padding-bottom: 3px;
   flex: none;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border-default) transparent;
+  scrollbar-width: auto;
+  scrollbar-color: auto;
 }
 
 .emoji-picker-categories::-webkit-scrollbar { height: 3px; }
@@ -3029,8 +3077,18 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  scrollbar-width: thin;
+  scrollbar-width: auto;
+  scrollbar-color: auto;
 }
+
+/* Keep WebView2 on the themed WebKit scrollbar path instead of its native thin bar. */
+.emoji-picker-results::-webkit-scrollbar { width: 6px; }
+.emoji-picker-results::-webkit-scrollbar-track,
+.emoji-picker-categories::-webkit-scrollbar-track { background: transparent; }
+.emoji-picker-results::-webkit-scrollbar-thumb { background: var(--border-focus); border-radius: var(--radius-full); }
+.emoji-picker-results::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+.emoji-picker-results::-webkit-scrollbar-button,
+.emoji-picker-categories::-webkit-scrollbar-button { display: none; }
 
 .emoji-picker-section + .emoji-picker-section { margin-top: 8px; }
 
@@ -5044,3 +5102,52 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .rendezvous-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--border-default); border-radius: var(--radius-sm); }
 .rendezvous-server-url { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
 .rendezvous-error { color: var(--danger-text); font-size: 12px; }
+
+/* Shared menu motion preserves positioning transforms, including centered transfer menus. */
+@keyframes dropdownEnter {
+  from { opacity: 0; scale: 0.97; translate: 0 var(--dropdown-enter-offset, -4px); }
+  to { opacity: 1; scale: 1; translate: 0 0; }
+}
+
+@keyframes dropdownExit {
+  from { opacity: 1; scale: 1; translate: 0 0; }
+  to { opacity: 0; scale: 0.97; translate: 0 var(--dropdown-enter-offset, -4px); }
+}
+
+.chat-file-download-menu,
+.chat-transfer-menu,
+.chat-msg-menu,
+.participant-menu,
+.room-app-options-menu,
+.emoji-picker {
+  transform-origin: top right;
+  animation: dropdownEnter var(--dropdown-enter-duration) cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.chat-file-download-menu:not(.is-below),
+.chat-msg-menu-up {
+  --dropdown-enter-offset: 4px;
+  transform-origin: bottom right;
+}
+
+.chat-transfer-menu,
+.emoji-picker {
+  --dropdown-enter-offset: 4px;
+  transform-origin: bottom center;
+}
+
+.dropdown-closing {
+  pointer-events: none;
+  animation: dropdownExit var(--dropdown-exit-duration) cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-file-download-menu,
+  .chat-transfer-menu,
+  .chat-msg-menu,
+  .participant-menu,
+  .room-app-options-menu,
+  .emoji-picker {
+    animation: none;
+  }
+}
