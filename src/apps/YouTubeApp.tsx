@@ -4,24 +4,26 @@ import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { ArrowDown, ArrowLeft, ArrowUp, ExternalLink, Expand, ListMinus, ListVideo,
   LoaderCircle, Minimize2, PictureInPicture2, Play, Plus, Repeat, Repeat1, Search, Shuffle, SquarePlay,
-  Trash2 } from 'lucide-react';
+  Trash2, Library } from 'lucide-react';
 import { roomAppsService } from './room_apps_service';
 import { YouTubeModel } from './models.ts';
 import { loadYouTubePlaylist, loadYouTubePlaylistPreview, parseYouTubeInput, resolveYouTubeTitle, searchYouTube,
   type YouTubeSearchItem } from './youtube_api';
-import { createYouTubePlayer, loadYouTubePlayerApi, reconcileYouTubePlayer, setYouTubeCaptions,
+import { createYouTubePlayer, loadYouTubePlayerApi, reconcileYouTubePlayer, setYouTubeCaptions, sampleYouTubeLive,
   type YouTubePlaybackTracker, type YouTubePlayer } from './youtube_player';
-import { advanceYouTubeQueue, canAdvanceYouTubeQueue, moveYouTubeQueueEntry } from './youtube_queue';
+import { advanceYouTubeQueue, canAdvanceYouTubeQueue, moveYouTubeQueueEntry, importYouTubeQueue, appendYouTubeQueue } from './youtube_queue';
+import { YouTubeSavedQueuesDialog } from './YouTubeSavedQueuesDialog';
 import { YouTubeControls } from './YouTubeControls';
 import { Tooltip } from '../components/common/Tooltip';
 import { TooltipButton } from '../components/common/TooltipButton';
 import { ActivityAvatar, type ActivityParticipant } from '../components/common/ActivityParticipants';
 import { ActivityToast } from '../components/common/ActivityToast';
 import { useRoom } from '../hooks/useRoom';
-import { describeYouTubeActivity } from './youtube_activity';
+import { describeYouTubeActivity, describeAutomaticYouTubeActivity } from './youtube_activity';
 import { validYouTubePipCommand, validYouTubePipSettings, youtubePipEvent, youtubePipPeerId,
   type YouTubePipMessage } from './youtube_pip';
 import { MEDIA_SYNC_INTERVAL_MS } from '../core/media_sync';
+import { markCurrentYouTubeLive, YOUTUBE_MAX_POSITION_SECONDS } from './youtube_timeline';
 import type { YouTubeEntry, YouTubeState } from './types';
 
 interface Props { instanceId: string; compact?: boolean }
@@ -42,11 +44,13 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
   const [playerReady, setPlayerReady] = useState(false);
   const [playhead, setPlayhead] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [liveVideoId, setLiveVideoId] = useState('');
   const [buffered, setBuffered] = useState(0);
   const [theater, setTheater] = useState(false);
   const [pipActive, setPipActive] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<'watch' | 'discover'>('watch');
   const [resolvedTitles, setResolvedTitles] = useState<Record<string, string>>({});
+  const [savedQueuesOpen, setSavedQueuesOpen] = useState(false);
   const [volume, setVolume] = useState(() => {
     const stored = localStorage.getItem(VOLUME_STORAGE);
     const saved = stored === null ? NaN : Number(stored);
@@ -67,7 +71,7 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
   const pipActiveRef = useRef(false);
   const pipSequenceRef = useRef(0);
   const pipListenersReadyRef = useRef<Promise<void> | null>(null);
-  const pipProgressRef = useRef({ videoId: '', position: 0, duration: 0, playing: false });
+  const pipProgressRef = useRef({ videoId: '', position: 0, duration: 0, playing: false, live: false });
   stateRef.current = state;
   const captionsRef = useRef(captions);
   captionsRef.current = captions;
@@ -83,10 +87,11 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
     const next = model?.state;
     if (!next || next === previousStateRef.current) return;
     const message = describeYouTubeActivity(previousStateRef.current, next, previousReceivedAtRef.current);
+    const automaticMessage = describeAutomaticYouTubeActivity(previousStateRef.current, next);
     previousStateRef.current = next;
     previousReceivedAtRef.current = model.receivedAt;
-    if (message && model?.actor && !model.lastChangeWasSnapshot)
-      setActivity({ id: ++activityIdRef.current, actor: model.actor, message });
+    if (!model.lastChangeWasSnapshot && (automaticMessage || message && model.actor))
+      setActivity({ id: ++activityIdRef.current, actor: automaticMessage ? '' : model.actor, message: automaticMessage || message! });
     setState(next);
     if (pipActiveRef.current) sendPipState();
   }), [instanceId]);
@@ -103,9 +108,10 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
         if (message.type === 'progress') {
           const entry = stateRef.current.queue[stateRef.current.index];
           if (entry?.videoId !== message.videoId || !Number.isFinite(message.position) ||
-            message.position < 0 || message.position >= 86_400 || !Number.isFinite(message.duration)) return;
+            message.position < 0 || message.position >= YOUTUBE_MAX_POSITION_SECONDS || !Number.isFinite(message.duration)) return;
           pipProgressRef.current = { videoId: message.videoId, position: message.position,
-            duration: message.duration, playing: message.playing === true };
+            duration: message.duration, playing: message.playing === true, live: message.live === true };
+          if (message.live === true) setLiveVideoId(message.videoId);
           setPlayhead(message.position);
           setDuration(message.duration);
           return;
@@ -114,7 +120,7 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
           const current = stateRef.current;
           if (current.playing && current.queue[current.index]?.videoId === message.videoId &&
             roomAppsService.getParticipants(instanceId).sort()[0] === roomAppsService.getLocalActor())
-            publish(advanceYouTubeQueue(current), 'seek');
+            finishPlayback();
           return;
         }
         if (message.type === 'settings') {
@@ -178,7 +184,7 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
           const current = stateRef.current;
           const expected = current.queue[current.index];
           if (expected && playerRef.current?.getVideoData().video_id === expected.videoId && current.playing)
-            publish(advanceYouTubeQueue(current), 'seek');
+            finishPlayback();
         }
       }, () => {
         const player = playerRef.current;
@@ -209,6 +215,7 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
       const position = player.getCurrentTime();
       const length = player.getDuration();
       const loaded = player.getVideoLoadedFraction();
+      if (sampleYouTubeLive(player, playbackTrackerRef.current, Date.now())) setLiveVideoId(current.queue[current.index].videoId);
       if (Number.isFinite(position) && position >= 0) setPlayhead(position);
       if (Number.isFinite(length) && length >= 0) setDuration(length);
       if (Number.isFinite(loaded) && loaded >= 0) setBuffered(loaded);
@@ -236,7 +243,7 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
         const progress = pipProgressRef.current;
         if (roomAppsService.getParticipants(instanceId).sort()[0] === roomAppsService.getLocalActor() &&
           current.playing && progress.playing && progress.videoId === entry.videoId)
-          publish({ ...current, position: progress.position }, 'heartbeat');
+          publish({ ...markCurrentYouTubeLive(current, progress.live), position: progress.position }, 'heartbeat');
         return;
       }
       const corrected = reconcilePlayback(current, 'periodic');
@@ -245,7 +252,8 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
         current.playing && player.getPlayerState() === 1 &&
         player.getVideoData().video_id === entry.videoId) {
         const position = player.getCurrentTime();
-        if (Number.isFinite(position) && position >= 0) publish({ ...current, position }, 'heartbeat');
+        if (Number.isFinite(position) && position >= 0 && position < YOUTUBE_MAX_POSITION_SECONDS)
+          publish({ ...markCurrentYouTubeLive(current, Boolean(playbackTrackerRef.current.live)), position }, 'heartbeat');
       }
     }, MEDIA_SYNC_INTERVAL_MS);
     return () => clearInterval(timer);
@@ -265,7 +273,7 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
     const signature = `${current.videoId}:${state.index}:${state.playing}:${state.position}:${state.updatedAt}`;
     if (appliedRef.current === signature) return;
     appliedRef.current = signature;
-    reconcilePlayback(state, state.syncReason === 'playback' || state.syncReason === 'seek'
+    reconcilePlayback(state, state.syncReason === 'playback' || state.syncReason === 'seek' || state.syncReason === 'queue-replace' || state.syncReason === 'auto-advance'
       ? 'urgent' : 'update');
   }, [state, current, playerReady]);
 
@@ -308,7 +316,18 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
     syncReason: NonNullable<YouTubeState['syncReason']> = 'update') {
     const fullState: YouTubeState = { ...next, updatedAt: Date.now(), syncReason };
     stateRef.current = fullState;
-    roomAppsService.getModel<YouTubeModel>(instanceId)?.update(fullState);
+    const model = roomAppsService.getModel<YouTubeModel>(instanceId);
+    model?.update(fullState);
+    if (model) stateRef.current = model.state;
+  }
+
+  function finishPlayback() {
+    const latest = stateRef.current;
+    const player = playerRef.current;
+    const endpoint = pipActiveRef.current ? pipProgressRef.current.duration || pipProgressRef.current.position
+      : player?.getDuration() || player?.getCurrentTime();
+    publish(advanceYouTubeQueue({ ...latest, position: Number.isFinite(endpoint) && endpoint! >= 0 && endpoint! < YOUTUBE_MAX_POSITION_SECONDS
+      ? endpoint! : latest.position }), 'auto-advance');
   }
 
   function sendPipState() {
@@ -398,8 +417,8 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
     if (!latest.queue[latest.index]) return;
     const position = pipActiveRef.current && pipProgressRef.current.videoId === latest.queue[latest.index].videoId
       ? pipProgressRef.current.position : pipActiveRef.current ? latest.position : playerRef.current?.getCurrentTime();
-    publish({ ...latest, position: Number.isFinite(position) && position! >= 0 ? position! : latest.position,
-      playing: !latest.playing }, 'playback');
+    publish({ ...latest, position: latest.ended ? 0 : Number.isFinite(position) && position! >= 0 ? position! : latest.position,
+      playing: !latest.playing, ended: false }, 'playback');
   };
 
   const seek = (position: number) => {
@@ -408,15 +427,15 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
     const next = Math.max(0, Math.min(length || position, position));
     setPlayhead(next);
     playbackTrackerRef.current.lastCorrectionAt = Date.now();
-    publish({ ...stateRef.current, position: next }, 'seek');
+    publish({ ...stateRef.current, position: next, ended: false }, 'seek');
   };
 
   const add = (entries: YouTubeEntry[]) => {
     if (!entries.length) return;
     const latest = stateRef.current;
-    const queue = [...latest.queue, ...entries.map((entry) => ({ ...entry,
-      addedBy: roomAppsService.getLocalActor(), addedByName: (username || 'Você').slice(0, 80) }))].slice(0, 200);
-    publish({ ...latest, queue, playing: latest.queue.length === 0 ? true : latest.playing });
+    const next = appendYouTubeQueue(latest, entries.map((entry) => ({ ...entry,
+      addedBy: roomAppsService.getLocalActor(), addedByName: (username || 'Você').slice(0, 80) })));
+    if (next !== latest) publish(next, next.index !== latest.index || next.playing !== latest.playing ? 'seek' : 'update');
   };
 
   const openExternalSearch = async (terms: string) => {
@@ -480,9 +499,10 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
     const nextIndex = index < latest.index ? latest.index - 1 :
       Math.min(latest.index, Math.max(0, queue.length - 1));
     publish({ ...latest, queue, index: nextIndex, playing: queue.length > 0 && latest.playing,
-      position: index === latest.index ? 0 : latest.position });
+      position: index === latest.index ? 0 : latest.position,
+      ended: index === latest.index ? false : latest.ended }, index === latest.index ? 'seek' : 'update');
   };
-  const select = (index: number) => publish({ ...stateRef.current, index, position: 0, playing: true }, 'seek');
+  const select = (index: number) => publish({ ...stateRef.current, index, position: 0, playing: true, ended: false }, 'seek');
   const next = () => publish(advanceYouTubeQueue(stateRef.current, true), 'seek');
   const cycleRepeat = () => {
     const latest = stateRef.current;
@@ -494,8 +514,18 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
 
   return <div className={`room-app-youtube ${compact ? 'compact' : ''} ${theater ? 'is-theater' : ''} ${mobilePanel === 'discover' ? 'show-discover' : ''}`}
     onClick={(event) => event.stopPropagation()}>
+    {savedQueuesOpen && <YouTubeSavedQueuesDialog
+      entries={state.queue.map((entry) => ({ ...entry, title: displayTitle(entry) }))}
+      onClose={() => setSavedQueuesOpen(false)} onImport={(entries, mode) => {
+        if (!roomAppsService.getModel<YouTubeModel>(instanceId)) throw new Error('Activity unavailable');
+        const latest = stateRef.current;
+        const next = importYouTubeQueue(latest, entries, mode, roomAppsService.getLocalActor(), username || 'Você');
+        publish(next, mode === 'replace' ? 'queue-replace'
+          : next.index !== latest.index || next.playing !== latest.playing ? 'seek' : 'update');
+      }} />}
     {activity && <ActivityToast key={activity.id} className="youtube-activity-toast"
-      person={personFor(activity.actor)} message={activity.message} />}
+      person={activity.actor ? personFor(activity.actor) : undefined}
+      icon={<ListVideo size={17} />} message={activity.message} />}
     <section className="youtube-watch-pane" aria-label="Player e fila de reprodução">
       <div className="youtube-player-frame">
         <div ref={mountRef} className="room-app-player-mount" />
@@ -528,13 +558,17 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
       <YouTubeControls hasVideo={Boolean(current)} playing={state.playing} hasPrevious={state.index > 0}
         hasNext={canAdvanceYouTubeQueue(state)} position={playhead} duration={duration}
         buffered={buffered} volume={volume} muted={muted} captions={captions}
+        live={Boolean(current && (current.isLive || liveVideoId === current.videoId))}
         onTogglePlayback={togglePlayback}
         onPrevious={() => state.index > 0 ? select(state.index - 1) : seek(0)}
         onNext={next} onSeek={seek} onVolume={setLocalVolume}
         onToggleMute={toggleMute} onToggleCaptions={toggleCaptions}
         onPictureInPicture={isTauri() && current && !pipActive ? () => void openPip() : undefined} />
       <div className="youtube-queue-header">
-        <div><ListVideo size={16} /><strong>Fila de reprodução</strong><span>{state.queue.length}</span></div>
+        <div><ListVideo size={16} /><strong>Fila de reprodução</strong><span>{state.queue.length}</span>
+          <TooltipButton tooltip="Filas salvas" className="youtube-saved-queues-button" aria-haspopup="dialog"
+            onClick={() => setSavedQueuesOpen(true)}><Library size={15} /></TooltipButton>
+        </div>
         <div className="youtube-queue-modes" aria-label="Opções da fila">
           <TooltipButton tooltip={state.repeat === 'off' ? 'Repetição desativada' : state.repeat === 'all'
             ? 'Repetir fila' : 'Repetir um vídeo'}

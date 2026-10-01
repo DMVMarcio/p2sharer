@@ -12,6 +12,7 @@ pub struct ChatFileState {
     sources: Mutex<HashMap<String, PathBuf>>,
     downloads: Mutex<HashMap<String, Download>>,
     completed: Mutex<HashMap<String, PathBuf>>,
+    clipboard_sources: Mutex<HashMap<String, PathBuf>>,
 }
 
 struct Download { temp: PathBuf, destination: PathBuf, size: u64, written: u64, hash: String }
@@ -28,7 +29,9 @@ fn random_id() -> Result<String, String> {
 
 fn digest(path: &Path) -> Result<(u64, String), String> {
     let mut file = File::open(path).map_err(|e| e.to_string())?;
-    let size = file.metadata().map_err(|e| e.to_string())?.len();
+    let metadata = file.metadata().map_err(|e| e.to_string())?;
+    if !metadata.is_file() { return Err("Only regular files can be shared".into()); }
+    let size = metadata.len();
     if size > MAX_FILE { return Err("File exceeds 2 GiB limit".into()); }
     let mut hasher = Sha256::new();
     let mut buffer = [0u8; 128 * 1024];
@@ -199,6 +202,87 @@ pub fn read_chat_image_preview(state: State<'_, ChatFileState>, id: String) -> R
     Ok(STANDARD.encode(bytes))
 }
 
+fn register_source(state: &ChatFileState, path: PathBuf) -> Result<FileInfo, String> {
+    let id = random_id()?;
+    let info = file_info(id.clone(), &path)?;
+    state.sources.lock().map_err(|e| e.to_string())?.insert(id, path);
+    Ok(info)
+}
+
+#[tauri::command]
+pub async fn import_chat_files(state: State<'_, ChatFileState>, paths: Vec<String>) -> Result<Vec<FileInfo>, String> {
+    if paths.is_empty() || paths.len() > 32 { return Err("Select between 1 and 32 files".into()); }
+    let sources = tauri::async_runtime::spawn_blocking(move || {
+        paths.into_iter().map(|path| {
+            let path = PathBuf::from(path);
+            let info = file_info(random_id()?, &path)?;
+            Ok((info, path))
+        }).collect::<Result<Vec<_>, String>>()
+    }).await.map_err(|e| e.to_string())??;
+    let mut registered = state.sources.lock().map_err(|e| e.to_string())?;
+    Ok(sources.into_iter().map(|(info, path)| { registered.insert(info.id.clone(), path); info }).collect())
+}
+
+#[tauri::command]
+pub async fn paste_chat_files(state: State<'_, ChatFileState>) -> Result<Vec<FileInfo>, String> {
+    let sources = tauri::async_runtime::spawn_blocking(|| -> Result<Vec<(PathBuf, bool)>, String> {
+        let mut clipboard = arboard::Clipboard::new().map_err(|e| e.to_string())?;
+        match clipboard.get().file_list() {
+            Ok(paths) if !paths.is_empty() => {
+                if paths.len() > 32 { return Err("Select at most 32 files".into()); }
+                return Ok(paths.into_iter().map(|path| (path, false)).collect());
+            }
+            Err(arboard::Error::ContentNotAvailable) | Ok(_) => {}
+            Err(error) => return Err(error.to_string()),
+        }
+        let pixels = match clipboard.get_image() {
+            Ok(pixels) => pixels,
+            Err(arboard::Error::ContentNotAvailable) => return Ok(Vec::new()),
+            Err(error) => return Err(error.to_string()),
+        };
+        let width = u32::try_from(pixels.width).map_err(|_| "Image too wide")?;
+        let height = u32::try_from(pixels.height).map_err(|_| "Image too tall")?;
+        if pixels.bytes.len() > 256 * 1024 * 1024 { return Err("Clipboard image too large".into()); }
+        let image = image::RgbaImage::from_raw(width, height, pixels.bytes.into_owned()).ok_or("Invalid clipboard image")?;
+        let directory = dirs::data_local_dir().ok_or("Local data folder unavailable")?
+            .join("P2Sharer").join("chat-clipboard");
+        fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
+        let path = directory.join(format!("clipboard-{}.png", random_id()?));
+        if let Err(error) = image.save_with_format(&path, image::ImageFormat::Png) {
+            let _ = fs::remove_file(&path);
+            return Err(error.to_string());
+        }
+        Ok(vec![(path, true)])
+    }).await.map_err(|e| e.to_string())??;
+    let mut files = Vec::new();
+    for (path, managed) in sources {
+        match register_source(&state, path.clone()) {
+            Ok(info) => {
+                if managed { state.clipboard_sources.lock().map_err(|e| e.to_string())?.insert(info.id.clone(), path); }
+                files.push(info);
+            }
+            Err(error) => {
+                if managed { let _ = fs::remove_file(path); }
+                for info in files { discard_source(&state, &info.id); }
+                return Err(error);
+            }
+        }
+    }
+    Ok(files)
+}
+
+fn discard_source(state: &ChatFileState, id: &str) {
+    if let Ok(mut sources) = state.sources.lock() { sources.remove(id); }
+    if let Ok(mut sources) = state.clipboard_sources.lock() {
+        if let Some(path) = sources.remove(id) { let _ = fs::remove_file(path); }
+    }
+}
+
+#[tauri::command]
+pub fn discard_chat_file(state: State<'_, ChatFileState>, id: String) {
+    discard_source(&state, &id);
+}
+
 #[tauri::command]
 pub fn reveal_chat_download(state: State<'_, ChatFileState>, id: String) -> Result<(), String> {
     let path = state.completed.lock().map_err(|e| e.to_string())?.get(&id).cloned()
@@ -212,6 +296,40 @@ pub fn reveal_chat_download(state: State<'_, ChatFileState>, id: String) -> Resu
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn discarding_an_original_source_preserves_the_file() {
+        let state = ChatFileState::default();
+        let path = std::env::temp_dir().join(format!("p2sharer-original-{}", random_id().unwrap()));
+        fs::write(&path, b"original").unwrap();
+        let info = register_source(&state, path.clone()).unwrap();
+        assert_eq!(info.size, 8);
+        assert_eq!(state.sources.lock().unwrap().get(&info.id), Some(&path));
+        discard_source(&state, &info.id);
+        assert!(state.sources.lock().unwrap().is_empty());
+        assert_eq!(fs::read(&path).unwrap(), b"original");
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn discarding_a_clipboard_source_removes_only_its_snapshot() {
+        let state = ChatFileState::default();
+        let path = std::env::temp_dir().join(format!("p2sharer-clipboard-{}.png", random_id().unwrap()));
+        image::RgbaImage::from_pixel(2, 2, image::Rgba([255, 0, 0, 255])).save(&path).unwrap();
+        let info = register_source(&state, path.clone()).unwrap();
+        assert!(info.is_image);
+        state.clipboard_sources.lock().unwrap().insert(info.id.clone(), path.clone());
+        discard_source(&state, &info.id);
+        discard_source(&state, &info.id);
+        assert!(!path.exists());
+        assert!(state.sources.lock().unwrap().is_empty());
+        assert!(state.clipboard_sources.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn rejects_directory_sources() {
+        assert!(register_source(&ChatFileState::default(), std::env::temp_dir()).is_err());
+    }
 
     #[test]
     fn rejects_unsafe_download_names() {

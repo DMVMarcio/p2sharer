@@ -41,6 +41,17 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 4. User Guidelines & Expressed Preferences
 
+- `[UI Polish]` Submit room creation, room joining, and similar single-line modal forms with Enter from any editable field. Keep enlarged volume thumbs fully visible, wrap long tooltip content without truncation, and animate dropdown opening smoothly. The logs-folder action must open the actual logs directory in Windows Explorer.
+
+
+- `[YouTube Live]` Live broadcasts must play continuously without repeated rewinds, seeks, or loading loops. The displayed time and growing live duration should follow playback; users may seek manually when the stream supports DVR.
+
+- `[YouTube Playback Continuity]` Queue additions and playback-option changes must never rewind or seek the current video. Automatic advances/repeats must show a separate toast without attributing them to a participant. Adding videos after playback has ended should start the first newly added video automatically, while additions during playback or an intentional pause preserve the current selection and playback.
+
+- `[YouTube Saved Queues]` Add a saved-queues button beside the playback queue count. Persist named queues locally, list them in a popup, support rename and confirmed deletion, import by replacing or appending with cancellation, and make overwriting an existing saved queue practical.
+
+- `[Chat Files Input]` Support native file drag-and-drop over the chat with a drop overlay, and Ctrl+V for copied files, browser images, and screenshots. Every attachment must use the existing offer/auto-accept consent dialog before publication. Multiple files are confirmed individually.
+
 - `[Diagnostics Logs]` Keep at most eight per-instance session logs, removing the oldest when a new instance starts while preserving logs in use.
 - `[P2P Diagnostics]` Allow users to add, remove, enable, and disable rendezvous servers in settings for connection troubleshooting. Keep the configuration persistent and apply it to actual signaling connections.
 - `[P2P Settings UI]` Write rendezvous settings copy for end users without testing or debugging instructions. Show each server's enable control as the canonical switch aligned at the right edge of its row.
