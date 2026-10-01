@@ -3,11 +3,16 @@ import React, { useState, useEffect } from 'react';
 import { useModal } from '../../hooks/useModal';
 import { useScreenPicker } from '../../hooks/useScreenPicker';
 import { getSkeletonCountForTab } from './screen_picker_utils';
+import { MediaPreview } from '../common/MediaPreview';
+import { Camera } from 'lucide-react';
 
 export const ScreenPickerModal: React.FC = () => {
   const { closeModal, isClosing } = useModal();
   const {
     cameras,
+    cameraModes,
+    cameraRates,
+    preview,
     editingId,
     editingKind,
     error,
@@ -31,7 +36,7 @@ export const ScreenPickerModal: React.FC = () => {
     setShowCursor,
     loadSources,
     confirmPicker,
-  } = useScreenPicker(closeModal);
+  } = useScreenPicker(closeModal, isClosing);
 
   const [displaySkeleton, setDisplaySkeleton] = useState(isLoading);
   const [isFadingOut, setIsFadingOut] = useState(false);
@@ -71,12 +76,12 @@ export const ScreenPickerModal: React.FC = () => {
             <h2>{editingId ? 'Editar transmissão' : 'Iniciar transmissão'}</h2>
             <p className="modal-subtitle">Escolha uma tela, janela ou câmera.</p>
           </div>
-          <button className="btn-close" id="btn-close-screen-picker" onClick={closeModal}>
+          <button className="btn-close" id="btn-close-screen-picker" onClick={closeModal} disabled={isStarting} aria-label="Fechar seletor">
             &times;
           </button>
         </div>
 
-        <div className="modal-body">
+        <div className="modal-body" inert={isStarting || undefined}>
 
           {error && <p role="alert">{error}</p>}
           <div className="picker-tabs">
@@ -101,6 +106,7 @@ export const ScreenPickerModal: React.FC = () => {
               onClick={() => setCurrentTab('cameras')}>Câmeras</button>
           </div>
 
+          <div className="picker-preview-layout">
           <div className="picker-sources-container-wrapper" id="picker-sources-container">
             {displaySkeleton && (
               <div
@@ -146,7 +152,7 @@ export const ScreenPickerModal: React.FC = () => {
                 {currentTab === 'cameras' && cameras.map((camera, index) => <button type="button" key={camera.deviceId || index}
                   className={`source-card ${selectedSourceId === `camera:${camera.deviceId}` ? 'selected' : ''}`}
                   onClick={() => setSelectedSourceId(`camera:${camera.deviceId}`)}>
-                  <div className="source-card-thumb"><div className="source-card-thumb-placeholder">Câmera</div></div>
+                  <div className="source-card-thumb camera-device-thumb"><Camera size={28} aria-hidden="true" /></div>
                   <div className="source-card-info"><div className="source-card-title">{camera.label || `Câmera ${index + 1}`}</div></div>
                 </button>)}
                 {currentTab === 'screens' && monitors.length === 0 && (
@@ -220,6 +226,11 @@ export const ScreenPickerModal: React.FC = () => {
             )}
           </div>
 
+          <MediaPreview stream={preview.stream} busy={preview.busy} error={preview.error} settings={preview.settings}
+            label={cameras.find((camera) => `camera:${camera.deviceId}` === selectedSourceId)?.label ||
+              monitors.find((monitor) => monitor.id === selectedSourceId)?.name ||
+              windows.find((window) => window.id === selectedSourceId)?.title || ''} />
+          </div>
           <div className="picker-settings-row">
             <div className="picker-setting-item">
               <label htmlFor="modal-select-resolution">Resolução:</label>
@@ -228,7 +239,8 @@ export const ScreenPickerModal: React.FC = () => {
                 className="select-input-sm"
                 value={resolution}
                 onValueChange={(value) => setResolution(value)}
-                options={[
+                disabled={currentTab === 'cameras' && (preview.busy || !cameraModes.length)}
+                options={currentTab === 'cameras' ? cameraModes : [
                   { value: '4k', label: '4K (3840x2160)' },
                   { value: '1440p', label: '1440p 2K' },
                   { value: '1080p', label: '1080p Full HD' },
@@ -245,8 +257,9 @@ export const ScreenPickerModal: React.FC = () => {
                 id="modal-select-fps"
                 className="select-input-sm"
                 value={fps}
-                onValueChange={(value) => setFps(parseInt(value, 10))}
-                options={[
+                onValueChange={(value) => setFps(Number(value))}
+                disabled={currentTab === 'cameras' && (preview.busy || !cameraRates.length)}
+                options={currentTab === 'cameras' ? cameraRates.map((rate) => ({ value: String(rate), label: `${rate} FPS` })) : [
                   { value: '120', label: '120 FPS' },
                   { value: '60', label: '60 FPS' },
                   { value: '30', label: '30 FPS' },
@@ -302,12 +315,13 @@ export const ScreenPickerModal: React.FC = () => {
         </div>
 
         <div className="modal-footer">
-          <button className="btn btn-secondary" id="btn-cancel-picker" style={{ width: 'auto' }} onClick={closeModal}>
+          <button className="btn btn-secondary" id="btn-cancel-picker" style={{ width: 'auto' }} onClick={closeModal} disabled={isStarting}>
             Cancelar
           </button>
           {(() => {
             const hasAvailableSources = currentTab === 'cameras' ? cameras.length > 0 : currentTab === 'screens' ? monitors.length > 0 : windows.length > 0;
-            const isConfirmDisabled = isLoading || isStarting || !selectedSourceId || !hasAvailableSources;
+            const isConfirmDisabled = isLoading || isStarting || preview.busy || !selectedSourceId || !hasAvailableSources ||
+              (currentTab === 'cameras' && (!preview.stream || !!preview.error || !cameraModes.length || !cameraRates.length));
             return (
               <button
                 className="btn btn-primary"

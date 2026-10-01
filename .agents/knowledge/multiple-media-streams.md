@@ -18,7 +18,19 @@ Room slot keys are stable `owner/mediaId` identifiers. `ownerPeerId` is the actu
 
 Compositions and automatic dismissals are viewer-local and reset on room departure. Overlays use muted video; subscribed source cards retain the existing audio sink and volume controls. Pointer annotations retain the owner's first screen as their eligible source, avoiding misrouting onto additional screens or cameras.
 
-## Validation
+## Source picker and camera consent
+
+`camera_permission.rs` registers WebView2 camera-only consent on the main webview. The requesting origin must be the packaged `http://tauri.localhost` origin (or the exact configured development origin in debug builds); embedded external origins retain the normal permission behavior. Windows privacy settings still govern physical device access. `listCameras` unlocks Chromium's initially redacted device identities with one temporary default-camera capture only when necessary, releases it, and returns all labeled video inputs. It does not open every camera for thumbnails. Device cards show an icon; a separate live panel previews the selected device.
+
+`useCapturePreview` serializes isolated native sessions and selected-camera captures, invalidates stale asynchronous results, releases captures on source changes/cancellation, and transfers ownership to `RoomService.startCapture` on confirmation. A prepared stream is published without stopping/reopening its device. Screen configuration changes restart only the isolated preview. Camera mode discovery verifies common resolutions plus the initial actual dimensions against exact constraints with native resize mode where supported, then verifies FPS choices for the selected resolution. Capability ranges alone do not establish valid pairs. Negotiated dimensions/FPS appear below the video. Explicit dimensions preserve nonstandard camera aspect ratios, including during edits, and screen selectors retain their standard options when returning from a camera.
+
+The attached transmission split button opens the canonical context menu of local media slots. Each action stops only its selected `mediaId`; the primary button displays "Transmissão" while any local capture is active and continues to open the source picker.
+
+Validation on 2026-10-01: 386 frontend tests passed, including camera identity bootstrap/release, valid resolution/FPS pairs, the shared protocol's 120 FPS ceiling, cancelled/late preview cleanup, ownership handoff, and individual local stop-menu actions. The native camera origin-scoping test passed. A fresh-profile packaged WebView2 session using Chromium's two simulated camera devices (without the fake permission UI flag) granted camera capture without a browser prompt, listed both labeled devices, played live monitor/camera previews, released the previous selected camera, reused the preview video track when publishing, and stopped the chosen transmission/cancelled preview. The temporary test room was removed afterward. The physical EMEET SmartCam S600 appeared disconnected (`Unknown`) in Windows; physical-camera compatibility remains unverified.
+
+## Previous multistream validation
+
+The source-picker task completed `npm run tauri:build` successfully and verified the current native executable plus MSI/NSIS bundles under the standard `src-tauri/target/release` paths. The QA executable was closed before the final packaging build.
 
 `test/unit/media_streams.test.ts` covers manifest validation, stable ownership/card keys, independent session stopping, successful and failed live track replacement, isolated sender settings and overlay anchors. Native tests exercise two simultaneous WGC captures with distinct frame dimensions and session-selective authenticated WebSockets. Always run the Tauri packaging build and inspect executable/MSI/NSIS artifacts. Native capture tests and local RTP tests do not establish remote Internet performance or actual camera hardware compatibility.
 

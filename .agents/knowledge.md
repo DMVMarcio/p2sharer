@@ -42,6 +42,8 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 4. User Guidelines & Expressed Preferences
 
+- `[Transmission Picker]` Use an attached split button: show "Transmissão" while broadcasting and an X/down-arrow menu listing individual local streams to stop. Grant camera permission in the trusted native app host without a browser prompt, enumerate labeled devices before selection, and preview only the selected source live before publication. Derive camera resolution/FPS choices from device capabilities and verified constraints where available; show the actual negotiated preview settings. Support screen/window previews too.
+
 - `[Multiple Media Streams]` Each participant can broadcast multiple independent native screen/window sessions and multiple cameras. Preserve stream identities, ownership, subscriptions, and peer connections while editing FPS, resolution/quality, bitrate, or the selected monitor/application. A camera occupies the participant's primary media card when there is no screen; with screen sharing it appears as a separate owned media card, without creating a fake room participant.
 - `[Viewer Compositions]` Treat screen and camera streams uniformly for spotlight overlays. Allow multiple draggable/resizable overlays, magnetic snapping to corners and side centers, and the tray context action "Sobrepor na transmissão atual". Automatically overlay the screen owner's cameras when watching their spotlight screen, allow dismissal and arbitrary owners/types, and never render overlays in grid mode. Composition choices are local to each viewer.
 

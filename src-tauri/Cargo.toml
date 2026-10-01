@@ -39,6 +39,7 @@ fast_image_resize = "5.1"
 
 
 [target.'cfg(windows)'.dependencies]
+webview2-com = "0.38.2"
 windows = { version = "0.58", features = [
     "implement",
     "Win32_Foundation",

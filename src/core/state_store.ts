@@ -159,6 +159,10 @@ export class StateStore {
   }
 
   public parseResolution(resLabel: string): ResolutionConfig {
+    const dimensions = /^(\d{2,5})x(\d{2,5})$/.exec(resLabel);
+    if (dimensions && Number(dimensions[1]) <= 16384 && Number(dimensions[2]) <= 16384) {
+      return { width: Number(dimensions[1]), height: Number(dimensions[2]), label: resLabel };
+    }
     if (resLabel === '4k') return { width: 3840, height: 2160, label: '4K' };
     if (resLabel === '1440p') return { width: 2560, height: 1440, label: '1440p' };
     if (resLabel === '720p') return { width: 1280, height: 720, label: '720p' };
