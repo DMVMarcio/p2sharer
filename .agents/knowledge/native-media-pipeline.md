@@ -92,7 +92,7 @@ At application startup, before WebView2 initialization, Rust configures `WEBVIEW
 - `--disable-renderer-backgrounding`
 - `--disable-backgrounding-occluded-windows`
 
-These flags force hardware-accelerated encoding/decoding via dedicated GPU video engines (NVENC/AMF/QuickSync) and zero-copy texture transfer within Chromium, preventing WebRTC from falling back to CPU software encoders (OpenH264/libvpx).
+These flags enable hardware acceleration where WebView2 and the GPU driver support it. They do not guarantee a hardware encoder for a particular codec/profile. Probe `navigator.mediaCapabilities.encodingInfo` with `type: "webrtc"` and verify real RTP encoding statistics rather than inferring hardware use from flags.
 
 ---
 
@@ -101,7 +101,7 @@ These flags force hardware-accelerated encoding/decoding via dedicated GPU video
 ### DirectFlip / Independent Flip & MinimumUpdateInterval
 - DirectX 11/12 and Vulkan games running in exclusive fullscreen or borderless window engage DirectFlip / Independent Flip (MPO hardware scanout bypass), bypassing DWM desktop composition.
 - Setting `MinimumUpdateIntervalSettings::Custom(...)` calls WinRT `SetMinUpdateInterval`, which relies on DWM compositor ticks. Under DirectFlip, DWM composition is dormant, causing frame arrival callbacks to stall or drop to ~0-1 FPS.
-- Always use `MinimumUpdateIntervalSettings::Default` on WGC capture sessions. Software rate-limiting (90% of the requested frame interval) inside `on_frame_arrived` handles framerate capping without DWM dependencies.
+- Always use `MinimumUpdateIntervalSettings::Default` on WGC capture sessions. A phase-preserving deadline inside `on_frame_arrived` caps capture at the requested cadence without tying the next deadline to GPU readback completion. Callback jitter and monitor refresh rates that differ from the requested FPS must not reset the cadence on every accepted frame.
 - The capture test must report JPEG image frames separately from one-byte static heartbeat messages. Heartbeat throughput is not evidence of live capture FPS; a static desktop can produce many heartbeats and few new images.
 
 ### Transient DXGI Error Recovery in `on_frame_arrived`
@@ -131,3 +131,24 @@ These flags force hardware-accelerated encoding/decoding via dedicated GPU video
 
 - In `NativeVideoBridge` (`src/video/native_video_bridge.ts`), incoming 1-byte dummy heartbeat ticks (`byteLength <= 4`) never overwrite real video frames (`pendingBuffer.byteLength > 4`) awaiting asynchronous decoding.
 - WebCodecs `VideoFrame` timestamps are strictly checked and advanced (`nowUs > lastTimestampUs`) to prevent pipeline rejection.
+
+
+## 7. Encoder Capability Selection and Receiver FPS
+
+Before starting capture, `RoomService` calls `MediaCoordinator.prepareCodecPreferences` for the selected resolution, FPS, and bitrate. A bounded 1.5-second WebRTC media-capabilities probe ranks reported power-efficient encoders first, retaining the original hardware codec ordering within that group. When no encoder is reported power-efficient, VP8 precedes software H.264, VP9, and AV1. Missing capability APIs retain the legacy ordering. These capability reports are hints, not proof of a particular GPU encoder implementation.
+
+Apply codec preferences immediately before offer/answer generation, including Trystero's parameterless `setLocalDescription`. Restrict local preferences to transceivers with an outgoing video track so receive-only answers preserve the broadcaster's codec order.
+
+Measured in the RX 5500 XT desktop WebView2 using a 1080p canvas and two independent real loopback receivers: H.264 produced approximately 23–24 decoded FPS with 20 ms encoding time per frame; VP8 produced approximately 56 decoded FPS with 5 ms encoding time per frame. All probed encoders were reported non-power-efficient on this installation. The native WGC/JPEG bridge must be measured separately; these canvas results do not establish native capture FPS or remote Internet throughput. Reproduce with `test/bench/video_loopback.ts` as described in `test/bench/README.md`.
+
+
+### Reusable Native JPEG Encoder
+
+WGC and automatic xcap capture share `video_jpeg::RealtimeJpegEncoder`, backed by statically linked libjpeg-turbo through the `turbojpeg` crate. It preserves requested quality and 4:2:0 subsampling, keeps a compressor and output buffer across frames, and disables optimized entropy coding for real-time work. A decoder round-trip test checks RGBA color order and reuse across changing image sizes. Raw RGBA WebSocket transport was tested and rejected because the large local packets reduced measured FPS in this WebView2.
+
+Building the vendored native library requires CMake and the existing MSVC C/C++ toolchain. NASM is required for x86 SIMD by the selected `require-simd` feature; do not silently package the slower scalar encoder. `.cargo/config.toml` selects a CMake toolchain setting `WITH_CRT_DLL=ON`, matching Rust's default MSVC runtime while keeping the JPEG library static. No separately installed JPEG DLL is required at runtime. Benchmark the full native path after encoder changes; a faster synthetic source alone is insufficient.
+
+
+### Desktop Measurements (RX 5500 XT, 2026-09-30)
+
+With SIMD and the shared MSVC runtime, encoding the same 1920x1080 primary-monitor pixels at quality 90 took approximately 15.8 ms/frame in the previous Rust JPEG encoder and 5.7 ms/frame in libjpeg-turbo. The final native desktop loopback with two receivers measured approximately 49 encoded FPS and 49 decoded FPS per receiver at 1920x1080, with around 5.5 ms RTP encoding time per frame. This does not establish constant 60 FPS or delivery across the Internet. The video socket sets TCP_NODELAY to deliver partial frame tails promptly; the codec-only canvas test reached approximately 56 decoded FPS instead of the previous H.264 24 FPS.
