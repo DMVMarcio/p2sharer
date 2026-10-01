@@ -310,9 +310,21 @@ describe('M3 Unit Tests: Robust P2P Networking & Signaling Failover', () => {
       const servers = buildIceServers(turnConfig);
       assert.equal(servers.length, 2);
       assert.deepEqual(servers[0]!.urls, DEFAULT_STUN_SERVERS);
-      assert.equal(servers[1]!.urls, 'turns:custom-turn.net:5349');
+      assert.deepEqual(servers[1]!.urls, ['turns:custom-turn.net:5349']);
       assert.equal(servers[1]!.username, 'user1');
       assert.equal(servers[1]!.credential, 'secret-password');
+    });
+
+    it('uses UDP and TCP TURN routes with one credential set', () => {
+      const servers = buildIceServers({
+        enabled: true,
+        url: 'turn:relay.example:3478?transport=udp\nturn:relay.example:3478?transport=tcp',
+        username: 'tester', credential: 'secret',
+      });
+      assert.deepEqual(servers[1]!.urls, [
+        'turn:relay.example:3478?transport=udp',
+        'turn:relay.example:3478?transport=tcp',
+      ]);
     });
 
     it('buildRtcConfiguration should enforce relay-only policy when forceRelay is true', () => {
@@ -321,6 +333,11 @@ describe('M3 Unit Tests: Robust P2P Networking & Signaling Failover', () => {
 
       const forceRelayConfig = buildRtcConfiguration({ enabled: true, url: 'turn:relay.net:3478', forceRelay: true });
       assert.equal(forceRelayConfig.iceTransportPolicy, 'relay');
+      assert.equal(forceRelayConfig.iceServers?.length, 1);
+      assert.deepEqual(forceRelayConfig.iceServers?.[0]?.urls, ['turn:relay.net:3478']);
+
+      const missingTurnConfig = buildRtcConfiguration({ enabled: false, url: 'turn:relay.net:3478', forceRelay: true });
+      assert.equal(missingTurnConfig.iceTransportPolicy, 'all');
     });
 
     it('formatJoinError should translate SDP/TURN errors into actionable messages', () => {
@@ -328,7 +345,7 @@ describe('M3 Unit Tests: Robust P2P Networking & Signaling Failover', () => {
         error: 'could not connect to peer after exchanging SDP; check that your TURN server URLs and credentials are reachable',
         peerId: 'peer-abc12345',
       });
-      assert.ok(turnUnreachableMsg.includes('servidor TURN configurado inacessível'));
+      assert.ok(turnUnreachableMsg.includes('nenhuma rota ICE foi estabelecida'));
 
       const symmetricNatMsg = formatJoinError({
         error: 'could not connect to peer after exchanging SDP; configure TURN servers with turnConfig',

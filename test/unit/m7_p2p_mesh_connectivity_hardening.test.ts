@@ -1,7 +1,7 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupTestDOM, type DOMEnvironment } from '../e2e/harness/dom-mock.ts';
-import { SignalingManager, DEFAULT_MQTT_RELAY_URLS } from '../../src/p2p/signaling_manager.ts';
+import { SignalingManager, DEFAULT_MQTT_RELAY_URLS, computeTrysteroSha1 } from '../../src/p2p/signaling_manager.ts';
 import { PeerTracker } from '../../src/p2p/peer_tracker.ts';
 import { buildRtcConfiguration, formatJoinError } from '../../src/p2p/ice_config.ts';
 import { GroupRoomManager } from '../../src/p2p/group_room.ts';
@@ -77,6 +77,18 @@ describe('M7: P2P Mesh Connectivity, Indirect Bridging & Signaling Stability Har
       assert.equal(manager.getRelayStatus('mqtt').connected, 0);
     });
 
+    it('keeps MQTT signaling when a broker probe is connected but the adapter socket is hidden', () => {
+      const manager = new SignalingManager();
+      (manager as any).activeRoom = { leave: async () => {} };
+      (manager as any).roomJoinedTimestamp = Date.now() - 5000;
+      (manager as any).mqttSocketStatuses.set('wss://broker.example', { readyState: 1, connected: true });
+      manager.getRelaySockets = () => ({});
+      manager.checkRelayHealth();
+      manager.checkRelayHealth();
+      assert.equal(manager.getActiveTransport(), 'mqtt');
+      assert.equal(manager.failoverHistory.length, 0);
+    });
+
     it('1.5: joinRoom and leaveRoom deterministically reset activeTransport to mqtt', async () => {
       const manager = new SignalingManager();
       // Simulate that transport drifted to nostr during previous session
@@ -104,6 +116,7 @@ describe('M7: P2P Mesh Connectivity, Indirect Bridging & Signaling Stability Har
     it('1.6: reannounce publishes to sockets with connected=true or readyState=1', async () => {
       const manager = new SignalingManager();
       (manager as any).activeRoom = { selfId: 'self-peer-123' };
+      (manager as any).lastRoomParams = { config: { appId: 'p2sharer-multi-stream-v5' }, topic: 'test-room' };
       const publishedTopics: string[] = [];
       const mockClient = {
         connected: false,
@@ -117,7 +130,12 @@ describe('M7: P2P Mesh Connectivity, Indirect Bridging & Signaling Stability Har
       await manager.reannounce('test-room', 'peer-target');
       // Publishes root topic + peer direct topic
       assert.equal(publishedTopics.length, 2);
-      assert.ok(publishedTopics.every((t) => typeof t === 'string' && t.length > 0));
+      assert.deepEqual(publishedTopics, [
+        await computeTrysteroSha1('Trystero@p2sharer-multi-stream-v5@test-room'),
+        await computeTrysteroSha1('Trystero@p2sharer-multi-stream-v5@test-room@peer-target'),
+      ]);
+      await manager.reannounce('stale-room');
+      assert.equal(publishedTopics.length, 2);
     });
   });
 
@@ -125,6 +143,21 @@ describe('M7: P2P Mesh Connectivity, Indirect Bridging & Signaling Stability Har
   // Area 2: PeerTracker Indirect Rumors & Accessors
   // =========================================================================
   describe('Area 2: PeerTracker Indirect Rumors & Quarantine Accessors', () => {
+    it('retries a stable identity challenge until the peer proves its key', () => {
+      const manager = new GroupRoomManager('Alice', 'room');
+      const sent: Array<{ data: { nonce: string }; target: string }> = [];
+      (manager as any).room = {};
+      (manager as any).identityAction = {
+        send: (data: { nonce: string }, options: { target: string }) => {
+          sent.push({ data, target: options.target });
+        },
+      };
+      (manager as any).sendIdentityChallenge('peer-bob');
+      (manager as any).sendIdentityChallenge('peer-bob');
+      assert.equal(sent.length, 2);
+      assert.equal(sent[0]!.data.nonce, sent[1]!.data.nonce);
+      assert.equal(sent[1]!.target, 'peer-bob');
+    });
     it('2.1: receivePeerExchange tracks rumor usernames and exposes getPendingRumors', () => {
       const tracker = new PeerTracker();
 
@@ -168,19 +201,14 @@ describe('M7: P2P Mesh Connectivity, Indirect Bridging & Signaling Stability Har
   // Area 3: ICE / WebRTC Configuration & Diagnostics
   // =========================================================================
   describe('Area 3: ICE Pre-Gathering & Informative Join Error Formatting', () => {
-    it('3.1: buildRtcConfiguration includes iceCandidatePoolSize: 2 and OpenRelay fallback TURN servers', () => {
+    it('3.1: default ICE configuration does not use failed public TURN credentials', () => {
       const rtcConfig = buildRtcConfiguration();
-      assert.equal(rtcConfig.iceCandidatePoolSize, 2);
+      assert.equal(rtcConfig.iceCandidatePoolSize, 0);
       assert.ok(Array.isArray(rtcConfig.iceServers));
-      assert.ok(rtcConfig.iceServers.length >= 2);
-      // Fallback TURN server must be present for symmetric NAT traversal
-      assert.ok(
-        rtcConfig.iceServers.some(
-          (server) =>
-            Array.isArray(server.urls) &&
-            server.urls.some((u) => u.includes('openrelay.metered.ca'))
-        )
-      );
+      assert.ok(rtcConfig.iceServers.length >= 1);
+      assert.ok(rtcConfig.iceServers.every((server) =>
+        (Array.isArray(server.urls) ? server.urls : [server.urls]).every((url) => !url.includes('openrelay.metered.ca'))
+      ));
     });
 
     it('3.2: formatJoinError provides non-alarmist explanation and maintains compatibility keywords', () => {
