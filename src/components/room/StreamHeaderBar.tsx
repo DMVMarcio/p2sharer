@@ -114,7 +114,7 @@ export const StreamHeaderBar: React.FC = () => {
         {/* Transmission Button */}
         <Tooltip content={isBroadcasting ? 'Gerenciar transmissões' : 'Compartilhar tela, janela ou câmera'}>
           <button
-            className="btn btn-sm btn-compact btn-outline"
+            className={`btn btn-sm btn-compact btn-outline ${isBroadcasting ? 'btn-transmission-menu' : ''}`}
             id="btn-toggle-share-screen"
             onClick={handleToggleTransmission}
             aria-label={isBroadcasting ? 'Gerenciar transmissões' : 'Transmitir'}
@@ -131,7 +131,7 @@ export const StreamHeaderBar: React.FC = () => {
             <span className="btn-text" id="label-share-screen">
               {isBroadcasting ? 'Transmissão' : 'Transmitir'}
             </span>
-            {isBroadcasting && <ChevronDown size={12} aria-hidden="true" />}
+            {isBroadcasting && <ChevronDown className="transmission-chevron" size={12} aria-hidden="true" />}
           </button>
         </Tooltip>
 

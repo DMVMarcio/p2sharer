@@ -1,11 +1,12 @@
 import { Select } from '../common/Select';
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useModal } from '../../hooks/useModal';
 import { useScreenPicker } from '../../hooks/useScreenPicker';
 import { getSkeletonCountForTab } from './screen_picker_utils';
 import { MediaPreview } from '../common/MediaPreview';
 import { Camera } from 'lucide-react';
 import { formatFrameRate } from '../../core/media_streams';
+import { useSkeletonPresence } from '../../hooks/useSkeletonPresence';
 
 export const ScreenPickerModal: React.FC = () => {
   const { closeModal, isClosing } = useModal();
@@ -39,26 +40,11 @@ export const ScreenPickerModal: React.FC = () => {
     confirmPicker,
   } = useScreenPicker(closeModal, isClosing);
 
-  const [displaySkeleton, setDisplaySkeleton] = useState(isLoading);
-  const [isFadingOut, setIsFadingOut] = useState(false);
+  const { displaySkeleton, isFadingOut } = useSkeletonPresence(isLoading);
 
   useEffect(() => {
     if (!isClosing) void loadSources();
   }, [loadSources, isClosing]);
-
-  useEffect(() => {
-    if (!isLoading && displaySkeleton) {
-      setIsFadingOut(true);
-      const timer = setTimeout(() => {
-        setDisplaySkeleton(false);
-        setIsFadingOut(false);
-      }, 400);
-      return () => clearTimeout(timer);
-    } else if (isLoading && !displaySkeleton) {
-      setDisplaySkeleton(true);
-      setIsFadingOut(false);
-    }
-  }, [isLoading, displaySkeleton]);
 
   const skeletonCount = getSkeletonCountForTab(currentTab === 'cameras' ? 'screens' : currentTab, monitors.length);
 
@@ -227,7 +213,7 @@ export const ScreenPickerModal: React.FC = () => {
             )}
           </div>
 
-          <MediaPreview stream={preview.stream} busy={preview.busy} error={preview.error} settings={preview.settings}
+          <MediaPreview stream={preview.stream} sourceKey={selectedSourceId} busy={isLoading || preview.busy} error={preview.error} settings={preview.settings}
             label={cameras.find((camera) => `camera:${camera.deviceId}` === selectedSourceId)?.label ||
               monitors.find((monitor) => monitor.id === selectedSourceId)?.name ||
               windows.find((window) => window.id === selectedSourceId)?.title || ''} />

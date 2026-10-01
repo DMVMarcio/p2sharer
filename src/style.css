@@ -19,6 +19,8 @@
   --transition-normal: 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   --dropdown-enter-duration: 320ms;
   --dropdown-exit-duration: 260ms;
+  --source-loading-duration: 400ms;
+  --dropdown-hover-bg: color-mix(in srgb, var(--bg-card-hover) 96%, var(--text-primary) 4%);
 
   /* Shadows */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
@@ -726,6 +728,9 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .btn-compact {
   padding: 6px 10px;
 }
+
+.btn.btn-transmission-menu { padding-right: 8px; }
+.btn-transmission-menu .transmission-chevron { flex-shrink: 0; width: 10px; margin-left: -5px; }
 
 /* ==========================================================================
    VIEW 2: UNIFIED GROUP ROOM
@@ -2619,7 +2624,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .chat-file-download-menu { position: absolute; z-index: 30; right: 0; bottom: calc(100% + 4px); width: 120px; padding: 4px; border: 1px solid var(--border-default); border-radius: var(--radius-sm); background: var(--bg-card); box-shadow: 0 10px 24px rgba(0,0,0,.25); }
 .chat-file-download-menu.is-below { top: calc(100% + 4px); bottom: auto; }
 .chat-file-download-menu button { width: 100%; border: 0; background: transparent; color: var(--text-primary); padding: 7px; text-align: left; cursor: pointer; }
-.chat-file-download-menu button:hover { background: var(--bg-card-hover); }
+.chat-file-download-menu button:hover { background: var(--dropdown-hover-bg); }
 .chat-file-image-button { display: flex; align-items: center; justify-content: center; width: 100%; max-height: 220px; margin-bottom: 7px; padding: 0; overflow: hidden; border: 0; border-radius: var(--radius-sm); background: var(--bg-card); cursor: zoom-in; }
 .chat-file-image-button img { display: block; max-width: 100%; max-height: 220px; object-fit: contain; }
 .chat-file-preview-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; width: 100%; height: 140px; margin-bottom: 7px; border: 1px solid var(--border-default); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-secondary); }
@@ -2681,7 +2686,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .chat-msg-menu { position: absolute; z-index: 20; top: 100%; right: 0; width: 150px; padding: 4px; border: 1px solid var(--border-default); border-radius: var(--radius-sm); background: var(--bg-card); box-shadow: 0 10px 24px rgba(0,0,0,.25); }
 .chat-msg-menu-up { top: auto; bottom: 100%; }
 .chat-msg-menu button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 8px; border: 0; border-radius: 4px; background: transparent; color: var(--text-primary); font: inherit; font-size: 12px; text-align: left; cursor: pointer; user-select: none; }
-.chat-msg-menu button:hover { background: var(--bg-card-hover); }
+.chat-msg-menu button:hover { background: var(--dropdown-hover-bg); }
 .chat-msg-menu .chat-msg-delete { color: #ef4444; }
 .chat-msg-highlighted .chat-msg-bubble { border-color: var(--accent-color); box-shadow: 0 0 0 2px var(--accent-subtle); }
 .chat-msg-reply { display: flex; flex-direction: column; gap: 2px; width: 100%; max-width: 100%; margin: 0 0 6px; padding: 4px 7px; border: 0; border-left: 2px solid var(--accent-color); border-radius: 2px; background: var(--accent-subtle); color: var(--text-secondary); text-align: left; cursor: pointer; }
@@ -3176,7 +3181,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 
 .emoji-pack-option:hover,
 .emoji-pack-option.active {
-  background: var(--bg-card-hover);
+  background: var(--dropdown-hover-bg);
   border-color: var(--accent-color);
 }
 
@@ -3294,7 +3299,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   display: block; width: 100%; padding: 8px; border: 0; border-radius: var(--radius-sm);
   text-align: left; background: transparent; color: var(--text-primary); cursor: pointer;
 }
-.participant-menu button:hover { background: var(--bg-card-hover); }
+.participant-menu button:hover { background: var(--dropdown-hover-bg); }
 .participant-menu .participant-menu-danger { color: var(--danger-text); }
 .participant-confirm-dialog { max-width: 430px; }
 
@@ -3897,6 +3902,11 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .media-preview { overflow: hidden; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--bg-card); }
 .media-preview-stage { position: relative; aspect-ratio: 16 / 9; background: #000; display: grid; place-items: center; }
 .media-preview-stage video { width: 100%; height: 100%; object-fit: contain; position: absolute; inset: 0; }
+.media-preview-video { opacity: 0; }
+.media-preview-video.ready { opacity: 1; animation: sourceCardsFadeIn var(--source-loading-duration) cubic-bezier(0.16, 1, 0.3, 1) both; }
+.media-preview-skeleton { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; background: var(--bg-card); pointer-events: none; }
+.media-preview-shimmer { position: absolute; inset: 0; }
+.media-preview-skeleton .source-card-thumb-skeleton-icon { position: relative; }
 .media-preview-stage p { position: relative; padding: 16px; text-align: center; color: var(--text-secondary); font-size: 0.8125rem; }
 .media-preview-caption { display: flex; flex-direction: column; gap: 4px; padding: 12px; min-width: 0; font-size: 0.8125rem; }
 .media-preview-caption strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -3913,9 +3923,12 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   padding: 4px;
 }
 
-.source-cards-skeleton-layer {
-  transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+.source-cards-skeleton-layer, .media-preview-skeleton {
+  animation: sourceCardsFadeIn var(--source-loading-duration) cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  transition: opacity var(--source-loading-duration) cubic-bezier(0.16, 1, 0.3, 1);
 }
+
+.source-cards-skeleton-layer.fade-out, .media-preview-skeleton.fade-out { opacity: 0; animation: none; }
 
 .source-cards-skeleton-layer.fade-out {
   position: absolute;
@@ -3929,7 +3942,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 }
 
 .source-cards-content-layer {
-  animation: sourceCardsFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: sourceCardsFadeIn var(--source-loading-duration) cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes sourceCardsFadeIn {
@@ -5198,11 +5211,15 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   text-align: left;
   cursor: pointer;
 }
-.context-menu button:hover, .context-menu button:focus-visible { background: var(--bg-card-hover); outline: none; }
-.context-menu-row { display: flex; align-items: center; }
+.context-menu button:hover, .context-menu button:focus-visible { background: var(--dropdown-hover-bg); outline: none; }
+.context-menu-row { display: flex; align-items: center; border-radius: var(--radius-xs); }
+.context-menu-row:hover, .context-menu-row:focus-within { background: var(--dropdown-hover-bg); }
+.context-menu-row > button:first-child:hover, .context-menu-row > button:first-child:focus-visible { background: transparent; }
 .context-menu-row > button:first-child { flex: 1; min-width: 0; }
 .context-menu-row > button:first-child > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .context-menu-row .context-menu-secondary { flex-shrink: 0; width: 32px; padding: 7px; justify-content: center; }
+.context-menu-row .context-menu-secondary.context-menu-danger:hover,
+.context-menu-row .context-menu-secondary.context-menu-danger:focus-visible { background: var(--danger-bg); }
 .context-menu button:disabled { opacity: .45; cursor: default; }
 .context-menu .context-menu-danger { color: var(--danger-text); }
 .context-menu .context-menu-separated { border-top: 1px solid var(--border-default); margin-top: 4px; border-radius: 0 0 4px 4px; }
@@ -5272,7 +5289,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   cursor: pointer;
   user-select: none;
 }
-.app-select-option.is-active { background: var(--bg-card-hover); }
+.app-select-option.is-active { background: var(--dropdown-hover-bg); }
 .app-select-option[aria-selected="true"] { color: var(--accent-color); }
 .app-select-option[aria-disabled="true"] { opacity: .45; cursor: default; }
 .app-select-option > svg { flex-shrink: 0; }
@@ -5280,4 +5297,14 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 @media (prefers-reduced-motion: reduce) {
   .app-select, .app-select-chevron { transition: none; }
   .app-select-list, .app-select-list.dropdown-closing { animation: none; }
+}
+
+.context-menu button, .context-menu-row, .app-select-option,
+.chat-file-download-menu button, .chat-msg-menu button, .participant-menu button, .room-app-options-menu button {
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+@media (prefers-reduced-motion: reduce) {
+  .source-cards-skeleton-layer, .source-cards-content-layer, .media-preview-skeleton, .media-preview-video.ready, .skeleton-shimmer { animation: none; transition: none; }
+  .context-menu button, .context-menu-row, .app-select-option,
+  .chat-file-download-menu button, .chat-msg-menu button, .participant-menu button, .room-app-options-menu button { transition: none; }
 }
