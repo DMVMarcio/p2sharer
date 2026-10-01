@@ -1,0 +1,3 @@
+[env]
+# Match Rust's default MSVC runtime when statically linking libjpeg-turbo.
+CMAKE_TOOLCHAIN_FILE = { value = "src-tauri/cmake/native-runtime.cmake", relative = true }

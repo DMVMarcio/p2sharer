@@ -2,6 +2,58 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { MediaCoordinator } from '../../src/p2p/media_coordinator.ts';
 
+describe('Video encoder selection', () => {
+  const codecs = [
+    { mimeType: 'video/H264', sdpFmtpLine: 'profile-level-id=64001f' },
+    { mimeType: 'video/AV1' },
+    { mimeType: 'video/VP8' },
+    { mimeType: 'video/rtx', sdpFmtpLine: 'apt=96' },
+  ];
+  const software = { supported: true, smooth: true, powerEfficient: false };
+
+  it('uses the faster VP8 fallback when WebRTC reports software encoding', () => {
+    const support = new Map([
+      ['video/h264;profile-level-id=64001f', software],
+      ['video/av1', software], ['video/vp8', software],
+    ]);
+    const sorted = MediaCoordinator.sortCodecs(codecs, support);
+    assert.equal(sorted[0].mimeType, 'video/VP8');
+    assert.equal(sorted.at(-1)?.mimeType, 'video/rtx');
+    assert.equal(sorted.length, codecs.length);
+  });
+
+  it('preserves hardware encoding ahead of the software fallback', () => {
+    const support = new Map([
+      ['video/h264;profile-level-id=64001f', software],
+      ['video/av1', { ...software, powerEfficient: true }], ['video/vp8', software],
+    ]);
+    assert.deepEqual(MediaCoordinator.sortCodecs(codecs, support).map((codec) => codec.mimeType),
+      ['video/AV1', 'video/VP8', 'video/H264', 'video/rtx']);
+  });
+
+  it('keeps the established codec order when encoding capabilities are unavailable', () => {
+    assert.equal(MediaCoordinator.sortCodecs(codecs)[0].mimeType, 'video/H264');
+  });
+
+  it('does not override the broadcaster codec order on receiving-only transceivers', () => {
+    const original = Object.getOwnPropertyDescriptor(globalThis, 'RTCRtpSender');
+    Object.defineProperty(globalThis, 'RTCRtpSender', { configurable: true,
+      value: { getCapabilities: () => ({ codecs }) } });
+    let configured = 0;
+    try {
+      const receiving = { sender: { track: null }, receiver: { track: { kind: 'video' } },
+        setCodecPreferences: () => { throw new Error('Receiving codec preference changed'); } };
+      const sending = { sender: { track: { kind: 'video' } },
+        setCodecPreferences: () => { configured++; } };
+      MediaCoordinator.configureCodecPreferences({ getTransceivers: () => [receiving, sending] } as unknown as RTCPeerConnection);
+      assert.equal(configured, 1);
+    } finally {
+      if (original) Object.defineProperty(globalThis, 'RTCRtpSender', original);
+      else Reflect.deleteProperty(globalThis, 'RTCRtpSender');
+    }
+  });
+});
+
 describe('MediaCoordinator SDP Munging and WebRTC Bandwidth Allocation', () => {
   const sampleSdp = [
     'v=0',
@@ -113,6 +165,48 @@ describe('MediaCoordinator SDP Munging and WebRTC Bandwidth Allocation', () => {
     assert.ok(setLocalCalledWith, 'setLocalDescription must receive the generated munged offer');
     assert.match(setLocalCalledWith.sdp, /b=AS:25000/);
     assert.match(setLocalCalledWith.sdp, /x-google-min-bitrate=500/);
+  });
+
+  it('serializes overlapping sender updates and applies the latest FPS and bitrate', async () => {
+    let active = 0;
+    let maxActive = 0;
+    const applied: Array<{ bitrate: number; fps: number }> = [];
+    const sender = {
+      track: { kind: 'video' },
+      getParameters: () => ({ encodings: [{}] }),
+      setParameters: async (params: any) => {
+        active++;
+        maxActive = Math.max(maxActive, active);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        applied.push({ bitrate: params.encodings[0].maxBitrate, fps: params.encodings[0].maxFramerate });
+        active--;
+      },
+    };
+    const pc = { signalingState: 'stable', getSenders: () => [sender] } as unknown as RTCPeerConnection;
+    await Promise.all([
+      MediaCoordinator.applySenderBitrate(pc, 8_000_000, 30),
+      MediaCoordinator.applySenderBitrate(pc, 12_000_000, 60),
+      MediaCoordinator.applySenderBitrate(pc, 15_000_000, 60),
+    ]);
+    assert.equal(maxActive, 1, 'Parameter transactions must not overlap');
+    assert.deepEqual(applied, [
+      { bitrate: 8_000_000, fps: 30 }, { bitrate: 12_000_000, fps: 60 }, { bitrate: 15_000_000, fps: 60 },
+    ]);
+  });
+
+  it('waits for negotiated encodings instead of inventing an invalid sender transaction', async () => {
+    const params: any = { encodings: [] };
+    let applied = 0;
+    const pc = { signalingState: 'stable', getSenders: () => [{
+      track: { kind: 'video' }, getParameters: () => params, setParameters: async () => { applied++; },
+    }] } as unknown as RTCPeerConnection;
+    await MediaCoordinator.applySenderBitrate(pc, 15_000_000, 60);
+    assert.equal(applied, 0);
+    assert.deepEqual(params.encodings, []);
+    params.encodings = [{}];
+    await MediaCoordinator.applySenderBitrate(pc, 15_000_000, 60);
+    assert.equal(applied, 1);
+    assert.equal(params.encodings[0].maxFramerate, 60);
   });
 
   it('lets video yield bandwidth to high-priority audio', async () => {

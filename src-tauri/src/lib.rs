@@ -6,6 +6,7 @@ pub mod pip_manager;
 pub mod process_manager;
 pub mod room_vault;
 pub mod screen_sources;
+mod video_jpeg;
 
 use audio_loopback::{start_audio_capture, stop_audio_capture};
 use logger::{clear_log_file, get_log_file_path, open_latest_log, open_log_folder, write_frontend_log};
