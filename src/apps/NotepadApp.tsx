@@ -83,16 +83,12 @@ export const NotepadApp: React.FC<Props> = ({ instanceId, compact = false }) => 
   return <div className={`room-app-notepad ${compact ? 'compact' : ''}`}
     onClick={(event) => event.stopPropagation()}>
     {!compact && <>
-      <div className="room-app-toolbar">
-        <span>Edição compartilhada</span>
-        <div className="room-app-toolbar-actions">
-          <button className="btn btn-sm btn-outline" disabled={busy} onClick={open}>Abrir</button>
-          <button className="btn btn-sm btn-outline" disabled={busy} onClick={save}>Salvar</button>
-        </div>
-      </div>
       {editor && <NotepadToolbar editor={editor} onLink={() => {
         setLinkUrl(editor.getAttributes('link').href || ''); setEditingLink(true);
-      }} />}
+      }} fileActions={<>
+        <button className="btn btn-sm btn-outline" disabled={busy} onClick={open}>Abrir</button>
+        <button className="btn btn-sm btn-outline" disabled={busy} onClick={save}>Salvar</button>
+      </>} />}
       {editingLink && <div className="room-app-notepad-link">
         <input aria-label="URL do link" autoFocus value={linkUrl} placeholder="https://..."
           onChange={(event) => setLinkUrl(event.target.value)}

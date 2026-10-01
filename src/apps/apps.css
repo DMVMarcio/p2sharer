@@ -99,8 +99,7 @@
 
 /* Shared notepad */
 .room-app-notepad { display: flex; flex-direction: column; width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: hidden; }
-.room-app-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  padding: 7px 9px; font-size: 11px; color: var(--text-secondary); }
+.room-app-notepad-file-actions { margin-left: auto; }
 .room-app-notepad-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; flex-shrink: 0;
   padding: 5px 8px; border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle);
   background: var(--bg-elevated); }
