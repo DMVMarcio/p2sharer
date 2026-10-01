@@ -3,8 +3,14 @@
 html.stream-pointer-desktop, .stream-pointer-desktop body, .stream-pointer-desktop #root { background: transparent !important; margin: 0; width: 100%; height: 100%; overflow: hidden; pointer-events: none; }
 .stream-pointer-native-layer { position: fixed; inset: 0; overflow: hidden; pointer-events: none; }
 .stream-pointer-remote { position: absolute; filter: drop-shadow(0 1px 2px #000); pointer-events: none; }
+/* Cover the 50 ms snapshot cadence plus jitter. Retarget from the current rendered
+   position when a new sample arrives, rather than jumping to the previous target. */
+.stream-pointer-remote.is-interpolated { --stream-pointer-move-duration: 70ms; transition: left var(--stream-pointer-move-duration) linear, top var(--stream-pointer-move-duration) linear; }
 .stream-pointer-remote svg { display: block; transform: translate(-3px, -3px); stroke: white; stroke-width: 1.5px; }
 .stream-pointer-remote span { display: block; margin: 2px 0 0 10px; padding: 2px 5px; border-radius: var(--radius-sm, 4px); background: rgba(0,0,0,.75); font-size: 12px; white-space: nowrap; max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
 .stream-pointer-ripple { position: absolute; width: 16px; height: 16px; border: 2px solid currentColor; border-radius: 50%; animation: streamPointerRipple 1s ease-out forwards; }
 @keyframes streamPointerRipple { from { transform: translate(-50%, -50%) scale(.5); opacity: 1; } to { transform: translate(-50%, -50%) scale(4); opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .stream-pointer-ripple { animation: none; transform: translate(-50%, -50%); } }
+@media (prefers-reduced-motion: reduce) {
+  .stream-pointer-remote.is-interpolated { transition: none; }
+  .stream-pointer-ripple { animation: none; transform: translate(-50%, -50%); }
+}
