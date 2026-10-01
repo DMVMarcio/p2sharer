@@ -4,6 +4,7 @@ import { AudioBridge } from '../audio/audio_bridge.ts';
 import { audioContextManager } from '../audio/audio_context_manager.ts';
 import { stateStore } from '../core/state_store.ts';
 import { mergeChatHistory } from '../core/chat_history.ts';
+import { CHAT_FILE_CHUNK_BYTES, MAX_IMAGE_PREVIEW_BYTES } from '../core/chat_file_limits.ts';
 import { verifyRoomInvite } from '../core/room_invite_validation.ts';
 import { savedRooms } from '../core/saved_rooms.ts';
 import type { ChatMessage, PeerInfo, RoomSlotInfo } from '../core/types.ts';
@@ -35,6 +36,13 @@ export class RoomService {
   public fileRequests: FileRequest[] = [];
   public fileProgress: Record<string, FileProgress> = {};
   public localFilePreviews: Record<string, string> = {};
+  public imagePreviews: Record<string, string> = {};
+  public savedDownloads: Record<string, string> = {};
+  private imagePreviewBytes: Record<string, Uint8Array> = {};
+  private transferRates = new Map<string, { at: number; bytes: number; speed: number }>();
+  private transferRouteChecks = new Map<string, number>();
+  private localSaveIds = new Set<string>();
+  private cancelledLocalSaves = new Set<string>();
   public peers: PeerInfo[] = [];
   public roomStatusText: string = 'Sala Ativa';
   public connectingOverlay: ConnectingOverlayState = {
@@ -173,10 +181,14 @@ export class RoomService {
 
     soundEffects.playUserJoin();
 
-    for (const transfer of Object.values(this.fileProgress)) {
-      if (transfer.preview?.startsWith('blob:')) URL.revokeObjectURL(transfer.preview);
-    }
+    this.clearImagePreviews();
     this.chatMessages = [];
+    this.fileRequests = [];
+    this.fileProgress = {};
+    this.transferRates.clear();
+    this.transferRouteChecks.clear();
+    this.savedDownloads = {};
+    this.localFilePreviews = {};
     this.peers = [];
     this.roomStatusText = 'Conectando à sala...';
 
@@ -220,6 +232,11 @@ export class RoomService {
       });
 
     await manager.join({
+      onFileRequestCancelled: (requestId) => {
+        if (this.roomManager !== manager) return;
+        this.fileRequests = this.fileRequests.filter((request) => request.requestId !== requestId);
+        this.notify();
+      },
       onFileRequest: (request) => {
         if (this.roomManager !== manager) return;
         this.fileRequests = [...this.fileRequests, request];
@@ -227,9 +244,8 @@ export class RoomService {
       },
       onFileProgress: (progress) => {
         if (this.roomManager !== manager) return;
-        this.fileProgress = { ...this.fileProgress, [progress.requestId]: progress };
+        this.recordFileProgress(progress);
         if (progress.status === 'error') showToast('Não foi possível concluir a transferência do arquivo.');
-        this.notify();
       },
       onAppEvent: (event, peerId) => {
         if (this.roomManager === manager) roomAppsService.receive(event, peerId);
@@ -247,6 +263,13 @@ export class RoomService {
       onChat: (msg: ChatMessage) => {
         if (this.roomManager !== manager) return;
         this.chatMessages = mergeChatHistory(this.chatMessages, [msg]);
+        if (msg.deletedAt && msg.file) {
+          this.fileRequests = this.fileRequests.filter((request) => request.messageId !== msg.id);
+          const preview = this.imagePreviews[msg.id];
+          if (preview?.startsWith('blob:')) URL.revokeObjectURL(preview);
+          delete this.imagePreviews[msg.id];
+          delete this.imagePreviewBytes[msg.id];
+        }
         this.notify();
       },
       onChatHistory: (messages: ChatMessage[]) => {
@@ -466,7 +489,13 @@ export class RoomService {
     this.chatMessages = [];
     this.fileRequests = [];
     this.fileProgress = {};
+    this.transferRates.clear();
+    this.transferRouteChecks.clear();
+    this.savedDownloads = {};
     this.localFilePreviews = {};
+    this.clearImagePreviews();
+    this.localSaveIds.clear();
+    this.cancelledLocalSaves.clear();
     this.peers = [];
     this.hideConnecting();
     showToast('Você saiu da sala.');
@@ -482,7 +511,7 @@ export class RoomService {
   public async offerFile(file: NativeChatFile, name: string, autoAccept: boolean): Promise<void> {
     if (!this.roomManager) throw new Error('Room unavailable');
     const message = await this.roomManager.offerFile(file, name, autoAccept);
-    if (message.file?.isImage && file.size <= 10 * 1024 * 1024) {
+    if (message.file?.isImage && file.size <= MAX_IMAGE_PREVIEW_BYTES) {
       try {
         const data = await invoke<string>('read_chat_image_preview', { id: file.id });
         const extension = file.name.split('.').pop()?.toLowerCase();
@@ -497,7 +526,134 @@ export class RoomService {
 
   public requestFile(messageId: string, saveAs: boolean): Promise<string | null> {
     if (!this.roomManager) throw new Error('Room unavailable');
+    if (this.imagePreviewBytes[messageId]) return this.saveCachedImage(messageId, saveAs);
     return this.roomManager.requestFile(messageId, saveAs);
+  }
+
+  public requestFilePreview(messageId: string): Promise<void> {
+    if (!this.roomManager) throw new Error('Room unavailable');
+    return this.roomManager.requestFilePreview(messageId);
+  }
+
+  private recordFileProgress(progress: FileProgress): void {
+    const { previewBytes, ...reported } = progress;
+    const previous = this.fileProgress[progress.requestId];
+    const message = this.chatMessages.find((item) => item.id === progress.messageId);
+    const peer = this.peers.find((item) => item.id === progress.peerId);
+    let bytesPerSecond = previous?.bytesPerSecond ?? 0;
+    if (progress.status === 'active') {
+      const now = performance.now();
+      const sample = this.transferRates.get(progress.requestId);
+      if (!sample) this.transferRates.set(progress.requestId, { at: now, bytes: progress.bytes, speed: 0 });
+      else if (now - sample.at >= 100 && progress.bytes >= sample.bytes) {
+        const instant = (progress.bytes - sample.bytes) * 1000 / (now - sample.at);
+        bytesPerSecond = sample.speed ? sample.speed * 0.65 + instant * 0.35 : instant;
+        this.transferRates.set(progress.requestId, { at: now, bytes: progress.bytes, speed: bytesPerSecond });
+      }
+    } else if (progress.status !== 'pending') this.transferRates.delete(progress.requestId);
+    const entry: FileProgress = {
+      ...previous, ...reported,
+      fileName: progress.fileName ?? previous?.fileName ?? message?.file?.name ?? 'Arquivo',
+      peerName: progress.peerName ?? previous?.peerName ?? peer?.username ??
+        (progress.direction === 'receive' ? message?.sender : undefined) ?? 'Participante',
+      peerId: progress.peerId ?? previous?.peerId,
+      previewOnly: progress.previewOnly ?? previous?.previewOnly,
+      startedAt: previous?.startedAt ?? Date.now(),
+      isImage: progress.isImage ?? previous?.isImage ?? message?.file?.isImage ?? false,
+      bytesPerSecond,
+      timings: progress.timings ?? previous?.timings,
+    };
+    this.fileProgress = { ...this.fileProgress, [entry.requestId]: entry };
+    if (entry.status === 'active' && entry.peerId && this.roomManager) {
+      const now = performance.now();
+      const last = this.transferRouteChecks.get(entry.requestId);
+      if (last === undefined || now - last >= 5000) {
+        this.transferRouteChecks.set(entry.requestId, now);
+        void this.roomManager.getFileTransportDiagnostics(entry.peerId).then((stats) => {
+          const current = this.fileProgress[entry.requestId];
+          if (!stats || !current || current.status !== 'active' || current.peerId !== entry.peerId) return;
+          const previous = current.transport;
+          const transport = { ...stats.transport };
+          const currentBytes = current.direction === 'send' ? transport.pairBytesSent : transport.pairBytesReceived;
+          const previousBytes = current.direction === 'send' ? previous?.pairBytesSent : previous?.pairBytesReceived;
+          const elapsedMs = transport.pairTimestamp !== undefined && previous?.pairTimestamp !== undefined ?
+            transport.pairTimestamp - previous.pairTimestamp : 0;
+          if (currentBytes !== undefined && previousBytes !== undefined && currentBytes >= previousBytes && elapsedMs > 0) {
+            transport.pairBytesPerSecond = (currentBytes - previousBytes) * 1000 / elapsedMs;
+          }
+          this.fileProgress = { ...this.fileProgress, [entry.requestId]: {
+            ...current, connectionType: stats.connectionType, rttMs: stats.rttMs, transport } };
+          this.notify();
+        });
+      }
+    } else if (entry.status !== 'pending') this.transferRouteChecks.delete(entry.requestId);
+    if (entry.status === 'complete' && entry.previewOnly && entry.preview) {
+      this.imagePreviews = { ...this.imagePreviews, [entry.messageId]: entry.preview };
+      if (previewBytes) this.imagePreviewBytes[entry.messageId] = previewBytes;
+    }
+    if (entry.status === 'complete' && entry.direction === 'receive' && entry.saved) {
+      this.savedDownloads = { ...this.savedDownloads, [entry.messageId]: entry.requestId };
+    }
+    this.notify();
+  }
+
+  private clearImagePreviews(): void {
+    for (const preview of Object.values(this.imagePreviews)) {
+      if (preview.startsWith('blob:')) URL.revokeObjectURL(preview);
+    }
+    this.imagePreviews = {};
+    this.imagePreviewBytes = {};
+  }
+
+  public dismissFileProgress(requestId: string): void {
+    if (!this.fileProgress[requestId]) return;
+    const next = { ...this.fileProgress };
+    delete next[requestId];
+    this.fileProgress = next;
+    this.notify();
+  }
+
+  private async saveCachedImage(messageId: string, saveAs: boolean): Promise<string | null> {
+    const message = this.chatMessages.find((item) => item.id === messageId && !item.deletedAt);
+    const bytes = this.imagePreviewBytes[messageId];
+    if (!message?.file?.isImage || !bytes) throw new Error('Image preview unavailable');
+    const requestId = crypto.randomUUID();
+    const selected = await invoke<boolean>('choose_chat_download', { id: requestId,
+      name: message.file.name, size: message.file.size, hash: message.file.sha256, saveAs });
+    if (!selected) return null;
+    this.localSaveIds.add(requestId);
+    let written = 0;
+    this.recordFileProgress({ requestId, messageId, direction: 'receive', bytes: 0,
+      total: message.file.size, status: 'active', fileName: message.file.name,
+      peerName: message.sender });
+    try {
+      if (bytes.length !== message.file.size) throw new Error('Preview size mismatch');
+      for (let offset = 0; offset < bytes.length; offset += CHAT_FILE_CHUNK_BYTES) {
+        if (this.cancelledLocalSaves.has(requestId)) throw new Error('Download cancelled');
+        const chunk = bytes.subarray(offset, offset + CHAT_FILE_CHUNK_BYTES);
+        let binary = '';
+        for (const byte of chunk) binary += String.fromCharCode(byte);
+        written = await invoke<number>('write_chat_download_chunk', { id: requestId,
+          offset, data: btoa(binary) });
+        this.recordFileProgress({ requestId, messageId, direction: 'receive', bytes: written,
+          total: message.file.size, status: 'active' });
+      }
+      if (this.cancelledLocalSaves.has(requestId)) throw new Error('Download cancelled');
+      await invoke('finish_chat_download', { id: requestId });
+      this.recordFileProgress({ requestId, messageId, direction: 'receive', bytes: message.file.size,
+        total: message.file.size, status: 'complete', saved: true });
+      return requestId;
+    } catch (error) {
+      await invoke('cancel_chat_download', { id: requestId });
+      const cancelled = this.cancelledLocalSaves.has(requestId);
+      this.recordFileProgress({ requestId, messageId, direction: 'receive', bytes: written,
+        total: message.file.size, status: cancelled ? 'cancelled' : 'error' });
+      if (cancelled) return null;
+      throw error;
+    } finally {
+      this.localSaveIds.delete(requestId);
+      this.cancelledLocalSaves.delete(requestId);
+    }
   }
 
   public async answerFileRequest(requestId: string, accept: boolean): Promise<void> {
@@ -507,7 +663,24 @@ export class RoomService {
   }
 
   public cancelFileTransfer(requestId: string): Promise<void> {
+    if (this.localSaveIds.has(requestId)) {
+      this.cancelledLocalSaves.add(requestId);
+      return Promise.resolve();
+    }
     return this.roomManager?.cancelFileTransfer(requestId) ?? Promise.resolve();
+  }
+
+  public async revealSavedFile(messageId: string, requestId: string): Promise<void> {
+    try { await invoke('reveal_chat_download', { id: requestId }); }
+    catch (error) {
+      if (this.savedDownloads[messageId] === requestId) {
+        const next = { ...this.savedDownloads };
+        delete next[messageId];
+        this.savedDownloads = next;
+        this.notify();
+      }
+      throw error;
+    }
   }
 
   public editChatMessage(id: string, text: string): Promise<boolean> {

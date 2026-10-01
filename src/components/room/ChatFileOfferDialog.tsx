@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import type { NativeChatFile } from '../../p2p/group_room';
+import { formatFileSize } from '../../core/file_size';
+import { Paperclip } from 'lucide-react';
 
 interface Props { file: NativeChatFile; onClose: () => void; onOffer: (name: string, autoAccept: boolean) => Promise<void> }
 
@@ -16,19 +18,22 @@ export function ChatFileOfferDialog({ file, onClose, onOffer }: Props) {
   };
   return <div className="modal-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <div className="modal-card chat-file-dialog" role="dialog" aria-modal="true" aria-labelledby="chat-file-dialog-title">
-      <div className="modal-header"><div><h2 id="chat-file-dialog-title">Anexar arquivo</h2>
+      <div className="modal-header"><div className="modal-header-icon"><Paperclip size={19} /></div><div><h2 id="chat-file-dialog-title">Anexar arquivo</h2>
         <p className="modal-subtitle">O arquivo será oferecido no chat. Você decide quando enviá-lo.</p></div>
         <button className="btn-close" aria-label="Fechar" onClick={onClose}>&times;</button></div>
-      <div className="modal-body">
-        <label className="chat-file-field">Nome exibido<input value={name} maxLength={180} onChange={(event) => setName(event.target.value)} /></label>
-        <div className="chat-file-switch"><span>Aceitar solicitações automaticamente por 10 minutos</span>
+      <div className="modal-body chat-file-dialog-body">
+        <div className="form-group"><label className="form-label" htmlFor="chat-file-name">Nome exibido</label>
+          <input className="text-input" id="chat-file-name" value={name} maxLength={180}
+            onChange={(event) => setName(event.target.value)} /></div>
+        <div className="chat-file-detail"><span>{formatFileSize(file.size)}</span><span>SHA-256 {file.hash}</span></div>
+        <div className="chat-file-switch"><span>Aceitar solicitações</span>
           <label className="modern-switch"><input type="checkbox" checked={autoAccept}
-            aria-label="Aceitar solicitações automaticamente por 10 minutos"
+            aria-label="Aceitar solicitações"
             onChange={(event) => setAutoAccept(event.target.checked)} /><span className="switch-slider" /></label></div>
-        <p className="chat-file-detail">{(file.size / 1024).toFixed(1)} KB · SHA-256 {file.hash}</p>
+        <p className="chat-file-observation"><strong>Obs:</strong> Ao ativar, todas as solicitações de download deste arquivo serão aceitas automaticamente pelos próximos 10 minutos.</p>
         {error && <p className="chat-file-error">{error}</p>}
       </div>
-      <div className="chat-file-dialog-actions"><button className="btn" onClick={onClose}>Cancelar</button>
+      <div className="modal-footer"><button className="btn btn-secondary" onClick={onClose}>Cancelar</button>
         <button className="btn btn-primary" disabled={busy || !name.trim()} onClick={() => void submit()}>Anexar</button></div>
     </div>
   </div>;

@@ -7,7 +7,11 @@ import { soundEffects } from '../../ui/sound_effects';
 import { showToast } from '../../hooks/useToast';
 import { ThemeMode } from '../../core/types';
 import { EMOJI_PACKS, EmojiPack, getEmojiPack, saveEmojiPack } from '../../core/emoji_preferences';
+import { getTransferSpeedUnit, saveTransferSpeedUnit, type TransferSpeedUnit } from '../../core/transfer_speed';
 import { EmojiGlyph } from '../common/EmojiGlyph';
+import { RendezvousServerEditor } from '../common/RendezvousServerEditor';
+import { loadRendezvousPreferences, saveRendezvousPreferences, validateRendezvousPreferences } from '../../p2p/relay_preferences.ts';
+import { isValidTurnUrl, parseTurnUrls } from '../../p2p/ice_config.ts';
 
 export const SettingsModal: React.FC = () => {
   const { closeModal, isClosing } = useModal();
@@ -20,6 +24,7 @@ export const SettingsModal: React.FC = () => {
   // Form states initialized once upon mounting
   const [nick, setNick] = useState(() => stateStore.username);
   const [emojiPack, setEmojiPack] = useState<EmojiPack>(getEmojiPack);
+  const [transferSpeedUnit, setTransferSpeedUnit] = useState<TransferSpeedUnit>(getTransferSpeedUnit);
   const [sfxEnabled, setSfxEnabled] = useState(() => soundEffects.getEnabled());
   const [sfxVolume, setSfxVolume] = useState(() => Math.round(soundEffects.getVolume() * 100));
 
@@ -48,6 +53,7 @@ export const SettingsModal: React.FC = () => {
   const [turnForceRelay, setTurnForceRelay] = useState(
     () => localStorage.getItem('p2sharer_turn_force_relay') === 'true'
   );
+  const [rendezvousPreferences, setRendezvousPreferences] = useState(loadRendezvousPreferences);
 
   const [logPath, setLogPath] = useState('Carregando caminho do log...');
 
@@ -58,6 +64,23 @@ export const SettingsModal: React.FC = () => {
   }, []);
 
   const handleSave = () => {
+    const turnUrls = parseTurnUrls(turnUrl);
+    if (turnEnabled && (turnUrls.length === 0 || turnUrls.some((url) => !isValidTurnUrl(url)))) {
+      setActiveTab('network');
+      showToast('Informe endereços TURN válidos, um por linha.');
+      return;
+    }
+    if (turnEnabled && (!turnUser.trim() || !turnCred.trim())) {
+      setActiveTab('network');
+      showToast('Informe o usuário e a senha do servidor TURN.');
+      return;
+    }
+    const rendezvousError = validateRendezvousPreferences(rendezvousPreferences);
+    if (rendezvousError) {
+      setActiveTab('network');
+      showToast(rendezvousError);
+      return;
+    }
     // Save username
     if (nick.trim()) {
       stateStore.set((s) => {
@@ -68,6 +91,7 @@ export const SettingsModal: React.FC = () => {
 
     // Save SFX
     saveEmojiPack(emojiPack);
+    saveTransferSpeedUnit(transferSpeedUnit);
     soundEffects.setEnabled(sfxEnabled);
     soundEffects.setVolume(sfxVolume / 100);
 
@@ -87,19 +111,11 @@ export const SettingsModal: React.FC = () => {
 
     // Save TURN
     localStorage.setItem('p2sharer_turn_enabled', turnEnabled ? 'true' : 'false');
-    let sanitizedTurn = turnUrl.trim();
-    if (
-      sanitizedTurn &&
-      !sanitizedTurn.startsWith('turn:') &&
-      !sanitizedTurn.startsWith('turns:') &&
-      !sanitizedTurn.startsWith('stun:')
-    ) {
-      sanitizedTurn = `turn:${sanitizedTurn}`;
-    }
-    localStorage.setItem('p2sharer_turn_url', sanitizedTurn);
+    localStorage.setItem('p2sharer_turn_url', turnUrls.join('\n'));
     localStorage.setItem('p2sharer_turn_user', turnUser.trim());
     localStorage.setItem('p2sharer_turn_cred', turnCred.trim());
     localStorage.setItem('p2sharer_turn_force_relay', turnForceRelay ? 'true' : 'false');
+    saveRendezvousPreferences(rendezvousPreferences);
 
     closeModal();
     showToast('Configurações salvas com sucesso!');
@@ -230,7 +246,7 @@ export const SettingsModal: React.FC = () => {
                 <line x1="2" x2="22" y1="12" y2="12"/>
                 <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
               </svg>
-              <span>Rede & TURN</span>
+              <span>Rede & P2P</span>
             </button>
 
             <button
@@ -310,6 +326,14 @@ export const SettingsModal: React.FC = () => {
                     ))}
                   </div>
                   <p className="field-info-text">A escolha muda a aparência local dos emojis. As mensagens continuam compatíveis entre participantes.</p>
+                </div>
+                <div className="settings-row">
+                  <label className="settings-label" htmlFor="settings-transfer-speed-unit">Velocidade das transferências:</label>
+                  <select id="settings-transfer-speed-unit" className="select-input-sm"
+                    value={transferSpeedUnit} onChange={(event) => setTransferSpeedUnit(event.target.value as TransferSpeedUnit)}>
+                    <option value="MB">MB/s (megabytes por segundo)</option>
+                    <option value="Mb">Mb/s (megabits por segundo)</option>
+                  </select>
                 </div>
               </div>
             )}
@@ -605,18 +629,18 @@ export const SettingsModal: React.FC = () => {
             {activeTab === 'network' && (
               <div className="settings-tab-pane active" id="settings-pane-network">
                 <div className="settings-pane-header">
-                  <h3 className="settings-pane-title">Rede & Proteção de IP (TURN Relay)</h3>
+                  <h3 className="settings-pane-title">Conexão P2P e relay TURN</h3>
                   <p className="settings-pane-desc">
-                    Opcional: Oculte seu IP residencial encaminhando o tráfego P2P por um servidor relay.
+                    Configure um relay TURN para conectar participantes quando a rota direta falhar.
                   </p>
                 </div>
 
                 <div className="settings-row">
                   <label className="settings-switch-row" htmlFor="settings-enable-turn">
                     <div className="settings-switch-label-group">
-                      <span className="settings-switch-title">Servidor TURN / Proxy de IP</span>
+                      <span className="settings-switch-title">Servidor TURN</span>
                       <span className="settings-switch-subtitle">
-                        Encaminhar conexões por um servidor relay para proteger seu IP residencial
+                        Permitir conexões por relay quando necessário
                       </span>
                     </div>
                     <div className="modern-switch">
@@ -635,13 +659,13 @@ export const SettingsModal: React.FC = () => {
                   <div className="turn-config-box" id="turn-config-fields" style={{ display: 'flex', marginTop: '10px' }}>
                     <div className="settings-row">
                       <label className="settings-label" htmlFor="settings-turn-url">
-                        URL do Servidor TURN:
+                        Endereços TURN (um por linha):
                       </label>
-                      <input
-                        type="text"
+                      <textarea
                         id="settings-turn-url"
                         className="text-input-sm"
-                        placeholder="turn:turn.exemplo.com:3478?transport=udp"
+                        rows={3}
+                        placeholder={'turn:turn.exemplo.com:3478?transport=udp\nturn:turn.exemplo.com:3478?transport=tcp'}
                         value={turnUrl}
                         onChange={(e) => setTurnUrl(e.target.value)}
                       />
@@ -697,6 +721,14 @@ export const SettingsModal: React.FC = () => {
                     </div>
                   </div>
                 )}
+                <div className="settings-pane-header rendezvous-header">
+                  <h3 className="settings-pane-title">Servidores de encontro P2P</h3>
+                  <p className="settings-pane-desc">
+                    Escolha os servidores usados para localizar outros participantes. As alterações são aplicadas
+                    ao entrar novamente em uma sala.
+                  </p>
+                </div>
+                <RendezvousServerEditor preferences={rendezvousPreferences} onChange={setRendezvousPreferences} />
               </div>
             )}
 

@@ -6,6 +6,54 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 static LOG_FILE: Mutex<Option<File>> = Mutex::new(None);
 static LOG_PATH: Mutex<Option<PathBuf>> = Mutex::new(None);
+const MAX_SESSION_LOGS: usize = 8;
+
+fn session_log_started_at(path: &Path) -> Option<u128> {
+    let name = path.file_name()?.to_str()?;
+    let stem = name.strip_prefix("session-")?.strip_suffix(".log")?;
+    let (started_at, pid) = stem.split_once('-')?;
+    if !started_at.bytes().all(|byte| byte.is_ascii_digit())
+        || !pid.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        return None;
+    }
+    pid.parse::<u32>().ok()?;
+    started_at.parse::<u128>().ok()
+}
+
+fn rotate_session_logs(log_dir: &Path, current_path: &Path) -> std::io::Result<()> {
+    let mut logs = fs::read_dir(log_dir)?
+        .filter_map(|entry| {
+            let entry = entry.ok()?;
+            if !entry.file_type().ok()?.is_file() {
+                return None;
+            }
+            let path = entry.path();
+            let started_at = session_log_started_at(&path)?;
+            Some((started_at, entry.file_name(), path))
+        })
+        .collect::<Vec<_>>();
+
+    logs.sort_by(|left, right| left.0.cmp(&right.0).then_with(|| left.1.cmp(&right.1)));
+    let mut excess = logs.len().saturating_sub(MAX_SESSION_LOGS);
+    for (_, _, path) in logs {
+        if excess == 0 {
+            break;
+        }
+        if path == current_path {
+            continue;
+        }
+        match fs::remove_file(&path) {
+            Ok(()) => excess -= 1,
+            Err(error) => eprintln!(
+                "[LOGGER] Failed to remove old session log {}: {}",
+                path.display(),
+                error
+            ),
+        }
+    }
+    Ok(())
+}
 
 pub fn get_log_dir() -> PathBuf {
     let base = std::env::var("APPDATA")
@@ -62,6 +110,9 @@ pub fn init_logger() {
             }
             if let Ok(mut lock) = LOG_PATH.lock() {
                 *lock = Some(session_path.clone());
+            }
+            if let Err(error) = rotate_session_logs(&log_dir, &session_path) {
+                eprintln!("[LOGGER] Failed to rotate session logs: {}", error);
             }
         }
         Err(e) => {
@@ -242,4 +293,48 @@ pub fn clear_log_file() -> Result<(), String> {
     }
     log_msg("INFO", "system", "Log file cleared by user request.");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rotation_keeps_eight_newest_session_logs_and_unrelated_files() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let log_dir = std::env::temp_dir().join(format!("p2sharer-log-rotation-{unique}"));
+        fs::create_dir(&log_dir).unwrap();
+
+        // Create in reverse order so file modification time cannot decide retention.
+        for started_at in (1..=10).rev() {
+            File::create(log_dir.join(format!("session-{started_at}-123.log"))).unwrap();
+        }
+        File::create(log_dir.join("notes.txt")).unwrap();
+        File::create(log_dir.join("session-invalid-123.log")).unwrap();
+
+        let current_path = log_dir.join("session-10-123.log");
+        rotate_session_logs(&log_dir, &current_path).unwrap();
+
+        let remaining = fs::read_dir(&log_dir)
+            .unwrap()
+            .filter_map(|entry| entry.ok())
+            .filter_map(|entry| session_log_started_at(&entry.path()))
+            .collect::<Vec<_>>();
+        assert_eq!(remaining.len(), MAX_SESSION_LOGS);
+        for started_at in 1..=10 {
+            assert_eq!(
+                log_dir
+                    .join(format!("session-{started_at}-123.log"))
+                    .exists(),
+                started_at >= 3
+            );
+        }
+        assert!(log_dir.join("notes.txt").exists());
+        assert!(log_dir.join("session-invalid-123.log").exists());
+
+        fs::remove_dir_all(log_dir).unwrap();
+    }
 }

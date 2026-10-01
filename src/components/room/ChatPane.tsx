@@ -5,6 +5,7 @@ import { EmojiPickerPopover } from '../common/EmojiPickerPopover';
 import { EmojiComposerInput, type EmojiComposerHandle } from '../common/EmojiComposerInput';
 import { ChatMessageContent } from '../common/ChatMessageContent';
 import { getEmojiPack, subscribeEmojiPack } from '../../core/emoji_preferences';
+import { getTransferSpeedUnit, subscribeTransferSpeedUnit } from '../../core/transfer_speed';
 import { SystemNoticeIcon } from './SystemNoticeIcon';
 import { SystemNoticeText } from './SystemNoticeText';
 import { useEmojiSelectionHighlight } from '../../hooks/useEmojiSelectionHighlight';
@@ -15,12 +16,14 @@ import { invoke } from '@tauri-apps/api/core';
 import type { NativeChatFile } from '../../p2p/group_room';
 import { ChatFileOfferDialog } from './ChatFileOfferDialog';
 import { ChatFileAttachment } from './ChatFileAttachment';
+import { ChatTransferCenter } from './ChatTransferCenter';
 import { selfId } from '@trystero-p2p/core';
 import { showToast } from '../../hooks/useToast';
 
 export const ChatPane: React.FC = () => {
   const { chatMessages, sendChatMessage, editChatMessage, deleteChatMessage, offerFile,
-    requestFile, cancelFileTransfer, fileProgress, localFilePreviews } = useRoom();
+    requestFile, requestFilePreview, cancelFileTransfer, fileProgress,
+    localFilePreviews, imagePreviews, savedDownloads, revealSavedFile } = useRoom();
   const [selectedFile, setSelectedFile] = useState<NativeChatFile | null>(null);
   const [inputText, setInputText] = useState('');
   const [pickerTarget, setPickerTarget] = useState<'compose' | 'edit' | null>(null);
@@ -30,6 +33,7 @@ export const ChatPane: React.FC = () => {
   const [editDraft, setEditDraft] = useState('');
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const emojiPack = useSyncExternalStore(subscribeEmojiPack, getEmojiPack);
+  const transferSpeedUnit = useSyncExternalStore(subscribeTransferSpeedUnit, getTransferSpeedUnit);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<EmojiComposerHandle>(null);
   const editRef = useRef<EmojiComposerHandle>(null);
@@ -124,7 +128,13 @@ export const ChatPane: React.FC = () => {
     catch { showToast('Não foi possível abrir o arquivo.'); }
   };
   const startDownload = (messageId: string, saveAs: boolean) => {
-    void requestFile(messageId, saveAs).catch(() => showToast('Download indisponível. Verifique se o autor está conectado.'));
+    void requestFile(messageId, saveAs).catch((error) => {
+      console.warn('[Files] Could not save download:', error);
+      showToast('Não foi possível salvar o arquivo.');
+    });
+  };
+  const revealDownload = (messageId: string, requestId: string) => {
+    void revealSavedFile(messageId, requestId).catch(() => showToast('O arquivo não está mais disponível na pasta.'));
   };
 
   return (
@@ -186,10 +196,14 @@ export const ChatPane: React.FC = () => {
                     <button type="button" onClick={() => saveEdit(msg.id)}>Salvar</button>
                   </div>
                 </div> : msg.file ? <ChatFileAttachment message={msg}
+                  speedUnit={transferSpeedUnit}
                   transfers={Object.values(fileProgress).filter((transfer) => transfer.messageId === msg.id)}
-                  preview={localFilePreviews[msg.id]}
+                  preview={localFilePreviews[msg.id] ?? imagePreviews[msg.id]}
+                  savedRequestId={savedDownloads[msg.id]}
                   onRequest={(saveAs) => startDownload(msg.id, saveAs)}
-                  onCancel={(id) => void cancelFileTransfer(id)} /> : <ChatMessageContent text={msg.text} pack={emojiPack} />}
+                  onPreview={() => void requestFilePreview(msg.id).catch(() => showToast('Prévia indisponível. Verifique se o autor está conectado.'))}
+                  onCancel={(id) => void cancelFileTransfer(id)}
+                  onReveal={(id) => revealDownload(msg.id, id)} /> : <ChatMessageContent text={msg.text} pack={emojiPack} />}
               </div>
             </div>
           );
@@ -205,18 +219,6 @@ export const ChatPane: React.FC = () => {
         <button type="button" aria-label="Cancelar resposta" onClick={() => setReplyToId(null)}><X size={16} /></button>
       </div>}
       <form className="chat-input-bar" id="chat-input-form" onSubmit={handleSubmit}>
-        <button type="button" className="btn-chat-emoji" aria-label="Anexar arquivo" onClick={() => void pickFile()}><Paperclip size={18} /></button>
-        <button
-          type="button"
-          className={`btn-chat-emoji ${pickerTarget === 'compose' ? 'active' : ''}`}
-          aria-label="Selecionar emoji"
-          aria-expanded={pickerTarget === 'compose'}
-          onClick={() => setPickerTarget((current) => current === 'compose' ? null : 'compose')}
-        >
-          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01M15 9h.01" strokeWidth="2.5"/>
-          </svg>
-        </button>
         <EmojiComposerInput
           ref={inputRef}
           value={inputText}
@@ -224,12 +226,25 @@ export const ChatPane: React.FC = () => {
           onChange={setInputText}
           onSend={sendMessage}
         />
-        <button type="submit" className="btn-chat-send" aria-label="Enviar Mensagem">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="22" x2="11" y1="2" y2="13"/>
-            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
-          </svg>
-        </button>
+        <div className="chat-input-actions">
+          <div className="chat-input-actions-left">
+            <button type="button" className={`btn-chat-emoji ${pickerTarget === 'compose' ? 'active' : ''}`}
+              aria-label="Selecionar emoji" aria-expanded={pickerTarget === 'compose'}
+              onClick={() => setPickerTarget((current) => current === 'compose' ? null : 'compose')}>
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01M15 9h.01" strokeWidth="2.5"/>
+              </svg>
+            </button>
+            <button type="button" className="btn-chat-emoji" aria-label="Anexar arquivo" onClick={() => void pickFile()}><Paperclip size={18} /></button>
+          </div>
+          <ChatTransferCenter />
+          <button type="submit" className="btn-chat-send" aria-label="Enviar Mensagem">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="22" x2="11" y1="2" y2="13"/>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            </svg>
+          </button>
+        </div>
       </form>
       </div>
       {pickerTarget === 'edit' && <EmojiPickerPopover anchor={editEmojiButtonRef.current} pack={emojiPack} onSelect={insertEmoji} />}
