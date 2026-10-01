@@ -1,15 +1,62 @@
 import type { StreamStatusPayload } from '../core/types.ts';
 
 export class MediaCoordinator {
+  private static senderUpdates = new WeakMap<RTCPeerConnection, Promise<void>>();
+  private static preparedVideoCodecs: RTCRtpCodec[] | null = null;
+
+  private static codecContentType(codec: { mimeType: string; sdpFmtpLine?: string }): string {
+    const profile = /(?:^|;)((?:profile-level-id|profile-id|profile)=[^;]+)/i.exec(codec.sdpFmtpLine || '')?.[1];
+    return `${codec.mimeType.toLowerCase()}${profile ? `;${profile.toLowerCase()}` : ''}`;
+  }
+
+  /** Probe the actual WebRTC encoder, rather than assuming a codec is GPU accelerated. */
+  public static async prepareCodecPreferences(
+    width: number, height: number, frameRate: number, bitrate: number
+  ): Promise<void> {
+    MediaCoordinator.preparedVideoCodecs = null;
+    if (typeof navigator === 'undefined' || !navigator.mediaCapabilities?.encodingInfo ||
+        typeof RTCRtpSender === 'undefined' || !RTCRtpSender.getCapabilities) return;
+    const codecs = RTCRtpSender.getCapabilities('video')?.codecs;
+    if (!codecs?.length) return;
+    const support = new Map<string, MediaCapabilitiesInfo>();
+    const contentTypes = new Set(codecs.filter((codec) =>
+      /video\/(h264|vp8|vp9|av1)$/i.test(codec.mimeType)
+    ).map(MediaCoordinator.codecContentType));
+    const probes = Array.from(contentTypes).map(async (contentType) => {
+      try {
+        const info = await navigator.mediaCapabilities.encodingInfo({
+          type: 'webrtc', video: { contentType, width, height, bitrate, framerate: frameRate },
+        });
+        support.set(contentType, info);
+      } catch {
+        // Retain the normal codec ordering when this browser cannot probe a codec.
+      }
+    });
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([
+      Promise.all(probes),
+      new Promise<void>((resolve) => { timeout = setTimeout(resolve, 1500); }),
+    ]);
+    clearTimeout(timeout);
+    if (!Array.from(support.values()).some((info) => info.supported)) return;
+    MediaCoordinator.preparedVideoCodecs = MediaCoordinator.sortCodecs(codecs, support);
+    console.info('[Video] Encoder preference:', MediaCoordinator.preparedVideoCodecs
+      .filter((codec) => !/\/(rtx|red|ulpfec)$/i.test(codec.mimeType))
+      .map((codec) => `${codec.mimeType} (${support.get(MediaCoordinator.codecContentType(codec))?.powerEfficient ? 'power-efficient' : 'standard'})`));
+  }
   /**
-   * Sorts WebRTC video codecs according to hardware acceleration priority:
+   * Sorts codecs by encoder capability, keeping the legacy order without probe results.
+   * Power-efficient encoders are preferred; otherwise VP8 is the software fallback.
+   * Legacy order:
    * 1. video/H264 (NVENC, QuickSync, VCN hardware encoding)
    * 2. video/AV1
    * 3. video/VP9
    * 4. video/VP8 (fallback)
    * 5. others
    */
-  public static sortCodecs<T extends { mimeType: string; sdpFmtpLine?: string }>(codecs: T[]): T[] {
+  public static sortCodecs<T extends { mimeType: string; sdpFmtpLine?: string }>(
+    codecs: T[], support?: ReadonlyMap<string, MediaCapabilitiesInfo>
+  ): T[] {
     const h264High = codecs.filter(
       (c) =>
         c.mimeType.toLowerCase() === 'video/h264' &&
@@ -33,7 +80,18 @@ export class MediaCoordinator {
       );
     });
 
-    return [...h264High, ...h264Other, ...av1Codecs, ...vp9Codecs, ...vp8Codecs, ...otherCodecs];
+    const defaults = [...h264High, ...h264Other, ...av1Codecs, ...vp9Codecs, ...vp8Codecs];
+    if (!support?.size) return [...defaults, ...otherCodecs];
+    const hardware = defaults.filter((codec) => {
+      const info = support.get(MediaCoordinator.codecContentType(codec));
+      return info?.supported && info.powerEfficient;
+    });
+    // VP8 has a much faster software path than H.264 on affected WebView2/AMD systems.
+    const fallback = [...vp8Codecs, ...h264High, ...h264Other, ...vp9Codecs, ...av1Codecs]
+      .filter((codec) => !hardware.includes(codec));
+    const software = fallback.filter((codec) => support.get(MediaCoordinator.codecContentType(codec))?.supported !== false);
+    const unsupported = fallback.filter((codec) => support.get(MediaCoordinator.codecContentType(codec))?.supported === false);
+    return [...hardware, ...software, ...unsupported, ...otherCodecs];
   }
 
   private static globalMungingInitialized = false;
@@ -56,6 +114,7 @@ export class MediaCoordinator {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     proto.createOffer = async function (options?: any) {
+      MediaCoordinator.configureCodecPreferences(this);
       const offer = await origCreateOffer.call(this, options);
       if (offer && offer.sdp) {
         offer.sdp = MediaCoordinator.mungeSdpBitrates(offer.sdp);
@@ -65,6 +124,7 @@ export class MediaCoordinator {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     proto.createAnswer = async function (options?: any) {
+      MediaCoordinator.configureCodecPreferences(this);
       const answer = await origCreateAnswer.call(this, options);
       if (answer && answer.sdp) {
         answer.sdp = MediaCoordinator.mungeSdpBitrates(answer.sdp);
@@ -76,6 +136,7 @@ export class MediaCoordinator {
       description?: RTCLocalSessionDescriptionInit
     ) {
       if (!description) {
+        MediaCoordinator.configureCodecPreferences(this);
         // Parameterless setLocalDescription() as invoked by modern WebRTC / Trystero:
         // Automatically generate offer or answer, munge SDP with high-bitrate floor/ceiling, and apply it.
         try {
@@ -195,6 +256,7 @@ export class MediaCoordinator {
 
     pc.setLocalDescription = async function (description?: RTCLocalSessionDescriptionInit) {
       if (!description) {
+        MediaCoordinator.configureCodecPreferences(pc);
         try {
           if (
             (pc.signalingState === 'have-remote-offer' || pc.signalingState === 'have-local-pranswer') &&
@@ -234,16 +296,11 @@ export class MediaCoordinator {
       try {
         const capabilities = RTCRtpSender.getCapabilities('video');
         if (capabilities && capabilities.codecs && capabilities.codecs.length > 0) {
-          const prioritized = MediaCoordinator.sortCodecs(capabilities.codecs);
+          const prioritized = MediaCoordinator.preparedVideoCodecs ?? MediaCoordinator.sortCodecs(capabilities.codecs);
 
           pc.getTransceivers().forEach((transceiver) => {
-            const isVideo =
-              transceiver.sender?.track?.kind === 'video' ||
-              transceiver.receiver?.track?.kind === 'video' ||
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              (transceiver as any).kind === 'video' ||
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              (transceiver as any).mid === 'video';
+            // Receiving-only transceivers retain the broadcaster's offered codec order.
+            const isVideo = transceiver.sender?.track?.kind === 'video';
 
             if (isVideo && typeof transceiver.setCodecPreferences === 'function') {
               try {
@@ -269,16 +326,29 @@ export class MediaCoordinator {
     maxFps: number = 60
   ): Promise<void> {
     if (!pc || typeof pc.getSenders !== 'function') return;
-    if (pc.signalingState && pc.signalingState !== 'stable') return;
+    const previous = MediaCoordinator.senderUpdates.get(pc) ?? Promise.resolve();
+    const update = previous.catch(() => {}).then(() =>
+      MediaCoordinator.applySenderParameters(pc, maxBitrateBps, maxFps));
+    MediaCoordinator.senderUpdates.set(pc, update);
+    try {
+      await update;
+    } finally {
+      if (MediaCoordinator.senderUpdates.get(pc) === update) MediaCoordinator.senderUpdates.delete(pc);
+    }
+  }
+
+  private static async applySenderParameters(
+    pc: RTCPeerConnection, maxBitrateBps: number, maxFps: number
+  ): Promise<void> {
+    if (pc.connectionState === 'closed' || (pc.signalingState && pc.signalingState !== 'stable')) return;
     try {
       const senders = pc.getSenders();
       for (const sender of senders) {
         if (sender.track && sender.track.kind === 'video') {
           try {
             const params = sender.getParameters();
-            if (!params.encodings || params.encodings.length === 0) {
-              params.encodings = [{}];
-            }
+            // An unnegotiated sender has no valid RTP parameter transaction yet.
+            if (!params.encodings?.length) continue;
             params.encodings.forEach((enc) => {
               enc.maxBitrate = maxBitrateBps;
               // A high video floor prevents congestion control from yielding
@@ -323,9 +393,8 @@ export class MediaCoordinator {
         } else if (sender.track && sender.track.kind === 'audio') {
           try {
             const params = sender.getParameters();
-            if (!params.encodings || params.encodings.length === 0) {
-              params.encodings = [{}];
-            }
+            // An unnegotiated sender has no valid RTP parameter transaction yet.
+            if (!params.encodings?.length) continue;
             params.encodings.forEach((enc) => {
               enc.maxBitrate = 192000; // 192 kbps high-fidelity stereo audio
               enc.networkPriority = 'high';

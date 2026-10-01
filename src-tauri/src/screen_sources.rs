@@ -3,6 +3,8 @@ use base64::Engine;
 use futures_util::{SinkExt, StreamExt};
 use image::codecs::jpeg::JpegEncoder;
 use image::imageops::FilterType;
+use crate::video_jpeg::RealtimeJpegEncoder;
+#[cfg(test)]
 use jpeg_encoder::{ColorType, Encoder as FastJpegEncoder, SamplingFactor};
 use serde::{Deserialize, Serialize};
 use std::io::Cursor;
@@ -78,14 +80,13 @@ pub struct NativeWgcHandler {
     sender: broadcast::Sender<Message>,
     target_width: u32,
     target_height: u32,
-    quality: u8,
     active_flag: Arc<AtomicBool>,
     raw_buffer: Vec<u8>,
     resized_image: Option<fast_image_resize::images::Image<'static>>,
     resizer: fast_image_resize::Resizer,
-    jpeg_buffer: Vec<u8>,
-    last_frame_time: std::time::Instant,
-    min_frame_interval: std::time::Duration,
+    jpeg_encoder: RealtimeJpegEncoder,
+    next_frame_time: std::time::Instant,
+    frame_interval: std::time::Duration,
     latest_frame: Arc<std::sync::Mutex<Option<Arc<Vec<u8>>>>>,
     last_sent_us: Arc<std::sync::atomic::AtomicU64>,
     start_instant: std::time::Instant,
@@ -98,21 +99,18 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
 
     fn new(ctx: Context<Self::Flags>) -> Result<Self, Self::Error> {
         let fps = ctx.flags.target_fps.clamp(15, 120);
-        // Allow up to 10% timing tolerance to accommodate natural VSync/DWM presentation jitter without accepting double frame rate on high-refresh monitors
-        let frame_interval_ns = 1_000_000_000 / (fps as u64);
-        let min_frame_interval = std::time::Duration::from_nanos(frame_interval_ns * 9 / 10);
+        let frame_interval = std::time::Duration::from_nanos(1_000_000_000 / fps as u64);
         Ok(Self {
             sender: ctx.flags.sender,
             target_width: ctx.flags.target_width,
             target_height: ctx.flags.target_height,
-            quality: ctx.flags.quality,
             active_flag: ctx.flags.active_flag,
             raw_buffer: Vec::with_capacity(1920 * 1080 * 4),
             resized_image: None,
             resizer: fast_image_resize::Resizer::new(),
-            jpeg_buffer: Vec::with_capacity(256 * 1024),
-            last_frame_time: std::time::Instant::now() - std::time::Duration::from_secs(1),
-            min_frame_interval,
+            jpeg_encoder: RealtimeJpegEncoder::new(ctx.flags.quality)?,
+            next_frame_time: std::time::Instant::now(),
+            frame_interval,
             latest_frame: ctx.flags.latest_frame,
             last_sent_us: ctx.flags.last_sent_us,
             start_instant: ctx.flags.start_instant,
@@ -129,8 +127,10 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
             return Ok(());
         }
 
-        let elapsed = self.last_frame_time.elapsed();
-        if elapsed < self.min_frame_interval {
+        // Keep the target cadence across callback jitter and non-matching refresh rates.
+        // Resetting the gate after each frame can halve 60 FPS capture on a 75 Hz display.
+        let arrival_time = std::time::Instant::now();
+        if arrival_time < self.next_frame_time {
             return Ok(());
         }
 
@@ -148,7 +148,10 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
                 return Ok(());
             }
         };
-        self.last_frame_time = std::time::Instant::now();
+        self.next_frame_time += self.frame_interval;
+        if arrival_time.saturating_duration_since(self.next_frame_time) >= self.frame_interval {
+            self.next_frame_time = arrival_time + self.frame_interval;
+        }
         let pixel_data = frame_buffer.as_nopadding_buffer(&mut self.raw_buffer);
 
         let (final_pixels, final_w, final_h) = if self.target_width > 0
@@ -188,19 +191,7 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
             (pixel_data, src_width, src_height)
         };
 
-        self.jpeg_buffer.clear();
-        let mut encoder = FastJpegEncoder::new(&mut self.jpeg_buffer, self.quality);
-        encoder.set_sampling_factor(SamplingFactor::R_4_2_0);
-        if encoder
-            .encode(
-                final_pixels,
-                final_w as u16,
-                final_h as u16,
-                ColorType::Rgba,
-            )
-            .is_ok()
-        {
-            let frame_bytes = std::mem::take(&mut self.jpeg_buffer);
+        if let Ok(frame_bytes) = self.jpeg_encoder.encode_rgba(final_pixels, final_w, final_h) {
             let frame_arc = Arc::new(frame_bytes);
             if let Ok(mut cache) = self.latest_frame.lock() {
                 *cache = Some(frame_arc.clone());
@@ -354,6 +345,8 @@ pub fn ensure_ws_server_running() {
             }
 
             while let Ok((stream, _)) = listener.accept().await {
+                // Deliver frame tails immediately instead of waiting for TCP coalescing.
+                let _ = stream.set_nodelay(true);
                 let token = token.clone();
 
                 tokio::spawn(async move {
@@ -673,7 +666,6 @@ pub fn start_native_screen_capture(
     if source_id.trim().is_empty() {
         return Err("sourceId cannot be empty".to_string());
     }
-
     ensure_ws_server_running();
 
     // Stop any existing capture session first
@@ -796,17 +788,13 @@ pub fn start_native_screen_capture(
                 }
             });
 
-            let min_interval = std::time::Duration::from_nanos(
-                1_000_000_000 / (flags.target_fps.clamp(15, 120) as u64),
-            );
-
             if let Some(win) = wgc_window {
                 let settings = Settings::new(
                     win,
                     cursor_settings,
                     DrawBorderSettings::WithoutBorder,
                     SecondaryWindowSettings::Default,
-                    MinimumUpdateIntervalSettings::Custom(min_interval),
+                    MinimumUpdateIntervalSettings::Default,
                     DirtyRegionSettings::Default,
                     ColorFormat::Rgba8,
                     flags.clone(),
@@ -828,9 +816,6 @@ pub fn start_native_screen_capture(
                 }
             }
         } else {
-            let min_interval = std::time::Duration::from_nanos(
-                1_000_000_000 / (flags.target_fps.clamp(15, 120) as u64),
-            );
             let target_mon_idx: usize = raw_id.parse().unwrap_or(0);
             let wgc_monitor =
                 WgcMonitor::from_index(target_mon_idx + 1).or_else(|_| WgcMonitor::primary());
@@ -841,7 +826,7 @@ pub fn start_native_screen_capture(
                     cursor_settings,
                     DrawBorderSettings::WithoutBorder,
                     SecondaryWindowSettings::Default,
-                    MinimumUpdateIntervalSettings::Custom(min_interval),
+                    MinimumUpdateIntervalSettings::Default,
                     DirtyRegionSettings::Default,
                     ColorFormat::Rgba8,
                     flags.clone(),
@@ -908,7 +893,15 @@ pub fn start_native_screen_capture(
 
         let mut last_retry = std::time::Instant::now();
         let mut consecutive_errors: u32 = 0;
-        let mut jpeg_bytes = Vec::with_capacity(256 * 1024);
+        let mut jpeg_encoder = match RealtimeJpegEncoder::new(jpeg_quality) {
+            Ok(encoder) => encoder,
+            Err(error) => {
+                eprintln!("[Native Video] JPEG encoder initialization failed: {error}");
+                let _ = sender.send(Message::Text("{\"type\":\"fallback\",\"reason\":\"capture_error\"}".into()));
+                is_capturing_clone.store(false, Ordering::Relaxed);
+                return;
+            }
+        };
         let mut resizer = fast_image_resize::Resizer::new();
         let mut resized_img_buf: Option<fast_image_resize::images::Image<'static>> = None;
 
@@ -1051,19 +1044,8 @@ pub fn start_native_screen_capture(
                         (img.as_raw().as_slice(), src_w, src_h)
                     };
 
-                jpeg_bytes.clear();
-                let mut encoder = FastJpegEncoder::new(&mut jpeg_bytes, jpeg_quality);
-                encoder.set_sampling_factor(SamplingFactor::R_4_2_0);
-                if encoder
-                    .encode(
-                        final_raw,
-                        final_w as u16,
-                        final_h as u16,
-                        ColorType::Rgba,
-                    )
-                    .is_ok()
-                {
-                    let frame_arc = Arc::new(jpeg_bytes.clone());
+                if let Ok(jpeg_bytes) = jpeg_encoder.encode_rgba(final_raw, final_w, final_h) {
+                    let frame_arc = Arc::new(jpeg_bytes);
                     if let Ok(mut cache) = xcap_latest_cache.lock() {
                         *cache = Some(frame_arc.clone());
                     }
@@ -1237,6 +1219,8 @@ mod tests {
         let timeout = std::time::Instant::now();
         let mut first_frame_time = None;
         let mut frame_count = 0;
+        let mut image_frame_count = 0;
+        let mut heartbeat_count = 0;
         let measure_duration = std::time::Duration::from_millis(2000);
 
         while timeout.elapsed().as_millis() < 4000 {
@@ -1245,6 +1229,11 @@ mod tests {
                     if first_frame_time.is_none() {
                         first_frame_time = Some(std::time::Instant::now());
                         println!("First frame received! size = {} bytes", bytes.len());
+                    }
+                    if bytes.len() > 4 {
+                        image_frame_count += 1;
+                    } else {
+                        heartbeat_count += 1;
                     }
                     frame_count += 1;
                 }
@@ -1270,11 +1259,12 @@ mod tests {
 
         let elapsed_sec = first_frame_time.map_or(0.0, |t| t.elapsed().as_secs_f64());
         let fps = if elapsed_sec > 0.0 { frame_count as f64 / elapsed_sec } else { 0.0 };
-        println!("Captured {} frames in {:.2}s = {:.1} FPS", frame_count, elapsed_sec, fps);
+        println!("Captured {} messages in {:.2}s = {:.1} messages/s ({} images, {} heartbeats)", frame_count, elapsed_sec, fps, image_frame_count, heartbeat_count);
 
         let stop_res = stop_native_screen_capture();
         println!("stop_native_screen_capture result: {:?}", stop_res);
         assert!(fps >= 55.0, "Expected at least 55 FPS, got {:.1}", fps);
+        assert!(image_frame_count > 0, "Capture produced only heartbeat messages");
     }
 }
 

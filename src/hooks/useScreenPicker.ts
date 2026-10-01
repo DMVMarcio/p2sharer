@@ -98,7 +98,6 @@ export function useScreenPicker(onClose?: () => void) {
         ? (windows[0]?.id || 'window:0')
         : (monitors[0]?.id || 'screen:0');
       const chosen = selectedSourceId || fallbackId;
-
       if (onClose) onClose();
       await startCapture(chosen, fps, { width: resConfig.width, height: resConfig.height }, showCursor, quality);
     } catch (err) {
