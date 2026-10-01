@@ -17,6 +17,8 @@
   /* Base Transitions */
   --transition-fast: 0.15s cubic-bezier(0.16, 1, 0.3, 1);
   --transition-normal: 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  --dropdown-enter-duration: 320ms;
+  --dropdown-exit-duration: 260ms;
 
   /* Shadows */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
@@ -487,8 +489,16 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
    VIEW 1: HOME / DASHBOARD
    ========================================================================== */
 
+#view-home {
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+}
+
 .hero-container {
+  width: 100%;
   max-width: 860px;
+  flex-shrink: 0;
   margin: auto;
   padding: 40px 24px;
   display: flex;
@@ -3056,8 +3066,8 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   gap: 3px;
   padding-bottom: 3px;
   flex: none;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border-default) transparent;
+  scrollbar-width: auto;
+  scrollbar-color: auto;
 }
 
 .emoji-picker-categories::-webkit-scrollbar { height: 3px; }
@@ -3067,8 +3077,18 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  scrollbar-width: thin;
+  scrollbar-width: auto;
+  scrollbar-color: auto;
 }
+
+/* Keep WebView2 on the themed WebKit scrollbar path instead of its native thin bar. */
+.emoji-picker-results::-webkit-scrollbar { width: 6px; }
+.emoji-picker-results::-webkit-scrollbar-track,
+.emoji-picker-categories::-webkit-scrollbar-track { background: transparent; }
+.emoji-picker-results::-webkit-scrollbar-thumb { background: var(--border-focus); border-radius: var(--radius-full); }
+.emoji-picker-results::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+.emoji-picker-results::-webkit-scrollbar-button,
+.emoji-picker-categories::-webkit-scrollbar-button { display: none; }
 
 .emoji-picker-section + .emoji-picker-section { margin-top: 8px; }
 
@@ -5083,10 +5103,15 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .rendezvous-server-url { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
 .rendezvous-error { color: var(--danger-text); font-size: 12px; }
 
-/* Shared entrance motion for floating menus; preserve each menu's positioning transform. */
+/* Shared menu motion preserves positioning transforms, including centered transfer menus. */
 @keyframes dropdownEnter {
   from { opacity: 0; scale: 0.97; translate: 0 var(--dropdown-enter-offset, -4px); }
   to { opacity: 1; scale: 1; translate: 0 0; }
+}
+
+@keyframes dropdownExit {
+  from { opacity: 1; scale: 1; translate: 0 0; }
+  to { opacity: 0; scale: 0.97; translate: 0 var(--dropdown-enter-offset, -4px); }
 }
 
 .chat-file-download-menu,
@@ -5094,9 +5119,9 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .chat-msg-menu,
 .participant-menu,
 .room-app-options-menu,
-.emoji-picker-popover {
+.emoji-picker {
   transform-origin: top right;
-  animation: dropdownEnter 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: dropdownEnter var(--dropdown-enter-duration) cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .chat-file-download-menu:not(.is-below),
@@ -5106,9 +5131,14 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 }
 
 .chat-transfer-menu,
-.emoji-picker-popover {
+.emoji-picker {
   --dropdown-enter-offset: 4px;
   transform-origin: bottom center;
+}
+
+.dropdown-closing {
+  pointer-events: none;
+  animation: dropdownExit var(--dropdown-exit-duration) cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -5117,7 +5147,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   .chat-msg-menu,
   .participant-menu,
   .room-app-options-menu,
-  .emoji-picker-popover {
+  .emoji-picker {
     animation: none;
   }
 }

@@ -1,3 +1,4 @@
+import { useDropdownPresence } from '../../hooks/useDropdownPresence';
 import { useEffect, useRef, useState } from 'react';
 import { Copy, Download, File, FolderSearch, Image as ImageIcon, X, ZoomIn, ZoomOut } from 'lucide-react';
 import type { ChatMessage } from '../../core/types';
@@ -27,6 +28,7 @@ export function ChatFileAttachment({ message, transfers, preview, savedRequestId
   const file = message.file!;
   const receiving = transfers.find((transfer) => transfer.direction === 'receive' && !transfer.previewOnly &&
     (transfer.status === 'pending' || transfer.status === 'active'));
+  const menuPresence = useDropdownPresence(menu && !receiving ? true : null);
   const previewTransfer = transfers.find((transfer) => transfer.direction === 'receive' && transfer.previewOnly &&
     (transfer.status === 'pending' || transfer.status === 'active'));
   const sending = transfers.filter((transfer) => transfer.direction === 'send' && transfer.status === 'active');
@@ -104,7 +106,7 @@ export function ChatFileAttachment({ message, transfers, preview, savedRequestId
             setMenuBelow((downloadWrap.current?.getBoundingClientRect().top ?? 0) < 130);
             setMenu(!menu);
           }}><Download size={17} /></button>}
-        {menu && !receiving && <div className={`chat-file-download-menu ${menuBelow ? 'is-below' : ''}`}>
+        {menuPresence.value && <div className={`chat-file-download-menu ${menuBelow ? 'is-below' : ''} ${menuPresence.closing ? 'dropdown-closing' : ''}`} inert={menuPresence.closing} aria-hidden={menuPresence.closing}>
           <button onClick={() => { setMenu(false); onRequest(false); }}>Salvar</button>
           <button onClick={() => { setMenu(false); onRequest(true); }}>Salvar Como</button>
         </div>}

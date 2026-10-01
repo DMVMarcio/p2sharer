@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useSyncExternalStore } from 'react';
+import { useDropdownPresence } from '../../hooks/useDropdownPresence';
 import { useRoom } from '../../hooks/useRoom';
 import { EmojiPicker } from '../common/EmojiPicker';
 import { EmojiPickerPopover } from '../common/EmojiPickerPopover';
@@ -26,6 +27,8 @@ export const ChatPane: React.FC = () => {
     localFilePreviews, imagePreviews, savedDownloads, revealSavedFile } = useRoom();
   const [inputText, setInputText] = useState('');
   const [pickerTarget, setPickerTarget] = useState<'compose' | 'edit' | null>(null);
+  const composePicker = useDropdownPresence(pickerTarget === 'compose' ? true : null);
+  const editPicker = useDropdownPresence(pickerTarget === 'edit' ? true : null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [replyToId, setReplyToId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -209,7 +212,7 @@ export const ChatPane: React.FC = () => {
       </div>
 
       <div className="chat-composer" ref={composerRef}>
-      {pickerTarget === 'compose' && <EmojiPicker pack={emojiPack} onSelect={insertEmoji} />}
+      {composePicker.value && <EmojiPicker pack={emojiPack} onSelect={insertEmoji} closing={composePicker.closing} />}
       {replyMessage && <div className="chat-composer-reply">
         <Reply size={15} />
         <div><strong>Respondendo a {replyMessage.sender}</strong><span>{replyMessage.text}</span></div>
@@ -244,7 +247,7 @@ export const ChatPane: React.FC = () => {
         </div>
       </form>
       </div>
-      {pickerTarget === 'edit' && <EmojiPickerPopover anchor={editEmojiButtonRef.current} pack={emojiPack} onSelect={insertEmoji} />}
+      {editPicker.value && <EmojiPickerPopover anchor={editEmojiButtonRef.current} pack={emojiPack} onSelect={insertEmoji} closing={editPicker.closing} />}
       {selectedFile && <ChatFileOfferDialog key={selectedFile.id} file={selectedFile} onClose={closeFile} onOffer={async (name, autoAccept) => { await offerFile(selectedFile, name, autoAccept); markOffered(); }} />}
     </div>
   );
