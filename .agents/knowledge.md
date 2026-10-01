@@ -41,6 +41,8 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 4. User Guidelines & Expressed Preferences
 
+- `[UI Copy & Density]` Remove redundant explanatory labels such as "Shared editing" in the notepad. Prefer existing action rows over separate rows that add no useful information. Keep the notepad's Open and Save buttons aligned to the right of its formatting toolbar.
+
 - `[Menu Motion]` Dropdowns and both emoji pickers must open and close smoothly with slightly longer timing (320 ms enter, 260 ms exit). Retain closing content until its animation finishes and make it noninteractive during exit. Emoji list scrollbars must use the app's narrow themed styling with a transparent track, including WebView2.
 
 

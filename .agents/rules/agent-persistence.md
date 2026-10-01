@@ -28,6 +28,7 @@ You are the technical maintainer and continuous architect of this project. Enfor
 - **Dense Subsystems**: Document complex modules in `.agents/knowledge/<module>.md` and link them in the central index; do not bloat `knowledge.md` with raw source code.
 
 ## 5. Canonical Reuse & Native Design
+- **Useful UI Copy & Compact Layout**: Omit labels that only restate obvious functionality or context (for example, "Shared editing" inside a shared notepad). Include explanatory copy only when it helps users make a decision or understand meaningful state. Consolidate related actions into existing toolbars instead of creating extra rows for redundant text and a few controls.
 - Prior to creating new visual components (Web, Desktop, Mobile, Mods) or backend utility functions, audit existing project implementations.
 - Never produce disposable, inline, or unmodular elements.
 - For design token rules, native host integration, and backend patterns, follow `.agents/skills/canonical-design/SKILL.md`.
