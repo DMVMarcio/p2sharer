@@ -152,3 +152,8 @@ Building the vendored native library requires CMake and the existing MSVC C/C++ 
 ### Desktop Measurements (RX 5500 XT, 2026-09-30)
 
 With SIMD and the shared MSVC runtime, encoding the same 1920x1080 primary-monitor pixels at quality 90 took approximately 15.8 ms/frame in the previous Rust JPEG encoder and 5.7 ms/frame in libjpeg-turbo. The final native desktop loopback with two receivers measured approximately 49 encoded FPS and 49 decoded FPS per receiver at 1920x1080, with around 5.5 ms RTP encoding time per frame. This does not establish constant 60 FPS or delivery across the Internet. The video socket sets TCP_NODELAY to deliver partial frame tails promptly; the codec-only canvas test reached approximately 56 decoded FPS instead of the previous H.264 24 FPS.
+
+
+### Sender Parameter Transactions and Remote Retest (2026-10-01)
+
+The user confirmed that FPS normalized in a subsequent real remote test; this confirmation does not establish an exact constant frame rate or identify the original cause. Session logs also contained repeated RTCRtpSender `InvalidStateError` messages while applying transmission parameters. `MediaCoordinator.applySenderBitrate` now serializes parameter updates per peer connection and skips senders without negotiated encodings. Do not fabricate an encoding array before RTP negotiation. Reapply through the existing stable-signaling listener and startup retries once encodings are available. Regression tests cover overlapping updates and the transition from unnegotiated to negotiated senders. Codec selection remains unchanged after the successful remote retest.
