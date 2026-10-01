@@ -1,5 +1,5 @@
 import { useStreamPointer } from '../../hooks/useStreamPointer';
-import { streamOwner } from '../../core/media_streams';
+import { streamOwner, formatFrameRate } from '../../core/media_streams';
 import { StreamPointerToggle } from './StreamPointerToggle';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { invoke, isTauri } from '@tauri-apps/api/core';
@@ -510,7 +510,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
 
         <StreamStatsOverlay
           className="pip-stream-stats-hud"
-          qualityText={`${stats.height} ${stats.fps} FPS`}
+          qualityText={`${stats.height} ${formatFrameRate(stats.fps)} FPS`}
           liveBitrateKbps={stats.bitrateKbps}
           configuredBitrateKbps={stats.configuredBitrateKbps}
           isLocal={isLocal}

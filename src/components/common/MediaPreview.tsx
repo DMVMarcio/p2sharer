@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { formatFrameRate } from '../../core/media_streams';
 
 export function MediaPreview({ stream, label, busy, error, settings }: {
   stream: MediaStream | null; label: string; busy: boolean; error?: string; settings: MediaTrackSettings;
@@ -18,7 +19,7 @@ export function MediaPreview({ stream, label, busy, error, settings }: {
     </div>
     <div className="media-preview-caption"><strong>{label || 'Prévia'}</strong>
       <span>{busy ? 'Verificando dispositivo…' : settings.width && settings.height
-        ? `${settings.width} × ${settings.height}${settings.frameRate ? ` · ${Math.round(settings.frameRate * 10) / 10} FPS` : ''}` : 'Prévia local'}</span>
+        ? `${settings.width} × ${settings.height}${settings.frameRate ? ` · ${formatFrameRate(settings.frameRate)} FPS` : ''}` : 'Prévia local'}</span>
     </div>
   </aside>;
 }

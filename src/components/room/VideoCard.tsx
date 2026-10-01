@@ -1,4 +1,5 @@
 import { useModal } from '../../hooks/useModal';
+import { formatFrameRate } from '../../core/media_streams';
 import { useStreamPointer } from '../../hooks/useStreamPointer';
 import { StreamPointerToggle } from './StreamPointerToggle';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -343,7 +344,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
             {!inTray && <span className="local-broadcaster-title">Você está transmitindo</span>}
             {!inTray && (
               <span className="local-broadcaster-subtitle">
-                {currentResolution.label} • {currentFps} FPS • Transmissão Ativa
+                {currentResolution.label} • {formatFrameRate(currentFps)} FPS • Transmissão Ativa
               </span>
             )}
             {!inTray && (
@@ -397,7 +398,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
       {/* Stats HUD on top of card - only when not in tray and not in PiP */}
       {!inTray && !isPipActive && (
         <StreamStatsOverlay
-          qualityText={slot.isLocal ? `${currentResolution.label} ${currentFps} FPS` : `${remoteResolution} ${liveFps} FPS`}
+          qualityText={slot.isLocal ? `${currentResolution.label} ${formatFrameRate(currentFps)} FPS` : `${remoteResolution} ${formatFrameRate(liveFps)} FPS`}
           liveBitrateKbps={liveBitrate}
           configuredBitrateKbps={currentBitrate}
           isLocal={slot.isLocal}

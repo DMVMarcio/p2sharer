@@ -5,8 +5,8 @@ import { useRoom } from '../../hooks/useRoom';
 import { useModal } from '../../hooks/useModal';
 import { useStore } from '../../hooks/useStore';
 import { Tooltip } from '../common/Tooltip';
-import { AppWindow, X, ChevronDown, Camera, Monitor } from 'lucide-react';
-import { useContextMenu } from '../common/ContextMenu';
+import { AppWindow, Square, ChevronDown, Camera, Monitor, Plus } from 'lucide-react';
+import { useContextMenu, type ContextMenuAction } from '../common/ContextMenu';
 import { roomService } from '../../services/room_service';
 
 export const StreamHeaderBar: React.FC = () => {
@@ -37,9 +37,27 @@ export const StreamHeaderBar: React.FC = () => {
     (s) => !s.isLocal && s.isStreaming && subscribedStreams.has(s.peerId)
   ).length + appCounts.joined;
 
-  const handleToggleTransmission = () => {
+  const startTransmission = () => {
     stateStore.set((state) => { state.editingStreamId = null; });
     openModal('screenPicker');
+  };
+  const handleToggleTransmission = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (!isBroadcasting) { startTransmission(); return; }
+    const actions: ContextMenuAction[] = roomSlots
+      .filter((slot) => slot.isLocal && slot.isStreaming && slot.mediaId)
+      .map((slot) => {
+        const label = slot.mediaLabel || (slot.mediaKind === 'camera' ? 'Câmera' : 'Tela');
+        return { id: `edit-${slot.mediaId}`, label,
+          icon: slot.mediaKind === 'camera' ? <Camera size={15} /> : <Monitor size={15} />,
+          onSelect: () => { roomService.editTransmission(slot.mediaId!); openModal('screenPicker'); },
+          secondary: { label: `Parar ${label}`, icon: <Square size={14} />, danger: true,
+            onSelect: () => roomService.stopTransmission(slot.mediaId!) } };
+      });
+    actions.push({ id: 'new-transmission', label: 'Iniciar nova transmissão', icon: <Plus size={15} />,
+      separator: true, onSelect: startTransmission });
+    const bounds = event.currentTarget.getBoundingClientRect();
+    openContextMenu({ currentTarget: event.currentTarget, clientX: bounds.left, clientY: bounds.bottom,
+      preventDefault: () => event.preventDefault(), stopPropagation: () => event.stopPropagation() }, actions);
   };
 
   return (
@@ -94,13 +112,13 @@ export const StreamHeaderBar: React.FC = () => {
             onClick={() => openModal('apps')}><AppWindow size={14} strokeWidth={2} /><span className="btn-text">Apps</span></button>
         </Tooltip>
         {/* Transmission Button */}
-        <div className={`transmission-control ${isBroadcasting ? 'broadcasting' : ''}`}>
-        <Tooltip content="Compartilhar tela, janela ou câmera">
+        <Tooltip content={isBroadcasting ? 'Gerenciar transmissões' : 'Compartilhar tela, janela ou câmera'}>
           <button
             className="btn btn-sm btn-compact btn-outline"
             id="btn-toggle-share-screen"
             onClick={handleToggleTransmission}
-            aria-label={isBroadcasting ? 'Adicionar transmissão' : 'Transmitir'}
+            aria-label={isBroadcasting ? 'Gerenciar transmissões' : 'Transmitir'}
+            aria-haspopup={isBroadcasting ? 'menu' : undefined}
           >
             <span className={`stream-sharing-indicator ${isBroadcasting ? 'active' : ''}`} id="stream-sharing-dot"></span>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -113,23 +131,10 @@ export const StreamHeaderBar: React.FC = () => {
             <span className="btn-text" id="label-share-screen">
               {isBroadcasting ? 'Transmissão' : 'Transmitir'}
             </span>
+            {isBroadcasting && <ChevronDown size={12} aria-hidden="true" />}
           </button>
         </Tooltip>
 
-        {isBroadcasting && <Tooltip content="Escolher uma transmissão para parar">
-          <button type="button" className="btn btn-sm btn-outline btn-compact transmission-stop-menu"
-            aria-label="Escolher transmissão para parar" aria-haspopup="menu" onClick={(event) => {
-              const bounds = event.currentTarget.getBoundingClientRect();
-              openContextMenu({ currentTarget: event.currentTarget, clientX: bounds.left, clientY: bounds.bottom,
-                preventDefault: () => event.preventDefault(), stopPropagation: () => event.stopPropagation() },
-              roomSlots.filter((slot) => slot.isLocal && slot.isStreaming && slot.mediaId).map((slot) => ({
-                id: `stop-${slot.mediaId}`, label: `Parar · ${slot.mediaLabel || (slot.mediaKind === 'camera' ? 'Câmera' : 'Tela')}`,
-                icon: slot.mediaKind === 'camera' ? <Camera size={15} /> : <Monitor size={15} />, danger: true,
-                onSelect: () => roomService.stopTransmission(slot.mediaId!),
-              })));
-            }}><X size={14} /><ChevronDown size={12} /></button>
-        </Tooltip>}
-        </div>
         {/* Audio Filter Config */}
         <Tooltip content="Configurar filtros de áudio">
           <button

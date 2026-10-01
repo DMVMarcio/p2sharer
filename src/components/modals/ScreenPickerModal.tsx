@@ -5,6 +5,7 @@ import { useScreenPicker } from '../../hooks/useScreenPicker';
 import { getSkeletonCountForTab } from './screen_picker_utils';
 import { MediaPreview } from '../common/MediaPreview';
 import { Camera } from 'lucide-react';
+import { formatFrameRate } from '../../core/media_streams';
 
 export const ScreenPickerModal: React.FC = () => {
   const { closeModal, isClosing } = useModal();
@@ -63,7 +64,7 @@ export const ScreenPickerModal: React.FC = () => {
 
   return (
     <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} id="modal-screen-picker">
-      <div className="modal-card modal-xl">
+      <div className="modal-card modal-xl screen-picker-card">
         <div className="modal-header">
           <div className="modal-header-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -259,7 +260,7 @@ export const ScreenPickerModal: React.FC = () => {
                 value={fps}
                 onValueChange={(value) => setFps(Number(value))}
                 disabled={currentTab === 'cameras' && (preview.busy || !cameraRates.length)}
-                options={currentTab === 'cameras' ? cameraRates.map((rate) => ({ value: String(rate), label: `${rate} FPS` })) : [
+                options={currentTab === 'cameras' ? cameraRates.map((rate) => ({ value: String(rate), label: `${formatFrameRate(rate)} FPS` })) : [
                   { value: '120', label: '120 FPS' },
                   { value: '60', label: '60 FPS' },
                   { value: '30', label: '30 FPS' },

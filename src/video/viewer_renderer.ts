@@ -1,4 +1,5 @@
 import { audioContextManager } from '../audio/audio_context_manager.ts';
+import { formatFrameRate } from '../core/media_streams.ts';
 import { stateStore } from '../core/state_store.ts';
 import type { RoomSlotInfo, StreamCardCacheItem } from '../core/types.ts';
 
@@ -217,7 +218,7 @@ export class ViewerRenderer {
       if (slot.isLocal) {
         const qualText = cardEl.querySelector('.stat-quality-text');
         if (qualText) {
-          qualText.textContent = `${stateStore.currentResolution.label} ${stateStore.currentFps} FPS`;
+          qualText.textContent = `${stateStore.currentResolution.label} ${formatFrameRate(stateStore.currentFps)} FPS`;
         }
       } else {
         const pingVal = this.callbacks.getPeerPing(slot.peerId);
@@ -330,7 +331,7 @@ export class ViewerRenderer {
         statsHud.innerHTML = `
           <span class="stat-badge stat-badge-quality">
             <span class="stat-badge-dot"></span>
-            <span class="stat-quality-text">${stateStore.currentResolution.label} ${stateStore.currentFps} FPS</span>
+            <span class="stat-quality-text">${stateStore.currentResolution.label} ${formatFrameRate(stateStore.currentFps)} FPS</span>
           </span>
           <span class="stat-badge stat-badge-watchers">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>

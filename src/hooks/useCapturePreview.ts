@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NativeVideoBridge } from '../video/native_video_bridge';
-import { cameraFrameRates, cameraResolutions, configureCamera, type CameraResolution } from '../video/camera_devices';
+import { cameraFrameRates, cameraResolutions, configureCamera, preferredCameraFrameRate, type CameraResolution } from '../video/camera_devices';
 
 export interface PreparedCapture { sourceId: string; stream: MediaStream; bridge?: NativeVideoBridge }
 
@@ -75,7 +75,7 @@ export function useCapturePreview(sourceId: string, resolution: { width: number;
         if (stale()) return;
         requested.current.onFrameRates(rates);
         if (!rates.length) throw new Error('A câmera não oferece esse modo.');
-        const chosen = rates.includes(fps) ? fps : rates.find((rate) => rate <= fps) || rates[rates.length - 1];
+        const chosen = preferredCameraFrameRate(rates, fps);
         const actual = await configureCamera(track, mode, chosen);
         if (!stale()) { setSettings(actual); setError(''); }
       } catch (err) { if (!stale()) setError(`Prévia indisponível: ${err}`); }
