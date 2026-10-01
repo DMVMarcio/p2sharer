@@ -155,6 +155,8 @@
   background: var(--bg-elevated); color: var(--text-primary); box-shadow: 0 8px 24px #0008;
   font-size: 11px; line-height: 1.3; }
 .activity-toast .activity-toast-avatar { flex-shrink: 0; margin: 0; }
+.activity-toast-icon { display: grid; place-items: center; flex-shrink: 0; width: 24px; height: 24px;
+  color: var(--accent-color); border-radius: 50%; background: var(--accent-subtle); }
 .activity-toast-message { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .activity-toast-message strong { font-weight: 700; }
 .youtube-activity-toast { position: absolute; z-index: 7; right: 12px; bottom: 12px; pointer-events: none;
@@ -223,6 +225,7 @@
 .youtube-captions-active { color: #fff; }
 .youtube-time-readout { margin-left: 7px; color: #e7e7eb; font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .youtube-time-readout span { color: var(--yt-muted); }
+.youtube-live-label { margin-left: 7px; color: var(--danger-text); font-size: 10px; font-weight: 700; white-space: nowrap; }
 .youtube-volume-control { gap: 3px; flex-shrink: 0; }
 .youtube-volume-control input { width: 74px; height: 4px; margin: 0 3px; appearance: none; -webkit-appearance: none;
   border-radius: 10px; background: linear-gradient(to right, #f3f3f5 var(--volume-progress), #55555a var(--volume-progress)); cursor: pointer; }
@@ -236,6 +239,36 @@
 .youtube-queue-header span { display: grid; place-items: center; min-width: 17px; height: 17px;
   padding: 0 4px; border-radius: 8px; background: #323236; color: var(--yt-muted); font-size: 10px; }
 .youtube-queue-modes { margin-left: auto; }
+.youtube-saved-queues-button { display: grid; place-items: center; flex-shrink: 0; width: 27px; height: 27px;
+  padding: 0; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--yt-muted); cursor: pointer; }
+.youtube-saved-queues-button:hover { background: rgba(255,255,255,.09); color: var(--yt-ink); }
+.youtube-saved-queues-button:focus-visible { outline: 2px solid var(--accent-color); outline-offset: -2px; }
+
+.youtube-saved-queues-dialog .modal-body { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
+.youtube-save-queue-form { flex-shrink: 0; }
+.youtube-save-queue-input { display: flex; align-items: center; gap: 8px; }
+.youtube-save-queue-input .text-input { flex: 1; min-width: 0; }
+.youtube-save-queue-input .btn { flex-shrink: 0; width: auto; white-space: nowrap; gap: 6px; }
+.youtube-saved-queue-list { display: flex; flex-direction: column; gap: 8px; }
+.youtube-saved-queue-row { display: flex; align-items: center; gap: 12px; padding: 12px;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--bg-elevated); }
+.youtube-saved-queue-info { display: flex; flex: 1; flex-direction: column; gap: 4px; min-width: 0; }
+.youtube-saved-queue-info strong { overflow-wrap: anywhere; font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.youtube-saved-queue-info span { font-size: 12px; color: var(--text-secondary); }
+.youtube-saved-queue-actions { display: flex; align-items: center; flex-shrink: 0; gap: 6px; }
+.youtube-saved-queue-actions .btn { width: auto; gap: 5px; }
+.youtube-saved-hint { margin-top: 8px; font-size: 12px; line-height: 1.5; color: var(--text-secondary); }
+.modal-body .youtube-saved-error { font-size: 12px; line-height: 1.5; color: var(--danger-text); }
+.youtube-saved-empty { padding: 24px 0; text-align: center; font-size: 13px; color: var(--text-secondary); }
+.youtube-saved-action-copy { font-size: 13px; line-height: 1.6; color: var(--text-primary); overflow-wrap: anywhere; }
+.youtube-saved-action-dialog { max-width: 580px; }
+.youtube-saved-action-dialog .modal-footer { flex-wrap: wrap; }
+@media (max-width: 520px) {
+  .youtube-saved-queue-row { flex-wrap: wrap; }
+  .youtube-saved-queue-info { flex-basis: 100%; }
+  .youtube-save-queue-input { flex-wrap: wrap; }
+  .youtube-save-queue-input .text-input { flex-basis: 100%; }
+}
 .youtube-queue-modes button { display: grid; place-items: center; width: 27px; height: 27px; padding: 0;
   border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--yt-muted); cursor: pointer; }
 .youtube-queue-modes button:hover { background: rgba(255,255,255,.09); color: var(--yt-ink); }

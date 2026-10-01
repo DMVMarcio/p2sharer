@@ -3,6 +3,7 @@ import { BookmarkPlus, Eye, EyeOff } from 'lucide-react';
 import { compareRoomInvites, parseRoomInvite } from '../../core/room_invite';
 import { verifyRoomInvite } from '../../core/room_invite_validation';
 import { savedRooms } from '../../core/saved_rooms';
+import { useFormSubmit } from '../../hooks/useFormSubmit';
 import { useModal } from '../../hooks/useModal';
 import { showToast } from '../../hooks/useToast';
 
@@ -54,9 +55,11 @@ export const SaveInviteModal: React.FC = () => {
     }
   };
 
+  const { submit, pending } = useFormSubmit(save, isClosing);
+
   return (
     <div className={`modal-overlay ${isClosing ? 'closing' : ''}`}>
-      <div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="save-invite-title">
+      <form onSubmit={submit} aria-busy={pending} className="modal-card" role="dialog" aria-modal="true" aria-labelledby="save-invite-title">
         <div className="modal-header">
           <div className="modal-header-icon"><BookmarkPlus size={20} /></div>
           <div>
@@ -93,11 +96,11 @@ export const SaveInviteModal: React.FC = () => {
         </div>
         <div className="modal-footer">
           <button type="button" className="btn btn-secondary" onClick={closeModal}>Cancelar</button>
-          <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void save()}>
+          <button type="submit" className="btn btn-primary" disabled={busy || pending || isClosing}>
             Salvar convite
           </button>
         </div>
-      </div>
+      </form>
     </div>
   );
 };

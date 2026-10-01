@@ -15,6 +15,7 @@ interface Props {
   volume: number;
   muted: boolean;
   captions: boolean;
+  live?: boolean;
   onTogglePlayback: () => void;
   onPrevious: () => void;
   onNext: () => void;
@@ -27,7 +28,7 @@ interface Props {
 
 export const YouTubeControls: React.FC<Props> = ({ hasVideo, playing, hasPrevious, hasNext,
   position, duration, buffered, volume, muted, onTogglePlayback, onPrevious, onNext, onSeek,
-  onVolume, onToggleMute, captions, onToggleCaptions, onPictureInPicture }) => {
+  onVolume, onToggleMute, captions, onToggleCaptions, onPictureInPicture, live = false }) => {
   return <div className="youtube-control-deck" aria-label="Controles de reprodução compartilhada">
     <MediaSeekBar value={position} duration={duration} buffered={buffered} onCommit={onSeek}
       disabled={!hasVideo || duration <= 0} />
@@ -43,6 +44,7 @@ export const YouTubeControls: React.FC<Props> = ({ hasVideo, playing, hasPreviou
         <TooltipButton tooltip="Próximo vídeo" className="youtube-control-button"
           disabled={!hasNext} onClick={onNext}><SkipForward size={18} strokeWidth={2} /></TooltipButton>
         <span className="youtube-time-readout">{formatMediaTime(position)} <span>/</span> {formatMediaTime(duration)}</span>
+        {live && <span className="youtube-live-label">AO VIVO</span>}
       </div>
       <div className="youtube-volume-control">
         <TooltipButton tooltip={captions ? 'Desativar legendas' : 'Ativar legendas'}

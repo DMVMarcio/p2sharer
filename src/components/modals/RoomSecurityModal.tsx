@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useFormSubmit } from '../../hooks/useFormSubmit';
 import { useModal } from '../../hooks/useModal';
 import { useRoom } from '../../hooks/useRoom';
 import { showToast } from '../../hooks/useToast';
@@ -36,9 +37,11 @@ export const RoomSecurityModal: React.FC = () => {
     }
   };
 
+  const { submit, pending } = useFormSubmit(handleSave, isClosing);
+
   return (
     <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} id="modal-room-security">
-      <div className="modal-card">
+      <form onSubmit={submit} aria-busy={pending} className="modal-card">
         <div className="modal-header">
           <div className="modal-header-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -52,7 +55,7 @@ export const RoomSecurityModal: React.FC = () => {
               Configure o acesso à sala.
             </p>
           </div>
-          <button className="btn-close" id="btn-close-room-security" onClick={closeModal}>
+          <button type="button" className="btn-close" id="btn-close-room-security" onClick={closeModal}>
             &times;
           </button>
         </div>
@@ -111,9 +114,6 @@ export const RoomSecurityModal: React.FC = () => {
                 disabled={!isRoomHost}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleSave();
-                }}
                 autoFocus
               />
               <button
@@ -143,14 +143,14 @@ export const RoomSecurityModal: React.FC = () => {
         </div>
 
         <div className="modal-footer">
-          <button className="btn btn-secondary" id="btn-cancel-room-security" onClick={closeModal}>
+          <button type="button" className="btn btn-secondary" id="btn-cancel-room-security" onClick={closeModal}>
             Fechar
           </button>
-          <button className="btn btn-primary" id="btn-save-room-security" onClick={() => void handleSave()} disabled={!isRoomHost}>
+          <button className="btn btn-primary" id="btn-save-room-security" type="submit" disabled={pending || isClosing || !isRoomHost}>
             <span>Salvar configurações</span>
           </button>
         </div>
-      </div>
+      </form>
     </div>
   );
 };

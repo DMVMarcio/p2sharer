@@ -1,4 +1,5 @@
 import type { YouTubeState } from './types.ts';
+import { YOUTUBE_MAX_POSITION_SECONDS } from './youtube_timeline.ts';
 
 export const youtubePipPeerId = (instanceId: string): string => `youtube-${instanceId}`;
 export const youtubePipEvent = (instanceId: string): string => `youtube-pip-${instanceId}`;
@@ -15,7 +16,7 @@ export interface YouTubePipLocalSettings {
 
 export type YouTubePipMessage =
   | { source: 'pip'; type: 'ready' }
-  | { source: 'pip'; type: 'progress'; videoId: string; position: number; duration: number; playing: boolean }
+  | { source: 'pip'; type: 'progress'; videoId: string; position: number; duration: number; playing: boolean; live?: boolean }
   | { source: 'pip'; type: 'ended'; videoId: string }
   | { source: 'pip'; type: 'command'; command: YouTubePipCommand }
   | { source: 'pip'; type: 'settings'; settings: YouTubePipLocalSettings }
@@ -35,5 +36,5 @@ export function validYouTubePipCommand(value: unknown): value is YouTubePipComma
   const command = value as YouTubePipCommand;
   if (command.action === 'toggle' || command.action === 'previous' || command.action === 'next') return true;
   return command.action === 'seek' && Number.isFinite(command.position) &&
-    command.position >= 0 && command.position < 86_400;
+    command.position >= 0 && command.position < YOUTUBE_MAX_POSITION_SECONDS;
 }

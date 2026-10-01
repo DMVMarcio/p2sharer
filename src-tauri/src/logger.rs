@@ -248,18 +248,13 @@ pub fn flush_log() {
 pub fn open_log_folder() -> Result<(), String> {
     flush_log();
     let log_dir = get_log_dir();
-    let current_path = current_log_path()?;
-
-    if current_path.exists() {
-        // Select the file in Windows Explorer
-        let _ = std::process::Command::new("explorer.exe")
-            .arg(format!("/select,\"{}\"", current_path.to_string_lossy()))
-            .spawn();
-    } else {
-        let _ = std::process::Command::new("explorer.exe")
-            .arg(log_dir.to_string_lossy().to_string())
-            .spawn();
-    }
+    fs::create_dir_all(&log_dir)
+        .map_err(|error| format!("Falha ao acessar a pasta de logs: {}", error))?;
+    // Command handles path quoting; embedded quotes confuse Explorer's argument parser.
+    std::process::Command::new("explorer.exe")
+        .arg(&log_dir)
+        .spawn()
+        .map_err(|error| format!("Falha ao abrir a pasta de logs: {}", error))?;
     Ok(())
 }
 
