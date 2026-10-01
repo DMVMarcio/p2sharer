@@ -35,6 +35,6 @@ export function StreamPointerVideoLayer({ container, video, peerId, local }: {
     {bounds && scene.visuals.filter((v) => v.expires > now && (v.ping || v.peerId !== scene.localPeerId)).map((v) =>
       <StreamPointerGlyph key={v.id} name={v.name} color={v.color} ping={v.ping}
         style={{ left: bounds.left + v.x * bounds.width, top: bounds.top + v.y * bounds.height }} />)}
-    {local && <StreamPointerGlyph name={scene.name} color={scene.color} style={{ left: local.x, top: local.y }} />}
+    {local && <StreamPointerGlyph name={scene.name} color={scene.color} interpolate={false} style={{ left: local.x, top: local.y }} />}
   </div>;
 }
