@@ -1,3 +1,5 @@
+import { useStreamPointer } from '../../hooks/useStreamPointer';
+import { StreamPointerToggle } from './StreamPointerToggle';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { RoomSlotInfo } from '../../core/types';
 import { useRoom } from '../../hooks/useRoom';
@@ -9,6 +11,8 @@ import { pipService } from '../../services/pip_service';
 import { ZoomControlBar } from './ZoomControlBar';
 import { Tooltip } from '../common/Tooltip';
 import { StreamStatsOverlay } from './StreamStatsOverlay';
+import { Grid2X2, Focus, Eye, EyeOff, Maximize, Pin, PictureInPicture2, RotateCcw, Volume2, VolumeX, Square } from 'lucide-react';
+import { useContextMenu, type ContextMenuAction } from '../common/ContextMenu';
 
 interface VideoCardProps {
   slot: RoomSlotInfo;
@@ -23,7 +27,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   inTray = false,
   isSelectedFeatured = false,
 }) => {
-  const { togglePin, stopWatchingStream, getPeerPing, username } = useRoom();
+  const { togglePin, stopWatchingStream, stopScreenSharing, getPeerPing, username, layoutMode, returnToGrid } = useRoom();
+  const openContextMenu = useContextMenu();
   const currentResolution = useStore((s) => s.currentResolution);
   const currentFps = useStore((s) => s.currentFps);
   const currentBitrate = useStore((s) => s.currentBitrate);
@@ -69,8 +74,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     };
   }, []);
 
-  const handleToggleFullscreen = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleToggleFullscreen = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (document.fullscreenElement !== cardRef.current) {
       if (cardRef.current?.requestFullscreen) {
         cardRef.current.requestFullscreen().catch(() => {});
@@ -83,6 +88,10 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   };
 
   const videoElementRef = useRef<HTMLVideoElement | null>(null);
+
+  const pointer = useStreamPointer(cardRef, videoElementRef, slot.peerId, !slot.isLocal && !inTray && !isPipActive && !!slot.stream,
+    slot.stream, false, !isPipActive && !!slot.stream && !(inTray && isSelectedFeatured) && (!slot.isLocal || showLocalPreview));
+
 
   const cleanupVideoElement = useCallback((el: HTMLVideoElement | null) => {
     if (!el) return;
@@ -196,8 +205,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     audioContextManager.setPeerVolume(slot.peerId, val, val === 0);
   };
 
-  const handleToggleMute = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleToggleMute = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (isMuted || volume === 0) {
       const targetVol = lastVolume || 100;
       setVolume(targetVol);
@@ -212,6 +221,30 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   };
 
   const watchers = slot.watchers || [];
+
+  const handleContextMenu = (event: React.MouseEvent) => {
+    const actions: ContextMenuAction[] = [];
+    if (!isFeatured && !isSelectedFeatured) actions.push({ id: 'feature', label: 'Destacar transmissão', icon: <Focus size={15} />, onSelect: () => togglePin(slot.peerId) });
+    if (layoutMode === 'spotlight') actions.push({ id: 'grid', label: 'Voltar à grade', icon: <Grid2X2 size={15} />,
+      onSelect: returnToGrid });
+    if (isPipActive) actions.push({ id: 'restore', label: 'Restaurar para o app', icon: <PictureInPicture2 size={15} />, onSelect: () => pipService.restoreFromPip(slot.peerId) });
+    else {
+      if (slot.isLocal) actions.push({ id: 'preview', label: showLocalPreview ? 'Ocultar prévia' : 'Ver prévia',
+        icon: showLocalPreview ? <EyeOff size={15} /> : <Eye size={15} />, onSelect: () => setShowLocalPreview(!showLocalPreview) });
+      else actions.push({ id: 'mute', label: isMuted || volume === 0 ? 'Ativar áudio' : 'Silenciar áudio',
+        icon: isMuted ? <Volume2 size={15} /> : <VolumeX size={15} />, onSelect: () => handleToggleMute() });
+      if (!inTray) {
+        actions.push({ id: 'hud', label: isHudPinned ? 'Desafixar controles' : 'Fixar controles', icon: <Pin size={15} />, onSelect: () => setIsHudPinned(!isHudPinned) });
+        if (zoom > 1) actions.push({ id: 'zoom', label: 'Redefinir zoom', icon: <RotateCcw size={15} />, onSelect: resetZoom });
+        actions.push({ id: 'fullscreen', label: isFullscreen ? 'Sair da tela cheia' : 'Tela cheia', icon: <Maximize size={15} />, onSelect: () => handleToggleFullscreen() });
+      }
+      actions.push({ id: 'pip', label: 'Abrir em Picture-in-Picture', icon: <PictureInPicture2 size={15} />,
+        disabled: !slot.stream, onSelect: () => pipService.openPip(slot.peerId, slot.senderName, slot.stream) });
+    }
+    actions.push({ id: 'stop', label: slot.isLocal ? 'Parar transmissão' : 'Parar de assistir', icon: <Square size={15} />, separator: true,
+      onSelect: slot.isLocal ? stopScreenSharing : () => stopWatchingStream(slot.peerId) });
+    openContextMenu(event, actions);
+  };
 
   const pingVal = !slot.isLocal ? getPeerPing(slot.peerId) : 0;
   const pingNum = pingVal ?? 15;
@@ -229,6 +262,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
       className={`stream-card ${isFeatured ? 'featured' : ''} ${inTray ? 'in-tray' : ''} ${isSelectedFeatured ? 'selected-featured' : ''} ${zoom > 1.0 && !inTray ? 'is-zoomed' : ''} ${isDragging && !inTray ? 'is-dragging' : ''} ${!slot.isLocal && !inTray ? 'has-volume-controller' : ''} ${isHudPinned ? 'is-hud-pinned' : ''} ${activeTooltips > 0 ? 'is-hud-active' : ''}`}
       data-peer-id={slot.peerId}
       onClick={handleCardClick}
+      onContextMenu={handleContextMenu}
+      tabIndex={0}
       onMouseDown={!inTray ? handleMouseDown : undefined}
       onDoubleClick={!inTray ? handleDoubleClick : undefined}
     >
@@ -337,6 +372,9 @@ export const VideoCard: React.FC<VideoCardProps> = ({
         )}
       </div>
 
+      {pointer.indicator}
+
+
       {/* Featured badge when in tray */}
       {inTray && isSelectedFeatured && (
         <span className="selected-featured-badge">
@@ -384,6 +422,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           className="stream-controls-group"
           onClick={(e) => e.stopPropagation()}
         >
+          {!slot.isLocal && <StreamPointerToggle enabled={pointer.enabled} onToggle={pointer.toggle} onTooltipOpenChange={handleTooltipOpenChange} />}
           {slot.isLocal && showLocalPreview && (
             <button
               type="button"
@@ -430,7 +469,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
               </button>
 
               <div className="stream-volume-slider-box">
-                <input
+                <input autoComplete="off"
                   type="range"
                   min="0"
                   max="100"

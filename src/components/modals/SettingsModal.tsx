@@ -1,3 +1,4 @@
+import { Select } from '../common/Select';
 import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useModal } from '../../hooks/useModal';
@@ -40,6 +41,8 @@ export const SettingsModal: React.FC = () => {
   const [defaultQuality, setDefaultQuality] = useState(
     () => localStorage.getItem('p2sharer_default_quality') || '90'
   );
+  const [participantCursors, setParticipantCursors] = useState(() => stateStore.allowParticipantCursors);
+  const [participantPings, setParticipantPings] = useState(() => stateStore.allowParticipantPings);
   const [defaultCursor, setDefaultCursor] = useState(
     () => localStorage.getItem('p2sharer_default_cursor') !== 'false'
   );
@@ -94,6 +97,10 @@ export const SettingsModal: React.FC = () => {
     saveTransferSpeedUnit(transferSpeedUnit);
     soundEffects.setEnabled(sfxEnabled);
     soundEffects.setVolume(sfxVolume / 100);
+
+    localStorage.setItem('p2sharer_participant_cursors', String(participantCursors));
+    localStorage.setItem('p2sharer_participant_pings', String(participantPings));
+    stateStore.set((s) => { s.allowParticipantCursors = participantCursors; s.allowParticipantPings = participantPings; });
 
     // Save Stream defaults
     localStorage.setItem('p2sharer_default_res', defaultRes);
@@ -278,7 +285,7 @@ export const SettingsModal: React.FC = () => {
                   <label className="settings-label" htmlFor="settings-input-username">
                     Apelido na Sala:
                   </label>
-                  <input
+                  <input autoComplete="off"
                     type="text"
                     id="settings-input-username"
                     className="text-input"
@@ -329,11 +336,13 @@ export const SettingsModal: React.FC = () => {
                 </div>
                 <div className="settings-row">
                   <label className="settings-label" htmlFor="settings-transfer-speed-unit">Velocidade das transferências:</label>
-                  <select id="settings-transfer-speed-unit" className="select-input-sm"
-                    value={transferSpeedUnit} onChange={(event) => setTransferSpeedUnit(event.target.value as TransferSpeedUnit)}>
-                    <option value="MB">MB/s (megabytes por segundo)</option>
-                    <option value="Mb">Mb/s (megabits por segundo)</option>
-                  </select>
+                  <Select id="settings-transfer-speed-unit" className="select-input-sm"
+                    value={transferSpeedUnit} onValueChange={(value) => setTransferSpeedUnit(value as TransferSpeedUnit)}
+                    options={[
+                      { value: 'MB', label: 'MB/s (megabytes por segundo)' },
+                      { value: 'Mb', label: 'Mb/s (megabits por segundo)' },
+                    ]}
+                  />
                 </div>
               </div>
             )}
@@ -424,7 +433,7 @@ export const SettingsModal: React.FC = () => {
                       </span>
                     </div>
                     <div className="modern-switch">
-                      <input
+                      <input autoComplete="off"
                         type="checkbox"
                         id="settings-check-sfx-enabled"
                         checked={sfxEnabled}
@@ -453,7 +462,7 @@ export const SettingsModal: React.FC = () => {
                     </span>
                   </div>
                   <div className="settings-slider-container">
-                    <input
+                    <input autoComplete="off"
                       type="range"
                       id="settings-slider-sfx-volume"
                       min="0"
@@ -530,80 +539,98 @@ export const SettingsModal: React.FC = () => {
                     <label className="settings-label" htmlFor="settings-default-resolution">
                       Resolução Padrão:
                     </label>
-                    <select
+                    <Select
                       id="settings-default-resolution"
                       className="select-input-sm"
                       value={defaultRes}
-                      onChange={(e) => {
-                        const newRes = e.target.value;
+                      onValueChange={(value) => {
+                        const newRes = value;
                         setDefaultRes(newRes);
                         setDefaultBitrate(String(stateStore.getDefaultBitrateForResolution(newRes)));
                       }}
-                    >
-                      <option value="4k">4K (3840x2160)</option>
-                      <option value="1440p">1440p 2K</option>
-                      <option value="1080p">1080p Full HD</option>
-                      <option value="720p">720p HD</option>
-                      <option value="480p">480p SD</option>
-                      <option value="360p">360p Baixa</option>
-                    </select>
+                      options={[
+                        { value: '4k', label: '4K (3840x2160)' },
+                        { value: '1440p', label: '1440p 2K' },
+                        { value: '1080p', label: '1080p Full HD' },
+                        { value: '720p', label: '720p HD' },
+                        { value: '480p', label: '480p SD' },
+                        { value: '360p', label: '360p Baixa' },
+                      ]}
+                    />
                   </div>
 
                   <div className="settings-col">
                     <label className="settings-label" htmlFor="settings-default-fps">
                       Taxa de FPS:
                     </label>
-                    <select
+                    <Select
                       id="settings-default-fps"
                       className="select-input-sm"
                       value={defaultFps}
-                      onChange={(e) => setDefaultFps(e.target.value)}
-                    >
-                      <option value="120">120 FPS</option>
-                      <option value="60">60 FPS</option>
-                      <option value="30">30 FPS</option>
-                      <option value="15">15 FPS</option>
-                    </select>
+                      onValueChange={(value) => setDefaultFps(value)}
+                      options={[
+                        { value: '120', label: '120 FPS' },
+                        { value: '60', label: '60 FPS' },
+                        { value: '30', label: '30 FPS' },
+                        { value: '15', label: '15 FPS' },
+                      ]}
+                    />
                   </div>
 
                   <div className="settings-col">
                     <label className="settings-label" htmlFor="settings-default-bitrate">
                       Bitrate de Vídeo:
                     </label>
-                    <select
+                    <Select
                       id="settings-default-bitrate"
                       className="select-input-sm"
                       value={defaultBitrate}
-                      onChange={(e) => setDefaultBitrate(e.target.value)}
-                    >
-                      <option value="35000">35 Mbps (Ultra)</option>
-                      <option value="25000">25 Mbps (Alto)</option>
-                      <option value="15000">15 Mbps (Médio)</option>
-                      <option value="8000">8 Mbps (Econômico)</option>
-                      <option value="3000">3 Mbps</option>
-                      <option value="1000">1 Mbps</option>
-                    </select>
+                      onValueChange={(value) => setDefaultBitrate(value)}
+                      options={[
+                        { value: '35000', label: '35 Mbps (Ultra)' },
+                        { value: '25000', label: '25 Mbps (Alto)' },
+                        { value: '15000', label: '15 Mbps (Médio)' },
+                        { value: '8000', label: '8 Mbps (Econômico)' },
+                        { value: '3000', label: '3 Mbps' },
+                        { value: '1000', label: '1 Mbps' },
+                      ]}
+                    />
                   </div>
 
                   <div className="settings-col">
                     <label className="settings-label" htmlFor="settings-default-quality">
                       Qualidade de Imagem:
                     </label>
-                    <select
+                    <Select
                       id="settings-default-quality"
                       className="select-input-sm"
                       value={defaultQuality}
-                      onChange={(e) => setDefaultQuality(e.target.value)}
-                    >
-                      <option value="95">95% (Máxima Fidelidade)</option>
-                      <option value="90">90% (Muito Alta - Recomendado)</option>
-                      <option value="85">85% (Alta)</option>
-                      <option value="75">75% (Equilibrada)</option>
-                    </select>
+                      onValueChange={(value) => setDefaultQuality(value)}
+                      options={[
+                        { value: '95', label: '95% (Máxima Fidelidade)' },
+                        { value: '90', label: '90% (Muito Alta - Recomendado)' },
+                        { value: '85', label: '85% (Alta)' },
+                        { value: '75', label: '75% (Equilibrada)' },
+                      ]}
+                    />
                   </div>
                 </div>
 
                 <div className="settings-row" style={{ marginTop: '14px' }}>
+                  {[
+                    { id: 'participant-cursors', label: 'Exibir cursores dos participantes', description: 'Permitir apontamentos na sua tela, sem controlar o desktop.', checked: participantCursors, change: setParticipantCursors },
+                    { id: 'participant-pings', label: 'Exibir pings dos participantes', description: 'Mostrar onde os participantes clicarem.', checked: participantPings, change: setParticipantPings },
+                  ].map((option) => <label className="settings-switch-row" htmlFor={option.id} key={option.id}>
+                    <div className="settings-switch-label-group">
+                      <span className="settings-switch-title">{option.label}</span>
+                      <span className="settings-switch-subtitle">{option.description}</span>
+                    </div>
+                    <div className="modern-switch">
+                      <input autoComplete="off" type="checkbox" id={option.id} checked={option.checked}
+                        onChange={(event) => option.change(event.target.checked)} />
+                      <span className="switch-slider" />
+                    </div>
+                  </label>)}
                   <label className="settings-switch-row" htmlFor="settings-check-cursor">
                     <div className="settings-switch-label-group">
                       <span className="settings-switch-title">Captura do Cursor do Mouse</span>
@@ -612,7 +639,7 @@ export const SettingsModal: React.FC = () => {
                       </span>
                     </div>
                     <div className="modern-switch">
-                      <input
+                      <input autoComplete="off"
                         type="checkbox"
                         id="settings-check-cursor"
                         checked={defaultCursor}
@@ -644,7 +671,7 @@ export const SettingsModal: React.FC = () => {
                       </span>
                     </div>
                     <div className="modern-switch">
-                      <input
+                      <input autoComplete="off"
                         type="checkbox"
                         id="settings-enable-turn"
                         checked={turnEnabled}
@@ -661,7 +688,7 @@ export const SettingsModal: React.FC = () => {
                       <label className="settings-label" htmlFor="settings-turn-url">
                         Endereços TURN (um por linha):
                       </label>
-                      <textarea
+                      <textarea autoComplete="off"
                         id="settings-turn-url"
                         className="text-input-sm"
                         rows={3}
@@ -676,7 +703,7 @@ export const SettingsModal: React.FC = () => {
                         <label className="settings-label" htmlFor="settings-turn-username">
                           Usuário (Username):
                         </label>
-                        <input
+                        <input autoComplete="off"
                           type="text"
                           id="settings-turn-username"
                           className="text-input-sm"
@@ -689,7 +716,7 @@ export const SettingsModal: React.FC = () => {
                         <label className="settings-label" htmlFor="settings-turn-credential">
                           Senha (Credential):
                         </label>
-                        <input
+                        <input autoComplete="off"
                           type="password"
                           id="settings-turn-credential"
                           className="text-input-sm"
@@ -709,7 +736,7 @@ export const SettingsModal: React.FC = () => {
                           </span>
                         </div>
                         <div className="modern-switch">
-                          <input
+                          <input autoComplete="off"
                             type="checkbox"
                             id="settings-turn-force-relay"
                             checked={turnForceRelay}

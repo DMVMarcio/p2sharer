@@ -35,7 +35,7 @@ export const CreateRoomModal: React.FC = () => {
 
   return (
     <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} id="modal-create-room-dialog">
-      <form onSubmit={submit} aria-busy={pending} className="modal-card">
+      <form autoComplete="off" onSubmit={submit} aria-busy={pending} className="modal-card">
         <div className="modal-header">
           <div className="modal-header-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -57,7 +57,7 @@ export const CreateRoomModal: React.FC = () => {
         <div className="modal-body">
           <div className="form-group">
             <label className="form-label" htmlFor="input-create-room-name-dialog">Nome da sala neste dispositivo:</label>
-            <input id="input-create-room-name-dialog" className="text-input" maxLength={80}
+            <input autoComplete="off" id="input-create-room-name-dialog" className="text-input" maxLength={80}
               autoFocus value={name} onChange={(event) => setName(event.target.value)} />
           </div>
 
@@ -66,7 +66,7 @@ export const CreateRoomModal: React.FC = () => {
               <span>Senha de Proteção (Opcional):</span>
             </label>
             <div className="input-with-action">
-              <input
+              <input autoComplete="off"
                 type={showPassword ? 'text' : 'password'}
                 id="input-create-room-password-dialog"
                 className="text-input"

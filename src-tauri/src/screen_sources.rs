@@ -671,6 +671,7 @@ pub fn start_native_screen_capture(
     // Stop any existing capture session first
     let _ = stop_native_screen_capture();
 
+    crate::stream_pointer::set_source(Some(source_id.clone()));
     CAPTURING_VIDEO.store(true, Ordering::SeqCst);
     let is_capturing = Arc::new(AtomicBool::new(true));
     let is_capturing_clone = is_capturing.clone();
@@ -1112,6 +1113,7 @@ fn safely_stop_wgc_control(control: ActiveCaptureControl) {
 
 #[tauri::command]
 pub fn stop_native_screen_capture() -> Result<bool, String> {
+    crate::stream_pointer::set_source(None);
     CAPTURING_VIDEO.store(false, Ordering::SeqCst);
     if let Ok(mut guard) = CURRENT_CAPTURE_FLAG.lock() {
         if let Some(flag) = guard.take() {

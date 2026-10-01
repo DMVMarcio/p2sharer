@@ -41,6 +41,24 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 4. User Guidelines & Expressed Preferences
 
+- `[Git]` Commit completed task changes automatically after required validation and before the final response, using English Conventional Commits. Report the commit hash and any remaining pending changes. The user explicitly authorized committing all currently pending workspace changes on 2026-10-01. Future tasks should preserve unrelated pre-existing edits unless their inclusion is authorized; pushing requires separate authorization.
+
+- `[Stream Pointing]` Viewer pointing is opt-in and resets off for each viewed stream. Replace the viewer mouse over active video with the same participant-colored named cursor shown on the broadcaster desktop; do not show a local ring. All watchers, including passive viewers, see interactive participant cursors and their own/others' click ripples. Ripples animate for one second. Keep pointing visual-only, without remote input control. Independent persistent broadcaster cursor and ping consent switches in Transmission settings default on.
+
+- `[YouTube Mix Links]` Treat generated YouTube Mix/radio links as their selected video only. Skip Mix playlist lookups and omit the invalid playlist preview, while preserving ordinary video-plus-playlist link previews.
+
+- `[Text Input History]` Disable Chromium/WebView2 autocomplete history suggestions across application inputs and forms using `autoComplete="off"`; previously typed values must not appear in a browser popup when a field is focused.
+
+- `[Canonical UI]` Standardization rules must cover every existing shared control, not only selects: buttons, text fields and rich editors, contextual/dots menus, tooltips, dialogs, switches, sliders, media controls, emoji components, and feedback states. Reuse canonical components or CSS recipes across every application surface, preserving themed appearance, smooth family-specific motion, accessibility, and interaction behavior.
+
+- `[Select Controls]` Every selection input must use the canonical custom `Select` component instead of native browser `<select>`. Match app tokens, themed narrow scrollbars, keyboard access, and smooth 320 ms enter / 260 ms exit motion, retaining noninteractive content during exit. Apply this rule to all new and existing application surfaces.
+
+
+- `[Text Context Menus]` Text inputs and rich editors must use the application context menu, with selection-aware copy, cut, paste, delete, select-all, undo, and redo rather than the original WebView menu. Preserve the selection and use each editor's own history.
+
+- `[Context Menus]` Provide a modular application-wide right-click menu adapted to the current surface, reusing dots actions for messages and offering stream layout actions such as returning to the grid. Match the app design and smooth menu motion; prevent browser media menus from exposing playback controls or disrupting transmissions.
+
+
 - `[Video]` **Receiver Frame Rate**: Prioritize smooth 1080p/60 FPS transmission to other participants. A fluid local preview alone does not validate remote encoding or delivery; measure real RTP frame counters.
 
 - `[External Repositories]` **zkTrackier Is Read-Only**: When investigating P2Sharer screen sharing with zkTrackier, inspect `D:\Projetos\zkTrackier\` only for context. Never modify files in that directory.
@@ -191,6 +209,8 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 ---
 
 ## 5. Build, Test & Run Commands
+
+The npm Tauri commands use `tools/tauri.mjs` to find standalone or Visual Studio-bundled CMake when it is absent from PATH. The launcher preserves explicit CMAKE overrides, sets the tool environment only for its process, and retains the normal Cargo output directory. The vendored turbojpeg SIMD build also requires NASM. Direct Cargo builds need CMake on PATH or an explicit CMAKE environment variable.
 - **Development Server**: `npm run dev` (Vite on port 1420)
 - **Tauri App Dev**: `npm run tauri:dev` (runs `npm run dev` and starts Tauri window)
 - **Frontend Typecheck & Build (Web Only)**: `npm run build` (`tsc && vite build`)

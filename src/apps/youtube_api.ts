@@ -2,6 +2,8 @@ import type { YouTubeEntry } from './types';
 
 const VIDEO_ID = /^[\w-]{11}$/;
 const PLAYLIST_ID = /^[\w-]{10,60}$/;
+// RD identifiers represent generated radio/Mix queues, not importable playlists.
+const isImportablePlaylist = (id: string) => PLAYLIST_ID.test(id) && !id.startsWith('RD');
 const INVIDIOUS_INSTANCES = [
   'https://invidious.f5.si',
   'https://invidious.tiekoetter.com',
@@ -41,21 +43,25 @@ export function parseYouTubeInput(input: string): { videoId?: string; playlistId
       /^\/(shorts|live|embed|v)\//.test(url.pathname) ? url.pathname.split('/')[2] : url.searchParams.get('v');
     const playlistId = url.searchParams.get('list') || undefined;
     return { videoId: videoId && VIDEO_ID.test(videoId) ? videoId : undefined,
-      playlistId: playlistId && /^[\w-]{10,60}$/.test(playlistId) ? playlistId : undefined };
+      playlistId: playlistId && isImportablePlaylist(playlistId) ? playlistId : undefined };
   } catch { return {}; }
 }
 
-async function invidiousRequest(path: string, params: Record<string, string> = {}): Promise<unknown> {
+async function invidiousRequest(path: string, params: Record<string, string> = {},
+  accept: (data: unknown) => boolean = () => true,
+  failureMessage = 'A busca está indisponível no momento. Você ainda pode colar um link de vídeo.'): Promise<unknown> {
   for (const instance of INVIDIOUS_INSTANCES) {
     try {
       const url = new URL(`/api/v1/${path}`, instance);
       Object.entries(params).forEach(([name, value]) => url.searchParams.set(name, value));
       const response = await fetch(url, { signal: AbortSignal.timeout(12000) });
       if (!response.ok) continue;
-      return await response.json();
+      const data: unknown = await response.json();
+      if (!accept(data)) continue;
+      return data;
     } catch { /* Try the next documented public instance. */ }
   }
-  throw new Error('A busca está indisponível no momento. Você ainda pode colar um link de vídeo.');
+  throw new Error(failureMessage);
 }
 
 function validTitle(value: unknown): value is string {
@@ -70,7 +76,7 @@ export function parseInvidiousResults(value: unknown): YouTubeSearchItem[] {
     if (!validTitle(result.title)) return [];
     if (result.type === 'video' && typeof result.videoId === 'string' && VIDEO_ID.test(result.videoId))
       return [{ kind: 'video' as const, id: result.videoId, title: result.title.trim() }];
-    if (result.type === 'playlist' && typeof result.playlistId === 'string' && PLAYLIST_ID.test(result.playlistId))
+    if (result.type === 'playlist' && typeof result.playlistId === 'string' && isImportablePlaylist(result.playlistId))
       return [{ kind: 'playlist' as const, id: result.playlistId, title: result.title.trim() }];
     return [];
   }).slice(0, 20);
@@ -84,7 +90,7 @@ export async function searchYouTube(query: string): Promise<YouTubeSearchItem[]>
 export async function loadYouTubePlaylistPreview(id: string): Promise<{
   title: string; count?: number; thumbnailVideoId?: string
 } | null> {
-  if (!PLAYLIST_ID.test(id)) return null;
+  if (!isImportablePlaylist(id)) return null;
   const data = await invidiousRequest(`playlists/${id}`);
   if (!data || typeof data !== 'object') return null;
   const playlist = data as Record<string, unknown>;
@@ -108,13 +114,28 @@ export function parseInvidiousPlaylist(value: unknown): YouTubeEntry[] {
 }
 
 export async function loadYouTubePlaylist(id: string): Promise<YouTubeEntry[]> {
-  if (!PLAYLIST_ID.test(id)) return [];
+  if (!isImportablePlaylist(id)) return [];
+  const { isTauri, invoke } = await import('@tauri-apps/api/core');
+  if (isTauri()) {
+    try {
+      const data = await invoke<unknown>('load_youtube_playlist', { playlistId: id });
+      const entries = parseInvidiousPlaylist({ videos: data });
+      if (entries.length) return entries;
+    } catch { /* Fall back to validated public API responses. */ }
+  }
   const videos: YouTubeEntry[] = [];
   for (let page = 1; page <= 4 && videos.length < 200; page++) {
-    const data = await invidiousRequest(`playlists/${id}`, { page: String(page) });
+    const data = await invidiousRequest(`playlists/${id}`, { page: String(page) }, (value) => {
+      if (!value || typeof value !== 'object' || !Array.isArray((value as { videos?: unknown }).videos)) return false;
+      const record = value as { videoCount?: unknown; videos: unknown[]; error?: unknown };
+      if (record.error) return false;
+      return record.videos.length > 0 && parseInvidiousPlaylist(value).length > 0;
+    }, 'Não foi possível carregar os vídeos desta playlist. Ela pode estar indisponível ou o serviço de consulta pode ter falhado.');
     const entries = parseInvidiousPlaylist(data);
     videos.push(...entries.slice(0, 200 - videos.length));
-    if (entries.length < 50) break;
+    const record = data as { videoCount?: number; videos: unknown[] };
+    if ((Number.isSafeInteger(record.videoCount) && videos.length >= record.videoCount!) || record.videos.length < 50) break;
   }
+  if (!videos.length) throw new Error('Não foi possível carregar os vídeos desta playlist. Tente novamente.');
   return videos;
 }

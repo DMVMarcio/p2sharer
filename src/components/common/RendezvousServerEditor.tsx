@@ -68,7 +68,7 @@ export const RendezvousServerEditor: React.FC<Props> = ({ preferences, onChange 
               aria-label={`Remover ${server.url}`}
               onClick={() => update(preferences[transport].filter((_, i) => i !== index))}>Remover</button>
             <label className="modern-switch" title={server.enabled ? 'Desabilitar servidor' : 'Habilitar servidor'}>
-              <input type="checkbox" checked={server.enabled} aria-label={`Habilitar ${server.url}`}
+              <input autoComplete="off" type="checkbox" checked={server.enabled} aria-label={`Habilitar ${server.url}`}
                 onChange={(event) => update(preferences[transport].map((entry, i) => i === index ? { ...entry, enabled: event.target.checked } : entry))} />
               <span className="switch-slider" aria-hidden="true" />
             </label>
@@ -76,7 +76,7 @@ export const RendezvousServerEditor: React.FC<Props> = ({ preferences, onChange 
         ))}
       </div>
       <div className="rendezvous-add">
-        <input className="text-input-sm" type="url" value={newUrl} placeholder="wss://servidor.exemplo"
+        <input autoComplete="off" className="text-input-sm" type="url" value={newUrl} placeholder="wss://servidor.exemplo"
           aria-label={`Novo servidor ${labels[transport]}`} onChange={(event) => { setNewUrl(event.target.value); setError(''); }}
           onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); add(); } }} />
         <button type="button" className="btn btn-sm btn-outline" onClick={add}>Adicionar</button>

@@ -1,15 +1,14 @@
-import { useDropdownPresence } from '../../hooks/useDropdownPresence';
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal, Shield, Crown, UserX, Play } from 'lucide-react';
+import { useContextMenu, type ContextMenuAction } from '../common/ContextMenu';
 import { useRoom } from '../../hooks/useRoom';
 import { showToast } from '../../hooks/useToast';
 
 export const ParticipantsPane: React.FC = () => {
   const { username, peers, roomSlots, isCreator, isRoomHost, isRoomAdmin,
-    transferOwnership, setAdministrator, kickPeer } = useRoom();
-  const [openMenu, setOpenMenu] = useState<string | null>(null);
-  const menuPresence = useDropdownPresence(openMenu);
+    transferOwnership, setAdministrator, kickPeer, requestStream } = useRoom();
+  const openContextMenu = useContextMenu();
   const [pendingAction, setPendingAction] = useState<{
     kind: 'kick' | 'transfer' | 'admin' | 'revoke-admin'; id: string; name: string;
   } | null>(null);
@@ -65,9 +64,19 @@ export const ParticipantsPane: React.FC = () => {
           const color = getSlotColor(p.id, false);
           const slot = roomSlots.find((s) => s.peerId === p.id);
           const isStreaming = slot?.isStreaming;
+          const actions: ContextMenuAction[] = [];
+          if (isStreaming) actions.push({ id: 'watch', label: 'Assistir transmissão', icon: <Play size={15} />, onSelect: () => requestStream(p.id) });
+          if (isRoomHost && p.connectionState === 'connected' && !p.isCreator) actions.push(
+            { id: 'admin', label: p.isAdmin ? 'Remover administrador' : 'Tornar administrador', icon: <Shield size={15} />,
+              onSelect: () => setPendingAction({ kind: p.isAdmin ? 'revoke-admin' : 'admin', id: p.id, name: p.username }) },
+            { id: 'transfer', label: 'Transferir propriedade', icon: <Crown size={15} />,
+              onSelect: () => setPendingAction({ kind: 'transfer', id: p.id, name: p.username }) },
+            { id: 'kick', label: 'Expulsar', icon: <UserX size={15} />, danger: true,
+              onSelect: () => setPendingAction({ kind: 'kick', id: p.id, name: p.username }) },
+          );
 
           return (
-            <div key={p.id} className="participant-item">
+            <div key={p.id} className="participant-item" onContextMenu={(event) => openContextMenu(event, actions)}>
               <div className="participant-item-identity">
                 <div
                   className="participant-item-avatar"
@@ -84,25 +93,12 @@ export const ParticipantsPane: React.FC = () => {
               </div>
               <div className="participant-end-actions">
                 <span className={`user-status-dot ${p.connectionState === 'connected' ? 'online' : 'connecting'}`}></span>
-                {isRoomHost && p.connectionState === 'connected' && !p.isCreator && (
-                  <div className="participant-menu-wrap">
-                    <button className="participant-menu-trigger" aria-label={`Ações para ${p.username}`}
-                      onClick={() => setOpenMenu(openMenu === p.id ? null : p.id)}><MoreHorizontal size={16} /></button>
-                    {menuPresence.value === p.id && <div className={`participant-menu ${menuPresence.closing ? 'dropdown-closing' : ''}`} inert={menuPresence.closing} aria-hidden={menuPresence.closing} role="menu">
-                      <button role="menuitem" onClick={() => { setOpenMenu(null);
-                        setPendingAction({ kind: p.isAdmin ? 'revoke-admin' : 'admin', id: p.id, name: p.username }); }}>
-                        {p.isAdmin ? 'Remover administrador' : 'Tornar administrador'}
-                      </button>
-                      <button role="menuitem" onClick={() => { setOpenMenu(null); setPendingAction({ kind: 'transfer', id: p.id, name: p.username }); }}>
-                        Transferir propriedade
-                      </button>
-                      <button role="menuitem" className="participant-menu-danger"
-                        onClick={() => { setOpenMenu(null); setPendingAction({ kind: 'kick', id: p.id, name: p.username }); }}>
-                        Expulsar
-                      </button>
-                    </div>}
-                  </div>
-                )}
+                {actions.length > 0 && <button className="participant-menu-trigger" aria-label={`Ações para ${p.username}`}
+                  aria-haspopup="menu" onClick={(event) => {
+                    const rect = event.currentTarget.getBoundingClientRect();
+                    openContextMenu({ clientX: rect.right, clientY: rect.bottom, currentTarget: event.currentTarget,
+                      preventDefault: () => event.preventDefault(), stopPropagation: () => event.stopPropagation() }, actions);
+                  }}><MoreHorizontal size={16} /></button>}
               </div>
             </div>
           );

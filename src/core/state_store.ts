@@ -11,6 +11,8 @@ export class StateStore {
   public currentRoomPassword: string = '';
   public isCreator: boolean = false;
   public isSharingScreen: boolean = false;
+  public allowParticipantCursors = true;
+  public allowParticipantPings = true;
 
   public layoutMode: 'grid' | 'spotlight' = 'grid';
   public pinnedPeerId: string | null = null;
@@ -89,6 +91,8 @@ export class StateStore {
 
   public loadFromStorage(): void {
     if (typeof localStorage === 'undefined') return;
+    this.allowParticipantCursors = localStorage.getItem('p2sharer_participant_cursors') !== 'false';
+    this.allowParticipantPings = localStorage.getItem('p2sharer_participant_pings') !== 'false';
     this.username = localStorage.getItem('p2sharer_username') || '';
     this.currentThemeMode = (localStorage.getItem('p2sharer_theme_mode') as ThemeMode) || 'dark';
     this.currentAccentColor = localStorage.getItem('p2sharer_accent_color') || 'cyan';

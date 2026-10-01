@@ -59,7 +59,7 @@ export const SaveInviteModal: React.FC = () => {
 
   return (
     <div className={`modal-overlay ${isClosing ? 'closing' : ''}`}>
-      <form onSubmit={submit} aria-busy={pending} className="modal-card" role="dialog" aria-modal="true" aria-labelledby="save-invite-title">
+      <form autoComplete="off" onSubmit={submit} aria-busy={pending} className="modal-card" role="dialog" aria-modal="true" aria-labelledby="save-invite-title">
         <div className="modal-header">
           <div className="modal-header-icon"><BookmarkPlus size={20} /></div>
           <div>
@@ -71,19 +71,19 @@ export const SaveInviteModal: React.FC = () => {
         <div className="modal-body">
           <div className="form-group">
             <label className="form-label" htmlFor="save-invite-code">Código de convite</label>
-            <input className="text-input" id="save-invite-code" value={code}
+            <input autoComplete="off" className="text-input" id="save-invite-code" value={code}
               placeholder="Cole o convite p2s4..." autoFocus
               onChange={(event) => setCode(event.target.value)} />
           </div>
           <div className="form-group saved-room-form-field">
             <label className="form-label" htmlFor="save-invite-name">Nome neste dispositivo (opcional)</label>
-            <input className="text-input" id="save-invite-name" maxLength={80} value={name}
+            <input autoComplete="off" className="text-input" id="save-invite-name" maxLength={80} value={name}
               onChange={(event) => setName(event.target.value)} />
           </div>
           <div className="form-group saved-room-form-field">
             <label className="form-label" htmlFor="save-invite-password">Senha para entrada automática (opcional)</label>
             <div className="input-with-action">
-              <input className="text-input" id="save-invite-password" maxLength={128}
+              <input autoComplete="off" className="text-input" id="save-invite-password" maxLength={128}
                 type={showPassword ? 'text' : 'password'} value={password}
                 onChange={(event) => setPassword(event.target.value)} />
               <button type="button" className="btn btn-sm btn-outline btn-inline-action btn-inline-action-icon"

@@ -4,6 +4,9 @@ import { useRoom } from '../../hooks/useRoom';
 import { useStore } from '../../hooks/useStore';
 import { Tooltip } from '../common/Tooltip';
 import { WatchersTooltipContent } from './WatchersTooltipContent';
+import { Focus, Grid2X2, Play, MonitorUp } from 'lucide-react';
+import { useContextMenu, type ContextMenuAction } from '../common/ContextMenu';
+import { useModal } from '../../hooks/useModal';
 
 interface ParticipantCardProps {
   slot: RoomSlotInfo;
@@ -18,7 +21,9 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
   inTray = false,
   isSelectedFeatured = false,
 }) => {
-  const { togglePin, requestStream, username } = useRoom();
+  const { togglePin, requestStream, username, layoutMode, returnToGrid } = useRoom();
+  const openContextMenu = useContextMenu();
+  const { openModal } = useModal();
   const subscribedStreams = useStore((s) => s.subscribedStreams);
 
   const isSubscribed = subscribedStreams.has(slot.peerId);
@@ -40,6 +45,16 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
       data-peer-id={slot.peerId}
       style={{ '--user-color': slot.color } as React.CSSProperties}
       onClick={handleCardClick}
+      tabIndex={0}
+      onContextMenu={(event) => {
+        const actions: ContextMenuAction[] = [];
+        if (!isFeatured && !isSelectedFeatured) actions.push({ id: 'feature', label: 'Destacar participante', icon: <Focus size={15} />, onSelect: () => togglePin(slot.peerId) });
+        if (layoutMode === 'spotlight') actions.push({ id: 'grid', label: 'Voltar à grade', icon: <Grid2X2 size={15} />,
+          onSelect: returnToGrid });
+        if (!slot.isLocal && slot.isStreaming && !isSubscribed) actions.push({ id: 'watch', label: 'Assistir transmissão', icon: <Play size={15} />, onSelect: () => requestStream(slot.peerId) });
+        if (slot.isLocal && !slot.isStreaming) actions.push({ id: 'share', label: 'Transmitir', icon: <MonitorUp size={15} />, onSelect: () => openModal('screenPicker') });
+        openContextMenu(event, actions);
+      }}
     >
       {/* Featured badge when in tray */}
       {inTray && isSelectedFeatured && (

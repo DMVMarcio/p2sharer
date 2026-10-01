@@ -5,9 +5,11 @@ import { useModal } from '../../hooks/useModal';
 import { useRoom } from '../../hooks/useRoom';
 import { showToast } from '../../hooks/useToast';
 import { roomService } from '../../services/room_service';
+import { useContextMenu } from '../common/ContextMenu';
 import { EditSavedRoomDialog } from '../modals/EditSavedRoomDialog';
 
 export const SavedRoomsSection: React.FC = () => {
+  const openContextMenu = useContextMenu();
   const [rooms, setRooms] = useState<SavedRoom[]>([]);
   const [editingRoom, setEditingRoom] = useState<SavedRoom | null>(null);
   const { openModal } = useModal();
@@ -56,7 +58,11 @@ export const SavedRoomsSection: React.FC = () => {
       ) : (
         <div className="saved-rooms-grid">
           {rooms.map((room) => (
-            <article className="saved-room-card" key={room.roomId}>
+            <article className="saved-room-card" key={room.roomId} onContextMenu={(event) => openContextMenu(event, [
+              { id: 'enter', label: 'Entrar na sala', icon: <ArrowRight size={15} />, onSelect: () => openSaved(room) },
+              { id: 'edit', label: 'Editar sala salva', icon: <Pencil size={15} />, onSelect: () => setEditingRoom(room) },
+              { id: 'remove', label: 'Remover das salas salvas', icon: <Trash2 size={15} />, danger: true, onSelect: () => removeSaved(room) },
+            ])}>
               <div className="saved-room-details">
                 <strong>{room.customName ?? room.name}</strong>
                 <span>{room.owned ? 'Sua sala' : 'Participante'} · {room.roomId.slice(0, 8)}

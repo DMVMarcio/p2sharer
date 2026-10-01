@@ -15,6 +15,7 @@ import { NotepadModel } from './models.ts';
 import { NotepadToolbar } from './NotepadToolbar';
 import { showToast } from '../hooks/useToast';
 import { useRoom } from '../hooks/useRoom';
+import { useTextEditorContextMenu } from '../hooks/useTextEditorContextMenu';
 
 interface Props { instanceId: string; compact?: boolean }
 
@@ -49,6 +50,7 @@ export const NotepadApp: React.FC<Props> = ({ instanceId, compact = false }) => 
       'aria-multiline': 'true' } },
   }, [instanceId, model]);
 
+  useTextEditorContextMenu(editor);
   useEffect(() => { editor?.setEditable(!compact); }, [editor, compact]);
   useEffect(() => { if (editor) editor.commands.updateUser(user); }, [editor, user]);
 
@@ -90,7 +92,7 @@ export const NotepadApp: React.FC<Props> = ({ instanceId, compact = false }) => 
         <button className="btn btn-sm btn-outline" disabled={busy} onClick={save}>Salvar</button>
       </>} />}
       {editingLink && <div className="room-app-notepad-link">
-        <input aria-label="URL do link" autoFocus value={linkUrl} placeholder="https://..."
+        <input autoComplete="off" aria-label="URL do link" autoFocus value={linkUrl} placeholder="https://..."
           onChange={(event) => setLinkUrl(event.target.value)}
           onKeyDown={(event) => { if (event.key === 'Enter') applyLink(); if (event.key === 'Escape') setEditingLink(false); }} />
         <button className="btn btn-sm btn-outline" onClick={applyLink}>Aplicar</button>

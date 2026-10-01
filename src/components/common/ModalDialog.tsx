@@ -37,6 +37,7 @@ export function ModalDialog({ title, subtitle, icon, children, footer, className
     const keydown = (event: KeyboardEvent) => {
       const dialogs = document.querySelectorAll('[role="dialog"][aria-modal="true"]');
       if (dialogs[dialogs.length - 1] !== card) return;
+      if (event.key === 'Escape' && event.target instanceof Element && event.target.closest('[role="combobox"][aria-expanded="true"]')) return;
       if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); close(); }
       if (event.key === 'Tab') {
         const controls = focusables();

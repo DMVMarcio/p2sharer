@@ -69,7 +69,7 @@ export const EmojiPicker: React.FC<Props> = ({ pack, onSelect, closing = false }
   return (
     <div className={`emoji-picker ${closing ? 'dropdown-closing' : ''}`} inert={closing} aria-hidden={closing} role="dialog" aria-label="Selecionar emoji">
       <div className="emoji-picker-header"><strong>Emojis</strong></div>
-      <input
+      <input autoComplete="off"
         className="emoji-picker-search"
         type="search"
         placeholder="Buscar emoji..."

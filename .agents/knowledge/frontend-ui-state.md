@@ -112,3 +112,40 @@ Rather than re-rendering HTML strings when peers join, leave, or toggle streams:
   - Custom SVG icons from `lucide`.
   - Micro-animations with transition curves (`cubic-bezier(0.4, 0, 0.2, 1)`).
   - Floating toast notifications and interactive connection overlays.
+
+## Application Context Menus
+
+`components/common/ContextMenu.tsx` owns the shared portal, viewport clamping, keyboard navigation, focus return, dismissal, and retained dropdown exit. `AppContextMenu` installs it for the main and PiP WebViews. Feature surfaces pass typed action lists; messages share their action builder between dots and right-click, and participant moderation keeps its existing confirmation dialog. Stream menus use existing local audio, preview, layout, fullscreen, and PiP actions, preventing WebView2's native media menu from altering playback. Text fields use shared selection-aware editing actions from `text_editing_actions.tsx` and snapshots in `core/text_editing.ts`. Tiptap editors register through `useTextEditorContextMenu` so mutations and undo/redo use their own commands, including collaboration history. Native fields use WebView2 editing commands to preserve undo and React input events. Modal backgrounds suppress underlying room actions. Add new contexts through `useContextMenu` rather than separate popups.
+
+## Canonical Select Controls
+
+`components/common/Select.tsx` replaces all native selects. Pass controlled `value`, `options` (value, label, optional disabled), and `onValueChange` (string value), with an associated label or `aria-label`. It uses the shared dropdown presence and duration tokens, retaining inert exit content, and Floating UI for fixed portal positioning, boundary flipping, resize/scroll tracking, and available-height sizing. Keyboard navigation, Home/End, typeahead, Enter/Space, Escape, and Tab work through a select-only combobox with active-descendant semantics. Focus stays on its trigger so modal traps and rich-editor selection remain stable. `ModalDialog` delegates Escape to an expanded combobox before closing the dialog. Application UI must not introduce native `<select>` controls.
+
+## Canonical UI Control Catalog
+
+The application-wide rule covers reusable React components and shared CSS recipes. Styled native buttons, text inputs, checkboxes, and ranges retain their semantic behavior; browser select menus, context menus, and `title` tooltips are replaced by the application's shared implementations.
+
+| Control family | Canonical implementation |
+| --- | --- |
+| Buttons and icon actions | `style.css`: `.btn` with semantic/size variants and established specialized icon-button recipes; `TooltipButton` for actions with tooltips |
+| Text fields and rich composition | `.text-input`, `.text-input-sm`, `EmojiComposerInput`; shared `text_editing_actions` and editor registration for context editing |
+| Selection fields | `components/common/Select.tsx` |
+| Context and dots menus | `ContextMenu`, `AppContextMenu`, `useContextMenu`, and shared feature action builders |
+| Tooltips | `Tooltip`, `TooltipButton`, and shared positioning utilities |
+| Dialogs | `ModalDialog` and the existing modal presence lifecycle |
+| Switches | `.modern-switch` / `.switch-slider` with semantic checkbox inputs |
+| Sliders and playback controls | `.settings-slider-input`, `.stream-volume-range`, existing zoom styles, `MediaSeekBar`, and shared stream-control recipes |
+| Emoji and message rendering | `EmojiPickerPopover`, `EmojiPicker`, `EmojiGlyph`, `EmojiText`, `ChatMessageContent` |
+| Notifications and activity feedback | `ToastContainer`, `ActivityToast`, `ActivityParticipants`, and established loading/empty/error patterns |
+| Shared settings editors | `RendezvousServerEditor` and existing common editors for their supported domain |
+
+Before adding a control, inspect the common components and its existing usage. Extend the canonical implementation when a new variant is needed. Apply shared tokens, keyboard and focus behavior, disabled/read-only states, and reduced-motion handling across main, settings, activities, and PiP surfaces. Menus/dropdowns retain their 320 ms enter / 260 ms exit lifecycle; dialogs and other families keep their established motion rather than inheriting dropdown timings indiscriminately.
+
+
+## Consent-Based Stream Pointing
+
+`useStreamPointer` and `StreamPointerToggle` share viewer pointing in stream cards and native PiP. Pointing starts off, resets when the stream/surface changes, excludes HUD controls and letterboxing, inverts the video element's transformed contain rectangle, and captures primary video clicks instead of layout selection or pan drags. Over active video, the native mouse is hidden and replaced by the same named, participant-colored `StreamPointerGlyph` used on the desktop. The local ring was removed. Movement is targeted at 25 Hz with an 800 ms stationary heartbeat; leaving, blur, visibility changes, and unmount send `leave`. PiP forwards visual packets to the main WebView through a targeted Tauri event.
+
+`GroupRoomManager` uses the independent `stream_pointer` action, its existing verified/admitted peer gate, targeted sends, and broadcaster watcher membership. The receiver derives names/colors from peer identity rather than packet claims, rate-limits motion and pings, expires stale cursors after three seconds, and clears departed watchers. Independent persistent `allowParticipantCursors` and `allowParticipantPings` switches default on and apply on Settings Save. Pings animate for one second even with cursors disabled. The broadcaster relays bounded `StreamPointerState` snapshots only to verified/admitted watchers, including passive viewers and the pointer author. Snapshots are accepted only from the broadcaster whose media is present and locally subscribed. `streamPointerView` converts sender-relative TTLs to local time; `StreamPointerVideoLayer` projects shared glyphs onto the transformed video image, with expiry and clipping. Own cursors are rendered locally to avoid echoed duplicates; own pings arrive in the same shared snapshots as other participants. Targeted main/PiP events provide identity and the current snapshot even when interactive mode is off. Passive video views include spotlight tray streams and local previews.
+
+`stream_pointer.rs` tracks the native capture source and hosts an unfocusable, click-through, transparent topmost WebView. It follows monitor physical bounds using the capture library's monitor ordering and window extended frame bounds, hiding minimized/closed windows. Display affinity excludes the annotation layer from captured monitor video. The main WebView publishes bounded, expiring visual snapshots; the overlay itself only reads snapshots/events. No mouse injection or remote desktop input commands exist in this feature. Capture stop clears the native source; room/stream lifecycle clears receiver state. Runtime verification with two desktop clients remains separate from compilation and unit checks.

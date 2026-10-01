@@ -28,7 +28,7 @@ export const UsernameModal: React.FC = () => {
 
   return (
     <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} id="modal-username">
-      <form onSubmit={submit} aria-busy={pending} className="modal-card">
+      <form autoComplete="off" onSubmit={submit} aria-busy={pending} className="modal-card">
         <div className="modal-header">
           <div className="modal-header-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -40,7 +40,7 @@ export const UsernameModal: React.FC = () => {
         </div>
         <div className="modal-body">
           <p>Como você deseja ser identificado pelos outros participantes da sala?</p>
-          <input
+          <input autoComplete="off"
             type="text"
             id="input-username"
             className="text-input"

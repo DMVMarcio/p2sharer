@@ -1,3 +1,4 @@
+import { validStreamPointer, validStreamPointerState, type StreamPointerState, type StreamPointerPacket } from '../core/stream_pointer.ts';
 import { selfId } from '@trystero-p2p/core';
 import { invoke } from '@tauri-apps/api/core';
 import type { AppWireEvent } from '../apps/types.ts';
@@ -87,6 +88,8 @@ export interface RoomCallbacks {
   onFileRequest?: (request: FileRequest) => void;
   onFileRequestCancelled?: (requestId: string) => void;
   onFileProgress?: (transfer: FileProgress) => void;
+  onStreamPointerState?: (state: StreamPointerState, broadcasterId: string) => void;
+  onStreamPointer?: (packet: StreamPointerPacket, peerId: string) => void;
   onAppEvent?: (event: AppWireEvent, peerId: string) => void;
   onStreamsUpdate: (streams: ActiveStreamInfo[]) => void;
   onSlotsUpdate: (slots: RoomSlotInfo[]) => void;
@@ -202,6 +205,7 @@ export class GroupRoomManager {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private pongAction: any = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private pointerAction: any = null;
   private appAction: any = null;
 
   private lastPeerStats: Map<string, { bytesReceived: number; timestamp: number }> = new Map();
@@ -255,6 +259,22 @@ export class GroupRoomManager {
   }
 
   public getLocalPeerId(): string { return selfId; }
+
+  public sendStreamPointerState(state: StreamPointerState): void {
+    if (!validStreamPointerState(state)) return;
+    for (const watcher of this.getStreamWatchers('local')) {
+      if (!this.pointerAction || !this.peerTracker.isVerified(watcher.peerId) ||
+          (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(watcher.peerId)))) continue;
+      void Promise.resolve(this.pointerAction.send(state, { target: watcher.peerId })).catch(() => {});
+    }
+  }
+
+  public sendStreamPointer(packet: StreamPointerPacket, target: string): void {
+    if (!validStreamPointer(packet)) return;
+    if (!this.pointerAction || !this.peerTracker.isVerified(target) ||
+        (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(target)))) return;
+    void Promise.resolve(this.pointerAction.send(packet, { target })).catch(() => {});
+  }
 
   public sendAppEvent(event: AppWireEvent, target?: string): void {
     if (!this.appAction || (this.authority && !this.localAdmitted)) return;
@@ -832,6 +852,16 @@ export class GroupRoomManager {
     if (!this.room) return;
     const boundRoom = this.room;
 
+    this.pointerAction = this.room.makeAction('stream_pointer');
+    this.pointerAction.onMessage = (packet: unknown, meta: { peerId: string }) => {
+      if (validStreamPointerState(packet)) {
+        if (this.remoteStreams.has(meta.peerId)) this.callbacks?.onStreamPointerState?.(packet, meta.peerId);
+        return;
+      }
+      if (!this.localStream || !validStreamPointer(packet)) return;
+      if (!this.getStreamWatchers('local').some((watcher) => watcher.peerId === meta.peerId)) return;
+      this.callbacks?.onStreamPointer?.(packet, meta.peerId);
+    };
     this.appAction = this.room.makeAction('room_apps');
     this.appAction.onMessage = (event: AppWireEvent, meta: { peerId: string }) => {
       if (!event || typeof event !== 'object' || JSON.stringify(event).length > 4_000_000) return;
@@ -1374,7 +1404,7 @@ export class GroupRoomManager {
       this.pexAction, this.meshRelayAction, this.watchAction,
       this.pingAction, this.pongAction, this.identityAction,
       this.authorityAction, this.admissionAction, this.inviteAction,
-      this.appAction, this.fileAction,
+      this.appAction, this.fileAction, this.pointerAction,
     ].forEach((action) => {
       if (!action?.onMessage) return;
       const handler = action.onMessage;

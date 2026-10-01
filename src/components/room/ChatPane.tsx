@@ -29,7 +29,6 @@ export const ChatPane: React.FC = () => {
   const [pickerTarget, setPickerTarget] = useState<'compose' | 'edit' | null>(null);
   const composePicker = useDropdownPresence(pickerTarget === 'compose' ? true : null);
   const editPicker = useDropdownPresence(pickerTarget === 'edit' ? true : null);
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [replyToId, setReplyToId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
@@ -53,20 +52,6 @@ export const ChatPane: React.FC = () => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [latestMessageId]);
-
-  useEffect(() => {
-    if (!openMenuId) return;
-    const closeOutside = (event: PointerEvent) => {
-      if (!(event.target as Element).closest('.chat-msg-menu-wrap')) setOpenMenuId(null);
-    };
-    const closeEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpenMenuId(null); };
-    document.addEventListener('pointerdown', closeOutside);
-    document.addEventListener('keydown', closeEscape);
-    return () => {
-      document.removeEventListener('pointerdown', closeOutside);
-      document.removeEventListener('keydown', closeEscape);
-    };
-  }, [openMenuId]);
 
   const jumpToMessage = (id: string) => {
     const target = messageRefs.current.get(id);
@@ -172,15 +157,13 @@ export const ChatPane: React.FC = () => {
                 {msg.editedAt && <EditedMessageMarker editedAt={msg.editedAt} />}
                 <span className="chat-msg-time">{timeStr}</span>
                 <ChatMessageMenu
-                  open={openMenuId === msg.id}
                   own={msg.authorId === selfId}
-                  onToggle={() => setOpenMenuId((current) => current === msg.id ? null : msg.id)}
-                  onReply={() => { setReplyToId(msg.id); setOpenMenuId(null); inputRef.current?.focus(); }}
-                  onCopy={() => { copyText(msg.text); setOpenMenuId(null); }}
-                  onEdit={() => { setEditingId(msg.id); setEditDraft(msg.text); setPickerTarget(null); setOpenMenuId(null); }}
-                  onDelete={() => { void deleteChatMessage(msg.id).then((deleted) => { if (!deleted) showToast('Não foi possível excluir a mensagem.'); }); if (editingId === msg.id) setEditingId(null); setPickerTarget(null); setOpenMenuId(null); }}
+                  onReply={() => { setReplyToId(msg.id); inputRef.current?.focus(); }}
+                  onCopy={() => { copyText(msg.text); }}
+                  onEdit={() => { setEditingId(msg.id); setEditDraft(msg.text); setPickerTarget(null); }}
+                  onDelete={() => { void deleteChatMessage(msg.id).then((deleted) => { if (!deleted) showToast('Não foi possível excluir a mensagem.'); }); if (editingId === msg.id) setEditingId(null); setPickerTarget(null); }}
                   isFile={Boolean(msg.file)}
-                  onSaveAs={() => { startDownload(msg.id, true); setOpenMenuId(null); }}
+                  onSaveAs={() => { startDownload(msg.id, true); }}
                 />
               </div>
               <div className="chat-msg-bubble">
@@ -218,7 +201,7 @@ export const ChatPane: React.FC = () => {
         <div><strong>Respondendo a {replyMessage.sender}</strong><span>{replyMessage.text}</span></div>
         <button type="button" aria-label="Cancelar resposta" onClick={() => setReplyToId(null)}><X size={16} /></button>
       </div>}
-      <form className="chat-input-bar" id="chat-input-form" onSubmit={handleSubmit}>
+      <form autoComplete="off" className="chat-input-bar" id="chat-input-form" onSubmit={handleSubmit}>
         <EmojiComposerInput
           ref={inputRef}
           value={inputText}

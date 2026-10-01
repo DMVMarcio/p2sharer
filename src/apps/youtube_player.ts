@@ -36,8 +36,10 @@ export interface YouTubePlaybackTracker {
   live?: boolean;
   durationSample?: number;
   durationSampleAt?: number;
+  liveEdge?: number;
+  liveEdgeAt?: number;
   initialPlaybackKey?: string;
-  lastLiveSeekKey?: string;
+  lastSeekKey?: string;
 }
 
 export function sampleYouTubeLive(player: YouTubePlayer, tracker: YouTubePlaybackTracker, now: number): boolean {
@@ -46,6 +48,8 @@ export function sampleYouTubeLive(player: YouTubePlayer, tracker: YouTubePlaybac
   if (!Number.isFinite(duration) || duration <= 0) return Boolean(tracker.live);
   const elapsed = (now - (tracker.durationSampleAt ?? now)) / 1000;
   const growth = duration - (tracker.durationSample ?? duration);
+  const position = player.getCurrentTime();
+  if (Number.isFinite(position) && position > duration + 1) tracker.live = true;
   // The documented live duration grows with the broadcast clock. Ignore the
   // initial metadata load and small rounding changes of fixed-duration videos.
   if (elapsed >= 1 && growth >= 0.5 && growth <= elapsed * 1.5 + 2) tracker.live = true;
@@ -54,6 +58,23 @@ export function sampleYouTubeLive(player: YouTubePlayer, tracker: YouTubePlaybac
     tracker.durationSampleAt = now;
   }
   return Boolean(tracker.live);
+}
+
+/** Keep the broadcast edge advancing even when the iframe caches its duration. */
+export function sampleYouTubeTimeline(player: YouTubePlayer, tracker: YouTubePlaybackTracker, now: number) {
+  const live = sampleYouTubeLive(player, tracker, now);
+  const rawDuration = player.getDuration();
+  const rawPosition = player.getCurrentTime();
+  const position = Number.isFinite(rawPosition) ? Math.max(0, rawPosition) : 0;
+  let duration = Number.isFinite(rawDuration) ? Math.max(0, rawDuration) : 0;
+  if (player.getVideoData().video_id !== tracker.videoId) return { position, duration, live: false };
+  if (live) {
+    const projectedEdge = (tracker.liveEdge ?? duration) + Math.max(0, now - (tracker.liveEdgeAt ?? now)) / 1000;
+    duration = Math.max(duration, position, projectedEdge);
+    tracker.liveEdge = duration;
+    tracker.liveEdgeAt = now;
+  }
+  return { position, duration, live };
 }
 
 export function reconcileYouTubePlayer(player: YouTubePlayer, state: YouTubeState,
@@ -66,6 +87,8 @@ export function reconcileYouTubePlayer(player: YouTubePlayer, state: YouTubeStat
     tracker.live = false;
     tracker.durationSample = undefined;
     tracker.durationSampleAt = undefined;
+    tracker.liveEdge = undefined;
+    tracker.liveEdgeAt = undefined;
     return { corrected: false, loaded: false, position: 0 };
   }
   if (mode === 'periodic' && now - receivedAt > MEDIA_SYNC_MAX_SAMPLE_AGE_MS)
@@ -80,14 +103,16 @@ export function reconcileYouTubePlayer(player: YouTubePlayer, state: YouTubeStat
       tracker.live = Boolean(entry.isLive);
       tracker.durationSample = undefined;
       tracker.durationSampleAt = undefined;
-      tracker.lastLiveSeekKey = undefined;
+      tracker.lastSeekKey = undefined;
+      tracker.liveEdge = undefined;
+      tracker.liveEdgeAt = undefined;
     }
     tracker.videoId = entry.videoId;
     tracker.lastLoadAt = now;
     tracker.lastPlayAttemptAt = now;
     tracker.lastCorrectionAt = now;
     tracker.initialPlaybackKey = playbackKey;
-    tracker.lastLiveSeekKey = playbackKey;
+    tracker.lastSeekKey = playbackKey;
     // Let YouTube select its default live edge instead of asking for second 0.
     const start = (position > 0 && !tracker.live) || (tracker.live && state.syncReason === 'seek') ? position : undefined;
     if (state.playing) player.loadVideoById(entry.videoId, start);
@@ -101,17 +126,18 @@ export function reconcileYouTubePlayer(player: YouTubePlayer, state: YouTubeStat
   const playerState = player.getPlayerState();
   let corrected = false;
   const metadataOnly = mode === 'update' && (state.syncReason === undefined || state.syncReason === 'update');
-  const explicitLiveSeek = live && (mode === 'urgent' || mode === 'resume') && state.syncReason === 'seek' && tracker.lastLiveSeekKey !== playbackKey;
+  const explicitSeek = state.syncReason === 'seek' && tracker.lastSeekKey !== playbackKey;
   const awaitingFirstSample = tracker.initialPlaybackKey === playbackKey && state.position === 0;
-  const allowCorrection = live ? explicitLiveSeek : !awaitingFirstSample;
+  const allowCorrection = state.syncReason === 'seek' ? explicitSeek : !live && !awaitingFirstSample;
+  // Consume before calling the iframe: seekTo may synchronously dispatch a
+  // state change, and DVR may clamp to a different available keyframe.
+  if (explicitSeek && playerState !== 3) tracker.lastSeekKey = playbackKey;
   if (allowCorrection && !metadataOnly && !state.ended && playerState !== 3 && shouldCorrectMediaPosition(player.getCurrentTime(), position,
-    mode === 'urgent' || explicitLiveSeek, mode === 'resume' ? 0 : tracker.lastCorrectionAt, now)) {
+    mode === 'urgent' || explicitSeek, mode === 'resume' ? 0 : tracker.lastCorrectionAt, now)) {
     player.seekTo(position, true);
     tracker.lastCorrectionAt = now;
-    if (live) tracker.lastLiveSeekKey = playbackKey;
     corrected = true;
   }
-  if (explicitLiveSeek && playerState !== 3) tracker.lastLiveSeekKey = playbackKey;
   if (state.playing && playerState !== 1 && playerState !== 3 &&
     (mode === 'urgent' || playerState === 5 || now - tracker.lastPlayAttemptAt >= 1500)) {
     tracker.lastPlayAttemptAt = now;

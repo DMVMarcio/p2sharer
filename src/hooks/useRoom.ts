@@ -84,6 +84,10 @@ export function useRoom() {
     });
   }, []);
 
+  const returnToGrid = useCallback(() => {
+    stateStore.set((state) => { state.layoutMode = 'grid'; state.pinnedPeerId = null; });
+  }, []);
+
   const toggleSpotlightTray = useCallback(() => {
     stateStore.set((s) => {
       s.isSpotlightTrayCollapsed = !s.isSpotlightTrayCollapsed;
@@ -146,6 +150,7 @@ export function useRoom() {
     stopWatchingStream,
     stopScreenSharing,
     togglePin,
+    returnToGrid,
     toggleSidebar,
     toggleSpotlightTray,
     setStreamFilter,
