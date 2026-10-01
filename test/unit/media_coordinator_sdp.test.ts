@@ -2,6 +2,58 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { MediaCoordinator } from '../../src/p2p/media_coordinator.ts';
 
+describe('Video encoder selection', () => {
+  const codecs = [
+    { mimeType: 'video/H264', sdpFmtpLine: 'profile-level-id=64001f' },
+    { mimeType: 'video/AV1' },
+    { mimeType: 'video/VP8' },
+    { mimeType: 'video/rtx', sdpFmtpLine: 'apt=96' },
+  ];
+  const software = { supported: true, smooth: true, powerEfficient: false };
+
+  it('uses the faster VP8 fallback when WebRTC reports software encoding', () => {
+    const support = new Map([
+      ['video/h264;profile-level-id=64001f', software],
+      ['video/av1', software], ['video/vp8', software],
+    ]);
+    const sorted = MediaCoordinator.sortCodecs(codecs, support);
+    assert.equal(sorted[0].mimeType, 'video/VP8');
+    assert.equal(sorted.at(-1)?.mimeType, 'video/rtx');
+    assert.equal(sorted.length, codecs.length);
+  });
+
+  it('preserves hardware encoding ahead of the software fallback', () => {
+    const support = new Map([
+      ['video/h264;profile-level-id=64001f', software],
+      ['video/av1', { ...software, powerEfficient: true }], ['video/vp8', software],
+    ]);
+    assert.deepEqual(MediaCoordinator.sortCodecs(codecs, support).map((codec) => codec.mimeType),
+      ['video/AV1', 'video/VP8', 'video/H264', 'video/rtx']);
+  });
+
+  it('keeps the established codec order when encoding capabilities are unavailable', () => {
+    assert.equal(MediaCoordinator.sortCodecs(codecs)[0].mimeType, 'video/H264');
+  });
+
+  it('does not override the broadcaster codec order on receiving-only transceivers', () => {
+    const original = Object.getOwnPropertyDescriptor(globalThis, 'RTCRtpSender');
+    Object.defineProperty(globalThis, 'RTCRtpSender', { configurable: true,
+      value: { getCapabilities: () => ({ codecs }) } });
+    let configured = 0;
+    try {
+      const receiving = { sender: { track: null }, receiver: { track: { kind: 'video' } },
+        setCodecPreferences: () => { throw new Error('Receiving codec preference changed'); } };
+      const sending = { sender: { track: { kind: 'video' } },
+        setCodecPreferences: () => { configured++; } };
+      MediaCoordinator.configureCodecPreferences({ getTransceivers: () => [receiving, sending] } as unknown as RTCPeerConnection);
+      assert.equal(configured, 1);
+    } finally {
+      if (original) Object.defineProperty(globalThis, 'RTCRtpSender', original);
+      else Reflect.deleteProperty(globalThis, 'RTCRtpSender');
+    }
+  });
+});
+
 describe('MediaCoordinator SDP Munging and WebRTC Bandwidth Allocation', () => {
   const sampleSdp = [
     'v=0',

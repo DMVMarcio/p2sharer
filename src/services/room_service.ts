@@ -10,6 +10,7 @@ import { savedRooms } from '../core/saved_rooms.ts';
 import type { ChatMessage, PeerInfo, RoomSlotInfo } from '../core/types.ts';
 import { generateRandomRoomSlug, GroupRoomManager, type FileProgress, type FileRequest, type NativeChatFile } from '../p2p/group_room.ts';
 import { soundEffects } from '../ui/sound_effects.ts';
+import { MediaCoordinator } from '../p2p/media_coordinator.ts';
 import { NativeVideoBridge } from '../video/native_video_bridge.ts';
 import { showToast } from '../hooks/useToast.ts';
 import { pipService } from './pip_service.ts';
@@ -373,6 +374,7 @@ export class RoomService {
 
       const chosenSource = !sourceId ? 'screen:0' : sourceId;
       const targetQuality = quality ?? stateStore.currentQuality ?? 90;
+      await MediaCoordinator.prepareCodecPreferences(res.width, res.height, fps, stateStore.currentBitrate * 1000);
       const videoStream = await this.nativeVideoBridge.startCapture(chosenSource, fps, res, mouse, targetQuality);
 
       const audioMode = stateStore.isAudioFilterFullAudio ? 'full' : stateStore.selectedFilterMode;
