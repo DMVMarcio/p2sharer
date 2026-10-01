@@ -62,10 +62,11 @@
   color: var(--text-primary); font-size: 11px; font-weight: 600; cursor: pointer; }
 .room-app-leave-button:hover { background: var(--bg-card-hover); }
 .room-app-options { position: relative; }
-.room-app-options summary { display: grid; place-items: center; width: 27px; height: 27px; list-style: none;
+.room-app-options summary, .room-app-context-trigger { display: grid; place-items: center; width: 27px; height: 27px; list-style: none;
   border-radius: var(--radius-sm); color: var(--text-secondary); cursor: pointer; }
 .room-app-options summary::-webkit-details-marker { display: none; }
-.room-app-options summary:hover { background: var(--bg-card-hover); color: var(--text-primary); }
+.room-app-context-trigger { border: 0; background: transparent; }
+.room-app-options summary:hover, .room-app-context-trigger:hover { background: var(--bg-card-hover); color: var(--text-primary); }
 .room-app-options-menu { position: absolute; z-index: 20; top: calc(100% + 5px); right: 0; min-width: 160px;
   padding: 4px; border: 1px solid var(--border-default); border-radius: var(--radius-sm);
   background: var(--bg-elevated); box-shadow: 0 8px 20px #0006; }
@@ -103,7 +104,7 @@
 .room-app-notepad-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; flex-shrink: 0;
   padding: 5px 8px; border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle);
   background: var(--bg-elevated); }
-.room-app-notepad-tools select { max-width: 92px; height: 26px; padding: 0 5px; border: 1px solid var(--border-default);
+.room-app-notepad-tools .room-app-notepad-select { width: 112px; max-width: 112px; flex-shrink: 0; min-height: 26px; height: 26px; padding: 0 6px; border: 1px solid var(--border-default);
   border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-primary); font: inherit; font-size: 11px; }
 .room-app-notepad-tool { display: grid; place-items: center; width: 27px; height: 27px; padding: 0; border: 0;
   border-radius: var(--radius-sm); background: transparent; color: var(--text-secondary); cursor: pointer; }

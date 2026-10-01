@@ -9,6 +9,7 @@ import { Bold, Italic, Strikethrough, Code, Code2, Link2, Quote, List, ListOrder
 import type { EmojiPack } from '../../core/emoji_preferences';
 import { safeChatUrl } from '../../core/chat_links';
 import { ChatEmojiDecorations } from './ChatEmojiDecorations';
+import { useTextEditorContextMenu } from '../../hooks/useTextEditorContextMenu';
 
 export type EmojiComposerHandle = {
   insertEmoji: (emoji: string) => void;
@@ -83,6 +84,8 @@ export const EmojiComposerInput = forwardRef<EmojiComposerHandle, Props>(functio
     onUpdate: ({ editor: current }) => onChangeRef.current(current.getMarkdown()),
   }, []);
 
+  useTextEditorContextMenu(editor);
+
   useEffect(() => {
     if (!editor) return;
     if (editor.getMarkdown() !== value) editor.commands.setContent(value, { contentType: 'markdown', emitUpdate: false });
@@ -134,7 +137,7 @@ export const EmojiComposerInput = forwardRef<EmojiComposerHandle, Props>(functio
         >
           {editingLink ? (
             <div className="chat-format-link">
-              <input
+              <input autoComplete="off"
                 ref={linkInputRef}
                 type="url"
                 value={linkUrl}

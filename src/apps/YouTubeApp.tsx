@@ -9,7 +9,7 @@ import { roomAppsService } from './room_apps_service';
 import { YouTubeModel } from './models.ts';
 import { loadYouTubePlaylist, loadYouTubePlaylistPreview, parseYouTubeInput, resolveYouTubeTitle, searchYouTube,
   type YouTubeSearchItem } from './youtube_api';
-import { createYouTubePlayer, loadYouTubePlayerApi, reconcileYouTubePlayer, setYouTubeCaptions, sampleYouTubeLive,
+import { createYouTubePlayer, loadYouTubePlayerApi, reconcileYouTubePlayer, setYouTubeCaptions, sampleYouTubeTimeline,
   type YouTubePlaybackTracker, type YouTubePlayer } from './youtube_player';
 import { advanceYouTubeQueue, canAdvanceYouTubeQueue, moveYouTubeQueueEntry, importYouTubeQueue, appendYouTubeQueue } from './youtube_queue';
 import { YouTubeSavedQueuesDialog } from './YouTubeSavedQueuesDialog';
@@ -212,10 +212,9 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
         setBuffered(0);
         return;
       }
-      const position = player.getCurrentTime();
-      const length = player.getDuration();
+      const { position, duration: length, live } = sampleYouTubeTimeline(player, playbackTrackerRef.current, Date.now());
       const loaded = player.getVideoLoadedFraction();
-      if (sampleYouTubeLive(player, playbackTrackerRef.current, Date.now())) setLiveVideoId(current.queue[current.index].videoId);
+      if (live) setLiveVideoId(current.queue[current.index].videoId);
       if (Number.isFinite(position) && position >= 0) setPlayhead(position);
       if (Number.isFinite(length) && length >= 0) setDuration(length);
       if (Number.isFinite(loaded) && loaded >= 0) setBuffered(loaded);
@@ -431,8 +430,12 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
   };
 
   const add = (entries: YouTubeEntry[]) => {
-    if (!entries.length) return;
+    if (!entries.length) { setError('Nenhum vídeo disponível para adicionar à fila.'); return; }
     const latest = stateRef.current;
+    if (latest.queue.length + entries.length > 200) {
+      setError(`A fila aceita até 200 vídeos. Há espaço para ${Math.max(0, 200 - latest.queue.length)} vídeos.`);
+      return;
+    }
     const next = appendYouTubeQueue(latest, entries.map((entry) => ({ ...entry,
       addedBy: roomAppsService.getLocalActor(), addedByName: (username || 'Você').slice(0, 80) })));
     if (next !== latest) publish(next, next.index !== latest.index || next.playing !== latest.playing ? 'seek' : 'update');
@@ -624,7 +627,7 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
       <p className="youtube-discover-hint">Cole um link para visualizar antes de adicionar, ou pesquise algo para assistir juntos.</p>
       <div className="youtube-search-field">
         <Search size={17} aria-hidden="true" />
-        <input aria-label="Pesquisar ou colar URL do YouTube" placeholder="Link ou nome do vídeo" value={query}
+        <input autoComplete="off" aria-label="Pesquisar ou colar URL do YouTube" placeholder="Link ou nome do vídeo" value={query}
           onChange={(event) => { setQuery(event.target.value); setHasSearched(false); }}
           onKeyDown={(event) => { if (event.key === 'Enter') void search(); }} />
         <button aria-label="Pesquisar ou visualizar link" disabled={busy || !query.trim()} onClick={() => void search()}>

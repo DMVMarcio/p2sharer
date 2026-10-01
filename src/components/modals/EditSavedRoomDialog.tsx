@@ -81,7 +81,7 @@ export const EditSavedRoomDialog: React.FC<EditSavedRoomDialogProps> = ({ room, 
     <div className="modal-overlay" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget) onClose();
     }}>
-      <form onSubmit={submit} aria-busy={pending} className="modal-card" role="dialog" aria-modal="true" aria-labelledby="edit-saved-room-title">
+      <form autoComplete="off" onSubmit={submit} aria-busy={pending} className="modal-card" role="dialog" aria-modal="true" aria-labelledby="edit-saved-room-title">
         <div className="modal-header">
           <div><h2 id="edit-saved-room-title">Editar sala salva</h2></div>
           <button type="button" className="btn-close" aria-label="Fechar" onClick={onClose}>&times;</button>
@@ -89,7 +89,7 @@ export const EditSavedRoomDialog: React.FC<EditSavedRoomDialogProps> = ({ room, 
         <div className="modal-body">
           <div className="form-group">
             <label className="form-label" htmlFor="saved-room-name">Nome</label>
-            <input className="text-input" id="saved-room-name" maxLength={80}
+            <input autoComplete="off" className="text-input" id="saved-room-name" maxLength={80}
               value={name} onChange={(event) => {
                 setName(event.target.value);
                 setNameCustomized(true);
@@ -97,13 +97,13 @@ export const EditSavedRoomDialog: React.FC<EditSavedRoomDialogProps> = ({ room, 
           </div>
           <div className="form-group saved-room-form-field">
             <label className="form-label" htmlFor="saved-room-invite">Código de convite</label>
-            <input className="text-input" id="saved-room-invite" value={inviteCode}
+            <input autoComplete="off" className="text-input" id="saved-room-invite" value={inviteCode}
               onChange={(event) => setInviteCode(event.target.value)} />
           </div>
           <div className="form-group saved-room-edit-password">
             <label className="form-label" htmlFor="saved-room-password">Senha salva para entrar</label>
             <div className="input-with-action">
-              <input className="text-input" id="saved-room-password" maxLength={128}
+              <input autoComplete="off" className="text-input" id="saved-room-password" maxLength={128}
                 type={showPassword ? 'text' : 'password'} value={password}
                 placeholder="Deixe vazio para não lembrar"
                 onChange={(event) => setPassword(event.target.value)} />

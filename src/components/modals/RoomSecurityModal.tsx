@@ -41,7 +41,7 @@ export const RoomSecurityModal: React.FC = () => {
 
   return (
     <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} id="modal-room-security">
-      <form onSubmit={submit} aria-busy={pending} className="modal-card">
+      <form autoComplete="off" onSubmit={submit} aria-busy={pending} className="modal-card">
         <div className="modal-header">
           <div className="modal-header-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -94,7 +94,7 @@ export const RoomSecurityModal: React.FC = () => {
 
           <div className="form-group" style={{ marginTop: '16px' }}>
             <label className="form-label" htmlFor="input-room-security-name">Nome da sala</label>
-            <input id="input-room-security-name" className="text-input" maxLength={80}
+            <input autoComplete="off" id="input-room-security-name" className="text-input" maxLength={80}
               value={name} disabled={!isRoomHost}
               onChange={(event) => setName(event.target.value)} />
           </div>
@@ -105,7 +105,7 @@ export const RoomSecurityModal: React.FC = () => {
               <span className="label-hint">Deixe vazio para tornar pública</span>
             </label>
             <div className="input-with-action">
-              <input
+              <input autoComplete="off"
                 type={showPassword ? 'text' : 'password'}
                 id="input-room-security-password"
                 className="text-input"

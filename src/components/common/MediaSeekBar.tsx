@@ -41,7 +41,7 @@ export const MediaSeekBar: React.FC<Props> = ({ value, duration, buffered = 0, o
     '--media-buffered': `${Math.max(progress, Math.min(100, buffered * 100))}%`,
     '--media-tooltip-position': `${tooltipPosition}%`,
   } as React.CSSProperties}>
-    <input type="range" min="0" max={maximum} step="1" value={shown} disabled={disabled}
+    <input autoComplete="off" type="range" min="0" max={maximum} step="1" value={shown} disabled={disabled}
       aria-label="Posição do vídeo" aria-valuetext={`${formatMediaTime(shown)} de ${formatMediaTime(duration)}`}
       onChange={(event) => setPending(Number(event.target.value))}
       onPointerMove={trackPointer} onPointerLeave={() => setHover(null)}

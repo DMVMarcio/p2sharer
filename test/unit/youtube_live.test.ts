@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { reconcileYouTubePlayer, sampleYouTubeLive, type YouTubePlayer, type YouTubePlaybackTracker } from '../../src/apps/youtube_player.ts';
+import { reconcileYouTubePlayer, sampleYouTubeLive, sampleYouTubeTimeline, type YouTubePlayer, type YouTubePlaybackTracker } from '../../src/apps/youtube_player.ts';
 import { markCurrentYouTubeLive, projectYouTubePosition } from '../../src/apps/youtube_timeline.ts';
 import { validYouTubeState } from '../../src/apps/models.ts';
 import { validYouTubePipCommand } from '../../src/apps/youtube_pip.ts';
@@ -102,4 +102,56 @@ test('broadcast positions beyond one day stay valid in room state, PiP and timel
   assert.equal(projectYouTubePosition(state.position, true, 10_000, 15_000), 172805);
   assert.equal(state.queue[0].isLive, true);
   assert.equal(initial.queue[0].isLive, undefined);
+});
+
+test('cached live duration advances while playing, paused and watching earlier DVR footage', () => {
+  const { player, tracker, values } = fixture();
+  tracker.videoId = values.id;
+  values.position = 7202;
+  assert.deepEqual(sampleYouTubeTimeline(player, tracker, 10_000), { position: 7202, duration: 7202, live: true });
+  values.position = 7203;
+  assert.equal(sampleYouTubeTimeline(player, tracker, 11_000).duration, 7203);
+  values.position = 120;
+  values.state = 2;
+  assert.equal(sampleYouTubeTimeline(player, tracker, 16_000).duration, 7208);
+  values.duration = 7220;
+  assert.equal(sampleYouTubeTimeline(player, tracker, 17_000).duration, 7220);
+  values.id = 'bbbbbbbbbbb';
+  values.duration = 200;
+  reconcileYouTubePlayer(player, { ...initial, queue: [{ videoId: values.id, title: 'Recording' }] },
+    tracker, 18_000, 18_000, 'urgent');
+  assert.equal(sampleYouTubeTimeline(player, tracker, 18_000).duration, 200);
+});
+
+test('a DVR seek is consumed even before a frozen-duration broadcast is identified', () => {
+  const { player, tracker, values, calls } = fixture();
+  reconcileYouTubePlayer(player, initial, tracker, 10_000, 10_000, 'urgent');
+  const seek = { ...initial, position: 120, updatedAt: 2, syncReason: 'seek' as const };
+  reconcileYouTubePlayer(player, seek, tracker, 11_000, 11_000, 'urgent');
+  values.position = 200; // DVR clamps to the earliest available frame.
+  for (let step = 1; step <= 20; step++) {
+    values.state = 3;
+    reconcileYouTubePlayer(player, seek, tracker, 11_000, 11_000 + step * 1000, 'update');
+    values.state = 1;
+    reconcileYouTubePlayer(player, seek, tracker, 11_000, 11_100 + step * 1000, 'resume');
+    reconcileYouTubePlayer(player, seek, tracker, 11_000, 11_200 + step * 1000, 'periodic');
+  }
+  assert.deepEqual(calls, [['load', undefined], ['seek', 120]]);
+});
+
+test('a deferred seek can be applied by the polling update and is safe against reentrant iframe events', () => {
+  const { player, tracker, values, calls } = fixture();
+  const live = markCurrentYouTubeLive(initial, true);
+  reconcileYouTubePlayer(player, live, tracker, 10_000, 10_000, 'urgent');
+  const seek = { ...live, position: 0, updatedAt: 2, syncReason: 'seek' as const };
+  values.state = 3;
+  reconcileYouTubePlayer(player, seek, tracker, 11_000, 11_000, 'urgent');
+  values.state = 2;
+  player.seekTo = (seconds) => {
+    calls.push(['seek', seconds]);
+    values.state = 1;
+    reconcileYouTubePlayer(player, seek, tracker, 11_000, 11_000, 'resume');
+  };
+  reconcileYouTubePlayer(player, seek, tracker, 11_000, 11_000, 'update');
+  assert.deepEqual(calls, [['load', undefined], ['seek', 0]]);
 });

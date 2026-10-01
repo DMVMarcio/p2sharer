@@ -63,7 +63,7 @@ function QueueActionDialog({ action, currentCount, onImport, onClose }: {
       </button>}
     </>}>
     {action.kind === 'rename' ? <div className="form-group"><label className="form-label" htmlFor={inputId}>Nome da fila</label>
-      <input className="text-input" id={inputId} data-autofocus maxLength={80} value={name}
+      <input autoComplete="off" className="text-input" id={inputId} data-autofocus maxLength={80} value={name}
         onChange={(event) => { setName(event.target.value); setError(''); }} /></div>
       : <p className="youtube-saved-action-copy">{action.kind === 'delete'
         ? <>Excluir “<strong>{action.queue.name}</strong>” das filas salvas? A fila em reprodução não será alterada.</>
@@ -103,10 +103,10 @@ export function YouTubeSavedQueuesDialog({ entries, onImport, onClose }: Props) 
     <ModalDialog title="Filas salvas" subtitle="Suas filas ficam salvas neste dispositivo." icon={<Library size={20} />}
       onClose={onClose} busy={Boolean(action)} className="modal-lg youtube-saved-queues-dialog"
       footer={(close) => <button type="button" className="btn btn-secondary" disabled={Boolean(action)} onClick={close}>Fechar</button>}>
-      <form className="youtube-save-queue-form" onSubmit={(event) => { event.preventDefault(); save(); }}>
+      <form autoComplete="off" className="youtube-save-queue-form" onSubmit={(event) => { event.preventDefault(); save(); }}>
         <label className="form-label" htmlFor={inputId}>Salvar fila atual · {entries.length} vídeos</label>
         <div className="youtube-save-queue-input">
-          <input className="text-input" id={inputId} data-autofocus maxLength={80} placeholder="Nome da fila" value={name}
+          <input autoComplete="off" className="text-input" id={inputId} data-autofocus maxLength={80} placeholder="Nome da fila" value={name}
             onChange={(event) => { setName(event.target.value); if (!loadFailed) setError(''); }} />
           <button type="submit" className="btn btn-primary" disabled={!entries.length || !name.trim() || loadFailed}>
             <Save size={15} />{existing ? 'Salvar por cima' : 'Salvar'}

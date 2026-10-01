@@ -77,7 +77,7 @@ export const ZoomControlBar: React.FC<ZoomControlBarProps> = ({
 
       {/* Precision Slider */}
       <div className="stream-zoom-slider-container">
-        <input
+        <input autoComplete="off"
           type="range"
           min={MIN_ZOOM * 100}
           max={MAX_ZOOM * 100}

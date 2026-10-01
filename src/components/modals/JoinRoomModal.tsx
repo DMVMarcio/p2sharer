@@ -30,7 +30,7 @@ export const JoinRoomModal: React.FC = () => {
 
   return (
     <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} id="modal-join-room-dialog">
-      <form onSubmit={submit} aria-busy={pending} className="modal-card">
+      <form autoComplete="off" onSubmit={submit} aria-busy={pending} className="modal-card">
         <div className="modal-header">
           <div className="modal-header-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -53,7 +53,7 @@ export const JoinRoomModal: React.FC = () => {
             <label className="form-label" htmlFor="input-join-room-code-dialog">
               Convite da Sala:
             </label>
-            <input
+            <input autoComplete="off"
               type="text"
               id="input-join-room-code-dialog"
               className="text-input"
@@ -71,7 +71,7 @@ export const JoinRoomModal: React.FC = () => {
               <span className="label-hint">Deixe em branco se a sala for pública</span>
             </label>
             <div className="input-with-action">
-              <input
+              <input autoComplete="off"
                 type={showPassword ? 'text' : 'password'}
                 id="input-join-room-password-dialog"
                 className="text-input"

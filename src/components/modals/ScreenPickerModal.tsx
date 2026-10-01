@@ -1,3 +1,4 @@
+import { Select } from '../common/Select';
 import React, { useState, useEffect } from 'react';
 import { useModal } from '../../hooks/useModal';
 import { useScreenPicker } from '../../hooks/useScreenPicker';
@@ -204,71 +205,75 @@ export const ScreenPickerModal: React.FC = () => {
 
           <div className="picker-settings-row">
             <div className="picker-setting-item">
-              <label>Resolução:</label>
-              <select
+              <label htmlFor="modal-select-resolution">Resolução:</label>
+              <Select
                 id="modal-select-resolution"
                 className="select-input-sm"
                 value={resolution}
-                onChange={(e) => setResolution(e.target.value)}
-              >
-                <option value="4k">4K (3840x2160)</option>
-                <option value="1440p">1440p 2K</option>
-                <option value="1080p">1080p Full HD</option>
-                <option value="720p">720p HD</option>
-                <option value="480p">480p SD</option>
-                <option value="360p">360p Baixa</option>
-              </select>
+                onValueChange={(value) => setResolution(value)}
+                options={[
+                  { value: '4k', label: '4K (3840x2160)' },
+                  { value: '1440p', label: '1440p 2K' },
+                  { value: '1080p', label: '1080p Full HD' },
+                  { value: '720p', label: '720p HD' },
+                  { value: '480p', label: '480p SD' },
+                  { value: '360p', label: '360p Baixa' },
+                ]}
+              />
             </div>
 
             <div className="picker-setting-item">
-              <label>Taxa de FPS:</label>
-              <select
+              <label htmlFor="modal-select-fps">Taxa de FPS:</label>
+              <Select
                 id="modal-select-fps"
                 className="select-input-sm"
                 value={fps}
-                onChange={(e) => setFps(parseInt(e.target.value, 10))}
-              >
-                <option value={120}>120 FPS</option>
-                <option value={60}>60 FPS</option>
-                <option value={30}>30 FPS</option>
-                <option value={15}>15 FPS</option>
-              </select>
+                onValueChange={(value) => setFps(parseInt(value, 10))}
+                options={[
+                  { value: '120', label: '120 FPS' },
+                  { value: '60', label: '60 FPS' },
+                  { value: '30', label: '30 FPS' },
+                  { value: '15', label: '15 FPS' },
+                ]}
+              />
             </div>
 
             <div className="picker-setting-item">
-              <label>Bitrate:</label>
-              <select
+              <label htmlFor="modal-select-bitrate">Bitrate:</label>
+              <Select
                 id="modal-select-bitrate"
                 className="select-input-sm"
                 value={bitrate}
-                onChange={(e) => setBitrate(parseInt(e.target.value, 10))}
-              >
-                <option value={35000}>35 Mbps</option>
-                <option value={25000}>25 Mbps</option>
-                <option value={15000}>15 Mbps</option>
-                <option value={8000}>8 Mbps</option>
-                <option value={3000}>3 Mbps</option>
-                <option value={1000}>1 Mbps</option>
-              </select>
+                onValueChange={(value) => setBitrate(parseInt(value, 10))}
+                options={[
+                  { value: '35000', label: '35 Mbps' },
+                  { value: '25000', label: '25 Mbps' },
+                  { value: '15000', label: '15 Mbps' },
+                  { value: '8000', label: '8 Mbps' },
+                  { value: '3000', label: '3 Mbps' },
+                  { value: '1000', label: '1 Mbps' },
+                ]}
+              />
             </div>
 
             <div className="picker-setting-item">
-              <label>Qualidade:</label>
-              <select
+              <label htmlFor="modal-select-quality">Qualidade:</label>
+              <Select
                 id="modal-select-quality"
                 className="select-input-sm"
                 value={quality}
-                onChange={(e) => setQuality(parseInt(e.target.value, 10))}
-              >
-                <option value={95}>95% (Máxima)</option>
-                <option value={90}>90% (Muito Alta)</option>
-                <option value={85}>85% (Alta)</option>
-                <option value={75}>75% (Equilibrada)</option>
-              </select>
+                onValueChange={(value) => setQuality(parseInt(value, 10))}
+                options={[
+                  { value: '95', label: '95% (Máxima)' },
+                  { value: '90', label: '90% (Muito Alta)' },
+                  { value: '85', label: '85% (Alta)' },
+                  { value: '75', label: '75% (Equilibrada)' },
+                ]}
+              />
             </div>
 
             <label className="picker-checkbox-label">
-              <input
+              <input autoComplete="off"
                 type="checkbox"
                 id="modal-check-cursor"
                 checked={showCursor}

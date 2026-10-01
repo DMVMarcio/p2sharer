@@ -29,9 +29,10 @@ interface Props {
 export const YouTubeControls: React.FC<Props> = ({ hasVideo, playing, hasPrevious, hasNext,
   position, duration, buffered, volume, muted, onTogglePlayback, onPrevious, onNext, onSeek,
   onVolume, onToggleMute, captions, onToggleCaptions, onPictureInPicture, live = false }) => {
+  const timelineDuration = Math.max(duration, position);
   return <div className="youtube-control-deck" aria-label="Controles de reprodução compartilhada">
-    <MediaSeekBar value={position} duration={duration} buffered={buffered} onCommit={onSeek}
-      disabled={!hasVideo || duration <= 0} />
+    <MediaSeekBar value={position} duration={timelineDuration} buffered={buffered} onCommit={onSeek}
+      disabled={!hasVideo || timelineDuration <= 0} />
     <div className="youtube-control-row">
       <div className="youtube-transport">
         <TooltipButton tooltip="Vídeo anterior" className="youtube-control-button"
@@ -43,7 +44,7 @@ export const YouTubeControls: React.FC<Props> = ({ hasVideo, playing, hasPreviou
         </TooltipButton>
         <TooltipButton tooltip="Próximo vídeo" className="youtube-control-button"
           disabled={!hasNext} onClick={onNext}><SkipForward size={18} strokeWidth={2} /></TooltipButton>
-        <span className="youtube-time-readout">{formatMediaTime(position)} <span>/</span> {formatMediaTime(duration)}</span>
+        <span className="youtube-time-readout">{formatMediaTime(position)} <span>/</span> {formatMediaTime(timelineDuration)}</span>
         {live && <span className="youtube-live-label">AO VIVO</span>}
       </div>
       <div className="youtube-volume-control">
@@ -60,7 +61,7 @@ export const YouTubeControls: React.FC<Props> = ({ hasVideo, playing, hasPreviou
           onClick={onToggleMute}>
           {muted || volume === 0 ? <VolumeX size={17} /> : <Volume2 size={17} />}
         </TooltipButton>
-        <input aria-label="Volume do YouTube" type="range" min="0" max="100" value={volume}
+        <input autoComplete="off" aria-label="Volume do YouTube" type="range" min="0" max="100" value={volume}
           onChange={(event) => onVolume(Number(event.target.value))}
           style={{ '--volume-progress': `${muted ? 0 : volume}%` } as React.CSSProperties} />
         <span>{muted ? 0 : volume}%</span>

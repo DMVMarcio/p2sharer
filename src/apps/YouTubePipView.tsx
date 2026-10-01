@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event';
-import { Pin, X } from 'lucide-react';
+import { Pin, X, PictureInPicture2, Play, Pause, Volume2, VolumeX, Captions } from 'lucide-react';
+import { useContextMenu } from '../components/common/ContextMenu';
 import { TooltipButton } from '../components/common/TooltipButton';
 import { initFrontendLogger } from '../core/logger';
 import { YouTubeControls } from './YouTubeControls';
 import { canAdvanceYouTubeQueue } from './youtube_queue';
-import { createYouTubePlayer, loadYouTubePlayerApi, reconcileYouTubePlayer, setYouTubeCaptions, sampleYouTubeLive,
+import { createYouTubePlayer, loadYouTubePlayerApi, reconcileYouTubePlayer, setYouTubeCaptions, sampleYouTubeTimeline,
   type YouTubePlaybackTracker, type YouTubePlayer } from './youtube_player';
 import { validYouTubeState } from './models.ts';
 import { validYouTubePipSettings, youtubePipEvent, youtubePipPeerId,
@@ -17,6 +18,7 @@ const VOLUME_STORAGE = 'p2sharer_youtube_volume';
 const CAPTIONS_STORAGE = 'p2sharer_youtube_captions';
 
 export const YouTubePipView: React.FC<{ instanceId: string }> = ({ instanceId }) => {
+  const openContextMenu = useContextMenu();
   const [state, setState] = useState<YouTubeState | null>(null);
   const [playerReady, setPlayerReady] = useState(false);
   const [position, setPosition] = useState(0);
@@ -147,10 +149,8 @@ export const YouTubePipView: React.FC<{ instanceId: string }> = ({ instanceId })
       const current = stateRef.current;
       if (!player || !current) return;
       if (!current.queue[current.index]) return;
-      const time = player.getCurrentTime();
-      const length = player.getDuration();
+      const { position: time, duration: length, live } = sampleYouTubeTimeline(player, trackerRef.current, Date.now());
       const loaded = player.getVideoLoadedFraction();
-      const live = sampleYouTubeLive(player, trackerRef.current, Date.now());
       if (live) setLiveVideoId(current.queue[current.index].videoId);
       if (Number.isFinite(time) && time >= 0) setPosition(time);
       if (Number.isFinite(length) && length >= 0) setDuration(length);
@@ -202,7 +202,14 @@ export const YouTubePipView: React.FC<{ instanceId: string }> = ({ instanceId })
     } catch (reason) { setError(`Não foi possível fechar o Picture-in-Picture: ${String(reason)}`); }
   };
 
-  return <div className="pip-window-root youtube-pip-root">
+  return <div className="pip-window-root youtube-pip-root" onContextMenu={(event) => openContextMenu(event, [
+    { id: 'restore', label: 'Restaurar para o app', icon: <PictureInPicture2 size={15} />, onSelect: close },
+    { id: 'playback', label: state?.playing ? 'Pausar para todos' : 'Reproduzir para todos', icon: state?.playing ? <Pause size={15} /> : <Play size={15} />,
+      disabled: !current, onSelect: () => command({ action: 'toggle' }) },
+    { id: 'mute', label: muted ? 'Ativar áudio' : 'Silenciar áudio', icon: muted ? <Volume2 size={15} /> : <VolumeX size={15} />, onSelect: toggleMute },
+    { id: 'captions', label: captions ? 'Desativar legendas' : 'Ativar legendas', icon: <Captions size={15} />, disabled: !current, onSelect: toggleCaptions },
+    { id: 'top', label: alwaysOnTop ? 'Desafixar janela do topo' : 'Manter janela no topo', icon: <Pin size={15} />, onSelect: toggleTop },
+  ])}>
     <div ref={mountRef} className="room-app-player-mount" />
     {current && <button className="youtube-pip-hit-area" onClick={() => command({ action: 'toggle' })}
       aria-label={state?.playing ? 'Pausar para todos' : 'Reproduzir para todos'} />}

@@ -1,3 +1,8 @@
+import { StreamPointerReceiver } from './stream_pointer_receiver.ts';
+import { generateUserColor } from '../p2p/group_room.ts';
+import { validStreamPointer, validStreamPointerState, type StreamPointerState, type StreamPointerPacket } from '../core/stream_pointer.ts';
+import { emitTo, listen } from '@tauri-apps/api/event';
+import { streamPointerView } from './stream_pointer_view.ts';
 import { invoke } from '@tauri-apps/api/core';
 import { roomAppsService } from '../apps/room_apps_service.ts';
 import { AudioBridge } from '../audio/audio_bridge.ts';
@@ -86,6 +91,14 @@ export class RoomService {
   }
 
   private initFallbackHandler(): void {
+    if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window && !new URLSearchParams(window.location.search).has('pip') && !new URLSearchParams(window.location.search).has('pointerOverlay')) {
+      void listen<{ peerId: string; packet: StreamPointerPacket }>('stream-pointer-send', ({ payload }) => {
+        if (payload && typeof payload.peerId === 'string') this.sendStreamPointer(payload.packet, payload.peerId);
+      }).catch(console.warn);
+      void listen<{ peerId: string }>('stream-pointer-ready', ({ payload }) => {
+        if (payload && (payload.peerId === 'local' || stateStore.subscribedStreams.has(payload.peerId))) this.publishPointerView(payload.peerId, streamPointerView.state(payload.peerId));
+      }).catch(console.warn);
+    }
     this.nativeVideoBridge.onFallbackNeeded = (reason: string, fallbackStream?: MediaStream) => {
       if (fallbackStream) {
         showToast(`Transmissão alternada (${reason})`);
@@ -157,6 +170,7 @@ export class RoomService {
   }
 
   private async joinRoomNow(code: string, pass: string, isCreator: boolean): Promise<void> {
+    streamPointerView.clear();
     roomAppsService.reset();
     const parsed = await verifyRoomInvite(code);
     if (!parsed && typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
@@ -248,6 +262,14 @@ export class RoomService {
         this.recordFileProgress(progress);
         if (progress.status === 'error') showToast('Não foi possível concluir a transferência do arquivo.');
       },
+      onStreamPointerState: (snapshot, broadcasterId) => {
+        if (this.roomManager === manager && stateStore.subscribedStreams.has(broadcasterId)) this.publishPointerView(broadcasterId, snapshot);
+      },
+      onStreamPointer: (packet, peerId) => {
+        if (this.roomManager !== manager) return;
+        const peer = this.peers.find((p) => p.id === peerId);
+        if (peer) this.pointerReceiver.receive(packet, peerId, peer.username, generateUserColor(peer.username));
+      },
       onAppEvent: (event, peerId) => {
         if (this.roomManager === manager) roomAppsService.receive(event, peerId);
       },
@@ -298,6 +320,7 @@ export class RoomService {
         this.fileRequests = this.fileRequests.filter((request) => request.peerId !== _peerId);
         this.notify();
         roomAppsService.forgetPeer(_peerId);
+        this.pointerReceiver.forget(_peerId);
         const name = username.trim();
         if (!name) return;
         soundEffects.playUserLeave();
@@ -313,7 +336,10 @@ export class RoomService {
         }
       },
       onWatchStarted: () => soundEffects.playWatchStreamStart(),
-      onWatchStopped: () => soundEffects.playWatchStreamStop(),
+      onWatchStopped: (watcherPeerId, _name, broadcasterPeerId) => {
+        if (broadcasterPeerId === 'local' || broadcasterPeerId === manager.getLocalPeerId()) this.pointerReceiver.forget(watcherPeerId);
+        soundEffects.playWatchStreamStop();
+      },
       onStatusChange: (status) => {
         if (this.roomManager !== manager) return;
         this.roomStatusText = status;
@@ -362,6 +388,30 @@ export class RoomService {
     this.notify();
   }
 
+  private pointerReceiver = new StreamPointerReceiver((snapshot) => {
+    this.roomManager?.sendStreamPointerState(snapshot);
+    this.publishPointerView('local', snapshot);
+  });
+
+  public refreshStreamPointerView(peerId: string): void {
+    this.publishPointerView(peerId, streamPointerView.state(peerId));
+  }
+
+  private publishPointerView(peerId: string, snapshot: StreamPointerState): void {
+    if (!validStreamPointerState(snapshot)) return;
+    const identity = { localPeerId: this.roomManager?.getLocalPeerId() ?? '', name: stateStore.username, color: generateUserColor(stateStore.username) };
+    streamPointerView.set(peerId, snapshot, identity);
+    if (stateStore.activePipPeers.has(peerId)) {
+      void emitTo(`pip-${peerId.replace(/[^a-zA-Z0-9_-]/g, '_')}`, 'stream-pointer-view', { peerId, snapshot, identity }).catch(console.warn);
+    }
+  }
+
+  public sendStreamPointer(packet: StreamPointerPacket, peerId: string): void {
+    if (validStreamPointer(packet) && stateStore.subscribedStreams.has(peerId)) {
+      this.roomManager?.sendStreamPointer(packet, peerId);
+    }
+  }
+
   public async startCapture(
     sourceId: string,
     fps: number,
@@ -370,6 +420,7 @@ export class RoomService {
     quality?: number
   ): Promise<void> {
     try {
+      this.pointerReceiver.clear();
       showToast('Iniciando transmissão...');
 
       const chosenSource = !sourceId ? 'screen:0' : sourceId;
@@ -423,6 +474,7 @@ export class RoomService {
   }
 
   public stopScreenSharing(): void {
+    this.pointerReceiver.clear();
     stateStore.set((s) => {
       s.isSharingScreen = false;
       const localSlot = s.roomSlots.find((slot) => slot.isLocal);
@@ -453,6 +505,8 @@ export class RoomService {
   }
 
   private async leaveRoomNow(): Promise<void> {
+    this.pointerReceiver.clear();
+    streamPointerView.clear();
     roomAppsService.reset();
     if (this.roomConnectingTimeout) {
       clearTimeout(this.roomConnectingTimeout);
@@ -755,6 +809,7 @@ export class RoomService {
   }
 
   public stopWatchingStream(peerId: string): void {
+    this.publishPointerView(peerId, { kind: 'state', sentAt: Date.now(), visuals: [] });
     audioContextManager.detachPeerAudio(peerId);
     stateStore.set((s) => {
       s.subscribedStreams.delete(peerId);

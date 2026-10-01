@@ -1,3 +1,4 @@
+import { Select } from '../components/common/Select';
 import React from 'react';
 import type { Editor } from '@tiptap/react';
 import { useEditorState } from '@tiptap/react';
@@ -23,14 +24,18 @@ export const NotepadToolbar: React.FC<Props> = ({ editor, onLink, fileActions })
       aria-pressed={selected} onMouseDown={(event) => event.preventDefault()} onClick={run}>{icon}</TooltipButton>;
 
   return <div className="room-app-notepad-tools" role="toolbar" aria-label="Formatação da nota">
-    <select aria-label="Estilo do parágrafo" value={active.heading} onChange={(event) => {
-      const level = Number(event.target.value);
+    <Select className="room-app-notepad-select" aria-label="Estilo do parágrafo" value={active.heading} onValueChange={(value) => {
+      const level = Number(value);
       if (level === 0) editor.chain().focus().setParagraph().run();
       else editor.chain().focus().setHeading({ level: level as 1 | 2 | 3 }).run();
-    }}>
-      <option value={0}>Texto</option><option value={1}>Título 1</option>
-      <option value={2}>Título 2</option><option value={3}>Título 3</option>
-    </select>
+    }}
+      options={[
+        { value: '0', label: 'Texto' },
+        { value: '1', label: 'Título 1' },
+        { value: '2', label: 'Título 2' },
+        { value: '3', label: 'Título 3' },
+      ]}
+    />
     <span className="room-app-notepad-tools-divider" />
     {tool('Negrito', <Bold size={15} />, active.bold, () => editor.chain().focus().toggleBold().run())}
     {tool('Itálico', <Italic size={15} />, active.italic, () => editor.chain().focus().toggleItalic().run())}

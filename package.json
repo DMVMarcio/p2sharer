@@ -8,9 +8,9 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "postinstall": "patch-package",
-    "tauri": "tauri",
-    "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri": "node tools/tauri.mjs",
+    "tauri:dev": "node tools/tauri.mjs dev",
+    "tauri:build": "node tools/tauri.mjs build"
   },
   "dependencies": {
     "@floating-ui/dom": "^1.8.0",

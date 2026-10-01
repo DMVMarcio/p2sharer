@@ -89,7 +89,7 @@ export const AudioFilterModal: React.FC = () => {
               </p>
             </div>
             <label className="modern-switch" htmlFor="toggle-full-audio">
-              <input
+              <input autoComplete="off"
                 id="toggle-full-audio"
                 type="checkbox"
                 checked={isFullAudio}
@@ -169,7 +169,7 @@ export const AudioFilterModal: React.FC = () => {
                     <circle cx="11" cy="11" r="8" />
                     <line x1="21" y1="21" x2="16.65" y2="16.65" />
                   </svg>
-                  <input
+                  <input autoComplete="off"
                     type="text"
                     id="input-search-process"
                     className="audio-search-input"
@@ -309,7 +309,7 @@ export const AudioFilterModal: React.FC = () => {
 
                         {/* Standard Checkbox for multi-selection */}
                         <div className="audio-process-toggle-col" onClick={(e) => e.stopPropagation()}>
-                          <input
+                          <input autoComplete="off"
                             type="checkbox"
                             className="audio-process-checkbox"
                             checked={isSelected}

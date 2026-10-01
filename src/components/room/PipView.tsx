@@ -1,3 +1,5 @@
+import { useStreamPointer } from '../../hooks/useStreamPointer';
+import { StreamPointerToggle } from './StreamPointerToggle';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event';
@@ -8,6 +10,8 @@ import { ZoomControlBar } from './ZoomControlBar';
 import { StreamStatsOverlay } from './StreamStatsOverlay';
 import { buildIceServers } from '../../p2p/ice_config';
 import { initFrontendLogger } from '../../core/logger';
+import { Maximize, Pin, PictureInPicture2, RotateCcw, VolumeX, Volume2 } from 'lucide-react';
+import { useContextMenu, type ContextMenuAction } from '../common/ContextMenu';
 import { validPipAudioSettings } from '../../services/pip_audio';
 
 interface PipViewProps {
@@ -25,6 +29,7 @@ interface PeerStats {
 }
 
 export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
+  const openContextMenu = useContextMenu();
   useEffect(() => {
     initFrontendLogger();
   }, []);
@@ -60,6 +65,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const pointer = useStreamPointer(containerRef, videoRef, peerId, !isLocal && !!stream && isVideoPlaying, stream, true, !!stream && isVideoPlaying);
   const streamRef = useRef<MediaStream | null>(null);
   const bcRef = useRef<BroadcastChannel | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
@@ -343,8 +349,8 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
     };
   }, [peerId]);
 
-  const handleToggleMute = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleToggleMute = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (isMuted || volume === 0) {
       const targetVol = lastVolume || 100;
       setVolume(targetVol);
@@ -359,7 +365,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
   };
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    e.stopPropagation();
+    e?.stopPropagation();
     const val = parseInt(e.target.value, 10);
     setVolume(val);
     setIsMuted(val === 0);
@@ -367,8 +373,8 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
     sendSignalRef.current?.({ type: 'audio-settings', volume: val, muted: val === 0 });
   };
 
-  const handleToggleAlwaysOnTop = async (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleToggleAlwaysOnTop = async (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     const next = !isAlwaysOnTop;
     setIsAlwaysOnTop(next);
     try {
@@ -385,8 +391,8 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
     }
   };
 
-  const handleClose = async (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleClose = async (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     try {
       bcRef.current?.postMessage({ type: 'pip-close' });
       emit(`pip-signal-${peerId}`, { type: 'pip-close' }).catch(() => {});
@@ -398,8 +404,8 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
     }
   };
 
-  const handleToggleFullscreen = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleToggleFullscreen = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (document.fullscreenElement !== containerRef.current) {
       containerRef.current?.requestFullscreen?.().catch(() => {});
       setIsFullscreen(true);
@@ -413,6 +419,17 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
     <div
       className="pip-window-root"
       ref={containerRef}
+      onContextMenu={(event) => {
+        const actions: ContextMenuAction[] = [
+          { id: 'restore', label: 'Restaurar para o app', icon: <PictureInPicture2 size={15} />, onSelect: () => handleClose() },
+          { id: 'top', label: isAlwaysOnTop ? 'Desafixar janela do topo' : 'Manter janela no topo', icon: <Pin size={15} />, onSelect: () => handleToggleAlwaysOnTop() },
+          { id: 'hud', label: isHudPinned ? 'Desafixar controles' : 'Fixar controles', icon: <Pin size={15} />, onSelect: () => setIsHudPinned(!isHudPinned) },
+          { id: 'fullscreen', label: isFullscreen ? 'Sair da tela cheia' : 'Tela cheia', icon: <Maximize size={15} />, onSelect: () => handleToggleFullscreen() },
+        ];
+        if (!isLocal) actions.push({ id: 'mute', label: isMuted ? 'Ativar áudio' : 'Silenciar áudio', icon: isMuted ? <Volume2 size={15} /> : <VolumeX size={15} />, onSelect: () => handleToggleMute() });
+        if (zoom > 1) actions.push({ id: 'zoom', label: 'Redefinir zoom', icon: <RotateCcw size={15} />, onSelect: resetZoom });
+        openContextMenu(event, actions);
+      }}
       onMouseDown={handleMouseDown}
       onDoubleClick={handleDoubleClick}
     >
@@ -437,6 +454,8 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
           cursor: zoom > 1.0 ? (isDragging ? 'grabbing' : 'grab') : 'default',
         }}
       />
+
+      {pointer.indicator}
 
       {/* Loading state indicator */}
       {!isVideoPlaying && (
@@ -502,6 +521,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
 
         {/* Hover / Pinned Controls Pill (Bottom-Right) */}
         <div className="stream-controls-group">
+          {!isLocal && <StreamPointerToggle enabled={pointer.enabled} onToggle={pointer.toggle} />}
           {/* Audio Volume Controller */}
           {!isLocal && (
             <div className={`stream-volume-controller ${isMuted ? 'muted' : ''}`}>
@@ -528,7 +548,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
               </button>
 
               <div className="stream-volume-slider-box">
-                <input
+                <input autoComplete="off"
                   type="range"
                   min="0"
                   max="100"
@@ -547,7 +567,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
             type="button"
             className={`btn-stream-pin ${isHudPinned ? 'active' : ''}`}
             onClick={(e) => {
-              e.stopPropagation();
+              e?.stopPropagation();
               setIsHudPinned(!isHudPinned);
             }}
             aria-label={isHudPinned ? 'Desafixar Controles' : 'Fixar Controles'}

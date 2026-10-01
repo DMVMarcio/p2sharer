@@ -1,8 +1,10 @@
 pub mod audio_loopback;
 pub mod logger;
 pub mod note_files;
+pub mod youtube_playlist;
 pub mod chat_files;
 pub mod pip_manager;
+pub mod stream_pointer;
 pub mod process_manager;
 pub mod room_vault;
 pub mod screen_sources;
@@ -65,6 +67,8 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            stream_pointer::update_stream_pointer_overlay,
+            stream_pointer::get_stream_pointer_visuals,
             list_audio_processes,
             list_screen_sources,
             start_native_screen_capture,
@@ -86,6 +90,7 @@ pub fn run() {
             delete_room_record,
             open_note_file,
             save_note_file,
+            youtube_playlist::load_youtube_playlist,
             pick_chat_file,
             import_chat_files,
             paste_chat_files,
