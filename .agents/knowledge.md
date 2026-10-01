@@ -41,6 +41,12 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 4. User Guidelines & Expressed Preferences
 
+- `[Menu Motion]` Dropdowns and both emoji pickers must open and close smoothly with slightly longer timing (320 ms enter, 260 ms exit). Retain closing content until its animation finishes and make it noninteractive during exit. Emoji list scrollbars must use the app's narrow themed styling with a transparent track, including WebView2.
+
+
+- `[Desktop Build Hygiene]` Always use the normal Tauri output directory (`src-tauri/target/release` and its `bundle` subdirectory). Do not create alternate target trees or scatter executable/installer copies across the repository. If a running app locks the normal output, report the blocker instead of duplicating build directories. Remove obsolete alternate build trees when authorized, retaining normal Cargo build artifacts.
+- `[Home UI]` The home page must scroll vertically when saved rooms or a small window make its content taller than the available area; every saved room must remain accessible.
+
 - `[UI Polish]` Submit room creation, room joining, and similar single-line modal forms with Enter from any editable field. Keep enlarged volume thumbs fully visible, wrap long tooltip content without truncation, and animate dropdown opening smoothly. The logs-folder action must open the actual logs directory in Windows Explorer.
 
 

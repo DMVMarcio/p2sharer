@@ -6,11 +6,11 @@ import { EmojiGlyph } from './EmojiGlyph';
 
 const CATEGORY_ICONS = [Smile, Hand, PawPrint, UtensilsCrossed, MapPin, Gamepad2, Box, Hash, Flag];
 const PAGE_SIZE = 112;
-type Props = { pack: EmojiPack; onSelect: (emoji: string) => void };
+type Props = { pack: EmojiPack; onSelect: (emoji: string) => void; closing?: boolean };
 
 const normalize = (value: string) => value.toLocaleLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-export const EmojiPicker: React.FC<Props> = ({ pack, onSelect }) => {
+export const EmojiPicker: React.FC<Props> = ({ pack, onSelect, closing = false }) => {
   const [activeCategory, setActiveCategory] = useState<EmojiCategory>(EMOJI_CATEGORIES[0].id);
   const [query, setQuery] = useState('');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -67,7 +67,7 @@ export const EmojiPicker: React.FC<Props> = ({ pack, onSelect }) => {
 
   let remaining = visibleCount;
   return (
-    <div className="emoji-picker" role="dialog" aria-label="Selecionar emoji">
+    <div className={`emoji-picker ${closing ? 'dropdown-closing' : ''}`} inert={closing} aria-hidden={closing} role="dialog" aria-label="Selecionar emoji">
       <div className="emoji-picker-header"><strong>Emojis</strong></div>
       <input
         className="emoji-picker-search"
