@@ -1,6 +1,7 @@
 import type { StreamStatusPayload } from '../core/types.ts';
 
 export class MediaCoordinator {
+  private static senderUpdates = new WeakMap<RTCPeerConnection, Promise<void>>();
   private static preparedVideoCodecs: RTCRtpCodec[] | null = null;
 
   private static codecContentType(codec: { mimeType: string; sdpFmtpLine?: string }): string {
@@ -325,16 +326,29 @@ export class MediaCoordinator {
     maxFps: number = 60
   ): Promise<void> {
     if (!pc || typeof pc.getSenders !== 'function') return;
-    if (pc.signalingState && pc.signalingState !== 'stable') return;
+    const previous = MediaCoordinator.senderUpdates.get(pc) ?? Promise.resolve();
+    const update = previous.catch(() => {}).then(() =>
+      MediaCoordinator.applySenderParameters(pc, maxBitrateBps, maxFps));
+    MediaCoordinator.senderUpdates.set(pc, update);
+    try {
+      await update;
+    } finally {
+      if (MediaCoordinator.senderUpdates.get(pc) === update) MediaCoordinator.senderUpdates.delete(pc);
+    }
+  }
+
+  private static async applySenderParameters(
+    pc: RTCPeerConnection, maxBitrateBps: number, maxFps: number
+  ): Promise<void> {
+    if (pc.connectionState === 'closed' || (pc.signalingState && pc.signalingState !== 'stable')) return;
     try {
       const senders = pc.getSenders();
       for (const sender of senders) {
         if (sender.track && sender.track.kind === 'video') {
           try {
             const params = sender.getParameters();
-            if (!params.encodings || params.encodings.length === 0) {
-              params.encodings = [{}];
-            }
+            // An unnegotiated sender has no valid RTP parameter transaction yet.
+            if (!params.encodings?.length) continue;
             params.encodings.forEach((enc) => {
               enc.maxBitrate = maxBitrateBps;
               // A high video floor prevents congestion control from yielding
@@ -379,9 +393,8 @@ export class MediaCoordinator {
         } else if (sender.track && sender.track.kind === 'audio') {
           try {
             const params = sender.getParameters();
-            if (!params.encodings || params.encodings.length === 0) {
-              params.encodings = [{}];
-            }
+            // An unnegotiated sender has no valid RTP parameter transaction yet.
+            if (!params.encodings?.length) continue;
             params.encodings.forEach((enc) => {
               enc.maxBitrate = 192000; // 192 kbps high-fidelity stereo audio
               enc.networkPriority = 'high';

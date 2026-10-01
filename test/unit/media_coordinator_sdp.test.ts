@@ -167,6 +167,48 @@ describe('MediaCoordinator SDP Munging and WebRTC Bandwidth Allocation', () => {
     assert.match(setLocalCalledWith.sdp, /x-google-min-bitrate=500/);
   });
 
+  it('serializes overlapping sender updates and applies the latest FPS and bitrate', async () => {
+    let active = 0;
+    let maxActive = 0;
+    const applied: Array<{ bitrate: number; fps: number }> = [];
+    const sender = {
+      track: { kind: 'video' },
+      getParameters: () => ({ encodings: [{}] }),
+      setParameters: async (params: any) => {
+        active++;
+        maxActive = Math.max(maxActive, active);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        applied.push({ bitrate: params.encodings[0].maxBitrate, fps: params.encodings[0].maxFramerate });
+        active--;
+      },
+    };
+    const pc = { signalingState: 'stable', getSenders: () => [sender] } as unknown as RTCPeerConnection;
+    await Promise.all([
+      MediaCoordinator.applySenderBitrate(pc, 8_000_000, 30),
+      MediaCoordinator.applySenderBitrate(pc, 12_000_000, 60),
+      MediaCoordinator.applySenderBitrate(pc, 15_000_000, 60),
+    ]);
+    assert.equal(maxActive, 1, 'Parameter transactions must not overlap');
+    assert.deepEqual(applied, [
+      { bitrate: 8_000_000, fps: 30 }, { bitrate: 12_000_000, fps: 60 }, { bitrate: 15_000_000, fps: 60 },
+    ]);
+  });
+
+  it('waits for negotiated encodings instead of inventing an invalid sender transaction', async () => {
+    const params: any = { encodings: [] };
+    let applied = 0;
+    const pc = { signalingState: 'stable', getSenders: () => [{
+      track: { kind: 'video' }, getParameters: () => params, setParameters: async () => { applied++; },
+    }] } as unknown as RTCPeerConnection;
+    await MediaCoordinator.applySenderBitrate(pc, 15_000_000, 60);
+    assert.equal(applied, 0);
+    assert.deepEqual(params.encodings, []);
+    params.encodings = [{}];
+    await MediaCoordinator.applySenderBitrate(pc, 15_000_000, 60);
+    assert.equal(applied, 1);
+    assert.equal(params.encodings[0].maxFramerate, 60);
+  });
+
   it('lets video yield bandwidth to high-priority audio', async () => {
     const videoParams: any = { encodings: [{ minBitrate: 12_500_000 }] };
     const audioParams: any = { encodings: [{}] };
