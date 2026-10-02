@@ -42,6 +42,8 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 4. User Guidelines & Expressed Preferences
 
+- `[Annotation History & Capacity]` Provide per-author stream drawing undo/redo buttons below the tools and Ctrl+Z/Ctrl+Y shortcuts without stealing text editing. Raise the default retained drawing capacity twentyfold (64 to 1280), expose a persistent Transmission slider, raise the toolbar slightly, and give the size control a readable background.
+
 - `[Stream Annotations]` Interactive mouse mode exposes brush, outline rectangle/circle, text, preset color palette, and a 0-10 size scale with tool-specific mapping. Broadcaster drawing and ping permissions are independent persistent Transmission toggles, both gated by participant cursor permission. Keep native annotation surfaces stable and transparent when participants enter/leave interactive mode.
 
 - `[Native Capture Portability]` Preserve the application's native screen/window picker and capture path; do not replace them with Chromium getDisplayMedia or its browser picker as a performance workaround. Explain proposed pipeline changes and their tradeoffs before a substantial architecture migration. Optimize by measured capabilities across NVIDIA, AMD, and Intel, with supported fallbacks instead of vendor-name assumptions. Clearly distinguish simulated high-refresh cadence checks from physical monitor, driver, and game validation.

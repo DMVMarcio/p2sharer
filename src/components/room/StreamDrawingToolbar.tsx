@@ -1,4 +1,4 @@
-import { Brush, Square, Circle, Type, MousePointer2, Eraser } from 'lucide-react';
+import { Brush, Square, Circle, Type, MousePointer2, Eraser, Undo2, Redo2 } from 'lucide-react';
 import { TooltipButton } from '../common/TooltipButton';
 import { useContextMenu } from '../common/ContextMenu';
 import type { DrawingTool } from '../../core/stream_pointer';
@@ -9,8 +9,8 @@ const COLORS = [
   ['#06b6d4', 'Ciano'], ['#3b82f6', 'Azul'], ['#a855f7', 'Roxo'], ['#ec4899', 'Rosa'],
   ['#ffffff', 'Branco'], ['#000000', 'Preto'],
 ];
-export function StreamDrawingToolbar({ settings, onChange, onClear }: {
-  settings: DrawingSettings; onChange: (settings: DrawingSettings) => void; onClear: () => void;
+export function StreamDrawingToolbar({ settings, onChange, onClear, onUndo, onRedo, canUndo, canRedo }: {
+  settings: DrawingSettings; onChange: (settings: DrawingSettings) => void; onClear: () => void; onUndo: () => void; onRedo: () => void; canUndo: boolean; canRedo: boolean;
 }) {
   const menu = useContextMenu();
   const tools = [[null, 'Mouse', MousePointer2], ['brush', 'Pincel', Brush], ['rectangle', 'Quadrado', Square],
@@ -28,5 +28,9 @@ export function StreamDrawingToolbar({ settings, onChange, onClear }: {
     {settings.tool === 'text' && <input autoComplete="off" className="text-input text-input-sm" aria-label="Texto do rabisco"
       placeholder="Texto para inserir na tela" maxLength={160} value={settings.text} onChange={event => onChange({ ...settings, text: event.target.value })} />}
     <TooltipButton tooltip="Apagar meus rabiscos" className="btn-stream-pin" onClick={onClear}><Eraser size={15} /></TooltipButton>
+    <div className="stream-drawing-history">
+      <TooltipButton tooltip="Desfazer (Ctrl+Z)" aria-label="Desfazer" className="btn btn-secondary btn-sm" disabled={!canUndo} onClick={onUndo}><Undo2 size={14} />Desfazer</TooltipButton>
+      <TooltipButton tooltip="Refazer (Ctrl+Y)" aria-label="Refazer" className="btn btn-secondary btn-sm" disabled={!canRedo} onClick={onRedo}><Redo2 size={14} />Refazer</TooltipButton>
+    </div>
   </div>;
 }

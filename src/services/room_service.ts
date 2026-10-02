@@ -424,9 +424,9 @@ export class RoomService {
         this.roomManager?.sendStreamPointerState(state);
         const slot = stateStore.roomSlots.find(slot => slot.isLocal && slot.mediaId === mediaId);
         if (slot) this.publishPointerView(slot.peerId, state);
-      }, async (visuals) => {
+      }, async (visuals, drawingsIncluded) => {
         const sessionId = this.localCaptures.get(mediaId)?.bridge?.sessionId;
-        if (sessionId) await invoke('update_stream_pointer_overlay', { visuals, sessionId });
+        if (sessionId) await invoke('update_stream_pointer_overlay', { visuals, sessionId, drawingsIncluded });
       });
       this.pointerReceivers.set(mediaId, receiver);
     }
@@ -439,6 +439,7 @@ export class RoomService {
   }
 
   public refreshStreamPointerView(peerId: string): void {
+    if (peerId !== 'local' && stateStore.subscribedStreams.has(peerId)) this.sendStreamPointer({ kind: 'sync' }, peerId);
     this.publishPointerView(peerId, streamPointerView.state(peerId));
   }
 

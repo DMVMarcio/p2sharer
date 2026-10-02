@@ -10,8 +10,9 @@ export function StreamPointerOverlay() {
   useEffect(() => {
     let disposed = false;
     document.documentElement.classList.add('stream-pointer-desktop');
-    const subscription = listen<StreamPointerVisual[]>('stream-pointer-visuals', ({ payload }) => {
-      if (!disposed) setVisuals(payload);
+    const subscription = listen<StreamPointerVisual[] | { visuals: StreamPointerVisual[]; drawingsIncluded: boolean }>('stream-pointer-visuals', ({ payload }) => {
+      if (!disposed) setVisuals(previous => Array.isArray(payload) ? payload : payload.drawingsIncluded ? payload.visuals
+        : [...payload.visuals, ...previous.filter(v => v.drawing)]);
     });
     void subscription.then(async () => {
       // Hidden WebViews may suspend animation frames; let the transparent DOM commit without requiring visibility.

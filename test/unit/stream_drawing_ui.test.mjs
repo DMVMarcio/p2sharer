@@ -98,7 +98,9 @@ test('circle and literal text use the same normalized projection and cancelled g
     Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(input, '<script>instruction</script>');
     input.dispatchEvent(new window.Event('input', { bubbles: true }));
   });
+  input.focus();
   await pointer('pointerdown', 400, 225);
+  assert.equal(document.activeElement, video.parentElement);
   const text = globalThis.__pointerTestSent.at(-1);
   assert.equal(text.drawing.tool, 'text');
   assert.equal(text.drawing.text, '<script>instruction</script>');
@@ -110,4 +112,31 @@ test('circle and literal text use the same normalized projection and cancelled g
   assert.equal(document.querySelector('.stream-drawing-layer text').textContent, '<script>instruction</script>');
   assert.equal(document.querySelector('.stream-drawing-layer script'), null);
   assert.equal(document.querySelector('video'), video);
+});
+
+test('history buttons and Ctrl+Z/Ctrl+Y issue scoped commands while input editing keeps its shortcuts', async () => {
+  await act(async () => streamPointerView.set('host', { kind: 'state', sentAt: Date.now(), visuals: [], drawingAllowed: true,
+    history: [{ peerId: 'viewer', undo: 2, redo: 1 }] }, { name: 'Viewer', color: 'cyan', localPeerId: 'viewer' }));
+  assert.equal(document.querySelector('[aria-label="Desfazer"]').disabled, false);
+  assert.equal(document.querySelector('[aria-label="Refazer"]').disabled, false);
+  await click('[aria-label="Desfazer"]'); assert.equal(globalThis.__pointerTestSent.at(-1).kind, 'undo');
+  await click('[aria-label="Refazer"]'); assert.equal(globalThis.__pointerTestSent.at(-1).kind, 'redo');
+  await pointer('pointermove', 200, 200);
+  const key = async key => {
+    const event = new window.KeyboardEvent('keydown', { key, ctrlKey: true, bubbles: true, cancelable: true });
+    await act(async () => window.dispatchEvent(event)); return event;
+  };
+  await key('z'); assert.equal(globalThis.__pointerTestSent.at(-1).kind, 'undo');
+  await key('y'); assert.equal(globalThis.__pointerTestSent.at(-1).kind, 'redo');
+  const before = globalThis.__pointerTestSent.length;
+  document.querySelector('[aria-label="Texto do rabisco"]').focus();
+  assert.equal((await key('z')).defaultPrevented, false);
+  assert.equal((await key('y')).defaultPrevented, false);
+  assert.equal(globalThis.__pointerTestSent.length, before);
+  document.activeElement.blur();
+  await act(async () => streamPointerView.set('host', { kind: 'state', sentAt: Date.now(), visuals: [], drawingAllowed: true,
+    history: [{ peerId: 'viewer', undo: 0, redo: 0 }] }, { name: 'Viewer', color: 'cyan', localPeerId: 'viewer' }));
+  assert.equal(document.querySelector('[aria-label="Desfazer"]').disabled, true);
+  assert.equal(document.querySelector('[aria-label="Refazer"]').disabled, true);
+  await key('z'); assert.equal(globalThis.__pointerTestSent.length, before);
 });

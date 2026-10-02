@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::LazyLock;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use tauri::{
     AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindowBuilder,
 };
@@ -51,6 +51,7 @@ fn valid_stream_drawing(d: &StreamDrawing) -> bool {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PointerVisual {
     id: String,
     name: String,
@@ -59,7 +60,14 @@ pub struct PointerVisual {
     y: f64,
     expires: u64,
     ping: bool,
-    drawing: Option<StreamDrawing>,
+    drawing: Option<Arc<StreamDrawing>>,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PointerFrame {
+    visuals: Vec<PointerVisual>,
+    drawings_included: bool,
 }
 
 pub fn set_source(source: Option<String>) {
@@ -142,6 +150,7 @@ pub async fn update_stream_pointer_overlay(
     window: tauri::WebviewWindow,
     visuals: Vec<PointerVisual>,
     session_id: Option<String>,
+    drawings_included: Option<bool>,
 ) -> Result<(), String> {
     if window.label() != "main" {
         return Err("Only the main window can publish stream pointers".into());
@@ -164,7 +173,7 @@ pub async fn update_stream_pointer_overlay(
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis() as u64;
-    let visuals: Vec<_> = visuals
+    let mut visuals: Vec<_> = visuals
         .into_iter()
         .filter(|v| {
             v.x.is_finite()
@@ -173,13 +182,38 @@ pub async fn update_stream_pointer_overlay(
                 && (0.0..=1.0).contains(&v.y)
                 && v.expires > now
                 && v.expires <= now + 3500
-                && v.drawing.as_ref().map(valid_stream_drawing).unwrap_or(true)
+                && v.drawing
+                    .as_deref()
+                    .map(valid_stream_drawing)
+                    .unwrap_or(true)
                 && v.id.len() <= 160
                 && v.name.len() <= 320
                 && v.color.len() <= 80
         })
-        .take(256)
+        .take(1536)
         .collect();
+    let included = drawings_included != Some(false);
+    if !included {
+        visuals.retain(|v| v.drawing.is_none());
+    }
+    let frame = PointerFrame {
+        visuals: visuals.clone(),
+        drawings_included: included,
+    };
+    if !included {
+        if let Some(previous) = VISUALS.lock().unwrap().get(&label) {
+            visuals.extend(
+                previous
+                    .iter()
+                    .filter(|v| v.drawing.is_some())
+                    .cloned()
+                    .map(|mut v| {
+                        v.expires = now + 3000;
+                        v
+                    }),
+            );
+        }
+    }
     if source.is_none() {
         READY.lock().unwrap().remove(&label);
         VISUALS.lock().unwrap().remove(&label);
@@ -199,6 +233,8 @@ pub async fn update_stream_pointer_overlay(
         // Keep the transparent surface alive until capture stops; do not churn DWM surfaces.
         return Ok(());
     }
+    // Cache changes even while a shared window is minimized; its next cursor-only frame must retain them.
+    VISUALS.lock().unwrap().insert(label.clone(), visuals);
     #[cfg(windows)]
     if let Some((x, y, width, height)) = source_bounds(source.as_deref().unwrap()) {
         let win = if let Some(win) = app.get_webview_window(&label) {
@@ -246,16 +282,14 @@ pub async fn update_stream_pointer_overlay(
         if win.inner_size().ok() != Some(size) {
             win.set_size(size).map_err(|e| e.to_string())?;
         }
-        VISUALS
-            .lock()
-            .unwrap()
-            .insert(label.clone(), visuals.clone());
-        win.emit("stream-pointer-visuals", visuals)
+        win.emit("stream-pointer-visuals", frame)
             .map_err(|e| e.to_string())?;
         if READY.lock().unwrap().contains(&label) && !win.is_visible().unwrap_or(false) {
             win.show().map_err(|e| e.to_string())?;
         }
     } else if let Some(win) = app.get_webview_window(&label) {
+        win.emit("stream-pointer-visuals", frame)
+            .map_err(|e| e.to_string())?;
         win.hide().map_err(|e| e.to_string())?;
     }
     Ok(())
