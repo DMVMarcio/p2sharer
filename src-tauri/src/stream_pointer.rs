@@ -32,7 +32,7 @@ fn valid_stream_drawing(d: &StreamDrawing) -> bool {
         && d.color.starts_with('#')
         && d.color.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)
         && !d.points.is_empty()
-        && d.points.len() <= 128
+        && d.points.len() <= 192
         && d.points.iter().all(|p| {
             p.x.is_finite()
                 && p.y.is_finite()
@@ -190,7 +190,7 @@ pub async fn update_stream_pointer_overlay(
                 && v.name.len() <= 320
                 && v.color.len() <= 80
         })
-        .take(1536)
+        .take(1280)
         .collect();
     let included = drawings_included != Some(false);
     if !included {

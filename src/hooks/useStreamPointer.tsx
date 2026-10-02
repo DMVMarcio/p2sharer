@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type RefObject } from 'react';
 import { emitTo, listen } from '@tauri-apps/api/event';
-import { streamPointerPosition, validStreamPointerState, type StreamDrawing, type StreamPointerState, type StreamPointerPacket } from '../core/stream_pointer';
+import { STREAM_DRAWING_MAX_POINTS, streamPointerPosition, validStreamPointerState, type StreamDrawing, type StreamPointerState, type StreamPointerPacket } from '../core/stream_pointer';
 import { roomService } from '../services/room_service';
 import { streamPointerView, type StreamPointerScene } from '../services/stream_pointer_view';
 import { StreamDrawingToolbar, type DrawingSettings } from '../components/room/StreamDrawingToolbar';
@@ -65,7 +65,7 @@ export function useStreamPointer(container: RefObject<HTMLDivElement | null>,
         const p = v && streamPointerPosition(v.getBoundingClientRect(), v.videoWidth, v.videoHeight, event.clientX, event.clientY);
         if (p) {
           if (drawing.tool === 'brush') {
-            if (drawing.points.length >= 128) drawing.points = drawing.points.filter((_, i) => i % 2 === 0);
+            if (drawing.points.length >= STREAM_DRAWING_MAX_POINTS) drawing.points = drawing.points.filter((_, i) => i % 2 === 0);
             drawing.points.push(p);
           } else drawing.points = [drawing.points[0], p];
           setDraft({ ...drawing, points: [...drawing.points] });
