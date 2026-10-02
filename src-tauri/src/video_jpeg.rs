@@ -16,13 +16,18 @@ impl RealtimeJpegEncoder {
     }
 
     pub fn encode_rgba(&mut self, pixels: &[u8], width: u32, height: u32) -> turbojpeg::Result<Vec<u8>> {
+        self.encode_rgba_strided(pixels, width, height, width as usize * 4)
+    }
+
+    /// Encode mapped GPU rows directly without packing away their alignment padding.
+    pub fn encode_rgba_strided(&mut self, pixels: &[u8], width: u32, height: u32, pitch: usize) -> turbojpeg::Result<Vec<u8>> {
         let width = width as usize;
         let height = height as usize;
         let capacity = self.compressor.buf_len(width, height)?;
         if self.output.len() < capacity {
             self.output.resize(capacity, 0);
         }
-        let image = Image { pixels, width, pitch: width * 4, height, format: PixelFormat::RGBA };
+        let image = Image { pixels, width, pitch, height, format: PixelFormat::RGBA };
         let len = self.compressor.compress_to_slice(image, &mut self.output)?;
         Ok(self.output[..len].to_vec())
     }
@@ -31,6 +36,20 @@ impl RealtimeJpegEncoder {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn padded_rows_encode_identically_to_packed_rows() {
+        let mut encoder = RealtimeJpegEncoder::new(90).unwrap();
+        for (width, height) in [(37u32, 19u32), (19, 37)] {
+            let packed = [230u8, 20, 10, 255].repeat((width * height) as usize);
+            let pitch = width as usize * 4 + 64;
+            let mut padded = vec![99; pitch * height as usize];
+            for row in padded.chunks_exact_mut(pitch) { row[..width as usize * 4].copy_from_slice(&packed[..width as usize * 4]); }
+            let expected = encoder.encode_rgba(&packed, width, height).unwrap();
+            let actual = encoder.encode_rgba_strided(&padded, width, height, pitch).unwrap();
+            assert_eq!(actual, expected);
+        }
+    }
 
     #[test]
     fn preserves_rgba_color_order_and_reuses_encoder_across_sizes() {

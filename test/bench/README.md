@@ -68,3 +68,28 @@ Run `node test/bench/check_capture_cadence.mjs` from the repository root with Ru
 At 120/144/165/240 Hz, the modeled output maintains 60 and 120 FPS. At 60/75 Hz, a 120 FPS target is limited by available source updates. Without jitter, 144 Hz to 60 FPS alternates gaps of 13.89 and 20.83 ms, and 165 Hz to 60 FPS has 12.12 and 18.18 ms gaps. Exact average FPS does not imply uniform frame intervals. A future output pacer must evaluate the latency tradeoff of waiting for the next deadline and repeating the latest frame; repeated frames do not represent newly captured motion.
 
 Physical validation remains outstanding for high-refresh hardware, variable refresh, exclusive fullscreen, heavy games and non-NVIDIA adapters. Measure native callbacks/images and stage timings alongside encoded/decoded RTP counters and frame interval percentiles; record display rate, driver, GPU, codec, stream count and game load.
+
+### Native video cost reduction (2026-10-02)
+
+The first implementation stage preserves WGC, the application's picker, the JPEG/WebView bridge and WebRTC. `video_readback.rs` owns one reusable staging texture per capture session, keyed by source device, geometry and format, and retains the capture library's read/write mapping and parallel pixel packing. Three consecutive reusable-readback errors select the legacy native path. GPU resources are released with the handler; CPU packing storage is allocated lazily.
+
+`video_gpu_scale.rs` performs weighted area downscaling on the capture device before readback. It preserves the shared aspect-fit dimensions and skips scaling when the source is already within the requested bounds. Shaders and input/output textures are reused. Unsupported shader/resource creation falls back to the existing CPU box resizer without requesting browser capture. GPU tests exercise landscape, portrait, odd dimensions, synthetic 4K textures, checkerboard averaging, and invalid output sizes. These tests do not establish physical 4K or AMD/Intel validation.
+
+For a controlled desktop comparison, set `P2SHARER_LEGACY_VIDEO_READBACK=1` before launching the app to use the former allocation/CPU-resize path. Unset it for the default GPU path. In a fresh desktop instance, run `runVideoLoopback({pipeline:'native', peers:2, probe:true, hideReceivers:true, resolution:{width:1280,height:720}})`. Hiding the receiver thumbnails prevents recursive capture of those thumbnails. `visualChecks` samples source/decoded RGB ranges and rejects black receivers. `staging_allocations`, `readback_errors`, `resize_us` and `gpu_scaled_images` extend the native metrics. Readback time includes GPU scaling submission and completion; it is not a standalone GPU execution timer.
+
+On the NVENC-capable adapter / approximately 75 Hz / 1920x1080 desktop, two local H.264 receivers at 1280x720 and 60 FPS, quality 90 and 15 Mbps:
+
+| Measurement | Legacy native path | GPU downscale + reusable readback |
+| --- | --- | --- |
+| Total native processing | 5.14 ms/frame | 2.52 ms/frame (repeat: 2.37 ms) |
+| CPU resize | 2.46 ms/frame | 0 ms/frame |
+| Readback, including GPU scaling on the new path | 0.46 ms/frame | 0.32 ms/frame |
+| JPEG | 2.20 ms/frame | 2.19 ms/frame |
+| Staging allocations in the warmed 4-second sample | 240 | 0 |
+| Decoded receiver FPS | About 60 each | About 60 each, zero recorded drops |
+
+The measured processing reduction is approximately 51% for this downscaling case, not a universal FPS increase or a Deadlock result. Source and output both at 1080p showed no clear total-processing improvement; resource churn is still reduced. Read-only mapped JPEG input and forced serial CPU packing were tested and rejected after slower full-desktop results, despite attractive isolated measurements. Do not reintroduce them based only on the isolated `video_readback_bench` example. The final path retains the library's pixel-access semantics.
+
+Native NVENC/AMF/VPL encoding and removal of the JPEG bridge are not implemented by this stage. Load adaptation and frame pacing remain separate next stages; do not report the overall optimization sequence as complete.
+
+The final packaged binary was checked again after the invalid-size guard tests and desktop build: 2.80 ms/frame, approximately 58.4–58.7 decoded FPS per receiver, zero recorded drops, zero warmed staging allocations and nonblack decoded samples. Desktop content and load varied between runs; retain this variation when reporting the earlier controlled comparison.

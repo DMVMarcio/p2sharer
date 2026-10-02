@@ -78,11 +78,17 @@ pub struct CaptureMetrics {
     readback_us: std::sync::atomic::AtomicU64,
     jpeg_us: std::sync::atomic::AtomicU64,
     processing_us: std::sync::atomic::AtomicU64,
+    staging_allocations: std::sync::atomic::AtomicU64,
+    readback_errors: std::sync::atomic::AtomicU64,
+    resize_us: std::sync::atomic::AtomicU64,
+    gpu_scaled_images: std::sync::atomic::AtomicU64,
 }
 
 #[derive(Serialize)]
 pub struct CaptureMetricsSnapshot {
     callbacks: u64, gated: u64, images: u64, readback_us: u64, jpeg_us: u64, processing_us: u64,
+    staging_allocations: u64, readback_errors: u64, resize_us: u64,
+    gpu_scaled_images: u64,
 }
 
 #[tauri::command]
@@ -93,6 +99,10 @@ pub fn get_capture_metrics(session_id: String) -> Result<CaptureMetricsSnapshot,
         callbacks: metrics.callbacks.load(Ordering::Relaxed), gated: metrics.gated.load(Ordering::Relaxed),
         images: metrics.images.load(Ordering::Relaxed), readback_us: metrics.readback_us.load(Ordering::Relaxed),
         jpeg_us: metrics.jpeg_us.load(Ordering::Relaxed), processing_us: metrics.processing_us.load(Ordering::Relaxed),
+        staging_allocations: metrics.staging_allocations.load(Ordering::Relaxed),
+        readback_errors: metrics.readback_errors.load(Ordering::Relaxed),
+        resize_us: metrics.resize_us.load(Ordering::Relaxed),
+        gpu_scaled_images: metrics.gpu_scaled_images.load(Ordering::Relaxed),
     })
 }
 
@@ -117,6 +127,11 @@ pub struct NativeWgcHandler {
     target_height: u32,
     active_flag: Arc<AtomicBool>,
     raw_buffer: Vec<u8>,
+    readback: crate::video_readback::ReusableReadback,
+    legacy_readback: bool,
+    consecutive_readback_errors: u8,
+    gpu_scaler: crate::video_gpu_scale::GpuScaler,
+    gpu_scaling_disabled: bool,
     resized_image: Option<fast_image_resize::images::Image<'static>>,
     resizer: fast_image_resize::Resizer,
     jpeg_encoder: RealtimeJpegEncoder,
@@ -141,7 +156,12 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
             target_width: ctx.flags.target_width,
             target_height: ctx.flags.target_height,
             active_flag: ctx.flags.active_flag,
-            raw_buffer: Vec::with_capacity(1920 * 1080 * 4),
+            raw_buffer: Vec::new(),
+            readback: crate::video_readback::ReusableReadback::default(),
+            legacy_readback: std::env::var("P2SHARER_LEGACY_VIDEO_READBACK").as_deref() == Ok("1"),
+            consecutive_readback_errors: 0,
+            gpu_scaler: crate::video_gpu_scale::GpuScaler::default(),
+            gpu_scaling_disabled: false,
             resized_image: None,
             resizer: fast_image_resize::Resizer::new(),
             jpeg_encoder: RealtimeJpegEncoder::new(ctx.flags.quality)?,
@@ -173,15 +193,41 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
             return Ok(());
         }
 
-        let src_width = frame.width();
-        let src_height = frame.height();
+        let mut src_width = frame.width();
+        let mut src_height = frame.height();
         if src_width == 0 || src_height == 0 {
             return Ok(());
         }
 
-        let frame_buffer = match frame.buffer() {
+        let scaled = if !self.legacy_readback && !self.gpu_scaling_disabled
+            && self.target_width > 0 && self.target_height > 0
+            && (src_width > self.target_width || src_height > self.target_height) {
+            let (width, height) = fit_capture_dimensions(src_width, src_height, self.target_width, self.target_height);
+            match self.gpu_scaler.resize(frame.device(), frame.device_context(), frame.as_raw_texture(), width, height) {
+                Ok(texture) => { src_width = width; src_height = height; Some(texture) },
+                Err(error) => {
+                    self.gpu_scaling_disabled = true;
+                    eprintln!("[Native Video] GPU downscaling unavailable; retaining CPU resize: {error}");
+                    None
+                }
+            }
+        } else { None };
+        let mut frame_buffer = match if self.legacy_readback {
+            frame.buffer().map(crate::video_readback::CapturePixels::Legacy).map_err(|error| -> Self::Error { error.into() })
+        } else if let Some(texture) = scaled.as_ref() {
+            self.readback.read_texture(frame.device(), frame.device_context(), texture)
+                .map(crate::video_readback::CapturePixels::Reused).map_err(|error| -> Self::Error { error.into() })
+        } else {
+            self.readback.read(frame).map(crate::video_readback::CapturePixels::Reused).map_err(|error| -> Self::Error { error.into() })
+        } {
             Ok(buf) => buf,
             Err(_e) => {
+                self.metrics.readback_errors.fetch_add(1, Ordering::Relaxed);
+                self.consecutive_readback_errors = self.consecutive_readback_errors.saturating_add(1);
+                if !self.legacy_readback && self.consecutive_readback_errors >= 3 {
+                    self.legacy_readback = true;
+                    eprintln!("[Native Video] Reusable readback failed repeatedly; using legacy native readback: {_e}");
+                }
                 // Transient DXGI surface lock or swapchain mode switch (e.g. game launched / resized)
                 // Returning Ok(()) ensures windows-capture does NOT abort the capture loop!
                 return Ok(());
@@ -191,13 +237,15 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
         if arrival_time.saturating_duration_since(self.next_frame_time) >= self.frame_interval {
             self.next_frame_time = arrival_time + self.frame_interval;
         }
-        let pixel_data = frame_buffer.as_nopadding_buffer(&mut self.raw_buffer);
-        self.metrics.readback_us.fetch_add(arrival_time.elapsed().as_micros() as u64, Ordering::Relaxed);
-
-        let (final_pixels, final_w, final_h) = if self.target_width > 0
+        let should_resize = self.target_width > 0
             && self.target_height > 0
-            && (src_width > self.target_width || src_height > self.target_height)
-        {
+            && (src_width > self.target_width || src_height > self.target_height);
+        let row_bytes = src_width as usize * 4;
+        let pixel_data = frame_buffer.packed(&mut self.raw_buffer, src_width, src_height);
+        let pixel_pitch = row_bytes;
+        self.metrics.readback_us.fetch_add(arrival_time.elapsed().as_micros() as u64, Ordering::Relaxed);
+        let resize_start = std::time::Instant::now();
+        let (final_pixels, final_w, final_h, final_pitch) = if should_resize {
             use fast_image_resize::images::{Image, ImageRef};
             use fast_image_resize::{FilterType, PixelType, ResizeAlg, ResizeOptions};
 
@@ -216,22 +264,25 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
                     let options =
                         ResizeOptions::new().resize_alg(ResizeAlg::Convolution(FilterType::Box));
                     if self.resizer.resize(&src_img, dst_img, &options).is_ok() {
-                        (dst_img.buffer(), dst_w, dst_h)
+                        (dst_img.buffer(), dst_w, dst_h, dst_w as usize * 4)
                     } else {
-                        (pixel_data, src_width, src_height)
+                        (pixel_data, src_width, src_height, pixel_pitch)
                     }
                 } else {
-                    (pixel_data, src_width, src_height)
+                    (pixel_data, src_width, src_height, pixel_pitch)
                 }
             } else {
-                (pixel_data, src_width, src_height)
+                (pixel_data, src_width, src_height, pixel_pitch)
             }
         } else {
-            (pixel_data, src_width, src_height)
+            (pixel_data, src_width, src_height, pixel_pitch)
         };
+        self.consecutive_readback_errors = 0;
+        self.metrics.resize_us.fetch_add(resize_start.elapsed().as_micros() as u64, Ordering::Relaxed);
 
         let encode_start = std::time::Instant::now();
-        if let Ok(frame_bytes) = self.jpeg_encoder.encode_rgba(final_pixels, final_w, final_h) {
+        if let Ok(frame_bytes) = self.jpeg_encoder.encode_rgba_strided(final_pixels, final_w, final_h, final_pitch) {
+            if scaled.is_some() { self.metrics.gpu_scaled_images.fetch_add(1, Ordering::Relaxed); }
             self.metrics.images.fetch_add(1, Ordering::Relaxed);
             let frame_arc = Arc::new(frame_bytes);
             if let Ok(mut cache) = self.latest_frame.lock() {
@@ -245,6 +296,12 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
         }
 
         self.metrics.jpeg_us.fetch_add(encode_start.elapsed().as_micros() as u64, Ordering::Relaxed);
+        drop(frame_buffer);
+        if self.legacy_readback {
+            self.metrics.staging_allocations.fetch_add(1, Ordering::Relaxed);
+        } else {
+            self.metrics.staging_allocations.store(self.readback.allocations(), Ordering::Relaxed);
+        }
         self.metrics.processing_us.fetch_add(arrival_time.elapsed().as_micros() as u64, Ordering::Relaxed);
 
         Ok(())

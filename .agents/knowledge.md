@@ -42,6 +42,8 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 4. User Guidelines & Expressed Preferences
 
+- `[Streaming Optimization Sequence]` Work on the user's selected streaming refactor branch and implement/validate changes one stage at a time: video-path cost reduction, load adaptation, then frame regularity. Preserve native capture and capability-based portability, measure real desktop results before claiming improvements, and keep each stage independently reviewable.
+
 - `[Annotation Toolbar Toggles]` Clicking an already selected drawing tool deselects it and returns to Mouse. The color palette closes on a second trigger click and highlights the current color with a selected row background. Keep the overall drawing toolbar transparent; only its individual controls, including the size slider, have readable backgrounds.
 
 - `[Inline Annotation Text]` Selecting Text and clicking the stream starts typing at that normalized position with a visible caret and no field background or border. Show characters locally as they are typed; confirm once on outside click or Enter, and preserve Shift+Enter as a line break. Remove the toolbar text input.
