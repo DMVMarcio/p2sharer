@@ -12,6 +12,7 @@ export interface ContextMenuAction {
   label: string;
   icon?: ReactNode;
   disabled?: boolean;
+  selected?: boolean;
   danger?: boolean;
   separator?: boolean;
   onSelect: () => void | Promise<unknown>;
@@ -23,10 +24,11 @@ interface MenuState {
   y: number;
   actions: ContextMenuAction[];
   source: HTMLElement;
+  toggle?: boolean;
 }
 
 type MenuEvent = { preventDefault: () => void; stopPropagation: () => void; clientX: number; clientY: number; currentTarget: EventTarget | null };
-const MenuContext = createContext<(event: MenuEvent, actions: ContextMenuAction[]) => void>(() => {});
+const MenuContext = createContext<(event: MenuEvent, actions: ContextMenuAction[], options?: { toggle?: boolean }) => void>(() => {});
 export const useContextMenu = () => useContext(MenuContext);
 
 /** Feature menus defer editor targets to the central text editing menu. */
@@ -50,15 +52,16 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
     if (restoreFocus && currentRef.current?.source.isConnected) currentRef.current.source.focus({ preventScroll: true });
     setMenu(null);
   }, []);
-  const open = useCallback((event: MenuEvent, actions: ContextMenuAction[]) => {
+  const open = useCallback((event: MenuEvent, actions: ContextMenuAction[], options?: { toggle?: boolean }) => {
     event.preventDefault();
     event.stopPropagation();
     const source = event.currentTarget instanceof HTMLElement ? event.currentTarget : document.body;
+    if (options?.toggle && currentRef.current?.source === source) { close(true); return; }
     const bounds = source.getBoundingClientRect();
-    setMenu(actions.length ? { actions, source,
+    setMenu(actions.length ? { actions, source, toggle: options?.toggle,
       x: event.clientX || bounds.left + Math.min(bounds.width / 2, 24),
       y: event.clientY || bounds.top + Math.min(bounds.height / 2, 24) } : null);
-  }, []);
+  }, [close]);
 
   useEffect(() => {
     const preserveSelection = (event: MouseEvent) => {
@@ -82,6 +85,7 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
       open(event, actions);
     };
     const dismiss = (event: PointerEvent) => {
+      if (currentRef.current?.toggle && currentRef.current.source.contains(event.target as Node)) return;
       if (!menuRef.current?.contains(event.target as Node)) close();
     };
     const scroll = (event: Event) => {
@@ -150,7 +154,7 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
       onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); }}
       onClick={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()}>
       {retained.actions.map((action) => {
-        const primary = <button key={action.id} type="button" role="menuitem"
+        const primary = <button key={action.id} type="button" role={action.selected === undefined ? 'menuitem' : 'menuitemradio'} aria-checked={action.selected}
         disabled={action.disabled} className={`${action.danger ? 'context-menu-danger' : ''} ${action.separator ? 'context-menu-separated' : ''}`}
         onClick={() => select(action)}>{action.icon && <span className="context-menu-icon">{action.icon}</span>}<span>{action.label}</span></button>;
         const secondary = action.secondary;
