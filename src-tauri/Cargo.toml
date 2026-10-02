@@ -39,6 +39,7 @@ fast_image_resize = "5.1"
 
 
 [target.'cfg(windows)'.dependencies]
+windows-capture-api = { package = "windows", version = "0.62.2", features = ["Win32_Graphics_Direct3D11", "Win32_Graphics_Direct3D_Fxc", "Win32_Graphics_Dxgi_Common"] }
 webview2-com = "0.38.2"
 windows = { version = "0.58", features = [
     "implement",

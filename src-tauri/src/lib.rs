@@ -9,6 +9,10 @@ pub mod process_manager;
 pub mod room_vault;
 pub mod screen_sources;
 mod video_jpeg;
+#[cfg(windows)]
+mod video_readback;
+#[cfg(windows)]
+mod video_gpu_scale;
 mod camera_permission;
 
 use audio_loopback::{start_audio_capture, stop_audio_capture};

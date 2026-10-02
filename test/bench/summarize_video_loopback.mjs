@@ -13,6 +13,11 @@ export function summarizeVideoLoopback(result) {
     readbackMs: delta(result.nativeBefore, result.nativeAfter, 'readback_us') / images / 1000,
     jpegMs: delta(result.nativeBefore, result.nativeAfter, 'jpeg_us') / images / 1000,
     processingMs: delta(result.nativeBefore, result.nativeAfter, 'processing_us') / images / 1000,
+    resizeMs: delta(result.nativeBefore, result.nativeAfter, 'resize_us') === undefined ? undefined
+      : delta(result.nativeBefore, result.nativeAfter, 'resize_us') / images / 1000,
+    stagingAllocations: delta(result.nativeBefore, result.nativeAfter, 'staging_allocations'),
+    readbackErrors: delta(result.nativeBefore, result.nativeAfter, 'readback_errors'),
+    gpuScaledImages: delta(result.nativeBefore, result.nativeAfter, 'gpu_scaled_images'),
   };
   const rtp = result.after.flatMap((reports, connection) => reports.filter(report =>
     ['outbound-rtp', 'inbound-rtp'].includes(report.type) && report.kind === 'video').map(report => {
@@ -30,8 +35,10 @@ export function summarizeVideoLoopback(result) {
       encoder: report.encoderImplementation, decoder: report.decoderImplementation,
     };
   }));
-  return { options: result.options, seconds, native,
+  return { options: result.options, seconds, native, visualChecks: result.visualChecks,
     websocketImageFps: delta(result.captureBefore, result.captureAfter, 'imageMessages') / seconds,
+    jpegBytesPerFrame: delta(result.captureBefore, result.captureAfter, 'jpegBytes') === undefined ? undefined
+      : delta(result.captureBefore, result.captureAfter, 'jpegBytes') / delta(result.captureBefore, result.captureAfter, 'imageMessages'),
     heartbeatFps: delta(result.captureBefore, result.captureAfter, 'heartbeatMessages') / seconds, rtp };
 }
 
