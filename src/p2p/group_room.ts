@@ -1596,7 +1596,12 @@ export class GroupRoomManager {
           const video = stream.getVideoTracks().length ? stream.getVideoTracks() : existing.getVideoTracks();
           const audio = stream.getAudioTracks().length ? stream.getAudioTracks() : existing.getAudioTracks();
           const incoming = stream;
-          stream = new MediaStream([...video, ...audio]);
+          const tracks = [...video, ...audio];
+          const current = existing.getTracks();
+          // Presence re-advertises the same tracks every two seconds. Keep the
+          // playback container stable instead of resetting video, audio and pointing.
+          stream = tracks.length === current.length && tracks.every(track => current.includes(track))
+            ? existing : new MediaStream(tracks);
           if (!this.observedRemoteStreams.has(incoming)) {
             this.observedRemoteStreams.add(incoming);
             incoming.addEventListener('addtrack', () => this.receivePeerStream(incoming, peerId, metadata));
@@ -1610,9 +1615,7 @@ export class GroupRoomManager {
         this.observedRemoteStreams.add(stream);
         stream.addEventListener('addtrack', () => {
           if (this.remoteDescriptors.get(peerId)?.some((entry) => entry.id === metadata.id)) {
-            this.remoteMedia.get(peerId)?.set(metadata.id, new MediaStream(stream.getTracks()));
-            this.lastStreamsHash = '';
-            this.notifyStreamsUpdate();
+            this.receivePeerStream(stream, peerId, metadata);
           }
         });
       }
@@ -2489,7 +2492,7 @@ export class GroupRoomManager {
     const slots = this.getAllRoomSlots();
 
     const hash = slots
-      .map((s) => `${s.peerId}:${s.senderName}:${s.mediaKind}:${s.mediaLabel}:${s.connectionState}:${s.isStreaming}:${s.stream?.id}:${s.watchers?.length || 0}`)
+      .map((s) => `${s.peerId}:${s.senderName}:${s.mediaKind}:${s.mediaLabel}:${s.connectionState}:${s.isStreaming}:${s.stream?.id}:${s.stream?.getTracks().map(track => `${track.id}/${track.readyState}`).join(',')}:${s.watchers?.length || 0}`)
       .join('|');
     if (hash === this.lastStreamsHash) return;
     this.lastStreamsHash = hash;

@@ -313,8 +313,8 @@ export class MockVideoElement extends MockElement {
   public pauseCount: number = 0;
   public loadCount: number = 0;
 
-  constructor() {
-    super('VIDEO');
+  constructor(tag = 'VIDEO') {
+    super(tag);
   }
 
   public async play(): Promise<void> {
@@ -543,6 +543,7 @@ export class MockDocument {
   public createElement(tagName: string): MockElement {
     const tag = tagName.toUpperCase();
     if (tag === 'VIDEO') return new MockVideoElement();
+    if (tag === 'AUDIO') return new MockVideoElement('AUDIO');
     if (tag === 'CANVAS') return new MockCanvasElement();
     return new MockElement(tag);
   }

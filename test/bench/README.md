@@ -216,3 +216,22 @@ On the 75 Hz host, requesting 120 FPS yields about 75 fresh frames/second throug
 native RTP. This is not a physical high-refresh monitor test. See
 `.agents/knowledge/native-nvenc.md` for measured results and outstanding deployment
 conditions, including native loss/RTT rate control rather than Chromium GCC.
+
+### Playback identity, pointing and PiP audio continuity
+
+Bundle `stream_playback_continuity.ts` as `PlaybackQA` and load it into two fresh
+packaged desktop processes with distinct WebView profiles. Call `joinPlaybackRoom`
+with the same unique QA room/password and different names, then
+`publishPlaybackSources` in the sender. Run `validatePlaybackContinuity` in the
+receiver asynchronously (it takes about 28 seconds, exceeding a short CDP request).
+Finally call `closePlaybackRoom` in both processes.
+
+The benchmark mounts the canonical React room cards and sends two actual WGC screens
+plus a 440 Hz WebRTC audio track. It verifies stable video containers and zero
+`emptied` events across six presence cycles, persistent interactive pointing,
+sampled nonblack video, and actual Web Audio samples through native PiP and restore
+after the main video element is removed. Audio probes run every 50 ms, record all
+silent samples and fail sustained gaps of 150 ms or more; this detects playback
+loss, not individual dropped audio packets or audible fidelity. Repeat with the
+sender's `P2SHARER_NATIVE_NVENC` set to `0` and `1`. This does not establish Internet
+performance or WASAPI fidelity because the diagnostic tone is synthetic.

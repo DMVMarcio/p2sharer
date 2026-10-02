@@ -40,11 +40,12 @@ test('native sender HUD measures transmitted frames rather than preview repeats 
 
 test('native video and ordinary audio merge into the same advertised slot without replacing another source', () => {
   const original = globalThis.MediaStream;
-  class TestStream {
+  class TestStream extends EventTarget {
     id = crypto.randomUUID(); private tracks: any[];
-    constructor(tracks: any[]) { this.tracks = tracks; }
+    constructor(tracks: any[]) { super(); this.tracks = tracks; }
     getTracks() { return this.tracks; } getVideoTracks() { return this.tracks.filter(t=>t.kind==='video'); }
-    getAudioTracks() { return this.tracks.filter(t=>t.kind==='audio'); } addEventListener() {}
+    getAudioTracks() { return this.tracks.filter(t=>t.kind==='audio'); }
+    addTrack(track: any) { this.tracks.push(track); this.dispatchEvent(new Event('addtrack')); }
   }
   Object.assign(globalThis, { MediaStream: TestStream });
   try {
@@ -59,10 +60,20 @@ test('native video and ordinary audio merge into the same advertised slot withou
     internal.receivePeerStream(new TestStream([video]),'owner',descriptor('screen'));
     const media=internal.remoteMedia.get('owner'); assert.deepEqual(media.get('screen').getTracks(),[video,audio]);
     assert.equal(media.get('camera').getVideoTracks()[0],camera);
+    const stable = media.get('screen');
+    for (let index = 0; index < 10; index++) {
+      internal.receivePeerStream(new TestStream([video, audio]), 'owner', descriptor('screen'));
+      internal.receivePeerStream(new TestStream([audio]), 'owner', descriptor('screen'));
+      assert.equal(media.get('screen'), stable, 'Repeated presence must not reset playback or pointing');
+    }
     const replacement={id:'generic-fallback',kind:'video',readyState:'live'};
     internal.receivePeerStream(new TestStream([replacement]),'owner',descriptor('screen'));
     assert.deepEqual(media.get('screen').getTracks(),[replacement,audio]);
     assert.equal(media.get('camera').getVideoTracks()[0],camera);
+    const cameraStream = media.get('camera');
+    cameraStream.addTrack({ id: 'late-audio', kind: 'audio', readyState: 'live' });
+    assert.equal(media.get('camera'), cameraStream, 'Late tracks must preserve the observed container');
+    assert.equal(media.get('camera').getAudioTracks().length, 1);
   } finally { Object.assign(globalThis,{MediaStream:original}); }
 });
 

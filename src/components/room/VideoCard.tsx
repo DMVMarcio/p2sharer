@@ -42,6 +42,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   const currentFps = capture?.fps || defaultFps;
   const currentBitrate = capture?.bitrate || defaultBitrate;
   const isPipActive = useStore((s) => s.isPeerInPip(slot.peerId));
+  const audioTracksKey = slot.stream?.getAudioTracks().map(track => `${track.id}:${track.readyState}`).join(',');
 
   const [liveFps, setLiveFps] = useState<number>(() => (slot.isLocal ? currentFps : 60));
   const [liveBitrate, setLiveBitrate] = useState<number>(0);
@@ -152,13 +153,13 @@ export const VideoCard: React.FC<VideoCardProps> = ({
       setIsMuted(st.isMuted);
       if (st.volume > 0) setLastVolume(st.volume);
     }
-  }, [slot.isLocal, slot.peerId, slot.stream, isPipActive]);
+  }, [slot.isLocal, slot.peerId, slot.stream, audioTracksKey, isPipActive]);
 
   useEffect(() => {
     if (isPipActive) {
       pipService.updateStream(slot.peerId, slot.stream);
     }
-  }, [isPipActive, slot.peerId, slot.stream]);
+  }, [isPipActive, slot.peerId, slot.stream, audioTracksKey]);
 
   useEffect(() => {
     if (inTray || (!slot.isStreaming && slot.isLocal)) return;
