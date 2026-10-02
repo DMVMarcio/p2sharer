@@ -348,7 +348,10 @@ export class RoomService {
           this.notify();
         }
       },
-      onWatchStarted: () => soundEffects.playWatchStreamStart(),
+      onWatchStarted: () => {
+        soundEffects.playWatchStreamStart();
+        this.refreshStreamPointerPermissions();
+      },
       onWatchStopped: (watcherPeerId, _name, broadcasterPeerId) => {
         if (broadcasterPeerId === 'local' || broadcasterPeerId === manager.getLocalPeerId()) this.pointerReceiver.forget(watcherPeerId);
         if (broadcasterPeerId === 'local' || broadcasterPeerId === manager.getLocalPeerId()) {
@@ -428,6 +431,11 @@ export class RoomService {
       this.pointerReceivers.set(mediaId, receiver);
     }
     return receiver;
+  }
+
+  public refreshStreamPointerPermissions(): void {
+    this.pointerReceiver.refreshPermissions();
+    for (const [id, entry] of this.localCaptures) if (entry.kind === 'screen') this.getPointerReceiver(id).refreshPermissions();
   }
 
   public refreshStreamPointerView(peerId: string): void {

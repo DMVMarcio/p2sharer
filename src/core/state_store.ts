@@ -13,6 +13,7 @@ export class StateStore {
   public isSharingScreen: boolean = false;
   public allowParticipantCursors = true;
   public allowParticipantPings = true;
+  public allowParticipantDrawings = true;
 
   public layoutMode: 'grid' | 'spotlight' = 'grid';
   public pinnedPeerId: string | null = null;
@@ -96,6 +97,7 @@ export class StateStore {
   public loadFromStorage(): void {
     if (typeof localStorage === 'undefined') return;
     this.allowParticipantCursors = localStorage.getItem('p2sharer_participant_cursors') !== 'false';
+    this.allowParticipantDrawings = localStorage.getItem('p2sharer_participant_drawings') !== 'false';
     this.allowParticipantPings = localStorage.getItem('p2sharer_participant_pings') !== 'false';
     this.username = localStorage.getItem('p2sharer_username') || '';
     this.currentThemeMode = (localStorage.getItem('p2sharer_theme_mode') as ThemeMode) || 'dark';

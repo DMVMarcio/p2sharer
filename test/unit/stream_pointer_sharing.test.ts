@@ -79,7 +79,7 @@ test('viewer/PiP scenes retain both participants and own pings without requiring
   assert.equal(streamPointerView.get('host').visuals.length, 0);
 });
 
-test('broadcaster relay applies independent cursor/ping consent and clears departed participants', async (context) => {
+test('broadcaster relay gates pings on cursor consent and clears departed participants', async (context) => {
   const original = { sharing: stateStore.isSharingScreen, cursors: stateStore.allowParticipantCursors, pings: stateStore.allowParticipantPings };
   stateStore.isSharingScreen = true; stateStore.allowParticipantCursors = false; stateStore.allowParticipantPings = true;
   const states: StreamPointerState[] = [];
@@ -90,9 +90,7 @@ test('broadcaster relay applies independent cursor/ping consent and clears depar
   });
   receiver.receive({ kind: 'ping', x: 0.2, y: 0.4 }, 'alice', 'Alice', 'cyan');
   await new Promise((resolve) => setTimeout(resolve, 70));
-  assert.equal(states.at(-1)?.visuals.length, 1);
-  assert.equal(states.at(-1)?.visuals[0].ping, true);
-  assert.ok(states.at(-1)!.visuals[0].expires - states.at(-1)!.sentAt <= 1000);
+  assert.deepEqual(states.at(-1)?.visuals, []);
   stateStore.allowParticipantCursors = true; stateStore.allowParticipantPings = false;
   receiver.receive({ kind: 'ping', x: 0.5, y: 0.5 }, 'bob', 'Bob', 'lime');
   await new Promise((resolve) => setTimeout(resolve, 70));
