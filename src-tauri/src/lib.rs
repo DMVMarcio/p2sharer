@@ -15,6 +15,8 @@ mod video_pacer;
 mod video_readback;
 #[cfg(windows)]
 mod video_gpu_scale;
+#[cfg(windows)]
+mod video_nvenc;
 mod camera_permission;
 
 use audio_loopback::{start_audio_capture, stop_audio_capture};
@@ -85,6 +87,8 @@ pub fn run() {
             start_native_screen_capture,
             stop_native_screen_capture,
             screen_sources::start_capture_session,
+            screen_sources::get_native_encoder_support,
+            screen_sources::control_capture_encoder,
             screen_sources::get_capture_metrics,
             screen_sources::report_capture_load,
             screen_sources::stop_capture_session,

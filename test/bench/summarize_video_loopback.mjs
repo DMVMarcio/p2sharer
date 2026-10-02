@@ -7,6 +7,9 @@ export function summarizeVideoLoopback(result) {
     ? after[key] - before[key] : undefined;
   const images = delta(result.nativeBefore, result.nativeAfter, 'images');
   const native = images === undefined ? undefined : {
+    nvencImageFps: delta(result.nativeBefore, result.nativeAfter, 'nvenc_images') / seconds,
+    nvencMs: delta(result.nativeBefore, result.nativeAfter, 'nvenc_us') / Math.max(1, delta(result.nativeBefore, result.nativeAfter, 'nvenc_images')) / 1000,
+    nvencFallbacks: delta(result.nativeBefore, result.nativeAfter, 'nvenc_fallbacks'),
     imageFps: images / seconds,
     callbackFps: delta(result.nativeBefore, result.nativeAfter, 'callbacks') / seconds,
     gatedFrames: delta(result.nativeBefore, result.nativeAfter, 'gated'),

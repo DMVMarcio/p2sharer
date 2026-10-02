@@ -209,3 +209,12 @@ Controlled same-executable packaged A/B measurements used a maximized RTX 5070 /
 Validation includes 414 frontend tests and 43 native release library tests (two manual/external cases ignored). Six pacer cases cover bounded backlog, static repeats/refreshes, FPS changes, stalls and diagnostic bypass. The synthetic pacer case asserts output cadence and bounded fresh-image age for 24 combinations of 60/75/120/144/165/240 Hz sources, 60/120 FPS targets and arrival jitter. These are timestamp models, not physical high-refresh/VRR/game/AMD/Intel validation. Hidden receiver requestVideoFrameCallback samples can omit decoded frames and quantize to the 75 Hz compositor; use RTP counters for decoded FPS.
 
 After the final Tauri build, sustained 100 ms writer pressure again reached 704x396/30 FPS and recovered to 1280x720/60 at about 76 seconds, with zero adjustments to the independent capture. The final healthy sample measured 59.95 decoded FPS per receiver, no drops/readback errors/queue drops/missed deadlines, nonblack content, track-write p95 17.9 ms and mean queue wait 15.05 ms. A separate 120 FPS target on the same physical 75 Hz monitor produced 74.74 fresh native images/second plus about 44.85 cached ticks/second and 120.15 decoded FPS per receiver. This validates target pacing and repetition, not 120 FPS of new motion or a physical 120 Hz display. Track-write p95 was 12.2 ms versus an 8.33 ms target interval, so bridge/timer jitter is not eliminated. Executable, MSI and NSIS bundles were verified in the standard release directory.
+
+### Optional NVENC bridge (2026-10-02)
+
+An experimental session-owned native NVENC encoder now accepts WGC GPU textures and
+replaces local JPEG/readback with H264 when `P2SHARER_NATIVE_NVENC=1`. The default
+generic path remains intact. The current H264 bridge decodes locally and still uses
+the browser WebRTC encoder; direct encoded RTP remains outstanding. See
+[NVENC implementation, validated fallback and measured limits](native-nvenc.md)
+before modifying the encoder or claiming complete native transport optimization.

@@ -58,11 +58,16 @@ impl CaptureLoad {
     }
 
     pub fn report_bridge(&self, token: &str, pressure_percent: u32) -> Result<(), String> {
+        self.validate_token(token)?;
+        *self.feedback.lock().map_err(|_| "Capture feedback lock poisoned")? =
+            Some((pressure_percent.min(200), self.elapsed_ms()));
+        Ok(())
+    }
+
+    pub fn validate_token(&self, token: &str) -> Result<(), String> {
         if self.feedback_token.as_deref() != Some(token) {
             return Err("Capture feedback belongs to a different session generation".into());
         }
-        *self.feedback.lock().map_err(|_| "Capture feedback lock poisoned")? =
-            Some((pressure_percent.min(200), self.elapsed_ms()));
         Ok(())
     }
 

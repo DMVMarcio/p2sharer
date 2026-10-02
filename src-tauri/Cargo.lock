@@ -3189,6 +3189,7 @@ dependencies = [
  "arboard",
  "base64 0.22.1",
  "byteorder",
+ "cc",
  "dirs",
  "fast_image_resize",
  "futures-util",

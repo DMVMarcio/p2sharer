@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type { ScreenSourcesResponse, VideoCaptureBridge, VideoSourceOptions } from '../core/types.ts';
 import { BridgeLoadMeter } from './bridge_load_meter.ts';
 import { VideoFrameClock } from './frame_timing.ts';
+import { isNativeEncodedPacket, NativeEncodedDecoder } from './native_encoded_video.ts';
 
 export class NativeVideoBridge implements VideoCaptureBridge {
   public readonly sessionId: string;
@@ -13,6 +14,8 @@ export class NativeVideoBridge implements VideoCaptureBridge {
   private isCapturing: boolean = false;
   private isDirectGpu: boolean = false;
   private latestBitmap: ImageBitmap | null = null;
+  private encodedDecoder: NativeEncodedDecoder | null = null;
+  private latestEncodedFrame: VideoFrame | null = null;
   private animationFrameId: number | null = null;
   private currentFps: number = 60;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -24,6 +27,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
   private pendingBuffer: ArrayBuffer | null = null;
   private isDecoding: boolean = false;
   private captureGeneration = 0;
+  private encoderFeedbackToken: string | null = null;
   public onFallbackNeeded: ((reason: string, stream?: MediaStream) => void) | null = null;
 
   public isCapturingDirectGpu(): boolean {
@@ -138,8 +142,13 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     this.effectiveFps = Math.min(120, Math.max(15, fps));
     const generation = this.captureGeneration;
     const feedbackToken = crypto.randomUUID();
+    this.encoderFeedbackToken = feedbackToken;
+    const encodedDecoder = new NativeEncodedDecoder(this.sessionId, feedbackToken);
+    this.encodedDecoder = encodedDecoder;
     const loadMeter = new BridgeLoadMeter(fps, performance.now());
     let feedbackPending = false;
+    let nativeEncodingFailed = false;
+    let receivedNativeEncoding = false;
 
     // 1. Initialize WebCodecs MediaStreamTrackGenerator if available for zero-copy GPU video pipeline
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -226,10 +235,11 @@ export class NativeVideoBridge implements VideoCaptureBridge {
       const processingStarted = performance.now();
 
       try {
-        let bitmap = this.latestBitmap;
+        let bitmap: ImageBitmap | VideoFrame | null = this.latestEncodedFrame || this.latestBitmap;
 
         // If buffer contains a real JPEG payload (> 4 bytes), decode it into an ImageBitmap
         if (buffer.byteLength > 4) {
+          this.latestEncodedFrame?.close(); this.latestEncodedFrame = null;
           const blob = new Blob([buffer], { type: 'image/jpeg' });
           const newBitmap = await createImageBitmap(blob, {
             premultiplyAlpha: 'none',
@@ -276,9 +286,11 @@ export class NativeVideoBridge implements VideoCaptureBridge {
         } else {
           // Canvas fallback
           if (this.ctx && this.canvas) {
-            if (this.canvas.width !== bitmap.width || this.canvas.height !== bitmap.height) {
-              this.canvas.width = bitmap.width;
-              this.canvas.height = bitmap.height;
+            const width = bitmap instanceof ImageBitmap ? bitmap.width : bitmap.displayWidth;
+            const height = bitmap instanceof ImageBitmap ? bitmap.height : bitmap.displayHeight;
+            if (this.canvas.width !== width || this.canvas.height !== height) {
+              this.canvas.width = width;
+              this.canvas.height = height;
             }
             this.ctx.drawImage(bitmap, 0, 0, this.canvas.width, this.canvas.height);
           }
@@ -294,7 +306,9 @@ export class NativeVideoBridge implements VideoCaptureBridge {
         // Ignore frame decode failure
       } finally {
         if (generation === this.captureGeneration) {
-          if (buffer.byteLength > 4) loadMeter.complete(performance.now() - processingStarted);
+          if (buffer.byteLength > 4 || buffer.byteLength === 4 && new Uint8Array(buffer)[0] === 1) {
+            loadMeter.complete(performance.now() - processingStarted);
+          }
           this.isDecoding = false;
           if (this.pendingBuffer) pumpNextFrame();
         }
@@ -364,6 +378,30 @@ export class NativeVideoBridge implements VideoCaptureBridge {
                 .catch(() => {}) // Stopped/replaced sessions reject stale feedback.
                 .finally(() => { feedbackPending = false; });
             }
+            if (isNativeEncodedPacket(evt.data)) {
+              if (nativeEncodingFailed) return;
+              receivedNativeEncoding = true;
+              // Hardware decoders may need several input frames before producing the first output.
+              // Submit asynchronously to the decoder's bounded queue; serialize only track writes.
+              void encodedDecoder.decode(evt.data).then(frame => {
+                if (!frame) return;
+                if (generation !== this.captureGeneration || !this.isCapturing || nativeEncodingFailed) { frame.close(); return; }
+                this.latestEncodedFrame?.close(); this.latestEncodedFrame = frame;
+                this.pendingBuffer = new Uint8Array([1, 0, 0, 0]).buffer;
+                void pumpNextFrame();
+              }).catch(error => {
+                if (generation !== this.captureGeneration || !this.isCapturing || nativeEncodingFailed) return;
+                nativeEncodingFailed = true;
+                encodedDecoder.close();
+                console.warn('[NativeVideoBridge] Native H264 rejected; retaining native JPEG:', String(error));
+                void invoke('control_capture_encoder', {sessionId:this.sessionId,feedbackToken,disable:true}).catch(() => {});
+              });
+              return;
+            }
+            if (evt.data.byteLength > 4 && receivedNativeEncoding && !nativeEncodingFailed) {
+              nativeEncodingFailed = true;
+              encodedDecoder.close();
+            }
             // Never allow a 1-byte pacer tick to overwrite an awaiting real video frame!
             if (evt.data.byteLength <= 4 && this.pendingBuffer && this.pendingBuffer.byteLength > 4) {
               return;
@@ -399,7 +437,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
       await new Promise<void>((resolve, reject) => {
         const started = performance.now();
         const check = () => {
-          if (this.latestBitmap) { resolve(); return; }
+          if (this.latestBitmap || this.latestEncodedFrame) { resolve(); return; }
           if (!this.isCapturing || performance.now() - started > 6000) {
             reject(new Error('A fonte selecionada não forneceu quadros de vídeo.'));
             return;
@@ -459,12 +497,23 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     await this.stopCapture();
   }
 
+  /** Retain the current MediaStreamTrack while returning to generic native encoding. */
+  public async disableNativeEncoding(): Promise<void> {
+    if (!this.isCapturingNative() || !this.encoderFeedbackToken) return;
+    await invoke('control_capture_encoder', { sessionId: this.sessionId,
+      feedbackToken: this.encoderFeedbackToken, disable: true });
+  }
+
   public async stopCapture(): Promise<void> {
     this.captureGeneration++;
+    this.encoderFeedbackToken = null;
     this.isCapturing = false;
     this.isDirectGpu = false;
     this.pendingBuffer = null;
     this.isDecoding = false;
+
+    this.encodedDecoder?.close(); this.encodedDecoder = null;
+    this.latestEncodedFrame?.close(); this.latestEncodedFrame = null;
 
     if (this.animationFrameId !== null) {
       cancelAnimationFrame(this.animationFrameId);

@@ -63,6 +63,8 @@ static WS_PORT: std::sync::atomic::AtomicU16 = std::sync::atomic::AtomicU16::new
 static WS_TOKEN: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 static FRAME_SENDER: std::sync::OnceLock<broadcast::Sender<Message>> = std::sync::OnceLock::new();
 struct CaptureSession {
+    nvenc_enabled: Arc<AtomicBool>,
+    nvenc_keyframe: Arc<AtomicBool>,
     source: String,
     active: Arc<AtomicBool>,
     sender: broadcast::Sender<Message>,
@@ -76,6 +78,9 @@ static SESSIONS: std::sync::LazyLock<std::sync::Mutex<std::collections::HashMap<
 
 #[derive(Default)]
 pub struct CaptureMetrics {
+    nvenc_images: std::sync::atomic::AtomicU64,
+    nvenc_us: std::sync::atomic::AtomicU64,
+    nvenc_fallbacks: std::sync::atomic::AtomicU64,
     callbacks: std::sync::atomic::AtomicU64,
     gated: std::sync::atomic::AtomicU64,
     images: std::sync::atomic::AtomicU64,
@@ -97,6 +102,7 @@ pub struct CaptureMetrics {
 
 #[derive(Serialize)]
 pub struct CaptureMetricsSnapshot {
+    nvenc_images: u64, nvenc_us: u64, nvenc_fallbacks: u64,
     callbacks: u64, gated: u64, images: u64, readback_us: u64, jpeg_us: u64, processing_us: u64,
     staging_allocations: u64, readback_errors: u64, resize_us: u64,
     gpu_scaled_images: u64,
@@ -111,6 +117,9 @@ pub fn get_capture_metrics(session_id: String) -> Result<CaptureMetricsSnapshot,
     let session = sessions.get(&session_id).ok_or("Capture session is no longer active")?;
     let metrics = &session.metrics;
     Ok(CaptureMetricsSnapshot {
+        nvenc_images: metrics.nvenc_images.load(Ordering::Relaxed),
+        nvenc_us: metrics.nvenc_us.load(Ordering::Relaxed),
+        nvenc_fallbacks: metrics.nvenc_fallbacks.load(Ordering::Relaxed),
         callbacks: metrics.callbacks.load(Ordering::Relaxed), gated: metrics.gated.load(Ordering::Relaxed),
         images: metrics.images.load(Ordering::Relaxed), readback_us: metrics.readback_us.load(Ordering::Relaxed),
         jpeg_us: metrics.jpeg_us.load(Ordering::Relaxed), processing_us: metrics.processing_us.load(Ordering::Relaxed),
@@ -135,6 +144,31 @@ pub fn report_capture_load(session_id: String, feedback_token: String, pressure_
     let load = &sessions.get(&session_id).ok_or("Capture session is no longer active")?.load;
     load.report_bridge(&feedback_token, pressure_percent)?;
     Ok(load.fps())
+}
+
+#[tauri::command]
+pub fn get_native_encoder_support() -> serde_json::Value {
+    #[cfg(windows)]
+    let support = crate::video_nvenc::probe();
+    #[cfg(not(windows))]
+    let support: Result<(), String> = Err("Native NVENC requires Windows".into());
+    serde_json::json!({ "driver_api_available": support.is_ok(),
+        "experimental_enabled": std::env::var("P2SHARER_NATIVE_NVENC").as_deref() == Ok("1"),
+        "reason": support.err(), "transport": "h264_webcodecs_then_webrtc" })
+}
+
+#[tauri::command]
+pub fn control_capture_encoder(session_id: String, feedback_token: String, disable: bool) -> Result<(), String> {
+    let sessions = SESSIONS.lock().map_err(|_| "Capture session lock poisoned")?;
+    let session = sessions.get(&session_id).ok_or("Capture session is no longer active")?;
+    session.load.validate_token(&feedback_token)?;
+    if disable {
+        if session.nvenc_enabled.swap(false, Ordering::Relaxed) {
+            session.metrics.nvenc_fallbacks.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+    else { session.nvenc_keyframe.store(true, Ordering::Relaxed); }
+    Ok(())
 }
 
 fn send_paced_frame(frame: PacedFrame<Arc<Vec<u8>>>, sender: &broadcast::Sender<Message>, metrics: &CaptureMetrics) {
@@ -201,6 +235,8 @@ fn start_frame_delivery(delivery: FrameDelivery, active: Arc<AtomicBool>, load: 
 
 #[derive(Clone)]
 pub struct CaptureFlags {
+    pub nvenc_enabled: Arc<AtomicBool>,
+    pub nvenc_keyframe: Arc<AtomicBool>,
     pub delivery: FrameDelivery,
     pub legacy_pacing: bool,
     pub load: Arc<crate::video_load::CaptureLoad>,
@@ -216,6 +252,9 @@ pub struct CaptureFlags {
 
 #[cfg(windows)]
 pub struct NativeWgcHandler {
+    nvenc: crate::video_nvenc::GpuEncoder,
+    nvenc_enabled: Arc<AtomicBool>,
+    nvenc_keyframe: Arc<AtomicBool>,
     delivery: FrameDelivery,
     legacy_pacing: bool,
     load: Arc<crate::video_load::CaptureLoad>,
@@ -248,6 +287,9 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
         let fps = ctx.flags.target_fps.clamp(15, 120);
         let frame_interval = std::time::Duration::from_nanos(1_000_000_000 / fps as u64);
         Ok(Self {
+            nvenc: crate::video_nvenc::GpuEncoder::default(),
+            nvenc_enabled: ctx.flags.nvenc_enabled,
+            nvenc_keyframe: ctx.flags.nvenc_keyframe,
             delivery: ctx.flags.delivery,
             legacy_pacing: ctx.flags.legacy_pacing,
             load: ctx.flags.load,
@@ -313,6 +355,43 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
                 }
             }
         } else { None };
+        if self.nvenc_enabled.load(Ordering::Relaxed) && (scaled.is_some() || (src_width <= self.target_width && src_height <= self.target_height)) {
+            let encoder_started = std::time::Instant::now();
+            let result = self.nvenc.encode(frame.device(), scaled.as_ref().unwrap_or(frame.as_raw_texture()),
+                src_width, src_height, self.load.fps(), self.start_instant.elapsed().as_micros() as u64,
+                self.nvenc_keyframe.swap(false, Ordering::Relaxed));
+            self.metrics.nvenc_us.fetch_add(encoder_started.elapsed().as_micros() as u64, Ordering::Relaxed);
+            match result {
+                Ok(bytes) => {
+                    self.next_frame_time += self.frame_interval;
+                    if arrival_time.saturating_duration_since(self.next_frame_time) >= self.frame_interval {
+                        self.next_frame_time = arrival_time + self.frame_interval;
+                    }
+                    self.load.output(src_width, src_height);
+                    self.metrics.images.fetch_add(1, Ordering::Relaxed);
+                    self.metrics.nvenc_images.fetch_add(1, Ordering::Relaxed);
+                    if scaled.is_some() { self.metrics.gpu_scaled_images.fetch_add(1, Ordering::Relaxed); }
+                    enqueue_capture_frame(&self.delivery, Arc::new(bytes), self.start_instant.elapsed().as_micros() as u64,
+                        self.legacy_pacing, &self.active_flag, &self.sender, &self.metrics);
+                    let processing_us = arrival_time.elapsed().as_micros() as u64;
+                    self.metrics.processing_us.fetch_add(processing_us, Ordering::Relaxed);
+                    self.load_controller.observe(&self.load, self.load.elapsed_ms(), processing_us);
+                    return Ok(());
+                }
+                Err(error) => {
+                    self.nvenc_enabled.store(false, Ordering::Relaxed);
+                    self.metrics.nvenc_fallbacks.fetch_add(1, Ordering::Relaxed);
+                    self.nvenc = crate::video_nvenc::GpuEncoder::default();
+                    eprintln!("[Native Video] NVENC unavailable on capture device; retaining native JPEG: {error}");
+                }
+            }
+        } else {
+            if self.nvenc_enabled.swap(false, Ordering::Relaxed) {
+                self.metrics.nvenc_fallbacks.fetch_add(1, Ordering::Relaxed);
+            }
+            // A decoder rejection releases the driver session on its owner thread.
+            self.nvenc = crate::video_nvenc::GpuEncoder::default();
+        }
         let mut frame_buffer = match if self.legacy_readback {
             frame.buffer().map(crate::video_readback::CapturePixels::Legacy).map_err(|error| -> Self::Error { error.into() })
         } else if let Some(texture) = scaled.as_ref() {
@@ -909,7 +988,10 @@ pub fn start_capture_session(
     let sender = if session_id == "default" { get_frame_sender().clone() } else { broadcast::channel(32).0 };
     let metrics = Arc::new(CaptureMetrics::default());
     let load = Arc::new(crate::video_load::CaptureLoad::new(fps, width, height, feedback_token));
+    let nvenc_enabled = Arc::new(AtomicBool::new(std::env::var("P2SHARER_NATIVE_NVENC").as_deref() == Ok("1")));
+    let nvenc_keyframe = Arc::new(AtomicBool::new(true));
     SESSIONS.lock().map_err(|_| "Capture session lock poisoned")?.insert(session_id.clone(), CaptureSession {
+        nvenc_enabled: nvenc_enabled.clone(), nvenc_keyframe: nvenc_keyframe.clone(),
         source: source_id.clone(),
         active: is_capturing.clone(), sender: sender.clone(),
         metrics: metrics.clone(),
@@ -925,6 +1007,7 @@ pub fn start_capture_session(
     #[cfg(windows)]
     {
         let flags = CaptureFlags {
+            nvenc_enabled: nvenc_enabled.clone(), nvenc_keyframe: nvenc_keyframe.clone(),
             delivery: delivery.clone(),
             legacy_pacing,
             metrics: metrics.clone(),
@@ -1359,6 +1442,7 @@ mod tests {
         let (b, _) = broadcast::channel(32);
         for (id, sender) in [("socket-test-a", a.clone()), ("socket-test-b", b.clone())] {
             SESSIONS.lock().unwrap().insert(id.into(), CaptureSession {
+                nvenc_enabled: Arc::new(AtomicBool::new(false)), nvenc_keyframe: Arc::new(AtomicBool::new(true)),
                 metrics: Arc::new(CaptureMetrics::default()),
                 load: Arc::new(crate::video_load::CaptureLoad::new(60, 0, 0, None)),
                 source: "screen:0".into(), active: Arc::new(AtomicBool::new(true)), sender,
