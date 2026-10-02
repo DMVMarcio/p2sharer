@@ -3990,7 +3990,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .source-card-thumb img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .source-card-info {

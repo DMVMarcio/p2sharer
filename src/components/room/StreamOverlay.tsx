@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { clampOverlay, snapOverlay, type OverlayPosition } from '../../core/media_streams';
+import { clampOverlay, snapOverlay, resizeOverlay, type OverlayCorner, type OverlayPosition } from '../../core/media_streams';
 import type { RoomSlotInfo } from '../../core/types';
 import { roomService } from '../../services/room_service';
 import { stateStore } from '../../core/state_store';
@@ -19,7 +19,7 @@ export function StreamOverlay({ slot, target, index }: Props) {
   const [position, setPosition] = useState<OverlayPosition>(() => stateStore.overlayPositions[positionKey] ||
     { x: 0.72, y: Math.max(0, 0.72 - index * 0.24), width: 0.26 });
   const [moving, setMoving] = useState(false);
-  const gesture = useRef<{ x: number; y: number; position: OverlayPosition; resizing: boolean } | null>(null);
+  const gesture = useRef<{ x: number; y: number; position: OverlayPosition; corner?: OverlayCorner } | null>(null);
   const [aspect, setAspect] = useState(16 / 9);
   const [order, setOrder] = useState(20 + index);
   useEffect(() => { stateStore.overlayPositions[positionKey] = position; }, [positionKey, position]);
@@ -29,7 +29,7 @@ export function StreamOverlay({ slot, target, index }: Props) {
     if (!parent) return;
     const observer = new ResizeObserver(() => {
       const bounds = parent.getBoundingClientRect();
-      if (bounds.width && bounds.height) setPosition((current) => clampOverlay(current, aspect, bounds.width / bounds.height));
+      if (bounds.width && bounds.height) setPosition((current) => clampOverlay(current, aspect, bounds.width / bounds.height, inset(bounds)));
     });
     observer.observe(parent);
     return () => observer.disconnect();
@@ -47,12 +47,13 @@ export function StreamOverlay({ slot, target, index }: Props) {
     const bounds = frameRef.current?.parentElement?.getBoundingClientRect();
     return bounds && bounds.width > 0 && bounds.height > 0 ? bounds : null;
   };
-  const start = (event: React.PointerEvent, resizing = false) => {
+  const inset = (bounds: DOMRect) => ({ x: Math.min(0.04, 12 / bounds.width), y: Math.min(0.04, 12 / bounds.height) });
+  const start = (event: React.PointerEvent, corner?: OverlayCorner) => {
     if (event.button !== 0 || (event.target as HTMLElement).closest('button')) return;
     event.preventDefault();
     event.stopPropagation();
     frameRef.current?.setPointerCapture(event.pointerId);
-    gesture.current = { x: event.clientX, y: event.clientY, position, resizing };
+    gesture.current = { x: event.clientX, y: event.clientY, position, corner };
     setOrder(++overlayOrder);
     setMoving(true);
   };
@@ -63,9 +64,9 @@ export function StreamOverlay({ slot, target, index }: Props) {
     event.stopPropagation();
     const dx = (event.clientX - current.x) / bounds.width;
     const dy = (event.clientY - current.y) / bounds.height;
-    const next = current.resizing ? { ...current.position, width: Math.max(0.14, Math.min(0.6, current.position.width + dx)) } :
+    const next = current.corner ? resizeOverlay(current.position, current.corner, dx, dy, aspect, bounds.width / bounds.height, inset(bounds)) :
       { ...current.position, x: current.position.x + dx, y: current.position.y + dy };
-    setPosition(clampOverlay(next, aspect, bounds.width / bounds.height));
+    setPosition(clampOverlay(next, aspect, bounds.width / bounds.height, inset(bounds)));
   };
   const finish = (event: React.PointerEvent) => {
     if (!gesture.current) return;
@@ -73,7 +74,7 @@ export function StreamOverlay({ slot, target, index }: Props) {
     gesture.current = null;
     setMoving(false);
     const bounds = geometry();
-    if (bounds) setPosition((current) => snapOverlay(current, aspect, bounds.width / bounds.height));
+    if (bounds) setPosition((current) => snapOverlay(current, aspect, bounds.width / bounds.height, inset(bounds)));
   };
   const remove = () => roomService.removeOverlay(target, slot.peerId);
 
@@ -92,7 +93,7 @@ export function StreamOverlay({ slot, target, index }: Props) {
       if (!bounds) return;
       setPosition((current) => clampOverlay({ x: current.x + (event.key === 'ArrowLeft' ? -0.04 : event.key === 'ArrowRight' ? 0.04 : 0),
         y: current.y + (event.key === 'ArrowUp' ? -0.04 : event.key === 'ArrowDown' ? 0.04 : 0),
-        width: current.width + (event.key === '-' ? -0.02 : ['+', '='].includes(event.key) ? 0.02 : 0) }, aspect, bounds.width / bounds.height));
+        width: current.width + (event.key === '-' ? -0.02 : ['+', '='].includes(event.key) ? 0.02 : 0) }, aspect, bounds.width / bounds.height, inset(bounds)));
     }}>
     {slot.stream ? <video ref={videoRef} autoPlay playsInline muted onLoadedMetadata={() => {
       const video = videoRef.current;
@@ -101,6 +102,6 @@ export function StreamOverlay({ slot, target, index }: Props) {
     <div className="stream-overlay-toolbar"><span>{slot.senderName} · {slot.mediaLabel || 'Vídeo'}</span>
       <TooltipButton tooltip="Remover sobreposição" className="btn btn-sm btn-outline" aria-label="Remover sobreposição" onClick={remove}><X size={14} /></TooltipButton>
     </div>
-    <div className="stream-overlay-resize" onPointerDown={(event) => start(event, true)} aria-hidden="true" />
+    {(['nw', 'ne', 'sw', 'se'] as const).map(corner => <div key={corner} className={`stream-overlay-resize ${corner}`} onPointerDown={(event) => start(event, corner)} aria-hidden="true" />)}
   </div>;
 }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { snapOverlay, streamOwner, streamSlotKey, validStreamDescriptors, type StreamDescriptor } from '../../src/core/media_streams.ts';
+import { snapOverlay, resizeOverlay, streamOwner, streamSlotKey, validStreamDescriptors, type StreamDescriptor } from '../../src/core/media_streams.ts';
 import { GroupRoomManager } from '../../src/p2p/group_room.ts';
 import { MediaCoordinator } from '../../src/p2p/media_coordinator.ts';
 import { signalingManager } from '../../src/p2p/signaling_manager.ts';
@@ -38,6 +38,7 @@ test('camera occupies the main participant card; adding screens produces indepen
   const slots = manager.getAllRoomSlots();
   assert.deepEqual(slots.map((slot) => slot.mediaKind), ['screen', 'screen', 'camera']);
   assert.ok(slots.every((slot) => slot.ownerPeerId === 'local'));
+  assert.deepEqual(slots.map(slot => slot.pointerEligible), [true, true, false]);
   const remainingTrack = slots[1].stream!.getVideoTracks()[0];
   manager.stopStream('screen');
   assert.equal(remainingTrack.readyState, 'live');
@@ -126,13 +127,27 @@ test('stopping the audio-bearing screen transfers audio to a remaining screen', 
 });
 
 test('overlay gravity snaps near corners and side centers while retaining free positions', () => {
-  assert.deepEqual(snapOverlay({ x: 0.74, y: 0.74, width: 0.25 }), { x: 0.75, y: 0.75, width: 0.25 });
-  assert.deepEqual(snapOverlay({ x: 0.02, y: 0.36, width: 0.25 }), { x: 0, y: 0.375, width: 0.25 });
+  assert.deepEqual(snapOverlay({ x: 0.74, y: 0.74, width: 0.25 }), { x: 0.73, y: 0.73, width: 0.25 });
+  assert.deepEqual(snapOverlay({ x: 0.02, y: 0.36, width: 0.25 }), { x: 0.02, y: 0.375, width: 0.25 });
   assert.deepEqual(snapOverlay({ x: 0.31, y: 0.31, width: 0.2 }), { x: 0.31, y: 0.31, width: 0.2 });
   const bounded = snapOverlay({ x: 2, y: -2, width: 0.1 }, 4 / 3, 16 / 9);
   assert.equal(bounded.width, 0.14);
-  assert.equal(bounded.y, 0);
-  assert.equal(bounded.x, 0.86);
+  assert.equal(bounded.y, 0.02);
+  assert.equal(bounded.x, 0.84);
+});
+
+test('all overlay resize corners preserve the opposite anchor and portrait edge insets', () => {
+  const initial = { x: 0.3, y: 0.3, width: 0.2 };
+  for (const corner of ['nw', 'ne', 'sw', 'se'] as const) {
+    const left = corner.endsWith('w'), top = corner.startsWith('n');
+    const result = resizeOverlay(initial, corner, left ? -0.05 : 0.05, top ? -0.05 : 0.05, 16 / 9, 16 / 9);
+    assert.ok(Math.abs(result.width - 0.25) < 1e-8);
+    assert.ok(Math.abs(result.x + (left ? result.width : 0) - initial.x - (left ? initial.width : 0)) < 1e-8);
+    assert.ok(Math.abs(result.y + (top ? result.width : 0) - initial.y - (top ? initial.width : 0)) < 1e-8);
+  }
+  const portrait = resizeOverlay(initial, 'se', 5, 5, 9 / 16, 16 / 9);
+  assert.ok(portrait.x + portrait.width <= 0.98 + 1e-8);
+  assert.ok(portrait.y + portrait.width * (16 / 9) / (9 / 16) <= 0.98 + 1e-8);
 });
 
 test('remote screen and camera streams reconcile without fake participants or stale resurrection', async () => {

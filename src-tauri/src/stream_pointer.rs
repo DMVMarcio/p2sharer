@@ -1,9 +1,11 @@
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindowBuilder};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::LazyLock;
 
 static SOURCE: Mutex<Option<String>> = Mutex::new(None);
-static VISUALS: Mutex<Vec<PointerVisual>> = Mutex::new(Vec::new());
+static VISUALS: LazyLock<Mutex<HashMap<String, Vec<PointerVisual>>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct PointerVisual {
@@ -12,12 +14,12 @@ pub struct PointerVisual {
 
 pub fn set_source(source: Option<String>) {
     *SOURCE.lock().unwrap() = source;
-    VISUALS.lock().unwrap().clear();
+    VISUALS.lock().unwrap().remove("stream-pointer");
 }
 
 #[tauri::command]
-pub fn get_stream_pointer_visuals() -> Vec<PointerVisual> {
-    VISUALS.lock().unwrap().clone()
+pub fn get_stream_pointer_visuals(window: tauri::WebviewWindow) -> Vec<PointerVisual> {
+    VISUALS.lock().unwrap().get(window.label()).cloned().unwrap_or_default()
 }
 
 #[cfg(windows)]
@@ -45,25 +47,27 @@ fn source_bounds(source: &str) -> Option<(i32, i32, u32, u32)> {
 }
 
 #[tauri::command]
-pub async fn update_stream_pointer_overlay(app: AppHandle, window: tauri::WebviewWindow, visuals: Vec<PointerVisual>) -> Result<(), String> {
+pub async fn update_stream_pointer_overlay(app: AppHandle, window: tauri::WebviewWindow, visuals: Vec<PointerVisual>, session_id: Option<String>) -> Result<(), String> {
     if window.label() != "main" { return Err("Only the main window can publish stream pointers".into()); }
-    let source = SOURCE.lock().unwrap().clone();
+    let source = session_id.as_deref().and_then(crate::screen_sources::pointer_capture_source)
+        .or_else(|| if session_id.is_none() { SOURCE.lock().unwrap().clone() } else { None });
+    let label = session_id.as_ref().map(|id| format!("stream-pointer-{id}")).unwrap_or_else(|| "stream-pointer".into());
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as u64;
     let visuals: Vec<_> = visuals.into_iter().filter(|v| v.x.is_finite() && v.y.is_finite() &&
         (0.0..=1.0).contains(&v.x) && (0.0..=1.0).contains(&v.y) && v.expires > now &&
         v.expires <= now + 3500 && v.id.len() <= 160 && v.name.len() <= 320 && v.color.len() <= 80).take(256).collect();
     if source.is_none() || visuals.is_empty() {
-        VISUALS.lock().unwrap().clear();
-        if let Some(win) = app.get_webview_window("stream-pointer") {
+        VISUALS.lock().unwrap().remove(&label);
+        if let Some(win) = app.get_webview_window(&label) {
             win.emit("stream-pointer-visuals", Vec::<PointerVisual>::new()).map_err(|e| e.to_string())?;
-            win.hide().map_err(|e| e.to_string())?;
+            win.close().map_err(|e| e.to_string())?;
         }
         return Ok(());
     }
     #[cfg(windows)]
     if let Some((x, y, width, height)) = source_bounds(source.as_deref().unwrap()) {
-        let win = if let Some(win) = app.get_webview_window("stream-pointer") { win } else {
-            let win = WebviewWindowBuilder::new(&app, "stream-pointer", WebviewUrl::App("index.html?pointerOverlay=1".into()))
+        let win = if let Some(win) = app.get_webview_window(&label) { win } else {
+            let win = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html?pointerOverlay=1".into()))
                 .title("P2Sharer pointers").transparent(true).decorations(false).shadow(false)
                 .always_on_top(true).skip_taskbar(true).resizable(false).focused(false).focusable(false).visible(false)
                 .build().map_err(|e| e.to_string())?;
@@ -80,9 +84,9 @@ pub async fn update_stream_pointer_overlay(app: AppHandle, window: tauri::Webvie
         let size = PhysicalSize::new(width, height);
         if win.outer_position().ok() != Some(position) { win.set_position(position).map_err(|e| e.to_string())?; }
         if win.inner_size().ok() != Some(size) { win.set_size(size).map_err(|e| e.to_string())?; }
-        *VISUALS.lock().unwrap() = visuals.clone();
+        VISUALS.lock().unwrap().insert(label.clone(), visuals.clone());
         win.emit("stream-pointer-visuals", visuals).map_err(|e| e.to_string())?;
         win.show().map_err(|e| e.to_string())?;
-    } else if let Some(win) = app.get_webview_window("stream-pointer") { win.hide().map_err(|e| e.to_string())?; }
+    } else if let Some(win) = app.get_webview_window(&label) { win.hide().map_err(|e| e.to_string())?; }
     Ok(())
 }

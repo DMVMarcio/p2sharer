@@ -1,12 +1,16 @@
-export type StreamPointerPacket = { kind: 'move' | 'ping'; x: number; y: number } | { kind: 'leave' };
+export type StreamPointerPacket = ({ kind: 'move' | 'ping'; x: number; y: number } | { kind: 'leave' }) & { mediaId?: string };
 export const STREAM_POINTER_PING_MS = 1000;
 export interface StreamPointerVisual { id: string; peerId: string; name: string; color: string; x: number; y: number; expires: number; ping: boolean }
-export interface StreamPointerState { kind: 'state'; sentAt: number; visuals: StreamPointerVisual[] }
+export interface StreamPointerState { kind: 'state'; sentAt: number; visuals: StreamPointerVisual[]; mediaId?: string }
+
+function validPointerMediaId(value: unknown): boolean {
+  return value === undefined || typeof value === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(value);
+}
 
 export function validStreamPointerState(value: unknown): value is StreamPointerState {
   if (!value || typeof value !== 'object') return false;
   const state = value as StreamPointerState;
-  return state.kind === 'state' && Number.isFinite(state.sentAt) && Array.isArray(state.visuals) &&
+  return validPointerMediaId(state.mediaId) && state.kind === 'state' && Number.isFinite(state.sentAt) && Array.isArray(state.visuals) &&
     state.visuals.length <= 256 && state.visuals.every((v) => v &&
       typeof v.id === 'string' && v.id.length <= 160 && typeof v.peerId === 'string' && v.peerId.length <= 128 &&
       typeof v.name === 'string' && v.name.length <= 80 && typeof v.color === 'string' && v.color.length <= 80 &&
@@ -30,9 +34,9 @@ export function streamPointerVideoRect(rect: { left: number; top: number; width:
 export function validStreamPointer(value: unknown): value is StreamPointerPacket {
   if (!value || typeof value !== 'object') return false;
   const p = value as Record<string, unknown>;
-  return p.kind === 'leave' || ((p.kind === 'move' || p.kind === 'ping') &&
+  return validPointerMediaId(p.mediaId) && (p.kind === 'leave' || ((p.kind === 'move' || p.kind === 'ping') &&
     typeof p.x === 'number' && Number.isFinite(p.x) && p.x >= 0 && p.x <= 1 &&
-    typeof p.y === 'number' && Number.isFinite(p.y) && p.y >= 0 && p.y <= 1);
+    typeof p.y === 'number' && Number.isFinite(p.y) && p.y >= 0 && p.y <= 1));
 }
 
 // The element rectangle already includes CSS zoom and pan. Exclude contain letterboxing.
