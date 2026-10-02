@@ -1,9 +1,10 @@
-export const STREAM_DRAWING_MAX = 1280;
+export const STREAM_DRAWING_MAX = 1024;
+export const STREAM_DRAWING_MAX_POINTS = 192;
 export const STREAM_POINTER_MAX_VISUALS = STREAM_DRAWING_MAX + 256;
 export function streamDrawingLimit(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? Math.max(1, Math.min(STREAM_DRAWING_MAX, Math.round(value))) : STREAM_DRAWING_MAX;
 }
-export function streamDrawingPointLimit(limit: number): number { return streamDrawingLimit(limit) * 128; }
+export function streamDrawingPointLimit(limit: number): number { return streamDrawingLimit(limit) * STREAM_DRAWING_MAX_POINTS; }
 export interface StreamDrawingHistoryState { peerId: string; undo: number; redo: number }
 export type DrawingTool = 'brush' | 'rectangle' | 'ellipse' | 'text';
 export interface StreamDrawing { tool: DrawingTool; color: string; size: number; points: { x: number; y: number }[]; text?: string }
@@ -11,7 +12,7 @@ export function validStreamDrawing(value: unknown): value is StreamDrawing {
   if (!value || typeof value !== 'object') return false;
   const d = value as StreamDrawing;
   return ['brush', 'rectangle', 'ellipse', 'text'].includes(d.tool) && typeof d.color === 'string' && /^#[0-9a-f]{6}$/i.test(d.color) &&
-    Number.isInteger(d.size) && d.size >= 0 && d.size <= 10 && Array.isArray(d.points) && d.points.length >= 1 && d.points.length <= 128 &&
+    Number.isInteger(d.size) && d.size >= 0 && d.size <= 10 && Array.isArray(d.points) && d.points.length >= 1 && d.points.length <= STREAM_DRAWING_MAX_POINTS &&
     d.points.every(p => p && Number.isFinite(p.x) && p.x >= 0 && p.x <= 1 && Number.isFinite(p.y) && p.y >= 0 && p.y <= 1) &&
     (d.text === undefined || typeof d.text === 'string' && d.text.length <= 160) &&
     (d.tool !== 'text' || typeof d.text === 'string' && d.text.trim().length > 0 && d.text.length <= 160);

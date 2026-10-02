@@ -10,7 +10,7 @@ const drawing = { tool: 'brush' as const, color: '#ff0000', size: 3, points: [{ 
 test('undo/redo affect only the authenticated author, include clear, and new actions invalidate redo', async context => {
   context.mock.timers.enable({ apis: ['Date', 'setInterval'], now: 10000 });
   const original = { sharing: stateStore.isSharingScreen, cursors: stateStore.allowParticipantCursors, drawings: stateStore.allowParticipantDrawings, limit: stateStore.participantDrawingLimit };
-  stateStore.isSharingScreen = true; stateStore.allowParticipantCursors = true; stateStore.allowParticipantDrawings = true; stateStore.participantDrawingLimit = 1280;
+  stateStore.isSharingScreen = true; stateStore.allowParticipantCursors = true; stateStore.allowParticipantDrawings = true; stateStore.participantDrawingLimit = 1024;
   const identity = { localPeerId: 'alice', name: 'Alice', color: 'red' };
   const receiver = new StreamPointerReceiver(state => { assert.ok(validStreamPointerState(state)); streamPointerView.set('history-host', state, identity); }, async () => {});
   context.after(() => { receiver.clear(); streamPointerView.clear(); stateStore.isSharingScreen = original.sharing; stateStore.allowParticipantCursors = original.cursors; stateStore.allowParticipantDrawings = original.drawings; stateStore.participantDrawingLimit = original.limit; });
@@ -33,22 +33,22 @@ test('undo/redo affect only the authenticated author, include clear, and new act
   action('alice', 'undo'); await flush(); assert.equal(drawings().length, 1);
 });
 
-test('1280 drawings survive the former count ceiling and a lower setting evicts oldest drawings and history', async context => {
+test('1024 drawings survive the former count ceiling and a lower setting evicts oldest drawings and history', async context => {
   context.mock.timers.enable({ apis: ['Date', 'setInterval'], now: 10000 });
   const original = { sharing: stateStore.isSharingScreen, cursors: stateStore.allowParticipantCursors, drawings: stateStore.allowParticipantDrawings, limit: stateStore.participantDrawingLimit };
   stateStore.isSharingScreen = true; stateStore.allowParticipantCursors = true; stateStore.allowParticipantDrawings = true; stateStore.participantDrawingLimit = STREAM_DRAWING_MAX;
   let latest: StreamPointerState | undefined;
   const receiver = new StreamPointerReceiver(state => { latest = state; }, async () => {});
   context.after(() => { receiver.clear(); stateStore.isSharingScreen = original.sharing; stateStore.allowParticipantCursors = original.cursors; stateStore.allowParticipantDrawings = original.drawings; stateStore.participantDrawingLimit = original.limit; });
-  const fullBrush = { ...drawing, points: Array.from({ length: 128 }, (_, i) => ({ x: i / 127, y: .5 })) };
-  for (let i = 0; i < 1280; i++) {
+  const fullBrush = { ...drawing, points: Array.from({ length: 192 }, (_, i) => ({ x: i / 191, y: .5 })) };
+  for (let i = 0; i < 1024; i++) {
     receiver.receive({ kind: 'draw', id: `stroke-${i}`, drawing: fullBrush }, 'alice', 'Alice', '#ff0000');
     context.mock.timers.tick(80);
   }
-  assert.equal(latest?.visuals.length, 1280); assert.ok(validStreamPointerState(latest));
+  assert.equal(latest?.visuals.length, 1024); assert.ok(validStreamPointerState(latest));
   stateStore.participantDrawingLimit = 64; receiver.refreshPermissions(); context.mock.timers.tick(100);
   assert.equal(latest?.visuals.length, 64); assert.ok(validStreamPointerState(latest));
-  assert.equal(latest?.visuals[0].id, 'alice:d:stroke-1216');
+  assert.equal(latest?.visuals[0].id, 'alice:d:stroke-960');
   assert.equal(latest?.history?.[0].undo, 64);
   stateStore.participantDrawingLimit = 1; receiver.refreshPermissions(); context.mock.timers.tick(100);
   assert.equal(latest?.visuals.length, 1);
@@ -72,8 +72,9 @@ test('drawing limit loads persistently and clamps invalid settings', context => 
   context.after(() => { globalThis.localStorage = originalStorage; });
   globalThis.localStorage = { getItem: (key: string) => key === 'p2sharer_drawing_limit' ? '640' : null } as Storage;
   assert.equal(new StateStore().participantDrawingLimit, 640);
-  assert.equal(streamDrawingLimit(NaN), 1280); assert.equal(streamDrawingLimit(Infinity), 1280);
-  assert.equal(streamDrawingLimit(5000), 1280); assert.equal(streamDrawingLimit(-1), 1);
+  assert.equal(streamDrawingLimit(NaN), 1024); assert.equal(streamDrawingLimit(Infinity), 1024);
+  assert.equal(streamDrawingLimit(1280), 1024);
+  assert.equal(streamDrawingLimit(5000), 1024); assert.equal(streamDrawingLimit(-1), 1);
 });
 
 test('viewer readiness requests a full retained scene and repeated sync requests are rate-limited', async context => {

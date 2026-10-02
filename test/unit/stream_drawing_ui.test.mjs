@@ -140,3 +140,15 @@ test('history buttons and Ctrl+Z/Ctrl+Y issue scoped commands while input editin
   assert.equal(document.querySelector('[aria-label="Refazer"]').disabled, true);
   await key('z'); assert.equal(globalThis.__pointerTestSent.length, before);
 });
+
+test('continuous brush strokes retain 192 points before simplifying their path', async () => {
+  await click('[aria-label="Pincel"]');
+  await pointer('pointerdown', 0, 225);
+  for (let i = 0; i < 190; i++) await pointer('pointermove', 1 + i * 3, 225);
+  await pointer('pointerup', 799, 225);
+  const packet = globalThis.__pointerTestSent.at(-1);
+  assert.equal(packet.kind, 'draw');
+  assert.equal(packet.drawing.points.length, 192);
+  assert.deepEqual(packet.drawing.points[0], { x: 0, y: .5 });
+  assert.deepEqual(packet.drawing.points.at(-1), { x: 799 / 800, y: .5 });
+});

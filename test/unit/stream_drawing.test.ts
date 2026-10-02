@@ -7,8 +7,9 @@ import { stateStore } from '../../src/core/state_store.ts';
 const drawing = (): StreamDrawing => ({ tool: 'brush', size: 3, color: '#ef4444', points: [{ x: .1, y: .2 }, { x: .8, y: .9 }] });
 test('drawing wire input bounds coordinates, text, colors, sizes, and point counts', () => {
   assert.ok(validStreamPointer({ kind: 'draw', id: 'stroke-1', drawing: drawing() }));
+  assert.ok(validStreamDrawing({ ...drawing(), points: Array(192).fill({ x: .5, y: .5 }) }));
   for (const patch of [{ tool: 'script' }, { size: -1 }, { size: 11 }, { size: 1.5 }, { color: 'url(x)' },
-    { points: [] }, { points: Array(129).fill({ x: 0, y: 0 }) }, { points: [{ x: Infinity, y: .5 }] },
+    { points: [] }, { points: Array(193).fill({ x: 0, y: 0 }) }, { points: [{ x: Infinity, y: .5 }] },
     { text: {} }, { text: 'x'.repeat(161) }, { tool: 'text', text: ' ' }, { tool: 'text', text: 'x'.repeat(161) }]) {
     assert.equal(validStreamDrawing({ ...drawing(), ...patch }), false);
   }
