@@ -13,8 +13,10 @@ export function useStreamPointer(container: RefObject<HTMLDivElement | null>,
   pip = false, displayAvailable = available) {
   const [enabled, setEnabled] = useState(false);
   const [indicator, setIndicator] = useState<{ x: number; y: number } | null>(null);
-  const [settings, setSettings] = useState<DrawingSettings>({ tool: null, color: '#ef4444', size: 3, text: '' });
+  const [settings, setSettings] = useState<DrawingSettings>({ tool: null, color: '#ef4444', size: 3 });
   const [draft, setDraft] = useState<StreamDrawing | null>(null);
+  const [textDraft, setTextDraft] = useState<StreamDrawing | null>(null);
+  const editingText = useRef(false);
   const scene = useSyncExternalStore(streamPointerView.subscribe, () => streamPointerView.get(peerId));
   const drawingAllowed = scene.drawingAllowed !== false;
   const history = scene.history?.find(entry => entry.peerId === scene.localPeerId);
@@ -25,7 +27,16 @@ export function useStreamPointer(container: RefObject<HTMLDivElement | null>,
     else roomService.sendStreamPointer(packet, peerId);
   };
   const lastSent = useRef(0);
-  useEffect(() => { setEnabled(false); setSettings(s => ({ ...s, tool: null })); setDraft(null); }, [peerId, stream, available]);
+  useEffect(() => { setEnabled(false); setSettings(s => ({ ...s, tool: null })); setDraft(null); setTextDraft(null); editingText.current = false; }, [peerId, stream, available]);
+  useEffect(() => {
+    if (!enabled || !drawingAllowed) { editingText.current = false; setTextDraft(null); }
+  }, [enabled, drawingAllowed]);
+  const confirmText = (drawing: StreamDrawing) => {
+    if (!editingText.current) return;
+    editingText.current = false;
+    setTextDraft(null);
+    if (enabled && config.current.drawingAllowed && drawing.text?.trim()) transmit({ kind: 'draw', id: crypto.randomUUID(), drawing });
+  };
   useEffect(() => {
     if (!displayAvailable) return;
     if (!pip) { roomService.refreshStreamPointerView(peerId); return; }
@@ -89,16 +100,21 @@ export function useStreamPointer(container: RefObject<HTMLDivElement | null>,
       if (!config.current.settings.tool && position && event.button === 0) send({ kind: 'ping', ...position });
     };
     // Pointing owns primary clicks; it never forwards native input or starts a pan drag.
-    const down = (event: MouseEvent) => { if (event.target === video.current && event.button === 0) { focusSurface(); event.stopPropagation(); } };
+    const down = (event: MouseEvent) => { if (event.target === video.current && event.button === 0) { if (!editingText.current) focusSurface(); event.stopPropagation(); } };
     const drawDown = (event: PointerEvent) => {
       const v = video.current;
       const { settings: options, drawingAllowed } = config.current;
       if (!v || event.target !== v || event.button !== 0 || !options.tool || !drawingAllowed) return;
       const position = streamPointerPosition(v.getBoundingClientRect(), v.videoWidth, v.videoHeight, event.clientX, event.clientY);
-      if (!position || options.tool === 'text' && !options.text.trim()) return;
+      if (!position) return;
+      if (editingText.current) {
+        event.preventDefault(); event.stopPropagation();
+        element.querySelector<HTMLTextAreaElement>('.stream-drawing-text-editor')?.focus({ preventScroll: true });
+        focusSurface(); return;
+      }
       event.preventDefault(); event.stopPropagation(); focusSurface();
-      const next: StreamDrawing = { tool: options.tool, color: options.color, size: options.size, points: [position], ...(options.tool === 'text' ? { text: options.text.trim() } : {}) };
-      if (options.tool === 'text') { send({ kind: 'draw', id: crypto.randomUUID(), drawing: next }); return; }
+      const next: StreamDrawing = { tool: options.tool, color: options.color, size: options.size, points: [position] };
+      if (options.tool === 'text') { editingText.current = true; setTextDraft(next); return; }
       drawing = next; drawingPointer = event.pointerId;
       v.setPointerCapture(event.pointerId); setDraft(next);
     };
@@ -121,6 +137,13 @@ export function useStreamPointer(container: RefObject<HTMLDivElement | null>,
       if ((config.current.history?.[direction] ?? 0) > 0) send({ kind: direction });
     };
     const activate = () => { activePointerSurface = element; };
+    const outsideText = (event: PointerEvent) => {
+      if (!editingText.current || event.target === video.current ||
+        event.target instanceof Element && event.target.closest('.stream-drawing-text-editor, [role="menu"]')) return;
+      const editor = element.querySelector<HTMLTextAreaElement>('.stream-drawing-text-editor');
+      editor?.focus({ preventScroll: true }); editor?.blur();
+    };
+    document.addEventListener('pointerdown', outsideText, true);
     element.addEventListener('focusin', activate);
     window.addEventListener('keydown', key);
     element.addEventListener('pointerdown', drawDown, true);
@@ -138,6 +161,7 @@ export function useStreamPointer(container: RefObject<HTMLDivElement | null>,
     document.addEventListener('visibilitychange', deactivate);
     return () => {
       cancel();
+      document.removeEventListener('pointerdown', outsideText, true);
       window.removeEventListener('keydown', key);
       element.removeEventListener('focusin', activate);
       if (activePointerSurface === element) activePointerSurface = null;
@@ -155,5 +179,6 @@ export function useStreamPointer(container: RefObject<HTMLDivElement | null>,
   }, [enabled, available, peerId, stream, pip, container, video]);
   return { enabled, toggle: () => setEnabled((value) => !value),
     toolbar: enabled && available && drawingAllowed ? <StreamDrawingToolbar settings={settings} onChange={setSettings} onClear={() => transmit({ kind: 'clear' })} onUndo={() => transmit({ kind: 'undo' })} onRedo={() => transmit({ kind: 'redo' })} canUndo={(history?.undo ?? 0) > 0} canRedo={(history?.redo ?? 0) > 0} /> : null,
-    indicator: displayAvailable ? <StreamPointerVideoLayer container={container} video={video} peerId={peerId} local={enabled ? indicator : null} draft={drawingAllowed ? draft : null} /> : null };
+    indicator: displayAvailable ? <StreamPointerVideoLayer container={container} video={video} peerId={peerId} local={enabled ? indicator : null} draft={drawingAllowed ? draft : null}
+      textDraft={enabled && drawingAllowed ? textDraft : null} onTextConfirm={confirmText} /> : null };
 }

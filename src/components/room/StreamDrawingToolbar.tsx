@@ -3,7 +3,7 @@ import { TooltipButton } from '../common/TooltipButton';
 import { useContextMenu } from '../common/ContextMenu';
 import type { DrawingTool } from '../../core/stream_pointer';
 
-export interface DrawingSettings { tool: DrawingTool | null; color: string; size: number; text: string }
+export interface DrawingSettings { tool: DrawingTool | null; color: string; size: number }
 const COLORS = [
   ['#ef4444', 'Vermelho'], ['#f97316', 'Laranja'], ['#facc15', 'Amarelo'], ['#22c55e', 'Verde'],
   ['#06b6d4', 'Ciano'], ['#3b82f6', 'Azul'], ['#a855f7', 'Roxo'], ['#ec4899', 'Rosa'],
@@ -25,8 +25,6 @@ export function StreamDrawingToolbar({ settings, onChange, onClear, onUndo, onRe
     })))}><span className="stream-drawing-swatch" style={{ background: settings.color }} /></TooltipButton>
     <label className="stream-drawing-size">Tamanho <input autoComplete="off" className="stream-volume-range" type="range" min={0} max={10} step={1}
       value={settings.size} onChange={event => onChange({ ...settings, size: Number(event.target.value) })} /><output>{settings.size}</output></label>
-    {settings.tool === 'text' && <input autoComplete="off" className="text-input text-input-sm" aria-label="Texto do rabisco"
-      placeholder="Texto para inserir na tela" maxLength={160} value={settings.text} onChange={event => onChange({ ...settings, text: event.target.value })} />}
     <div className="stream-drawing-history">
       <TooltipButton tooltip="Desfazer (Ctrl+Z)" aria-label="Desfazer" className="btn-stream-pin" disabled={!canUndo} onClick={onUndo}><Undo2 size={15} /></TooltipButton>
       <TooltipButton tooltip="Refazer (Ctrl+Y)" aria-label="Refazer" className="btn-stream-pin" disabled={!canRedo} onClick={onRedo}><Redo2 size={15} /></TooltipButton>

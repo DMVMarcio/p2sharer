@@ -42,6 +42,8 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 4. User Guidelines & Expressed Preferences
 
+- `[Inline Annotation Text]` Selecting Text and clicking the stream starts typing at that normalized position with a visible caret and no field background or border. Show characters locally as they are typed; confirm once on outside click or Enter, and preserve Shift+Enter as a line break. Remove the toolbar text input.
+
 - `[Annotation History & Capacity]` Provide per-author stream drawing undo/redo buttons below the tools and Ctrl+Z/Ctrl+Y shortcuts without stealing text editing. Use a default and maximum retained drawing capacity of 1024 (revised from 1280), allow up to 192 normalized points per continuous brush stroke (1.5x the original 128), expose a persistent Transmission slider, use circular icon-only undo/redo buttons with the eraser beside them on the second row, give the size control an opaque themed background, and raise the toolbar while aligning its left inset with the top statistics overlay.
 
 - `[Stream Annotations]` Interactive mouse mode exposes brush, outline rectangle/circle, text, preset color palette, and a 0-10 size scale with tool-specific mapping. Broadcaster drawing and ping permissions are independent persistent Transmission toggles, both gated by participant cursor permission. Keep native annotation surfaces stable and transparent when participants enter/leave interactive mode.
