@@ -459,6 +459,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
       />
 
       {pointer.indicator}
+      {pointer.toolbar}
 
       {/* Loading state indicator */}
       {!isVideoPlaying && (

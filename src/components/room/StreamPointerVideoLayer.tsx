@@ -1,16 +1,17 @@
 import { useEffect, useState, useSyncExternalStore, type RefObject } from 'react';
 import { streamPointerVideoRect } from '../../core/stream_pointer';
 import { streamPointerView } from '../../services/stream_pointer_view';
+import { StreamDrawingLayer } from './StreamDrawingLayer';
 import { StreamPointerGlyph } from './StreamPointerGlyph';
 
-export function StreamPointerVideoLayer({ container, video, peerId, local }: {
+export function StreamPointerVideoLayer({ container, video, peerId, local, draft }: {
   container: RefObject<HTMLDivElement | null>; video: RefObject<HTMLVideoElement | null>; peerId: string;
-  local: { x: number; y: number } | null;
+  local: { x: number; y: number } | null; draft?: import('../../core/stream_pointer').StreamDrawing | null;
 }) {
   const scene = useSyncExternalStore(streamPointerView.subscribe, () => streamPointerView.get(peerId));
   const [bounds, setBounds] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   const [now, setNow] = useState(Date.now());
-  const active = scene.visuals.some((v) => v.expires > now) || !!local;
+  const active = scene.visuals.some((v) => v.expires > now) || !!local || !!draft;
   useEffect(() => {
     if (!active) { setBounds(null); return; }
     const element = video.current, parent = container.current;
@@ -32,7 +33,8 @@ export function StreamPointerVideoLayer({ container, video, peerId, local }: {
     return () => { clearInterval(timer); resize.disconnect(); mutation.disconnect(); element.removeEventListener('loadedmetadata', measure); };
   }, [container, video, peerId, active]);
   return <div className="stream-pointer-video-layer" aria-hidden="true">
-    {bounds && scene.visuals.filter((v) => v.expires > now && (v.ping || v.peerId !== scene.localPeerId)).map((v) =>
+    {bounds && <StreamDrawingLayer visuals={scene.visuals.filter(v => v.expires > now)} bounds={bounds} draft={draft} />}
+    {bounds && scene.visuals.filter((v) => v.expires > now && !v.drawing && (v.ping || v.peerId !== scene.localPeerId)).map((v) =>
       <StreamPointerGlyph key={v.id} name={v.name} color={v.color} ping={v.ping}
         style={{ left: bounds.left + v.x * bounds.width, top: bounds.top + v.y * bounds.height }} />)}
     {local && <StreamPointerGlyph name={scene.name} color={scene.color} interpolate={false} style={{ left: local.x, top: local.y }} />}

@@ -386,6 +386,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
       </div>
 
       {pointer.indicator}
+      {pointer.toolbar}
 
 
       {/* Featured badge when in tray */}

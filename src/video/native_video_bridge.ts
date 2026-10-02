@@ -506,5 +506,6 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     }
     this.ctx = null;
     await invoke('stop_capture_session', { sessionId: this.sessionId }).catch(() => {});
+    await invoke('update_stream_pointer_overlay', { sessionId: this.sessionId, visuals: [] }).catch(console.warn);
   }
 }

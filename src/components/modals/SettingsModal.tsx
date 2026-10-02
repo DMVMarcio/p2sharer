@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useModal } from '../../hooks/useModal';
 import { useAppTheme, ACCENT_COLORS } from '../../hooks/useAppTheme';
+import { roomService } from '../../services/room_service';
 import { stateStore } from '../../core/state_store';
 import { soundEffects } from '../../ui/sound_effects';
 import { showToast } from '../../hooks/useToast';
@@ -42,6 +43,7 @@ export const SettingsModal: React.FC = () => {
     () => localStorage.getItem('p2sharer_default_quality') || '90'
   );
   const [participantCursors, setParticipantCursors] = useState(() => stateStore.allowParticipantCursors);
+  const [participantDrawings, setParticipantDrawings] = useState(() => stateStore.allowParticipantDrawings);
   const [participantPings, setParticipantPings] = useState(() => stateStore.allowParticipantPings);
   const [defaultCursor, setDefaultCursor] = useState(
     () => localStorage.getItem('p2sharer_default_cursor') !== 'false'
@@ -99,8 +101,10 @@ export const SettingsModal: React.FC = () => {
     soundEffects.setVolume(sfxVolume / 100);
 
     localStorage.setItem('p2sharer_participant_cursors', String(participantCursors));
+    localStorage.setItem('p2sharer_participant_drawings', String(participantDrawings));
     localStorage.setItem('p2sharer_participant_pings', String(participantPings));
-    stateStore.set((s) => { s.allowParticipantCursors = participantCursors; s.allowParticipantPings = participantPings; });
+    stateStore.set((s) => { s.allowParticipantCursors = participantCursors; s.allowParticipantPings = participantPings; s.allowParticipantDrawings = participantDrawings; });
+    roomService.refreshStreamPointerPermissions();
 
     // Save Stream defaults
     localStorage.setItem('p2sharer_default_res', defaultRes);
@@ -619,6 +623,7 @@ export const SettingsModal: React.FC = () => {
                 <div className="settings-row" style={{ marginTop: '14px' }}>
                   {[
                     { id: 'participant-cursors', label: 'Exibir cursores dos participantes', description: 'Permitir apontamentos na sua tela, sem controlar o desktop.', checked: participantCursors, change: setParticipantCursors },
+                    { id: 'participant-drawings', label: 'Permitir rabiscos dos participantes', description: 'Permitir desenhos e instruções de texto na sua tela.', checked: participantDrawings, change: setParticipantDrawings },
                     { id: 'participant-pings', label: 'Exibir pings dos participantes', description: 'Mostrar onde os participantes clicarem.', checked: participantPings, change: setParticipantPings },
                   ].map((option) => <label className="settings-switch-row" htmlFor={option.id} key={option.id}>
                     <div className="settings-switch-label-group">
@@ -626,7 +631,7 @@ export const SettingsModal: React.FC = () => {
                       <span className="settings-switch-subtitle">{option.description}</span>
                     </div>
                     <div className="modern-switch">
-                      <input autoComplete="off" type="checkbox" id={option.id} checked={option.checked}
+                      <input autoComplete="off" type="checkbox" id={option.id} checked={option.checked} disabled={option.id !== 'participant-cursors' && !participantCursors}
                         onChange={(event) => option.change(event.target.checked)} />
                       <span className="switch-slider" />
                     </div>
