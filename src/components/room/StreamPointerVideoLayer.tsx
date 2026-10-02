@@ -3,15 +3,18 @@ import { streamPointerVideoRect } from '../../core/stream_pointer';
 import { streamPointerView } from '../../services/stream_pointer_view';
 import { StreamDrawingLayer } from './StreamDrawingLayer';
 import { StreamPointerGlyph } from './StreamPointerGlyph';
+import { StreamDrawingTextEditor } from './StreamDrawingTextEditor';
+import type { StreamDrawing } from '../../core/stream_pointer';
 
-export function StreamPointerVideoLayer({ container, video, peerId, local, draft }: {
+export function StreamPointerVideoLayer({ container, video, peerId, local, draft, textDraft, onTextConfirm }: {
   container: RefObject<HTMLDivElement | null>; video: RefObject<HTMLVideoElement | null>; peerId: string;
   local: { x: number; y: number } | null; draft?: import('../../core/stream_pointer').StreamDrawing | null;
+  textDraft?: StreamDrawing | null; onTextConfirm?: (drawing: StreamDrawing) => void;
 }) {
   const scene = useSyncExternalStore(streamPointerView.subscribe, () => streamPointerView.get(peerId));
   const [bounds, setBounds] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   const [now, setNow] = useState(Date.now());
-  const active = scene.visuals.some((v) => v.expires > now) || !!local || !!draft;
+  const active = scene.visuals.some((v) => v.expires > now) || !!local || !!draft || !!textDraft;
   useEffect(() => {
     if (!active) { setBounds(null); return; }
     const element = video.current, parent = container.current;
@@ -32,11 +35,13 @@ export function StreamPointerVideoLayer({ container, video, peerId, local, draft
     measure();
     return () => { clearInterval(timer); resize.disconnect(); mutation.disconnect(); element.removeEventListener('loadedmetadata', measure); };
   }, [container, video, peerId, active]);
-  return <div className="stream-pointer-video-layer" aria-hidden="true">
+  return <><div className="stream-pointer-video-layer" aria-hidden="true">
     {bounds && <StreamDrawingLayer visuals={scene.visuals.filter(v => v.expires > now)} bounds={bounds} draft={draft} />}
     {bounds && scene.visuals.filter((v) => v.expires > now && !v.drawing && (v.ping || v.peerId !== scene.localPeerId)).map((v) =>
       <StreamPointerGlyph key={v.id} name={v.name} color={v.color} ping={v.ping}
         style={{ left: bounds.left + v.x * bounds.width, top: bounds.top + v.y * bounds.height }} />)}
     {local && <StreamPointerGlyph name={scene.name} color={scene.color} interpolate={false} style={{ left: local.x, top: local.y }} />}
-  </div>;
+  </div>
+    {bounds && textDraft && onTextConfirm && <StreamDrawingTextEditor drawing={textDraft} bounds={bounds} onConfirm={onTextConfirm} />}
+  </>;
 }

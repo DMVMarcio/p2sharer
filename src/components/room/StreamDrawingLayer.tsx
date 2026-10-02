@@ -31,7 +31,9 @@ const StreamDrawingShape = memo(function StreamDrawingShape({ drawing: d, width,
       const a = points[0], b = points[points.length - 1];
       const strokeWidth = (d.tool === 'brush' ? 2 + d.size * 3 : 1 + d.size) * scale;
       const common = { stroke: d.color, strokeWidth, fill: 'none', strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
-      if (d.tool === 'text') return <text x={a.x} y={a.y} fill={d.color} fontSize={(14 + d.size * 5) * scale} dominantBaseline="hanging">{d.text}</text>;
+      if (d.tool === 'text') return <text x={a.x} y={a.y} fill={d.color} fontFamily="var(--font-sans)" fontSize={(14 + d.size * 5) * scale} dominantBaseline="text-before-edge" xmlSpace="preserve">
+        {d.text?.split('\n').map((line, index) => <tspan key={index} x={a.x} dy={index === 0 ? 0 : '1.2em'}>{line || '\u00a0'}</tspan>)}
+      </text>;
       if (d.tool === 'rectangle') return <rect {...common} x={Math.min(a.x, b.x)} y={Math.min(a.y, b.y)} width={Math.abs(b.x - a.x)} height={Math.abs(b.y - a.y)} />;
       if (d.tool === 'ellipse') return <ellipse {...common} cx={(a.x + b.x) / 2} cy={(a.y + b.y) / 2} rx={Math.abs(b.x - a.x) / 2} ry={Math.abs(b.y - a.y) / 2} />;
       return points.length === 1 ? <circle cx={a.x} cy={a.y} r={strokeWidth / 2} fill={d.color} />

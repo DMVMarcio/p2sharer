@@ -21,6 +21,8 @@ html.stream-pointer-desktop, .stream-pointer-desktop body, .stream-pointer-deskt
 .stream-drawing-size { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 4px 7px; border-radius: var(--radius-sm); background: var(--bg-input); border: 1px solid var(--border-default); box-shadow: var(--shadow-md); }
 .stream-drawing-size input { width: 72px; }
 .stream-drawing-size output { min-width: 16px; }
-.stream-drawing-toolbar .text-input { width: 180px; }
+.text-input.stream-drawing-text-editor,
+.text-input.stream-drawing-text-editor:hover,
+.text-input.stream-drawing-text-editor:focus { position: absolute; z-index: 11; min-height: 0; margin: 0; padding: 0; border: 0; border-radius: 0; outline: none; background: transparent; box-shadow: none; font-family: var(--font-sans); line-height: 1.2; resize: none; overflow: hidden; }
 
 .stream-drawing-history { display: flex; flex-basis: 100%; gap: 6px; }

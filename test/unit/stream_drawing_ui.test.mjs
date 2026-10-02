@@ -7,7 +7,7 @@ import { JSDOM } from 'jsdom';
 import React, { act, useRef } from 'react';
 
 const browser = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', { url: 'http://localhost' });
-for (const key of ['window', 'document', 'HTMLElement', 'Element', 'Node', 'MutationObserver', 'CustomEvent']) globalThis[key] = browser.window[key];
+for (const key of ['window', 'document', 'HTMLElement', 'HTMLInputElement', 'HTMLTextAreaElement', 'Element', 'Node', 'MutationObserver', 'CustomEvent']) globalThis[key] = browser.window[key];
 globalThis.getComputedStyle = window.getComputedStyle;
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 globalThis.ResizeObserver = class { observe() {} disconnect() {} };
@@ -92,15 +92,27 @@ test('circle and literal text use the same normalized projection and cancelled g
   await pointer('pointerup', 200, 200);
   assert.equal(globalThis.__pointerTestSent.filter(p => p.kind === 'draw').length, before);
   await click('[aria-label="Texto"]');
+  assert.equal(document.querySelector('[aria-label="Texto do rabisco"]'), null);
+  await pointer('pointerdown', 400, 225);
   const input = document.querySelector('[aria-label="Texto do rabisco"]');
   assert.equal(input.autocomplete, 'off');
+  assert.equal(document.activeElement, input);
+  await act(async () => video.dispatchEvent(new window.MouseEvent('mousedown', { button: 0, bubbles: true })));
+  assert.equal(document.activeElement, input);
+  const drawsBefore = globalThis.__pointerTestSent.filter(p => p.kind === 'draw').length;
   await act(async () => {
-    Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(input, '<script>instruction</script>');
+    Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set.call(input, '<script>instruction</script>');
     input.dispatchEvent(new window.Event('input', { bubbles: true }));
   });
-  input.focus();
-  await pointer('pointerdown', 400, 225);
-  assert.equal(document.activeElement, video.parentElement);
+  assert.equal(globalThis.__pointerTestSent.filter(p => p.kind === 'draw').length, drawsBefore);
+  await act(async () => input.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true, cancelable: true })));
+  assert.equal(document.querySelector('[aria-label="Texto do rabisco"]'), input);
+  await act(async () => input.dispatchEvent(new window.MouseEvent('contextmenu', { bubbles: true, cancelable: true })));
+  assert.ok(document.querySelector('[role="menu"]'));
+  assert.equal(document.querySelector('[aria-label="Texto do rabisco"]'), input);
+  await act(async () => document.activeElement.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  await act(async () => input.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })));
+  assert.equal(document.querySelector('[aria-label="Texto do rabisco"]'), null);
   const text = globalThis.__pointerTestSent.at(-1);
   assert.equal(text.drawing.tool, 'text');
   assert.equal(text.drawing.text, '<script>instruction</script>');
@@ -128,17 +140,48 @@ test('history buttons and Ctrl+Z/Ctrl+Y issue scoped commands while input editin
   };
   await key('z'); assert.equal(globalThis.__pointerTestSent.at(-1).kind, 'undo');
   await key('y'); assert.equal(globalThis.__pointerTestSent.at(-1).kind, 'redo');
+  await pointer('pointerdown', 400, 225);
   const before = globalThis.__pointerTestSent.length;
   document.querySelector('[aria-label="Texto do rabisco"]').focus();
   assert.equal((await key('z')).defaultPrevented, false);
   assert.equal((await key('y')).defaultPrevented, false);
   assert.equal(globalThis.__pointerTestSent.length, before);
-  document.activeElement.blur();
+  await act(async () => document.activeElement.blur());
   await act(async () => streamPointerView.set('host', { kind: 'state', sentAt: Date.now(), visuals: [], drawingAllowed: true,
     history: [{ peerId: 'viewer', undo: 0, redo: 0 }] }, { name: 'Viewer', color: 'cyan', localPeerId: 'viewer' }));
   assert.equal(document.querySelector('[aria-label="Desfazer"]').disabled, true);
   assert.equal(document.querySelector('[aria-label="Refazer"]').disabled, true);
   await key('z'); assert.equal(globalThis.__pointerTestSent.length, before);
+});
+
+test('inline text preserves Shift+Enter and confirms once on outside clicks without committing empty drafts', async () => {
+  await click('[aria-label="Texto"]');
+  await pointer('pointerdown', 160, 135);
+  const input = document.querySelector('[aria-label="Texto do rabisco"]');
+  const before = globalThis.__pointerTestSent.filter(p => p.kind === 'draw').length;
+  const shiftEnter = new window.KeyboardEvent('keydown', { key: 'Enter', shiftKey: true, bubbles: true, cancelable: true });
+  await act(async () => input.dispatchEvent(shiftEnter));
+  assert.equal(shiftEnter.defaultPrevented, false);
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set.call(input, 'First line\n\nThird line');
+    input.dispatchEvent(new window.Event('input', { bubbles: true }));
+  });
+  await pointer('pointerdown', 500, 300);
+  assert.equal(document.querySelector('[aria-label="Texto do rabisco"]'), null);
+  const packet = globalThis.__pointerTestSent.at(-1);
+  assert.equal(packet.kind, 'draw');
+  assert.equal(packet.drawing.text, 'First line\n\nThird line');
+  await act(async () => streamPointerView.set('host', { kind: 'state', sentAt: Date.now(), drawingAllowed: true,
+    visuals: [{ id: 'multiline', peerId: 'viewer', name: 'Viewer', color: packet.drawing.color, ...packet.drawing.points[0],
+      expires: Date.now() + 3000, ping: false, drawing: packet.drawing }] }, { name: 'Viewer', color: 'cyan', localPeerId: 'viewer' }));
+  assert.equal(document.querySelectorAll('.stream-drawing-layer text tspan').length, 3);
+  assert.equal(document.querySelectorAll('.stream-drawing-layer text tspan')[2].textContent, 'Third line');
+  assert.deepEqual(packet.drawing.points[0], { x: .2, y: .3 });
+  assert.equal(globalThis.__pointerTestSent.filter(p => p.kind === 'draw').length, before + 1);
+  await pointer('pointerdown', 500, 300);
+  await act(async () => document.body.dispatchEvent(new window.MouseEvent('pointerdown', { bubbles: true })));
+  assert.equal(globalThis.__pointerTestSent.filter(p => p.kind === 'draw').length, before + 1);
+  assert.equal(document.querySelector('[aria-label="Texto do rabisco"]'), null);
 });
 
 test('continuous brush strokes retain 192 points before simplifying their path', async () => {
