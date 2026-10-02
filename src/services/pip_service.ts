@@ -320,12 +320,12 @@ export class PipService {
 
     const newVideoTrack = stream?.getVideoTracks()[0];
     const videoSender = session.pc.getSenders().find((sender) => sender.track?.kind === 'video');
+    if (streamOwner(peerId) !== 'local' && stream?.getAudioTracks().length) {
+      audioContextManager.attachPeerAudio(peerId, stream);
+    }
     if (session.stream === stream && videoSender?.track === newVideoTrack) return;
     session.stream = stream;
     try {
-      if (streamOwner(peerId) !== 'local' && stream?.getAudioTracks().length) {
-        audioContextManager.attachPeerAudio(peerId, stream);
-      }
       if (videoSender && newVideoTrack) {
         void videoSender.replaceTrack(newVideoTrack).catch((error) => console.warn('[PiP] Live video replacement failed:', error));
         return;

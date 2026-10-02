@@ -44,3 +44,24 @@ test('PiP audio settings reject invalid cross-window values', () => {
   assert.equal(validPipAudioSettings({ volume: 101, muted: false }), false);
   assert.equal(validPipAudioSettings({ volume: 50, muted: 'false' }), false);
 });
+
+test('audio follows track identity across video container changes and releases its independent pull sink', () => {
+  const dom = setupTestDOM();
+  try {
+    const audio = new MockMediaStreamTrack('audio');
+    const first = new MockMediaStream(); first.addTrack(audio);
+    const state = audioContextManager.attachPeerAudio('stable-audio', first as unknown as MediaStream);
+    const source = state.source;
+    assert.ok(source);
+    const element = dom.document.body.children.find(element => element.tagName === 'AUDIO') as any;
+    assert.ok(element); assert.equal(element.volume, 0); assert.equal(element.paused, false);
+    const replacement = new MockMediaStream(); replacement.addTrack(audio);
+    replacement.addTrack(new MockMediaStreamTrack('video'));
+    assert.equal(audioContextManager.attachPeerAudio('stable-audio', replacement as unknown as MediaStream).source, source);
+    const changed = new MockMediaStream(); changed.addTrack(new MockMediaStreamTrack('audio'));
+    assert.notEqual(audioContextManager.attachPeerAudio('stable-audio', changed as unknown as MediaStream).source, source);
+    audioContextManager.detachPeerAudio('stable-audio');
+    assert.equal(element.srcObject, null); assert.equal(element.paused, true);
+    assert.equal(dom.document.body.children.includes(element), false);
+  } finally { audioContextManager.cleanup(); dom.cleanup(); }
+});

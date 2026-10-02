@@ -77,6 +77,26 @@ test('transmission menu edits sources, stops only the chosen source, and starts 
 
 after(async () => { await act(async () => root.unmount()); browser.window.close(); });
 
+test('late audio in a stable video container reaches the canonical audio sink', async () => {
+  const calls = [];
+  const original = audioContextManager.attachPeerAudio;
+  audioContextManager.attachPeerAudio = (_key, stream) => { calls.push(stream.getAudioTracks().length); return { volume: 100, isMuted: false }; };
+  const tracks = [];
+  const stable = { ...slot('late-owner', 'late-screen', 'screen') };
+  stable.stream.getAudioTracks = () => tracks;
+  try {
+    stateStore.set(state => { state.roomSlots = [stable]; state.subscribedStreams = new Set([stable.peerId]); });
+    await render('grid');
+    const video = document.querySelector('video');
+    assert.deepEqual(calls, [0]);
+    tracks.push({ id: 'late-audio', readyState: 'live' });
+    await act(async () => stateStore.set(state => { state.roomSlots = [{ ...stable }]; }));
+    assert.deepEqual(calls, [0, 1]);
+    assert.equal(document.querySelector('video'), video);
+    assert.equal(video.srcObject, stable.stream);
+  } finally { audioContextManager.attachPeerAudio = original; }
+});
+
 test('spotlight automatically subscribes the owner camera and grid mounts no overlays', async () => {
   stateStore.set((state) => { state.roomSlots = [screen, camera, other]; state.subscribedStreams = new Set([screen.peerId, other.peerId]); });
   await render();

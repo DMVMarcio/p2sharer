@@ -4,6 +4,8 @@ export class AudioContextManager {
   private static instance: AudioContextManager | null = null;
   private audioCtx: AudioContext | null = null;
   private peerSinks: Map<string, PeerAudioSinkState> = new Map();
+  private peerAudioTracks = new Map<string, MediaStreamTrack[]>();
+  private peerPullElements = new Map<string, HTMLAudioElement>();
 
   public static getInstance(): AudioContextManager {
     if (!AudioContextManager.instance) {
@@ -42,20 +44,38 @@ export class AudioContextManager {
       this.peerSinks.set(peerId, state);
     }
 
-    if (stream.getAudioTracks().length === 0) {
+    const tracks = stream.getAudioTracks().filter(track => track.readyState !== 'ended');
+    if (tracks.length === 0) {
       return state;
     }
 
-    if (state.streamId !== stream.id || !state.source) {
+    const previous = this.peerAudioTracks.get(peerId);
+    if (!state.source || !previous || tracks.length !== previous.length || tracks.some(track => !previous.includes(track))) {
       if (state.source) {
         try {
           state.source.disconnect();
         } catch {}
       }
       try {
-        state.source = ctx.createMediaStreamSource(stream);
+        const audioStream = new MediaStream(tracks);
+        state.source = ctx.createMediaStreamSource(audioStream);
         state.source.connect(state.gainNode);
         state.streamId = stream.id;
+        this.peerAudioTracks.set(peerId, tracks);
+        // Chromium remote WebRTC audio needs an active media-element sink to
+        // keep pulling samples into Web Audio after the visible video enters PiP.
+        // Zero element volume avoids a second audible path; gain owns the volume.
+        let element = this.peerPullElements.get(peerId);
+        if (!element) {
+          element = document.createElement('audio');
+          element.autoplay = true;
+          element.volume = 0;
+          element.hidden = true;
+          document.body.appendChild(element);
+          this.peerPullElements.set(peerId, element);
+        }
+        element.srcObject = audioStream;
+        void element.play().catch(() => {});
       } catch (err) {
         console.warn('Failed to connect media stream source for peer:', peerId, err);
       }
@@ -66,6 +86,14 @@ export class AudioContextManager {
   }
 
   public detachPeerAudio(peerId: string): void {
+    const element = this.peerPullElements.get(peerId);
+    if (element) {
+      element.pause();
+      element.srcObject = null;
+      element.remove();
+      this.peerPullElements.delete(peerId);
+    }
+    this.peerAudioTracks.delete(peerId);
     const state = this.peerSinks.get(peerId);
     if (state) {
       if (state.source) {

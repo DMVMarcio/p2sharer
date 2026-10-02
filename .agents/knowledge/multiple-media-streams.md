@@ -8,6 +8,33 @@ Broadcast `MediaStream` containers are separate from bridge-owned capture contai
 
 ## Transport and presentation
 
+Presence can re-deliver the same Trystero tracks every two seconds. Remote stream
+merging must preserve the existing `MediaStream` object when the resulting track
+objects are identical, including separate native video/browser audio delivery.
+Creating a new wrapper on every advertisement reloads React video players, rebuilds
+audio sources and resets interactive pointing. Late `addtrack` events re-enter the
+same reconciliation path; the slot update fingerprint includes current track IDs
+and ready states so actual additions still reach subscribers. A real replacement
+retains the independent media slot and other sources while updating its contents.
+
+`VideoCard` audio effects include the current audio track fingerprint, so audio
+arriving after video is attached even when its container stays stable. PiP likewise
+attaches newly arrived audio before its unchanged-video early return.
+
+Playback regression validation on 2026-10-02 used two fresh packaged WebView2
+processes and the canonical React room cards (`test/bench/stream_playback_continuity.ts`).
+Before the fix, identical video/audio track IDs acquired new stream wrappers every
+2,000 ms. After the fix, generic and native NVENC runs retained both players with
+zero `emptied` events through a 12-second grid sample and kept pointing enabled.
+Both received 720p/60 and 360p/30 screens. NVENC used two native routes and zero
+browser video senders. Synthetic 440 Hz audio remained nonzero throughout native
+PiP (5 seconds generic, 15 seconds NVENC) and restore (3 seconds each). Each grid
+sample recorded one isolated silent 50 ms probe, no sustained gap and no black
+samples. A separate real PiP window check confirmed 720p decoded video and nonzero
+audio in the main Web Audio sink after its visible card video was removed. These
+same-host checks do not validate the user's Internet route, real game audio fidelity
+or lip sync. The frontend suite passed 427 tests, including late-audio React effects.
+
 `GroupRoomManager.localMedia` and `remoteMedia` map independent media identities to streams. Validated descriptors contain kind, label, track identity, FPS and bitrate. The existing admitted/verified action gate protects the revisioned manifest and targeted Trystero stream metadata. Manifests reconcile removals and recover missing streams; old revisions and late media absent from the current manifest are ignored. Parameter updates are serialized per connection and filter by sender track so sessions retain distinct settings. RTP statistics are sampled per sender/receiver.
 
 Room slot keys are stable `owner/mediaId` identifiers. `ownerPeerId` is the actual authenticated participant; participant rosters, admission and moderation retain that identity. Screens sort before cameras. A camera-only owner has its camera as the first media card; an owner sharing screens has separate camera cards without additional peer identities. PiP uses the same slot keys, including sanitized native-window close routing.
