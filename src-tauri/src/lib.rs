@@ -79,6 +79,7 @@ pub fn run() {
             start_native_screen_capture,
             stop_native_screen_capture,
             screen_sources::start_capture_session,
+            screen_sources::get_capture_metrics,
             screen_sources::stop_capture_session,
             screen_sources::select_pointer_capture,
             start_audio_capture,

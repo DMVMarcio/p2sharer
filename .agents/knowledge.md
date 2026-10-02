@@ -42,6 +42,8 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 4. User Guidelines & Expressed Preferences
 
+- `[Capture Performance Validation]` Investigate low measured FPS on the current test hardware rather than attributing it to GPU capacity. Verify the current hardware and monitor refresh rate, compare optimized desktop capture with encoder-only tests, and report actual captured/encoded/decoded frame rates with per-stage timings. Debug test results alone do not establish production performance.
+
 - `[Independent Transmission Rendering]` Adding a camera must never replace another screen's remote content. All screen streams support interactive pointing independently. Overlays resize from all four corners and keep an inset from the stage edges. Preserve source aspect ratio, including portrait monitors, in thumbnails, live previews, and outgoing video. Repeated multi-stream start/stop cycles must retain surviving streams and release discontinued capture resources.
 
 - `[Stream Pointer Motion]` Interpolate received virtual cursor positions smoothly, including fast and long-distance movements, to avoid visible teleports between network snapshots. Apply the same movement recipe to viewer cards, PiP, and the broadcaster desktop; keep the locally controlled cursor immediate and leave click ripples anchored at their original coordinates.

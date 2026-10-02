@@ -63,11 +63,38 @@ struct CaptureSession {
     source: String,
     active: Arc<AtomicBool>,
     sender: broadcast::Sender<Message>,
+    metrics: Arc<CaptureMetrics>,
     #[cfg(windows)]
     control: Option<ActiveCaptureControl>,
 }
 static SESSIONS: std::sync::LazyLock<std::sync::Mutex<std::collections::HashMap<String, CaptureSession>>> =
     std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
+
+#[derive(Default)]
+pub struct CaptureMetrics {
+    callbacks: std::sync::atomic::AtomicU64,
+    gated: std::sync::atomic::AtomicU64,
+    images: std::sync::atomic::AtomicU64,
+    readback_us: std::sync::atomic::AtomicU64,
+    jpeg_us: std::sync::atomic::AtomicU64,
+    processing_us: std::sync::atomic::AtomicU64,
+}
+
+#[derive(Serialize)]
+pub struct CaptureMetricsSnapshot {
+    callbacks: u64, gated: u64, images: u64, readback_us: u64, jpeg_us: u64, processing_us: u64,
+}
+
+#[tauri::command]
+pub fn get_capture_metrics(session_id: String) -> Result<CaptureMetricsSnapshot, String> {
+    let sessions = SESSIONS.lock().map_err(|_| "Capture session lock poisoned")?;
+    let metrics = &sessions.get(&session_id).ok_or("Capture session is no longer active")?.metrics;
+    Ok(CaptureMetricsSnapshot {
+        callbacks: metrics.callbacks.load(Ordering::Relaxed), gated: metrics.gated.load(Ordering::Relaxed),
+        images: metrics.images.load(Ordering::Relaxed), readback_us: metrics.readback_us.load(Ordering::Relaxed),
+        jpeg_us: metrics.jpeg_us.load(Ordering::Relaxed), processing_us: metrics.processing_us.load(Ordering::Relaxed),
+    })
+}
 
 #[derive(Clone)]
 pub struct CaptureFlags {
@@ -80,6 +107,7 @@ pub struct CaptureFlags {
     pub latest_frame: Arc<std::sync::Mutex<Option<Arc<Vec<u8>>>>>,
     pub last_sent_us: Arc<std::sync::atomic::AtomicU64>,
     pub start_instant: std::time::Instant,
+    pub metrics: Arc<CaptureMetrics>,
 }
 
 #[cfg(windows)]
@@ -97,6 +125,7 @@ pub struct NativeWgcHandler {
     latest_frame: Arc<std::sync::Mutex<Option<Arc<Vec<u8>>>>>,
     last_sent_us: Arc<std::sync::atomic::AtomicU64>,
     start_instant: std::time::Instant,
+    metrics: Arc<CaptureMetrics>,
 }
 
 #[cfg(windows)]
@@ -121,6 +150,7 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
             latest_frame: ctx.flags.latest_frame,
             last_sent_us: ctx.flags.last_sent_us,
             start_instant: ctx.flags.start_instant,
+            metrics: ctx.flags.metrics,
         })
     }
 
@@ -137,7 +167,9 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
         // Keep the target cadence across callback jitter and non-matching refresh rates.
         // Resetting the gate after each frame can halve 60 FPS capture on a 75 Hz display.
         let arrival_time = std::time::Instant::now();
+        self.metrics.callbacks.fetch_add(1, Ordering::Relaxed);
         if arrival_time < self.next_frame_time {
+            self.metrics.gated.fetch_add(1, Ordering::Relaxed);
             return Ok(());
         }
 
@@ -160,6 +192,7 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
             self.next_frame_time = arrival_time + self.frame_interval;
         }
         let pixel_data = frame_buffer.as_nopadding_buffer(&mut self.raw_buffer);
+        self.metrics.readback_us.fetch_add(arrival_time.elapsed().as_micros() as u64, Ordering::Relaxed);
 
         let (final_pixels, final_w, final_h) = if self.target_width > 0
             && self.target_height > 0
@@ -197,7 +230,9 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
             (pixel_data, src_width, src_height)
         };
 
+        let encode_start = std::time::Instant::now();
         if let Ok(frame_bytes) = self.jpeg_encoder.encode_rgba(final_pixels, final_w, final_h) {
+            self.metrics.images.fetch_add(1, Ordering::Relaxed);
             let frame_arc = Arc::new(frame_bytes);
             if let Ok(mut cache) = self.latest_frame.lock() {
                 *cache = Some(frame_arc.clone());
@@ -208,6 +243,9 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
             );
             let _ = self.sender.send(Message::Binary((*frame_arc).clone()));
         }
+
+        self.metrics.jpeg_us.fetch_add(encode_start.elapsed().as_micros() as u64, Ordering::Relaxed);
+        self.metrics.processing_us.fetch_add(arrival_time.elapsed().as_micros() as u64, Ordering::Relaxed);
 
         Ok(())
     }
@@ -223,6 +261,17 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
 #[cfg(windows)]
 type ActiveCaptureControl =
     CaptureControl<NativeWgcHandler, Box<dyn std::error::Error + Send + Sync>>;
+
+#[cfg(windows)]
+fn capture_update_interval() -> MinimumUpdateIntervalSettings {
+    // A default Windows interval can quantize 60 FPS to 37.5 on a 75 Hz display.
+    // Let WGC deliver changes promptly; the phase-preserving handler enforces user FPS.
+    if windows_capture::graphics_capture_api::GraphicsCaptureApi::is_minimum_update_interval_supported().unwrap_or(false) {
+        MinimumUpdateIntervalSettings::Custom(std::time::Duration::from_millis(4))
+    } else {
+        MinimumUpdateIntervalSettings::Default
+    }
+}
 
 
 
@@ -702,9 +751,11 @@ pub fn start_capture_session(
     let jpeg_quality = quality.unwrap_or(90).clamp(50, 98);
 
     let sender = if session_id == "default" { get_frame_sender().clone() } else { broadcast::channel(32).0 };
+    let metrics = Arc::new(CaptureMetrics::default());
     SESSIONS.lock().map_err(|_| "Capture session lock poisoned")?.insert(session_id.clone(), CaptureSession {
         source: source_id.clone(),
         active: is_capturing.clone(), sender: sender.clone(),
+        metrics: metrics.clone(),
         #[cfg(windows)]
         control: None,
     });
@@ -764,6 +815,7 @@ pub fn start_capture_session(
     #[cfg(windows)]
     {
         let flags = CaptureFlags {
+            metrics,
             sender: sender.clone(),
             target_fps: fps,
             target_width: width,
@@ -816,7 +868,7 @@ pub fn start_capture_session(
                     cursor_settings,
                     DrawBorderSettings::WithoutBorder,
                     SecondaryWindowSettings::Default,
-                    MinimumUpdateIntervalSettings::Default,
+                    capture_update_interval(),
                     DirtyRegionSettings::Default,
                     ColorFormat::Rgba8,
                     flags.clone(),
@@ -848,7 +900,7 @@ pub fn start_capture_session(
                     cursor_settings,
                     DrawBorderSettings::WithoutBorder,
                     SecondaryWindowSettings::Default,
-                    MinimumUpdateIntervalSettings::Default,
+                    capture_update_interval(),
                     DirtyRegionSettings::Default,
                     ColorFormat::Rgba8,
                     flags.clone(),
@@ -1199,6 +1251,7 @@ mod tests {
         let (b, _) = broadcast::channel(32);
         for (id, sender) in [("socket-test-a", a.clone()), ("socket-test-b", b.clone())] {
             SESSIONS.lock().unwrap().insert(id.into(), CaptureSession {
+                metrics: Arc::new(CaptureMetrics::default()),
                 source: "screen:0".into(), active: Arc::new(AtomicBool::new(true)), sender,
                 #[cfg(windows)]
                 control: None,

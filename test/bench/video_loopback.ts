@@ -1,4 +1,5 @@
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { invoke } from '@tauri-apps/api/core';
 import { NativeVideoBridge } from '../../src/video/native_video_bridge';
 import { MediaCoordinator } from '../../src/p2p/media_coordinator';
 
@@ -18,7 +19,8 @@ export async function runVideoLoopback(options: {
   document.body.appendChild(canvas);
   const context = canvas.getContext('2d', { alpha: false })!;
   let frame = 0;
-  const timer = setInterval(() => {
+  let animation = 0;
+  const draw = () => {
     context.fillStyle = '#182430';
     context.fillRect(0, 0, 1920, 1080);
     for (let row = 0; row < 9; row++) {
@@ -28,7 +30,9 @@ export async function runVideoLoopback(options: {
     context.fillStyle = '#fff';
     context.font = '48px sans-serif';
     context.fillText(`1080p / 60 FPS — frame ${frame++}`, 40, 65);
-  }, 1000 / 60);
+    animation = requestAnimationFrame(draw);
+  };
+  animation = requestAnimationFrame(draw);
   const bridge = new NativeVideoBridge();
   const connections: RTCPeerConnection[] = [];
   const videos: HTMLVideoElement[] = [];
@@ -79,22 +83,24 @@ export async function runVideoLoopback(options: {
         ['outbound-rtp', 'inbound-rtp', 'media-source', 'codec', 'candidate-pair'].includes(entry.type));
     }));
     const before = await sample();
+    const nativeBefore = options.pipeline === 'canvas' ? undefined : await invoke('get_capture_metrics', { sessionId: bridge.sessionId });
     const captureBefore = { imageMessages, heartbeatMessages, timestamp: performance.now() };
     await new Promise((resolve) => setTimeout(resolve, 4000));
     const after = await sample();
+    const nativeAfter = options.pipeline === 'canvas' ? undefined : await invoke('get_capture_metrics', { sessionId: bridge.sessionId });
     const sourceBitmap = (bridge as unknown as { latestBitmap: ImageBitmap | null }).latestBitmap;
     const snapshot = document.createElement('canvas');
     snapshot.width = 480;
     snapshot.height = 270;
     if (sourceBitmap) snapshot.getContext('2d')!.drawImage(sourceBitmap, 0, 0, 480, 270);
-    return { sourceSnapshot: sourceBitmap ? snapshot.toDataURL() : undefined, options, animationFrames: frame, source: track.getSettings(), before, after,
+    return { nativeBefore, nativeAfter, sourceSnapshot: sourceBitmap ? snapshot.toDataURL() : undefined, options, animationFrames: frame, source: track.getSettings(), before, after,
       captureBefore, captureAfter: { imageMessages, heartbeatMessages, timestamp: performance.now() } };
   } finally {
     connections.forEach((pc) => pc.close());
     videos.forEach((video) => { video.srcObject = null; video.remove(); });
     stream?.getTracks().forEach((track) => track.stop());
     await bridge.stopCapture();
-    clearInterval(timer);
+    cancelAnimationFrame(animation);
     canvas.remove();
     await desktopWindow?.setAlwaysOnTop(wasAlwaysOnTop);
   }
