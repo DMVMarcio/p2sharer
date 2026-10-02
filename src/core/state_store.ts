@@ -1,3 +1,4 @@
+import { streamDrawingLimit, STREAM_DRAWING_MAX } from './stream_pointer.ts';
 import type { ResolutionConfig, RoomSlotInfo, StreamFilterMode, ThemeMode, TurnConfig } from './types.ts';
 import { parseTurnUrls } from '../p2p/ice_config.ts';
 
@@ -14,6 +15,7 @@ export class StateStore {
   public allowParticipantCursors = true;
   public allowParticipantPings = true;
   public allowParticipantDrawings = true;
+  public participantDrawingLimit = STREAM_DRAWING_MAX;
 
   public layoutMode: 'grid' | 'spotlight' = 'grid';
   public pinnedPeerId: string | null = null;
@@ -97,6 +99,7 @@ export class StateStore {
   public loadFromStorage(): void {
     if (typeof localStorage === 'undefined') return;
     this.allowParticipantCursors = localStorage.getItem('p2sharer_participant_cursors') !== 'false';
+    this.participantDrawingLimit = streamDrawingLimit(Number(localStorage.getItem('p2sharer_drawing_limit') ?? STREAM_DRAWING_MAX));
     this.allowParticipantDrawings = localStorage.getItem('p2sharer_participant_drawings') !== 'false';
     this.allowParticipantPings = localStorage.getItem('p2sharer_participant_pings') !== 'false';
     this.username = localStorage.getItem('p2sharer_username') || '';

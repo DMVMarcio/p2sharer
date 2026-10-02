@@ -1,3 +1,4 @@
+import { streamDrawingLimit, STREAM_DRAWING_MAX } from '../../core/stream_pointer';
 import { Select } from '../common/Select';
 import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
@@ -43,6 +44,7 @@ export const SettingsModal: React.FC = () => {
     () => localStorage.getItem('p2sharer_default_quality') || '90'
   );
   const [participantCursors, setParticipantCursors] = useState(() => stateStore.allowParticipantCursors);
+  const [drawingLimit, setDrawingLimit] = useState(() => stateStore.participantDrawingLimit);
   const [participantDrawings, setParticipantDrawings] = useState(() => stateStore.allowParticipantDrawings);
   const [participantPings, setParticipantPings] = useState(() => stateStore.allowParticipantPings);
   const [defaultCursor, setDefaultCursor] = useState(
@@ -101,9 +103,10 @@ export const SettingsModal: React.FC = () => {
     soundEffects.setVolume(sfxVolume / 100);
 
     localStorage.setItem('p2sharer_participant_cursors', String(participantCursors));
+    localStorage.setItem('p2sharer_drawing_limit', String(streamDrawingLimit(drawingLimit)));
     localStorage.setItem('p2sharer_participant_drawings', String(participantDrawings));
     localStorage.setItem('p2sharer_participant_pings', String(participantPings));
-    stateStore.set((s) => { s.allowParticipantCursors = participantCursors; s.allowParticipantPings = participantPings; s.allowParticipantDrawings = participantDrawings; });
+    stateStore.set((s) => { s.allowParticipantCursors = participantCursors; s.allowParticipantPings = participantPings; s.allowParticipantDrawings = participantDrawings; s.participantDrawingLimit = streamDrawingLimit(drawingLimit); });
     roomService.refreshStreamPointerPermissions();
 
     // Save Stream defaults
@@ -636,6 +639,14 @@ export const SettingsModal: React.FC = () => {
                       <span className="switch-slider" />
                     </div>
                   </label>)}
+                  <div className="settings-row">
+                    <label className="settings-label" htmlFor="settings-drawing-limit">Limite de rabiscos: <output>{drawingLimit}</output></label>
+                    <div className="settings-slider-container">
+                      <input autoComplete="off" type="range" id="settings-drawing-limit" min={1} max={STREAM_DRAWING_MAX} step={1}
+                        className="settings-slider-input" value={drawingLimit} disabled={!participantCursors || !participantDrawings}
+                        onChange={event => setDrawingLimit(streamDrawingLimit(Number(event.target.value)))} />
+                    </div>
+                  </div>
                   <label className="settings-switch-row" htmlFor="settings-check-cursor">
                     <div className="settings-switch-label-group">
                       <span className="settings-switch-title">Captura do Cursor do Mouse</span>

@@ -59,7 +59,9 @@ test('stationary drawings renew their TTL while snapshots and desktop IPC avoid 
   receiver.receive({ kind: 'draw', id: 'one', drawing: drawing() }, 'alice', 'Alice', 'cyan');
   for (let i = 0; i < 80; i++) { context.mock.timers.tick(50); await Promise.resolve(); await Promise.resolve(); }
   assert.equal(states.length, 5);
-  assert.equal(states.at(-1)?.visuals.length, 1);
+  assert.equal(states[0]?.visuals.length, 1);
+  assert.equal(states.at(-1)?.visuals.length, 0);
+  assert.equal(states.at(-1)?.drawingsIncluded, false);
   assert.ok(validStreamPointerState(states.at(-1)));
-  assert.ok(states.at(-1)!.visuals[0].expires > Date.now());
+  assert.ok(states[0]!.visuals[0].expires > states[0]!.sentAt);
 });
