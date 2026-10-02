@@ -18,6 +18,7 @@ export function summarizeVideoLoopback(result) {
     stagingAllocations: delta(result.nativeBefore, result.nativeAfter, 'staging_allocations'),
     readbackErrors: delta(result.nativeBefore, result.nativeAfter, 'readback_errors'),
     gpuScaledImages: delta(result.nativeBefore, result.nativeAfter, 'gpu_scaled_images'),
+    load: result.nativeAfter?.load,
   };
   const rtp = result.after.flatMap((reports, connection) => reports.filter(report =>
     ['outbound-rtp', 'inbound-rtp'].includes(report.type) && report.kind === 'video').map(report => {

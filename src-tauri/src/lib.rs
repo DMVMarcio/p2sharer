@@ -9,6 +9,7 @@ pub mod process_manager;
 pub mod room_vault;
 pub mod screen_sources;
 mod video_jpeg;
+mod video_load;
 #[cfg(windows)]
 mod video_readback;
 #[cfg(windows)]
@@ -84,6 +85,7 @@ pub fn run() {
             stop_native_screen_capture,
             screen_sources::start_capture_session,
             screen_sources::get_capture_metrics,
+            screen_sources::report_capture_load,
             screen_sources::stop_capture_session,
             screen_sources::select_pointer_capture,
             start_audio_capture,

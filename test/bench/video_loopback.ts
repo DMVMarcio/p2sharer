@@ -10,6 +10,7 @@ export async function runVideoLoopback(options: {
   probe?: boolean;
   hideReceivers?: boolean;
   resolution?: { width: number; height: number };
+  loadScenario?: boolean | 'sustained';
 } = {}) {
   const desktopWindow = options.pipeline === 'canvas' ? undefined : getCurrentWindow();
   const wasAlwaysOnTop = desktopWindow ? await desktopWindow.isAlwaysOnTop() : false;
@@ -42,6 +43,8 @@ export async function runVideoLoopback(options: {
   let imageMessages = 0;
   let heartbeatMessages = 0;
   let jpegBytes = 0;
+  let secondaryBridge: NativeVideoBridge | undefined;
+  let loadScenario: unknown;
   try {
     stream = options.pipeline === 'canvas'
       ? canvas.captureStream(60)
@@ -88,6 +91,47 @@ export async function runVideoLoopback(options: {
       return Array.from(stats.values()).filter((entry) =>
         ['outbound-rtp', 'inbound-rtp', 'media-source', 'codec', 'candidate-pair'].includes(entry.type));
     }));
+    if (options.loadScenario) {
+      if (options.pipeline === 'canvas') throw new Error('Load scenario requires native capture');
+      secondaryBridge = new NativeVideoBridge(crypto.randomUUID());
+      await secondaryBridge.startCapture('screen:0', 30, { width: 640, height: 360 }, false, 90);
+      const writer = (bridge as unknown as { trackWriter: WritableStreamDefaultWriter<VideoFrame> }).trackWriter;
+      if (!writer) throw new Error('Load scenario requires the track generator');
+      const originalWrite = writer.write.bind(writer);
+      let slowWrite = true;
+      writer.write = async (frame) => {
+        if (slowWrite) await new Promise(resolve => setTimeout(resolve, 100));
+        return originalWrite(frame);
+      };
+      const phases = [];
+      const overloadSamples = options.loadScenario === 'sustained' ? 11 : 3;
+      const totalSamples = options.loadScenario === 'sustained' ? 38 : 16;
+      try {
+        for (let index = 0; index < totalSamples; index++) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          if (index === overloadSamples - 1) slowWrite = false;
+          const metrics = await invoke<{ load: { resolution_scale_percent: number; effective_fps: number; adjustments: number } }>(
+            'get_capture_metrics', { sessionId: bridge.sessionId });
+          const secondary = await invoke<{ load: { adjustments: number } }>('get_capture_metrics', { sessionId: secondaryBridge.sessionId });
+          const bitmap = (bridge as unknown as { latestBitmap: ImageBitmap | null }).latestBitmap;
+          phases.push({ seconds: (index + 1) * 2, injectedSlowWrite: index < overloadSamples, metrics, secondary,
+            bitmap: bitmap ? { width: bitmap.width, height: bitmap.height } : undefined, rtp: await sample() });
+        }
+        const loads = phases.map(phase => phase.metrics.load);
+        if (!loads.some(load => load.resolution_scale_percent < 100)) throw new Error('Sustained bridge load was not adapted');
+        if (options.loadScenario === 'sustained' && !loads.some(load => load.effective_fps === 30)) {
+          throw new Error('Sustained overload did not reach the bounded FPS fallback');
+        }
+        if (loads.at(-1)?.resolution_scale_percent !== 100 || loads.at(-1)?.effective_fps !== 60) {
+          throw new Error('Capture did not recover its requested settings');
+        }
+        if (phases.some(phase => phase.secondary.load.adjustments !== 0)) throw new Error('Adaptation leaked into the second capture');
+        loadScenario = phases;
+      } finally {
+        slowWrite = false;
+        writer.write = originalWrite;
+      }
+    }
     const before = await sample();
     const nativeBefore = options.pipeline === 'canvas' ? undefined : await invoke('get_capture_metrics', { sessionId: bridge.sessionId });
     const captureBefore = { imageMessages, heartbeatMessages, jpegBytes, timestamp: performance.now() };
@@ -115,13 +159,14 @@ export async function runVideoLoopback(options: {
     snapshot.width = 480;
     snapshot.height = 270;
     if (sourceBitmap) snapshot.getContext('2d')!.drawImage(sourceBitmap, 0, 0, 480, 270);
-    return { nativeBefore, nativeAfter, visualChecks, sourceSnapshot: sourceBitmap ? snapshot.toDataURL() : undefined, options, animationFrames: frame, source: track.getSettings(), before, after,
+    return { nativeBefore, nativeAfter, loadScenario, visualChecks, sourceSnapshot: sourceBitmap ? snapshot.toDataURL() : undefined, options, animationFrames: frame, source: track.getSettings(), before, after,
       captureBefore, captureAfter: { imageMessages, heartbeatMessages, jpegBytes, timestamp: performance.now() } };
   } finally {
     connections.forEach((pc) => pc.close());
     videos.forEach((video) => { video.srcObject = null; video.remove(); });
     stream?.getTracks().forEach((track) => track.stop());
     await bridge.stopCapture();
+    await secondaryBridge?.stopCapture();
     cancelAnimationFrame(animation);
     canvas.remove();
     await desktopWindow?.setAlwaysOnTop(wasAlwaysOnTop);

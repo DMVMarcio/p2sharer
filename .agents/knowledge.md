@@ -42,6 +42,8 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 4. User Guidelines & Expressed Preferences
 
+- `[Optional Native Hardware Encoding]` Schedule capability-probed native NVENC integration as a final optimization stage after load adaptation and frame regularity. Preserve the optimized generic native fallback, the application's picker, and compatibility with non-NVIDIA systems; measure end-to-end gains rather than assuming the adapter brand guarantees improvement.
+
 - `[Streaming Optimization Sequence]` Work on the user's selected streaming refactor branch and implement/validate changes one stage at a time: video-path cost reduction, load adaptation, then frame regularity. Preserve native capture and capability-based portability, measure real desktop results before claiming improvements, and keep each stage independently reviewable.
 
 - `[Annotation Toolbar Toggles]` Clicking an already selected drawing tool deselects it and returns to Mouse. The color palette closes on a second trigger click and highlights the current color with a selected row background. Keep the overall drawing toolbar transparent; only its individual controls, including the size slider, have readable backgrounds.
