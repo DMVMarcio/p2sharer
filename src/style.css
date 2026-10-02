@@ -1954,13 +1954,20 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   transition: all var(--transition-fast);
 }
 
-.btn-stream-fullscreen:hover,
-.btn-stream-pin:hover,
-.btn-stream-pip:hover {
+.btn-stream-fullscreen:hover:not(:disabled),
+.btn-stream-pin:hover:not(:disabled),
+.btn-stream-pip:hover:not(:disabled) {
   background-color: rgba(15, 15, 22, 0.94);
   border-color: var(--accent-border);
   color: var(--accent-color);
   transform: scale(1.08);
+}
+
+.btn-stream-fullscreen:disabled,
+.btn-stream-pin:disabled,
+.btn-stream-pip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .btn-stream-pin.active {

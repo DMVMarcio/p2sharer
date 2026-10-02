@@ -16,9 +16,9 @@ html.stream-pointer-desktop, .stream-pointer-desktop body, .stream-pointer-deskt
 }
 
 .stream-drawing-layer { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; pointer-events: none; }
-.stream-drawing-toolbar { position: absolute; top: 40px; left: 12px; right: 12px; z-index: 12; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; width: fit-content; max-width: calc(100% - 24px); padding: 8px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--bg-secondary); color: var(--text-primary); }
+.stream-drawing-toolbar { position: absolute; top: 34px; left: 10px; right: 10px; z-index: 12; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; width: fit-content; max-width: calc(100% - 20px); padding: 8px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--bg-surface); color: var(--text-primary); }
 .stream-drawing-swatch { display: inline-block; width: 16px; height: 16px; border: 1px solid var(--border-subtle); border-radius: 50%; }
-.stream-drawing-size { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 4px 7px; border-radius: var(--radius-sm); background: var(--bg-tertiary); border: 1px solid var(--border-subtle); box-shadow: 0 1px 4px rgba(0, 0, 0, .25); }
+.stream-drawing-size { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 4px 7px; border-radius: var(--radius-sm); background: var(--bg-input); border: 1px solid var(--border-default); box-shadow: var(--shadow-md); }
 .stream-drawing-size input { width: 72px; }
 .stream-drawing-size output { min-width: 16px; }
 .stream-drawing-toolbar .text-input { width: 180px; }

@@ -106,7 +106,7 @@ Rather than re-rendering HTML strings when peers join, leave, or toggle streams:
 ## 4. UI Design Tokens & Theme Engine (`src/style.css`)
 
 - **Design System Tokens**:
-  - CSS Custom Properties define all surfaces (`--bg-primary`, `--bg-secondary`, `--bg-tertiary`), borders (`--border-subtle`, `--border-focus`), text (`--text-primary`, `--text-muted`), and accent hues.
+  - CSS Custom Properties define all surfaces (`--bg-app`, `--bg-surface`, `--bg-elevated`, `--bg-card`, `--bg-input`), borders (`--border-subtle`, `--border-focus`), text (`--text-primary`, `--text-muted`), and accent hues.
   - Accent colors dynamically update `--accent-color`, `--accent-glow`, and `--accent-hover`.
 - **Accessibility & Feedback**:
   - Custom SVG icons from `lucide`.
