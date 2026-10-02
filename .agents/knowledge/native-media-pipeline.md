@@ -218,3 +218,12 @@ generic path remains intact. The current H264 bridge decodes locally and still u
 the browser WebRTC encoder; direct encoded RTP remains outstanding. See
 [NVENC implementation, validated fallback and measured limits](native-nvenc.md)
 before modifying the encoder or claiming complete native transport optimization.
+
+
+## Native encoded RTP publication (2026-10-02)
+
+The optional NVENC path now publishes native H264 through webrtc-rs RTP/DTLS-SRTP,
+without full-resolution browser re-encoding. WebCodecs remains only for local preview.
+See [native-nvenc.md](native-nvenc.md) for generation ownership, packet pacing, rate
+control, keyframe recovery, audio association, fallback and measured validation
+limits. The `P2SHARER_NATIVE_NVENC=1` flag remains required for experimental rollout.

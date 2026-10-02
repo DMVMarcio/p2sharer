@@ -3,6 +3,7 @@ import type { ScreenSourcesResponse, VideoCaptureBridge, VideoSourceOptions } fr
 import { BridgeLoadMeter } from './bridge_load_meter.ts';
 import { VideoFrameClock } from './frame_timing.ts';
 import { isNativeEncodedPacket, NativeEncodedDecoder } from './native_encoded_video.ts';
+import { registerNativeSenderSource } from './native_sender_source.ts';
 
 export class NativeVideoBridge implements VideoCaptureBridge {
   public readonly sessionId: string;
@@ -437,7 +438,12 @@ export class NativeVideoBridge implements VideoCaptureBridge {
       await new Promise<void>((resolve, reject) => {
         const started = performance.now();
         const check = () => {
-          if (this.latestBitmap || this.latestEncodedFrame) { resolve(); return; }
+          if (this.latestBitmap || this.latestEncodedFrame) {
+            if (this.latestEncodedFrame && stream.getVideoTracks()[0]) {
+              registerNativeSenderSource(stream.getVideoTracks()[0], { sessionId: this.sessionId, feedbackToken });
+            }
+            resolve(); return;
+          }
           if (!this.isCapturing || performance.now() - started > 6000) {
             reject(new Error('A fonte selecionada não forneceu quadros de vídeo.'));
             return;

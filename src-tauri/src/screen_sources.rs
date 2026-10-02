@@ -65,6 +65,7 @@ static FRAME_SENDER: std::sync::OnceLock<broadcast::Sender<Message>> = std::sync
 struct CaptureSession {
     nvenc_enabled: Arc<AtomicBool>,
     nvenc_keyframe: Arc<AtomicBool>,
+    nvenc_bitrate: Arc<std::sync::atomic::AtomicU32>,
     source: String,
     active: Arc<AtomicBool>,
     sender: broadcast::Sender<Message>,
@@ -75,6 +76,22 @@ struct CaptureSession {
 }
 static SESSIONS: std::sync::LazyLock<std::sync::Mutex<std::collections::HashMap<String, CaptureSession>>> =
     std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
+
+pub struct EncodedCapture {
+    pub frames: broadcast::Receiver<Message>,
+    pub active: Arc<AtomicBool>,
+    pub keyframe: Arc<AtomicBool>,
+    pub bitrate: Arc<std::sync::atomic::AtomicU32>,
+    pub load: Arc<crate::video_load::CaptureLoad>,
+}
+pub fn encoded_capture(id: &str, token: &str) -> Result<EncodedCapture, String> {
+    let sessions = SESSIONS.lock().map_err(|_| "Capture session lock poisoned")?;
+    let session = sessions.get(id).ok_or("Capture session is no longer active")?;
+    session.load.validate_token(token)?;
+    if !session.nvenc_enabled.load(Ordering::Relaxed) { return Err("Native encoder is unavailable".into()); }
+    Ok(EncodedCapture { frames: session.sender.subscribe(), active: session.active.clone(),
+        keyframe: session.nvenc_keyframe.clone(), bitrate: session.nvenc_bitrate.clone(), load: session.load.clone() })
+}
 
 #[derive(Default)]
 pub struct CaptureMetrics {
@@ -154,7 +171,7 @@ pub fn get_native_encoder_support() -> serde_json::Value {
     let support: Result<(), String> = Err("Native NVENC requires Windows".into());
     serde_json::json!({ "driver_api_available": support.is_ok(),
         "experimental_enabled": std::env::var("P2SHARER_NATIVE_NVENC").as_deref() == Ok("1"),
-        "reason": support.err(), "transport": "h264_webcodecs_then_webrtc" })
+        "reason": support.err(), "transport": "native_h264_rtp" })
 }
 
 #[tauri::command]
@@ -237,6 +254,7 @@ fn start_frame_delivery(delivery: FrameDelivery, active: Arc<AtomicBool>, load: 
 pub struct CaptureFlags {
     pub nvenc_enabled: Arc<AtomicBool>,
     pub nvenc_keyframe: Arc<AtomicBool>,
+    nvenc_bitrate: Arc<std::sync::atomic::AtomicU32>,
     pub delivery: FrameDelivery,
     pub legacy_pacing: bool,
     pub load: Arc<crate::video_load::CaptureLoad>,
@@ -255,6 +273,7 @@ pub struct NativeWgcHandler {
     nvenc: crate::video_nvenc::GpuEncoder,
     nvenc_enabled: Arc<AtomicBool>,
     nvenc_keyframe: Arc<AtomicBool>,
+    nvenc_bitrate: Arc<std::sync::atomic::AtomicU32>,
     delivery: FrameDelivery,
     legacy_pacing: bool,
     load: Arc<crate::video_load::CaptureLoad>,
@@ -290,6 +309,7 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
             nvenc: crate::video_nvenc::GpuEncoder::default(),
             nvenc_enabled: ctx.flags.nvenc_enabled,
             nvenc_keyframe: ctx.flags.nvenc_keyframe,
+            nvenc_bitrate: ctx.flags.nvenc_bitrate,
             delivery: ctx.flags.delivery,
             legacy_pacing: ctx.flags.legacy_pacing,
             load: ctx.flags.load,
@@ -358,7 +378,7 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
         if self.nvenc_enabled.load(Ordering::Relaxed) && (scaled.is_some() || (src_width <= self.target_width && src_height <= self.target_height)) {
             let encoder_started = std::time::Instant::now();
             let result = self.nvenc.encode(frame.device(), scaled.as_ref().unwrap_or(frame.as_raw_texture()),
-                src_width, src_height, self.load.fps(), self.start_instant.elapsed().as_micros() as u64,
+                src_width, src_height, self.load.fps(), self.nvenc_bitrate.load(Ordering::Relaxed), self.start_instant.elapsed().as_micros() as u64,
                 self.nvenc_keyframe.swap(false, Ordering::Relaxed));
             self.metrics.nvenc_us.fetch_add(encoder_started.elapsed().as_micros() as u64, Ordering::Relaxed);
             match result {
@@ -990,8 +1010,9 @@ pub fn start_capture_session(
     let load = Arc::new(crate::video_load::CaptureLoad::new(fps, width, height, feedback_token));
     let nvenc_enabled = Arc::new(AtomicBool::new(std::env::var("P2SHARER_NATIVE_NVENC").as_deref() == Ok("1")));
     let nvenc_keyframe = Arc::new(AtomicBool::new(true));
+    let nvenc_bitrate = Arc::new(std::sync::atomic::AtomicU32::new(15_000_000));
     SESSIONS.lock().map_err(|_| "Capture session lock poisoned")?.insert(session_id.clone(), CaptureSession {
-        nvenc_enabled: nvenc_enabled.clone(), nvenc_keyframe: nvenc_keyframe.clone(),
+        nvenc_enabled: nvenc_enabled.clone(), nvenc_keyframe: nvenc_keyframe.clone(), nvenc_bitrate: nvenc_bitrate.clone(),
         source: source_id.clone(),
         active: is_capturing.clone(), sender: sender.clone(),
         metrics: metrics.clone(),
@@ -1007,7 +1028,7 @@ pub fn start_capture_session(
     #[cfg(windows)]
     {
         let flags = CaptureFlags {
-            nvenc_enabled: nvenc_enabled.clone(), nvenc_keyframe: nvenc_keyframe.clone(),
+            nvenc_enabled: nvenc_enabled.clone(), nvenc_keyframe: nvenc_keyframe.clone(), nvenc_bitrate: nvenc_bitrate.clone(),
             delivery: delivery.clone(),
             legacy_pacing,
             metrics: metrics.clone(),
@@ -1442,7 +1463,7 @@ mod tests {
         let (b, _) = broadcast::channel(32);
         for (id, sender) in [("socket-test-a", a.clone()), ("socket-test-b", b.clone())] {
             SESSIONS.lock().unwrap().insert(id.into(), CaptureSession {
-                nvenc_enabled: Arc::new(AtomicBool::new(false)), nvenc_keyframe: Arc::new(AtomicBool::new(true)),
+                nvenc_enabled: Arc::new(AtomicBool::new(false)), nvenc_keyframe: Arc::new(AtomicBool::new(true)), nvenc_bitrate: Arc::new(std::sync::atomic::AtomicU32::new(15_000_000)),
                 metrics: Arc::new(CaptureMetrics::default()),
                 load: Arc::new(crate::video_load::CaptureLoad::new(60, 0, 0, None)),
                 source: "screen:0".into(), active: Arc::new(AtomicBool::new(true)), sender,

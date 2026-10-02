@@ -189,3 +189,30 @@ after live JPEG fallback. `runNvencLifecycle()` also runs six repeated restarts 
 simulates an unavailable decoder, asserting that JPEG resumes. A 120 FPS target on
 the physical 75 Hz source delivered 74.72 fresh native FPS plus cached repetition,
 120.15 decoded FPS and 9.7 ms track-write p95; it does not establish 120 FPS of motion.
+
+
+### Native NVENC RTP publication
+
+Enable `P2SHARER_NATIVE_NVENC=1` before a fresh packaged desktop launch. Bundle
+`native_rtp_loopback.ts` for desktop WebView2 and call `runNativeRtpLoopback`.
+This uses native RTP/SRTP and normal browser H264 receivers, rather than the older
+`runVideoLoopback` path which intentionally retains browser sending video tracks.
+Options include `peers`, `fps`, `warmupMs`, and `lifecycle`. The diagnostic receiver
+worker checks encoded NAL fingerprints and sends real keyframe requests. Native
+source websocket observations may arrive after the receiver, so matches are
+reconciled. The lifecycle checks bitrate edits, independent sources, restart,
+resource release and fallback notification. Keep loopback isolated from other native
+routes because its route-count assertions expect ownership of the QA process.
+
+For actual room integration, bundle `native_rtp_room.ts` into two separate packaged
+processes/profiles. Join a unique password-protected QA room, call
+`publishNativeRtpRoom` in one process and sample `nativeRtpRoomStats` in both.
+`stopNativeRtpRoomStream` checks survivor/audio transfer;
+`disableNativeRtpRoomEncoder` checks generic republishing; `closeNativeRtpRoom`
+cleans up. The receiving process may leave native NVENC disabled. Do not use an
+existing user room for diagnostic publications.
+
+On the 75 Hz host, requesting 120 FPS yields about 75 fresh frames/second through
+native RTP. This is not a physical high-refresh monitor test. See
+`.agents/knowledge/native-nvenc.md` for measured results and outstanding deployment
+conditions, including native loss/RTT rate control rather than Chromium GCC.

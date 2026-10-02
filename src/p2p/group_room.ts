@@ -36,6 +36,7 @@ import {
 } from './ice_config.ts';
 import { createFileOptimizedPeerConnection, type FileOptimizedConnection } from './file_data_channel.ts';
 import { FileBulkChannelManager } from './file_bulk_channel.ts';
+import { NativeVideoTransport } from './native_video_transport.ts';
 import { MediaCoordinator } from './media_coordinator.ts';
 import { PeerTracker } from './peer_tracker.ts';
 import { signalingManager } from './signaling_manager.ts';
@@ -138,13 +139,15 @@ export class GroupRoomManager {
   private turnConfig: TurnConfig | null = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private room: any = null;
+  private nativeVideo: NativeVideoTransport | null = null;
+  private nativeVideoAction: any = null;
   private localMedia = new Map<string, { descriptor: StreamDescriptor; stream: MediaStream }>();
   private remoteMedia = new Map<string, Map<string, MediaStream>>();
   private observedRemoteStreams = new WeakSet<MediaStream>();
   private remoteDescriptors = new Map<string, StreamDescriptor[]>();
   private remoteMediaRevisions = new Map<string, number>();
   private mediaRevision = 0;
-  private mediaStatsSamples = new Map<string, { bytes: number; at: number }>();
+  private mediaStatsSamples = new Map<string, { bytes: number; at: number; nativeFrames?: number }>();
   private localStream: MediaStream | null = null;
 
   // Single source of truth for peer states and verified connections
@@ -1178,6 +1181,8 @@ export class GroupRoomManager {
         const wasStreaming = this.peerTracker.isStreaming(peerId);
         this.remoteMediaRevisions.set(peerId, data.revision!);
         this.remoteDescriptors.set(peerId, data.streams);
+        const previous = this.remoteMedia.get(peerId);
+        if (previous) for (const id of previous.keys()) if (!data.streams.some(entry => entry.id === id)) this.nativeVideo?.stop(id, peerId);
         const media = this.remoteMedia.get(peerId);
         if (media) for (const id of media.keys()) if (!data.streams.some((entry) => entry.id === id)) media.delete(id);
         this.peerTracker.setStreaming(peerId, data.streams.length > 0);
@@ -1430,6 +1435,24 @@ export class GroupRoomManager {
       }
     };
 
+    this.nativeVideo?.close();
+    this.nativeVideoAction = this.room.makeAction('native_video_v1');
+    this.nativeVideo = new NativeVideoTransport({
+      rtc: () => buildRtcConfiguration(this.turnConfig),
+      send: (peerId, signal) => this.nativeVideoAction?.send(signal, { target: peerId }),
+      permitted: (peerId, descriptor) => this.room === boundRoom && this.peerTracker.isVerified(peerId) &&
+        (!this.authority || this.localAdmitted && this.isAdmittedPeer(peerId)) &&
+        (!descriptor || !!this.remoteDescriptors.get(peerId)?.some(entry => entry.id === descriptor.id && entry.videoTrackId === descriptor.videoTrackId)),
+      receive: (peerId, stream, descriptor) => this.receivePeerStream(stream, peerId, descriptor),
+      fallback: (peerId, mediaId) => {
+        const entry = this.localMedia.get(mediaId);
+        if (entry && this.room === boundRoom) this.dispatchMediaToPeer(peerId);
+      },
+    });
+    this.nativeVideoAction.onMessage = (data: unknown, meta: { peerId: string }) => {
+      void this.nativeVideo?.signal(meta.peerId, data).catch(error => console.warn('[Native RTP] Signal rejected:', error));
+    };
+
     // Trystero delivers action handlers asynchronously. A queued message from
     // the previous transport must not mutate the replacement room's state.
     [
@@ -1438,7 +1461,7 @@ export class GroupRoomManager {
       this.pexAction, this.meshRelayAction, this.watchAction,
       this.pingAction, this.pongAction, this.identityAction,
       this.authorityAction, this.admissionAction, this.inviteAction,
-      this.appAction, this.fileAction, this.pointerAction,
+      this.appAction, this.fileAction, this.pointerAction, this.nativeVideoAction,
     ].forEach((action) => {
       if (!action?.onMessage) return;
       const handler = action.onMessage;
@@ -1542,8 +1565,18 @@ export class GroupRoomManager {
     };
 
     // 10. Incoming Stream Listener
+    this.room.onPeerTrack = (track: MediaStreamTrack, _stream: MediaStream, peerId: string, metadata?: StreamDescriptor) => {
+      if (this.room !== boundRoom || !metadata || !validStreamDescriptors([metadata])) return;
+      this.receivePeerStream(new MediaStream([track]), peerId, metadata);
+    };
     this.room.onPeerStream = (stream: MediaStream, peerId: string, metadata?: StreamDescriptor) => {
       if (this.room !== boundRoom) return;
+      this.receivePeerStream(stream, peerId, metadata);
+    };
+
+  }
+
+  private receivePeerStream(stream: MediaStream, peerId: string, metadata?: StreamDescriptor): void {
       if (!this.peerTracker.isVerified(peerId)) return;
       if (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(peerId))) return;
       if (metadata !== undefined && !validStreamDescriptors([metadata])) return;
@@ -1558,6 +1591,17 @@ export class GroupRoomManager {
           this.remoteDescriptors.set(peerId, [...entries, metadata]);
         }
         const media = this.remoteMedia.get(peerId) || new Map<string, MediaStream>();
+        const existing = media.get(metadata.id);
+        if (existing) {
+          const video = stream.getVideoTracks().length ? stream.getVideoTracks() : existing.getVideoTracks();
+          const audio = stream.getAudioTracks().length ? stream.getAudioTracks() : existing.getAudioTracks();
+          const incoming = stream;
+          stream = new MediaStream([...video, ...audio]);
+          if (!this.observedRemoteStreams.has(incoming)) {
+            this.observedRemoteStreams.add(incoming);
+            incoming.addEventListener('addtrack', () => this.receivePeerStream(incoming, peerId, metadata));
+          }
+        }
         media.set(metadata.id, stream);
         this.remoteMedia.set(peerId, media);
       }
@@ -1600,7 +1644,6 @@ export class GroupRoomManager {
 
       this.notifyStreamsUpdate();
       this.callbacks?.onStatusChange('Ao Vivo');
-    };
   }
 
   private startHeartbeatLoop(): void {
@@ -1720,6 +1763,7 @@ export class GroupRoomManager {
   }
 
   private removePeer(peerId: string) {
+    this.nativeVideo?.stop(undefined, peerId);
     this.pendingChallenges.delete(peerId);
     this.fileBulk.close(peerId);
     for (const [requestId, session] of this.fileSessions) {
@@ -1930,6 +1974,15 @@ export class GroupRoomManager {
     const room = this.room;
     if (!room) return;
     for (const entry of this.localMedia.values()) {
+      if (this.nativeVideo?.dispatch(peerId, entry.stream, entry.descriptor)) {
+        for (const video of entry.stream.getVideoTracks()) room.removeTrack(video, { target: peerId });
+        for (const audio of entry.stream.getAudioTracks()) {
+          for (const operation of room.addTrack(audio, entry.stream, { target: peerId, metadata: entry.descriptor }) || []) {
+            void Promise.resolve(operation).catch(error => console.warn('[Media] Audio dispatch failed:', error));
+          }
+        }
+        continue;
+      }
       for (const operation of room.addStream(entry.stream, { target: peerId, metadata: entry.descriptor }) || []) {
         void Promise.resolve(operation).then(() => {
           if (this.room !== room || this.localMedia.get(entry.descriptor.id) !== entry) {
@@ -1991,6 +2044,8 @@ export class GroupRoomManager {
     this.mediaRevision++;
     old?.stop();
     this.publishMediaManifest();
+    this.nativeVideo?.stop(id);
+    for (const peerId of this.peerTracker.directConnectedPeers) this.sendStreamToPeer(peerId);
     this.boostSenders();
     this.lastStreamsHash = '';
     this.notifyStreamsUpdate();
@@ -2000,6 +2055,7 @@ export class GroupRoomManager {
     const entry = this.localMedia.get(id);
     if (!entry) throw new Error('Transmission no longer exists');
     entry.descriptor = { ...entry.descriptor, fps, bitrate };
+    this.nativeVideo?.update(id, bitrate);
     this.mediaRevision++;
     this.publishMediaManifest();
     this.boostSenders();
@@ -2048,6 +2104,7 @@ export class GroupRoomManager {
           }
         }
       }
+      this.nativeVideo?.stop(entry.descriptor.id);
       this.room?.removeStream(entry.stream);
       for (const track of entry.stream.getTracks()) track.stop();
       this.localMedia.delete(entry.descriptor.id);
@@ -2345,11 +2402,12 @@ export class GroupRoomManager {
     let bytes = 0;
     let timestamp = 0;
     let connections = 0;
+    let nativeFrames: number | undefined;
     const peers = this.room?.getPeers?.() || {};
     try {
       for (const [owner, peer] of Object.entries(peers) as Array<[string, any]>) {
         if (!slot.isLocal && owner !== slot.ownerPeerId) continue;
-        const pc: RTCPeerConnection = peer?.connection || peer?.pc || peer;
+        const pc: RTCPeerConnection = (!slot.isLocal && slot.mediaId ? this.nativeVideo?.receiver(owner, slot.mediaId) : undefined) || peer?.connection || peer?.pc || peer;
         const endpoint = slot.isLocal ? pc?.getSenders?.().find((sender) => sender.track === track) :
           pc?.getReceivers?.().find((receiver) => receiver.track === track);
         if (!endpoint?.getStats) continue;
@@ -2371,11 +2429,22 @@ export class GroupRoomManager {
           if (route.pingMs !== null) result.pingMs = route.pingMs;
         }
       }
+      if (slot.isLocal && slot.mediaId) {
+        const native = await this.nativeVideo?.senderStats(slot.mediaId);
+        if (native?.length) {
+          bytes += native.reduce((total, sender) => total + sender.bytes, 0);
+          nativeFrames = native.reduce((total, sender) => total + sender.frames, 0);
+          timestamp = Date.now(); connections += native.length;
+        }
+      }
       const previous = this.mediaStatsSamples.get(key);
       if (timestamp && previous && timestamp - previous.at >= 500 && bytes >= previous.bytes) {
         result.bitrateKbps = Math.round((bytes - previous.bytes) * 8 / (timestamp - previous.at) / Math.max(1, connections));
+        if (nativeFrames !== undefined && previous.nativeFrames !== undefined && nativeFrames >= previous.nativeFrames) {
+          result.fps = Math.round((nativeFrames - previous.nativeFrames) * 1000 / (timestamp - previous.at) / Math.max(1, connections));
+        }
       }
-      if (timestamp && (!previous || timestamp - previous.at >= 500)) this.mediaStatsSamples.set(key, { bytes, at: timestamp });
+      if (timestamp && (!previous || timestamp - previous.at >= 500)) this.mediaStatsSamples.set(key, { bytes, at: timestamp, nativeFrames });
     } catch (error) { console.warn('[Media] Could not sample transmission stats:', error); }
     this.peerStatsCache.set(key, { stats: result, timestamp: Date.now() });
     return result;
@@ -3039,6 +3108,8 @@ export class GroupRoomManager {
     // Allow a brief flush window for socket buffers before tearing down WebRTC
     await new Promise((resolve) => setTimeout(resolve, 60));
 
+    this.nativeVideo?.close();
+    this.nativeVideo = null;
     this.fileBulk.closeAll();
     const roomToLeave = this.room;
     this.room = null;
