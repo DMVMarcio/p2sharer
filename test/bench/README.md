@@ -22,6 +22,10 @@ Close the desktop app before running a packaging build. The native benchmark tem
 
 Compute FPS from the differences between `before` and `after` frame counters and timestamps, rather than counting static heartbeat messages. `captureBefore`/`captureAfter` separate full native image messages from cached-frame heartbeats. The benchmark runs sender and receivers on the same PC; it cannot validate another participant's network, decoder, or Internet route.
 
+The animation uses requestAnimationFrame so a quantized setInterval timer cannot cap the benchmark's input below 60 FPS. For native runs, `nativeBefore`/`nativeAfter` expose per-session WGC callbacks, gate drops, image counts, GPU readback, JPEG compression and total processing microseconds. Compute timings from counter deltas divided by the image delta. This separates Windows capture cadence from WebView/encoder throughput.
+
+Use `cargo test --release --lib screen_sources::tests -- --test-threads=1` for optimized native unit checks, and finish with `npm run tauri:build` before launching the packaged application. Running all Cargo test targets can rebuild the application binary without Tauri's production feature configuration in the same release directory.
+
 
 ### JPEG encoding benchmark and native build prerequisites
 
@@ -34,9 +38,23 @@ Recorded RX 5500 XT / WebView2 measurements on 2026-09-30:
 
 | Measurement | Result |
 | --- | --- |
-| Canvas, legacy H.264, two receivers | 23–24 decoded FPS at 1080p |
+| Canvas, legacy H.264, two receivers | 23â€“24 decoded FPS at 1080p |
 | Canvas, automatic VP8 fallback, two receivers | About 56 decoded FPS at 1080p |
 | Full native pipeline, final fixes, two receivers | About 49 decoded FPS per receiver at 1080p |
 | Same monitor JPEG pixels, previous encoder / SIMD libjpeg-turbo | 15.8 / 5.7 ms per frame |
 
 These local measurements do not prove constant 60 FPS or a remote Internet result.
+
+### RTX 5070 validation (2026-10-01)
+
+Windows 11 build 26100, NVIDIA driver 32.0.16.1714, Ryzen 7 5700X3D, approximately 75 Hz / 1920x1080 display. Packaged native capture at quality 90, 60 FPS and 15 Mbps H.264 was sampled for four seconds after eight seconds of warmup.
+
+| Measurement | Default WGC interval | Short WGC interval with 60 FPS application gate |
+| --- | --- | --- |
+| Real native image frames | About 37.5 FPS | About 60 FPS |
+| One local receiver, decoded 1080p | About 37.3 FPS | 59.95 FPS |
+| Two local receivers, decoded 1080p each | Not sampled | 59.95 FPS each, zero dropped frames |
+
+Baseline WGC callbacks were only 37.3 FPS with zero application gate drops; GPU readback took 0.48 ms and JPEG compression 4.70 ms per image. Changing the supported Windows update interval to 4 ms raised WGC delivery to approximately 75 callbacks/second, while the existing phase-preserving handler kept JPEG/transport output at 60 FPS. This does not require encoding at 250 FPS.
+
+Summarize saved benchmark results with `node test/bench/summarize_video_loopback.mjs result.json`. These local measurements do not establish another participant's decoder/network performance or exclusive-fullscreen game behavior.
