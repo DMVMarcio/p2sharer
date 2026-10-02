@@ -27,10 +27,10 @@ export function StreamDrawingToolbar({ settings, onChange, onClear, onUndo, onRe
       value={settings.size} onChange={event => onChange({ ...settings, size: Number(event.target.value) })} /><output>{settings.size}</output></label>
     {settings.tool === 'text' && <input autoComplete="off" className="text-input text-input-sm" aria-label="Texto do rabisco"
       placeholder="Texto para inserir na tela" maxLength={160} value={settings.text} onChange={event => onChange({ ...settings, text: event.target.value })} />}
-    <TooltipButton tooltip="Apagar meus rabiscos" className="btn-stream-pin" onClick={onClear}><Eraser size={15} /></TooltipButton>
     <div className="stream-drawing-history">
-      <TooltipButton tooltip="Desfazer (Ctrl+Z)" aria-label="Desfazer" className="btn btn-secondary btn-sm" disabled={!canUndo} onClick={onUndo}><Undo2 size={14} />Desfazer</TooltipButton>
-      <TooltipButton tooltip="Refazer (Ctrl+Y)" aria-label="Refazer" className="btn btn-secondary btn-sm" disabled={!canRedo} onClick={onRedo}><Redo2 size={14} />Refazer</TooltipButton>
+      <TooltipButton tooltip="Desfazer (Ctrl+Z)" aria-label="Desfazer" className="btn-stream-pin" disabled={!canUndo} onClick={onUndo}><Undo2 size={15} /></TooltipButton>
+      <TooltipButton tooltip="Refazer (Ctrl+Y)" aria-label="Refazer" className="btn-stream-pin" disabled={!canRedo} onClick={onRedo}><Redo2 size={15} /></TooltipButton>
+      <TooltipButton tooltip="Apagar meus rabiscos" className="btn-stream-pin" onClick={onClear}><Eraser size={15} /></TooltipButton>
     </div>
   </div>;
 }
