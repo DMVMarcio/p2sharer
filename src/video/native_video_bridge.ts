@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { ScreenSourcesResponse, VideoCaptureBridge, VideoSourceOptions } from '../core/types.ts';
+import { BridgeLoadMeter } from './bridge_load_meter.ts';
 
 export class NativeVideoBridge implements VideoCaptureBridge {
   public readonly sessionId: string;
@@ -133,6 +134,9 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     this.currentFps = fps;
     this.lastTimestampUs = 0;
     const generation = this.captureGeneration;
+    const feedbackToken = crypto.randomUUID();
+    const loadMeter = new BridgeLoadMeter(fps, performance.now());
+    let feedbackPending = false;
 
     // 1. Initialize WebCodecs MediaStreamTrackGenerator if available for zero-copy GPU video pipeline
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -189,6 +193,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
         targetHeight: resolution.height,
         captureMouse,
         quality,
+        feedbackToken,
       });
     } catch (err) {
       this.isCapturing = false;
@@ -215,6 +220,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
       this.isDecoding = true;
       const buffer = this.pendingBuffer;
       this.pendingBuffer = null;
+      const processingStarted = performance.now();
 
       try {
         let bitmap = this.latestBitmap;
@@ -295,6 +301,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
         // Ignore frame decode failure
       } finally {
         if (generation === this.captureGeneration) {
+          if (buffer.byteLength > 4) loadMeter.complete(performance.now() - processingStarted);
           this.isDecoding = false;
           if (this.pendingBuffer) pumpNextFrame();
         }
@@ -350,6 +357,17 @@ export class NativeVideoBridge implements VideoCaptureBridge {
           }
 
           if (evt.data instanceof ArrayBuffer) {
+            const pressurePercent = loadMeter.receive(evt.data.byteLength > 4,
+              Boolean(this.pendingBuffer && this.pendingBuffer.byteLength > 4), performance.now());
+            if (pressurePercent !== undefined && !feedbackPending && generation === this.captureGeneration) {
+              feedbackPending = true;
+              void invoke<number>('report_capture_load', { sessionId: this.sessionId, feedbackToken, pressurePercent })
+                .then(effectiveFps => {
+                  if (generation === this.captureGeneration) loadMeter.setEffectiveFps(effectiveFps);
+                })
+                .catch(() => {}) // Stopped/replaced sessions reject stale feedback.
+                .finally(() => { feedbackPending = false; });
+            }
             // Never allow a 1-byte pacer tick to overwrite an awaiting real video frame!
             if (evt.data.byteLength <= 4 && this.pendingBuffer && this.pendingBuffer.byteLength > 4) {
               return;

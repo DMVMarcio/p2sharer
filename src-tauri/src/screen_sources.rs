@@ -64,6 +64,7 @@ struct CaptureSession {
     active: Arc<AtomicBool>,
     sender: broadcast::Sender<Message>,
     metrics: Arc<CaptureMetrics>,
+    load: Arc<crate::video_load::CaptureLoad>,
     #[cfg(windows)]
     control: Option<ActiveCaptureControl>,
 }
@@ -89,12 +90,14 @@ pub struct CaptureMetricsSnapshot {
     callbacks: u64, gated: u64, images: u64, readback_us: u64, jpeg_us: u64, processing_us: u64,
     staging_allocations: u64, readback_errors: u64, resize_us: u64,
     gpu_scaled_images: u64,
+    load: crate::video_load::LoadSnapshot,
 }
 
 #[tauri::command]
 pub fn get_capture_metrics(session_id: String) -> Result<CaptureMetricsSnapshot, String> {
     let sessions = SESSIONS.lock().map_err(|_| "Capture session lock poisoned")?;
-    let metrics = &sessions.get(&session_id).ok_or("Capture session is no longer active")?.metrics;
+    let session = sessions.get(&session_id).ok_or("Capture session is no longer active")?;
+    let metrics = &session.metrics;
     Ok(CaptureMetricsSnapshot {
         callbacks: metrics.callbacks.load(Ordering::Relaxed), gated: metrics.gated.load(Ordering::Relaxed),
         images: metrics.images.load(Ordering::Relaxed), readback_us: metrics.readback_us.load(Ordering::Relaxed),
@@ -103,11 +106,21 @@ pub fn get_capture_metrics(session_id: String) -> Result<CaptureMetricsSnapshot,
         readback_errors: metrics.readback_errors.load(Ordering::Relaxed),
         resize_us: metrics.resize_us.load(Ordering::Relaxed),
         gpu_scaled_images: metrics.gpu_scaled_images.load(Ordering::Relaxed),
+        load: session.load.snapshot(),
     })
+}
+
+#[tauri::command]
+pub fn report_capture_load(session_id: String, feedback_token: String, pressure_percent: u32) -> Result<u32, String> {
+    let sessions = SESSIONS.lock().map_err(|_| "Capture session lock poisoned")?;
+    let load = &sessions.get(&session_id).ok_or("Capture session is no longer active")?.load;
+    load.report_bridge(&feedback_token, pressure_percent)?;
+    Ok(load.fps())
 }
 
 #[derive(Clone)]
 pub struct CaptureFlags {
+    pub load: Arc<crate::video_load::CaptureLoad>,
     pub sender: broadcast::Sender<Message>,
     pub target_fps: u32,
     pub target_width: u32,
@@ -122,6 +135,8 @@ pub struct CaptureFlags {
 
 #[cfg(windows)]
 pub struct NativeWgcHandler {
+    load: Arc<crate::video_load::CaptureLoad>,
+    load_controller: crate::video_load::LoadController,
     sender: broadcast::Sender<Message>,
     target_width: u32,
     target_height: u32,
@@ -152,6 +167,8 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
         let fps = ctx.flags.target_fps.clamp(15, 120);
         let frame_interval = std::time::Duration::from_nanos(1_000_000_000 / fps as u64);
         Ok(Self {
+            load: ctx.flags.load,
+            load_controller: crate::video_load::LoadController::default(),
             sender: ctx.flags.sender,
             target_width: ctx.flags.target_width,
             target_height: ctx.flags.target_height,
@@ -187,6 +204,7 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
         // Keep the target cadence across callback jitter and non-matching refresh rates.
         // Resetting the gate after each frame can halve 60 FPS capture on a 75 Hz display.
         let arrival_time = std::time::Instant::now();
+        self.frame_interval = std::time::Duration::from_nanos(1_000_000_000 / u64::from(self.load.fps()));
         self.metrics.callbacks.fetch_add(1, Ordering::Relaxed);
         if arrival_time < self.next_frame_time {
             self.metrics.gated.fetch_add(1, Ordering::Relaxed);
@@ -198,6 +216,8 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
         if src_width == 0 || src_height == 0 {
             return Ok(());
         }
+
+        (self.target_width, self.target_height) = self.load.bounds(src_width, src_height);
 
         let scaled = if !self.legacy_readback && !self.gpu_scaling_disabled
             && self.target_width > 0 && self.target_height > 0
@@ -282,6 +302,7 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
 
         let encode_start = std::time::Instant::now();
         if let Ok(frame_bytes) = self.jpeg_encoder.encode_rgba_strided(final_pixels, final_w, final_h, final_pitch) {
+            self.load.output(final_w, final_h);
             if scaled.is_some() { self.metrics.gpu_scaled_images.fetch_add(1, Ordering::Relaxed); }
             self.metrics.images.fetch_add(1, Ordering::Relaxed);
             let frame_arc = Arc::new(frame_bytes);
@@ -302,7 +323,9 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
         } else {
             self.metrics.staging_allocations.store(self.readback.allocations(), Ordering::Relaxed);
         }
-        self.metrics.processing_us.fetch_add(arrival_time.elapsed().as_micros() as u64, Ordering::Relaxed);
+        let processing_us = arrival_time.elapsed().as_micros() as u64;
+        self.metrics.processing_us.fetch_add(processing_us, Ordering::Relaxed);
+        self.load_controller.observe(&self.load, self.load.elapsed_ms(), processing_us);
 
         Ok(())
     }
@@ -777,13 +800,14 @@ pub fn start_native_screen_capture(
     capture_mouse: Option<bool>,
     quality: Option<u8>,
 ) -> Result<bool, String> {
-    start_capture_session("default".into(), source_id, target_fps, target_width, target_height, capture_mouse, quality)
+    start_capture_session("default".into(), source_id, target_fps, target_width, target_height, capture_mouse, quality, None)
 }
 
 #[tauri::command]
 pub fn start_capture_session(
     session_id: String, source_id: String, target_fps: Option<u32>, target_width: Option<u32>,
     target_height: Option<u32>, capture_mouse: Option<bool>, quality: Option<u8>,
+    feedback_token: Option<String>,
 ) -> Result<bool, String> {
     if session_id.is_empty() || session_id.len() > 100 { return Err("Invalid capture session".into()); }
     if source_id.trim().is_empty() {
@@ -809,10 +833,12 @@ pub fn start_capture_session(
 
     let sender = if session_id == "default" { get_frame_sender().clone() } else { broadcast::channel(32).0 };
     let metrics = Arc::new(CaptureMetrics::default());
+    let load = Arc::new(crate::video_load::CaptureLoad::new(fps, width, height, feedback_token));
     SESSIONS.lock().map_err(|_| "Capture session lock poisoned")?.insert(session_id.clone(), CaptureSession {
         source: source_id.clone(),
         active: is_capturing.clone(), sender: sender.clone(),
         metrics: metrics.clone(),
+        load: load.clone(),
         #[cfg(windows)]
         control: None,
     });
@@ -827,15 +853,16 @@ pub fn start_capture_session(
     let pacer_cache = latest_frame_cache.clone();
     let pacer_wgc_last_sent_us = last_sent_us.clone();
     let pacer_start = start_instant;
-    let target_interval_us = (1_000_000 / fps as u64).max(8_000);
-    let static_timeout_us = target_interval_us * 4; // ~66ms threshold before emitting static ticks
+    let pacer_load = load.clone();
 
     std::thread::spawn(move || {
         let _timer_guard = MultimediaTimerGuard::new();
-        let mut next_tick_us = pacer_start.elapsed().as_micros() as u64 + target_interval_us;
+        let mut next_tick_us = pacer_start.elapsed().as_micros() as u64 + 1_000_000 / u64::from(pacer_load.fps());
         let mut pacer_tick_count: u64 = 0;
 
         while pacer_active.load(Ordering::Relaxed) {
+            let target_interval_us = 1_000_000 / u64::from(pacer_load.fps());
+            let static_timeout_us = target_interval_us * 4;
             let now_us = pacer_start.elapsed().as_micros() as u64;
             let last_wgc = pacer_wgc_last_sent_us.load(Ordering::Acquire);
 
@@ -872,7 +899,8 @@ pub fn start_capture_session(
     #[cfg(windows)]
     {
         let flags = CaptureFlags {
-            metrics,
+            metrics: metrics.clone(),
+            load: load.clone(),
             sender: sender.clone(),
             target_fps: fps,
             target_width: width,
@@ -986,12 +1014,11 @@ pub fn start_capture_session(
     }
 
     // Fallback capture thread (xcap) if WGC is unsupported or failed
-    let frame_interval =
-        std::time::Duration::from_nanos((1_000_000_000 / fps as u64).max(8_000_000));
     let xcap_latest_cache = latest_frame_cache.clone();
     let xcap_last_sent_us = last_sent_us.clone();
     std::thread::spawn(move || {
         let _timer_guard = MultimediaTimerGuard::new();
+        let mut load_controller = crate::video_load::LoadController::default();
 
         let is_window = source_id.starts_with("window:");
         let raw_id = source_id.split(':').nth(1).unwrap_or("0");
@@ -1039,6 +1066,7 @@ pub fn start_capture_session(
         while is_capturing_clone.load(Ordering::Relaxed)
         {
             let loop_start = std::time::Instant::now();
+            let frame_interval = std::time::Duration::from_nanos(1_000_000_000 / u64::from(load.fps()));
 
             let captured_img = if is_window {
                 if let Some(ref win) = cached_window {
@@ -1145,7 +1173,7 @@ pub fn start_capture_session(
 
                 let src_w = img.width();
                 let src_h = img.height();
-                let (width, height) = fit_capture_dimensions(src_w, src_h, width, height);
+                let (width, height) = load.bounds(src_w, src_h);
 
                 let (final_raw, final_w, final_h) =
                     if width > 0 && height > 0 && (src_w != width || src_h != height) {
@@ -1177,6 +1205,8 @@ pub fn start_capture_session(
                     };
 
                 if let Ok(jpeg_bytes) = jpeg_encoder.encode_rgba(final_raw, final_w, final_h) {
+                    load.output(final_w, final_h);
+                    metrics.images.fetch_add(1, Ordering::Relaxed);
                     let frame_arc = Arc::new(jpeg_bytes);
                     if let Ok(mut cache) = xcap_latest_cache.lock() {
                         *cache = Some(frame_arc.clone());
@@ -1186,6 +1216,9 @@ pub fn start_capture_session(
                         Ordering::Release,
                     );
                     let _ = sender.send(Message::Binary((*frame_arc).clone()));
+                    let processing_us = loop_start.elapsed().as_micros() as u64;
+                    metrics.processing_us.fetch_add(processing_us, Ordering::Relaxed);
+                    load_controller.observe(&load, load.elapsed_ms(), processing_us);
                 }
             }
 
@@ -1279,7 +1312,7 @@ pub fn pointer_capture_source(session_id: &str) -> Option<String> {
 }
 
 /// Bound capture dimensions without changing the monitor/window aspect ratio or upscaling.
-fn fit_capture_dimensions(width: u32, height: u32, max_width: u32, max_height: u32) -> (u32, u32) {
+pub(crate) fn fit_capture_dimensions(width: u32, height: u32, max_width: u32, max_height: u32) -> (u32, u32) {
     if width == 0 || height == 0 || max_width == 0 || max_height == 0 { return (width, height); }
     let scale = (max_width as f64 / width as f64).min(max_height as f64 / height as f64).min(1.0);
     ((width as f64 * scale).round().max(1.0) as u32, (height as f64 * scale).round().max(1.0) as u32)
@@ -1309,6 +1342,7 @@ mod tests {
         for (id, sender) in [("socket-test-a", a.clone()), ("socket-test-b", b.clone())] {
             SESSIONS.lock().unwrap().insert(id.into(), CaptureSession {
                 metrics: Arc::new(CaptureMetrics::default()),
+                load: Arc::new(crate::video_load::CaptureLoad::new(60, 0, 0, None)),
                 source: "screen:0".into(), active: Arc::new(AtomicBool::new(true)), sender,
                 #[cfg(windows)]
                 control: None,
@@ -1334,8 +1368,8 @@ mod tests {
 
     #[test]
     fn simultaneous_native_sessions_keep_frames_and_teardown_independent() {
-        start_capture_session("capture-test-a".into(), "screen:0".into(), Some(30), Some(640), Some(360), Some(true), Some(75)).unwrap();
-        start_capture_session("capture-test-b".into(), "screen:0".into(), Some(30), Some(320), Some(180), Some(true), Some(85)).unwrap();
+        start_capture_session("capture-test-a".into(), "screen:0".into(), Some(30), Some(640), Some(360), Some(true), Some(75), None).unwrap();
+        start_capture_session("capture-test-b".into(), "screen:0".into(), Some(30), Some(320), Some(180), Some(true), Some(85), None).unwrap();
         let (mut first, mut second, second_active) = {
             let sessions = SESSIONS.lock().unwrap();
             let a = sessions.get("capture-test-a").unwrap();
@@ -1390,9 +1424,14 @@ mod tests {
         assert_eq!(acknowledgement.into_text().unwrap(), "auth-ok");
         tokio::time::sleep(std::time::Duration::from_millis(10)).await;
         get_frame_sender().send(Message::Binary(vec![1, 2, 3])).unwrap();
-        let frame = tokio::time::timeout(std::time::Duration::from_secs(2), authorized.next())
-            .await.unwrap().unwrap().unwrap();
-        assert_eq!(frame.into_data(), vec![1, 2, 3]);
+        // A capture stopped by an earlier test can finish one in-flight callback.
+        // Authentication must deliver the marker, not depend on its being first.
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            while let Some(message) = authorized.next().await {
+                if message.unwrap() == Message::Binary(vec![1, 2, 3]) { return; }
+            }
+            panic!("Authenticated video socket closed before receiving the marker");
+        }).await.expect("Authenticated video socket did not deliver the marker");
     }
 
     fn sanitize_quality(quality: Option<u8>) -> u8 {
