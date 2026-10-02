@@ -1,3 +1,85 @@
+diff --git a/node_modules/@trystero-p2p/core/dist/media.mjs b/node_modules/@trystero-p2p/core/dist/media.mjs
+index 2fd4906..3089c90 100644
+--- a/node_modules/@trystero-p2p/core/dist/media.mjs
++++ b/node_modules/@trystero-p2p/core/dist/media.mjs
+@@ -53,6 +53,8 @@ const createMediaIdentityCache = () => {
+ const createMediaManager = ({ iterate, isActive, getSharedMediaPeer }) => {
+ 	const pendingStreamMetas = {};
+ 	const pendingTrackMetas = {};
++	const receivedStreams = {};
++	const receivedTracks = {};
+ 	const localMedia = createMediaIdentityCache();
+ 	const listeners = {
+ 		onPeerStream: null,
+@@ -76,7 +78,7 @@ const createMediaManager = ({ iterate, isActive, getSharedMediaPeer }) => {
+ 		};
+ 		return iterate(targets, async (id, peer) => {
+ 			await sendMeta(payload, id);
+-			op(peer);
++			return op(peer);
+ 		});
+ 	};
+ 	return {
+@@ -101,7 +103,14 @@ const createMediaManager = ({ iterate, isActive, getSharedMediaPeer }) => {
+ 				emitStream(id, parsed.key, cached, parsed.metadata);
+ 				return;
+ 			}
+-			(pendingStreamMetas[id] ??= []).push(parsed);
++			pendingStreamMetas[id] = (pendingStreamMetas[id] ?? []).filter(meta => meta.key !== parsed.key);
++			pendingStreamMetas[id].push(parsed);
++			const received = receivedStreams[id]?.get(parsed.streamId);
++			if (received) {
++				pendingStreamMetas[id].pop();
++				receivedStreams[id].delete(parsed.streamId);
++				emitStream(id, parsed.key, received, parsed.metadata);
++			}
+ 		},
+ 		receiveTrackMeta: (meta, id) => {
+ 			if (!isActive(id)) return;
+@@ -112,23 +121,40 @@ const createMediaManager = ({ iterate, isActive, getSharedMediaPeer }) => {
+ 				emitTrack(id, parsed.key, cached.track, cached.stream, parsed.metadata);
+ 				return;
+ 			}
+-			(pendingTrackMetas[id] ??= []).push(parsed);
++			pendingTrackMetas[id] = (pendingTrackMetas[id] ?? []).filter(meta => meta.key !== parsed.key);
++			pendingTrackMetas[id].push(parsed);
++			const received = receivedTracks[id]?.get(parsed.trackId);
++			if (received) {
++				pendingTrackMetas[id].pop();
++				receivedTracks[id].delete(parsed.trackId);
++				emitTrack(id, parsed.key, received.track, received.stream, parsed.metadata);
++			}
+ 		},
+ 		receiveRemoteStream: (id, stream) => {
+ 			if (!isActive(id)) return;
+-			const next = pendingStreamMetas[id]?.shift();
++			if (getSharedMediaPeer(id)?.__trysteroMedia?.getRemoteStream("", stream.id)) return;
++			(receivedStreams[id] ??= new Map()).set(stream.id, stream);
++			const index = pendingStreamMetas[id]?.findIndex(meta => meta.streamId === stream.id) ?? -1;
++			const next = index >= 0 ? pendingStreamMetas[id].splice(index, 1)[0] : null;
+ 			if (!next) return;
++			receivedStreams[id].delete(stream.id);
+ 			emitStream(id, next.key, stream, next.metadata);
+ 		},
+ 		receiveRemoteTrack: (id, track, stream) => {
+ 			if (!isActive(id)) return;
+-			const next = pendingTrackMetas[id]?.shift();
++			if (getSharedMediaPeer(id)?.__trysteroMedia?.getRemoteTrack("", track.id)) return;
++			(receivedTracks[id] ??= new Map()).set(track.id, { track, stream });
++			const index = pendingTrackMetas[id]?.findIndex(meta => meta.trackId === track.id) ?? -1;
++			const next = index >= 0 ? pendingTrackMetas[id].splice(index, 1)[0] : null;
+ 			if (!next) return;
++			receivedTracks[id].delete(track.id);
+ 			emitTrack(id, next.key, track, stream, next.metadata);
+ 		},
+ 		clearPeer: (id) => {
+ 			delete pendingStreamMetas[id];
+ 			delete pendingTrackMetas[id];
++			delete receivedStreams[id];
++			delete receivedTracks[id];
+ 		},
+ 		get onPeerStream() {
+ 			return listeners.onPeerStream;
 diff --git a/node_modules/@trystero-p2p/core/dist/offer-pool.mjs b/node_modules/@trystero-p2p/core/dist/offer-pool.mjs
 index 7340a4f..4d7bee1 100644
 --- a/node_modules/@trystero-p2p/core/dist/offer-pool.mjs
@@ -11,3 +93,19 @@ index 7340a4f..4d7bee1 100644
  var OfferPool = class {
  	makeOffer;
  	pool = [];
+diff --git a/node_modules/@trystero-p2p/core/dist/peer.mjs b/node_modules/@trystero-p2p/core/dist/peer.mjs
+index 8003df9..c3554ee 100644
+--- a/node_modules/@trystero-p2p/core/dist/peer.mjs
++++ b/node_modules/@trystero-p2p/core/dist/peer.mjs
+@@ -286,9 +286,9 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
+ 			});
+ 		},
+ 		offerPromise,
+-		addStream: (stream) => stream.getTracks().forEach((track) => pc.addTrack(track, stream)),
++		addStream: (stream) => stream.getTracks().filter(track => track.readyState !== "ended" && !pc.getSenders().some(sender => sender.track === track)).forEach((track) => pc.addTrack(track, stream)),
+ 		removeStream: (stream) => pc.getSenders().filter((sender) => sender.track && stream.getTracks().includes(sender.track)).forEach((sender) => pc.removeTrack(sender)),
+-		addTrack: (track, stream) => pc.addTrack(track, stream),
++		addTrack: (track, stream) => track.readyState !== "ended" && !pc.getSenders().some(sender => sender.track === track) ? pc.addTrack(track, stream) : void 0,
+ 		removeTrack: (track) => {
+ 			const sender = pc.getSenders().find((s) => s.track === track);
+ 			if (sender) pc.removeTrack(sender);

@@ -140,6 +140,7 @@ export class GroupRoomManager {
   private room: any = null;
   private localMedia = new Map<string, { descriptor: StreamDescriptor; stream: MediaStream }>();
   private remoteMedia = new Map<string, Map<string, MediaStream>>();
+  private observedRemoteStreams = new WeakSet<MediaStream>();
   private remoteDescriptors = new Map<string, StreamDescriptor[]>();
   private remoteMediaRevisions = new Map<string, number>();
   private mediaRevision = 0;
@@ -862,10 +863,11 @@ export class GroupRoomManager {
     this.pointerAction = this.room.makeAction('stream_pointer');
     this.pointerAction.onMessage = (packet: unknown, meta: { peerId: string }) => {
       if (validStreamPointerState(packet)) {
-        if (this.remoteStreams.has(meta.peerId)) this.callbacks?.onStreamPointerState?.(packet, meta.peerId);
+        if (packet.mediaId ? this.remoteDescriptors.get(meta.peerId)?.some(entry => entry.id === packet.mediaId && entry.kind === 'screen') : this.remoteStreams.has(meta.peerId)) this.callbacks?.onStreamPointerState?.(packet, meta.peerId);
         return;
       }
       if (!this.localStream || !validStreamPointer(packet)) return;
+      if (packet.mediaId && this.localMedia.get(packet.mediaId)?.descriptor.kind !== 'screen') return;
       if (!this.getStreamWatchers('local').some((watcher) => watcher.peerId === meta.peerId)) return;
       this.callbacks?.onStreamPointer?.(packet, meta.peerId);
     };
@@ -1560,13 +1562,16 @@ export class GroupRoomManager {
         this.remoteMedia.set(peerId, media);
       }
       this.remoteStreams.set(peerId, stream);
-      if (metadata && stream.addEventListener) stream.addEventListener('addtrack', () => {
-        if (this.remoteDescriptors.get(peerId)?.some((entry) => entry.id === metadata.id)) {
-          this.remoteMedia.get(peerId)?.set(metadata.id, new MediaStream(stream.getTracks()));
-          this.lastStreamsHash = '';
-          this.notifyStreamsUpdate();
-        }
-      });
+      if (metadata && stream.addEventListener && !this.observedRemoteStreams.has(stream)) {
+        this.observedRemoteStreams.add(stream);
+        stream.addEventListener('addtrack', () => {
+          if (this.remoteDescriptors.get(peerId)?.some((entry) => entry.id === metadata.id)) {
+            this.remoteMedia.get(peerId)?.set(metadata.id, new MediaStream(stream.getTracks()));
+            this.lastStreamsHash = '';
+            this.notifyStreamsUpdate();
+          }
+        });
+      }
       this.lastStreamRecoveryRequests.delete(peerId);
       this.watchStream(peerId);
 
@@ -1908,7 +1913,7 @@ export class GroupRoomManager {
       }
 
       // Targeted addStream dispatch passing `{ target: peerId }` object option
-      for (const entry of this.localMedia.values()) this.room.addStream(entry.stream, { target: peerId, metadata: entry.descriptor });
+      this.dispatchMediaToPeer(peerId);
 
       [0, 30, 80, 150, 300, 600, 1200, 2000].forEach((delay) => {
         setTimeout(() => this.boostSenders(this.currentTargetBitrate, this.currentTargetFps), delay);
@@ -1916,8 +1921,22 @@ export class GroupRoomManager {
     } catch (err) {
       console.warn('[P2P] Error sending stream to peer, fallback:', err);
       try {
-        for (const entry of this.localMedia.values()) this.room.addStream(entry.stream, { target: peerId, metadata: entry.descriptor });
+        this.dispatchMediaToPeer(peerId);
       } catch {}
+    }
+  }
+
+  private dispatchMediaToPeer(peerId: string) {
+    const room = this.room;
+    if (!room) return;
+    for (const entry of this.localMedia.values()) {
+      for (const operation of room.addStream(entry.stream, { target: peerId, metadata: entry.descriptor }) || []) {
+        void Promise.resolve(operation).then(() => {
+          if (this.room !== room || this.localMedia.get(entry.descriptor.id) !== entry) {
+            room.removeStream(entry.stream, { target: peerId });
+          }
+        }).catch(error => console.warn('[Media] Stream dispatch failed:', error));
+      }
     }
   }
 
@@ -2092,7 +2111,7 @@ export class GroupRoomManager {
       return ordered.map((entry, index) => ({ ...slot, ownerPeerId: slot.peerId,
         peerId: streamSlotKey(slot.peerId, entry.id, index === 0), mediaId: entry.id,
         mediaKind: entry.kind, mediaLabel: entry.label, isStreaming: true,
-        pointerEligible: index === 0 && entry.kind === 'screen',
+        pointerEligible: entry.kind === 'screen',
         stream: slot.isLocal ? this.localMedia.get(entry.id)?.stream || null : this.remoteMedia.get(slot.peerId)?.get(entry.id) || null,
       }));
     });

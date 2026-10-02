@@ -42,6 +42,8 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 4. User Guidelines & Expressed Preferences
 
+- `[Independent Transmission Rendering]` Adding a camera must never replace another screen's remote content. All screen streams support interactive pointing independently. Overlays resize from all four corners and keep an inset from the stage edges. Preserve source aspect ratio, including portrait monitors, in thumbnails, live previews, and outgoing video. Repeated multi-stream start/stop cycles must retain surviving streams and release discontinued capture resources.
+
 - `[Stream Pointer Motion]` Interpolate received virtual cursor positions smoothly, including fast and long-distance movements, to avoid visible teleports between network snapshots. Apply the same movement recipe to viewer cards, PiP, and the broadcaster desktop; keep the locally controlled cursor immediate and leave click ripples anchored at their original coordinates.
 
 - `[Transmission Motion & Hover]` The selected-source side preview must reuse the source-card skeleton's fade-in and crossfade when preparing or switching screens/windows. Keep the transmission arrow compact and closer to its text than its outer border. Hover/focus highlights the whole transmission menu row, including the stop area; hovering/focusing stop adds its own soft red background. All dropdown options use a slightly brighter shared hover token with smooth background-color transitions.

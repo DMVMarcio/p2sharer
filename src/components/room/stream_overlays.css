@@ -1,7 +1,6 @@
 .stream-overlay {
   position: absolute;
   overflow: hidden;
-  min-width: 80px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md, 8px);
   background: var(--bg-secondary);
@@ -15,13 +14,17 @@
 .stream-overlay video { width: 100%; height: 100%; object-fit: contain; pointer-events: none; display: block; }
 .stream-overlay-toolbar {
   position: absolute; top: 0; left: 0; right: 0;
-  display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 4px 6px;
+  display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 4px 22px;
   background: var(--bg-secondary); color: var(--text-primary); font-size: 11px;
   opacity: 0; transition: opacity .26s ease;
 }
 .stream-overlay-toolbar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .stream-overlay:hover .stream-overlay-toolbar, .stream-overlay:focus-within .stream-overlay-toolbar { opacity: 1; }
-.stream-overlay-resize { position: absolute; bottom: 0; right: 0; width: 20px; height: 20px; cursor: nwse-resize; }
+.stream-overlay-resize { position: absolute; width: 20px; height: 20px; }
+.stream-overlay-resize.nw { top: 0; left: 0; cursor: nwse-resize; transform: rotate(180deg); }
+.stream-overlay-resize.ne { top: 0; right: 0; cursor: nesw-resize; transform: rotate(270deg); }
+.stream-overlay-resize.sw { bottom: 0; left: 0; cursor: nesw-resize; transform: rotate(90deg); }
+.stream-overlay-resize.se { bottom: 0; right: 0; cursor: nwse-resize; }
 .stream-overlay-resize::after { content: ''; position: absolute; right: 4px; bottom: 4px; width: 8px; height: 8px; border-right: 2px solid var(--text-secondary); border-bottom: 2px solid var(--text-secondary); }
 .stream-overlay-loading { height: 100%; display: grid; place-items: center; color: var(--text-secondary); font-size: 12px; }
 @media (prefers-reduced-motion: reduce) { .stream-overlay, .stream-overlay-toolbar { transition: none; } }

@@ -2,7 +2,6 @@ use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use futures_util::{SinkExt, StreamExt};
 use image::codecs::jpeg::JpegEncoder;
-use image::imageops::FilterType;
 use crate::video_jpeg::RealtimeJpegEncoder;
 #[cfg(test)]
 use jpeg_encoder::{ColorType, Encoder as FastJpegEncoder, SamplingFactor};
@@ -170,8 +169,7 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
             use fast_image_resize::{FilterType, PixelType, ResizeAlg, ResizeOptions};
 
             if let Ok(src_img) = ImageRef::new(src_width, src_height, pixel_data, PixelType::U8x4) {
-                let dst_w = self.target_width;
-                let dst_h = self.target_height;
+                let (dst_w, dst_h) = fit_capture_dimensions(src_width, src_height, self.target_width, self.target_height);
 
                 if self
                     .resized_image
@@ -431,7 +429,7 @@ pub fn list_screen_sources() -> ScreenSourcesResponse {
 
             let mut thumb_b64 = None;
             if let Ok(rgba_img) = mon.capture_image() {
-                let thumb = image::imageops::resize(&rgba_img, 320, 180, FilterType::Triangle);
+                let thumb = image::DynamicImage::ImageRgba8(rgba_img).thumbnail(320, 180);
                 let mut buf = Vec::new();
                 let mut cursor = Cursor::new(&mut buf);
                 let mut encoder = JpegEncoder::new_with_quality(&mut cursor, 65);
@@ -501,7 +499,7 @@ pub fn list_screen_sources() -> ScreenSourcesResponse {
             // Only generate thumbnails for top 6 foreground windows to eliminate 2-5s IPC freeze
             if idx < 6 {
                 if let Ok(rgba_img) = win.capture_image() {
-                    let thumb = image::imageops::resize(&rgba_img, 320, 180, FilterType::Triangle);
+                    let thumb = image::DynamicImage::ImageRgba8(rgba_img).thumbnail(320, 180);
                     let mut buf = Vec::new();
                     let mut cursor = Cursor::new(&mut buf);
                     let mut encoder = JpegEncoder::new_with_quality(&mut cursor, 65);
@@ -1038,6 +1036,7 @@ pub fn start_capture_session(
 
                 let src_w = img.width();
                 let src_h = img.height();
+                let (width, height) = fit_capture_dimensions(src_w, src_h, width, height);
 
                 let (final_raw, final_w, final_h) =
                     if width > 0 && height > 0 && (src_w != width || src_h != height) {
@@ -1166,9 +1165,28 @@ pub fn select_pointer_capture(session_id: Option<String>) -> Result<(), String> 
     Ok(())
 }
 
+pub fn pointer_capture_source(session_id: &str) -> Option<String> {
+    SESSIONS.lock().ok()?.get(session_id).map(|session| session.source.clone())
+}
+
+/// Bound capture dimensions without changing the monitor/window aspect ratio or upscaling.
+fn fit_capture_dimensions(width: u32, height: u32, max_width: u32, max_height: u32) -> (u32, u32) {
+    if width == 0 || height == 0 || max_width == 0 || max_height == 0 { return (width, height); }
+    let scale = (max_width as f64 / width as f64).min(max_height as f64 / height as f64).min(1.0);
+    ((width as f64 * scale).round().max(1.0) as u32, (height as f64 * scale).round().max(1.0) as u32)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn capture_dimensions_preserve_portrait_and_window_aspect_ratios() {
+        assert_eq!(fit_capture_dimensions(1080, 1920, 1920, 1080), (608, 1080));
+        assert_eq!(fit_capture_dimensions(2560, 1440, 1920, 1080), (1920, 1080));
+        assert_eq!(fit_capture_dimensions(1000, 1000, 1920, 1080), (1000, 1000));
+        assert_eq!(fit_capture_dimensions(800, 600, 640, 360), (480, 360));
+    }
 
     #[tokio::test]
     async fn video_websocket_routes_only_the_authenticated_capture_session() {

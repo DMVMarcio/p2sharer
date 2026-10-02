@@ -57,6 +57,15 @@ test('receive gate accepts scenes only from the watched broadcaster and pointer 
   for (const peerId of ['alice', 'outsider', 'rumor']) action.onMessage({ kind: 'ping', x: 0.5, y: 0.5 }, { peerId });
   assert.deepEqual(scenes, ['host']);
   assert.deepEqual(pointers, ['alice']);
+  manager.localMedia.set('second-screen', { descriptor: { kind: 'screen' } });
+  manager.localMedia.set('camera', { descriptor: { kind: 'camera' } });
+  manager.remoteDescriptors.set('host', [{ id: 'second-screen', kind: 'screen' }]);
+  action.onMessage({ kind: 'move', x: 0.5, y: 0.5, mediaId: 'second-screen' }, { peerId: 'alice' });
+  action.onMessage({ kind: 'move', x: 0.5, y: 0.5, mediaId: 'camera' }, { peerId: 'alice' });
+  action.onMessage({ ...snapshot(), mediaId: 'second-screen' }, { peerId: 'host' });
+  action.onMessage({ ...snapshot(), mediaId: 'missing' }, { peerId: 'host' });
+  assert.deepEqual(pointers, ['alice', 'alice']);
+  assert.deepEqual(scenes, ['host', 'host']);
 });
 
 test('viewer/PiP scenes retain both participants and own pings without requiring interactive mode or synchronized clocks', () => {

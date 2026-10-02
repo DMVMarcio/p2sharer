@@ -35,20 +35,39 @@ export function streamSlotKey(owner: string, id: string, _primary = false): stri
 
 export interface OverlayPosition { x: number; y: number; width: number }
 
-export function clampOverlay(position: OverlayPosition, aspect = 16 / 9, stageAspect = 16 / 9): OverlayPosition {
+export interface OverlayInset { x: number; y: number }
+const overlayInset: OverlayInset = { x: 0.02, y: 0.02 };
+export type OverlayCorner = 'nw' | 'ne' | 'sw' | 'se';
+
+export function clampOverlay(position: OverlayPosition, aspect = 16 / 9, stageAspect = 16 / 9, inset = overlayInset): OverlayPosition {
   const maxWidth = Math.min(0.6, 0.85 * aspect / stageAspect);
   const width = Math.max(Math.min(0.14, maxWidth), Math.min(maxWidth, position.width));
   const height = width * stageAspect / aspect;
-  return { width, x: Math.max(0, Math.min(1 - width, position.x)), y: Math.max(0, Math.min(1 - height, position.y)) };
+  return { width, x: Math.max(inset.x, Math.min(1 - width - inset.x, position.x)), y: Math.max(inset.y, Math.min(1 - height - inset.y, position.y)) };
 }
 
-export function snapOverlay(position: OverlayPosition, aspect = 16 / 9, stageAspect = 16 / 9): OverlayPosition {
-  const { x, y, width } = clampOverlay(position, aspect, stageAspect);
+export function resizeOverlay(position: OverlayPosition, corner: OverlayCorner, dx: number, dy: number,
+  aspect: number, stageAspect: number, inset = overlayInset): OverlayPosition {
+  const left = corner.endsWith('w'), top = corner.startsWith('n');
+  const ratio = stageAspect / aspect;
+  const horizontal = dx * (left ? -1 : 1), vertical = dy / ratio * (top ? -1 : 1);
+  const delta = Math.abs(horizontal) >= Math.abs(vertical) ? horizontal : vertical;
+  const anchorX = position.x + (left ? position.width : 0);
+  const anchorY = position.y + (top ? position.width * ratio : 0);
+  const available = Math.min(left ? anchorX - inset.x : 1 - inset.x - anchorX,
+    (top ? anchorY - inset.y : 1 - inset.y - anchorY) / ratio);
+  const width = Math.min(available, clampOverlay({ ...position, width: position.width + delta }, aspect, stageAspect, inset).width);
+  return { width, x: left ? anchorX - width : anchorX, y: top ? anchorY - width * ratio : anchorY };
+}
+
+export function snapOverlay(position: OverlayPosition, aspect = 16 / 9, stageAspect = 16 / 9, inset = overlayInset): OverlayPosition {
+  const { x, y, width } = clampOverlay(position, aspect, stageAspect, inset);
   const height = width * stageAspect / aspect;
-  const maxX = 1 - width;
-  const maxY = 1 - height;
-  const anchors = [[0, 0], [maxX / 2, 0], [maxX, 0], [0, maxY / 2], [maxX, maxY / 2],
-    [0, maxY], [maxX / 2, maxY], [maxX, maxY]];
+  const maxX = 1 - width - inset.x;
+  const maxY = 1 - height - inset.y;
+  const midX = (1 - width) / 2, midY = (1 - height) / 2;
+  const anchors = [[inset.x, inset.y], [midX, inset.y], [maxX, inset.y], [inset.x, midY], [maxX, midY],
+    [inset.x, maxY], [midX, maxY], [maxX, maxY]];
   const nearest = anchors.reduce((best, anchor) => Math.hypot(anchor[0] - x, anchor[1] - y) <
     Math.hypot(best[0] - x, best[1] - y) ? anchor : best);
   return Math.hypot(nearest[0] - x, nearest[1] - y) < 0.12 ? { x: nearest[0], y: nearest[1], width } : { x, y, width };

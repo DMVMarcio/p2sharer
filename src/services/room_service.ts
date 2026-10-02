@@ -268,13 +268,13 @@ export class RoomService {
         if (progress.status === 'error') showToast('Não foi possível concluir a transferência do arquivo.');
       },
       onStreamPointerState: (snapshot, broadcasterId) => {
-        const slot = stateStore.roomSlots.find((slot) => (slot.ownerPeerId || slot.peerId) === broadcasterId && slot.pointerEligible !== false);
+        const slot = stateStore.roomSlots.find((slot) => (slot.ownerPeerId || slot.peerId) === broadcasterId && slot.pointerEligible !== false && (!snapshot.mediaId || slot.mediaId === snapshot.mediaId));
         if (this.roomManager === manager && slot && stateStore.subscribedStreams.has(slot.peerId)) this.publishPointerView(slot.peerId, snapshot);
       },
       onStreamPointer: (packet, peerId) => {
         if (this.roomManager !== manager) return;
         const peer = this.peers.find((p) => p.id === peerId);
-        if (peer) this.pointerReceiver.receive(packet, peerId, peer.username, generateUserColor(peer.username));
+        if (peer) this.getPointerReceiver(packet.mediaId).receive(packet, peerId, peer.username, generateUserColor(peer.username));
       },
       onAppEvent: (event, peerId) => {
         if (this.roomManager === manager) roomAppsService.receive(event, peerId);
@@ -333,6 +333,7 @@ export class RoomService {
         this.notify();
         roomAppsService.forgetPeer(_peerId);
         this.pointerReceiver.forget(_peerId);
+        for (const receiver of this.pointerReceivers.values()) receiver.forget(_peerId);
         const name = username.trim();
         if (!name) return;
         soundEffects.playUserLeave();
@@ -350,6 +351,9 @@ export class RoomService {
       onWatchStarted: () => soundEffects.playWatchStreamStart(),
       onWatchStopped: (watcherPeerId, _name, broadcasterPeerId) => {
         if (broadcasterPeerId === 'local' || broadcasterPeerId === manager.getLocalPeerId()) this.pointerReceiver.forget(watcherPeerId);
+        if (broadcasterPeerId === 'local' || broadcasterPeerId === manager.getLocalPeerId()) {
+          for (const receiver of this.pointerReceivers.values()) receiver.forget(watcherPeerId);
+        }
         soundEffects.playWatchStreamStop();
       },
       onStatusChange: (status) => {
@@ -406,6 +410,26 @@ export class RoomService {
     this.publishPointerView(slot?.peerId || 'local', snapshot);
   });
 
+  private pointerReceivers = new Map<string, StreamPointerReceiver>();
+
+  private getPointerReceiver(mediaId?: string): StreamPointerReceiver {
+    if (!mediaId) return this.pointerReceiver;
+    let receiver = this.pointerReceivers.get(mediaId);
+    if (!receiver) {
+      receiver = new StreamPointerReceiver((snapshot) => {
+        const state = { ...snapshot, mediaId };
+        this.roomManager?.sendStreamPointerState(state);
+        const slot = stateStore.roomSlots.find(slot => slot.isLocal && slot.mediaId === mediaId);
+        if (slot) this.publishPointerView(slot.peerId, state);
+      }, async (visuals) => {
+        const sessionId = this.localCaptures.get(mediaId)?.bridge?.sessionId;
+        if (sessionId) await invoke('update_stream_pointer_overlay', { visuals, sessionId });
+      });
+      this.pointerReceivers.set(mediaId, receiver);
+    }
+    return receiver;
+  }
+
   public refreshStreamPointerView(peerId: string): void {
     this.publishPointerView(peerId, streamPointerView.state(peerId));
   }
@@ -422,7 +446,7 @@ export class RoomService {
   public sendStreamPointer(packet: StreamPointerPacket, peerId: string): void {
     const slot = stateStore.roomSlots.find((slot) => slot.peerId === peerId);
     if (validStreamPointer(packet) && slot?.pointerEligible !== false && stateStore.subscribedStreams.has(peerId)) {
-      this.roomManager?.sendStreamPointer(packet, streamOwner(peerId));
+      this.roomManager?.sendStreamPointer({ ...packet, mediaId: slot?.mediaId }, streamOwner(peerId));
     }
   }
 
@@ -470,6 +494,8 @@ export class RoomService {
           sourceId.startsWith('window:') ? 'Janela' : 'Tela')).slice(0, 200), videoTrackId: track.id, fps, bitrate };
         if (previous) {
           await manager.replaceMediaTrack(id, track, descriptor);
+          this.pointerReceivers.get(id)?.clear();
+          this.pointerReceivers.delete(id);
           stream = previous.stream;
           const slot = stateStore.roomSlots.find((slot) => slot.isLocal && slot.mediaId === id);
           if (slot) pipService.updateStream(slot.peerId, stream);
@@ -516,6 +542,8 @@ export class RoomService {
   public stopTransmission(id: string, notifyManager = true) {
     const entry = this.localCaptures.get(id);
     if (!entry) return;
+    this.pointerReceivers.get(id)?.clear();
+    this.pointerReceivers.delete(id);
     this.localCaptures.delete(id);
     if (notifyManager) this.roomManager?.stopStream(id);
     if (entry.bridge) void entry.bridge.stopCapture();

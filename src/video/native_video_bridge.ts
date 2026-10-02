@@ -20,6 +20,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
   private lastTimestampUs: number = 0;
   private pendingBuffer: ArrayBuffer | null = null;
   private isDecoding: boolean = false;
+  private captureGeneration = 0;
   public onFallbackNeeded: ((reason: string, stream?: MediaStream) => void) | null = null;
 
   public isCapturingDirectGpu(): boolean {
@@ -131,6 +132,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     await this.stopCapture();
     this.currentFps = fps;
     this.lastTimestampUs = 0;
+    const generation = this.captureGeneration;
 
     // 1. Initialize WebCodecs MediaStreamTrackGenerator if available for zero-copy GPU video pipeline
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -209,7 +211,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     this.isDecoding = false;
 
     const pumpNextFrame = async () => {
-      if (this.isDecoding || !this.pendingBuffer || !this.isCapturing) return;
+      if (generation !== this.captureGeneration || this.isDecoding || !this.pendingBuffer || !this.isCapturing) return;
       this.isDecoding = true;
       const buffer = this.pendingBuffer;
       this.pendingBuffer = null;
@@ -225,9 +227,8 @@ export class NativeVideoBridge implements VideoCaptureBridge {
             colorSpaceConversion: 'none',
           });
 
-          if (!this.isCapturing) {
+          if (!this.isCapturing || generation !== this.captureGeneration) {
             newBitmap.close();
-            this.isDecoding = false;
             return;
           }
 
@@ -262,9 +263,10 @@ export class NativeVideoBridge implements VideoCaptureBridge {
             try {
               // Keep only the newest pending JPEG while the encoder consumes this frame.
               // Unawaited writes build an unbounded queue on slower GPU encoders.
-              await this.trackWriter.ready;
-              if (this.isCapturing) {
-                await this.trackWriter.write(videoFrame);
+              const writer = this.trackWriter;
+              await writer.ready;
+              if (this.isCapturing && generation === this.captureGeneration) {
+                await writer.write(videoFrame);
               }
             } finally {
               videoFrame.close();
@@ -275,6 +277,10 @@ export class NativeVideoBridge implements VideoCaptureBridge {
         } else {
           // Canvas fallback
           if (this.ctx && this.canvas) {
+            if (this.canvas.width !== bitmap.width || this.canvas.height !== bitmap.height) {
+              this.canvas.width = bitmap.width;
+              this.canvas.height = bitmap.height;
+            }
             this.ctx.drawImage(bitmap, 0, 0, this.canvas.width, this.canvas.height);
           }
 
@@ -288,9 +294,9 @@ export class NativeVideoBridge implements VideoCaptureBridge {
       } catch {
         // Ignore frame decode failure
       } finally {
-        this.isDecoding = false;
-        if (this.pendingBuffer) {
-          pumpNextFrame();
+        if (generation === this.captureGeneration) {
+          this.isDecoding = false;
+          if (this.pendingBuffer) pumpNextFrame();
         }
       }
     };
@@ -440,12 +446,11 @@ export class NativeVideoBridge implements VideoCaptureBridge {
   }
 
   public async stopCapture(): Promise<void> {
+    this.captureGeneration++;
     this.isCapturing = false;
     this.isDirectGpu = false;
     this.pendingBuffer = null;
     this.isDecoding = false;
-
-    await invoke('stop_capture_session', { sessionId: this.sessionId }).catch(() => {});
 
     if (this.animationFrameId !== null) {
       cancelAnimationFrame(this.animationFrameId);
@@ -481,7 +486,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
 
     if (this.trackWriter) {
       try {
-        this.trackWriter.close().catch(() => {});
+        this.trackWriter.abort().catch(() => {});
       } catch {}
       this.trackWriter = null;
     }
@@ -500,5 +505,6 @@ export class NativeVideoBridge implements VideoCaptureBridge {
       this.canvas = null;
     }
     this.ctx = null;
+    await invoke('stop_capture_session', { sessionId: this.sessionId }).catch(() => {});
   }
 }
