@@ -16,6 +16,8 @@ struct Encoder {
     NV_ENC_INPUT_PTR mapped;
     NV_ENC_OUTPUT_PTR bitstream;
     uint32_t width, height;
+    NV_ENC_CONFIG config;
+    NV_ENC_INITIALIZE_PARAMS init;
     uint8_t* bytes;
     size_t capacity, length;
 };
@@ -92,12 +94,14 @@ bool initialize(Encoder* encoder, ID3D11Device* device, uint32_t w, uint32_t h,
     config.rcParams.enableLookahead = 0;
     config.encodeCodecConfig.h264Config.idrPeriod = config.gopLength;
     config.encodeCodecConfig.h264Config.repeatSPSPPS = 1;
+    config.encodeCodecConfig.h264Config.level = NV_ENC_LEVEL_H264_51;
     NV_ENC_INITIALIZE_PARAMS init{}; init.version = NV_ENC_INITIALIZE_PARAMS_VER;
     init.encodeGUID = NV_ENC_CODEC_H264_GUID; init.presetGUID = NV_ENC_PRESET_P1_GUID;
     init.encodeWidth = w; init.encodeHeight = h; init.darWidth = w; init.darHeight = h;
     init.frameRateNum = fps; init.frameRateDen = 1; init.enablePTD = 1;
     init.encodeConfig = &config; init.tuningInfo = NV_ENC_TUNING_INFO_ULTRA_LOW_LATENCY;
     NV_CHECK(api.nvEncInitializeEncoder(session, &init), "Initialize H264 encoder");
+    encoder->config = config; encoder->init = init; encoder->init.encodeConfig = &encoder->config;
     D3D11_TEXTURE2D_DESC desc{};
     desc.Width = w; desc.Height = h; desc.MipLevels = 1; desc.ArraySize = 1;
     desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; desc.SampleDesc.Count = 1; desc.Usage = D3D11_USAGE_DEFAULT;
@@ -169,6 +173,19 @@ extern "C" int p2_nvenc_encode(void* handle, void* texture, uint64_t timestamp, 
     auto encoder = static_cast<Encoder*>(handle);
     if (!encode(encoder, static_cast<ID3D11Texture2D*>(texture), timestamp, force_key != 0, key, error, size)) return 0;
     *bytes = encoder->bytes; *len = encoder->length; return 1;
+}
+extern "C" int p2_nvenc_bitrate(void* handle, uint32_t bitrate, char* error, size_t size) noexcept {
+    auto encoder = static_cast<Encoder*>(handle);
+    auto config = encoder->config;
+    config.rcParams.averageBitRate = bitrate; config.rcParams.maxBitRate = bitrate;
+    config.rcParams.vbvBufferSize = bitrate / encoder->init.frameRateNum;
+    config.rcParams.vbvInitialDelay = config.rcParams.vbvBufferSize;
+    NV_ENC_RECONFIGURE_PARAMS params{}; params.version = NV_ENC_RECONFIGURE_PARAMS_VER;
+    params.reInitEncodeParams = encoder->init; params.reInitEncodeParams.encodeConfig = &config;
+    params.resetEncoder = 1; params.forceIDR = 1;
+    if (!check(encoder->api.nvEncReconfigureEncoder(encoder->session, &params), "Update H264 bitrate", error, size)) return 0;
+    encoder->config = config;
+    return 1;
 }
 extern "C" void p2_nvenc_destroy(void* handle) noexcept {
     auto encoder = static_cast<Encoder*>(handle); cleanup(encoder); HeapFree(GetProcessHeap(), 0, encoder);

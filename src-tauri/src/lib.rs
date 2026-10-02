@@ -11,6 +11,7 @@ pub mod screen_sources;
 mod video_jpeg;
 mod video_load;
 mod video_pacer;
+mod native_rtc;
 #[cfg(windows)]
 mod video_readback;
 #[cfg(windows)]
@@ -80,6 +81,12 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            native_rtc::create_native_video_offer,
+            native_rtc::answer_native_video,
+            native_rtc::add_native_video_ice,
+            native_rtc::close_native_video,
+            native_rtc::set_native_video_bitrate,
+            native_rtc::get_native_video_stats,
             stream_pointer::update_stream_pointer_overlay,
             stream_pointer::get_stream_pointer_visuals,
             list_audio_processes,

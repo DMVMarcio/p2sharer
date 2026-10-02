@@ -5,6 +5,67 @@ import { GroupRoomManager } from '../../src/p2p/group_room.ts';
 import { MediaCoordinator } from '../../src/p2p/media_coordinator.ts';
 import { signalingManager } from '../../src/p2p/signaling_manager.ts';
 
+test('native publication targets only its peer, suppresses browser video and preserves audio', () => {
+  const manager = new GroupRoomManager('Owner', 'test', '', true);
+  const stream = fakeStream('native-screen');
+  const audio = { id: 'audio', kind: 'audio' };
+  Object.assign(stream, { getAudioTracks: () => [audio] });
+  const calls: Array<{ kind: string; track: any; options: any }> = [];
+  const internal = manager as any;
+  internal.localMedia.set('native-screen', { stream, descriptor: descriptor('native-screen') });
+  internal.nativeVideo = { dispatch: () => true };
+  internal.room = {
+    addStream: () => assert.fail('Native video must not enter the browser encoder'),
+    removeTrack: (track: any, options: any) => calls.push({ kind: 'remove', track, options }),
+    addTrack: (track: any, _stream: MediaStream, options: any) => { calls.push({ kind: 'add', track, options }); return []; },
+  };
+  internal.dispatchMediaToPeer('watcher');
+  assert.equal(calls.length, 2); assert.equal(calls[0].track.kind, 'video'); assert.equal(calls[1].track, audio);
+  assert.ok(calls.every(call => call.options.target === 'watcher'));
+  internal.nativeVideo = null; internal.room = null; manager.stopStream();
+});
+
+test('native sender HUD measures transmitted frames rather than preview repeats or requested FPS', async () => {
+  const manager = new GroupRoomManager('Owner','test','',true);
+  const stream = fakeStream('native-screen');
+  Object.assign(stream.getVideoTracks()[0],{getSettings:()=>({frameRate:120,width:1280,height:720})});
+  manager.shareStream(stream,8_000_000,120,descriptor('native-screen'));
+  const internal=manager as any;
+  internal.nativeVideo={senderStats:async()=>[{bytes:200_000,frames:110}]};
+  internal.mediaStatsSamples.set('local/native-screen',{bytes:100_000,at:Date.now()-1000,nativeFrames:50});
+  const stats=await manager.getPeerStats('local/native-screen');
+  assert.ok(stats.fps!>=58&&stats.fps!<=62);assert.ok(stats.bitrateKbps!>=780&&stats.bitrateKbps!<=820);
+  internal.nativeVideo=null;manager.stopStream();
+});
+
+test('native video and ordinary audio merge into the same advertised slot without replacing another source', () => {
+  const original = globalThis.MediaStream;
+  class TestStream {
+    id = crypto.randomUUID(); private tracks: any[];
+    constructor(tracks: any[]) { this.tracks = tracks; }
+    getTracks() { return this.tracks; } getVideoTracks() { return this.tracks.filter(t=>t.kind==='video'); }
+    getAudioTracks() { return this.tracks.filter(t=>t.kind==='audio'); } addEventListener() {}
+  }
+  Object.assign(globalThis, { MediaStream: TestStream });
+  try {
+    const manager = new GroupRoomManager('Viewer','test','',false); const internal = manager as any;
+    internal.peerTracker.receivePeerExchange('owner',true,'Owner');
+    internal.remoteDescriptors.set('owner',[descriptor('screen'),descriptor('camera','camera')]);
+    internal.remoteMediaRevisions.set('owner',1);
+    const audio = { id:'audio', kind:'audio', readyState:'live' }, video = { id:'native',kind:'video',readyState:'live' };
+    const camera = { id:'camera',kind:'video',readyState:'live' };
+    internal.receivePeerStream(new TestStream([camera]),'owner',descriptor('camera','camera'));
+    internal.receivePeerStream(new TestStream([audio]),'owner',descriptor('screen'));
+    internal.receivePeerStream(new TestStream([video]),'owner',descriptor('screen'));
+    const media=internal.remoteMedia.get('owner'); assert.deepEqual(media.get('screen').getTracks(),[video,audio]);
+    assert.equal(media.get('camera').getVideoTracks()[0],camera);
+    const replacement={id:'generic-fallback',kind:'video',readyState:'live'};
+    internal.receivePeerStream(new TestStream([replacement]),'owner',descriptor('screen'));
+    assert.deepEqual(media.get('screen').getTracks(),[replacement,audio]);
+    assert.equal(media.get('camera').getVideoTracks()[0],camera);
+  } finally { Object.assign(globalThis,{MediaStream:original}); }
+});
+
 const descriptor = (id: string, kind: 'screen' | 'camera' = 'screen'): StreamDescriptor =>
   ({ id, kind, label: kind, videoTrackId: `${id}-video`, fps: 60, bitrate: 8000 });
 function fakeStream(id: string) {
