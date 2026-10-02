@@ -58,3 +58,13 @@ Windows 11 build 26100, NVIDIA driver 32.0.16.1714, Ryzen 7 5700X3D, approximate
 Baseline WGC callbacks were only 37.3 FPS with zero application gate drops; GPU readback took 0.48 ms and JPEG compression 4.70 ms per image. Changing the supported Windows update interval to 4 ms raised WGC delivery to approximately 75 callbacks/second, while the existing phase-preserving handler kept JPEG/transport output at 60 FPS. This does not require encoding at 250 FPS.
 
 Summarize saved benchmark results with `node test/bench/summarize_video_loopback.mjs result.json`. These local measurements do not establish another participant's decoder/network performance or exclusive-fullscreen game behavior.
+
+### High-refresh deadline validation (2026-10-01)
+
+The current primary display exposes at most 75 Hz through Win32 EnumDisplaySettings; no physical 120/144/165/240 Hz mode is available on this host. The earlier packaged 75 Hz measurement remains the physical validation. Do not describe synthetic results as high-refresh hardware validation.
+
+Run `node test/bench/check_capture_cadence.mjs` from the repository root with Rust installed. The diagnostic extracts the current Rust rejection/deadline-update blocks and compiles them into an isolated timestamp-driven harness under the ignored standard target directory. Each case represents 60 seconds of ideal callbacks, with and without alternating 1 ms arrival delays. It asserts the expected average cadence for 60/75/120/144/165/240 Hz sources at 60 and 120 FPS targets. This assumes every accepted frame can be processed before subsequent callbacks; it does not exercise WGC's 4 ms minimum interval, frame readback failures, processing, a GPU, VRR, game presentation, WebView2, network or decoding.
+
+At 120/144/165/240 Hz, the modeled output maintains 60 and 120 FPS. At 60/75 Hz, a 120 FPS target is limited by available source updates. Without jitter, 144 Hz to 60 FPS alternates gaps of 13.89 and 20.83 ms, and 165 Hz to 60 FPS has 12.12 and 18.18 ms gaps. Exact average FPS does not imply uniform frame intervals. A future output pacer must evaluate the latency tradeoff of waiting for the next deadline and repeating the latest frame; repeated frames do not represent newly captured motion.
+
+Physical validation remains outstanding for high-refresh hardware, variable refresh, exclusive fullscreen, heavy games and non-NVIDIA adapters. Measure native callbacks/images and stage timings alongside encoded/decoded RTP counters and frame interval percentiles; record display rate, driver, GPU, codec, stream count and game load.
