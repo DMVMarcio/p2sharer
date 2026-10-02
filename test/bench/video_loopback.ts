@@ -2,6 +2,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
 import { NativeVideoBridge } from '../../src/video/native_video_bridge';
 import { MediaCoordinator } from '../../src/p2p/media_coordinator';
+export { runNvencLifecycle, runNvencVisualCheck } from './nvenc_lifecycle';
 
 /** Run inside the desktop WebView2 to exercise native capture and real RTP encoding. */
 export async function runVideoLoopback(options: {
@@ -12,6 +13,7 @@ export async function runVideoLoopback(options: {
   resolution?: { width: number; height: number };
   fps?: number;
   loadScenario?: boolean | 'sustained';
+  warmupMs?: number;
 } = {}) {
   const fps = options.fps ?? 60;
   const desktopWindow = options.pipeline === 'canvas' ? undefined : getCurrentWindow();
@@ -108,7 +110,7 @@ export async function runVideoLoopback(options: {
       await sender.setRemoteDescription(receiver.localDescription!);
       await MediaCoordinator.applySenderBitrate(sender, 15_000_000, fps);
     }
-    await new Promise((resolve) => setTimeout(resolve, 8000));
+    await new Promise((resolve) => setTimeout(resolve, options.warmupMs ?? 8000));
     const sample = async () => Promise.all(connections.map(async (pc) => {
       const stats = await pc.getStats();
       return Array.from(stats.values()).filter((entry) =>
@@ -171,7 +173,8 @@ export async function runVideoLoopback(options: {
     const cadence = { websocketImages: intervals(imageTimes), trackWrites: intervals(writerTimes),
       receivers: receiverTimes.map(timing => ({ media: intervals(timing.media), display: intervals(timing.display) })) };
     const nativeAfter = options.pipeline === 'canvas' ? undefined : await invoke('get_capture_metrics', { sessionId: bridge.sessionId });
-    const sourceBitmap = (bridge as unknown as { latestBitmap: ImageBitmap | null }).latestBitmap;
+    const sourceState = bridge as unknown as { latestBitmap: ImageBitmap | null; latestEncodedFrame: VideoFrame | null };
+    const sourceBitmap = sourceState.latestEncodedFrame || sourceState.latestBitmap;
     const pixelRange = (source: CanvasImageSource) => {
       const sample = document.createElement('canvas'); sample.width = 64; sample.height = 36;
       const ctx = sample.getContext('2d', { willReadFrequently: true })!;

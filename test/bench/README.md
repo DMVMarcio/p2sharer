@@ -125,3 +125,67 @@ The paced four-second sample had zero queue drops, missed deadlines, repeats and
 The summarizer reports fresh paced FPS separately from cached repeats and refresh JPEGs. Hidden receiver callbacks can skip frames even while RTP reports 60 decoded FPS; callback media/display intervals are sampled presentation evidence, not a complete frame log. Display intervals naturally quantize to the physical monitor refresh rate. Physical 120/144/165/240 Hz, VRR, exclusive fullscreen and other adapters still require hardware tests. `cargo test --release --lib video_pacer::tests` covers queue bounds, deadline stalls, adaptive FPS and 24 synthetic source/target/jitter combinations. Finish with a Tauri build before packaged desktop tests.
 
 The final packaged sustained-load run reduced to 704x396/30, recovered full 720p/60 at approximately 76 seconds, and left the second capture unchanged. After recovery: 59.95 decoded FPS each, no recorded drops/readback errors, track-write p95 17.9 ms and mean queue wait 15.05 ms. A separate `fps:120` run on the physical 75 Hz source measured 74.74 fresh native FPS, 44.85 cached ticks/second, 120.15 decoded FPS each and no recorded receiver drops. Track-write p95 was 12.2 ms, above the 8.33 ms target interval: jitter remains. This higher decoded count includes repeated motion and cannot validate a physical high-refresh monitor.
+
+### Optional native NVENC (2026-10-02)
+
+Close the app and launch a fresh packaged process with `P2SHARER_NATIVE_NVENC=1` in
+its environment to select the experimental native H264 bridge. Unset the variable
+or use `0` for the default generic path. Run the same maximized 720p/60, quality 90,
+15 Mbps, two-receiver benchmark above. `nvenc_images` must increase and native JPEG
+and readback deltas must be zero to establish that the hardware path was actually
+used. `get_native_encoder_support` reports driver API availability, not successful
+capture-device initialization. Keep codec, source content, resolution and stream
+count equal across fresh-process comparisons.
+
+From PowerShell in the repository root, with the desktop app closed:
+
+```powershell
+$env:P2SHARER_NATIVE_NVENC = '1'
+& '.\src-tauri\target\release\p2sharer.exe'
+```
+
+Use `0` and launch a fresh process to return to the default. This opt-in is not a
+persisted application setting.
+
+This uses the NVIDIA driver API on GPU textures, then locally decodes H264 and uses
+the existing WebRTC encoder. It does not remove that second encoder or change remote
+peer protocols. The internal CBR bridge budget is 15 Mbps; it is separate from the
+network bitrate and JPEG quality. Compare fidelity and end-to-end behavior before
+considering automatic selection. See [architecture and limits](../../.agents/knowledge/native-nvenc.md).
+
+For lifecycle checks, import `runNvencLifecycle` from `test/bench/nvenc_lifecycle.ts`
+in desktop development mode or include it in the packaged QA bundle. It asserts two
+concurrent NVENC sessions, live JPEG fallback retaining the track and other session,
+restart with stale-token rejection, and unsupported tiny geometry fallback.
+`loadScenario:'sustained'` validates adaptive resolution/FPS with encoder recreation.
+Run native hardware tests with `P2SHARER_TEST_NVENC=1` and
+`cargo test --release --lib -- --test-threads=1`, then package with Tauri last.
+
+The first hardware-decoder run had 83 ms pauses despite about 1 ms native processing.
+Low-delay software decoding retained about 60 decoded FPS with regular track writes.
+Do not infer an overall improvement from the native encoder timing alone. WARP
+fallback tests are not physical AMD/Intel tests, and 120 FPS targets on this host are
+not physical high-refresh monitor validation.
+
+Final same-executable fresh-process comparison at full 1280x720/60:
+
+| Measurement | Generic native JPEG | Experimental NVENC/software decode |
+| --- | --- | --- |
+| Native processing time | 2.56 ms/frame | 0.97 ms/frame |
+| Local packet bytes | 34,737/image | 2,867/image |
+| Decoded FPS per receiver | 59.95 | 60.19 |
+| Track-write interval p95 | 18.1 ms | 18.1 ms |
+| Raw pixel readback / JPEG | 0.32 / 2.22 ms | 0 / 0 ms |
+| Recorded receiver drops | 0 | 0 |
+
+The generic sample used `warmupMs:20000` after a discarded cold-start sample adapted
+to 85% resolution. Both final samples retained 100% resolution with zero adjustments.
+This shows lower native processing and local traffic, not higher FPS or less Internet
+traffic. The native internal H264 budget and JPEG quality are different controls;
+quadrant colors are checked, but quantitative text/game fidelity is not established.
+
+`runNvencVisualCheck()` validates decoded RGB quadrants and orientation before and
+after live JPEG fallback. `runNvencLifecycle()` also runs six repeated restarts and
+simulates an unavailable decoder, asserting that JPEG resumes. A 120 FPS target on
+the physical 75 Hz source delivered 74.72 fresh native FPS plus cached repetition,
+120.15 decoded FPS and 9.7 ms track-write p95; it does not establish 120 FPS of motion.
