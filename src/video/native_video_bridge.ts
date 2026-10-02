@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { ScreenSourcesResponse, VideoCaptureBridge, VideoSourceOptions } from '../core/types.ts';
 import { BridgeLoadMeter } from './bridge_load_meter.ts';
+import { VideoFrameClock } from './frame_timing.ts';
 
 export class NativeVideoBridge implements VideoCaptureBridge {
   public readonly sessionId: string;
@@ -18,7 +19,8 @@ export class NativeVideoBridge implements VideoCaptureBridge {
   private trackGenerator: any = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private trackWriter: any = null;
-  private lastTimestampUs: number = 0;
+  private frameClock = new VideoFrameClock();
+  private effectiveFps = 60;
   private pendingBuffer: ArrayBuffer | null = null;
   private isDecoding: boolean = false;
   private captureGeneration = 0;
@@ -132,7 +134,8 @@ export class NativeVideoBridge implements VideoCaptureBridge {
   ): Promise<MediaStream> {
     await this.stopCapture();
     this.currentFps = fps;
-    this.lastTimestampUs = 0;
+    this.frameClock.reset();
+    this.effectiveFps = Math.min(120, Math.max(15, fps));
     const generation = this.captureGeneration;
     const feedbackToken = crypto.randomUUID();
     const loadMeter = new BridgeLoadMeter(fps, performance.now());
@@ -255,17 +258,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
         const VideoFrameClass = (globalThis as any).VideoFrame;
         if (this.trackWriter && typeof VideoFrameClass === 'function') {
           try {
-            let nowUs = Math.round(performance.now() * 1000);
-            if (nowUs <= this.lastTimestampUs) {
-              const minIntervalUs = Math.round((1_000_000 / Math.max(this.currentFps, 1)) * 0.5);
-              nowUs = this.lastTimestampUs + minIntervalUs;
-            }
-            this.lastTimestampUs = nowUs;
-
-            const videoFrame = new VideoFrameClass(bitmap, {
-              timestamp: nowUs,
-              duration: Math.round((1000 / Math.max(this.currentFps, 1)) * 1000),
-            });
+            const videoFrame = new VideoFrameClass(bitmap, this.frameClock.next(performance.now(), this.effectiveFps));
             try {
               // Keep only the newest pending JPEG while the encoder consumes this frame.
               // Unawaited writes build an unbounded queue on slower GPU encoders.
@@ -363,7 +356,10 @@ export class NativeVideoBridge implements VideoCaptureBridge {
               feedbackPending = true;
               void invoke<number>('report_capture_load', { sessionId: this.sessionId, feedbackToken, pressurePercent })
                 .then(effectiveFps => {
-                  if (generation === this.captureGeneration) loadMeter.setEffectiveFps(effectiveFps);
+                  if (generation === this.captureGeneration) {
+                    loadMeter.setEffectiveFps(effectiveFps);
+                    if (Number.isFinite(effectiveFps) && effectiveFps >= 15 && effectiveFps <= 120) this.effectiveFps = effectiveFps;
+                  }
                 })
                 .catch(() => {}) // Stopped/replaced sessions reject stale feedback.
                 .finally(() => { feedbackPending = false; });

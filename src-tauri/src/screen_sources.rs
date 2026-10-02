@@ -13,6 +13,9 @@ use tokio::net::TcpListener;
 use tokio::sync::broadcast;
 use tokio_tungstenite::tungstenite::protocol::Message;
 use xcap::{Monitor, Window};
+use crate::video_pacer::{FramePacer, PacedFrame};
+
+type FrameDelivery = Arc<(std::sync::Mutex<FramePacer<Arc<Vec<u8>>>>, std::sync::Condvar)>;
 
 #[cfg(windows)]
 use windows_capture::{
@@ -83,6 +86,13 @@ pub struct CaptureMetrics {
     readback_errors: std::sync::atomic::AtomicU64,
     resize_us: std::sync::atomic::AtomicU64,
     gpu_scaled_images: std::sync::atomic::AtomicU64,
+    paced_images: std::sync::atomic::AtomicU64,
+    repeat_ticks: std::sync::atomic::AtomicU64,
+    refresh_images: std::sync::atomic::AtomicU64,
+    queue_drops: std::sync::atomic::AtomicU64,
+    missed_deadlines: std::sync::atomic::AtomicU64,
+    queue_age_us: std::sync::atomic::AtomicU64,
+    max_queue_age_us: std::sync::atomic::AtomicU64,
 }
 
 #[derive(Serialize)]
@@ -91,6 +101,8 @@ pub struct CaptureMetricsSnapshot {
     staging_allocations: u64, readback_errors: u64, resize_us: u64,
     gpu_scaled_images: u64,
     load: crate::video_load::LoadSnapshot,
+    paced_images: u64, repeat_ticks: u64, refresh_images: u64,
+    queue_drops: u64, missed_deadlines: u64, queue_age_us: u64, max_queue_age_us: u64,
 }
 
 #[tauri::command]
@@ -107,6 +119,13 @@ pub fn get_capture_metrics(session_id: String) -> Result<CaptureMetricsSnapshot,
         resize_us: metrics.resize_us.load(Ordering::Relaxed),
         gpu_scaled_images: metrics.gpu_scaled_images.load(Ordering::Relaxed),
         load: session.load.snapshot(),
+        paced_images: metrics.paced_images.load(Ordering::Relaxed),
+        repeat_ticks: metrics.repeat_ticks.load(Ordering::Relaxed),
+        refresh_images: metrics.refresh_images.load(Ordering::Relaxed),
+        queue_drops: metrics.queue_drops.load(Ordering::Relaxed),
+        missed_deadlines: metrics.missed_deadlines.load(Ordering::Relaxed),
+        queue_age_us: metrics.queue_age_us.load(Ordering::Relaxed),
+        max_queue_age_us: metrics.max_queue_age_us.load(Ordering::Relaxed),
     })
 }
 
@@ -118,8 +137,72 @@ pub fn report_capture_load(session_id: String, feedback_token: String, pressure_
     Ok(load.fps())
 }
 
+fn send_paced_frame(frame: PacedFrame<Arc<Vec<u8>>>, sender: &broadcast::Sender<Message>, metrics: &CaptureMetrics) {
+    let message = match frame {
+        PacedFrame::Fresh { frame, age_us } => {
+            metrics.paced_images.fetch_add(1, Ordering::Relaxed);
+            metrics.queue_age_us.fetch_add(age_us, Ordering::Relaxed);
+            metrics.max_queue_age_us.fetch_max(age_us, Ordering::Relaxed);
+            Message::Binary((*frame).clone())
+        }
+        PacedFrame::Refresh(frame) => {
+            metrics.refresh_images.fetch_add(1, Ordering::Relaxed);
+            Message::Binary((*frame).clone())
+        }
+        PacedFrame::Repeat => {
+            metrics.repeat_ticks.fetch_add(1, Ordering::Relaxed);
+            Message::Binary(vec![0])
+        }
+    };
+    let _ = sender.send(message);
+}
+
+fn enqueue_capture_frame(delivery: &FrameDelivery, frame: Arc<Vec<u8>>, ready_us: u64,
+    legacy: bool, active: &AtomicBool, sender: &broadcast::Sender<Message>, metrics: &CaptureMetrics) {
+    if !active.load(Ordering::Relaxed) { return; }
+    if let Ok(mut pacer) = delivery.0.lock() {
+        if legacy { pacer.record_immediate(frame.clone(), ready_us); }
+        else { pacer.enqueue(frame.clone(), ready_us); }
+    }
+    if legacy && active.load(Ordering::Relaxed) {
+        send_paced_frame(PacedFrame::Fresh { frame, age_us: 0 }, sender, metrics);
+    }
+    delivery.1.notify_one();
+}
+
+fn start_frame_delivery(delivery: FrameDelivery, active: Arc<AtomicBool>, load: Arc<crate::video_load::CaptureLoad>,
+    sender: broadcast::Sender<Message>, metrics: Arc<CaptureMetrics>, started: std::time::Instant) {
+    std::thread::spawn(move || {
+        let _timer_guard = MultimediaTimerGuard::new();
+        while active.load(Ordering::Relaxed) {
+            let now_us = started.elapsed().as_micros() as u64;
+            let output = if let Ok(mut pacer) = delivery.0.lock() {
+                pacer.set_fps(load.fps(), now_us);
+                let output = pacer.tick(now_us);
+                metrics.queue_drops.store(pacer.dropped, Ordering::Relaxed);
+                metrics.missed_deadlines.store(pacer.missed, Ordering::Relaxed);
+                output
+            } else { break; };
+            if let Some(frame) = output {
+                if !active.load(Ordering::Relaxed) { break; }
+                send_paced_frame(frame, &sender, &metrics);
+            }
+            if let Ok(pacer) = delivery.0.lock() {
+                let now_us = started.elapsed().as_micros() as u64;
+                let wait_us = pacer.next_tick_us().map_or(16_000, |deadline| deadline.saturating_sub(now_us)).min(16_000);
+                if wait_us > 0 {
+                    // Notifications wake the waiter for new data; they never advance its deadline.
+                    let _wait = delivery.1.wait_timeout(pacer, std::time::Duration::from_micros(wait_us));
+                }
+            } else { break; }
+        }
+    });
+}
+
 #[derive(Clone)]
 pub struct CaptureFlags {
+    pub delivery: FrameDelivery,
+    pub legacy_pacing: bool,
     pub load: Arc<crate::video_load::CaptureLoad>,
     pub sender: broadcast::Sender<Message>,
     pub target_fps: u32,
@@ -127,14 +210,14 @@ pub struct CaptureFlags {
     pub target_height: u32,
     pub quality: u8,
     pub active_flag: Arc<AtomicBool>,
-    pub latest_frame: Arc<std::sync::Mutex<Option<Arc<Vec<u8>>>>>,
-    pub last_sent_us: Arc<std::sync::atomic::AtomicU64>,
     pub start_instant: std::time::Instant,
     pub metrics: Arc<CaptureMetrics>,
 }
 
 #[cfg(windows)]
 pub struct NativeWgcHandler {
+    delivery: FrameDelivery,
+    legacy_pacing: bool,
     load: Arc<crate::video_load::CaptureLoad>,
     load_controller: crate::video_load::LoadController,
     sender: broadcast::Sender<Message>,
@@ -152,8 +235,6 @@ pub struct NativeWgcHandler {
     jpeg_encoder: RealtimeJpegEncoder,
     next_frame_time: std::time::Instant,
     frame_interval: std::time::Duration,
-    latest_frame: Arc<std::sync::Mutex<Option<Arc<Vec<u8>>>>>,
-    last_sent_us: Arc<std::sync::atomic::AtomicU64>,
     start_instant: std::time::Instant,
     metrics: Arc<CaptureMetrics>,
 }
@@ -167,6 +248,8 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
         let fps = ctx.flags.target_fps.clamp(15, 120);
         let frame_interval = std::time::Duration::from_nanos(1_000_000_000 / fps as u64);
         Ok(Self {
+            delivery: ctx.flags.delivery,
+            legacy_pacing: ctx.flags.legacy_pacing,
             load: ctx.flags.load,
             load_controller: crate::video_load::LoadController::default(),
             sender: ctx.flags.sender,
@@ -184,8 +267,6 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
             jpeg_encoder: RealtimeJpegEncoder::new(ctx.flags.quality)?,
             next_frame_time: std::time::Instant::now(),
             frame_interval,
-            latest_frame: ctx.flags.latest_frame,
-            last_sent_us: ctx.flags.last_sent_us,
             start_instant: ctx.flags.start_instant,
             metrics: ctx.flags.metrics,
         })
@@ -306,14 +387,8 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
             if scaled.is_some() { self.metrics.gpu_scaled_images.fetch_add(1, Ordering::Relaxed); }
             self.metrics.images.fetch_add(1, Ordering::Relaxed);
             let frame_arc = Arc::new(frame_bytes);
-            if let Ok(mut cache) = self.latest_frame.lock() {
-                *cache = Some(frame_arc.clone());
-            }
-            self.last_sent_us.store(
-                self.start_instant.elapsed().as_micros() as u64,
-                Ordering::Release,
-            );
-            let _ = self.sender.send(Message::Binary((*frame_arc).clone()));
+            enqueue_capture_frame(&self.delivery, frame_arc, self.start_instant.elapsed().as_micros() as u64,
+                self.legacy_pacing, &self.active_flag, &self.sender, &self.metrics);
         }
 
         self.metrics.jpeg_us.fetch_add(encode_start.elapsed().as_micros() as u64, Ordering::Relaxed);
@@ -843,62 +918,15 @@ pub fn start_capture_session(
         control: None,
     });
     let start_instant = std::time::Instant::now();
-    let latest_frame_cache: Arc<std::sync::Mutex<Option<Arc<Vec<u8>>>>> =
-        Arc::new(std::sync::Mutex::new(None));
-    let last_sent_us = Arc::new(std::sync::atomic::AtomicU64::new(0));
-
-    // High-precision frame heartbeat pacer thread (guarantees constant stream heartbeat without starvation)
-    let pacer_active = is_capturing.clone();
-    let pacer_sender = sender.clone();
-    let pacer_cache = latest_frame_cache.clone();
-    let pacer_wgc_last_sent_us = last_sent_us.clone();
-    let pacer_start = start_instant;
-    let pacer_load = load.clone();
-
-    std::thread::spawn(move || {
-        let _timer_guard = MultimediaTimerGuard::new();
-        let mut next_tick_us = pacer_start.elapsed().as_micros() as u64 + 1_000_000 / u64::from(pacer_load.fps());
-        let mut pacer_tick_count: u64 = 0;
-
-        while pacer_active.load(Ordering::Relaxed) {
-            let target_interval_us = 1_000_000 / u64::from(pacer_load.fps());
-            let static_timeout_us = target_interval_us * 4;
-            let now_us = pacer_start.elapsed().as_micros() as u64;
-            let last_wgc = pacer_wgc_last_sent_us.load(Ordering::Acquire);
-
-            // If a real WGC frame arrived recently (< static_timeout_us), WGC is actively streaming:
-            // Back off next_tick_us so pacer never competes with active screen/mouse movement
-            if last_wgc > 0 && now_us.saturating_sub(last_wgc) < static_timeout_us {
-                next_tick_us = last_wgc + static_timeout_us;
-            } else if now_us >= next_tick_us {
-                pacer_tick_count += 1;
-                if let Ok(guard) = pacer_cache.lock() {
-                    if let Some(frame) = guard.as_ref() {
-                        // Full frame keyframe refresh twice per second (every 30 ticks / ~500ms);
-                        // On intermediate static ticks, emit 1-byte heartbeat tick [0] to bypass CPU JPEG decoding in JS!
-                        if pacer_tick_count % 30 == 0 {
-                            let _ = pacer_sender.send(Message::Binary((**frame).clone()));
-                        } else {
-                            let _ = pacer_sender.send(Message::Binary(vec![0]));
-                        }
-                    }
-                }
-                next_tick_us += target_interval_us;
-                if next_tick_us < now_us {
-                    next_tick_us = now_us + target_interval_us;
-                }
-            }
-
-            // Dynamically sleep based on time remaining to avoid 1000 wakeups/second
-            let remaining_us = next_tick_us.saturating_sub(now_us);
-            let sleep_ms = (remaining_us / 2000).clamp(1, 16);
-            std::thread::sleep(std::time::Duration::from_millis(sleep_ms));
-        }
-    });
+    let legacy_pacing = std::env::var("P2SHARER_LEGACY_VIDEO_PACING").as_deref() == Ok("1");
+    let delivery: FrameDelivery = Arc::new((std::sync::Mutex::new(FramePacer::new(fps)), std::sync::Condvar::new()));
+    start_frame_delivery(delivery.clone(), is_capturing.clone(), load.clone(), sender.clone(), metrics.clone(), start_instant);
 
     #[cfg(windows)]
     {
         let flags = CaptureFlags {
+            delivery: delivery.clone(),
+            legacy_pacing,
             metrics: metrics.clone(),
             load: load.clone(),
             sender: sender.clone(),
@@ -907,8 +935,6 @@ pub fn start_capture_session(
             target_height: height,
             quality: jpeg_quality,
             active_flag: is_capturing.clone(),
-            latest_frame: latest_frame_cache.clone(),
-            last_sent_us: last_sent_us.clone(),
             start_instant,
         };
 
@@ -1014,8 +1040,6 @@ pub fn start_capture_session(
     }
 
     // Fallback capture thread (xcap) if WGC is unsupported or failed
-    let xcap_latest_cache = latest_frame_cache.clone();
-    let xcap_last_sent_us = last_sent_us.clone();
     std::thread::spawn(move || {
         let _timer_guard = MultimediaTimerGuard::new();
         let mut load_controller = crate::video_load::LoadController::default();
@@ -1208,14 +1232,8 @@ pub fn start_capture_session(
                     load.output(final_w, final_h);
                     metrics.images.fetch_add(1, Ordering::Relaxed);
                     let frame_arc = Arc::new(jpeg_bytes);
-                    if let Ok(mut cache) = xcap_latest_cache.lock() {
-                        *cache = Some(frame_arc.clone());
-                    }
-                    xcap_last_sent_us.store(
-                        start_instant.elapsed().as_micros() as u64,
-                        Ordering::Release,
-                    );
-                    let _ = sender.send(Message::Binary((*frame_arc).clone()));
+                    enqueue_capture_frame(&delivery, frame_arc, start_instant.elapsed().as_micros() as u64,
+                        legacy_pacing, &is_capturing_clone, &sender, &metrics);
                     let processing_us = loop_start.elapsed().as_micros() as u64;
                     metrics.processing_us.fetch_add(processing_us, Ordering::Relaxed);
                     load_controller.observe(&load, load.elapsed_ms(), processing_us);

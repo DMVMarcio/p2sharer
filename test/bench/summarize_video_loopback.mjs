@@ -19,6 +19,15 @@ export function summarizeVideoLoopback(result) {
     readbackErrors: delta(result.nativeBefore, result.nativeAfter, 'readback_errors'),
     gpuScaledImages: delta(result.nativeBefore, result.nativeAfter, 'gpu_scaled_images'),
     load: result.nativeAfter?.load,
+    pacedImageFps: delta(result.nativeBefore, result.nativeAfter, 'paced_images') === undefined ? undefined
+      : delta(result.nativeBefore, result.nativeAfter, 'paced_images') / seconds,
+    repeatTicks: delta(result.nativeBefore, result.nativeAfter, 'repeat_ticks'),
+    refreshImages: delta(result.nativeBefore, result.nativeAfter, 'refresh_images'),
+    queueDrops: delta(result.nativeBefore, result.nativeAfter, 'queue_drops'),
+    missedDeadlines: delta(result.nativeBefore, result.nativeAfter, 'missed_deadlines'),
+    queueAgeMs: delta(result.nativeBefore, result.nativeAfter, 'queue_age_us') === undefined ? undefined
+      : delta(result.nativeBefore, result.nativeAfter, 'queue_age_us') / delta(result.nativeBefore, result.nativeAfter, 'paced_images') / 1000,
+    lifetimeMaxQueueAgeMs: result.nativeAfter?.max_queue_age_us === undefined ? undefined : result.nativeAfter.max_queue_age_us / 1000,
   };
   const rtp = result.after.flatMap((reports, connection) => reports.filter(report =>
     ['outbound-rtp', 'inbound-rtp'].includes(report.type) && report.kind === 'video').map(report => {
@@ -36,7 +45,7 @@ export function summarizeVideoLoopback(result) {
       encoder: report.encoderImplementation, decoder: report.decoderImplementation,
     };
   }));
-  return { options: result.options, seconds, native, visualChecks: result.visualChecks,
+  return { options: result.options, seconds, native, cadence: result.cadence, visualChecks: result.visualChecks,
     websocketImageFps: delta(result.captureBefore, result.captureAfter, 'imageMessages') / seconds,
     jpegBytesPerFrame: delta(result.captureBefore, result.captureAfter, 'jpegBytes') === undefined ? undefined
       : delta(result.captureBefore, result.captureAfter, 'jpegBytes') / delta(result.captureBefore, result.captureAfter, 'imageMessages'),

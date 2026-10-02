@@ -10,6 +10,7 @@ pub mod room_vault;
 pub mod screen_sources;
 mod video_jpeg;
 mod video_load;
+mod video_pacer;
 #[cfg(windows)]
 mod video_readback;
 #[cfg(windows)]

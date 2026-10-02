@@ -18,7 +18,7 @@ const result = await runVideoLoopback({ pipeline: 'native', peers: 2, probe: tru
 console.log(result);
 ```
 
-Close the desktop app before running a packaging build. The native benchmark temporarily keeps the desktop window above other windows and restores its previous setting afterward. The benchmark animates a 1920x1080 canvas, captures `screen:0` through the Rust WGC/image/WebSocket bridge, and sends the resulting track through independent real WebRTC loopback connections. Ensure the desktop window is visible on the selected monitor. `pipeline: 'canvas'` isolates encoding from native capture. `probe: true` applies the production encoder capability selection; use a fresh app instance with `probe: false` for the legacy codec order.
+Close the desktop app before running a packaging build. The native benchmark temporarily maximizes the desktop window and keeps it above other windows, restoring both previous settings afterward. The benchmark animates a 1920x1080 canvas, captures `screen:0` through the Rust WGC/image/WebSocket bridge, and sends the resulting track through independent real WebRTC loopback connections. Ensure the desktop window is visible on the selected monitor. `pipeline: 'canvas'` isolates encoding from native capture. `probe: true` applies the production encoder capability selection; use a fresh app instance with `probe: false` for the legacy codec order.
 
 Compute FPS from the differences between `before` and `after` frame counters and timestamps, rather than counting static heartbeat messages. `captureBefore`/`captureAfter` separate full native image messages from cached-frame heartbeats. The benchmark runs sender and receivers on the same PC; it cannot validate another participant's network, decoder, or Internet route.
 
@@ -105,3 +105,23 @@ In packaged Tauri WebView2, run `runVideoLoopback({pipeline:'native', peers:2, p
 The brief-load RTX 5070 / 75 Hz run stepped 1280x720 -> 1088x612 -> 896x504 -> 1088x612 -> 1280x720. FPS stayed at the requested 60; the independent capture had zero adjustments. Final local receivers decoded about 60.1 FPS each, with zero recorded drops and nonblack sampled content; native processing averaged 2.46 ms/frame. Feedback windows introduce a bounded response delay; one additional reduction can occur shortly after injected pressure is removed. Do not claim instantaneous recovery or a Deadlock performance gain from this test.
 
 The sustained run reached 704x396/45 FPS at about 16 seconds and 704x396/30 FPS at about 20 seconds. After pressure removal at 22 seconds, it restored FPS to 45/60 before restoring resolution to 896x504, 1088x612 and 1280x720, completing recovery at about 76 seconds. The second capture had zero adjustments throughout. Final native images measured 59.73 FPS, both receivers 59.95 FPS with zero recorded drops and nonblack pixels, and native processing averaged 2.39 ms/frame. The final four-second measurement is taken after recovery; the deliberately delayed writer limits receiver delivery during injection and is not a performance comparison.
+
+### Native delivery pacing (2026-10-02)
+
+The default native path delivers through a bounded two-image queue on deadlines at the current effective FPS. Set `P2SHARER_LEGACY_VIDEO_PACING=1` before launching a fresh desktop instance to compare immediate image delivery. Keep source content, maximized window, output size, quality, codec and receiver count equal. Use the native 720p options above; the diagnostic now reports `cadence.websocketImages`, `cadence.trackWrites` and receiver callback media/display intervals. `fps:120` changes capture/probe/sender targets, but does not turn a 75 Hz source into 120 fresh images per second.
+
+Controlled packaged same-binary measurements on the RTX 5070 / 75 Hz desktop:
+
+| Measurement | Immediate images | Paced images |
+| --- | --- | --- |
+| Track-write interval median / p95 / p99 | 13.5 / 27.1 / 27.7 ms | 16.7 / 18.4 / 19.1 ms |
+| JPEG arrival interval p95 | 27.0 ms | 18.2 ms |
+| Local decoded FPS per receiver | 60.19 | 59.86 |
+| JPEG bytes per image | 34,492 | 34,480 |
+| Mean ready-image queue wait | 0 ms | 23.76 ms |
+
+The paced four-second sample had zero queue drops, missed deadlines, repeats and receiver drops. This improvement is encoder-input interval regularity, with an added queue-latency tradeoff; it does not establish remote display smoothness or game performance. Queue age starts after JPEG readiness and excludes capture/processing/network/decode time. The maximum-age metric is a session lifetime maximum, not a sampled-window delta.
+
+The summarizer reports fresh paced FPS separately from cached repeats and refresh JPEGs. Hidden receiver callbacks can skip frames even while RTP reports 60 decoded FPS; callback media/display intervals are sampled presentation evidence, not a complete frame log. Display intervals naturally quantize to the physical monitor refresh rate. Physical 120/144/165/240 Hz, VRR, exclusive fullscreen and other adapters still require hardware tests. `cargo test --release --lib video_pacer::tests` covers queue bounds, deadline stalls, adaptive FPS and 24 synthetic source/target/jitter combinations. Finish with a Tauri build before packaged desktop tests.
+
+The final packaged sustained-load run reduced to 704x396/30, recovered full 720p/60 at approximately 76 seconds, and left the second capture unchanged. After recovery: 59.95 decoded FPS each, no recorded drops/readback errors, track-write p95 17.9 ms and mean queue wait 15.05 ms. A separate `fps:120` run on the physical 75 Hz source measured 74.74 fresh native FPS, 44.85 cached ticks/second, 120.15 decoded FPS each and no recorded receiver drops. Track-write p95 was 12.2 ms, above the 8.33 ms target interval: jitter remains. This higher decoded count includes repeated motion and cannot validate a physical high-refresh monitor.
