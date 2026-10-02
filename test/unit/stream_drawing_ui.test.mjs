@@ -70,10 +70,18 @@ test('drawing tools preserve the video node, capture complete gestures, and do n
 
 test('color palette uses the canonical menu and broadcaster consent removes drawing controls', async () => {
   await click('[aria-label="Cor"]');
-  assert.equal(document.querySelectorAll('[role="menuitem"]').length, 10);
-  await act(async () => document.querySelectorAll('[role="menuitem"]')[5].click());
+  assert.equal(document.querySelectorAll('[role="menuitemradio"]').length, 10);
+  assert.equal(document.querySelector('[role="menuitemradio"][aria-checked="true"]').textContent, 'Vermelho');
+  await act(async () => document.querySelector('[aria-label="Cor"]').dispatchEvent(new window.MouseEvent('pointerdown', { bubbles: true })));
+  await click('[aria-label="Cor"]');
+  assert.equal(document.querySelector('[role="menu"]').hasAttribute('inert'), true);
+  await click('[aria-label="Cor"]');
+  await act(async () => document.querySelectorAll('[role="menuitemradio"]')[5].click());
   await pointer('pointerdown', 80, 90); await pointer('pointerup', 400, 225);
   assert.equal(globalThis.__pointerTestSent.at(-1).drawing.color, '#3b82f6');
+  await click('[aria-label="Cor"]');
+  assert.equal(document.querySelector('[role="menuitemradio"][aria-checked="true"]').textContent, 'Azul');
+  await click('[aria-label="Cor"]');
   const now = Date.now();
   await act(async () => streamPointerView.set('host', { kind: 'state', sentAt: now, visuals: [], drawingAllowed: false }, { name: 'Viewer', color: 'cyan', localPeerId: 'viewer' }));
   assert.equal(document.querySelector('[aria-label="Rabiscos"]'), null);
@@ -155,6 +163,7 @@ test('history buttons and Ctrl+Z/Ctrl+Y issue scoped commands while input editin
 });
 
 test('inline text preserves Shift+Enter and confirms once on outside clicks without committing empty drafts', async () => {
+  await click('[aria-label="Mouse"]');
   await click('[aria-label="Texto"]');
   await pointer('pointerdown', 160, 135);
   const input = document.querySelector('[aria-label="Texto do rabisco"]');
@@ -194,4 +203,15 @@ test('continuous brush strokes retain 192 points before simplifying their path',
   assert.equal(packet.drawing.points.length, 192);
   assert.deepEqual(packet.drawing.points[0], { x: 0, y: .5 });
   assert.deepEqual(packet.drawing.points.at(-1), { x: 799 / 800, y: .5 });
+});
+
+test('clicking each active drawing tool again returns to Mouse', async () => {
+  for (const label of ['Pincel', 'Quadrado', 'Círculo', 'Texto']) {
+    await click('[aria-label="Mouse"]');
+    await click(`[aria-label="${label}"]`);
+    assert.equal(document.querySelector(`[aria-label="${label}"]`).getAttribute('aria-pressed'), 'true');
+    await click(`[aria-label="${label}"]`);
+    assert.equal(document.querySelector(`[aria-label="${label}"]`).getAttribute('aria-pressed'), 'false');
+    assert.equal(document.querySelector('[aria-label="Mouse"]').getAttribute('aria-pressed'), 'true');
+  }
 });

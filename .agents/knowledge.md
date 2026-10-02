@@ -42,6 +42,8 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 4. User Guidelines & Expressed Preferences
 
+- `[Annotation Toolbar Toggles]` Clicking an already selected drawing tool deselects it and returns to Mouse. The color palette closes on a second trigger click and highlights the current color with a selected row background. Keep the overall drawing toolbar transparent; only its individual controls, including the size slider, have readable backgrounds.
+
 - `[Inline Annotation Text]` Selecting Text and clicking the stream starts typing at that normalized position with a visible caret and no field background or border. Show characters locally as they are typed; confirm once on outside click or Enter, and preserve Shift+Enter as a line break. Remove the toolbar text input.
 
 - `[Annotation History & Capacity]` Provide per-author stream drawing undo/redo buttons below the tools and Ctrl+Z/Ctrl+Y shortcuts without stealing text editing. Use a default and maximum retained drawing capacity of 1024 (revised from 1280), allow up to 192 normalized points per continuous brush stroke (1.5x the original 128), expose a persistent Transmission slider, use circular icon-only undo/redo buttons with the eraser beside them on the second row, give the size control an opaque themed background, and raise the toolbar while aligning its left inset with the top statistics overlay.

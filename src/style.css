@@ -5219,6 +5219,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   cursor: pointer;
 }
 .context-menu button:hover, .context-menu button:focus-visible { background: var(--dropdown-hover-bg); outline: none; }
+.context-menu button[aria-checked="true"] { background: var(--accent-subtle); }
 .context-menu-row { display: flex; align-items: center; border-radius: var(--radius-xs); }
 .context-menu-row:hover, .context-menu-row:focus-within { background: var(--dropdown-hover-bg); }
 .context-menu-row > button:first-child:hover, .context-menu-row > button:first-child:focus-visible { background: transparent; }
