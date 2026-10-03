@@ -9,6 +9,15 @@ pub mod process_manager;
 pub mod room_vault;
 pub mod screen_sources;
 mod video_jpeg;
+mod video_load;
+mod video_pacer;
+mod native_rtc;
+#[cfg(windows)]
+mod video_readback;
+#[cfg(windows)]
+mod video_gpu_scale;
+#[cfg(windows)]
+mod video_nvenc;
 mod camera_permission;
 
 use audio_loopback::{start_audio_capture, stop_audio_capture};
@@ -72,6 +81,12 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            native_rtc::create_native_video_offer,
+            native_rtc::answer_native_video,
+            native_rtc::add_native_video_ice,
+            native_rtc::close_native_video,
+            native_rtc::set_native_video_bitrate,
+            native_rtc::get_native_video_stats,
             stream_pointer::update_stream_pointer_overlay,
             stream_pointer::get_stream_pointer_visuals,
             list_audio_processes,
@@ -79,7 +94,10 @@ pub fn run() {
             start_native_screen_capture,
             stop_native_screen_capture,
             screen_sources::start_capture_session,
+            screen_sources::get_native_encoder_support,
+            screen_sources::control_capture_encoder,
             screen_sources::get_capture_metrics,
+            screen_sources::report_capture_load,
             screen_sources::stop_capture_session,
             screen_sources::select_pointer_capture,
             start_audio_capture,

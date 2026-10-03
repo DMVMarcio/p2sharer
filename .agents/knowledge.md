@@ -32,6 +32,7 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 ## 3. Subsystem Architectural Deep Dives
 - [P2P Networking, Signaling Failover & WebRTC Mesh](.agents/knowledge/p2p-architecture.md)
 - [Native Media Pipeline: Audio Loopback, Video Capture & Web Bridges](.agents/knowledge/native-media-pipeline.md)
+- [Optional Native NVENC Encoding, Validation and Transport Limits](.agents/knowledge/native-nvenc.md)
 - [Frontend Architecture, Keyed DOM Reconciliation & State Management](.agents/knowledge/frontend-ui-state.md)
 - [Multiple Screen/Camera Sessions and Viewer Compositions](.agents/knowledge/multiple-media-streams.md)
 - [P2P Message Authorization and Threat Model](.agents/knowledge/peer-security.md)
@@ -41,6 +42,12 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 ---
 
 ## 4. User Guidelines & Expressed Preferences
+
+- `[Native Encoded Publication]` On 2026-10-02 the user authorized completing native NVENC-to-WebRTC publication to remove full-resolution browser re-encoding. An NVENC/decode/browser-encode bridge is an intermediate implementation, not completion of this stage. Preserve native selection and generic compatibility, validate actual receiver decoding and transport recovery, and explain remaining hardware/network validation limits.
+
+- `[Optional Native Hardware Encoding]` Schedule capability-probed native NVENC integration as a final optimization stage after load adaptation and frame regularity. Preserve the optimized generic native fallback, the application's picker, and compatibility with non-NVIDIA systems; measure end-to-end gains rather than assuming the adapter brand guarantees improvement. On 2026-10-02, the user authorized beginning implementation and all necessary validation after the three generic stages.
+
+- `[Streaming Optimization Sequence]` Work on the user's selected streaming refactor branch and implement/validate changes one stage at a time: video-path cost reduction, load adaptation, then frame regularity. Preserve native capture and capability-based portability, measure real desktop results before claiming improvements, and keep each stage independently reviewable.
 
 - `[Annotation Toolbar Toggles]` Clicking an already selected drawing tool deselects it and returns to Mouse. The color palette closes on a second trigger click and highlights the current color with a selected row background. Keep the overall drawing toolbar transparent; only its individual controls, including the size slider, have readable backgrounds.
 

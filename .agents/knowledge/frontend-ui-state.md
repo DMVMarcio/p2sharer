@@ -4,6 +4,14 @@
 
 Remote screen PiP keeps audio in the main window's `AudioContextManager` sink, where remote stream playback already works, while its loopback WebRTC connection carries only the video track. The PiP video element stays muted for reliable autoplay in WebView2. Initial audio volume and mute state travel with the offer, and PiP control changes return as validated `audio-settings` signals to update the main sink. The sink remains active when PiP closes so the regular stream card inherits the latest volume.
 
+`AudioContextManager` owns an independent audio-only `MediaStream` and a hidden,
+playing HTML audio element with volume zero for each subscribed audio-bearing slot.
+This keeps Chromium's remote audio sample pull active when the visible video is
+removed for native PiP. Web Audio gain remains the single audible output. Audio
+source nodes are keyed by actual audio track object identity, so changing a video
+container or repeating the same tracks does not disconnect audio. Detach pauses,
+clears and removes the auxiliary element without stopping shared remote tracks.
+
 ## Overview
 The frontend is built using TypeScript 5.6, HTML5, and CSS3, bundled via Vite 6. It follows a modular structure without heavy single-page application framework overhead, achieving sub-millisecond DOM updates and minimal memory consumption.
 

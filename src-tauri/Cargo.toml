@@ -11,6 +11,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+cc = "1"
 
 [dependencies]
 tauri = { version = "2", features = [] }
@@ -30,6 +31,8 @@ tokio-tungstenite = "0.24"
 futures-util = "0.3"
 getrandom = "0.2"
 sha2 = "0.10"
+webrtc = "=0.17.2"
+bytes = "1"
 dirs = "6"
 rayon = "1.10"
 jpeg-encoder = { version = "0.7.1", features = ["simd"] }
@@ -39,6 +42,7 @@ fast_image_resize = "5.1"
 
 
 [target.'cfg(windows)'.dependencies]
+windows-capture-api = { package = "windows", version = "0.62.2", features = ["Win32_Graphics_Direct3D11", "Win32_Graphics_Direct3D_Fxc", "Win32_Graphics_Dxgi_Common"] }
 webview2-com = "0.38.2"
 windows = { version = "0.58", features = [
     "implement",
