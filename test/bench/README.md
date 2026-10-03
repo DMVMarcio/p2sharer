@@ -128,7 +128,8 @@ The final packaged sustained-load run reduced to 704x396/30, recovered full 720p
 
 ### Optional native NVENC (2026-10-02)
 
-Close the app and launch a fresh packaged process with `P2SHARER_NATIVE_NVENC=1` in
+Automatic now enables supported native NVENC by default. For explicit diagnostic QA,
+close the app and launch a fresh packaged process with `P2SHARER_NATIVE_NVENC=1` in
 its environment to select the experimental native H264 bridge. Unset the variable
 or use `0` for the default generic path. Run the same maximized 720p/60, quality 90,
 15 Mbps, two-receiver benchmark above. `nvenc_images` must increase and native JPEG
@@ -193,7 +194,8 @@ the physical 75 Hz source delivered 74.72 fresh native FPS plus cached repetitio
 
 ### Native NVENC RTP publication
 
-Enable `P2SHARER_NATIVE_NVENC=1` before a fresh packaged desktop launch. Bundle
+Use Automatic or NVIDIA NVENC in Transmission settings (Generic disables this path).
+`P2SHARER_NATIVE_NVENC=1` remains available for a fresh diagnostic desktop launch. Bundle
 `native_rtp_loopback.ts` for desktop WebView2 and call `runNativeRtpLoopback`.
 This uses native RTP/SRTP and normal browser H264 receivers, rather than the older
 `runVideoLoopback` path which intentionally retains browser sending video tracks.

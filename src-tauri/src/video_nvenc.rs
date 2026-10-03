@@ -22,6 +22,16 @@ pub fn probe() -> Result<(), String> {
     if unsafe { p2_nvenc_probe(error.as_mut_ptr(), error.len()) } == 1 { Ok(()) }
     else { Err(message(&error)) }
 }
+/// Validate the same D3D11 device and H264 preset used by WGC, then release the slot.
+pub fn probe_session() -> Result<(), String> {
+    probe()?;
+    let (device, _) = windows_capture::d3d11::create_d3d_device().map_err(|error| error.to_string())?;
+    let mut error = [0; 256];
+    let handle = unsafe { p2_nvenc_create(device.as_raw(), 320, 180, 60, 2_000_000, error.as_mut_ptr(), error.len()) };
+    if handle.is_null() { return Err(message(&error)); }
+    unsafe { p2_nvenc_destroy(handle); }
+    Ok(())
+}
 struct Session { handle: NonNull<c_void>, device: ID3D11Device, width: u32, height: u32, fps: u32, bitrate: u32 }
 // The WGC handler exclusively owns this synchronous encoder and never accesses it concurrently.
 unsafe impl Send for Session {}

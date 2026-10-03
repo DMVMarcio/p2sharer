@@ -1,3 +1,4 @@
+import { getEncoderPreference, type NativeEncoderSupport } from '../core/encoder_preferences.ts';
 import { invoke } from '@tauri-apps/api/core';
 import type { ScreenSourcesResponse, VideoCaptureBridge, VideoSourceOptions } from '../core/types.ts';
 import { BridgeLoadMeter } from './bridge_load_meter.ts';
@@ -198,6 +199,11 @@ export class NativeVideoBridge implements VideoCaptureBridge {
 
     // 2. Start native Rust capture thread
     try {
+      let encoderPreference = getEncoderPreference();
+      if (encoderPreference === 'nvenc') {
+        const support = await invoke<NativeEncoderSupport>('get_native_encoder_support').catch(() => null);
+        encoderPreference = getEncoderPreference(support?.driver_api_available ?? false);
+      }
       await invoke('start_capture_session', {
         sessionId: this.sessionId,
         sourceId,
@@ -207,6 +213,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
         captureMouse,
         quality,
         feedbackToken,
+        encoderPreference,
       });
     } catch (err) {
       this.isCapturing = false;

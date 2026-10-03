@@ -1,11 +1,21 @@
-# Optional native NVENC encoding
+# Native NVENC encoding
 
 ## Current scope
 
-The native WGC handler has an experimental GPU-texture H264 encoder. Enable it only
-with `P2SHARER_NATIVE_NVENC=1` before launching a fresh desktop process. The default
-remains the optimized generic WGC/JPEG bridge. This is a deliberate rollout decision,
-not a user preference to permanently disable hardware encoding.
+The native WGC handler defaults to automatic GPU-texture H264 encoding. Transmission
+settings offer Automatic, Generic, and NVIDIA NVENC only after a real D3D11 encoder
+session/preset/resource probe succeeds. The short probe runs off the command thread
+and releases its hardware session immediately. Each actual capture still validates
+its own device, dimensions and driver resources and falls back to generic on failure.
+AMD encoding is not implemented or advertised yet.
+
+`p2sharer_video_encoder` persists the preference. Unknown values or unavailable
+explicit NVENC selections recover to Automatic (and generic when native encoding
+cannot run). Settings Save applies to future screen/window captures, including source
+restarts, without an application restart; existing captures remain intact. Cameras
+keep their established path. `P2SHARER_NATIVE_NVENC=0` is a diagnostic override for
+Automatic; `=1` remains accepted. Explicit Generic overrides that flag, and explicit
+NVENC overrides the automatic diagnostic disable.
 
 The published path is WGC -> GPU area scaler -> NVENC -> native H264 RTP
 packetization/pacing -> DTLS-SRTP -> the viewer's ordinary WebRTC video track.
@@ -21,8 +31,8 @@ local UI track. A WeakMap registers only live local capture tracks and their cap
 generation tokens. Cameras, unsupported capture devices and generic captures retain
 the established browser WebRTC path. Native negotiation/encoding/transport rejection
 also selects that path for the affected viewer without opening a browser picker.
-The experimental flag is still required; this does not silently enable native RTP
-on every NVIDIA installation.
+Automatic enables native RTP on supported captures; failed native negotiation retains
+the existing generic fallback.
 
 Audio retains the original Trystero connection and its filters. Its per-track
 metadata callback and native video callback merge tracks into the same advertised
@@ -202,7 +212,9 @@ and installers, and repeat changed-path desktop checks before completing edits.
 Physical high-refresh/VRR/4K, older NVIDIA/drivers, AMD/Intel, constrained Internet
 media routes, controlled packet loss, heavy games, end-to-end latency/CPU comparisons,
 quantitative text/game fidelity and audio/video synchronization remain unverified.
-Keep the rollout experimental while those deployment conditions are evaluated.
+This earlier experimental rollout was superseded by the user-approved Automatic
+default after the preview regressions below were corrected. The deployment limits
+above still apply; automatic per-capture/viewer fallback remains required.
 
 Primary references: [webrtc-rs source](https://github.com/webrtc-rs/webrtc),
 [NVIDIA NVENC guide](https://docs.nvidia.com/video-technologies/video-codec-sdk/13.1/nvenc-video-encoder-api-prog-guide/index.html),
@@ -315,3 +327,30 @@ keys/gaps. The benchmark now measures that separate settled window. Its previous
 three-gap threshold incorrectly treated skipped waiting pictures as repeated
 recovery events even though keys advanced only once; do not silently reinterpret
 `gaps` as a count of loss episodes.
+
+
+## Automatic default and settings rollout (2026-10-03)
+
+Settings > Transmission retains resolution/FPS/bitrate/quality outside local tabs.
+Pointing and Drawing contains consent switches and drawing capacity; Advanced contains
+cursor capture and the canonical encoder Select. Draft values persist across tab
+changes; arrow/Home/End navigation moves tab focus. No app restart is needed: Save
+changes future screen/window captures while existing captures retain their encoder.
+
+Validation: 487 frontend tests, 57 native release tests (two external/manual cases
+ignored), including actual NVENC hardware tests. Full `npm run tauri:build` produced
+and verified the executable, MSI and NSIS bundles. Packaged WebView2 QA with the
+legacy NVENC environment flag absent verified the real capability probe, automatic
+NVENC, explicit Generic, explicit NVIDIA NVENC, option filtering, tab keyboard focus,
+draft retention and uninterrupted active capture through Settings Save. Automatic
+produced 27 native images before Save and 64 afterward; the subsequent Generic
+capture produced 27 images and zero NVENC images/fallbacks; explicit NVENC produced
+27 native images. Stale/unrecognized preference repair and missing-NVENC handling
+were exercised by unit tests, not physical AMD/Intel or GPU replacement tests.
+
+A packaged native RTP loopback with two local receivers at 1920x1080/60 and 15 Mbps,
+without the old opt-in flag, decoded about 60 FPS for both with zero decoder drops,
+zero capture load adjustments/fallbacks and 892/892 matching encoded NAL slices.
+The observed local packet stream had one initial IDR and zero sequence gaps.
+A desktop screenshot confirmed the Advanced panel layout. Internet, other hardware
+and physical high-refresh limitations recorded above remain unverified.
