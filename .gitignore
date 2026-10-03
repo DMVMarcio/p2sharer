@@ -42,6 +42,7 @@ __pycache__/
 relatorios/
 DEBUG_PERFORMANCE_*.md
 /repository-audits/
+/deploy/
 
 # Editor directories and files
 .vscode/*

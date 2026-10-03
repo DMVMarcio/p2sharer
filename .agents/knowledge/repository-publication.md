@@ -8,6 +8,8 @@ Do not commit logs, runtime captures, machine-specific reports, private environm
 
 ## Historical audit and rewrite
 
+Include IPv4/IPv6 literals, private hostnames, URL credentials, and deployment identifiers in the audit. The retired deployment directory must remain absent from the current tree and prepared history. Runtime loopback addresses and reviewed public service endpoints are functional configuration, while real server addresses in diagnostic logs are private infrastructure data. Reserved documentation ranges are appropriate examples; browser user-agent version numbers can resemble IP literals and must be distinguished. Reference: [IANA special-purpose IPv4 ranges](https://www.iana.org/assignments/iana-ipv4-special-registry).
+
 Inspect every commit tree across all published branches and tags, and fetch pull-request heads separately. Cache scans by blob ID but associate findings with every containing commit. Audit commit messages and author/committer metadata as well as file contents. Inventory binary sizes and check any archives or unusually large assets manually. A scanner's synthetic-test finding needs a narrow documented explanation; never suppress an entire test directory.
 
 Keep redacted reports, mail mappings, and original-history backups outside the repository. Create and verify a complete Git bundle before rewriting. Prepare the rewrite in an isolated mirror, preserve commit topology and contributor attribution, and compare each branch tip against the intended changes. Verify that application source, required assets, lockfiles, and patches are unchanged by the privacy rewrite. Check the cleaned object graph and re-run secret detection.

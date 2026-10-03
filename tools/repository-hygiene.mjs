@@ -1,14 +1,52 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
+import { isIP } from 'node:net';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const maxBytes = 5 * 1024 * 1024;
 
+export function inspectNetworkIdentifiers(text) {
+  const findings = [];
+  const addresses = text.matchAll(/(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?![\w.])/g);
+  for (const match of addresses) {
+    if (!isIP(match[0])) continue;
+    if (/(?:Chrome|Chromium|Firefox|Edg|Version)\/$/i.test(text.slice(Math.max(0, match.index - 20), match.index))) continue;
+    const octets = match[0].split('.').map(Number);
+    const documentation = (octets[0] === 192 && octets[1] === 0 && octets[2] === 2) ||
+      (octets[0] === 198 && octets[1] === 51 && octets[2] === 100) ||
+      (octets[0] === 203 && octets[1] === 0 && octets[2] === 113);
+    if (octets[0] !== 127 && match[0] !== '0.0.0.0' && !documentation) {
+      findings.push('literal non-loopback IP address; replace private infrastructure details with documentation placeholders');
+      break;
+    }
+  }
+  for (const match of text.matchAll(/(?<=[\s\["'])(?:[0-9a-f]{0,4}:){2,}[0-9a-f]{0,4}(?=[\s\]"'])/gi)) {
+    if (isIP(match[0]) !== 6) continue;
+    const normalized = new URL(`http://[${match[0]}]/`).hostname;
+    if (!['[::]', '[::1]'].includes(normalized) && !normalized.startsWith('[2001:db8:')) {
+      findings.push('literal non-loopback IPv6 address; review private infrastructure details');
+      break;
+    }
+  }
+  for (const match of text.matchAll(/\b(?:https?|wss?):\/\/[^\s'"<>`]+/gi)) {
+    let url;
+    try { url = new URL(match[0]); } catch { continue; }
+    const publicBroker = url.protocol === 'wss:' && url.hostname === 'public.cloud.shiftr.io' &&
+      url.username === 'public' && url.password === 'public';
+    if ((url.username || url.password) && !publicBroker) {
+      findings.push('credentials embedded in a connection URL');
+    }
+    if (/\.(?:local|internal|lan|home)$/i.test(url.hostname)) findings.push('private infrastructure hostname');
+  }
+  return [...new Set(findings)];
+}
+
 export function inspectEntry(path, content) {
   const findings = [];
   const segments = path.split('/');
   const name = segments.at(-1);
+  if (segments[0].toLowerCase() === 'deploy') findings.push('retired deployment directory');
   if (segments.some(segment => ['node_modules', 'target', 'dist', '.pnpm-store', 'coverage', 'relatorios'].includes(segment))) {
     findings.push('generated or local directory');
   }
@@ -20,6 +58,7 @@ export function inspectEntry(path, content) {
   if (content.length > maxBytes) findings.push('file exceeds 5 MiB; review and use an appropriate distribution channel');
   if (!content.subarray(0, 8000).includes(0)) {
     const text = content.toString('utf8');
+    findings.push(...inspectNetworkIdentifiers(text));
     if (/-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/.test(text) ||
         /\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{50,}|(?:AKIA|ASIA)[A-Z0-9]{16}|xox[baprs]-[A-Za-z0-9-]{20,})\b/.test(text)) {
       findings.push('potential credential; revoke real credentials and review history');

@@ -44,6 +44,8 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 4. User Guidelines & Expressed Preferences
 
+- `[Publication Infrastructure]` Remove the optional TURN deployment directory from the current tree and prepared public history. Audit literal IP addresses, connection URLs, credentials in URLs, private hostnames, and infrastructure identifiers across current files, historical blobs, and commit messages. Preserve required loopback bindings and demonstrably public service endpoints; never record private deployment details in shared rules or memory.
+
 - `[Repository Privacy]` Prepare public access by auditing current files and every reachable historical commit, including branches, tags, and pull-request refs. Exclude diagnostic logs, generated output, credentials, private environment files, and unnecessary personal information. Review staged content and sizes before every commit. Current deletion does not remove historical exposure. Prepare and validate history rewrites before requesting approval for remote replacement or visibility changes.
 
 - [Frontend Maintenance] Prefer React state, events, and refs over manual DOM lookup or HTML rendering. Remove proven unused code while preserving all existing functionality, styling, layout, and animations. Keep required browser/media/editor integrations intact. Established on October 3, 2026.

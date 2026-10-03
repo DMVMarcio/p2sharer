@@ -31,6 +31,7 @@ Before running `git add` or committing, ensure `.gitignore` exists and covers th
 
 ### Public repository review
 - Apply `.agents/rules/agent-persistence.md` repository safety checks before every commit.
+- Include network identifiers in staged and historical audits: IPv4/IPv6 literals, private DNS names, URL user information, and server logs. Do not disclose real infrastructure addresses in reports or public agent memory. Keep required loopback bindings and public services after review; use reserved documentation addresses for examples.
 - Use `pnpm run check:repository` and `pnpm run check:repository --staged`; inspect `git diff --cached` and run `git diff --cached --check`.
 - Run `gitleaks git . --pre-commit --staged --redact=100 --no-banner` for staged secret detection. For a full historical review use `gitleaks git . --log-opts "--all --full-history" --redact=100 --no-banner`, together with an inventory of every commit tree and blob size. Keep reports outside the repository and do not print secret values.
 - Do not stage ignored files with `git add -f`, commit personal reports, or bundle installers into Git. Review binary assets and licenses explicitly. Environment templates must contain placeholders only. Preserve pnpm/Cargo lockfiles, dependency patches, required application assets, and source licenses.
