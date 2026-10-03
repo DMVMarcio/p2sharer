@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { compareRoomInvites, parseRoomInvite, type RoomIdentity } from './room_invite.ts';
 import { verifyRoomInvite } from './room_invite_validation.ts';
 import type { AuthorityTransfer, HostCommand } from './room_authority.ts';
+import { saveSavedRoomOrder } from './saved_room_order.ts';
 
 export interface SavedRoom {
   roomId: string;
@@ -57,6 +58,10 @@ function validRecord(value: unknown): value is SavedRoom {
 }
 
 export const savedRooms = {
+  reorder(ids: string[]): void {
+    saveSavedRoomOrder(ids);
+    listeners.forEach((listener) => listener());
+  },
   subscribe(listener: () => void): () => void {
     listeners.add(listener);
     return () => listeners.delete(listener);

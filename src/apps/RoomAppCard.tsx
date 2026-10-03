@@ -88,7 +88,7 @@ export const RoomAppCard: React.FC<Props> = ({ instance, isFeatured = false, com
       {detached ? <div className="room-app-join-panel">
         <ExternalLink size={compact ? 25 : 32} />
         {!compact && <><strong>App em janela externa</strong><span>{label} está aberto em outra janela</span></>}
-        <button onClick={() => void restore().catch(console.warn)}>Restaurar para o App</button>
+        <button className="room-app-placeholder-action" onClick={() => void restore().catch(console.warn)}>Restaurar para o App</button>
       </div> : joined ? <Suspense fallback={<div className="room-app-player-placeholder">Carregando App...</div>}>
         {View && <View instanceId={instance.id} compact={compact} />}
       </Suspense> : <div className="room-app-join-panel">
@@ -97,8 +97,8 @@ export const RoomAppCard: React.FC<Props> = ({ instance, isFeatured = false, com
         <button onClick={enter}>Entrar no app</button>
         {!compact && <ActivityParticipants people={people} />}
       </div>}
+      {compact && joined && <button className="room-app-focus-overlay" aria-label={`Destacar ${label}`}
+        onClick={() => togglePin(`app:${instance.id}`)} />}
     </div>
-    {compact && joined && !detached && <button className="room-app-focus-overlay" aria-label={`Destacar ${label}`}
-      onClick={() => togglePin(`app:${instance.id}`)} />}
   </div>;
 };

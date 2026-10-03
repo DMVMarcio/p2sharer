@@ -46,6 +46,7 @@
 .room-app-focus-overlay { position: absolute; inset: 0; z-index: 6; width: 100%; height: 100%;
   padding: 0; border: 0; background: transparent; cursor: pointer; }
 .room-app-focus-overlay:focus-visible { outline: 2px solid var(--accent-color); outline-offset: -3px; }
+.room-app-placeholder-action { position: relative; z-index: 7; }
 .room-app-card-header { box-sizing: border-box; min-height: 40px; display: flex; flex: 0 0 40px;
   align-items: center; justify-content: space-between; padding: 3px 10px; border-bottom: 1px solid var(--border-subtle);
   background: var(--bg-elevated); }
@@ -77,7 +78,7 @@
 .room-app-icon-button { display: grid; place-items: center; width: 25px; height: 25px; border: 0;
   border-radius: var(--radius-sm); background: transparent; color: var(--text-secondary); cursor: pointer; font-size: 17px; }
 .room-app-icon-button:hover { background: var(--bg-card-hover); color: var(--text-primary); }
-.room-app-card-body { box-sizing: border-box; display: flex; flex: 1 1 0; min-width: 0; min-height: 0;
+.room-app-card-body { position: relative; box-sizing: border-box; display: flex; flex: 1 1 0; min-width: 0; min-height: 0;
   overflow: hidden; container: room-app / inline-size; }
 .room-app-participants { display: flex; align-items: center; flex-shrink: 0; padding-left: 5px; }
 .room-app-participant, .room-app-participant-extra { display: grid; place-items: center; width: 24px; height: 24px;

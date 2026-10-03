@@ -43,6 +43,9 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 4. User Guidelines & Expressed Preferences
 
+- [Detached App Focus] Empty app placeholders remain focusable in the grid and spotlight tray without restoring the external window.
+- [Saved Room Order] Allow persistent manual ordering of homepage saved-room cards with a six-dot drag handle, smooth animated movement, and keyboard access.
+
 - [Room App Windows & Preview] Offer an ExternalLink header action beside Back to grid to detach the complete joined app into a native window with a restore placeholder; coordinate YouTube player PiP ownership. Remove the redundant app dots-menu grid action and use app terminology in room copy. Keep preview choices per local transmission across focus/layout changes and render enabled previews in the spotlight tray. Each owned tray stream has a Stop Transmission action.
 
 - [Transmission Settings Layout] Keep Advanced first and selected by default in the local Transmission tabs; give rows visible spacing in both panels. Remove the explanatory paragraph below the video encoder and label the generic option "Genérico (Padrão)" while retaining Automatic as the actual encoder default.

@@ -189,3 +189,8 @@ existing sessions; cameras keep their current capture path.
 ## Local transmission previews
 
 `StateStore.localPreviewStreams` stores a boolean override per local media slot, with cameras defaulting to preview on and screens defaulting off. Every `VideoCard` in grid, stage, and tray reads the same choice, so remounting a layout cannot reset it. Room slot reconciliation removes ended stream keys and room teardown clears all choices. Local spotlight tray cards reuse the stop-watching control recipe to stop only their own `mediaId`. The selected featured tray card retains the existing lightweight placeholder, matching other selected streams.
+
+
+## Saved room ordering
+
+`SavedRoomsSection` displays device-local order from `core/saved_room_order.ts`, persisted as room IDs under `p2sharer_saved_room_order_v1`; it never rewrites signed invitations, identities, or passwords to reorder cards. Existing rooms initially use their display-name alphabetical order. New records absent from the manual order append afterward, and renames retain their positions. `useSortableGrid` provides shared pointer/keyboard sorting with a six-dot handle, a transient draft, grid-aware nearest-slot placement, scroll-edge movement, and FLIP animations using the shared normal transition and reduced-motion setting. Drop commits once; Escape, pointer cancellation, and blur restore the initial order. Storage failures roll back the gesture and show a toast. The focused handle remains attached to its keyed card. Unit DOM checks verify gestures, keyboard focus, animations, and reduced motion; storage tests cover corruption and write failure.

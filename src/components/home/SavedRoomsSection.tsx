@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowRight, BookmarkPlus, LockKeyhole, Pencil, Trash2 } from 'lucide-react';
+import { ArrowRight, BookmarkPlus, GripVertical, LockKeyhole, Pencil, Trash2 } from 'lucide-react';
 import { savedRooms, type SavedRoom } from '../../core/saved_rooms';
 import { useModal } from '../../hooks/useModal';
 import { useRoom } from '../../hooks/useRoom';
@@ -7,6 +7,9 @@ import { showToast } from '../../hooks/useToast';
 import { roomService } from '../../services/room_service';
 import { useContextMenu } from '../common/ContextMenu';
 import { EditSavedRoomDialog } from '../modals/EditSavedRoomDialog';
+import { orderSavedRooms } from '../../core/saved_room_order';
+import { useSortableGrid } from '../../hooks/useSortableGrid';
+import { TooltipButton } from '../common/TooltipButton';
 
 export const SavedRoomsSection: React.FC = () => {
   const openContextMenu = useContextMenu();
@@ -14,15 +17,34 @@ export const SavedRoomsSection: React.FC = () => {
   const [editingRoom, setEditingRoom] = useState<SavedRoom | null>(null);
   const { openModal } = useModal();
   const { joinRoom, username } = useRoom();
+  const sortable = useSortableGrid(rooms.map((room) => room.roomId), (ids) => {
+    try {
+      savedRooms.reorder(ids);
+      setRooms((records) => orderSavedRooms(records, ids));
+      return true;
+    } catch {
+      showToast('Não foi possível salvar a ordem das salas.');
+      return false;
+    }
+  });
+  const orderedRooms = sortable.order.map((id) => rooms.find((room) => room.roomId === id))
+    .filter((room): room is SavedRoom => !!room);
+  // Include newly loaded records before the hook reconciles its draft in the layout effect.
+  orderedRooms.push(...rooms.filter((room) => !sortable.order.includes(room.roomId)));
 
   useEffect(() => {
+    let generation = 0;
+    let disposed = false;
     const reload = () => {
-      void savedRooms.list().then((records) => setRooms(records.filter((room) => room.saved)
-        .sort((a, b) => (a.customName ?? a.name).localeCompare(b.customName ?? b.name))))
+      const current = ++generation;
+      void savedRooms.list().then((records) => {
+        if (!disposed && current === generation) setRooms(orderSavedRooms(records.filter((room) => room.saved)));
+      })
         .catch((error) => console.warn('[Rooms] Could not load saved rooms:', error));
     };
     reload();
-    return savedRooms.subscribe(reload);
+    const unsubscribe = savedRooms.subscribe(reload);
+    return () => { disposed = true; unsubscribe(); };
   }, []);
 
   const openSaved = (room: SavedRoom) => {
@@ -56,17 +78,26 @@ export const SavedRoomsSection: React.FC = () => {
       {rooms.length === 0 ? (
         <p className="saved-rooms-empty">Nenhuma sala salva ainda.</p>
       ) : (
-        <div className="saved-rooms-grid">
-          {rooms.map((room) => (
-            <article className="saved-room-card" key={room.roomId} onContextMenu={(event) => openContextMenu(event, [
+        <div className={`saved-rooms-grid ${sortable.draggingId ? 'is-sorting' : ''}`} ref={sortable.gridRef}>
+          {orderedRooms.map((room) => (
+            <article className={`saved-room-card ${sortable.draggingId === room.roomId ? 'is-dragging' : ''}`}
+              data-sortable-id={room.roomId} key={room.roomId} onContextMenu={(event) => openContextMenu(event, [
               { id: 'enter', label: 'Entrar na sala', icon: <ArrowRight size={15} />, onSelect: () => openSaved(room) },
               { id: 'edit', label: 'Editar sala salva', icon: <Pencil size={15} />, onSelect: () => setEditingRoom(room) },
               { id: 'remove', label: 'Remover das salas salvas', icon: <Trash2 size={15} />, danger: true, onSelect: () => removeSaved(room) },
             ])}>
-              <div className="saved-room-details">
-                <strong>{room.customName ?? room.name}</strong>
-                <span>{room.owned ? 'Sua sala' : 'Participante'} · {room.roomId.slice(0, 8)}
-                  {room.password !== undefined && <LockKeyhole size={12} aria-label="Senha lembrada" />}</span>
+              <div className="saved-room-card-heading">
+                <TooltipButton tooltip="Arraste para reordenar ou use as setas do teclado"
+                  className="btn btn-outline saved-room-drag-handle"
+                  aria-label={`Reordenar ${room.customName ?? room.name}`}
+                  disabled={rooms.length < 2} {...sortable.handleProps(room.roomId)}>
+                  <GripVertical size={17} />
+                </TooltipButton>
+                <div className="saved-room-details">
+                  <strong>{room.customName ?? room.name}</strong>
+                  <span>{room.owned ? 'Sua sala' : 'Participante'} · {room.roomId.slice(0, 8)}
+                    {room.password !== undefined && <LockKeyhole size={12} aria-label="Senha lembrada" />}</span>
+                </div>
               </div>
               <div className="saved-room-actions">
                 <button className="btn btn-primary btn-sm saved-room-enter" onClick={() => openSaved(room)}>
@@ -83,6 +114,9 @@ export const SavedRoomsSection: React.FC = () => {
           ))}
         </div>
       )}
+      <span className="sr-only" aria-live="polite" aria-atomic="true">
+        {sortable.draggingId ? `Movendo sala. Posição ${sortable.order.indexOf(sortable.draggingId) + 1} de ${rooms.length}.` : ''}
+      </span>
       {editingRoom && <EditSavedRoomDialog room={editingRoom} onClose={() => setEditingRoom(null)} />}
     </section>
   );
