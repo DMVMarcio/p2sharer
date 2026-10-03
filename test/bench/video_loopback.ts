@@ -1,3 +1,4 @@
+import { resolveCaptureSource } from './capture_source';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
 import { NativeVideoBridge } from '../../src/video/native_video_bridge';
@@ -6,6 +7,7 @@ export { runNvencLifecycle, runNvencVisualCheck } from './nvenc_lifecycle';
 
 /** Run inside the desktop WebView2 to exercise native capture and real RTP encoding. */
 export async function runVideoLoopback(options: {
+  sourceId?: string;
   peers?: number;
   pipeline?: 'native' | 'canvas';
   probe?: boolean;
@@ -15,6 +17,7 @@ export async function runVideoLoopback(options: {
   loadScenario?: boolean | 'sustained';
   warmupMs?: number;
 } = {}) {
+  const sourceId = options.pipeline === 'canvas' ? '' : await resolveCaptureSource(options.sourceId);
   const fps = options.fps ?? 60;
   const desktopWindow = options.pipeline === 'canvas' ? undefined : getCurrentWindow();
   const wasAlwaysOnTop = desktopWindow ? await desktopWindow.isAlwaysOnTop() : false;
@@ -60,7 +63,7 @@ export async function runVideoLoopback(options: {
   try {
     stream = options.pipeline === 'canvas'
       ? canvas.captureStream(fps)
-      : await bridge.startCapture('screen:0', fps, options.resolution ?? { width: 1920, height: 1080 }, false, 90);
+      : await bridge.startCapture(sourceId, fps, options.resolution ?? { width: 1920, height: 1080 }, false, 90);
     const track = stream.getVideoTracks()[0];
     const socket = (bridge as unknown as { ws: WebSocket | null }).ws;
     const trackWriter = (bridge as unknown as { trackWriter: WritableStreamDefaultWriter<VideoFrame> | null }).trackWriter;
@@ -119,7 +122,7 @@ export async function runVideoLoopback(options: {
     if (options.loadScenario) {
       if (options.pipeline === 'canvas') throw new Error('Load scenario requires native capture');
       secondaryBridge = new NativeVideoBridge(crypto.randomUUID());
-      await secondaryBridge.startCapture('screen:0', 30, { width: 640, height: 360 }, false, 90);
+      await secondaryBridge.startCapture(sourceId, 30, { width: 640, height: 360 }, false, 90);
       const writer = (bridge as unknown as { trackWriter: WritableStreamDefaultWriter<VideoFrame> }).trackWriter;
       if (!writer) throw new Error('Load scenario requires the track generator');
       const originalWrite = writer.write.bind(writer);

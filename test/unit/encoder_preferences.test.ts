@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { getEncoderPreference, normalizeEncoderPreference, saveEncoderPreference } from '../src/core/encoder_preferences.ts';
+import { getEncoderPreference, normalizeEncoderPreference, saveEncoderPreference } from '../../src/core/encoder_preferences.ts';
 
 test('encoder preferences recover after GPU changes and preserve generic selection', () => {
   assert.equal(normalizeEncoderPreference(null, true), 'auto');

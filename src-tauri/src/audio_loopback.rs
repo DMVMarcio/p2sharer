@@ -1401,17 +1401,29 @@ pub fn is_audio_capturing() -> bool {
 mod tests {
     use super::*;
 
+    #[cfg(windows)]
     #[test]
-    fn test_repeat_n_silence_buffer() {
-        let mut buffer: Vec<f32> = Vec::new();
-        let total_samples = 480;
-        buffer.extend(std::iter::repeat_n(0.0f32, total_samples));
-        assert_eq!(buffer.len(), 480);
-        assert!(buffer.iter().all(|&s| s == 0.0f32));
+    fn production_event_guard_closes_on_scope_exit_and_unwind() {
+        use windows::core::PCWSTR;
+        use windows::Win32::Foundation::GetHandleInformation;
+        use windows::Win32::System::Threading::CreateEventW;
+        for unwind in [false, true] {
+            let handle = unsafe { CreateEventW(None, false, false, PCWSTR::null()) }.unwrap();
+            let mut flags = 0;
+            assert!(unsafe { GetHandleInformation(handle, &mut flags) }.is_ok());
+            let guard = win_audio::EventHandleGuard(handle);
+            let result = std::panic::catch_unwind(move || {
+                let _guard = guard;
+                if unwind { panic!("fixture unwind"); }
+            });
+            assert_eq!(result.is_err(), unwind);
+            assert!(unsafe { GetHandleInformation(handle, &mut flags) }.is_err());
+        }
     }
 
     #[cfg(windows)]
     #[test]
+    #[ignore = "requires a default Windows audio output device"]
     fn test_default_render_mix_format_is_decodable() {
         unsafe {
             use windows::Win32::Media::Audio::WAVEFORMATEXTENSIBLE;
@@ -1520,6 +1532,7 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
+    #[ignore = "requires Windows process loopback support and an audio output device"]
     fn test_process_loopback_activation_and_init() {
         unsafe {
             use windows::core::PCWSTR;
@@ -1528,14 +1541,14 @@ mod tests {
             use windows::Win32::System::Com::*;
             use windows::Win32::System::Threading::{CreateEventW, WaitForSingleObject};
 
-            let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+            CoInitializeEx(None, COINIT_MULTITHREADED).ok().expect("test COM initialization");
             let my_pid = std::process::id();
             let client_res = win_audio::activate_process_loopback_client(my_pid, true);
             assert!(client_res.is_ok(), "Process loopback activation must succeed for valid PID");
 
             if let Ok(client) = client_res {
-                let master = win_audio::get_default_render_audio_client();
-                if let Ok(master_client) = master {
+                let master_client = win_audio::get_default_render_audio_client().expect("default render device");
+                {
                     let mix_format = master_client.GetMixFormat().unwrap();
 
                     // Regression test: Without AUDCLNT_STREAMFLAGS_LOOPBACK, WASAPI rejects with AUDCLNT_E_INVALID_STREAM_FLAG (0x88890021)
@@ -1553,7 +1566,8 @@ mod tests {
                     assert!(res_without.is_err(), "Initialize without LOOPBACK must be rejected");
 
                     // With AUDCLNT_STREAMFLAGS_LOOPBACK, initialization and capture pipeline must succeed
-                    if let Ok(client2) = win_audio::activate_process_loopback_client(my_pid, true) {
+                    let client2 = win_audio::activate_process_loopback_client(my_pid, true).expect("second process loopback client");
+                    {
                         let flags_with = AUDCLNT_STREAMFLAGS_LOOPBACK
                             | win_audio::AUDCLNT_STREAMFLAGS_EVENTCALLBACK
                             | win_audio::AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM
@@ -1585,8 +1599,10 @@ mod tests {
 
                         let _ = CloseHandle(event);
                     }
+                    CoTaskMemFree(Some(mix_format as *const _));
                 }
             }
+            CoUninitialize();
         }
     }
 

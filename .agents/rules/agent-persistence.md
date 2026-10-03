@@ -50,6 +50,13 @@ You are the technical maintainer and continuous architect of this project. Enfor
 - Never produce disposable, inline, or unmodular elements.
 - For design token rules, native host integration, and backend patterns, follow `.agents/skills/canonical-design/SKILL.md`.
 
+## Test Maintenance
+- Run frontend regressions with `pnpm test` and native regressions with `pnpm run test:native --release`. Keep the production desktop packaging check for application changes.
+- Preserve tests that execute real production behavior or meaningful invariants. Remove stale harnesses, temporary diagnostics and tests that only validate locally copied implementation models.
+- Make automatic tests independent of personal checkout paths, installed applications, GPU vendors, cameras, displays and audio devices. Use isolated fixtures and software rendering where appropriate.
+- Mark live hardware checks explicitly ignored with prerequisites and document named opt-in commands. Never silently return from a test and report a pass without exercising its assertions. Do not use machine-specific FPS or wall-clock performance as universal acceptance criteria.
+- Keep generated diagnostic outputs ignored and private infrastructure, room credentials and personal machine profiles out of fixtures and shared documentation.
+
 ## 6. Subagent Schema & Orchestration Standard
 - Whenever authoring or updating subagents in `.agents/subagents/`, never create raw markdown without configuration.
 - Strictly adhere to the YAML frontmatter schema (defining `name`, `description`, `tools`, `skills`, `subagent: true`, `mainAgent`, `model`, and `commandExecutionPolicy`) specified in `.agents/skills/subagent-management/SKILL.md`.

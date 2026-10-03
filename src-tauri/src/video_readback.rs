@@ -115,7 +115,7 @@ mod tests {
 
     #[test]
     fn reuses_unmapped_texture_and_recreates_for_portrait_and_size_changes() {
-        let (device, context) = windows_capture::d3d11::create_d3d_device().unwrap();
+        let (device, context) = crate::test_support::software_d3d_device();
         let mut readback = ReusableReadback::default();
         for (width, height, expected_allocations) in [(37, 19, 1), (37, 19, 1), (19, 37, 2), (64, 32, 3)] {
             let pixels = [230u8, 20, 10, 255].repeat((width * height) as usize);

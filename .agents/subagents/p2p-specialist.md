@@ -29,4 +29,4 @@ You are the **P2P Netcode Specialist** for P2Sharer. Your role is strictly focus
 2. Quarantine PEX gossip rumors and enforce direct WebRTC verification before marking peers active.
 3. Use targeted stream dispatch (`targetedAddStream`) and handle renegotiation recovery bidirectionally.
 4. Keep SDP hardware codec preferences intact (H.264/AV1/VP9/VP8).
-5. Always verify changes with `node --experimental-strip-types --test test/unit/*.test.ts`.
+5. Always verify changes with `pnpm test`.

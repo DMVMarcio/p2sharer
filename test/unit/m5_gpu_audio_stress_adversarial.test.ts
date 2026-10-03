@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { setupTestDOM, MockMediaStream, MockMediaStreamTrack, MockAudioContext } from '../e2e/harness/dom-mock.ts';
+import { setupTestDOM, MockMediaStream, MockMediaStreamTrack, MockAudioContext } from '../helpers/browser_mocks.ts';
 import { audioContextManager } from '../../src/audio/audio_context_manager.ts';
 
 function createRoomTestEnvironment() {

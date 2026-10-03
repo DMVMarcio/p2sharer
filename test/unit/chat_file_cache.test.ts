@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { setupTestDOM } from '../e2e/harness/dom-mock.ts';
+import { setupTestDOM } from '../helpers/browser_mocks.ts';
 import { RoomService } from '../../src/services/room_service.ts';
 import { GroupRoomManager } from '../../src/p2p/group_room.ts';
 import { CHAT_FILE_CHUNK_BYTES, MAX_IMAGE_PREVIEW_BYTES } from '../../src/core/chat_file_limits.ts';

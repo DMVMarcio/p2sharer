@@ -136,7 +136,7 @@ separate `nvenc_images`, `nvenc_us` and `nvenc_fallbacks` from JPEG/readback and
 ## Initial intermediate bridge validation (historical)
 
 Test configuration: an NVENC-capable NVIDIA GPU, Windows 11, physical 1920x1080/75 Hz.
-Native hardware tests explicitly enabled with `P2SHARER_TEST_NVENC=1` pass horizontal,
+Previously opt-in native hardware tests passed horizontal,
 portrait, 30/60/120 FPS session recreation and forced IDR recovery. Invalid limits
 are rejected without driver sessions. A WARP software D3D11 device fails safely; this
 is an unsupported-device check, not physical AMD/Intel validation.
@@ -239,7 +239,7 @@ pattern at a bounded bitrate; the fix removes unsolicited resets, not the cost o
 genuine IDR recovery. `test/bench/nvenc_quality.ts` decodes the real GPU packets with
 the same local preview decoder and asserts stable dimensions, the expected key
 sequence, and no quality collapse on either bitrate-only change. The hardware test
-also runs without fixture export when `P2SHARER_TEST_NVENC=1`.
+also runs without fixture export when the named ignored test is explicitly requested.
 
 The live dense-text RTP diagnostic exposed another source of repeated keys: a full
 CBR payload budget left no margin for the pacer's RTP/SRTP overhead. Before adding
@@ -354,3 +354,7 @@ zero capture load adjustments/fallbacks and 892/892 matching encoded NAL slices.
 The observed local packet stream had one initial IDR and zero sequence gaps.
 A desktop screenshot confirmed the Advanced panel layout. Internet, other hardware
 and physical high-refresh limitations recorded above remain unverified.
+
+## Portable test selection
+
+Native NVENC fixtures now use `#[ignore]` rather than returning early when an environment flag is absent. Run a named fixture with `pnpm run test:native --release <test-name> -- --ignored --test-threads=1` on a compatible device. Default texture/invalid-limit checks use Windows WARP software rendering. Optional quality exports stay under ignored output paths; see [test instructions](../../test/README.md).

@@ -64,7 +64,7 @@ When capture devices output 5.1, 7.1, or other multi-channel audio:
 
 ### Multimedia Timer RAII Guard (`MultimediaTimerGuard`)
 - Automatically calls `timeBeginPeriod(1)` upon capture initialization and `timeEndPeriod(1)` on drop.
-- Forces Windows OS scheduler timer resolution to 1ms, ensuring steady 60–120 FPS capture timing without jitter.
+- Forces Windows OS scheduler timer resolution to 1ms, ensuring steady 60â€“120 FPS capture timing without jitter.
 
 ### Local WebSocket Video Server & Direct GPU Pipeline
 - For ultra-low latency native capture, Rust binds a loopback WebSocket server on an ephemeral port.
@@ -139,7 +139,7 @@ Before starting capture, `RoomService` calls `MediaCoordinator.prepareCodecPrefe
 
 Apply codec preferences immediately before offer/answer generation, including Trystero's parameterless `setLocalDescription`. Restrict local preferences to transceivers with an outgoing video track so receive-only answers preserve the broadcaster's codec order.
 
-Measured in the RX 5500 XT desktop WebView2 using a 1080p canvas and two independent real loopback receivers: H.264 produced approximately 23–24 decoded FPS with 20 ms encoding time per frame; VP8 produced approximately 56 decoded FPS with 5 ms encoding time per frame. All probed encoders were reported non-power-efficient on this installation. The native WGC/JPEG bridge must be measured separately; these canvas results do not establish native capture FPS or remote Internet throughput. Reproduce with `test/bench/video_loopback.ts` as described in `test/bench/README.md`.
+Measured in the RX 5500 XT desktop WebView2 using a 1080p canvas and two independent real loopback receivers: H.264 produced approximately 23â€“24 decoded FPS with 20 ms encoding time per frame; VP8 produced approximately 56 decoded FPS with 5 ms encoding time per frame. All probed encoders were reported non-power-efficient on this installation. The native WGC/JPEG bridge must be measured separately; these canvas results do not establish native capture FPS or remote Internet throughput. Reproduce with `test/bench/video_loopback.ts` as described in `test/bench/README.md`.
 
 
 ### Reusable Native JPEG Encoder
@@ -176,7 +176,7 @@ The measured 1080p-source/720p-output native pipeline on RTX 5070 took 5.14 ms/f
 
 GPU tests validate color/orientation, odd and portrait dimensions, weighted checkerboard averaging and synthetic 4K textures. Physical high-refresh/4K monitors, AMD/Intel hardware and Deadlock remain untested. Native hardware video encoding and JPEG removal are outstanding; load adaptation and frame regularity are subsequent independent stages. See [benchmark reproduction and results](../../test/bench/README.md).
 
-Final packaged-binary confirmation after the invalid-size tests measured 2.80 ms/frame and 58.4–58.7 decoded FPS per receiver, with zero recorded drops, zero warmed allocations and nonblack decoded samples. Do not hide the variation between desktop runs. Frontend tests passed (408), native release library tests passed (31, two ignored), and the final targeted video tests passed (six, one ignored). Tauri build generated and verified the executable, MSI and NSIS bundles.
+Final packaged-binary confirmation after the invalid-size tests measured 2.80 ms/frame and 58.4â€“58.7 decoded FPS per receiver, with zero recorded drops, zero warmed allocations and nonblack decoded samples. Do not hide the variation between desktop runs. Frontend tests passed (408), native release library tests passed (31, two ignored), and the final targeted video tests passed (six, one ignored). Tauri build generated and verified the executable, MSI and NSIS bundles.
 
 ### Native Capture Load Adaptation (2026-10-02)
 
@@ -227,3 +227,7 @@ without full-resolution browser re-encoding. WebCodecs remains only for local pr
 See [native-nvenc.md](native-nvenc.md) for generation ownership, packet pacing, rate
 control, keyframe recovery, audio association, fallback and measured validation
 limits. The `P2SHARER_NATIVE_NVENC=1` flag remains required for experimental rollout.
+
+## Portable regression entry points
+
+Use `pnpm test` for frontend regressions and `pnpm run test:native --release` for native library/integration tests. Native texture fixtures use WARP rather than requiring a physical adapter. Live desktop/audio and NVENC regressions are explicitly ignored and run individually with documented prerequisites; native packaging still requires `pnpm run tauri:build`. The retired source-extraction cadence script became stale against the capture handler. Production frame-pacer tests retain deterministic timing invariants; physical display cadence remains a manual measurement. See [test maintenance](../../test/README.md).

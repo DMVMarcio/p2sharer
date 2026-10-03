@@ -1,9 +1,11 @@
+import { resolveCaptureSource } from './capture_source';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { NativeVideoBridge } from '../../src/video/native_video_bridge';
 
-/** Requires P2SHARER_NATIVE_NVENC=1 in a real packaged Tauri instance. */
-export async function runNvencLifecycle() {
+/** Requires an NVENC-capable GPU in a real Tauri instance. */
+export async function runNvencLifecycle(requestedSource?: string) {
+  const sourceId = await resolveCaptureSource(requestedSource);
   const first = new NativeVideoBridge(crypto.randomUUID()), second = new NativeVideoBridge(crypto.randomUUID());
   const tiny = new NativeVideoBridge(crypto.randomUUID());
   const decoderUnavailable = new NativeVideoBridge(crypto.randomUUID());
@@ -17,8 +19,8 @@ export async function runNvencLifecycle() {
   const metrics=(bridge:NativeVideoBridge)=>invoke<Record<string,number>>('get_capture_metrics',{sessionId:bridge.sessionId});
   const require=(value:unknown,message:string)=>{if(!value)throw new Error(message);};
   try {
-    const firstStream=await first.startCapture('screen:0',60,{width:1280,height:720},false,90);
-    const secondStream=await second.startCapture('screen:0',30,{width:640,height:360},false,90);
+    const firstStream=await first.startCapture(sourceId,60,{width:1280,height:720},false,90);
+    const secondStream=await second.startCapture(sourceId,30,{width:640,height:360},false,90);
     const firstTrack=firstStream.getVideoTracks()[0], secondTrack=secondStream.getVideoTracks()[0];
     const oldToken=(first as unknown as {encoderFeedbackToken:string}).encoderFeedbackToken;
     await wait(); const before=await metrics(first), independentBefore=await metrics(second);
@@ -29,25 +31,25 @@ export async function runNvencLifecycle() {
     require(firstStream.getVideoTracks()[0]===firstTrack && firstTrack.readyState==='live','Fallback replaced or stopped the track');
     require(independentAfter.nvenc_images>independentBefore.nvenc_images && independentAfter.nvenc_fallbacks===0 && secondTrack.readyState==='live','Fallback affected the second session');
     await first.stopCapture();
-    await first.startCapture('screen:0',30,{width:640,height:360},false,90); await wait();
+    await first.startCapture(sourceId,30,{width:640,height:360},false,90); await wait();
     let staleRejected=false;
     try {await invoke('control_capture_encoder',{sessionId:first.sessionId,feedbackToken:oldToken,disable:true});}
     catch {staleRejected=true;}
     require(staleRejected,'Old encoder feedback token affected restarted capture');
     const restarted=await metrics(first); require(restarted.nvenc_images>0 && restarted.nvenc_fallbacks===0,'NVENC restart failed');
     for (let index=0;index<6;index++) {
-      await first.startCapture('screen:0',30,{width:640,height:360},false,90);
+      await first.startCapture(sourceId,30,{width:640,height:360},false,90);
       const cycle=await metrics(first);
       require(cycle.nvenc_images>0 && cycle.nvenc_fallbacks===0,'Repeated restart exhausted encoder sessions');
     }
-    await tiny.startCapture('screen:0',30,{width:16,height:16},false,90); await wait();
+    await tiny.startCapture(sourceId,30,{width:16,height:16},false,90); await wait();
     const unsupported=await metrics(tiny);
     require(unsupported.nvenc_images===0 && unsupported.nvenc_fallbacks===1 && unsupported.images>0,'Unsupported NVENC geometry did not fall back to JPEG');
     const originalDecoder=globalThis.VideoDecoder;
     let decoderFallback:Record<string,number>;
     try {
       Object.assign(globalThis,{VideoDecoder:undefined});
-      await decoderUnavailable.startCapture('screen:0',30,{width:640,height:360},false,90); await wait();
+      await decoderUnavailable.startCapture(sourceId,30,{width:640,height:360},false,90); await wait();
       decoderFallback=await metrics(decoderUnavailable);
       require(decoderFallback.nvenc_images>0 && decoderFallback.nvenc_fallbacks===1 && decoderFallback.images>decoderFallback.nvenc_images,'Missing decoder did not resume native JPEG');
     } finally {Object.assign(globalThis,{VideoDecoder:originalDecoder});}
@@ -56,7 +58,8 @@ export async function runNvencLifecycle() {
 }
 
 /** Check RGBA channel order and quadrant orientation through actual encode/decode. */
-export async function runNvencVisualCheck() {
+export async function runNvencVisualCheck(requestedSource?: string) {
+  const sourceId = await resolveCaptureSource(requestedSource);
   const window=getCurrentWindow(),wasMaximized=await window.isMaximized(),wasAlwaysOnTop=await window.isAlwaysOnTop();
   await window.setAlwaysOnTop(true);
   if(!wasMaximized)await invoke('plugin:window|internal_toggle_maximize',{label:window.label});
@@ -82,7 +85,7 @@ export async function runNvencVisualCheck() {
     });
   };
   try {
-    await bridge.startCapture('screen:0',30,{width:1280,height:720},false,90);await wait();
+    await bridge.startCapture(sourceId,30,{width:1280,height:720},false,90);await wait();
     const before=await invoke<Record<string,number>>('get_capture_metrics',{sessionId:bridge.sessionId});
     if(!before.nvenc_images)throw new Error('NVENC required for color validation');
     const nvenc=sample();await bridge.disableNativeEncoding();await wait();const jpeg=sample();

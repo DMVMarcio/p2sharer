@@ -1,13 +1,15 @@
+import { resolveCaptureSource } from './capture_source';
 import createPeer from '../../node_modules/@trystero-p2p/core/dist/peer.mjs';
 import { createMediaIdentityCache, createMediaManager } from '../../node_modules/@trystero-p2p/core/dist/media.mjs';
 import { NativeVideoBridge } from '../../src/video/native_video_bridge';
 import { invoke } from '@tauri-apps/api/core';
 import { getAllWebviewWindows } from '@tauri-apps/api/webviewWindow';
 
-export async function runPointerIsolation() {
+export async function runPointerIsolation(requestedSource?: string) {
+  const sourceId = await resolveCaptureSource(requestedSource);
   const bridges = [new NativeVideoBridge(`qa-pointer-${crypto.randomUUID()}`), new NativeVideoBridge(`qa-pointer-${crypto.randomUUID()}`)];
   try {
-    for (const bridge of bridges) await bridge.startCapture('screen:0', 30, { width: 320, height: 180 }, false, 75);
+    for (const bridge of bridges) await bridge.startCapture(sourceId, 30, { width: 320, height: 180 }, false, 75);
     const expires = Date.now() + 3000;
     for (const [index, bridge] of bridges.entries()) await invoke('update_stream_pointer_overlay', {
       sessionId: bridge.sessionId, visuals: [{ id: `pointer-${index}`, name: `Screen ${index}`, color: '#5599ff',
@@ -32,7 +34,8 @@ export async function runPointerIsolation() {
 }
 
 /** Desktop-only regression exercise: actual Trystero media pairing, WGC and RTP. */
-export async function runMultipleMediaLoopback() {
+export async function runMultipleMediaLoopback(options: { sourceId?: string; cameraMode?: 'synthetic' | 'device' } = {}) {
+  const sourceId = await resolveCaptureSource(options.sourceId);
   const sender = createPeer(true, { rtcConfig: { iceServers: [] }, _test_only_mdnsHostFallbackToLoopback: true });
   const receiver = createPeer(false, { rtcConfig: { iceServers: [] }, _test_only_mdnsHostFallbackToLoopback: true });
   receiver.__trysteroMedia = createMediaIdentityCache();
@@ -80,7 +83,7 @@ export async function runMultipleMediaLoopback() {
     await wait(() => sender.connection.connectionState === 'connected', 'WebRTC connection');
     const primary = new NativeVideoBridge(`qa-primary-${crypto.randomUUID()}`);
     bridges.push(primary);
-    const screen = await primary.startCapture('screen:0', 30, { width: 640, height: 360 }, false, 75);
+    const screen = await primary.startCapture(sourceId, 30, { width: 640, height: 360 }, false, 75);
     screen.addTrack(destination.stream.getAudioTracks()[0]);
     captures.push(screen);
     await publish('screen', screen);
@@ -89,8 +92,17 @@ export async function runMultipleMediaLoopback() {
     for (let cycle = 0; cycle < 4; cycle++) {
       const bridge = new NativeVideoBridge(`qa-extra-${crypto.randomUUID()}`);
       bridges.push(bridge);
-      const extra = await bridge.startCapture('screen:0', 30, { width: 320, height: 180 }, false, 75);
-      const camera = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240, frameRate: 30 }, audio: false });
+      const extra = await bridge.startCapture(sourceId, 30, { width: 320, height: 180 }, false, 75);
+      const cameraCanvas = document.createElement('canvas');
+      cameraCanvas.width = 320; cameraCanvas.height = 240;
+      timers.push(setInterval(() => {
+        const context = cameraCanvas.getContext('2d')!;
+        context.fillStyle = `hsl(${performance.now() % 360},70%,40%)`;
+        context.fillRect(0, 0, 320, 240);
+      }, 33));
+      const camera = options.cameraMode === 'device'
+        ? await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240, frameRate: 30 }, audio: false })
+        : cameraCanvas.captureStream(30);
       captures.push(extra, camera);
       await publish(`extra-${cycle}`, extra);
       await publish(`camera-${cycle}`, camera);

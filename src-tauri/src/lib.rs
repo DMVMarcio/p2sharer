@@ -1,3 +1,6 @@
+#[cfg(all(test, windows))]
+mod test_support;
+
 pub mod audio_loopback;
 pub mod logger;
 pub mod note_files;

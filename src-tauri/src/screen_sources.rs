@@ -3,8 +3,6 @@ use base64::Engine;
 use futures_util::{SinkExt, StreamExt};
 use image::codecs::jpeg::JpegEncoder;
 use crate::video_jpeg::RealtimeJpegEncoder;
-#[cfg(test)]
-use jpeg_encoder::{ColorType, Encoder as FastJpegEncoder, SamplingFactor};
 use serde::{Deserialize, Serialize};
 use std::io::Cursor;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -1522,9 +1520,15 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires an interactive Windows desktop and capture permission"]
     fn simultaneous_native_sessions_keep_frames_and_teardown_independent() {
-        start_capture_session("capture-test-a".into(), "screen:0".into(), Some(30), Some(640), Some(360), Some(true), Some(75), None, Some("generic".into())).unwrap();
-        start_capture_session("capture-test-b".into(), "screen:0".into(), Some(30), Some(320), Some(180), Some(true), Some(85), None, Some("generic".into())).unwrap();
+        let monitor = list_screen_sources().monitors.into_iter()
+            .find(|monitor| monitor.is_primary)
+            .expect("manual capture check requires a primary monitor");
+        let first_size = fit_capture_dimensions(monitor.width, monitor.height, 640, 360);
+        let second_size = fit_capture_dimensions(monitor.width, monitor.height, 320, 180);
+        start_capture_session("capture-test-a".into(), monitor.id.clone(), Some(30), Some(640), Some(360), Some(true), Some(75), None, Some("generic".into())).unwrap();
+        start_capture_session("capture-test-b".into(), monitor.id.clone(), Some(30), Some(320), Some(180), Some(true), Some(85), None, Some("generic".into())).unwrap();
         let (mut first, mut second, second_active) = {
             let sessions = SESSIONS.lock().unwrap();
             let a = sessions.get("capture-test-a").unwrap();
@@ -1544,12 +1548,12 @@ mod tests {
             }
             panic!("Capture did not produce an image frame");
         }
-        assert_eq!(next_image(&mut first), (640, 360));
-        assert_eq!(next_image(&mut second), (320, 180));
+        assert_eq!(next_image(&mut first), first_size);
+        assert_eq!(next_image(&mut second), second_size);
         stop_capture_session("capture-test-a".into()).unwrap();
         assert!(second_active.load(Ordering::SeqCst));
         assert!(is_video_capturing());
-        assert_eq!(next_image(&mut second), (320, 180));
+        assert_eq!(next_image(&mut second), second_size);
         stop_capture_session("capture-test-b".into()).unwrap();
         assert!(!second_active.load(Ordering::SeqCst));
     }
@@ -1589,25 +1593,6 @@ mod tests {
         }).await.expect("Authenticated video socket did not deliver the marker");
     }
 
-    fn sanitize_quality(quality: Option<u8>) -> u8 {
-        quality.unwrap_or(90).clamp(60, 98)
-    }
-
-    #[test]
-    fn test_fps_clamp() {
-        assert_eq!(10u32.clamp(15, 120), 15);
-        assert_eq!(60u32.clamp(15, 120), 60);
-        assert_eq!(144u32.clamp(15, 120), 120);
-    }
-
-    #[test]
-    fn test_quality_clamp() {
-        assert_eq!(sanitize_quality(None), 90);
-        assert_eq!(sanitize_quality(Some(30)), 60);
-        assert_eq!(sanitize_quality(Some(75)), 75);
-        assert_eq!(sanitize_quality(Some(100)), 98);
-    }
-
     #[test]
     fn test_timer_guard_lifecycle() {
         let guard = MultimediaTimerGuard::new();
@@ -1622,25 +1607,13 @@ mod tests {
     }
 
     #[test]
-    fn test_jpeg_sampling_sizes() {
-        let dummy = vec![128u8; 1920 * 1080 * 4];
-        let mut buf_444 = Vec::new();
-        let mut enc_444 = FastJpegEncoder::new(&mut buf_444, 80);
-        enc_444.set_sampling_factor(SamplingFactor::R_4_4_4);
-        enc_444.encode(&dummy, 1920, 1080, ColorType::Rgba).unwrap();
-
-        let mut buf_420 = Vec::new();
-        let mut enc_420 = FastJpegEncoder::new(&mut buf_420, 80);
-        enc_420.set_sampling_factor(SamplingFactor::R_4_2_0);
-        enc_420.encode(&dummy, 1920, 1080, ColorType::Rgba).unwrap();
-
-        println!("dummy 1080p: 444 = {} bytes, 420 = {} bytes", buf_444.len(), buf_420.len());
-    }
-
-    #[test]
-    fn test_wgc_live_fps() {
+    #[ignore = "requires an interactive Windows desktop and capture permission"]
+    fn live_capture_produces_images_and_stops_idempotently() {
+        let monitor = list_screen_sources().monitors.into_iter()
+            .find(|monitor| monitor.is_primary)
+            .expect("manual capture check requires a primary monitor");
         let mut rx = get_frame_sender().subscribe();
-        let res = start_native_screen_capture("screen:0".to_string(), Some(60), Some(1920), Some(1080), Some(true), Some(80));
+        let res = start_native_screen_capture(monitor.id, Some(60), Some(1920), Some(1080), Some(true), Some(80));
         println!("start_native_screen_capture result: {:?}", res);
         assert!(res.is_ok());
 
@@ -1691,7 +1664,8 @@ mod tests {
 
         let stop_res = stop_native_screen_capture();
         println!("stop_native_screen_capture result: {:?}", stop_res);
-        assert!(fps >= 55.0, "Expected at least 55 FPS, got {:.1}", fps);
+        assert!(stop_res.is_ok());
+        assert!(stop_native_screen_capture().is_ok());
         assert!(image_frame_count > 0, "Capture produced only heartbeat messages");
     }
 }

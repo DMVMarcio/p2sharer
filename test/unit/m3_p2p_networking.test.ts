@@ -13,7 +13,7 @@ import {
 import {
   MockMediaStream,
   MockMediaStreamTrack,
-} from '../e2e/harness/dom-mock.ts';
+} from '../helpers/browser_mocks.ts';
 
 describe('M3 Unit Tests: Robust P2P Networking & Signaling Failover', () => {
   describe('1. Multi-Transport Failover State Machine (SignalingManager)', () => {

@@ -1,3 +1,4 @@
+import { resolveCaptureSource } from './capture_source';
 import { GroupRoomManager } from '../../src/p2p/group_room';
 import { NativeVideoBridge } from '../../src/video/native_video_bridge';
 
@@ -18,7 +19,8 @@ export async function joinNativeRtpRoom(roomId:string,password:string,name:strin
     }});
   return {peerId:manager.getLocalPeerId(),roomId};
 }
-export async function publishNativeRtpRoom() {
+export async function publishNativeRtpRoom(requestedSource?: string) {
+  const sourceId = await resolveCaptureSource(requestedSource);
   if(!manager)throw new Error('QA room not joined');
   canvas=document.createElement('canvas');canvas.width=1280;canvas.height=720;
   canvas.style.cssText='position:fixed;inset:0;width:100vw;height:100vh;z-index:100000';document.body.appendChild(canvas);
@@ -27,7 +29,7 @@ export async function publishNativeRtpRoom() {
   audio=new AudioContext();const destination=audio.createMediaStreamDestination();
   for(const [width,height,fps] of [[1280,720,60],[640,360,30]]){
     const bridge=new NativeVideoBridge(crypto.randomUUID());bridges.push(bridge);
-    const stream=await bridge.startCapture('screen:0',fps,{width,height},false,90);
+    const stream=await bridge.startCapture(sourceId,fps,{width,height},false,90);
     if(bridges.length===1)stream.addTrack(destination.stream.getAudioTracks()[0]);
     manager.shareStream(stream,8_000_000,fps,{id:bridge.sessionId,kind:'screen',label:`Native ${width}`,videoTrackId:stream.getVideoTracks()[0].id,fps,bitrate:8000});
   }

@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { MockMediaStream, MockMediaStreamTrack } from '../e2e/harness/dom-mock.ts';
+import { MockMediaStream, MockMediaStreamTrack } from '../helpers/browser_mocks.ts';
 import { stateStore } from '../../src/core/state_store.ts';
 import { SignalingManager } from '../../src/p2p/signaling_manager.ts';
 import { MediaCoordinator } from '../../src/p2p/media_coordinator.ts';

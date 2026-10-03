@@ -1,3 +1,4 @@
+import { resolveCaptureSource } from './capture_source';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { NativeVideoBridge } from '../../src/video/native_video_bridge';
@@ -7,7 +8,8 @@ import type { StreamDescriptor } from '../../src/core/media_streams';
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve,ms));
 function require(value: unknown, message: string): asserts value { if (!value) throw new Error(message); }
 /** Actual packaged native RTP sender -> browser H264 receiver; no browser sending video track. */
-export async function runNativeRtpLoopback(options: { peers?: number; fps?: number; width?: number; height?: number; sampleMs?: number; uiStallMs?: number; warmupMs?: number; lifecycle?: boolean; detail?: boolean } = {}) {
+export async function runNativeRtpLoopback(options: { sourceId?: string; peers?: number; fps?: number; width?: number; height?: number; sampleMs?: number; uiStallMs?: number; warmupMs?: number; lifecycle?: boolean; detail?: boolean } = {}) {
+  const sourceId = await resolveCaptureSource(options.sourceId);
   const desktop = getCurrentWindow(), maximized = await desktop.isMaximized(), top = await desktop.isAlwaysOnTop();
   await desktop.setAlwaysOnTop(true);
   if (!maximized) await invoke('plugin:window|internal_toggle_maximize',{label:desktop.label});
@@ -40,7 +42,7 @@ export async function runNativeRtpLoopback(options: { peers?: number; fps?: numb
   try {
     const fps=options.fps??60;
     const width=options.width??1280,height=options.height??720;
-    const stream=await bridge.startCapture('screen:0',fps,{width,height},false,90);
+    const stream=await bridge.startCapture(sourceId,fps,{width,height},false,90);
     // Match encoded VCL NAL bytes before local decoding and after RTP depacketization.
     const fingerprint=(buffer:ArrayBuffer,offset=0)=>{
       const bytes=new Uint8Array(buffer);const starts:number[]=[];
@@ -114,7 +116,7 @@ export async function runNativeRtpLoopback(options: { peers?: number; fps?: numb
       for(let request=0;request<4;request++){worker.postMessage('key');await wait(350);}
       const requestedKeys=(await sender.senderStats(descriptor.id))[0].keyframes-keysBefore;
       require(requestedKeys>=3,'Actual receiver keyframe requests did not reach native NVENC');
-      const secondStream=await secondary.startCapture('screen:0',30,{width:640,height:360},false,90);
+      const secondStream=await secondary.startCapture(sourceId,30,{width:640,height:360},false,90);
       const secondDescriptor={...descriptor,id:crypto.randomUUID(),videoTrackId:secondStream.getVideoTracks()[0].id,fps:30,bitrate:5000};
       require(sender.dispatch('0',secondStream,secondDescriptor),'Independent native source unavailable');await wait(2500);
       const secondBefore=await sender.senderStats(secondDescriptor.id);

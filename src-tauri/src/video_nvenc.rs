@@ -95,7 +95,7 @@ mod tests {
     }
     #[test]
     fn rejects_invalid_limits_before_opening_a_driver_session() {
-        let (device, _) = windows_capture::d3d11::create_d3d_device().unwrap();
+        let (device, _) = crate::test_support::software_d3d_device();
         let texture = texture(&device, 320, 180);
         let mut encoder = GpuEncoder::default();
         for (width, height, fps) in [(0,180,60),(320,0,60),(8193,180,60),(320,180,0),(320,180,121)] {
@@ -104,9 +104,8 @@ mod tests {
         }
     }
     #[test]
+    #[ignore = "requires an NVENC-capable GPU; run this test explicitly"]
     fn hardware_encodes_recreates_portrait_and_forces_recovery_keyframes() {
-        // Opt-in hardware validation must fail, rather than silently pass, on this NVIDIA host.
-        if std::env::var("P2SHARER_TEST_NVENC").as_deref() != Ok("1") { return; }
         probe().unwrap();
         let (device, _) = windows_capture::d3d11::create_d3d_device().unwrap();
         let mut encoder = GpuEncoder::default();
@@ -123,8 +122,8 @@ mod tests {
         }
     }
     #[test]
+    #[ignore = "requires an NVENC-capable GPU; run this test explicitly"]
     fn hardware_bitrate_edits_preserve_prediction_and_quality_fixture() {
-        if std::env::var("P2SHARER_TEST_NVENC").as_deref() != Ok("1") { return; }
         use std::io::Write;
         let directory = std::env::var("P2SHARER_NVENC_QUALITY_DIR").ok().map(std::path::PathBuf::from);
         if let Some(directory) = &directory { std::fs::create_dir_all(directory).unwrap(); }
@@ -160,15 +159,16 @@ mod tests {
         println!("Detailed NVENC 720p sequence: {} ms / 361 frames", start.elapsed().as_millis());
     }
     #[test]
+    #[ignore = "requires an NVENC-capable GPU; run this test explicitly"]
     fn hardware_1080p_motion_quality_fixture() {
         motion_quality_fixture(false);
     }
     #[test]
+    #[ignore = "requires an NVENC-capable GPU; run this test explicitly"]
     fn hardware_1080p_delivery_stalls_preserve_the_reference_chain() {
         motion_quality_fixture(true);
     }
     fn motion_quality_fixture(stalled_delivery: bool) {
-        if std::env::var("P2SHARER_TEST_NVENC").as_deref() != Ok("1") { return; }
         use std::io::Write;
         let directory = std::env::var("P2SHARER_NVENC_QUALITY_DIR").ok().map(std::path::PathBuf::from);
         if let Some(directory) = &directory { std::fs::create_dir_all(directory).unwrap(); }
@@ -219,11 +219,8 @@ mod tests {
     }
     #[test]
     fn software_capture_device_returns_an_error_instead_of_assuming_vendor_support() {
-        use windows_capture_api::Win32::Graphics::Direct3D::D3D_DRIVER_TYPE_WARP;
-        let mut device = None;
-        unsafe { D3D11CreateDevice(None, D3D_DRIVER_TYPE_WARP, windows_capture_api::Win32::Foundation::HMODULE::default(), D3D11_CREATE_DEVICE_FLAG(0), None,
-            D3D11_SDK_VERSION, Some(&mut device), None, None).unwrap(); }
-        let device = device.unwrap(); let texture = texture(&device, 320, 180);
+        let (device, _) = crate::test_support::software_d3d_device();
+        let texture = texture(&device, 320, 180);
         let mut encoder = GpuEncoder::default();
         assert!(encoder.encode(&device, &texture, 320, 180, 60, 15_000_000, 0, false).is_err());
         assert!(encoder.session.is_none());

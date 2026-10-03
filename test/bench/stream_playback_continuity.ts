@@ -1,3 +1,4 @@
+import { resolveCaptureSource } from './capture_source';
 import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { GroupRoomManager } from '../../src/p2p/group_room';
@@ -38,7 +39,8 @@ export async function joinPlaybackRoom(room: string, password: string, name: str
   return manager.getLocalPeerId();
 }
 
-export async function publishPlaybackSources() {
+export async function publishPlaybackSources(requestedSource?: string) {
+  const sourceId = await resolveCaptureSource(requestedSource);
   check(manager, 'Join the QA room first');
   canvas = document.createElement('canvas'); canvas.width = 1280; canvas.height = 720;
   canvas.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;z-index:100000'; document.body.appendChild(canvas);
@@ -52,7 +54,7 @@ export async function publishPlaybackSources() {
   oscillator.connect(gain); gain.connect(destination); oscillator.start();
   for (const [width, height, fps] of [[1280, 720, 60], [640, 360, 30]]) {
     const bridge = new NativeVideoBridge(crypto.randomUUID()); bridges.push(bridge);
-    const stream = await bridge.startCapture('screen:0', fps, { width, height }, false, 90);
+    const stream = await bridge.startCapture(sourceId, fps, { width, height }, false, 90);
     if (bridges.length === 1) stream.addTrack(destination.stream.getAudioTracks()[0]);
     manager.shareStream(stream, 8_000_000, fps, { id: bridge.sessionId, kind: 'screen', label: `Continuity ${width}`,
       videoTrackId: stream.getVideoTracks()[0].id, fps, bitrate: 8000 });

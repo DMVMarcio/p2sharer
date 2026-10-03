@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { setupTestDOM, MockAudioBufferSourceNode } from '../e2e/harness/dom-mock.ts';
+import { setupTestDOM, MockAudioBufferSourceNode } from '../helpers/browser_mocks.ts';
 import { AudioBridge } from '../../src/audio/audio_bridge.ts';
 import type { AudioStreamPayload } from '../../src/core/types.ts';
 

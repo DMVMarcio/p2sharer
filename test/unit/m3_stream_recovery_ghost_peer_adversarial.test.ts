@@ -5,7 +5,7 @@ import { PeerTracker } from '../../src/p2p/peer_tracker.ts';
 import {
   MockMediaStream,
   MockMediaStreamTrack,
-} from '../e2e/harness/dom-mock.ts';
+} from '../helpers/browser_mocks.ts';
 import type { StreamStatusPayload } from '../../src/core/types.ts';
 
 describe('M3 Adversarial Challenge: Stream Recovery Protocol & Ghost Peer Elimination', () => {

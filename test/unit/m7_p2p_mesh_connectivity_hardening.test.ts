@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { setupTestDOM, type DOMEnvironment } from '../e2e/harness/dom-mock.ts';
+import { setupTestDOM, type DOMEnvironment } from '../helpers/browser_mocks.ts';
 import { SignalingManager, DEFAULT_MQTT_RELAY_URLS, computeTrysteroSha1 } from '../../src/p2p/signaling_manager.ts';
 import { PeerTracker } from '../../src/p2p/peer_tracker.ts';
 import { buildRtcConfiguration, formatJoinError } from '../../src/p2p/ice_config.ts';

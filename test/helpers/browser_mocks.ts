@@ -1,5 +1,5 @@
 /**
- * Complete headless DOM, Web Audio, and WebRTC mock for P2Sharer E2E tests.
+ * Complete headless DOM, Web Audio, and WebRTC mock for P2Sharer regression tests.
  * Enables testing DOM reconciliation, Singleton AudioContext invariants, and media streams.
  */
 

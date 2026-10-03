@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { setupTestDOM, MockMediaStream, MockMediaStreamTrack } from '../e2e/harness/dom-mock.ts';
+import { setupTestDOM, MockMediaStream, MockMediaStreamTrack } from '../helpers/browser_mocks.ts';
 import { audioContextManager } from '../../src/audio/audio_context_manager.ts';
 import { PipService } from '../../src/services/pip_service.ts';
 import { validPipAudioSettings } from '../../src/services/pip_audio.ts';

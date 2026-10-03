@@ -2,7 +2,7 @@ import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { setupTestDOM, type DOMEnvironment } from '../e2e/harness/dom-mock.ts';
+import { setupTestDOM, type DOMEnvironment } from '../helpers/browser_mocks.ts';
 import { RoomService } from '../../src/services/room_service.ts';
 import type { ChatMessage, PeerInfo } from '../../src/core/types.ts';
 

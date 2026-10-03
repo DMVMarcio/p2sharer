@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "tauri": "node tools/tauri.mjs",
     "tauri:dev": "node tools/tauri.mjs dev",
-    "tauri:build": "node tools/tauri.mjs build"
+    "tauri:build": "node tools/tauri.mjs build",
+    "test": "node tools/test.mjs",
+    "test:native": "node tools/test.mjs --native"
   },
   "dependencies": {
     "@floating-ui/dom": "^1.8.0",

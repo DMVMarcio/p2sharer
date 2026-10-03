@@ -481,35 +481,6 @@ fn test_multichannel_downmix_clipping_and_overflow() {
     assert_eq!(out.len(), 0);
 }
 
-/// 5. EMPIRICAL TEST: Monotonic Presentation Timestamps and Jitter Bounds
-///
-/// Verifies:
-/// - Presentation timestamp is strictly monotonically increasing across 100 simulated iterations.
-/// - Delta between timestamps matches real-world elapsed time within reasonable OS scheduling jitter.
-#[test]
-fn test_timestamp_us_high_frequency_progression() {
-    let start = std::time::Instant::now();
-    let mut timestamps: Vec<u64> = Vec::with_capacity(100);
-
-    for _ in 0..100 {
-        std::thread::sleep(std::time::Duration::from_micros(100));
-        let ts = start.elapsed().as_micros() as u64;
-        timestamps.push(ts);
-    }
-
-    // Verify strict monotonicity
-    for i in 1..timestamps.len() {
-        assert!(
-            timestamps[i] > timestamps[i - 1],
-            "Timestamps must be strictly increasing: ts[{}]={} <= ts[{}]={}",
-            i,
-            timestamps[i],
-            i - 1,
-            timestamps[i - 1]
-        );
-    }
-}
-
 /// 6. EMPIRICAL TEST: AudioResampler Corner Cases (Empty, Single Sample, In==Out Passthrough, Reset)
 #[test]
 fn test_resampler_corner_cases() {

@@ -29,4 +29,4 @@ You are the **Native Media Specialist** for P2Sharer. Your role is focused on th
 2. Adhere to ITU-R BS.775 downmix ratios and protect against audio clipping.
 3. Maintain fractional phase continuity in `AudioResampler` across consecutive audio chunks.
 4. Protect process filtering heuristics in `process_manager.rs` for VoIP/chat exclusion.
-5. Verify changes with `cargo test` in `src-tauri/` and relevant Node unit tests.
+5. Verify changes with `pnpm run test:native --release` and `pnpm test`; run named ignored hardware tests only when their documented prerequisites are met.

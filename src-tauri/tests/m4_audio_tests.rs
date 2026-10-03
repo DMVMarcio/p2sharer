@@ -284,25 +284,6 @@ fn test_downmix_silence_flag_handling() {
     );
 }
 
-/// 8. Monotonic presentation timestamp progression
-#[test]
-fn test_timestamp_us_monotonicity() {
-    let start = std::time::Instant::now();
-    let mut last_ts = 0u64;
-
-    for _ in 0..10 {
-        std::thread::sleep(std::time::Duration::from_micros(500));
-        let current_ts = start.elapsed().as_micros() as u64;
-        assert!(
-            current_ts > last_ts,
-            "timestamp_us must be strictly monotonically increasing (last: {}, current: {})",
-            last_ts,
-            current_ts
-        );
-        last_ts = current_ts;
-    }
-}
-
 /// 9. AudioStreamPayload serialization with timestamp_us
 #[test]
 fn test_audio_stream_payload_serde_roundtrip() {

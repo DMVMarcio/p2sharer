@@ -14,7 +14,10 @@ Install the locked dependencies with `pnpm install --frozen-lockfile`. Start the
 - `pnpm run dev`: Vite frontend development server on port 1420.
 - `pnpm run build`: TypeScript and Vite frontend validation.
 - `pnpm run tauri:build`: full frontend and native production build, including Windows installers.
-- `pnpm exec node --experimental-strip-types --test test/unit/*.test.ts test/unit/*.test.mjs`: frontend unit tests.
+- `pnpm test`: frontend unit tests.
+- `pnpm run test:native --release`: portable native library and integration checks on Windows.
+
+See [test maintenance and manual hardware checks](test/README.md) for scope and explicit opt-in commands.
 
 The product runs inside Tauri/WebView2. A browser preview does not validate native application behavior. Production artifacts are written to `src-tauri/target/release/p2sharer.exe` and `src-tauri/target/release/bundle/`. Always use the default target directory.
 
