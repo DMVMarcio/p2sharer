@@ -96,7 +96,7 @@ export function ChatFileAttachment({ message, transfers, preview, savedRequestId
           {' '}{formatFileSize(transfer.bytes)} de {formatFileSize(transfer.total)} ·
           {' '}{formatTransferSpeed(transfer.bytesPerSecond ?? 0, speedUnit)}</small>)}
         {!receiving && savedRequestId && <small>Download concluído</small>}</div>
-      {!own && <div className="chat-file-download-wrap" ref={downloadWrap}>
+      {(!own || file.isImage) && <div className="chat-file-download-wrap" ref={downloadWrap}>
         {savedRequestId && <Tooltip content="Mostrar na pasta"><button type="button" className="chat-file-reveal-button"
           aria-label="Mostrar arquivo na pasta" onClick={() => onReveal(savedRequestId)}><FolderSearch size={16} /></button></Tooltip>}
         {receiving ? <FileProgressRing pending={receiving.status === 'pending'}

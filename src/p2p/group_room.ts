@@ -2535,6 +2535,27 @@ export class GroupRoomManager {
     catch (error) { this.fileSources.delete(id); throw error; }
   }
 
+  private async getFileSource(messageId: string): Promise<{ file: NativeChatFile; autoAcceptUntil: number } | undefined> {
+    let source = this.fileSources.get(messageId);
+    if (!source) {
+      const file = await invoke<NativeChatFile | null>('restore_chat_file_source', { roomId: this.roomId, messageId });
+      if (file) { source = { file, autoAcceptUntil: 0 }; this.fileSources.set(messageId, source); }
+    }
+    return source;
+  }
+
+  public async getOwnImageSource(messageId: string): Promise<NativeChatFile | null> {
+    const message = this.chatHistory.find((item) => item.id === messageId);
+    if (!this.chatAuth || message?.authorKey !== this.chatAuth.publicKey || !message.file?.isImage) return null;
+    if (message.deletedAt || this.revokedFileMessages.has(messageId)) throw new Error('Image offer unavailable');
+    const source = await this.getFileSource(messageId);
+    if (!source) throw new Error('Local image source unavailable');
+    const checked = await invoke<NativeChatFile>('inspect_chat_file', { id: source.file.id });
+    if (checked.hash !== message.file.sha256 || checked.size !== message.file.size || checked.path !== source.file.path)
+      throw new Error('Source file changed or moved');
+    return checked;
+  }
+
   public async requestFile(messageId: string, saveAs: boolean): Promise<string | null> {
     const message = this.chatHistory.find((item) => item.id === messageId && !item.deletedAt);
     const authorPeerId = message?.authorKey && this.peerTracker.getVerifiedPeers().find((peer) =>
@@ -2717,17 +2738,8 @@ export class GroupRoomManager {
           this.pendingFileRequests.size >= 8 || this.fileSessions.size >= 8 ||
           this.pendingFileRequests.has(packet.requestId) ||
           this.fileSessions.has(packet.requestId)) return;
-      let source = this.fileSources.get(message.id);
-      if (!source) {
-        try {
-          const file = await invoke<NativeChatFile | null>('restore_chat_file_source',
-            { roomId: this.roomId, messageId: message.id });
-          if (file) {
-            source = { file, autoAcceptUntil: 0 };
-            this.fileSources.set(message.id, source);
-          }
-        } catch {}
-      }
+      let source: Awaited<ReturnType<GroupRoomManager['getFileSource']>>;
+      try { source = await this.getFileSource(message.id); } catch {}
       if (!source) {
         await this.sendFilePacket(peerId, { kind: 'deny', requestId: packet.requestId, messageId: message.id });
         return;

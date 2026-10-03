@@ -43,6 +43,8 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 4. User Guidelines & Expressed Preferences
 
+- [Own Chat Image Downloads] Allow users to save their own sent images through the existing Save and Save As actions, including clipboard screenshots retained in app data. Saving an own image must use its local source or verified preview bytes rather than request a transfer from oneself.
+
 - [File Offer Defaults] Image and GIF offers default to automatic request acceptance. Initialize this choice independently for each selected file, defaulting off for every non-image file; the sender can still change it manually.
 - [Saved Room Deletion] Require a confirmation popup before removing a saved room from the home screen.
 

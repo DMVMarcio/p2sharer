@@ -681,9 +681,11 @@ export class RoomService {
     }
   }
 
-  public requestFile(messageId: string, saveAs: boolean): Promise<string | null> {
+  public async requestFile(messageId: string, saveAs: boolean): Promise<string | null> {
     if (!this.roomManager) throw new Error('Room unavailable');
-    if (this.imagePreviewBytes[messageId]) return this.saveCachedImage(messageId, saveAs);
+    if (this.imagePreviewBytes[messageId]) return this.saveLocalImage(messageId, saveAs);
+    const source = await this.roomManager.getOwnImageSource(messageId);
+    if (source) return this.saveLocalImage(messageId, saveAs, source);
     return this.roomManager.requestFile(messageId, saveAs);
   }
 
@@ -770,10 +772,10 @@ export class RoomService {
     this.notify();
   }
 
-  private async saveCachedImage(messageId: string, saveAs: boolean): Promise<string | null> {
+  private async saveLocalImage(messageId: string, saveAs: boolean, source?: NativeChatFile): Promise<string | null> {
     const message = this.chatMessages.find((item) => item.id === messageId && !item.deletedAt);
     const bytes = this.imagePreviewBytes[messageId];
-    if (!message?.file?.isImage || !bytes) throw new Error('Image preview unavailable');
+    if (!message?.file?.isImage || (!bytes && !source)) throw new Error('Image source unavailable');
     const requestId = crypto.randomUUID();
     const selected = await invoke<boolean>('choose_chat_download', { id: requestId,
       name: message.file.name, size: message.file.size, hash: message.file.sha256, saveAs });
@@ -784,14 +786,21 @@ export class RoomService {
       total: message.file.size, status: 'active', fileName: message.file.name,
       peerName: message.sender });
     try {
-      if (bytes.length !== message.file.size) throw new Error('Preview size mismatch');
-      for (let offset = 0; offset < bytes.length; offset += CHAT_FILE_CHUNK_BYTES) {
+      if (!source && bytes.length !== message.file.size) throw new Error('Preview size mismatch');
+      for (let offset = 0; offset < message.file.size; offset += CHAT_FILE_CHUNK_BYTES) {
         if (this.cancelledLocalSaves.has(requestId)) throw new Error('Download cancelled');
-        const chunk = bytes.subarray(offset, offset + CHAT_FILE_CHUNK_BYTES);
-        let binary = '';
-        for (const byte of chunk) binary += String.fromCharCode(byte);
+        let data: string;
+        if (source) data = await invoke<string>('read_chat_file_chunk', { id: source.id,
+          offset, length: Math.min(CHAT_FILE_CHUNK_BYTES, message.file.size - offset) });
+        else {
+          const chunk = bytes.subarray(offset, offset + CHAT_FILE_CHUNK_BYTES);
+          let binary = '';
+          for (const byte of chunk) binary += String.fromCharCode(byte);
+          data = btoa(binary);
+        }
+        if (this.cancelledLocalSaves.has(requestId)) throw new Error('Download cancelled');
         written = await invoke<number>('write_chat_download_chunk', { id: requestId,
-          offset, data: btoa(binary) });
+          offset, data });
         this.recordFileProgress({ requestId, messageId, direction: 'receive', bytes: written,
           total: message.file.size, status: 'active' });
       }
