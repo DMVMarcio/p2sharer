@@ -337,6 +337,7 @@ pub async fn create_native_video_offer(
         let mut first_time = None;
         let mut next_packet = tokio::time::Instant::now();
         let mut send_failures = 0;
+        let mut recovery_age = RecoveryAgeBudget::default();
         let mut last_key = Instant::now() - Duration::from_secs(1);
         while live.load(Ordering::Relaxed) && capture.active.load(Ordering::Relaxed) {
             let packet = match tokio::time::timeout(Duration::from_secs(1), rx.recv()).await {
@@ -364,7 +365,7 @@ pub async fn create_native_video_offer(
                 .elapsed_ms()
                 .saturating_mul(1000)
                 .saturating_sub(frame.timestamp)
-                > 100_000
+                > recovery_age.limit_us(Instant::now())
             {
                 gate.wait_key = true;
                 value.gaps.fetch_add(1, Ordering::Relaxed);
@@ -400,6 +401,7 @@ pub async fn create_native_video_offer(
                 continue;
             };
             let count = payloads.len();
+            let send_started = Instant::now();
             let deadline = tokio::time::Instant::now() + Duration::from_millis(120);
             let mut complete = true;
             for (index, payload) in payloads.into_iter().enumerate() {
@@ -450,6 +452,7 @@ pub async fn create_native_video_offer(
             value.frames.fetch_add(1, Ordering::Relaxed);
             if frame.key {
                 value.keys.fetch_add(1, Ordering::Relaxed);
+                recovery_age.sent_key(Instant::now(), send_started.elapsed());
             }
         }
         if live.load(Ordering::Relaxed) {
@@ -614,6 +617,27 @@ impl<'a> EncodedFrame<'a> {
         })
     }
 }
+/// A bounded keyframe burst must not make its dependent pictures request another
+/// key immediately. With 20% payload headroom, retire that serialization allowance
+/// over at most 600 ms. Ordinary queue age stays at 100 ms; no send deadline grows.
+#[derive(Default)]
+struct RecoveryAgeBudget {
+    completed: Option<Instant>,
+    serialization_us: u64,
+}
+impl RecoveryAgeBudget {
+    fn sent_key(&mut self, now: Instant, duration: Duration) {
+        self.completed = Some(now);
+        self.serialization_us = (duration.as_micros().min(120_000)) as u64;
+    }
+    fn limit_us(&self, now: Instant) -> u64 {
+        let retired = self.completed.map_or(u64::MAX, |completed| {
+            (now.saturating_duration_since(completed).as_micros() / 5)
+                .min(u64::MAX as u128) as u64
+        });
+        100_000 + self.serialization_us.saturating_sub(retired)
+    }
+}
 #[derive(PartialEq, Debug)]
 enum Decision {
     Send,
@@ -660,6 +684,19 @@ impl FrameGate {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn recovery_age_allows_key_serialization_then_returns_to_normal_bound() {
+        let now = Instant::now();
+        let mut age = RecoveryAgeBudget::default();
+        assert_eq!(age.limit_us(now), 100_000);
+        age.sent_key(now, Duration::from_millis(110));
+        assert_eq!(age.limit_us(now), 210_000);
+        assert_eq!(age.limit_us(now + Duration::from_millis(250)), 160_000);
+        assert_eq!(age.limit_us(now + Duration::from_millis(550)), 100_000);
+        age.sent_key(now, Duration::from_secs(1));
+        assert_eq!(age.limit_us(now), 220_000);
+        assert_eq!(age.limit_us(now + Duration::from_millis(600)), 100_000);
+    }
     #[test]
     fn dependency_gate_requires_keys_after_gaps_resize_and_restart() {
         let mut g = FrameGate::default();

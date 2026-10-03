@@ -32,10 +32,18 @@ and real content lip sync still require measurement; receiving an audio track al
 is not proof of synchronization or audio fidelity.
 
 NVENC uses H264 baseline level 5.1, P1 ultra-low-latency, no B frames/lookahead,
-two-second GOP and SPS/PPS on IDR. The local-only default budget is 15 Mbps.
+on-demand IDRs and SPS/PPS on IDR. Periodic GOP refreshes are disabled; startup,
+new viewers and actual decoder/dependency recovery still request explicit IDRs.
+The local-only default budget is 15 Mbps.
 Published capture budget follows the user's selected bitrate and native transport
-feedback, with live NVENC reconfiguration (no new hardware session for bitrate-only
-edits). JPEG quality is not an H264 quality scale.
+feedback, with live NVENC reconfiguration. Bitrate-only changes preserve prediction
+and rate-control history (`resetEncoder=0`, `forceIDR=0`); geometry changes still
+recreate the session. H264 targets 80% of the shared wire/pacer budget, leaving room
+for RTP/SRTP overhead and timing variance. `encoderBitrate` route statistics report
+that shared wire budget, not the encoder's 80% elementary-stream target. VBV uses
+an 80 ms bit reservoir (at least one frame) instead of the one-frame cap. This is a
+bit allowance, not an added frame queue or a guarantee of a maximum packet size.
+JPEG quality is not an H264 quality scale.
 
 ## Native transport control and recovery
 
@@ -44,8 +52,13 @@ origin. RTP timestamps derive directly from native capture microseconds, preserv
 elapsed time across skipped frames and wraparound. H264 NAL/FU-A/STAP-A packetization
 uses the library payloader; native packet pacing includes overhead and allows at most
 2 ms of timer credit. A frame has a 120 ms send deadline; three consecutive send
-failures select generic publication. Queued capture frames older than 100 ms are
-skipped while waiting for a fresh IDR.
+failures select generic publication. Ordinary queued capture frames older than
+100 ms are skipped while waiting for a fresh IDR. After a successfully sent IDR,
+allow its serialization duration (capped at 120 ms) temporarily on top of that age
+limit, retiring the allowance at 20% per elapsed microsecond. The allowance expires
+within 600 ms, and total allowed pre-send age never exceeds 220 ms. This prevents a
+bounded recovery burst from making its dependent frames request another IDR before
+the headroom can drain the queue; the per-frame send deadline remains 120 ms.
 
 Repeated cached encoded packets are not treated as new motion. Sequence gaps,
 resize and queue overflow require IDR before more delta frames. Library interceptors
@@ -188,3 +201,55 @@ Keep the rollout experimental while those deployment conditions are evaluated.
 Primary references: [webrtc-rs source](https://github.com/webrtc-rs/webrtc),
 [NVIDIA NVENC guide](https://docs.nvidia.com/video-technologies/video-codec-sdk/13.1/nvenc-video-encoder-api-prog-guide/index.html),
 [W3C encoded transform pipeline](https://www.w3.org/TR/webrtc-encoded-transform/#stream-processing).
+
+## Detail-pulse regression (2026-10-02)
+
+The previous configuration generated a badly quantized full-picture refresh on
+every bitrate update (`resetEncoder=1`, `forceIDR=1`) as well as periodic GOP keys.
+The defect was present in the encoded bytes used by the local preview, not just
+receiver rendering. A deterministic real-driver fixture uses 361 detailed static
+720p frames, configured for 60 FPS, budget changes 8 -> 6.4 -> 8 Mbps, and explicit
+keys at frames 90/270. Before the fix, reconfiguration created extra keys at 180/240;
+sampled grayscale PSNR fell from 48.76 to 13.86 dB at the first budget change. After
+the fix, only startup and the two requested keys remain and both budget changes
+retain the accumulated detail (47.54/47.62 dB before and after each edit) in the
+same pattern. This is not a general text/game
+fidelity measurement.
+
+Requested recovery keys still lose substantial detail in this deliberately dense
+pattern at a bounded bitrate; the fix removes unsolicited resets, not the cost of
+genuine IDR recovery. `test/bench/nvenc_quality.ts` decodes the real GPU packets with
+the same local preview decoder and asserts stable dimensions, the expected key
+sequence, and no quality collapse on either bitrate-only change. The hardware test
+also runs without fixture export when `P2SHARER_TEST_NVENC=1`.
+
+The live dense-text RTP diagnostic exposed another source of repeated keys: a full
+CBR payload budget left no margin for the pacer's RTP/SRTP overhead. Before adding
+headroom, the startup sample accumulated 60 dependency gaps and 11 keys per viewer;
+the later low-bitrate phase accumulated further gaps despite plausible average FPS.
+The encoder now targets 80% of the shared wire budget, retaining the send deadline
+and adding the bounded post-IDR age allowance described above. Check gap/key
+counters in addition to FPS when changing these settings. Native release tests
+pass 52 cases (including real NVENC and the transient age bound), with two
+external/manual tests ignored; the frontend suite passes 427 tests.
+
+An initial 10% reserve passed once but reproduced repeated recovery on subsequent
+sharp decreases to 800 kbps; 20% alone also failed. Encoded diagnostic packets showed
+roughly 11 KB recovery keys, whose serialization near 110 ms caused the subsequent
+dependent frames to trip the fixed 100 ms age check. The result was another recovery
+key every 250 ms. Headroom and bounded post-key drain time address different parts
+of this cycle. Do not validate this path only
+at the selected high bitrate after warmup. The dense-text benchmark asserts no
+repeated unsolicited keys during healthy adaptation and the low-bitrate window.
+
+Final packaged WebView2/NVENC dense-text runs with two local receivers passed both
+8-second and 15-second warmups. The four-second healthy samples retained about
+60 FPS with zero receiver decoder drops, no new dependency gaps and no unsolicited
+keys while shared caps grew 3.456 -> 4.977 and 5.972 -> 8.600 Mbps respectively.
+Sharp reductions from 7.166/12.383 Mbps to 800 kbps sent 120/121 frames per route
+over two seconds, with zero new gaps or keys. Each run also passed four genuine
+receiver key requests, four source restarts, independent capture/targeted stop,
+and deliberate generic fallback; 1399/1399 and 1834/1834 encoded slices matched.
+The final fixture decoded all 361 frames at 1280x720 with the expected three keys.
+Tauri release executable, MSI and NSIS packaging succeeded. These are local-machine
+diagnostics, not impaired Internet, other GPU/driver, or heavy-game validation.
