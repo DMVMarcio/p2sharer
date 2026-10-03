@@ -1,13 +1,5 @@
 import type { PeerInfo, StreamWatcher } from '../core/types.ts';
 
-export interface PeerExchangeEntry {
-  peerId: string;
-  username: string;
-  isStreaming?: boolean;
-  isCreator?: boolean;
-  joinedAt?: number;
-}
-
 /**
  * PeerTracker provides verified WebRTC peer tracking for P2Sharer rooms.
  * It strictly separates direct WebRTC connected peers from unverified PEX rumors,

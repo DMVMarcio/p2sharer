@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useLayoutEffect, useEffect, useState } from 'react';
+import React, { useMemo, useRef, useLayoutEffect, useEffect, useState, useCallback } from 'react';
 import { roomAppsService } from '../../apps/room_apps_service';
 import { RoomAppSlot } from '../../apps/RoomAppSlot';
 import { PersistentRoomApps } from '../../apps/PersistentRoomApps';
@@ -39,6 +39,11 @@ export const RoomVideoContainer: React.FC = () => {
 
   const gridWrapperRef = useRef<HTMLDivElement | null>(null);
   const videoContainerRef = useRef<HTMLDivElement | null>(null);
+  const appSlotsRef = useRef(new Map<string, HTMLDivElement>());
+  const registerAppSlot = useCallback((key: string, element: HTMLDivElement | null) => {
+    if (element) appSlotsRef.current.set(key, element);
+    else appSlotsRef.current.delete(key);
+  }, []);
   const trayStripRef = useRef<HTMLDivElement | null>(null);
   const prevGridRectsRef = useRef<Map<string, DOMRect>>(new Map());
   const prevTrayRectsRef = useRef<Map<string, DOMRect>>(new Map());
@@ -50,7 +55,8 @@ export const RoomVideoContainer: React.FC = () => {
   ) => {
     if (!container) return;
 
-    const cards = container.querySelectorAll<HTMLElement>('[data-peer-id]');
+    const cards = Array.from(container.children).filter((card): card is HTMLElement =>
+      card instanceof HTMLElement && card.dataset.peerId !== undefined);
     const currentRects = new Map<string, DOMRect>();
 
     cards.forEach((card) => {
@@ -166,6 +172,7 @@ export const RoomVideoContainer: React.FC = () => {
     isSelectedFeatured = false
   ) => {
     if (!('peerId' in slot)) return <RoomAppSlot key={slot.id} instance={slot}
+      registerSlot={registerAppSlot}
       role={inTray ? 'tray' : isFeatured ? 'featured' : 'grid'} selected={isSelectedFeatured} />;
     if (shouldRenderVideo(slot)) {
       return (
@@ -268,7 +275,7 @@ export const RoomVideoContainer: React.FC = () => {
       <PersistentRoomApps instances={appInstances} layoutMode={layoutMode}
         featuredId={layoutMode === 'spotlight' && featuredSlot ? entryId(featuredSlot) : undefined}
         layoutKey={`${slotIdsKey}:${layoutMode}:${pinnedPeerId}:${isSpotlightTrayCollapsed}:${streamFilter}`}
-        rootRef={videoContainerRef} />
+        rootRef={videoContainerRef} slotsRef={appSlotsRef} />
     </div>
   );
 };

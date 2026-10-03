@@ -47,7 +47,7 @@ src/
 ├── hooks/                   # Specialized business logic hooks
 │   ├── useStore.ts          # Reactive subscription via useSyncExternalStore
 │   ├── useRoom.ts           # Room lifecycle, P2P mesh & chat
-│   ├── useScreenCapture.ts  # Native video & WASAPI audio capture
+│   ├── useCapturePreview.ts # Managed screen/camera picker previews
 │   ├── useScreenPicker.ts   # Screen/window source selection & GPU direct
 │   ├── useAudioFilter.ts    # Windows process audio filtering
 │   ├── useAppTheme.ts       # Dark/Light/System & 16-color accent palette
@@ -58,7 +58,6 @@ src/
 ├── core/                    # Fundamental app primitives
 │   ├── types.ts             # Shared interfaces, message contracts, states
 │   ├── state_store.ts       # Central state management & reactive subscriptions
-│   ├── event_bus.ts         # Pub/sub event emitter for cross-module decoupling
 │   └── logger.ts            # Frontend logger forwarding to Rust backend
 ├── p2p/                     # WebRTC networking & signaling
 │   ├── group_room.ts        # Mesh room coordinator & lifecycle
@@ -71,9 +70,7 @@ src/
 │   └── audio_context_manager.ts # Zero-allocation buffer reuse & AudioContext lifecycle
 ├── video/                   # Video pipeline & presentation
 │   ├── native_video_bridge.ts # Rust WebSocket client & getDisplayMedia fallback
-│   └── viewer_renderer.ts   # Unit-tested DOM reconciliation engine
 ├── ui/                      # Audio SFX & diagnostics
-│   ├── hud_controller.ts    # WebRTC HUD diagnostics overlay
 │   └── sound_effects.ts     # Synthesized Web Audio UI sound indicators
 ├── App.tsx                  # Root application component
 ├── main.tsx                 # React DOM mount entrypoint
@@ -96,18 +93,17 @@ Persistent settings are automatically synchronized to and restored from `localSt
 
 ---
 
-## 3. Keyed In-Place DOM Reconciliation (`src/video/viewer_renderer.ts`)
+## 3. React Media Rendering (`RoomVideoContainer` and `VideoCard`)
 
-### Zero-Allocation Video Element Reuse
-Rather than re-rendering HTML strings when peers join, leave, or toggle streams:
-- `ViewerRenderer` tracks peer cards by unique `peerId`.
-- Existing `<video>` elements are kept intact across re-renders to avoid triggering expensive Chromium video decoder recreation or GPU texture stalls.
-- Modifies classes, hidden attributes, and stream assignments in-place.
+### Keyed Media Elements
 
-### Layout Modes & Spotlight Pinning
-- **Grid View**: Responsive CSS grid adapting automatically from 1 to 16+ peer cards.
-- **Spotlight View**: Highlights one pinned peer stream in the central viewport while docking remaining participants in a collapsible bottom tray.
-- **Auto-Reversion**: If the pinned peer leaves the room or stops streaming, the renderer gracefully falls back to grid mode without freezing the UI.
+- React owns peer cards and their markup. Stable peer keys retain video nodes across name/status updates, sibling churn, and reordering. A stable callback ref attaches each node; stream replacements update its native srcObject without ref detachment. Unmount releases the decoder through pause, source clearing, and load.
+- Only the active grid or spotlight layout mounts cards. The selected spotlight tray entry keeps its lightweight placeholder, preventing duplicate decoders for the featured stream.
+- Persistent room apps retain keyed player/editor components while React callback refs register their grid, featured, and tray slots. Layout measurement and ResizeObserver follow those refs and preserve clipping and transitions.
+- Saved-room sorting registers cards through useSortableGrid.cardRef; keyboard and pointer gestures share the existing draft, focus, rollback, and animation lifecycle.
+- Selector options, context-menu buttons, transmission tabs, and inline drawing editors use refs instead of selector lookups. Chat right-click actions use React onContextMenu and the same action builder as dots menus.
+- Native DOM APIs remain at explicit boundaries: React's root mount, media playback/capture, third-party editor/player integrations, geometry/animation measurements, selection highlighting, document-level dismissal, and modal focus traps. These are necessary browser contracts; do not replace them with HTML strings or duplicate feature renderers.
+- The retired ViewerRenderer, no-op HudController, EventBus, unused capture hook, compatibility re-export modules, starter assets, stale types, and CSS recipes without consumers were removed in the October 3, 2026 frontend maintenance pass. Renderer tests now exercise the active React components; independent audio and P2P checks remain.
 
 ---
 
@@ -196,3 +192,7 @@ existing sessions; cameras keep their current capture path.
 ## Saved room ordering
 
 `SavedRoomsSection` displays device-local order from `core/saved_room_order.ts`, persisted as room IDs under `p2sharer_saved_room_order_v1`; it never rewrites signed invitations, identities, or passwords to reorder cards. Existing rooms initially use their display-name alphabetical order. New records absent from the manual order append afterward, and renames retain their positions. `useSortableGrid` provides shared pointer/keyboard sorting with a six-dot handle, a transient draft, grid-aware nearest-slot placement, scroll-edge movement, and FLIP animations using the shared normal transition and reduced-motion setting. Drop commits once; Escape, pointer cancellation, and blur restore the initial order. Storage failures roll back the gesture and show a toast. The focused handle remains attached to its keyed card. Unit DOM checks verify gestures, keyboard focus, animations, and reduced motion; storage tests cover corruption and write failure.
+
+## Frontend maintenance validation (October 3, 2026)
+
+All 426 current unit tests pass, including actual React video reconciliation, decoder teardown, stream replacement, Strict Mode, persistent app placement, chat/editor context menus, keyboard navigation, sorting, cursor state, and inline drawing focus. Retired renderer-only suites were replaced by active-component checks; audio scaling, track handling, signaling, security, and capture tests remain. The 165 source modules are all reachable from the application entrypoint. All 1,244 retained CSS selectors preserve their original declarations and media-query context. `pnpm run tauri:build` successfully produced the native executable and MSI/NSIS bundles under the default release directory. These automated checks do not claim manual verification of every screen, hardware device, or remote peer route.

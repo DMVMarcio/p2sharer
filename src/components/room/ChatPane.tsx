@@ -11,6 +11,8 @@ import { SystemNoticeIcon } from './SystemNoticeIcon';
 import { SystemNoticeText } from './SystemNoticeText';
 import { useEmojiSelectionHighlight } from '../../hooks/useEmojiSelectionHighlight';
 import { ChatMessageMenu } from './ChatMessageMenu';
+import { isContextMenuEditor, useContextMenu } from '../common/ContextMenu';
+import { getChatMessageActions, type ChatMessageActionsProps } from './chat_message_actions';
 import { EditedMessageMarker } from './EditedMessageMarker';
 import { Paperclip, Reply, Smile, X } from 'lucide-react';
 import { useChatFileInput } from '../../hooks/useChatFileInput';
@@ -22,6 +24,7 @@ import { selfId } from '@trystero-p2p/core';
 import { showToast } from '../../hooks/useToast';
 
 export const ChatPane: React.FC = () => {
+  const openContextMenu = useContextMenu();
   const { chatMessages, sendChatMessage, editChatMessage, deleteChatMessage, offerFile,
     requestFile, requestFilePreview, cancelFileTransfer, fileProgress,
     localFilePreviews, imagePreviews, savedDownloads, revealSavedFile } = useRoom();
@@ -149,22 +152,24 @@ export const ChatPane: React.FC = () => {
             );
           }
 
+          const messageActions: ChatMessageActionsProps = {
+            own: msg.authorId === selfId,
+            onReply: () => { setReplyToId(msg.id); inputRef.current?.focus(); },
+            onCopy: () => { copyText(msg.text); },
+            onEdit: () => { setEditingId(msg.id); setEditDraft(msg.text); setPickerTarget(null); },
+            onDelete: () => { void deleteChatMessage(msg.id).then((deleted) => { if (!deleted) showToast('Não foi possível excluir a mensagem.'); }); if (editingId === msg.id) setEditingId(null); setPickerTarget(null); },
+            isFile: Boolean(msg.file),
+            onSaveAs: () => { startDownload(msg.id, true); }
+          };
+
           return (
-            <div key={msg.id || index} className={`chat-msg ${highlightedId === msg.id ? 'chat-msg-highlighted' : ''}`} ref={(element) => { if (element) messageRefs.current.set(msg.id, element); else messageRefs.current.delete(msg.id); }}>
+            <div key={msg.id || index} onContextMenu={event => { if (!isContextMenuEditor(event.target)) openContextMenu(event, getChatMessageActions(messageActions)); }} className={`chat-msg ${highlightedId === msg.id ? 'chat-msg-highlighted' : ''}`} ref={(element) => { if (element) messageRefs.current.set(msg.id, element); else messageRefs.current.delete(msg.id); }}>
               <div className="chat-msg-header">
                 <span className="chat-msg-sender">{msg.sender}</span>
                 {msg.isHost && <span className="badge-host">HOST</span>}
                 {msg.editedAt && <EditedMessageMarker editedAt={msg.editedAt} />}
                 <span className="chat-msg-time">{timeStr}</span>
-                <ChatMessageMenu
-                  own={msg.authorId === selfId}
-                  onReply={() => { setReplyToId(msg.id); inputRef.current?.focus(); }}
-                  onCopy={() => { copyText(msg.text); }}
-                  onEdit={() => { setEditingId(msg.id); setEditDraft(msg.text); setPickerTarget(null); }}
-                  onDelete={() => { void deleteChatMessage(msg.id).then((deleted) => { if (!deleted) showToast('Não foi possível excluir a mensagem.'); }); if (editingId === msg.id) setEditingId(null); setPickerTarget(null); }}
-                  isFile={Boolean(msg.file)}
-                  onSaveAs={() => { startDownload(msg.id, true); }}
-                />
+                <ChatMessageMenu {...messageActions} />
               </div>
               <div className="chat-msg-bubble">
                 {msg.replyTo && !repliedMessage?.deletedAt && <button type="button" className="chat-msg-reply" onClick={() => jumpToMessage(msg.replyTo!.id)}>

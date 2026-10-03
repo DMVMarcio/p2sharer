@@ -3,7 +3,7 @@ import { useModal } from '../../hooks/useModal';
 import { formatFrameRate } from '../../core/media_streams';
 import { useStreamPointer } from '../../hooks/useStreamPointer';
 import { StreamPointerToggle } from './StreamPointerToggle';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { RoomSlotInfo } from '../../core/types';
 import { useRoom } from '../../hooks/useRoom';
 import { useStore } from '../../hooks/useStore';
@@ -102,6 +102,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   };
 
   const videoElementRef = useRef<HTMLVideoElement | null>(null);
+  const currentStreamRef = useRef(slot.stream);
+  currentStreamRef.current = slot.stream;
 
   const pointer = useStreamPointer(cardRef, videoElementRef, slot.peerId, slot.pointerEligible !== false && !slot.isLocal && !inTray && !isPipActive && !!slot.stream,
     slot.stream, false, slot.pointerEligible !== false && !isPipActive && !!slot.stream && !(inTray && isSelectedFeatured) && (!slot.isLocal || showLocalPreview));
@@ -125,9 +127,10 @@ export const VideoCard: React.FC<VideoCardProps> = ({
       videoElementRef.current = el;
 
       if (el) {
-        if (slot.stream) {
-          if (el.srcObject !== slot.stream) {
-            el.srcObject = slot.stream;
+        const stream = currentStreamRef.current;
+        if (stream) {
+          if (el.srcObject !== stream) {
+            el.srcObject = stream;
             el.play().catch(() => {});
           } else if (el.paused) {
             el.play().catch(() => {});
@@ -137,8 +140,18 @@ export const VideoCard: React.FC<VideoCardProps> = ({
         }
       }
     },
-    [slot.stream, cleanupVideoElement]
+    [cleanupVideoElement]
   );
+
+  // Stream replacement updates the existing node without detaching its React ref.
+  useLayoutEffect(() => {
+    const element = videoElementRef.current;
+    if (!element) return;
+    if (slot.stream && element.srcObject !== slot.stream) {
+      element.srcObject = slot.stream;
+      void element.play().catch(() => {});
+    } else if (!slot.stream && element.srcObject) cleanupVideoElement(element);
+  }, [slot.stream, cleanupVideoElement]);
 
   useEffect(() => {
     return () => {
@@ -373,6 +386,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
         ) : (
           <video
             ref={videoRef}
+            className={pointer.cursorActive ? 'stream-pointer-active-cursor' : undefined}
             autoPlay
             playsInline
             muted

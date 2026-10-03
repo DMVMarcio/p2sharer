@@ -22,6 +22,7 @@ export function Select({ value, options, onValueChange, placeholder = 'Seleciona
   const listId = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const optionRefs = useRef(new Map<number, HTMLDivElement>());
   const searchRef = useRef({ text: '', time: 0 });
   const [open, setOpen] = useState(false);
   const presence = useDropdownPresence(open ? true : null);
@@ -29,6 +30,7 @@ export function Select({ value, options, onValueChange, placeholder = 'Seleciona
   const [activeIndex, setActiveIndex] = useState(selectedIndex);
   const [positioned, setPositioned] = useState(false);
   const [placement, setPlacement] = useState('bottom');
+  const [position, setPosition] = useState({ left: 0, top: 0 });
   const enabled = options.map((option, index) => !option.disabled ? index : -1).filter((index) => index >= 0);
 
   const close = () => { setOpen(false); searchRef.current.text = ''; };
@@ -81,7 +83,7 @@ export function Select({ value, options, onValueChange, placeholder = 'Seleciona
             elements.floating.style.minWidth = `${Math.min(rects.reference.width, Math.max(0, availableWidth))}px`;
           } })] });
       if (disposed) return;
-      Object.assign(list.style, { left: `${position.x}px`, top: `${position.y}px` });
+      setPosition({ left: position.x, top: position.y });
       setPlacement(position.placement.startsWith('top') ? 'top' : 'bottom');
       setPositioned(true);
     };
@@ -90,7 +92,7 @@ export function Select({ value, options, onValueChange, placeholder = 'Seleciona
   }, [open, options]);
 
   useEffect(() => {
-    if (open && positioned) listRef.current?.querySelector<HTMLElement>(`[data-option-index="${activeIndex}"]`)?.scrollIntoView({ block: 'nearest' });
+    if (open && positioned) optionRefs.current.get(activeIndex)?.scrollIntoView({ block: 'nearest' });
   }, [activeIndex, open, positioned]);
 
   const move = (direction: number) => {
@@ -146,10 +148,11 @@ export function Select({ value, options, onValueChange, placeholder = 'Seleciona
       aria-label={props['aria-label'] ?? triggerRef.current?.labels?.[0]?.textContent ?? 'Opções'}
       className={`app-select-list ${presence.closing ? 'dropdown-closing' : ''}`}
       data-placement={placement} inert={presence.closing} aria-hidden={presence.closing}
-      style={{ visibility: positioned ? 'visible' : 'hidden' }}
+      style={{ ...position, visibility: positioned ? 'visible' : 'hidden' }}
       onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); }}
       onMouseDown={(event) => { event.preventDefault(); event.stopPropagation(); }}>
       {options.map((option, index) => <div key={String(option.value)} id={`${listId}-${index}`} role="option"
+        ref={element => { if (element) optionRefs.current.set(index, element); else optionRefs.current.delete(index); }}
         data-option-index={index} aria-selected={index === selectedIndex} aria-disabled={option.disabled || undefined}
         className={`app-select-option ${index === activeIndex ? 'is-active' : ''}`}
         onPointerMove={() => { if (!option.disabled) setActiveIndex(index); }}

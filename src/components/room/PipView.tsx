@@ -439,7 +439,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
       {/* Edge-to-edge Video Element */}
       <video
         ref={videoRef}
-        className="pip-video-element"
+        className={`pip-video-element${pointer.cursorActive ? ' stream-pointer-active-cursor' : ''}`}
         autoPlay
         playsInline
         muted

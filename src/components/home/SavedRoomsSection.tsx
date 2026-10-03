@@ -83,7 +83,7 @@ export const SavedRoomsSection: React.FC = () => {
         <div className={`saved-rooms-grid ${sortable.draggingId ? 'is-sorting' : ''}`} ref={sortable.gridRef}>
           {orderedRooms.map((room) => (
             <article className={`saved-room-card ${sortable.draggingId === room.roomId ? 'is-dragging' : ''}`}
-              data-sortable-id={room.roomId} key={room.roomId} onContextMenu={(event) => openContextMenu(event, [
+              data-sortable-id={room.roomId} key={room.roomId} ref={sortable.cardRef(room.roomId)} onContextMenu={(event) => openContextMenu(event, [
               { id: 'enter', label: 'Entrar na sala', icon: <ArrowRight size={15} />, onSelect: () => openSaved(room) },
               { id: 'edit', label: 'Editar sala salva', icon: <Pencil size={15} />, onSelect: () => setEditingRoom(room) },
               { id: 'remove', label: 'Remover das salas salvas', icon: <Trash2 size={15} />, danger: true, onSelect: () => setRemovingRoom(room) },

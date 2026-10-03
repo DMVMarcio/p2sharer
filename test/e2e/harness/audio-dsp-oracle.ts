@@ -77,7 +77,7 @@ export function float32ArrayToBase64(samples: Float32Array): string {
 
 /**
  * Decodes Base64 string back into Little-Endian Float32Array.
- * Exact match with src/audio_bridge.ts playPCMChunk
+ * Exact match with src/audio/audio_bridge.ts playPCMChunk
  */
 export function base64ToFloat32Array(b64: string): Float32Array {
   const buf = Buffer.from(b64, 'base64');

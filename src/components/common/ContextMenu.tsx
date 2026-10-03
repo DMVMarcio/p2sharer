@@ -43,6 +43,10 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
   const [menu, setMenu] = useState<MenuState | null>(null);
   const presence = useDropdownPresence(menu);
   const menuRef = useRef<HTMLDivElement>(null);
+  const buttonRefs = useRef(new Map<string, HTMLButtonElement>());
+  const enabledButtons = (actions: ContextMenuAction[]) => actions.flatMap(action =>
+    [buttonRefs.current.get(action.id), buttonRefs.current.get(`${action.id}:secondary`)]
+  ).filter((button): button is HTMLButtonElement => Boolean(button && !button.disabled));
   const currentRef = useRef(menu);
   const actionsRef = useRef(getActions);
   currentRef.current = menu;
@@ -115,7 +119,7 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
     const { offsetWidth, offsetHeight } = menuRef.current;
     setPosition({ x: Math.max(8, Math.min(menu.x, window.innerWidth - offsetWidth - 8)),
       y: Math.max(8, Math.min(menu.y, window.innerHeight - offsetHeight - 8)) });
-    menuRef.current.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({ preventScroll: true });
+    enabledButtons(menu.actions)[0]?.focus({ preventScroll: true });
   }, [menu]);
 
   useEffect(() => {
@@ -126,7 +130,7 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
       }
       if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
       event.preventDefault();
-      const buttons = Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? []);
+      const buttons = enabledButtons(menu.actions);
       const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
       const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1
         : (index + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length;
@@ -155,11 +159,13 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
       onClick={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()}>
       {retained.actions.map((action) => {
         const primary = <button key={action.id} type="button" role={action.selected === undefined ? 'menuitem' : 'menuitemradio'} aria-checked={action.selected}
+        ref={element => { if (element) buttonRefs.current.set(action.id, element); else buttonRefs.current.delete(action.id); }}
         disabled={action.disabled} className={`${action.danger ? 'context-menu-danger' : ''} ${action.separator ? 'context-menu-separated' : ''}`}
         onClick={() => select(action)}>{action.icon && <span className="context-menu-icon">{action.icon}</span>}<span>{action.label}</span></button>;
         const secondary = action.secondary;
         return secondary ? <div key={action.id} className="context-menu-row" role="none">{primary}
           <Tooltip content={secondary.label}><button type="button" role="menuitem" aria-label={secondary.label}
+            ref={element => { const id = `${action.id}:secondary`; if (element) buttonRefs.current.set(id, element); else buttonRefs.current.delete(id); }}
             disabled={secondary.disabled} className={`context-menu-secondary ${secondary.danger ? 'context-menu-danger' : ''}`}
             onClick={() => select(secondary)}>{secondary.icon || secondary.label}</button></Tooltip>
         </div> : primary;

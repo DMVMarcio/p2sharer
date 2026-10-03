@@ -46,7 +46,7 @@ test('grid drag previews order, Escape cancels, drop commits, and keyboard prese
   function Fixture() {
     const sort = useSortableGrid(['a', 'b', 'c', 'd'], (ids) => { commits.push(ids); });
     return React.createElement('div', { ref: sort.gridRef, style: { '--transition-normal': '0.22s cubic-bezier(0.16, 1, 0.3, 1)' } }, sort.order.map((id) =>
-      React.createElement('article', { key: id, 'data-sortable-id': id },
+      React.createElement('article', { key: id, ref: sort.cardRef(id), 'data-sortable-id': id },
         React.createElement('button', { ...sort.handleProps(id), 'data-handle': id }, id))));
   }
   const root = createRoot(dom.window.document.getElementById('root')!);

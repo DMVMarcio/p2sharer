@@ -1,9 +1,10 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useModal } from '../../hooks/useModal';
 import { useAudioFilter } from '../../hooks/useAudioFilter';
 import { Tooltip } from '../common/Tooltip';
 
 export const AudioFilterModal: React.FC = () => {
+  const [failedIcons, setFailedIcons] = useState<Set<string>>(() => new Set());
   const { closeModal, isClosing } = useModal();
   const {
     processes,
@@ -277,9 +278,8 @@ export const AudioFilterModal: React.FC = () => {
                               src={p.icon_base64}
                               alt=""
                               className="audio-app-icon-img"
-                              onError={(e) => {
-                                (e.target as HTMLElement).style.display = 'none';
-                              }}
+                              style={failedIcons.has(p.icon_base64) ? { display: 'none' } : undefined}
+                              onError={() => setFailedIcons(previous => new Set(previous).add(p.icon_base64!))}
                             />
                           ) : p.is_likely_chat_or_voice ? (
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

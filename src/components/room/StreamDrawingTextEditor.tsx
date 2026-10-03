@@ -1,12 +1,14 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import type { StreamDrawing } from '../../core/stream_pointer';
 
 /** Borderless native text editing anchored to the shared video projection. */
-export function StreamDrawingTextEditor({ drawing, bounds, onConfirm }: {
+export function StreamDrawingTextEditor({ drawing, bounds, inputRef, onConfirm }: {
   drawing: StreamDrawing; bounds: { left: number; top: number; width: number; height: number };
   onConfirm: (drawing: StreamDrawing) => void;
+  inputRef?: RefObject<HTMLTextAreaElement | null>;
 }) {
-  const input = useRef<HTMLTextAreaElement>(null);
+  const localInput = useRef<HTMLTextAreaElement>(null);
+  const input = inputRef ?? localInput;
   const confirmed = useRef(false);
   const [text, setText] = useState('');
   const fontSize = (14 + drawing.size * 5) * Math.min(bounds.width, bounds.height) / 1080;

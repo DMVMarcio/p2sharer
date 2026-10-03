@@ -6,12 +6,12 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 - **Ecosystem & Stack**:
   - **Host Framework**: Tauri v2 (`@tauri-apps/api: ^2`, `@tauri-apps/cli: ^2`, `tauri-plugin-opener: ^2`)
   - **Backend**: Rust 2021 edition (`src-tauri/`), Windows Win32 / Core Audio APIs (`windows: 0.58`), `xcap: 0.9.8`, `tokio: 1`, `tokio-tungstenite: 0.24`, `rayon: 1.10`, `sysinfo: 0.32`, `image: 0.25`
-  - **Frontend**: React 18, TypeScript 5.6, Vite 6 (`src/`), Web Audio API, Lucide icons (`lucide: ^1.31.0`, `lucide-react`), Pako compression (`pako: ^3.0.1`)
+  - **Frontend**: React 19, TypeScript 5.6, Vite 6 (`src/`), Web Audio API, Lucide icons (`lucide: ^1.31.0`, `lucide-react`), Pako compression (`pako: ^3.0.1`)
   - **Networking & P2P**: Trystero (`@trystero-p2p/mqtt`, `@trystero-p2p/nostr`, `@trystero-p2p/torrent`, `trystero: ^0.25.3`), WebRTC mesh with multi-transport signaling failover
 - **Primary Design Pattern**:
   - Event-driven, decoupled modular architecture.
   - Rust side: Asynchronous Tokio runtime, event-driven audio loopback, thread-safe broadcast channels for video streaming.
-  - Frontend side: React 18 component tree (`components/`), specialized custom hooks (`hooks/`), central reactive state store (`core/state_store.ts` with `useStore`), and service coordinator (`services/room_service.ts`).
+  - Frontend side: React 19 component tree (`components/`), specialized custom hooks (`hooks/`), central reactive state store (`core/state_store.ts` with `useStore`), and service coordinator (`services/room_service.ts`).
 - **Core Entrypoints**:
   - Frontend: `src/main.tsx`, `src/App.tsx`
   - Backend Rust: `src-tauri/src/main.rs`, `src-tauri/src/lib.rs`
@@ -33,7 +33,7 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 - [P2P Networking, Signaling Failover & WebRTC Mesh](.agents/knowledge/p2p-architecture.md)
 - [Native Media Pipeline: Audio Loopback, Video Capture & Web Bridges](.agents/knowledge/native-media-pipeline.md)
 - [Native NVENC Encoding, Settings, Validation and Transport Limits](.agents/knowledge/native-nvenc.md)
-- [Frontend Architecture, Keyed DOM Reconciliation & State Management](.agents/knowledge/frontend-ui-state.md)
+- [Frontend Architecture, React Media Rendering & State Management](.agents/knowledge/frontend-ui-state.md)
 - [Multiple Screen/Camera Sessions and Viewer Compositions](.agents/knowledge/multiple-media-streams.md)
 - [P2P Message Authorization and Threat Model](.agents/knowledge/peer-security.md)
 - [Room Apps: Modular Instances and Synchronized State](.agents/knowledge/room-apps.md)
@@ -42,6 +42,8 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 ---
 
 ## 4. User Guidelines & Expressed Preferences
+
+- [Frontend Maintenance] Prefer React state, events, and refs over manual DOM lookup or HTML rendering. Remove proven unused code while preserving all existing functionality, styling, layout, and animations. Keep required browser/media/editor integrations intact. Established on October 3, 2026.
 
 - [Package Manager] Use pnpm for dependency installation, scripts, CLI execution, and Tauri hooks. Keep rules, skills, agent prompts, and documentation synchronized with this choice. Established on October 3, 2026.
 

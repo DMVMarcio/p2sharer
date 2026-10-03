@@ -6,10 +6,11 @@ import { StreamPointerGlyph } from './StreamPointerGlyph';
 import { StreamDrawingTextEditor } from './StreamDrawingTextEditor';
 import type { StreamDrawing } from '../../core/stream_pointer';
 
-export function StreamPointerVideoLayer({ container, video, peerId, local, draft, textDraft, onTextConfirm }: {
+export function StreamPointerVideoLayer({ container, video, peerId, local, draft, textDraft, textEditorRef, onTextConfirm }: {
   container: RefObject<HTMLDivElement | null>; video: RefObject<HTMLVideoElement | null>; peerId: string;
   local: { x: number; y: number } | null; draft?: import('../../core/stream_pointer').StreamDrawing | null;
   textDraft?: StreamDrawing | null; onTextConfirm?: (drawing: StreamDrawing) => void;
+  textEditorRef?: RefObject<HTMLTextAreaElement | null>;
 }) {
   const scene = useSyncExternalStore(streamPointerView.subscribe, () => streamPointerView.get(peerId));
   const [bounds, setBounds] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
@@ -42,6 +43,6 @@ export function StreamPointerVideoLayer({ container, video, peerId, local, draft
         style={{ left: bounds.left + v.x * bounds.width, top: bounds.top + v.y * bounds.height }} />)}
     {local && <StreamPointerGlyph name={scene.name} color={scene.color} interpolate={false} style={{ left: local.x, top: local.y }} />}
   </div>
-    {bounds && textDraft && onTextConfirm && <StreamDrawingTextEditor drawing={textDraft} bounds={bounds} onConfirm={onTextConfirm} />}
+    {bounds && textDraft && onTextConfirm && <StreamDrawingTextEditor drawing={textDraft} bounds={bounds} inputRef={textEditorRef} onConfirm={onTextConfirm} />}
   </>;
 }

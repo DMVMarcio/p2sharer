@@ -17,6 +17,7 @@ export function useStreamPointer(container: RefObject<HTMLDivElement | null>,
   const [draft, setDraft] = useState<StreamDrawing | null>(null);
   const [textDraft, setTextDraft] = useState<StreamDrawing | null>(null);
   const editingText = useRef(false);
+  const textEditorRef = useRef<HTMLTextAreaElement>(null);
   const scene = useSyncExternalStore(streamPointerView.subscribe, () => streamPointerView.get(peerId));
   const drawingAllowed = scene.drawingAllowed !== false;
   const history = scene.history?.find(entry => entry.peerId === scene.localPeerId);
@@ -67,7 +68,7 @@ export function useStreamPointer(container: RefObject<HTMLDivElement | null>,
       if (drawingPointer !== null && video.current?.hasPointerCapture(drawingPointer)) video.current.releasePointerCapture(drawingPointer);
       drawing = null; drawingPointer = null; setDraft(null);
     };
-    const leave = () => { if (point) send({ kind: 'leave' }); point = null; setIndicator(null); video.current?.classList.remove('stream-pointer-active-cursor'); };
+    const leave = () => { if (point) send({ kind: 'leave' }); point = null; setIndicator(null); };
     const move = (event: PointerEvent) => {
       if (event.target === video.current) activePointerSurface = element;
       if (drawing && event.pointerId === drawingPointer) {
@@ -87,7 +88,6 @@ export function useStreamPointer(container: RefObject<HTMLDivElement | null>,
       const nextPoint = streamPointerPosition(v.getBoundingClientRect(), v.videoWidth, v.videoHeight, event.clientX, event.clientY);
       if (!nextPoint) { leave(); return; }
       point = nextPoint;
-      v.classList.add('stream-pointer-active-cursor');
       const bounds = element.getBoundingClientRect();
       setIndicator({ x: event.clientX - bounds.left, y: event.clientY - bounds.top });
       if (Date.now() - lastSent.current >= 40) { send({ kind: 'move', ...point }); lastSent.current = Date.now(); }
@@ -109,7 +109,7 @@ export function useStreamPointer(container: RefObject<HTMLDivElement | null>,
       if (!position) return;
       if (editingText.current) {
         event.preventDefault(); event.stopPropagation();
-        element.querySelector<HTMLTextAreaElement>('.stream-drawing-text-editor')?.focus({ preventScroll: true });
+        textEditorRef.current?.focus({ preventScroll: true });
         focusSurface(); return;
       }
       event.preventDefault(); event.stopPropagation(); focusSurface();
@@ -140,7 +140,7 @@ export function useStreamPointer(container: RefObject<HTMLDivElement | null>,
     const outsideText = (event: PointerEvent) => {
       if (!editingText.current || event.target === video.current ||
         event.target instanceof Element && event.target.closest('.stream-drawing-text-editor, [role="menu"]')) return;
-      const editor = element.querySelector<HTMLTextAreaElement>('.stream-drawing-text-editor');
+      const editor = textEditorRef.current;
       editor?.focus({ preventScroll: true }); editor?.blur();
     };
     document.addEventListener('pointerdown', outsideText, true);
@@ -177,8 +177,8 @@ export function useStreamPointer(container: RefObject<HTMLDivElement | null>,
       window.removeEventListener('blur', deactivate); document.removeEventListener('visibilitychange', deactivate);
     };
   }, [enabled, available, peerId, stream, pip, container, video]);
-  return { enabled, toggle: () => setEnabled((value) => !value),
+  return { enabled, cursorActive: enabled && available && indicator !== null, toggle: () => setEnabled((value) => !value),
     toolbar: enabled && available && drawingAllowed ? <StreamDrawingToolbar settings={settings} onChange={setSettings} onClear={() => transmit({ kind: 'clear' })} onUndo={() => transmit({ kind: 'undo' })} onRedo={() => transmit({ kind: 'redo' })} canUndo={(history?.undo ?? 0) > 0} canRedo={(history?.redo ?? 0) > 0} /> : null,
     indicator: displayAvailable ? <StreamPointerVideoLayer container={container} video={video} peerId={peerId} local={enabled ? indicator : null} draft={drawingAllowed ? draft : null}
-      textDraft={enabled && drawingAllowed ? textDraft : null} onTextConfirm={confirmText} /> : null };
+      textDraft={enabled && drawingAllowed ? textDraft : null} textEditorRef={textEditorRef} onTextConfirm={confirmText} /> : null };
 }

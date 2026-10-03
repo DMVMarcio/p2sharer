@@ -1,6 +1,6 @@
 /**
  * Shared types for P2Sharer E2E Test Suite
- * Derives from PROJECT.md Interface Contracts and src/types.ts
+ * Derives from PROJECT.md Interface Contracts and src/core/types.ts
  */
 
 export interface ActiveStreamInfo {

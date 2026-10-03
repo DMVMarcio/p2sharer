@@ -8,11 +8,12 @@ interface Props {
   featuredId?: string;
   layoutKey: string;
   rootRef: React.RefObject<HTMLDivElement | null>;
+  slotsRef: React.RefObject<Map<string, HTMLDivElement>>;
 }
 
 interface Placement { left: number; top: number; width: number; height: number; clipPath: string }
 
-export const PersistentRoomApps: React.FC<Props> = ({ instances, layoutMode, featuredId, layoutKey, rootRef }) => {
+export const PersistentRoomApps: React.FC<Props> = ({ instances, layoutMode, featuredId, layoutKey, rootRef, slotsRef }) => {
   const [placements, setPlacements] = useState<Record<string, Placement>>({});
   const previousRef = useRef('');
 
@@ -20,12 +21,10 @@ export const PersistentRoomApps: React.FC<Props> = ({ instances, layoutMode, fea
     const root = rootRef.current;
     if (!root) return;
     const rootRect = root.getBoundingClientRect();
-    const slots = Array.from(root.querySelectorAll<HTMLElement>('[data-room-app-slot]'));
     const next: Record<string, Placement> = {};
     for (const instance of instances) {
       const role = layoutMode === 'grid' ? 'grid' : featuredId === `app:${instance.id}` ? 'featured' : 'tray';
-      const slot = slots.find((element) => element.dataset.roomAppSlot === instance.id &&
-        element.dataset.roomAppRole === role);
+      const slot = slotsRef.current.get(`${role}:${instance.id}`);
       if (!slot) continue;
       const rect = slot.getBoundingClientRect();
       if (!rect.width || !rect.height) continue;
@@ -44,7 +43,7 @@ export const PersistentRoomApps: React.FC<Props> = ({ instances, layoutMode, fea
       previousRef.current = serialized;
       setPlacements(next);
     }
-  }, [instances, layoutMode, featuredId, rootRef]);
+  }, [instances, layoutMode, featuredId, rootRef, slotsRef]);
 
   useLayoutEffect(() => {
     const root = rootRef.current;
@@ -52,7 +51,7 @@ export const PersistentRoomApps: React.FC<Props> = ({ instances, layoutMode, fea
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(root);
-    root.querySelectorAll<HTMLElement>('[data-room-app-slot]').forEach((slot) => observer.observe(slot));
+    slotsRef.current.forEach((slot) => observer.observe(slot));
     root.addEventListener('scroll', measure, true);
     window.addEventListener('resize', measure);
     let frame = 0;

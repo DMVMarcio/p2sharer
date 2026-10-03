@@ -9,6 +9,19 @@ interface Drag {
 // Pointer and keyboard sorting share one draft; only a completed gesture is persisted.
 export function useSortableGrid(ids: string[], onCommit: (ids: string[]) => boolean | void) {
   const gridRef = useRef<HTMLDivElement>(null);
+  const cardElements = useRef(new Map<string, HTMLElement>());
+  const cardCallbacks = useRef(new Map<string, (element: HTMLElement | null) => void>());
+  const cardRef = (id: string) => {
+    let callback = cardCallbacks.current.get(id);
+    if (!callback) {
+      callback = element => {
+        if (element) cardElements.current.set(id, element);
+        else { cardElements.current.delete(id); cardCallbacks.current.delete(id); }
+      };
+      cardCallbacks.current.set(id, callback);
+    }
+    return callback;
+  };
   const [order, setOrder] = useState(ids);
   const orderRef = useRef(order);
   const commitRef = useRef(onCommit);
@@ -19,7 +32,8 @@ export function useSortableGrid(ids: string[], onCommit: (ids: string[]) => bool
   const idsKey = JSON.stringify(ids);
   commitRef.current = onCommit;
 
-  const cards = () => Array.from(gridRef.current?.querySelectorAll<HTMLElement>('[data-sortable-id]') || []);
+  const cards = () => orderRef.current.map(id => cardElements.current.get(id))
+    .filter((element): element is HTMLElement => Boolean(element));
   const measure = () => {
     previousRects.current = new Map(cards().map((node) => [node.dataset.sortableId!, node.getBoundingClientRect()]));
   };
@@ -154,7 +168,7 @@ export function useSortableGrid(ids: string[], onCommit: (ids: string[]) => bool
     onPointerDown: (event: PointerEvent<HTMLButtonElement>) => {
       if (event.button !== 0 || orderRef.current.length < 2) return;
       event.preventDefault();
-      const node = event.currentTarget.closest<HTMLElement>('[data-sortable-id]');
+      const node = cardElements.current.get(id);
       if (!node) return;
       measure();
       animations.current.get(node)?.cancel();
@@ -179,5 +193,5 @@ export function useSortableGrid(ids: string[], onCommit: (ids: string[]) => bool
       if (next !== orderRef.current && commitRef.current(next) !== false) changeOrder(next);
     },
   });
-  return { gridRef, order, draggingId, handleProps };
+  return { gridRef, cardRef, order, draggingId, handleProps };
 }

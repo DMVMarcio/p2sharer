@@ -27,7 +27,7 @@ const mocks = {
   service: 'export const roomService = {};',
   menu: 'export const useContextMenu = () => (event, actions) => { event.preventDefault(); globalThis.fileOfferSavedRoomFixture.actions = actions; };',
   editing: 'export const EditSavedRoomDialog = () => null;',
-  sorting: 'export const useSortableGrid = (ids) => ({ order: ids, draggingId: null, gridRef: null, handleProps: () => ({}) });',
+  sorting: 'export const useSortableGrid = (ids) => ({ order: ids, draggingId: null, gridRef: null, cardRef: () => null, handleProps: () => ({}) });',
   toast: 'export const showToast = () => {};',
 };
 const require = createRequire(import.meta.url);

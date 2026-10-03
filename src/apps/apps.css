@@ -75,13 +75,6 @@
 .room-app-options summary::-webkit-details-marker { display: none; }
 .room-app-context-trigger { border: 0; background: transparent; }
 .room-app-options summary:hover, .room-app-context-trigger:hover { background: var(--bg-card-hover); color: var(--text-primary); }
-.room-app-options-menu { position: absolute; z-index: 20; top: calc(100% + 5px); right: 0; min-width: 160px;
-  padding: 4px; border: 1px solid var(--border-default); border-radius: var(--radius-sm);
-  background: var(--bg-elevated); box-shadow: 0 8px 20px #0006; }
-.room-app-options-menu button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 8px;
-  border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-primary);
-  font-size: 11px; text-align: left; white-space: nowrap; cursor: pointer; }
-.room-app-options-menu button:hover { background: var(--dropdown-hover-bg); }
 .room-app-icon-button { display: grid; place-items: center; width: 25px; height: 25px; border: 0;
   border-radius: var(--radius-sm); background: transparent; color: var(--text-secondary); cursor: pointer; font-size: 17px; }
 .room-app-icon-button:hover { background: var(--bg-card-hover); color: var(--text-primary); }

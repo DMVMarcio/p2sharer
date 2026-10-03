@@ -2,7 +2,7 @@ import { getEncoderPreference, normalizeEncoderPreference, saveEncoderPreference
 import { streamDrawingLimit, STREAM_DRAWING_MAX } from '../../core/stream_pointer';
 import { formatFrameRate } from '../../core/media_streams';
 import { Select } from '../common/Select';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useModal } from '../../hooks/useModal';
 import { useAppTheme, ACCENT_COLORS } from '../../hooks/useAppTheme';
@@ -51,6 +51,7 @@ export const SettingsModal: React.FC = () => {
   const [participantDrawings, setParticipantDrawings] = useState(() => stateStore.allowParticipantDrawings);
   const [participantPings, setParticipantPings] = useState(() => stateStore.allowParticipantPings);
   const [streamOptionsTab, setStreamOptionsTab] = useState<'pointing' | 'advanced'>('advanced');
+  const streamOptionRefs = useRef<Partial<Record<'pointing' | 'advanced', HTMLButtonElement>>>({});
   const [encoder, setEncoder] = useState<EncoderPreference>(() => getEncoderPreference());
   const [encoderSupport, setEncoderSupport] = useState<NativeEncoderSupport | null>(null);
   const [encoderProbeDone, setEncoderProbeDone] = useState(false);
@@ -660,6 +661,7 @@ export const SettingsModal: React.FC = () => {
                 <div className="settings-row" style={{ marginTop: '14px' }}>
                   <div className="theme-mode-pills" role="tablist" aria-label="Opções de transmissão">
                     {(['advanced', 'pointing'] as const).map(tab => <button key={tab} type="button"
+                      ref={element => { if (element) streamOptionRefs.current[tab] = element; else delete streamOptionRefs.current[tab]; }}
                       className={`pill-btn ${streamOptionsTab === tab ? 'active' : ''}`} role="tab"
                       id={`stream-options-${tab}`} aria-selected={streamOptionsTab === tab}
                       aria-controls={`stream-options-panel-${tab}`} tabIndex={streamOptionsTab === tab ? 0 : -1}
@@ -668,7 +670,7 @@ export const SettingsModal: React.FC = () => {
                           event.preventDefault();
                           const next = event.key === 'Home' ? 'advanced' : event.key === 'End' ? 'pointing' : tab === 'pointing' ? 'advanced' : 'pointing';
                           setStreamOptionsTab(next);
-                          document.getElementById(`stream-options-${next}`)?.focus();
+                          streamOptionRefs.current[next]?.focus();
                         }
                       }}>{tab === 'pointing' ? 'Apontar e rabiscar' : 'Avançadas'}</button>)}
                   </div>

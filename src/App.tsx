@@ -37,6 +37,10 @@ export const App: React.FC = () => {
     return <PipView peerId={pipPeerId} />;
   }
 
+  return <MainApp />;
+};
+
+const MainApp: React.FC = () => {
   const { isInRoom, stopScreenSharing, leaveRoom, isSharingScreen } = useRoom();
   const { openModal, activeModal } = useModal();
 

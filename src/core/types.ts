@@ -116,27 +116,10 @@ export interface TurnConfig {
   forceRelay?: boolean;
 }
 
-export interface QualityProfile {
-  id: string;
-  name: string;
-  width: number;
-  height: number;
-  fps?: number;
-  frameRate?: number;
-  maxBitrateKbps: number;
-}
-
 export interface ResolutionConfig {
   width: number;
   height: number;
   label: string;
-}
-
-export interface AudioFilterConfig {
-  mode: 'exclude' | 'include';
-  targetPids: number[];
-  targetNames: string[];
-  sampleRate?: number;
 }
 
 export interface AudioStreamPayload {
@@ -156,18 +139,10 @@ export interface PeerAudioSinkState {
   isMuted: boolean;
 }
 
-export interface StreamCardCacheItem {
-  el: HTMLElement;
-  isVideo: boolean;
-  streamId?: string;
-  subMode?: 'video' | 'connecting' | 'can_watch' | 'idle';
-}
-
 export type ThemeMode = 'dark' | 'light' | 'system';
 export type StreamFilterMode = 'all' | 'streaming' | 'watching';
 
 export type SignalingTransport = 'mqtt' | 'nostr' | 'torrent';
-export type SignalingTransportType = SignalingTransport;
 
 export interface SignalingStatus {
   activeTransport: SignalingTransport;
@@ -205,13 +180,6 @@ export interface StreamRequestPayload {
   broadcasterId: string;
   requesterId: string;
   reason?: 'initial_join' | 'stream_resumed' | 'track_ended_recovery';
-}
-
-export interface WatchStatusPayload {
-  broadcasterId: string;
-  isWatching: boolean;
-  watcherName: string;
-  watcherPeerId: string;
 }
 
 export interface VideoSourceOptions {
