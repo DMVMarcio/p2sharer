@@ -30,6 +30,7 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 ---
 
 ## 3. Subsystem Architectural Deep Dives
+- [Public Repository Safety and Historical Audits](.agents/knowledge/repository-publication.md)
 - [P2P Networking, Signaling Failover & WebRTC Mesh](.agents/knowledge/p2p-architecture.md)
 - [Native Media Pipeline: Audio Loopback, Video Capture & Web Bridges](.agents/knowledge/native-media-pipeline.md)
 - [Native NVENC Encoding, Settings, Validation and Transport Limits](.agents/knowledge/native-nvenc.md)
@@ -42,6 +43,8 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 ---
 
 ## 4. User Guidelines & Expressed Preferences
+
+- `[Repository Privacy]` Prepare public access by auditing current files and every reachable historical commit, including branches, tags, and pull-request refs. Exclude diagnostic logs, generated output, credentials, private environment files, and unnecessary personal information. Review staged content and sizes before every commit. Current deletion does not remove historical exposure. Prepare and validate history rewrites before requesting approval for remote replacement or visibility changes.
 
 - [Frontend Maintenance] Prefer React state, events, and refs over manual DOM lookup or HTML rendering. Remove proven unused code while preserving all existing functionality, styling, layout, and animations. Keep required browser/media/editor integrations intact. Established on October 3, 2026.
 

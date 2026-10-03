@@ -24,6 +24,12 @@ Use `pnpm add <package>`, `pnpm add -D <package>`, and `pnpm exec <tool>`. Commi
 
 The Trystero core patch is applied by pnpm through `patchedDependencies` in `pnpm-workspace.yaml`; esbuild is explicitly permitted to run its installation script. Update patches with `pnpm patch @trystero-p2p/core@0.25.3` and `pnpm patch-commit <directory>`, then commit the patch, configuration, and lockfile together. MQTT is explicitly declared for application imports; esbuild and Trystero core are explicit development dependencies for tests. Do not rely on incidental dependency hoisting.
 
+## Repository safety
+
+Run `pnpm run check:repository` before staging and `pnpm run check:repository --staged` before committing. Review the complete staged diff and use Gitleaks with full redaction for secret scanning. The built-in hygiene check covers selected patterns; it does not replace a dedicated scanner or manual review.
+
+Keep private environment files, diagnostic logs, personal machine reports, credentials, signing keys, and generated build output outside Git. Environment examples contain placeholders only. Preserve required application assets, third-party licenses, dependency patches, and lockfiles. Use GitHub `noreply` author addresses. Removing a file from the current tree does not remove it from older commits.
+
 ## Recommended IDE setup
 
 [VS Code](https://code.visualstudio.com/) with [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) and [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer).

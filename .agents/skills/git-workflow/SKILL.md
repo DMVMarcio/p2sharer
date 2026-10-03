@@ -28,6 +28,13 @@ Before running `git add` or committing, ensure `.gitignore` exists and covers th
 - Validate application changes with `pnpm run tauri:build` before committing; `pnpm run build` covers only the frontend.
 
 ## 2. Commit Standards
+
+### Public repository review
+- Apply `.agents/rules/agent-persistence.md` repository safety checks before every commit.
+- Use `pnpm run check:repository` and `pnpm run check:repository --staged`; inspect `git diff --cached` and run `git diff --cached --check`.
+- Run `gitleaks git . --pre-commit --staged --redact=100 --no-banner` for staged secret detection. For a full historical review use `gitleaks git . --log-opts "--all --full-history" --redact=100 --no-banner`, together with an inventory of every commit tree and blob size. Keep reports outside the repository and do not print secret values.
+- Do not stage ignored files with `git add -f`, commit personal reports, or bundle installers into Git. Review binary assets and licenses explicitly. Environment templates must contain placeholders only. Preserve pnpm/Cargo lockfiles, dependency patches, required application assets, and source licenses.
+- Publication and history rewrites require a reviewed plan, a recoverable backup, validated branch tips, and explicit approval before replacing remote history. Include author/committer email privacy and GitHub-only metadata in the review.
 - **Language**: Strictly English.
 - **Convention**: Conventional Commits format (`type(scope): subject`).
   - `feat`: New feature or user-facing capability.
