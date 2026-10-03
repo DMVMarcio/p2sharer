@@ -12,7 +12,7 @@ function validInstance(value: unknown): value is RoomAppInstance {
   const item = value as RoomAppInstance;
   return typeof item.id === 'string' && /^[a-f0-9-]{36}$/.test(item.id) &&
     isRoomAppKind(item.kind) && typeof item.createdBy === 'string' && item.createdBy.length <= 100 &&
-    Number.isFinite(item.createdAt);
+    Number.isFinite(item.createdAt) && item.personal === undefined;
 }
 
 export class RoomAppsService {
@@ -38,6 +38,13 @@ export class RoomAppsService {
   getParticipants(id: string): string[] { return [...(this.participants.get(id) || [])]; }
   isJoined(id: string): boolean { return Boolean(this.localActor && this.participants.get(id)?.has(this.localActor)); }
 
+  private sendInstanceEvent(id: string, event: AppWireEvent, target?: string): void {
+    if (this.instances.has(id) && !this.instances.get(id)?.personal) this.sender?.(event, target);
+  }
+
+  // Trusted device-local bootstrap for detached windows, never for room packets.
+  initializeLocalView(instance: RoomAppInstance): void { this.addInstance(instance, true); }
+
   // A detached WebView mirrors the model; the main window remains the room transport owner.
   applyLocalView(id: string, snapshot: unknown, participants: string[], receivedAt?: number): void {
     this.models.get(id)?.apply(snapshot, this.localActor, true, receivedAt);
@@ -48,20 +55,21 @@ export class RoomAppsService {
   publishLocalView(id: string, payload: unknown): void {
     if (!this.sender || !this.isJoined(id)) return;
     this.models.get(id)?.apply(payload, this.localActor, false);
-    this.sender({ kind: 'data', id, payload });
+    this.sendInstanceEvent(id, { kind: 'data', id, payload });
     this.notify();
   }
 
   join(id: string): void {
     if (!this.sender || !this.instances.has(id) || this.isJoined(id)) return;
     this.setPresence(id, this.localActor, true);
-    this.sender({ kind: 'presence', id, joined: true });
+    this.sendInstanceEvent(id, { kind: 'presence', id, joined: true });
   }
 
   leave(id: string): void {
     if (!this.sender || !this.isJoined(id)) return;
+    if (this.instances.get(id)?.personal) { this.stop(id); return; }
     this.setPresence(id, this.localActor, false);
-    this.sender({ kind: 'presence', id, joined: false });
+    this.sendInstanceEvent(id, { kind: 'presence', id, joined: false });
   }
 
   forgetPeer(actor: string): void {
@@ -95,14 +103,17 @@ export class RoomAppsService {
     this.notify();
   }
 
-  start(kind: string): string {
+  start(kind: string, personal = false): string {
     if (!this.sender || !getRoomApp(kind) || this.instances.size >= MAX_INSTANCES)
       throw new Error('App indisponível ou limite da sala atingido');
     const instance: RoomAppInstance = { id: crypto.randomUUID(), kind,
-      createdBy: this.localActor, createdAt: Date.now() };
+      createdBy: this.localActor, createdAt: Date.now(), ...(personal ? { personal: true } : {}) };
     this.addInstance(instance);
-    this.sender({ kind: 'start', instance });
-    this.onLocalLifecycle?.('start', instance);
+    if (personal) this.setPresence(instance.id, this.localActor, true);
+    else {
+      this.sender({ kind: 'start', instance });
+      this.onLocalLifecycle?.('start', instance);
+    }
     return instance.id;
   }
 
@@ -110,17 +121,23 @@ export class RoomAppsService {
     const instance = this.instances.get(id);
     if (!instance || !this.sender) return;
     this.removeInstance(id);
-    this.sender({ kind: 'stop', id });
-    this.onLocalLifecycle?.('stop', instance);
+    if (!instance.personal) {
+      this.sender({ kind: 'stop', id });
+      this.onLocalLifecycle?.('stop', instance);
+    }
   }
 
-  private addInstance(instance: RoomAppInstance): void {
+  private addInstance(instance: RoomAppInstance, localView = false): void {
     if (this.closed.has(instance.id) || this.instances.has(instance.id) || this.instances.size >= MAX_INSTANCES) return;
     const definition = getRoomApp(instance.kind);
     if (!definition) return;
     const model = definition.createModel({
       localActor: this.localActor,
-      emit: (payload) => this.sender?.({ kind: 'data', id: instance.id, payload }),
+      emit: (payload) => {
+        const event: AppWireEvent = { kind: 'data', id: instance.id, payload };
+        if (localView) this.sender?.(event);
+        else this.sendInstanceEvent(instance.id, event);
+      },
       changed: () => this.notify(),
     });
     this.instances.set(instance.id, instance);
@@ -129,7 +146,7 @@ export class RoomAppsService {
   }
 
   private removeInstance(id: string): void {
-    this.closed.add(id);
+    if (!this.instances.get(id)?.personal) this.closed.add(id);
     this.instances.delete(id);
     this.participants.delete(id);
     this.models.get(id)?.destroy();
@@ -140,20 +157,21 @@ export class RoomAppsService {
   requestSync(): void { this.sender?.({ kind: 'sync-request' }); }
   sendSync(target: string): void {
     if (!this.sender) return;
-    this.sender({ kind: 'sync', instances: this.getInstances(), snapshots: {},
+    this.sender({ kind: 'sync', instances: this.getInstances().filter((instance) => !instance.personal), snapshots: {},
       closed: [...this.closed].slice(-100) }, target);
     for (const [id, model] of this.models) {
       const instance = this.instances.get(id);
-      if (instance) this.sender({ kind: 'sync', instances: [instance],
+      if (instance && !instance.personal) this.sender({ kind: 'sync', instances: [instance],
         snapshots: { [id]: model.snapshot() }, closed: [] }, target);
     }
     for (const id of this.instances.keys()) if (this.isJoined(id))
-      this.sender({ kind: 'presence', id, joined: true }, target);
+      this.sendInstanceEvent(id, { kind: 'presence', id, joined: true }, target);
   }
 
   receive(event: unknown, actor: string): void {
     if (!event || typeof event !== 'object' || !this.sender) return;
     const data = event as AppWireEvent;
+    if ('id' in data && this.instances.get(data.id)?.personal) return;
     if (data.kind === 'sync-request') { this.sendSync(actor); return; }
     if (data.kind === 'start') {
       if (validInstance(data.instance) && data.instance.createdBy === actor) this.addInstance(data.instance);
@@ -178,9 +196,11 @@ export class RoomAppsService {
     if (data.kind === 'sync' && Array.isArray(data.instances) && data.instances.length <= MAX_INSTANCES &&
       Array.isArray(data.closed) && data.closed.length <= 100 && data.snapshots &&
       typeof data.snapshots === 'object') {
-      for (const id of data.closed) if (typeof id === 'string' && /^[a-f0-9-]{36}$/.test(id)) this.removeInstance(id);
+      for (const id of data.closed) if (typeof id === 'string' && /^[a-f0-9-]{36}$/.test(id) &&
+        !this.instances.get(id)?.personal) this.removeInstance(id);
       for (const instance of data.instances) if (validInstance(instance)) this.addInstance(instance);
       for (const [id, payload] of Object.entries(data.snapshots)) {
+        if (this.instances.get(id)?.personal) continue;
         try { this.models.get(id)?.apply(payload, actor, true); }
         catch (error) { console.warn('[Apps] Invalid app snapshot:', error); }
       }

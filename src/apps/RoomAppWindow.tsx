@@ -28,8 +28,7 @@ export const RoomAppWindow: React.FC<{ instanceId: string }> = ({ instanceId }) 
           if (event.kind === 'data' && event.id === instanceId)
             void sendAppWindow(instanceId, 'main', { type: 'update', payload: event.payload }).catch(console.warn);
         }, message.actor);
-        roomAppsService.receive({ kind: 'sync', instances: [message.instance],
-          snapshots: {}, closed: [] }, message.actor);
+        roomAppsService.initializeLocalView(message.instance);
         stateStore.set((state) => { state.username = message.username; });
         setLabel(definition.label);
         setView(() => lazy(definition.loadView));

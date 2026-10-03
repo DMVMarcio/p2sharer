@@ -39,3 +39,6 @@ The featured app header offers an ExternalLink action that detaches the entire j
 
 
 Detached app placeholders retain the compact card focus overlay, allowing grid/tray selection without closing their external window. The explicit restore button sits above that overlay with the shared placeholder-action recipe, so restore and spotlight focus remain independent actions.
+
+
+Personal room apps use optional local-only `RoomAppInstance.personal` metadata. The library selects a kind by card, then launches from a footer with a default-off "Somente para mim" switch. Personal launches join the local actor immediately. `RoomAppsService` excludes these instances from room sends, snapshots, presence, closed-ID history, and lifecycle chat callbacks; incoming room updates and tombstones cannot affect them. Leaving a personal instance disposes it. Detached windows bootstrap through `initializeLocalView` and forward model edits over targeted device-local Tauri events; the main service retains the room-send privacy gate. Unit tests cover notes, awareness, YouTube, late-peer synchronization, mixed shared/personal instances, hostile room packets, detached edits, and teardown.

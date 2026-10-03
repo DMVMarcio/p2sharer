@@ -3,6 +3,7 @@ export interface RoomAppInstance {
   kind: string;
   createdBy: string;
   createdAt: number;
+  personal?: boolean;
 }
 
 export interface YouTubeEntry {

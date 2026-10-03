@@ -59,13 +59,13 @@ export const RoomAppCard: React.FC<Props> = ({ instance, isFeatured = false, com
   const actions: ContextMenuAction[] = [];
   if (!joined) actions.push({ id: 'join', label: 'Entrar no app', icon: <Play size={15} />, onSelect: enter });
   if (!isFeatured) actions.push({ id: 'feature', label: 'Destacar app', icon: <Focus size={15} />, onSelect: () => togglePin(`app:${instance.id}`) });
-  if (joined) actions.push({ id: 'leave', label: 'Sair do app', icon: <ArrowLeft size={15} />, onSelect: leave });
-  actions.push({ id: 'stop', label: 'Encerrar para todos', icon: <SquareX size={15} />, danger: true, separator: true, onSelect: () => roomAppsService.stop(instance.id) });
+  if (joined && !instance.personal) actions.push({ id: 'leave', label: 'Sair do app', icon: <ArrowLeft size={15} />, onSelect: leave });
+  actions.push({ id: 'stop', label: instance.personal ? 'Fechar app pessoal' : 'Encerrar para todos', icon: <SquareX size={15} />, danger: true, separator: true, onSelect: () => roomAppsService.stop(instance.id) });
   return <div onContextMenu={(event) => { if (!isContextMenuEditor(event.target)) openContextMenu(event, actions); }} className={`room-app-card room-app-kind-${instance.kind} ${isFeatured ? 'featured' : ''} ${compact ? 'compact' : ''}`}
     style={style} data-peer-id={`app:${instance.id}`}>
     <div className="room-app-card-header">
       <span className="room-app-card-title"><RoomAppIcon kind={instance.kind} size={20} />{label}
-        <span className="room-app-shared-label">na sala</span></span>
+        <span className="room-app-shared-label">{instance.personal ? 'pessoal' : 'na sala'}</span></span>
       <div className="room-app-toolbar-actions">
         <ActivityParticipants people={people} />
         {isFeatured && <button className="room-app-leave-button" onClick={backToGrid}>

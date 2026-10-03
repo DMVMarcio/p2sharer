@@ -60,7 +60,7 @@ export function ModalDialog({ title, subtitle, icon, children, footer, className
   return createPortal(<div className={`modal-overlay ${closing ? 'closing' : ''}`}
     onClick={(event) => event.stopPropagation()}
     onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
-    <div ref={cardRef} className={`modal-card ${className}`} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}>
+    <div ref={cardRef} className={`modal-card ${className}`} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} inert={closing || undefined}>
       <div className="modal-header">
         {icon && <div className="modal-header-icon">{icon}</div>}
         <div><h2 id={titleId}>{title}</h2>{subtitle && <p className="modal-subtitle">{subtitle}</p>}</div>

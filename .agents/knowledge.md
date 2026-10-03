@@ -43,6 +43,8 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 4. User Guidelines & Expressed Preferences
 
+- [Personal Room Apps] Select an app by clicking its library card and launch from a shared footer. Offer a personal-only switch that resets off whenever the library opens. Personal instances, presence, edits, playback events, lifecycle notices, and synchronization must never reach room peers; only the initiating participant can see and use them.
+
 - [Detached App Focus] Empty app placeholders remain focusable in the grid and spotlight tray without restoring the external window.
 - [Saved Room Drag Handle] Keep the six-dot handle compact and borderless, with no resting button outline/background. Its scoped sizing must override the global full-width button recipe so room titles retain their row space. Preserve keyboard-only focus feedback.
 - [Saved Room Order] Allow persistent manual ordering of homepage saved-room cards with a six-dot drag handle, smooth animated movement, and keyboard access.

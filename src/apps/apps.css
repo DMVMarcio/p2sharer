@@ -1,8 +1,7 @@
 /* Room App library */
 .apps-library-modal { max-width: 720px; }
-.apps-library-body { padding: 20px; }
 .apps-library-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
-.apps-library-card { overflow: hidden; border: 1px solid var(--border-default); border-radius: var(--radius-lg);
+.apps-library-card { width: 100%; padding: 0; text-align: left; cursor: pointer; font: inherit; overflow: hidden; border: 1px solid var(--border-default); border-radius: var(--radius-lg);
   background: var(--bg-card); transition: border-color var(--transition-fast), transform var(--transition-fast); }
 .apps-library-card:hover { border-color: var(--border-focus); transform: translateY(-2px); }
 .apps-library-banner { height: 116px; position: relative; display: grid; place-items: center; overflow: hidden;
@@ -18,10 +17,18 @@
   filter: drop-shadow(0 8px 18px rgba(0,0,0,.16)); }
 .apps-library-banner.youtube > svg { width: 68px; height: 68px; padding: 0; border: 0;
   border-radius: 0; background: transparent; filter: drop-shadow(0 6px 15px #0005); }
-.apps-library-card-content { display: flex; min-height: 155px; flex-direction: column; align-items: flex-start;
+.apps-library-card-content { display: flex; min-height: 105px; flex-direction: column; align-items: flex-start;
   padding: 15px; gap: 7px; }
 .apps-library-card-content h3 { margin: 0; color: var(--text-primary); font-size: 14px; font-weight: 700; }
 .apps-library-card-content p { flex: 1; margin: 0; color: var(--text-secondary); font-size: 11px; line-height: 1.45; }
+.apps-library-card.selected { border-color: var(--accent-color); box-shadow: 0 0 0 1px var(--accent-color); }
+.apps-library-card:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 3px; }
+.apps-library-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; flex-wrap: wrap; }
+.apps-library-personal { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.apps-library-personal > span:last-child { display: flex; flex-direction: column; gap: 3px; }
+.apps-library-personal strong { color: var(--text-primary); font-size: 13px; font-weight: 600; }
+.apps-library-personal #apps-personal-description { color: var(--text-secondary); font-size: 11px; }
+.apps-library-footer .apps-library-start { width: auto; }
 .apps-library-start { display: inline-flex; align-items: center; gap: 6px; }
 
 /* App cards are constrained to the same rectangular slots as media cards. */

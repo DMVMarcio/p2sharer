@@ -161,3 +161,84 @@ test('only the local actor emits app lifecycle notices, once per start and stop'
   first.stop(id);
   assert.deepEqual(notices, [`start:notepad:${id}`, `stop:notepad:${id}`]);
 });
+
+
+test('personal apps never publish existence, state, presence, notices, or closed IDs', () => {
+  const service = new RoomAppsService();
+  const peer = new RoomAppsService();
+  const sent: AppWireEvent[] = [];
+  const notices: string[] = [];
+  service.attach((event) => { sent.push(event); peer.receive(event, 'alice'); }, 'alice',
+    (action) => notices.push(action));
+  peer.attach(() => {}, 'bob');
+  const note = service.start('notepad', true);
+  const video = service.start('youtube', true);
+  assert.equal(service.isJoined(note), true);
+  assert.deepEqual(service.getParticipants(video), ['alice']);
+  service.getModel<NotepadModel>(note)!.replace('Personal secret');
+  service.getModel<NotepadModel>(note)!.awareness.setLocalState({ user: { name: 'Alice' } });
+  const model = service.getModel<YouTubeModel>(video)!;
+  model.update({ ...model.state, queue: [{ videoId: 'dQw4w9WgXcQ', title: 'Private video' }] });
+  service.publishLocalView(note, service.getModel<NotepadModel>(note)!.snapshot());
+  assert.deepEqual(sent, []);
+  assert.deepEqual(notices, []);
+  const shared = service.start('notepad');
+  service.getModel<NotepadModel>(shared)!.replace('Shared note');
+  service.sendSync('bob');
+  assert.deepEqual(peer.getInstances().map((item) => item.id), [shared]);
+  assert.equal(peer.getModel<NotepadModel>(shared)!.text.toString(), 'Shared note');
+  assert.ok(!JSON.stringify(sent).includes(note));
+  assert.ok(!JSON.stringify(sent).includes(video));
+  sent.length = 0;
+  service.leave(note);
+  service.stop(video);
+  assert.equal(service.getInstance(note), undefined);
+  assert.deepEqual(sent, []);
+  service.sendSync('bob');
+  assert.ok(!JSON.stringify(sent).includes(note));
+  assert.ok(!JSON.stringify(sent).includes(video));
+  service.reset(); peer.reset();
+});
+
+test('room packets cannot modify, join, stop, or import personal instances', () => {
+  const service = new RoomAppsService();
+  service.attach(() => {}, 'alice');
+  const id = service.start('notepad', true);
+  const model = service.getModel<NotepadModel>(id)!;
+  model.replace('Keep private');
+  const attacker = new NotepadModel({ localActor: 'bob', emit: () => {}, changed: () => {} });
+  attacker.replace('Injected');
+  service.receive({ kind: 'data', id, payload: attacker.snapshot() }, 'bob');
+  service.receive({ kind: 'presence', id, joined: true }, 'bob');
+  service.receive({ kind: 'stop', id }, 'bob');
+  service.receive({ kind: 'sync', instances: [], snapshots: { [id]: attacker.snapshot() }, closed: [id] }, 'bob');
+  assert.equal(model.text.toString(), 'Keep private');
+  assert.equal(service.getInstance(id)?.personal, true);
+  assert.deepEqual(service.getParticipants(id), ['alice']);
+  const remotePersonal = { ...service.getInstance(id)!, id: crypto.randomUUID(), createdBy: 'bob' };
+  service.receive({ kind: 'start', instance: remotePersonal }, 'bob');
+  service.receive({ kind: 'sync', instances: [remotePersonal], snapshots: {}, closed: [] }, 'bob');
+  assert.equal(service.getInstances().length, 1);
+  service.reset(); attacker.destroy();
+});
+
+test('personal detached models forward only device-local edits and retain main transport isolation', () => {
+  const main = new RoomAppsService();
+  const mirror = new RoomAppsService();
+  const sent: AppWireEvent[] = [];
+  main.attach((event) => sent.push(event), 'alice');
+  const id = main.start('notepad', true);
+  mirror.attach((event) => {
+    if (event.kind === 'data') main.publishLocalView(id, event.payload);
+  }, 'alice');
+  mirror.initializeLocalView(main.getInstance(id)!);
+  mirror.applyLocalView(id, main.getModel(id)!.snapshot(), ['alice']);
+  mirror.getModel<NotepadModel>(id)!.replace('From my window');
+  assert.equal(main.getModel<NotepadModel>(id)!.text.toString(), 'From my window');
+  assert.deepEqual(sent, []);
+  main.getModel<NotepadModel>(id)!.text.insert(0, 'Main: ');
+  mirror.applyLocalView(id, main.getModel(id)!.snapshot(), ['alice']);
+  assert.equal(mirror.getModel<NotepadModel>(id)!.text.toString(), 'Main: From my window');
+  mirror.reset(); main.reset();
+  assert.deepEqual(sent, []);
+});
