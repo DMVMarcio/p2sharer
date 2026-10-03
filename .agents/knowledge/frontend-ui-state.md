@@ -173,6 +173,8 @@ Text annotations use `StreamDrawingTextEditor`, a borderless native textarea anc
 
 ## Transmission settings sections
 
+The default-on `StateStore.rememberTransmissionSettings` preference is persisted under `p2sharer_remember_transmission_settings`. Settings exposes it beside transmission defaults and applies it only on Save. `saveTransmissionDefaults` centralizes persistence of resolution, FPS, bitrate, image quality, and cursor capture. The picker saves these defaults only after a successful start or edit; cancellation and capture failure leave both saved defaults and the previous runtime configuration intact. The capture service accepts an explicit bitrate so starting a capture does not require changing global defaults beforehand. When remembering is off, picker changes still configure that capture but do not replace stored defaults. Camera-specific dimensions and fractional frame rates remain exact in storage and appear as additional current options in Settings; screen picks retain their existing supported-mode normalization.
+
 Transmission defaults remain outside the local Pointing/Drawing and Advanced tabs.
 The tabs reuse `.theme-mode-pills` / `.pill-btn` with tablist/tab/tabpanel semantics,
 roving focus and arrow/Home/End navigation. Advanced appears first and opens by

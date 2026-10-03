@@ -463,9 +463,9 @@ export class RoomService {
 
   public startCapture(sourceId: string, fps: number, res: { width: number; height: number },
     mouse: boolean, quality = 90, label?: string,
-    prepared?: { sourceId: string; stream: MediaStream; bridge?: NativeVideoBridge }): Promise<void> {
+    prepared?: { sourceId: string; stream: MediaStream; bridge?: NativeVideoBridge },
+    bitrate = stateStore.currentBitrate): Promise<void> {
     const editingId = stateStore.editingStreamId;
-    const bitrate = stateStore.currentBitrate;
     const manager = this.roomManager;
     const task = this.captureTransition.then(async () => {
       if (!manager || manager !== this.roomManager) throw new Error('A sala foi encerrada.');

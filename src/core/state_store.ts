@@ -2,6 +2,14 @@ import { streamDrawingLimit, STREAM_DRAWING_MAX } from './stream_pointer.ts';
 import type { ResolutionConfig, RoomSlotInfo, StreamFilterMode, ThemeMode, TurnConfig } from './types.ts';
 import { parseTurnUrls } from '../p2p/ice_config.ts';
 
+export interface TransmissionDefaults {
+  resolution: string;
+  fps: number;
+  bitrate: number;
+  quality: number;
+  cursor: boolean;
+}
+
 export class StateStore {
   private static instance: StateStore | null = null;
 
@@ -35,6 +43,7 @@ export class StateStore {
   public currentFps: number = 60;
   public currentBitrate: number = 15000;
   public currentQuality: number = 90;
+  public rememberTransmissionSettings = true;
   public currentResolution: ResolutionConfig = { width: 1920, height: 1080, label: '1080p' };
 
   public isAudioFilterFullAudio: boolean = false;
@@ -107,7 +116,8 @@ export class StateStore {
     this.currentThemeMode = (localStorage.getItem('p2sharer_theme_mode') as ThemeMode) || 'dark';
     this.currentAccentColor = localStorage.getItem('p2sharer_accent_color') || 'cyan';
 
-    this.currentFps = parseInt(localStorage.getItem('p2sharer_default_fps') || '60', 10);
+    this.rememberTransmissionSettings = localStorage.getItem('p2sharer_remember_transmission_settings') !== 'false';
+    this.currentFps = Number(localStorage.getItem('p2sharer_default_fps') || '60');
     this.currentBitrate = parseInt(localStorage.getItem('p2sharer_default_bitrate') || '15000', 10);
     this.currentQuality = parseInt(localStorage.getItem('p2sharer_default_quality') || '90', 10);
     if (isNaN(this.currentQuality) || this.currentQuality < 50 || this.currentQuality > 100) {
@@ -143,6 +153,22 @@ export class StateStore {
     } catch {
       this.includeProcessNames = new Set();
     }
+  }
+
+  public saveTransmissionDefaults(settings: TransmissionDefaults): void {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('p2sharer_default_res', settings.resolution);
+      localStorage.setItem('p2sharer_default_fps', String(settings.fps));
+      localStorage.setItem('p2sharer_default_bitrate', String(settings.bitrate));
+      localStorage.setItem('p2sharer_default_quality', String(settings.quality));
+      localStorage.setItem('p2sharer_default_cursor', String(settings.cursor));
+    }
+    this.set((state) => {
+      state.currentResolution = state.parseResolution(settings.resolution);
+      state.currentFps = settings.fps;
+      state.currentBitrate = settings.bitrate;
+      state.currentQuality = settings.quality;
+    });
   }
 
   public getDefaultBitrateForResolution(resLabel: string): number {

@@ -6,6 +6,7 @@ import { useStore } from './useStore';
 import { roomService } from '../services/room_service';
 import { listCameras, preferredCameraFrameRate, type CameraResolution } from '../video/camera_devices';
 import { useCapturePreview } from './useCapturePreview';
+import { showToast } from './useToast';
 
 export function useScreenPicker(onClose?: () => void, isClosing = false) {
   const editingId = useStore((state) => state.editingStreamId);
@@ -128,13 +129,6 @@ export function useScreenPicker(onClose?: () => void, isClosing = false) {
     if (isLoading || isStarting || preview.busy) return;
     setIsStarting(true);
     try {
-      stateStore.set((s) => {
-        s.currentResolution = resConfig;
-        s.currentFps = fps;
-        s.currentBitrate = bitrate;
-        s.currentQuality = quality;
-      });
-
       const fallbackId = currentTab === 'windows'
         ? (windows[0]?.id || 'window:0')
         : (monitors[0]?.id || 'screen:0');
@@ -142,7 +136,21 @@ export function useScreenPicker(onClose?: () => void, isClosing = false) {
       const label = monitors.find((source) => source.id === chosen)?.name || windows.find((source) => source.id === chosen)?.title ||
         cameras.find((source) => `camera:${source.deviceId}` === chosen)?.label;
       const prepared = await preview.take();
-      await roomService.startCapture(chosen, fps, { width: resConfig.width, height: resConfig.height }, showCursor, quality, label, prepared);
+      await roomService.startCapture(chosen, fps, { width: resConfig.width, height: resConfig.height }, showCursor, quality, label, prepared, bitrate);
+      stateStore.set((s) => {
+        s.currentResolution = resConfig;
+        s.currentFps = fps;
+        s.currentBitrate = bitrate;
+        s.currentQuality = quality;
+      });
+      if (stateStore.rememberTransmissionSettings) {
+        try {
+          stateStore.saveTransmissionDefaults({ resolution: resConfig.label.toLowerCase(), fps, bitrate, quality, cursor: showCursor });
+        } catch (error) {
+          console.warn('[Transmission] Could not save the last configuration:', error);
+          showToast('Transmissão aplicada, mas não foi possível salvar os novos padrões.');
+        }
+      }
       if (onClose) onClose();
     } catch (err) {
       setError(`Não foi possível aplicar a transmissão: ${err}`);

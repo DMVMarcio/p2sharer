@@ -43,6 +43,8 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 4. User Guidelines & Expressed Preferences
 
+- [Remember Transmission Settings] Successful transmission starts or edits automatically replace the saved transmission defaults with the most recently confirmed settings. Provide a persistent Settings switch to disable this behavior; automatic remembering is enabled by default, including first-run installations. Cancelled or failed transmission attempts must preserve saved defaults.
+
 - [Desktop Build Directory] Always use the default `src-tauri/target/` for desktop builds; never use alternate directories. If the app is running or its executable is locked, present a questionnaire asking the user to close it and wait for confirmation before retrying. Never terminate it automatically. The user established this rule on October 3, 2026.
 
 - [Personal Room Apps] Select an app by clicking its library card and launch from a shared footer. Offer a personal-only switch that resets off whenever the library opens. Personal instances, presence, edits, playback events, lifecycle notices, and synchronization must never reach room peers; only the initiating participant can see and use them.

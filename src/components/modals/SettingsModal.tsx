@@ -1,5 +1,6 @@
 import { getEncoderPreference, normalizeEncoderPreference, saveEncoderPreference, type EncoderPreference, type NativeEncoderSupport } from '../../core/encoder_preferences';
 import { streamDrawingLimit, STREAM_DRAWING_MAX } from '../../core/stream_pointer';
+import { formatFrameRate } from '../../core/media_streams';
 import { Select } from '../common/Select';
 import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
@@ -35,6 +36,7 @@ export const SettingsModal: React.FC = () => {
   const [defaultRes, setDefaultRes] = useState(
     () => localStorage.getItem('p2sharer_default_res') || '1080p'
   );
+  const [rememberTransmissionSettings, setRememberTransmissionSettings] = useState(() => stateStore.rememberTransmissionSettings);
   const [defaultFps, setDefaultFps] = useState(
     () => localStorage.getItem('p2sharer_default_fps') || '60'
   );
@@ -133,18 +135,10 @@ export const SettingsModal: React.FC = () => {
     saveEncoderPreference(encoder);
 
     // Save Stream defaults
-    localStorage.setItem('p2sharer_default_res', defaultRes);
-    localStorage.setItem('p2sharer_default_fps', defaultFps);
-    localStorage.setItem('p2sharer_default_bitrate', defaultBitrate);
-    localStorage.setItem('p2sharer_default_quality', defaultQuality);
-    localStorage.setItem('p2sharer_default_cursor', defaultCursor.toString());
-
-    stateStore.set((s) => {
-      s.currentResolution = s.parseResolution(defaultRes);
-      s.currentFps = parseInt(defaultFps, 10);
-      s.currentBitrate = parseInt(defaultBitrate, 10);
-      s.currentQuality = parseInt(defaultQuality, 10);
-    });
+    localStorage.setItem('p2sharer_remember_transmission_settings', String(rememberTransmissionSettings));
+    stateStore.rememberTransmissionSettings = rememberTransmissionSettings;
+    stateStore.saveTransmissionDefaults({ resolution: defaultRes, fps: Number(defaultFps),
+      bitrate: Number(defaultBitrate), quality: Number(defaultQuality), cursor: defaultCursor });
 
     // Save TURN
     localStorage.setItem('p2sharer_turn_enabled', turnEnabled ? 'true' : 'false');
@@ -564,6 +558,19 @@ export const SettingsModal: React.FC = () => {
                   <p className="settings-pane-desc">Valores padrão aplicados ao abrir o seletor de tela ou janela.</p>
                 </div>
 
+                <label className="settings-switch-row" htmlFor="settings-remember-transmission">
+                  <div className="settings-switch-label-group">
+                    <span className="settings-switch-title">Lembrar a última configuração de transmissão</span>
+                    <span className="settings-switch-subtitle">Atualizar estes padrões ao iniciar ou aplicar alterações em uma transmissão.</span>
+                  </div>
+                  <div className="modern-switch">
+                    <input autoComplete="off" type="checkbox" id="settings-remember-transmission"
+                      checked={rememberTransmissionSettings}
+                      onChange={(event) => setRememberTransmissionSettings(event.target.checked)} />
+                    <span className="switch-slider" />
+                  </div>
+                </label>
+
                 <div className="settings-row-grid">
                   <div className="settings-col">
                     <label className="settings-label" htmlFor="settings-default-resolution">
@@ -579,6 +586,8 @@ export const SettingsModal: React.FC = () => {
                         setDefaultBitrate(String(stateStore.getDefaultBitrateForResolution(newRes)));
                       }}
                       options={[
+                        ...(!['4k', '1440p', '1080p', '720p', '480p', '360p'].includes(defaultRes)
+                          ? [{ value: defaultRes, label: `${defaultRes} (última transmissão)` }] : []),
                         { value: '4k', label: '4K (3840x2160)' },
                         { value: '1440p', label: '1440p 2K' },
                         { value: '1080p', label: '1080p Full HD' },
@@ -599,6 +608,8 @@ export const SettingsModal: React.FC = () => {
                       value={defaultFps}
                       onValueChange={(value) => setDefaultFps(value)}
                       options={[
+                        ...(!['120', '60', '30', '15'].includes(defaultFps)
+                          ? [{ value: defaultFps, label: `${formatFrameRate(Number(defaultFps))} FPS (última transmissão)` }] : []),
                         { value: '120', label: '120 FPS' },
                         { value: '60', label: '60 FPS' },
                         { value: '30', label: '30 FPS' },
