@@ -184,3 +184,8 @@ Automatic and Generic remain available. `core/encoder_preferences.ts` centralize
 validated local persistence and stale hardware selection recovery. Save applies the
 encoder to future native screen/window captures without restarting or changing
 existing sessions; cameras keep their current capture path.
+
+
+## Local transmission previews
+
+`StateStore.localPreviewStreams` stores a boolean override per local media slot, with cameras defaulting to preview on and screens defaulting off. Every `VideoCard` in grid, stage, and tray reads the same choice, so remounting a layout cannot reset it. Room slot reconciliation removes ended stream keys and room teardown clears all choices. Local spotlight tray cards reuse the stop-watching control recipe to stop only their own `mediaId`. The selected featured tray card retains the existing lightweight placeholder, matching other selected streams.

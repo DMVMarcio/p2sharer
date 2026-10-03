@@ -399,3 +399,8 @@
   .youtube-volume-control input { width: 42px; }
   .youtube-volume-control > span { display: none; }
 }
+
+/* Native detached apps reuse the room body and floating window chrome. */
+.room-app-window { height: 100vh; display: flex; flex-direction: column; background: var(--bg-app); overflow: hidden; }
+.room-app-window > .pip-top-bar { position: static; flex-shrink: 0; }
+.room-app-window > .room-app-card-body { flex: 1; min-height: 0; }

@@ -89,12 +89,12 @@ export const StreamHeaderBar: React.FC = () => {
           </button>
         </Tooltip>
 
-        <Tooltip content={`Mostrar telas e atividades que você acompanha (${watchingCount})`}>
+        <Tooltip content={`Mostrar telas e apps que você acompanha (${watchingCount})`}>
           <button
             type="button"
             className={`btn-stream-filter ${streamFilter === 'watching' ? 'active' : ''}`}
             onClick={() => setStreamFilter(streamFilter === 'watching' ? 'all' : 'watching')}
-            aria-label="Mostrar apenas telas e atividades que você acompanha"
+            aria-label="Mostrar apenas telas e apps que você acompanha"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z" />

@@ -158,7 +158,11 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
       else removers.push(...listeners);
     });
     pipListenersReadyRef.current = ready;
-    return () => { disposed = true; removers.forEach((remove) => remove()); };
+    return () => {
+      disposed = true;
+      removers.forEach((remove) => remove());
+      if (pipActiveRef.current) void invoke('close_pip_window', { peerId: youtubePipPeerId(instanceId) }).catch(console.warn);
+    };
   }, [instanceId]);
 
   useEffect(() => {
@@ -538,7 +542,7 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
         {pipActive && !compact && <div className="youtube-pip-placeholder">
           <PictureInPicture2 size={25} strokeWidth={1.6} />
           <span>Reproduzindo no Picture-in-Picture</span>
-          <button onClick={() => void closePip()}>Voltar à atividade</button>
+          <button onClick={() => void closePip()}>Voltar ao app</button>
         </div>}
         {!current && <div className="youtube-player-empty">
           <SquarePlay size={30} strokeWidth={1.5} />

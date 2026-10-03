@@ -16,7 +16,7 @@ export const ActivityAvatar: React.FC<{ person: ActivityParticipant; className?:
   </Tooltip>;
 
 export const ActivityParticipants: React.FC<{ people: ActivityParticipant[] }> = ({ people }) =>
-  <div className="room-app-participants" aria-label={`${people.length} pessoas nesta atividade`}>
+  <div className="room-app-participants" aria-label={`${people.length} pessoas neste app`}>
     {people.slice(0, 5).map((person) => <ActivityAvatar key={person.id} person={person} />)}
     {people.length > 5 && <span className="room-app-participant-extra">+{people.length - 5}</span>}
   </div>;

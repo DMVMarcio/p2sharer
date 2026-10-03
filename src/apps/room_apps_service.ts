@@ -38,6 +38,20 @@ export class RoomAppsService {
   getParticipants(id: string): string[] { return [...(this.participants.get(id) || [])]; }
   isJoined(id: string): boolean { return Boolean(this.localActor && this.participants.get(id)?.has(this.localActor)); }
 
+  // A detached WebView mirrors the model; the main window remains the room transport owner.
+  applyLocalView(id: string, snapshot: unknown, participants: string[], receivedAt?: number): void {
+    this.models.get(id)?.apply(snapshot, this.localActor, true, receivedAt);
+    this.participants.set(id, new Set(participants));
+    this.notify();
+  }
+
+  publishLocalView(id: string, payload: unknown): void {
+    if (!this.sender || !this.isJoined(id)) return;
+    this.models.get(id)?.apply(payload, this.localActor, false);
+    this.sender({ kind: 'data', id, payload });
+    this.notify();
+  }
+
   join(id: string): void {
     if (!this.sender || !this.instances.has(id) || this.isJoined(id)) return;
     this.setPresence(id, this.localActor, true);

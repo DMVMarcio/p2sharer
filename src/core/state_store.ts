@@ -20,6 +20,7 @@ export class StateStore {
   public layoutMode: 'grid' | 'spotlight' = 'grid';
   public pinnedPeerId: string | null = null;
   public subscribedStreams: Set<string> = new Set();
+  public localPreviewStreams: Record<string, boolean> = {};
   public activePipPeers: Set<string> = new Set();
   public roomSlots: RoomSlotInfo[] = [];
   public editingStreamId: string | null = null;

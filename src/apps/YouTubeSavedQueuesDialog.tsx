@@ -69,7 +69,7 @@ function QueueActionDialog({ action, currentCount, onImport, onClose }: {
         ? <>Excluir “<strong>{action.queue.name}</strong>” das filas salvas? A fila em reprodução não será alterada.</>
         : action.kind === 'overwrite'
           ? <>Substituir os {action.queue.entries.length} vídeos salvos em “<strong>{action.queue.name}</strong>” pelos {action.entries.length} vídeos da fila atual?</>
-          : <>Como deseja importar os {action.queue.entries.length} vídeos de “<strong>{action.queue.name}</strong>” para a atividade?</>}</p>}
+          : <>Como deseja importar os {action.queue.entries.length} vídeos de “<strong>{action.queue.name}</strong>” para o app?</>}</p>}
     {action.kind === 'import' && <p className="youtube-saved-hint">Substituir inicia o primeiro vídeo. Adicionar mantém a reprodução atual e coloca os vídeos no final.</p>}
     {action.kind === 'import' && exceedsLimit && <p className="youtube-saved-error" role="status">Adicionar ultrapassaria o limite de 200 vídeos. Você ainda pode substituir a fila.</p>}
     {error && <p className="youtube-saved-error" role="alert">{error}</p>}

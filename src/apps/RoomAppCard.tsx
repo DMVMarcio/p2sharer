@@ -3,7 +3,8 @@ import type { RoomAppInstance } from './types';
 import { getRoomApp, type RoomAppViewProps } from './registry';
 import { roomAppsService } from './room_apps_service';
 import { useRoom } from '../hooks/useRoom';
-import { ArrowLeft, MoreHorizontal, SquareX, Focus, Play } from 'lucide-react';
+import { ArrowLeft, MoreHorizontal, SquareX, Focus, Play, ExternalLink } from 'lucide-react';
+import { useAppWindow } from './useAppWindow';
 import { isContextMenuEditor, useContextMenu, type ContextMenuAction } from '../components/common/ContextMenu';
 import { RoomAppIcon } from './RoomAppIcon';
 import { ActivityParticipants } from '../components/common/ActivityParticipants';
@@ -30,6 +31,7 @@ interface Props {
 export const RoomAppCard: React.FC<Props> = ({ instance, isFeatured = false, compact = false, style }) => {
   const { togglePin, peers, roomSlots, username, returnToGrid } = useRoom();
   const openContextMenu = useContextMenu();
+  const { detached, detach, restore } = useAppWindow(instance);
   const [, setPresenceTick] = useState(0);
   useEffect(() => roomAppsService.subscribe(() => setPresenceTick((tick) => tick + 1)), []);
   const joined = roomAppsService.isJoined(instance.id);
@@ -55,10 +57,9 @@ export const RoomAppCard: React.FC<Props> = ({ instance, isFeatured = false, com
   const label = definition?.label || instance.kind;
   const View = viewFor(instance.kind);
   const actions: ContextMenuAction[] = [];
-  if (!joined) actions.push({ id: 'join', label: 'Entrar na atividade', icon: <Play size={15} />, onSelect: enter });
-  if (isFeatured) actions.push({ id: 'grid', label: 'Voltar à grade', icon: <ArrowLeft size={15} />, onSelect: backToGrid });
-  else actions.push({ id: 'feature', label: 'Destacar atividade', icon: <Focus size={15} />, onSelect: () => togglePin(`app:${instance.id}`) });
-  if (joined) actions.push({ id: 'leave', label: 'Sair da atividade', icon: <ArrowLeft size={15} />, onSelect: leave });
+  if (!joined) actions.push({ id: 'join', label: 'Entrar no app', icon: <Play size={15} />, onSelect: enter });
+  if (!isFeatured) actions.push({ id: 'feature', label: 'Destacar app', icon: <Focus size={15} />, onSelect: () => togglePin(`app:${instance.id}`) });
+  if (joined) actions.push({ id: 'leave', label: 'Sair do app', icon: <ArrowLeft size={15} />, onSelect: leave });
   actions.push({ id: 'stop', label: 'Encerrar para todos', icon: <SquareX size={15} />, danger: true, separator: true, onSelect: () => roomAppsService.stop(instance.id) });
   return <div onContextMenu={(event) => { if (!isContextMenuEditor(event.target)) openContextMenu(event, actions); }} className={`room-app-card room-app-kind-${instance.kind} ${isFeatured ? 'featured' : ''} ${compact ? 'compact' : ''}`}
     style={style} data-peer-id={`app:${instance.id}`}>
@@ -70,6 +71,10 @@ export const RoomAppCard: React.FC<Props> = ({ instance, isFeatured = false, com
         {isFeatured && <button className="room-app-leave-button" onClick={backToGrid}>
           <ArrowLeft size={14} /> Voltar para grade
         </button>}
+        {isFeatured && joined && !detached && <Tooltip content="Separar app em outra janela">
+          <button className="room-app-context-trigger" aria-label="Separar app em outra janela"
+            onClick={() => void detach()}><ExternalLink size={18} /></button>
+        </Tooltip>}
         <Tooltip content="Opções do App">
           <button className="room-app-context-trigger" aria-label={`Opções de ${label}`} aria-haspopup="menu" onClick={(event) => {
             const rect = event.currentTarget.getBoundingClientRect();
@@ -80,16 +85,20 @@ export const RoomAppCard: React.FC<Props> = ({ instance, isFeatured = false, com
       </div>
     </div>
     <div className="room-app-card-body">
-      {joined ? <Suspense fallback={<div className="room-app-player-placeholder">Carregando App...</div>}>
+      {detached ? <div className="room-app-join-panel">
+        <ExternalLink size={compact ? 25 : 32} />
+        {!compact && <><strong>App em janela externa</strong><span>{label} está aberto em outra janela</span></>}
+        <button onClick={() => void restore().catch(console.warn)}>Restaurar para o App</button>
+      </div> : joined ? <Suspense fallback={<div className="room-app-player-placeholder">Carregando App...</div>}>
         {View && <View instanceId={instance.id} compact={compact} />}
       </Suspense> : <div className="room-app-join-panel">
         <RoomAppIcon kind={instance.kind} size={compact ? 25 : 32} strokeWidth={1.5} />
-        {!compact && <><strong>{label}</strong><span>Atividade compartilhada na sala</span></>}
-        <button onClick={enter}>Entrar na atividade</button>
+        {!compact && <><strong>{label}</strong><span>App compartilhado na sala</span></>}
+        <button onClick={enter}>Entrar no app</button>
         {!compact && <ActivityParticipants people={people} />}
       </div>}
     </div>
-    {compact && joined && <button className="room-app-focus-overlay" aria-label={`Destacar ${label}`}
+    {compact && joined && !detached && <button className="room-app-focus-overlay" aria-label={`Destacar ${label}`}
       onClick={() => togglePin(`app:${instance.id}`)} />}
   </div>;
 };

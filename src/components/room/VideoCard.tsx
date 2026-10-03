@@ -1,3 +1,4 @@
+import { stateStore } from '../../core/state_store';
 import { useModal } from '../../hooks/useModal';
 import { formatFrameRate } from '../../core/media_streams';
 import { useStreamPointer } from '../../hooks/useStreamPointer';
@@ -52,7 +53,10 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [lastVolume, setLastVolume] = useState<number>(100);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
-  const [showLocalPreview, setShowLocalPreview] = useState<boolean>(slot.mediaKind === 'camera');
+  const showLocalPreview = useStore((s) => s.localPreviewStreams[slot.peerId] ?? (slot.mediaKind === 'camera'));
+  const setShowLocalPreview = (visible: boolean) => stateStore.set((s) => {
+    s.localPreviewStreams = { ...s.localPreviewStreams, [slot.peerId]: visible };
+  });
   const [isHudPinned, setIsHudPinned] = useState<boolean>(false);
   const [activeTooltips, setActiveTooltips] = useState<number>(0);
 
@@ -420,14 +424,17 @@ export const VideoCard: React.FC<VideoCardProps> = ({
         {slot.isLocal && <span className="badge-you">VOCÊ</span>}
       </div>
 
-      {/* Remote peer controls: Stop Watching */}
-      {!slot.isLocal && !isPipActive && (
+      {/* Stream stop actions share the tray control recipe. */}
+      {((!slot.isLocal && !isPipActive) || (slot.isLocal && inTray)) && (
         <button
           className="btn-stop-watch-stream"
-          onClick={handleStopWatching}
-          aria-label="Parar de assistir esta transmissão"
+          onClick={(event) => {
+            if (slot.isLocal) { event.stopPropagation(); if (slot.mediaId) void roomService.stopTransmission(slot.mediaId); }
+            else handleStopWatching(event);
+          }}
+          aria-label={slot.isLocal ? "Parar esta transmissão" : "Parar de assistir esta transmissão"}
         >
-          Parar de Assistir
+          {slot.isLocal ? 'Parar Transmissão' : 'Parar de Assistir'}
         </button>
       )}
 

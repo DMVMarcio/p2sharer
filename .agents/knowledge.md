@@ -43,6 +43,8 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 4. User Guidelines & Expressed Preferences
 
+- [Room App Windows & Preview] Offer an ExternalLink header action beside Back to grid to detach the complete joined app into a native window with a restore placeholder; coordinate YouTube player PiP ownership. Remove the redundant app dots-menu grid action and use app terminology in room copy. Keep preview choices per local transmission across focus/layout changes and render enabled previews in the spotlight tray. Each owned tray stream has a Stop Transmission action.
+
 - [Transmission Settings Layout] Keep Advanced first and selected by default in the local Transmission tabs; give rows visible spacing in both panels. Remove the explanatory paragraph below the video encoder and label the generic option "Genérico (Padrão)" while retaining Automatic as the actual encoder default.
 
 - [Encoder Settings] Default to automatic native NVENC when usable, retain a generic choice, list only implemented and detected hardware backends, and recover stale selections after GPU changes. Apply encoder changes to future captures without restarting the app when possible. Split only the Transmission toggle area into pointing/drawing and advanced sub-tabs; cursor capture and encoder selection belong to advanced. Show a Save-time restart dialog only for settings that truly require an application restart.

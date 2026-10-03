@@ -6,7 +6,7 @@ import { preserveYouTubeTimeline, YOUTUBE_MAX_POSITION_SECONDS } from './youtube
 
 export interface RoomAppModel {
   snapshot(): unknown;
-  apply(payload: unknown, actor: string, fromSnapshot: boolean): void;
+  apply(payload: unknown, actor: string, fromSnapshot: boolean, receivedAt?: number): void;
   destroy(): void;
 }
 
@@ -136,7 +136,7 @@ export class YouTubeModel implements RoomAppModel {
     this.context.changed();
   }
   snapshot(): unknown { return { state: this.stateValue, clock: this.clock, actor: this.actorValue }; }
-  apply(payload: unknown, actor: string, fromSnapshot: boolean): void {
+  apply(payload: unknown, actor: string, fromSnapshot: boolean, receivedAt?: number): void {
     if (!payload || typeof payload !== 'object') return;
     const value = payload as { state?: unknown; clock?: unknown; actor?: unknown };
     if (!validYouTubeState(value.state) || !Number.isSafeInteger(value.clock) ||
@@ -148,7 +148,7 @@ export class YouTubeModel implements RoomAppModel {
     this.actorValue = value.actor;
     this.snapshotValue = fromSnapshot;
     this.stateValue = value.state;
-    this.receivedAtValue = Date.now();
+    this.receivedAtValue = receivedAt !== undefined && Number.isFinite(receivedAt) ? receivedAt : Date.now();
     this.context.changed();
   }
   destroy(): void {}

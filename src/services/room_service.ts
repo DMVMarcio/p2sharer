@@ -289,6 +289,8 @@ export class RoomService {
         for (const key of stateStore.activePipPeers) if (!currentKeys.has(key)) void pipService.restoreFromPip(key);
         stateStore.set((s) => {
           s.roomSlots = slots;
+          s.localPreviewStreams = Object.fromEntries(Object.entries(s.localPreviewStreams)
+            .filter(([key]) => slots.some((slot) => slot.isLocal && slot.isStreaming && slot.peerId === key)));
           s.subscribedStreams = new Set([...s.subscribedStreams].filter((key) => currentKeys.has(key)));
           s.streamOverlays = Object.fromEntries(Object.entries(s.streamOverlays).filter(([target]) => currentKeys.has(target))
             .map(([target, keys]) => [target, keys.filter((key) => currentKeys.has(key))]));
@@ -632,6 +634,7 @@ export class RoomService {
       s.overlayPositions = {};
       s.editingStreamId = null;
       s.roomSlots = [];
+      s.localPreviewStreams = {};
       s.currentRoomCode = generateRandomRoomSlug();
       s.currentRoomInvite = '';
       s.currentRoomName = '';
