@@ -164,14 +164,25 @@ pub fn report_capture_load(session_id: String, feedback_token: String, pressure_
 }
 
 #[tauri::command]
-pub fn get_native_encoder_support() -> serde_json::Value {
-    #[cfg(windows)]
-    let support = crate::video_nvenc::probe();
-    #[cfg(not(windows))]
-    let support: Result<(), String> = Err("Native NVENC requires Windows".into());
-    serde_json::json!({ "driver_api_available": support.is_ok(),
-        "experimental_enabled": std::env::var("P2SHARER_NATIVE_NVENC").as_deref() == Ok("1"),
-        "reason": support.err(), "transport": "native_h264_rtp" })
+pub async fn get_native_encoder_support() -> Result<serde_json::Value, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        #[cfg(windows)]
+        let support = crate::video_nvenc::probe_session();
+        #[cfg(not(windows))]
+        let support: Result<(), String> = Err("Native NVENC requires Windows".into());
+        serde_json::json!({ "driver_api_available": support.is_ok(),
+            "experimental_enabled": nvenc_requested(Some("auto"), std::env::var("P2SHARER_NATIVE_NVENC").ok().as_deref()),
+            "reason": support.err(), "transport": "native_h264_rtp" })
+    }).await.map_err(|error| error.to_string())
+}
+
+// Explicit generic always wins; the old diagnostic flag only overrides automatic mode.
+fn nvenc_requested(preference: Option<&str>, diagnostic: Option<&str>) -> bool {
+    match preference {
+        Some("generic") => false,
+        Some("nvenc") => true,
+        _ => diagnostic != Some("0"),
+    }
 }
 
 #[tauri::command]
@@ -985,14 +996,14 @@ pub fn start_native_screen_capture(
     capture_mouse: Option<bool>,
     quality: Option<u8>,
 ) -> Result<bool, String> {
-    start_capture_session("default".into(), source_id, target_fps, target_width, target_height, capture_mouse, quality, None)
+    start_capture_session("default".into(), source_id, target_fps, target_width, target_height, capture_mouse, quality, None, None)
 }
 
 #[tauri::command]
 pub fn start_capture_session(
     session_id: String, source_id: String, target_fps: Option<u32>, target_width: Option<u32>,
     target_height: Option<u32>, capture_mouse: Option<bool>, quality: Option<u8>,
-    feedback_token: Option<String>,
+    feedback_token: Option<String>, encoder_preference: Option<String>,
 ) -> Result<bool, String> {
     if session_id.is_empty() || session_id.len() > 100 { return Err("Invalid capture session".into()); }
     if source_id.trim().is_empty() {
@@ -1019,7 +1030,7 @@ pub fn start_capture_session(
     let sender = if session_id == "default" { get_frame_sender().clone() } else { broadcast::channel(32).0 };
     let metrics = Arc::new(CaptureMetrics::default());
     let load = Arc::new(crate::video_load::CaptureLoad::new(fps, width, height, feedback_token));
-    let nvenc_enabled = Arc::new(AtomicBool::new(std::env::var("P2SHARER_NATIVE_NVENC").as_deref() == Ok("1")));
+    let nvenc_enabled = Arc::new(AtomicBool::new(nvenc_requested(encoder_preference.as_deref(), std::env::var("P2SHARER_NATIVE_NVENC").ok().as_deref())));
     let nvenc_keyframe = Arc::new(AtomicBool::new(true));
     let nvenc_bitrate = Arc::new(std::sync::atomic::AtomicU32::new(15_000_000));
     SESSIONS.lock().map_err(|_| "Capture session lock poisoned")?.insert(session_id.clone(), CaptureSession {
@@ -1456,6 +1467,16 @@ mod tests {
     use super::*;
 
     #[test]
+    fn encoder_selection_defaults_and_diagnostic_override_are_safe() {
+        for preference in [None, Some("auto"), Some("amd"), Some("invalid")] {
+            assert!(nvenc_requested(preference, None));
+            assert!(!nvenc_requested(preference, Some("0")));
+        }
+        assert!(!nvenc_requested(Some("generic"), Some("1")));
+        assert!(nvenc_requested(Some("nvenc"), Some("0")));
+    }
+
+    #[test]
     fn capture_dimensions_preserve_portrait_and_window_aspect_ratios() {
         assert_eq!(fit_capture_dimensions(1080, 1920, 1920, 1080), (608, 1080));
         assert_eq!(fit_capture_dimensions(2560, 1440, 1920, 1080), (1920, 1080));
@@ -1502,8 +1523,8 @@ mod tests {
 
     #[test]
     fn simultaneous_native_sessions_keep_frames_and_teardown_independent() {
-        start_capture_session("capture-test-a".into(), "screen:0".into(), Some(30), Some(640), Some(360), Some(true), Some(75), None).unwrap();
-        start_capture_session("capture-test-b".into(), "screen:0".into(), Some(30), Some(320), Some(180), Some(true), Some(85), None).unwrap();
+        start_capture_session("capture-test-a".into(), "screen:0".into(), Some(30), Some(640), Some(360), Some(true), Some(75), None, Some("generic".into())).unwrap();
+        start_capture_session("capture-test-b".into(), "screen:0".into(), Some(30), Some(320), Some(180), Some(true), Some(85), None, Some("generic".into())).unwrap();
         let (mut first, mut second, second_active) = {
             let sessions = SESSIONS.lock().unwrap();
             let a = sessions.get("capture-test-a").unwrap();
