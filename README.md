@@ -1,38 +1,60 @@
 # P2Sharer
 
-P2Sharer is a Windows desktop application built with Tauri v2, Rust, React, TypeScript, and Vite.
+P2Sharer is a Windows desktop app for sharing screens, application audio and cameras with other people in a room. Watch multiple streams, exchange messages and files, take notes together, and watch YouTube with synchronized playback.
 
-## Prerequisites
+**[Latest release](https://github.com/DMVMarcio/p2sharer/releases/latest)** · [All releases](https://github.com/DMVMarcio/p2sharer/releases)
 
-- Node.js 22.14 or newer and pnpm 10.30.1 (pinned in package.json). With Corepack available, run `corepack enable` and `corepack install` from this directory.
-- Rust, Microsoft Visual Studio C++ build tools, CMake, and NASM for native builds. The Tauri launcher discovers standalone or Visual Studio-bundled CMake when necessary.
+Windows installers will be available on GitHub Releases as versions are published. Choose the `.exe` setup or `.msi` installer from the release's **Assets** section; the source-code archives are for development.
 
-## Install and run
+## What you can do
 
-Install the locked dependencies with `pnpm install --frozen-lockfile`. Start the desktop application with `pnpm run tauri:dev`.
+- Share a screen or individual window with audio, and add cameras as independent streams.
+- Choose which streams to watch, switch between grid and spotlight views, and keep video visible in picture-in-picture windows.
+- Control participant audio independently and select which applications contribute to shared audio.
+- Chat, share images and transfer files with recipient consent.
+- Use a collaborative notepad and synchronized YouTube queues, including saved playlists and player picture-in-picture.
+- Point and draw on shared streams to explain something together.
 
-- `pnpm run dev`: Vite frontend development server on port 1420.
-- `pnpm run build`: TypeScript and Vite frontend validation.
-- `pnpm run tauri:build`: full frontend and native production build, including Windows installers.
-- `pnpm test`: frontend unit tests.
-- `pnpm run test:native --release`: portable native library and integration checks on Windows.
+Rooms use WebRTC connections between participants, with public services for discovering and connecting peers. Streaming quality depends on each participant's connection, hardware and capture settings.
 
-See [test maintenance and manual hardware checks](test/README.md) for scope and explicit opt-in commands.
+## Get started
 
-The product runs inside Tauri/WebView2. A browser preview does not validate native application behavior. Production artifacts are written to `src-tauri/target/release/p2sharer.exe` and `src-tauri/target/release/bundle/`. Always use the default target directory.
+1. Install a published Windows release and open P2Sharer.
+2. Choose a display name, create a room and share its invitation, or join with an invitation you received. Enter the room password if required.
+3. Select a screen, window or camera to share. Choose other participants' streams to watch and open room apps when you want to collaborate.
 
-## Dependency maintenance
+## Development
 
-Use `pnpm add <package>`, `pnpm add -D <package>`, and `pnpm exec <tool>`. Commit `pnpm-lock.yaml` after dependency changes. Pass script arguments directly after the script name (for example, `pnpm run tauri:dev --release --no-watch`); do not insert the extra argument separator used by the previous package manager. CI and clean installations should use `pnpm install --frozen-lockfile`.
+P2Sharer uses Tauri v2 and Rust for the Windows host, with React, TypeScript and Vite for the interface. Development requires:
 
-The Trystero core patch is applied by pnpm through `patchedDependencies` in `pnpm-workspace.yaml`; esbuild is explicitly permitted to run its installation script. Update patches with `pnpm patch @trystero-p2p/core@0.25.3` and `pnpm patch-commit <directory>`, then commit the patch, configuration, and lockfile together. MQTT is explicitly declared for application imports; esbuild and Trystero core are explicit development dependencies for tests. Do not rely on incidental dependency hoisting.
+- Node.js 22.14 or newer and pnpm 10.30.1, pinned in `package.json`.
+- Rust and Microsoft Visual Studio C++ build tools.
+- CMake and NASM for native media dependencies. The launcher discovers standalone or Visual Studio-bundled CMake when it is not on PATH.
 
-## Repository safety
+With Corepack available, run `corepack enable` and `corepack install` from the checkout. Then install dependencies and start the desktop app:
 
-Run `pnpm run check:repository` before staging and `pnpm run check:repository --staged` before committing. Review the complete staged diff and use Gitleaks with full redaction for secret scanning. The built-in hygiene check covers selected patterns; it does not replace a dedicated scanner or manual review.
+```powershell
+pnpm install --frozen-lockfile
+pnpm run tauri:dev
+```
 
-Keep private environment files, diagnostic logs, personal machine reports, credentials, signing keys, and generated build output outside Git. Environment examples contain placeholders only. Preserve required application assets, third-party licenses, dependency patches, and lockfiles. Use GitHub `noreply` author addresses. Removing a file from the current tree does not remove it from older commits.
+### Build and test
 
-## Recommended IDE setup
+| Command | Purpose |
+| --- | --- |
+| `pnpm run tauri:dev` | Run the desktop application in development mode. |
+| `pnpm run dev` | Run the Vite frontend development server. |
+| `pnpm run build` | Check TypeScript and build the frontend. |
+| `pnpm run tauri:build` | Build the production desktop executable and Windows installers. |
+| `pnpm test` | Run frontend regression tests. |
+| `pnpm run test:native --release` | Run native library and integration tests on Windows. |
 
-[VS Code](https://code.visualstudio.com/) with [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) and [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer).
+The application runs inside Tauri/WebView2; a browser preview checks only the frontend. Native capture and desktop integration require the desktop runtime. See [test instructions](test/README.md) for manual hardware checks and benchmark scope.
+
+Production output is written to `src-tauri/target/release/p2sharer.exe`, with installers under `src-tauri/target/release/bundle/`. Close the application before rebuilding and use the default Cargo target directory.
+
+### Dependencies
+
+Use `pnpm add <package>`, `pnpm add -D <package>` and `pnpm exec <tool>`. Commit `pnpm-lock.yaml` after dependency changes. Pass script options directly, for example `pnpm run tauri:dev --release --no-watch`.
+
+Keep the Trystero dependency patches and installation-script permissions in `pnpm-workspace.yaml` aligned with dependency updates. Use `pnpm patch` and `pnpm patch-commit` when updating patches, and commit the patch, workspace configuration and lockfile together.
