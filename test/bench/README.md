@@ -1,6 +1,6 @@
 # Local WebRTC file transfer benchmark
 
-Run `npx vite --host 127.0.0.1 --port 1420`, then open `http://127.0.0.1:1420/test/bench/chat_file_webrtc.html?mib=55` in a Chromium-based browser. The result appears on the page as JSON.
+Run `pnpm exec vite --host 127.0.0.1 --port 1420`, then open `http://127.0.0.1:1420/test/bench/chat_file_webrtc.html?mib=55` in a Chromium-based browser. The result appears on the page as JSON.
 
 To collect results without browser automation, start `node test/bench/result_receiver.mjs` first. The page sends only its final benchmark JSON to that local listener on `127.0.0.1:1421`; the listener prints it to the terminal.
 
@@ -10,7 +10,7 @@ This is a network reproduction, not a full Tauri desktop test. Native file selec
 
 ## Desktop video loopback
 
-Start `npm run tauri:dev -- --release --no-watch` and run the following in the desktop WebView2 developer console:
+Start `pnpm run tauri:dev --release --no-watch` and run the following in the desktop WebView2 developer console:
 
 ```js
 const { runVideoLoopback } = await import('/test/bench/video_loopback.ts');
@@ -24,7 +24,7 @@ Compute FPS from the differences between `before` and `after` frame counters and
 
 The animation uses requestAnimationFrame so a quantized setInterval timer cannot cap the benchmark's input below 60 FPS. For native runs, `nativeBefore`/`nativeAfter` expose per-session WGC callbacks, gate drops, image counts, GPU readback, JPEG compression and total processing microseconds. Compute timings from counter deltas divided by the image delta. This separates Windows capture cadence from WebView/encoder throughput.
 
-Use `cargo test --release --lib screen_sources::tests -- --test-threads=1` for optimized native unit checks, and finish with `npm run tauri:build` before launching the packaged application. Running all Cargo test targets can rebuild the application binary without Tauri's production feature configuration in the same release directory.
+Use `cargo test --release --lib screen_sources::tests -- --test-threads=1` for optimized native unit checks, and finish with `pnpm run tauri:build` before launching the packaged application. Running all Cargo test targets can rebuild the application binary without Tauri's production feature configuration in the same release directory.
 
 
 ### JPEG encoding benchmark and native build prerequisites

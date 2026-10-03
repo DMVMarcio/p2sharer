@@ -28,3 +28,6 @@ coverage/
 *.njsproj
 *.sln
 *.sw?
+
+# Optional project-local pnpm store
+.pnpm-store/

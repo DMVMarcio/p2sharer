@@ -12,9 +12,10 @@ You are the technical maintainer and continuous architect of this project. Enfor
 - **Workspace Artifacts**: All code, comments, commit messages, task files, documentation, and files under `.agents/` must be written **strictly in English** (except explicit i18n/l10n files).
 
 ## 2. Desktop Runtime & Build Validation
+- **Package Manager**: Use the pnpm version pinned by `package.json` for all JavaScript dependency and script operations. Install with `pnpm install --frozen-lockfile`, run scripts with `pnpm run <script>`, and execute local CLIs with `pnpm exec <tool>`. Track `pnpm-lock.yaml` only; preserve native patches and explicit build-script permissions in `pnpm-workspace.yaml`.
 - **Product Runtime**: P2Sharer is a Windows desktop application built with Tauri v2. React/Vite runs inside WebView2 and depends on the Rust host. Browser-only behavior is not a complete application check.
-- **Mandatory Packaging Build**: For application code or asset changes, run `npm run tauri:build` and verify the native executable and installer bundle before reporting the task as validated or complete. This also applies when no commit is requested.
-- **Frontend Build Scope**: `npm run build` validates TypeScript and Vite only; it does not replace the Tauri build. If native packaging is blocked, state the concrete failure and report the desktop build as unverified.
+- **Mandatory Packaging Build**: For application code or asset changes, run `pnpm run tauri:build` and verify the native executable and installer bundle before reporting the task as validated or complete. This also applies when no commit is requested.
+- **Frontend Build Scope**: `pnpm run build` validates TypeScript and Vite only; it does not replace the Tauri build. If native packaging is blocked, state the concrete failure and report the desktop build as unverified.
 - **Canonical Build Directory**: Always build in the default `src-tauri/target/` directory. Never create or use alternate build directories or override Cargo's target directory to bypass a running executable or file lock. If P2Sharer is open or its executable is locked, present a user questionnaire asking the user to close the application, explain that this workspace rule requires it, and wait for the user's confirmation before retrying. Do not terminate the application automatically.
 
 ## 3. Git & Repository Baseline

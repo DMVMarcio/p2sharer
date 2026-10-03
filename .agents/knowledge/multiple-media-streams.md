@@ -81,7 +81,7 @@ Validation on 2026-10-01: 386 frontend tests passed, including camera identity b
 
 ## Previous multistream validation
 
-The source-picker task completed `npm run tauri:build` successfully and verified the current native executable plus MSI/NSIS bundles under the standard `src-tauri/target/release` paths. The QA executable was closed before the final packaging build.
+The source-picker task completed `pnpm run tauri:build` successfully and verified the current native executable plus MSI/NSIS bundles under the standard `src-tauri/target/release` paths. The QA executable was closed before the final packaging build.
 
 `test/unit/media_streams.test.ts` covers manifest validation, stable ownership/card keys, independent session stopping, successful and failed live track replacement, isolated sender settings and overlay anchors. Native tests exercise two simultaneous WGC captures with distinct frame dimensions and session-selective authenticated WebSockets. Always run the Tauri packaging build and inspect executable/MSI/NSIS artifacts. Native capture tests and local RTP tests do not establish remote Internet performance or actual camera hardware compatibility.
 

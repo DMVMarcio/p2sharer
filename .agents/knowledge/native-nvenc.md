@@ -338,7 +338,7 @@ changes; arrow/Home/End navigation moves tab focus. No app restart is needed: Sa
 changes future screen/window captures while existing captures retain their encoder.
 
 Validation: 487 frontend tests, 57 native release tests (two external/manual cases
-ignored), including actual NVENC hardware tests. Full `npm run tauri:build` produced
+ignored), including actual NVENC hardware tests. Full `pnpm run tauri:build` produced
 and verified the executable, MSI and NSIS bundles. Packaged WebView2 QA with the
 legacy NVENC environment flag absent verified the real capability probe, automatic
 NVENC, explicit Generic, explicit NVIDIA NVENC, option filtering, tab keyboard focus,

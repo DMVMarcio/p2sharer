@@ -29,5 +29,5 @@ You are the **UI Architect** for P2Sharer. Your role is focused on React compone
 2. Keep room video React keys stable and avoid unnecessary video element remounts in `RoomVideoContainer` and related components.
 3. Preserve CSS variable tokens for dark/light themes and dynamic accent colors.
 4. Keep state synchronized through `StateStore` and persistent in `localStorage`.
-5. Use `npm run build` and relevant UI unit tests for focused frontend feedback, then run `npm run tauri:build` and verify the Windows executable and installer bundle before reporting application changes as validated.
-6. Check interactive behavior in `npm run tauri:dev` when needed; a Vite browser preview does not exercise Tauri/WebView2 integration.
+5. Use `pnpm run build` and relevant UI unit tests for focused frontend feedback, then run `pnpm run tauri:build` and verify the Windows executable and installer bundle before reporting application changes as validated.
+6. Check interactive behavior in `pnpm run tauri:dev` when needed; a Vite browser preview does not exercise Tauri/WebView2 integration.

@@ -19,7 +19,7 @@ export interface BuildCheckResult {
 
 export function checkTypeScriptCompilation(): BuildCheckResult {
   try {
-    const stdout = execSync('npx tsc --noEmit', {
+    const stdout = execSync('pnpm exec tsc --noEmit', {
       cwd: PROJECT_ROOT,
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],

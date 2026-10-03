@@ -22,6 +22,11 @@ Before running `git add` or committing, ensure `.gitignore` exists and covers th
 - **Game Mods & Host Software Plugins**:
   Base host/game binaries, third-party stock assets, engine dumps, savegames. Track **strictly** the plugin/mod source code, manifests, and custom assets.
 
+## P2Sharer Package Manager
+- Use the pnpm version pinned in `package.json`; validate installations with `pnpm install --frozen-lockfile`.
+- Track `pnpm-lock.yaml`, `pnpm-workspace.yaml`, and native dependency patches. Do not add lockfiles from other package managers. Ignore `.pnpm-store/` if a project-local store is used.
+- Validate application changes with `pnpm run tauri:build` before committing; `pnpm run build` covers only the frontend.
+
 ## 2. Commit Standards
 - **Language**: Strictly English.
 - **Convention**: Conventional Commits format (`type(scope): subject`).

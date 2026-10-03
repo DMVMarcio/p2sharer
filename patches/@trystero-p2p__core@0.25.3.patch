@@ -1,7 +1,7 @@
-diff --git a/node_modules/@trystero-p2p/core/dist/media.mjs b/node_modules/@trystero-p2p/core/dist/media.mjs
+diff --git a/dist/media.mjs b/dist/media.mjs
 index 2fd4906..3089c90 100644
---- a/node_modules/@trystero-p2p/core/dist/media.mjs
-+++ b/node_modules/@trystero-p2p/core/dist/media.mjs
+--- a/dist/media.mjs
++++ b/dist/media.mjs
 @@ -53,6 +53,8 @@ const createMediaIdentityCache = () => {
  const createMediaManager = ({ iterate, isActive, getSharedMediaPeer }) => {
  	const pendingStreamMetas = {};
@@ -80,10 +80,10 @@ index 2fd4906..3089c90 100644
  		},
  		get onPeerStream() {
  			return listeners.onPeerStream;
-diff --git a/node_modules/@trystero-p2p/core/dist/offer-pool.mjs b/node_modules/@trystero-p2p/core/dist/offer-pool.mjs
+diff --git a/dist/offer-pool.mjs b/dist/offer-pool.mjs
 index 7340a4f..4d7bee1 100644
---- a/node_modules/@trystero-p2p/core/dist/offer-pool.mjs
-+++ b/node_modules/@trystero-p2p/core/dist/offer-pool.mjs
+--- a/dist/offer-pool.mjs
++++ b/dist/offer-pool.mjs
 @@ -2,7 +2,7 @@ import { all, alloc, noOp, resetTimer } from "./utils.mjs";
  //#region src/offer-pool.ts
  const offerTtl = 57333;
@@ -93,10 +93,10 @@ index 7340a4f..4d7bee1 100644
  var OfferPool = class {
  	makeOffer;
  	pool = [];
-diff --git a/node_modules/@trystero-p2p/core/dist/peer.mjs b/node_modules/@trystero-p2p/core/dist/peer.mjs
+diff --git a/dist/peer.mjs b/dist/peer.mjs
 index 8003df9..c3554ee 100644
---- a/node_modules/@trystero-p2p/core/dist/peer.mjs
-+++ b/node_modules/@trystero-p2p/core/dist/peer.mjs
+--- a/dist/peer.mjs
++++ b/dist/peer.mjs
 @@ -286,9 +286,9 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
  			});
  		},

@@ -43,6 +43,8 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 4. User Guidelines & Expressed Preferences
 
+- [Package Manager] Use pnpm for dependency installation, scripts, CLI execution, and Tauri hooks. Keep rules, skills, agent prompts, and documentation synchronized with this choice. Established on October 3, 2026.
+
 - [Chat Ordering] Keep newly sent chat messages after the messages already observed by their sender, even when participant computer clocks differ by seconds or minutes. Separate signed logical ordering from the displayed local timestamp and preserve the original position on edits and deletions.
 
 - [Own Chat Image Downloads] Allow users to save their own sent images through the existing Save and Save As actions, including clipboard screenshots retained in app data. Saving an own image must use its local source or verified preview bytes rather than request a transfer from oneself.
@@ -205,7 +207,7 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 - `[Chat]` **Composer and Emoji Picker Refinement**: The chat composer must be a stable, modular WYSIWYG editor: formatting and selected-pack emoji artwork appear directly in the editable message, with a floating formatting toolbar on text selection and no separate preview pane. Message emoji glyphs must stay aligned to text size. The emoji picker must use standard icons for category anchors, allow a thin-scroll navigation strip, and present one continuous category-sectioned scroll list. In conversation settings, limit the emoji pack selector to three visible rows with internal scrolling and fixed-size pack previews. Avoid native title tooltips on the composer and emoji-menu button.
 - `[Chat]` **Emoji and Message UX**: Emoji pack choices must use genuine, independently sourced artwork; do not offer a pixelated recolor of another pack as a retro set. The message composer must preview the selected emoji pack, sent messages must allow mouse selection and copying, and message rendering must support simple Markdown, fenced code blocks, and safe clickable links.
 - `[Workflow]` **Central Agent Rule**: `.agents/rules/agent-persistence.md` is the primary, always-on workspace rule. Read and follow the entire file at the start of every task, then consult this knowledge base and applicable skills. Keep its persistent-memory directive active: record new user preferences and architectural choices here immediately.
-- `[Desktop]` **Tauri Is the Product Runtime**: P2Sharer is a Windows Tauri v2 desktop application, not a website. For application code or asset changes, `npm run tauri:build` and verification of the native executable and installer bundle are required before reporting validation or completion, even when no commit is requested. `npm run build` checks only TypeScript/Vite; browser-only previews do not verify native behavior. Use `npm run tauri:dev` for interactive desktop checks.
+- `[Desktop]` **Tauri Is the Product Runtime**: P2Sharer is a Windows Tauri v2 desktop application, not a website. For application code or asset changes, `pnpm run tauri:build` and verification of the native executable and installer bundle are required before reporting validation or completion, even when no commit is requested. `pnpm run build` checks only TypeScript/Vite; browser-only previews do not verify native behavior. Use `pnpm run tauri:dev` for interactive desktop checks.
 - `[Protocol]` **Dual-Channel Language Protocol**: All interactive conversational chat must mirror the user's language (e.g. Portuguese). All code, commits, pull requests, task files, documentation, and `.agents/` artifacts must be written strictly in English.
 - `[Workflow]` **No Mandatory Task Files**: Do not create task-specific Markdown files or checklists as a prerequisite for investigation or implementation. Keep durable architectural discoveries in this knowledge base.
 - `[Git]` **Conventional Commits**: Format commit messages strictly as `type(scope): subject` in English (`feat`, `fix`, `refactor`, `chore`, `docs`, `test`).
@@ -266,12 +268,16 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 5. Build, Test & Run Commands
 
-The npm Tauri commands use `tools/tauri.mjs` to find standalone or Visual Studio-bundled CMake when it is absent from PATH. The launcher preserves explicit CMAKE overrides, sets the tool environment only for its process, and retains the normal Cargo output directory. The vendored turbojpeg SIMD build also requires NASM. Direct Cargo builds need CMake on PATH or an explicit CMAKE environment variable.
-- **Development Server**: `npm run dev` (Vite on port 1420)
-- **Tauri App Dev**: `npm run tauri:dev` (runs `npm run dev` and starts Tauri window)
-- **Frontend Typecheck & Build (Web Only)**: `npm run build` (`tsc && vite build`)
+Use the pinned pnpm 10.30.1 from `package.json` (Node.js 22.14+). Install dependencies with `pnpm install --frozen-lockfile`; commit `pnpm-lock.yaml` and do not generate other package-manager lockfiles. `pnpm-workspace.yaml` registers the native Trystero core patch and permits esbuild installation scripts. Direct imports must have explicit dependencies: MQTT is a runtime dependency, while esbuild and Trystero core are development dependencies used by tests. Do not rely on incidental dependency hoisting. Pass script arguments directly after the script name (for example, `pnpm run tauri:dev --release --no-watch`); do not insert the extra argument separator used by the previous package manager. Use `pnpm patch @trystero-p2p/core@0.25.3` and `pnpm patch-commit <directory>` to maintain the patch; do not restore the former postinstall patching tool.
+
+Migration validation on October 3, 2026: frozen-lockfile installation passed; all 454 frontend unit tests passed; `pnpm run tauri:build` produced the Windows executable and both MSI/NSIS installers in the default release directory. Existing direct dependency versions and Trystero patch behavior were preserved.
+
+The pnpm Tauri commands use `tools/tauri.mjs` to find standalone or Visual Studio-bundled CMake when it is absent from PATH. The launcher preserves explicit CMAKE overrides, sets the tool environment only for its process, and retains the normal Cargo output directory. The vendored turbojpeg SIMD build also requires NASM. Direct Cargo builds need CMake on PATH or an explicit CMAKE environment variable.
+- **Development Server**: `pnpm run dev` (Vite on port 1420)
+- **Tauri App Dev**: `pnpm run tauri:dev` (runs `pnpm run dev` and starts Tauri window)
+- **Frontend Typecheck & Build (Web Only)**: `pnpm run build` (`tsc && vite build`)
 - **Native JPEG Build Tools**: CMake, MSVC C/C++ tools, and NASM on PATH are required for statically linked libjpeg-turbo with SIMD. Recipients running the executable do not need these build tools.
-- **Full Production Desktop Build (Frontend + Rust Native Bundle)**: `npm run tauri:build` (invokes `beforeBuildCommand: "npm run build"`, compiles Rust in release mode, and outputs `p2sharer.exe` and bundles to `src-tauri/target/release/bundle/`)
-- **Frontend Unit & Adversarial Tests**: `node --experimental-strip-types --test test/unit/*.test.ts` (230+ tests across 22 suites)
+- **Full Production Desktop Build (Frontend + Rust Native Bundle)**: `pnpm run tauri:build` (invokes `beforeBuildCommand: "pnpm run build"`, compiles Rust in release mode, and outputs `p2sharer.exe` and bundles to `src-tauri/target/release/bundle/`)
+- **Frontend Unit & Adversarial Tests**: `pnpm exec node --experimental-strip-types --test test/unit/*.test.ts test/unit/*.test.mjs`
 - **Backend Rust Tests**: `cargo test` inside `src-tauri/` (44+ tests)
 - **Cargo Compilation Check**: `cargo check` inside `src-tauri/`
