@@ -11,6 +11,7 @@ P2Sharer is a Windows desktop application built with Tauri v2. The React/Vite fr
 - For code or asset changes intended for the application, run `npm run tauri:build` before reporting the work as validated or complete. This command runs the frontend build through Tauri's `beforeBuildCommand`, compiles the Rust application, and creates desktop bundles.
 - `npm run build` checks only TypeScript and Vite. It does not replace `npm run tauri:build`.
 - Inspect the build result and verify the native executable and installer bundle under `src-tauri/target/release/` and `src-tauri/target/release/bundle/`.
+- Always use the default `src-tauri/target/` build directory. Never create or use alternate build directories. If the application is open or the executable is locked, present a questionnaire asking the user to close it and wait for confirmation before retrying. Do not terminate the application automatically or bypass the lock with a different Cargo target directory.
 - If the desktop build cannot finish, report the specific failure and treat native packaging as unverified.
 - Use `npm run tauri:dev` for interactive app checks when needed. Do not describe a browser-only preview as a desktop app check.
 
