@@ -88,7 +88,7 @@ export const SavedRoomsSection: React.FC = () => {
             ])}>
               <div className="saved-room-card-heading">
                 <TooltipButton tooltip="Arraste para reordenar ou use as setas do teclado"
-                  className="btn btn-outline saved-room-drag-handle"
+                  className="btn saved-room-drag-handle"
                   aria-label={`Reordenar ${room.customName ?? room.name}`}
                   disabled={rooms.length < 2} {...sortable.handleProps(room.roomId)}>
                   <GripVertical size={17} />
