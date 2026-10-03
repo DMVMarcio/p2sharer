@@ -9,7 +9,7 @@ import { roomAppsService } from '../apps/room_apps_service.ts';
 import { AudioBridge } from '../audio/audio_bridge.ts';
 import { audioContextManager } from '../audio/audio_context_manager.ts';
 import { stateStore } from '../core/state_store.ts';
-import { mergeChatHistory } from '../core/chat_history.ts';
+import { mergeChatHistory, nextChatOrder } from '../core/chat_history.ts';
 import { CHAT_FILE_CHUNK_BYTES, MAX_IMAGE_PREVIEW_BYTES } from '../core/chat_file_limits.ts';
 import { verifyRoomInvite } from '../core/room_invite_validation.ts';
 import { savedRooms } from '../core/saved_rooms.ts';
@@ -865,6 +865,7 @@ export class RoomService {
     }
     const msg: ChatMessage = {
       id: `sys_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      logicalOrder: nextChatOrder(this.chatMessages),
       sender: 'Sistema',
       text,
       timestamp: Date.now(),

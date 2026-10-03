@@ -92,6 +92,7 @@ export interface ChatMessage {
   text: string;
   file?: { name: string; size: number; sha256: string; isImage: boolean };
   timestamp: number;
+  logicalOrder?: number;
   authorId?: string;
   authorKey?: string;
   signature?: string;

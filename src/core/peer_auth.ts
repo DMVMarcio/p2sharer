@@ -1,4 +1,5 @@
 import type { ChatMessage } from './types.ts';
+import { hasSafeChatOrder } from './chat_history.ts';
 import { createRoomIdentity, hexToBytes, type RoomIdentity } from './room_invite.ts';
 
 const encoder = new TextEncoder();
@@ -6,7 +7,7 @@ const hex = (bytes: Uint8Array): string => Array.from(bytes, (byte) => byte.toSt
 const unhex = (value: string): Uint8Array => Uint8Array.from(value.match(/../g) ?? [], (byte) => Number.parseInt(byte, 16));
 
 function signedChatData(roomId: string, message: ChatMessage): Uint8Array {
-  return encoder.encode(JSON.stringify([
+  const fields: unknown[] = [
     'p2sharer-chat-v1', roomId.toLowerCase(), message.id, message.authorId,
     message.sender, message.text, message.timestamp, message.revision ?? 0,
     message.file ? [message.file.name, message.file.size, message.file.sha256, message.file.isImage] : null,
@@ -14,7 +15,10 @@ function signedChatData(roomId: string, message: ChatMessage): Uint8Array {
     message.replyTo ? [message.replyTo.id, message.replyTo.sender, message.replyTo.text] : null,
     Boolean(message.isHost), Boolean(message.isSystem), message.systemType ?? null,
     message.systemActor ?? null, message.systemRoom ?? null, message.systemAppKind ?? null,
-  ]));
+  ];
+  // Bind the sequence when present while retaining existing signed history.
+  if (message.logicalOrder !== undefined) fields.push(message.logicalOrder);
+  return encoder.encode(JSON.stringify(fields));
 }
 
 type SignedChatMessage = ChatMessage & Required<Pick<ChatMessage, 'authorId' | 'authorKey' | 'signature'>>;
@@ -35,6 +39,7 @@ function hasSafeChatShape(value: unknown): value is SignedChatMessage {
       typeof message.file.isImage === 'boolean' &&
       (!message.file.isImage || /\.(png|jpe?g|gif|webp|bmp)$/i.test(message.file.name)))) &&
     Number.isFinite(message.timestamp) &&
+    hasSafeChatOrder(message.logicalOrder) &&
     Number.isInteger(message.revision) && (message.revision ?? -1) >= 0 && (message.revision ?? 0) <= 100000 &&
     (message.editedAt === undefined || Number.isFinite(message.editedAt)) &&
     (message.deletedAt === undefined || Number.isFinite(message.deletedAt)) &&

@@ -22,6 +22,8 @@ The current administrator flow must not be considered a globally fresh revocatio
 
 ## Action policy
 
+Chat messages carry a signed `logicalOrder` independent of the displayed wall-clock timestamp. Each new local message reserves one more than the largest retained or locally reserved sequence before asynchronous signing, including file offers and system notices. Authenticated live messages and synchronized history contribute to the next sequence. Concurrent messages at the same sequence use code-unit ID ordering so every peer converges independently of locale or delivery order. Edits and deletions must retain both original ordering fields. Existing history without a sequence retains timestamp ordering ahead of sequenced messages. This provides causal ordering for observed messages, not proof of real-world chronology for concurrent or disconnected senders; displayed timestamps are not synchronized.
+
 | Channel | Receiver authorization |
 | --- | --- |
 | `peer_identity` | Fresh challenge and P-256 signature bind a key to the direct `meta.peerId`. |

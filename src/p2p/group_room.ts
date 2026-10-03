@@ -4,7 +4,7 @@ import { selfId } from '@trystero-p2p/core';
 import { invoke } from '@tauri-apps/api/core';
 import type { AppWireEvent } from '../apps/types.ts';
 import { getRoomApp } from '../apps/registry.ts';
-import { chatHistoryChanged, chatRevision, chatRevisionKey, mergeChatHistory } from '../core/chat_history.ts';
+import { chatHistoryChanged, chatRevision, chatRevisionKey, mergeChatHistory, nextChatOrder } from '../core/chat_history.ts';
 import { CHAT_FILE_CHUNK_BYTES, CHAT_FILE_IN_FLIGHT_CHUNKS, MAX_IMAGE_PREVIEW_BYTES } from '../core/chat_file_limits.ts';
 import { decodeFileBase64, decodeSignedFileChunk, encodeFileBase64, encodeSignedFileChunk,
   fileChunkSignatureData, hashFileChunk } from '../core/chat_file_wire.ts';
@@ -154,6 +154,7 @@ export class GroupRoomManager {
   private peerTracker = new PeerTracker();
   private remoteStreams: Map<string, MediaStream> = new Map(); // peerId -> stream
   private chatHistory: ChatMessage[] = [];
+  private reservedChatOrder = 0;
   private fileSources = new Map<string, { file: NativeChatFile; autoAcceptUntil: number }>();
   private fileSessions = new Map<string, FileSession>();
   private pendingFileRequests = new Map<string, FileRequest>();
@@ -2973,6 +2974,10 @@ export class GroupRoomManager {
 
   private async publishChatMessage(msg: ChatMessage): Promise<ChatMessage> {
     if (!this.chatAuth) throw new Error('Chat identity is not ready');
+    if (chatRevision(msg) === 0) {
+      this.reservedChatOrder = nextChatOrder(this.chatHistory, this.reservedChatOrder);
+      msg = { ...msg, logicalOrder: this.reservedChatOrder };
+    }
     const signed = await this.chatAuth.sign(msg);
     this.seenChatRevisions.add(chatRevisionKey(signed));
     this.chatHistory = mergeChatHistory(this.chatHistory, [signed]);
@@ -3151,6 +3156,7 @@ export class GroupRoomManager {
     this.localStatsCache = null;
     this.initialJoinComplete = false;
     this.chatHistory = [];
+    this.reservedChatOrder = 0;
     this.fileSources.clear();
     await Promise.allSettled([...this.fileSessions].filter(([, session]) =>
       session.direction === 'receive' && !session.preview).map(([id]) =>
