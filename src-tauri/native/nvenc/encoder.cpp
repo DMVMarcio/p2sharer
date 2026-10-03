@@ -30,6 +30,20 @@ bool check(NVENCSTATUS status, const char* stage, char* error, size_t size) {
     return false;
 }
 #define NV_CHECK(call, stage) if (!check(call, stage, error, size)) return false
+void rate_control(NV_ENC_CONFIG& config, uint32_t bitrate, uint32_t fps) {
+    config.rcParams.rateControlMode = NV_ENC_PARAMS_RC_CBR;
+    // The caller's budget also paces RTP/SRTP headers. Encoding at that whole
+    // rate accumulates queue delay and creates repeated recovery-keyframe loops.
+    // At low bitrates, partial RTP packets and Windows timer/I/O variance cost
+    // proportionally more than full-size header overhead alone.
+    const uint32_t payload_bitrate = static_cast<uint32_t>(static_cast<uint64_t>(bitrate) * 80 / 100);
+    config.rcParams.averageBitRate = payload_bitrate; config.rcParams.maxBitRate = payload_bitrate;
+    // Allow detailed recovery pictures an 80 ms bit reservoir without delaying
+    // input frames. This remains below the native RTP frame's 120 ms deadline.
+    const uint32_t reservoir = static_cast<uint32_t>(static_cast<uint64_t>(payload_bitrate) * 80 / 1000);
+    config.rcParams.vbvBufferSize = reservoir > payload_bitrate / fps ? reservoir : payload_bitrate / fps;
+    config.rcParams.vbvInitialDelay = config.rcParams.vbvBufferSize;
+}
 bool load(Encoder* encoder, char* error, size_t size) {
 #ifdef _WIN64
     const auto name = L"nvEncodeAPI64.dll";
@@ -87,10 +101,10 @@ bool initialize(Encoder* encoder, ID3D11Device* device, uint32_t w, uint32_t h,
         NV_ENC_TUNING_INFO_ULTRA_LOW_LATENCY, &preset), "Query low-latency preset");
     auto config = preset.presetCfg;
     config.profileGUID = NV_ENC_H264_PROFILE_BASELINE_GUID;
-    config.gopLength = fps * 2; config.frameIntervalP = 1;
-    config.rcParams.rateControlMode = NV_ENC_PARAMS_RC_CBR;
-    config.rcParams.averageBitRate = bitrate; config.rcParams.maxBitRate = bitrate;
-    config.rcParams.vbvBufferSize = bitrate / fps; config.rcParams.vbvInitialDelay = config.rcParams.vbvBufferSize;
+    // WebRTC requests recovery IDRs explicitly; periodic full-picture refreshes
+    // unnecessarily destroy the fine detail accumulated by delta pictures.
+    config.gopLength = NVENC_INFINITE_GOPLENGTH; config.frameIntervalP = 1;
+    rate_control(config, bitrate, fps);
     config.rcParams.enableLookahead = 0;
     config.encodeCodecConfig.h264Config.idrPeriod = config.gopLength;
     config.encodeCodecConfig.h264Config.repeatSPSPPS = 1;
@@ -177,12 +191,12 @@ extern "C" int p2_nvenc_encode(void* handle, void* texture, uint64_t timestamp, 
 extern "C" int p2_nvenc_bitrate(void* handle, uint32_t bitrate, char* error, size_t size) noexcept {
     auto encoder = static_cast<Encoder*>(handle);
     auto config = encoder->config;
-    config.rcParams.averageBitRate = bitrate; config.rcParams.maxBitRate = bitrate;
-    config.rcParams.vbvBufferSize = bitrate / encoder->init.frameRateNum;
-    config.rcParams.vbvInitialDelay = config.rcParams.vbvBufferSize;
+    rate_control(config, bitrate, encoder->init.frameRateNum);
     NV_ENC_RECONFIGURE_PARAMS params{}; params.version = NV_ENC_RECONFIGURE_PARAMS_VER;
     params.reInitEncodeParams = encoder->init; params.reInitEncodeParams.encodeConfig = &config;
-    params.resetEncoder = 1; params.forceIDR = 1;
+    // Bitrate-only adaptation keeps prediction and rate-control history. Geometry
+    // changes recreate the session; genuine decoder recovery still forces an IDR.
+    params.resetEncoder = 0; params.forceIDR = 0;
     if (!check(encoder->api.nvEncReconfigureEncoder(encoder->session, &params), "Update H264 bitrate", error, size)) return 0;
     encoder->config = config;
     return 1;

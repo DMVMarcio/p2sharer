@@ -235,3 +235,31 @@ silent samples and fail sustained gaps of 150 ms or more; this detects playback
 loss, not individual dropped audio packets or audible fidelity. Repeat with the
 sender's `P2SHARER_NATIVE_NVENC` set to `0` and `1`. This does not establish Internet
 performance or WASAPI fidelity because the diagnostic tone is synthetic.
+
+### NVENC detail pulses and bitrate reconfiguration
+
+The native opt-in test `hardware_bitrate_edits_preserve_prediction_and_quality_fixture`
+encodes 361 identical detailed 720p GPU textures at 60 FPS, changes the wire budget
+8 -> 6.4 -> 8 Mbps at frames 180/240, and requests IDRs at frames 90/270. It asserts
+that only startup and those explicit requests produce keys. Set
+`P2SHARER_TEST_NVENC=1` and optionally `P2SHARER_NVENC_QUALITY_DIR` to an ignored
+directory under `src-tauri/target` before running release native tests. The latter
+exports length-prefixed `P2NV` packets and their reference RGBA texture.
+
+Bundle `nvenc_quality.ts` into packaged WebView2 and pass the fixture's base64 bytes
+to `measureNvencDetail(base64, true)`. It uses the actual local preview decoder,
+checks every frame's dimensions, samples grayscale reconstruction PSNR, and rejects
+unexpected keys or a >0.5 dB quality drop at either bitrate-only change. For baseline
+comparisons with the old encoder use `validate=false`. This synthetic, static
+detail measurement is not a game-fidelity or Internet benchmark. Requested IDRs
+can still lose detail under a constrained bitrate.
+
+`runNativeRtpLoopback({detail:true,peers:2,lifecycle:true})` adds dense small text to
+the live WGC scene and exercises the real native pacing, receiver keyframe requests,
+bitrate decrease, independent sources, restart and fallback. Inspect sender gap/key
+counters during startup and bitrate adaptation, not only nonblack video or average
+FPS; an encoder saturating the wire budget can repeatedly recover while still
+averaging a plausible frame rate.
+The detail mode rejects repeated recovery keys/gaps or a collapse in sent-frame
+progress after the 800 kbps reduction. Failure diagnostics retain recent encoded
+packet sizes and key flags, distinguishing an encoder burst from geometry changes.

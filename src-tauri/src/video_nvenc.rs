@@ -113,6 +113,43 @@ mod tests {
         }
     }
     #[test]
+    fn hardware_bitrate_edits_preserve_prediction_and_quality_fixture() {
+        if std::env::var("P2SHARER_TEST_NVENC").as_deref() != Ok("1") { return; }
+        use std::io::Write;
+        let directory = std::env::var("P2SHARER_NVENC_QUALITY_DIR").ok().map(std::path::PathBuf::from);
+        if let Some(directory) = &directory { std::fs::create_dir_all(directory).unwrap(); }
+        let (device, _) = windows_capture::d3d11::create_d3d_device().unwrap();
+        let (width, height, fps) = (1280u32, 720u32, 60u32);
+        let mut pixels = Vec::with_capacity((width * height * 4) as usize);
+        for y in 0..height { for x in 0..width {
+            let ink = x % 13 == 0 || y % 19 == 0 ||
+                (x % 13 >= 3 && x % 13 < 10 && y % 19 >= 5 && y % 19 < 14 && (x + y) % 7 < 2);
+            let value = if ink { 24u8 } else { 224u8 };
+            pixels.extend_from_slice(&[value, value, value, 255]);
+        } }
+        if let Some(directory) = &directory { std::fs::write(directory.join("reference.rgba"), &pixels).unwrap(); }
+        let desc = D3D11_TEXTURE2D_DESC { Width: width, Height: height, MipLevels: 1, ArraySize: 1,
+            Format: DXGI_FORMAT_R8G8B8A8_UNORM, SampleDesc: DXGI_SAMPLE_DESC { Count: 1, Quality: 0 },
+            Usage: D3D11_USAGE_DEFAULT, ..Default::default() };
+        let data = D3D11_SUBRESOURCE_DATA { pSysMem: pixels.as_ptr().cast(), SysMemPitch: width * 4, SysMemSlicePitch: 0 };
+        let mut source = None;
+        unsafe { device.CreateTexture2D(&desc, Some(&data), Some(&mut source)).unwrap(); }
+        let source = source.unwrap();
+        let mut output = directory.as_ref().map(|directory| std::fs::File::create(directory.join("detail.p2nv")).unwrap());
+        let mut encoder = GpuEncoder::default();
+        let start = std::time::Instant::now();
+        for index in 0..361u64 {
+            // Stable, detailed pixels isolate quality pulses from resizing or real source motion.
+            // Budget-only edits and requested IDRs are deliberately independent.
+            let bitrate = if index < 180 { 8_000_000 } else if index < 240 { 6_400_000 } else { 8_000_000 };
+            let forced = index == 90 || index == 270;
+            let packet = encoder.encode(&device, &source, width, height, fps, bitrate, index * 1_000_000 / u64::from(fps), forced).unwrap();
+            assert_eq!(packet[5] != 0, index == 0 || forced, "Bitrate-only changes and elapsed GOP time must not force IDRs at frame {index}");
+            if let Some(output) = &mut output { output.write_all(&(packet.len() as u32).to_le_bytes()).unwrap(); output.write_all(&packet).unwrap(); }
+        }
+        println!("Detailed NVENC 720p sequence: {} ms / 361 frames", start.elapsed().as_millis());
+    }
+    #[test]
     fn software_capture_device_returns_an_error_instead_of_assuming_vendor_support() {
         use windows_capture_api::Win32::Graphics::Direct3D::D3D_DRIVER_TYPE_WARP;
         let mut device = None;
