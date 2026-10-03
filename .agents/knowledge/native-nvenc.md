@@ -1,11 +1,21 @@
-# Optional native NVENC encoding
+# Native NVENC encoding
 
 ## Current scope
 
-The native WGC handler has an experimental GPU-texture H264 encoder. Enable it only
-with `P2SHARER_NATIVE_NVENC=1` before launching a fresh desktop process. The default
-remains the optimized generic WGC/JPEG bridge. This is a deliberate rollout decision,
-not a user preference to permanently disable hardware encoding.
+The native WGC handler defaults to automatic GPU-texture H264 encoding. Transmission
+settings offer Automatic, Generic, and NVIDIA NVENC only after a real D3D11 encoder
+session/preset/resource probe succeeds. The short probe runs off the command thread
+and releases its hardware session immediately. Each actual capture still validates
+its own device, dimensions and driver resources and falls back to generic on failure.
+AMD encoding is not implemented or advertised yet.
+
+`p2sharer_video_encoder` persists the preference. Unknown values or unavailable
+explicit NVENC selections recover to Automatic (and generic when native encoding
+cannot run). Settings Save applies to future screen/window captures, including source
+restarts, without an application restart; existing captures remain intact. Cameras
+keep their established path. `P2SHARER_NATIVE_NVENC=0` is a diagnostic override for
+Automatic; `=1` remains accepted. Explicit Generic overrides that flag, and explicit
+NVENC overrides the automatic diagnostic disable.
 
 The published path is WGC -> GPU area scaler -> NVENC -> native H264 RTP
 packetization/pacing -> DTLS-SRTP -> the viewer's ordinary WebRTC video track.
@@ -21,8 +31,8 @@ local UI track. A WeakMap registers only live local capture tracks and their cap
 generation tokens. Cameras, unsupported capture devices and generic captures retain
 the established browser WebRTC path. Native negotiation/encoding/transport rejection
 also selects that path for the affected viewer without opening a browser picker.
-The experimental flag is still required; this does not silently enable native RTP
-on every NVIDIA installation.
+Automatic enables native RTP on supported captures; failed native negotiation retains
+the existing generic fallback.
 
 Audio retains the original Trystero connection and its filters. Its per-track
 metadata callback and native video callback merge tracks into the same advertised
@@ -66,7 +76,10 @@ provide RTCP reports and NACK response. Actual PLI/FIR requests reach the captur
 keyframe flag, with a 250 ms request cooldown. Tokens isolate restarted capture
 generations; old routes cannot change a replacement capture's budget or encoder.
 
-Native rate control starts at min(user limit, 2 Mbps), reduces by 20% for >=5% loss
+Native rate control starts with a 2 Mbps 720p/60 reference scaled by actual encoded
+pixel count and effective FPS, clamped to 2-8 Mbps and capped by the user's limit
+(1080p/60 starts at 4.5 Mbps). Unknown dimensions retain the 2 Mbps reference. It
+reduces by 20% for >=5% loss
 or elevated RTT (over baseline +100 ms and 1.5x baseline), and increases by 20% every
 two healthy seconds, bounded by the user limit. It uses receiver reports; it is not
 Chromium GCC/TWCC bandwidth estimation. Advertising REMB without the corresponding
@@ -106,8 +119,11 @@ NVENC. Old generation tokens cannot disable or request keys from a replacement.
 `P2NV` v1 packets carry key flag, actual dimensions, sequence and native microsecond
 timestamp followed by Annex B. The parser rejects invalid size/version/geometry and
 unsafe timestamps. Queues that drop dependent H264 frames trigger an IDR request.
-The decoder caps pending input at eight frames, discards old pending work on recovery,
-uses a 1.5-second failure timeout and closes frames/pending work on stop/fallback.
+The decoder caps submitted input at eight pictures and retains at most eight more
+compressed packets in FIFO order during WebView event-loop bursts. Valid prediction
+is preserved until that bounded capacity is exceeded or a real sequence/geometry
+change needs recovery. IDR requests are coalesced with a 250 ms cooldown. A 1.5-second
+failure timeout remains; stop/fallback rejects both submitted and queued work.
 Asynchronous submission is necessary: waiting for output after every input stalled
 the first hardware decode. Repeated cached packets are not decoded twice.
 
@@ -196,7 +212,9 @@ and installers, and repeat changed-path desktop checks before completing edits.
 Physical high-refresh/VRR/4K, older NVIDIA/drivers, AMD/Intel, constrained Internet
 media routes, controlled packet loss, heavy games, end-to-end latency/CPU comparisons,
 quantitative text/game fidelity and audio/video synchronization remain unverified.
-Keep the rollout experimental while those deployment conditions are evaluated.
+This earlier experimental rollout was superseded by the user-approved Automatic
+default after the preview regressions below were corrected. The deployment limits
+above still apply; automatic per-capture/viewer fallback remains required.
 
 Primary references: [webrtc-rs source](https://github.com/webrtc-rs/webrtc),
 [NVIDIA NVENC guide](https://docs.nvidia.com/video-technologies/video-codec-sdk/13.1/nvenc-video-encoder-api-prog-guide/index.html),
@@ -253,3 +271,86 @@ and deliberate generic fallback; 1399/1399 and 1834/1834 encoded slices matched.
 The final fixture decoded all 361 frames at 1280x720 with the expected three keys.
 Tauri release executable, MSI and NSIS packaging succeeded. These are local-machine
 diagnostics, not impaired Internet, other GPU/driver, or heavy-game validation.
+
+## Solo 1080p preview recovery bursts (2026-10-03)
+
+User reproduction: 1080p/60 at 15 Mbps, no viewers, animated wallpaper and static
+chat/VS Code. A real packaged local-only capture reproduced five unnecessary IDRs
+during three controlled 200 ms UI interruptions despite zero sequence gaps, zero
+native queue drops and unchanged 1080p/60 dimensions. The main-thread WebCodecs
+wrapper discarded its prediction state when intact queued WS packets filled its
+eight submitted-frame limit. The FIFO compressed backlog above reduced this
+specific reproduction to zero new IDRs under the same interruptions. This establishes
+an actual local cause beyond the prior bitrate/GOP changes; it does not identify
+every possible desktop/game/driver quality fluctuation.
+
+The native delivery pacer also used its JPEG latest-image eviction policy for
+H264 reference pictures. It now retains admitted dependent pictures in FIFO order
+and skips source pixels before NVENC advances prediction when its two-slot queue
+is full. Deterministic short-stall tests prove the order and capacity bound;
+real-driver 1080p moving-detail fixtures include three roughly 50 ms delivery pauses,
+with no discarded encoded references or extra IDRs. Generic JPEG pacing is unchanged.
+
+The independent 601-frame motion fixture at 15 Mbps had no >4 dB one-frame drops in
+its stationary text ROI even before these fixes (mean delta PSNR about 44.46 dB).
+Do not blame rate control or change presets based on the symptom alone. The dense
+text ROI is a synthetic fidelity measurement, not the user's exact wallpaper/game.
+
+The same 1080p dense-text diagnostic also exposed native sender startup selecting
+generic fallback for both routes with the fixed 2 Mbps probe. Scaling the probe to
+actual geometry/FPS (4.5 Mbps at 1080p/60) prevented this failure while preserving the
+user ceiling and normal RTCP loss/RTT adaptation. Two local receivers then retained
+1080p at about 59.97 FPS with zero decoder drops during a ten-second sample, no new
+dependency gaps or IDRs, and a cap growing from 9.331 to the selected 15 Mbps.
+A repeat with three 200 ms UI interruptions also retained roughly 60 FPS, zero new
+IDRs or gaps after warmup, and matching native/depacketized encoded slices
+(1171/1171 and 1483/1483). Startup can still need genuine recovery; these counts do
+not claim a loss-free handshake or prove constrained Internet behavior.
+
+Final packaged solo preview stress sent 901 fresh pictures in the 15-second sample
+with zero additional keys/gaps and no native load/resolution adjustment. Decoding
+the real motion/delivery fixtures in final WebView2 produced 601/593 pictures at
+1080p, only the initial key, no >4 dB one-frame text drops, and mean delta PSNR
+44.46/44.45 dB. Release native tests pass 56 cases with two external/manual cases
+ignored and real NVENC enabled; frontend tests pass 486 cases. A broader frontend
+run initially failed its Cargo-check case due to missing CMake in that shell; using
+the existing bundled CMake path resolved it. Tauri executable/MSI/NSIS packaging
+succeeded. Other driver/device, physical high-refresh and heavy-game conditions
+still require measurement.
+
+The final 720p lifecycle regression also passed four real receiver key requests,
+four route restarts, targeted stop retaining an independent 640x360/30 source, and
+deliberate generic fallback (1528/1528 matching slices). A sharp 7.166 Mbps -> 800
+kbps cut needed one genuine IDR and skipped eight dependent pictures while waiting
+for it; the next two-second settled sample sent 120/121 pictures with no further
+keys/gaps. The benchmark now measures that separate settled window. Its previous
+three-gap threshold incorrectly treated skipped waiting pictures as repeated
+recovery events even though keys advanced only once; do not silently reinterpret
+`gaps` as a count of loss episodes.
+
+
+## Automatic default and settings rollout (2026-10-03)
+
+Settings > Transmission retains resolution/FPS/bitrate/quality outside local tabs.
+Pointing and Drawing contains consent switches and drawing capacity; Advanced contains
+cursor capture and the canonical encoder Select. Draft values persist across tab
+changes; arrow/Home/End navigation moves tab focus. No app restart is needed: Save
+changes future screen/window captures while existing captures retain their encoder.
+
+Validation: 487 frontend tests, 57 native release tests (two external/manual cases
+ignored), including actual NVENC hardware tests. Full `npm run tauri:build` produced
+and verified the executable, MSI and NSIS bundles. Packaged WebView2 QA with the
+legacy NVENC environment flag absent verified the real capability probe, automatic
+NVENC, explicit Generic, explicit NVIDIA NVENC, option filtering, tab keyboard focus,
+draft retention and uninterrupted active capture through Settings Save. Automatic
+produced 27 native images before Save and 64 afterward; the subsequent Generic
+capture produced 27 images and zero NVENC images/fallbacks; explicit NVENC produced
+27 native images. Stale/unrecognized preference repair and missing-NVENC handling
+were exercised by unit tests, not physical AMD/Intel or GPU replacement tests.
+
+A packaged native RTP loopback with two local receivers at 1920x1080/60 and 15 Mbps,
+without the old opt-in flag, decoded about 60 FPS for both with zero decoder drops,
+zero capture load adjustments/fallbacks and 892/892 matching encoded NAL slices.
+The observed local packet stream had one initial IDR and zero sequence gaps.
+A desktop screenshot confirmed the Advanced panel layout. Internet, other hardware
+and physical high-refresh limitations recorded above remain unverified.

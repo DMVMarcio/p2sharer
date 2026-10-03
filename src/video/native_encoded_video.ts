@@ -27,17 +27,21 @@ export function parseNativeEncodedPacket(buffer: ArrayBuffer): NativeEncodedPack
 export class NativeEncodedDecoder {
   private decoder: VideoDecoder | null = null;
   private pending = new Map<number, { resolve: (frame: VideoFrame | null) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>();
+  private queued: Array<{ buffer: ArrayBuffer; sequence: number; resolve: (frame: VideoFrame | null) => void; reject: (error: Error) => void }> = [];
   private sequence: number | null = null;
   private geometry = '';
   private waitingForKey = true;
   private closed = false;
   private requestingKey = false;
+  private lastKeyRequest = -Infinity;
   private sessionId: string;
   private feedbackToken: string;
   constructor(sessionId: string, feedbackToken: string) { this.sessionId = sessionId; this.feedbackToken = feedbackToken; }
 
   private requestKey(): void {
-    if (this.requestingKey || this.closed) return;
+    const now = performance.now();
+    if (this.requestingKey || this.closed || now - this.lastKeyRequest < 250) return;
+    this.lastKeyRequest = now;
     this.requestingKey = true;
     void invoke('control_capture_encoder', { sessionId: this.sessionId, feedbackToken: this.feedbackToken, disable: false })
       .catch(() => {}).finally(() => { this.requestingKey = false; });
@@ -46,6 +50,8 @@ export class NativeEncodedDecoder {
   private rejectPending(error: Error): void {
     for (const pending of this.pending.values()) { clearTimeout(pending.timer); pending.reject(error); }
     this.pending.clear();
+    for (const queued of this.queued) queued.reject(error);
+    this.queued = [];
   }
 
   private discardPending(): void {
@@ -54,6 +60,34 @@ export class NativeEncodedDecoder {
   }
 
   public async decode(buffer: ArrayBuffer): Promise<VideoFrame | null> {
+    if (this.closed) return null;
+    const packet = parseNativeEncodedPacket(buffer);
+    if (packet.sequence === (this.queued.length ? this.queued[this.queued.length - 1].sequence : this.sequence)) return null;
+    // WebView UI stalls deliver intact WS pictures in a burst. Keep at most eight
+    // compressed inputs behind the eight submitted pictures instead of destroying
+    // valid prediction state. Presentation can discard decoded pictures safely.
+    if (this.pending.size >= 8 || this.queued.length) {
+      if (this.queued.length >= 8) {
+        this.discardPending();
+        for (const queued of this.queued) queued.resolve(null);
+        this.queued = [];
+        this.waitingForKey = true;
+        this.requestKey();
+        return null;
+      }
+      return new Promise((resolve, reject) => this.queued.push({ buffer, sequence: packet.sequence, resolve, reject }));
+    }
+    return this.decodePacket(buffer);
+  }
+
+  private drainQueued(): void {
+    while (!this.closed && this.pending.size < 8 && this.queued.length) {
+      const queued = this.queued.shift()!;
+      void this.decodePacket(queued.buffer).then(queued.resolve, queued.reject);
+    }
+  }
+
+  private async decodePacket(buffer: ArrayBuffer): Promise<VideoFrame | null> {
     if (this.closed) return null;
     const packet = parseNativeEncodedPacket(buffer);
     // A cached JPEG-style refresh is repetition, not another dependent H264 frame.
@@ -75,6 +109,7 @@ export class NativeEncodedDecoder {
           const pending = this.pending.get(frame.timestamp); this.pending.delete(frame.timestamp);
           if (!pending || this.closed) { frame.close(); return; }
           clearTimeout(pending.timer); pending.resolve(frame);
+          this.drainQueued();
         },
         error: error => this.rejectPending(error),
       });

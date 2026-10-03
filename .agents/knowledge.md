@@ -32,7 +32,7 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 ## 3. Subsystem Architectural Deep Dives
 - [P2P Networking, Signaling Failover & WebRTC Mesh](.agents/knowledge/p2p-architecture.md)
 - [Native Media Pipeline: Audio Loopback, Video Capture & Web Bridges](.agents/knowledge/native-media-pipeline.md)
-- [Optional Native NVENC Encoding, Validation and Transport Limits](.agents/knowledge/native-nvenc.md)
+- [Native NVENC Encoding, Settings, Validation and Transport Limits](.agents/knowledge/native-nvenc.md)
 - [Frontend Architecture, Keyed DOM Reconciliation & State Management](.agents/knowledge/frontend-ui-state.md)
 - [Multiple Screen/Camera Sessions and Viewer Compositions](.agents/knowledge/multiple-media-streams.md)
 - [P2P Message Authorization and Threat Model](.agents/knowledge/peer-security.md)
@@ -42,6 +42,12 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 ---
 
 ## 4. User Guidelines & Expressed Preferences
+
+- [Transmission Settings Layout] Keep Advanced first and selected by default in the local Transmission tabs; give rows visible spacing in both panels. Remove the explanatory paragraph below the video encoder and label the generic option "Genérico (Padrão)" while retaining Automatic as the actual encoder default.
+
+- [Encoder Settings] Default to automatic native NVENC when usable, retain a generic choice, list only implemented and detected hardware backends, and recover stale selections after GPU changes. Apply encoder changes to future captures without restarting the app when possible. Split only the Transmission toggle area into pointing/drawing and advanced sub-tabs; cursor capture and encoder selection belong to advanced. Show a Save-time restart dialog only for settings that truly require an application restart.
+
+- `[NVENC Preview Regression]` Validate the reported one-frame quality flashes at 1920x1080, 60 FPS and 15 Mbps, including local preview with no viewers. The user sees them on an animated desktop wallpaper and static chat/VS Code content; 720p receiver counters alone do not validate this issue. Preserve reference-dependent encoded frames and measure decoded quality, not only dimensions/FPS.
 
 - `[Native Encoded Publication]` On 2026-10-02 the user authorized completing native NVENC-to-WebRTC publication to remove full-resolution browser re-encoding. An NVENC/decode/browser-encode bridge is an intermediate implementation, not completion of this stage. Preserve native selection and generic compatibility, validate actual receiver decoding and transport recovery, and explain remaining hardware/network validation limits.
 

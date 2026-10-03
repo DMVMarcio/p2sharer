@@ -3717,6 +3717,10 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   width: 100%;
 }
 
+.settings-row.settings-options-panel {
+  gap: 12px;
+}
+
 .settings-row-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

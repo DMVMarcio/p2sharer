@@ -22,6 +22,16 @@ pub fn probe() -> Result<(), String> {
     if unsafe { p2_nvenc_probe(error.as_mut_ptr(), error.len()) } == 1 { Ok(()) }
     else { Err(message(&error)) }
 }
+/// Validate the same D3D11 device and H264 preset used by WGC, then release the slot.
+pub fn probe_session() -> Result<(), String> {
+    probe()?;
+    let (device, _) = windows_capture::d3d11::create_d3d_device().map_err(|error| error.to_string())?;
+    let mut error = [0; 256];
+    let handle = unsafe { p2_nvenc_create(device.as_raw(), 320, 180, 60, 2_000_000, error.as_mut_ptr(), error.len()) };
+    if handle.is_null() { return Err(message(&error)); }
+    unsafe { p2_nvenc_destroy(handle); }
+    Ok(())
+}
 struct Session { handle: NonNull<c_void>, device: ID3D11Device, width: u32, height: u32, fps: u32, bitrate: u32 }
 // The WGC handler exclusively owns this synchronous encoder and never accesses it concurrently.
 unsafe impl Send for Session {}
@@ -148,6 +158,64 @@ mod tests {
             if let Some(output) = &mut output { output.write_all(&(packet.len() as u32).to_le_bytes()).unwrap(); output.write_all(&packet).unwrap(); }
         }
         println!("Detailed NVENC 720p sequence: {} ms / 361 frames", start.elapsed().as_millis());
+    }
+    #[test]
+    fn hardware_1080p_motion_quality_fixture() {
+        motion_quality_fixture(false);
+    }
+    #[test]
+    fn hardware_1080p_delivery_stalls_preserve_the_reference_chain() {
+        motion_quality_fixture(true);
+    }
+    fn motion_quality_fixture(stalled_delivery: bool) {
+        if std::env::var("P2SHARER_TEST_NVENC").as_deref() != Ok("1") { return; }
+        use std::io::Write;
+        let directory = std::env::var("P2SHARER_NVENC_QUALITY_DIR").ok().map(std::path::PathBuf::from);
+        if let Some(directory) = &directory { std::fs::create_dir_all(directory).unwrap(); }
+        let (device, context) = windows_capture::d3d11::create_d3d_device().unwrap();
+        let (width, height, fps) = (1920u32, 1080u32, 60u32);
+        let source = texture(&device, width, height);
+        let mut pixels = vec![0u8; (width * height * 4) as usize];
+        let filename = if stalled_delivery { "delivery1080.p2nv" } else { "motion1080.p2nv" };
+        let mut output = directory.as_ref().map(|dir| std::fs::File::create(dir.join(filename)).unwrap());
+        let mut encoder = GpuEncoder::default();
+        let mut pacer = crate::video_pacer::FramePacer::<Vec<u8>>::new(fps);
+        let mut sequence = 0u32;
+        let mut admitted = 0;
+        let mut emitted = 0;
+        for index in 0..610u64 {
+            let now = (index * 1_000_000).div_ceil(u64::from(fps));
+            if stalled_delivery && ![90,91,92,180,181,182,270,271,272].contains(&index) {
+                if let Some(crate::video_pacer::PacedFrame::Fresh {frame,..}) = pacer.tick(now) {
+                    let next = u32::from_le_bytes(frame[16..20].try_into().unwrap());
+                    assert_eq!(next, sequence + 1); sequence = next; emitted += 1;
+                    assert_eq!(frame[5] != 0, emitted == 1);
+                    if let Some(output) = &mut output { output.write_all(&(frame.len() as u32).to_le_bytes()).unwrap(); output.write_all(&frame).unwrap(); }
+                }
+            }
+            if index >= 601 || stalled_delivery && !pacer.has_encode_capacity() { continue; }
+            for y in 0..height { for x in 0..width {
+                let value = if y < 192 {
+                    let ink = x % 13 == 0 || y % 19 == 0 ||
+                        (x % 13 >= 3 && x % 13 < 10 && y % 19 >= 5 && y % 19 < 14 && (x + y) % 7 < 2);
+                    if ink { 24 } else { 224 }
+                } else {
+                    // Moving spatial detail changes encoding cost while the top text stays fixed.
+                    let shifted = x + index as u32 * 11;
+                    if (shifted / 16 + y / 16) % 2 == 0 { 48 } else { 176 }
+                };
+                let offset = ((y * width + x) * 4) as usize;
+                pixels[offset..offset + 4].copy_from_slice(&[value, value, value, 255]);
+            } }
+            unsafe { context.UpdateSubresource(&source, 0, None, pixels.as_ptr().cast(), width * 4, 0); }
+            let packet = encoder.encode(&device, &source, width, height, fps, 15_000_000,
+                index * 1_000_000 / u64::from(fps), false).unwrap();
+            admitted += 1;
+            assert_eq!(packet[5] != 0, admitted == 1);
+            if stalled_delivery { assert!(pacer.enqueue_dependent(packet, now)); }
+            else if let Some(output) = &mut output { output.write_all(&(packet.len() as u32).to_le_bytes()).unwrap(); output.write_all(&packet).unwrap(); }
+        }
+        if stalled_delivery { assert_eq!(admitted, emitted); assert!(admitted < 601 && admitted > 570, "Admitted {admitted} source pictures"); assert_eq!(pacer.dropped, 0); }
     }
     #[test]
     fn software_capture_device_returns_an_error_instead_of_assuming_vendor_support() {

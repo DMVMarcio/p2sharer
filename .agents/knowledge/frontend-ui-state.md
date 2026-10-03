@@ -169,3 +169,18 @@ Virtual cursor motion is centralized in `StreamPointerGlyph` and the `.stream-po
 `allowParticipantDrawings` is persisted under `p2sharer_participant_drawings`, defaults on, and is independent of pings; both require `allowParticipantCursors`. Changes publish immediately to existing watchers, and new watchers receive permission/scene snapshots. Drawing packets validate tool, hexadecimal color, 0-10 integer size, up to 192 normalized points, and up to 160 text characters. The broadcaster retains a configurable 1-1024 drawings (default 1024), each with up to 192 points, evicting oldest instructions at capacity. The Transmission slider persists under `p2sharer_drawing_limit`. Broadcaster-owned `StreamDrawingHistory` maintains independent author undo/redo stacks, including clear operations, trims evicted drawings/history, resets redo on a new action, and clears history on watch departure or revoked consent. History button state is relayed with snapshots; Ctrl+Z/Ctrl+Y (and Ctrl+Shift+Z) are scoped to the active interactive surface and bypass text fields and active dialogs/menus. Drawings persist when a viewer leaves interactive mode, and disappear when their author clears them, stops watching/disconnects, the capture ends, or consent is revoked. Snapshots renew drawing TTLs and idle scenes publish at most every 800 ms. `drawingsIncluded=false` sends cursor-only frames that retain existing drawings; complete drawing lists travel only on geometry/history/consent changes or watcher readiness. Main viewer readiness requests a rate-limited full `sync` snapshot after the media surface mounts, and PiP readiness exports a full merged scene. Native event frames use the same distinction, Rust shares immutable drawing geometry with Arc, and memoized SVG shapes retain geometry during cursor updates. Authors can clear only their own drawings. Native overlay exclusion prevents capture recursion, so passive viewers and PiP receive the same drawings through shared snapshots.
 
 Text annotations use `StreamDrawingTextEditor`, a borderless native textarea anchored to the same normalized video bounds as the SVG scene. The toolbar has no text field. Text drafts remain local until Enter or outside click confirms one history action; Shift+Enter preserves newlines, empty drafts are discarded, and IME composition does not commit on Enter. Shared SVG text uses one tspan per line across native overlays, viewers, and PiP. Consent revocation or stream departure removes the editor without publishing.
+
+
+## Transmission settings sections
+
+Transmission defaults remain outside the local Pointing/Drawing and Advanced tabs.
+The tabs reuse `.theme-mode-pills` / `.pill-btn` with tablist/tab/tabpanel semantics,
+roving focus and arrow/Home/End navigation. Advanced appears first and opens by
+default; both panels reuse `.settings-row` with the 12 px `.settings-options-panel`
+row spacing. The encoder has no explanatory paragraph and its generic label is
+"Genérico (Padrão)"; Automatic remains the encoder default. Advanced owns cursor capture and the
+canonical encoder Select. Hardware choices require a real native encoder probe;
+Automatic and Generic remain available. `core/encoder_preferences.ts` centralizes
+validated local persistence and stale hardware selection recovery. Save applies the
+encoder to future native screen/window captures without restarting or changing
+existing sessions; cameras keep their current capture path.
