@@ -14,6 +14,7 @@ pub struct FramePacer<T> {
     next_tick_ns: Option<u64>,
     last_tick_us: Option<u64>,
     last_image_us: u64,
+    dependent: bool,
     pub dropped: u64,
     pub missed: u64,
 }
@@ -22,10 +23,11 @@ impl<T: Clone> FramePacer<T> {
     pub fn new(fps: u32) -> Self {
         Self { queue: VecDeque::with_capacity(2), latest: None,
             interval_ns: 1_000_000_000 / u64::from(fps.clamp(15, 120)), next_tick_ns: None,
-            last_tick_us: None, last_image_us: 0, dropped: 0, missed: 0 }
+            last_tick_us: None, last_image_us: 0, dependent: false, dropped: 0, missed: 0 }
     }
 
     pub fn enqueue(&mut self, frame: T, ready_us: u64) {
+        self.dependent = false;
         if self.queue.len() == 2 {
             self.queue.pop_front();
             self.dropped += 1;
@@ -33,6 +35,17 @@ impl<T: Clone> FramePacer<T> {
         self.queue.push_back((frame, ready_us));
         // One frame of initial headroom absorbs capture/processing jitter.
         if self.next_tick_ns.is_none() { self.next_tick_ns = Some(ready_us * 1000 + self.interval_ns); }
+    }
+
+    /// Reserve capacity before encoding a reference-dependent picture. Skipping
+    /// source pixels is safe; discarding an already encoded H264 reference is not.
+    pub fn has_encode_capacity(&self) -> bool { self.queue.len() < 2 }
+
+    pub fn enqueue_dependent(&mut self, frame: T, ready_us: u64) -> bool {
+        if !self.has_encode_capacity() { return false; }
+        self.enqueue(frame, ready_us);
+        self.dependent = true;
+        true
     }
 
     /// Diagnostic passthrough retains static repetition without double delivery.
@@ -67,7 +80,7 @@ impl<T: Clone> FramePacer<T> {
         self.next_tick_ns = Some(next);
         self.last_tick_us = Some(now_us);
         // Prefer the newest image after a long stall, not an obsolete backlog.
-        while self.queue.len() > 1
+        while !self.dependent && self.queue.len() > 1
             && now_us.saturating_sub(self.queue.front().unwrap().1) > self.interval_ns * 2 / 1000 {
             self.queue.pop_front();
             self.dropped += 1;
@@ -90,6 +103,21 @@ impl<T: Clone> FramePacer<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn dependent_pictures_keep_reference_order_after_a_short_delivery_stall() {
+        let mut pacer = FramePacer::new(60);
+        assert!(pacer.enqueue_dependent(1, 0));
+        assert!(pacer.enqueue_dependent(2, 16_667));
+        assert!(!pacer.has_encode_capacity());
+        assert!(!pacer.enqueue_dependent(3, 33_333));
+        // The independent JPEG policy would discard picture 1 here.
+        assert!(matches!(pacer.tick(50_000), Some(PacedFrame::Fresh {frame:1,..})));
+        assert!(pacer.has_encode_capacity());
+        assert!(pacer.enqueue_dependent(3, 50_001));
+        assert!(matches!(pacer.tick(66_667), Some(PacedFrame::Fresh {frame:2,..})));
+        assert!(matches!(pacer.tick(83_334), Some(PacedFrame::Fresh {frame:3,..})));
+        assert_eq!(pacer.dropped, 0);
+    }
     #[test]
     fn bounded_queue_preserves_short_jitter_and_discards_obsolete_frames() {
         let mut pacer = FramePacer::new(60);

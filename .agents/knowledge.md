@@ -43,6 +43,8 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 4. User Guidelines & Expressed Preferences
 
+- `[NVENC Preview Regression]` Validate the reported one-frame quality flashes at 1920x1080, 60 FPS and 15 Mbps, including local preview with no viewers. The user sees them on an animated desktop wallpaper and static chat/VS Code content; 720p receiver counters alone do not validate this issue. Preserve reference-dependent encoded frames and measure decoded quality, not only dimensions/FPS.
+
 - `[Native Encoded Publication]` On 2026-10-02 the user authorized completing native NVENC-to-WebRTC publication to remove full-resolution browser re-encoding. An NVENC/decode/browser-encode bridge is an intermediate implementation, not completion of this stage. Preserve native selection and generic compatibility, validate actual receiver decoding and transport recovery, and explain remaining hardware/network validation limits.
 
 - `[Optional Native Hardware Encoding]` Schedule capability-probed native NVENC integration as a final optimization stage after load adaptation and frame regularity. Preserve the optimized generic native fallback, the application's picker, and compatibility with non-NVIDIA systems; measure end-to-end gains rather than assuming the adapter brand guarantees improvement. On 2026-10-02, the user authorized beginning implementation and all necessary validation after the three generic stages.
