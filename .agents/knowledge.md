@@ -44,6 +44,8 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 4. User Guidelines & Expressed Preferences
 
+- `[AI Transparency]` Include a concise README note that the project is built entirely with AI, with careful human orchestration, review, analysis and manual testing. Do not include personal biography or motivations in this disclosure.
+
 - `[README Audience]` Lead with a plain-language application overview, useful features, release downloads and basic usage for end users. Keep developer setup afterward. Omit recommended IDE choices and temporary repository-publication/security-audit instructions from the public README. Use the stable GitHub latest-release link without implying an unpublished release already exists.
 
 - `[Test Maintenance]` Retain tests that exercise real application behavior or meaningful invariants. Remove temporary diagnostics, stale harnesses, duplicated implementation models, and checks that only prove their own fixtures. Automated tests must be independent of a contributor's personal machine, installed apps, audio devices, GPUs, display configuration, or checkout path. Keep genuinely useful hardware benchmarks explicit and capability-gated, with portable setup and documented limits.

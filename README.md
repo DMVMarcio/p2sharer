@@ -58,3 +58,5 @@ Production output is written to `src-tauri/target/release/p2sharer.exe`, with in
 Use `pnpm add <package>`, `pnpm add -D <package>` and `pnpm exec <tool>`. Commit `pnpm-lock.yaml` after dependency changes. Pass script options directly, for example `pnpm run tauri:dev --release --no-watch`.
 
 Keep the Trystero dependency patches and installation-script permissions in `pnpm-workspace.yaml` aligned with dependency updates. Use `pnpm patch` and `pnpm patch-commit` when updating patches, and commit the patch, workspace configuration and lockfile together.
+
+> **Development note:** P2Sharer is built entirely with AI, with careful human orchestration, review, analysis and manual testing throughout development.
