@@ -48,7 +48,7 @@ export const SettingsModal: React.FC = () => {
   const [drawingLimit, setDrawingLimit] = useState(() => stateStore.participantDrawingLimit);
   const [participantDrawings, setParticipantDrawings] = useState(() => stateStore.allowParticipantDrawings);
   const [participantPings, setParticipantPings] = useState(() => stateStore.allowParticipantPings);
-  const [streamOptionsTab, setStreamOptionsTab] = useState<'pointing' | 'advanced'>('pointing');
+  const [streamOptionsTab, setStreamOptionsTab] = useState<'pointing' | 'advanced'>('advanced');
   const [encoder, setEncoder] = useState<EncoderPreference>(() => getEncoderPreference());
   const [encoderSupport, setEncoderSupport] = useState<NativeEncoderSupport | null>(null);
   const [encoderProbeDone, setEncoderProbeDone] = useState(false);
@@ -648,20 +648,20 @@ export const SettingsModal: React.FC = () => {
 
                 <div className="settings-row" style={{ marginTop: '14px' }}>
                   <div className="theme-mode-pills" role="tablist" aria-label="Opções de transmissão">
-                    {(['pointing', 'advanced'] as const).map(tab => <button key={tab} type="button"
+                    {(['advanced', 'pointing'] as const).map(tab => <button key={tab} type="button"
                       className={`pill-btn ${streamOptionsTab === tab ? 'active' : ''}`} role="tab"
                       id={`stream-options-${tab}`} aria-selected={streamOptionsTab === tab}
                       aria-controls={`stream-options-panel-${tab}`} tabIndex={streamOptionsTab === tab ? 0 : -1}
                       onClick={() => setStreamOptionsTab(tab)} onKeyDown={event => {
                         if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
                           event.preventDefault();
-                          const next = event.key === 'Home' ? 'pointing' : event.key === 'End' ? 'advanced' : tab === 'pointing' ? 'advanced' : 'pointing';
+                          const next = event.key === 'Home' ? 'advanced' : event.key === 'End' ? 'pointing' : tab === 'pointing' ? 'advanced' : 'pointing';
                           setStreamOptionsTab(next);
                           document.getElementById(`stream-options-${next}`)?.focus();
                         }
                       }}>{tab === 'pointing' ? 'Apontar e rabiscar' : 'Avançadas'}</button>)}
                   </div>
-                  {streamOptionsTab === 'pointing' && <div role="tabpanel" id="stream-options-panel-pointing" aria-labelledby="stream-options-pointing">
+                  {streamOptionsTab === 'pointing' && <div className="settings-row settings-options-panel" role="tabpanel" id="stream-options-panel-pointing" aria-labelledby="stream-options-pointing">
                   {[
                     { id: 'participant-cursors', label: 'Exibir cursores dos participantes', description: 'Permitir apontamentos na sua tela, sem controlar o desktop.', checked: participantCursors, change: setParticipantCursors },
                     { id: 'participant-drawings', label: 'Permitir rabiscos dos participantes', description: 'Permitir desenhos e instruções de texto na sua tela.', checked: participantDrawings, change: setParticipantDrawings },
@@ -686,18 +686,17 @@ export const SettingsModal: React.FC = () => {
                     </div>
                   </div>
                   </div>}
-                  {streamOptionsTab === 'advanced' && <div role="tabpanel" id="stream-options-panel-advanced" aria-labelledby="stream-options-advanced">
+                  {streamOptionsTab === 'advanced' && <div className="settings-row settings-options-panel" role="tabpanel" id="stream-options-panel-advanced" aria-labelledby="stream-options-advanced">
                   <div className="settings-row">
                     <label className="settings-label" htmlFor="settings-video-encoder">Codificador de vídeo:</label>
                     <Select id="settings-video-encoder" className="select-input-sm" value={encoder}
                       disabled={!encoderProbeDone} onValueChange={value => setEncoder(value as EncoderPreference)}
                       options={[
                         { value: 'auto', label: 'Automático (recomendado)' },
-                        { value: 'generic', label: 'Genérico' },
+                        { value: 'generic', label: 'Genérico (Padrão)' },
                         ...(encoderSupport?.driver_api_available ? [{ value: 'nvenc', label: 'NVIDIA NVENC' }] : []),
                       ]} />
-                    <p className="field-info-text">{!encoderProbeDone ? 'Detectando codificadores disponíveis…' : encoderSupport?.driver_api_available && encoderSupport.experimental_enabled
-                      ? 'Automático usa NVIDIA NVENC, com fallback para o genérico.' : 'Automático usa o codificador genérico neste computador.'} A escolha vale para novas transmissões de tela e janela, sem reiniciar o app.</p>
+
                   </div>
                   <label className="settings-switch-row" htmlFor="settings-check-cursor">
                     <div className="settings-switch-label-group">

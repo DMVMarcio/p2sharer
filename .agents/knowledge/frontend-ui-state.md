@@ -175,7 +175,10 @@ Text annotations use `StreamDrawingTextEditor`, a borderless native textarea anc
 
 Transmission defaults remain outside the local Pointing/Drawing and Advanced tabs.
 The tabs reuse `.theme-mode-pills` / `.pill-btn` with tablist/tab/tabpanel semantics,
-roving focus and arrow/Home/End navigation. Advanced owns cursor capture and the
+roving focus and arrow/Home/End navigation. Advanced appears first and opens by
+default; both panels reuse `.settings-row` with the 12 px `.settings-options-panel`
+row spacing. The encoder has no explanatory paragraph and its generic label is
+"Genérico (Padrão)"; Automatic remains the encoder default. Advanced owns cursor capture and the
 canonical encoder Select. Hardware choices require a real native encoder probe;
 Automatic and Generic remain available. `core/encoder_preferences.ts` centralizes
 validated local persistence and stale hardware selection recovery. Save applies the
