@@ -10,11 +10,13 @@ import { EditSavedRoomDialog } from '../modals/EditSavedRoomDialog';
 import { orderSavedRooms } from '../../core/saved_room_order';
 import { useSortableGrid } from '../../hooks/useSortableGrid';
 import { TooltipButton } from '../common/TooltipButton';
+import { ModalDialog } from '../common/ModalDialog';
 
 export const SavedRoomsSection: React.FC = () => {
   const openContextMenu = useContextMenu();
   const [rooms, setRooms] = useState<SavedRoom[]>([]);
   const [editingRoom, setEditingRoom] = useState<SavedRoom | null>(null);
+  const [removingRoom, setRemovingRoom] = useState<SavedRoom | null>(null);
   const { openModal } = useModal();
   const { joinRoom, username } = useRoom();
   const sortable = useSortableGrid(rooms.map((room) => room.roomId), (ids) => {
@@ -84,7 +86,7 @@ export const SavedRoomsSection: React.FC = () => {
               data-sortable-id={room.roomId} key={room.roomId} onContextMenu={(event) => openContextMenu(event, [
               { id: 'enter', label: 'Entrar na sala', icon: <ArrowRight size={15} />, onSelect: () => openSaved(room) },
               { id: 'edit', label: 'Editar sala salva', icon: <Pencil size={15} />, onSelect: () => setEditingRoom(room) },
-              { id: 'remove', label: 'Remover das salas salvas', icon: <Trash2 size={15} />, danger: true, onSelect: () => removeSaved(room) },
+              { id: 'remove', label: 'Remover das salas salvas', icon: <Trash2 size={15} />, danger: true, onSelect: () => setRemovingRoom(room) },
             ])}>
               <div className="saved-room-card-heading">
                 <TooltipButton tooltip="Arraste para reordenar ou use as setas do teclado"
@@ -107,7 +109,7 @@ export const SavedRoomsSection: React.FC = () => {
                   onClick={() => setEditingRoom(room)} aria-label={`Editar ${room.name}`}>
                   <Pencil size={14} />
                 </button>
-                <button className="btn btn-outline btn-sm saved-room-remove" onClick={() => void removeSaved(room)}
+                <button className="btn btn-outline btn-sm saved-room-remove" onClick={() => setRemovingRoom(room)}
                   aria-label={`Remover ${room.name} das salas salvas`}><Trash2 size={14} /></button>
               </div>
             </article>
@@ -118,6 +120,16 @@ export const SavedRoomsSection: React.FC = () => {
         {sortable.draggingId ? `Movendo sala. Posição ${sortable.order.indexOf(sortable.draggingId) + 1} de ${rooms.length}.` : ''}
       </span>
       {editingRoom && <EditSavedRoomDialog room={editingRoom} onClose={() => setEditingRoom(null)} />}
+      {removingRoom && <ModalDialog title="Remover sala salva?" icon={<Trash2 size={20} />}
+        onClose={() => setRemovingRoom(null)} footer={(close) => <>
+          <button type="button" className="btn btn-secondary" data-autofocus onClick={close}>Cancelar</button>
+          <button type="button" className="btn btn-danger" onClick={() => {
+            void removeSaved(removingRoom);
+            close();
+          }}>Remover</button>
+        </>}>
+        <p>Remover “<strong>{removingRoom.customName ?? removingRoom.name}</strong>” das salas salvas?</p>
+      </ModalDialog>}
     </section>
   );
 };

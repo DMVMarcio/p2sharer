@@ -43,6 +43,9 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 4. User Guidelines & Expressed Preferences
 
+- [File Offer Defaults] Image and GIF offers default to automatic request acceptance. Initialize this choice independently for each selected file, defaulting off for every non-image file; the sender can still change it manually.
+- [Saved Room Deletion] Require a confirmation popup before removing a saved room from the home screen.
+
 - [Remember Transmission Settings] Successful transmission starts or edits automatically replace the saved transmission defaults with the most recently confirmed settings. Provide a persistent Settings switch to disable this behavior; automatic remembering is enabled by default, including first-run installations. Cancelled or failed transmission attempts must preserve saved defaults.
 
 - [Desktop Build Directory] Always use the default `src-tauri/target/` for desktop builds; never use alternate directories. If the app is running or its executable is locked, present a questionnaire asking the user to close it and wait for confirmation before retrying. Never terminate it automatically. The user established this rule on October 3, 2026.

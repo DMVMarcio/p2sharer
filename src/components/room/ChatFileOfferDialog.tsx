@@ -7,7 +7,7 @@ interface Props { file: NativeChatFile; onClose: () => void; onOffer: (name: str
 
 export function ChatFileOfferDialog({ file, onClose, onOffer }: Props) {
   const [name, setName] = useState(file.name);
-  const [autoAccept, setAutoAccept] = useState(false);
+  const [autoAccept, setAutoAccept] = useState(() => file.isImage);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const submit = async () => {
