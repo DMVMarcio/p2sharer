@@ -72,6 +72,15 @@ struct SignalEvent {
     reason: Option<String>,
 }
 
+fn initial_rate(budget: u32, width: u32, height: u32, fps: u32) -> u32 {
+    // Keep the existing 720p/60 probe but scale its starting allowance to the
+    // actual encoded picture. A fixed 2 Mbps can make 1080p recovery pictures
+    // exceed the bounded send deadline before useful receiver feedback arrives.
+    let rate = 2_000_000u64 * u64::from(width) * u64::from(height) * u64::from(fps.clamp(15, 120))
+        / (1280 * 720 * 60);
+    (rate.clamp(2_000_000, 8_000_000) as u32).min(budget)
+}
+
 fn valid_id(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= 100
@@ -184,13 +193,14 @@ pub async fn create_native_video_offer(
         .map_err(|e| e.to_string())?,
     );
     let live = Arc::new(AtomicBool::new(true));
+    let geometry = capture.load.snapshot();
     let value = Arc::new(Route {
         pc: pc.clone(),
         session: session_id.clone(),
         token: feedback_token,
         active: live.clone(),
         budget: AtomicU32::new(bitrate),
-        cap: AtomicU32::new(bitrate.min(2_000_000)),
+        cap: AtomicU32::new(initial_rate(bitrate, geometry.output_width, geometry.output_height, geometry.effective_fps)),
         bitrate: capture.bitrate.clone(),
         frames: AtomicU64::new(0),
         bytes: AtomicU64::new(0),
@@ -684,6 +694,16 @@ impl FrameGate {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn startup_probe_scales_to_encoded_geometry_without_exceeding_user_budget() {
+        assert_eq!(initial_rate(15_000_000, 1280, 720, 60), 2_000_000);
+        assert_eq!(initial_rate(15_000_000, 1920, 1080, 60), 4_500_000);
+        assert_eq!(initial_rate(15_000_000, 1080, 1920, 60), 4_500_000);
+        assert_eq!(initial_rate(3_000_000, 1920, 1080, 120), 3_000_000);
+        assert_eq!(initial_rate(50_000_000, 3840, 2160, 120), 8_000_000);
+        assert_eq!(initial_rate(800_000, 640, 360, 30), 800_000);
+        assert_eq!(initial_rate(15_000_000, 0, 0, 60), 2_000_000);
+    }
     #[test]
     fn recovery_age_allows_key_serialization_then_returns_to_normal_bound() {
         let now = Instant::now();

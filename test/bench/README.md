@@ -263,3 +263,14 @@ averaging a plausible frame rate.
 The detail mode rejects repeated recovery keys/gaps or a collapse in sent-frame
 progress after the 800 kbps reduction. Failure diagnostics retain recent encoded
 packet sizes and key flags, distinguishing an encoder burst from geometry changes.
+
+For isolated local-preview diagnosis, run
+`runNativeRtpLoopback({peers:0,width:1920,height:1080,detail:true,warmupMs:3000,sampleMs:15000,uiStallMs:200})`.
+No native RTP routes are created, so capture retains its local 15 Mbps budget. Three
+deliberate 200 ms event-loop interruptions exercise intact WS input bursts; the
+diagnostic rejects any added recovery keys or sequence gaps in that sample.
+Use `measureNvencDetail(base64, true, true)` with native `motion1080.p2nv` and
+`delivery1080.p2nv` fixtures to measure fixed text detail during moving 1080p content
+and short delivery stalls. The latter pauses the native pacer at three intervals,
+skips source pixels before encoding when capacity is full, and verifies that all
+admitted H264 references are emitted in sequence without requesting another IDR.

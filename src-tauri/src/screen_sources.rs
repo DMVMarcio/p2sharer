@@ -209,16 +209,19 @@ fn send_paced_frame(frame: PacedFrame<Arc<Vec<u8>>>, sender: &broadcast::Sender<
 }
 
 fn enqueue_capture_frame(delivery: &FrameDelivery, frame: Arc<Vec<u8>>, ready_us: u64,
-    legacy: bool, active: &AtomicBool, sender: &broadcast::Sender<Message>, metrics: &CaptureMetrics) {
-    if !active.load(Ordering::Relaxed) { return; }
+    legacy: bool, active: &AtomicBool, sender: &broadcast::Sender<Message>, metrics: &CaptureMetrics) -> bool {
+    if !active.load(Ordering::Relaxed) { return false; }
     if let Ok(mut pacer) = delivery.0.lock() {
         if legacy { pacer.record_immediate(frame.clone(), ready_us); }
-        else { pacer.enqueue(frame.clone(), ready_us); }
-    }
+        else if frame.starts_with(b"P2NV") {
+            if !pacer.enqueue_dependent(frame.clone(), ready_us) { return false; }
+        } else { pacer.enqueue(frame.clone(), ready_us); }
+    } else { return false; }
     if legacy && active.load(Ordering::Relaxed) {
         send_paced_frame(PacedFrame::Fresh { frame, age_us: 0 }, sender, metrics);
     }
     delivery.1.notify_one();
+    true
 }
 
 fn start_frame_delivery(delivery: FrameDelivery, active: Arc<AtomicBool>, load: Arc<crate::video_load::CaptureLoad>,
@@ -376,6 +379,12 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
             }
         } else { None };
         if self.nvenc_enabled.load(Ordering::Relaxed) && (scaled.is_some() || (src_width <= self.target_width && src_height <= self.target_height)) {
+            // There is only one producer per capture. Check admission before
+            // NVENC advances its reference chain; the delivery thread only removes.
+            if !self.legacy_pacing && !self.delivery.0.lock().map_or(false, |pacer| pacer.has_encode_capacity()) {
+                self.metrics.gated.fetch_add(1, Ordering::Relaxed);
+                return Ok(());
+            }
             let encoder_started = std::time::Instant::now();
             let result = self.nvenc.encode(frame.device(), scaled.as_ref().unwrap_or(frame.as_raw_texture()),
                 src_width, src_height, self.load.fps(), self.nvenc_bitrate.load(Ordering::Relaxed), self.start_instant.elapsed().as_micros() as u64,
@@ -391,8 +400,10 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
                     self.metrics.images.fetch_add(1, Ordering::Relaxed);
                     self.metrics.nvenc_images.fetch_add(1, Ordering::Relaxed);
                     if scaled.is_some() { self.metrics.gpu_scaled_images.fetch_add(1, Ordering::Relaxed); }
-                    enqueue_capture_frame(&self.delivery, Arc::new(bytes), self.start_instant.elapsed().as_micros() as u64,
-                        self.legacy_pacing, &self.active_flag, &self.sender, &self.metrics);
+                    if !enqueue_capture_frame(&self.delivery, Arc::new(bytes), self.start_instant.elapsed().as_micros() as u64,
+                        self.legacy_pacing, &self.active_flag, &self.sender, &self.metrics) {
+                        self.nvenc_keyframe.store(true, Ordering::Relaxed);
+                    }
                     let processing_us = arrival_time.elapsed().as_micros() as u64;
                     self.metrics.processing_us.fetch_add(processing_us, Ordering::Relaxed);
                     self.load_controller.observe(&self.load, self.load.elapsed_ms(), processing_us);

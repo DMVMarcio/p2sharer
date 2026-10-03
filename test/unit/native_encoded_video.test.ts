@@ -9,6 +9,32 @@ function packet(sequence = 1, key = true): ArrayBuffer {
   view.setUint32(16, sequence, true); view.setBigUint64(20, BigInt(sequence) * 1_000_000n, true);
   new Uint8Array(buffer, 28).set([0,0,0,1,0x65]); return buffer;
 }
+
+test('preview coalesces recovery requests while a replacement key travels through delivery', async () => {
+  const previous={VideoDecoder:globalThis.VideoDecoder,EncodedVideoChunk:globalThis.EncodedVideoChunk,
+    performance:globalThis.performance,window:globalThis.window};
+  let now=0,requests=0;
+  class Decoder {
+    state='configured';output:(frame:unknown)=>void;
+    constructor(callbacks:{output:(frame:unknown)=>void}){this.output=callbacks.output;}
+    configure(){}
+    decode(chunk:{timestamp:number}){queueMicrotask(()=>this.output({...chunk,close(){}}));}
+    close(){this.state='closed';}
+  }
+  Object.assign(globalThis,{performance:{now:()=>now},window:{__TAURI_INTERNALS__:{invoke:async()=>{requests++;}}},
+    VideoDecoder:Decoder,EncodedVideoChunk:class{timestamp:number;constructor(init:{timestamp:number}){this.timestamp=init.timestamp;}}});
+  const decoder=new NativeEncodedDecoder('test','token');
+  try {
+    (await decoder.decode(packet(1)))!.close();
+    assert.equal(await decoder.decode(packet(3,false)),null);
+    for(let sequence=4;sequence<15;sequence++){now+=16;assert.equal(await decoder.decode(packet(sequence,false)),null);}
+    assert.equal(requests,1,'Waiting delta pictures must not each force a new full-picture refresh');
+    now=250;assert.equal(await decoder.decode(packet(15,false)),null);assert.equal(requests,2);
+    (await decoder.decode(packet(16)))!.close();
+    (await decoder.decode(packet(17,false)))!.close();
+    assert.equal(requests,2);
+  } finally {decoder.close();Object.assign(globalThis,previous);}
+});
 test('native H264 envelope preserves portrait geometry, sequence, key and microsecond timestamp', () => {
   const buffer = packet(); const decoded = parseNativeEncodedPacket(buffer);
   assert.equal(isNativeEncodedPacket(buffer), true);
@@ -77,8 +103,34 @@ test('decoder feeds buffered hardware without awaiting its first output and boun
     const frames=await Promise.all([decoder.decode(packet(1)),decoder.decode(packet(2,false)),decoder.decode(packet(3,false))]);
     assert.ok(frames.every(Boolean)); assert.equal(submitted,3);
     frames.forEach(frame=>frame!.close()); stalled=true;
-    const dropped=await Promise.all(Array.from({length:9},(_,index)=>decoder.decode(packet(index+4,false))));
+    const dropped=await Promise.all(Array.from({length:17},(_,index)=>decoder.decode(packet(index+4,false))));
     assert.ok(dropped.every(frame=>frame===null)); assert.equal(submitted,11);
     decoder.close();
   } finally {Object.assign(globalThis,{VideoDecoder:originalDecoder,EncodedVideoChunk:originalChunk});}
+});
+
+test('decoder preserves all references across a bounded UI input burst without resetting', async () => {
+  const previous={VideoDecoder:globalThis.VideoDecoder,EncodedVideoChunk:globalThis.EncodedVideoChunk};
+  let instance:Decoder,configurations=0;
+  class Decoder {
+    state='configured';output:(frame:unknown)=>void;submitted:number[]=[];awaiting:number[]=[];
+    constructor(callbacks:{output:(frame:unknown)=>void}){this.output=callbacks.output;instance=this;}
+    configure(){configurations++;}
+    decode(chunk:{timestamp:number}){this.submitted.push(chunk.timestamp);this.awaiting.push(chunk.timestamp);}
+    flushBatch(){const batch=this.awaiting.splice(0);for(const timestamp of batch)this.output({timestamp,close(){}});}
+    close(){this.state='closed';}
+  }
+  Object.assign(globalThis,{VideoDecoder:Decoder,EncodedVideoChunk:class{timestamp:number;constructor(init:{timestamp:number}){this.timestamp=init.timestamp;}}});
+  const decoder=new NativeEncodedDecoder('test','token');
+  try {
+    const burst=Array.from({length:16},(_,index)=>decoder.decode(packet(index+1,index===0)));
+    assert.equal(instance!.submitted.length,8);
+    assert.equal(await decoder.decode(packet(16,false)),null,'Cached refresh must not occupy backlog capacity');
+    instance!.flushBatch();assert.equal(instance!.submitted.length,16);instance!.flushBatch();
+    const frames=await Promise.all(burst);assert.ok(frames.every(Boolean));frames.forEach(frame=>frame!.close());
+    assert.equal(configurations,1,'An intact input burst must not restart decoder prediction');
+    assert.deepEqual(instance!.submitted,Array.from({length:16},(_,index)=>(index+1)*1_000_000));
+    const stopping=Array.from({length:10},(_,index)=>decoder.decode(packet(index+17,false)));
+    const rejected=Promise.allSettled(stopping);decoder.close();assert.ok((await rejected).every(value=>value.status==='rejected'));
+  } finally {decoder.close();Object.assign(globalThis,previous);}
 });
