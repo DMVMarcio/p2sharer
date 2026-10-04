@@ -22,6 +22,7 @@ mod video_gpu_scale;
 #[cfg(windows)]
 mod video_nvenc;
 mod camera_permission;
+mod browser_shortcuts;
 mod app_data_migration;
 mod app_updates;
 
@@ -81,6 +82,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
             camera_permission::install(app)?;
+            browser_shortcuts::disable_browser_shortcuts(app.get_webview_window("main").ok_or("main webview missing")?)?;
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -99,6 +101,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             app_updates::check_app_update,
             prepare_app_update,
+            browser_shortcuts::disable_browser_shortcuts,
             native_rtc::create_native_video_offer,
             native_rtc::answer_native_video,
             native_rtc::add_native_video_ice,

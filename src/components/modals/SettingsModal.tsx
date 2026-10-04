@@ -8,7 +8,7 @@ import { useModal } from '../../hooks/useModal';
 import { useAppTheme, ACCENT_COLORS } from '../../hooks/useAppTheme';
 import { roomService } from '../../services/room_service';
 import { INITIAL_TRANSMISSION_DEFAULTS, stateStore } from '../../core/state_store';
-import { soundEffects } from '../../ui/sound_effects';
+import { soundEffects, SOUND_EVENTS, type SoundEvent } from '../../ui/sound_effects';
 import { showToast } from '../../hooks/useToast';
 import { ThemeMode } from '../../core/types';
 import { EMOJI_PACKS, EmojiPack, getEmojiPack, saveEmojiPack } from '../../core/emoji_preferences';
@@ -21,6 +21,12 @@ import { appUpdates } from '../../services/app_updates';
 import { automaticUpdateChecks, betaUpdateChecks } from '../../core/app_updates';
 import { ApplicationSettings } from './ApplicationSettings';
 import { useAppUpdates } from '../../hooks/useAppUpdates';
+
+const SOUND_LABELS: Record<SoundEvent, string> = {
+  message: 'Mensagem recebida', userJoin: 'Entrada na sala', userLeave: 'Saída da sala',
+  screenShareStart: 'Início de transmissão', screenShareStop: 'Fim de transmissão',
+  watchStreamStart: 'Começar a assistir', watchStreamStop: 'Parar de assistir',
+};
 
 export const SettingsModal: React.FC = () => {
   const { closeModal, isClosing } = useModal();
@@ -39,6 +45,7 @@ export const SettingsModal: React.FC = () => {
   const [emojiPack, setEmojiPack] = useState<EmojiPack>(getEmojiPack);
   const [transferSpeedUnit, setTransferSpeedUnit] = useState<TransferSpeedUnit>(getTransferSpeedUnit);
   const [sfxEnabled, setSfxEnabled] = useState(() => soundEffects.getEnabled());
+  const [soundEvents, setSoundEvents] = useState(() => soundEffects.getEventPreferences());
   const [sfxVolume, setSfxVolume] = useState(() => Math.round(soundEffects.getVolume() * 100));
 
   const [defaultRes, setDefaultRes] = useState(
@@ -133,6 +140,7 @@ export const SettingsModal: React.FC = () => {
     saveTransferSpeedUnit(transferSpeedUnit);
     appUpdates.setPreferences(autoUpdates, betaUpdates);
     soundEffects.setEnabled(sfxEnabled);
+    soundEffects.setEventPreferences(soundEvents);
     soundEffects.setVolume(sfxVolume / 100);
 
     localStorage.setItem('p2sharer_participant_cursors', String(participantCursors));
@@ -271,7 +279,7 @@ export const SettingsModal: React.FC = () => {
                 <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
                 <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
               </svg>
-              <span>Efeitos Sonoros</span>
+              <span>Som</span>
             </button>
 
             <button
@@ -461,20 +469,20 @@ export const SettingsModal: React.FC = () => {
               </div>
             )}
 
-            {/* TAB 3: ÁUDIO & EFEITOS SONOROS */}
+            {/* Sound settings */}
             {activeTab === 'audio' && (
               <div className="settings-tab-pane active" id="settings-pane-audio">
                 <div className="settings-pane-header">
-                  <h3 className="settings-pane-title">Efeitos Sonoros & Notificações</h3>
+                  <h3 className="settings-pane-title">Som</h3>
                   <p className="settings-pane-desc">
-                    Sons ao vivo para início/fim de transmissão, espectadores e entrada/saída de participantes.
+                    Escolha os sons para mensagens, participantes e transmissões.
                   </p>
                 </div>
 
                 <div className="settings-row">
                   <label className="settings-switch-row" htmlFor="settings-check-sfx-enabled">
                     <div className="settings-switch-label-group">
-                      <span className="settings-switch-title">Efeitos Sonoros</span>
+                      <span className="settings-switch-title">Sons do aplicativo</span>
                       <span className="settings-switch-subtitle">
                         Ativar notificações sonoras para eventos da sala e transmissões
                       </span>
@@ -494,7 +502,7 @@ export const SettingsModal: React.FC = () => {
                 <div className="settings-row" id="settings-sfx-volume-row" style={{ marginTop: '12px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                     <label className="settings-label" htmlFor="settings-slider-sfx-volume" style={{ marginBottom: 0 }}>
-                      Volume dos Efeitos:
+                      Volume:
                     </label>
                     <span
                       id="settings-sfx-volume-label"
@@ -521,54 +529,23 @@ export const SettingsModal: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="settings-row" style={{ marginTop: '14px' }}>
-                  <label className="settings-label">Testar e Pré-escutar Sons:</label>
-                  <div className="sfx-test-buttons-grid">
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-outline"
-                      onClick={() => soundEffects.playUserJoin()}
-                    >
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
-                        <polyline points="10 17 15 12 10 7"/>
-                        <line x1="15" x2="3" y1="12" y2="12"/>
-                      </svg>
-                      <span>Entrada na Sala</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-outline"
-                      onClick={() => soundEffects.playScreenShareStart()}
-                    >
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polygon points="5 3 19 12 5 21 5 3"/>
-                      </svg>
-                      <span>Iniciar Transmissão</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-outline"
-                      onClick={() => soundEffects.playWatchStreamStart()}
-                    >
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <circle cx="12" cy="12" r="3"/>
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"/>
-                      </svg>
-                      <span>Começar a Assistir</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-outline"
-                      onClick={() => soundEffects.playWatchStreamStop()}
-                    >
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <line x1="18" y1="6" x2="6" y2="18"/>
-                        <line x1="6" y1="6" x2="18" y2="18"/>
-                      </svg>
-                      <span>Parar de Assistir</span>
-                    </button>
-                  </div>
+                <div className="settings-sound-events">
+                  {SOUND_EVENTS.map((event) => (
+                    <div className="settings-sound-event" key={event}>
+                      <label className="settings-switch-row" htmlFor={`settings-sound-${event}`}>
+                        <span className="settings-switch-title">{SOUND_LABELS[event]}</span>
+                        <div className="modern-switch">
+                          <input autoComplete="off" type="checkbox" id={`settings-sound-${event}`}
+                            checked={soundEvents[event]} disabled={!sfxEnabled}
+                            onChange={(e) => setSoundEvents((current) => ({ ...current, [event]: e.target.checked }))} />
+                          <span className="switch-slider" />
+                        </div>
+                      </label>
+                      <button type="button" className="btn btn-sm btn-outline"
+                        aria-label={`Ouvir som: ${SOUND_LABELS[event]}`}
+                        onClick={() => soundEffects.preview(event, sfxVolume / 100)}>Ouvir</button>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}

@@ -15,6 +15,8 @@ export function useRoom() {
   const isCreator = useStore((s) => s.isCreator);
   const username = useStore((s) => s.username);
   const isSidebarCollapsed = useStore((s) => s.isSidebarCollapsed);
+  const sidebarTab = useStore((s) => s.sidebarTab);
+  const unreadChatMessages = useStore((s) => s.unreadChatMessages);
   const isSpotlightTrayCollapsed = useStore((s) => s.isSpotlightTrayCollapsed);
   const streamFilter = useStore((s) => s.streamFilter);
 
@@ -81,6 +83,7 @@ export function useRoom() {
   const toggleSidebar = useCallback(() => {
     stateStore.set((s) => {
       s.isSidebarCollapsed = !s.isSidebarCollapsed;
+      if (!s.isSidebarCollapsed && s.sidebarTab === 'chat') s.unreadChatMessages = 0;
     });
   }, []);
 
@@ -113,6 +116,8 @@ export function useRoom() {
     isCreator,
     username,
     isSidebarCollapsed,
+    sidebarTab,
+    unreadChatMessages,
     isSpotlightTrayCollapsed,
     streamFilter,
     chatMessages: roomService.chatMessages,

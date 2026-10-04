@@ -56,6 +56,8 @@ export class StateStore {
   public includePids: Set<number> = new Set();
 
   public isSidebarCollapsed: boolean = false;
+  public sidebarTab: 'chat' | 'participants' = 'chat';
+  public unreadChatMessages = 0;
   public isSpotlightTrayCollapsed: boolean = false;
 
   public version: number = 0;

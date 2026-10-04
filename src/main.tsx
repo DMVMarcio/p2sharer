@@ -1,5 +1,8 @@
 import { StreamPointerOverlay } from './components/room/StreamPointerOverlay';
 import React from 'react';
+import { invoke, isTauri } from '@tauri-apps/api/core';
+
+if (isTauri()) void invoke('disable_browser_shortcuts').catch((error) => console.warn('Browser shortcut configuration failed:', error));
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { AppContextMenu } from './components/common/AppContextMenu';

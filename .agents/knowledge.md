@@ -45,6 +45,9 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 4. User Guidelines & Expressed Preferences
 
+- `[Chat Notifications & Sound]` Play a sound for new incoming chat messages. Show unread counts on the collapsed sidebar opener and chat tab, clearing when chat is opened. Exclude own messages, system notices, history sync, duplicates, edits and deletions. Rename the sound settings tab to "Som" and persist independent switches for every sound event alongside master enable/volume.
+- `[Browser Shortcuts]` Disable WebView2 browser accelerators (including Ctrl+F, F3, Ctrl+J and Ctrl+P) in all application windows while retaining text editing shortcuts.
+
 - `[First-Run Transmission Defaults]` New installations start at 720p and 30 FPS with the existing recommended 720p bitrate (8 Mbps). Respect saved preferences and continue remembering settings only after a successful transmission confirmation when automatic remembering is enabled.
 
 - `[Update Channels]` Put application update controls in a dedicated Application settings tab instead of Profile. Offer a persistent opt-in toggle for beta/prerelease updates, disabled by default; stable releases remain eligible on both channels. Turning beta off and saving must offer the latest stable release even when older than the installed beta. Preserve signed downloads and explicit installation consent; permit this deliberate beta-to-stable downgrade only, never automatic installation or stable-to-stable downgrades.

@@ -1,4 +1,5 @@
 import React from 'react';
+import { UnreadChatBadge } from './UnreadChatBadge';
 import { StreamHeaderBar } from './StreamHeaderBar';
 import { RoomVideoContainer } from './RoomVideoContainer';
 import { RoomSidebar } from './RoomSidebar';
@@ -6,7 +7,7 @@ import { ChatFileRequests } from './ChatFileRequests';
 import { useRoom } from '../../hooks/useRoom';
 
 export const RoomView: React.FC = () => {
-  const { isSidebarCollapsed, toggleSidebar } = useRoom();
+  const { isSidebarCollapsed, toggleSidebar, unreadChatMessages } = useRoom();
 
   return (
     <section className="view active" id="view-group-room">
@@ -18,7 +19,7 @@ export const RoomView: React.FC = () => {
 
         {/* Hoverable lateral sidebar toggle arrow */}
         <div
-          className={`sidebar-toggle-edge ${isSidebarCollapsed ? 'collapsed' : 'expanded'}`}
+          className={`sidebar-toggle-edge ${isSidebarCollapsed ? 'collapsed' : 'expanded'} ${unreadChatMessages > 0 ? 'has-unread' : ''}`}
         >
           <button
             type="button"
@@ -43,6 +44,7 @@ export const RoomView: React.FC = () => {
                 <polyline points="9 18 15 12 9 6" />
               )}
             </svg>
+            {isSidebarCollapsed && <UnreadChatBadge count={unreadChatMessages} />}
           </button>
         </div>
 

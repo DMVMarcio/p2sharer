@@ -9,6 +9,7 @@ import { roomAppsService } from '../apps/room_apps_service.ts';
 import { AudioBridge } from '../audio/audio_bridge.ts';
 import { audioContextManager } from '../audio/audio_context_manager.ts';
 import { stateStore } from '../core/state_store.ts';
+import { shouldNotifyChat } from '../core/chat_notifications.ts';
 import { mergeChatHistory, nextChatOrder } from '../core/chat_history.ts';
 import { CHAT_FILE_CHUNK_BYTES, MAX_IMAGE_PREVIEW_BYTES } from '../core/chat_file_limits.ts';
 import { verifyRoomInvite } from '../core/room_invite_validation.ts';
@@ -202,6 +203,7 @@ export class RoomService {
 
     this.clearImagePreviews();
     this.chatMessages = [];
+    stateStore.set((state) => { state.unreadChatMessages = 0; state.sidebarTab = 'chat'; });
     this.fileRequests = [];
     this.fileProgress = {};
     this.transferRates.clear();
@@ -299,6 +301,12 @@ export class RoomService {
       },
       onChat: (msg: ChatMessage) => {
         if (this.roomManager !== manager) return;
+        if (shouldNotifyChat(msg, this.chatMessages, manager.getLocalPeerId())) {
+          soundEffects.playMessage();
+          if (stateStore.isSidebarCollapsed || stateStore.sidebarTab !== 'chat') {
+            stateStore.set((state) => { state.unreadChatMessages += 1; });
+          }
+        }
         this.chatMessages = mergeChatHistory(this.chatMessages, [msg]);
         if (msg.deletedAt && msg.file) {
           this.fileRequests = this.fileRequests.filter((request) => request.messageId !== msg.id);
@@ -644,6 +652,7 @@ export class RoomService {
     });
 
     this.chatMessages = [];
+    stateStore.set((state) => { state.unreadChatMessages = 0; state.sidebarTab = 'chat'; });
     this.fileRequests = [];
     this.fileProgress = {};
     this.transferRates.clear();
