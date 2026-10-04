@@ -84,7 +84,7 @@ jobs:
           args: --config src-tauri/tauri.release.conf.json -- --locked
           tagName: ${{ env.RELEASE_TAG }}
           releaseName: P2Sharer v__VERSION__
-          releaseAssetNamePattern: '[name]_[version]_[arch]-setup.[ext]'
+          releaseAssetNamePattern: '[name]_[version]_[arch]-setup[ext]'
           releaseDraft: true
           prerelease: ${{ contains(env.RELEASE_TAG, '-') }}
           generateReleaseNotes: true
