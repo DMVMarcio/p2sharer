@@ -30,7 +30,14 @@ jobs:
         with:
           ref: refs/tags/${{ inputs.tag || github.ref_name }}
           persist-credentials: false
-      - uses: ./.github/actions/setup-build
+      - name: Check out build setup from the workflow revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: .release-workflow
+          sparse-checkout: .github/actions/setup-build
+          persist-credentials: false
+      - uses: ./.release-workflow/.github/actions/setup-build
       - name: Validate release version
         shell: pwsh
         run: pnpm run release:check --tag "$env:RELEASE_TAG"
@@ -54,14 +61,14 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         run: pnpm run release:check --signing
       - name: Build signed installers and draft release
-        uses: tauri-apps/tauri-action@944946e3e4cac6603d1fe8f514171e9ecd3c78aa # v1
+        uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tauriScript: pnpm run tauri
-          args: --locked --config src-tauri/tauri.release.conf.json
+          args: --config src-tauri/tauri.release.conf.json -- --locked
           tagName: ${{ env.RELEASE_TAG }}
           releaseName: P2Sharer v__VERSION__
           releaseDraft: true

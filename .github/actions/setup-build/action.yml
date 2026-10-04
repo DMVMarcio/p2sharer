@@ -22,18 +22,22 @@ runs:
         toolchain: stable
     - name: Install native build prerequisites
       shell: pwsh
+      env:
+        BUILD_SETUP_PATH: ${{ github.action_path }}
       run: |
         choco install nasm --yes --no-progress
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         Add-Content -LiteralPath $env:GITHUB_PATH -Value 'C:\Program Files\NASM'
         $nasmVersion = & 'C:\Program Files\NASM\nasm.exe' -v
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-        Add-Content -LiteralPath $env:GITHUB_ENV -Value "P2SHARER_NATIVE_ENV=$env:ImageVersion $nasmVersion"
+        $setupHash = (Get-FileHash -LiteralPath (Join-Path $env:BUILD_SETUP_PATH 'action.yml') -Algorithm SHA256).Hash
+        $nativeEnvironmentHash = (Get-FileHash -LiteralPath 'tools/native-build-env.mjs' -Algorithm SHA256).Hash
+        Add-Content -LiteralPath $env:GITHUB_ENV -Value "P2SHARER_NATIVE_ENV=$env:ImageVersion $nasmVersion $setupHash $nativeEnvironmentHash"
     - name: Restore Rust dependencies
       uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       with:
         workspaces: src-tauri -> target
-        shared-key: windows-2022-x64-release-v1-${{ hashFiles('.github/actions/setup-build/action.yml', 'tools/native-build-env.mjs') }}
+        shared-key: windows-2022-x64-release-v1
         env-vars: CARGO CC CFLAGS CXX CMAKE RUST P2SHARER_NATIVE
         cache-bin: 'false'
         cache-workspace-crates: 'false'

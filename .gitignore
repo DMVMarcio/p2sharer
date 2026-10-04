@@ -44,6 +44,7 @@ DEBUG_PERFORMANCE_*.md
 /repository-audits/
 /deploy/
 /latest.json
+/.release-workflow/
 
 # Editor directories and files
 .vscode/*

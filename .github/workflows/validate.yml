@@ -33,7 +33,7 @@ jobs:
       - name: Run portable native regressions
         run: pnpm run test:native --release --locked
       - name: Build unsigned desktop installers
-        run: pnpm run tauri:build --locked
+        run: pnpm run tauri:build -- --locked
       - name: Remove distribution outputs before caching
         shell: pwsh
         run: |

@@ -59,7 +59,7 @@ For later releases, first run `pnpm run release:version <new-version>`, validate
 4. Review the generated release notes and add user-facing changes and known limitations.
 5. Select **Publish release** when ready. Publish stable releases as the latest release; keep beta tags marked as prereleases. The stable updater endpoint excludes prereleases.
 
-To retry an unpublished draft, use **Run workflow** and supply its existing tag. The job refuses to rebuild a published release. Never delete or recreate a public tag to replace its binaries.
+To retry an unpublished draft after fixing the workflow, push the fix to `main`, then use **Actions > Build release draft > Run workflow**, select branch **main** and supply the existing tag (for example, `v1.0.0`). **Re-run jobs** on an old run uses its original workflow revision and will repeat an already-fixed workflow error. The application is still checked out from the requested tag; shared build setup comes from the selected workflow revision. The job refuses to rebuild a published release. Never delete or recreate a public tag to replace its binaries.
 
 ## Build caches
 
@@ -69,6 +69,8 @@ The [main-branch workflow](../.github/workflows/validate.yml) runs on pushes to 
 - **Rust:** cache Cargo downloads and compiled dependencies in the default `src-tauri/target/`. Keys account for Cargo manifests/lockfiles, Rust compiler, OS/architecture, native build environment and shared setup. Application crates, installers, incremental output and signing credentials are excluded. Successful main builds save the cache; release jobs only restore it.
 
 Adding, removing or replacing dependencies changes the relevant key. Rust can reuse compatible dependencies from an earlier lockfile, while Cargo validates build fingerprints and rebuilds what changed. Always commit updated lockfiles, patches and workspace settings; caches never bypass installation, tests or compilation. A missing or evicted cache results in a normal build from scratch.
+
+Pass Cargo-only flags after Tauri's argument separator: `pnpm run tauri:build -- --locked`, or `--config src-tauri/tauri.release.conf.json -- --locked` in the release action's `args`. The separator forwards arguments to Cargo; it is not an extra pnpm script separator. Native tests invoke Cargo directly and retain `pnpm run test:native --release --locked`.
 
 For the best reuse, wait for **Validate and warm build caches** to finish successfully on `main` before pushing a release tag. GitHub allows tags to restore default-branch caches, but unrelated release tags cannot share their own caches. A release already running uses its existing workflow; these changes apply to subsequent runs using commits that contain this setup.
 
