@@ -13,7 +13,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "P2Sharer - Compartilhamento P2P de Tela e Áudio",
+        "title": "P2Sharer - Compartilhamento de tela e áudio",
         "decorations": false,
         "shadow": true,
         "width": 1200,

@@ -339,10 +339,11 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   z-index: 100;
 }
 
-.logo-group {
+.header-room-info {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 
 .app-update-badge {
@@ -361,28 +362,8 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   color: var(--text-muted);
 }
 
-.logo-icon-clean {
-  color: var(--accent-color);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.app-header-logo {
-  width: 22px;
-  height: 22px;
-  object-fit: contain;
-  border-radius: 4px;
-}
-
-.logo-title {
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: -0.3px;
-  color: var(--text-primary);
-}
-
 .header-user-info {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -5283,7 +5264,8 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   padding-left: 12px;
   font-size: 12px;
 }
-.window-titlebar-drag img { pointer-events: none; }
+.window-titlebar-drag img { pointer-events: none; flex-shrink: 0; }
+.window-titlebar-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .window-titlebar.is-inactive .window-titlebar-drag { color: var(--text-muted); }
 .window-caption-controls { display: flex; align-self: stretch; }
 .btn.window-caption-button {

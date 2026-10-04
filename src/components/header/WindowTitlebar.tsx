@@ -4,13 +4,24 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { Minus, Square, Copy, X } from 'lucide-react';
 import { Tooltip } from '../common/Tooltip';
 import logoImg from '../../assets/logo.png';
+import { useStore } from '../../hooks/useStore';
 
 /** Main-window chrome; detached media windows keep their existing controls. */
 export const WindowTitlebar: React.FC = () => {
   const nativeWindow = useMemo(() => isTauri() ? getCurrentWindow() : null, []);
+  const title = useStore((state) => state.currentRoomCode && state.roomSlots.length > 0
+    ? `P2Sharer - ${state.currentRoomName || state.currentRoomCode}`
+    : 'P2Sharer - Compartilhamento de tela e áudio');
   const [maximized, setMaximized] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [focused, setFocused] = useState(true);
+
+  useEffect(() => {
+    document.title = title;
+    if (nativeWindow) {
+      void nativeWindow.setTitle(title).catch((error) => console.warn('[Window] Could not update window title:', error));
+    }
+  }, [nativeWindow, title]);
 
   useEffect(() => {
     if (!nativeWindow) return;
@@ -49,7 +60,7 @@ export const WindowTitlebar: React.FC = () => {
     <div className={`window-titlebar ${focused ? '' : 'is-inactive'}`}>
       <div className="window-titlebar-drag" data-tauri-drag-region>
         <img src={logoImg} width="16" height="16" alt="" draggable={false} data-tauri-drag-region />
-        <span data-tauri-drag-region>P2Sharer</span>
+        <span className="window-titlebar-title" data-tauri-drag-region>{title}</span>
       </div>
       <div className="window-caption-controls" role="group" aria-label="Controles da janela">
         <Tooltip content="Minimizar">

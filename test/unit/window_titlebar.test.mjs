@@ -11,6 +11,7 @@ for (const key of ['window', 'document', 'HTMLElement']) globalThis[key] = dom.w
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const callbacks = new Map();
 const actions = [];
+const titles = [];
 let desktop = true, maximized = false, fullscreen = false, focused = true, unlistens = 0;
 const subscribe = async (key, callback) => {
   callbacks.set(key, callback);
@@ -18,6 +19,7 @@ const subscribe = async (key, callback) => {
 };
 globalThis.windowChromeFixture = {
   isTauri: () => desktop,
+  setTitle: async title => { titles.push(title); },
   isMaximized: async () => maximized, isFullscreen: async () => fullscreen, isFocused: async () => focused,
   onResized: callback => subscribe('resize', callback), onFocusChanged: callback => subscribe('focus', callback),
   minimize: async () => { actions.push('minimize'); },
@@ -26,7 +28,7 @@ globalThis.windowChromeFixture = {
 };
 const require = createRequire(import.meta.url);
 const bundle = await build({
-  stdin: { contents: `export { WindowTitlebar } from './src/components/header/WindowTitlebar.tsx';`, resolveDir: process.cwd() },
+  stdin: { contents: `export { WindowTitlebar } from './src/components/header/WindowTitlebar.tsx'; export { stateStore } from './src/core/state_store.ts';`, resolveDir: process.cwd() },
   bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic', loader: { '.png': 'dataurl' },
   plugins: [{ name: 'native-window-fixture', setup(builder) {
     builder.onResolve({ filter: /^@tauri-apps\/api\/(core|window)$/ }, args => ({ path: args.path, namespace: 'fixture' }));
@@ -36,7 +38,7 @@ const bundle = await build({
     builder.onResolve({ filter: /^[^./]/ }, args => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
   } }],
 });
-const { WindowTitlebar } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
+const { WindowTitlebar, stateStore } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
 const { createRoot } = await import('react-dom/client');
 const root = createRoot(document.getElementById('root'));
 after(async () => { await act(async () => root.unmount()); dom.window.close(); delete globalThis.windowChromeFixture; });
@@ -52,6 +54,28 @@ test('caption buttons retain Windows order and invoke native actions', async () 
   await act(async () => document.querySelector('[aria-label="Restaurar"]').click());
   await act(async () => document.querySelector('[aria-label="Fechar"]').click());
   assert.deepEqual(actions, ['minimize', 'toggleMaximize', 'toggleMaximize', 'close']);
+});
+
+test('native and custom titles follow room join, rename, missing name and leave', async () => {
+  const defaultTitle = 'P2Sharer - Compartilhamento de tela e áudio';
+  assert.equal(titles.at(-1), defaultTitle);
+  assert.equal(document.querySelector('.window-titlebar-title').textContent, defaultTitle);
+  await act(async () => stateStore.set(state => {
+    state.currentRoomCode = 'room-code'; state.currentRoomName = 'Example room';
+    state.roomSlots = [{ peerId: 'local', isLocal: true }];
+  }));
+  assert.equal(titles.at(-1), 'P2Sharer - Example room');
+  assert.equal(document.title, 'P2Sharer - Example room');
+  assert.equal(document.querySelector('.window-titlebar-title').textContent, 'P2Sharer - Example room');
+  await act(async () => stateStore.set(state => { state.currentRoomName = 'Renamed room'; }));
+  assert.equal(titles.at(-1), 'P2Sharer - Renamed room');
+  await act(async () => stateStore.set(state => { state.currentRoomName = ''; }));
+  assert.equal(titles.at(-1), 'P2Sharer - room-code');
+  await act(async () => stateStore.set(state => {
+    state.currentRoomCode = ''; state.currentRoomName = ''; state.roomSlots = [];
+  }));
+  assert.equal(titles.at(-1), defaultTitle);
+  assert.equal(document.querySelector('.window-titlebar-title').textContent, defaultTitle);
 });
 
 test('external window changes update chrome, fullscreen hides it, and teardown releases listeners', async () => {

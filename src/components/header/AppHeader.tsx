@@ -3,7 +3,6 @@ import { useRoom } from '../../hooks/useRoom';
 import { useModal } from '../../hooks/useModal';
 import { showToast } from '../../hooks/useToast';
 import { Tooltip } from '../common/Tooltip';
-import logoImg from '../../assets/logo.png';
 import { BookmarkCheck, BookmarkPlus } from 'lucide-react';
 import { parseRoomInvite } from '../../core/room_invite';
 import { savedRooms, type SavedRoom } from '../../core/saved_rooms';
@@ -59,20 +58,7 @@ export const AppHeader: React.FC = () => {
 
   return (
     <header className="app-header" data-tauri-drag-region>
-      <div className="logo-group">
-        <div className="logo-icon-clean">
-          <img src={logoImg} alt="P2Sharer Logo" className="app-header-logo" width="22" height="22" />
-        </div>
-        <span className="logo-title">P2Sharer</span>
-        {update.version && <Tooltip content={`Atualização ${update.version} disponível`}>
-          <button type="button" className="btn btn-secondary btn-sm app-update-badge"
-            onClick={appUpdates.open} aria-label={`Atualização ${update.version} disponível`}>
-            Atualização
-          </button>
-        </Tooltip>}
-      </div>
-
-      <div className="header-user-info">
+      <div className="header-room-info">
         {isInRoom && (
           <Tooltip
             content={`Copiar convite autenticado (${currentRoomName || currentRoomCode})`}
@@ -119,6 +105,15 @@ export const AppHeader: React.FC = () => {
           </Tooltip>
         )}
 
+        {update.version && <Tooltip content={`Atualização ${update.version} disponível`}>
+          <button type="button" className="btn btn-secondary btn-sm app-update-badge"
+            onClick={appUpdates.open} aria-label={`Atualização ${update.version} disponível`}>
+            Atualização
+          </button>
+        </Tooltip>}
+      </div>
+
+      <div className="header-user-info">
         <button
           className="user-pill"
           id="user-pill"
