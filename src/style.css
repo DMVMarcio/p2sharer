@@ -5260,3 +5260,44 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .settings-sound-event { display: flex; align-items: center; gap: 12px; }
 .settings-sound-event .settings-switch-row { flex: 1; }
 .settings-sound-event .btn { flex-shrink: 0; }
+
+
+/* Main-window chrome follows Windows caption geometry and app theme tokens. */
+.window-titlebar {
+  position: relative;
+  z-index: 10001;
+  display: flex;
+  height: 32px;
+  flex-shrink: 0;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  user-select: none;
+}
+.window-titlebar-drag {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+  padding-left: 12px;
+  font-size: 12px;
+}
+.window-titlebar-drag img { pointer-events: none; }
+.window-titlebar.is-inactive .window-titlebar-drag { color: var(--text-muted); }
+.window-caption-controls { display: flex; align-self: stretch; }
+.btn.window-caption-button {
+  width: 46px;
+  height: 100%;
+  min-width: 46px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-primary);
+  box-shadow: none;
+}
+.btn.window-caption-button:hover { background: var(--bg-card-hover); transform: none; }
+.btn.window-caption-button:active { transform: none; }
+.btn.window-caption-button:focus-visible { outline: 2px solid var(--accent-color); outline-offset: -3px; }
+.btn.window-caption-close:hover { background: var(--danger-hover); color: #ffffff; }

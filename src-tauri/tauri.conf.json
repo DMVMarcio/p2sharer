@@ -14,6 +14,8 @@
     "windows": [
       {
         "title": "P2Sharer - Compartilhamento P2P de Tela e Áudio",
+        "decorations": false,
+        "shadow": true,
         "width": 1200,
         "height": 800,
         "minWidth": 900,
