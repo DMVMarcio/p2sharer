@@ -1,3 +1,4 @@
+import { t } from '../i18n/index.ts';
 import { streamOwner } from "../core/media_streams.ts";
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event';
@@ -57,7 +58,7 @@ export class PipService {
       try {
         await invoke('open_pip_window', {
           peerId,
-          title: senderName || 'Transmissão',
+          title: senderName || t("message.15589e9e374d"),
         });
       } catch (err) {
         console.warn('[PipService] Error focusing PiP window:', err);
@@ -184,7 +185,7 @@ export class PipService {
         console.warn('[PipService] Error creating loopback offer:', err);
         lastOfferFailureAt = Date.now();
         offerPending = false;
-        sendSignal({ type: 'error', message: 'Falha ao negociar a transmissão.' });
+        sendSignal({ type: 'error', message: t("message.fc3bbe0b04e1") });
       } finally {
         creatingOffer = false;
       }
@@ -306,7 +307,7 @@ export class PipService {
     try {
       await invoke('open_pip_window', {
         peerId,
-        title: senderName || 'Transmissão',
+        title: senderName || t("message.15589e9e374d"),
       });
     } catch (err) {
       console.warn('[PipService] Failed to invoke open_pip_window:', err);

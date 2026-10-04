@@ -339,10 +339,11 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   z-index: 100;
 }
 
-.logo-group {
+.header-room-info {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 
 .app-update-badge {
@@ -361,28 +362,8 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   color: var(--text-muted);
 }
 
-.logo-icon-clean {
-  color: var(--accent-color);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.app-header-logo {
-  width: 22px;
-  height: 22px;
-  object-fit: contain;
-  border-radius: 4px;
-}
-
-.logo-title {
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: -0.3px;
-  color: var(--text-primary);
-}
-
 .header-user-info {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -5230,3 +5211,75 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   .source-cards-skeleton-layer, .source-cards-content-layer, .media-preview-skeleton, .media-preview-video.ready, .skeleton-shimmer { animation: none; transition: none; }
   .context-menu button, .context-menu-row, .app-select-option, .chat-file-download-menu button { transition: none; }
 }
+
+
+.chat-unread-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: var(--radius-full);
+  background: var(--accent-color);
+  color: var(--bg-app);
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+}
+
+.tab-btn .chat-unread-badge { margin-left: 6px; }
+.sidebar-toggle-edge.has-unread .sidebar-edge-toggle-btn { opacity: 1; }
+.sidebar-edge-toggle-btn { position: relative; }
+.sidebar-edge-toggle-btn .chat-unread-badge {
+  position: absolute;
+  right: 2px;
+  bottom: calc(100% + 4px);
+}
+.settings-sound-events { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.settings-sound-event { display: flex; align-items: center; gap: 12px; }
+.settings-sound-event .settings-switch-row { flex: 1; }
+.settings-sound-event .btn { flex-shrink: 0; }
+
+
+/* Main-window chrome follows Windows caption geometry and app theme tokens. */
+.window-titlebar {
+  position: relative;
+  z-index: 10001;
+  display: flex;
+  height: 32px;
+  flex-shrink: 0;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  user-select: none;
+}
+.window-titlebar-drag {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+  padding-left: 12px;
+  font-size: 12px;
+}
+.window-titlebar-drag img { pointer-events: none; flex-shrink: 0; }
+.window-titlebar-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.window-titlebar.is-inactive .window-titlebar-drag { color: var(--text-muted); }
+.window-caption-controls { display: flex; align-self: stretch; }
+.btn.window-caption-button {
+  width: 46px;
+  height: 100%;
+  min-width: 46px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-primary);
+  box-shadow: none;
+}
+.btn.window-caption-button:hover { background: var(--bg-card-hover); transform: none; }
+.btn.window-caption-button:active { transform: none; }
+.btn.window-caption-button:focus-visible { outline: 2px solid var(--accent-color); outline-offset: -3px; }
+.btn.window-caption-close:hover { background: var(--danger-hover); color: #ffffff; }

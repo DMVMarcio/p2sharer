@@ -1,3 +1,5 @@
+import { t } from '../../i18n';
+import { useLocale } from '../../hooks/useLocale';
 import React, { useState } from 'react';
 import { useFormSubmit } from '../../hooks/useFormSubmit';
 import { useModal } from '../../hooks/useModal';
@@ -5,6 +7,7 @@ import { stateStore } from '../../core/state_store';
 import { showToast } from '../../hooks/useToast';
 
 export const UsernameModal: React.FC = () => {
+  useLocale();
   const { closeModal, isClosing } = useModal();
   const [val, setVal] = useState(
     () => stateStore.username || `User_${Math.floor(1000 + Math.random() * 9000)}`
@@ -13,7 +16,7 @@ export const UsernameModal: React.FC = () => {
   const handleSave = () => {
     const trimmed = val.trim();
     if (!trimmed) {
-      showToast('Por favor, digite um nome válido.');
+      showToast(t("message.6e96f7800777"));
       return;
     }
     stateStore.set((s) => {
@@ -21,7 +24,7 @@ export const UsernameModal: React.FC = () => {
     });
     localStorage.setItem('p2sharer_username', trimmed);
     closeModal();
-    showToast(`Nome salvo: ${trimmed}`);
+    showToast(t("message.de936d0d1b4d", { v0: trimmed }));
   };
 
   const { submit, pending } = useFormSubmit(handleSave, isClosing);
@@ -36,15 +39,15 @@ export const UsernameModal: React.FC = () => {
               <circle cx="12" cy="7" r="4"/>
             </svg>
           </div>
-          <h2>Definir seu Nome / Apelido</h2>
+          <h2>{t("message.9e74ff12ab50")}</h2>
         </div>
         <div className="modal-body">
-          <p>Como você deseja ser identificado pelos outros participantes da sala?</p>
+          <p>{t("message.647904045700")}</p>
           <input autoComplete="off"
             type="text"
             id="input-username"
             className="text-input"
-            placeholder="Ex: Marcos, Player1, etc."
+            placeholder={t("message.6541e1023005")}
             maxLength={25}
             value={val}
             onChange={(e) => setVal(e.target.value)}
@@ -53,8 +56,7 @@ export const UsernameModal: React.FC = () => {
         </div>
         <div className="modal-footer">
           <button className="btn btn-primary" id="btn-save-username" type="submit" disabled={pending || isClosing}>
-            Continuar
-          </button>
+            {t("message.63e2bbaf1c92")}</button>
         </div>
       </form>
     </div>

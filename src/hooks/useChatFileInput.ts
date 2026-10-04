@@ -1,3 +1,4 @@
+import { t } from '../i18n/index.ts';
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
@@ -26,7 +27,7 @@ export function useChatFileInput(paneRef: RefObject<HTMLDivElement | null>) {
       setFiles(incoming);
     } catch (error) {
       console.warn('[Files] Could not prepare attachment:', error);
-      if (mounted.current) showToast('Não foi possível abrir os arquivos. Selecione até 32 arquivos, de até 2 GB cada.');
+      if (mounted.current) showToast(t("message.3ac7f82e95fe"));
     } finally { busy.current = false; }
   };
 

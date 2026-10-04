@@ -1,3 +1,4 @@
+import { getLanguage, t } from '../i18n/index.ts';
 import { MEDIA_SYNC_MAX_SAMPLE_AGE_MS, shouldCorrectMediaPosition } from '../core/media_sync.ts';
 import { projectYouTubePosition } from './youtube_timeline.ts';
 import type { YouTubeState } from './types.ts';
@@ -164,7 +165,7 @@ export function setYouTubeCaptions(player: YouTubePlayer, enabled: boolean): voi
     }
     const tracks = player.getOption?.('captions', 'tracklist');
     if (Array.isArray(tracks)) {
-      const preferred = navigator.language.split('-')[0];
+      const preferred = getLanguage().split('-')[0];
       const track = tracks.find((entry) => entry?.languageCode === preferred) || tracks[0];
       if (track?.languageCode) player.setOption?.('captions', 'track', { languageCode: track.languageCode });
     }
@@ -184,7 +185,7 @@ export function loadYouTubePlayerApi(): Promise<void> {
   if (!loading) loading = new Promise<void>((resolve, reject) => {
     const script = document.createElement('script');
     script.src = 'https://www.youtube.com/iframe_api';
-    script.onerror = () => reject(new Error('Não foi possível carregar o player do YouTube'));
+    script.onerror = () => reject(new Error(t("message.d15126f20df6")));
     window.onYouTubeIframeAPIReady = () => resolve();
     document.head.appendChild(script);
   });
@@ -193,11 +194,11 @@ export function loadYouTubePlayerApi(): Promise<void> {
 
 export function createYouTubePlayer(element: HTMLElement, onStateChange: (event: PlayerEvent) => void,
   onReady: () => void, onApiChange?: () => void): YouTubePlayer {
-  if (!window.YT) throw new Error('Player indisponível');
+  if (!window.YT) throw new Error(t("message.850a3d116a77"));
   return new window.YT.Player(element, {
     width: '100%', height: '100%',
     playerVars: { playsinline: 1, origin: window.location.origin, rel: 0, controls: 0,
-      disablekb: 1, iv_load_policy: 3, cc_load_policy: 0 },
+      disablekb: 1, iv_load_policy: 3, cc_load_policy: 0, hl: getLanguage() },
     events: { onStateChange, onReady, onApiChange },
   });
 }

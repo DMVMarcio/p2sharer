@@ -1,3 +1,4 @@
+import { t } from '../i18n/index.ts';
 import type { DownloadEvent } from '@tauri-apps/plugin-updater';
 
 export interface AvailableUpdate {
@@ -121,7 +122,7 @@ export class AppUpdateController {
         returnToStable: !this.state.includePrereleases && !!result?.currentVersion?.split('+')[0].includes('-') });
     } catch {
       if (channel === this.channelGeneration) {
-        this.set({ status: 'error', error: 'Não foi possível procurar atualizações. Verifique sua conexão e tente novamente.' });
+        this.set({ status: 'error', error: t("message.94a3bbaf45de") });
       }
     } finally {
       this.busy = false;
@@ -147,7 +148,7 @@ export class AppUpdateController {
       this.set({ status: 'ready', progress: 100 });
     } catch {
       this.set({ status: 'error', progress: null,
-        error: 'Não foi possível baixar ou validar a atualização. Tente novamente.' });
+        error: t("message.39190aefd928") });
     } finally { this.busy = false; }
   }
 
@@ -161,7 +162,7 @@ export class AppUpdateController {
       await this.dependencies.restart();
     } catch {
       // Keep the verified download available for another installation attempt.
-      this.set({ status: 'ready', error: 'Não foi possível instalar a atualização. Tente novamente.' });
+      this.set({ status: 'ready', error: t("message.0d3fe36ea8ce") });
     } finally { this.busy = false; }
   }
 }

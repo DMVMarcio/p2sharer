@@ -1,3 +1,5 @@
+import { localizeText, t } from '../../i18n';
+import { useLocale } from '../../hooks/useLocale';
 import { useStreamPointer } from '../../hooks/useStreamPointer';
 import { streamOwner, formatFrameRate } from '../../core/media_streams';
 import { StreamPointerToggle } from './StreamPointerToggle';
@@ -11,7 +13,7 @@ import { ZoomControlBar } from './ZoomControlBar';
 import { StreamStatsOverlay } from './StreamStatsOverlay';
 import { buildIceServers } from '../../p2p/ice_config';
 import { initFrontendLogger } from '../../core/logger';
-import { Maximize, Pin, PictureInPicture2, RotateCcw, VolumeX, Volume2 } from 'lucide-react';
+import { Maximize, PanelsTopLeft, Pin, PictureInPicture2, RotateCcw, VolumeX, Volume2 } from 'lucide-react';
 import { useContextMenu, type ContextMenuAction } from '../common/ContextMenu';
 import { validPipAudioSettings } from '../../services/pip_audio';
 
@@ -30,6 +32,7 @@ interface PeerStats {
 }
 
 export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
+  useLocale();
   const openContextMenu = useContextMenu();
   useEffect(() => {
     initFrontendLogger();
@@ -39,7 +42,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [senderName, setSenderName] = useState<string>(
-    () => new URLSearchParams(window.location.search).get('name') || 'Transmissão'
+    () => new URLSearchParams(window.location.search).get('name') || t("message.15589e9e374d")
   );
   const [isLocal, setIsLocal] = useState<boolean>(streamOwner(peerId) === 'local');
   const [pointerEligible, setPointerEligible] = useState(true);
@@ -137,7 +140,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
         videoRef.current.muted = true;
         videoRef.current.play().catch((err) => {
           console.warn('[PipView] Video playback failed:', err);
-          setConnectionError('Não foi possível reproduzir a transmissão.');
+          setConnectionError(t("message.0dab620e9961"));
         });
       }
 
@@ -277,7 +280,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
           clearInterval(retryInterval);
           retryInterval = null;
           if (!isVideoPlayingRef.current) {
-            setConnectionError('A transmissão não respondeu. Feche e abra o PiP para tentar novamente.');
+            setConnectionError(t("message.cb809bc84e15"));
           }
         }
       }, 500);
@@ -424,13 +427,13 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
       ref={containerRef}
       onContextMenu={(event) => {
         const actions: ContextMenuAction[] = [
-          { id: 'restore', label: 'Restaurar para o app', icon: <PictureInPicture2 size={15} />, onSelect: () => handleClose() },
-          { id: 'top', label: isAlwaysOnTop ? 'Desafixar janela do topo' : 'Manter janela no topo', icon: <Pin size={15} />, onSelect: () => handleToggleAlwaysOnTop() },
-          { id: 'hud', label: isHudPinned ? 'Desafixar controles' : 'Fixar controles', icon: <Pin size={15} />, onSelect: () => setIsHudPinned(!isHudPinned) },
-          { id: 'fullscreen', label: isFullscreen ? 'Sair da tela cheia' : 'Tela cheia', icon: <Maximize size={15} />, onSelect: () => handleToggleFullscreen() },
+          { id: 'restore', get label() { return t("message.5899ac52fbbf"); }, icon: <PictureInPicture2 size={15} />, onSelect: () => handleClose() },
+          { id: 'top', get label() { return isAlwaysOnTop ? t("message.ceda40d1828b") : t("message.22da96afd9d8"); }, icon: <Pin size={15} />, onSelect: () => handleToggleAlwaysOnTop() },
+          { id: 'hud', get label() { return isHudPinned ? t("message.6bc8448647e0") : t("message.1572541abe33"); }, icon: <PanelsTopLeft size={15} />, onSelect: () => setIsHudPinned(!isHudPinned) },
+          { id: 'fullscreen', get label() { return isFullscreen ? t("message.cbe5019d4a64") : t("message.cdd35dea1ee3"); }, icon: <Maximize size={15} />, onSelect: () => handleToggleFullscreen() },
         ];
-        if (!isLocal) actions.push({ id: 'mute', label: isMuted ? 'Ativar áudio' : 'Silenciar áudio', icon: isMuted ? <Volume2 size={15} /> : <VolumeX size={15} />, onSelect: () => handleToggleMute() });
-        if (zoom > 1) actions.push({ id: 'zoom', label: 'Redefinir zoom', icon: <RotateCcw size={15} />, onSelect: resetZoom });
+        if (!isLocal) actions.push({ id: 'mute', get label() { return isMuted ? t("message.5cfebda5d336") : t("message.70f507f2963f"); }, icon: isMuted ? <Volume2 size={15} /> : <VolumeX size={15} />, onSelect: () => handleToggleMute() });
+        if (zoom > 1) actions.push({ id: 'zoom', get label() { return t("message.2a1c7eafd8bb"); }, icon: <RotateCcw size={15} />, onSelect: resetZoom });
         openContextMenu(event, actions);
       }}
       onMouseDown={handleMouseDown}
@@ -465,7 +468,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
       {!isVideoPlaying && (
         <div className="pip-loading-placeholder">
           {!connectionError && <div className="pip-loading-spinner" />}
-          <span>{connectionError || (stream ? 'Aguardando vídeo...' : 'Conectando transmissão...')}</span>
+          <span>{(connectionError ? localizeText(connectionError) : null) || (stream ? t("message.863d929084c6") : t("message.3bc3a2cd970b"))}</span>
         </div>
       )}
 
@@ -486,7 +489,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
               type="button"
               className={`pip-header-btn ${isAlwaysOnTop ? 'active' : ''}`}
               onClick={handleToggleAlwaysOnTop}
-              aria-label={isAlwaysOnTop ? 'Desafixar do topo' : 'Fixar sempre no topo'}
+              aria-label={isAlwaysOnTop ? t("message.9edf08040405") : t("message.8826562e878e")}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill={isAlwaysOnTop ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="12" y1="17" x2="12" y2="22" />
@@ -499,7 +502,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
               type="button"
               className="pip-header-btn pip-close-btn"
               onClick={handleClose}
-              aria-label="Fechar Picture-in-Picture e voltar ao app"
+              aria-label={t("message.68392bf40d15")}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="18" y1="6" x2="6" y2="18" />
@@ -519,13 +522,11 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
           pingClass={(stats.pingMs ?? 15) < 80 ? 'ping-good' : (stats.pingMs ?? 15) < 180 ? 'ping-medium' : 'ping-poor'}
           transportTag={stats.transportTag}
           watchers={stats.watchers}
-          currentUsername={stateStore.username}
           onTooltipOpenChange={handleTooltipOpenChange}
         />
 
         {/* Hover / Pinned Controls Pill (Bottom-Right) */}
         <div className="stream-controls-group">
-          {!isLocal && pointerEligible && <StreamPointerToggle enabled={pointer.enabled} onToggle={pointer.toggle} />}
           {/* Audio Volume Controller */}
           {!isLocal && (
             <div className={`stream-volume-controller ${isMuted ? 'muted' : ''}`}>
@@ -533,7 +534,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
                 type="button"
                 className="btn-stream-volume"
                 onClick={handleToggleMute}
-                aria-label={isMuted ? 'Ativar Áudio' : 'Desativar Áudio'}
+                aria-label={isMuted ? t("message.d99ff5fe7c0d") : t("message.712929976510")}
               >
                 {isMuted || volume === 0 ? (
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -559,12 +560,14 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
                   value={isMuted ? 0 : volume}
                   onChange={handleVolumeChange}
                   className="stream-volume-range"
-                  aria-label="Controle de volume do participante"
+                  aria-label={t("message.c6c6caae0ddf")}
                 />
                 <span className="stream-volume-percent">{isMuted ? '0%' : `${volume}%`}</span>
               </div>
             </div>
           )}
+
+          {!isLocal && pointerEligible && <StreamPointerToggle enabled={pointer.enabled} onToggle={pointer.toggle} />}
 
           {/* Pin HUD Button */}
           <button
@@ -574,12 +577,9 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
               e?.stopPropagation();
               setIsHudPinned(!isHudPinned);
             }}
-            aria-label={isHudPinned ? 'Desafixar Controles' : 'Fixar Controles'}
+            aria-label={isHudPinned ? t("message.36e8a1a8461f") : t("message.e96d2fff8199")}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill={isHudPinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="17" x2="12" y2="22" />
-              <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
-            </svg>
+            <PanelsTopLeft size={14} aria-hidden="true" />
           </button>
 
           {/* Fullscreen Button */}
@@ -587,7 +587,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
             type="button"
             className={`btn-stream-fullscreen ${isFullscreen ? 'active' : ''}`}
             onClick={handleToggleFullscreen}
-            aria-label={isFullscreen ? 'Sair da Tela Cheia' : 'Tela Cheia'}
+            aria-label={isFullscreen ? t("message.1ea619b7211d") : t("message.1dfa15614e9a")}
           >
             {isFullscreen ? (
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

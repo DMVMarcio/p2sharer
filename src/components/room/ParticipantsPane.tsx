@@ -1,3 +1,5 @@
+import { t } from '../../i18n';
+import { useLocale } from '../../hooks/useLocale';
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { MoreHorizontal, Shield, Crown, UserX, Play } from 'lucide-react';
@@ -6,6 +8,7 @@ import { useRoom } from '../../hooks/useRoom';
 import { showToast } from '../../hooks/useToast';
 
 export const ParticipantsPane: React.FC = () => {
+  useLocale();
   const { username, peers, roomSlots, isCreator, isRoomHost, isRoomAdmin,
     transferOwnership, setAdministrator, kickPeer, requestStream } = useRoom();
   const openContextMenu = useContextMenu();
@@ -19,10 +22,10 @@ export const ParticipantsPane: React.FC = () => {
       : pendingAction.kind === 'transfer' ? await transferOwnership(pendingAction.id)
       : await setAdministrator(pendingAction.id, pendingAction.kind === 'admin');
     showToast(success
-      ? pendingAction.kind === 'kick' ? 'Participante removido.'
-        : pendingAction.kind === 'transfer' ? 'Transferência de propriedade enviada.'
-          : pendingAction.kind === 'admin' ? 'Administrador adicionado.' : 'Administrador removido.'
-      : 'Não foi possível concluir esta ação.');
+      ? pendingAction.kind === 'kick' ? t("message.3b9975d16b7e")
+        : pendingAction.kind === 'transfer' ? t("message.fcd904c2aa7a")
+          : pendingAction.kind === 'admin' ? t("message.0e7b483bebf7") : t("message.38a94bc6dc26")
+      : t("message.1776fea88e1f"));
     setPendingAction(null);
   };
 
@@ -50,10 +53,10 @@ export const ParticipantsPane: React.FC = () => {
               <span className="participant-item-avatar-letter">{getInitial(username)}</span>
             </div>
             <div className="participant-item-text">
-              <span className="participant-item-name">{username || 'Usuário'}</span>
-              <span className="badge-you">VOCÊ</span>
-              {isCreator && <span className="badge-host">HOST</span>}
-              {isRoomAdmin && !isCreator && <span className="badge-host">ADMIN</span>}
+              <span className="participant-item-name">{username || t("message.f53bbaa05fae")}</span>
+              <span className="badge-you">{t("message.a03099f135b1")}</span>
+              {isCreator && <span className="badge-host">{t("common.hostBadge")}</span>}
+              {isRoomAdmin && !isCreator && <span className="badge-host">{t("common.adminBadge")}</span>}
             </div>
           </div>
           <span className="user-status-dot online"></span>
@@ -65,13 +68,13 @@ export const ParticipantsPane: React.FC = () => {
           const slot = roomSlots.find((s) => s.peerId === p.id);
           const isStreaming = slot?.isStreaming;
           const actions: ContextMenuAction[] = [];
-          if (isStreaming) actions.push({ id: 'watch', label: 'Assistir transmissão', icon: <Play size={15} />, onSelect: () => requestStream(p.id) });
+          if (isStreaming) actions.push({ id: 'watch', get label() { return t("message.5a49c69bab6b"); }, icon: <Play size={15} />, onSelect: () => requestStream(p.id) });
           if (isRoomHost && p.connectionState === 'connected' && !p.isCreator) actions.push(
-            { id: 'admin', label: p.isAdmin ? 'Remover administrador' : 'Tornar administrador', icon: <Shield size={15} />,
+            { id: 'admin', get label() { return p.isAdmin ? t("message.a1073128f2dc") : t("message.1c6f1047e43c"); }, icon: <Shield size={15} />,
               onSelect: () => setPendingAction({ kind: p.isAdmin ? 'revoke-admin' : 'admin', id: p.id, name: p.username }) },
-            { id: 'transfer', label: 'Transferir propriedade', icon: <Crown size={15} />,
+            { id: 'transfer', get label() { return t("message.2ffa385a1bc4"); }, icon: <Crown size={15} />,
               onSelect: () => setPendingAction({ kind: 'transfer', id: p.id, name: p.username }) },
-            { id: 'kick', label: 'Expulsar', icon: <UserX size={15} />, danger: true,
+            { id: 'kick', get label() { return t("message.ffb1a9c946e7"); }, icon: <UserX size={15} />, danger: true,
               onSelect: () => setPendingAction({ kind: 'kick', id: p.id, name: p.username }) },
           );
 
@@ -86,14 +89,14 @@ export const ParticipantsPane: React.FC = () => {
                 </div>
                 <div className="participant-item-text">
                   <span className="participant-item-name">{p.username}</span>
-                  {p.isCreator && <span className="badge-host">HOST</span>}
-                  {p.isAdmin && !p.isCreator && <span className="badge-host">ADMIN</span>}
-                  {isStreaming && <span className="badge-live-stream-mini">AO VIVO</span>}
+                  {p.isCreator && <span className="badge-host">{t("common.hostBadge")}</span>}
+                  {p.isAdmin && !p.isCreator && <span className="badge-host">{t("common.adminBadge")}</span>}
+                  {isStreaming && <span className="badge-live-stream-mini">{t("message.b7c19868a9a8")}</span>}
                 </div>
               </div>
               <div className="participant-end-actions">
                 <span className={`user-status-dot ${p.connectionState === 'connected' ? 'online' : 'connecting'}`}></span>
-                {actions.length > 0 && <button className="participant-menu-trigger" aria-label={`Ações para ${p.username}`}
+                {actions.length > 0 && <button className="participant-menu-trigger" aria-label={t("message.b52de8210f9a", { v0: p.username })}
                   aria-haspopup="menu" onClick={(event) => {
                     const rect = event.currentTarget.getBoundingClientRect();
                     openContextMenu({ clientX: rect.right, clientY: rect.bottom, currentTarget: event.currentTarget,
@@ -106,20 +109,20 @@ export const ParticipantsPane: React.FC = () => {
       </div>
       {pendingAction && createPortal(<div className="modal-overlay" role="presentation">
         <div className="modal-card participant-confirm-dialog" role="alertdialog" aria-modal="true"
-          aria-label={pendingAction.kind === 'kick' ? 'Confirmar expulsão' : 'Confirmar alteração de função'}>
-          <div className="modal-header"><h2>{pendingAction.kind === 'kick' ? 'Expulsar participante'
-            : pendingAction.kind === 'transfer' ? 'Transferir propriedade' : 'Alterar administrador'}</h2></div>
+          aria-label={pendingAction.kind === 'kick' ? t("message.c8441cf46109") : t("message.31da2f84aa1c")}>
+          <div className="modal-header"><h2>{pendingAction.kind === 'kick' ? t("message.dd71f6a23c60")
+            : pendingAction.kind === 'transfer' ? t("message.2ffa385a1bc4") : t("message.159c8a918684")}</h2></div>
           <div className="modal-body"><p>{pendingAction.kind === 'kick'
-            ? `Remover ${pendingAction.name} da sala e renovar a senha de entrada?`
+            ? t("message.6bf827d35784", { v0: pendingAction.name })
             : pendingAction.kind === 'transfer'
-              ? `Tornar ${pendingAction.name} o único host da sala? Você perderá as permissões de host.`
+              ? t("message.91a5639b2411", { v0: pendingAction.name })
               : pendingAction.kind === 'admin'
-                ? `Permitir que ${pendingAction.name} entre e admita participantes mesmo quando você estiver ausente?`
-                : `Remover as permissões de administrador de ${pendingAction.name}?`}</p></div>
+                ? t("message.b13c3124bfc2", { v0: pendingAction.name })
+                : t("message.7cfbbb1f9566", { v0: pendingAction.name })}</p></div>
           <div className="modal-footer">
-            <button className="btn btn-secondary" onClick={() => setPendingAction(null)}>Cancelar</button>
+            <button className="btn btn-secondary" onClick={() => setPendingAction(null)}>{t("message.bb9dbb406dcb")}</button>
             <button className={pendingAction.kind === 'kick' ? 'btn btn-danger' : 'btn btn-primary'}
-              onClick={() => void confirmAction()}>Confirmar</button>
+              onClick={() => void confirmAction()}>{t("message.717bedea36fc")}</button>
           </div>
         </div>
       </div>, document.body)}

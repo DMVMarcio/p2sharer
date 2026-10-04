@@ -1,3 +1,5 @@
+import { t } from '../../i18n';
+import { useLocale } from '../../hooks/useLocale';
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { autoUpdate, computePosition, flip, offset, shift, size } from '@floating-ui/dom';
@@ -18,7 +20,8 @@ interface Props extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'value' | 
 }
 
 /** Canonical single-value selector. Focus stays on the combobox, including inside modal traps. */
-export function Select({ value, options, onValueChange, placeholder = 'Selecionar', className = '', disabled, onKeyDown, onBlur, ...props }: Props) {
+export function Select({ value, options, onValueChange, placeholder = t("message.6a57618c2593"), className = '', disabled, onKeyDown, onBlur, ...props }: Props) {
+  useLocale();
   const listId = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -145,7 +148,7 @@ export function Select({ value, options, onValueChange, placeholder = 'Seleciona
       <ChevronDown className="app-select-chevron" size={14} aria-hidden="true" />
     </button>
     {presence.value && createPortal(<div ref={listRef} id={listId} role="listbox"
-      aria-label={props['aria-label'] ?? triggerRef.current?.labels?.[0]?.textContent ?? 'Opções'}
+      aria-label={props['aria-label'] ?? triggerRef.current?.labels?.[0]?.textContent ?? t("message.eadb377837ef")}
       className={`app-select-list ${presence.closing ? 'dropdown-closing' : ''}`}
       data-placement={placement} inert={presence.closing} aria-hidden={presence.closing}
       style={{ ...position, visibility: positioned ? 'visible' : 'hidden' }}

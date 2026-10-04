@@ -1,3 +1,4 @@
+import { localizeError, t } from '../i18n/index.ts';
 import { streamOwner, type MediaKind, type StreamDescriptor } from "../core/media_streams.ts";
 import { StreamPointerReceiver } from './stream_pointer_receiver.ts';
 import { generateUserColor } from '../p2p/group_room.ts';
@@ -9,6 +10,7 @@ import { roomAppsService } from '../apps/room_apps_service.ts';
 import { AudioBridge } from '../audio/audio_bridge.ts';
 import { audioContextManager } from '../audio/audio_context_manager.ts';
 import { stateStore } from '../core/state_store.ts';
+import { shouldNotifyChat } from '../core/chat_notifications.ts';
 import { mergeChatHistory, nextChatOrder } from '../core/chat_history.ts';
 import { CHAT_FILE_CHUNK_BYTES, MAX_IMAGE_PREVIEW_BYTES } from '../core/chat_file_limits.ts';
 import { verifyRoomInvite } from '../core/room_invite_validation.ts';
@@ -54,12 +56,12 @@ export class RoomService {
   private localSaveIds = new Set<string>();
   private cancelledLocalSaves = new Set<string>();
   public peers: PeerInfo[] = [];
-  public roomStatusText: string = 'Sala Ativa';
+  public roomStatusText: string = t("message.e56841de8c6f");
   public connectingOverlay: ConnectingOverlayState = {
     visible: false,
     roomCode: '',
-    title: 'Entrando na sala...',
-    subtitle: 'Estabelecendo sinalização e túnel P2P criptografado...',
+    get title() { return t("message.ecec62501ea4"); },
+    subtitle: t("message.4077d30835d4"),
   };
 
   private listeners: Set<Listener> = new Set();
@@ -105,7 +107,7 @@ export class RoomService {
     }
     this.nativeVideoBridge.onFallbackNeeded = (reason: string, fallbackStream?: MediaStream) => {
       if (fallbackStream) {
-        showToast(`Transmissão alternada (${reason})`);
+        showToast(t("message.fdd8098529f7", { v0: localizeError(reason) }));
         const isLive =
           fallbackStream.active ??
           fallbackStream.getVideoTracks().some((t) => t.readyState === 'live');
@@ -133,18 +135,18 @@ export class RoomService {
         }
       } else {
         if (reason === 'window_minimized') {
-          showToast('Aviso: A janela transmitida foi minimizada.');
+          showToast(t("message.da9fa69dcc5d"));
         } else if (reason === 'window_not_found') {
-          showToast('A janela transmitida foi fechada.');
+          showToast(t("message.52272f3cb20b"));
           this.stopScreenSharing();
         } else {
-          showToast(`Alerta de captura: ${reason}`);
+          showToast(t("message.c74fa38e13bf", { v0: localizeError(reason) }));
         }
       }
     };
   }
 
-  public showConnecting(roomCode: string, title = 'Entrando na sala...', subtitle = 'Estabelecendo sinalização e túnel P2P criptografado...'): void {
+  public showConnecting(roomCode: string, title = t("message.ecec62501ea4"), subtitle = t("message.4077d30835d4")): void {
     this.connectingOverlay = {
       visible: true,
       roomCode,
@@ -178,7 +180,7 @@ export class RoomService {
     roomAppsService.reset();
     const parsed = await verifyRoomInvite(code);
     if (!parsed && typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
-      throw new Error('Um convite autenticado é necessário para entrar na sala');
+      throw new Error(t("message.a07036fbd08c"));
     }
     stateStore.set((s) => {
       s.currentRoomCode = parsed ? parsed.roomId.slice(0, 8) : code;
@@ -189,7 +191,7 @@ export class RoomService {
       s.roomSlots = [
         {
           peerId: 'local',
-          senderName: s.username || 'Usuário',
+          senderName: s.username || t("message.f53bbaa05fae"),
           stream: null,
           isStreaming: false,
           isLocal: true,
@@ -202,6 +204,7 @@ export class RoomService {
 
     this.clearImagePreviews();
     this.chatMessages = [];
+    stateStore.set((state) => { state.unreadChatMessages = 0; state.sidebarTab = 'chat'; });
     this.fileRequests = [];
     this.fileProgress = {};
     this.transferRates.clear();
@@ -209,10 +212,10 @@ export class RoomService {
     this.savedDownloads = {};
     this.localFilePreviews = {};
     this.peers = [];
-    this.roomStatusText = 'Conectando à sala...';
+    this.roomStatusText = t("message.93b8343c85ed");
 
     this.showConnecting(parsed ? parsed.roomId.slice(0, 8) : code,
-      isCreator ? 'Criando sala P2P...' : 'Entrando na sala...');
+      isCreator ? t("message.5cdbf83a7ecb") : t("message.ecec62501ea4"));
 
     if (this.roomConnectingTimeout) {
       clearTimeout(this.roomConnectingTimeout);
@@ -220,7 +223,7 @@ export class RoomService {
     // Dismiss the overlay, but keep searching and describe the actual state.
     this.roomConnectingTimeout = setTimeout(() => {
       if (!isCreator && this.peers.every((peer) => peer.connectionState !== 'connected')) {
-        this.roomStatusText = 'Ainda procurando participantes...';
+        this.roomStatusText = t("message.5ea38d33d5af");
       }
       this.hideConnecting();
       this.notify();
@@ -238,7 +241,7 @@ export class RoomService {
     }
 
     const manager = new GroupRoomManager(
-      stateStore.username || 'Usuário',
+      stateStore.username || t("message.f53bbaa05fae"),
       code,
       pass,
       isCreator,
@@ -265,7 +268,7 @@ export class RoomService {
       onFileProgress: (progress) => {
         if (this.roomManager !== manager) return;
         this.recordFileProgress(progress);
-        if (progress.status === 'error') showToast('Não foi possível concluir a transferência do arquivo.');
+        if (progress.status === 'error') showToast(t("message.fd2175809652"));
       },
       onStreamPointerState: (snapshot, broadcasterId) => {
         const slot = stateStore.roomSlots.find((slot) => (slot.ownerPeerId || slot.peerId) === broadcasterId && slot.pointerEligible !== false && (!snapshot.mediaId || slot.mediaId === snapshot.mediaId));
@@ -299,6 +302,12 @@ export class RoomService {
       },
       onChat: (msg: ChatMessage) => {
         if (this.roomManager !== manager) return;
+        if (shouldNotifyChat(msg, this.chatMessages, manager.getLocalPeerId())) {
+          soundEffects.playMessage();
+          if (stateStore.isSidebarCollapsed || stateStore.sidebarTab !== 'chat') {
+            stateStore.set((state) => { state.unreadChatMessages += 1; });
+          }
+        }
         this.chatMessages = mergeChatHistory(this.chatMessages, [msg]);
         if (msg.deletedAt && msg.file) {
           this.fileRequests = this.fileRequests.filter((request) => request.messageId !== msg.id);
@@ -383,7 +392,7 @@ export class RoomService {
         stateStore.set((s) => {
           s.currentRoomPassword = newPassword;
         });
-        showToast(`Senha atualizada por ${updatedBy}`);
+        showToast(t("message.6fef198fc542", { v0: updatedBy }));
         if (parsed) {
           void savedRooms.get(parsed.roomId).then((record) => {
             if (record) return savedRooms.put({ ...record, protected: Boolean(newPassword),
@@ -468,20 +477,20 @@ export class RoomService {
     const editingId = stateStore.editingStreamId;
     const manager = this.roomManager;
     const task = this.captureTransition.then(async () => {
-      if (!manager || manager !== this.roomManager) throw new Error('A sala foi encerrada.');
-      if (prepared && prepared.sourceId !== sourceId) throw new Error('A fonte da prévia foi alterada.');
+      if (!manager || manager !== this.roomManager) throw new Error(t("message.bf66db69d5a4"));
+      if (prepared && prepared.sourceId !== sourceId) throw new Error(t("message.fd5594ea5b0a"));
       const previous = editingId ? this.localCaptures.get(editingId) : undefined;
-      if (editingId && !previous) throw new Error('A transmissão foi encerrada.');
-      if (!previous && this.localCaptures.size >= 16) throw new Error('Limite de 16 transmissões simultâneas.');
+      if (editingId && !previous) throw new Error(t("message.114345ccaf14"));
+      if (!previous && this.localCaptures.size >= 16) throw new Error(t("message.00499022bcb0"));
       const kind: MediaKind = sourceId.startsWith('camera:') ? 'camera' : 'screen';
-      if (previous && kind !== previous.kind) throw new Error('Escolha outra fonte do mesmo tipo de transmissão.');
+      if (previous && kind !== previous.kind) throw new Error(t("message.eae4d3abfdf0"));
       if (previous && kind === 'camera' && sourceId === previous.sourceId && !prepared) {
         await previous.stream.getVideoTracks()[0].applyConstraints({ width: { ideal: res.width }, height: { ideal: res.height },
           frameRate: { ideal: fps, max: fps } });
         manager.updateMediaSettings(editingId!, fps, bitrate);
         Object.assign(previous, { fps, bitrate, resolution: res, quality, mouse });
         this.syncCaptureState();
-        showToast('Transmissão atualizada');
+        showToast(t("message.d1943a972148"));
         return;
       }
       const id = editingId || crypto.randomUUID();
@@ -494,15 +503,15 @@ export class RoomService {
             ...(sourceId.slice(7) ? { deviceId: { exact: sourceId.slice(7) } } : {}),
             width: { ideal: res.width }, height: { ideal: res.height }, frameRate: { ideal: fps, max: fps },
           } }));
-        if (manager !== this.roomManager) throw new Error('A sala foi encerrada.');
+        if (manager !== this.roomManager) throw new Error(t("message.bf66db69d5a4"));
         const track = stream.getVideoTracks()[0];
-        if (!track || track.readyState === 'ended') throw new Error('A fonte não forneceu vídeo.');
+        if (!track || track.readyState === 'ended') throw new Error(t("message.06ca1dffe31a"));
         // Keep the capture bridge's track container separate from the broadcast container.
         // Live replacement mutates only the latter; disposing the old bridge must not stop the new track.
         if (!previous) stream = new MediaStream(stream.getTracks());
         track.contentHint = kind === 'camera' ? 'motion' : 'detail';
-        const descriptor: StreamDescriptor = { id, kind, label: (label || (kind === 'camera' ? 'Câmera' :
-          sourceId.startsWith('window:') ? 'Janela' : 'Tela')).slice(0, 200), videoTrackId: track.id, fps, bitrate };
+        const descriptor: StreamDescriptor = { id, kind, get label() { return (label || (kind === 'camera' ? t("message.dafb61aca12d") :
+          sourceId.startsWith('window:') ? t("message.28014ef35252") : t("message.2d31efc9c2ed"))).slice(0, 200); }, videoTrackId: track.id, fps, bitrate };
         if (previous) {
           await manager.replaceMediaTrack(id, track, descriptor);
           this.pointerReceivers.get(id)?.clear();
@@ -523,16 +532,16 @@ export class RoomService {
         this.localCaptures.set(id, capture);
         track.onended = () => { if (this.localCaptures.get(id) === capture) this.stopTransmission(id); };
         if (bridge) bridge.onFallbackNeeded = () => {
-          if (this.localCaptures.get(id) === capture) { showToast('A fonte de vídeo foi encerrada.'); this.stopTransmission(id); }
+          if (this.localCaptures.get(id) === capture) { showToast(t("message.e018f7492e19")); this.stopTransmission(id); }
         };
         if (previous?.bridge) await previous.bridge.stopCapture();
         if (previous && !previous.bridge) previous.stream.getVideoTracks().filter((item) => item !== track).forEach((item) => item.stop());
         this.syncCaptureState();
-        showToast(previous ? 'Transmissão atualizada' : 'Transmissão iniciada');
+        showToast(previous ? t("message.d1943a972148") : t("message.3c3d7ea79d61"));
       } catch (error) {
         if (bridge) await bridge.stopCapture();
         else if (stream && stream !== previous?.stream) stream.getTracks().forEach((track) => track.stop());
-        showToast(`Não foi possível iniciar a captura: ${error}`);
+        showToast(t("message.5a1156df731c", { v0: localizeError(error) }));
         throw error;
       }
     });
@@ -644,6 +653,7 @@ export class RoomService {
     });
 
     this.chatMessages = [];
+    stateStore.set((state) => { state.unreadChatMessages = 0; state.sidebarTab = 'chat'; });
     this.fileRequests = [];
     this.fileProgress = {};
     this.transferRates.clear();
@@ -655,7 +665,7 @@ export class RoomService {
     this.cancelledLocalSaves.clear();
     this.peers = [];
     this.hideConnecting();
-    showToast('Você saiu da sala.');
+    showToast(t("message.b520e8324025"));
     this.notify();
   }
 
@@ -712,9 +722,9 @@ export class RoomService {
     } else if (progress.status !== 'pending') this.transferRates.delete(progress.requestId);
     const entry: FileProgress = {
       ...previous, ...reported,
-      fileName: progress.fileName ?? previous?.fileName ?? message?.file?.name ?? 'Arquivo',
+      fileName: progress.fileName ?? previous?.fileName ?? message?.file?.name ?? t("message.ba8a452f2f83"),
       peerName: progress.peerName ?? previous?.peerName ?? peer?.username ??
-        (progress.direction === 'receive' ? message?.sender : undefined) ?? 'Participante',
+        (progress.direction === 'receive' ? message?.sender : undefined) ?? t("message.1e97ddf60a0f"),
       peerId: progress.peerId ?? previous?.peerId,
       previewOnly: progress.previewOnly ?? previous?.previewOnly,
       startedAt: previous?.startedAt ?? Date.now(),
@@ -866,7 +876,7 @@ export class RoomService {
     const msg: ChatMessage = {
       id: `sys_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       logicalOrder: nextChatOrder(this.chatMessages),
-      sender: 'Sistema',
+      sender: t("message.f150afd3c599"),
       text,
       timestamp: Date.now(),
       isSystem: true,
@@ -914,7 +924,7 @@ export class RoomService {
       s.subscribedStreams.add(peerId);
     });
     if (this.roomManager) {
-      this.roomManager.requestStream(streamOwner(peerId));
+      this.roomManager.requestStream(peerId);
     }
     this.notify();
   }
@@ -930,9 +940,7 @@ export class RoomService {
       }
     });
     if (this.roomManager) {
-      if (!stateStore.roomSlots.some((slot) => streamOwner(slot.peerId) === streamOwner(peerId) && stateStore.subscribedStreams.has(slot.peerId))) {
-        this.roomManager.stopWatching(streamOwner(peerId));
-      }
+      this.roomManager.stopWatching(peerId);
     }
     this.notify();
   }

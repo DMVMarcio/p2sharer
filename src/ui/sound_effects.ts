@@ -1,7 +1,12 @@
 // Sound Effects Manager using Web Audio API
 // Generates crisp, modern and pleasant auditory cues with zero external audio assets and zero latency.
 
-class SoundEffectsManager {
+export const SOUND_EVENTS = ['message', 'userJoin', 'userLeave', 'screenShareStart', 'screenShareStop', 'watchStreamStart', 'watchStreamStop'] as const;
+export type SoundEvent = typeof SOUND_EVENTS[number];
+export type SoundPreferences = Record<SoundEvent, boolean>;
+
+export class SoundEffectsManager {
+  private events: SoundPreferences = Object.fromEntries(SOUND_EVENTS.map((event) => [event, true])) as SoundPreferences;
   private audioCtx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
   private isEnabled: boolean = true;
@@ -16,6 +21,16 @@ class SoundEffectsManager {
       const savedEnabled = localStorage.getItem('p2sharer_sfx_enabled');
       if (savedEnabled !== null) {
         this.isEnabled = savedEnabled === 'true';
+      }
+      const savedEvents = localStorage.getItem('p2sharer_sfx_events');
+      if (savedEvents) {
+        const parsed: unknown = JSON.parse(savedEvents);
+        if (parsed && typeof parsed === 'object') {
+          for (const event of SOUND_EVENTS) {
+            const value = (parsed as Record<string, unknown>)[event];
+            if (typeof value === 'boolean') this.events[event] = value;
+          }
+        }
       }
       const savedVolume = localStorage.getItem('p2sharer_sfx_volume');
       if (savedVolume !== null) {
@@ -52,10 +67,62 @@ class SoundEffectsManager {
     return this.volume;
   }
 
-  private ensureAudioContext(): AudioContext | null {
-    if (!this.isEnabled || this.volume <= 0) {
+  public getEventPreferences(): SoundPreferences { return { ...this.events }; }
+
+  public setEventPreferences(preferences: SoundPreferences) {
+    this.events = { ...preferences };
+    try { localStorage.setItem('p2sharer_sfx_events', JSON.stringify(this.events)); } catch {}
+  }
+
+  public preview(event: SoundEvent, volume: number) {
+    const enabled = this.isEnabled;
+    const preferences = this.events;
+    const savedVolume = this.volume;
+    this.isEnabled = true;
+    this.events = { ...this.events, [event]: true };
+    this.volume = Math.max(0, Math.min(1, volume));
+    if (this.masterGain && this.audioCtx) this.masterGain.gain.setValueAtTime(this.volume, this.audioCtx.currentTime);
+    try {
+      const players = {
+        message: () => this.playMessage(), userJoin: () => this.playUserJoin(), userLeave: () => this.playUserLeave(),
+        screenShareStart: () => this.playScreenShareStart(), screenShareStop: () => this.playScreenShareStop(),
+        watchStreamStart: () => this.playWatchStreamStart(), watchStreamStop: () => this.playWatchStreamStop(),
+      };
+      players[event]();
+    } finally {
+      this.isEnabled = enabled;
+      this.events = preferences;
+      this.volume = savedVolume;
+    }
+  }
+
+  public playMessage() {
+    const ctx = this.ensureAudioContext('message');
+    if (!ctx || !this.masterGain) return;
+    try {
+      const now = ctx.currentTime;
+      const gain = ctx.createGain();
+      gain.connect(this.masterGain);
+      const tone = ctx.createOscillator();
+      tone.type = 'sine';
+      tone.frequency.setValueAtTime(880, now);
+      tone.frequency.setValueAtTime(1174.66, now + 0.08);
+      tone.connect(gain);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.25, now + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.25);
+      tone.onended = () => { tone.disconnect(); gain.disconnect(); };
+      tone.start(now);
+      tone.stop(now + 0.25);
+    } catch (error) { console.warn('[SFX] Error playing message sound:', error); }
+  }
+
+  private ensureAudioContext(event: SoundEvent): AudioContext | null {
+    if (!this.isEnabled || !this.events[event] || this.volume <= 0) {
       return null;
     }
+
+    if (this.masterGain && this.audioCtx) this.masterGain.gain.setValueAtTime(this.volume, this.audioCtx.currentTime);
 
     if (!this.audioCtx) {
       const AudioCtxClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -74,11 +141,11 @@ class SoundEffectsManager {
   }
 
   /**
-   * 1. Screen Share Started (Alguém ou o usuário iniciou uma transmissão de tela)
+   * 1. Screen Share Started
    * Pleasant ascending two-tone chime (Eb5 -> Bb5)
    */
   public playScreenShareStart() {
-    const ctx = this.ensureAudioContext();
+    const ctx = this.ensureAudioContext('screenShareStart');
     if (!ctx || !this.masterGain) return;
 
     try {
@@ -116,11 +183,11 @@ class SoundEffectsManager {
   }
 
   /**
-   * 2. Screen Share Stopped (Alguém ou o usuário parou uma transmissão de tela)
+   * 2. Screen Share Stopped
    * Descending two-tone cue (Bb5 -> Eb5)
    */
   public playScreenShareStop() {
-    const ctx = this.ensureAudioContext();
+    const ctx = this.ensureAudioContext('screenShareStop');
     if (!ctx || !this.masterGain) return;
 
     try {
@@ -157,11 +224,11 @@ class SoundEffectsManager {
   }
 
   /**
-   * 3. Started Watching Stream (Alguém ou o usuário começou a assistir à transmissão)
+   * 3. Started Watching Stream
    * Crisp, subtle upward chirp / pop (480Hz -> 880Hz)
    */
   public playWatchStreamStart() {
-    const ctx = this.ensureAudioContext();
+    const ctx = this.ensureAudioContext('watchStreamStart');
     if (!ctx || !this.masterGain) return;
 
     try {
@@ -187,11 +254,11 @@ class SoundEffectsManager {
   }
 
   /**
-   * 4. Stopped Watching Stream (Alguém ou o usuário parou de assistir à transmissão)
+   * 4. Stopped Watching Stream
    * Subtle soft downward chirp / pop-out (780Hz -> 360Hz)
    */
   public playWatchStreamStop() {
-    const ctx = this.ensureAudioContext();
+    const ctx = this.ensureAudioContext('watchStreamStop');
     if (!ctx || !this.masterGain) return;
 
     try {
@@ -217,11 +284,11 @@ class SoundEffectsManager {
   }
 
   /**
-   * 5. User Joined Room (Alguém ou o próprio usuário entrou no grupo/sala)
+   * 5. User Joined Room
    * Bright, pleasant harmonic entry chime (C5 -> G5 chord progression)
    */
   public playUserJoin() {
-    const ctx = this.ensureAudioContext();
+    const ctx = this.ensureAudioContext('userJoin');
     if (!ctx || !this.masterGain) return;
 
     try {
@@ -267,11 +334,11 @@ class SoundEffectsManager {
   }
 
   /**
-   * 6. User Left Room (Alguém ou o próprio usuário saiu do grupo/sala)
+   * 6. User Left Room
    * Soft descending exit chime (G5 -> C5)
    */
   public playUserLeave() {
-    const ctx = this.ensureAudioContext();
+    const ctx = this.ensureAudioContext('userLeave');
     if (!ctx || !this.masterGain) return;
 
     try {

@@ -1,3 +1,5 @@
+import { t } from '../../i18n';
+import { useLocale } from '../../hooks/useLocale';
 import React, { useMemo, useRef, useLayoutEffect, useEffect, useState, useCallback } from 'react';
 import { roomAppsService } from '../../apps/room_apps_service';
 import { RoomAppSlot } from '../../apps/RoomAppSlot';
@@ -12,6 +14,7 @@ import { ParticipantCard } from './ParticipantCard';
 import { RoomSlotInfo } from '../../core/types';
 
 export const RoomVideoContainer: React.FC = () => {
+  useLocale();
   const [, setAppsTick] = useState(0);
   const appVisibilityRef = useRef('');
   useEffect(() => roomAppsService.subscribe(() => {
@@ -212,12 +215,12 @@ export const RoomVideoContainer: React.FC = () => {
             entries.map((slot) => renderSlotCard(slot, false, false, false))
           ) : (
             <div className="stream-filter-empty-state">
-              <p className="filter-empty-title">Nenhum participante com o filtro selecionado.</p>
+              <p className="filter-empty-title">{t("message.4f9d41039012")}</p>
               <button
                 className="btn btn-sm btn-outline filter-empty-btn"
                 onClick={() => setStreamFilter('all')}
               >
-                Mostrar todos ({roomSlots.length})
+                {t("message.0a0d57462f8f")}{roomSlots.length})
               </button>
             </div>
           )
@@ -237,12 +240,12 @@ export const RoomVideoContainer: React.FC = () => {
                 renderSlotCard(featuredSlot, true, false, false)
               ) : (
                 <div className="stream-filter-empty-state">
-                  <p className="filter-empty-title">Nenhuma transmissão selecionada.</p>
+                  <p className="filter-empty-title">{t("message.9490bd6a385d")}</p>
                   <button
                     className="btn btn-sm btn-outline filter-empty-btn"
                     onClick={() => setStreamFilter('all')}
                   >
-                    Mostrar todos ({roomSlots.length})
+                    {t("message.0a0d57462f8f")}{roomSlots.length})
                   </button>
                 </div>
               )}
@@ -256,7 +259,7 @@ export const RoomVideoContainer: React.FC = () => {
               <button
                 className="btn-toggle-spotlight-tray"
                 id="btn-toggle-spotlight-tray"
-                aria-label="Minimizar / Expandir miniaturas"
+                aria-label={t("message.b4479dd728f5")}
                 onClick={toggleSpotlightTray}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">

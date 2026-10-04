@@ -46,6 +46,7 @@ export interface PeerInfo {
 export interface StreamWatcher {
   peerId: string;
   username: string;
+  isSelf?: boolean;
 }
 
 export interface RoomSlotInfo {

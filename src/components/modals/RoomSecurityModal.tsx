@@ -1,3 +1,5 @@
+import { t } from '../../i18n';
+import { useLocale } from '../../hooks/useLocale';
 import React, { useState } from 'react';
 import { useFormSubmit } from '../../hooks/useFormSubmit';
 import { useModal } from '../../hooks/useModal';
@@ -5,6 +7,7 @@ import { useRoom } from '../../hooks/useRoom';
 import { showToast } from '../../hooks/useToast';
 
 export const RoomSecurityModal: React.FC = () => {
+  useLocale();
   const { closeModal, isClosing } = useModal();
   const { currentRoomCode, currentRoomName, currentRoomPassword,
     updateRoomName, updateRoomPassword, isRoomHost } = useRoom();
@@ -14,26 +17,26 @@ export const RoomSecurityModal: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
 
   const handleSave = async () => {
-    if (!isRoomHost) { showToast('Somente o anfitrião pode alterar a sala.'); return; }
+    if (!isRoomHost) { showToast(t("message.d5b821ebbd15")); return; }
     const finalName = name.trim();
-    if (!finalName || finalName.length > 80) { showToast('Digite um nome válido para a sala.'); return; }
+    if (!finalName || finalName.length > 80) { showToast(t("message.e7b0dfd1473f")); return; }
     const finalPass = password.trim();
     const oldPassword = currentRoomPassword;
 
     if (finalName !== currentRoomName && !await updateRoomName(finalName)) {
-      showToast('Não foi possível alterar o nome da sala.'); return;
+      showToast(t("message.02a4133c9995")); return;
     }
     if (finalPass !== oldPassword && !await updateRoomPassword(finalPass)) {
-      showToast('Não foi possível alterar a senha da sala.'); return;
+      showToast(t("message.7a7e235c15fa")); return;
     }
     closeModal();
 
     if (finalPass) {
-      showToast('Senha da sala alterada e sincronizada com os participantes.', 4000);
+      showToast(t("message.89f84f0bf28a"), 4000);
     } else if (oldPassword && !finalPass) {
-      showToast('Senha removida: a sala agora é pública.', 4000);
+      showToast(t("message.8374fc2ef03e"), 4000);
     } else {
-      showToast('Configurações de segurança da sala salvas.');
+      showToast(t("message.2c4bbfd95e13"));
     }
   };
 
@@ -50,10 +53,9 @@ export const RoomSecurityModal: React.FC = () => {
             </svg>
           </div>
           <div>
-            <h2>Configurações da Sala</h2>
+            <h2>{t("message.7efe8d00498f")}</h2>
             <p className="modal-subtitle">
-              Configure o acesso à sala.
-            </p>
+              {t("message.f14c5062b294")}</p>
           </div>
           <button type="button" className="btn-close" id="btn-close-room-security" onClick={closeModal}>
             &times;
@@ -63,13 +65,13 @@ export const RoomSecurityModal: React.FC = () => {
         <div className="modal-body">
           <div className="room-security-info-box">
             <div className="security-info-row">
-              <span className="security-info-label">Identificador:</span>
+              <span className="security-info-label">{t("message.d14c1f4dfb99")}</span>
               <span className="security-info-value" id="sec-modal-room-code">
                 {currentRoomCode}
               </span>
             </div>
             <div className="security-info-row">
-              <span className="security-info-label">Status Atual:</span>
+              <span className="security-info-label">{t("message.f997e78693a1")}</span>
               <span className="security-info-status" id="sec-modal-current-status">
                 {currentRoomPassword ? (
                   <>
@@ -77,7 +79,7 @@ export const RoomSecurityModal: React.FC = () => {
                       <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                       <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                     </svg>
-                    <span>Protegida por senha</span>
+                    <span>{t("message.b7ceb0729ce2")}</span>
                   </>
                 ) : (
                   <>
@@ -85,7 +87,7 @@ export const RoomSecurityModal: React.FC = () => {
                       <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                       <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
                     </svg>
-                    <span>Pública (Sem Senha)</span>
+                    <span>{t("message.e941f7b734a0")}</span>
                   </>
                 )}
               </span>
@@ -93,7 +95,7 @@ export const RoomSecurityModal: React.FC = () => {
           </div>
 
           <div className="form-group" style={{ marginTop: '16px' }}>
-            <label className="form-label" htmlFor="input-room-security-name">Nome da sala</label>
+            <label className="form-label" htmlFor="input-room-security-name">{t("message.c59a35b4105b")}</label>
             <input autoComplete="off" id="input-room-security-name" className="text-input" maxLength={80}
               value={name} disabled={!isRoomHost}
               onChange={(event) => setName(event.target.value)} />
@@ -101,15 +103,15 @@ export const RoomSecurityModal: React.FC = () => {
 
           <div className="form-group" style={{ marginTop: '16px' }}>
             <label className="form-label" htmlFor="input-room-security-password">
-              <span>Nova Senha da Sala:</span>
-              <span className="label-hint">Deixe vazio para tornar pública</span>
+              <span>{t("message.732368bacb17")}</span>
+              <span className="label-hint">{t("message.cfc15aaf818e")}</span>
             </label>
             <div className="input-with-action">
               <input autoComplete="off"
                 type={showPassword ? 'text' : 'password'}
                 id="input-room-security-password"
                 className="text-input"
-                placeholder="Digite uma nova senha..."
+                placeholder={t("message.a25d2dda8036")}
                 maxLength={40}
                 disabled={!isRoomHost}
                 value={password}
@@ -120,7 +122,7 @@ export const RoomSecurityModal: React.FC = () => {
                 type="button"
                 className="btn btn-sm btn-outline btn-inline-action"
                 id="btn-toggle-security-password-visibility"
-                aria-label="Mostrar / Ocultar Senha"
+                aria-label={t("message.d7d229c67924")}
                 onClick={() => setShowPassword(!showPassword)}
               >
                 <span id="icon-sec-pass-toggle">
@@ -138,16 +140,15 @@ export const RoomSecurityModal: React.FC = () => {
                 </span>
               </button>
             </div>
-            {!isRoomHost && <p className="field-info-text">Somente o anfitrião pode alterar a sala.</p>}
+            {!isRoomHost && <p className="field-info-text">{t("message.d5b821ebbd15")}</p>}
           </div>
         </div>
 
         <div className="modal-footer">
           <button type="button" className="btn btn-secondary" id="btn-cancel-room-security" onClick={closeModal}>
-            Fechar
-          </button>
+            {t("message.0f2bd88ef0ac")}</button>
           <button className="btn btn-primary" id="btn-save-room-security" type="submit" disabled={pending || isClosing || !isRoomHost}>
-            <span>Salvar configurações</span>
+            <span>{t("message.aa8464858f9e")}</span>
           </button>
         </div>
       </form>

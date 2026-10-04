@@ -1,3 +1,4 @@
+import { localizeError, t } from '../i18n/index.ts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NativeVideoBridge } from '../video/native_video_bridge';
 import { cameraFrameRates, cameraResolutions, configureCamera, preferredCameraFrameRate, type CameraResolution } from '../video/camera_devices';
@@ -42,7 +43,7 @@ export function useCapturePreview(sourceId: string, resolution: { width: number;
         active.current = { sourceId, stream: preview, bridge };
         if (cancelled()) { await dispose(); return; }
         preview.getVideoTracks()[0].onended = () => {
-          if (!cancelled() && active.current?.stream === preview) setError('A fonte foi desconectada. Selecione outra fonte.');
+          if (!cancelled() && active.current?.stream === preview) setError(t("message.a1d4a2ca6dcf"));
         };
         setStream(preview);
         if (!bridge) {
@@ -51,7 +52,7 @@ export function useCapturePreview(sourceId: string, resolution: { width: number;
         } else setSettings(preview.getVideoTracks()[0].getSettings());
       } catch (err) {
         if (bridge) await bridge.stopCapture();
-        if (!cancelled()) setError(`Prévia indisponível: ${err}`);
+        if (!cancelled()) setError(t("message.80e583478ab0", { v0: localizeError(err) }));
       } finally { if (!cancelled()) setBusy(false); }
     });
     return () => {
@@ -74,11 +75,11 @@ export function useCapturePreview(sourceId: string, resolution: { width: number;
         const rates = await cameraFrameRates(track, mode, stale);
         if (stale()) return;
         requested.current.onFrameRates(rates);
-        if (!rates.length) throw new Error('A câmera não oferece esse modo.');
+        if (!rates.length) throw new Error(t("message.f47f39a15741"));
         const chosen = preferredCameraFrameRate(rates, fps);
         const actual = await configureCamera(track, mode, chosen);
         if (!stale()) { setSettings(actual); setError(''); }
-      } catch (err) { if (!stale()) setError(`Prévia indisponível: ${err}`); }
+      } catch (err) { if (!stale()) setError(t("message.80e583478ab0", { v0: localizeError(err) })); }
       finally { if (!stale()) setBusy(false); }
     });
     return () => { cancelled = true; };

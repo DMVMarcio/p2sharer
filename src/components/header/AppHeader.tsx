@@ -1,9 +1,10 @@
+import { t } from '../../i18n';
+import { useLocale } from '../../hooks/useLocale';
 import React, { useEffect, useState } from 'react';
 import { useRoom } from '../../hooks/useRoom';
 import { useModal } from '../../hooks/useModal';
 import { showToast } from '../../hooks/useToast';
 import { Tooltip } from '../common/Tooltip';
-import logoImg from '../../assets/logo.png';
 import { BookmarkCheck, BookmarkPlus } from 'lucide-react';
 import { parseRoomInvite } from '../../core/room_invite';
 import { savedRooms, type SavedRoom } from '../../core/saved_rooms';
@@ -11,6 +12,7 @@ import { useAppUpdates } from '../../hooks/useAppUpdates';
 import { appUpdates } from '../../services/app_updates';
 
 export const AppHeader: React.FC = () => {
+  useLocale();
   const update = useAppUpdates();
   const { currentRoomCode, currentRoomInvite, currentRoomName, currentRoomPassword, username, isInRoom } = useRoom();
   const { openModal } = useModal();
@@ -35,7 +37,7 @@ export const AppHeader: React.FC = () => {
     const copyText = currentRoomInvite || currentRoomCode;
     navigator.clipboard
       .writeText(copyText)
-      .then(() => showToast('Código copiado!'))
+      .then(() => showToast(t("message.d78cc8e1cef4")))
       .catch(() => {});
   };
 
@@ -48,10 +50,10 @@ export const AppHeader: React.FC = () => {
       if (!record) throw new Error('Room record is missing');
       const saved = !record.saved;
       await savedRooms.put({ ...record, saved, password: saved ? record.password : undefined });
-      showToast(saved ? 'Sala salva neste dispositivo.' : 'Sala removida das salvas.');
+      showToast(saved ? t("message.08064fa0da8c") : t("message.7611fbde28f9"));
     } catch (error) {
       console.warn('[Rooms] Could not toggle saved room:', error);
-      showToast('Não foi possível atualizar a sala salva.');
+      showToast(t("message.d94a6e24bf10"));
     } finally {
       setSavingRoom(false);
     }
@@ -59,31 +61,18 @@ export const AppHeader: React.FC = () => {
 
   return (
     <header className="app-header" data-tauri-drag-region>
-      <div className="logo-group">
-        <div className="logo-icon-clean">
-          <img src={logoImg} alt="P2Sharer Logo" className="app-header-logo" width="22" height="22" />
-        </div>
-        <span className="logo-title">P2Sharer</span>
-        {update.version && <Tooltip content={`Atualização ${update.version} disponível`}>
-          <button type="button" className="btn btn-secondary btn-sm app-update-badge"
-            onClick={appUpdates.open} aria-label={`Atualização ${update.version} disponível`}>
-            Atualização
-          </button>
-        </Tooltip>}
-      </div>
-
-      <div className="header-user-info">
+      <div className="header-room-info">
         {isInRoom && (
           <Tooltip
-            content={`Copiar convite autenticado (${currentRoomName || currentRoomCode})`}
+            content={t("message.70fad3f21d89", { v0: currentRoomName || currentRoomCode })}
           >
             <button
               className="room-code-header-pill"
               id="header-room-code-pill"
               onClick={handleCopyRoomCode}
-              aria-label="Copiar convite da sala"
+              aria-label={t("message.159e49453544")}
             >
-              <span className="header-pill-label">SALA</span>
+              <span className="header-pill-label">{t("message.d17ac7cc9c93")}</span>
               <strong id="display-room-code">{currentRoomName || currentRoomCode}</strong>
               <span
                 className="room-lock-icon"
@@ -109,31 +98,39 @@ export const AppHeader: React.FC = () => {
           </Tooltip>
         )}
         {isInRoom && currentRoomInvite && (
-          <Tooltip content={savedRecord?.saved ? 'Remover sala das salvas' : 'Salvar sala neste dispositivo'}>
+          <Tooltip content={savedRecord?.saved ? t("message.1fd26e5f3f0e") : t("message.3caaf5a72320")}>
             <button className={`btn-icon-header ${savedRecord?.saved ? 'is-saved' : ''}`}
               onClick={() => void toggleSavedRoom()}
-              aria-label={savedRecord?.saved ? 'Remover sala das salvas' : 'Salvar sala'}
+              aria-label={savedRecord?.saved ? t("message.1fd26e5f3f0e") : t("message.7b07e948b7c7")}
               aria-pressed={Boolean(savedRecord?.saved)} disabled={savingRoom || !savedRecord}>
               {savedRecord?.saved ? <BookmarkCheck size={16} /> : <BookmarkPlus size={16} />}
             </button>
           </Tooltip>
         )}
 
+        {update.version && <Tooltip content={t("message.0986025090c9", { v0: update.version })}>
+          <button type="button" className="btn btn-secondary btn-sm app-update-badge"
+            onClick={appUpdates.open} aria-label={t("message.0986025090c9", { v0: update.version })}>
+            {t("message.0d52ab3423d3")}</button>
+        </Tooltip>}
+      </div>
+
+      <div className="header-user-info">
         <button
           className="user-pill"
           id="user-pill"
           onClick={() => openModal('settings')}
-          aria-label="Configurações e Perfil"
+          aria-label={t("message.ee91711e6b22")}
         >
           <span className="user-status-dot"></span>
-          <span id="current-username-display">{username || 'Usuário'}</span>
+          <span id="current-username-display">{username || t("message.f53bbaa05fae")}</span>
         </button>
 
         <button
           className="btn-icon-header"
           id="btn-open-settings"
           onClick={() => openModal('settings')}
-          aria-label="Configurações"
+          aria-label={t("message.76b0fb6ad189")}
         >
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>

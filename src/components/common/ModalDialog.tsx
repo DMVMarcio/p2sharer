@@ -1,3 +1,5 @@
+import { t } from '../../i18n';
+import { useLocale } from '../../hooks/useLocale';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -13,6 +15,7 @@ interface Props {
 }
 
 export function ModalDialog({ title, subtitle, icon, children, footer, className = '', busy = false, onClose }: Props) {
+  useLocale();
   const titleId = useId();
   const cardRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
@@ -64,7 +67,7 @@ export function ModalDialog({ title, subtitle, icon, children, footer, className
       <div className="modal-header">
         {icon && <div className="modal-header-icon">{icon}</div>}
         <div><h2 id={titleId}>{title}</h2>{subtitle && <p className="modal-subtitle">{subtitle}</p>}</div>
-        <button type="button" className="btn-close" aria-label="Fechar" disabled={busy || closing} onClick={close}>&times;</button>
+        <button type="button" className="btn-close" aria-label={t("message.0f2bd88ef0ac")} disabled={busy || closing} onClick={close}>&times;</button>
       </div>
       <div className="modal-body">{children}</div>
       {footer && <div className="modal-footer">{typeof footer === 'function' ? footer(close) : footer}</div>}

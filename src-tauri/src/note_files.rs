@@ -1,10 +1,12 @@
 const MAX_NOTE_BYTES: usize = 2_000_000;
 
 #[tauri::command]
-pub async fn open_note_file() -> Result<Option<(String, String)>, String> {
-    tauri::async_runtime::spawn_blocking(|| {
+pub async fn open_note_file(language: Option<String>) -> Result<Option<(String, String)>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let copy = crate::localization::note_dialog_copy(language.as_deref());
         let Some(path) = rfd::FileDialog::new()
-            .add_filter("Notes", &["html", "md", "txt"])
+            .set_title(copy.open_title)
+            .add_filter(copy.open_filter, &["html", "md", "txt"])
             .pick_file() else { return Ok(None); };
         let metadata = std::fs::metadata(&path).map_err(|e| e.to_string())?;
         if metadata.len() > MAX_NOTE_BYTES as u64 { return Err("Note file is too large".into()); }
@@ -14,12 +16,14 @@ pub async fn open_note_file() -> Result<Option<(String, String)>, String> {
 }
 
 #[tauri::command]
-pub async fn save_note_file(content: String) -> Result<bool, String> {
+pub async fn save_note_file(content: String, language: Option<String>) -> Result<bool, String> {
     if content.len() > MAX_NOTE_BYTES { return Err("Note file is too large".into()); }
     tauri::async_runtime::spawn_blocking(move || {
+        let copy = crate::localization::note_dialog_copy(language.as_deref());
         let Some(path) = rfd::FileDialog::new()
-            .add_filter("Rich text notes", &["html"])
-            .set_file_name("nota.html")
+            .set_title(copy.save_title)
+            .add_filter(copy.save_filter, &["html"])
+            .set_file_name(copy.file_name)
             .save_file() else { return Ok(false); };
         std::fs::write(path, content).map(|_| true).map_err(|e| e.to_string())
     }).await.map_err(|e| e.to_string())?

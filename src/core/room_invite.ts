@@ -1,3 +1,4 @@
+import { t } from '../i18n/index.ts';
 import type { AuthorityTransfer } from './room_authority.ts';
 import type { PeerAuthenticator } from './peer_auth.ts';
 
@@ -111,7 +112,7 @@ export async function createRoomIdentity(): Promise<RoomIdentity> {
   };
 }
 
-export async function createAuthenticatedInvite(name = 'Minha sala'): Promise<{ invite: string; identity: RoomIdentity }> {
+export async function createAuthenticatedInvite(name = t("message.659cf77f64fc")): Promise<{ invite: string; identity: RoomIdentity }> {
   const identity = await createRoomIdentity();
   const roomId = bytesToHex(crypto.getRandomValues(new Uint8Array(16)));
   const roomName = name.trim();

@@ -1,3 +1,5 @@
+import { t } from '../../i18n';
+import { useLocale } from '../../hooks/useLocale';
 import React, { useEffect, useRef, useState } from 'react';
 import { clampOverlay, snapOverlay, resizeOverlay, type OverlayCorner, type OverlayPosition } from '../../core/media_streams';
 import type { RoomSlotInfo } from '../../core/types';
@@ -12,6 +14,7 @@ interface Props { slot: RoomSlotInfo; target: string; index: number }
 let overlayOrder = 100;
 
 export function StreamOverlay({ slot, target, index }: Props) {
+  useLocale();
   const frameRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const openContextMenu = useContextMenu();
@@ -83,8 +86,8 @@ export function StreamOverlay({ slot, target, index }: Props) {
     zIndex: order,
   }} onPointerDown={start} onPointerMove={move} onPointerUp={finish} onPointerCancel={finish}
     onLostPointerCapture={finish} onClick={(event) => event.stopPropagation()} onDoubleClick={(event) => event.stopPropagation()}
-    onContextMenu={(event) => openContextMenu(event, [{ id: 'remove-overlay', label: 'Remover sobreposição', onSelect: remove }])}
-    tabIndex={0} aria-label={`Sobreposição de ${slot.senderName}. Use as setas para mover e + ou - para redimensionar.`}
+    onContextMenu={(event) => openContextMenu(event, [{ id: 'remove-overlay', get label() { return t("message.4f3ceac0cb5c"); }, onSelect: remove }])}
+    tabIndex={0} aria-label={t("message.79d5eedaf833", { v0: slot.senderName })}
     onKeyDown={(event) => {
       if (event.key === 'Delete' || event.key === 'Escape') { event.stopPropagation(); remove(); return; }
       if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', '+', '-', '='].includes(event.key)) return;
@@ -98,9 +101,9 @@ export function StreamOverlay({ slot, target, index }: Props) {
     {slot.stream ? <video ref={videoRef} autoPlay playsInline muted onLoadedMetadata={() => {
       const video = videoRef.current;
       if (video?.videoWidth && video.videoHeight) setAspect(video.videoWidth / video.videoHeight);
-    }} /> : <div className="stream-overlay-loading">Conectando vídeo…</div>}
-    <div className="stream-overlay-toolbar"><span>{slot.senderName} · {slot.mediaLabel || 'Vídeo'}</span>
-      <TooltipButton tooltip="Remover sobreposição" className="btn btn-sm btn-outline" aria-label="Remover sobreposição" onClick={remove}><X size={14} /></TooltipButton>
+    }} /> : <div className="stream-overlay-loading">{t("message.744a6cf3f2d0")}</div>}
+    <div className="stream-overlay-toolbar"><span>{slot.senderName} · {slot.mediaLabel || t("message.bc10c86c24b5")}</span>
+      <TooltipButton tooltip={t("message.4f3ceac0cb5c")} className="btn btn-sm btn-outline" aria-label={t("message.4f3ceac0cb5c")} onClick={remove}><X size={14} /></TooltipButton>
     </div>
     {(['nw', 'ne', 'sw', 'se'] as const).map(corner => <div key={corner} className={`stream-overlay-resize ${corner}`} onPointerDown={(event) => start(event, corner)} aria-hidden="true" />)}
   </div>;

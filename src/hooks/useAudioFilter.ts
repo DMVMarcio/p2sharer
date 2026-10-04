@@ -1,3 +1,4 @@
+import { t } from '../i18n/index.ts';
 import { useState, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { stateStore } from '../core/state_store';
@@ -55,7 +56,7 @@ export function useAudioFilter() {
       setDraftIncludePids(inPids);
     } catch (err) {
       console.error('Failed to list processes:', err);
-      showToast('Erro ao carregar lista de aplicativos de áudio.');
+      showToast(t("message.67523526cb3c"));
     } finally {
       setIsLoading(false);
     }
@@ -173,17 +174,17 @@ export function useAudioFilter() {
 
     let successMsg = '';
     if (isFullAudio) {
-      successMsg = 'Filtro aplicado: Transmitindo todo o som do computador sem filtros';
+      successMsg = t("message.bd5c0e60c469");
     } else if (selectedFilterMode === 'exclude') {
       successMsg =
         count === 0
-          ? 'Filtro aplicado: Nenhum aplicativo silenciado'
-          : `Filtro aplicado: Silenciando ${count} aplicativo(s)`;
+          ? t("message.0fab559c6e07")
+          : t("message.d192e7d09169", { v0: count });
     } else {
       successMsg =
         count === 0
-          ? 'Filtro aplicado: Silêncio (nenhum aplicativo selecionado para transmissão)'
-          : `Filtro aplicado: Transmitindo exclusivamente ${count} aplicativo(s)`;
+          ? t("message.37b4e4fade16")
+          : t("message.8a536acf951b", { v0: count });
     }
 
     // 2. Only dispatch updated config to backend audio capture engine IF actively sharing screen.
@@ -207,7 +208,7 @@ export function useAudioFilter() {
         return true;
       } catch (err) {
         console.error('Error applying audio filter:', err);
-        showToast('Erro ao aplicar filtros de áudio.');
+        showToast(t("message.e6c4f27405a7"));
         return false;
       }
     }
@@ -225,7 +226,7 @@ export function useAudioFilter() {
       return true;
     } catch (err) {
       console.error('Error applying audio filter:', err);
-      showToast('Erro ao aplicar filtros de áudio.');
+      showToast(t("message.e6c4f27405a7"));
       return false;
     }
   }, [

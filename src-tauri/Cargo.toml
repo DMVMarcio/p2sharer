@@ -1,6 +1,6 @@
 [package]
 name = "p2sharer"
-version = "1.0.0"
+version = "1.0.1"
 description = "P2Sharer - Serverless P2P Screen & Process Audio Sharing"
 authors = ["P2Sharer Team"]
 edition = "2021"
@@ -49,6 +49,8 @@ windows-capture-api = { package = "windows", version = "0.62.2", features = ["Wi
 webview2-com = "0.39.1"
 windows = { version = "0.58", features = [
     "implement",
+    "Win32_Globalization",
+    "Win32_System_SystemServices",
     "Win32_Foundation",
     "Win32_Media",
     "Win32_Media_Audio",

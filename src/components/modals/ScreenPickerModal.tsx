@@ -1,3 +1,5 @@
+import { localizeText, t } from '../../i18n';
+import { useLocale } from '../../hooks/useLocale';
 import { Select } from '../common/Select';
 import React, { useEffect } from 'react';
 import { useModal } from '../../hooks/useModal';
@@ -9,6 +11,7 @@ import { formatFrameRate } from '../../core/media_streams';
 import { useSkeletonPresence } from '../../hooks/useSkeletonPresence';
 
 export const ScreenPickerModal: React.FC = () => {
+  useLocale();
   const { closeModal, isClosing } = useModal();
   const {
     cameras,
@@ -60,17 +63,17 @@ export const ScreenPickerModal: React.FC = () => {
             </svg>
           </div>
           <div>
-            <h2>{editingId ? 'Editar transmissão' : 'Iniciar transmissão'}</h2>
-            <p className="modal-subtitle">Escolha uma tela, janela ou câmera.</p>
+            <h2>{editingId ? t("message.eb9fb0e94a23") : t("message.e2deb5c4ba95")}</h2>
+            <p className="modal-subtitle">{t("message.83e0034044c4")}</p>
           </div>
-          <button className="btn-close" id="btn-close-screen-picker" onClick={closeModal} disabled={isStarting} aria-label="Fechar seletor">
+          <button className="btn-close" id="btn-close-screen-picker" onClick={closeModal} disabled={isStarting} aria-label={t("message.fe2d6306c0ae")}>
             &times;
           </button>
         </div>
 
         <div className="modal-body" inert={isStarting || undefined}>
 
-          {error && <p role="alert">{error}</p>}
+          {error && <p role="alert">{localizeText(error)}</p>}
           <div className="picker-tabs">
             <button
               className={`picker-tab-btn ${currentTab === 'screens' ? 'active' : ''}`}
@@ -78,19 +81,17 @@ export const ScreenPickerModal: React.FC = () => {
               disabled={editingKind === 'camera'}
               onClick={() => setCurrentTab('screens')}
             >
-              Telas Inteiras
-            </button>
+              {t("message.3bd03ac9b6d5")}</button>
             <button
               className={`picker-tab-btn ${currentTab === 'windows' ? 'active' : ''}`}
               id="picker-tab-windows"
               disabled={editingKind === 'camera'}
               onClick={() => setCurrentTab('windows')}
             >
-              Janelas de Apps
-            </button>
+              {t("message.26b90fd75350")}</button>
             <button className={`picker-tab-btn ${currentTab === 'cameras' ? 'active' : ''}`}
               disabled={editingKind === 'screen'}
-              onClick={() => setCurrentTab('cameras')}>Câmeras</button>
+              onClick={() => setCurrentTab('cameras')}>{t("message.de25a5114246")}</button>
           </div>
 
           <div className="picker-preview-layout">
@@ -135,12 +136,12 @@ export const ScreenPickerModal: React.FC = () => {
 
             {!isLoading && (
               <div className="source-cards-grid source-cards-content-layer">
-                {currentTab === 'cameras' && cameras.length === 0 && <div className="source-cards-empty-state">Nenhuma câmera detectada.</div>}
+                {currentTab === 'cameras' && cameras.length === 0 && <div className="source-cards-empty-state">{t("message.f95f9dbef95a")}</div>}
                 {currentTab === 'cameras' && cameras.map((camera, index) => <button type="button" key={camera.deviceId || index}
                   className={`source-card ${selectedSourceId === `camera:${camera.deviceId}` ? 'selected' : ''}`}
                   onClick={() => setSelectedSourceId(`camera:${camera.deviceId}`)}>
                   <div className="source-card-thumb camera-device-thumb"><Camera size={28} aria-hidden="true" /></div>
-                  <div className="source-card-info"><div className="source-card-title">{camera.label || `Câmera ${index + 1}`}</div></div>
+                  <div className="source-card-info"><div className="source-card-title">{camera.label || t("message.6c0ba75d2838", { v0: index + 1 })}</div></div>
                 </button>)}
                 {currentTab === 'screens' && monitors.length === 0 && (
                   <div className="source-cards-empty-state">
@@ -149,7 +150,7 @@ export const ScreenPickerModal: React.FC = () => {
                       <line x1="8" x2="16" y1="21" y2="21"/>
                       <line x1="12" x2="12" y1="17" y2="21"/>
                     </svg>
-                    <span>Nenhum monitor detectado.</span>
+                    <span>{t("message.0b7114350c1c")}</span>
                   </div>
                 )}
 
@@ -165,7 +166,7 @@ export const ScreenPickerModal: React.FC = () => {
                         {mon.thumbnail ? (
                           <img src={mon.thumbnail} alt={mon.name} />
                         ) : (
-                          <div className="source-card-thumb-placeholder">Monitor</div>
+                          <div className="source-card-thumb-placeholder">{t("common.monitor")}</div>
                         )}
                       </div>
                       <div className="source-card-info">
@@ -183,7 +184,7 @@ export const ScreenPickerModal: React.FC = () => {
                       <line x1="3" x2="21" y1="9" y2="9"/>
                       <line x1="9" x2="21" y2="9"/>
                     </svg>
-                    <span>Nenhuma janela aberta encontrada.</span>
+                    <span>{t("message.239f9f8ae9fa")}</span>
                   </div>
                 )}
 
@@ -199,7 +200,7 @@ export const ScreenPickerModal: React.FC = () => {
                         {win.thumbnail ? (
                           <img src={win.thumbnail} alt={win.title} />
                         ) : (
-                          <div className="source-card-thumb-placeholder">Janela</div>
+                          <div className="source-card-thumb-placeholder">{t("message.28014ef35252")}</div>
                         )}
                       </div>
                       <div className="source-card-info">
@@ -220,7 +221,7 @@ export const ScreenPickerModal: React.FC = () => {
           </div>
           <div className="picker-settings-row">
             <div className="picker-setting-item">
-              <label htmlFor="modal-select-resolution">Resolução:</label>
+              <label htmlFor="modal-select-resolution">{t("message.37f9b18e9942")}</label>
               <Select
                 id="modal-select-resolution"
                 className="select-input-sm"
@@ -233,13 +234,13 @@ export const ScreenPickerModal: React.FC = () => {
                   { value: '1080p', label: '1080p Full HD' },
                   { value: '720p', label: '720p HD' },
                   { value: '480p', label: '480p SD' },
-                  { value: '360p', label: '360p Baixa' },
+                  { value: '360p', get label() { return t("message.7e20ddcbeb68"); } },
                 ]}
               />
             </div>
 
             <div className="picker-setting-item">
-              <label htmlFor="modal-select-fps">Taxa de FPS:</label>
+              <label htmlFor="modal-select-fps">{t("message.d4b20c1d2e76")}</label>
               <Select
                 id="modal-select-fps"
                 className="select-input-sm"
@@ -256,7 +257,7 @@ export const ScreenPickerModal: React.FC = () => {
             </div>
 
             <div className="picker-setting-item">
-              <label htmlFor="modal-select-bitrate">Bitrate:</label>
+              <label htmlFor="modal-select-bitrate">{t("common.bitrateLabel")}</label>
               <Select
                 id="modal-select-bitrate"
                 className="select-input-sm"
@@ -274,17 +275,17 @@ export const ScreenPickerModal: React.FC = () => {
             </div>
 
             {currentTab !== 'cameras' && <div className="picker-setting-item">
-              <label htmlFor="modal-select-quality">Qualidade:</label>
+              <label htmlFor="modal-select-quality">{t("message.6b7ea7f227ce")}</label>
               <Select
                 id="modal-select-quality"
                 className="select-input-sm"
                 value={quality}
                 onValueChange={(value) => setQuality(parseInt(value, 10))}
                 options={[
-                  { value: '95', label: '95% (Máxima)' },
-                  { value: '90', label: '90% (Muito Alta)' },
-                  { value: '85', label: '85% (Alta)' },
-                  { value: '75', label: '75% (Equilibrada)' },
+                  { value: '95', get label() { return t("message.dd41bcf7d5d9"); } },
+                  { value: '90', get label() { return t("message.d494620a5da6"); } },
+                  { value: '85', get label() { return t("message.0254f0dbf2af"); } },
+                  { value: '75', get label() { return t("message.9df00552db6a"); } },
                 ]}
               />
             </div>}
@@ -296,15 +297,14 @@ export const ScreenPickerModal: React.FC = () => {
                 checked={showCursor}
                 onChange={(e) => setShowCursor(e.target.checked)}
               />
-              <span>Exibir Cursor</span>
+              <span>{t("message.3798f7d6d73b")}</span>
             </label>}
           </div>
         </div>
 
         <div className="modal-footer">
           <button className="btn btn-secondary" id="btn-cancel-picker" style={{ width: 'auto' }} onClick={closeModal} disabled={isStarting}>
-            Cancelar
-          </button>
+            {t("message.bb9dbb406dcb")}</button>
           {(() => {
             const hasAvailableSources = currentTab === 'cameras' ? cameras.length > 0 : currentTab === 'screens' ? monitors.length > 0 : windows.length > 0;
             const isConfirmDisabled = isLoading || isStarting || preview.busy || !selectedSourceId || !hasAvailableSources ||
@@ -317,7 +317,7 @@ export const ScreenPickerModal: React.FC = () => {
                 disabled={isConfirmDisabled}
                 onClick={confirmPicker}
               >
-                <span>{isStarting ? 'Aplicando...' : editingId ? 'Aplicar alterações' : 'Iniciar Transmissão'}</span>
+                <span>{isStarting ? t("message.a523b5d5ccb8") : editingId ? t("message.e2162ad991bd") : t("message.fdefcffd1869")}</span>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <polygon points="5 3 19 12 5 21 5 3"/>
                 </svg>

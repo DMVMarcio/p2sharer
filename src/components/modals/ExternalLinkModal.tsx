@@ -1,3 +1,5 @@
+import { t } from '../../i18n';
+import { useLocale } from '../../hooks/useLocale';
 import React, { useEffect, useRef } from 'react';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { ExternalLink } from 'lucide-react';
@@ -5,6 +7,7 @@ import { modalManager, useModal } from '../../hooks/useModal';
 import { showToast } from '../../hooks/useToast';
 
 export const ExternalLinkModal: React.FC = () => {
+  useLocale();
   const { closeModal, isClosing } = useModal();
   const destination = modalManager.getExternalLinkUrl();
   const cancelRef = useRef<HTMLButtonElement>(null);
@@ -21,7 +24,7 @@ export const ExternalLinkModal: React.FC = () => {
   const proceed = () => {
     if (!destination) return;
     closeModal();
-    void openUrl(destination).catch(() => showToast('Não foi possível abrir o link.'));
+    void openUrl(destination).catch(() => showToast(t("message.3c3c85fd6b50")));
   };
 
   return (
@@ -32,18 +35,18 @@ export const ExternalLinkModal: React.FC = () => {
         <div className="modal-header">
           <div className="modal-header-icon"><ExternalLink size={20} aria-hidden="true" /></div>
           <div>
-            <h2 id="external-link-title">Abrir site externo</h2>
-            <p className="modal-subtitle" id="external-link-description">Você está indo para um site externo ao P2Sharer.</p>
+            <h2 id="external-link-title">{t("message.47426cdc9ee3")}</h2>
+            <p className="modal-subtitle" id="external-link-description">{t("message.86bbff276c78")}</p>
           </div>
-          <button type="button" className="btn-close" aria-label="Cancelar" onClick={closeModal}>&times;</button>
+          <button type="button" className="btn-close" aria-label={t("message.bb9dbb406dcb")} onClick={closeModal}>&times;</button>
         </div>
         <div className="modal-body">
-          <p>Confira o endereço antes de prosseguir:</p>
-          <div className="external-link-address" aria-label="Endereço de destino">{destination}</div>
+          <p>{t("message.776785a9cc05")}</p>
+          <div className="external-link-address" aria-label={t("message.534910c40589")}>{destination}</div>
         </div>
         <div className="modal-footer">
-          <button ref={cancelRef} type="button" className="btn btn-secondary" onClick={closeModal}>Cancelar</button>
-          <button type="button" className="btn btn-primary" onClick={proceed}>Prosseguir</button>
+          <button ref={cancelRef} type="button" className="btn btn-secondary" onClick={closeModal}>{t("message.bb9dbb406dcb")}</button>
+          <button type="button" className="btn btn-primary" onClick={proceed}>{t("message.6dd36999938b")}</button>
         </div>
       </div>
     </div>

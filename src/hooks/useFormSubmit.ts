@@ -1,3 +1,4 @@
+import { t } from '../i18n/index.ts';
 import { useRef, useState, type FormEvent } from 'react';
 import { showToast } from './useToast';
 
@@ -14,7 +15,7 @@ export function useFormSubmit(action: () => void | Promise<void>, disabled = fal
       await action();
     } catch (error) {
       console.error('[Form] Submission failed:', error);
-      showToast('Não foi possível concluir a operação. Tente novamente.');
+      showToast(t("message.29014ff38240"));
     } finally {
       running.current = false;
       setPending(false);

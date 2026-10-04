@@ -1,3 +1,5 @@
+import { localizeError, localizeText, t } from '../i18n';
+import { useLocale } from '../hooks/useLocale';
 import React, { useEffect, useRef, useState } from 'react';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event';
@@ -31,6 +33,7 @@ const VOLUME_STORAGE = 'p2sharer_youtube_volume';
 const CAPTIONS_STORAGE = 'p2sharer_youtube_captions';
 
 export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => {
+  useLocale();
   const { username, peers, roomSlots } = useRoom();
   const [state, setState] = useState<YouTubeState>(() => roomAppsService.getModel<YouTubeModel>(instanceId)?.state ||
     { queue: [], index: 0, playing: false, position: 0, repeat: 'off', shuffle: false,
@@ -201,7 +204,7 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
       }, () => {
         if (playerRef.current) setYouTubeCaptions(playerRef.current, captionsRef.current);
       });
-    }).catch((reason) => setError(String(reason)));
+    }).catch((reason) => setError(localizeError(reason)));
     return () => { canceled = true; playerRef.current?.destroy(); playerRef.current = null; };
   }, [instanceId]);
 
@@ -375,16 +378,17 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
       if (pipActiveRef.current) sendPipState();
     } catch (reason) {
       restoreFromPip();
-      setError(`Não foi possível abrir o Picture-in-Picture: ${String(reason)}`);
+      setError(t("message.75b288ac3cd1", { v0: localizeError(String(reason)) }));
     }
   }
 
-  const displayTitle = (entry: YouTubeEntry) => resolvedTitles[entry.videoId] || entry.title;
+  const displayTitle = (entry: YouTubeEntry) => resolvedTitles[entry.videoId] ||
+    (entry.title === `Vídeo ${entry.videoId}` ? t("message.361277a73f56", { v0: entry.videoId }) : entry.title);
   const personFor = (actor: string, savedName?: string): ActivityParticipant => {
     const local = actor === roomAppsService.getLocalActor();
     const peer = peers.find((entry) => entry.id === actor);
     const slot = roomSlots.find((entry) => local ? entry.isLocal : entry.peerId === actor);
-    return { id: actor, name: (local ? username || 'Você' : peer?.username || savedName || 'Participante'),
+    return { id: actor, name: (local ? username || t("message.b21e91730d18") : peer?.username || savedName || t("message.1e97ddf60a0f")),
       color: slot?.color || 'var(--accent-color)' };
   };
 
@@ -434,14 +438,14 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
   };
 
   const add = (entries: YouTubeEntry[]) => {
-    if (!entries.length) { setError('Nenhum vídeo disponível para adicionar à fila.'); return; }
+    if (!entries.length) { setError(t("message.53a353c4b061")); return; }
     const latest = stateRef.current;
     if (latest.queue.length + entries.length > 200) {
-      setError(`A fila aceita até 200 vídeos. Há espaço para ${Math.max(0, 200 - latest.queue.length)} vídeos.`);
+      setError(t("message.2a68e8fcc5bd", { v0: Math.max(0, 200 - latest.queue.length) }));
       return;
     }
     const next = appendYouTubeQueue(latest, entries.map((entry) => ({ ...entry,
-      addedBy: roomAppsService.getLocalActor(), addedByName: (username || 'Você').slice(0, 80) })));
+      addedBy: roomAppsService.getLocalActor(), addedByName: (username || t("message.b21e91730d18")).slice(0, 80) })));
     if (next !== latest) publish(next, next.index !== latest.index || next.playing !== latest.playing ? 'seek' : 'update');
   };
 
@@ -451,7 +455,7 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
     try {
       if (isTauri()) await openUrl(url.toString());
       else window.open(url.toString(), '_blank', 'noopener,noreferrer');
-    } catch { setError('Não foi possível abrir a busca no YouTube.'); }
+    } catch { setError(t("message.38cd69d5ee59")); }
   };
 
   const search = async () => {
@@ -466,7 +470,7 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
         const previews: YouTubeSearchItem[] = [];
         if (parsed.videoId) {
           const title = await resolveYouTubeTitle(parsed.videoId);
-          previews.push({ kind: 'video', id: parsed.videoId, title: title || `Vídeo ${parsed.videoId}` });
+          previews.push({ kind: 'video', id: parsed.videoId, title: title || t("message.361277a73f56", { v0: parsed.videoId }) });
         }
         if (parsed.playlistId) {
           const preview = await loadYouTubePlaylistPreview(parsed.playlistId).catch(() => null);
@@ -476,7 +480,7 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
         }
         setResults(previews);
         setHasSearched(true);
-      } catch (reason) { setError(String(reason)); } finally { setBusy(false); }
+      } catch (reason) { setError(localizeError(reason)); } finally { setBusy(false); }
       return;
     }
     setBusy(true);
@@ -485,7 +489,7 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
       setResults(found);
       setHasSearched(true);
     }
-    catch (reason) { setError(String(reason)); } finally { setBusy(false); }
+    catch (reason) { setError(localizeError(reason)); } finally { setBusy(false); }
   };
 
   const chooseResult = async (result: YouTubeSearchItem) => {
@@ -493,7 +497,7 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
     setBusy(true);
     setError('');
     try { add(await loadYouTubePlaylist(result.id)); }
-    catch (reason) { setError(String(reason)); } finally { setBusy(false); }
+    catch (reason) { setError(localizeError(reason)); } finally { setBusy(false); }
   };
 
   const move = (from: number, to: number) => {
@@ -526,38 +530,38 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
       onClose={() => setSavedQueuesOpen(false)} onImport={(entries, mode) => {
         if (!roomAppsService.getModel<YouTubeModel>(instanceId)) throw new Error('Activity unavailable');
         const latest = stateRef.current;
-        const next = importYouTubeQueue(latest, entries, mode, roomAppsService.getLocalActor(), username || 'Você');
+        const next = importYouTubeQueue(latest, entries, mode, roomAppsService.getLocalActor(), username || t("message.b21e91730d18"));
         publish(next, mode === 'replace' ? 'queue-replace'
           : next.index !== latest.index || next.playing !== latest.playing ? 'seek' : 'update');
       }} />}
     {activity && <ActivityToast key={activity.id} className="youtube-activity-toast"
       person={activity.actor ? personFor(activity.actor) : undefined}
       icon={<ListVideo size={17} />} message={activity.message} />}
-    <section className="youtube-watch-pane" aria-label="Player e fila de reprodução">
+    <section className="youtube-watch-pane" aria-label={t("message.51cb40efcb46")}>
       <div className="youtube-player-frame">
         <div ref={mountRef} className="room-app-player-mount" />
         {current && !compact && !pipActive && <button className="youtube-player-hit-area"
-          aria-label={state.playing ? 'Pausar vídeo para todos' : 'Reproduzir vídeo para todos'}
+          aria-label={state.playing ? t("message.1eca39ec3896") : t("message.4f6c4ff51751")}
           onClick={togglePlayback} />}
         {pipActive && !compact && <div className="youtube-pip-placeholder">
           <PictureInPicture2 size={25} strokeWidth={1.6} />
-          <span>Reproduzindo no Picture-in-Picture</span>
-          <button onClick={() => void closePip()}>Voltar ao app</button>
+          <span>{t("message.5b4e0530d764")}</span>
+          <button onClick={() => void closePip()}>{t("message.99b3e03aa60c")}</button>
         </div>}
         {!current && <div className="youtube-player-empty">
           <SquarePlay size={30} strokeWidth={1.5} />
-          <span>Adicione um vídeo para começar</span>
+          <span>{t("message.75a89a91ea35")}</span>
         </div>}
-        {!pipActive && <TooltipButton tooltip={theater ? 'Sair do modo teatro' : 'Modo teatro'} className="youtube-theater-toggle"
+        {!pipActive && <TooltipButton tooltip={theater ? t("message.dc787df84d37") : t("message.d071dd31e6d6")} className="youtube-theater-toggle"
           onClick={() => setTheater(!theater)}>
           {theater ? <Minimize2 size={16} /> : <Expand size={16} />}
-          <span>{theater ? 'Sair do teatro' : 'Teatro'}</span>
+          <span>{theater ? t("message.d7cdba9fbe87") : t("message.501b0f7fd09e")}</span>
         </TooltipButton>}
       </div>
       <div className="youtube-watch-meta">
-        <div className="youtube-watch-title"><span>Reproduzindo na sala</span>
+        <div className="youtube-watch-title"><span>{t("message.c55d11f7f13c")}</span>
           <Tooltip content={current ? displayTitle(current) : ''}>
-            <h3 tabIndex={current ? 0 : undefined}>{current ? displayTitle(current) : 'Nenhum vídeo selecionado'}</h3>
+            <h3 tabIndex={current ? 0 : undefined}>{current ? displayTitle(current) : t("message.4a6d3493a310")}</h3>
           </Tooltip>
         </div>
         {state.queue.length > 0 && <span className="youtube-watch-position">{state.index + 1} / {state.queue.length}</span>}
@@ -572,87 +576,85 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
         onToggleMute={toggleMute} onToggleCaptions={toggleCaptions}
         onPictureInPicture={isTauri() && current && !pipActive ? () => void openPip() : undefined} />
       <div className="youtube-queue-header">
-        <div><ListVideo size={16} /><strong>Fila de reprodução</strong><span>{state.queue.length}</span>
-          <TooltipButton tooltip="Filas salvas" className="youtube-saved-queues-button" aria-haspopup="dialog"
+        <div><ListVideo size={16} /><strong>{t("message.65d9dcef50e7")}</strong><span>{state.queue.length}</span>
+          <TooltipButton tooltip={t("message.13ebb5489523")} className="youtube-saved-queues-button" aria-haspopup="dialog"
             onClick={() => setSavedQueuesOpen(true)}><Library size={15} /></TooltipButton>
         </div>
-        <div className="youtube-queue-modes" aria-label="Opções da fila">
-          <TooltipButton tooltip={state.repeat === 'off' ? 'Repetição desativada' : state.repeat === 'all'
-            ? 'Repetir fila' : 'Repetir um vídeo'}
+        <div className="youtube-queue-modes" aria-label={t("message.c05200df9fb5")}>
+          <TooltipButton tooltip={state.repeat === 'off' ? t("message.a05d28ba8038") : state.repeat === 'all'
+            ? t("message.150cc3a42648") : t("message.d51986df523a")}
             className={state.repeat !== 'off' ? 'active' : ''} onClick={cycleRepeat}
-            aria-label={state.repeat === 'off' ? 'Repetição desativada. Ativar repetição da fila'
-              : state.repeat === 'all' ? 'Repetir fila. Ativar repetição de um vídeo'
-                : 'Repetir vídeo. Desativar repetição'}>
+            aria-label={state.repeat === 'off' ? t("message.8275328a4476")
+              : state.repeat === 'all' ? t("message.211f9c1d4db8")
+                : t("message.b8fa3d33b77c")}>
             {state.repeat === 'one' ? <Repeat1 size={15} /> : <Repeat size={15} />}
           </TooltipButton>
-          <TooltipButton tooltip="Ordem aleatória" className={state.shuffle ? 'active' : ''}
-            onClick={toggleShuffle} aria-pressed={state.shuffle} aria-label="Reproduzir em ordem aleatória">
+          <TooltipButton tooltip={t("message.9267fd5bed63")} className={state.shuffle ? 'active' : ''}
+            onClick={toggleShuffle} aria-pressed={state.shuffle} aria-label={t("message.3e62855b5387")}>
             <Shuffle size={15} /></TooltipButton>
-          <TooltipButton tooltip="Remover após reproduzir" className={state.removePlayed ? 'active' : ''}
+          <TooltipButton tooltip={t("message.c80041e80fb5")} className={state.removePlayed ? 'active' : ''}
             onClick={toggleRemovePlayed} aria-pressed={state.removePlayed}>
             <ListMinus size={15} /></TooltipButton>
         </div>
         <button className="youtube-mobile-switch" onClick={() => setMobilePanel('discover')}>
-          <Plus size={15} /> Adicionar
-        </button>
+          <Plus size={15} /> {t("message.967bcf34a913")}</button>
       </div>
-      <div className="youtube-queue-list" aria-label="Fila de reprodução">
-        {state.queue.length === 0 && <p className="youtube-list-empty">A fila está vazia. Cole um link ou pesquise para adicionar um vídeo.</p>}
+      <div className="youtube-queue-list" aria-label={t("message.65d9dcef50e7")}>
+        {state.queue.length === 0 && <p className="youtube-list-empty">{t("message.c5fb4b855295")}</p>}
         {state.queue.map((entry, index) => <div className={`youtube-queue-item ${index === state.index ? 'active' : ''}`}
           key={`${entry.videoId}-${index}`}>
-          <button className="youtube-queue-select" aria-label={`Reproduzir ${displayTitle(entry)}`} onClick={() => select(index)}>
+          <button className="youtube-queue-select" aria-label={t("message.197b1110873f", { v0: displayTitle(entry) })} onClick={() => select(index)}>
             <span className="youtube-queue-thumb">
               <img src={`https://i.ytimg.com/vi/${entry.videoId}/mqdefault.jpg`} alt="" loading="lazy" />
               <Play size={18} fill="currentColor" className="youtube-queue-play" aria-hidden="true" />
             </span>
             <span className="youtube-queue-copy"><Tooltip content={displayTitle(entry)}><strong tabIndex={0}>{displayTitle(entry)}</strong></Tooltip>
-              <small>{index === state.index ? 'Reproduzindo' : `Na fila · ${index + 1}`}</small></span>
+              <small>{index === state.index ? t("message.8006f5d83b50") : t("message.78a8d9381d6b", { v0: index + 1 })}</small></span>
           </button>
           <ActivityAvatar person={personFor(entry.addedBy || '', entry.addedByName)} className="youtube-queue-avatar" />
           <div className="youtube-queue-actions">
-            <TooltipButton tooltip="Subir na fila" aria-label={`Subir ${displayTitle(entry)} na fila`} disabled={index === 0}
+            <TooltipButton tooltip={t("message.d8afab06cebd")} aria-label={t("message.79f693c3c8df", { v0: displayTitle(entry) })} disabled={index === 0}
               onClick={() => move(index, index - 1)}><ArrowUp size={13} /></TooltipButton>
-            <TooltipButton tooltip="Descer na fila" aria-label={`Descer ${displayTitle(entry)} na fila`}
+            <TooltipButton tooltip={t("message.483365a6d20b")} aria-label={t("message.906a44f01386", { v0: displayTitle(entry) })}
               disabled={index === state.queue.length - 1} onClick={() => move(index, index + 1)}>
               <ArrowDown size={13} /></TooltipButton>
-            <TooltipButton tooltip="Remover da fila" aria-label={`Remover ${displayTitle(entry)}`}
+            <TooltipButton tooltip={t("message.59edc3f0849b")} aria-label={t("message.36e48c875542", { v0: displayTitle(entry) })}
               onClick={() => remove(index)}><Trash2 size={13} /></TooltipButton>
           </div>
         </div>)}
       </div>
     </section>
-    <aside className="youtube-discover-pane" aria-label="Pesquisar e adicionar vídeos">
+    <aside className="youtube-discover-pane" aria-label={t("message.a0b7dff4e56f")}>
       <div className="youtube-discover-heading">
-        <div><h3>Adicionar vídeos</h3></div>
-        <button className="youtube-mobile-switch" onClick={() => setMobilePanel('watch')} aria-label="Voltar ao player">
-          <ArrowLeft size={16} /> Voltar
-        </button>
+        <div><h3>{t("message.2788eb3018e3")}</h3></div>
+        <button className="youtube-mobile-switch" onClick={() => setMobilePanel('watch')} aria-label={t("message.cfcc80887acb")}>
+          <ArrowLeft size={16} /> {t("message.59dc926760d0")}</button>
       </div>
-      <p className="youtube-discover-hint">Cole um link para visualizar antes de adicionar, ou pesquise algo para assistir juntos.</p>
+      <p className="youtube-discover-hint">{t("message.3b4081078926")}</p>
       <div className="youtube-search-field">
         <Search size={17} aria-hidden="true" />
-        <input autoComplete="off" aria-label="Pesquisar ou colar URL do YouTube" placeholder="Link ou nome do vídeo" value={query}
+        <input autoComplete="off" aria-label={t("message.af08ad21840d")} placeholder={t("message.0d31d3569988")} value={query}
           onChange={(event) => { setQuery(event.target.value); setHasSearched(false); }}
           onKeyDown={(event) => { if (event.key === 'Enter') void search(); }} />
-        <button aria-label="Pesquisar ou visualizar link" disabled={busy || !query.trim()} onClick={() => void search()}>
+        <button aria-label={t("message.d40e840eb9c5")} disabled={busy || !query.trim()} onClick={() => void search()}>
           {busy ? <LoaderCircle size={16} className="youtube-loading" /> : <Search size={16} />}
         </button>
       </div>
-      <p className="youtube-search-help">Busca via Invidious</p>
-      {error && <p className="youtube-search-error" role="alert">{error}</p>}
+      <p className="youtube-search-help">{t("message.3b830f218586")}</p>
+      {error && <p className="youtube-search-error" role="alert">{localizeText(error)}</p>}
       {error && <button className="youtube-external-search" onClick={() => void openExternalSearch(query)}>
-        <span>Abrir busca no YouTube</span><ExternalLink size={15} />
+        <span>{t("message.312222a9802a")}</span><ExternalLink size={15} />
       </button>}
-      <div className="youtube-results-header"><span>Resultados</span>{results.length > 0 && <span>{results.length}</span>}</div>
-      <div className="youtube-results-list" aria-label="Resultados da busca">
+      <div className="youtube-results-header"><span>{t("message.31056106ce60")}</span>{results.length > 0 && <span>{results.length}</span>}</div>
+      <div className="youtube-results-list" aria-label={t("message.ae7971111bd6")}>
         {results.length === 0 && <p className="youtube-list-empty">{hasSearched
-          ? 'Nenhum resultado encontrado. Tente outros termos ou cole um link.'
-          : 'Pesquise vídeos e playlists ou cole um link acima.'}</p>}
+          ? t("message.bf334d3f2189")
+          : t("message.4c814573447e")}</p>}
         {results.map((entry) => <button className="youtube-result-item" key={`${entry.kind}-${entry.id}`}
           disabled={busy} onClick={() => void chooseResult(entry)}>
           {entry.kind === 'video' || entry.thumbnailVideoId ? <img src={`https://i.ytimg.com/vi/${entry.kind === 'video' ? entry.id : entry.thumbnailVideoId}/mqdefault.jpg`} alt="" loading="lazy" /> :
             <span className="youtube-result-playlist"><ListVideo size={18} /></span>}
-          <span><strong>{entry.title}</strong><small>{entry.kind === 'playlist' ? `Playlist${entry.count ? ` · ${entry.count} vídeos` : ''}` : 'Vídeo'}</small></span>
+          <span><strong>{entry.title}</strong><small>{entry.kind === 'playlist' ? `Playlist${entry.count ? t("message.80ba0965b4f7", { v0: entry.count }) : ''}` : t("message.bc10c86c24b5")}</small></span>
           <Plus size={15} />
         </button>)}
       </div>

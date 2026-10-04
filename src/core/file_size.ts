@@ -1,3 +1,4 @@
+import { getLanguage } from '../i18n/index.ts';
 const units = ['B', 'KB', 'MB', 'GB'] as const;
 
 export function formatFileSize(bytes: number): string {
@@ -9,5 +10,5 @@ export function formatFileSize(bytes: number): string {
     unit += 1;
   }
   const digits = unit === 0 ? 0 : value < 10 ? 1 : 0;
-  return `${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value)} ${units[unit]}`;
+  return `${new Intl.NumberFormat(getLanguage(), { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value)} ${units[unit]}`;
 }

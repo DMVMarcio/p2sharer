@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { AppHeader } from './components/header/AppHeader';
+import { WindowTitlebar } from './components/header/WindowTitlebar';
 import { HomeView } from './components/home/HomeView';
 import { RoomView } from './components/room/RoomView';
 import { SettingsModal } from './components/modals/SettingsModal';
@@ -73,6 +74,7 @@ const MainApp: React.FC = () => {
 
   return (
     <>
+      <WindowTitlebar />
       <AppHeader />
       <main className="app-main" id="app-main">
         {isInRoom ? <RoomView /> : <HomeView />}

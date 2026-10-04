@@ -1,25 +1,38 @@
+import { t } from '../../i18n';
+import type { AppLanguage } from '../../i18n/language';
+import { useLocale } from '../../hooks/useLocale';
 import { useAppUpdates } from '../../hooks/useAppUpdates';
 import { appUpdates } from '../../services/app_updates';
+import { Select } from '../common/Select';
 
 interface Props {
+  language: AppLanguage;
+  onLanguageChange: (language: AppLanguage) => void;
   automatic: boolean;
   includePrereleases: boolean;
   onAutomaticChange: (enabled: boolean) => void;
   onPrereleasesChange: (enabled: boolean) => void;
 }
 
-export function ApplicationSettings({ automatic, includePrereleases, onAutomaticChange, onPrereleasesChange }: Props) {
+export function ApplicationSettings({ language, onLanguageChange, automatic, includePrereleases, onAutomaticChange, onPrereleasesChange }: Props) {
+  useLocale();
   const update = useAppUpdates();
   const busy = ['downloading', 'installing'].includes(update.status);
   const channelChanged = includePrereleases !== update.includePrereleases;
   return <div className="settings-tab-pane active" id="settings-pane-application">
     <div className="settings-pane-header">
-      <h3 className="settings-pane-title">Aplicação</h3>
-      <p className="settings-pane-desc">Gerencie as atualizações do P2Sharer.</p>
+      <h3 className="settings-pane-title">{t("message.82929ebe1446")}</h3>
+      <p className="settings-pane-desc">{t("message.b1ed22acfd16")}</p>
+    </div>
+    <div className="form-group">
+      <label className="form-label" htmlFor="settings-language">{t('language.label')}</label>
+      <Select id="settings-language" value={language} aria-label={t('language.label')}
+        options={[{ value: 'en', label: 'English' }, { value: 'pt-BR', label: 'Português Brasil' }]}
+        onValueChange={(value) => onLanguageChange(value === 'pt-BR' ? 'pt-BR' : 'en')} />
     </div>
     <label className="settings-switch-row" htmlFor="settings-auto-updates">
       <div className="settings-switch-label-group">
-        <span className="settings-switch-title">Procurar automaticamente por atualizações</span>
+        <span className="settings-switch-title">{t("message.d8a908a0e8ab")}</span>
       </div>
       <div className="modern-switch">
         <input autoComplete="off" type="checkbox" id="settings-auto-updates" disabled={busy}
@@ -29,9 +42,9 @@ export function ApplicationSettings({ automatic, includePrereleases, onAutomatic
     </label>
     <label className="settings-switch-row" htmlFor="settings-beta-updates">
       <div className="settings-switch-label-group">
-        <span className="settings-switch-title">Receber versões beta</span>
-        <span className="settings-switch-subtitle">Inclui versões de teste, que podem apresentar falhas. Versões estáveis continuam disponíveis.</span>
-        <span className="settings-switch-subtitle">Ao desativar e salvar, você poderá voltar à última versão estável.</span>
+        <span className="settings-switch-title">{t("message.b634126b8065")}</span>
+        <span className="settings-switch-subtitle">{t("message.4832edeea766")}</span>
+        <span className="settings-switch-subtitle">{t("message.521fa9607c3d")}</span>
       </div>
       <div className="modern-switch">
         <input autoComplete="off" type="checkbox" id="settings-beta-updates" disabled={busy}
@@ -39,10 +52,9 @@ export function ApplicationSettings({ automatic, includePrereleases, onAutomatic
         <span className="switch-slider" />
       </div>
     </label>
-    {channelChanged && <p className="field-info-text">Salve as configurações para procurar atualizações no canal escolhido.</p>}
+    {channelChanged && <p className="field-info-text">{t("message.013d77e5aa5d")}</p>}
     <button type="button" className="btn btn-secondary btn-sm"
       disabled={busy || channelChanged || update.status === 'checking'} onClick={() => void appUpdates.check(true)}>
-      Procurar atualizações agora
-    </button>
+      {t("message.5f59554ade76")}</button>
   </div>;
 }

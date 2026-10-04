@@ -1,9 +1,12 @@
+import { t } from '../../i18n';
+import { useLocale } from '../../hooks/useLocale';
 import React, { useEffect, useState } from 'react';
 import { useModal } from '../../hooks/useModal';
 import { useAudioFilter } from '../../hooks/useAudioFilter';
 import { Tooltip } from '../common/Tooltip';
 
 export const AudioFilterModal: React.FC = () => {
+  useLocale();
   const [failedIcons, setFailedIcons] = useState<Set<string>>(() => new Set());
   const { closeModal, isClosing } = useModal();
   const {
@@ -62,16 +65,15 @@ export const AudioFilterModal: React.FC = () => {
         {/* Modal Header */}
         <div className="modal-header">
           <div>
-            <h2>Filtro de Áudio</h2>
+            <h2>{t("message.cd9f9a4fe6f8")}</h2>
             <p className="modal-subtitle">
-              Defina quais aplicativos serão ouvidos na transmissão.
-            </p>
+              {t("message.f79d4938bb8c")}</p>
           </div>
           <button
             className="btn-close"
             id="btn-close-audio-modal"
             onClick={closeModal}
-            aria-label="Fechar"
+            aria-label={t("message.0f2bd88ef0ac")}
           >
             &times;
           </button>
@@ -82,12 +84,11 @@ export const AudioFilterModal: React.FC = () => {
           <div className={`audio-master-switch-card ${isFullAudio ? 'active' : ''}`}>
             <div className="audio-master-switch-info">
               <div className="audio-master-switch-title-row">
-                <span className="audio-master-switch-title">Transmitir áudio sem filtros</span>
-                {isFullAudio && <span className="audio-master-switch-badge">Ativado</span>}
+                <span className="audio-master-switch-title">{t("message.dcd7a51c1fbd")}</span>
+                {isFullAudio && <span className="audio-master-switch-badge">{t("message.5fc7e20f01a4")}</span>}
               </div>
               <p className="audio-master-switch-desc">
-                Compartilha todo o som do computador diretamente, sobrepondo qualquer filtro abaixo.
-              </p>
+                {t("message.d735bc54979c")}</p>
             </div>
             <label className="modern-switch" htmlFor="toggle-full-audio">
               <input autoComplete="off"
@@ -108,14 +109,14 @@ export const AudioFilterModal: React.FC = () => {
                 <line x1="12" x2="12" y1="19" y2="22" />
               </svg>
               <div>
-                <strong>Modo direto ativo</strong>
-                <p>Todos os sons e aplicativos do seu computador estão sendo transmitidos sem restrições. Desative a opção acima caso queira selecionar aplicativos específicos.</p>
+                <strong>{t("message.f933e62ed746")}</strong>
+                <p>{t("message.1fe90c2f5d4b")}</p>
               </div>
             </div>
           ) : (
             <div className="audio-granular-section">
               {/* Sober Native Segmented Control */}
-              <div className="audio-segmented-control" role="tablist" aria-label="Modo do filtro de áudio">
+              <div className="audio-segmented-control" role="tablist" aria-label={t("message.408dd2f85c4a")}>
                 <button
                   type="button"
                   role="tab"
@@ -123,8 +124,7 @@ export const AudioFilterModal: React.FC = () => {
                   className={`audio-segment-btn ${isExclude ? 'active' : ''}`}
                   onClick={() => setFilterMode('exclude')}
                 >
-                  Silenciar selecionados
-                </button>
+                  {t("message.fea132673fba")}</button>
                 <button
                   type="button"
                   role="tab"
@@ -132,26 +132,23 @@ export const AudioFilterModal: React.FC = () => {
                   className={`audio-segment-btn ${!isExclude ? 'active' : ''}`}
                   onClick={() => setFilterMode('include')}
                 >
-                  Transmitir apenas selecionados
-                </button>
+                  {t("message.ba1d9ee9cb3e")}</button>
               </div>
 
               {/* Clean Informational Status Line */}
               <div className="audio-info-box">
                 {isExclude ? (
                   selectedCount === 0 ? (
-                    <span>Nenhum aplicativo marcado. O áudio de todo o computador será compartilhado.</span>
+                    <span>{t("message.eb76028b0eb9")}</span>
                   ) : (
                     <span>
-                      Silenciando <strong>{selectedCount}</strong> aplicativo(s). Todo o restante do sistema será compartilhado.
-                    </span>
+                      {t("message.2734d756396f")} <strong>{selectedCount}</strong> {t("message.06899e2d53ad")}</span>
                   )
                 ) : selectedCount === 0 ? (
-                  <span>Nenhum aplicativo marcado. A transmissão ficará em silêncio até você selecionar aplicativos.</span>
+                  <span>{t("message.408a2c311897")}</span>
                 ) : (
                   <span>
-                    Transmitindo com exclusividade <strong>{selectedCount}</strong> aplicativo(s) selecionado(s).
-                  </span>
+                    {t("message.521b22065b2a")} <strong>{selectedCount}</strong> {t("message.a6ffc768bd58")}</span>
                 )}
               </div>
 
@@ -174,7 +171,7 @@ export const AudioFilterModal: React.FC = () => {
                     type="text"
                     id="input-search-process"
                     className="audio-search-input"
-                    placeholder="Buscar aplicativo ou janela..."
+                    placeholder={t("message.d5c1ff19ba78")}
                     value={searchText}
                     onChange={(e) => setSearchText(e.target.value)}
                   />
@@ -183,7 +180,7 @@ export const AudioFilterModal: React.FC = () => {
                       type="button"
                       className="audio-search-clear-btn"
                       onClick={() => setSearchText('')}
-                      aria-label="Limpar busca"
+                      aria-label={t("message.9f3ebbde555a")}
                     >
                       &times;
                     </button>
@@ -204,7 +201,7 @@ export const AudioFilterModal: React.FC = () => {
                         <line x1="12" x2="12" y1="19" y2="23" />
                         <line x1="8" x2="16" y1="23" y2="23" />
                       </svg>
-                      <span>Silenciar chamadas</span>
+                      <span>{t("message.0feef24e3985")}</span>
                     </button>
                   )}
 
@@ -214,16 +211,16 @@ export const AudioFilterModal: React.FC = () => {
                       className="btn btn-sm btn-ghost audio-action-btn"
                       onClick={clearSelection}
                     >
-                      <span>Desmarcar todos</span>
+                      <span>{t("message.4af6af276835")}</span>
                     </button>
                   )}
 
-                  <Tooltip content="Atualizar lista de aplicativos abertos">
+                  <Tooltip content={t("message.cea1be571207")}>
                     <button
                       type="button"
                       className={`btn btn-sm btn-outline audio-refresh-btn ${isLoading ? 'spinning' : ''}`}
                       onClick={loadProcesses}
-                      aria-label="Atualizar lista de aplicativos"
+                      aria-label={t("message.bc3205686c5b")}
                       disabled={isLoading}
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -242,13 +239,13 @@ export const AudioFilterModal: React.FC = () => {
                 {isLoading && (
                   <div className="audio-loading-state">
                     <span className="spinner-sm" />
-                    <span>Atualizando aplicativos...</span>
+                    <span>{t("message.7cbee137622b")}</span>
                   </div>
                 )}
 
                 {!isLoading && processes.length === 0 && (
                   <div className="audio-empty-state">
-                    <span>Nenhum aplicativo correspondente a &quot;{searchText}&quot;</span>
+                    <span>{t("message.f550813bc0e5")}{searchText}{t("message.8a331fdde703")}</span>
                   </div>
                 )}
 
@@ -299,11 +296,11 @@ export const AudioFilterModal: React.FC = () => {
                           <div className="audio-process-name-row">
                             <span className="audio-app-name">{p.name}</span>
                             {p.is_likely_chat_or_voice && (
-                              <span className="audio-app-tag">Voz</span>
+                              <span className="audio-app-tag">{t("message.c9566ca43bdc")}</span>
                             )}
                           </div>
                           <div className="audio-app-window-title">
-                            {p.window_title || p.exe_path || 'Processo em execução'}
+                            {p.window_title || p.exe_path || t("message.8cadb576e17c")}
                           </div>
                         </div>
 
@@ -314,7 +311,7 @@ export const AudioFilterModal: React.FC = () => {
                             className="audio-process-checkbox"
                             checked={isSelected}
                             onChange={(e) => toggleProcess(p, e.target.checked)}
-                            aria-label={`Selecionar ${p.name}`}
+                            aria-label={t("message.d574458ad595", { v0: p.name })}
                           />
                         </div>
                       </div>
@@ -328,12 +325,11 @@ export const AudioFilterModal: React.FC = () => {
         {/* Modal Footer */}
         <div className="modal-footer audio-modal-footer">
           <span className="audio-footer-count">
-            {isFullAudio ? 'Áudio geral do computador' : `${rawProcessCount} aplicativo(s) detectado(s)`}
+            {isFullAudio ? t("message.ef4d03545b12") : t('audio.detectedApps', { count: rawProcessCount })}
           </span>
           <div className="audio-footer-buttons">
             <button className="btn btn-secondary" id="btn-cancel-audio-filter" onClick={closeModal}>
-              Cancelar
-            </button>
+              {t("message.bb9dbb406dcb")}</button>
             <button
               className="btn btn-primary"
               id="btn-apply-audio-filter"
@@ -341,14 +337,14 @@ export const AudioFilterModal: React.FC = () => {
               onClick={handleApply}
             >
               {isFullAudio
-                ? 'Salvar'
+                ? t("message.aef7cd5b2081")
                 : isExclude
                 ? selectedCount === 0
-                  ? 'Salvar'
-                  : `Silenciar (${selectedCount})`
+                  ? t("message.aef7cd5b2081")
+                  : t("message.01c5f2082214", { v0: selectedCount })
                 : selectedCount === 0
-                  ? 'Salvar (Sem áudio)'
-                  : `Transmitir (${selectedCount})`}
+                  ? t("message.def57be507c5")
+                  : t("message.cc71524f7404", { v0: selectedCount })}
             </button>
           </div>
         </div>

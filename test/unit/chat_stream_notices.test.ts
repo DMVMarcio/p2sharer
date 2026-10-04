@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import type { ChatMessage } from '../../src/core/types.ts';
 import { GroupRoomManager } from '../../src/p2p/group_room.ts';
 import { signalingManager } from '../../src/p2p/signaling_manager.ts';
+import { setLanguage } from '../../src/i18n/index.ts';
 
 test('stream owner publishes one start and stop notice into synchronized history', async () => {
   const originalJoin = signalingManager.joinRoom;
@@ -66,12 +67,24 @@ test('stream owner publishes one start and stop notice into synchronized history
     assert.equal(sent.filter(({ action, data }) => action === 'chat' &&
       data.systemType?.startsWith('app-')).length, 2);
 
+    setLanguage('en');
+    await manager.sendAppLifecycleNotice('start', 'notepad');
+    const noteNotice = received.findLast((message) => message.systemAppKind === 'notepad')!;
+    assert.equal(noteNotice.text, 'Márcio iniciou Bloco de notas');
+    const receiver = new GroupRoomManager('Receiver', 'stream-notices-test');
+    (receiver as any).peerTracker.receivePeerExchange(noteNotice.authorId, true, 'Márcio', true);
+    (receiver as any).announcedPeerNames.set(noteNotice.authorId, 'Márcio');
+    assert.ok((receiver as any).isConsistentChatClaim(noteNotice));
+    setLanguage('pt-BR');
+    assert.ok((receiver as any).isConsistentChatClaim(noteNotice));
+
     room.onPeerJoin('late-peer');
     const history = sent.findLast(({ action, data, options }) => action === 'history_sync' &&
       options?.target === 'late-peer' && Array.isArray(data.history))?.data.history as ChatMessage[];
     assert.deepEqual(history.filter((message) => message.systemType?.startsWith('stream-'))
       .map((message) => message.id), notices.map((message) => message.id));
   } finally {
+    setLanguage('pt-BR');
     await manager.leave();
     (signalingManager as any).joinRoom = originalJoin;
     (signalingManager as any).leaveRoom = originalLeave;

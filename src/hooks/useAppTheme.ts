@@ -1,25 +1,26 @@
+import { t } from '../i18n/index.ts';
 import { useEffect, useCallback } from 'react';
 import { stateStore } from '../core/state_store';
 import { ThemeMode } from '../core/types';
 import { useStore } from './useStore';
 
 export const ACCENT_COLORS = [
-  { id: 'cyan', label: 'Ciano', color: '#06b6d4' },
-  { id: 'sky', label: 'Azul Celeste', color: '#0284c7' },
-  { id: 'blue', label: 'Azul', color: '#3b82f6' },
-  { id: 'indigo', label: 'Índigo', color: '#6366f1' },
-  { id: 'violet', label: 'Violeta', color: '#8b5cf6' },
-  { id: 'purple', label: 'Roxo', color: '#a855f7' },
-  { id: 'fuchsia', label: 'Fúcsia', color: '#d946ef' },
-  { id: 'pink', label: 'Rosa', color: '#ec4899' },
-  { id: 'rose', label: 'Rose', color: '#f43f5e' },
-  { id: 'red', label: 'Vermelho', color: '#ef4444' },
-  { id: 'orange', label: 'Laranja', color: '#f97316' },
-  { id: 'amber', label: 'Âmbar', color: '#f59e0b' },
-  { id: 'lime', label: 'Lima', color: '#84cc16' },
-  { id: 'emerald', label: 'Esmeralda', color: '#10b981' },
-  { id: 'teal', label: 'Verde Água', color: '#14b8a6' },
-  { id: 'zinc', label: 'Monocromático', color: '#a1a1aa' },
+  { id: 'cyan', get label() { return t("message.c954e4de2019"); }, color: '#06b6d4' },
+  { id: 'sky', get label() { return t("message.db6b0018a206"); }, color: '#0284c7' },
+  { id: 'blue', get label() { return t("message.b0bf526b23af"); }, color: '#3b82f6' },
+  { id: 'indigo', get label() { return t("message.46a5f1fafbac"); }, color: '#6366f1' },
+  { id: 'violet', get label() { return t("message.264f2ba06e85"); }, color: '#8b5cf6' },
+  { id: 'purple', get label() { return t("message.57a73ede5f6f"); }, color: '#a855f7' },
+  { id: 'fuchsia', get label() { return t("message.591dceeb4a25"); }, color: '#d946ef' },
+  { id: 'pink', get label() { return t("message.75f9577a1637"); }, color: '#ec4899' },
+  { id: 'rose', get label() { return t('color.rose'); }, color: '#f43f5e' },
+  { id: 'red', get label() { return t("message.6741b8b5e1c2"); }, color: '#ef4444' },
+  { id: 'orange', get label() { return t("message.2b2b4ad00333"); }, color: '#f97316' },
+  { id: 'amber', get label() { return t("message.a2c334da46a3"); }, color: '#f59e0b' },
+  { id: 'lime', get label() { return t("message.aaf2d054d5f7"); }, color: '#84cc16' },
+  { id: 'emerald', get label() { return t("message.f22f3a4a6cd6"); }, color: '#10b981' },
+  { id: 'teal', get label() { return t("message.f1d0073c7a6b"); }, color: '#14b8a6' },
+  { id: 'zinc', get label() { return t("message.e7c9cc1ea080"); }, color: '#a1a1aa' },
 ];
 
 export function useAppTheme() {

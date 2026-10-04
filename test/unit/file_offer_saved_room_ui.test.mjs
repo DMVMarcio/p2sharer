@@ -98,15 +98,15 @@ test('own sent images expose Save and Save As while own non-image files retain t
     transfers: [], preview: 'data:image/png;base64,AA==', speedUnit: 'MBps', onRequest: saveAs => requests.push(saveAs),
     onPreview: () => {}, onCancel: () => {}, onReveal: () => {} };
   await render(React.createElement(ChatFileAttachment, props));
-  await click(document.querySelector('[aria-label="Download"]'));
+  await click(document.querySelector('[aria-label="Baixar"]'));
   await click([...document.querySelectorAll('.chat-file-download-menu button')].find(button => button.textContent === 'Salvar'));
   await settleExit();
-  await click(document.querySelector('[aria-label="Download"]'));
+  await click(document.querySelector('[aria-label="Baixar"]'));
   await click([...document.querySelectorAll('.chat-file-download-menu button')].find(button => button.textContent === 'Salvar Como'));
   assert.deepEqual(requests, [false, true]);
   await render(React.createElement(ChatFileAttachment, { ...props, message: { ...props.message,
     file: { ...props.message.file, name: 'report.pdf', isImage: false } } }));
-  assert.equal(document.querySelector('[aria-label="Download"]'), null);
+  assert.equal(document.querySelector('[aria-label="Baixar"]'), null);
 });
 
 after(async () => { await act(async () => root.unmount()); dom.window.close(); delete globalThis.fileOfferSavedRoomFixture; });

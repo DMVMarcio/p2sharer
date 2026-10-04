@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "window-chrome",
+  "description": "Main-window caption buttons use native window actions.",
+  "windows": ["main"],
+  "permissions": [
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-set-title",
+    "core:window:allow-close"
+  ]
+}

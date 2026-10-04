@@ -1,7 +1,7 @@
 {
   "name": "tauri-app",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "scripts": {
     "release:version": "node tools/release.mjs version",
@@ -48,6 +48,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^4.7.0",
+    "i18next": "^26.4.2",
     "lib0": "^0.2.119",
     "lucide": "^1.31.0",
     "lucide-react": "^1.48.0",

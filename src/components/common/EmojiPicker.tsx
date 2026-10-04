@@ -1,6 +1,8 @@
+import { t } from '../../i18n';
+import { useLocale } from '../../hooks/useLocale';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Smile, Hand, PawPrint, UtensilsCrossed, MapPin, Gamepad2, Box, Hash, Flag } from 'lucide-react';
-import { EMOJI_CATALOG, EMOJI_CATEGORIES, EMOJI_SEARCH_ALIASES, EmojiCategory } from '../../core/emoji_catalog';
+import { EMOJI_CATALOG, EMOJI_CATEGORIES, EMOJI_SEARCH_ALIASES, getEmojiName, EmojiCategory } from '../../core/emoji_catalog';
 import { EmojiPack } from '../../core/emoji_preferences';
 import { EmojiGlyph } from './EmojiGlyph';
 
@@ -11,6 +13,7 @@ type Props = { pack: EmojiPack; onSelect: (emoji: string) => void; closing?: boo
 const normalize = (value: string) => value.toLocaleLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
 export const EmojiPicker: React.FC<Props> = ({ pack, onSelect, closing = false }) => {
+  const language = useLocale();
   const [activeCategory, setActiveCategory] = useState<EmojiCategory>(EMOJI_CATEGORIES[0].id);
   const [query, setQuery] = useState('');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -30,12 +33,12 @@ export const EmojiPicker: React.FC<Props> = ({ pack, onSelect, closing = false }
     return () => nav.removeEventListener('wheel', scrollWithWheel);
   }, []);
   const matching = useMemo(() => EMOJI_CATALOG.filter((entry) =>
-    !normalizedQuery || normalize(`${entry.name} ${EMOJI_SEARCH_ALIASES[entry.emoji] ?? ''}`).includes(normalizedQuery) || entry.emoji.includes(normalizedQuery)
-  ), [normalizedQuery]);
+    !normalizedQuery || normalize(`${getEmojiName(entry)} ${entry.name} ${EMOJI_SEARCH_ALIASES[entry.emoji] ?? ''}`).includes(normalizedQuery) || entry.emoji.includes(normalizedQuery)
+  ), [normalizedQuery, language]);
   const sections = useMemo(() => EMOJI_CATEGORIES.map((category) => ({
     ...category,
     entries: matching.filter((entry) => entry.category === category.id),
-  })).filter((section) => section.entries.length), [matching]);
+  })).filter((section) => section.entries.length), [matching, language]);
 
   const onListScroll = () => {
     const list = listRef.current;
@@ -67,13 +70,13 @@ export const EmojiPicker: React.FC<Props> = ({ pack, onSelect, closing = false }
 
   let remaining = visibleCount;
   return (
-    <div className={`emoji-picker ${closing ? 'dropdown-closing' : ''}`} inert={closing} aria-hidden={closing} role="dialog" aria-label="Selecionar emoji">
-      <div className="emoji-picker-header"><strong>Emojis</strong></div>
+    <div className={`emoji-picker ${closing ? 'dropdown-closing' : ''}`} inert={closing} aria-hidden={closing} role="dialog" aria-label={t("message.393abe74ad54")}>
+      <div className="emoji-picker-header"><strong>{t("common.emojis")}</strong></div>
       <input autoComplete="off"
         className="emoji-picker-search"
         type="search"
-        placeholder="Buscar emoji..."
-        aria-label="Buscar emoji"
+        placeholder={t("message.6ea01c05805b")}
+        aria-label={t("message.9306b76a82a0")}
         value={query}
         onChange={(event) => {
           setQuery(event.target.value);
@@ -81,7 +84,7 @@ export const EmojiPicker: React.FC<Props> = ({ pack, onSelect, closing = false }
           if (listRef.current) listRef.current.scrollTop = 0;
         }}
       />
-      <div ref={navRef} className="emoji-picker-categories" aria-label="Categorias de emojis">
+      <div ref={navRef} className="emoji-picker-categories" aria-label={t("message.3a19217471ff")}>
         {EMOJI_CATEGORIES.map((item, index) => {
           const Icon = CATEGORY_ICONS[index];
           return (
@@ -110,7 +113,7 @@ export const EmojiPicker: React.FC<Props> = ({ pack, onSelect, closing = false }
               <h3 className="emoji-picker-section-label">{section.label}</h3>
               <div className="emoji-picker-grid">
                 {entries.map((entry) => (
-                  <button key={entry.emoji} type="button" aria-label={entry.name} onClick={() => onSelect(entry.emoji)}>
+                  <button key={entry.emoji} type="button" aria-label={getEmojiName(entry)} onClick={() => onSelect(entry.emoji)}>
                     <EmojiGlyph emoji={entry.emoji} pack={pack} size={25} />
                   </button>
                 ))}
@@ -118,7 +121,7 @@ export const EmojiPicker: React.FC<Props> = ({ pack, onSelect, closing = false }
             </section>
           );
         })}
-        {!matching.length && <p className="emoji-picker-empty">Nenhum emoji encontrado.</p>}
+        {!matching.length && <p className="emoji-picker-empty">{t("message.d26bebda6099")}</p>}
       </div>
     </div>
   );

@@ -1,3 +1,5 @@
+import { t } from '../../i18n';
+import { useLocale } from '../../hooks/useLocale';
 import React from 'react';
 import { useModal } from '../../hooks/useModal';
 import { useRoom } from '../../hooks/useRoom';
@@ -5,6 +7,7 @@ import { SavedRoomsSection } from './SavedRoomsSection';
 import { roomService } from '../../services/room_service';
 
 export const HomeView: React.FC = () => {
+  useLocale();
   const { openModal } = useModal();
   const { username } = useRoom();
 
@@ -30,10 +33,9 @@ export const HomeView: React.FC = () => {
     <section className="view active" id="view-home">
       <div className="hero-container">
         <div className="hero-text">
-          <h1 className="hero-title">Salas P2P de Alta Fidelidade</h1>
+          <h1 className="hero-title">{t("message.fec4d35dc061")}</h1>
           <p className="hero-subtitle">
-            Transmita tela, janelas e áudio diretamente ponto a ponto sem servidores intermediários.
-          </p>
+            {t("message.4d3e94d0c285")}</p>
         </div>
 
         <div className="action-cards-grid">
@@ -47,13 +49,12 @@ export const HomeView: React.FC = () => {
                 <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
               </svg>
             </div>
-            <h2 className="card-title">Criar Nova Sala</h2>
+            <h2 className="card-title">{t("message.05c0432bf1ae")}</h2>
             <p className="card-desc">
-              Inicie um espaço compartilhado para transmitir sua tela e convidar amigos instantaneamente.
-            </p>
+              {t("message.8e648ce77c35")}</p>
             <div className="card-footer">
               <button className="btn btn-primary" id="btn-create-room-direct" onClick={handleCreateRoom}>
-                <span>Criar Sala e Entrar</span>
+                <span>{t("message.bb0f3686fc7e")}</span>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <line x1="5" x2="19" y1="12" y2="12"/>
                   <polyline points="12 5 19 12 12 19"/>
@@ -71,13 +72,12 @@ export const HomeView: React.FC = () => {
                 <line x1="15" x2="3" y1="12" y2="12"/>
               </svg>
             </div>
-            <h2 className="card-title">Entrar em uma Sala</h2>
+            <h2 className="card-title">{t("message.d2979e7d0cf4")}</h2>
             <p className="card-desc">
-              Conecte-se a uma sala existente através do código de compartilhamento.
-            </p>
+              {t("message.75b5ed8c34b1")}</p>
             <div className="card-footer">
               <button className="btn btn-secondary" id="btn-start-join-flow" onClick={handleJoinRoom}>
-                <span>Entrar com Código</span>
+                <span>{t("message.ce76754cde67")}</span>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <line x1="5" x2="19" y1="12" y2="12"/>
                   <polyline points="12 5 19 12 12 19"/>

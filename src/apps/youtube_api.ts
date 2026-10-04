@@ -1,3 +1,4 @@
+import { t } from '../i18n/index.ts';
 import type { YouTubeEntry } from './types';
 
 const VIDEO_ID = /^[\w-]{11}$/;
@@ -49,7 +50,7 @@ export function parseYouTubeInput(input: string): { videoId?: string; playlistId
 
 async function invidiousRequest(path: string, params: Record<string, string> = {},
   accept: (data: unknown) => boolean = () => true,
-  failureMessage = 'A busca está indisponível no momento. Você ainda pode colar um link de vídeo.'): Promise<unknown> {
+  failureMessage = t("message.8b92ac7ffe1f")): Promise<unknown> {
   for (const instance of INVIDIOUS_INSTANCES) {
     try {
       const url = new URL(`/api/v1/${path}`, instance);
@@ -130,12 +131,12 @@ export async function loadYouTubePlaylist(id: string): Promise<YouTubeEntry[]> {
       const record = value as { videoCount?: unknown; videos: unknown[]; error?: unknown };
       if (record.error) return false;
       return record.videos.length > 0 && parseInvidiousPlaylist(value).length > 0;
-    }, 'Não foi possível carregar os vídeos desta playlist. Ela pode estar indisponível ou o serviço de consulta pode ter falhado.');
+    }, t("message.a97b5fda5f58"));
     const entries = parseInvidiousPlaylist(data);
     videos.push(...entries.slice(0, 200 - videos.length));
     const record = data as { videoCount?: number; videos: unknown[] };
     if ((Number.isSafeInteger(record.videoCount) && videos.length >= record.videoCount!) || record.videos.length < 50) break;
   }
-  if (!videos.length) throw new Error('Não foi possível carregar os vídeos desta playlist. Tente novamente.');
+  if (!videos.length) throw new Error(t("message.f26f2c1bb071"));
   return videos;
 }

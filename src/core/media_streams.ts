@@ -1,10 +1,16 @@
+import { getLanguage } from '../i18n/index.ts';
 export type MediaKind = 'screen' | 'camera';
 export const MAX_MEDIA_FPS = 120;
-const frameRateFormatter = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2, useGrouping: false });
+const frameRateFormatters = new Map<string, Intl.NumberFormat>();
+function frameRateFormatter() {
+  const language = getLanguage();
+  if (!frameRateFormatters.has(language)) frameRateFormatters.set(language, new Intl.NumberFormat(language, { maximumFractionDigits: 2, useGrouping: false }));
+  return frameRateFormatters.get(language)!;
+}
 
 /** Hide device floating-point noise without changing capture constraints. */
 export function formatFrameRate(fps: number): string {
-  return Number.isFinite(fps) ? frameRateFormatter.format(fps) : '0';
+  return Number.isFinite(fps) ? frameRateFormatter().format(fps) : '0';
 }
 
 export interface StreamDescriptor {

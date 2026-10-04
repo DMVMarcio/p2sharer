@@ -48,7 +48,7 @@ test('the real header badge opens the update dialog and installation remains an 
     await act(async () => root.render(React.createElement(React.Fragment, null, React.createElement(AppHeader), React.createElement(AppUpdateDialog))));
     assert.equal(document.querySelector('.app-update-badge'), null);
     await act(async () => { await globalThis.appUpdateUiFixture.check(); });
-    const badge = document.querySelector('.logo-group .app-update-badge');
+    const badge = document.querySelector('.header-room-info .app-update-badge');
     assert.ok(badge);
     assert.equal(document.querySelector('[role="dialog"]'), null);
     await act(async () => badge.click());
