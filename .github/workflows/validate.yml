@@ -1,0 +1,48 @@
+name: Validate and warm build caches
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-2022
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-build
+        with:
+          save-rust-cache: 'true'
+      - name: Review repository hygiene
+        run: pnpm run check:repository
+      - name: Validate version declarations
+        run: pnpm run release:check
+      - name: Run frontend regressions
+        run: pnpm test
+      - name: Run portable native regressions
+        run: pnpm run test:native --release --locked
+      - name: Build unsigned desktop installers
+        run: pnpm run tauri:build --locked
+      - name: Remove distribution outputs before caching
+        shell: pwsh
+        run: |
+          # Keep dependency artifacts, never installers or application executables.
+          $releaseDirectory = Join-Path $env:GITHUB_WORKSPACE 'src-tauri/target/release'
+          $bundleDirectory = Join-Path $releaseDirectory 'bundle'
+          $resolvedBundle = (Resolve-Path -LiteralPath $bundleDirectory -ErrorAction Stop).Path
+          if ($resolvedBundle -ne [System.IO.Path]::GetFullPath($bundleDirectory)) {
+            throw 'Refusing to remove distribution outputs outside the expected workspace directory.'
+          }
+          Remove-Item -LiteralPath $resolvedBundle -Recurse -Force -ErrorAction Stop
+          Remove-Item -LiteralPath (Join-Path $releaseDirectory 'p2sharer.exe') -Force -ErrorAction Stop

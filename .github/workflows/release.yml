@@ -30,22 +30,7 @@ jobs:
         with:
           ref: refs/tags/${{ inputs.tag || github.ref_name }}
           persist-credentials: false
-      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: '22.14.0'
-          cache: pnpm
-      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable
-        with:
-          toolchain: stable
-      - name: Install native build prerequisites
-        shell: pwsh
-        run: |
-          choco install nasm --yes --no-progress
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Add-Content -LiteralPath $env:GITHUB_PATH -Value 'C:\Program Files\NASM'
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup-build
       - name: Validate release version
         shell: pwsh
         run: pnpm run release:check --tag "$env:RELEASE_TAG"

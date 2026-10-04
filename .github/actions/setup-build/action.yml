@@ -1,0 +1,44 @@
+name: Prepare Windows build environment
+description: Shared pinned tooling and dependency caches for validation and releases.
+inputs:
+  save-rust-cache:
+    description: Save compiled dependencies after a successful job; releases only restore.
+    required: false
+    default: 'false'
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      with:
+        node-version: '22.14.0'
+        cache: pnpm
+        cache-dependency-path: |
+          pnpm-lock.yaml
+          pnpm-workspace.yaml
+          patches/**
+    - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable
+      with:
+        toolchain: stable
+    - name: Install native build prerequisites
+      shell: pwsh
+      run: |
+        choco install nasm --yes --no-progress
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        Add-Content -LiteralPath $env:GITHUB_PATH -Value 'C:\Program Files\NASM'
+        $nasmVersion = & 'C:\Program Files\NASM\nasm.exe' -v
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        Add-Content -LiteralPath $env:GITHUB_ENV -Value "P2SHARER_NATIVE_ENV=$env:ImageVersion $nasmVersion"
+    - name: Restore Rust dependencies
+      uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      with:
+        workspaces: src-tauri -> target
+        shared-key: windows-2022-x64-release-v1-${{ hashFiles('.github/actions/setup-build/action.yml', 'tools/native-build-env.mjs') }}
+        env-vars: CARGO CC CFLAGS CXX CMAKE RUST P2SHARER_NATIVE
+        cache-bin: 'false'
+        cache-workspace-crates: 'false'
+        cache-on-failure: 'false'
+        save-if: ${{ inputs.save-rust-cache == 'true' && github.ref == 'refs/heads/main' }}
+    - name: Install dependencies
+      shell: pwsh
+      run: pnpm install --frozen-lockfile

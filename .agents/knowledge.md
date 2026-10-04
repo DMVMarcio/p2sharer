@@ -45,6 +45,8 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 4. User Guidelines & Expressed Preferences
 
+- `[Build Caching]` Share pnpm package downloads and compiled Rust dependencies between trusted main-branch validation and release builds. Dependency additions, removals and replacements must remain safe: use lockfile/toolchain-aware keys, always run locked installation and normal validation/build commands, and never cache signing credentials or distributed installers.
+
 - `[Portable Updates]` Installed application updates are required. The user also welcomes portable updates; treat preservation of portable operation as a separate future distribution feature, since the current updater invokes Windows installers and does not replace a standalone executable in place.
 
 - `[Release Implementation]` Standardize the application at version 1.0.0 and use a bundle identifier without the .app suffix. Provide an update badge next to the header logo, a persistent setting to disable automatic checks, and maintainer-controlled GitHub release builds and publication. The maintainer generates and safeguards signing keys; never generate or disclose their production private key on their behalf.
