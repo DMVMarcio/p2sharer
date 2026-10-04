@@ -9,7 +9,6 @@ import { useContextMenu } from '../common/ContextMenu';
 import { EditSavedRoomDialog } from '../modals/EditSavedRoomDialog';
 import { orderSavedRooms } from '../../core/saved_room_order';
 import { useSortableGrid } from '../../hooks/useSortableGrid';
-import { TooltipButton } from '../common/TooltipButton';
 import { ModalDialog } from '../common/ModalDialog';
 
 export const SavedRoomsSection: React.FC = () => {
@@ -89,12 +88,12 @@ export const SavedRoomsSection: React.FC = () => {
               { id: 'remove', label: 'Remover das salas salvas', icon: <Trash2 size={15} />, danger: true, onSelect: () => setRemovingRoom(room) },
             ])}>
               <div className="saved-room-card-heading">
-                <TooltipButton tooltip="Arraste para reordenar ou use as setas do teclado"
+                <button type="button"
                   className="btn saved-room-drag-handle"
                   aria-label={`Reordenar ${room.customName ?? room.name}`}
                   disabled={rooms.length < 2} {...sortable.handleProps(room.roomId)}>
                   <GripVertical size={17} />
-                </TooltipButton>
+                </button>
                 <div className="saved-room-details">
                   <strong>{room.customName ?? room.name}</strong>
                   <span>{room.owned ? 'Sua sala' : 'Participante'} · {room.roomId.slice(0, 8)}

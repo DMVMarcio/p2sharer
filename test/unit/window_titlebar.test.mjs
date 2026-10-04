@@ -33,7 +33,7 @@ const bundle = await build({
   plugins: [{ name: 'native-window-fixture', setup(builder) {
     builder.onResolve({ filter: /^@tauri-apps\/api\/(core|window)$/ }, args => ({ path: args.path, namespace: 'fixture' }));
     builder.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: args.path.endsWith('core')
-      ? 'export const isTauri = () => globalThis.windowChromeFixture.isTauri();'
+      ? 'export const isTauri = () => globalThis.windowChromeFixture.isTauri(); export const invoke = async command => globalThis.windowChromeFixture.menuCommand = command;'
       : 'export const getCurrentWindow = () => globalThis.windowChromeFixture;' }));
     builder.onResolve({ filter: /^[^./]/ }, args => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
   } }],
@@ -76,6 +76,18 @@ test('native and custom titles follow room join, rename, missing name and leave'
   }));
   assert.equal(titles.at(-1), defaultTitle);
   assert.equal(document.querySelector('.window-titlebar-title').textContent, defaultTitle);
+});
+
+test('caption right click invokes Windows menu and suppresses the application fallback', async () => {
+  let fallback = 0;
+  const listener = () => { fallback++; };
+  document.addEventListener('contextmenu', listener);
+  const event = new dom.window.MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+  await act(async () => document.querySelector('.window-titlebar-title').dispatchEvent(event));
+  document.removeEventListener('contextmenu', listener);
+  assert.equal(event.defaultPrevented, true);
+  assert.equal(fallback, 0);
+  assert.equal(globalThis.windowChromeFixture.menuCommand, 'show_window_menu');
 });
 
 test('external window changes update chrome, fullscreen hides it, and teardown releases listeners', async () => {

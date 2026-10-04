@@ -11,7 +11,7 @@ import { ZoomControlBar } from './ZoomControlBar';
 import { StreamStatsOverlay } from './StreamStatsOverlay';
 import { buildIceServers } from '../../p2p/ice_config';
 import { initFrontendLogger } from '../../core/logger';
-import { Maximize, Pin, PictureInPicture2, RotateCcw, VolumeX, Volume2 } from 'lucide-react';
+import { Maximize, PanelsTopLeft, Pin, PictureInPicture2, RotateCcw, VolumeX, Volume2 } from 'lucide-react';
 import { useContextMenu, type ContextMenuAction } from '../common/ContextMenu';
 import { validPipAudioSettings } from '../../services/pip_audio';
 
@@ -426,7 +426,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
         const actions: ContextMenuAction[] = [
           { id: 'restore', label: 'Restaurar para o app', icon: <PictureInPicture2 size={15} />, onSelect: () => handleClose() },
           { id: 'top', label: isAlwaysOnTop ? 'Desafixar janela do topo' : 'Manter janela no topo', icon: <Pin size={15} />, onSelect: () => handleToggleAlwaysOnTop() },
-          { id: 'hud', label: isHudPinned ? 'Desafixar controles' : 'Fixar controles', icon: <Pin size={15} />, onSelect: () => setIsHudPinned(!isHudPinned) },
+          { id: 'hud', label: isHudPinned ? 'Desafixar controles' : 'Fixar controles', icon: <PanelsTopLeft size={15} />, onSelect: () => setIsHudPinned(!isHudPinned) },
           { id: 'fullscreen', label: isFullscreen ? 'Sair da tela cheia' : 'Tela cheia', icon: <Maximize size={15} />, onSelect: () => handleToggleFullscreen() },
         ];
         if (!isLocal) actions.push({ id: 'mute', label: isMuted ? 'Ativar áudio' : 'Silenciar áudio', icon: isMuted ? <Volume2 size={15} /> : <VolumeX size={15} />, onSelect: () => handleToggleMute() });
@@ -519,13 +519,11 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
           pingClass={(stats.pingMs ?? 15) < 80 ? 'ping-good' : (stats.pingMs ?? 15) < 180 ? 'ping-medium' : 'ping-poor'}
           transportTag={stats.transportTag}
           watchers={stats.watchers}
-          currentUsername={stateStore.username}
           onTooltipOpenChange={handleTooltipOpenChange}
         />
 
         {/* Hover / Pinned Controls Pill (Bottom-Right) */}
         <div className="stream-controls-group">
-          {!isLocal && pointerEligible && <StreamPointerToggle enabled={pointer.enabled} onToggle={pointer.toggle} />}
           {/* Audio Volume Controller */}
           {!isLocal && (
             <div className={`stream-volume-controller ${isMuted ? 'muted' : ''}`}>
@@ -566,6 +564,8 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
             </div>
           )}
 
+          {!isLocal && pointerEligible && <StreamPointerToggle enabled={pointer.enabled} onToggle={pointer.toggle} />}
+
           {/* Pin HUD Button */}
           <button
             type="button"
@@ -576,10 +576,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
             }}
             aria-label={isHudPinned ? 'Desafixar Controles' : 'Fixar Controles'}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill={isHudPinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="17" x2="12" y2="22" />
-              <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
-            </svg>
+            <PanelsTopLeft size={14} aria-hidden="true" />
           </button>
 
           {/* Fullscreen Button */}

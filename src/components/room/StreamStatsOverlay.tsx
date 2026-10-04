@@ -12,7 +12,6 @@ interface StreamStatsOverlayProps {
   pingClass?: 'ping-good' | 'ping-medium' | 'ping-poor';
   transportTag?: string;
   watchers: StreamWatcher[];
-  currentUsername?: string;
   onTooltipOpenChange?: (open: boolean) => void;
   className?: string;
 }
@@ -26,7 +25,6 @@ export const StreamStatsOverlay: React.FC<StreamStatsOverlayProps> = ({
   pingClass,
   transportTag = '',
   watchers,
-  currentUsername,
   onTooltipOpenChange,
   className = '',
 }) => {
@@ -117,9 +115,9 @@ export const StreamStatsOverlay: React.FC<StreamStatsOverlayProps> = ({
         interactive
         tooltipClassName="watchers-tooltip"
         onOpenChange={onTooltipOpenChange}
-        content={<WatchersTooltipContent watchers={watchers} currentUsername={currentUsername} />}
+        content={<WatchersTooltipContent watchers={watchers} />}
       >
-        <div className="stat-badge stat-badge-watchers" onClick={(event) => event.stopPropagation()}>
+        <button type="button" className="stat-badge stat-badge-watchers" aria-label="Ver espectadores desta transmissão" onClick={(event) => event.stopPropagation()}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z" />
             <circle cx="12" cy="12" r="3" />
@@ -127,7 +125,7 @@ export const StreamStatsOverlay: React.FC<StreamStatsOverlayProps> = ({
           <span className="stat-watchers-text">
             {watchers.length === 1 ? '1 assistindo' : `${watchers.length} assistindo`}
           </span>
-        </div>
+        </button>
       </Tooltip>
     </div>
   );

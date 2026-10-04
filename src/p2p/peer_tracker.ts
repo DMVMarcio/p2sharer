@@ -116,7 +116,7 @@ export class PeerTracker {
       watchers.delete(peerId);
     });
     // Remove their own broadcast watchers list
-    this.streamWatchers.delete(peerId);
+    for (const key of this.getStreamKeys(peerId)) this.streamWatchers.delete(key);
 
     return username;
   }
@@ -196,6 +196,14 @@ export class PeerTracker {
       peerId: id,
       username: this.watcherNames.get(id) || this.peers.get(id) || 'Usuário',
     }));
+  }
+
+  public getStreamKeys(broadcasterId: string): string[] {
+    return [...this.streamWatchers.keys()].filter((key) => key === broadcasterId || key.startsWith(`${broadcasterId}/`));
+  }
+
+  public getWatchedStreams(watcherId: string): string[] {
+    return [...this.streamWatchers].filter(([, watchers]) => watchers.has(watcherId)).map(([key]) => key);
   }
 
   /**

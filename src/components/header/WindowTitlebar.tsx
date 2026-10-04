@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { isTauri } from '@tauri-apps/api/core';
+import { invoke, isTauri } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { Minus, Square, Copy, X } from 'lucide-react';
 import { Tooltip } from '../common/Tooltip';
@@ -57,7 +57,11 @@ export const WindowTitlebar: React.FC = () => {
   };
 
   return (
-    <div className={`window-titlebar ${focused ? '' : 'is-inactive'}`}>
+    <div className={`window-titlebar ${focused ? '' : 'is-inactive'}`} onContextMenu={(event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      void invoke('show_window_menu').catch((error) => console.warn('[Window] Could not open system menu:', error));
+    }}>
       <div className="window-titlebar-drag" data-tauri-drag-region>
         <img src={logoImg} width="16" height="16" alt="" draggable={false} data-tauri-drag-region />
         <span className="window-titlebar-title" data-tauri-drag-region>{title}</span>

@@ -45,6 +45,8 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 4. User Guidelines & Expressed Preferences
 
+- `[Window Caption & Stream Overlay]` Right-clicking the custom main-window caption must open the native Windows system menu, not the app context menu. Omit the saved-room reorder tooltip. Use a settings icon for room configuration and a panel/layout icon for keeping stream controls visible, retaining the separate always-on-top pin. Place volume before pointing in main streams and PiP. Viewer lists must reflect explicit subscriptions to each transmission, never automatic media receipt; synchronize snapshots on presence/heartbeat, purge ended streams and departed peers, update on identity changes and mark the local viewer by peer identity rather than username.
+
 - `[Chat Notifications & Sound]` Play a sound for new incoming chat messages. Show unread counts on the collapsed sidebar opener and chat tab, clearing when chat is opened. Exclude own messages, system notices, history sync, duplicates, edits and deletions. Rename the sound settings tab to "Som" and persist independent switches for every sound event alongside master enable/volume.
 - `[Sound Settings Spacing]` Keep a small vertical gap between individual sound-toggle rows so adjacent controls do not touch.
 - `[Settings Order & Window Chrome]` Keep Application as the last settings navigation tab. Replace the main window's Windows titlebar with compact app-themed chrome, preserving Windows caption-button order and right alignment, native minimize/maximize/restore/close, resizing and drag/double-click behavior. Keep existing detached-media window controls.

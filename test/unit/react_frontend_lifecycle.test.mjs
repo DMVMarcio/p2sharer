@@ -67,6 +67,7 @@ const names = { useRoom: 'useRoom', useStore: 'useStore', state_store: 'state', 
 const require = createRequire(import.meta.url);
 const bundle = await build({ stdin: { contents: `export { RoomVideoContainer } from './src/components/room/RoomVideoContainer.tsx';
 export { ChatPane } from './src/components/room/ChatPane.tsx';
+export { WatchersTooltipContent } from './src/components/room/WatchersTooltipContent.tsx';
 export { ContextMenuProvider } from './src/components/common/ContextMenu.tsx';`, resolveDir: process.cwd() },
   bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic', loader: { '.css': 'empty' }, plugins: [{ name: 'fixtures', setup(builder) {
     builder.onResolve({ filter: /\/(useRoom|useStore|state_store|room_service|room_apps_service|RoomAppCard|audio_context_manager|pip_service|useStreamPointer|useModal|useToast|useChatFileInput|EmojiComposerInput)$/ }, args => ({
@@ -75,7 +76,7 @@ export { ContextMenuProvider } from './src/components/common/ContextMenu.tsx';`,
     builder.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: mocks[args.path], loader: 'js' }));
     builder.onResolve({ filter: /^[^./]/ }, args => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
   } }] });
-const { RoomVideoContainer, ChatPane, ContextMenuProvider } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
+const { RoomVideoContainer, ChatPane, ContextMenuProvider, WatchersTooltipContent } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
 const { createRoot } = await import('react-dom/client');
 const root = createRoot(document.getElementById('root'));
 const render = async (Component = RoomVideoContainer) => act(async () => root.render(React.createElement(ContextMenuProvider, null, React.createElement(Component))));
@@ -93,6 +94,23 @@ const reset = async slots => {
   await render();
 };
 after(async () => { await clear(); await act(async () => root.unmount()); dom.window.close(); });
+
+test('stream controls place volume before pointing and distinguish interface visibility from window pinning', async () => {
+  await reset([slot('controls')]);
+  const controls = card('controls').querySelector('.stream-controls-group');
+  assert.ok(controls.querySelector('.stream-volume-controller').compareDocumentPosition(controls.querySelector('[aria-label="Apontar na transmissão"]')) & dom.window.Node.DOCUMENT_POSITION_FOLLOWING);
+  assert.ok(controls.querySelector('.btn-stream-pin .lucide-panels-top-left'));
+});
+
+test('viewer identity badge remains correct when two participants share a username', async () => {
+  await clear();
+  await act(async () => root.render(React.createElement(WatchersTooltipContent, { watchers: [
+    { peerId: 'other', username: 'Same name', isSelf: false }, { peerId: 'self', username: 'Same name', isSelf: true },
+  ] })));
+  const rows = [...document.querySelectorAll('.watchers-tooltip-item')];
+  assert.equal(rows[0].querySelector('.badge-you'), null);
+  assert.equal(rows[1].querySelector('.badge-you').textContent, 'VOCÊ');
+});
 
 test('React keeps video nodes and decoders stable across repeated updates, sibling churn and reordering', async () => {
   const first = slot('first'), second = slot('second');

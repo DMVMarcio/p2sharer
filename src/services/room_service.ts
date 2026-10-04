@@ -923,7 +923,7 @@ export class RoomService {
       s.subscribedStreams.add(peerId);
     });
     if (this.roomManager) {
-      this.roomManager.requestStream(streamOwner(peerId));
+      this.roomManager.requestStream(peerId);
     }
     this.notify();
   }
@@ -939,9 +939,7 @@ export class RoomService {
       }
     });
     if (this.roomManager) {
-      if (!stateStore.roomSlots.some((slot) => streamOwner(slot.peerId) === streamOwner(peerId) && stateStore.subscribedStreams.has(slot.peerId))) {
-        this.roomManager.stopWatching(streamOwner(peerId));
-      }
+      this.roomManager.stopWatching(peerId);
     }
     this.notify();
   }

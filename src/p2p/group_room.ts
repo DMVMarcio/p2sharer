@@ -212,6 +212,9 @@ export class GroupRoomManager {
   private meshRelayAction: any = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private watchAction: any = null;
+  private localWatching = new Set<string>();
+  private watchRevision = 0;
+  private remoteWatchRevisions = new Map<string, number>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private pingAction: any = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -561,6 +564,7 @@ export class GroupRoomManager {
         isCreator: this.isCreator,
         isStreaming: Boolean(this.localStream),
         joinedAt: this.myJoinedAt,
+        watching: [...this.localWatching], watchRevision: this.watchRevision,
       });
     }
 
@@ -646,6 +650,7 @@ export class GroupRoomManager {
     this.presenceAction?.send({
       username: this.username, isCreator: this.isRoomHost(),
       isStreaming: Boolean(this.localStream), joinedAt: this.myJoinedAt,
+      watching: [...this.localWatching], watchRevision: this.watchRevision,
     }, { target: peerId });
     this.pexAction?.send({ peers: this.getPeersPayload() }, { target: peerId });
     this.historyAction?.send({ history: this.chatHistory }, { target: peerId });
@@ -1098,7 +1103,7 @@ export class GroupRoomManager {
     // 3. Setup Presence Action (Exchange usernames, host status & broadcast stream state)
     this.presenceAction = this.room.makeAction('presence');
     this.presenceAction.onMessage = (
-      data: { username: string; isCreator?: boolean; isStreaming?: boolean; joinedAt?: number },
+      data: { username: string; isCreator?: boolean; isStreaming?: boolean; joinedAt?: number; watching?: unknown; watchRevision?: unknown },
       meta: { peerId: string }
     ) => {
       const peerId = meta.peerId;
@@ -1147,6 +1152,8 @@ export class GroupRoomManager {
         }
       }
 
+      if (data.watching !== undefined) this.applyWatchSnapshot(peerId, data.watching, data.watchRevision);
+
       // If I am currently streaming, push stream to this peer on presence
       if (this.localStream) {
         this.sendStreamToPeer(peerId);
@@ -1181,7 +1188,11 @@ export class GroupRoomManager {
         if (!Number.isSafeInteger(data.revision) || data.revision! < (this.remoteMediaRevisions.get(peerId) ?? -1)) return;
         const wasStreaming = this.peerTracker.isStreaming(peerId);
         this.remoteMediaRevisions.set(peerId, data.revision!);
+        const previousDescriptors = this.remoteDescriptors.get(peerId) || [];
         this.remoteDescriptors.set(peerId, data.streams);
+        for (const entry of previousDescriptors) if (!data.streams.some((next) => next.id === entry.id)) {
+          this.cleanupStreamWatchers(streamSlotKey(peerId, entry.id), senderName);
+        }
         const previous = this.remoteMedia.get(peerId);
         if (previous) for (const id of previous.keys()) if (!data.streams.some(entry => entry.id === id)) this.nativeVideo?.stop(id, peerId);
         const media = this.remoteMedia.get(peerId);
@@ -1255,15 +1266,20 @@ export class GroupRoomManager {
     // 4.5. Setup Live Watch Status Action (Tracks who is watching whose screen share)
     this.watchAction = this.room.makeAction('watch_status');
     this.watchAction.onMessage = (
-      data: { broadcasterId?: string; isWatching?: boolean; watcherName?: string },
+      data: { broadcasterId?: string; isWatching?: boolean; watcherName?: string; watching?: unknown; revision?: unknown },
       meta: { peerId: string }
     ) => {
       const watcherPeerId = meta.peerId;
+      if (data?.watching !== undefined) {
+        this.applyWatchSnapshot(watcherPeerId, data.watching, data.revision);
+        return;
+      }
       if (!data || typeof data.isWatching !== 'boolean') return;
       const watcherName = this.peerTracker.getUsername(watcherPeerId) || `Participante (${watcherPeerId.slice(0, 4)})`;
       const broadcasterId = data.broadcasterId;
       if (typeof broadcasterId !== 'string' ||
-          (broadcasterId !== selfId && !this.peerTracker.isVerified(broadcasterId))) return;
+          (streamOwner(broadcasterId) !== selfId && !this.peerTracker.isVerified(streamOwner(broadcasterId))) ||
+          streamOwner(broadcasterId) === watcherPeerId) return;
 
       const currentWatchers = this.peerTracker.getWatchers(broadcasterId);
       const isAlreadyWatching = currentWatchers.some((w) => w.peerId === watcherPeerId);
@@ -1528,6 +1544,7 @@ export class GroupRoomManager {
             isCreator: this.isCreator,
             isStreaming: Boolean(this.localStream),
             joinedAt: this.myJoinedAt,
+            watching: [...this.localWatching], watchRevision: this.watchRevision,
           },
           { target: peerId }
         );
@@ -1621,7 +1638,6 @@ export class GroupRoomManager {
         });
       }
       this.lastStreamRecoveryRequests.delete(peerId);
-      this.watchStream(peerId);
 
       // Listen to track state so if host stops, remote stream clears cleanly
       stream.getVideoTracks().forEach((track) => {
@@ -1673,6 +1689,7 @@ export class GroupRoomManager {
           isCreator: this.isCreator,
           isStreaming: Boolean(this.localStream),
           joinedAt: this.myJoinedAt,
+          watching: [...this.localWatching], watchRevision: this.watchRevision,
         });
       }
 
@@ -1761,12 +1778,15 @@ export class GroupRoomManager {
           isCreator: this.isCreator,
           isStreaming: Boolean(this.localStream),
           joinedAt: this.myJoinedAt,
+          watching: [...this.localWatching], watchRevision: this.watchRevision,
         });
       }
     }, 400);
   }
 
   private removePeer(peerId: string) {
+    this.cleanupStreamWatchers(peerId, '');
+    this.remoteWatchRevisions.delete(peerId);
     this.nativeVideo?.stop(undefined, peerId);
     this.pendingChallenges.delete(peerId);
     this.fileBulk.close(peerId);
@@ -1810,12 +1830,52 @@ export class GroupRoomManager {
   }
 
   private cleanupStreamWatchers(broadcasterId: string, _broadcasterName: string) {
-    const watchers = this.peerTracker.getWatchers(broadcasterId);
-    watchers.forEach((w) => {
-      this.peerTracker.removeWatcher(broadcasterId, w.peerId);
-      this.callbacks?.onWatchStopped?.(w.peerId, w.username, broadcasterId);
-    });
+    const target = broadcasterId === 'local' ? selfId : broadcasterId;
+    const keys = target.includes('/') ? [target] : this.peerTracker.getStreamKeys(target);
+    for (const key of keys) {
+      for (const watcher of this.peerTracker.getWatchers(key)) {
+        this.peerTracker.removeWatcher(key, watcher.peerId);
+        this.callbacks?.onWatchStopped?.(watcher.peerId, watcher.username, streamOwner(target));
+      }
+      if (this.localWatching.delete(key)) this.publishWatchState();
+    }
     this.notifyStreamsUpdate();
+  }
+
+  /** Snapshots repair missed stop events and populate late joiners without treating received media as viewing. */
+  private applyWatchSnapshot(watcherId: string, value: unknown, revision: unknown): void {
+    if (!this.peerTracker.isVerified(watcherId) || !Array.isArray(value) || value.length > 256 ||
+        !value.every((key) => typeof key === 'string' && key.length <= 250 &&
+          /^[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)?$/.test(key)) ||
+        !Number.isSafeInteger(revision) || (revision as number) < 0 ||
+        (revision as number) < (this.remoteWatchRevisions.get(watcherId) ?? -1)) return;
+    this.remoteWatchRevisions.set(watcherId, revision as number);
+    const targets = new Set<string>(value.filter((key) => {
+      const owner = streamOwner(key);
+      if (owner === watcherId || (owner !== selfId && !this.peerTracker.isVerified(owner))) return false;
+      const mediaId = key.split('/')[1];
+      if (mediaId) return owner === selfId ? this.localMedia.has(mediaId)
+        : Boolean(this.remoteDescriptors.get(owner)?.some((entry) => entry.id === mediaId));
+      return owner === selfId ? Boolean(this.localStream) : this.peerTracker.isStreaming(owner);
+    }));
+    const old = new Set(this.peerTracker.getWatchedStreams(watcherId));
+    const name = this.peerTracker.getUsername(watcherId) || 'Participante';
+    for (const key of old) if (!targets.has(key)) {
+      this.peerTracker.removeWatcher(key, watcherId);
+      this.callbacks?.onWatchStopped?.(watcherId, name, streamOwner(key));
+    }
+    for (const key of targets) if (!old.has(key)) {
+      this.peerTracker.addWatcher(key, watcherId, name);
+      this.callbacks?.onWatchStarted?.(watcherId, name, streamOwner(key));
+    }
+    this.notifyStreamsUpdate();
+  }
+
+  private publishWatchState(): void {
+    this.watchRevision++;
+    if (this.watchAction) this.sendRoomAction(this.watchAction, {
+      watching: [...this.localWatching], revision: this.watchRevision,
+    });
   }
 
   private bridgeIndirectPeer(targetPeerId: string, intermediaryPeerId: string, targetUsername?: string): void {
@@ -1867,45 +1927,20 @@ export class GroupRoomManager {
   }
 
   public watchStream(broadcasterId: string) {
-    if (broadcasterId === 'local' || broadcasterId === selfId) return;
-    const currentWatchers = this.peerTracker.getWatchers(broadcasterId);
-    const alreadyWatching = currentWatchers.some((w) => w.peerId === selfId);
-    if (alreadyWatching) return;
-
+    const owner = streamOwner(broadcasterId);
+    if (owner === 'local' || owner === selfId || this.localWatching.has(broadcasterId)) return;
+    this.localWatching.add(broadcasterId);
     this.peerTracker.addWatcher(broadcasterId, selfId, this.username);
-
-    if (this.watchAction) {
-      try {
-        this.sendRoomAction(this.watchAction, {
-          broadcasterId,
-          isWatching: true,
-          watcherName: this.username,
-        });
-      } catch {}
-    }
-
-    this.callbacks?.onWatchStarted?.(selfId, this.username, broadcasterId);
+    this.publishWatchState();
+    this.callbacks?.onWatchStarted?.(selfId, this.username, owner);
     this.notifyStreamsUpdate();
   }
 
   public stopWatchingStream(broadcasterId: string) {
-    const currentWatchers = this.peerTracker.getWatchers(broadcasterId);
-    const wasWatching = currentWatchers.some((w) => w.peerId === selfId);
-    if (!wasWatching) return;
-
+    if (!this.localWatching.delete(broadcasterId)) return;
     this.peerTracker.removeWatcher(broadcasterId, selfId);
-
-    if (this.watchAction) {
-      try {
-        this.sendRoomAction(this.watchAction, {
-          broadcasterId,
-          isWatching: false,
-          watcherName: this.username,
-        });
-      } catch {}
-    }
-
-    this.callbacks?.onWatchStopped?.(selfId, this.username, broadcasterId);
+    this.publishWatchState();
+    this.callbacks?.onWatchStopped?.(selfId, this.username, streamOwner(broadcasterId));
     this.notifyStreamsUpdate();
   }
 
@@ -2111,6 +2146,7 @@ export class GroupRoomManager {
       this.nativeVideo?.stop(entry.descriptor.id);
       this.room?.removeStream(entry.stream);
       for (const track of entry.stream.getTracks()) track.stop();
+      this.cleanupStreamWatchers(streamSlotKey(selfId, entry.descriptor.id), this.username);
       this.localMedia.delete(entry.descriptor.id);
     }
     this.localStream = Array.from(this.localMedia.values()).find((entry) => entry.descriptor.kind === 'screen')?.stream ||
@@ -2172,6 +2208,7 @@ export class GroupRoomManager {
       return ordered.map((entry, index) => ({ ...slot, ownerPeerId: slot.peerId,
         peerId: streamSlotKey(slot.peerId, entry.id, index === 0), mediaId: entry.id,
         mediaKind: entry.kind, mediaLabel: entry.label, isStreaming: true,
+        watchers: this.getStreamWatchers(streamSlotKey(slot.peerId, entry.id)),
         pointerEligible: entry.kind === 'screen',
         stream: slot.isLocal ? this.localMedia.get(entry.id)?.stream || null : this.remoteMedia.get(slot.peerId)?.get(entry.id) || null,
       }));
@@ -2180,27 +2217,12 @@ export class GroupRoomManager {
   }
 
   public getStreamWatchers(broadcasterId: string): StreamWatcher[] {
-    const result: StreamWatcher[] = [];
-    const targetKeys = [broadcasterId];
-    if (broadcasterId === 'local') targetKeys.push(selfId);
-    if (broadcasterId === selfId) targetKeys.push('local');
-
-    const watcherSet = new Set<string>();
-    targetKeys.forEach((k) => {
-      const watchers = this.peerTracker.getWatchers(k);
-      watchers.forEach((w) => watcherSet.add(w.peerId));
-    });
-
-    watcherSet.forEach((wPid) => {
-      let name =
-        wPid === selfId ? this.username : this.peerTracker.getUsername(wPid);
-      if (!name) {
-        name = `Participante (${wPid.slice(0, 4)})`;
-      }
-      result.push({ peerId: wPid, username: name });
-    });
-
-    return result;
+    const target = broadcasterId.replace(/^local(?=\/|$)/, selfId);
+    const keys = target.includes('/') ? [target] : this.peerTracker.getStreamKeys(target);
+    const ids = new Set(keys.flatMap((key) => this.peerTracker.getWatchers(key).map((watcher) => watcher.peerId)));
+    return [...ids].filter((id) => id !== streamOwner(target) && (id === selfId || this.peerTracker.isVerified(id)))
+      .map((id) => ({ peerId: id, username: id === selfId ? this.username : this.peerTracker.getUsername(id) || 'Participante',
+        isSelf: id === selfId }));
   }
 
   public getPeerPing(peerId: string): number | null {
@@ -2493,7 +2515,7 @@ export class GroupRoomManager {
     const slots = this.getAllRoomSlots();
 
     const hash = slots
-      .map((s) => `${s.peerId}:${s.senderName}:${s.mediaKind}:${s.mediaLabel}:${s.connectionState}:${s.isStreaming}:${s.stream?.id}:${s.stream?.getTracks().map(track => `${track.id}/${track.readyState}`).join(',')}:${s.watchers?.length || 0}`)
+      .map((s) => `${s.peerId}:${s.senderName}:${s.mediaKind}:${s.mediaLabel}:${s.connectionState}:${s.isStreaming}:${s.stream?.id}:${s.stream?.getTracks().map(track => `${track.id}/${track.readyState}`).join(',')}:${JSON.stringify(s.watchers || [])}`)
       .join('|');
     if (hash === this.lastStreamsHash) return;
     this.lastStreamsHash = hash;
@@ -3081,15 +3103,16 @@ export class GroupRoomManager {
   }
 
   public requestStream(peerId: string): void {
+    const owner = streamOwner(peerId);
     if (this.streamReqAction) {
       try {
         const payload: StreamRequestPayload = {
           request: true,
-          broadcasterId: peerId,
+          broadcasterId: owner,
           requesterId: selfId,
           reason: 'initial_join',
         };
-        this.streamReqAction.send(payload, { target: peerId });
+        this.streamReqAction.send(payload, { target: owner });
       } catch {}
     }
     this.watchStream(peerId);
@@ -3137,6 +3160,8 @@ export class GroupRoomManager {
     await signalingManager.leaveRoom(roomToLeave);
 
     this.peerTracker.clear();
+    this.localWatching.clear();
+    this.remoteWatchRevisions.clear();
     this.remoteStreams.clear();
     this.remoteMedia.clear();
     this.remoteDescriptors.clear();

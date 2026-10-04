@@ -3,12 +3,10 @@ import { StreamWatcher } from '../../core/types';
 
 interface WatchersTooltipContentProps {
   watchers: StreamWatcher[];
-  currentUsername?: string;
 }
 
 export const WatchersTooltipContent: React.FC<WatchersTooltipContentProps> = ({
   watchers,
-  currentUsername,
 }) => {
   const watchersCount = watchers.length;
 
@@ -39,7 +37,7 @@ export const WatchersTooltipContent: React.FC<WatchersTooltipContentProps> = ({
       {watchersCount > 0 ? (
         <div className="watchers-tooltip-list">
           {watchers.map((w) => {
-            const isSelf = w.username === currentUsername;
+            const isSelf = w.isSelf === true;
             return (
               <div key={w.peerId} className="watchers-tooltip-item">
                 <span className="watchers-tooltip-dot"></span>

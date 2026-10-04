@@ -1,3 +1,4 @@
+import { Settings2 } from 'lucide-react';
 import { stateStore } from '../../core/state_store';
 import React, { useEffect, useState } from 'react';
 import { roomAppsService } from '../../apps/room_apps_service';
@@ -166,10 +167,7 @@ export const StreamHeaderBar: React.FC = () => {
             onClick={() => openModal('roomSecurity')}
             aria-label="Configurações da Sala"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-            </svg>
+            <Settings2 size={14} aria-hidden="true" />
             <span className="btn-text" id="label-room-security">Sala</span>
           </button>
         </Tooltip>

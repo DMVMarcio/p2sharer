@@ -23,6 +23,7 @@ mod video_gpu_scale;
 mod video_nvenc;
 mod camera_permission;
 mod browser_shortcuts;
+mod window_chrome;
 mod app_data_migration;
 mod app_updates;
 
@@ -102,6 +103,7 @@ pub fn run() {
             app_updates::check_app_update,
             prepare_app_update,
             browser_shortcuts::disable_browser_shortcuts,
+            window_chrome::show_window_menu,
             native_rtc::create_native_video_offer,
             native_rtc::answer_native_video,
             native_rtc::add_native_video_ice,

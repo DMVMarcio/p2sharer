@@ -14,7 +14,7 @@ import { pipService } from '../../services/pip_service';
 import { ZoomControlBar } from './ZoomControlBar';
 import { Tooltip } from '../common/Tooltip';
 import { StreamStatsOverlay } from './StreamStatsOverlay';
-import { Grid2X2, Focus, Eye, EyeOff, Maximize, Pin, PictureInPicture2, RotateCcw, Volume2, VolumeX, Square, MonitorUp } from 'lucide-react';
+import { Grid2X2, Focus, Eye, EyeOff, Maximize, PanelsTopLeft, PictureInPicture2, RotateCcw, Volume2, VolumeX, Square, MonitorUp } from 'lucide-react';
 import { useContextMenu, type ContextMenuAction } from '../common/ContextMenu';
 
 interface VideoCardProps {
@@ -32,7 +32,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   inTray = false,
   isSelectedFeatured = false,
 }) => {
-  const { togglePin, stopWatchingStream, getPeerPing, username, layoutMode, returnToGrid } = useRoom();
+  const { togglePin, stopWatchingStream, getPeerPing, layoutMode, returnToGrid } = useRoom();
   const openContextMenu = useContextMenu();
   const { openModal } = useModal();
   const defaultResolution = useStore((s) => s.currentResolution);
@@ -265,7 +265,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
       else actions.push({ id: 'mute', label: isMuted || volume === 0 ? 'Ativar áudio' : 'Silenciar áudio',
         icon: isMuted ? <Volume2 size={15} /> : <VolumeX size={15} />, onSelect: () => handleToggleMute() });
       if (!inTray) {
-        actions.push({ id: 'hud', label: isHudPinned ? 'Desafixar controles' : 'Fixar controles', icon: <Pin size={15} />, onSelect: () => setIsHudPinned(!isHudPinned) });
+        actions.push({ id: 'hud', label: isHudPinned ? 'Desafixar controles' : 'Fixar controles', icon: <PanelsTopLeft size={15} />, onSelect: () => setIsHudPinned(!isHudPinned) });
         if (zoom > 1) actions.push({ id: 'zoom', label: 'Redefinir zoom', icon: <RotateCcw size={15} />, onSelect: resetZoom });
         actions.push({ id: 'fullscreen', label: isFullscreen ? 'Sair da tela cheia' : 'Tela cheia', icon: <Maximize size={15} />, onSelect: () => handleToggleFullscreen() });
       }
@@ -426,7 +426,6 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           pingClass={pingClass}
           transportTag={transportTag}
           watchers={watchers}
-          currentUsername={username}
           onTooltipOpenChange={handleTooltipOpenChange}
         />
     )}
@@ -458,7 +457,6 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           className="stream-controls-group"
           onClick={(e) => e.stopPropagation()}
         >
-          {!slot.isLocal && slot.pointerEligible !== false && <StreamPointerToggle enabled={pointer.enabled} onToggle={pointer.toggle} onTooltipOpenChange={handleTooltipOpenChange} />}
           {slot.isLocal && showLocalPreview && (
             <button
               type="button"
@@ -519,6 +517,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
             </div>
           )}
 
+          {!slot.isLocal && slot.pointerEligible !== false && <StreamPointerToggle enabled={pointer.enabled} onToggle={pointer.toggle} onTooltipOpenChange={handleTooltipOpenChange} />}
+
           <Tooltip
             content={
               isHudPinned
@@ -540,19 +540,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
                   : 'Fixar interface da transmissão'
               }
             >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill={isHudPinned ? 'currentColor' : 'none'}
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <line x1="12" y1="17" x2="12" y2="22" />
-                <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.79-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.79.9A2 2 0 0 0 5 15.24Z" />
-              </svg>
+              <PanelsTopLeft size={14} aria-hidden="true" />
             </button>
           </Tooltip>
 

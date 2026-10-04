@@ -23,7 +23,7 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
   inTray = false,
   isSelectedFeatured = false,
 }) => {
-  const { togglePin, requestStream, username, layoutMode, returnToGrid } = useRoom();
+  const { togglePin, requestStream, layoutMode, returnToGrid } = useRoom();
   const openContextMenu = useContextMenu();
   const { openModal } = useModal();
   const subscribedStreams = useStore((s) => s.subscribedStreams);
@@ -76,7 +76,7 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
             <Tooltip
               interactive
               tooltipClassName="watchers-tooltip"
-              content={<WatchersTooltipContent watchers={watchers} currentUsername={username} />}
+              content={<WatchersTooltipContent watchers={watchers} />}
             >
               <div
                 className="badge-live-watchers"
