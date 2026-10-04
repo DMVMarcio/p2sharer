@@ -38,11 +38,19 @@ jobs:
           sparse-checkout: |
             /.github/actions/setup-build/
             /tools/release.mjs
+            /src-tauri/tauri.windows.conf.json
+            /src-tauri/windows/installer-hooks.nsh
           sparse-checkout-cone-mode: false
           persist-credentials: false
       - uses: ./.release-workflow/.github/actions/setup-build
       - name: Validate public updater key encoding
         run: node .release-workflow/tools/release.mjs normalize-key .
+      - name: Apply Windows installer configuration
+        shell: pwsh
+        run: |
+          Copy-Item -LiteralPath '.release-workflow/src-tauri/tauri.windows.conf.json' -Destination 'src-tauri/tauri.windows.conf.json' -Force
+          New-Item -ItemType Directory -Path 'src-tauri/windows' -Force | Out-Null
+          Copy-Item -LiteralPath '.release-workflow/src-tauri/windows/installer-hooks.nsh' -Destination 'src-tauri/windows/installer-hooks.nsh' -Force
       - name: Validate release version
         shell: pwsh
         run: pnpm run release:check --tag "$env:RELEASE_TAG"
@@ -76,6 +84,7 @@ jobs:
           args: --config src-tauri/tauri.release.conf.json -- --locked
           tagName: ${{ env.RELEASE_TAG }}
           releaseName: P2Sharer v__VERSION__
+          releaseAssetNamePattern: '[name]_[version]_[arch][setup].[ext]'
           releaseDraft: true
           prerelease: ${{ contains(env.RELEASE_TAG, '-') }}
           generateReleaseNotes: true
@@ -84,3 +93,20 @@ jobs:
           uploadUpdaterSignatures: true
       - name: Verify updater manifest and signing key
         run: node tools/release.mjs artifacts
+      - name: Remove obsolete locale-specific draft MSI assets
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const releases = await github.paginate(github.rest.repos.listReleases, { ...context.repo, per_page: 100 });
+            const release = releases.find(item => item.tag_name === process.env.RELEASE_TAG);
+            if (!release?.draft) throw new Error('Only draft release assets may be cleaned up.');
+            const assets = await github.paginate(github.rest.repos.listReleaseAssets, { ...context.repo, release_id: release.id, per_page: 100 });
+            const stem = `P2Sharer_${process.env.RELEASE_TAG.slice(1)}_x64`;
+            for (const name of [`${stem}.msi`, `${stem}.msi.sig`, `${stem}-setup.exe`, `${stem}-setup.exe.sig`, 'latest.json']) {
+              if (!assets.some(asset => asset.name === name)) throw new Error(`Missing replacement release asset: ${name}`);
+            }
+            for (const asset of assets) {
+              if ([`${stem}_en-US.msi`, `${stem}_en-US.msi.sig`].includes(asset.name)) {
+                await github.rest.repos.deleteReleaseAsset({ ...context.repo, asset_id: asset.id });
+              }
+            }

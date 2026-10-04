@@ -45,6 +45,9 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 4. User Guidelines & Expressed Preferences
 
+- `[Installer Languages]` Distribute one Windows setup executable and one MSI, without locale-specific release filenames or duplicate installers per language. The user chose a single English MSI and a single NSIS EXE with Brazilian Portuguese/English language selection. Installer language is independent of future application localization; never imply that the MSI is multilingual merely because its release filename omits the locale.
+- `[Installer Default Language]` Detect the Windows language when supported and preserve a previous installer language choice. Keep English first as the fallback for unsupported languages; allow users to change the selection to English or Brazilian Portuguese. Passive/silent updates must not wait for a language dialog.
+
 - `[Build Caching]` Share pnpm package downloads and compiled Rust dependencies between trusted main-branch validation and release builds. Dependency additions, removals and replacements must remain safe: use lockfile/toolchain-aware keys, always run locked installation and normal validation/build commands, and never cache signing credentials or distributed installers.
 
 - `[Portable Updates]` Installed application updates are required. The user also welcomes portable updates; treat preservation of portable operation as a separate future distribution feature, since the current updater invokes Windows installers and does not replace a standalone executable in place.
