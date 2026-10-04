@@ -46,6 +46,8 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 4. User Guidelines & Expressed Preferences
 
+- `[Application Version]` Show the bundled application version discreetly in the homepage corner and beside update controls in Application settings. Update dialogs must show the installed and offered versions together, including beta-to-stable transitions. Reuse the shared AppVersion component and synchronized release metadata.
+
 - `[Localization]` Provide English and Brazilian Portuguese throughout the app. Detect the primary Windows user locale on first launch, fall back to English for unsupported languages, persist the choice locally, and apply changes under Settings > Application only after Save Settings, discarding unsaved language drafts when closing. Omit the language explanatory subtitle. Apply it to the main app and detached windows while preserving authored names, chat, notes and external media titles. Keep signed protocol copy stable and localize structured notices only at presentation.
 
 - `[Window Caption & Stream Overlay]` Right-clicking the custom main-window caption must open the native Windows system menu, not the app context menu. Omit the saved-room reorder tooltip. Use a settings icon for room configuration and a panel/layout icon for keeping stream controls visible, retaining the separate always-on-top pin. Place volume before pointing in main streams and PiP. Viewer lists must reflect explicit subscriptions to each transmission, never automatic media receipt; synchronize snapshots on presence/heartbeat, purge ended streams and departed peers, update on identity changes and mark the local viewer by peer identity rather than username.

@@ -354,6 +354,16 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 
 .app-update-content { display: grid; gap: 12px; }
 .app-update-progress { width: 100%; accent-color: var(--accent-color); }
+.app-version { font-variant-numeric: tabular-nums; }
+.app-version-compact { font-size: 11px; color: var(--text-muted); }
+.home-version {
+  position: fixed;
+  right: 16px;
+  bottom: 8px;
+  padding: 2px 6px;
+  border-radius: var(--radius-xs);
+  background: var(--bg-app);
+}
 .app-update-notes {
   max-height: 240px;
   overflow: auto;

@@ -1,4 +1,6 @@
 {
+  "appVersion.installed": "Versão instalada: {{version}}",
+  "appVersion.target": "Nova versão: {{version}}",
   "message.b21e91730d18": "Você",
   "message.ddf4b9ab9b48": "Comece a escrever com a sala...",
   "message.a01a5fce396e": "Abrir",

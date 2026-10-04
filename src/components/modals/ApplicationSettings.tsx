@@ -4,6 +4,7 @@ import { useLocale } from '../../hooks/useLocale';
 import { useAppUpdates } from '../../hooks/useAppUpdates';
 import { appUpdates } from '../../services/app_updates';
 import { Select } from '../common/Select';
+import { AppVersion } from '../common/AppVersion';
 
 interface Props {
   language: AppLanguage;
@@ -30,6 +31,7 @@ export function ApplicationSettings({ language, onLanguageChange, automatic, inc
         options={[{ value: 'en', label: 'English' }, { value: 'pt-BR', label: 'Português Brasil' }]}
         onValueChange={(value) => onLanguageChange(value === 'pt-BR' ? 'pt-BR' : 'en')} />
     </div>
+    <p className="field-info-text"><AppVersion /></p>
     <label className="settings-switch-row" htmlFor="settings-auto-updates">
       <div className="settings-switch-label-group">
         <span className="settings-switch-title">{t("message.d8a908a0e8ab")}</span>

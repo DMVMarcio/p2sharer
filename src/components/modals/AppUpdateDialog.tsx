@@ -2,6 +2,7 @@ import { localizeText, t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { Download } from 'lucide-react';
 import { ModalDialog } from '../common/ModalDialog';
+import { AppVersion } from '../common/AppVersion';
 import { useAppUpdates } from '../../hooks/useAppUpdates';
 import { appUpdates } from '../../services/app_updates';
 
@@ -20,7 +21,7 @@ export function AppUpdateDialog() {
           : <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void appUpdates.check(true)}>{t("message.e7b977ec2564")}</button>}
     </>}>
     <div className="app-update-content" aria-live="polite">
-      {update.version && <p>{t("message.15116ba37789")} {update.version}  {t("message.3a4b2347d109")}</p>}
+      <p><AppVersion targetVersion={update.version} /></p>
       {update.returnToStable && <p>{t("message.9c8c050186f0")}</p>}
       {update.status === 'checking' && <p>{t("message.5e86113605ec")}</p>}
       {update.status === 'current' && <p>{t("message.87c1d00ca14d")}</p>}

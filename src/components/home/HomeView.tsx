@@ -4,6 +4,7 @@ import React from 'react';
 import { useModal } from '../../hooks/useModal';
 import { useRoom } from '../../hooks/useRoom';
 import { SavedRoomsSection } from './SavedRoomsSection';
+import { AppVersion } from '../common/AppVersion';
 import { roomService } from '../../services/room_service';
 
 export const HomeView: React.FC = () => {
@@ -88,6 +89,7 @@ export const HomeView: React.FC = () => {
         </div>
         <SavedRoomsSection />
       </div>
+      <footer className="home-version"><AppVersion compact /></footer>
     </section>
   );
 };
