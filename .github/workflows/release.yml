@@ -66,6 +66,8 @@ jobs:
         run: pnpm run check:repository
       - name: Run frontend regressions
         run: pnpm test
+      - name: Check frontend compilation
+        run: pnpm run build
       - name: Run portable native regressions
         run: pnpm run test:native --release --locked
       - name: Validate signing setup
