@@ -316,3 +316,100 @@ pub fn setup_job_object_for_clean_child_teardown() {
 #[cfg(not(windows))]
 pub fn setup_job_object_for_clean_child_teardown() {}
 
+/// Let the updater's installer outlive the app without releasing existing media children.
+#[cfg(windows)]
+pub fn set_update_installer_breakaway(enabled: bool) -> Result<(), String> {
+    use windows::Win32::Foundation::HANDLE;
+    use windows::Win32::System::JobObjects::{
+        QueryInformationJobObject, SetInformationJobObject, JobObjectExtendedLimitInformation,
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK,
+    };
+    let handle = HELD_JOB_OBJECT.load(std::sync::atomic::Ordering::SeqCst);
+    if handle == 0 { return Ok(()); }
+    let job = HANDLE(handle as *mut std::ffi::c_void);
+    let mut info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+    unsafe {
+        QueryInformationJobObject(job, JobObjectExtendedLimitInformation,
+            &mut info as *mut _ as *mut std::ffi::c_void,
+            std::mem::size_of_val(&info) as u32, None)
+            .map_err(|error| format!("Could not read updater process policy: {error}"))?;
+        if enabled {
+            info.BasicLimitInformation.LimitFlags |= JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK;
+        } else {
+            info.BasicLimitInformation.LimitFlags &= !JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK;
+        }
+        SetInformationJobObject(job, JobObjectExtendedLimitInformation,
+            &info as *const _ as *const std::ffi::c_void,
+            std::mem::size_of_val(&info) as u32)
+            .map_err(|error| format!("Could not set updater process policy: {error}"))?;
+    }
+    Ok(())
+}
+
+#[cfg(not(windows))]
+pub fn set_update_installer_breakaway(_enabled: bool) -> Result<(), String> { Ok(()) }
+
+#[cfg(all(test, windows))]
+mod updater_job_tests {
+    use super::*;
+    use std::{io::Write, os::windows::io::AsRawHandle, process::{Command, Stdio}};
+    use windows::Win32::{Foundation::{BOOL, HANDLE}, System::JobObjects::{
+        IsProcessInJob, QueryInformationJobObject, JobObjectExtendedLimitInformation,
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+    }};
+
+    #[test]
+    fn installer_breakaway_preserves_normal_child_teardown_and_can_be_cancelled() {
+        // Assign only an isolated fixture process, never the parallel test runner.
+        let result = Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "process_manager::updater_job_tests::isolated_job_worker", "--ignored", "--nocapture"])
+            .env("P2SHARER_JOB_TEST_ROLE", "worker").output().unwrap();
+        assert!(result.status.success(), "{}\n{}", String::from_utf8_lossy(&result.stdout), String::from_utf8_lossy(&result.stderr));
+        assert!(String::from_utf8_lossy(&result.stdout).contains("UPDATER_JOB_POLICY_VERIFIED"));
+    }
+
+    #[test]
+    #[ignore = "Internal process fixture; invoked by the automatic updater containment regression"]
+    fn isolated_job_worker() {
+        assert_eq!(std::env::var("P2SHARER_JOB_TEST_ROLE").unwrap(), "worker");
+        setup_job_object_for_clean_child_teardown();
+        let raw_job = HELD_JOB_OBJECT.load(std::sync::atomic::Ordering::SeqCst);
+        assert_ne!(raw_job, 0, "The fixture must exercise a real Windows job");
+        let job = HANDLE(raw_job as *mut std::ffi::c_void);
+        let probe = |expected: bool| {
+            let mut child = Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", "process_manager::updater_job_tests::child_waits_for_probe", "--ignored"])
+                .env("P2SHARER_JOB_TEST_ROLE", "child")
+                .stdin(Stdio::piped()).stdout(Stdio::null()).spawn().unwrap();
+            let mut associated = BOOL(0);
+            unsafe { IsProcessInJob(HANDLE(child.as_raw_handle()), job, &mut associated).unwrap(); }
+            // Release and reap the child before asserting, including on a failed assertion.
+            child.stdin.take().unwrap().write_all(b"continue\n").unwrap();
+            assert!(child.wait().unwrap().success());
+            assert_eq!(associated.as_bool(), expected);
+        };
+        probe(true);
+        set_update_installer_breakaway(true).unwrap();
+        let mut info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+        unsafe {
+            QueryInformationJobObject(job, JobObjectExtendedLimitInformation,
+                &mut info as *mut _ as *mut std::ffi::c_void,
+                std::mem::size_of_val(&info) as u32, None).unwrap();
+        }
+        assert!(info.BasicLimitInformation.LimitFlags.contains(JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE));
+        probe(false);
+        set_update_installer_breakaway(false).unwrap();
+        probe(true);
+        println!("UPDATER_JOB_POLICY_VERIFIED");
+    }
+
+    #[test]
+    #[ignore = "Internal child fixture; invoked by the automatic updater containment regression"]
+    fn child_waits_for_probe() {
+        assert_eq!(std::env::var("P2SHARER_JOB_TEST_ROLE").unwrap(), "child");
+        let mut line = String::new();
+        std::io::stdin().read_line(&mut line).unwrap();
+        assert_eq!(line.trim(), "continue");
+    }
+}
+

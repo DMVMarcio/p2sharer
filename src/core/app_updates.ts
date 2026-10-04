@@ -38,6 +38,7 @@ export class AppUpdateController {
   private dependencies: {
     check: (includePrereleases: boolean) => Promise<AvailableUpdate | null>;
     prepareInstall: () => Promise<void>;
+    cancelInstall?: () => Promise<void>;
     restart: () => Promise<void>;
   };
   private state: UpdateState = { status: 'idle', version: null, notes: '', progress: null,
@@ -53,6 +54,7 @@ export class AppUpdateController {
   constructor(dependencies: {
     check: (includePrereleases: boolean) => Promise<AvailableUpdate | null>;
     prepareInstall: () => Promise<void>;
+    cancelInstall?: () => Promise<void>;
     restart: () => Promise<void>;
   }) { this.dependencies = dependencies; }
 
@@ -162,6 +164,7 @@ export class AppUpdateController {
       await this.dependencies.restart();
     } catch {
       // Keep the verified download available for another installation attempt.
+      await this.dependencies.cancelInstall?.().catch(() => {});
       this.set({ status: 'ready', error: t("message.0d3fe36ea8ce") });
     } finally { this.busy = false; }
   }

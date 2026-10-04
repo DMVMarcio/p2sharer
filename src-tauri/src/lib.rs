@@ -50,7 +50,14 @@ fn prepare_app_update(window: tauri::Window) -> Result<(), String> {
     if window.label() != "main" { return Err("Only the main window can install updates".into()); }
     stop_native_screen_capture()?;
     stop_audio_capture()?;
+    process_manager::set_update_installer_breakaway(true)?;
     Ok(())
+}
+
+#[tauri::command]
+fn cancel_app_update(window: tauri::Window) -> Result<(), String> {
+    if window.label() != "main" { return Err("Only the main window can cancel update preparation".into()); }
+    process_manager::set_update_installer_breakaway(false)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -103,6 +110,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             app_updates::check_app_update,
             prepare_app_update,
+            cancel_app_update,
             browser_shortcuts::disable_browser_shortcuts,
             window_chrome::show_window_menu,
             localization::get_system_locale,

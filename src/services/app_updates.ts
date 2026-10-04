@@ -15,6 +15,7 @@ export const appUpdates = new AppUpdateController({
     await invoke('prepare_app_update');
   },
   restart: relaunch,
+  cancelInstall: () => invoke('cancel_app_update'),
 });
 
 export function startAutomaticUpdateChecks(): () => void {

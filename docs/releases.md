@@ -109,6 +109,8 @@ The release configuration enables signed updater artifacts. Output remains under
 
 ## Installed update behavior
 
+On Windows, installation preparation lets the updater's installer escape the app's process job while preserving automatic teardown of existing media/WebView children. Failed installation attempts restore normal child containment. Test an actual installed-version upgrade before publishing: successful downloads and signatures do not prove that the installer survives app shutdown. An already distributed version whose job kills the installer needs a manual installer upgrade to receive this fix.
+
 ### Installer formats and languages
 
 Windows releases contain one `P2Sharer_<version>_x64-setup.exe` and one `P2Sharer_<version>_x64-setup.msi`. The EXE offers English and Brazilian Portuguese, using the Windows language when supported and English as the fallback. Its native selector allows users to change the choice; the standard NSIS registry handling can remember a previous explicit selection. The MSI uses English without a language selector. Both install the same application. Installer translations do not change the application's language.

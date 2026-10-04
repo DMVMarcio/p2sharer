@@ -98,6 +98,22 @@ test('duplicate requests are serialized and replaced updater resources are relea
   assert.deepEqual(events, ['close']);
 });
 
+test('an installer launch failure restores child containment before allowing a retry', async () => {
+  const { dependencies, update, events } = fixture();
+  const controller = new AppUpdateController({ ...dependencies,
+    async cancelInstall() { events.push('restore-policy'); },
+  });
+  await controller.check(true);
+  await controller.download();
+  update.install = async () => { events.push('blocked-install'); throw new Error('launch failed'); };
+  await controller.install();
+  assert.deepEqual(events, ['check', 'download', 'cleanup', 'blocked-install', 'restore-policy']);
+  assert.equal(controller.getSnapshot().status, 'ready');
+  update.install = async () => { events.push('install'); };
+  await controller.install();
+  assert.deepEqual(events.slice(-3), ['cleanup', 'install', 'restart']);
+});
+
 test('unavailable endpoint fails gracefully and can be checked again', async () => {
   const { controller, dependencies } = fixture();
   dependencies.check = async () => { throw new Error('offline'); };
