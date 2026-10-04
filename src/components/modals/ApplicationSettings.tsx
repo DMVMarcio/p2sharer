@@ -43,8 +43,8 @@ export function ApplicationSettings({ language, onLanguageChange, automatic, inc
     <label className="settings-switch-row" htmlFor="settings-beta-updates">
       <div className="settings-switch-label-group">
         <span className="settings-switch-title">{t("message.b634126b8065")}</span>
-        <span className="settings-switch-subtitle">{t("message.07ba94307e00")}</span>
-        <span className="settings-switch-subtitle">{t("message.c642291c9d62")}</span>
+        <span className="settings-switch-subtitle">{t("message.4832edeea766")}</span>
+        <span className="settings-switch-subtitle">{t("message.521fa9607c3d")}</span>
       </div>
       <div className="modern-switch">
         <input autoComplete="off" type="checkbox" id="settings-beta-updates" disabled={busy}
