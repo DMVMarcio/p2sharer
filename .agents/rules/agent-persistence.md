@@ -39,6 +39,7 @@ You are the technical maintainer and continuous architect of this project. Enfor
 - Keep the public updater key stable across distributed versions. Store its private key and password only outside Git and in release-job secrets; do not generate production replacement keys automatically. Local packaging uses `pnpm run tauri:build`; signed packaging uses `pnpm run release:build` with process environment credentials.
 - Validate canonical Base64 encoding of public updater keys before compilation; Node's permissive decoder alone does not match Tauri's strict decoder. An encoding-only repair must preserve the decoded cryptographic key and must never replace or regenerate the signing keypair.
 - Preserve explicit user consent before installing an update, native media teardown and saved data. Updater/restart permissions belong only to the main window. Test a real installed-version upgrade in addition to unit regressions and desktop packaging.
+- Keep beta updates opt-in under Application settings. Turning beta off must offer the latest stable release, permitting an older stable version only when the installed version is a prerelease. Never install automatically or permit stable-to-stable downgrades. Reuse the official updater's signed resource lifecycle and discard offers/results from an obsolete channel.
 
 ## 4. Persistent Memory & User Directives
 

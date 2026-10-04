@@ -23,6 +23,7 @@ mod video_gpu_scale;
 mod video_nvenc;
 mod camera_permission;
 mod app_data_migration;
+mod app_updates;
 
 use audio_loopback::{start_audio_capture, stop_audio_capture};
 use logger::{clear_log_file, get_log_file_path, open_latest_log, open_log_folder, write_frontend_log};
@@ -96,6 +97,7 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            app_updates::check_app_update,
             prepare_app_update,
             native_rtc::create_native_video_offer,
             native_rtc::answer_native_video,

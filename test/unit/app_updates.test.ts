@@ -16,7 +16,7 @@ function fixture() {
     async close() { events.push('close'); },
   };
   const dependencies = {
-    async check(): Promise<AvailableUpdate | null> { events.push('check'); return update; },
+    async check(_includePrereleases: boolean): Promise<AvailableUpdate | null> { events.push('check'); return update; },
     async prepareInstall() { events.push('cleanup'); },
     async restart() { events.push('restart'); },
   };
@@ -108,4 +108,120 @@ test('unavailable endpoint fails gracefully and can be checked again', async () 
   await controller.check(true);
   assert.equal(controller.getSnapshot().status, 'current');
   assert.equal(controller.getSnapshot().error, null);
+});
+
+function isolatedStorage(context: { after: (callback: () => void) => void }) {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  const values = new Map<string, string>();
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+  } });
+  context.after(() => {
+    if (previous) Object.defineProperty(globalThis, 'localStorage', previous);
+    else Reflect.deleteProperty(globalThis, 'localStorage');
+  });
+}
+
+test('beta opt-in defaults off, persists independently, and applies to manual checks', async context => {
+  isolatedStorage(context);
+  const { controller, dependencies } = fixture();
+  assert.equal(controller.getSnapshot().includePrereleases, false);
+  const channels: boolean[] = [];
+  dependencies.check = async preview => { channels.push(preview); return null; };
+  controller.setPreferences(false, true);
+  assert.equal(fixture().controller.getSnapshot().includePrereleases, true);
+  assert.equal(fixture().controller.getSnapshot().automatic, false);
+  await controller.check();
+  assert.deepEqual(channels, []);
+  await controller.check(true);
+  controller.setPreferences(false, false);
+  await controller.check(true);
+  assert.deepEqual(channels, [true, false]);
+});
+
+test('switching channels discards a verified download and cannot install it', async context => {
+  isolatedStorage(context);
+  const { controller, dependencies, events } = fixture();
+  controller.setPreferences(false, true);
+  await controller.check(true);
+  await controller.download();
+  dependencies.check = async () => null;
+  controller.setPreferences(false, false);
+  await controller.install();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(controller.getSnapshot().status, 'current');
+  assert.equal(controller.getSnapshot().version, null);
+  assert.deepEqual(events, ['check', 'download', 'close']);
+});
+
+test('in-flight results from an old channel are released, including rapid preference changes', async context => {
+  isolatedStorage(context);
+  const { controller, dependencies, update, events } = fixture();
+  controller.setPreferences(false, false);
+  let finish!: (result: AvailableUpdate) => void;
+  let requests = 0;
+  dependencies.check = () => ++requests === 1
+    ? new Promise(resolve => { finish = resolve; }) : Promise.resolve(null);
+  const pending = controller.check(true);
+  controller.setPreferences(false, true);
+  controller.setPreferences(false, false);
+  finish(update);
+  await pending;
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(controller.getSnapshot().includePrereleases, false);
+  assert.equal(controller.getSnapshot().version, null);
+  assert.equal(controller.getSnapshot().status, 'current');
+  assert.deepEqual(events, ['close']);
+});
+
+test('automatic checks restart on the selected channel after an obsolete request finishes', async context => {
+  isolatedStorage(context);
+  const { controller, dependencies, update } = fixture();
+  let finish!: (result: AvailableUpdate) => void;
+  const channels: boolean[] = [];
+  dependencies.check = preview => {
+    channels.push(preview);
+    return channels.length === 1 ? new Promise(resolve => { finish = resolve; }) : Promise.resolve(null);
+  };
+  const pending = controller.check();
+  controller.setPreferences(true, true);
+  finish(update);
+  await pending;
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(channels, [false, true]);
+  assert.equal(controller.getSnapshot().status, 'current');
+});
+
+test('channel changes are rejected during a download, preserving the selected installer', async context => {
+  isolatedStorage(context);
+  const { controller, update } = fixture();
+  controller.setPreferences(false, true);
+  await controller.check(true);
+  let finish!: () => void;
+  update.download = () => new Promise(resolve => { finish = resolve; });
+  const pending = controller.download();
+  controller.setPreferences(false, false);
+  assert.equal(controller.getSnapshot().includePrereleases, true);
+  finish();
+  await pending;
+  assert.equal(controller.getSnapshot().status, 'ready');
+});
+
+test('opting out of beta offers stable immediately even with automatic checks disabled', async context => {
+  isolatedStorage(context);
+  const { controller, dependencies, update } = fixture();
+  const channels: boolean[] = [];
+  update.version = '1.0.0';
+  update.currentVersion = '1.1.0-beta.2';
+  dependencies.check = async preview => { channels.push(preview); return update; };
+  controller.setPreferences(false, true);
+  controller.setPreferences(false, false);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(channels, [false]);
+  assert.equal(controller.getSnapshot().automatic, false);
+  assert.equal(controller.getSnapshot().dialogOpen, true);
+  assert.equal(controller.getSnapshot().version, '1.0.0');
+  assert.equal(controller.getSnapshot().status, 'available');
+  assert.equal(controller.getSnapshot().returnToStable, true);
 });

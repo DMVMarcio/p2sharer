@@ -61,6 +61,16 @@ For later releases, first run `pnpm run release:version <new-version>`, validate
 4. Review the generated release notes and add user-facing changes and known limitations.
 5. Select **Publish release** when ready. Publish stable releases as the latest release; keep beta tags marked as prereleases. The stable updater endpoint excludes prereleases.
 
+### Beta update channel
+
+In **Settings > Application**, automatic update checks and **Receive beta versions** are saved preferences. Beta updates are disabled by default. The manual check uses the saved channel; save a changed channel before checking. Checks never install automatically.
+
+Publish beta releases through the same signed workflow with versions such as `1.1.0-beta.1` and matching tags such as `v1.1.0-beta.1`. Review and publish the draft as a GitHub prerelease, without marking it as the latest stable release. No separate signing key or beta installer format is needed.
+
+The beta channel examines the 100 most recent GitHub release records and selects the highest newer semantic version with a `latest.json` asset, including stable releases. Drafts, invalid tags, incomplete releases and older/equal versions are excluded. Discovery runs in Rust; the official updater still owns signature verification, downloads and installation. Switching channels discards any previously offered or downloaded update; an in-flight check from the old channel cannot restore it. Channel changes are blocked during download/installation.
+
+Turning beta updates off and saving immediately checks the stable endpoint, even when automatic checks are disabled. If the installed application is a prerelease, the latest stable release is offered even when its version is lower (for example, `1.1.0-beta.2` back to `1.0.0`). Download and installation still require explicit user actions. Stable installations never receive older stable versions, and the stable channel rejects prerelease manifests. The Windows installer configuration permits downgrades; review compatibility of saved data when publishing betas that change its format.
+
 To retry an unpublished draft after fixing the workflow, push the fix to `main`, then use **Actions > Build release draft > Run workflow**, select branch **main** and supply the existing tag (for example, `v1.0.0`). **Re-run jobs** on an old run uses its original workflow revision and will repeat an already-fixed workflow error. The application is still checked out from the requested tag; shared build setup comes from the selected workflow revision. The job refuses to rebuild a published release. Never delete or recreate a public tag to replace its binaries.
 
 ## Build caches

@@ -18,19 +18,24 @@ import { RendezvousServerEditor } from '../common/RendezvousServerEditor';
 import { loadRendezvousPreferences, saveRendezvousPreferences, validateRendezvousPreferences } from '../../p2p/relay_preferences.ts';
 import { isValidTurnUrl, parseTurnUrls } from '../../p2p/ice_config.ts';
 import { appUpdates } from '../../services/app_updates';
-import { automaticUpdateChecks } from '../../core/app_updates';
+import { automaticUpdateChecks, betaUpdateChecks } from '../../core/app_updates';
+import { ApplicationSettings } from './ApplicationSettings';
+import { useAppUpdates } from '../../hooks/useAppUpdates';
 
 export const SettingsModal: React.FC = () => {
   const { closeModal, isClosing } = useModal();
   const { themeMode, accentColor, setThemeMode, setAccentColor } = useAppTheme();
 
   const [activeTab, setActiveTab] = useState<
-    'profile' | 'conversations' | 'appearance' | 'audio' | 'stream' | 'network' | 'diagnostics'
+    'profile' | 'application' | 'conversations' | 'appearance' | 'audio' | 'stream' | 'network' | 'diagnostics'
   >('profile');
 
   // Form states initialized once upon mounting
   const [nick, setNick] = useState(() => stateStore.username);
   const [autoUpdates, setAutoUpdates] = useState(automaticUpdateChecks);
+  const [betaUpdates, setBetaUpdates] = useState(betaUpdateChecks);
+  const update = useAppUpdates();
+  const updateBusy = ['downloading', 'installing'].includes(update.status);
   const [emojiPack, setEmojiPack] = useState<EmojiPack>(getEmojiPack);
   const [transferSpeedUnit, setTransferSpeedUnit] = useState<TransferSpeedUnit>(getTransferSpeedUnit);
   const [sfxEnabled, setSfxEnabled] = useState(() => soundEffects.getEnabled());
@@ -126,7 +131,7 @@ export const SettingsModal: React.FC = () => {
     // Save SFX
     saveEmojiPack(emojiPack);
     saveTransferSpeedUnit(transferSpeedUnit);
-    appUpdates.setAutomatic(autoUpdates);
+    appUpdates.setPreferences(autoUpdates, betaUpdates);
     soundEffects.setEnabled(sfxEnabled);
     soundEffects.setVolume(sfxVolume / 100);
 
@@ -214,6 +219,16 @@ export const SettingsModal: React.FC = () => {
                 <circle cx="12" cy="7" r="4"/>
               </svg>
               <span>Perfil</span>
+            </button>
+
+            <button type="button"
+              className={`settings-nav-item ${activeTab === 'application' ? 'active' : ''}`}
+              onClick={() => setActiveTab('application')}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <path d="M3 9h18M9 9v12" />
+              </svg>
+              <span>Aplicação</span>
             </button>
 
             <button
@@ -327,21 +342,11 @@ export const SettingsModal: React.FC = () => {
                     Este nome será enviado aos outros participantes assim que você se conectar à sala.
                   </p>
                 </div>
-                <label className="settings-switch-row" htmlFor="settings-auto-updates">
-                  <div className="settings-switch-label-group">
-                    <span className="settings-switch-title">Procurar automaticamente por atualizações</span>
-                  </div>
-                  <div className="modern-switch">
-                    <input autoComplete="off" type="checkbox" id="settings-auto-updates"
-                      checked={autoUpdates} onChange={event => setAutoUpdates(event.target.checked)} />
-                    <span className="switch-slider" />
-                  </div>
-                </label>
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => void appUpdates.check(true)}>
-                  Procurar atualizações agora
-                </button>
               </div>
             )}
+
+            {activeTab === 'application' && <ApplicationSettings automatic={autoUpdates}
+              includePrereleases={betaUpdates} onAutomaticChange={setAutoUpdates} onPrereleasesChange={setBetaUpdates} />}
 
             {activeTab === 'conversations' && (
               <div className="settings-tab-pane active" id="settings-pane-conversations">
@@ -928,7 +933,7 @@ export const SettingsModal: React.FC = () => {
           <button type="button" className="btn btn-secondary" id="btn-cancel-settings" onClick={closeModal}>
             Fechar
           </button>
-          <button type="button" className="btn btn-primary" id="btn-save-settings" onClick={handleSave}>
+          <button type="button" className="btn btn-primary" id="btn-save-settings" disabled={updateBusy} onClick={handleSave}>
             Salvar Configurações
           </button>
         </div>

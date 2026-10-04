@@ -41,6 +41,7 @@ windows-capture = "2.0.1"
 fast_image_resize = "5.1"
 tauri-plugin-updater = "2.13.1"
 tauri-plugin-process = "2.4.0"
+semver = "1"
 
 
 [target.'cfg(windows)'.dependencies]

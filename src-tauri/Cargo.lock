@@ -3867,6 +3867,7 @@ dependencies = [
  "rayon",
  "reqwest",
  "rfd",
+ "semver",
  "serde",
  "serde_json",
  "sha2",

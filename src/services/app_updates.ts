@@ -1,13 +1,14 @@
 import { isTauri, invoke } from '@tauri-apps/api/core';
-import { check } from '@tauri-apps/plugin-updater';
+import { Update } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { AppUpdateController } from '../core/app_updates';
 import { roomService } from './room_service';
 
 export const appUpdates = new AppUpdateController({
-  check: () => {
+  check: async (includePrereleases) => {
     if (!isTauri()) throw new Error('Desktop runtime required');
-    return check({ timeout: 15000 });
+    const metadata = await invoke<ConstructorParameters<typeof Update>[0] | null>('check_app_update', { includePrereleases });
+    return metadata ? new Update(metadata) : null;
   },
   prepareInstall: async () => {
     await roomService.leaveRoom();

@@ -45,6 +45,8 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 4. User Guidelines & Expressed Preferences
 
+- `[Update Channels]` Put application update controls in a dedicated Application settings tab instead of Profile. Offer a persistent opt-in toggle for beta/prerelease updates, disabled by default; stable releases remain eligible on both channels. Turning beta off and saving must offer the latest stable release even when older than the installed beta. Preserve signed downloads and explicit installation consent; permit this deliberate beta-to-stable downgrade only, never automatic installation or stable-to-stable downgrades.
+
 - `[CI Validation Scope]` Keep frontend compilation and frontend/native regressions on main-branch validation, preserving release-profile Rust dependency cache warming. Generate Windows installers only in the release workflow, avoiding a second application distribution build on each main push. Release jobs must retain their tests and signed packaging checks.
 
 - `[Installer Languages]` Distribute one Windows setup executable and one MSI, without locale-specific release filenames or duplicate installers per language. Both published installer filenames must use the `-setup` suffix before their extension. The user chose a single English MSI and a single NSIS EXE with Brazilian Portuguese/English language selection. Installer language is independent of future application localization; never imply that the MSI is multilingual merely because its release filename omits the locale.

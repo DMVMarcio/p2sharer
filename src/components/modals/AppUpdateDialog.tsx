@@ -7,17 +7,18 @@ export function AppUpdateDialog() {
   const update = useAppUpdates();
   if (!update.dialogOpen) return null;
   const busy = ['checking', 'downloading', 'installing'].includes(update.status);
-  return <ModalDialog title="Atualizações do P2Sharer" icon={<Download size={20} />}
+  return <ModalDialog title={update.returnToStable ? 'Voltar à versão estável' : 'Atualizações do P2Sharer'} icon={<Download size={20} />}
     busy={busy} onClose={appUpdates.close} footer={close => <>
       <button type="button" className="btn btn-secondary" disabled={busy} onClick={close}>Mais tarde</button>
       {update.status === 'ready'
         ? <button type="button" className="btn btn-primary" onClick={() => void appUpdates.install()}>Instalar e reiniciar</button>
         : update.version && update.status !== 'checking'
-          ? <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void appUpdates.download()}>Baixar atualização</button>
+          ? <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void appUpdates.download()}>{update.returnToStable ? 'Baixar versão estável' : 'Baixar atualização'}</button>
           : <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void appUpdates.check(true)}>Procurar novamente</button>}
     </>}>
     <div className="app-update-content" aria-live="polite">
       {update.version && <p>Versão {update.version} disponível.</p>}
+      {update.returnToStable && <p>Instalar esta versão estável substituirá a versão beta atual.</p>}
       {update.status === 'checking' && <p>Procurando atualizações...</p>}
       {update.status === 'current' && <p>Você está usando a versão mais recente.</p>}
       {update.status === 'downloading' && <>
