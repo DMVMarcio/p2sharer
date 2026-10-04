@@ -1,0 +1,89 @@
+name: Build release draft
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag to build, such as v1.0.0'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.14.0'
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable
+        with:
+          toolchain: stable
+      - name: Install native build prerequisites
+        shell: pwsh
+        run: |
+          choco install nasm --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Add-Content -LiteralPath $env:GITHUB_PATH -Value 'C:\Program Files\NASM'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Validate release version
+        shell: pwsh
+        run: pnpm run release:check --tag "$env:RELEASE_TAG"
+      - name: Protect published releases
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const releases = await github.paginate(github.rest.repos.listReleases, { ...context.repo, per_page: 100 });
+            if (releases.some(release => release.tag_name === process.env.RELEASE_TAG && !release.draft)) {
+              throw new Error('Published releases are immutable. Prepare a new version instead.');
+            }
+      - name: Review repository hygiene
+        run: pnpm run check:repository
+      - name: Run frontend regressions
+        run: pnpm test
+      - name: Run portable native regressions
+        run: pnpm run test:native --release --locked
+      - name: Validate signing setup
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: pnpm run release:check --signing
+      - name: Build signed installers and draft release
+        uses: tauri-apps/tauri-action@944946e3e4cac6603d1fe8f514171e9ecd3c78aa # v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tauriScript: pnpm run tauri
+          args: --locked --config src-tauri/tauri.release.conf.json
+          tagName: ${{ env.RELEASE_TAG }}
+          releaseName: P2Sharer v__VERSION__
+          releaseDraft: true
+          prerelease: ${{ contains(env.RELEASE_TAG, '-') }}
+          generateReleaseNotes: true
+          uploadUpdaterJson: true
+          updaterJsonPreferNsis: true
+          uploadUpdaterSignatures: true
+      - name: Verify updater manifest and signing key
+        run: node tools/release.mjs artifacts

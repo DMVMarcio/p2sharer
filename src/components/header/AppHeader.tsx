@@ -7,8 +7,11 @@ import logoImg from '../../assets/logo.png';
 import { BookmarkCheck, BookmarkPlus } from 'lucide-react';
 import { parseRoomInvite } from '../../core/room_invite';
 import { savedRooms, type SavedRoom } from '../../core/saved_rooms';
+import { useAppUpdates } from '../../hooks/useAppUpdates';
+import { appUpdates } from '../../services/app_updates';
 
 export const AppHeader: React.FC = () => {
+  const update = useAppUpdates();
   const { currentRoomCode, currentRoomInvite, currentRoomName, currentRoomPassword, username, isInRoom } = useRoom();
   const { openModal } = useModal();
   const [savedRecord, setSavedRecord] = useState<SavedRoom | null>(null);
@@ -61,6 +64,12 @@ export const AppHeader: React.FC = () => {
           <img src={logoImg} alt="P2Sharer Logo" className="app-header-logo" width="22" height="22" />
         </div>
         <span className="logo-title">P2Sharer</span>
+        {update.version && <Tooltip content={`Atualização ${update.version} disponível`}>
+          <button type="button" className="btn btn-secondary btn-sm app-update-badge"
+            onClick={appUpdates.open} aria-label={`Atualização ${update.version} disponível`}>
+            Atualização
+          </button>
+        </Tooltip>}
       </div>
 
       <div className="header-user-info">

@@ -43,6 +43,7 @@ relatorios/
 DEBUG_PERFORMANCE_*.md
 /repository-audits/
 /deploy/
+/latest.json
 
 # Editor directories and files
 .vscode/*

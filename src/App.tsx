@@ -22,6 +22,8 @@ import { stateStore } from './core/state_store';
 import { PipView } from './components/room/PipView';
 import { YouTubePipView } from './apps/YouTubePipView';
 import { RoomAppWindow } from './apps/RoomAppWindow';
+import { AppUpdateDialog } from './components/modals/AppUpdateDialog';
+import { startAutomaticUpdateChecks } from './services/app_updates';
 
 export const App: React.FC = () => {
   useAppTheme(); // Sets data-theme & data-accent
@@ -43,6 +45,8 @@ export const App: React.FC = () => {
 const MainApp: React.FC = () => {
   const { isInRoom, stopScreenSharing, leaveRoom, isSharingScreen } = useRoom();
   const { openModal, activeModal } = useModal();
+
+  useEffect(startAutomaticUpdateChecks, []);
 
   useEffect(() => {
     initFrontendLogger();
@@ -86,6 +90,7 @@ const MainApp: React.FC = () => {
       {activeModal === 'externalLink' && <ExternalLinkModal />}
       {activeModal === 'apps' && <AppsModal />}
       <ConnectingOverlay />
+      <AppUpdateDialog />
 
       {/* Global Notifications */}
       <ToastContainer />

@@ -22,6 +22,7 @@ mod video_gpu_scale;
 #[cfg(windows)]
 mod video_nvenc;
 mod camera_permission;
+mod app_data_migration;
 
 use audio_loopback::{start_audio_capture, stop_audio_capture};
 use logger::{clear_log_file, get_log_file_path, open_latest_log, open_log_folder, write_frontend_log};
@@ -40,8 +41,17 @@ use screen_sources::{
 use tauri::{Emitter, Manager};
 use chat_files::{import_chat_files, paste_chat_files, discard_chat_file};
 
+#[tauri::command]
+fn prepare_app_update(window: tauri::Window) -> Result<(), String> {
+    if window.label() != "main" { return Err("Only the main window can install updates".into()); }
+    stop_native_screen_capture()?;
+    stop_audio_capture()?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    app_data_migration::migrate_legacy_data().expect("Could not migrate previous application data; close older P2Sharer instances and retry");
     // Bind process to Windows Job Object to guarantee atomic child teardown on exit.
     setup_job_object_for_clean_child_teardown();
 
@@ -66,6 +76,8 @@ pub fn run() {
     tauri::Builder::default()
         .manage(ChatFileState::default())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             camera_permission::install(app)?;
             Ok(())
@@ -84,6 +96,7 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            prepare_app_update,
             native_rtc::create_native_video_offer,
             native_rtc::answer_native_video,
             native_rtc::add_native_video_ice,

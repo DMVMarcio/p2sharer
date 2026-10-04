@@ -2,7 +2,7 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "P2Sharer",
   "version": "1.0.0",
-  "identifier": "com.p2sharer.app",
+  "identifier": "com.p2sharer.desktop",
   "build": {
     "beforeDevCommand": "pnpm run dev",
     "devUrl": "http://localhost:1420",
@@ -27,6 +27,7 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": false,
     "targets": "all",
     "icon": [
       "icons/32x32.png",
@@ -36,9 +37,19 @@
       "icons/icon.ico"
     ],
     "windows": {
+      "wix": {
+        "upgradeCode": "7b204ccf-f6ba-5ddc-a719-cdf73e84ce2d"
+      },
       "nsis": {
         "installerIcon": "icons/icon.ico"
       }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDI2Q0Y0MkM2N0IwNTUxNTYKUldSV1VRVjd4a0xQSnVXeFlzc2ZPdzFhY2crRWRtRDNnaW95M3BUSzZiNzdyb0oxWEpYTG9QeWM",
+      "endpoints": ["https://github.com/DMVMarcio/p2sharer/releases/latest/download/latest.json"],
+      "windows": { "installMode": "passive" }
     }
   }
 }

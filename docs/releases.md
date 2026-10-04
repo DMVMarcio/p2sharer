@@ -1,65 +1,99 @@
-# Release and update plan
+# Releases and application updates
 
-This document describes the recommended release process. The repository does not yet contain a release workflow or an in-app updater. The commands below are a future release procedure, not an enabled publishing pipeline.
+P2Sharer uses version `1.0.0` and bundle identifier `com.p2sharer.desktop`. Official builds currently target Windows x64. The identifier is suitable for future macOS and Linux ports; those platforms still require native implementation and validation before adding release jobs.
 
-## Version policy
+## Versioning
 
-Use one application version across `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml`, including the root package entry in `src-tauri/Cargo.lock`. A release check should reject mismatches between these files and the tag.
+Use [Semantic Versioning](https://semver.org/): patches for compatible fixes (`1.0.1`), minor versions for compatible features (`1.1.0`), and major versions for incompatible supported behavior, room protocol or saved data (`2.0.0`). Preview versions can use `1.1.0-beta.1`.
 
-Currently, the JavaScript package declares `0.1.0`, while Tauri and Cargo declare `1.0.0`. Reconcile these before the first release. Start with `1.0.0` if declaring a stable application, or an explicit prerelease such as `1.0.0-beta.1` during public testing. Do not silently change the version policy of already distributed builds.
+```powershell
+pnpm run release:version 1.0.1
+pnpm run release:check
+```
 
-Apply [Semantic Versioning](https://semver.org/) to the application's compatibility contract:
+The version command updates `package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` and the application entry in `src-tauri/Cargo.lock`. Dependency versions remain unchanged. Commit the version change with its release changes. Tags use `vX.Y.Z` and must match every declaration. Published tags and binaries are immutable; fixes need a higher version.
 
-| Change | Example |
+## One-time updater signing setup
+
+The [Tauri updater](https://v2.tauri.app/plugin/updater/) requires signed updates. The maintainer's public key is already configured. Keep the corresponding private key and password outside Git, with a protected backup. Losing either prevents signing updates accepted by existing installations.
+
+To generate a key for a new, not-yet-distributed application:
+
+```powershell
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.tauri" | Out-Null
+pnpm run tauri signer generate -w "$env:USERPROFILE\.tauri\p2sharer.key"
+pnpm run release:key "$env:USERPROFILE\.tauri\p2sharer.key.pub"
+```
+
+Do not regenerate or replace the configured key for this application. These commands describe initial setup, not a routine release step. The key command accepts only public key files.
+
+In GitHub, open **Settings > Secrets and variables > Actions > New repository secret** and add:
+
+| Secret | Value |
 | --- | --- |
-| Compatible bug fix | `1.0.0` to `1.0.1` |
-| Compatible feature | `1.0.1` to `1.1.0` |
-| Incompatible change to supported behavior, room protocol or saved data | `1.1.0` to `2.0.0` |
-| Preview for testing | `1.1.0-beta.1` |
+| `TAURI_SIGNING_PRIVATE_KEY` | Entire contents of the private `p2sharer.key` file, not its path and not the `.pub` file |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Password chosen when generating the key |
 
-Use annotated tags named `vX.Y.Z`. Commits retain Conventional Commit messages; release notes explain user-visible changes, known limitations and migration requirements. Never move a published tag or replace its installer with different binaries. Correct a faulty release with a higher version.
+Copy the private file directly into the GitHub secret form; never paste it into issues, chats or tracked configuration. The workflow uses GitHub's automatic `GITHUB_TOKEN`, so a personal access token is unnecessary.
 
-## GitHub publication
+Updater signing is separate from [Windows Authenticode signing](https://v2.tauri.app/distribute/sign/windows/). Authenticode identifies the installer publisher and is a separate setup; this workflow does not provide it or guarantee absence of SmartScreen warnings.
 
-Build official Windows x64 artifacts in GitHub Actions from the tagged commit. Use the official [Tauri action](https://github.com/tauri-apps/tauri-action) to upload installers and updater metadata to a draft GitHub Release. Configure the job for this repository's pnpm launcher and native prerequisites, including MSVC, CMake and NASM. Install dependencies with `pnpm install --frozen-lockfile`.
+## Choose when to launch a release
 
-The proposed maintainer procedure is:
+Ordinary pushes to `main` do not create releases. The [release workflow](../.github/workflows/release.yml) starts when a `v*` tag is pushed, or when manually dispatched with an existing matching tag. The official [Tauri action](https://github.com/tauri-apps/tauri-action) builds signed installers and creates a draft release. Only publishing that draft makes it available to users.
 
-1. Update matching versions and lockfiles, write release notes and commit the changes.
-2. Run frontend and native regressions plus `pnpm run tauri:build`. Inspect the executable and installers in the default `src-tauri/target/` directory.
-3. Create and push the release tag. For example, after preparing version `1.0.1`:
+For the first release, after committing and pushing the reviewed implementation and configuring secrets:
 
-   ```powershell
-   git tag -a v1.0.1 -m "P2Sharer 1.0.1"
-   git push origin main
-   git push origin v1.0.1
-   ```
+```powershell
+pnpm run release:check
+git push origin main
+git tag -a v1.0.0 -m "P2Sharer 1.0.0"
+git push origin v1.0.0
+```
 
-4. Let the tag-triggered workflow validate the version, run portable tests, build and sign the installers, and prepare a draft release. A build failure must prevent a publishable release.
-5. Download the draft artifacts and test installation, startup, capture, room joining and an actual upgrade from the previous release. Verify saved settings survive. CI cannot replace live media checks.
-6. Publish the reviewed draft. Stable releases become the normal download/update destination. Mark preview builds as prereleases and keep them outside the stable update channel.
+For later releases, first run `pnpm run release:version <new-version>`, validate and commit the changes, then create and push the matching tag.
 
-Keep installers in Release assets, not in Git. Use narrowly scoped workflow permissions and expose signing secrets only to trusted release jobs.
+1. Inspect **Actions > Build release draft**. It installs pinned pnpm/Node dependencies and native prerequisites, checks versions and repository hygiene, runs frontend/native regressions, and builds using the default Cargo target directory.
+2. Open the draft under **Releases**. Its assets should include `.exe` and `.msi` installers, `.sig` signatures, and `latest.json` updater metadata. A failed job or incomplete assets must be resolved before publication.
+3. Download and test the actual draft installer. Check startup, saved settings, room joining and live media. For later releases, test a real upgrade from the previous installed release.
+4. Review the generated release notes and add user-facing changes and known limitations.
+5. Select **Publish release** when ready. Publish stable releases as the latest release; keep beta tags marked as prereleases. The stable updater endpoint excludes prereleases.
 
-## In-app updates
+To retry an unpublished draft, use **Run workflow** and supply its existing tag. The job refuses to rebuild a published release. Never delete or recreate a public tag to replace its binaries.
 
-Integrate the official [Tauri updater](https://v2.tauri.app/plugin/updater/), enable `createUpdaterArtifacts`, and distribute its generated signatures and `latest.json` with the installers. For a public release repository, use:
+## Local builds
+
+`pnpm run tauri:build` produces ordinary local installers without requiring signing credentials. These builds still include the updater and its public verification key.
+
+For a signed local release build, provide the existing private key and password through process environment variables:
+
+```powershell
+$env:TAURI_SIGNING_PRIVATE_KEY_PATH = "$env:USERPROFILE\.tauri\p2sharer.key"
+$releasePassword = Read-Host "Signing key password" -AsSecureString
+$releaseCredential = New-Object System.Management.Automation.PSCredential('signing', $releasePassword)
+$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = $releaseCredential.GetNetworkCredential().Password
+try {
+    pnpm run release:build
+} finally {
+    Remove-Item Env:\TAURI_SIGNING_PRIVATE_KEY_PATH -ErrorAction SilentlyContinue
+    Remove-Item Env:\TAURI_SIGNING_PRIVATE_KEY_PASSWORD -ErrorAction SilentlyContinue
+}
+```
+
+The release configuration enables signed updater artifacts. Output remains under `src-tauri/target/release/` and `src-tauri/target/release/bundle/`. Local builds do not publish anything to GitHub.
+
+## Installed update behavior
+
+The main window checks at startup and every six hours while automatic checks are enabled. **Settings > Profile** contains the persistent automatic-check switch and a manual check button. Changes to the switch apply when settings are saved.
+
+An available version adds an update badge beside the header logo. Users can download, defer installation and explicitly choose **Install and restart**. Installation leaves the room and stops native capture/audio. Offline checks and download/signature failures retain normal application use and allow retries. Only the main window receives updater and restart permissions.
+
+The stable manifest is served from:
 
 ```text
 https://github.com/DMVMarcio/p2sharer/releases/latest/download/latest.json
 ```
 
-The updater requires signed artifacts. Commit only the public verification key; keep the private key and its password in GitHub Actions secrets, with a separate protected backup. Never embed a GitHub credential in the application. A private release repository requires another distribution arrangement.
+The release repository/assets must be publicly downloadable for anonymous installed clients. Before the first stable release, this URL is unavailable and a manual check reports that it could not complete. Never embed GitHub authentication in the application.
 
-Recommended application behavior: check at startup, provide a manual check in settings, show the available version and download progress, and let the user choose when to install. Preserve room and media cleanup before installation. Windows installation closes the app; do not interrupt an active session without consent. Older builds without updater support need a manual installation of the first updater-enabled version.
-
-Updater signatures and [Windows Authenticode signing](https://v2.tauri.app/distribute/sign/windows/) serve different purposes. Evaluate Authenticode separately for installer publisher identity; updater signing does not address Windows reputation warnings.
-
-## Implementation acceptance
-
-- A release version command and tag validation keep every version declaration consistent.
-- Trusted tag builds produce reviewed draft releases with working installer links and updater metadata.
-- Update permissions are restricted to the main window, and UI uses existing canonical controls.
-- Missing connectivity, no available update, invalid signatures, download failures and cancelled installation produce meaningful states without breaking normal application use.
-- A packaged version A successfully discovers and installs a signed version B, preserving user data and releasing native media resources.
-- The first release is published only after the updater key, CI secrets and installed upgrade path have been validated.
+Older builds without this updater require a manual installation of the first updater-enabled release. The identifier migration copies the previous Windows application data before opening WebView2, keeps the old directory for recovery, and never replaces an existing new profile. Test an installed version A updating to a signed higher version B before describing the full delivery path as validated.

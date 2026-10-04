@@ -1,9 +1,13 @@
 {
   "name": "tauri-app",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "release:version": "node tools/release.mjs version",
+    "release:check": "node tools/release.mjs check",
+    "release:key": "node tools/release.mjs key",
+    "release:build": "node tools/release.mjs check --signing && node tools/tauri.mjs build --config src-tauri/tauri.release.conf.json",
     "check:repository": "node tools/repository-hygiene.mjs",
     "dev": "vite",
     "build": "tsc && vite build",
@@ -18,8 +22,10 @@
     "@floating-ui/dom": "^1.8.0",
     "@fontsource-variable/jetbrains-mono": "^5.3.0",
     "@fontsource-variable/plus-jakarta-sans": "^5.3.0",
-    "@tauri-apps/api": "^2",
+    "@tauri-apps/api": "^2.12.1",
     "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-process": "^2.4.0",
+    "@tauri-apps/plugin-updater": "^2.13.1",
     "@tiptap/core": "^3.31.3",
     "@tiptap/extension-bubble-menu": "^3.31.3",
     "@tiptap/extension-character-count": "^3.31.3",
@@ -57,7 +63,7 @@
     "yjs": "^13.6.33"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2",
+    "@tauri-apps/cli": "^2.12.1",
     "@trystero-p2p/core": "0.25.3",
     "@types/pako": "^2.0.4",
     "esbuild": "0.25.12",

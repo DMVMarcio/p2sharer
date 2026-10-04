@@ -345,6 +345,22 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   gap: 8px;
 }
 
+.app-update-badge {
+  color: var(--accent-color);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.app-update-content { display: grid; gap: 12px; }
+.app-update-progress { width: 100%; accent-color: var(--accent-color); }
+.app-update-notes {
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--text-muted);
+}
+
 .logo-icon-clean {
   color: var(--accent-color);
   display: flex;

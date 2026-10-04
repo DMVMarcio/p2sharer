@@ -53,7 +53,7 @@ The application runs inside Tauri/WebView2; a browser preview checks only the fr
 
 Production output is written to `src-tauri/target/release/p2sharer.exe`, with installers under `src-tauri/target/release/bundle/`. Close the application before rebuilding and use the default Cargo target directory.
 
-See the [release and update plan](docs/releases.md) for versioning and the proposed GitHub publication process. Release automation and in-app updates are not implemented yet.
+See [releases and application updates](docs/releases.md) for version commands, signing setup and the GitHub draft-release workflow. The app checks for updates automatically; this can be disabled in settings. Available updates appear beside the header logo and install when you choose to restart.
 
 ### Dependencies
 

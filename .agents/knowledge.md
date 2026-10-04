@@ -30,6 +30,7 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 ---
 
 ## 3. Subsystem Architectural Deep Dives
+- [Release Versioning, Signing and GitHub Distribution](../docs/releases.md)
 - [Public Repository Safety and Historical Audits](.agents/knowledge/repository-publication.md)
 - [P2P Networking, Signaling Failover & WebRTC Mesh](.agents/knowledge/p2p-architecture.md)
 - [Native Media Pipeline: Audio Loopback, Video Capture & Web Bridges](.agents/knowledge/native-media-pipeline.md)
@@ -43,6 +44,8 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 ---
 
 ## 4. User Guidelines & Expressed Preferences
+
+- `[Release Implementation]` Standardize the application at version 1.0.0 and use a bundle identifier without the .app suffix. Provide an update badge next to the header logo, a persistent setting to disable automatic checks, and maintainer-controlled GitHub release builds and publication. The maintainer generates and safeguards signing keys; never generate or disclose their production private key on their behalf.
 
 - `[Release Distribution]` Distribute official application versions through GitHub Releases and provide in-app update detection and installation. Keep versioning, release builds and updater delivery consistent, with a clearly documented release process.
 

@@ -30,7 +30,14 @@ You are the technical maintainer and continuous architect of this project. Enfor
 - **Mandatory Task-End Commit**: After every task that changes project files, commit the completed task's changes before the final response, without waiting for another user request. Run the required validation first and report the commit hash and any remaining changes. Preserve unrelated pre-existing edits unless the user authorizes committing them; an explicit request to commit all pending changes includes those edits. Do not create empty commits for read-only tasks or push unless authorized.
 - For stack-specific `.gitignore` rules, invoke `.agents/skills/git-workflow/SKILL.md`.
 
+### Release maintenance
+- Keep application versions synchronized with `pnpm run release:version <version>` and validate with `pnpm run release:check`. Tags must match the version exactly and published releases must never be rewritten.
+- Build official signed releases from trusted tags through `.github/workflows/release.yml`; review and manually publish its draft. Ordinary main-branch pushes must not publish releases.
+- Keep the public updater key stable across distributed versions. Store its private key and password only outside Git and in release-job secrets; do not generate production replacement keys automatically. Local packaging uses `pnpm run tauri:build`; signed packaging uses `pnpm run release:build` with process environment credentials.
+- Preserve explicit user consent before installing an update, native media teardown and saved data. Updater/restart permissions belong only to the main window. Test a real installed-version upgrade in addition to unit regressions and desktop packaging.
+
 ## 4. Persistent Memory & User Directives
+
 - **Knowledge Index**: Consult `.agents/knowledge.md` at the start of interactions. If missing, trigger `.agents/skills/project-audit/SKILL.md` to bootstrap it.
 - **User Directives**: Whenever the user expresses a preference, convention, or architectural choice (directly or indirectly), persist it immediately in `.agents/knowledge.md` under `## 4. User Guidelines & Preferences` as an English tagged directive (e.g., `[UI]`, `[Backend]`).
 - **Dense Subsystems**: Document complex modules in `.agents/knowledge/<module>.md` and link them in the central index; do not bloat `knowledge.md` with raw source code.
