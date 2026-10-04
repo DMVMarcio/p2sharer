@@ -53,6 +53,8 @@ The application runs inside Tauri/WebView2; a browser preview checks only the fr
 
 Production output is written to `src-tauri/target/release/p2sharer.exe`, with installers under `src-tauri/target/release/bundle/`. Close the application before rebuilding and use the default Cargo target directory.
 
+See the [release and update plan](docs/releases.md) for versioning and the proposed GitHub publication process. Release automation and in-app updates are not implemented yet.
+
 ### Dependencies
 
 Use `pnpm add <package>`, `pnpm add -D <package>` and `pnpm exec <tool>`. Commit `pnpm-lock.yaml` after dependency changes. Pass script options directly, for example `pnpm run tauri:dev --release --no-watch`.
