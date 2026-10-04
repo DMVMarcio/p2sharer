@@ -1,4 +1,4 @@
-import { t } from '../../i18n';
+import { getLanguage, setLanguage, t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { getEncoderPreference, normalizeEncoderPreference, saveEncoderPreference, type EncoderPreference, type NativeEncoderSupport } from '../../core/encoder_preferences';
 import { streamDrawingLimit, STREAM_DRAWING_MAX } from '../../core/stream_pointer';
@@ -45,6 +45,7 @@ export const SettingsModal: React.FC = () => {
 
   // Form states initialized once upon mounting
   const [nick, setNick] = useState(() => stateStore.username);
+  const [language, setLanguageDraft] = useState(getLanguage);
   const [autoUpdates, setAutoUpdates] = useState(automaticUpdateChecks);
   const [betaUpdates, setBetaUpdates] = useState(betaUpdateChecks);
   const update = useAppUpdates();
@@ -173,6 +174,7 @@ export const SettingsModal: React.FC = () => {
     localStorage.setItem('p2sharer_turn_force_relay', turnForceRelay ? 'true' : 'false');
     saveRendezvousPreferences(rendezvousPreferences);
 
+    setLanguage(language);
     closeModal();
     showToast(t("message.3f84cec002ac"));
   };
@@ -358,7 +360,7 @@ export const SettingsModal: React.FC = () => {
               </div>
             )}
 
-            {activeTab === 'application' && <ApplicationSettings automatic={autoUpdates}
+            {activeTab === 'application' && <ApplicationSettings language={language} onLanguageChange={setLanguageDraft} automatic={autoUpdates}
               includePrereleases={betaUpdates} onAutomaticChange={setAutoUpdates} onPrereleasesChange={setBetaUpdates} />}
 
             {activeTab === 'conversations' && (

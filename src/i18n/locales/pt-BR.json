@@ -877,7 +877,6 @@
   "message.71108d7b0ee4": "Mostrar participantes transmitindo ({{v0}})",
   "message.b9125ff913f7": "Desafixar interface (ocultar automaticamente)",
   "language.label": "Idioma",
-  "language.description": "Detectado na primeira abertura. As alterações são aplicadas imediatamente e salvas neste dispositivo.",
   "notice.join": "{{actor}} entrou na sala",
   "notice.leave": "{{actor}} saiu da sala",
   "notice.streamStart": "{{actor}} iniciou uma transmissão",

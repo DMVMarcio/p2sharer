@@ -877,7 +877,6 @@
   "message.71108d7b0ee4": "Show streaming participants ({{v0}})",
   "message.b9125ff913f7": "Unpin interface (hide automatically)",
   "language.label": "Language",
-  "language.description": "Detected on first launch. Changes apply immediately and are saved on this device.",
   "notice.join": "{{actor}} joined the room",
   "notice.leave": "{{actor}} left the room",
   "notice.streamStart": "{{actor}} started a stream",

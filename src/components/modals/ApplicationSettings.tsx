@@ -1,18 +1,21 @@
-import { setLanguage, t } from '../../i18n';
+import { t } from '../../i18n';
+import type { AppLanguage } from '../../i18n/language';
 import { useLocale } from '../../hooks/useLocale';
 import { useAppUpdates } from '../../hooks/useAppUpdates';
 import { appUpdates } from '../../services/app_updates';
 import { Select } from '../common/Select';
 
 interface Props {
+  language: AppLanguage;
+  onLanguageChange: (language: AppLanguage) => void;
   automatic: boolean;
   includePrereleases: boolean;
   onAutomaticChange: (enabled: boolean) => void;
   onPrereleasesChange: (enabled: boolean) => void;
 }
 
-export function ApplicationSettings({ automatic, includePrereleases, onAutomaticChange, onPrereleasesChange }: Props) {
-  const language = useLocale();
+export function ApplicationSettings({ language, onLanguageChange, automatic, includePrereleases, onAutomaticChange, onPrereleasesChange }: Props) {
+  useLocale();
   const update = useAppUpdates();
   const busy = ['downloading', 'installing'].includes(update.status);
   const channelChanged = includePrereleases !== update.includePrereleases;
@@ -25,8 +28,7 @@ export function ApplicationSettings({ automatic, includePrereleases, onAutomatic
       <label className="form-label" htmlFor="settings-language">{t('language.label')}</label>
       <Select id="settings-language" value={language} aria-label={t('language.label')}
         options={[{ value: 'en', label: 'English' }, { value: 'pt-BR', label: 'Português Brasil' }]}
-        onValueChange={(value) => setLanguage(value === 'pt-BR' ? 'pt-BR' : 'en')} />
-      <p className="field-info-text">{t('language.description')}</p>
+        onValueChange={(value) => onLanguageChange(value === 'pt-BR' ? 'pt-BR' : 'en')} />
     </div>
     <label className="settings-switch-row" htmlFor="settings-auto-updates">
       <div className="settings-switch-label-group">
