@@ -307,6 +307,8 @@ Use the pinned pnpm 10.30.1 from `package.json` (Node.js 22.14+). Install depend
 Migration validation on October 3, 2026: frozen-lockfile installation passed; all 454 frontend unit tests passed; `pnpm run tauri:build` produced the Windows executable and both MSI/NSIS installers in the default release directory. Existing direct dependency versions and Trystero patch behavior were preserved.
 
 The pnpm Tauri commands use `tools/tauri.mjs` to find standalone or Visual Studio-bundled CMake when it is absent from PATH. The launcher preserves explicit CMAKE overrides, sets the tool environment only for its process, and retains the normal Cargo output directory. The vendored turbojpeg SIMD build also requires NASM. Direct Cargo builds need CMake on PATH or an explicit CMAKE environment variable.
+
+Native integration tests also rebuild `target/release/p2sharer.exe`. The test launcher must enable `tauri/custom-protocol`; otherwise Cargo replaces a previously packaged executable with a runtime that opens the development URL, even under `--release`. `packaged_runtime.rs` verifies production runtime mode and the embedded frontend entry point. Run native tests before the final Tauri packaging build and verify the resulting executable alongside its installers.
 - **Development Server**: `pnpm run dev` (Vite on port 1420)
 - **Tauri App Dev**: `pnpm run tauri:dev` (runs `pnpm run dev` and starts Tauri window)
 - **Frontend Typecheck & Build (Web Only)**: `pnpm run build` (`tsc && vite build`)

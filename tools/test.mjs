@@ -17,7 +17,9 @@ if (native) {
 const files = native ? [] : readdirSync(new URL('../test/unit/', import.meta.url))
   .filter(name => /\.test\.(ts|mjs)$/.test(name)).sort().map(name => `test/unit/${name}`);
 const result = spawnSync(native ? 'cargo' : process.execPath,
-  native ? ['test', '--lib', '--tests', ...args]
+  // Cargo also rebuilds the application binary for integration tests. Keep it
+  // in packaged mode so release tests cannot replace it with a dev-server client.
+  native ? ['test', '--lib', '--tests', '--features', 'tauri/custom-protocol', ...args]
     : ['--experimental-strip-types', '--test', ...args, ...files],
   { cwd: native ? fileURLToPath(new URL('../src-tauri/', import.meta.url)) : root, stdio: 'inherit' });
 if (result.error) console.error(result.error.message);
