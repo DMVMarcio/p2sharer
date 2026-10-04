@@ -45,6 +45,8 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 4. User Guidelines & Expressed Preferences
 
+- `[CI Validation Scope]` Keep frontend compilation and frontend/native regressions on main-branch validation, preserving release-profile Rust dependency cache warming. Generate Windows installers only in the release workflow, avoiding a second application distribution build on each main push. Release jobs must retain their tests and signed packaging checks.
+
 - `[Installer Languages]` Distribute one Windows setup executable and one MSI, without locale-specific release filenames or duplicate installers per language. Both published installer filenames must use the `-setup` suffix before their extension. The user chose a single English MSI and a single NSIS EXE with Brazilian Portuguese/English language selection. Installer language is independent of future application localization; never imply that the MSI is multilingual merely because its release filename omits the locale.
 - `[Installer Default Language]` Detect the Windows language when supported and preserve a previous installer language choice. Keep English first as the fallback for unsupported languages; allow users to change the selection to English or Brazilian Portuguese. Passive/silent updates must not wait for a language dialog.
 

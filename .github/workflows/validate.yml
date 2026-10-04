@@ -30,19 +30,7 @@ jobs:
         run: pnpm run release:check
       - name: Run frontend regressions
         run: pnpm test
+      - name: Check frontend compilation
+        run: pnpm run build
       - name: Run portable native regressions
         run: pnpm run test:native --release --locked
-      - name: Build unsigned desktop installers
-        run: pnpm run tauri:build -- --locked
-      - name: Remove distribution outputs before caching
-        shell: pwsh
-        run: |
-          # Keep dependency artifacts, never installers or application executables.
-          $releaseDirectory = Join-Path $env:GITHUB_WORKSPACE 'src-tauri/target/release'
-          $bundleDirectory = Join-Path $releaseDirectory 'bundle'
-          $resolvedBundle = (Resolve-Path -LiteralPath $bundleDirectory -ErrorAction Stop).Path
-          if ($resolvedBundle -ne [System.IO.Path]::GetFullPath($bundleDirectory)) {
-            throw 'Refusing to remove distribution outputs outside the expected workspace directory.'
-          }
-          Remove-Item -LiteralPath $resolvedBundle -Recurse -Force -ErrorAction Stop
-          Remove-Item -LiteralPath (Join-Path $releaseDirectory 'p2sharer.exe') -Force -ErrorAction Stop
