@@ -5256,7 +5256,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   right: 2px;
   bottom: calc(100% + 4px);
 }
-.settings-sound-events { margin-top: 14px; }
+.settings-sound-events { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
 .settings-sound-event { display: flex; align-items: center; gap: 12px; }
 .settings-sound-event .settings-switch-row { flex: 1; }
 .settings-sound-event .btn { flex-shrink: 0; }
