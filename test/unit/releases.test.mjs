@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { checkRelease, setVersion, validateVersion, validatePublicKey, verifyArtifacts } from '../../tools/release.mjs';
+import { checkRelease, setVersion, validateVersion, validatePublicKey, normalizePublicKey, normalizeConfiguredPublicKey, verifyArtifacts } from '../../tools/release.mjs';
 
 const config = JSON.parse(readFileSync(new URL('../../src-tauri/tauri.conf.json', import.meta.url), 'utf8'));
 test('release version updates all declarations without changing dependency versions', () => {
@@ -50,4 +50,33 @@ test('release validation rejects malformed versions and private key input', () =
   assert.equal(validateVersion('2.1.0-beta.0'), '2.1.0-beta.0');
   assert.equal(validatePublicKey(config.plugins.updater.pubkey), config.plugins.updater.pubkey);
   assert.throws(() => validatePublicKey(Buffer.from('untrusted comment: minisign encrypted secret key\nfixture').toString('base64')), /public/);
+});
+
+test('updater key validation rejects missing padding and normalization preserves key bytes', () => {
+  const publicText = Buffer.from(config.plugins.updater.pubkey, 'base64').toString('utf8').trim();
+  const padded = Buffer.from(publicText).toString('base64');
+  const unpadded = padded.replace(/=+$/, '');
+  assert.notEqual(padded, unpadded);
+  assert.throws(() => validatePublicKey(unpadded), /padding/);
+  assert.equal(normalizePublicKey(unpadded), padded);
+  assert.deepEqual(Buffer.from(normalizePublicKey(unpadded), 'base64'), Buffer.from(unpadded, 'base64'));
+  for (const invalid of ['A', padded + '=', padded.replace(/.$/, '!'), Buffer.from('private key fixture').toString('base64')]) {
+    assert.throws(() => normalizePublicKey(invalid));
+  }
+  const root = mkdtempSync(join(tmpdir(), 'p2sharer-public-key-'));
+  try {
+    mkdirSync(join(root, 'src-tauri'));
+    const path = join(root, 'src-tauri/tauri.conf.json');
+    const legacy = structuredClone(config);
+    legacy.plugins.updater.pubkey = unpadded;
+    writeFileSync(path, JSON.stringify(legacy));
+    normalizeConfiguredPublicKey(root);
+    const normalized = JSON.parse(readFileSync(path, 'utf8'));
+    assert.equal(normalized.plugins.updater.pubkey, padded);
+    normalized.plugins.updater.pubkey = unpadded;
+    assert.deepEqual(normalized, legacy);
+    const before = readFileSync(path, 'utf8');
+    normalizeConfiguredPublicKey(root);
+    assert.equal(readFileSync(path, 'utf8'), before);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });

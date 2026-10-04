@@ -35,9 +35,14 @@ jobs:
         with:
           ref: ${{ github.workflow_sha }}
           path: .release-workflow
-          sparse-checkout: .github/actions/setup-build
+          sparse-checkout: |
+            /.github/actions/setup-build/
+            /tools/release.mjs
+          sparse-checkout-cone-mode: false
           persist-credentials: false
       - uses: ./.release-workflow/.github/actions/setup-build
+      - name: Validate public updater key encoding
+        run: node .release-workflow/tools/release.mjs normalize-key .
       - name: Validate release version
         shell: pwsh
         run: pnpm run release:check --tag "$env:RELEASE_TAG"

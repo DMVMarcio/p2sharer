@@ -27,6 +27,8 @@ pnpm run release:key "$env:USERPROFILE\.tauri\p2sharer.key.pub"
 
 Do not regenerate or replace the configured key for this application. These commands describe initial setup, not a routine release step. The key command accepts only public key files.
 
+Copy the entire `.key.pub` contents, including its final Base64 characters. Release validation rejects noncanonical encoding before compilation. When retrying an older unpublished tag, the workflow can restore missing Base64 padding without changing the decoded public key or touching signing secrets; malformed key material still fails validation.
+
 In GitHub, open **Settings > Secrets and variables > Actions > New repository secret** and add:
 
 | Secret | Value |

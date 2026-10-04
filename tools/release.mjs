@@ -50,13 +50,36 @@ export function setVersion(version, directory = root) {
 }
 export function validatePublicKey(value) {
   if (typeof value !== 'string' || !/^[A-Za-z0-9+/]+={0,2}$/.test(value.trim())) throw new Error('A Tauri public updater key is required.');
+  if (Buffer.from(value.trim(), 'base64').toString('base64') !== value.trim()) {
+    throw new Error('Public updater key must use canonical Base64 with valid padding.');
+  }
   const decoded = Buffer.from(value.trim(), 'base64').toString('utf8');
   const lines = decoded.trim().split(/\r?\n/);
   const raw = Buffer.from(lines[1] || '', 'base64');
-  if (lines.length !== 2 || !lines[0].startsWith('untrusted comment: minisign public key:') || raw.length !== 42 || raw.subarray(0, 2).toString() !== 'Ed') {
+  if (lines.length !== 2 || !lines[0].startsWith('untrusted comment: minisign public key:') || raw.length !== 42 ||
+      raw.toString('base64') !== lines[1] || raw.subarray(0, 2).toString() !== 'Ed') {
     throw new Error('Expected a public .key.pub file, never a private signing key.');
   }
   return value.trim();
+}
+
+export function normalizePublicKey(value) {
+  if (typeof value !== 'string') return validatePublicKey(value);
+  const trimmed = value.trim();
+  // Repair encoding only; validation still rejects malformed or private key data.
+  return validatePublicKey(trimmed.padEnd(Math.ceil(trimmed.length / 4) * 4, '='));
+}
+
+export function normalizeConfiguredPublicKey(directory = root) {
+  const path = resolve(directory, 'src-tauri/tauri.conf.json');
+  const config = JSON.parse(readFileSync(path, 'utf8'));
+  const original = config.plugins?.updater?.pubkey;
+  const normalized = normalizePublicKey(original);
+  if (normalized !== original) {
+    config.plugins.updater.pubkey = normalized;
+    writeFileSync(path, JSON.stringify(config, null, 2) + '\n');
+  }
+  return normalized;
 }
 
 export function verifyArtifacts(directory = root) {
@@ -96,6 +119,9 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       config.plugins.updater.pubkey = key;
       writeFileSync(path, JSON.stringify(config, null, 2) + '\n');
       console.log('Public updater key configured. Never replace the key for distributed builds without a migration plan.');
+    } else if (command === 'normalize-key' && args.length === 1) {
+      normalizeConfiguredPublicKey(resolve(args[0]));
+      console.log('Public updater key encoding validated; cryptographic key unchanged.');
     } else if (command === 'artifacts' && args.length === 0) {
       console.log(`Signed updater manifest verified: ${verifyArtifacts()}`);
     } else if (command === 'check' && (args.length === 0 ||
@@ -105,6 +131,6 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
         throw new Error('Set TAURI_SIGNING_PRIVATE_KEY or TAURI_SIGNING_PRIVATE_KEY_PATH for a signed release build.');
       }
       console.log(`Release version verified: ${checkRelease(root, args[0] === '--tag' ? args[1] : undefined)}`);
-    } else throw new Error('Usage: release.mjs version <version> | check [--tag vX.Y.Z] [--signing] | key <public-key-file> | artifacts');
+    } else throw new Error('Usage: release.mjs version <version> | check [--tag vX.Y.Z] [--signing] | key <public-key-file> | normalize-key <directory> | artifacts');
   } catch (error) { console.error(error.message); process.exitCode = 1; }
 }
