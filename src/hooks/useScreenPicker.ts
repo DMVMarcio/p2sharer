@@ -1,3 +1,4 @@
+import { localizeError, t } from '../i18n/index.ts';
 import { useState, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { INITIAL_TRANSMISSION_DEFAULTS, stateStore } from '../core/state_store';
@@ -99,7 +100,7 @@ export function useScreenPicker(onClose?: () => void, isClosing = false) {
         invoke<ScreenSourcesResponse>('list_screen_sources'),
       ]);
       if (cameraResult.status === 'fulfilled') setCameras(cameraResult.value.filter((device) => device.kind === 'videoinput'));
-      else setError('Não foi possível listar as câmeras. Verifique as permissões de câmera do Windows.');
+      else setError(t("message.b7ee01f4e0b2"));
       if (screenResult.status === 'rejected') throw screenResult.reason;
       const resp = screenResult.value;
       const monList = resp.monitors || [];
@@ -119,7 +120,7 @@ export function useScreenPicker(onClose?: () => void, isClosing = false) {
         setSelectedSourceId(winList[0].id);
       }
     } catch (err) {
-      setError(`Não foi possível listar as fontes: ${err}`);
+      setError(t("message.f3ec8f258239", { v0: localizeError(err) }));
     } finally {
       setIsLoading(false);
     }
@@ -148,12 +149,12 @@ export function useScreenPicker(onClose?: () => void, isClosing = false) {
           stateStore.saveTransmissionDefaults({ resolution: resConfig.label.toLowerCase(), fps, bitrate, quality, cursor: showCursor });
         } catch (error) {
           console.warn('[Transmission] Could not save the last configuration:', error);
-          showToast('Transmissão aplicada, mas não foi possível salvar os novos padrões.');
+          showToast(t("message.01791eb9ee03"));
         }
       }
       if (onClose) onClose();
     } catch (err) {
-      setError(`Não foi possível aplicar a transmissão: ${err}`);
+      setError(t("message.11b6606b6f25", { v0: localizeError(err) }));
     } finally {
       setIsStarting(false);
     }

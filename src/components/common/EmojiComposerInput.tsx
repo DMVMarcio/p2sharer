@@ -1,3 +1,5 @@
+import { t } from '../../i18n';
+import { useLocale } from '../../hooks/useLocale';
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type ReactNode } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import { BubbleMenu } from '@tiptap/react/menus';
@@ -27,6 +29,7 @@ type Props = {
 };
 
 function FormatButton({ label, active, onClick, children }: { label: string; active?: boolean; onClick: () => void; children: ReactNode }) {
+  useLocale();
   return (
     <button
       type="button"
@@ -40,6 +43,7 @@ function FormatButton({ label, active, onClick, children }: { label: string; act
 }
 
 export const EmojiComposerInput = forwardRef<EmojiComposerHandle, Props>(function EmojiComposerInput({ id = 'chat-input-field', value, pack, onChange, onSend }, ref) {
+  const language = useLocale();
   const packRef = useRef(pack);
   const onChangeRef = useRef(onChange);
   const onSendRef = useRef(onSend);
@@ -61,16 +65,16 @@ export const EmojiComposerInput = forwardRef<EmojiComposerHandle, Props>(functio
       StarterKit.configure({ link: { openOnClick: false, autolink: true, linkOnPaste: true } }),
       Markdown,
       CharacterCount.configure({ limit: 2000 }),
-      Placeholder.configure({ placeholder: 'Digite uma mensagem...' }),
+      Placeholder.configure({ placeholder: () => t("message.886fe94fce87") }),
       ChatEmojiDecorations.configure({ getPack: () => packRef.current }),
     ],
     editorProps: {
       attributes: {
         id,
         class: 'chat-composer-editor',
-        'aria-label': 'Mensagem',
+        'aria-label': t("message.322085898310"),
         'aria-multiline': 'true',
-        'data-placeholder': 'Digite uma mensagem...',
+        'data-placeholder': t("message.886fe94fce87"),
       },
       handleKeyDown: (_view, event) => {
         if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
@@ -85,6 +89,15 @@ export const EmojiComposerInput = forwardRef<EmojiComposerHandle, Props>(functio
   }, []);
 
   useTextEditorContextMenu(editor);
+
+  useEffect(() => {
+    if (!editor) return;
+    editor.setOptions({ editorProps: { ...editor.options.editorProps, attributes: {
+      id, class: 'chat-composer-editor', 'aria-label': t("message.322085898310"),
+      'aria-multiline': 'true', 'data-placeholder': t("message.886fe94fce87"),
+    } } });
+    editor.view.dispatch(editor.state.tr.setMeta('preventUpdate', true));
+  }, [editor, id, language]);
 
   useEffect(() => {
     if (!editor) return;
@@ -142,7 +155,7 @@ export const EmojiComposerInput = forwardRef<EmojiComposerHandle, Props>(functio
                 type="url"
                 value={linkUrl}
                 placeholder="https://..."
-                aria-label="Endereço do link"
+                aria-label={t("message.1b5ae5aaa05e")}
                 aria-invalid={linkError}
                 onChange={(event) => { setLinkUrl(event.target.value); setLinkError(false); }}
                 onKeyDown={(event) => {
@@ -150,21 +163,21 @@ export const EmojiComposerInput = forwardRef<EmojiComposerHandle, Props>(functio
                   if (event.key === 'Escape') { editingLinkRef.current = false; setEditingLink(false); editor.commands.focus(); }
                 }}
               />
-              <FormatButton label="Aplicar link" onClick={applyLink}><Check size={15} /></FormatButton>
-              <FormatButton label="Cancelar" onClick={() => { editingLinkRef.current = false; setEditingLink(false); editor.commands.focus(); }}><X size={15} /></FormatButton>
+              <FormatButton label={t("message.c04ad55d44a6")} onClick={applyLink}><Check size={15} /></FormatButton>
+              <FormatButton label={t("message.bb9dbb406dcb")} onClick={() => { editingLinkRef.current = false; setEditingLink(false); editor.commands.focus(); }}><X size={15} /></FormatButton>
             </div>
           ) : (
             <div className="chat-format-actions">
-              <FormatButton label="Negrito" active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}><Bold size={15} /></FormatButton>
-              <FormatButton label="Itálico" active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()}><Italic size={15} /></FormatButton>
-              <FormatButton label="Riscado" active={editor.isActive('strike')} onClick={() => editor.chain().focus().toggleStrike().run()}><Strikethrough size={15} /></FormatButton>
-              <FormatButton label="Código" active={editor.isActive('code')} onClick={() => editor.chain().focus().toggleCode().run()}><Code size={15} /></FormatButton>
+              <FormatButton label={t("message.0466381bc96d")} active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}><Bold size={15} /></FormatButton>
+              <FormatButton label={t("message.698a73c21e2d")} active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()}><Italic size={15} /></FormatButton>
+              <FormatButton label={t("message.dce3e1ac320a")} active={editor.isActive('strike')} onClick={() => editor.chain().focus().toggleStrike().run()}><Strikethrough size={15} /></FormatButton>
+              <FormatButton label={t("message.f58b85570398")} active={editor.isActive('code')} onClick={() => editor.chain().focus().toggleCode().run()}><Code size={15} /></FormatButton>
               <FormatButton label="Link" active={editor.isActive('link')} onClick={startLink}><Link2 size={15} /></FormatButton>
               <span className="chat-format-divider" aria-hidden="true" />
-              <FormatButton label="Citação" active={editor.isActive('blockquote')} onClick={() => editor.chain().focus().toggleBlockquote().run()}><Quote size={15} /></FormatButton>
-              <FormatButton label="Lista" active={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()}><List size={15} /></FormatButton>
-              <FormatButton label="Lista numerada" active={editor.isActive('orderedList')} onClick={() => editor.chain().focus().toggleOrderedList().run()}><ListOrdered size={15} /></FormatButton>
-              <FormatButton label="Bloco de código" active={editor.isActive('codeBlock')} onClick={() => editor.chain().focus().toggleCodeBlock().run()}><Code2 size={15} /></FormatButton>
+              <FormatButton label={t("message.a3132c798df1")} active={editor.isActive('blockquote')} onClick={() => editor.chain().focus().toggleBlockquote().run()}><Quote size={15} /></FormatButton>
+              <FormatButton label={t("message.5e77e1785d57")} active={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()}><List size={15} /></FormatButton>
+              <FormatButton label={t("message.089e8d86c7f3")} active={editor.isActive('orderedList')} onClick={() => editor.chain().focus().toggleOrderedList().run()}><ListOrdered size={15} /></FormatButton>
+              <FormatButton label={t("message.45b49b8b0365")} active={editor.isActive('codeBlock')} onClick={() => editor.chain().focus().toggleCodeBlock().run()}><Code2 size={15} /></FormatButton>
             </div>
           )}
         </BubbleMenu>

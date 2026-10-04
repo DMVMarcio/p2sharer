@@ -104,7 +104,7 @@ test('cancelled and failed attempts preserve both stored defaults and prior runt
   await choose(); captureError = true;
   await act(async () => picker.confirmPicker());
   captureError = false;
-  assert.ok(picker.error.includes('Capture failed'));
+  assert.equal(picker.error, 'Não foi possível aplicar a transmissão: Não foi possível concluir a operação. Tente novamente.');
   assert.deepEqual(saved(), ['1080p', '60', '15000', '90', 'true']);
   assert.equal(stateStore.currentFps, 60); assert.equal(stateStore.currentBitrate, 15000);
 });

@@ -1,3 +1,4 @@
+import { t } from '../i18n/index.ts';
 import { getRoomApp, isRoomAppKind } from './registry.ts';
 import type { RoomAppModel } from './models.ts';
 import type { AppWireEvent, RoomAppInstance } from './types.ts';
@@ -105,7 +106,7 @@ export class RoomAppsService {
 
   start(kind: string, personal = false): string {
     if (!this.sender || !getRoomApp(kind) || this.instances.size >= MAX_INSTANCES)
-      throw new Error('App indisponível ou limite da sala atingido');
+      throw new Error(t("message.dfcbf99bbaae"));
     const instance: RoomAppInstance = { id: crypto.randomUUID(), kind,
       createdBy: this.localActor, createdAt: Date.now(), ...(personal ? { personal: true } : {}) };
     this.addInstance(instance);

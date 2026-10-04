@@ -1,3 +1,5 @@
+import { t } from '../../i18n';
+import { useLocale } from '../../hooks/useLocale';
 import { roomService } from '../../services/room_service';
 import { stateStore } from '../../core/state_store';
 import React from 'react';
@@ -23,6 +25,7 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
   inTray = false,
   isSelectedFeatured = false,
 }) => {
+  useLocale();
   const { togglePin, requestStream, layoutMode, returnToGrid } = useRoom();
   const openContextMenu = useContextMenu();
   const { openModal } = useModal();
@@ -50,12 +53,12 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
       tabIndex={0}
       onContextMenu={(event) => {
         const actions: ContextMenuAction[] = [];
-        if (layoutMode === 'spotlight' && inTray && !isSelectedFeatured && slot.isStreaming) actions.push({ id: 'overlay', label: 'Sobrepor na transmissão atual', onSelect: () => roomService.overlayStream(slot.peerId) });
-        if (!isFeatured && !isSelectedFeatured) actions.push({ id: 'feature', label: 'Destacar participante', icon: <Focus size={15} />, onSelect: () => togglePin(slot.peerId) });
-        if (layoutMode === 'spotlight') actions.push({ id: 'grid', label: 'Voltar à grade', icon: <Grid2X2 size={15} />,
+        if (layoutMode === 'spotlight' && inTray && !isSelectedFeatured && slot.isStreaming) actions.push({ id: 'overlay', get label() { return t("message.1c2685f76e69"); }, onSelect: () => roomService.overlayStream(slot.peerId) });
+        if (!isFeatured && !isSelectedFeatured) actions.push({ id: 'feature', get label() { return t("message.3c31d7d451bc"); }, icon: <Focus size={15} />, onSelect: () => togglePin(slot.peerId) });
+        if (layoutMode === 'spotlight') actions.push({ id: 'grid', get label() { return t("message.2e00d3a9b870"); }, icon: <Grid2X2 size={15} />,
           onSelect: returnToGrid });
-        if (!slot.isLocal && slot.isStreaming && !isSubscribed) actions.push({ id: 'watch', label: 'Assistir transmissão', icon: <Play size={15} />, onSelect: () => requestStream(slot.peerId) });
-        if (slot.isLocal && !slot.isStreaming) actions.push({ id: 'share', label: 'Transmitir', icon: <MonitorUp size={15} />, onSelect: () => { stateStore.set((state) => { state.editingStreamId = null; }); openModal('screenPicker'); } });
+        if (!slot.isLocal && slot.isStreaming && !isSubscribed) actions.push({ id: 'watch', get label() { return t("message.5a49c69bab6b"); }, icon: <Play size={15} />, onSelect: () => requestStream(slot.peerId) });
+        if (slot.isLocal && !slot.isStreaming) actions.push({ id: 'share', get label() { return t("message.85344dae041c"); }, icon: <MonitorUp size={15} />, onSelect: () => { stateStore.set((state) => { state.editingStreamId = null; }); openModal('screenPicker'); } });
         openContextMenu(event, actions);
       }}
     >
@@ -70,8 +73,7 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
       {!inTray && !slot.isLocal && slot.isStreaming && !isSubscribed && (
         <>
           <span className="badge-live-stream">
-            <span className="badge-live-dot"></span>AO VIVO
-          </span>
+            <span className="badge-live-dot"></span>{t("message.b7c19868a9a8")}</span>
           {watchersCount > 0 && (
             <Tooltip
               interactive
@@ -86,7 +88,7 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
                   <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"/>
                   <circle cx="12" cy="12" r="3"/>
                 </svg>
-                <span>{watchersCount} assistindo</span>
+                <span>{watchersCount}  {t("message.00c112b70486")}</span>
               </div>
             </Tooltip>
           )}
@@ -101,23 +103,22 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
 
       <div className="participant-name-row">
         <span className="participant-avatar-label">{slot.senderName}{slot.mediaLabel ? ` · ${slot.mediaLabel}` : ""}</span>
-        {slot.isLocal && <span className="badge-you">VOCÊ</span>}
+        {slot.isLocal && <span className="badge-you">{t("message.a03099f135b1")}</span>}
       </div>
 
       {!inTray && slot.isLocal && !slot.isStreaming && (
-        <div className="participant-status-text">Você não está transmitindo</div>
+        <div className="participant-status-text">{t("message.f502620127f2")}</div>
       )}
 
       {!inTray && !slot.isLocal && !slot.isStreaming && (
         <div className="participant-status-text">
-          {slot.connectionState === 'connecting' ? 'Conectando participante...' : 'Sem transmissão'}
+          {slot.connectionState === 'connecting' ? t("message.de1237d241d3") : t("message.5e06d5da9c12")}
         </div>
       )}
 
       {!inTray && !slot.isLocal && slot.isStreaming && isSubscribed && !slot.stream && (
         <div className="participant-status-text" style={{ color: 'var(--accent-color)' }}>
-          Conectando transmissão...
-        </div>
+          {t("message.3bc3a2cd970b")}</div>
       )}
 
       {!slot.isLocal && slot.isStreaming && !isSubscribed && (
@@ -126,7 +127,7 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
             <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
               <polygon points="5 3 19 12 5 21 5 3"/>
             </svg>
-            <span>Assistir Transmissão</span>
+            <span>{t("message.81da4da84d51")}</span>
           </button>
         </div>
       )}

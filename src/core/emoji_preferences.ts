@@ -1,9 +1,10 @@
+import { t } from '../i18n/index.ts';
 export const EMOJI_PACKS = [
-  { id: 'twemoji', name: 'Twemoji', description: 'Visual colorido e familiar.' },
-  { id: 'classic', name: 'EmojiOne 2.2', description: 'Arte clássica © Ranks.com, CC BY 4.0.' },
-  { id: 'noto', name: 'Noto Emoji', description: 'Estilo do Google.' },
-  { id: 'openmoji', name: 'OpenMoji', description: 'Traços marcados e cores vivas.' },
-  { id: 'native', name: 'Sistema', description: 'Emojis da fonte do seu dispositivo.' },
+  { id: 'twemoji', name: 'Twemoji', get description() { return t("message.11806bf8d0e3"); } },
+  { id: 'classic', name: 'EmojiOne 2.2', get description() { return t("message.d880876bcdff"); } },
+  { id: 'noto', name: 'Noto Emoji', get description() { return t("message.1a1ae07f6929"); } },
+  { id: 'openmoji', name: 'OpenMoji', get description() { return t("message.6d2aacbdd410"); } },
+  { id: 'native', get name() { return t("message.f150afd3c599"); }, get description() { return t("message.1384a05883f2"); } },
 ] as const;
 
 export type EmojiPack = (typeof EMOJI_PACKS)[number]['id'];

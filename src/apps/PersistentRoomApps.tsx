@@ -1,3 +1,5 @@
+import { t } from '../i18n';
+import { useLocale } from '../hooks/useLocale';
 import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import type { RoomAppInstance } from './types';
 import { RoomAppCard } from './RoomAppCard';
@@ -14,6 +16,7 @@ interface Props {
 interface Placement { left: number; top: number; width: number; height: number; clipPath: string }
 
 export const PersistentRoomApps: React.FC<Props> = ({ instances, layoutMode, featuredId, layoutKey, rootRef, slotsRef }) => {
+  useLocale();
   const [placements, setPlacements] = useState<Record<string, Placement>>({});
   const previousRef = useRef('');
 
@@ -69,7 +72,7 @@ export const PersistentRoomApps: React.FC<Props> = ({ instances, layoutMode, fea
     };
   }, [measure, layoutKey]);
 
-  return <div className="room-app-layer" aria-label="Apps da sala">
+  return <div className="room-app-layer" aria-label={t("message.791e1b0c7eaf")}>
     {instances.map((instance) => {
       const placement = placements[instance.id];
       const isFeatured = layoutMode === 'spotlight' && featuredId === `app:${instance.id}`;

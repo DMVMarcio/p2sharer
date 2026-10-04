@@ -601,7 +601,7 @@ export class GroupRoomManager {
     if (message.systemType === 'app-start' || message.systemType === 'app-stop') {
       const app = message.systemAppKind && getRoomApp(message.systemAppKind);
       return Boolean(app && message.text === (message.systemType === 'app-start'
-        ? `${knownName} iniciou ${app.label}` : `${knownName} encerrou ${app.label}`));
+        ? `${knownName} iniciou ${app.protocolLabel ?? app.label}` : `${knownName} encerrou ${app.protocolLabel ?? app.label}`));
     }
     if (message.systemAppKind) return false;
     const expected: Partial<Record<NonNullable<ChatMessage['systemType']>, string>> = {
@@ -2989,8 +2989,8 @@ export class GroupRoomManager {
   public sendAppLifecycleNotice(action: 'start' | 'stop', kind: string): Promise<ChatMessage> {
     const app = getRoomApp(kind);
     if (!app) return Promise.reject(new Error('Unknown room app'));
-    return this.sendSystemMessage(action === 'start' ? `${this.username} iniciou ${app.label}` :
-      `${this.username} encerrou ${app.label}`, action === 'start' ? 'app-start' : 'app-stop',
+    return this.sendSystemMessage(action === 'start' ? `${this.username} iniciou ${app.protocolLabel ?? app.label}` :
+      `${this.username} encerrou ${app.protocolLabel ?? app.label}`, action === 'start' ? 'app-start' : 'app-stop',
     this.username, undefined, kind);
   }
 

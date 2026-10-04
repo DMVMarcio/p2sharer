@@ -1,3 +1,5 @@
+import { t } from '../../i18n';
+import { useLocale } from '../../hooks/useLocale';
 import React, { useEffect, useMemo, useState } from 'react';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -8,10 +10,11 @@ import { useStore } from '../../hooks/useStore';
 
 /** Main-window chrome; detached media windows keep their existing controls. */
 export const WindowTitlebar: React.FC = () => {
+  useLocale();
   const nativeWindow = useMemo(() => isTauri() ? getCurrentWindow() : null, []);
   const title = useStore((state) => state.currentRoomCode && state.roomSlots.length > 0
     ? `P2Sharer - ${state.currentRoomName || state.currentRoomCode}`
-    : 'P2Sharer - Compartilhamento de tela e áudio');
+    : t("message.80801012506c"));
   const [maximized, setMaximized] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [focused, setFocused] = useState(true);
@@ -66,19 +69,19 @@ export const WindowTitlebar: React.FC = () => {
         <img src={logoImg} width="16" height="16" alt="" draggable={false} data-tauri-drag-region />
         <span className="window-titlebar-title" data-tauri-drag-region>{title}</span>
       </div>
-      <div className="window-caption-controls" role="group" aria-label="Controles da janela">
-        <Tooltip content="Minimizar">
-          <button type="button" className="btn window-caption-button" aria-label="Minimizar"
+      <div className="window-caption-controls" role="group" aria-label={t("message.a64ca0dc164b")}>
+        <Tooltip content={t("message.3fc5f90b27f1")}>
+          <button type="button" className="btn window-caption-button" aria-label={t("message.3fc5f90b27f1")}
             onClick={() => run('minimize')}><Minus size={12} aria-hidden="true" /></button>
         </Tooltip>
-        <Tooltip content={maximized ? 'Restaurar' : 'Maximizar'}>
-          <button type="button" className="btn window-caption-button" aria-label={maximized ? 'Restaurar' : 'Maximizar'}
+        <Tooltip content={maximized ? t("message.eda02893d340") : t("message.092b9ccfbf63")}>
+          <button type="button" className="btn window-caption-button" aria-label={maximized ? t("message.eda02893d340") : t("message.092b9ccfbf63")}
             onClick={() => run('toggleMaximize')}>
             {maximized ? <Copy size={11} aria-hidden="true" /> : <Square size={11} aria-hidden="true" />}
           </button>
         </Tooltip>
-        <Tooltip content="Fechar">
-          <button type="button" className="btn window-caption-button window-caption-close" aria-label="Fechar"
+        <Tooltip content={t("message.0f2bd88ef0ac")}>
+          <button type="button" className="btn window-caption-button window-caption-close" aria-label={t("message.0f2bd88ef0ac")}
             onClick={() => run('close')}><X size={14} aria-hidden="true" /></button>
         </Tooltip>
       </div>

@@ -1,3 +1,5 @@
+import { localizeText, t } from '../../i18n';
+import { useLocale } from '../../hooks/useLocale';
 import { useEffect, useRef, useState } from 'react';
 import { formatFrameRate } from '../../core/media_streams';
 import { useSkeletonPresence } from '../../hooks/useSkeletonPresence';
@@ -6,6 +8,7 @@ import { Camera, Monitor } from 'lucide-react';
 export function MediaPreview({ stream, label, busy, error, settings, sourceKey = label }: {
   stream: MediaStream | null; label: string; busy: boolean; error?: string; settings: MediaTrackSettings; sourceKey?: string;
 }) {
+  useLocale();
   const video = useRef<HTMLVideoElement>(null);
   const [ready, setReady] = useState<{ stream: MediaStream; sourceKey: string } | null>(null);
   const loading = !error && (busy || (!!sourceKey && !stream) ||
@@ -32,23 +35,23 @@ export function MediaPreview({ stream, label, busy, error, settings, sourceKey =
       element.srcObject = null;
     };
   }, [stream, sourceKey]);
-  return <aside className="media-preview" aria-label="Prévia local da fonte selecionada" aria-busy={loading}>
+  return <aside className="media-preview" aria-label={t("message.d7b064249569")} aria-busy={loading}>
     <div className="media-preview-stage">
       <video key={`${sourceKey}:${stream?.id || 'empty'}`} ref={video} autoPlay muted playsInline aria-label={label}
         className={stream && !loading && !error ? 'media-preview-video ready' : 'media-preview-video'} />
       {displaySkeleton && <div className={`media-preview-skeleton ${isFadingOut ? 'fade-out' : ''}`} role="status"
-        aria-label="Preparando prévia" aria-hidden={isFadingOut}>
+        aria-label={t("message.72e18f67980f")} aria-hidden={isFadingOut}>
         <div className="media-preview-shimmer skeleton-shimmer" aria-hidden="true" />
         <div className="source-card-thumb-skeleton-icon" aria-hidden="true">
           {sourceKey.startsWith('camera:') ? <Camera size={28} /> : <Monitor size={28} />}
         </div>
       </div>}
-      {error && <p role="alert">{error}</p>}
-      {!stream && !loading && !error && <p role="status">Selecione uma fonte</p>}
+      {error && <p role="alert">{localizeText(error)}</p>}
+      {!stream && !loading && !error && <p role="status">{t("message.18aeee759388")}</p>}
     </div>
-    <div className="media-preview-caption"><strong>{label || 'Prévia'}</strong>
-      <span>{busy ? 'Verificando dispositivo…' : settings.width && settings.height
-        ? `${settings.width} × ${settings.height}${settings.frameRate ? ` · ${formatFrameRate(settings.frameRate)} FPS` : ''}` : 'Prévia local'}</span>
+    <div className="media-preview-caption"><strong>{label || t("message.7cf015b6b2cb")}</strong>
+      <span>{busy ? t("message.d14a44cefc01") : settings.width && settings.height
+        ? `${settings.width} × ${settings.height}${settings.frameRate ? ` · ${formatFrameRate(settings.frameRate)} FPS` : ''}` : t("message.dd6207727459")}</span>
     </div>
   </aside>;
 }

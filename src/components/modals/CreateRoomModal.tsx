@@ -1,3 +1,5 @@
+import { t } from '../../i18n';
+import { useLocale } from '../../hooks/useLocale';
 import React, { useState } from 'react';
 import { useFormSubmit } from '../../hooks/useFormSubmit';
 import { useModal } from '../../hooks/useModal';
@@ -7,27 +9,28 @@ import { createAuthenticatedInvite, parseRoomInvite } from '../../core/room_invi
 import { savedRooms } from '../../core/saved_rooms';
 
 export const CreateRoomModal: React.FC = () => {
+  useLocale();
   const { closeModal, isClosing } = useModal();
   const { joinRoom } = useRoom();
 
-  const [name, setName] = useState('Minha sala');
+  const [name, setName] = useState(t("message.659cf77f64fc"));
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
   const handleConfirm = async () => {
     const finalPass = password.trim();
     try {
-      const roomName = name.trim() || 'Minha sala';
+      const roomName = name.trim() || t("message.659cf77f64fc");
       const { invite, identity } = await createAuthenticatedInvite(roomName);
       const roomId = parseRoomInvite(invite)!.roomId;
       await savedRooms.put({ roomId, invite, name: roomName,
         saved: true, owned: true, protected: Boolean(finalPass), password: finalPass || undefined, identity });
       closeModal();
       joinRoom(invite, finalPass, true);
-      showToast('Sala autenticada criada e salva!');
+      showToast(t("message.71421eda382c"));
     } catch (error) {
       console.error('[Rooms] Failed to create room:', error);
-      showToast('Não foi possível criar a sala.');
+      showToast(t("message.6504d77e15a6"));
     }
   };
 
@@ -46,8 +49,8 @@ export const CreateRoomModal: React.FC = () => {
             </svg>
           </div>
           <div>
-            <h2>Criar Nova Sala</h2>
-            <p className="modal-subtitle">O convite autenticado será gerado ao criar a sala.</p>
+            <h2>{t("message.05c0432bf1ae")}</h2>
+            <p className="modal-subtitle">{t("message.0624b2a64c6f")}</p>
           </div>
           <button type="button" className="btn-close" id="btn-close-create-dialog" onClick={closeModal}>
             &times;
@@ -56,21 +59,21 @@ export const CreateRoomModal: React.FC = () => {
 
         <div className="modal-body">
           <div className="form-group">
-            <label className="form-label" htmlFor="input-create-room-name-dialog">Nome da sala neste dispositivo:</label>
+            <label className="form-label" htmlFor="input-create-room-name-dialog">{t("message.711b2b76f603")}</label>
             <input autoComplete="off" id="input-create-room-name-dialog" className="text-input" maxLength={80}
               autoFocus value={name} onChange={(event) => setName(event.target.value)} />
           </div>
 
           <div className="form-group" style={{ marginTop: '14px' }}>
             <label className="form-label" htmlFor="input-create-room-password-dialog">
-              <span>Senha de Proteção (Opcional):</span>
+              <span>{t("message.6a29a826f73e")}</span>
             </label>
             <div className="input-with-action">
               <input autoComplete="off"
                 type={showPassword ? 'text' : 'password'}
                 id="input-create-room-password-dialog"
                 className="text-input"
-                placeholder="Ex: 1234, segredo..."
+                placeholder={t("message.27af4369497f")}
                 maxLength={40}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -79,7 +82,7 @@ export const CreateRoomModal: React.FC = () => {
                 type="button"
                 className="btn btn-sm btn-outline btn-inline-action btn-inline-action-icon"
                 id="btn-toggle-create-password-visibility"
-                aria-label="Mostrar / Ocultar Senha"
+                aria-label={t("message.d7d229c67924")}
                 onClick={() => setShowPassword(!showPassword)}
               >
                 <span id="icon-create-pass-toggle">
@@ -102,10 +105,9 @@ export const CreateRoomModal: React.FC = () => {
 
         <div className="modal-footer">
           <button type="button" className="btn btn-secondary" id="btn-cancel-create-dialog" onClick={closeModal}>
-            Cancelar
-          </button>
+            {t("message.bb9dbb406dcb")}</button>
           <button className="btn btn-primary" id="btn-confirm-create-dialog" type="submit" disabled={pending || isClosing}>
-            <span>Criar Sala e Entrar</span>
+            <span>{t("message.bb0f3686fc7e")}</span>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="5" x2="19" y1="12" y2="12"/>
               <polyline points="12 5 19 12 12 19"/>

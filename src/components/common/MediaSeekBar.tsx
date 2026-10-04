@@ -1,3 +1,5 @@
+import { t } from '../../i18n';
+import { useLocale } from '../../hooks/useLocale';
 import React, { useRef, useState } from 'react';
 import { formatMediaTime } from '../../core/media_time';
 
@@ -11,6 +13,7 @@ interface Props {
 
 export const MediaSeekBar: React.FC<Props> = ({ value, duration, buffered = 0, onCommit,
   disabled = false }) => {
+  useLocale();
   const [draft, setDraft] = useState<number | null>(null);
   const [hover, setHover] = useState<number | null>(null);
   const draftRef = useRef<number | null>(null);
@@ -42,7 +45,7 @@ export const MediaSeekBar: React.FC<Props> = ({ value, duration, buffered = 0, o
     '--media-tooltip-position': `${tooltipPosition}%`,
   } as React.CSSProperties}>
     <input autoComplete="off" type="range" min="0" max={maximum} step="1" value={shown} disabled={disabled}
-      aria-label="Posição do vídeo" aria-valuetext={`${formatMediaTime(shown)} de ${formatMediaTime(duration)}`}
+      aria-label={t("message.8ba93b3b5f4d")} aria-valuetext={t("message.f444097e68ef", { v0: formatMediaTime(shown), v1: formatMediaTime(duration) })}
       onChange={(event) => setPending(Number(event.target.value))}
       onPointerMove={trackPointer} onPointerLeave={() => setHover(null)}
       onPointerUp={(event) => commit(Number(event.currentTarget.value))}

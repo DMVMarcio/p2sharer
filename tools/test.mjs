@@ -20,7 +20,7 @@ const result = spawnSync(native ? 'cargo' : process.execPath,
   // Cargo also rebuilds the application binary for integration tests. Keep it
   // in packaged mode so release tests cannot replace it with a dev-server client.
   native ? ['test', '--lib', '--tests', '--features', 'tauri/custom-protocol', ...args]
-    : ['--experimental-strip-types', '--test', ...args, ...files],
+    : ['--experimental-strip-types', '--import', './test/support/locale.mjs', '--test', ...args, ...files],
   { cwd: native ? fileURLToPath(new URL('../src-tauri/', import.meta.url)) : root, stdio: 'inherit' });
 if (result.error) console.error(result.error.message);
 process.exit(result.status ?? 1);

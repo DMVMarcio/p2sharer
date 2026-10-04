@@ -9,6 +9,7 @@ import React, { act } from 'react';
 const browser = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', { url: 'http://localhost' });
 for (const key of ['window', 'document', 'HTMLElement', 'Element', 'MutationObserver', 'HTMLInputElement', 'HTMLTextAreaElement', 'InputEvent', 'Node', 'DOMParser']) globalThis[key] = browser.window[key];
 Object.defineProperty(globalThis, 'navigator', { value: browser.window.navigator, configurable: true });
+Object.defineProperty(navigator, 'languages', { value: ['pt-BR'] });
 let clipboardText = '';
 Object.defineProperty(navigator, 'clipboard', { value: { writeText: async (text) => { clipboardText = text; }, readText: async () => clipboardText } });
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;

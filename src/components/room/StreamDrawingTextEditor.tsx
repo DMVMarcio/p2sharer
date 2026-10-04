@@ -1,3 +1,5 @@
+import { t } from '../../i18n';
+import { useLocale } from '../../hooks/useLocale';
 import { useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import type { StreamDrawing } from '../../core/stream_pointer';
 
@@ -7,6 +9,7 @@ export function StreamDrawingTextEditor({ drawing, bounds, inputRef, onConfirm }
   onConfirm: (drawing: StreamDrawing) => void;
   inputRef?: RefObject<HTMLTextAreaElement | null>;
 }) {
+  useLocale();
   const localInput = useRef<HTMLTextAreaElement>(null);
   const input = inputRef ?? localInput;
   const confirmed = useRef(false);
@@ -23,7 +26,7 @@ export function StreamDrawingTextEditor({ drawing, bounds, inputRef, onConfirm }
     confirmed.current = true;
     onConfirm({ ...drawing, text: input.current?.value ?? text });
   };
-  return <textarea ref={input} className="text-input stream-drawing-text-editor" aria-label="Texto do rabisco"
+  return <textarea ref={input} className="text-input stream-drawing-text-editor" aria-label={t("message.ba7f73248c3a")}
     autoComplete="off" spellCheck={false} maxLength={160} wrap="off" value={text}
     style={{ left: bounds.left + drawing.points[0].x * bounds.width, top: bounds.top + drawing.points[0].y * bounds.height,
       width: Math.max(fontSize, (1 - drawing.points[0].x) * bounds.width), fontSize, color: drawing.color, caretColor: drawing.color }}

@@ -1,3 +1,5 @@
+import { t } from '../../i18n';
+import { useLocale } from '../../hooks/useLocale';
 import { getEncoderPreference, normalizeEncoderPreference, saveEncoderPreference, type EncoderPreference, type NativeEncoderSupport } from '../../core/encoder_preferences';
 import { streamDrawingLimit, STREAM_DRAWING_MAX } from '../../core/stream_pointer';
 import { formatFrameRate } from '../../core/media_streams';
@@ -23,12 +25,17 @@ import { ApplicationSettings } from './ApplicationSettings';
 import { useAppUpdates } from '../../hooks/useAppUpdates';
 
 const SOUND_LABELS: Record<SoundEvent, string> = {
-  message: 'Mensagem recebida', userJoin: 'Entrada na sala', userLeave: 'Saída da sala',
-  screenShareStart: 'Início de transmissão', screenShareStop: 'Fim de transmissão',
-  watchStreamStart: 'Começar a assistir', watchStreamStop: 'Parar de assistir',
+  get message() { return t("message.c53540ce0e08"); },
+  get userJoin() { return t("message.61593d3f4699"); },
+  get userLeave() { return t("message.49d982c54975"); },
+  get screenShareStart() { return t("message.ea5c1b034cf4"); },
+  get screenShareStop() { return t("message.89eca8829730"); },
+  get watchStreamStart() { return t("message.06e5a94f9aec"); },
+  get watchStreamStop() { return t("message.470b862fbd07"); },
 };
 
 export const SettingsModal: React.FC = () => {
+  useLocale();
   const { closeModal, isClosing } = useModal();
   const { themeMode, accentColor, setThemeMode, setAccentColor } = useAppTheme();
 
@@ -85,12 +92,12 @@ export const SettingsModal: React.FC = () => {
   );
   const [rendezvousPreferences, setRendezvousPreferences] = useState(loadRendezvousPreferences);
 
-  const [logPath, setLogPath] = useState('Carregando caminho do log...');
+  const [logPath, setLogPath] = useState(t("message.fc228b3fc51f"));
 
   useEffect(() => {
     invoke<string>('get_log_file_path')
       .then((path) => setLogPath(path))
-      .catch(() => setLogPath('Não foi possível obter o caminho do log.'));
+      .catch(() => setLogPath(t("message.847ad4c50b0d")));
   }, []);
 
   useEffect(() => {
@@ -113,12 +120,12 @@ export const SettingsModal: React.FC = () => {
     const turnUrls = parseTurnUrls(turnUrl);
     if (turnEnabled && (turnUrls.length === 0 || turnUrls.some((url) => !isValidTurnUrl(url)))) {
       setActiveTab('network');
-      showToast('Informe endereços TURN válidos, um por linha.');
+      showToast(t("message.9c08044c6966"));
       return;
     }
     if (turnEnabled && (!turnUser.trim() || !turnCred.trim())) {
       setActiveTab('network');
-      showToast('Informe o usuário e a senha do servidor TURN.');
+      showToast(t("message.ae469ffded19"));
       return;
     }
     const rendezvousError = validateRendezvousPreferences(rendezvousPreferences);
@@ -167,14 +174,14 @@ export const SettingsModal: React.FC = () => {
     saveRendezvousPreferences(rendezvousPreferences);
 
     closeModal();
-    showToast('Configurações salvas com sucesso!');
+    showToast(t("message.3f84cec002ac"));
   };
 
   const handleOpenLatestLog = async () => {
     try {
       await invoke('open_latest_log');
     } catch (err) {
-      showToast(`Erro: ${err}`);
+      showToast(t("message.1d56d35310c9", { v0: err }));
     }
   };
 
@@ -182,16 +189,16 @@ export const SettingsModal: React.FC = () => {
     try {
       await invoke('open_log_folder');
     } catch (err) {
-      showToast(`Erro: ${err}`);
+      showToast(t("message.1d56d35310c9", { v0: err }));
     }
   };
 
   const handleClearLog = async () => {
     try {
       await invoke('clear_log_file');
-      showToast('Log limpo com sucesso!');
+      showToast(t("message.0485a9c10162"));
     } catch (err) {
-      showToast(`Erro: ${err}`);
+      showToast(t("message.1d56d35310c9", { v0: err }));
     }
   };
 
@@ -206,8 +213,8 @@ export const SettingsModal: React.FC = () => {
             </svg>
           </div>
           <div>
-            <h2>Configurações</h2>
-            <p className="modal-subtitle">Personalize suas conversas, aparência, áudio, transmissão e rede.</p>
+            <h2>{t("message.76b0fb6ad189")}</h2>
+            <p className="modal-subtitle">{t("message.1c345b3f945c")}</p>
           </div>
           <button className="btn-close" id="btn-close-settings" onClick={closeModal}>
             &times;
@@ -226,7 +233,7 @@ export const SettingsModal: React.FC = () => {
                 <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
                 <circle cx="12" cy="7" r="4"/>
               </svg>
-              <span>Perfil</span>
+              <span>{t("message.00d551e63dd5")}</span>
             </button>
 
             <button
@@ -237,7 +244,7 @@ export const SettingsModal: React.FC = () => {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8A8.5 8.5 0 0 1 8.7 3.9a8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
               </svg>
-              <span>Conversas</span>
+              <span>{t("message.071f649adb47")}</span>
             </button>
 
             <button
@@ -256,7 +263,7 @@ export const SettingsModal: React.FC = () => {
                 <path d="m6.34 17.66-1.41 1.41"/>
                 <path d="m19.07 4.93-1.41 1.41"/>
               </svg>
-              <span>Aparência</span>
+              <span>{t("message.04f9f0a78dbe")}</span>
             </button>
 
             <button
@@ -269,7 +276,7 @@ export const SettingsModal: React.FC = () => {
                 <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
                 <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
               </svg>
-              <span>Som</span>
+              <span>{t("message.a11f1b879793")}</span>
             </button>
 
             <button
@@ -282,7 +289,7 @@ export const SettingsModal: React.FC = () => {
                 <line x1="8" x2="16" y1="21" y2="21"/>
                 <line x1="12" x2="12" y1="17" y2="21"/>
               </svg>
-              <span>Transmissão</span>
+              <span>{t("message.15589e9e374d")}</span>
             </button>
 
             <button
@@ -295,7 +302,7 @@ export const SettingsModal: React.FC = () => {
                 <line x1="2" x2="22" y1="12" y2="12"/>
                 <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
               </svg>
-              <span>Rede & P2P</span>
+              <span>{t("message.55393a891023")}</span>
             </button>
 
             <button
@@ -309,7 +316,7 @@ export const SettingsModal: React.FC = () => {
                 <line x1="16" y1="13" x2="8" y2="13"/>
                 <line x1="16" y1="17" x2="8" y2="17"/>
               </svg>
-              <span>Diagnóstico & Logs</span>
+              <span>{t("message.2a5815044d04")}</span>
             </button>
 
             <button type="button"
@@ -319,7 +326,7 @@ export const SettingsModal: React.FC = () => {
                 <rect x="3" y="3" width="18" height="18" rx="2" />
                 <path d="M3 9h18M9 9v12" />
               </svg>
-              <span>Aplicação</span>
+              <span>{t("message.82929ebe1446")}</span>
             </button>
           </nav>
 
@@ -329,26 +336,24 @@ export const SettingsModal: React.FC = () => {
             {activeTab === 'profile' && (
               <div className="settings-tab-pane active" id="settings-pane-profile">
                 <div className="settings-pane-header">
-                  <h3 className="settings-pane-title">Perfil do Participante</h3>
-                  <p className="settings-pane-desc">Defina seu nome exibido na lista de participantes, cards e chat.</p>
+                  <h3 className="settings-pane-title">{t("message.d16122f3087d")}</h3>
+                  <p className="settings-pane-desc">{t("message.ea3a61eb13e1")}</p>
                 </div>
 
                 <div className="settings-row">
                   <label className="settings-label" htmlFor="settings-input-username">
-                    Apelido na Sala:
-                  </label>
+                    {t("message.295f254de3a9")}</label>
                   <input autoComplete="off"
                     type="text"
                     id="settings-input-username"
                     className="text-input"
-                    placeholder="Ex: Marcos"
+                    placeholder={t("message.1b92c5e9d144")}
                     maxLength={25}
                     value={nick}
                     onChange={(e) => setNick(e.target.value)}
                   />
                   <p className="field-info-text" style={{ marginTop: '4px' }}>
-                    Este nome será enviado aos outros participantes assim que você se conectar à sala.
-                  </p>
+                    {t("message.d7eb6b69801c")}</p>
                 </div>
               </div>
             )}
@@ -359,11 +364,11 @@ export const SettingsModal: React.FC = () => {
             {activeTab === 'conversations' && (
               <div className="settings-tab-pane active" id="settings-pane-conversations">
                 <div className="settings-pane-header">
-                  <h3 className="settings-pane-title">Conversas</h3>
-                  <p className="settings-pane-desc">Escolha como os emojis aparecem nas mensagens, na digitação e no seletor deste dispositivo.</p>
+                  <h3 className="settings-pane-title">{t("message.071f649adb47")}</h3>
+                  <p className="settings-pane-desc">{t("message.5aa1310a795e")}</p>
                 </div>
                 <div className="settings-row">
-                  <span className="settings-label" id="settings-emoji-pack-label">Pacote de emojis padrão:</span>
+                  <span className="settings-label" id="settings-emoji-pack-label">{t("message.17b7ebaab99f")}</span>
                   <div className="emoji-pack-options" role="radiogroup" aria-labelledby="settings-emoji-pack-label">
                     {EMOJI_PACKS.map((pack) => (
                       <button
@@ -387,15 +392,15 @@ export const SettingsModal: React.FC = () => {
                       </button>
                     ))}
                   </div>
-                  <p className="field-info-text">A escolha muda a aparência local dos emojis. As mensagens continuam compatíveis entre participantes.</p>
+                  <p className="field-info-text">{t("message.9c809ba3f687")}</p>
                 </div>
                 <div className="settings-row">
-                  <label className="settings-label" htmlFor="settings-transfer-speed-unit">Velocidade das transferências:</label>
+                  <label className="settings-label" htmlFor="settings-transfer-speed-unit">{t("message.68c769864a58")}</label>
                   <Select id="settings-transfer-speed-unit" className="select-input-sm"
                     value={transferSpeedUnit} onValueChange={(value) => setTransferSpeedUnit(value as TransferSpeedUnit)}
                     options={[
-                      { value: 'MB', label: 'MB/s (megabytes por segundo)' },
-                      { value: 'Mb', label: 'Mb/s (megabits por segundo)' },
+                      { value: 'MB', get label() { return t("message.762d9990529f"); } },
+                      { value: 'Mb', get label() { return t("message.40040115a717"); } },
                     ]}
                   />
                 </div>
@@ -406,12 +411,12 @@ export const SettingsModal: React.FC = () => {
             {activeTab === 'appearance' && (
               <div className="settings-tab-pane active" id="settings-pane-appearance">
                 <div className="settings-pane-header">
-                  <h3 className="settings-pane-title">Aparência e Tema</h3>
-                  <p className="settings-pane-desc">Personalize o tema visual e as cores da interface da aplicação.</p>
+                  <h3 className="settings-pane-title">{t("message.36ad11f3f98f")}</h3>
+                  <p className="settings-pane-desc">{t("message.024e4aad422c")}</p>
                 </div>
 
                 <div className="settings-row">
-                  <label className="settings-label">Modo de Exibição:</label>
+                  <label className="settings-label">{t("message.fe873b85b31b")}</label>
                   <div className="theme-mode-pills">
                     {(['dark', 'light', 'system'] as ThemeMode[]).map((mode) => (
                       <button
@@ -445,14 +450,14 @@ export const SettingsModal: React.FC = () => {
                             <line x1="12" x2="12" y1="17" y2="21"/>
                           </svg>
                         )}
-                        <span>{mode === 'dark' ? 'Escuro' : mode === 'light' ? 'Claro' : 'Sistema'}</span>
+                        <span>{mode === 'dark' ? t("message.fde8bb83362a") : mode === 'light' ? t("message.2f3e8dcc2464") : t("message.f150afd3c599")}</span>
                       </button>
                     ))}
                   </div>
                 </div>
 
                 <div className="settings-row" style={{ marginTop: '10px' }}>
-                  <label className="settings-label">Cor de Destaque:</label>
+                  <label className="settings-label">{t("message.d0bc3fef4a6e")}</label>
                   <div className="accent-colors-palette" id="accent-colors-palette">
                     {ACCENT_COLORS.map((item) => (
                       <button
@@ -473,19 +478,17 @@ export const SettingsModal: React.FC = () => {
             {activeTab === 'audio' && (
               <div className="settings-tab-pane active" id="settings-pane-audio">
                 <div className="settings-pane-header">
-                  <h3 className="settings-pane-title">Som</h3>
+                  <h3 className="settings-pane-title">{t("message.a11f1b879793")}</h3>
                   <p className="settings-pane-desc">
-                    Escolha os sons para mensagens, participantes e transmissões.
-                  </p>
+                    {t("message.280e594ece53")}</p>
                 </div>
 
                 <div className="settings-row">
                   <label className="settings-switch-row" htmlFor="settings-check-sfx-enabled">
                     <div className="settings-switch-label-group">
-                      <span className="settings-switch-title">Sons do aplicativo</span>
+                      <span className="settings-switch-title">{t("message.6df7357b9eee")}</span>
                       <span className="settings-switch-subtitle">
-                        Ativar notificações sonoras para eventos da sala e transmissões
-                      </span>
+                        {t("message.b10e15979020")}</span>
                     </div>
                     <div className="modern-switch">
                       <input autoComplete="off"
@@ -502,7 +505,7 @@ export const SettingsModal: React.FC = () => {
                 <div className="settings-row" id="settings-sfx-volume-row" style={{ marginTop: '12px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                     <label className="settings-label" htmlFor="settings-slider-sfx-volume" style={{ marginBottom: 0 }}>
-                      Volume:
+                      {t("common.volumeLabel")}
                     </label>
                     <span
                       id="settings-sfx-volume-label"
@@ -542,8 +545,8 @@ export const SettingsModal: React.FC = () => {
                         </div>
                       </label>
                       <button type="button" className="btn btn-sm btn-outline"
-                        aria-label={`Ouvir som: ${SOUND_LABELS[event]}`}
-                        onClick={() => soundEffects.preview(event, sfxVolume / 100)}>Ouvir</button>
+                        aria-label={t("message.a93982492cdc", { v0: SOUND_LABELS[event] })}
+                        onClick={() => soundEffects.preview(event, sfxVolume / 100)}>{t("message.76a30e43448f")}</button>
                     </div>
                   ))}
                 </div>
@@ -554,14 +557,14 @@ export const SettingsModal: React.FC = () => {
             {activeTab === 'stream' && (
               <div className="settings-tab-pane active" id="settings-pane-stream">
                 <div className="settings-pane-header">
-                  <h3 className="settings-pane-title">Padrões de Transmissão</h3>
-                  <p className="settings-pane-desc">Valores padrão aplicados ao abrir o seletor de tela ou janela.</p>
+                  <h3 className="settings-pane-title">{t("message.ff7b5832d9e8")}</h3>
+                  <p className="settings-pane-desc">{t("message.b1d138672f98")}</p>
                 </div>
 
                 <label className="settings-switch-row" htmlFor="settings-remember-transmission">
                   <div className="settings-switch-label-group">
-                    <span className="settings-switch-title">Lembrar a última configuração de transmissão</span>
-                    <span className="settings-switch-subtitle">Atualizar estes padrões ao iniciar ou aplicar alterações em uma transmissão.</span>
+                    <span className="settings-switch-title">{t("message.fc0ae2308590")}</span>
+                    <span className="settings-switch-subtitle">{t("message.90555aabe768")}</span>
                   </div>
                   <div className="modern-switch">
                     <input autoComplete="off" type="checkbox" id="settings-remember-transmission"
@@ -574,8 +577,7 @@ export const SettingsModal: React.FC = () => {
                 <div className="settings-row-grid">
                   <div className="settings-col">
                     <label className="settings-label" htmlFor="settings-default-resolution">
-                      Resolução Padrão:
-                    </label>
+                      {t("message.89cda7dbc708")}</label>
                     <Select
                       id="settings-default-resolution"
                       className="select-input-sm"
@@ -587,21 +589,20 @@ export const SettingsModal: React.FC = () => {
                       }}
                       options={[
                         ...(!['4k', '1440p', '1080p', '720p', '480p', '360p'].includes(defaultRes)
-                          ? [{ value: defaultRes, label: `${defaultRes} (última transmissão)` }] : []),
+                          ? [{ value: defaultRes, get label() { return t("message.d935ef3eb315", { v0: defaultRes }); } }] : []),
                         { value: '4k', label: '4K (3840x2160)' },
                         { value: '1440p', label: '1440p 2K' },
                         { value: '1080p', label: '1080p Full HD' },
                         { value: '720p', label: '720p HD' },
                         { value: '480p', label: '480p SD' },
-                        { value: '360p', label: '360p Baixa' },
+                        { value: '360p', get label() { return t("message.7e20ddcbeb68"); } },
                       ]}
                     />
                   </div>
 
                   <div className="settings-col">
                     <label className="settings-label" htmlFor="settings-default-fps">
-                      Taxa de FPS:
-                    </label>
+                      {t("message.d4b20c1d2e76")}</label>
                     <Select
                       id="settings-default-fps"
                       className="select-input-sm"
@@ -609,7 +610,7 @@ export const SettingsModal: React.FC = () => {
                       onValueChange={(value) => setDefaultFps(value)}
                       options={[
                         ...(!['120', '60', '30', '15'].includes(defaultFps)
-                          ? [{ value: defaultFps, label: `${formatFrameRate(Number(defaultFps))} FPS (última transmissão)` }] : []),
+                          ? [{ value: defaultFps, get label() { return t("message.d6a871b4aca9", { v0: formatFrameRate(Number(defaultFps)) }); } }] : []),
                         { value: '120', label: '120 FPS' },
                         { value: '60', label: '60 FPS' },
                         { value: '30', label: '30 FPS' },
@@ -620,18 +621,17 @@ export const SettingsModal: React.FC = () => {
 
                   <div className="settings-col">
                     <label className="settings-label" htmlFor="settings-default-bitrate">
-                      Bitrate de Vídeo:
-                    </label>
+                      {t("message.1ab0b9ee51f6")}</label>
                     <Select
                       id="settings-default-bitrate"
                       className="select-input-sm"
                       value={defaultBitrate}
                       onValueChange={(value) => setDefaultBitrate(value)}
                       options={[
-                        { value: '35000', label: '35 Mbps (Ultra)' },
-                        { value: '25000', label: '25 Mbps (Alto)' },
-                        { value: '15000', label: '15 Mbps (Médio)' },
-                        { value: '8000', label: '8 Mbps (Econômico)' },
+                        { value: '35000', get label() { return t("message.f42ed6bc24b2"); } },
+                        { value: '25000', get label() { return t("message.cb779830263e"); } },
+                        { value: '15000', get label() { return t("message.f92750a3986c"); } },
+                        { value: '8000', get label() { return t("message.f1deac202d7a"); } },
                         { value: '3000', label: '3 Mbps' },
                         { value: '1000', label: '1 Mbps' },
                       ]}
@@ -640,25 +640,24 @@ export const SettingsModal: React.FC = () => {
 
                   <div className="settings-col">
                     <label className="settings-label" htmlFor="settings-default-quality">
-                      Qualidade de Imagem:
-                    </label>
+                      {t("message.c3d090c6e04f")}</label>
                     <Select
                       id="settings-default-quality"
                       className="select-input-sm"
                       value={defaultQuality}
                       onValueChange={(value) => setDefaultQuality(value)}
                       options={[
-                        { value: '95', label: '95% (Máxima Fidelidade)' },
-                        { value: '90', label: '90% (Muito Alta - Recomendado)' },
-                        { value: '85', label: '85% (Alta)' },
-                        { value: '75', label: '75% (Equilibrada)' },
+                        { value: '95', get label() { return t("message.f11b8650575e"); } },
+                        { value: '90', get label() { return t("message.41bd9b5558ed"); } },
+                        { value: '85', get label() { return t("message.0254f0dbf2af"); } },
+                        { value: '75', get label() { return t("message.9df00552db6a"); } },
                       ]}
                     />
                   </div>
                 </div>
 
                 <div className="settings-row" style={{ marginTop: '14px' }}>
-                  <div className="theme-mode-pills" role="tablist" aria-label="Opções de transmissão">
+                  <div className="theme-mode-pills" role="tablist" aria-label={t("message.f45b43b042cf")}>
                     {(['advanced', 'pointing'] as const).map(tab => <button key={tab} type="button"
                       ref={element => { if (element) streamOptionRefs.current[tab] = element; else delete streamOptionRefs.current[tab]; }}
                       className={`pill-btn ${streamOptionsTab === tab ? 'active' : ''}`} role="tab"
@@ -671,13 +670,13 @@ export const SettingsModal: React.FC = () => {
                           setStreamOptionsTab(next);
                           streamOptionRefs.current[next]?.focus();
                         }
-                      }}>{tab === 'pointing' ? 'Apontar e rabiscar' : 'Avançadas'}</button>)}
+                      }}>{tab === 'pointing' ? t("message.fc4d44253740") : t("message.5427a20ed7f7")}</button>)}
                   </div>
                   {streamOptionsTab === 'pointing' && <div className="settings-row settings-options-panel" role="tabpanel" id="stream-options-panel-pointing" aria-labelledby="stream-options-pointing">
                   {[
-                    { id: 'participant-cursors', label: 'Exibir cursores dos participantes', description: 'Permitir apontamentos na sua tela, sem controlar o desktop.', checked: participantCursors, change: setParticipantCursors },
-                    { id: 'participant-drawings', label: 'Permitir rabiscos dos participantes', description: 'Permitir desenhos e instruções de texto na sua tela.', checked: participantDrawings, change: setParticipantDrawings },
-                    { id: 'participant-pings', label: 'Exibir pings dos participantes', description: 'Mostrar onde os participantes clicarem.', checked: participantPings, change: setParticipantPings },
+                    { id: 'participant-cursors', get label() { return t("message.0cdd1ad3fe1c"); }, description: t("message.6052f362cfdc"), checked: participantCursors, change: setParticipantCursors },
+                    { id: 'participant-drawings', get label() { return t("message.cda3e4551d5a"); }, description: t("message.2254b260a6cc"), checked: participantDrawings, change: setParticipantDrawings },
+                    { id: 'participant-pings', get label() { return t("message.ee4c7260df68"); }, description: t("message.865d9327256a"), checked: participantPings, change: setParticipantPings },
                   ].map((option) => <label className="settings-switch-row" htmlFor={option.id} key={option.id}>
                     <div className="settings-switch-label-group">
                       <span className="settings-switch-title">{option.label}</span>
@@ -690,7 +689,7 @@ export const SettingsModal: React.FC = () => {
                     </div>
                   </label>)}
                   <div className="settings-row">
-                    <label className="settings-label" htmlFor="settings-drawing-limit">Limite de rabiscos: <output>{drawingLimit}</output></label>
+                    <label className="settings-label" htmlFor="settings-drawing-limit">{t("message.0156c3e1a240")} <output>{drawingLimit}</output></label>
                     <div className="settings-slider-container">
                       <input autoComplete="off" type="range" id="settings-drawing-limit" min={1} max={STREAM_DRAWING_MAX} step={1}
                         className="settings-slider-input" value={drawingLimit} disabled={!participantCursors || !participantDrawings}
@@ -700,22 +699,21 @@ export const SettingsModal: React.FC = () => {
                   </div>}
                   {streamOptionsTab === 'advanced' && <div className="settings-row settings-options-panel" role="tabpanel" id="stream-options-panel-advanced" aria-labelledby="stream-options-advanced">
                   <div className="settings-row">
-                    <label className="settings-label" htmlFor="settings-video-encoder">Codificador de vídeo:</label>
+                    <label className="settings-label" htmlFor="settings-video-encoder">{t("message.e13520183b92")}</label>
                     <Select id="settings-video-encoder" className="select-input-sm" value={encoder}
                       disabled={!encoderProbeDone} onValueChange={value => setEncoder(value as EncoderPreference)}
                       options={[
-                        { value: 'auto', label: 'Automático (recomendado)' },
-                        { value: 'generic', label: 'Genérico (Padrão)' },
+                        { value: 'auto', get label() { return t("message.2e0fd9488d50"); } },
+                        { value: 'generic', get label() { return t("message.f574fa78f3a3"); } },
                         ...(encoderSupport?.driver_api_available ? [{ value: 'nvenc', label: 'NVIDIA NVENC' }] : []),
                       ]} />
 
                   </div>
                   <label className="settings-switch-row" htmlFor="settings-check-cursor">
                     <div className="settings-switch-label-group">
-                      <span className="settings-switch-title">Captura do Cursor do Mouse</span>
+                      <span className="settings-switch-title">{t("message.dc0fc785c2e0")}</span>
                       <span className="settings-switch-subtitle">
-                        Exibir o cursor do mouse por padrão ao iniciar uma transmissão
-                      </span>
+                        {t("message.792b3073212b")}</span>
                     </div>
                     <div className="modern-switch">
                       <input autoComplete="off"
@@ -736,19 +734,17 @@ export const SettingsModal: React.FC = () => {
             {activeTab === 'network' && (
               <div className="settings-tab-pane active" id="settings-pane-network">
                 <div className="settings-pane-header">
-                  <h3 className="settings-pane-title">Conexão P2P e relay TURN</h3>
+                  <h3 className="settings-pane-title">{t("message.da60254327a5")}</h3>
                   <p className="settings-pane-desc">
-                    Configure um relay TURN para conectar participantes quando a rota direta falhar.
-                  </p>
+                    {t("message.56c0bef18e07")}</p>
                 </div>
 
                 <div className="settings-row">
                   <label className="settings-switch-row" htmlFor="settings-enable-turn">
                     <div className="settings-switch-label-group">
-                      <span className="settings-switch-title">Servidor TURN</span>
+                      <span className="settings-switch-title">{t("message.4f24b84b085c")}</span>
                       <span className="settings-switch-subtitle">
-                        Permitir conexões por relay quando necessário
-                      </span>
+                        {t("message.1f0bc36a803d")}</span>
                     </div>
                     <div className="modern-switch">
                       <input autoComplete="off"
@@ -766,13 +762,12 @@ export const SettingsModal: React.FC = () => {
                   <div className="turn-config-box" id="turn-config-fields" style={{ display: 'flex', marginTop: '10px' }}>
                     <div className="settings-row">
                       <label className="settings-label" htmlFor="settings-turn-url">
-                        Endereços TURN (um por linha):
-                      </label>
+                        {t("message.87949ccf803a")}</label>
                       <textarea autoComplete="off"
                         id="settings-turn-url"
                         className="text-input-sm"
                         rows={3}
-                        placeholder={'turn:turn.exemplo.com:3478?transport=udp\nturn:turn.exemplo.com:3478?transport=tcp'}
+                        placeholder={t("message.4bfa478047d1")}
                         value={turnUrl}
                         onChange={(e) => setTurnUrl(e.target.value)}
                       />
@@ -781,21 +776,19 @@ export const SettingsModal: React.FC = () => {
                     <div className="settings-row-grid settings-row-grid-2col" style={{ marginTop: '8px' }}>
                       <div className="settings-col">
                         <label className="settings-label" htmlFor="settings-turn-username">
-                          Usuário (Username):
-                        </label>
+                          {t("message.e69e86de6c04")}</label>
                         <input autoComplete="off"
                           type="text"
                           id="settings-turn-username"
                           className="text-input-sm"
-                          placeholder="meu-usuario"
+                          placeholder={t("message.3ff4bbfe65d6")}
                           value={turnUser}
                           onChange={(e) => setTurnUser(e.target.value)}
                         />
                       </div>
                       <div className="settings-col">
                         <label className="settings-label" htmlFor="settings-turn-credential">
-                          Senha (Credential):
-                        </label>
+                          {t("message.9c47a12d5703")}</label>
                         <input autoComplete="off"
                           type="password"
                           id="settings-turn-credential"
@@ -810,10 +803,9 @@ export const SettingsModal: React.FC = () => {
                     <div className="settings-row" style={{ marginTop: '8px' }}>
                       <label className="settings-switch-row" htmlFor="settings-turn-force-relay">
                         <div className="settings-switch-label-group">
-                          <span className="settings-switch-title">Forçar Modo Relay</span>
+                          <span className="settings-switch-title">{t("message.3fa5703adf75")}</span>
                           <span className="settings-switch-subtitle">
-                            Desativa conexões P2P diretas e força 100% do tráfego pelo servidor TURN
-                          </span>
+                            {t("message.09e50e8c3aeb")}</span>
                         </div>
                         <div className="modern-switch">
                           <input autoComplete="off"
@@ -829,11 +821,9 @@ export const SettingsModal: React.FC = () => {
                   </div>
                 )}
                 <div className="settings-pane-header rendezvous-header">
-                  <h3 className="settings-pane-title">Servidores de encontro P2P</h3>
+                  <h3 className="settings-pane-title">{t("message.59b7d7c38320")}</h3>
                   <p className="settings-pane-desc">
-                    Escolha os servidores usados para localizar outros participantes. As alterações são aplicadas
-                    ao entrar novamente em uma sala.
-                  </p>
+                    {t("message.2cbfd880ac6f")}</p>
                 </div>
                 <RendezvousServerEditor preferences={rendezvousPreferences} onChange={setRendezvousPreferences} />
               </div>
@@ -843,10 +833,9 @@ export const SettingsModal: React.FC = () => {
             {activeTab === 'diagnostics' && (
               <div className="settings-tab-pane active" id="settings-pane-diagnostics">
                 <div className="settings-pane-header">
-                  <h3 className="settings-pane-title">Diagnóstico & Logs de Execução</h3>
+                  <h3 className="settings-pane-title">{t("message.b750226b7613")}</h3>
                   <p className="settings-pane-desc">
-                    Cada instância tem seu próprio arquivo de log com eventos, erros e dados de WebRTC em tempo real.
-                  </p>
+                    {t("message.d8f3f3836074")}</p>
                 </div>
 
                 <div className="log-path-box">
@@ -873,7 +862,7 @@ export const SettingsModal: React.FC = () => {
                       <polyline points="15 3 21 3 21 9"/>
                       <line x1="10" y1="14" x2="21" y2="3"/>
                     </svg>
-                    <span>Abrir log desta instância</span>
+                    <span>{t("message.27d6c20d47a8")}</span>
                   </button>
 
                   <button
@@ -884,7 +873,7 @@ export const SettingsModal: React.FC = () => {
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                     </svg>
-                    <span>Abrir Pasta de Logs</span>
+                    <span>{t("message.39b7a909f8f5")}</span>
                   </button>
 
                   <button
@@ -898,7 +887,7 @@ export const SettingsModal: React.FC = () => {
                       <line x1="10" y1="11" x2="10" y2="17"/>
                       <line x1="14" y1="11" x2="14" y2="17"/>
                     </svg>
-                    <span>Limpar Logs</span>
+                    <span>{t("message.64ac69ca075b")}</span>
                   </button>
                 </div>
               </div>
@@ -908,11 +897,9 @@ export const SettingsModal: React.FC = () => {
 
         <div className="modal-footer">
           <button type="button" className="btn btn-secondary" id="btn-cancel-settings" onClick={closeModal}>
-            Fechar
-          </button>
+            {t("message.0f2bd88ef0ac")}</button>
           <button type="button" className="btn btn-primary" id="btn-save-settings" disabled={updateBusy} onClick={handleSave}>
-            Salvar Configurações
-          </button>
+            {t("message.f28b2e26db4d")}</button>
         </div>
       </div>
     </div>

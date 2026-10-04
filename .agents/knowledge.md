@@ -40,10 +40,13 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 - [P2P Message Authorization and Threat Model](.agents/knowledge/peer-security.md)
 - [Room Apps: Modular Instances and Synchronized State](.agents/knowledge/room-apps.md)
 - [Consent-Based Chat File Transfer](.agents/knowledge/chat-file-transfer.md)
+- [English and Brazilian Portuguese Localization](.agents/knowledge/localization.md)
 
 ---
 
 ## 4. User Guidelines & Expressed Preferences
+
+- `[Localization]` Provide English and Brazilian Portuguese throughout the app. Detect the primary Windows user locale on first launch, fall back to English for unsupported languages, persist the choice locally, and allow immediate changes under Settings > Application. Apply it to the main app and detached windows while preserving authored names, chat, notes and external media titles. Keep signed protocol copy stable and localize structured notices only at presentation.
 
 - `[Window Caption & Stream Overlay]` Right-clicking the custom main-window caption must open the native Windows system menu, not the app context menu. Omit the saved-room reorder tooltip. Use a settings icon for room configuration and a panel/layout icon for keeping stream controls visible, retaining the separate always-on-top pin. Place volume before pointing in main streams and PiP. Viewer lists must reflect explicit subscriptions to each transmission, never automatic media receipt; synchronize snapshots on presence/heartbeat, purge ended streams and departed peers, update on identity changes and mark the local viewer by peer identity rather than username.
 

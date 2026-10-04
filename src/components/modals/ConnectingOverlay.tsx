@@ -1,7 +1,10 @@
+import { localizeText, t } from '../../i18n';
+import { useLocale } from '../../hooks/useLocale';
 import React from 'react';
 import { useRoom } from '../../hooks/useRoom';
 
 export const ConnectingOverlay: React.FC = () => {
+  useLocale();
   const { connectingOverlay, hideConnecting, leaveRoom, currentRoomPassword } = useRoom();
 
   if (!connectingOverlay.visible) return null;
@@ -18,17 +21,17 @@ export const ConnectingOverlay: React.FC = () => {
           <div className="connecting-spinner"></div>
         </div>
         <h2 className="connecting-title" id="connecting-title">
-          {connectingOverlay.title || 'Entrando na sala...'}
+          {localizeText(connectingOverlay.title) || t("message.ecec62501ea4")}
         </h2>
         <p className="connecting-subtitle" id="connecting-subtitle">
-          {connectingOverlay.subtitle || 'Estabelecendo sinalização e túnel P2P criptografado...'}
+          {localizeText(connectingOverlay.subtitle) || t("message.4077d30835d4")}
         </p>
         <div className="connecting-room-badge" id="connecting-room-code">
-          SALA: {connectingOverlay.roomCode}
-          {currentRoomPassword ? ' (Protegida)' : ''}
+          {t("message.87fe74c80d9f")} {connectingOverlay.roomCode}
+          {currentRoomPassword ? t('message.7125c04a8c2c') : ''}
         </div>
         <button className="btn btn-secondary btn-cancel-connect" id="btn-cancel-connecting" onClick={handleCancel}>
-          <span>Cancelar</span>
+          <span>{t("message.bb9dbb406dcb")}</span>
         </button>
       </div>
     </div>

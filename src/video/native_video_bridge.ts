@@ -1,3 +1,4 @@
+import { localizeError, t } from '../i18n/index.ts';
 import { getEncoderPreference, type NativeEncoderSupport } from '../core/encoder_preferences.ts';
 import { invoke } from '@tauri-apps/api/core';
 import type { ScreenSourcesResponse, VideoCaptureBridge, VideoSourceOptions } from '../core/types.ts';
@@ -220,7 +221,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
       this.isDirectGpu = false;
       const reason = err instanceof Error ? err.message : String(err);
       console.error('[NativeVideoBridge] Native capture failed to start:', reason);
-      throw new Error(`Falha ao iniciar transmissão da tela ou janela: ${reason}`);
+      throw new Error(t("message.879ac52b7cbf", { v0: localizeError(reason) }));
     }
 
     // 3. Connect to local binary WebSocket stream
@@ -230,7 +231,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
       accessToken = await invoke<string>('get_video_ws_token');
     } catch {
       await this.stopCapture();
-      throw new Error('Não foi possível autenticar a captura de vídeo local.');
+      throw new Error(t("message.c5919d3eedd0"));
     }
     this.pendingBuffer = null;
     this.isDecoding = false;
@@ -337,7 +338,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
           if (settled) return;
           settled = true;
           clearTimeout(timeout);
-          reject(new Error('A conexão com a captura de vídeo local não foi autenticada.'));
+          reject(new Error(t("message.35654175ba2a")));
         };
         const wsUrl = `ws://127.0.0.1:${port}`;
         this.ws = new WebSocket(wsUrl);
@@ -452,7 +453,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
             resolve(); return;
           }
           if (!this.isCapturing || performance.now() - started > 6000) {
-            reject(new Error('A fonte selecionada não forneceu quadros de vídeo.'));
+            reject(new Error(t("message.08b5364da3c6")));
             return;
           }
           setTimeout(check, 50);

@@ -1,3 +1,5 @@
+import { t } from '../i18n/index.ts';
+import protocolLabels from '../i18n/protocol.json' with { type: 'json' };
 import type React from 'react';
 import { FileText } from 'lucide-react';
 import { SiYoutube } from 'react-icons/si';
@@ -7,6 +9,8 @@ export interface RoomAppViewProps { instanceId: string; compact?: boolean }
 export interface RoomAppDefinition {
   kind: string;
   label: string;
+  /** Stable signed wire text; UI labels may change with the local language. */
+  protocolLabel?: string;
   description?: string;
   icon?: React.ComponentType<{ size?: number; strokeWidth?: number; 'aria-hidden'?: boolean }>;
   iconStyle?: 'outline' | 'filled';
@@ -37,11 +41,11 @@ export function isRoomAppKind(value: unknown): value is string {
   return typeof value === 'string' && definitions.has(value);
 }
 
-registerRoomApp({ kind: 'notepad', label: 'Bloco de notas',
-  description: 'Escreva em tempo real com todos na sala e abra ou salve notas no seu computador.',
+registerRoomApp({ kind: 'notepad', protocolLabel: protocolLabels.notepad, get label() { return t("message.753e28f9f62e"); },
+  get description() { return t("message.db228884dc9d"); },
   icon: FileText, bannerClass: 'notepad', createModel: (context) => new NotepadModel(context),
   loadView: () => import('./NotepadApp').then((module) => ({ default: module.NotepadApp })) });
 registerRoomApp({ kind: 'youtube', label: 'YouTube',
-  description: 'Monte uma fila de vídeos e playlists para assistir em sincronia.',
+  get description() { return t("message.22dea6587836"); },
   icon: SiYoutube, iconStyle: 'filled', bannerClass: 'youtube', createModel: (context) => new YouTubeModel(context),
   loadView: () => import('./YouTubeApp').then((module) => ({ default: module.YouTubeApp })) });

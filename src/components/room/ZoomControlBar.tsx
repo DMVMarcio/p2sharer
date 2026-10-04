@@ -1,3 +1,5 @@
+import { t } from '../../i18n';
+import { useLocale } from '../../hooks/useLocale';
 import React from 'react';
 import { MIN_ZOOM, MAX_ZOOM } from './zoom_utils';
 
@@ -16,6 +18,7 @@ export const ZoomControlBar: React.FC<ZoomControlBarProps> = ({
   onResetZoom,
   hasVolumeControl = false,
 }) => {
+  useLocale();
   if (zoom <= 1.0) return null;
 
   const percentage = Math.round(zoom * 100);
@@ -55,7 +58,7 @@ export const ZoomControlBar: React.FC<ZoomControlBarProps> = ({
       <button
         type="button"
         className="btn-zoom-step btn-zoom-out"
-        aria-label="Diminuir Zoom (-25%)"
+        aria-label={t("message.9eee5c2ade4f")}
         disabled={zoom <= MIN_ZOOM}
         onClick={(e) => {
           e.stopPropagation();
@@ -85,7 +88,7 @@ export const ZoomControlBar: React.FC<ZoomControlBarProps> = ({
           value={percentage}
           className="stream-zoom-range"
           onChange={handleSliderChange}
-          aria-label="Controle de Precisão de Zoom"
+          aria-label={t("message.000b55422207")}
         />
       </div>
 
@@ -93,7 +96,7 @@ export const ZoomControlBar: React.FC<ZoomControlBarProps> = ({
       <button
         type="button"
         className="btn-zoom-step btn-zoom-in"
-        aria-label="Aumentar Zoom (+25%)"
+        aria-label={t("message.a06a53fcef5d")}
         disabled={zoom >= MAX_ZOOM}
         onClick={(e) => {
           e.stopPropagation();
@@ -123,7 +126,7 @@ export const ZoomControlBar: React.FC<ZoomControlBarProps> = ({
       <button
         type="button"
         className="btn-zoom-reset"
-        aria-label="Redefinir Zoom para 100%"
+        aria-label={t("message.94e1172eb769")}
         onClick={(e) => {
           e.stopPropagation();
           onResetZoom();
@@ -142,7 +145,7 @@ export const ZoomControlBar: React.FC<ZoomControlBarProps> = ({
           <polyline points="1 4 1 10 7 10" />
           <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
         </svg>
-        <span>Reset</span>
+        <span>{t("common.reset")}</span>
       </button>
     </div>
   );

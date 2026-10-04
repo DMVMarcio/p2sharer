@@ -28,7 +28,7 @@ globalThis.windowChromeFixture = {
 };
 const require = createRequire(import.meta.url);
 const bundle = await build({
-  stdin: { contents: `export { WindowTitlebar } from './src/components/header/WindowTitlebar.tsx'; export { stateStore } from './src/core/state_store.ts';`, resolveDir: process.cwd() },
+  stdin: { contents: `export { WindowTitlebar } from './src/components/header/WindowTitlebar.tsx'; export { stateStore } from './src/core/state_store.ts'; export { setLanguage } from './src/i18n/index.ts';`, resolveDir: process.cwd() },
   bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic', loader: { '.png': 'dataurl' },
   plugins: [{ name: 'native-window-fixture', setup(builder) {
     builder.onResolve({ filter: /^@tauri-apps\/api\/(core|window)$/ }, args => ({ path: args.path, namespace: 'fixture' }));
@@ -38,7 +38,7 @@ const bundle = await build({
     builder.onResolve({ filter: /^[^./]/ }, args => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
   } }],
 });
-const { WindowTitlebar, stateStore } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
+const { WindowTitlebar, stateStore, setLanguage } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
 const { createRoot } = await import('react-dom/client');
 const root = createRoot(document.getElementById('root'));
 after(async () => { await act(async () => root.unmount()); dom.window.close(); delete globalThis.windowChromeFixture; });
@@ -88,6 +88,19 @@ test('caption right click invokes Windows menu and suppresses the application fa
   assert.equal(event.defaultPrevented, true);
   assert.equal(fallback, 0);
   assert.equal(globalThis.windowChromeFixture.menuCommand, 'show_window_menu');
+});
+
+test('language switches update native and custom captions while room names remain authored text', async () => {
+  const button = document.querySelector('.window-titlebar button');
+  await act(async () => setLanguage('en'));
+  assert.equal(titles.at(-1), 'P2Sharer - Screen and audio sharing');
+  assert.deepEqual([...document.querySelectorAll('button')].map(button => button.getAttribute('aria-label')), ['Minimize', 'Maximize', 'Close']);
+  assert.equal(document.querySelector('.window-titlebar button'), button);
+  await act(async () => stateStore.set(state => { state.currentRoomCode = 'example-code'; state.currentRoomName = 'Sala'; state.roomSlots = [{ peerId: 'local', isLocal: true }]; }));
+  assert.equal(titles.at(-1), 'P2Sharer - Sala');
+  await act(async () => setLanguage('pt-BR'));
+  assert.equal(titles.at(-1), 'P2Sharer - Sala');
+  await act(async () => stateStore.set(state => { state.currentRoomCode = ''; state.currentRoomName = ''; state.roomSlots = []; }));
 });
 
 test('external window changes update chrome, fullscreen hides it, and teardown releases listeners', async () => {

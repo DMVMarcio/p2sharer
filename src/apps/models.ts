@@ -1,3 +1,4 @@
+import { t } from '../i18n/index.ts';
 import * as Y from 'yjs';
 import { Awareness, applyAwarenessUpdate, encodeAwarenessUpdate } from 'y-protocols/awareness';
 import * as decoding from 'lib0/decoding';
@@ -62,7 +63,7 @@ export class NotepadModel implements RoomAppModel {
   get richContent(): Y.XmlFragment { return this.doc.getXmlFragment('rich-content'); }
   get document(): Y.Doc { return this.doc; }
   replace(content: string): void {
-    if (content.length > MAX_NOTE) throw new Error('Nota muito grande');
+    if (content.length > MAX_NOTE) throw new Error(t("message.c915d1570950"));
     const text = this.text;
     this.doc.transact(() => { text.delete(0, text.length); text.insert(0, content); });
   }

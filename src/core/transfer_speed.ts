@@ -1,3 +1,4 @@
+import { getLanguage } from '../i18n/index.ts';
 export type TransferSpeedUnit = 'MB' | 'Mb';
 
 const STORAGE_KEY = 'p2sharer_transfer_speed_unit';
@@ -25,6 +26,6 @@ export function subscribeTransferSpeedUnit(listener: () => void): () => void {
 export function formatTransferSpeed(bytesPerSecond: number, unit: TransferSpeedUnit): string {
   const value = Math.max(0, Number.isFinite(bytesPerSecond) ? bytesPerSecond : 0) *
     (unit === 'Mb' ? 8 : 1) / 1_000_000;
-  return `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: value < 1 ? 2 : 1,
+  return `${new Intl.NumberFormat(getLanguage(), { maximumFractionDigits: value < 1 ? 2 : 1,
     minimumFractionDigits: 1 }).format(value)} ${unit}/s`;
 }

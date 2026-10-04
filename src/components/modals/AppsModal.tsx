@@ -1,3 +1,5 @@
+import { localizeError, t } from '../../i18n';
+import { useLocale } from '../../hooks/useLocale';
 import React, { useEffect, useState } from 'react';
 import { AppWindow, Plus } from 'lucide-react';
 import { listRoomApps, onRoomAppRegistryChange } from '../../apps/registry';
@@ -8,6 +10,7 @@ import { useModal } from '../../hooks/useModal';
 import { showToast } from '../../hooks/useToast';
 
 export const AppsModal: React.FC = () => {
+  useLocale();
   const { closeModal } = useModal();
   const [, setRegistryTick] = useState(0);
   const [selectedKind, setSelectedKind] = useState('');
@@ -17,10 +20,10 @@ export const AppsModal: React.FC = () => {
 
   const start = (close: () => void) => {
     try { roomAppsService.start(selectedKind, personal); close(); }
-    catch (error) { showToast(String(error)); }
+    catch (error) { showToast(localizeError(error)); }
   };
 
-  return <ModalDialog title="Apps da sala" subtitle="Selecione um App para iniciar."
+  return <ModalDialog title={t("message.791e1b0c7eaf")} subtitle={t("message.beb35c20f071")}
     icon={<AppWindow size={20} strokeWidth={1.8} />} className="modal-lg apps-library-modal"
     onClose={closeModal} footer={(close) => <div className="apps-library-footer">
       <label className="apps-library-personal">
@@ -29,12 +32,12 @@ export const AppsModal: React.FC = () => {
             aria-describedby="apps-personal-description" />
           <span className="switch-slider" />
         </span>
-        <span><strong>Somente para mim</strong>
-          <span id="apps-personal-description">Só você vê e usa este App.</span>
+        <span><strong>{t("message.049f38e1d4e9")}</strong>
+          <span id="apps-personal-description">{t("message.fbd796b44845")}</span>
         </span>
       </label>
       <button type="button" className="btn btn-primary apps-library-start" disabled={!selectedKind}
-        onClick={() => start(close)}><Plus size={15} strokeWidth={2} /> Iniciar App</button>
+        onClick={() => start(close)}><Plus size={15} strokeWidth={2} />  {t("message.99bae897c2a6")}</button>
     </div>}>
     <div className="apps-library-grid">
       {listRoomApps().map((app) => <button type="button"
@@ -48,7 +51,7 @@ export const AppsModal: React.FC = () => {
         </div>
         <div className="apps-library-card-content">
           <h3>{app.label}</h3>
-          <p>{app.description || 'Experiência compartilhada para a sala.'}</p>
+          <p>{app.description || t("message.3ede798ddd3d")}</p>
         </div>
       </button>)}
     </div>

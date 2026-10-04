@@ -1,3 +1,5 @@
+import { t } from '../../i18n';
+import { useLocale } from '../../hooks/useLocale';
 import React, { useState } from 'react';
 import { useFormSubmit } from '../../hooks/useFormSubmit';
 import { useModal } from '../../hooks/useModal';
@@ -8,6 +10,7 @@ import { verifyRoomInvite } from '../../core/room_invite_validation';
 import { roomService } from '../../services/room_service';
 
 export const JoinRoomModal: React.FC = () => {
+  useLocale();
   const { closeModal, isClosing } = useModal();
   const { joinRoom } = useRoom();
 
@@ -16,14 +19,14 @@ export const JoinRoomModal: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const handleConfirm = async () => {
     if (!parseRoomInvite(code) || !await verifyRoomInvite(code)) {
-      showToast('Cole um convite autenticado válido.'); return;
+      showToast(t("message.5348364ca0b6")); return;
     }
     const asOwner = roomService.pendingJoinAsOwner;
     roomService.pendingJoinInvite = '';
     roomService.pendingJoinAsOwner = false;
     closeModal();
     joinRoom(code.trim(), password.trim(), asOwner);
-    showToast('Conectando à sala...');
+    showToast(t("message.93b8343c85ed"));
   };
 
   const { submit, pending } = useFormSubmit(handleConfirm, isClosing);
@@ -40,8 +43,8 @@ export const JoinRoomModal: React.FC = () => {
             </svg>
           </div>
           <div>
-            <h2>Entrar em uma Sala de Grupo</h2>
-            <p className="modal-subtitle">Cole o convite autenticado e, se necessário, informe a senha.</p>
+            <h2>{t("message.3b24015dc709")}</h2>
+            <p className="modal-subtitle">{t("message.c1fd46a858b2")}</p>
           </div>
           <button type="button" className="btn-close" id="btn-close-join-dialog" onClick={closeModal}>
             &times;
@@ -51,13 +54,12 @@ export const JoinRoomModal: React.FC = () => {
         <div className="modal-body">
           <div className="form-group">
             <label className="form-label" htmlFor="input-join-room-code-dialog">
-              Convite da Sala:
-            </label>
+              {t("message.68737d8e5d2e")}</label>
             <input autoComplete="off"
               type="text"
               id="input-join-room-code-dialog"
               className="text-input"
-              placeholder="Cole o convite p2s4..."
+              placeholder={t("message.7202cdb2b6f5")}
               style={{ fontFamily: 'var(--font-mono)', fontSize: '15px', fontWeight: 700 }}
               value={code}
               onChange={(e) => setCode(e.target.value)}
@@ -67,15 +69,15 @@ export const JoinRoomModal: React.FC = () => {
 
           <div className="form-group" style={{ marginTop: '14px' }}>
             <label className="form-label" htmlFor="input-join-room-password-dialog">
-              <span>Senha da Sala:</span>
-              <span className="label-hint">Deixe em branco se a sala for pública</span>
+              <span>{t("message.4c92bf162674")}</span>
+              <span className="label-hint">{t("message.4316639c06d8")}</span>
             </label>
             <div className="input-with-action">
               <input autoComplete="off"
                 type={showPassword ? 'text' : 'password'}
                 id="input-join-room-password-dialog"
                 className="text-input"
-                placeholder="Digite a senha (se houver)..."
+                placeholder={t("message.d995e8aa2371")}
                 maxLength={40}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -84,7 +86,7 @@ export const JoinRoomModal: React.FC = () => {
                 type="button"
                 className="btn btn-sm btn-outline btn-inline-action"
                 id="btn-toggle-join-password-visibility"
-                aria-label="Mostrar / Ocultar Senha"
+                aria-label={t("message.d7d229c67924")}
                 onClick={() => setShowPassword(!showPassword)}
               >
                 <span id="icon-join-pass-toggle">
@@ -107,10 +109,9 @@ export const JoinRoomModal: React.FC = () => {
 
         <div className="modal-footer">
           <button type="button" className="btn btn-secondary" id="btn-cancel-join-dialog" onClick={closeModal}>
-            Cancelar
-          </button>
+            {t("message.bb9dbb406dcb")}</button>
           <button className="btn btn-primary" id="btn-confirm-join-dialog" type="submit" disabled={pending || isClosing}>
-            <span>Entrar na Sala</span>
+            <span>{t("message.ad207d12bdc1")}</span>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="5" x2="19" y1="12" y2="12"/>
               <polyline points="12 5 19 12 12 19"/>

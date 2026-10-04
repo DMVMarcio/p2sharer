@@ -1,3 +1,5 @@
+import { t } from '../../i18n';
+import { useLocale } from '../../hooks/useLocale';
 import React from 'react';
 import { UnreadChatBadge } from './UnreadChatBadge';
 import { StreamHeaderBar } from './StreamHeaderBar';
@@ -7,6 +9,7 @@ import { ChatFileRequests } from './ChatFileRequests';
 import { useRoom } from '../../hooks/useRoom';
 
 export const RoomView: React.FC = () => {
+  useLocale();
   const { isSidebarCollapsed, toggleSidebar, unreadChatMessages } = useRoom();
 
   return (
@@ -26,7 +29,7 @@ export const RoomView: React.FC = () => {
             className="sidebar-edge-toggle-btn"
             id="btn-sidebar-edge-toggle"
             onClick={toggleSidebar}
-            aria-label={isSidebarCollapsed ? 'Abrir Chat e Participantes' : 'Ocultar Chat'}
+            aria-label={isSidebarCollapsed ? t("message.86d416fc47cf") : t("message.182641374267")}
           >
             <svg
               width="14"

@@ -1,3 +1,5 @@
+import { localizeError, localizeText, t } from '../i18n';
+import { useLocale } from '../hooks/useLocale';
 import React, { useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event';
@@ -18,6 +20,7 @@ const VOLUME_STORAGE = 'p2sharer_youtube_volume';
 const CAPTIONS_STORAGE = 'p2sharer_youtube_captions';
 
 export const YouTubePipView: React.FC<{ instanceId: string }> = ({ instanceId }) => {
+  useLocale();
   const openContextMenu = useContextMenu();
   const [state, setState] = useState<YouTubeState | null>(null);
   const [playerReady, setPlayerReady] = useState(false);
@@ -90,7 +93,7 @@ export const YouTubePipView: React.FC<{ instanceId: string }> = ({ instanceId })
       if (disposed) { remove(); return; }
       unlisten = remove;
       readyTimer = setTimeout(() => send({ source: 'pip', type: 'ready' }), 0);
-    }).catch((reason) => setError(String(reason)));
+    }).catch((reason) => setError(localizeError(reason)));
     return () => {
       disposed = true;
       if (readyTimer) clearTimeout(readyTimer);
@@ -128,7 +131,7 @@ export const YouTubePipView: React.FC<{ instanceId: string }> = ({ instanceId })
       }, () => {
         if (playerRef.current) setYouTubeCaptions(playerRef.current, captionsRef.current);
       });
-    }).catch((reason) => setError(String(reason)));
+    }).catch((reason) => setError(localizeError(reason)));
     return () => { disposed = true; playerRef.current?.destroy(); playerRef.current = null; };
   }, [instanceId]);
 
@@ -194,37 +197,37 @@ export const YouTubePipView: React.FC<{ instanceId: string }> = ({ instanceId })
     try {
       await invoke('set_pip_always_on_top', { peerId: youtubePipPeerId(instanceId), alwaysOnTop: next });
       setAlwaysOnTop(next);
-    } catch (reason) { setError(String(reason)); }
+    } catch (reason) { setError(localizeError(reason)); }
   };
   const close = async () => {
     try {
       await invoke('close_pip_window', { peerId: youtubePipPeerId(instanceId) });
-    } catch (reason) { setError(`Não foi possível fechar o Picture-in-Picture: ${String(reason)}`); }
+    } catch (reason) { setError(t("message.f97d9af8dc31", { v0: localizeError(String(reason)) })); }
   };
 
   return <div className="pip-window-root youtube-pip-root" onContextMenu={(event) => openContextMenu(event, [
-    { id: 'restore', label: 'Restaurar para o app', icon: <PictureInPicture2 size={15} />, onSelect: close },
-    { id: 'playback', label: state?.playing ? 'Pausar para todos' : 'Reproduzir para todos', icon: state?.playing ? <Pause size={15} /> : <Play size={15} />,
+    { id: 'restore', get label() { return t("message.5899ac52fbbf"); }, icon: <PictureInPicture2 size={15} />, onSelect: close },
+    { id: 'playback', get label() { return state?.playing ? t("message.c1301275ce3f") : t("message.ca0709c34209"); }, icon: state?.playing ? <Pause size={15} /> : <Play size={15} />,
       disabled: !current, onSelect: () => command({ action: 'toggle' }) },
-    { id: 'mute', label: muted ? 'Ativar áudio' : 'Silenciar áudio', icon: muted ? <Volume2 size={15} /> : <VolumeX size={15} />, onSelect: toggleMute },
-    { id: 'captions', label: captions ? 'Desativar legendas' : 'Ativar legendas', icon: <Captions size={15} />, disabled: !current, onSelect: toggleCaptions },
-    { id: 'top', label: alwaysOnTop ? 'Desafixar janela do topo' : 'Manter janela no topo', icon: <Pin size={15} />, onSelect: toggleTop },
+    { id: 'mute', get label() { return muted ? t("message.5cfebda5d336") : t("message.70f507f2963f"); }, icon: muted ? <Volume2 size={15} /> : <VolumeX size={15} />, onSelect: toggleMute },
+    { id: 'captions', get label() { return captions ? t("message.44cac55cd399") : t("message.ca0e837b4bbe"); }, icon: <Captions size={15} />, disabled: !current, onSelect: toggleCaptions },
+    { id: 'top', get label() { return alwaysOnTop ? t("message.ceda40d1828b") : t("message.22da96afd9d8"); }, icon: <Pin size={15} />, onSelect: toggleTop },
   ])}>
     <div ref={mountRef} className="room-app-player-mount" />
     {current && <button className="youtube-pip-hit-area" onClick={() => command({ action: 'toggle' })}
-      aria-label={state?.playing ? 'Pausar para todos' : 'Reproduzir para todos'} />}
-    {(!current || error) && <div className="pip-loading-placeholder">{error || 'Adicione um vídeo para começar'}</div>}
+      aria-label={state?.playing ? t("message.c1301275ce3f") : t("message.ca0709c34209")} />}
+    {(!current || error) && <div className="pip-loading-placeholder">{localizeText(error) || t("message.75a89a91ea35")}</div>}
     <div className="pip-overlay">
       <div className="pip-top-bar" data-tauri-drag-region>
         <div className="pip-top-left" data-tauri-drag-region>
           <span className="pip-status-dot" aria-hidden="true" />
-          <span className="pip-title" data-tauri-drag-region>{current?.title || 'YouTube compartilhado'}</span>
+          <span className="pip-title" data-tauri-drag-region>{current?.title || t("message.74e9d4b5b312")}</span>
         </div>
         <div className="pip-top-right">
-          <TooltipButton tooltip={alwaysOnTop ? 'Desafixar do topo' : 'Fixar no topo'}
+          <TooltipButton tooltip={alwaysOnTop ? t("message.9edf08040405") : t("message.5c73f9df033a")}
             className={`pip-header-btn ${alwaysOnTop ? 'active' : ''}`} onClick={() => void toggleTop()}>
             <Pin size={15} /></TooltipButton>
-          <TooltipButton tooltip="Fechar Picture-in-Picture" className="pip-header-btn pip-close-btn"
+          <TooltipButton tooltip={t("message.99f8f48f4223")} className="pip-header-btn pip-close-btn"
             onClick={() => void close()}><X size={16} /></TooltipButton>
         </div>
       </div>

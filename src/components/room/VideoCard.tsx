@@ -1,3 +1,5 @@
+import { t } from '../../i18n';
+import { useLocale } from '../../hooks/useLocale';
 import { stateStore } from '../../core/state_store';
 import { useModal } from '../../hooks/useModal';
 import { formatFrameRate } from '../../core/media_streams';
@@ -32,6 +34,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   inTray = false,
   isSelectedFeatured = false,
 }) => {
+  useLocale();
   const { togglePin, stopWatchingStream, getPeerPing, layoutMode, returnToGrid } = useRoom();
   const openContextMenu = useContextMenu();
   const { openModal } = useModal();
@@ -251,28 +254,28 @@ export const VideoCard: React.FC<VideoCardProps> = ({
 
   const handleContextMenu = (event: React.MouseEvent) => {
     const actions: ContextMenuAction[] = [];
-    if (layoutMode === 'spotlight' && inTray && !isSelectedFeatured) actions.push({ id: 'overlay', label: 'Sobrepor na transmissão atual',
+    if (layoutMode === 'spotlight' && inTray && !isSelectedFeatured) actions.push({ id: 'overlay', get label() { return t("message.1c2685f76e69"); },
       icon: <PictureInPicture2 size={15} />, onSelect: () => roomService.overlayStream(slot.peerId) });
-    if (slot.isLocal && slot.mediaId) actions.push({ id: 'edit', label: 'Editar transmissão', icon: <MonitorUp size={15} />,
+    if (slot.isLocal && slot.mediaId) actions.push({ id: 'edit', get label() { return t("message.eb9fb0e94a23"); }, icon: <MonitorUp size={15} />,
       onSelect: () => { roomService.editTransmission(slot.mediaId!); openModal('screenPicker'); } });
-    if (!isFeatured && !isSelectedFeatured) actions.push({ id: 'feature', label: 'Destacar transmissão', icon: <Focus size={15} />, onSelect: () => togglePin(slot.peerId) });
-    if (layoutMode === 'spotlight') actions.push({ id: 'grid', label: 'Voltar à grade', icon: <Grid2X2 size={15} />,
+    if (!isFeatured && !isSelectedFeatured) actions.push({ id: 'feature', get label() { return t("message.b384fe7c4b0e"); }, icon: <Focus size={15} />, onSelect: () => togglePin(slot.peerId) });
+    if (layoutMode === 'spotlight') actions.push({ id: 'grid', get label() { return t("message.2e00d3a9b870"); }, icon: <Grid2X2 size={15} />,
       onSelect: returnToGrid });
-    if (isPipActive) actions.push({ id: 'restore', label: 'Restaurar para o app', icon: <PictureInPicture2 size={15} />, onSelect: () => pipService.restoreFromPip(slot.peerId) });
+    if (isPipActive) actions.push({ id: 'restore', get label() { return t("message.5899ac52fbbf"); }, icon: <PictureInPicture2 size={15} />, onSelect: () => pipService.restoreFromPip(slot.peerId) });
     else {
-      if (slot.isLocal) actions.push({ id: 'preview', label: showLocalPreview ? 'Ocultar prévia' : 'Ver prévia',
+      if (slot.isLocal) actions.push({ id: 'preview', get label() { return showLocalPreview ? t("message.696806b6cddb") : t("message.f281575f257e"); },
         icon: showLocalPreview ? <EyeOff size={15} /> : <Eye size={15} />, onSelect: () => setShowLocalPreview(!showLocalPreview) });
-      else actions.push({ id: 'mute', label: isMuted || volume === 0 ? 'Ativar áudio' : 'Silenciar áudio',
+      else actions.push({ id: 'mute', get label() { return isMuted || volume === 0 ? t("message.5cfebda5d336") : t("message.70f507f2963f"); },
         icon: isMuted ? <Volume2 size={15} /> : <VolumeX size={15} />, onSelect: () => handleToggleMute() });
       if (!inTray) {
-        actions.push({ id: 'hud', label: isHudPinned ? 'Desafixar controles' : 'Fixar controles', icon: <PanelsTopLeft size={15} />, onSelect: () => setIsHudPinned(!isHudPinned) });
-        if (zoom > 1) actions.push({ id: 'zoom', label: 'Redefinir zoom', icon: <RotateCcw size={15} />, onSelect: resetZoom });
-        actions.push({ id: 'fullscreen', label: isFullscreen ? 'Sair da tela cheia' : 'Tela cheia', icon: <Maximize size={15} />, onSelect: () => handleToggleFullscreen() });
+        actions.push({ id: 'hud', get label() { return isHudPinned ? t("message.6bc8448647e0") : t("message.1572541abe33"); }, icon: <PanelsTopLeft size={15} />, onSelect: () => setIsHudPinned(!isHudPinned) });
+        if (zoom > 1) actions.push({ id: 'zoom', get label() { return t("message.2a1c7eafd8bb"); }, icon: <RotateCcw size={15} />, onSelect: resetZoom });
+        actions.push({ id: 'fullscreen', get label() { return isFullscreen ? t("message.cbe5019d4a64") : t("message.cdd35dea1ee3"); }, icon: <Maximize size={15} />, onSelect: () => handleToggleFullscreen() });
       }
-      actions.push({ id: 'pip', label: 'Abrir em Picture-in-Picture', icon: <PictureInPicture2 size={15} />,
+      actions.push({ id: 'pip', get label() { return t("message.850d2cf3aafa"); }, icon: <PictureInPicture2 size={15} />,
         disabled: !slot.stream, onSelect: () => pipService.openPip(slot.peerId, slot.senderName, slot.stream) });
     }
-    actions.push({ id: 'stop', label: slot.isLocal ? 'Parar transmissão' : 'Parar de assistir', icon: <Square size={15} />, separator: true,
+    actions.push({ id: 'stop', get label() { return slot.isLocal ? t("message.6ef17b51fd93") : t("message.470b862fbd07"); }, icon: <Square size={15} />, separator: true,
       onSelect: slot.isLocal ? () => { if (slot.mediaId) roomService.stopTransmission(slot.mediaId); } : () => stopWatchingStream(slot.peerId) });
     openContextMenu(event, actions);
   };
@@ -324,10 +327,10 @@ export const VideoCard: React.FC<VideoCardProps> = ({
                 <rect x="11" y="9" width="9" height="7" rx="1.5"/>
               </svg>
             </div>
-            {!inTray && <span className="local-broadcaster-title">Em Picture-in-Picture</span>}
+            {!inTray && <span className="local-broadcaster-title">{t("message.e78c504525f4")}</span>}
             {!inTray && (
               <span className="local-broadcaster-subtitle">
-                {slot.isLocal ? 'Sua tela está em janela externa' : `Tela de ${slot.senderName} em janela externa`}
+                {slot.isLocal ? t("message.40628576338c") : t("message.e368e80999d7", { v0: slot.senderName })}
               </span>
             )}
             {!inTray && (
@@ -338,7 +341,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
                   e.stopPropagation();
                   pipService.restoreFromPip(slot.peerId);
                 }}
-                aria-label="Restaurar transmissão para o app"
+                aria-label={t("message.3fd671203587")}
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="4 14 10 14 10 20"/>
@@ -346,8 +349,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
                   <line x1="14" y1="10" x2="21" y2="3"/>
                   <line x1="3" y1="21" x2="10" y2="14"/>
                 </svg>
-                Restaurar para o App
-              </button>
+                {t("message.690a35fa4990")}</button>
             )}
           </div>
         ) : slot.isLocal && !showLocalPreview ? (
@@ -359,11 +361,10 @@ export const VideoCard: React.FC<VideoCardProps> = ({
                 <line x1="12" y1="17" x2="12" y2="21"/>
               </svg>
             </div>
-            {!inTray && <span className="local-broadcaster-title">Você está transmitindo</span>}
+            {!inTray && <span className="local-broadcaster-title">{t("message.a6aa3bb90a7e")}</span>}
             {!inTray && (
               <span className="local-broadcaster-subtitle">
-                {currentResolution.label} • {formatFrameRate(currentFps)} FPS • Transmissão Ativa
-              </span>
+                {currentResolution.label} • {formatFrameRate(currentFps)} {t("message.df393af690a7")}</span>
             )}
             {!inTray && (
               <button
@@ -373,14 +374,13 @@ export const VideoCard: React.FC<VideoCardProps> = ({
                   e.stopPropagation();
                   setShowLocalPreview(true);
                 }}
-                aria-label="Exibir prévia da sua transmissão"
+                aria-label={t("message.e41d33bb8cb8")}
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"/>
                   <circle cx="12" cy="12" r="3"/>
                 </svg>
-                Ver Prévia
-              </button>
+                {t("message.11023c669c46")}</button>
             )}
           </div>
         ) : (
@@ -434,7 +434,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
       <div className="stream-card-overlay">
         <span className="user-status-dot"></span>
         <span className="stream-user-name">{slot.senderName}{slot.mediaLabel ? ` · ${slot.mediaLabel}` : ""}</span>
-        {slot.isLocal && <span className="badge-you">VOCÊ</span>}
+        {slot.isLocal && <span className="badge-you">{t("message.a03099f135b1")}</span>}
       </div>
 
       {/* Stream stop actions share the tray control recipe. */}
@@ -445,9 +445,9 @@ export const VideoCard: React.FC<VideoCardProps> = ({
             if (slot.isLocal) { event.stopPropagation(); if (slot.mediaId) void roomService.stopTransmission(slot.mediaId); }
             else handleStopWatching(event);
           }}
-          aria-label={slot.isLocal ? "Parar esta transmissão" : "Parar de assistir esta transmissão"}
+          aria-label={slot.isLocal ? t("message.7fd6d14936f2") : t("message.b9a45228925c")}
         >
-          {slot.isLocal ? 'Parar Transmissão' : 'Parar de Assistir'}
+          {slot.isLocal ? t("message.20321acf4fc8") : t("message.0fdd70d29050")}
         </button>
       )}
 
@@ -465,14 +465,13 @@ export const VideoCard: React.FC<VideoCardProps> = ({
                 e.stopPropagation();
                 setShowLocalPreview(false);
               }}
-              aria-label="Ocultar prévia para economizar CPU"
+              aria-label={t("message.317f00cc68bc")}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
                 <line x1="1" y1="1" x2="23" y2="23"/>
               </svg>
-              Ocultar Prévia
-            </button>
+              {t("message.c94490e9bdea")}</button>
           )}
           {!slot.isLocal && (
             <div className="stream-volume-controller">
@@ -480,7 +479,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
                 type="button"
                 className="btn-stream-volume"
                 onClick={handleToggleMute}
-                aria-label="Mutar / Desmutar"
+                aria-label={t("message.78ba36d6b04f")}
               >
                 {isMuted || volume === 0 ? (
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -522,8 +521,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           <Tooltip
             content={
               isHudPinned
-                ? 'Desafixar interface (ocultar automaticamente)'
-                : 'Fixar interface (sempre visível)'
+                ? t("message.b9125ff913f7")
+                : t("message.7dcee91def76")
             }
             onOpenChange={handleTooltipOpenChange}
           >
@@ -536,8 +535,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
               }}
               aria-label={
                 isHudPinned
-                  ? 'Desafixar interface da transmissão'
-                  : 'Fixar interface da transmissão'
+                  ? t("message.a66da920f259")
+                  : t("message.1efcef298a4c")
               }
             >
               <PanelsTopLeft size={14} aria-hidden="true" />
@@ -545,7 +544,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           </Tooltip>
 
           <Tooltip
-            content="Abrir em Picture-in-Picture (janela flutuante)"
+            content={t("message.365c67865e1c")}
             onOpenChange={handleTooltipOpenChange}
           >
             <button
@@ -556,7 +555,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
                 e.stopPropagation();
                 pipService.openPip(slot.peerId, slot.senderName, slot.stream);
               }}
-              aria-label="Abrir transmissão em Picture-in-Picture"
+              aria-label={t("message.1f626fd80ce4")}
             >
               <svg
                 width="14"
@@ -579,7 +578,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
             className="btn-stream-fullscreen"
             id={`btn-stream-fullscreen-${slot.peerId}`}
             onClick={handleToggleFullscreen}
-            aria-label={isFullscreen ? "Sair da Tela Cheia" : "Tela Cheia"}
+            aria-label={isFullscreen ? t("message.1ea619b7211d") : t("message.1dfa15614e9a")}
           >
             {isFullscreen ? (
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

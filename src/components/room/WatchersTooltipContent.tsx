@@ -1,3 +1,5 @@
+import { t } from '../../i18n';
+import { useLocale } from '../../hooks/useLocale';
 import React from 'react';
 import { StreamWatcher } from '../../core/types';
 
@@ -8,6 +10,7 @@ interface WatchersTooltipContentProps {
 export const WatchersTooltipContent: React.FC<WatchersTooltipContentProps> = ({
   watchers,
 }) => {
+  useLocale();
   const watchersCount = watchers.length;
 
   return (
@@ -28,10 +31,10 @@ export const WatchersTooltipContent: React.FC<WatchersTooltipContentProps> = ({
         </svg>
         <span>
           {watchersCount === 0
-            ? 'Ninguém assistindo'
+            ? t("message.a891f208b6c2")
             : watchersCount === 1
-            ? '1 pessoa assistindo:'
-            : `${watchersCount} pessoas assistindo:`}
+            ? t("message.565fd57b393f")
+            : t("message.8d6d315d59d7", { v0: watchersCount })}
         </span>
       </div>
       {watchersCount > 0 ? (
@@ -42,13 +45,13 @@ export const WatchersTooltipContent: React.FC<WatchersTooltipContentProps> = ({
               <div key={w.peerId} className="watchers-tooltip-item">
                 <span className="watchers-tooltip-dot"></span>
                 <span className="watchers-tooltip-name">{w.username}</span>
-                {isSelf && <span className="badge-you">VOCÊ</span>}
+                {isSelf && <span className="badge-you">{t("message.a03099f135b1")}</span>}
               </div>
             );
           })}
         </div>
       ) : (
-        <div className="watchers-tooltip-empty">Nenhum espectador no momento</div>
+        <div className="watchers-tooltip-empty">{t("message.27162bde7bda")}</div>
       )}
     </>
   );

@@ -1,3 +1,4 @@
+import { localizeError, t } from '../i18n/index.ts';
 import { useEffect, useRef, useState } from 'react';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
@@ -80,7 +81,7 @@ export function useAppWindow(instance: RoomAppInstance) {
     } catch (error) {
       active.current = false;
       setDetached(false);
-      showToast(`Erro ao separar app: ${error}`);
+      showToast(t("message.cd3c7e1436f8", { v0: localizeError(error) }));
     } finally { opening.current = false; }
   };
   return { detached, detach, restore };

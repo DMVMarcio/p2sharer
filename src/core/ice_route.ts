@@ -1,3 +1,4 @@
+import { t } from '../i18n/index.ts';
 export interface IceStat {
   id: string;
   type: string;
@@ -17,7 +18,7 @@ export interface IceStat {
 }
 
 export interface IceRoute {
-  connectionType: 'P2P Direto' | 'TURN Relay' | 'Rota desconhecida';
+  connectionType: string;
   pingMs: number | null;
 }
 
@@ -44,11 +45,11 @@ export function selectedIcePair(reports: Iterable<IceStat>): { pair: IceStat; lo
 export function selectedIceRoute(reports: Iterable<IceStat>): IceRoute {
   const selected = selectedIcePair(reports);
   if (!selected?.pair.localCandidateId || !selected.pair.remoteCandidateId) {
-    return { connectionType: 'Rota desconhecida', pingMs: null };
+    return { connectionType: t("message.9f4e406857c7"), pingMs: null };
   }
   const { pair, local, remote } = selected;
-  const connectionType = !local || !remote ? 'Rota desconhecida' :
-    local.candidateType === 'relay' || remote.candidateType === 'relay' ? 'TURN Relay' : 'P2P Direto';
+  const connectionType = !local || !remote ? t("message.9f4e406857c7") :
+    local.candidateType === 'relay' || remote.candidateType === 'relay' ? 'TURN Relay' : t("message.72382ef79340");
   return { connectionType, pingMs: typeof pair.currentRoundTripTime === 'number' ?
     Math.round(pair.currentRoundTripTime * 1000) : null };
 }

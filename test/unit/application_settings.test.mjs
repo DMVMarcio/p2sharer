@@ -8,7 +8,10 @@ import React, { act, useState } from 'react';
 import { AppUpdateController } from '../../src/core/app_updates.ts';
 
 const dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost' });
-for (const key of ['window', 'document', 'HTMLElement', 'localStorage']) globalThis[key] = dom.window[key];
+for (const key of ['window', 'document', 'HTMLElement', 'Element', 'Node', 'MutationObserver', 'CustomEvent', 'localStorage']) globalThis[key] = dom.window[key];
+globalThis.getComputedStyle = window.getComputedStyle;
+HTMLElement.prototype.scrollIntoView = () => {};
+window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const require = createRequire(import.meta.url);
 const bundle = await build({
@@ -51,7 +54,7 @@ test('application update controls keep drafts unsaved and check only the saved c
   await act(async () => root.render(React.createElement(Harness)));
   assert.equal(document.querySelector('h3').textContent, 'Aplicação');
   const preview = document.getElementById('settings-beta-updates');
-  const check = document.querySelector('#settings-pane-application button');
+  const check = document.querySelector('#settings-pane-application .btn-secondary');
   assert.equal(preview.checked, false);
   assert.equal(check.disabled, false);
   await act(async () => preview.click());
@@ -64,4 +67,17 @@ test('application update controls keep drafts unsaved and check only the saved c
   await act(async () => check.click());
   assert.deepEqual(channels, [true]);
   assert.equal(controller.getSnapshot().dialogOpen, true);
+});
+
+test('the canonical language selector applies and persists English immediately without resetting settings drafts', async () => {
+  const selector = document.getElementById('settings-language');
+  assert.equal(selector.getAttribute('role'), 'combobox');
+  await act(async () => selector.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Home', bubbles: true })));
+  assert.deepEqual([...document.querySelectorAll('[role="option"]')].map(option => option.textContent), ['English', 'Português Brasil']);
+  await act(async () => selector.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  assert.equal(document.querySelector('h3').textContent, 'Application');
+  assert.equal(localStorage.getItem('p2sharer_language'), 'en');
+  assert.equal(document.documentElement.lang, 'en');
+  assert.equal(document.getElementById('settings-beta-updates').checked, true);
+  assert.equal(document.getElementById('settings-language'), selector);
 });

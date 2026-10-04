@@ -1,3 +1,5 @@
+import { t } from '../../i18n';
+import { useLocale } from '../../hooks/useLocale';
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Copy } from 'lucide-react';
@@ -40,6 +42,7 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
   children: ReactNode;
   getActions?: () => ContextMenuAction[];
 }) {
+  useLocale();
   const [menu, setMenu] = useState<MenuState | null>(null);
   const presence = useDropdownPresence(menu);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -82,7 +85,7 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
         return;
       }
       const selection = window.getSelection()?.toString();
-      const actions: ContextMenuAction[] = selection ? [{ id: 'copy-selection', label: 'Copiar seleção', icon: <Copy size={15} />,
+      const actions: ContextMenuAction[] = selection ? [{ id: 'copy-selection', get label() { return t("message.73c01cc8056b"); }, icon: <Copy size={15} />,
         onSelect: () => navigator.clipboard.writeText(selection) }] : [];
       // Modal backgrounds must not expose actions belonging to the room behind them.
       if (!(event.target instanceof Element && event.target.closest('.modal-overlay, [role="dialog"], [role="alertdialog"]'))) actions.push(...actionsRef.current());
@@ -146,12 +149,12 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
   const retained = presence.value;
   const select = (action: Pick<ContextMenuAction, 'onSelect'>) => {
     close(true);
-    try { Promise.resolve(action.onSelect()).catch(() => showToast('Não foi possível concluir esta ação.')); }
-    catch { showToast('Não foi possível concluir esta ação.'); }
+    try { Promise.resolve(action.onSelect()).catch(() => showToast(t("message.1776fea88e1f"))); }
+    catch { showToast(t("message.1776fea88e1f")); }
   };
   return <MenuContext.Provider value={open}>
     {children}
-    {retained && createPortal(<div ref={menuRef} role="menu" aria-label="Ações de contexto"
+    {retained && createPortal(<div ref={menuRef} role="menu" aria-label={t("message.392b6906f80e")}
       className={`context-menu ${presence.closing ? 'dropdown-closing' : ''}`}
       inert={presence.closing} aria-hidden={presence.closing}
       style={{ left: position.x, top: position.y }}
