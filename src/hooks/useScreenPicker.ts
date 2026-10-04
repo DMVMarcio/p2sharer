@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { stateStore } from '../core/state_store';
+import { INITIAL_TRANSMISSION_DEFAULTS, stateStore } from '../core/state_store';
 import { MonitorSource, ScreenSourcesResponse, WindowSource } from '../core/types';
 import { useStore } from './useStore';
 import { roomService } from '../services/room_service';
@@ -29,7 +29,7 @@ export function useScreenPicker(onClose?: () => void, isClosing = false) {
 
   const initialRes = editing ? editing.kind === 'camera' ? `${editing.resolution.width}x${editing.resolution.height}` :
     editing.resolution.height === 2160 ? '4k' : `${editing.resolution.height}p` :
-    localStorage.getItem('p2sharer_default_res') || defaultRes || '1080p';
+    localStorage.getItem('p2sharer_default_res') || defaultRes || INITIAL_TRANSMISSION_DEFAULTS.resolution;
   const [resolution, setResolution] = useState<string>(initialRes.includes('x') && editing?.kind !== 'camera'
     ? [360, 480, 720, 1080, 1440].includes(stateStore.parseResolution(initialRes).height)
       ? `${stateStore.parseResolution(initialRes).height}p` : '1080p' : initialRes);

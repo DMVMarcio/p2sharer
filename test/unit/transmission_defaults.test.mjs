@@ -60,7 +60,14 @@ function saved() {
 test('first launch remembers settings only after successful confirmation, and they survive reload', async () => {
   localStorage.clear(); stateStore.loadFromStorage();
   assert.equal(new StateStore().rememberTransmissionSettings, true);
-  await open(); await choose();
+  assert.deepEqual(stateStore.currentResolution, { width: 1280, height: 720, label: '720p' });
+  assert.equal(stateStore.currentFps, 30);
+  assert.equal(stateStore.currentBitrate, 8000);
+  await open();
+  assert.equal(picker.resolution, '720p');
+  assert.equal(picker.fps, 30);
+  assert.equal(picker.bitrate, 8000);
+  await choose();
   assert.deepEqual(saved(), [null, null, null, null, null]);
   let resolve;
   finishCapture = new Promise(done => { resolve = done; });

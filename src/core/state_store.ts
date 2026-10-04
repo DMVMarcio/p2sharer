@@ -10,6 +10,8 @@ export interface TransmissionDefaults {
   cursor: boolean;
 }
 
+export const INITIAL_TRANSMISSION_DEFAULTS = { resolution: '720p', fps: 30 } as const;
+
 export class StateStore {
   private static instance: StateStore | null = null;
 
@@ -40,11 +42,11 @@ export class StateStore {
   public currentThemeMode: ThemeMode = 'dark';
   public currentAccentColor: string = 'cyan';
 
-  public currentFps: number = 60;
-  public currentBitrate: number = 15000;
+  public currentFps: number = INITIAL_TRANSMISSION_DEFAULTS.fps;
+  public currentBitrate: number = this.getDefaultBitrateForResolution(INITIAL_TRANSMISSION_DEFAULTS.resolution);
   public currentQuality: number = 90;
   public rememberTransmissionSettings = true;
-  public currentResolution: ResolutionConfig = { width: 1920, height: 1080, label: '1080p' };
+  public currentResolution: ResolutionConfig = this.parseResolution(INITIAL_TRANSMISSION_DEFAULTS.resolution);
 
   public isAudioFilterFullAudio: boolean = false;
   public selectedFilterMode: 'exclude' | 'include' = 'exclude';
@@ -117,15 +119,14 @@ export class StateStore {
     this.currentAccentColor = localStorage.getItem('p2sharer_accent_color') || 'cyan';
 
     this.rememberTransmissionSettings = localStorage.getItem('p2sharer_remember_transmission_settings') !== 'false';
-    this.currentFps = Number(localStorage.getItem('p2sharer_default_fps') || '60');
-    this.currentBitrate = parseInt(localStorage.getItem('p2sharer_default_bitrate') || '15000', 10);
+    const savedRes = localStorage.getItem('p2sharer_default_res') || INITIAL_TRANSMISSION_DEFAULTS.resolution;
+    this.currentResolution = this.parseResolution(savedRes);
+    this.currentFps = Number(localStorage.getItem('p2sharer_default_fps') || INITIAL_TRANSMISSION_DEFAULTS.fps);
+    this.currentBitrate = parseInt(localStorage.getItem('p2sharer_default_bitrate') || String(this.getDefaultBitrateForResolution(savedRes)), 10);
     this.currentQuality = parseInt(localStorage.getItem('p2sharer_default_quality') || '90', 10);
     if (isNaN(this.currentQuality) || this.currentQuality < 50 || this.currentQuality > 100) {
       this.currentQuality = 90;
     }
-
-    const savedRes = localStorage.getItem('p2sharer_default_res') || '1080p';
-    this.currentResolution = this.parseResolution(savedRes);
 
     this.isAudioFilterFullAudio = localStorage.getItem('p2sharer_audio_filter_full') === 'true';
     this.selectedFilterMode = (localStorage.getItem('p2sharer_audio_filter_mode') as 'exclude' | 'include') || 'exclude';

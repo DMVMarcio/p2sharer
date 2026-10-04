@@ -7,7 +7,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { useModal } from '../../hooks/useModal';
 import { useAppTheme, ACCENT_COLORS } from '../../hooks/useAppTheme';
 import { roomService } from '../../services/room_service';
-import { stateStore } from '../../core/state_store';
+import { INITIAL_TRANSMISSION_DEFAULTS, stateStore } from '../../core/state_store';
 import { soundEffects } from '../../ui/sound_effects';
 import { showToast } from '../../hooks/useToast';
 import { ThemeMode } from '../../core/types';
@@ -42,14 +42,14 @@ export const SettingsModal: React.FC = () => {
   const [sfxVolume, setSfxVolume] = useState(() => Math.round(soundEffects.getVolume() * 100));
 
   const [defaultRes, setDefaultRes] = useState(
-    () => localStorage.getItem('p2sharer_default_res') || '1080p'
+    () => localStorage.getItem('p2sharer_default_res') || INITIAL_TRANSMISSION_DEFAULTS.resolution
   );
   const [rememberTransmissionSettings, setRememberTransmissionSettings] = useState(() => stateStore.rememberTransmissionSettings);
   const [defaultFps, setDefaultFps] = useState(
-    () => localStorage.getItem('p2sharer_default_fps') || '60'
+    () => localStorage.getItem('p2sharer_default_fps') || String(INITIAL_TRANSMISSION_DEFAULTS.fps)
   );
   const [defaultBitrate, setDefaultBitrate] = useState(
-    () => localStorage.getItem('p2sharer_default_bitrate') || '15000'
+    () => localStorage.getItem('p2sharer_default_bitrate') || String(stateStore.getDefaultBitrateForResolution(defaultRes))
   );
   const [defaultQuality, setDefaultQuality] = useState(
     () => localStorage.getItem('p2sharer_default_quality') || '90'

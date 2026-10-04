@@ -45,6 +45,8 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 4. User Guidelines & Expressed Preferences
 
+- `[First-Run Transmission Defaults]` New installations start at 720p and 30 FPS with the existing recommended 720p bitrate (8 Mbps). Respect saved preferences and continue remembering settings only after a successful transmission confirmation when automatic remembering is enabled.
+
 - `[Update Channels]` Put application update controls in a dedicated Application settings tab instead of Profile. Offer a persistent opt-in toggle for beta/prerelease updates, disabled by default; stable releases remain eligible on both channels. Turning beta off and saving must offer the latest stable release even when older than the installed beta. Preserve signed downloads and explicit installation consent; permit this deliberate beta-to-stable downgrade only, never automatic installation or stable-to-stable downgrades.
 
 - `[CI Validation Scope]` Keep frontend compilation and frontend/native regressions on main-branch validation, preserving release-profile Rust dependency cache warming. Generate Windows installers only in the release workflow, avoiding a second application distribution build on each main push. Release jobs must retain their tests and signed packaging checks.
