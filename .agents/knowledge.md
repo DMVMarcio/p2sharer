@@ -46,6 +46,8 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 4. User Guidelines & Expressed Preferences
 
+- `[Connection Modes Exploration]` Preserve the existing decentralized P2P mode while evaluating room creation with a signed, versioned connection-mode descriptor in the invite. Explore LAN/virtual LAN (including Radmin VPN and Hamachi), an app-started host-dependent server, and a standalone self-hosted server suitable for a VPS. This is a feasibility request, not approval to implement or deploy; distinguish signaling-only hosting, TURN relaying, and full media/data server routing.
+
 - `[Application Version]` Show the bundled application version discreetly in the homepage corner and beside update controls in Application settings. Update dialogs must show the installed and offered versions together, including beta-to-stable transitions. Reuse the shared AppVersion component and synchronized release metadata.
 
 - `[Localization]` Provide English and Brazilian Portuguese throughout the app. Detect the primary Windows user locale on first launch, fall back to English for unsupported languages, persist the choice locally, and apply changes under Settings > Application only after Save Settings, discarding unsaved language drafts when closing. Omit the language explanatory subtitle. Apply it to the main app and detached windows while preserving authored names, chat, notes and external media titles. Keep signed protocol copy stable and localize structured notices only at presentation.
