@@ -1,4 +1,6 @@
 {
+  "ice.lanTimeout": "WebRTC connection timed out{{peer}} over LAN/VPN. Check negotiation, the network and participants' firewalls.",
+  "ice.connectionTimeout": "WebRTC connection timed out{{peer}}. Check negotiation and ICE connectivity; this error does not identify the cause.",
   "lan.connectionMode": "Connection",
   "lan.joinHint": "Local network / VPN room. Join the same network as the creator before connecting.",
   "lan.internetP2p": "Internet (P2P)",

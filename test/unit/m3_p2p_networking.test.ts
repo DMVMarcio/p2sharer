@@ -347,12 +347,13 @@ describe('M3 Unit Tests: Robust P2P Networking & Signaling Failover', () => {
       });
       assert.ok(turnUnreachableMsg.includes('nenhuma rota ICE foi estabelecida'));
 
-      const symmetricNatMsg = formatJoinError({
+      const timeoutMsg = formatJoinError({
         error: 'could not connect to peer after exchanging SDP; configure TURN servers with turnConfig',
         peerId: 'peer-xyz98765',
       });
-      assert.ok(symmetricNatMsg.includes('NAT Simétrico'));
-      assert.ok(symmetricNatMsg.includes('Configure um servidor TURN'));
+      assert.ok(timeoutMsg.includes('Tempo esgotado'));
+      assert.ok(timeoutMsg.includes('não identifica a causa'));
+      assert.ok(!timeoutMsg.includes('NAT Simétrico'));
     });
   });
 });

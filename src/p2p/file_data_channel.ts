@@ -1,4 +1,4 @@
-import { attachIceDiagnostics } from './ice_config.ts';
+import { attachIceDiagnostics, type IceConnectionMode } from './ice_config.ts';
 
 const FILE_CHANNEL_LOW_WATER_BYTES = 1024 * 1024;
 
@@ -14,14 +14,14 @@ export function ensureFileDataChannelWindow(connection: FileOptimizedConnection 
 }
 
 /** Keep enough data queued to fill a typical direct WAN path. */
-export function createFileOptimizedPeerConnection(): (new (configuration?: RTCConfiguration) => FileOptimizedConnection) | undefined {
+export function createFileOptimizedPeerConnection(mode: IceConnectionMode = 'internet'): (new (configuration?: RTCConfiguration) => FileOptimizedConnection) | undefined {
   if (typeof RTCPeerConnection === 'undefined') return undefined;
   return class FileOptimizedPeerConnection extends RTCPeerConnection {
     public roomDataChannel: RTCDataChannel | null = null;
 
     constructor(configuration?: RTCConfiguration) {
       super(configuration);
-      attachIceDiagnostics(this);
+      attachIceDiagnostics(this, mode);
       this.addEventListener('datachannel', ({ channel }) => {
         this.tuneChannel(channel);
       });

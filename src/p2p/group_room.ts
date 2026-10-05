@@ -517,18 +517,19 @@ export class GroupRoomManager {
   }
 
   private setupRoomInstance(): void {
+    const connectionMode = this.snapshot?.connection ? 'lan' : 'internet';
     const joinErrorHandler = createJoinErrorHandler((formattedMsg, details) => {
       console.warn(`[P2P/ICE Diagnostics] ${formattedMsg}`, details);
       if (this.callbacks && this.peerTracker.directConnectedPeers.size === 0) {
         this.callbacks.onStatusChange(formattedMsg);
       }
-    });
+    }, connectionMode);
 
     this.room = signalingManager.joinRoom(
       {
         appId: APP_ID,
         rtcConfig: this.rtcConfig,
-        rtcPolyfill: createFileOptimizedPeerConnection(),
+        rtcPolyfill: createFileOptimizedPeerConnection(connectionMode),
         // WebRTC is a full mesh: every participant must advertise so two
         // joiners can establish their own direct edge, not only reach the creator.
         passive: false,

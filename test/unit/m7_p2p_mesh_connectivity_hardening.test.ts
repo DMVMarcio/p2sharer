@@ -211,14 +211,14 @@ describe('M7: P2P Mesh Connectivity, Indirect Bridging & Signaling Stability Har
       ));
     });
 
-    it('3.2: formatJoinError provides non-alarmist explanation and maintains compatibility keywords', () => {
+    it('3.2: formatJoinError describes the timeout without asserting a NAT diagnosis', () => {
       const err = formatJoinError({
         error: 'could not connect to peer after exchanging SDP; configure TURN servers with turnConfig or rtcConfig.iceServers',
         peerId: 'peer-test-99',
       });
-      // Compatibility with existing tests and UI diagnostics
-      assert.ok(err.includes('NAT Simétrico'));
-      assert.ok(err.includes('Configure um servidor TURN'));
+      assert.ok(err.includes('Tempo esgotado'));
+      assert.ok(!err.includes('NAT Simétrico'));
+      assert.ok(!err.includes('Configure um servidor TURN'));
       assert.ok(err.includes('peer: peer-t'));
     });
   });

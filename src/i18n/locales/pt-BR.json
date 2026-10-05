@@ -1,4 +1,6 @@
 {
+  "ice.lanTimeout": "Tempo esgotado na conexão WebRTC{{peer}} pela LAN/VPN. Verifique a negociação, a rede e o firewall dos participantes.",
+  "ice.connectionTimeout": "Tempo esgotado na conexão WebRTC{{peer}}. Verifique a negociação e a conectividade ICE; este erro não identifica a causa.",
   "lan.connectionMode": "Conexão",
   "lan.joinHint": "Sala de rede local / VPN. Entre na mesma rede do criador antes de conectar.",
   "lan.internetP2p": "Internet (P2P)",
