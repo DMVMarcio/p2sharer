@@ -1,5 +1,5 @@
 diff --git a/dist/media.mjs b/dist/media.mjs
-index 2fd4906..3089c90 100644
+index 2fd4906e80aefbef3f6b9f523a77ebf58562c3af..3968364812260fdc364199dec4ad34f451e01143 100644
 --- a/dist/media.mjs
 +++ b/dist/media.mjs
 @@ -53,6 +53,8 @@ const createMediaIdentityCache = () => {
@@ -81,7 +81,7 @@ index 2fd4906..3089c90 100644
  		get onPeerStream() {
  			return listeners.onPeerStream;
 diff --git a/dist/offer-pool.mjs b/dist/offer-pool.mjs
-index 7340a4f..4d7bee1 100644
+index 7340a4f4bd7192c2c9f064d40311433436effc0f..387a39da8d4f2824f69b298e2b6993242744204a 100644
 --- a/dist/offer-pool.mjs
 +++ b/dist/offer-pool.mjs
 @@ -2,7 +2,7 @@ import { all, alloc, noOp, resetTimer } from "./utils.mjs";
@@ -94,10 +94,36 @@ index 7340a4f..4d7bee1 100644
  	makeOffer;
  	pool = [];
 diff --git a/dist/peer.mjs b/dist/peer.mjs
-index 8003df9..c3554ee 100644
+index 8003df9196a808650bc233f9243be5eae14b4a1d..908d87fe821d94e971cded6e67035012b964d63d 100644
 --- a/dist/peer.mjs
 +++ b/dist/peer.mjs
-@@ -286,9 +286,9 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
+@@ -8,6 +8,12 @@ const offerType = "offer";
+ const answerType = "answer";
+ const outOfRangePattern = /out of range/i;
+ const rewriteMdnsCandidatesToLoopback = (sdp) => sdp.replace(/ (\S+\.local) (\d+) typ host/g, " 127.0.0.1 $2 typ host");
++// Initial room offers must negotiate the data channel. Empty offers can appear
++// after offer recycling/rollback and otherwise consume an entire ICE timeout.
++const requireDataChannelOffer = (offer) => {
++	if (!offer || offer.type !== offerType || !/^m=application (?!0(?:\s|\/))\d+(?:\/\d+)? /m.test(offer.sdp)) throw new Error("WebRTC offer has no active data channel");
++	return offer;
++};
+ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig, _test_only_mdnsHostFallbackToLoopback }) => {
+ 	const pc = new (rtcPolyfill ?? RTCPeerConnection)({
+ 		iceServers: defaultIceServers.concat(turnConfig ?? []),
+@@ -224,9 +230,9 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
+ 		},
+ 		getOffer: async (restartIce = false) => {
+ 			if (!initiator) return;
+-			if (restartIce) return createOffer(true);
+-			if (pc.localDescription?.type === offerType) return shouldTrickleIce ? localDescriptionSignal(pc) : waitForIceGathering(pc);
+-			return offerPromise;
++			if (restartIce) return requireDataChannelOffer(await createOffer(true));
++			if (pc.localDescription?.type === offerType) return requireDataChannelOffer(shouldTrickleIce ? localDescriptionSignal(pc) : await waitForIceGathering(pc));
++			return requireDataChannelOffer(await offerPromise);
+ 		},
+ 		async signal(sdp) {
+ 			if (sdp.type === "candidate") {
+@@ -286,9 +292,9 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
  			});
  		},
  		offerPromise,
