@@ -7,7 +7,7 @@
   "lan.selectNetwork": "Select a network",
   "lan.noInterfaces": "No available network interfaces. Connect to a local network or start your VPN.",
   "lan.interfacesFailed": "Could not list network interfaces.",
-  "lan.createHint": "Everyone must be on the same local network or VPN. Media travels directly between participants. Keep this app open for new participants to join; allow P2Sharer through the firewall on this network.",
+  "lan.createHint": "Use the same network or VPN. Keep the app open for new participants and allow P2Sharer through the firewall.",
   "lan.signalingUnavailable": "LAN discovery is reconnecting. Existing peer connections remain active; new connections need the room creator online.",
   "lan.signalingRestored": "LAN discovery restored.",
   "lan.connectFailed": "Could not connect to the LAN room. Check that the creator is online, the selected network is available, and P2Sharer is allowed through the firewall.",

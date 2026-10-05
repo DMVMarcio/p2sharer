@@ -51,6 +51,8 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 - `[LAN Implementation Scope]` Implement and experiment with direct WebRTC mesh over LAN/virtual LAN first, including Radmin VPN; retain the existing internet P2P mode and defer full hosted-room and VPS server modes. Discover local adapter addresses at runtime and never retain personal VPN addresses in source, fixtures, or shared memory.
 
+- `[LAN UI Copy]` Keep the network-selector hint brief; omit the explanation that media travels directly between participants and simplify the remaining instructions.
+
 - `[Application Version]` Show the bundled application version discreetly in the homepage corner and beside update controls in Application settings. Update dialogs must show the installed and offered versions together, including beta-to-stable transitions. Reuse the shared AppVersion component and synchronized release metadata.
 
 - `[Localization]` Provide English and Brazilian Portuguese throughout the app. Detect the primary Windows user locale on first launch, fall back to English for unsupported languages, persist the choice locally, and apply changes under Settings > Application only after Save Settings, discarding unsaved language drafts when closing. Omit the language explanatory subtitle. Apply it to the main app and detached windows while preserving authored names, chat, notes and external media titles. Keep signed protocol copy stable and localize structured notices only at presentation.

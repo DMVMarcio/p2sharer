@@ -7,7 +7,7 @@
   "lan.selectNetwork": "Selecione uma rede",
   "lan.noInterfaces": "Nenhuma interface de rede disponível. Conecte-se a uma rede local ou inicie sua VPN.",
   "lan.interfacesFailed": "Não foi possível listar as interfaces de rede.",
-  "lan.createHint": "Todos devem estar na mesma rede local ou VPN. A mídia passa diretamente entre os participantes. Mantenha este app aberto para novas entradas; permita o P2Sharer no firewall dessa rede.",
+  "lan.createHint": "Use a mesma rede ou VPN. Mantenha o app aberto para novas entradas e permita o P2Sharer no firewall.",
   "lan.signalingUnavailable": "A descoberta LAN está reconectando. As conexões existentes continuam ativas; novas conexões precisam do criador da sala online.",
   "lan.signalingRestored": "Descoberta LAN restabelecida.",
   "lan.connectFailed": "Não foi possível conectar à sala LAN. Verifique se o criador está online, a rede selecionada está disponível e o P2Sharer está permitido no firewall.",
