@@ -82,6 +82,9 @@ importers:
       '@tiptap/starter-kit':
         specifier: ^3.31.3
         version: 3.31.3
+      '@trystero-p2p/core':
+        specifier: 0.25.3
+        version: 0.25.3(patch_hash=cf8e82e756f274710226230c4f7f67a3a46ab0c3524de9e7781666bfd829d088)
       '@trystero-p2p/mqtt':
         specifier: ^0.25.3
         version: 0.25.3
@@ -146,9 +149,6 @@ importers:
       '@tauri-apps/cli':
         specifier: ^2.12.1
         version: 2.12.1
-      '@trystero-p2p/core':
-        specifier: 0.25.3
-        version: 0.25.3(patch_hash=cf8e82e756f274710226230c4f7f67a3a46ab0c3524de9e7781666bfd829d088)
       '@types/pako':
         specifier: ^2.0.4
         version: 2.0.4

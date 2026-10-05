@@ -185,7 +185,7 @@ export class RoomService {
     stateStore.set((s) => {
       s.currentRoomCode = parsed ? parsed.roomId.slice(0, 8) : code;
       s.currentRoomInvite = parsed ? code : '';
-      s.currentRoomName = parsed?.version === 4 ? parsed.name : parsed?.roomId.slice(0, 8) ?? code;
+      s.currentRoomName = parsed && parsed.version !== 3 ? parsed.name : parsed?.roomId.slice(0, 8) ?? code;
       s.currentRoomPassword = pass;
       s.isCreator = isCreator;
       s.roomSlots = [
@@ -381,7 +381,7 @@ export class RoomService {
           status.includes('Participante')
         ) {
           this.hideConnecting();
-        } else if (status.startsWith('Erro') || status.startsWith('Senha incorreta')) {
+        } else if (status.startsWith('Erro') || status.startsWith('Senha incorreta') || status === t('lan.connectFailed')) {
           this.hideConnecting();
           showToast(status, 5000);
         }

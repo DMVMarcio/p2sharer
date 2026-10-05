@@ -52,7 +52,7 @@ export const EditSavedRoomDialog: React.FC<EditSavedRoomDialogProps> = ({ room, 
           return;
         }
         await savedRooms.put({ roomId: nextInvite.roomId, invite: inviteCode.trim(),
-          name: nextInvite.version === 4 ? nextInvite.name : nextInvite.roomId.slice(0, 8),
+          name: nextInvite.version !== 3 ? nextInvite.name : nextInvite.roomId.slice(0, 8),
           customName: nameCustomized ? nextName : undefined,
           saved: true, owned: false, protected: true,
           password: nextPassword || undefined });
@@ -63,7 +63,7 @@ export const EditSavedRoomDialog: React.FC<EditSavedRoomDialogProps> = ({ room, 
         }
       } else {
         await savedRooms.put({ ...current, invite: inviteCode.trim(),
-          name: nextInvite.version === 4 ? nextInvite.name : current.name,
+          name: nextInvite.version !== 3 ? nextInvite.name : current.name,
           customName: nameCustomized ? nextName : undefined,
           password: nextPassword || undefined,
           protected: Boolean(nextPassword) || current.protected });

@@ -1,13 +1,13 @@
 import { defaultRelayUrls as defaultNostrUrls } from '@trystero-p2p/nostr';
 import { defaultRelayUrls as defaultTorrentUrls } from '@trystero-p2p/torrent';
-import type { SignalingTransport } from '../core/types.ts';
+import type { RendezvousTransport, SignalingTransport } from '../core/types.ts';
 
 export interface RendezvousServer {
   url: string;
   enabled: boolean;
 }
 
-export type RendezvousPreferences = Record<SignalingTransport, RendezvousServer[]>;
+export type RendezvousPreferences = Record<RendezvousTransport, RendezvousServer[]>;
 
 const STORAGE_KEY = 'p2sharer_rendezvous_servers_v1';
 
@@ -18,7 +18,7 @@ export const DEFAULT_MQTT_RELAY_URLS = [
   'wss://test.mosquitto.org:8081/mqtt',
 ];
 
-const defaults: Record<SignalingTransport, string[]> = {
+const defaults: Record<RendezvousTransport, string[]> = {
   mqtt: DEFAULT_MQTT_RELAY_URLS,
   nostr: defaultNostrUrls,
   torrent: defaultTorrentUrls,
@@ -85,5 +85,6 @@ export function saveRendezvousPreferences(value: RendezvousPreferences): void {
 }
 
 export function enabledRendezvousUrls(value: RendezvousPreferences, transport: SignalingTransport): string[] {
+  if (transport === 'lan') return [];
   return value[transport].filter((server) => server.enabled).map((server) => server.url);
 }
