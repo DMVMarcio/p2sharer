@@ -48,7 +48,7 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 4. User Guidelines & Expressed Preferences
 
-- `[Stream Volume]` The vertical volume control stays 28px wide and keeps its icon stationary. One shared background expands upward to reveal the slider; the slider must not have a separate wider panel or duplicate background. Apply the shared recipe to stream cards and PiP.
+- `[Stream Volume]` The vertical volume control stays 28px wide and keeps its icon stationary. One shared background expands upward to reveal the slider; the slider must not have a separate wider panel or duplicate background. Display the percentage above the slider. Apply the shared recipe to stream cards and PiP.
 
 - `[Media Diagnostics]` For intermittent streaming failures, provide an opt-in diagnostic executable for both sender and receiver, including PiP telemetry. Collect bounded technical metrics without media, room credentials, messages or machine-specific reports in the repository; preserve production media behavior during diagnosis.
 

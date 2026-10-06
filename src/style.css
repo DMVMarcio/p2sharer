@@ -2116,6 +2116,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 }
 
 .stream-volume-slider-box .stream-volume-percent {
+  order: -1;
   text-align: center;
   min-width: 0;
   font-size: 9px;
