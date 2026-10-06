@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { AppUpdateController, type AvailableUpdate } from '../../src/core/app_updates.ts';
+import { AppUpdateController, UPDATE_CHECK_INTERVAL_MS, type AvailableUpdate } from '../../src/core/app_updates.ts';
 
 function fixture() {
   const events: string[] = [];
@@ -146,21 +146,26 @@ test('beta opt-in defaults off, persists independently, and applies to manual ch
   const channels: boolean[] = [];
   dependencies.check = async preview => { channels.push(preview); return null; };
   controller.setPreferences(false, true);
+  await new Promise(resolve => setImmediate(resolve));
   assert.equal(fixture().controller.getSnapshot().includePrereleases, true);
   assert.equal(fixture().controller.getSnapshot().automatic, false);
   await controller.check();
-  assert.deepEqual(channels, []);
+  assert.deepEqual(channels, [true]);
+  assert.equal(controller.getSnapshot().dialogOpen, false);
   await controller.check(true);
+  controller.close();
   controller.setPreferences(false, false);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(controller.getSnapshot().dialogOpen, false);
   await controller.check(true);
-  assert.deepEqual(channels, [true, false]);
+  assert.deepEqual(channels, [true, true, false, false]);
 });
 
 test('switching channels discards a verified download and cannot install it', async context => {
   isolatedStorage(context);
   const { controller, dependencies, events } = fixture();
   controller.setPreferences(false, true);
-  await controller.check(true);
+  await new Promise(resolve => setImmediate(resolve));
   await controller.download();
   dependencies.check = async () => null;
   controller.setPreferences(false, false);
@@ -213,7 +218,7 @@ test('channel changes are rejected during a download, preserving the selected in
   isolatedStorage(context);
   const { controller, update } = fixture();
   controller.setPreferences(false, true);
-  await controller.check(true);
+  await new Promise(resolve => setImmediate(resolve));
   let finish!: () => void;
   update.download = () => new Promise(resolve => { finish = resolve; });
   const pending = controller.download();
@@ -234,10 +239,39 @@ test('opting out of beta offers stable immediately even with automatic checks di
   controller.setPreferences(false, true);
   controller.setPreferences(false, false);
   await new Promise(resolve => setImmediate(resolve));
-  assert.deepEqual(channels, [false]);
+  assert.deepEqual(channels, [true, false]);
   assert.equal(controller.getSnapshot().automatic, false);
-  assert.equal(controller.getSnapshot().dialogOpen, true);
+  assert.equal(controller.getSnapshot().dialogOpen, false);
   assert.equal(controller.getSnapshot().version, '1.0.0');
   assert.equal(controller.getSnapshot().status, 'available');
   assert.equal(controller.getSnapshot().returnToStable, true);
+});
+
+test('automatic checks run at startup and every 30 minutes, respect opt-out and stop on teardown', async context => {
+  isolatedStorage(context);
+  context.mock.timers.enable({ apis: ['setInterval'] });
+  const { controller, dependencies } = fixture();
+  let checks = 0;
+  dependencies.check = async () => { checks++; return null; };
+  const stop = controller.startAutomaticChecks();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(checks, 1);
+  assert.equal(UPDATE_CHECK_INTERVAL_MS, 1_800_000);
+  context.mock.timers.tick(1_799_999);
+  assert.equal(checks, 1);
+  context.mock.timers.tick(1);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(checks, 2);
+  context.mock.timers.tick(1_800_000);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(checks, 3);
+  controller.setAutomatic(false);
+  context.mock.timers.tick(1_800_000);
+  assert.equal(checks, 3);
+  stop();
+  controller.setAutomatic(true);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(checks, 4);
+  context.mock.timers.tick(1_800_000);
+  assert.equal(checks, 4);
 });

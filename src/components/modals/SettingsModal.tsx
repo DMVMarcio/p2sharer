@@ -8,6 +8,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useModal } from '../../hooks/useModal';
 import { useAppTheme, ACCENT_COLORS } from '../../hooks/useAppTheme';
+import { ColorPicker } from '../common/ColorPicker';
+import { TooltipButton } from '../common/TooltipButton';
 import { roomService } from '../../services/room_service';
 import { INITIAL_TRANSMISSION_DEFAULTS, stateStore } from '../../core/state_store';
 import { soundEffects, SOUND_EVENTS, type SoundEvent } from '../../ui/sound_effects';
@@ -462,8 +464,9 @@ export const SettingsModal: React.FC = () => {
                   <label className="settings-label">{t("message.d0bc3fef4a6e")}</label>
                   <div className="accent-colors-palette" id="accent-colors-palette">
                     {ACCENT_COLORS.map((item) => (
-                      <button
+                      <TooltipButton
                         key={item.id}
+                        tooltip={item.label}
                         type="button"
                         className={`accent-swatch ${accentColor === item.id ? 'active' : ''}`}
                         style={{ '--swatch-color': item.color } as React.CSSProperties}
@@ -471,6 +474,9 @@ export const SettingsModal: React.FC = () => {
                         onClick={() => setAccentColor(item.id)}
                       />
                     ))}
+                    <ColorPicker label={t('color.custom')} active={accentColor.startsWith('#')}
+                      value={accentColor.startsWith('#') ? accentColor : ACCENT_COLORS.find(item => item.id === accentColor)?.color || '#06b6d4'}
+                      onChange={setAccentColor} />
                   </div>
                 </div>
               </div>

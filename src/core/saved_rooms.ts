@@ -22,7 +22,7 @@ export function savedRoomCustomName(record: SavedRoom): string | undefined {
   if (record.customName !== undefined) return record.customName;
   if (record.owned) return undefined;
   const invite = parseRoomInvite(record.invite);
-  const sharedName = invite?.version === 4 ? invite.name : record.roomId.slice(0, 8);
+  const sharedName = invite && invite.version !== 3 ? invite.name : record.roomId.slice(0, 8);
   return record.name !== sharedName ? record.name : undefined;
 }
 

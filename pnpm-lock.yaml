@@ -6,7 +6,7 @@ settings:
 
 patchedDependencies:
   '@trystero-p2p/core@0.25.3':
-    hash: cf8e82e756f274710226230c4f7f67a3a46ab0c3524de9e7781666bfd829d088
+    hash: 69cd6c33aa8c36ff9a130b3327cf9346bcaae6e322cdec8b30b1898839fb9c64
     path: patches/@trystero-p2p__core@0.25.3.patch
 
 importers:
@@ -82,6 +82,9 @@ importers:
       '@tiptap/starter-kit':
         specifier: ^3.31.3
         version: 3.31.3
+      '@trystero-p2p/core':
+        specifier: 0.25.3
+        version: 0.25.3(patch_hash=69cd6c33aa8c36ff9a130b3327cf9346bcaae6e322cdec8b30b1898839fb9c64)
       '@trystero-p2p/mqtt':
         specifier: ^0.25.3
         version: 0.25.3
@@ -146,9 +149,6 @@ importers:
       '@tauri-apps/cli':
         specifier: ^2.12.1
         version: 2.12.1
-      '@trystero-p2p/core':
-        specifier: 0.25.3
-        version: 0.25.3(patch_hash=cf8e82e756f274710226230c4f7f67a3a46ab0c3524de9e7781666bfd829d088)
       '@types/pako':
         specifier: ^2.0.4
         version: 2.0.4
@@ -2501,11 +2501,11 @@ snapshots:
       y-protocols: 1.0.7(yjs@13.6.33)
       yjs: 13.6.33
 
-  '@trystero-p2p/core@0.25.3(patch_hash=cf8e82e756f274710226230c4f7f67a3a46ab0c3524de9e7781666bfd829d088)': {}
+  '@trystero-p2p/core@0.25.3(patch_hash=69cd6c33aa8c36ff9a130b3327cf9346bcaae6e322cdec8b30b1898839fb9c64)': {}
 
   '@trystero-p2p/mqtt@0.25.3':
     dependencies:
-      '@trystero-p2p/core': 0.25.3(patch_hash=cf8e82e756f274710226230c4f7f67a3a46ab0c3524de9e7781666bfd829d088)
+      '@trystero-p2p/core': 0.25.3(patch_hash=69cd6c33aa8c36ff9a130b3327cf9346bcaae6e322cdec8b30b1898839fb9c64)
       mqtt: 5.15.2
     transitivePeerDependencies:
       - bufferutil
@@ -2515,11 +2515,11 @@ snapshots:
   '@trystero-p2p/nostr@0.25.3':
     dependencies:
       '@noble/secp256k1': 3.1.0
-      '@trystero-p2p/core': 0.25.3(patch_hash=cf8e82e756f274710226230c4f7f67a3a46ab0c3524de9e7781666bfd829d088)
+      '@trystero-p2p/core': 0.25.3(patch_hash=69cd6c33aa8c36ff9a130b3327cf9346bcaae6e322cdec8b30b1898839fb9c64)
 
   '@trystero-p2p/torrent@0.25.3':
     dependencies:
-      '@trystero-p2p/core': 0.25.3(patch_hash=cf8e82e756f274710226230c4f7f67a3a46ab0c3524de9e7781666bfd829d088)
+      '@trystero-p2p/core': 0.25.3(patch_hash=69cd6c33aa8c36ff9a130b3327cf9346bcaae6e322cdec8b30b1898839fb9c64)
 
   '@types/babel__core@7.20.5':
     dependencies:

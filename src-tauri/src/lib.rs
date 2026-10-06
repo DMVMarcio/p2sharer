@@ -27,6 +27,7 @@ mod window_chrome;
 mod localization;
 mod app_data_migration;
 mod app_updates;
+pub mod lan_signaling;
 
 use audio_loopback::{start_audio_capture, stop_audio_capture};
 use logger::{clear_log_file, get_log_file_path, open_latest_log, open_log_folder, write_frontend_log};
@@ -69,7 +70,9 @@ pub fn run() {
     #[cfg(windows)]
     {
         // Enable GPU hardware rasterization, zero-copy video pipeline, WebCodecs & WebRTC HW acceleration in WebView2
-        let current_args = std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS").unwrap_or_default();
+        let current_args = lan_signaling::browser_arguments(
+            &std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS").unwrap_or_default());
+        std::env::set_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", &current_args);
         if !current_args.contains("--enable-blink-features=MediaStreamTrackGenerator") {
             let extra_args = "--enable-gpu-rasterization --enable-zero-copy --enable-accelerated-video-decode --enable-accelerated-video-encode --enable-webrtc-hw-h264-encoding --enable-webrtc-hw-vp8-encoding --enable-gpu-memory-buffer-video-frames --enable-features=WebRtcHardwareVideoEncoding,WebRtcHardwareVideoDecoding,AcceleratedVideoEncoder,AcceleratedVideoDecoder,MediaStreamTrackGenerator --enable-blink-features=MediaStreamTrackGenerator";
             let new_args = if current_args.is_empty() {
@@ -86,6 +89,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .manage(ChatFileState::default())
+        .manage(lan_signaling::LanSignalingState::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
@@ -108,6 +112,12 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            lan_signaling::list_lan_interfaces,
+            lan_signaling::start_lan_signaling,
+            lan_signaling::stop_lan_signaling,
+            lan_signaling::connect_lan_signaling,
+            lan_signaling::send_lan_signaling,
+            lan_signaling::disconnect_lan_signaling,
             app_updates::check_app_update,
             prepare_app_update,
             cancel_app_update,

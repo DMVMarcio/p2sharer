@@ -62,7 +62,7 @@ fn invite_version(record: &serde_json::Value) -> Result<(String, u64, u64), Stri
     let invite = record.get("invite").and_then(|value| value.as_str())
         .ok_or("Missing room invitation")?;
     let (prefix, payload) = invite.split_once('.').ok_or("Invalid room invitation")?;
-    if prefix != "p2s3" && prefix != "p2s4" { return Err("Invalid room invitation version".into()); }
+    if prefix != "p2s3" && prefix != "p2s4" && prefix != "p2s5" { return Err("Invalid room invitation version".into()); }
     let decoded = URL_SAFE_NO_PAD.decode(payload).map_err(|e| e.to_string())?;
     let fields: serde_json::Value = serde_json::from_slice(&decoded).map_err(|e| e.to_string())?;
     let fields = fields.as_array().ok_or("Invalid room invitation payload")?;

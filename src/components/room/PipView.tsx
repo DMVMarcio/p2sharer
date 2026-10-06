@@ -560,6 +560,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
                   value={isMuted ? 0 : volume}
                   onChange={handleVolumeChange}
                   className="stream-volume-range"
+                  aria-orientation="vertical"
                   aria-label={t("message.c6c6caae0ddf")}
                 />
                 <span className="stream-volume-percent">{isMuted ? '0%' : `${volume}%`}</span>

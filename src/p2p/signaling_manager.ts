@@ -18,6 +18,8 @@ import type {
   TransportStatusInfo,
 } from '../core/types.ts';
 import { enabledRendezvousUrls, loadRendezvousPreferences, type RendezvousPreferences } from './relay_preferences.ts';
+import type { LanRoomConnection } from '../core/lan_room.ts';
+import { prepareLanSignaling, type LanSignalingRoom } from './lan_signaling.ts';
 export { DEFAULT_MQTT_RELAY_URLS } from './relay_preferences.ts';
 
 export interface RoomReconnectionHandler {
@@ -79,6 +81,17 @@ export class SignalingManager {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private lastRoomParams: { config: any; topic: string; callbacks?: any } | null = null;
   private directConnectedPeers: Set<string> = new Set();
+  private lanRoom: LanSignalingRoom | null = null;
+
+  public async prepareLan(connection: LanRoomConnection, room: string, host: boolean,
+    status: (connected: boolean) => void): Promise<void> {
+    this.stopMqttRelayMonitoring();
+    this.stopWatchdog();
+    this.lanRoom = await prepareLanSignaling(connection, room, host, (connected) => {
+      status(connected);
+      this.notifyStatusChange();
+    });
+  }
 
   // Active MQTT WebSocket probe monitoring
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -213,6 +226,9 @@ export class SignalingManager {
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public getRelaySockets(transport: SignalingTransport = this.activeTransport): Record<string, any> {
+    if (transport === 'lan') return this.lanRoom ? {
+      lan: { connected: this.lanRoom.relay.connected, readyState: this.lanRoom.relay.connected ? 1 : 3 },
+    } : {};
     try {
       if (transport === 'mqtt') {
         const raw = getMqttRelaySockets() || {};
@@ -259,7 +275,7 @@ export class SignalingManager {
       }
     }
 
-    const defaultUrlsCount = enabledRendezvousUrls(this.roomPreferences, transport).length;
+    const defaultUrlsCount = transport === 'lan' ? 1 : enabledRendezvousUrls(this.roomPreferences, transport).length;
 
     const effectiveTotal = Math.max(total, defaultUrlsCount);
     const ratio = effectiveTotal > 0 ? connected / effectiveTotal : 0;
@@ -325,7 +341,10 @@ export class SignalingManager {
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public joinRoom(config: any, topic: string, callbacks?: any): any {
-    if (!this.isFailingOver) {
+    if (this.lanRoom) {
+      this.activeTransport = 'lan';
+      this.availableTransports = ['lan'];
+    } else if (!this.isFailingOver) {
       this.roomPreferences = loadRendezvousPreferences();
       this.availableTransports = (['mqtt', 'nostr', 'torrent'] as const)
         .filter((transport) => enabledRendezvousUrls(this.roomPreferences, transport).length > 0);
@@ -337,7 +356,8 @@ export class SignalingManager {
 
     console.log(`[SignalingManager] Joining room on transport "${this.activeTransport}" (topic: ${topic})`);
 
-    const room = this.createRoomForTransport(this.activeTransport, config, topic, callbacks);
+    const room = this.lanRoom ? this.lanRoom.join(config, topic, callbacks) :
+      this.createRoomForTransport(this.activeTransport, config, topic, callbacks);
 
     if (this.activeRoom) {
       const oldRoom = this.activeRoom;
@@ -346,7 +366,7 @@ export class SignalingManager {
       } catch {}
     }
     this.activeRoom = room;
-    this.startWatchdog();
+    if (!this.lanRoom) this.startWatchdog();
     this.notifyStatusChange();
     return room;
   }
@@ -376,6 +396,9 @@ export class SignalingManager {
       this.activeRoom = null;
     }
     this.lastRoomParams = null;
+    const lanRoom = this.lanRoom;
+    this.lanRoom = null;
+    await lanRoom?.close();
     this.directConnectedPeers.clear();
     this.consecutiveStalls = 0;
     this.activeTransport = 'mqtt';
@@ -393,6 +416,20 @@ export class SignalingManager {
    */
   public async reannounce(topic: string, targetPeerId?: string): Promise<void> {
     const appId = this.lastRoomParams?.config?.appId;
+    if (this.lanRoom && this.activeRoom && topic === this.lastRoomParams?.topic && typeof appId === 'string') {
+      const lanRoom = this.lanRoom;
+      const room = this.activeRoom;
+      const rootTopic = await computeTrysteroSha1(`Trystero@${appId}@${topic}`);
+      if (this.lanRoom !== lanRoom || this.activeRoom !== room) return;
+      const payload = JSON.stringify({ peerId: this.getSelfId() });
+      await lanRoom.relay.publish(rootTopic, payload).catch(() => {});
+      if (targetPeerId) {
+        const peerTopic = await computeTrysteroSha1(`Trystero@${appId}@${topic}@${targetPeerId}`);
+        if (this.lanRoom !== lanRoom || this.activeRoom !== room) return;
+        await lanRoom.relay.publish(peerTopic, payload).catch(() => {});
+      }
+      return;
+    }
     if (this.activeTransport !== 'mqtt' || !this.activeRoom ||
         topic !== this.lastRoomParams?.topic || typeof appId !== 'string') return;
     const room = this.activeRoom;
@@ -551,7 +588,7 @@ export class SignalingManager {
    * triggers transport failover.
    */
   public checkRelayHealth(): void {
-    if (!this.activeRoom) return;
+    if (!this.activeRoom || this.lanRoom) return;
 
     // Allow 4.0s grace period after initial room join before diagnosing stall
     const now = Date.now();

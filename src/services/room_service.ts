@@ -10,7 +10,7 @@ import { roomAppsService } from '../apps/room_apps_service.ts';
 import { AudioBridge } from '../audio/audio_bridge.ts';
 import { audioContextManager } from '../audio/audio_context_manager.ts';
 import { stateStore } from '../core/state_store.ts';
-import { shouldNotifyChat } from '../core/chat_notifications.ts';
+import { shouldNotifyChat, shouldPlayChatSound } from '../core/chat_notifications.ts';
 import { mergeChatHistory, nextChatOrder } from '../core/chat_history.ts';
 import { CHAT_FILE_CHUNK_BYTES, MAX_IMAGE_PREVIEW_BYTES } from '../core/chat_file_limits.ts';
 import { verifyRoomInvite } from '../core/room_invite_validation.ts';
@@ -185,7 +185,7 @@ export class RoomService {
     stateStore.set((s) => {
       s.currentRoomCode = parsed ? parsed.roomId.slice(0, 8) : code;
       s.currentRoomInvite = parsed ? code : '';
-      s.currentRoomName = parsed?.version === 4 ? parsed.name : parsed?.roomId.slice(0, 8) ?? code;
+      s.currentRoomName = parsed && parsed.version !== 3 ? parsed.name : parsed?.roomId.slice(0, 8) ?? code;
       s.currentRoomPassword = pass;
       s.isCreator = isCreator;
       s.roomSlots = [
@@ -303,7 +303,9 @@ export class RoomService {
       onChat: (msg: ChatMessage) => {
         if (this.roomManager !== manager) return;
         if (shouldNotifyChat(msg, this.chatMessages, manager.getLocalPeerId())) {
-          soundEffects.playMessage();
+          if (shouldPlayChatSound(document.hasFocus() && !document.hidden, stateStore.isSidebarCollapsed, stateStore.sidebarTab)) {
+            soundEffects.playMessage();
+          }
           if (stateStore.isSidebarCollapsed || stateStore.sidebarTab !== 'chat') {
             stateStore.set((state) => { state.unreadChatMessages += 1; });
           }
@@ -381,7 +383,7 @@ export class RoomService {
           status.includes('Participante')
         ) {
           this.hideConnecting();
-        } else if (status.startsWith('Erro') || status.startsWith('Senha incorreta')) {
+        } else if (status.startsWith('Erro') || status.startsWith('Senha incorreta') || status === t('lan.connectFailed')) {
           this.hideConnecting();
           showToast(status, 5000);
         }
