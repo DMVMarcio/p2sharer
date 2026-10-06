@@ -12,6 +12,8 @@ import { showToast } from './useToast';
 export function useScreenPicker(onClose?: () => void, isClosing = false) {
   const editingId = useStore((state) => state.editingStreamId);
   const editing = editingId ? roomService.localCaptures.get(editingId) : undefined;
+  const screenEditing = editing?.kind === 'screen' ? editing : undefined;
+  const cameraEditing = editing?.kind === 'camera' ? editing : undefined;
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
   const [error, setError] = useState('');
   const [monitors, setMonitors] = useState<MonitorSource[]>([]);
@@ -28,34 +30,47 @@ export function useScreenPicker(onClose?: () => void, isClosing = false) {
   const defaultBitrate = useStore((s) => s.currentBitrate);
   const defaultQuality = useStore((s) => s.currentQuality);
 
-  const initialRes = editing ? editing.kind === 'camera' ? `${editing.resolution.width}x${editing.resolution.height}` :
-    editing.resolution.height === 2160 ? '4k' : `${editing.resolution.height}p` :
+  const initialRes = screenEditing ?
+    screenEditing.resolution.height === 2160 ? '4k' : `${screenEditing.resolution.height}p` :
     localStorage.getItem('p2sharer_default_res') || defaultRes || INITIAL_TRANSMISSION_DEFAULTS.resolution;
-  const [resolution, setResolution] = useState<string>(initialRes.includes('x') && editing?.kind !== 'camera'
+  const [screenResolution, setScreenResolution] = useState<string>(initialRes.includes('x')
     ? [360, 480, 720, 1080, 1440].includes(stateStore.parseResolution(initialRes).height)
       ? `${stateStore.parseResolution(initialRes).height}p` : '1080p' : initialRes);
-  const initialFps = editing?.fps || Number(localStorage.getItem('p2sharer_default_fps') || defaultFps);
-  const [fps, setFps] = useState<number>(editing?.kind === 'camera' || [15, 30, 60, 120].includes(initialFps) ? initialFps : 30);
-  const [bitrate, setBitrate] = useState<number>(
-    editing?.bitrate || parseInt(localStorage.getItem('p2sharer_default_bitrate') || '', 10) ||
+  const initialFps = screenEditing?.fps || Number(localStorage.getItem('p2sharer_default_fps') || defaultFps);
+  const [screenFps, setScreenFps] = useState<number>([15, 30, 60, 120].includes(initialFps) ? initialFps : 30);
+  const [screenBitrate, setScreenBitrate] = useState<number>(
+    screenEditing?.bitrate || parseInt(localStorage.getItem('p2sharer_default_bitrate') || '', 10) ||
       defaultBitrate ||
       stateStore.getDefaultBitrateForResolution(initialRes)
   );
-  const [quality, setQuality] = useState<number>(
-    editing?.quality || parseInt(localStorage.getItem('p2sharer_default_quality') || (defaultQuality ? defaultQuality.toString() : '90'), 10) || 90
+  const [screenQuality, setQuality] = useState<number>(
+    screenEditing?.quality || parseInt(localStorage.getItem('p2sharer_default_quality') || (defaultQuality ? defaultQuality.toString() : '90'), 10) || 90
   );
   const [showCursor, setShowCursor] = useState<boolean>(
-    editing?.mouse ?? (localStorage.getItem('p2sharer_default_cursor') !== 'false')
+    screenEditing?.mouse ?? (localStorage.getItem('p2sharer_default_cursor') !== 'false')
   );
+  const [cameraResolution, setCameraResolution] = useState(cameraEditing
+    ? `${cameraEditing.resolution.width}x${cameraEditing.resolution.height}` : INITIAL_TRANSMISSION_DEFAULTS.resolution);
+  const [cameraFps, setCameraFps] = useState(cameraEditing?.fps || INITIAL_TRANSMISSION_DEFAULTS.fps);
+  const [cameraBitrate, setCameraBitrate] = useState(cameraEditing?.bitrate ||
+    stateStore.getDefaultBitrateForResolution(INITIAL_TRANSMISSION_DEFAULTS.resolution));
+  const isCamera = currentTab === 'cameras';
+  const resolution = isCamera ? cameraResolution : screenResolution;
+  const setResolution = isCamera ? setCameraResolution : setScreenResolution;
+  const fps = isCamera ? cameraFps : screenFps;
+  const setFps = isCamera ? setCameraFps : setScreenFps;
+  const bitrate = isCamera ? cameraBitrate : screenBitrate;
+  const setBitrate = isCamera ? setCameraBitrate : setScreenBitrate;
+  const quality = isCamera ? cameraEditing?.quality || 90 : screenQuality;
 
   const receiveModes = useCallback((modes: CameraResolution[]) => {
     setCameraModes(modes);
-    setResolution((current) => modes.some((mode) => mode.value === current) ? current :
+    setCameraResolution((current) => modes.some((mode) => mode.value === current) ? current :
       modes.find((mode) => mode.height === stateStore.parseResolution(current).height)?.value || modes[0]?.value || current);
   }, []);
   const receiveRates = useCallback((rates: number[]) => {
     setCameraRates(rates);
-    setFps((current) => preferredCameraFrameRate(rates, current));
+    setCameraFps((current) => preferredCameraFrameRate(rates, current));
   }, []);
   const selectedMode = cameraModes.find((mode) => mode.value === resolution);
   const resConfig = selectedSourceId.startsWith('camera:') && selectedMode ? selectedMode : stateStore.parseResolution(resolution);
@@ -66,7 +81,7 @@ export function useScreenPicker(onClose?: () => void, isClosing = false) {
     setResolution(newRes);
     const autoBitrate = stateStore.getDefaultBitrateForResolution(newRes);
     setBitrate(autoBitrate);
-  }, []);
+  }, [setResolution, setBitrate]);
 
   const handleTabChange = useCallback((tab: 'screens' | 'windows' | 'cameras') => {
     setCurrentTab(tab);
@@ -74,12 +89,6 @@ export function useScreenPicker(onClose?: () => void, isClosing = false) {
       setSelectedSourceId(cameras[0] ? `camera:${cameras[0].deviceId}` : '');
       return;
     }
-    setResolution((current) => {
-      if (!current.includes('x')) return current;
-      const height = stateStore.parseResolution(current).height;
-      return height === 2160 ? '4k' : [360, 480, 720, 1080, 1440].includes(height) ? `${height}p` : '1080p';
-    });
-    if (!([15, 30, 60, 120].includes(fps))) setFps(30);
     if (tab === 'screens' && monitors.length > 0) {
       if (!selectedSourceId || !selectedSourceId.startsWith('screen:')) {
         setSelectedSourceId(monitors[0].id);
@@ -89,7 +98,7 @@ export function useScreenPicker(onClose?: () => void, isClosing = false) {
         setSelectedSourceId(windows[0].id);
       }
     }
-  }, [monitors, windows, cameras, selectedSourceId, fps]);
+  }, [monitors, windows, cameras, selectedSourceId]);
 
   const loadSources = useCallback(async () => {
     setIsLoading(true);
@@ -138,13 +147,13 @@ export function useScreenPicker(onClose?: () => void, isClosing = false) {
         cameras.find((source) => `camera:${source.deviceId}` === chosen)?.label;
       const prepared = await preview.take();
       await roomService.startCapture(chosen, fps, { width: resConfig.width, height: resConfig.height }, showCursor, quality, label, prepared, bitrate);
-      stateStore.set((s) => {
+      if (!chosen.startsWith('camera:')) stateStore.set((s) => {
         s.currentResolution = resConfig;
         s.currentFps = fps;
         s.currentBitrate = bitrate;
         s.currentQuality = quality;
       });
-      if (stateStore.rememberTransmissionSettings) {
+      if (!chosen.startsWith('camera:') && stateStore.rememberTransmissionSettings) {
         try {
           stateStore.saveTransmissionDefaults({ resolution: resConfig.label.toLowerCase(), fps, bitrate, quality, cursor: showCursor });
         } catch (error) {
