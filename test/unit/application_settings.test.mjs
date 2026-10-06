@@ -69,13 +69,20 @@ test('appearance applies and persists custom colors and restores preset tokens',
   await act(async () => appearance.click());
   assert.ok(document.querySelector('[aria-label="Marrom"]'));
   assert.ok(document.querySelector('[aria-label="Azul escuro"]'));
-  const picker = document.querySelector('input[type="color"]');
+  await act(async () => document.querySelector('[aria-label="Marrom"]').focus());
+  await act(async () => new Promise(resolve => setTimeout(resolve, 100)));
+  assert.equal(document.querySelector('[role="tooltip"]').textContent, 'Marrom');
+  const picker = document.querySelector('.custom-color-picker');
   assert.equal(picker.getAttribute('aria-label'), 'Cor personalizada');
+  await act(async () => picker.click());
+  const hex = document.querySelector('.color-picker-dialog .text-input');
   await act(async () => {
-    Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(picker, '#ffffff');
-    picker.dispatchEvent(new window.Event('input', { bubbles: true }));
-    picker.dispatchEvent(new window.Event('change', { bubbles: true }));
+    Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(hex, '#ffffff');
+    hex.dispatchEvent(new window.Event('input', { bubbles: true }));
   });
+  assert.notEqual(localStorage.getItem('p2sharer_accent_color'), '#ffffff');
+  await act(async () => document.querySelector('.color-picker-dialog .btn-primary').click());
+  await act(async () => new Promise(resolve => setTimeout(resolve, 260)));
   assert.equal(localStorage.getItem('p2sharer_accent_color'), '#ffffff');
   assert.equal(document.documentElement.getAttribute('data-accent'), 'custom');
   assert.equal(document.documentElement.style.getPropertyValue('--custom-accent-text'), '#000000');
@@ -83,7 +90,19 @@ test('appearance applies and persists custom colors and restores preset tokens',
   await act(async () => root.render(React.createElement(SettingsModal)));
   await act(async () => [...document.querySelectorAll('.settings-nav-sidebar button')]
     .find(button => button.textContent.includes('Aparência')).click());
-  assert.equal(document.querySelector('input[type="color"]').value, '#ffffff');
+  await act(async () => document.querySelector('.custom-color-picker').click());
+  assert.equal(document.querySelector('.color-picker-dialog .text-input').value, '#ffffff');
+  const red = document.querySelector('.color-picker-dialog [aria-label="Vermelho"]');
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(red, '0');
+    red.dispatchEvent(new window.Event('input', { bubbles: true }));
+    red.dispatchEvent(new window.Event('change', { bubbles: true }));
+  });
+  assert.equal(document.querySelector('.color-picker-dialog .text-input').value, '#00ffff');
+  assert.equal(localStorage.getItem('p2sharer_accent_color'), '#ffffff');
+  await act(async () => document.querySelector('.color-picker-dialog .btn-secondary').click());
+  await act(async () => new Promise(resolve => setTimeout(resolve, 260)));
+  assert.equal(localStorage.getItem('p2sharer_accent_color'), '#ffffff');
   await act(async () => document.querySelector('[aria-label="Marrom"]').click());
   assert.equal(localStorage.getItem('p2sharer_accent_color'), 'brown');
   assert.equal(document.documentElement.getAttribute('data-accent'), 'brown');
@@ -105,7 +124,7 @@ test('application update controls keep drafts unsaved and check only the saved c
   assert.equal(controller.getSnapshot().includePrereleases, true);
   assert.equal(check.disabled, false);
   await act(async () => check.click());
-  assert.deepEqual(channels, [true]);
+  assert.deepEqual(channels, [true, true]);
   assert.equal(controller.getSnapshot().dialogOpen, true);
 });
 

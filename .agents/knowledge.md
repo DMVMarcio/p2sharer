@@ -47,6 +47,8 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 4. User Guidelines & Expressed Preferences
 
+- `[UI & Updates]` Bottom-right toasts wrap long text within a compact viewport-bounded width. Every color swatch has a canonical tooltip naming its color. Custom colors use an app-themed picker rather than the native browser color dialog. Automatic update checks run every 30 minutes; saving either beta-channel direction checks in the background without opening the update dialog, including when periodic checks are disabled.
+
 - `[UI]` Stream volume uses an upward vertical slider with a stationary mute icon, including native PiP. Incoming message sounds play only while the main app is unfocused or chat is hidden. Spotlight tray participant/stream labels stay on one truncated line. Color selectors include brown; the application accent palette also includes dark blue and a persistent custom color picker.
 
 - `[Connection Modes Exploration]` Preserve the existing decentralized P2P mode while evaluating room creation with a signed, versioned connection-mode descriptor in the invite. Explore LAN/virtual LAN (including Radmin VPN and Hamachi), an app-started host-dependent server, and a standalone self-hosted server suitable for a VPS. This is a feasibility request, not approval to implement or deploy; distinguish signaling-only hosting, TURN relaying, and full media/data server routing.

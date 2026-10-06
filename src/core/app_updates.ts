@@ -24,6 +24,7 @@ export interface UpdateState {
 
 const preferenceKey = 'p2sharer_auto_updates';
 const previewPreferenceKey = 'p2sharer_beta_updates';
+export const UPDATE_CHECK_INTERVAL_MS = 30 * 60 * 1000;
 export function betaUpdateChecks(): boolean {
   try { return globalThis.localStorage?.getItem(previewPreferenceKey) === 'true'; }
   catch { return false; }
@@ -70,6 +71,11 @@ export class AppUpdateController {
   setAutomatic(enabled: boolean) {
     this.setPreferences(enabled, this.state.includePrereleases);
   }
+  startAutomaticChecks(): () => void {
+    void this.check();
+    const timer = setInterval(() => void this.check(), UPDATE_CHECK_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }
   setPreferences(enabled: boolean, includePrereleases: boolean) {
     const channelChanged = includePrereleases !== this.state.includePrereleases;
     // A downloaded installer cannot be changed while downloading or installing.
@@ -87,18 +93,17 @@ export class AppUpdateController {
       this.set({ status: 'idle', version: null, notes: '', progress: null, error: null, returnToStable: false });
     }
     this.set({ automatic: enabled, includePrereleases });
-    const returnToStable = channelChanged && !includePrereleases;
-    if (returnToStable || (enabled && (!previous || channelChanged))) {
-      if (this.busy) this.recheck = returnToStable;
-      else void this.check(returnToStable);
+    if (channelChanged || (enabled && !previous)) {
+      if (this.busy) this.recheck = channelChanged;
+      else void this.check(false, channelChanged);
     }
   }
   open = () => { this.set({ dialogOpen: true }); };
   close = () => { if (!this.busy) this.set({ dialogOpen: false }); };
 
-  async check(manual = false): Promise<void> {
+  async check(manual = false, preferenceChange = false): Promise<void> {
     if (manual) this.open();
-    if (this.busy || (!manual && !this.state.automatic) || this.state.status === 'ready') return;
+    if (this.busy || (!manual && !preferenceChange && !this.state.automatic) || this.state.status === 'ready') return;
     this.busy = true;
     this.checking = true;
     const generation = this.automaticGeneration;
@@ -106,7 +111,7 @@ export class AppUpdateController {
     this.set({ status: 'checking', error: null });
     try {
       const result = await this.dependencies.check(this.state.includePrereleases);
-      if (channel !== this.channelGeneration || (!manual && generation !== this.automaticGeneration && !this.state.automatic)) {
+      if (channel !== this.channelGeneration || (!manual && !preferenceChange && generation !== this.automaticGeneration && !this.state.automatic)) {
         await result?.close();
         this.set({ status: this.update ? 'available' : 'idle' });
         return;
@@ -131,7 +136,7 @@ export class AppUpdateController {
       this.checking = false;
       const recheck = this.recheck;
       this.recheck = null;
-      if (recheck !== null) void this.check(recheck);
+      if (recheck !== null) void this.check(false, recheck);
     }
   }
 

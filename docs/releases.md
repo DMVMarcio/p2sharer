@@ -121,7 +121,7 @@ The release action publishes locale-free installer filenames with a consistent `
 
 Updates currently target installed Windows applications, using signed NSIS and MSI installers. The release workflow does not distribute a portable executable. A standalone executable contains update checks, but installation follows the installer flow rather than replacing that executable in place. Preserving portable operation during updates requires a separate implementation and validation.
 
-The main window checks at startup and every six hours while automatic checks are enabled. **Settings > Profile** contains the persistent automatic-check switch and a manual check button. Changes to the switch apply when settings are saved.
+The main window checks at startup and every 30 minutes while automatic checks are enabled. **Settings > Application** contains the persistent automatic-check switch and a manual check button. Changes to the switch apply when settings are saved. Saving a change to the beta channel checks in the background in either direction, even when periodic checks are disabled; it does not open the update dialog. The manual check button opens the dialog.
 
 An available version adds an update badge beside the header logo. Users can download, defer installation and explicitly choose **Install and restart**. Installation leaves the room and stops native capture/audio. Offline checks and download/signature failures retain normal application use and allow retries. Only the main window receives updater and restart permissions.
 

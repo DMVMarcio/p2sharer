@@ -20,7 +20,5 @@ export const appUpdates = new AppUpdateController({
 
 export function startAutomaticUpdateChecks(): () => void {
   if (!isTauri()) return () => {};
-  void appUpdates.check();
-  const timer = setInterval(() => void appUpdates.check(), 6 * 60 * 60 * 1000);
-  return () => clearInterval(timer);
+  return appUpdates.startAutomaticChecks();
 }
