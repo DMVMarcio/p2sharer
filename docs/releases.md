@@ -117,6 +117,23 @@ Windows releases contain one `P2Sharer_<version>_x64-setup.exe` and one `P2Share
 
 The shared `src-tauri/tauri.windows.conf.json` is automatically merged into local Windows builds. Release builds load this packaging configuration and its small NSIS hook from the selected workflow revision, including retries of unpublished older tags. The standard Tauri/WiX path generates a separate MSI for each configured language, so keep its language set to `en-US`; NSIS embeds both languages in one executable. The hook preserves the native language dialog, translations, saved choice and cancel behavior, but skips the selector during passive/silent installations and updater runs. Keep Tauri's standard installer template and pages.
 
+### Replacing an existing installation
+
+Keep the published MSI UpgradeCode `7b204ccf-f6ba-5ddc-a719-cdf73e84ce2d` stable. MSI ProductCodes change between packages; the UpgradeCode identifies previous versions for `FindRelatedProducts` and `RemoveExistingProducts`. Changing installer format also requires migration: Windows Installer does not recognize an NSIS uninstall entry as a related MSI product.
+
+The WiX fragment `src-tauri/windows/nsis-migration.wxs` recognizes the exact P2Sharer NSIS name, publisher, binary and saved directory in HKCU or HKLM. On installation it retires the legacy NSIS uninstall registration, binary, uninstaller and standard shortcuts, while MSI installs the replacement. It adopts the old NSIS directory unless an existing MSI takes priority. Only those named files and uninstall keys are removed; application profiles and preferences are preserved. The fragment is loaded from the workflow revision alongside the Windows configuration when retrying an unpublished tag.
+
+| Previous installer | New installer | Replacement mechanism |
+| --- | --- | --- |
+| MSI | MSI | Stable UpgradeCode and the standard MSI major upgrade |
+| EXE | MSI | WiX NSIS registration detection and restricted legacy cleanup |
+| EXE | EXE | Standard NSIS detection and replacement in the saved directory |
+| MSI | EXE | Standard Tauri NSIS reinstall page detects the MSI and requires its removal before continuing |
+
+After building, run `powershell -NoProfile -ExecutionPolicy Bypass -File tools/test-installer-artifacts.ps1`. This opens the actual MSI with machine state ignored, evaluates its compiled migration conditions and directory assignments, and checks the upgrade/removal tables without installing anything. It does not replace a real upgrade test.
+
+Before publishing, exercise all four transitions in a disposable Windows VM using the actual previous release and the draft installers. Confirm one uninstall entry, working Start menu/desktop shortcuts, preserved preferences, launch and uninstall. Include EXE-to-MSI migration from a custom directory, cancellation/failure, and a machine already containing both formats. Test interactive and updater/passive flows separately; fully silent EXE migration is not established by the standard NSIS reinstall page checks. Do not use an existing personal installation as an automated fixture. Published older installers retain their original behavior; this migration requires a new release.
+
 The release action publishes locale-free installer filenames with a consistent `-setup` suffix and matching `.sig` signatures. Its `[ext]` placeholder already includes the leading dot, so the naming pattern must use `-setup[ext]` without another dot. `latest.json` remains required for updater discovery and signature verification. After replacement assets and updater metadata have been validated, retries remove only the obsolete `_en-US.msi` and unsuffixed `.msi` names and their signatures from the same draft. Published releases remain immutable. Local MSI filenames may still carry `_en-US`, which is the bundler's internal naming convention.
 
 Updates currently target installed Windows applications, using signed NSIS and MSI installers. The release workflow does not distribute a portable executable. A standalone executable contains update checks, but installation follows the installer flow rather than replacing that executable in place. Preserving portable operation during updates requires a separate implementation and validation.

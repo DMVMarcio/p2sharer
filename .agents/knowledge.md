@@ -47,6 +47,8 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 
 ## 4. User Guidelines & Expressed Preferences
 
+- `[Installer Upgrades]` Detect and replace previous P2Sharer installations regardless of whether the user chooses MSI or EXE; users should not need to remember the previous installer format. Preserve profiles and preferences, maintain the stable MSI UpgradeCode, and avoid duplicate uninstall registrations. Cross-format migration must be validated separately from same-format upgrades.
+
 - `[UI & Updates]` Bottom-right toasts wrap long text within a compact viewport-bounded width. Every color swatch has a canonical tooltip naming its color. Custom colors use an app-themed picker rather than the native browser color dialog. Automatic update checks run every 30 minutes; saving either beta-channel direction checks in the background without opening the update dialog, including when periodic checks are disabled.
 
 - `[UI]` Stream volume uses an upward vertical slider with a stationary mute icon, including native PiP. Incoming message sounds play only while the main app is unfocused or chat is hidden. Spotlight tray participant/stream labels stay on one truncated line. Color selectors include brown; the application accent palette also includes dark blue and a persistent custom color picker.

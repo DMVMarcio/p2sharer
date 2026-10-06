@@ -3,9 +3,12 @@
   "bundle": {
     "windows": {
       "wix": {
-        "language": "en-US"
+        "language": "en-US",
+        "fragmentPaths": ["windows/nsis-migration.wxs"],
+        "componentRefs": ["MigrateNsisUser", "MigrateNsisMachine"]
       },
       "nsis": {
+        "installMode": "currentUser",
         "languages": ["English", "PortugueseBR"],
         "displayLanguageSelector": true,
         "installerHooks": "windows/installer-hooks.nsh"
