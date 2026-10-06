@@ -1,4 +1,5 @@
 import { getLanguage } from '../i18n/index.ts';
+import type { RoomSlotInfo } from './types.ts';
 export type MediaKind = 'screen' | 'camera';
 export const MAX_MEDIA_FPS = 120;
 const frameRateFormatters = new Map<string, Intl.NumberFormat>();
@@ -37,6 +38,19 @@ export function streamOwner(key: string): string {
 
 export function streamSlotKey(owner: string, id: string, _primary = false): string {
   return `${owner}/${id}`;
+}
+
+export function reconcilePinnedRoomSlot(
+  pinnedId: string | null,
+  previousSlots: RoomSlotInfo[],
+  slots: RoomSlotInfo[],
+): string | null {
+  if (!pinnedId || slots.some((slot) => slot.peerId === pinnedId)) return pinnedId;
+  const previous = previousSlots.find((slot) => slot.peerId === pinnedId);
+  if (!previous) return pinnedId;
+  const owner = previous.ownerPeerId || previous.peerId;
+  const replacements = slots.filter((slot) => (slot.ownerPeerId || slot.peerId) === owner);
+  return (replacements.find((slot) => slot.mediaKind === 'screen') || replacements[0])?.peerId || null;
 }
 
 export interface OverlayPosition { x: number; y: number; width: number }

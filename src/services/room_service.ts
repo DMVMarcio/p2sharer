@@ -1,5 +1,5 @@
 import { localizeError, t } from '../i18n/index.ts';
-import { streamOwner, type MediaKind, type StreamDescriptor } from "../core/media_streams.ts";
+import { reconcilePinnedRoomSlot, streamOwner, type MediaKind, type StreamDescriptor } from "../core/media_streams.ts";
 import { StreamPointerReceiver } from './stream_pointer_receiver.ts';
 import { generateUserColor } from '../p2p/group_room.ts';
 import { validStreamPointer, validStreamPointerState, type StreamPointerState, type StreamPointerPacket } from '../core/stream_pointer.ts';
@@ -291,6 +291,7 @@ export class RoomService {
         for (const key of stateStore.subscribedStreams) if (!currentKeys.has(key)) audioContextManager.detachPeerAudio(key);
         for (const key of stateStore.activePipPeers) if (!currentKeys.has(key)) void pipService.restoreFromPip(key);
         stateStore.set((s) => {
+          s.pinnedPeerId = reconcilePinnedRoomSlot(s.pinnedPeerId, s.roomSlots, slots);
           s.roomSlots = slots;
           s.localPreviewStreams = Object.fromEntries(Object.entries(s.localPreviewStreams)
             .filter(([key]) => slots.some((slot) => slot.isLocal && slot.isStreaming && slot.peerId === key)));
