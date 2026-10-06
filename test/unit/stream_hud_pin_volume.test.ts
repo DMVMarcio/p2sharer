@@ -125,17 +125,17 @@ describe('Stream Card HUD Hover Fade, Pin Toggle, and Volume Polish', () => {
   });
 
   describe('Volume Button Alignment & Area Normalization', () => {
-    it('sets base collapsed .stream-volume-controller to 28x28 circular dimensions with zero excess padding', () => {
-      const controllerIdx = cssContent.indexOf('/* Stream Volume Controller (Compact Circle');
+    it('keeps the volume button fixed at 28x28 with zero excess padding', () => {
+      const controllerIdx = cssContent.indexOf('\n.stream-volume-controller {');
       assert.ok(controllerIdx !== -1, 'Must define .stream-volume-controller block');
       const controllerBlock = cssContent.slice(controllerIdx, cssContent.indexOf('}', controllerIdx));
 
       assert.ok(controllerBlock.includes('min-width: 28px;'), 'Must have min-width: 28px');
       assert.ok(controllerBlock.includes('height: 28px;'), 'Must have height: 28px');
-      assert.ok(controllerBlock.includes('max-width: 28px;'), 'Must have max-width: 28px');
+      assert.ok(controllerBlock.includes('width: 28px;'), 'Must have fixed width: 28px');
       assert.ok(controllerBlock.includes('padding: 0;'), 'Must have padding: 0 when collapsed');
       assert.ok(controllerBlock.includes('border-radius: var(--radius-full);'), 'Must have round pill border radius');
-      assert.ok(controllerBlock.includes('overflow: hidden;'), 'Must clip overflow when collapsed');
+      assert.ok(controllerBlock.includes('overflow: visible;'), 'Must allow the upward slider outside the fixed button');
     });
 
     it('centers speaker icon precisely within 26x26 .btn-stream-volume', () => {
@@ -168,24 +168,21 @@ describe('Stream Card HUD Hover Fade, Pin Toggle, and Volume Polish', () => {
       );
     });
 
-    it('smoothly expands .stream-volume-controller width and adds right padding only during expansion', () => {
+    it('opens a vertical slider above the button without changing hover geometry', () => {
       const hoverControllerSelector = '.stream-volume-controller:hover,';
       const hoverIdx = cssContent.indexOf(hoverControllerSelector);
       assert.ok(hoverIdx !== -1, 'Must define hover rule for controller container');
       const hoverBlock = cssContent.slice(hoverIdx, cssContent.indexOf('}', hoverIdx));
 
-      assert.ok(
-        hoverBlock.includes('padding-right: 8px;'),
-        'Must provide padding-right: 8px on expand'
-      );
-      assert.ok(
-        hoverBlock.includes('max-width: 175px;'),
-        'Must expand max-width for slider and percent content'
-      );
-      assert.ok(
-        !hoverBlock.includes('width: auto;'),
-        'Must NOT use width: auto which prevents smooth collapse transition'
-      );
+      assert.doesNotMatch(hoverBlock, /(?:width|height|padding)\s*:/, 'Hover must not move the mute button');
+      const boxIdx = cssContent.indexOf('\n.stream-volume-slider-box {');
+      const box = cssContent.slice(boxIdx, cssContent.indexOf('}', boxIdx));
+      assert.match(box, /position: absolute;/);
+      assert.match(box, /bottom: 26px;/);
+      const rangeIdx = cssContent.indexOf('.stream-volume-slider-box .stream-volume-range {');
+      const range = cssContent.slice(rangeIdx, cssContent.indexOf('}', rangeIdx));
+      assert.match(range, /writing-mode: vertical-lr;/);
+      assert.match(range, /direction: rtl;/, 'The maximum volume belongs at the top');
     });
   });
 });

@@ -3,8 +3,11 @@ import { useEffect, useCallback } from 'react';
 import { stateStore } from '../core/state_store';
 import { ThemeMode } from '../core/types';
 import { useStore } from './useStore';
+import { customAccentTokens } from '../core/accent_color';
 
 export const ACCENT_COLORS = [
+  { id: 'brown', get label() { return t('color.brown'); }, color: '#a47754' },
+  { id: 'navy', get label() { return t('color.navy'); }, color: '#1e40af' },
   { id: 'cyan', get label() { return t("message.c954e4de2019"); }, color: '#06b6d4' },
   { id: 'sky', get label() { return t("message.db6b0018a206"); }, color: '#0284c7' },
   { id: 'blue', get label() { return t("message.b0bf526b23af"); }, color: '#3b82f6' },
@@ -45,7 +48,6 @@ export function useAppTheme() {
     stateStore.set((s) => {
       s.currentAccentColor = accent;
     });
-    document.documentElement.setAttribute('data-accent', accent);
     localStorage.setItem('p2sharer_accent_color', accent);
   }, []);
 
@@ -71,7 +73,14 @@ export function useAppTheme() {
   }, [currentThemeMode]);
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-accent', currentAccentColor);
+    const root = document.documentElement;
+    const tokens = customAccentTokens(currentAccentColor);
+    root.setAttribute('data-accent', tokens ? 'custom' : currentAccentColor);
+    if (tokens) {
+      for (const [key, value] of Object.entries(tokens)) root.style.setProperty(key, value);
+    } else {
+      for (const key of Object.keys(customAccentTokens('#000000')!)) root.style.removeProperty(key);
+    }
   }, [currentAccentColor]);
 
   return {

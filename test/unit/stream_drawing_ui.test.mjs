@@ -70,13 +70,17 @@ test('drawing tools preserve the video node, capture complete gestures, and do n
 
 test('color palette uses the canonical menu and broadcaster consent removes drawing controls', async () => {
   await click('[aria-label="Cor"]');
-  assert.equal(document.querySelectorAll('[role="menuitemradio"]').length, 10);
+  assert.equal(document.querySelectorAll('[role="menuitemradio"]').length, 11);
   assert.equal(document.querySelector('[role="menuitemradio"][aria-checked="true"]').textContent, 'Vermelho');
   await act(async () => document.querySelector('[aria-label="Cor"]').dispatchEvent(new window.MouseEvent('pointerdown', { bubbles: true })));
   await click('[aria-label="Cor"]');
   assert.equal(document.querySelector('[role="menu"]').hasAttribute('inert'), true);
   await click('[aria-label="Cor"]');
-  await act(async () => document.querySelectorAll('[role="menuitemradio"]')[5].click());
+  await act(async () => [...document.querySelectorAll('[role="menuitemradio"]')].find(item => item.textContent === 'Marrom').click());
+  await pointer('pointerdown', 80, 90); await pointer('pointerup', 400, 225);
+  assert.equal(globalThis.__pointerTestSent.at(-1).drawing.color, '#a47754');
+  await click('[aria-label="Cor"]');
+  await act(async () => [...document.querySelectorAll('[role="menuitemradio"]')].find(item => item.textContent === 'Azul').click());
   await pointer('pointerdown', 80, 90); await pointer('pointerup', 400, 225);
   assert.equal(globalThis.__pointerTestSent.at(-1).drawing.color, '#3b82f6');
   await click('[aria-label="Cor"]');

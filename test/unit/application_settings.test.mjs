@@ -61,6 +61,35 @@ after(async () => {
   delete globalThis.applicationSettingsController;
 });
 
+test('appearance applies and persists custom colors and restores preset tokens', async () => {
+  await act(async () => { root.render(null); setLanguage('pt-BR'); });
+  await act(async () => root.render(React.createElement(SettingsModal)));
+  const appearance = [...document.querySelectorAll('.settings-nav-sidebar button')]
+    .find(button => button.textContent.includes('Aparência'));
+  await act(async () => appearance.click());
+  assert.ok(document.querySelector('[aria-label="Marrom"]'));
+  assert.ok(document.querySelector('[aria-label="Azul escuro"]'));
+  const picker = document.querySelector('input[type="color"]');
+  assert.equal(picker.getAttribute('aria-label'), 'Cor personalizada');
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(picker, '#ffffff');
+    picker.dispatchEvent(new window.Event('input', { bubbles: true }));
+    picker.dispatchEvent(new window.Event('change', { bubbles: true }));
+  });
+  assert.equal(localStorage.getItem('p2sharer_accent_color'), '#ffffff');
+  assert.equal(document.documentElement.getAttribute('data-accent'), 'custom');
+  assert.equal(document.documentElement.style.getPropertyValue('--custom-accent-text'), '#000000');
+  await act(async () => { root.render(null); });
+  await act(async () => root.render(React.createElement(SettingsModal)));
+  await act(async () => [...document.querySelectorAll('.settings-nav-sidebar button')]
+    .find(button => button.textContent.includes('Aparência')).click());
+  assert.equal(document.querySelector('input[type="color"]').value, '#ffffff');
+  await act(async () => document.querySelector('[aria-label="Marrom"]').click());
+  assert.equal(localStorage.getItem('p2sharer_accent_color'), 'brown');
+  assert.equal(document.documentElement.getAttribute('data-accent'), 'brown');
+  assert.equal(document.documentElement.style.getPropertyValue('--custom-accent-color'), '');
+});
+
 test('application update controls keep drafts unsaved and check only the saved channel', async () => {
   await act(async () => root.render(React.createElement(Harness)));
   assert.equal(document.querySelector('h3').textContent, 'Aplicação');
