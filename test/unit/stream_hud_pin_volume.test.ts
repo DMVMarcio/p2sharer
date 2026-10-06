@@ -169,12 +169,16 @@ describe('Stream Card HUD Hover Fade, Pin Toggle, and Volume Polish', () => {
     });
 
     it('opens a vertical slider above the button without changing hover geometry', () => {
-      const hoverControllerSelector = '.stream-volume-controller:hover,';
+      const hoverControllerSelector = '.stream-volume-controller:hover::before,';
       const hoverIdx = cssContent.indexOf(hoverControllerSelector);
-      assert.ok(hoverIdx !== -1, 'Must define hover rule for controller container');
+      assert.ok(hoverIdx !== -1, 'Must expand the shared background on hover');
       const hoverBlock = cssContent.slice(hoverIdx, cssContent.indexOf('}', hoverIdx));
 
-      assert.doesNotMatch(hoverBlock, /(?:width|height|padding)\s*:/, 'Hover must not move the mute button');
+      assert.doesNotMatch(hoverBlock, /(?:width|padding)\s*:/, 'The shared background must expand only upward');
+      const controllerIdx = cssContent.indexOf('\n.stream-volume-controller {');
+      const controller = cssContent.slice(controllerIdx, cssContent.indexOf('}', controllerIdx));
+      assert.match(controller, /width: 28px;/);
+      assert.match(controller, /height: 28px;/, 'The mute button geometry must stay fixed');
       const boxIdx = cssContent.indexOf('\n.stream-volume-slider-box {');
       const box = cssContent.slice(boxIdx, cssContent.indexOf('}', boxIdx));
       assert.match(box, /position: absolute;/);

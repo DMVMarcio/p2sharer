@@ -1992,7 +1992,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   background-color: #000000 !important;
 }
 
-/* Fixed mute button with an upward vertical slider. */
+/* Fixed mute button with one narrow surface expanding upward for the slider. */
 .stream-volume-controller {
   position: absolute;
   bottom: 10px;
@@ -2006,19 +2006,35 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   height: 28px;
   padding: 0;
   box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  overflow: visible;
+  flex-shrink: 0;
+}
+
+.stream-volume-controller::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  bottom: -1px;
+  width: 28px;
+  height: 28px;
+  box-sizing: border-box;
+  border-radius: var(--radius-full);
   background-color: rgba(10, 10, 15, 0.82);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: var(--radius-full);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
-  overflow: visible;
-  flex-shrink: 0;
-  transition: background-color var(--transition-fast),
+  pointer-events: none;
+  z-index: -1;
+  transition: height var(--transition-normal),
+              background-color var(--transition-fast),
               border-color var(--transition-fast);
 }
 
-.stream-volume-controller:hover,
-.stream-volume-controller:focus-within {
+.stream-volume-controller:hover::before,
+.stream-volume-controller:focus-within::before {
+  height: 130px;
   background-color: rgba(15, 15, 22, 0.94);
   border-color: var(--accent-border);
 }
@@ -2047,31 +2063,31 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .stream-volume-slider-box {
   position: absolute;
   bottom: 26px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  transform: translateY(6px);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  width: 40px;
-  padding: 10px 0 6px;
+  width: 26px;
+  height: 102px;
+  padding: 8px 0 6px;
   box-sizing: border-box;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--accent-border);
-  background: rgba(15, 15, 22, 0.94);
-  backdrop-filter: blur(12px);
   opacity: 0;
   overflow: hidden;
   pointer-events: none;
   visibility: hidden;
   white-space: nowrap;
-  transition: opacity var(--transition-normal), visibility var(--transition-normal);
+  transition: opacity var(--transition-normal),
+              transform var(--transition-normal),
+              visibility var(--transition-normal);
 }
 
 .stream-volume-controller:hover .stream-volume-slider-box,
 .stream-volume-controller:focus-within .stream-volume-slider-box {
   opacity: 1;
   visibility: visible;
+  transform: translateY(0);
   overflow: hidden;
   pointer-events: auto;
 }
@@ -2101,6 +2117,9 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 
 .stream-volume-slider-box .stream-volume-percent {
   text-align: center;
+  min-width: 0;
+  font-size: 9px;
+  line-height: 12px;
 }
 
 .stream-volume-range {
@@ -3856,7 +3875,8 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .spotlight-tray-strip .user-status-dot { flex-shrink: 0; }
 
 @media (prefers-reduced-motion: reduce) {
-  .stream-volume-slider-box { transition: none; }
+  .stream-volume-slider-box,
+  .stream-volume-controller::before { transition: none; }
 }
 
 .accent-swatch.active {
