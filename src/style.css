@@ -5018,6 +5018,11 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .pip-window-root:hover .pip-overlay,
 .pip-overlay.is-hud-pinned {
   opacity: 1;
+  pointer-events: none;
+}
+
+.pip-window-root:hover .pip-overlay > *,
+.pip-overlay.is-hud-pinned > * {
   pointer-events: auto;
 }
 

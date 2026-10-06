@@ -145,6 +145,10 @@ The application-wide rule covers reusable React components and shared CSS recipe
 
 Before adding a control, inspect the common components and its existing usage. Extend the canonical implementation when a new variant is needed. Apply shared tokens, keyboard and focus behavior, disabled/read-only states, and reduced-motion handling across main, settings, activities, and PiP surfaces. Menus/dropdowns retain their 320 ms enter / 260 ms exit lifecycle; dialogs and other families keep their established motion rather than inheriting dropdown timings indiscriminately.
 
+`Tooltip` cancels pending shows and dismisses after activation, Escape, outside focus, scroll/resize, window blur, document visibility changes and pointer exit. While open it checks whether the trigger moves or is detached. Global listeners are attached only during an active/pending tooltip, and `onOpenChange` emits each transition exactly once, including unmount. Interactive hover and keyboard focus remain supported; mouse activation cannot reopen a tooltip through its resulting focus event.
+
+Stream PiP creation receives available video track dimensions and falls back to 16:9 until the receiver reports metadata. `PipView` reports video metadata/resolution changes to `set_pip_aspect_ratio`, scoped to its own PiP window. The Windows UI thread installs a subclass for `WM_SIZING`, adjusting the client rectangle proportionally on every resize edge, accounting for frame thickness and DPI, and removing the subclass on destruction. Initial sizing fits the current monitor work area; native maximization is disabled because its bounds would break the video aspect. Explicit fullscreen remains available. `usePipWindowDrag` starts native dragging after a small primary-pointer movement anywhere outside controls; Shift-drag retains zoom panning, and the enabled pointing/drawing mode retains ownership of video interactions.
+
 
 ## Consent-Based Stream Pointing
 

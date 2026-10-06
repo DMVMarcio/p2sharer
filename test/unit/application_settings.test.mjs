@@ -7,9 +7,11 @@ import { JSDOM } from 'jsdom';
 import React, { act, useState } from 'react';
 import { AppUpdateController } from '../../src/core/app_updates.ts';
 
-const dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost' });
+const dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost', pretendToBeVisual: true });
 for (const key of ['window', 'document', 'HTMLElement', 'Element', 'Node', 'MutationObserver', 'Event', 'CustomEvent', 'localStorage']) globalThis[key] = dom.window[key];
 globalThis.getComputedStyle = window.getComputedStyle;
+globalThis.requestAnimationFrame = window.requestAnimationFrame.bind(window);
+globalThis.cancelAnimationFrame = window.cancelAnimationFrame.bind(window);
 HTMLElement.prototype.scrollIntoView = () => {};
 window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;

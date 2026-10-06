@@ -46,6 +46,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
 }) => {
   const tooltipId = useId();
   const [isOpen, setIsOpen] = useState(false);
+  const [isArmed, setIsArmed] = useState(false);
   const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
 
   const triggerRef = useRef<HTMLElement | null>(null);
@@ -53,6 +54,10 @@ export const Tooltip: React.FC<TooltipProps> = ({
 
   const showTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pointerActivationRef = useRef(false);
+  const onOpenChangeRef = useRef(onOpenChange);
+  onOpenChangeRef.current = onOpenChange;
+  const notifiedOpenRef = useRef(false);
 
   const isCompact = compact ?? (typeof content === 'string' && !tooltipClassName);
 
@@ -66,6 +71,13 @@ export const Tooltip: React.FC<TooltipProps> = ({
       hideTimeoutRef.current = null;
     }
   }, []);
+
+  const dismiss = useCallback(() => {
+    clearTimers();
+    setIsArmed(false);
+    setIsOpen(false);
+    setCoords(null);
+  }, [clearTimers]);
 
   const calculatePosition = useCallback(() => {
     if (!triggerRef.current || !tooltipRef.current) return;
@@ -88,6 +100,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
   const handleShow = useCallback(() => {
     if (disabled || !content) return;
     clearTimers();
+    setIsArmed(true);
     showTimeoutRef.current = setTimeout(() => {
       setIsOpen(true);
     }, showDelay);
@@ -97,19 +110,81 @@ export const Tooltip: React.FC<TooltipProps> = ({
     clearTimers();
     hideTimeoutRef.current = setTimeout(() => {
       setIsOpen(false);
+      setIsArmed(false);
       setCoords(null);
     }, hideDelay);
   }, [clearTimers, hideDelay]);
 
-  // Notify parent on open change and cleanup on unmount
+  // Notify each transition exactly once, including disposal of an open tooltip.
   useEffect(() => {
-    onOpenChange?.(isOpen);
-    return () => {
-      if (isOpen) {
-        onOpenChange?.(false);
-      }
+    if (notifiedOpenRef.current !== isOpen) {
+      notifiedOpenRef.current = isOpen;
+      onOpenChangeRef.current?.(isOpen);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (disabled || !content) dismiss();
+  }, [disabled, content, dismiss]);
+
+  // Window exits and activation can bypass the trigger's mouseleave (native
+  // dragging, portals, reparenting and focus changes). Cancel pending shows too.
+  useEffect(() => {
+    if (!isArmed) return;
+    const insidePanel = (event: Event) => interactive && tooltipRef.current?.contains(event.target as Node | null);
+    const activate = (event: Event) => {
+      if (insidePanel(event)) return;
+      pointerActivationRef.current = event.type === 'pointerdown' || event.type === 'mousedown';
+      dismiss();
     };
-  }, [isOpen, onOpenChange]);
+    const click = (event: Event) => {
+      if (insidePanel(event) && !(event.target instanceof Element && event.target.closest('button, a, [role="button"]'))) return;
+      dismiss();
+    };
+    const focusOutside = (event: FocusEvent) => {
+      const target = event.target as Node | null;
+      if (!triggerRef.current?.contains(target) && !tooltipRef.current?.contains(target)) dismiss();
+    };
+    const exit = (event: MouseEvent) => { if (!event.relatedTarget) dismiss(); };
+    const visibility = () => { if (document.hidden) dismiss(); };
+    const scroll = (event: Event) => {
+      // Lists inside interactive tooltips can scroll without dismissing their panel.
+      if (interactive && tooltipRef.current?.contains(event.target as Node | null)) return;
+      dismiss();
+    };
+    const escape = (event: KeyboardEvent) => {
+      pointerActivationRef.current = false;
+      if (event.key === 'Escape') dismiss();
+    };
+    window.addEventListener('blur', dismiss);
+    window.addEventListener('resize', dismiss);
+    window.addEventListener('scroll', scroll, true);
+    document.addEventListener('pointerdown', activate, true);
+    document.addEventListener('mousedown', activate, true);
+    document.addEventListener('click', click, true);
+    document.addEventListener('contextmenu', dismiss, true);
+    document.addEventListener('focusin', focusOutside);
+    document.addEventListener('mouseout', exit);
+    document.addEventListener('mouseleave', dismiss);
+    document.addEventListener('pointerleave', dismiss);
+    document.addEventListener('visibilitychange', visibility);
+    document.addEventListener('keydown', escape);
+    return () => {
+      window.removeEventListener('blur', dismiss);
+      window.removeEventListener('resize', dismiss);
+      window.removeEventListener('scroll', scroll, true);
+      document.removeEventListener('pointerdown', activate, true);
+      document.removeEventListener('mousedown', activate, true);
+      document.removeEventListener('click', click, true);
+      document.removeEventListener('contextmenu', dismiss, true);
+      document.removeEventListener('focusin', focusOutside);
+      document.removeEventListener('mouseout', exit);
+      document.removeEventListener('mouseleave', dismiss);
+      document.removeEventListener('pointerleave', dismiss);
+      document.removeEventListener('visibilitychange', visibility);
+      document.removeEventListener('keydown', escape);
+    };
+  }, [isArmed, interactive, dismiss]);
 
   // Position measurement right after opening or DOM change
   useLayoutEffect(() => {
@@ -118,34 +193,40 @@ export const Tooltip: React.FC<TooltipProps> = ({
     }
   }, [isOpen, content, calculatePosition]);
 
-  // Handle window resize and document scroll to re-anchor tooltip
+  // A trigger can move without a mouse event when a popup or layout changes.
   useEffect(() => {
     if (!isOpen) return;
-
-    const handleReposition = () => {
-      calculatePosition();
+    const anchor = triggerRef.current;
+    const initial = anchor?.getBoundingClientRect();
+    const screenPosition = { x: window.screenX, y: window.screenY };
+    let frame: number;
+    const checkAnchor = () => {
+      const rect = anchor?.getBoundingClientRect();
+      if (!anchor?.isConnected || !rect || !initial || rect.x !== initial.x || rect.y !== initial.y || rect.width !== initial.width || rect.height !== initial.height || window.screenX !== screenPosition.x || window.screenY !== screenPosition.y) {
+        dismiss();
+        return;
+      }
+      frame = requestAnimationFrame(checkAnchor);
     };
-
-    window.addEventListener('resize', handleReposition);
-    window.addEventListener('scroll', handleReposition, true);
-
-    return () => {
-      window.removeEventListener('resize', handleReposition);
-      window.removeEventListener('scroll', handleReposition, true);
-    };
-  }, [isOpen, calculatePosition]);
+    frame = requestAnimationFrame(checkAnchor);
+    return () => cancelAnimationFrame(frame);
+  }, [isOpen, dismiss]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       clearTimers();
+      if (notifiedOpenRef.current) {
+        notifiedOpenRef.current = false;
+        onOpenChangeRef.current?.(false);
+      }
     };
   }, [clearTimers]);
 
   // Clone child with ref and event handlers
   const handleTriggerRef = (node: HTMLElement | null) => {
     triggerRef.current = node;
-    const childRef = (children as any).ref;
+    const childRef = children.props.ref;
     if (typeof childRef === 'function') {
       childRef(node);
     } else if (childRef && 'current' in childRef) {
@@ -156,6 +237,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
   const triggerElement = React.cloneElement(children, {
     ref: handleTriggerRef,
     onMouseEnter: (e: React.MouseEvent) => {
+      pointerActivationRef.current = false;
       handleShow();
       children.props.onMouseEnter?.(e);
     },
@@ -164,12 +246,23 @@ export const Tooltip: React.FC<TooltipProps> = ({
       children.props.onMouseLeave?.(e);
     },
     onFocus: (e: React.FocusEvent) => {
-      handleShow();
+      if (!pointerActivationRef.current) handleShow();
       children.props.onFocus?.(e);
     },
     onBlur: (e: React.FocusEvent) => {
+      pointerActivationRef.current = false;
       handleHide();
       children.props.onBlur?.(e);
+    },
+    onPointerDown: (e: React.PointerEvent) => {
+      pointerActivationRef.current = true;
+      dismiss();
+      children.props.onPointerDown?.(e);
+    },
+    onKeyDown: (e: React.KeyboardEvent) => {
+      pointerActivationRef.current = false;
+      if (e.key === 'Escape') dismiss();
+      children.props.onKeyDown?.(e);
     },
     'aria-describedby': isOpen ? tooltipId : undefined,
   });
