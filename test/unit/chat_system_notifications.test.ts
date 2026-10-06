@@ -1,7 +1,5 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { setupTestDOM, type DOMEnvironment } from '../helpers/browser_mocks.ts';
 import { RoomService } from '../../src/services/room_service.ts';
 import type { ChatMessage, PeerInfo } from '../../src/core/types.ts';
@@ -91,23 +89,6 @@ describe('Chat System Notifications Architecture', () => {
       assert.strictEqual(roomService.chatMessages[0].isSystem, true);
       assert.strictEqual(roomService.chatMessages[1].isSystem, undefined);
       assert.strictEqual(roomService.chatMessages[2].isSystem, true);
-    });
-  });
-
-  describe('CSS Token and Class Verification', () => {
-    it('defines compact, single-line system notices in style.css', () => {
-      const cssPath = resolve(process.cwd(), 'src/style.css');
-      const css = readFileSync(cssPath, 'utf-8');
-
-      assert.ok(css.includes('.chat-system-msg'), 'style.css must define .chat-system-msg');
-      assert.ok(css.includes('.chat-system-content'), 'style.css must define .chat-system-content');
-      const noticeCss = css.slice(css.indexOf('.chat-system-msg {'), css.indexOf('.chat-msg {'));
-      assert.ok(noticeCss.includes('text-overflow: ellipsis'));
-      assert.ok(noticeCss.includes('white-space: nowrap'));
-      assert.ok(noticeCss.includes('align-items: center'));
-      assert.ok(noticeCss.includes('.chat-sys-icon'));
-      assert.ok(!noticeCss.includes('background-color:'));
-      assert.ok(!noticeCss.includes('border:'));
     });
   });
 

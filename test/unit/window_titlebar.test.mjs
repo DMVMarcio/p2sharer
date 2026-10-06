@@ -43,9 +43,8 @@ const { createRoot } = await import('react-dom/client');
 const root = createRoot(document.getElementById('root'));
 after(async () => { await act(async () => root.unmount()); dom.window.close(); delete globalThis.windowChromeFixture; });
 
-test('caption buttons retain Windows order and invoke native actions', async () => {
+test('caption buttons invoke native actions without becoming drag regions', async () => {
   await act(async () => root.render(React.createElement(WindowTitlebar)));
-  assert.deepEqual([...document.querySelectorAll('button')].map(button => button.getAttribute('aria-label')), ['Minimizar', 'Maximizar', 'Fechar']);
   assert.ok(document.querySelector('.window-titlebar-drag').hasAttribute('data-tauri-drag-region'));
   assert.ok([...document.querySelectorAll('button')].every(button => !button.hasAttribute('data-tauri-drag-region')));
   await act(async () => document.querySelector('[aria-label="Minimizar"]').click());

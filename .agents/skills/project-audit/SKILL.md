@@ -8,6 +8,14 @@ description: Audits new or unfamiliar repositories, bootstraps the knowledge bas
 ## Scope
 Executed on first contact with a repository, when `.agents/knowledge.md` is missing or incomplete, or during periodic architectural reviews to prevent agent drift.
 
+## Knowledge Maintenance
+Knowledge is a navigation aid for current architecture and explicit standing user rules. It is not a conversation archive, feature specification, task backlog, or completed-work log. Apply the memory criteria in `.agents/rules/agent-persistence.md` when bootstrapping or cleaning it.
+
+- Persist user rules only when explicitly intended to govern future work. "Every button must be circular" qualifies; adding a message sound, moving a control, or renaming a tab does not. Do not turn an example or isolated request into a universal requirement.
+- Keep the index short: project overview, subsystem links, explicit standing rules, and essential commands. Keep verified subsystem architecture in its own reference, without presenting it as a user mandate.
+- Remove superseded requests, layout minutiae, duplicated rules, approval history, dated validation totals, and personal measurements. Retain only the reusable technical conclusion of a past investigation. Do not move discarded task history to another memory file.
+- Audit tests by the behavior they exercise. Preserve production logic, security/consent, data integrity, persistence, lifecycle, and accessibility coverage. Remove tests that merely search implementation text or freeze incidental layout, labels, dimensions, or variable names. Static enforcement of an explicit global rule remains useful.
+
 ## 1. Discovery Routine
 1. **Manifest Inspection**: Read package files (`package.json`, `Cargo.toml`, `pyproject.toml`, `.csproj`, `CMakeLists.txt`, `go.mod`, etc.) to determine dependencies, runtime, and ecosystem.
 2. **Architecture Identification**: Determine the primary design pattern (Clean Architecture, Monorepo, MVC, MVVM, Hexagonal, Event-Driven).
