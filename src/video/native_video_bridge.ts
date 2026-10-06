@@ -1,3 +1,4 @@
+import { diagnosticOpaqueId, isMediaDiagnosticsActive, registerDiagnosticBridge } from '../core/media_diagnostics.ts';
 import { localizeError, t } from '../i18n/index.ts';
 import { getEncoderPreference, type NativeEncoderSupport } from '../core/encoder_preferences.ts';
 import { invoke } from '@tauri-apps/api/core';
@@ -27,6 +28,10 @@ export class NativeVideoBridge implements VideoCaptureBridge {
   private trackWriter: any = null;
   private frameClock = new VideoFrameClock();
   private effectiveFps = 60;
+  private disposeDiagnostics: (() => void) | null = null;
+  private diagnosticPackets = 0;
+  private diagnosticLastPacket = 0;
+  private diagnosticPressure = 0;
   private pendingBuffer: ArrayBuffer | null = null;
   private isDecoding: boolean = false;
   private captureGeneration = 0;
@@ -148,6 +153,15 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     this.encoderFeedbackToken = feedbackToken;
     const encodedDecoder = new NativeEncodedDecoder(this.sessionId, feedbackToken);
     this.encodedDecoder = encodedDecoder;
+    this.diagnosticPackets = 0;
+    this.diagnosticLastPacket = 0;
+    this.diagnosticPressure = 0;
+    this.disposeDiagnostics = registerDiagnosticBridge(() => ({
+      session: diagnosticOpaqueId(this.sessionId), packets: this.diagnosticPackets,
+      last_packet_age_ms: this.diagnosticLastPacket ? performance.now() - this.diagnosticLastPacket : null,
+      pending: Boolean(this.pendingBuffer), effective_fps: this.effectiveFps,
+      pressure_percent: this.diagnosticPressure, ...this.encodedDecoder?.diagnosticSnapshot(),
+    }));
     const loadMeter = new BridgeLoadMeter(fps, performance.now());
     let feedbackPending = false;
     let nativeEncodingFailed = false;
@@ -373,8 +387,13 @@ export class NativeVideoBridge implements VideoCaptureBridge {
           }
 
           if (evt.data instanceof ArrayBuffer) {
+            if (isMediaDiagnosticsActive()) {
+              this.diagnosticPackets++;
+              this.diagnosticLastPacket = performance.now();
+            }
             const pressurePercent = loadMeter.receive(evt.data.byteLength > 4,
               Boolean(this.pendingBuffer && this.pendingBuffer.byteLength > 4), performance.now());
+            if (isMediaDiagnosticsActive() && pressurePercent !== undefined) this.diagnosticPressure = pressurePercent;
             if (pressurePercent !== undefined && !feedbackPending && generation === this.captureGeneration) {
               feedbackPending = true;
               void invoke<number>('report_capture_load', { sessionId: this.sessionId, feedbackToken, pressurePercent })
@@ -519,6 +538,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
   }
 
   public async stopCapture(): Promise<void> {
+    this.disposeDiagnostics?.(); this.disposeDiagnostics = null;
     this.captureGeneration++;
     this.encoderFeedbackToken = null;
     this.isCapturing = false;

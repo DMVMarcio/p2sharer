@@ -36,6 +36,7 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 - [LAN and Virtual LAN WebRTC Mesh](.agents/knowledge/lan-mesh.md)
 - [Native Media Pipeline: Audio Loopback, Video Capture & Web Bridges](.agents/knowledge/native-media-pipeline.md)
 - [Native NVENC Encoding, Settings, Validation and Transport Limits](.agents/knowledge/native-nvenc.md)
+- [Opt-in Sender/Receiver Media Diagnostics](../docs/media-diagnostics.md)
 - [Frontend Architecture, React Media Rendering & State Management](.agents/knowledge/frontend-ui-state.md)
 - [Multiple Screen/Camera Sessions and Viewer Compositions](.agents/knowledge/multiple-media-streams.md)
 - [P2P Message Authorization and Threat Model](.agents/knowledge/peer-security.md)
@@ -46,6 +47,8 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 ---
 
 ## 4. User Guidelines & Expressed Preferences
+
+- `[Media Diagnostics]` For intermittent streaming failures, provide an opt-in diagnostic executable for both sender and receiver, including PiP telemetry. Collect bounded technical metrics without media, room credentials, messages or machine-specific reports in the repository; preserve production media behavior during diagnosis.
 
 - `[Tooltips & PiP]` Tooltips must dismiss after activation, layout changes, pointer exit from the window, and loss of application focus without remaining stuck. Stream PiP windows follow the video's aspect ratio at creation and during native resizing, and can be dragged from any noninteractive area while preserving controls.
 

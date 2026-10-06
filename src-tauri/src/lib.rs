@@ -3,6 +3,7 @@ mod test_support;
 
 pub mod audio_loopback;
 pub mod logger;
+mod media_diagnostics;
 pub mod note_files;
 pub mod youtube_playlist;
 pub mod chat_files;
@@ -85,6 +86,7 @@ pub fn run() {
     }
 
     logger::init_logger();
+    media_diagnostics::init();
     ensure_ws_server_running();
 
     tauri::Builder::default()
@@ -112,6 +114,8 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            media_diagnostics::media_diagnostics_enabled,
+            media_diagnostics::write_media_diagnostics,
             lan_signaling::list_lan_interfaces,
             lan_signaling::start_lan_signaling,
             lan_signaling::stop_lan_signaling,

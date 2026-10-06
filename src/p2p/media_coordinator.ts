@@ -1,3 +1,4 @@
+import { observeDiagnosticPeerConnection } from '../core/media_diagnostics.ts';
 import type { StreamStatusPayload } from '../core/types.ts';
 
 export class MediaCoordinator {
@@ -114,6 +115,7 @@ export class MediaCoordinator {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     proto.createOffer = async function (options?: any) {
+      observeDiagnosticPeerConnection(this);
       MediaCoordinator.configureCodecPreferences(this);
       const offer = await origCreateOffer.call(this, options);
       if (offer && offer.sdp) {
@@ -124,6 +126,7 @@ export class MediaCoordinator {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     proto.createAnswer = async function (options?: any) {
+      observeDiagnosticPeerConnection(this);
       MediaCoordinator.configureCodecPreferences(this);
       const answer = await origCreateAnswer.call(this, options);
       if (answer && answer.sdp) {
@@ -135,6 +138,7 @@ export class MediaCoordinator {
     proto.setLocalDescription = async function (
       description?: RTCLocalSessionDescriptionInit
     ) {
+      observeDiagnosticPeerConnection(this);
       if (!description) {
         MediaCoordinator.configureCodecPreferences(this);
         // Parameterless setLocalDescription() as invoked by modern WebRTC / Trystero:
