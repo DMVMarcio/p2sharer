@@ -2033,8 +2033,9 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 }
 
 .stream-volume-controller:hover::before,
-.stream-volume-controller:focus-within::before {
-  height: 130px;
+.stream-volume-controller:has(:focus-visible)::before,
+.stream-volume-controller:has(.stream-volume-range:active)::before {
+  height: 128px;
   background-color: rgba(15, 15, 22, 0.94);
   border-color: var(--accent-border);
 }
@@ -2062,7 +2063,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 
 .stream-volume-slider-box {
   position: absolute;
-  bottom: 26px;
+  bottom: 24px;
   left: 0;
   transform: translateY(6px);
   display: flex;
@@ -2084,7 +2085,8 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 }
 
 .stream-volume-controller:hover .stream-volume-slider-box,
-.stream-volume-controller:focus-within .stream-volume-slider-box {
+.stream-volume-controller:has(:focus-visible) .stream-volume-slider-box,
+.stream-volume-controller:has(.stream-volume-range:active) .stream-volume-slider-box {
   opacity: 1;
   visibility: visible;
   transform: translateY(0);
