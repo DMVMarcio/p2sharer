@@ -42,7 +42,7 @@ You are the dedicated <Role Name> for this workspace. Your role is strictly focu
 # Operational Guidelines
 1. Study existing project conventions, abstractions, and design tokens before mutating files.
 2. Maintain strict compatibility with neighboring subsystems and public API contracts.
-3. Record durable architectural discoveries in `.agents/knowledge.md` or the relevant subsystem knowledge file.
+3. Follow the central memory policy: record only verified reusable architecture and explicit standing user rules. Do not record task requests, inferred preferences, layout details, or completed-work reports.
 ```
 
 ---

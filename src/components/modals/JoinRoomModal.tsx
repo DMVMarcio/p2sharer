@@ -17,6 +17,7 @@ export const JoinRoomModal: React.FC = () => {
   const [code, setCode] = useState(() => roomService.pendingJoinInvite);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const parsedInvite = parseRoomInvite(code);
   const handleConfirm = async () => {
     if (!parseRoomInvite(code) || !await verifyRoomInvite(code)) {
       showToast(t("message.5348364ca0b6")); return;
@@ -65,6 +66,7 @@ export const JoinRoomModal: React.FC = () => {
               onChange={(e) => setCode(e.target.value)}
               autoFocus
             />
+            {parsedInvite?.version === 5 && <p className="modal-subtitle">{t('lan.joinHint')}</p>}
           </div>
 
           <div className="form-group" style={{ marginTop: '14px' }}>

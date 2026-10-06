@@ -143,7 +143,8 @@ export interface PeerAudioSinkState {
 export type ThemeMode = 'dark' | 'light' | 'system';
 export type StreamFilterMode = 'all' | 'streaming' | 'watching';
 
-export type SignalingTransport = 'mqtt' | 'nostr' | 'torrent';
+export type RendezvousTransport = 'mqtt' | 'nostr' | 'torrent';
+export type SignalingTransport = RendezvousTransport | 'lan';
 
 export interface SignalingStatus {
   activeTransport: SignalingTransport;

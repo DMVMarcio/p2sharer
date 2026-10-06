@@ -1,10 +1,10 @@
 import { localizeText, t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useState } from 'react';
-import type { SignalingTransport } from '../../core/types.ts';
+import type { RendezvousTransport } from '../../core/types.ts';
 import { normalizeRendezvousUrl, type RendezvousPreferences } from '../../p2p/relay_preferences.ts';
 
-const labels: Record<SignalingTransport, string> = {
+const labels: Record<RendezvousTransport, string> = {
   mqtt: 'MQTT',
   nostr: 'Nostr',
   torrent: 'WebTorrent',
@@ -17,11 +17,11 @@ interface Props {
 
 export const RendezvousServerEditor: React.FC<Props> = ({ preferences, onChange }) => {
   useLocale();
-  const [transport, setTransport] = useState<SignalingTransport>('mqtt');
+  const [transport, setTransport] = useState<RendezvousTransport>('mqtt');
   const [newUrl, setNewUrl] = useState('');
   const [error, setError] = useState('');
 
-  const update = (entries: RendezvousPreferences[SignalingTransport]) => {
+  const update = (entries: RendezvousPreferences[RendezvousTransport]) => {
     onChange({ ...preferences, [transport]: entries });
     setError('');
   };

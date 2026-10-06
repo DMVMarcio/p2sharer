@@ -508,6 +508,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
                   max="100"
                   value={isMuted ? 0 : volume}
                   className="stream-volume-range"
+                  aria-label={t('message.78ba36d6b04f')}
+                  aria-orientation="vertical"
                   onChange={handleVolumeChange}
                   onClick={(e) => e.stopPropagation()}
                 />

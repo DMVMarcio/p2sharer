@@ -25,6 +25,10 @@ The preserved scripts in `test/bench/` and Rust examples are manual diagnostics.
 
 ## Maintenance review
 
+Keep a test when it protects observable production behavior or a meaningful contract: authorization, consent, data integrity, persistence, lifecycle, keyboard access, or synchronization. A feature request does not automatically require a new test.
+
+Do not freeze incidental appearance with CSS/source substring checks, exact decorative dimensions, button positions, animation literals, labels, or internal variable names. Static checks may enforce an explicit repository-wide rule or a packaging contract. When removing a mixed suite's appearance checks, retain its real behavior tests; do not add replacement assertions merely to preserve the test count.
+
 The retired tier-based `test/e2e/` harness mostly validated handwritten DSP, signaling, IPC and UI models, with stale capture signatures. Its useful browser mocks were relocated to `test/helpers/`; actual codec selection and capture fallback remain covered by production-backed unit tests. This repository currently does not provide an automated end-to-end desktop suite.
 
 The retired capture-cadence script extracted Rust source with regular expressions and no longer compiled against the current handler; the production frame-pacer regressions remain in the native suite. Removed native diagnostics measured `Instant`, `Vec`, polling thread timings or duplicated resource guards. Production resampler, downmix, continuity, clipping, serialization, transport authentication, JPEG/readback and event-guard lifetime checks remain. The encoder preference regression is now included in the standard frontend command. Retain regressions because they protect behavior, even when their filenames originated in an earlier milestone.

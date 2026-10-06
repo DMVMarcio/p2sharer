@@ -1,3 +1,4 @@
+import { startMediaDiagnostics } from './core/media_diagnostics.ts';
 import { StreamPointerOverlay } from './components/room/StreamPointerOverlay';
 import React from 'react';
 import { invoke, isTauri } from '@tauri-apps/api/core';
@@ -16,6 +17,7 @@ import { initializeLanguage } from './i18n';
 
 // Initialize global WebRTC SDP bitrate munging at startup before any peer connection is created
 MediaCoordinator.initGlobalWebRtcMunging();
+void startMediaDiagnostics();
 
 if (new URLSearchParams(window.location.search).has('pointerOverlay')) document.documentElement.classList.add('stream-pointer-desktop');
 

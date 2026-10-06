@@ -50,7 +50,20 @@ struct Route {
     bytes: AtomicU64,
     keys: AtomicU64,
     gaps: AtomicU64,
+    #[cfg(feature = "media-diagnostics")]
+    diagnostics: RouteDiagnostics,
 }
+
+#[cfg(feature = "media-diagnostics")]
+struct RouteDiagnostics {
+    track: u32,
+    loss: AtomicU32,
+    rtt_us: AtomicU64,
+    baseline_rtt_us: AtomicU64,
+    queued: AtomicBool,
+    reports: AtomicU64,
+}
+
 static ROUTES: LazyLock<Mutex<HashMap<String, Arc<Route>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
@@ -206,6 +219,10 @@ pub async fn create_native_video_offer(
         bytes: AtomicU64::new(0),
         keys: AtomicU64::new(0),
         gaps: AtomicU64::new(0),
+        #[cfg(feature = "media-diagnostics")]
+        diagnostics: RouteDiagnostics { track: crate::media_diagnostics::opaque_id(&track_id),
+            loss: AtomicU32::new(0), rtt_us: AtomicU64::new(0), baseline_rtt_us: AtomicU64::new(0),
+            queued: AtomicBool::new(false), reports: AtomicU64::new(0) },
     });
     let track = Arc::new(TrackLocalStaticRTP::new(codec, track_id, stream_id));
     let sender = match pc
@@ -304,6 +321,8 @@ pub async fn create_native_video_offer(
                     last_key = Instant::now();
                 }
                 if let Some(rr) = p.as_any().downcast_ref::<ReceiverReport>() {
+                    #[cfg(feature = "media-diagnostics")]
+                    rtcp_value.diagnostics.reports.fetch_add(1, Ordering::Relaxed);
                     if last_adjust.elapsed() >= Duration::from_secs(2) {
                         let loss = rr
                             .reports
@@ -322,6 +341,14 @@ pub async fn create_native_video_offer(
                         let queued = rtt.is_some_and(|rtt| {
                             rtt > baseline_rtt + 0.100 && rtt > baseline_rtt * 1.5
                         });
+                        #[cfg(feature = "media-diagnostics")]
+                        {
+                            let d = &rtcp_value.diagnostics;
+                            d.loss.store(u32::from(loss), Ordering::Relaxed);
+                            d.rtt_us.store((rtt.unwrap_or(0.0) * 1_000_000.0) as u64, Ordering::Relaxed);
+                            d.baseline_rtt_us.store((if baseline_rtt.is_finite() { baseline_rtt * 1_000_000.0 } else { 0.0 }) as u64, Ordering::Relaxed);
+                            d.queued.store(queued, Ordering::Relaxed);
+                        }
                         cap = adjust_rate(
                             cap,
                             rtcp_value.budget.load(Ordering::Relaxed),
@@ -770,5 +797,31 @@ mod tests {
         assert!(EncodedFrame::parse(&p).is_some());
         p[5] = 2;
         assert!(EncodedFrame::parse(&p).is_none());
+    }
+}
+
+#[cfg(feature = "media-diagnostics")]
+pub(crate) fn diagnostic_snapshot() -> serde_json::Value {
+    match ROUTES.try_lock() {
+        Ok(routes) => serde_json::json!({ "routes": routes.iter().take(32).map(|(id, route)| {
+            serde_json::json!({"route": crate::media_diagnostics::opaque_id(id),
+                "session": crate::media_diagnostics::opaque_id(&route.session),
+                "active": route.active.load(Ordering::Relaxed),
+                "connection_state": route.pc.connection_state().to_string(),
+                "budget": route.budget.load(Ordering::Relaxed),
+                "cap": route.cap.load(Ordering::Relaxed),
+                "encoder_bitrate": route.bitrate.load(Ordering::Relaxed),
+                "frames": route.frames.load(Ordering::Relaxed),
+                "bytes": route.bytes.load(Ordering::Relaxed),
+                "keys": route.keys.load(Ordering::Relaxed),
+                "gaps": route.gaps.load(Ordering::Relaxed),
+                "track": route.diagnostics.track,
+                "rr_fraction_lost_256": route.diagnostics.loss.load(Ordering::Relaxed),
+                "rr_rtt_us": route.diagnostics.rtt_us.load(Ordering::Relaxed),
+                "rr_baseline_rtt_us": route.diagnostics.baseline_rtt_us.load(Ordering::Relaxed),
+                "rr_queued": route.diagnostics.queued.load(Ordering::Relaxed),
+                "receiver_reports": route.diagnostics.reports.load(Ordering::Relaxed)})
+        }).collect::<Vec<_>>() }),
+        Err(_) => serde_json::json!({"route_lock_busy": true}),
     }
 }

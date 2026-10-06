@@ -9,6 +9,7 @@ description: Enforces canonical component reuse, design system tokens, native ho
 Enforces the "audit-before-creation" rule across user interfaces, host software extensions, and backend utilities.
 
 ## 1. Visual Interfaces (Web, Desktop, Mobile)
+- **Rule Scope**: Reuse the current design system, but do not promote task-specific layouts, wording, dimensions, icons, or feature requests into permanent rules. Persist only explicitly established standing conventions under the central memory policy. Test observable interactions and accessibility when needed; do not freeze incidental styling through source-text assertions.
 - **Prior Discovery**: Search the codebase for existing UI elements (buttons, dialogs, inputs, cards, tooltips) before authoring new ones.
 - **Design Tokens**: Adhere strictly to defined color variables, spacing scales, typography standards, and transition constants.
 - **Mandatory Componentization**: If a needed component does not exist:

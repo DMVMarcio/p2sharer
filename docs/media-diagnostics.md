@@ -1,0 +1,28 @@
+# Opt-in media diagnostics
+
+Build a diagnostic desktop executable with `pnpm run tauri:build --features media-diagnostics -- --locked`. Normal builds leave collection disabled. This feature does not change capture, encoding, adaptation, WebRTC recovery, saved encoder preferences or release versioning. Run the same diagnostic executable on both endpoints; close the installed application first. Do not install its bundles over production.
+
+Each process writes a separate `media-diagnostics-<timestamp>-<pid>.jsonl` file in the existing application log directory. Open it through Settings > Diagnostics > Open log folder. Share only these dedicated files from the reproduction, identified as sender and receiver. Ordinary session logs have a different privacy boundary.
+
+For a reproduction, stream at the usual resolution, FPS and bitrate. Observe the game in action on the sender and the stream on the receiver. Test the main window first, then PiP, and return to the main window. After a failure, keep streaming for another minute to measure recovery before restarting it. Note approximate times and which window showed the failure. Do not force a machine freeze for testing. End the app normally afterward and collect both files. Synchronizing the Windows clocks improves cross-machine timing comparisons; cumulative RTP counters and SSRCs provide additional correlation.
+
+## Collection and privacy
+
+- Native capture and transport snapshots are sampled every two seconds on a separate thread. Capture locks are attempted without waiting. Existing cumulative capture, encoder, pacer and adaptation counters are reused. Diagnostic-only atomics record capture/delivery age and maximum gaps. Native RTP snapshots include per-route bitrate caps, the shared encoder bitrate, RTCP loss, RTT, baseline RTT and congestion classification. Zero RTT indicates no usable measurement.
+- Each WebView samples video/audio RTP statistics and nominated candidate-pair timing, without addresses or candidate descriptions. Samples include packet loss, retransmissions, bitrate availability, resolution, FPS, quality-limitation classification, jitter buffer, decoding time, freeze counters and audio concealment when WebView2 exposes them. Missing fields mean unavailable. Fields are cumulative where the WebRTC API defines them as cumulative; analyze differences over sample intervals.
+- Video elements report dimensions, playback time and displayed/dropped-frame counters. Native preview bridges report packet age, pressure and decoder queues. Each WebView has a random numeric `renderer` ID, separating simultaneous PiP windows and renderer restarts. Peer/video IDs are local to that renderer. Foreground state and sampling gaps distinguish WebView scheduling pauses from native capture stalls. Connection-state changes are recorded immediately.
+- Dedicated records contain no images, audio, chat, room secrets, SDP, ICE addresses, URLs, device/window names or raw errors. Track and session identifiers are reduced to numeric hashes solely for correlation; these are not cryptographic anonymization. Frontend IPC accepts only allowlisted numeric/boolean fields with bounded depth, size and array lengths; it rejects every string and unknown key.
+- One bounded 128-record queue feeds a file writer; overflow drops telemetry instead of blocking media threads. Each file is limited to 32 MiB and flushed per record. Collection stops writing at that limit; files are never uploaded automatically. Collection has a small nonzero cost and is intended for diagnostic builds only. WebView statistics have a one-second timeout and samples never overlap.
+- At most 32 connections, bridges and video elements are sampled per WebView. RTP reports are capped at 96 entries per connection; oversized samples omit trailing connection reports and mark `failed`. Renderer-local counters/IDs restart when a WebView closes. The executable uses the normal profile and log folder.
+
+## Schema 1
+
+Each JSON line contains `schema`, application `version`, `epoch_ms`, process `uptime_ms`, `dropped_records`, `event` and `data`. Events are `start`, `native` and `webview`. Cross-machine epoch timestamps depend on clock accuracy. `dropped_records` covers writer-queue overflow, not unavailable API measurements.
+
+WebView `surface`: 0 = main, 1 = PiP. RTP `type`: 0 = inbound, 1 = outbound, 2 = remote inbound, 3 = remote outbound, 4 = nominated candidate pair. RTP `kind`: 0 = video/unspecified, 1 = audio. Quality limitation: 0 = none, 1 = CPU, 2 = bandwidth, 3 = other, -1 = unrecognized. Connection `state`: new, connecting, connected, disconnected, failed, closed in that numeric order. ICE `ice`: new, checking, connected, completed, disconnected, failed, closed. Signaling `signaling`: stable, have-local-offer, have-remote-offer, have-local-pranswer, have-remote-pranswer, closed. Unknown states are -1.
+
+Capture/delivery gaps measure fresh images, so unchanged desktop content may legitimately produce large gaps. Repeated/refresh frames have their own counters. This telemetry can locate a bottleneck; it cannot measure total GPU utilization, independently prove network capacity or directly measure glass-to-glass latency without a visible synchronized reference.
+
+## Validation
+
+Use `pnpm test`, `pnpm run test:native --release --features media-diagnostics` and desktop packaging for both diagnostic and ordinary configurations. Hardware smoke checks should verify that native and main/PiP WebView records appear during capture and reception, that counters advance, and that ordinary builds do not create dedicated diagnostic files. Store captures and diagnostic executables only under ignored build/runtime directories; never commit personal reports.

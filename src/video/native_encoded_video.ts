@@ -38,6 +38,11 @@ export class NativeEncodedDecoder {
   private feedbackToken: string;
   constructor(sessionId: string, feedbackToken: string) { this.sessionId = sessionId; this.feedbackToken = feedbackToken; }
 
+  public diagnosticSnapshot(): Record<string, number | boolean> {
+    return { pending: this.pending.size, queued: this.queued.length,
+      waiting_for_key: this.waitingForKey, decode_queue_size: this.decoder?.decodeQueueSize ?? 0 };
+  }
+
   private requestKey(): void {
     const now = performance.now();
     if (this.requestingKey || this.closed || now - this.lastKeyRequest < 250) return;

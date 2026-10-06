@@ -40,6 +40,7 @@ import { NativeVideoTransport } from './native_video_transport.ts';
 import { MediaCoordinator } from './media_coordinator.ts';
 import { PeerTracker } from './peer_tracker.ts';
 import { signalingManager } from './signaling_manager.ts';
+import { t } from '../i18n/index.ts';
 
 const APP_ID = 'p2sharer-multi-stream-v5';
 
@@ -250,7 +251,7 @@ export class GroupRoomManager {
     const parsedInvite = parseRoomInvite(roomId);
     this.roomId = parsedInvite?.roomId ?? roomId.trim();
     this.invite = parsedInvite ? roomId.trim() : null;
-    this.roomName = parsedInvite?.version === 4 ? parsedInvite.name : this.roomId.slice(0, 8);
+    this.roomName = parsedInvite && parsedInvite.version !== 3 ? parsedInvite.name : this.roomId.slice(0, 8);
     this.rootKey = parsedInvite?.rootKey ?? null;
     this.password = password.trim();
     this.isCreator = isCreator;
@@ -448,7 +449,7 @@ export class GroupRoomManager {
       const savedInvite = saved ? await verifyRoomInvite(saved.invite) : null;
       const preferredInvite = incomingInvite && savedInvite &&
         compareRoomInvites(savedInvite, incomingInvite) > 0 ? savedInvite : incomingInvite;
-      if (preferredInvite?.version === 4) {
+      if (preferredInvite && preferredInvite.version !== 3) {
         this.invite = formatRoomInvite(preferredInvite);
         this.snapshot = preferredInvite;
         this.roomName = preferredInvite.name;
@@ -487,6 +488,15 @@ export class GroupRoomManager {
       this.signalingTopic = this.invite ? `public-${this.roomId}` : await computeSignalingRoomId(this.roomId, this.password);
       console.log(`[P2P] Computed signaling topic: "${this.signalingTopic}"`);
 
+      if (this.snapshot?.connection) {
+        // LAN rooms gather host candidates only; public STUN/TURN cannot select an internet route.
+        this.turnConfig = null;
+        this.rtcConfig = { iceServers: [], iceTransportPolicy: 'all', iceCandidatePoolSize: 0 };
+        await signalingManager.prepareLan(this.snapshot.connection, this.roomId, this.isCreator, (connected) => {
+          if (!connected) this.callbacks?.onStatusChange(t('lan.signalingUnavailable'));
+          else if (this.room) this.callbacks?.onStatusChange(t('lan.signalingRestored'));
+        });
+      }
       this.setupRoomInstance();
       if (this.isCreator && (!this.snapshot || this.snapshot.epoch < this.authority!.epoch)) {
         await this.publishSnapshot(this.roomName);
@@ -501,23 +511,25 @@ export class GroupRoomManager {
       callbacks.onStatusChange(this.isCreator ? 'Sala Ativa' : 'Procurando Participantes...');
     } catch (err) {
       console.error('[P2P] Fatal room join error:', err);
-      callbacks.onStatusChange('Erro ao conectar na sala');
+      await signalingManager.leaveRoom();
+      callbacks.onStatusChange(this.snapshot?.connection ? t('lan.connectFailed') : 'Erro ao conectar na sala');
     }
   }
 
   private setupRoomInstance(): void {
+    const connectionMode = this.snapshot?.connection ? 'lan' : 'internet';
     const joinErrorHandler = createJoinErrorHandler((formattedMsg, details) => {
       console.warn(`[P2P/ICE Diagnostics] ${formattedMsg}`, details);
       if (this.callbacks && this.peerTracker.directConnectedPeers.size === 0) {
         this.callbacks.onStatusChange(formattedMsg);
       }
-    });
+    }, connectionMode);
 
     this.room = signalingManager.joinRoom(
       {
         appId: APP_ID,
         rtcConfig: this.rtcConfig,
-        rtcPolyfill: createFileOptimizedPeerConnection(),
+        rtcPolyfill: createFileOptimizedPeerConnection(connectionMode),
         // WebRTC is a full mesh: every participant must advertise so two
         // joiners can establish their own direct edge, not only reach the creator.
         passive: false,
@@ -769,9 +781,10 @@ export class GroupRoomManager {
         !validRoomName(name)) return false;
     const revision = this.authority.nextSnapshotRevision();
     const snapshot = await signRoomInvite({
-      version: 4, roomId: this.roomId, rootKey: this.rootKey, name,
+      version: this.snapshot?.version ?? 4, roomId: this.roomId, rootKey: this.rootKey, name,
       epoch: this.authority.epoch, revision, adminKeys: this.activeAdminKeys(),
       authorityChain: this.authority.history(),
+      ...(this.snapshot?.connection ? { connection: this.snapshot.connection } : {}),
     }, this.chatAuth);
     this.snapshot = snapshot;
     this.roomName = name;
@@ -785,8 +798,10 @@ export class GroupRoomManager {
   private async acceptSnapshot(value: string): Promise<void> {
     if (!this.authority || !this.rootKey || typeof value !== 'string' || value.length > 30010) return;
     const candidate = await verifyRoomInvite(value);
-    if (!candidate || candidate.version !== 4 || candidate.roomId !== this.roomId ||
+    if (!candidate || candidate.version === 3 || candidate.roomId !== this.roomId ||
         candidate.rootKey !== this.rootKey) return;
+    // Renaming and role changes cannot silently move an active room to another endpoint/mode.
+    if (JSON.stringify(candidate.connection) !== JSON.stringify(this.snapshot?.connection)) return;
     if (this.snapshot && compareRoomInvites(candidate, this.snapshot) <= 0) return;
     const knownChain = this.authority.history();
     if (candidate.epoch < this.authority.epoch ||

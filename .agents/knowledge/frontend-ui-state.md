@@ -13,7 +13,7 @@ container or repeating the same tracks does not disconnect audio. Detach pauses,
 clears and removes the auxiliary element without stopping shared remote tracks.
 
 ## Overview
-The frontend is built using TypeScript 5.6, HTML5, and CSS3, bundled via Vite 6. It follows a modular structure without heavy single-page application framework overhead, achieving sub-millisecond DOM updates and minimal memory consumption.
+The frontend is built using TypeScript 5.6, HTML5, and CSS3, bundled via Vite 6. React owns rendering and lifecycle; shared services coordinate state and native/P2P boundaries.
 
 ---
 
@@ -103,7 +103,6 @@ Persistent settings are automatically synchronized to and restored from `localSt
 - Saved-room sorting registers cards through useSortableGrid.cardRef; keyboard and pointer gestures share the existing draft, focus, rollback, and animation lifecycle.
 - Selector options, context-menu buttons, transmission tabs, and inline drawing editors use refs instead of selector lookups. Chat right-click actions use React onContextMenu and the same action builder as dots menus.
 - Native DOM APIs remain at explicit boundaries: React's root mount, media playback/capture, third-party editor/player integrations, geometry/animation measurements, selection highlighting, document-level dismissal, and modal focus traps. These are necessary browser contracts; do not replace them with HTML strings or duplicate feature renderers.
-- The retired ViewerRenderer, no-op HudController, EventBus, unused capture hook, compatibility re-export modules, starter assets, stale types, and CSS recipes without consumers were removed in the October 3, 2026 frontend maintenance pass. Renderer tests now exercise the active React components; independent audio and P2P checks remain.
 
 ---
 
@@ -145,6 +144,9 @@ The application-wide rule covers reusable React components and shared CSS recipe
 
 Before adding a control, inspect the common components and its existing usage. Extend the canonical implementation when a new variant is needed. Apply shared tokens, keyboard and focus behavior, disabled/read-only states, and reduced-motion handling across main, settings, activities, and PiP surfaces. Menus/dropdowns retain their 320 ms enter / 260 ms exit lifecycle; dialogs and other families keep their established motion rather than inheriting dropdown timings indiscriminately.
 
+`Tooltip` cancels pending shows and dismisses after activation, Escape, outside focus, scroll/resize, window blur, document visibility changes and pointer exit. While open it checks whether the trigger moves or is detached. Global listeners are attached only during an active/pending tooltip, and `onOpenChange` emits each transition exactly once, including unmount. Interactive hover and keyboard focus remain supported; mouse activation cannot reopen a tooltip through its resulting focus event.
+
+Stream PiP creation receives available video track dimensions and falls back to 16:9 until the receiver reports metadata. `PipView` reports video metadata/resolution changes to `set_pip_aspect_ratio`, scoped to its own PiP window. The Windows UI thread installs a subclass for `WM_SIZING`, adjusting the client rectangle proportionally on every resize edge, accounting for frame thickness and DPI, and removing the subclass on destruction. Initial sizing fits the current monitor work area; native maximization is disabled because its bounds would break the video aspect. Explicit fullscreen remains available. `usePipWindowDrag` starts native dragging after a small primary-pointer movement anywhere outside controls; Shift-drag retains zoom panning, and the enabled pointing/drawing mode retains ownership of video interactions.
 
 ## Consent-Based Stream Pointing
 
@@ -154,45 +156,26 @@ Before adding a control, inspect the common components and its existing usage. E
 
 `stream_pointer.rs` tracks the native capture source and hosts an unfocusable, click-through, transparent topmost WebView. It follows monitor physical bounds using the capture library's monitor ordering and window extended frame bounds, hiding minimized/closed windows. The annotation WebView starts with a transparent native background and waits for its frontend readiness handshake before being shown; empty snapshots clear the existing surface rather than destroy it. Capture teardown closes the retained per-session overlay. Display affinity excludes the annotation layer from captured monitor video. The main WebView publishes bounded, expiring visual snapshots; the overlay itself only reads snapshots/events. No mouse injection or remote desktop input commands exist in this feature. Capture stop clears the native source; room/stream lifecycle clears receiver state. Runtime verification with two desktop clients remains separate from compilation and unit checks.
 
-
 Virtual cursor motion is centralized in `StreamPointerGlyph` and the `.stream-pointer-remote.is-interpolated` recipe. Received cursor coordinates use a 70 ms linear transition, covering the 50 ms snapshot cadence plus modest jitter. Interrupted transitions retarget from the currently rendered position rather than the last network sample. This shared recipe works for pixel-based video coordinates and percentage-based native overlay coordinates. The locally controlled cursor explicitly opts out of interpolation, ripple coordinates do not interpolate, newly mounted cursors start at their received position, and reduced-motion preferences disable the transition.
-
 
 ## Interactive Stream Annotations
 
-`StreamDrawingToolbar` extends viewer interactive mode in cards and PiP with pointer, brush, outline rectangle/ellipse, text, preset colors through the canonical ContextMenu, and a semantic 0-10 size slider. Text is entered in a history-disabled canonical text input, then placed by clicking the video. Gestures use pointer capture and a local SVG draft; completed drawings travel through the verified watcher pointer channel. `StreamDrawingLayer` projects normalized geometry into the transformed contain rectangle or native desktop bounds, with tool-specific widths and text sizes scaled against 1080 pixels. Pointer events stay visual-only.
+`StreamDrawingToolbar` extends viewer interactive mode in cards and PiP with pointer, brush, outline rectangle/ellipse, text, preset colors through the canonical ContextMenu, and a semantic 0-10 size slider. Text uses the inline `StreamDrawingTextEditor` described below. Gestures use pointer capture and a local SVG draft; completed drawings travel through the verified watcher pointer channel. `StreamDrawingLayer` projects normalized geometry into the transformed contain rectangle or native desktop bounds, with tool-specific widths and text sizes scaled against 1080 pixels. Pointer events stay visual-only.
 
 `allowParticipantDrawings` is persisted under `p2sharer_participant_drawings`, defaults on, and is independent of pings; both require `allowParticipantCursors`. Changes publish immediately to existing watchers, and new watchers receive permission/scene snapshots. Drawing packets validate tool, hexadecimal color, 0-10 integer size, up to 192 normalized points, and up to 160 text characters. The broadcaster retains a configurable 1-1024 drawings (default 1024), each with up to 192 points, evicting oldest instructions at capacity. The Transmission slider persists under `p2sharer_drawing_limit`. Broadcaster-owned `StreamDrawingHistory` maintains independent author undo/redo stacks, including clear operations, trims evicted drawings/history, resets redo on a new action, and clears history on watch departure or revoked consent. History button state is relayed with snapshots; Ctrl+Z/Ctrl+Y (and Ctrl+Shift+Z) are scoped to the active interactive surface and bypass text fields and active dialogs/menus. Drawings persist when a viewer leaves interactive mode, and disappear when their author clears them, stops watching/disconnects, the capture ends, or consent is revoked. Snapshots renew drawing TTLs and idle scenes publish at most every 800 ms. `drawingsIncluded=false` sends cursor-only frames that retain existing drawings; complete drawing lists travel only on geometry/history/consent changes or watcher readiness. Main viewer readiness requests a rate-limited full `sync` snapshot after the media surface mounts, and PiP readiness exports a full merged scene. Native event frames use the same distinction, Rust shares immutable drawing geometry with Arc, and memoized SVG shapes retain geometry during cursor updates. Authors can clear only their own drawings. Native overlay exclusion prevents capture recursion, so passive viewers and PiP receive the same drawings through shared snapshots.
 
 Text annotations use `StreamDrawingTextEditor`, a borderless native textarea anchored to the same normalized video bounds as the SVG scene. The toolbar has no text field. Text drafts remain local until Enter or outside click confirms one history action; Shift+Enter preserves newlines, empty drafts are discarded, and IME composition does not commit on Enter. Shared SVG text uses one tspan per line across native overlays, viewers, and PiP. Consent revocation or stream departure removes the editor without publishing.
 
-
 ## Transmission settings sections
 
 The default-on `StateStore.rememberTransmissionSettings` preference is persisted under `p2sharer_remember_transmission_settings`. Settings exposes it beside transmission defaults and applies it only on Save. `saveTransmissionDefaults` centralizes persistence of resolution, FPS, bitrate, image quality, and cursor capture. The picker saves these defaults only after a successful start or edit; cancellation and capture failure leave both saved defaults and the previous runtime configuration intact. The capture service accepts an explicit bitrate so starting a capture does not require changing global defaults beforehand. When remembering is off, picker changes still configure that capture but do not replace stored defaults. Camera-specific dimensions and fractional frame rates remain exact in storage and appear as additional current options in Settings; screen picks retain their existing supported-mode normalization.
 
-Transmission defaults remain outside the local Pointing/Drawing and Advanced tabs.
-The tabs reuse `.theme-mode-pills` / `.pill-btn` with tablist/tab/tabpanel semantics,
-roving focus and arrow/Home/End navigation. Advanced appears first and opens by
-default; both panels reuse `.settings-row` with the 12 px `.settings-options-panel`
-row spacing. The encoder has no explanatory paragraph and its generic label is
-"Genérico (Padrão)"; Automatic remains the encoder default. Advanced owns cursor capture and the
-canonical encoder Select. Hardware choices require a real native encoder probe;
-Automatic and Generic remain available. `core/encoder_preferences.ts` centralizes
-validated local persistence and stale hardware selection recovery. Save applies the
-encoder to future native screen/window captures without restarting or changing
-existing sessions; cameras keep their current capture path.
-
+`core/encoder_preferences.ts` centralizes validated encoder persistence and stale hardware selection recovery. Hardware options require a native probe; Automatic and Generic remain available. Settings drafts survive local tab changes and apply on Save. Encoder changes affect future screen/window captures, preserving active sessions and the camera path.
 
 ## Local transmission previews
 
 `StateStore.localPreviewStreams` stores a boolean override per local media slot, with cameras defaulting to preview on and screens defaulting off. Every `VideoCard` in grid, stage, and tray reads the same choice, so remounting a layout cannot reset it. Room slot reconciliation removes ended stream keys and room teardown clears all choices. Local spotlight tray cards reuse the stop-watching control recipe to stop only their own `mediaId`. The selected featured tray card retains the existing lightweight placeholder, matching other selected streams.
 
-
 ## Saved room ordering
 
 `SavedRoomsSection` displays device-local order from `core/saved_room_order.ts`, persisted as room IDs under `p2sharer_saved_room_order_v1`; it never rewrites signed invitations, identities, or passwords to reorder cards. Existing rooms initially use their display-name alphabetical order. New records absent from the manual order append afterward, and renames retain their positions. `useSortableGrid` provides shared pointer/keyboard sorting with a six-dot handle, a transient draft, grid-aware nearest-slot placement, scroll-edge movement, and FLIP animations using the shared normal transition and reduced-motion setting. Drop commits once; Escape, pointer cancellation, and blur restore the initial order. Storage failures roll back the gesture and show a toast. The focused handle remains attached to its keyed card. Unit DOM checks verify gestures, keyboard focus, animations, and reduced motion; storage tests cover corruption and write failure.
-
-## Frontend maintenance validation (October 3, 2026)
-
-All 426 current unit tests pass, including actual React video reconciliation, decoder teardown, stream replacement, Strict Mode, persistent app placement, chat/editor context menus, keyboard navigation, sorting, cursor state, and inline drawing focus. Retired renderer-only suites were replaced by active-component checks; audio scaling, track handling, signaling, security, and capture tests remain. The 165 source modules are all reachable from the application entrypoint. All 1,244 retained CSS selectors preserve their original declarations and media-query context. `pnpm run tauri:build` successfully produced the native executable and MSI/NSIS bundles under the default release directory. These automated checks do not claim manual verification of every screen, hardware device, or remote peer route.

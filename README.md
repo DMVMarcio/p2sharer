@@ -15,13 +15,15 @@ Windows installers will be available on GitHub Releases as versions are publishe
 - Use a collaborative notepad and synchronized YouTube queues, including saved playlists and player picture-in-picture.
 - Point and draw on shared streams to explain something together.
 
-Rooms use WebRTC connections between participants, with public services for discovering and connecting peers. Streaming quality depends on each participant's connection, hardware and capture settings.
+Rooms use WebRTC connections between participants. Internet (P2P) rooms use public services to discover peers; Local network / VPN rooms use local discovery. Streaming quality depends on each participant's connection, hardware and capture settings.
 
 ## Get started
 
 1. Install a published Windows release and open P2Sharer.
 2. Choose a display name, create a room and share its invitation, or join with an invitation you received. Enter the room password if required.
 3. Select a screen, window or camera to share. Choose other participants' streams to watch and open room apps when you want to collaborate.
+
+For the experimental LAN/VPN mode, choose **Local network / VPN** when creating a room and select your network adapter, such as Radmin VPN or Hamachi. Everyone must join the same network and use a version of P2Sharer that supports LAN invitations. Allow P2Sharer through the firewall on that network. Keep the creator's app open for new participants to join; media travels directly between participants. VPNs may use their own relays, and remote media compatibility still requires testing on your network.
 
 ## Development
 

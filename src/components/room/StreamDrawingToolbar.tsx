@@ -7,6 +7,7 @@ import type { DrawingTool } from '../../core/stream_pointer';
 
 export interface DrawingSettings { tool: DrawingTool | null; color: string; size: number }
 const getColors = () => [
+  ['#a47754', t('color.brown')],
   ['#ef4444', t("message.6741b8b5e1c2")], ['#f97316', t("message.2b2b4ad00333")], ['#facc15', t("message.1875203bcdcc")], ['#22c55e', t("message.40598e1cb1d2")],
   ['#06b6d4', t("message.c954e4de2019")], ['#3b82f6', t("message.b0bf526b23af")], ['#a855f7', t("message.57a73ede5f6f")], ['#ec4899', t("message.75f9577a1637")],
   ['#ffffff', t("message.3683a74222dd")], ['#000000', t("message.4b652af43d8d")],

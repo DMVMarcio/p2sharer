@@ -16,6 +16,7 @@ import { initFrontendLogger } from '../../core/logger';
 import { Maximize, PanelsTopLeft, Pin, PictureInPicture2, RotateCcw, VolumeX, Volume2 } from 'lucide-react';
 import { useContextMenu, type ContextMenuAction } from '../common/ContextMenu';
 import { validPipAudioSettings } from '../../services/pip_audio';
+import { usePipWindowDrag } from '../../hooks/usePipWindowDrag';
 
 interface PipViewProps {
   peerId: string;
@@ -70,6 +71,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const lastVideoSizeRef = useRef('');
   const pointer = useStreamPointer(containerRef, videoRef, peerId, pointerEligible && !isLocal && !!stream && isVideoPlaying, stream, true, pointerEligible && !!stream && isVideoPlaying);
   const streamRef = useRef<MediaStream | null>(null);
   const bcRef = useRef<BroadcastChannel | null>(null);
@@ -88,6 +90,25 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
     handleMouseDown,
     handleDoubleClick,
   } = useStreamZoom(containerRef, stream, true);
+
+  const handleWindowDrag = usePipWindowDrag(!isFullscreen);
+  const syncVideoSize = useCallback(() => {
+    const video = videoRef.current;
+    if (!isTauri() || !video?.videoWidth || !video.videoHeight || document.fullscreenElement) return;
+    const key = `${video.videoWidth}:${video.videoHeight}`;
+    if (key === lastVideoSizeRef.current) return;
+    lastVideoSizeRef.current = key;
+    void invoke('set_pip_aspect_ratio', { videoWidth: video.videoWidth, videoHeight: video.videoHeight })
+      .catch(error => { lastVideoSizeRef.current = ''; console.warn('[PiP] Video sizing failed:', error); });
+  }, []);
+  useEffect(() => {
+    const fullscreenChanged = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+      if (!document.fullscreenElement) { lastVideoSizeRef.current = ''; syncVideoSize(); }
+    };
+    document.addEventListener('fullscreenchange', fullscreenChanged);
+    return () => document.removeEventListener('fullscreenchange', fullscreenChanged);
+  }, [syncVideoSize]);
 
   // Set up the loopback WebRTC receiver and signaling on mount.
   useEffect(() => {
@@ -436,7 +457,10 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
         if (zoom > 1) actions.push({ id: 'zoom', get label() { return t("message.2a1c7eafd8bb"); }, icon: <RotateCcw size={15} />, onSelect: resetZoom });
         openContextMenu(event, actions);
       }}
-      onMouseDown={handleMouseDown}
+      onPointerDownCapture={(event) => {
+        if (!pointer.enabled || event.target !== videoRef.current) handleWindowDrag(event);
+      }}
+      onMouseDown={(event) => { if (event.shiftKey || !isTauri() || isFullscreen) handleMouseDown(event); }}
       onDoubleClick={handleDoubleClick}
     >
       {/* Edge-to-edge Video Element */}
@@ -446,6 +470,8 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
         autoPlay
         playsInline
         muted
+        onLoadedMetadata={syncVideoSize}
+        onResize={syncVideoSize}
         onPlaying={() => {
           isVideoPlayingRef.current = true;
           setIsVideoPlaying(true);
@@ -474,11 +500,11 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
 
       {/* Floating Hover Overlay - only shown on hover or when HUD is pinned */}
       <div className={`pip-overlay ${isHudPinned || activeTooltips > 0 ? 'is-hud-pinned' : ''}`}>
-        {/* Floating Top Bar with data-tauri-drag-region */}
-        <div className="pip-top-bar" data-tauri-drag-region>
-          <div className="pip-top-left" data-tauri-drag-region>
+        {/* Dragging is shared by all noninteractive window surfaces. */}
+        <div className="pip-top-bar">
+          <div className="pip-top-left">
             <span className="pip-status-dot" aria-hidden="true" />
-            <span className="pip-title" data-tauri-drag-region>
+            <span className="pip-title">
               {senderName}
             </span>
           </div>
@@ -560,6 +586,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
                   value={isMuted ? 0 : volume}
                   onChange={handleVolumeChange}
                   className="stream-volume-range"
+                  aria-orientation="vertical"
                   aria-label={t("message.c6c6caae0ddf")}
                 />
                 <span className="stream-volume-percent">{isMuted ? '0%' : `${volume}%`}</span>

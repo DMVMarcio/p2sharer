@@ -1,9 +1,17 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { shouldNotifyChat } from '../../src/core/chat_notifications.ts';
+import { shouldNotifyChat, shouldPlayChatSound } from '../../src/core/chat_notifications.ts';
 import { SoundEffectsManager, SOUND_EVENTS } from '../../src/ui/sound_effects.ts';
 
 const incoming = { id: 'message-1', sender: 'Peer', authorId: 'remote', text: 'Hello', timestamp: 1, revision: 0 };
+
+test('chat sounds require an unfocused app or hidden chat', () => {
+  assert.equal(shouldPlayChatSound(true, false, 'chat'), false);
+  assert.equal(shouldPlayChatSound(false, false, 'chat'), true);
+  assert.equal(shouldPlayChatSound(true, true, 'chat'), true);
+  assert.equal(shouldPlayChatSound(true, false, 'participants'), true);
+  assert.equal(shouldPlayChatSound(false, true, 'participants'), true);
+});
 
 test('chat notifications exclude history duplicates, own messages, notices and revisions', () => {
   assert.equal(shouldNotifyChat(incoming, [], 'local'), true);

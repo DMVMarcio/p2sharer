@@ -41,7 +41,7 @@ export const SaveInviteModal: React.FC = () => {
         ...existing,
         roomId: invite.roomId,
         invite: retainNewer ? existing!.invite : code.trim(),
-        name: retainNewer ? existing!.name : invite.version === 4 ? invite.name : existing?.name ?? invite.roomId.slice(0, 8),
+        name: retainNewer ? existing!.name : invite.version !== 3 ? invite.name : existing?.name ?? invite.roomId.slice(0, 8),
         customName: name.trim() || existing?.customName,
         saved: true,
         owned: existing?.owned ?? false,

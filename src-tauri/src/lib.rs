@@ -3,6 +3,7 @@ mod test_support;
 
 pub mod audio_loopback;
 pub mod logger;
+mod media_diagnostics;
 pub mod note_files;
 pub mod youtube_playlist;
 pub mod chat_files;
@@ -27,12 +28,13 @@ mod window_chrome;
 mod localization;
 mod app_data_migration;
 mod app_updates;
+pub mod lan_signaling;
 
 use audio_loopback::{start_audio_capture, stop_audio_capture};
 use logger::{clear_log_file, get_log_file_path, open_latest_log, open_log_folder, write_frontend_log};
 use note_files::{open_note_file, save_note_file};
 use chat_files::{ChatFileState, pick_chat_file, inspect_chat_file, read_chat_file_chunk, choose_chat_download, write_chat_download_chunk, finish_chat_download, cancel_chat_download, read_chat_image_preview, remember_chat_file_source, restore_chat_file_source, reveal_chat_download};
-use pip_manager::{close_pip_window, open_pip_window, set_pip_always_on_top};
+use pip_manager::{close_pip_window, open_pip_window, set_pip_always_on_top, set_pip_aspect_ratio};
 use process_manager::{
     list_audio_processes, setup_job_object_for_clean_child_teardown,
 };
@@ -69,7 +71,9 @@ pub fn run() {
     #[cfg(windows)]
     {
         // Enable GPU hardware rasterization, zero-copy video pipeline, WebCodecs & WebRTC HW acceleration in WebView2
-        let current_args = std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS").unwrap_or_default();
+        let current_args = lan_signaling::browser_arguments(
+            &std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS").unwrap_or_default());
+        std::env::set_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", &current_args);
         if !current_args.contains("--enable-blink-features=MediaStreamTrackGenerator") {
             let extra_args = "--enable-gpu-rasterization --enable-zero-copy --enable-accelerated-video-decode --enable-accelerated-video-encode --enable-webrtc-hw-h264-encoding --enable-webrtc-hw-vp8-encoding --enable-gpu-memory-buffer-video-frames --enable-features=WebRtcHardwareVideoEncoding,WebRtcHardwareVideoDecoding,AcceleratedVideoEncoder,AcceleratedVideoDecoder,MediaStreamTrackGenerator --enable-blink-features=MediaStreamTrackGenerator";
             let new_args = if current_args.is_empty() {
@@ -82,10 +86,12 @@ pub fn run() {
     }
 
     logger::init_logger();
+    media_diagnostics::init();
     ensure_ws_server_running();
 
     tauri::Builder::default()
         .manage(ChatFileState::default())
+        .manage(lan_signaling::LanSignalingState::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
@@ -108,6 +114,14 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            media_diagnostics::media_diagnostics_enabled,
+            media_diagnostics::write_media_diagnostics,
+            lan_signaling::list_lan_interfaces,
+            lan_signaling::start_lan_signaling,
+            lan_signaling::stop_lan_signaling,
+            lan_signaling::connect_lan_signaling,
+            lan_signaling::send_lan_signaling,
+            lan_signaling::disconnect_lan_signaling,
             app_updates::check_app_update,
             prepare_app_update,
             cancel_app_update,
@@ -145,6 +159,7 @@ pub fn run() {
             open_pip_window,
             close_pip_window,
             set_pip_always_on_top,
+            set_pip_aspect_ratio,
             save_room_record,
             list_room_records,
             delete_room_record,

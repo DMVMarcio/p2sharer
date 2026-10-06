@@ -308,6 +308,8 @@ export class PipService {
       await invoke('open_pip_window', {
         peerId,
         title: senderName || t("message.15589e9e374d"),
+        videoWidth: activeStream?.getVideoTracks()[0]?.getSettings().width,
+        videoHeight: activeStream?.getVideoTracks()[0]?.getSettings().height,
       });
     } catch (err) {
       console.warn('[PipService] Failed to invoke open_pip_window:', err);

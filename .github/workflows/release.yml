@@ -38,8 +38,10 @@ jobs:
           sparse-checkout: |
             /.github/actions/setup-build/
             /tools/release.mjs
+            /tools/test-installer-artifacts.ps1
             /src-tauri/tauri.windows.conf.json
             /src-tauri/windows/installer-hooks.nsh
+            /src-tauri/windows/nsis-migration.wxs
           sparse-checkout-cone-mode: false
           persist-credentials: false
       - uses: ./.release-workflow/.github/actions/setup-build
@@ -51,6 +53,7 @@ jobs:
           Copy-Item -LiteralPath '.release-workflow/src-tauri/tauri.windows.conf.json' -Destination 'src-tauri/tauri.windows.conf.json' -Force
           New-Item -ItemType Directory -Path 'src-tauri/windows' -Force | Out-Null
           Copy-Item -LiteralPath '.release-workflow/src-tauri/windows/installer-hooks.nsh' -Destination 'src-tauri/windows/installer-hooks.nsh' -Force
+          Copy-Item -LiteralPath '.release-workflow/src-tauri/windows/nsis-migration.wxs' -Destination 'src-tauri/windows/nsis-migration.wxs' -Force
       - name: Validate release version
         shell: pwsh
         run: pnpm run release:check --tag "$env:RELEASE_TAG"
@@ -93,6 +96,11 @@ jobs:
           uploadUpdaterJson: true
           updaterJsonPreferNsis: true
           uploadUpdaterSignatures: true
+      - name: Validate compiled MSI upgrade and migration rules
+        shell: pwsh
+        run: |
+          $installerVersion = (Get-Content 'src-tauri/tauri.conf.json' -Raw | ConvertFrom-Json).version
+          & .release-workflow/tools/test-installer-artifacts.ps1 -MsiPath "src-tauri/target/release/bundle/msi/P2Sharer_${installerVersion}_x64_en-US.msi"
       - name: Verify updater manifest and signing key
         run: node tools/release.mjs artifacts
       - name: Remove obsolete draft MSI asset names

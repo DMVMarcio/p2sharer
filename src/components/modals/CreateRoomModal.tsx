@@ -1,6 +1,9 @@
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+import { Select } from '../common/Select';
+import { createLanConnection, type LanInterface } from '../../core/lan_room';
 import { useFormSubmit } from '../../hooks/useFormSubmit';
 import { useModal } from '../../hooks/useModal';
 import { useRoom } from '../../hooks/useRoom';
@@ -16,12 +19,37 @@ export const CreateRoomModal: React.FC = () => {
   const [name, setName] = useState(t("message.659cf77f64fc"));
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [mode, setMode] = useState('p2p');
+  const [interfaces, setInterfaces] = useState<LanInterface[]>([]);
+  const [address, setAddress] = useState('');
+  const [loadingInterfaces, setLoadingInterfaces] = useState(false);
+  const [networkError, setNetworkError] = useState('');
+
+  useEffect(() => {
+    if (mode !== 'lan') return;
+    let active = true;
+    setLoadingInterfaces(true);
+    setNetworkError('');
+    void invoke<LanInterface[]>('list_lan_interfaces').then((available) => {
+      if (!active) return;
+      setInterfaces(available);
+      // Prefer a virtual adapter by its name, never by a hard-coded VPN address range.
+      const preferred = available.find((item) => /radmin|hamachi/i.test(item.name) && !item.address.includes(':')) ??
+        available.find((item) => !item.address.includes(':')) ?? available[0];
+      setAddress(preferred?.address ?? '');
+      if (!available.length) setNetworkError(t('lan.noInterfaces'));
+    }).catch(() => { if (active) setNetworkError(t('lan.interfacesFailed')); })
+      .finally(() => { if (active) setLoadingInterfaces(false); });
+    return () => { active = false; };
+  }, [mode]);
 
   const handleConfirm = async () => {
+    if (mode === 'lan' && (!address || loadingInterfaces)) return;
     const finalPass = password.trim();
     try {
       const roomName = name.trim() || t("message.659cf77f64fc");
-      const { invite, identity } = await createAuthenticatedInvite(roomName);
+      const { invite, identity } = await createAuthenticatedInvite(roomName,
+        mode === 'lan' ? createLanConnection(address) : undefined);
       const roomId = parseRoomInvite(invite)!.roomId;
       await savedRooms.put({ roomId, invite, name: roomName,
         saved: true, owned: true, protected: Boolean(finalPass), password: finalPass || undefined, identity });
@@ -58,6 +86,22 @@ export const CreateRoomModal: React.FC = () => {
         </div>
 
         <div className="modal-body">
+          <div className="form-group">
+            <label className="form-label" htmlFor="create-room-connection">{t('lan.connectionMode')}</label>
+            <Select id="create-room-connection" value={mode} disabled={pending}
+              onValueChange={setMode} options={[
+                { value: 'p2p', label: t('lan.internetP2p') },
+                { value: 'lan', label: t('lan.localVpn') },
+              ]} />
+          </div>
+          {mode === 'lan' && <div className="form-group">
+            <label className="form-label" htmlFor="create-room-network">{t('lan.networkInterface')}</label>
+            <Select id="create-room-network" value={address} onValueChange={setAddress}
+              disabled={pending || loadingInterfaces} placeholder={t('lan.selectNetwork')}
+              options={interfaces.map((item) => ({ value: item.address, label: `${item.name} · ${item.address}` }))} />
+            <p className="modal-subtitle">{t('lan.createHint')}</p>
+            {networkError && <p role="alert" className="modal-subtitle">{networkError}</p>}
+          </div>}
           <div className="form-group">
             <label className="form-label" htmlFor="input-create-room-name-dialog">{t("message.711b2b76f603")}</label>
             <input autoComplete="off" id="input-create-room-name-dialog" className="text-input" maxLength={80}
@@ -106,7 +150,8 @@ export const CreateRoomModal: React.FC = () => {
         <div className="modal-footer">
           <button type="button" className="btn btn-secondary" id="btn-cancel-create-dialog" onClick={closeModal}>
             {t("message.bb9dbb406dcb")}</button>
-          <button className="btn btn-primary" id="btn-confirm-create-dialog" type="submit" disabled={pending || isClosing}>
+          <button className="btn btn-primary" id="btn-confirm-create-dialog" type="submit"
+            disabled={pending || isClosing || (mode === 'lan' && (loadingInterfaces || !address || Boolean(networkError)))}>
             <span>{t("message.bb0f3686fc7e")}</span>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="5" x2="19" y1="12" y2="12"/>

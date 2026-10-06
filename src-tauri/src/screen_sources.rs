@@ -93,6 +93,14 @@ pub fn encoded_capture(id: &str, token: &str) -> Result<EncodedCapture, String> 
 
 #[derive(Default)]
 pub struct CaptureMetrics {
+    #[cfg(feature = "media-diagnostics")]
+    last_callback_us: std::sync::atomic::AtomicU64,
+    #[cfg(feature = "media-diagnostics")]
+    last_delivery_us: std::sync::atomic::AtomicU64,
+    #[cfg(feature = "media-diagnostics")]
+    max_callback_gap_us: std::sync::atomic::AtomicU64,
+    #[cfg(feature = "media-diagnostics")]
+    max_delivery_gap_us: std::sync::atomic::AtomicU64,
     nvenc_images: std::sync::atomic::AtomicU64,
     nvenc_us: std::sync::atomic::AtomicU64,
     nvenc_fallbacks: std::sync::atomic::AtomicU64,
@@ -130,8 +138,12 @@ pub struct CaptureMetricsSnapshot {
 pub fn get_capture_metrics(session_id: String) -> Result<CaptureMetricsSnapshot, String> {
     let sessions = SESSIONS.lock().map_err(|_| "Capture session lock poisoned")?;
     let session = sessions.get(&session_id).ok_or("Capture session is no longer active")?;
+    Ok(metrics_snapshot(session))
+}
+
+fn metrics_snapshot(session: &CaptureSession) -> CaptureMetricsSnapshot {
     let metrics = &session.metrics;
-    Ok(CaptureMetricsSnapshot {
+    CaptureMetricsSnapshot {
         nvenc_images: metrics.nvenc_images.load(Ordering::Relaxed),
         nvenc_us: metrics.nvenc_us.load(Ordering::Relaxed),
         nvenc_fallbacks: metrics.nvenc_fallbacks.load(Ordering::Relaxed),
@@ -150,7 +162,25 @@ pub fn get_capture_metrics(session_id: String) -> Result<CaptureMetricsSnapshot,
         missed_deadlines: metrics.missed_deadlines.load(Ordering::Relaxed),
         queue_age_us: metrics.queue_age_us.load(Ordering::Relaxed),
         max_queue_age_us: metrics.max_queue_age_us.load(Ordering::Relaxed),
-    })
+    }
+}
+
+#[cfg(feature = "media-diagnostics")]
+pub(crate) fn diagnostic_snapshot() -> serde_json::Value {
+    match SESSIONS.try_lock() {
+        Ok(sessions) => serde_json::json!({ "captures": sessions.iter().take(32).map(|(id, session)| {
+            serde_json::json!({"session": crate::media_diagnostics::opaque_id(id),
+                "active": session.active.load(Ordering::Relaxed),
+                "nvenc": session.nvenc_enabled.load(Ordering::Relaxed),
+                "encoder_bitrate": session.nvenc_bitrate.load(Ordering::Relaxed),
+                "metrics": metrics_snapshot(session),
+                "callback_age_us": diagnostic_age(session.metrics.last_callback_us.load(Ordering::Relaxed)),
+                "delivery_age_us": diagnostic_age(session.metrics.last_delivery_us.load(Ordering::Relaxed)),
+                "max_callback_gap_us": session.metrics.max_callback_gap_us.load(Ordering::Relaxed),
+                "max_delivery_gap_us": session.metrics.max_delivery_gap_us.load(Ordering::Relaxed)})
+        }).collect::<Vec<_>>() }),
+        Err(_) => serde_json::json!({"capture_lock_busy": true}),
+    }
 }
 
 #[tauri::command]
@@ -201,6 +231,8 @@ fn send_paced_frame(frame: PacedFrame<Arc<Vec<u8>>>, sender: &broadcast::Sender<
     let message = match frame {
         PacedFrame::Fresh { frame, age_us } => {
             metrics.paced_images.fetch_add(1, Ordering::Relaxed);
+            #[cfg(feature = "media-diagnostics")]
+            diagnostic_tick(&metrics.last_delivery_us, &metrics.max_delivery_gap_us);
             metrics.queue_age_us.fetch_add(age_us, Ordering::Relaxed);
             metrics.max_queue_age_us.fetch_max(age_us, Ordering::Relaxed);
             Message::Binary((*frame).clone())
@@ -361,6 +393,8 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
         let arrival_time = std::time::Instant::now();
         self.frame_interval = std::time::Duration::from_nanos(1_000_000_000 / u64::from(self.load.fps()));
         self.metrics.callbacks.fetch_add(1, Ordering::Relaxed);
+        #[cfg(feature = "media-diagnostics")]
+        diagnostic_tick(&self.metrics.last_callback_us, &self.metrics.max_callback_gap_us);
         if arrival_time < self.next_frame_time {
             self.metrics.gated.fetch_add(1, Ordering::Relaxed);
             return Ok(());
@@ -1671,4 +1705,14 @@ mod tests {
 }
 
 
+#[cfg(feature = "media-diagnostics")]
+fn diagnostic_tick(last: &std::sync::atomic::AtomicU64, max: &std::sync::atomic::AtomicU64) {
+    let now = crate::media_diagnostics::elapsed_us();
+    let previous = last.swap(now, Ordering::Relaxed);
+    if previous != 0 { max.fetch_max(now.saturating_sub(previous), Ordering::Relaxed); }
+}
 
+#[cfg(feature = "media-diagnostics")]
+fn diagnostic_age(last: u64) -> Option<u64> {
+    (last != 0).then(|| crate::media_diagnostics::elapsed_us().saturating_sub(last))
+}
