@@ -71,20 +71,33 @@ test('appearance applies and persists custom colors and restores preset tokens',
   await act(async () => appearance.click());
   assert.ok(document.querySelector('[aria-label="Marrom"]'));
   assert.ok(document.querySelector('[aria-label="Azul escuro"]'));
+  await act(async () => document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Tab', bubbles: true })));
   await act(async () => document.querySelector('[aria-label="Marrom"]').focus());
   await act(async () => new Promise(resolve => setTimeout(resolve, 100)));
   assert.equal(document.querySelector('[role="tooltip"]').textContent, 'Marrom');
   const picker = document.querySelector('.custom-color-picker');
   assert.equal(picker.getAttribute('aria-label'), 'Cor personalizada');
-  await act(async () => picker.click());
+  await act(async () => {
+    picker.dispatchEvent(new window.MouseEvent('pointerdown', { bubbles: true }));
+    picker.focus();
+    picker.click();
+  });
   const hex = document.querySelector('.color-picker-dialog .text-input');
   await act(async () => {
     Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(hex, '#ffffff');
     hex.dispatchEvent(new window.Event('input', { bubbles: true }));
   });
   assert.notEqual(localStorage.getItem('p2sharer_accent_color'), '#ffffff');
-  await act(async () => document.querySelector('.color-picker-dialog .btn-primary').click());
+  await act(async () => {
+    const apply = document.querySelector('.color-picker-dialog .btn-primary');
+    apply.dispatchEvent(new window.MouseEvent('pointerdown', { bubbles: true }));
+    apply.focus();
+    apply.click();
+  });
   await act(async () => new Promise(resolve => setTimeout(resolve, 260)));
+  assert.equal(document.activeElement, picker, 'Closing the color dialog restores its trigger focus');
+  await act(async () => new Promise(resolve => setTimeout(resolve, 100)));
+  assert.equal(document.querySelector('[role="tooltip"]'), null, 'Pointer focus restoration must not reopen the color tooltip');
   assert.equal(localStorage.getItem('p2sharer_accent_color'), '#ffffff');
   assert.equal(document.documentElement.getAttribute('data-accent'), 'custom');
   assert.equal(document.documentElement.style.getPropertyValue('--custom-accent-text'), '#000000');

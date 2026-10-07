@@ -3863,6 +3863,8 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .custom-color-picker {
   padding: 2px;
   background: conic-gradient(#ef4444, #facc15, #22c55e, #06b6d4, #a855f7, #ef4444);
+  background-clip: padding-box;
+  background-repeat: no-repeat;
   --swatch-color: var(--accent-color);
 }
 

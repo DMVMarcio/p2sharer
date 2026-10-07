@@ -127,6 +127,21 @@ export const Tooltip: React.FC<TooltipProps> = ({
     if (disabled || !content) dismiss();
   }, [disabled, content, dismiss]);
 
+  // Track input even while closed: returning focus from a pointer-opened dialog
+  // must not be treated as keyboard navigation and reopen its trigger tooltip.
+  useEffect(() => {
+    const pointer = () => { pointerActivationRef.current = true; };
+    const keyboard = () => { pointerActivationRef.current = false; };
+    document.addEventListener('pointerdown', pointer, true);
+    document.addEventListener('mousedown', pointer, true);
+    document.addEventListener('keydown', keyboard, true);
+    return () => {
+      document.removeEventListener('pointerdown', pointer, true);
+      document.removeEventListener('mousedown', pointer, true);
+      document.removeEventListener('keydown', keyboard, true);
+    };
+  }, []);
+
   // Window exits and activation can bypass the trigger's mouseleave (native
   // dragging, portals, reparenting and focus changes). Cancel pending shows too.
   useEffect(() => {
@@ -198,11 +213,18 @@ export const Tooltip: React.FC<TooltipProps> = ({
     if (!isOpen) return;
     const anchor = triggerRef.current;
     const initial = anchor?.getBoundingClientRect();
+    const layoutSize = { width: anchor?.offsetWidth, height: anchor?.offsetHeight };
     const screenPosition = { x: window.screenX, y: window.screenY };
     let frame: number;
     const checkAnchor = () => {
       const rect = anchor?.getBoundingClientRect();
-      if (!anchor?.isConnected || !rect || !initial || rect.x !== initial.x || rect.y !== initial.y || rect.width !== initial.width || rect.height !== initial.height || window.screenX !== screenPosition.x || window.screenY !== screenPosition.y) {
+      // A centered hover scale changes the painted bounds, not the layout anchor.
+      // Still dismiss on real movement, layout resizing and native window movement.
+      if (!anchor?.isConnected || !rect || !initial ||
+        Math.abs((rect.x + rect.width / 2) - (initial.x + initial.width / 2)) > 0.5 ||
+        Math.abs((rect.y + rect.height / 2) - (initial.y + initial.height / 2)) > 0.5 ||
+        anchor.offsetWidth !== layoutSize.width || anchor.offsetHeight !== layoutSize.height ||
+        window.screenX !== screenPosition.x || window.screenY !== screenPosition.y) {
         dismiss();
         return;
       }
@@ -237,7 +259,6 @@ export const Tooltip: React.FC<TooltipProps> = ({
   const triggerElement = React.cloneElement(children, {
     ref: handleTriggerRef,
     onMouseEnter: (e: React.MouseEvent) => {
-      pointerActivationRef.current = false;
       handleShow();
       children.props.onMouseEnter?.(e);
     },
@@ -246,11 +267,10 @@ export const Tooltip: React.FC<TooltipProps> = ({
       children.props.onMouseLeave?.(e);
     },
     onFocus: (e: React.FocusEvent) => {
-      if (!pointerActivationRef.current) handleShow();
+      if (!pointerActivationRef.current && (e.target as HTMLElement).matches(':focus-visible')) handleShow();
       children.props.onFocus?.(e);
     },
     onBlur: (e: React.FocusEvent) => {
-      pointerActivationRef.current = false;
       handleHide();
       children.props.onBlur?.(e);
     },

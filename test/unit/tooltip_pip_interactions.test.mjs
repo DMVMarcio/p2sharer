@@ -30,11 +30,17 @@ const { createRoot } = await import('react-dom/client');
 const root = createRoot(document.getElementById('root'));
 let transitions = [];
 let anchorX = 10;
+let anchorScale = 1;
 function Fixture({ disabled = false, interactive = false, content = 'Action', callback = open => transitions.push(open) }) {
   return React.createElement('div', null,
     React.createElement(Tooltip, { content, disabled, interactive, showDelay: 1, hideDelay: 5, onOpenChange: callback },
       React.createElement('button', { id: 'trigger', ref: node => {
-        if (node) node.getBoundingClientRect = () => ({ x: anchorX, y: 10, left: anchorX, right: anchorX + 30, top: 10, bottom: 40, width: 30, height: 30 });
+        if (node) node.getBoundingClientRect = () => {
+          const size = 30 * anchorScale;
+          const x = anchorX + (30 - size) / 2;
+          const y = 10 + (30 - size) / 2;
+          return { x, y, left: x, right: x + size, top: y, bottom: y + size, width: size, height: size };
+        };
       } }, 'Action')),
     React.createElement('button', { id: 'outside' }, 'Other'));
 }
@@ -46,7 +52,7 @@ const tooltip = () => document.querySelector('[role="tooltip"]');
 const hover = async () => { await dispatch(trigger(), 'mouseover', { relatedTarget: document.body }); await wait(); assert.ok(tooltip()); };
 beforeEach(async () => {
   await act(async () => root.render(null));
-  transitions = []; anchorX = 10; frames.clear(); globalThis.pipDragCalls = 0;
+  transitions = []; anchorX = 10; anchorScale = 1; frames.clear(); globalThis.pipDragCalls = 0;
   await render();
 });
 after(async () => { await act(async () => root.unmount()); browser.window.close(); });
@@ -90,6 +96,38 @@ test('layout movement and disabled content dismiss without duplicate visibility 
   await hover(); await render({ disabled: true });
   assert.equal(tooltip(), null);
   assert.deepEqual(transitions, [true, false, true, false]);
+});
+
+test('hover animation keeps the tooltip open, while actual anchor movement still dismisses it', async () => {
+  await hover();
+  for (const scale of [1.1, 1.18]) {
+    anchorScale = scale;
+    await act(async () => { const callbacks = [...frames.values()]; frames.clear(); callbacks.forEach(callback => callback()); });
+    assert.ok(tooltip());
+  }
+  anchorX = 70;
+  await act(async () => { const callbacks = [...frames.values()]; frames.clear(); callbacks.forEach(callback => callback()); });
+  assert.equal(tooltip(), null);
+});
+
+test('pointer dialog focus restoration does not reopen a tooltip; hover and keyboard navigation still work', async () => {
+  await hover();
+  await dispatch(trigger(), 'pointerdown');
+  await act(async () => document.getElementById('outside').focus());
+  await dispatch(document.getElementById('outside'), 'pointerdown');
+  await dispatch(document.getElementById('outside'), 'click');
+  await act(async () => trigger().focus());
+  await wait();
+  assert.equal(tooltip(), null);
+  await hover();
+  await dispatch(trigger(), 'mouseout', { relatedTarget: document.body });
+  await wait();
+  assert.equal(tooltip(), null, 'A pointer-restored focus must not retain the hover tooltip');
+  await act(async () => document.getElementById('outside').focus());
+  await act(async () => document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Tab', bubbles: true })));
+  await act(async () => trigger().focus());
+  await wait();
+  assert.ok(tooltip());
 });
 
 test('keyboard focus and interactive tooltip hover remain usable; unmount closes once', async () => {
