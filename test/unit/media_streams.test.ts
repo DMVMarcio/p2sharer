@@ -45,17 +45,26 @@ test('native publication targets only its peer, suppresses browser video and pre
   internal.nativeVideo = null; internal.room = null; manager.stopStream();
 });
 
-test('native sender HUD measures transmitted frames rather than preview repeats or requested FPS', async () => {
-  const manager = new GroupRoomManager('Owner','test','',true);
+test('native sender HUD measures transmitted frames rather than preview repeats or requested FPS', async (context) => {
+  context.mock.timers.enable({ apis: ['Date'], now: 10_000 });
+  const manager = new GroupRoomManager('Owner', 'test', '', true);
   const stream = fakeStream('native-screen');
-  Object.assign(stream.getVideoTracks()[0],{getSettings:()=>({frameRate:120,width:1280,height:720})});
-  manager.shareStream(stream,8_000_000,120,descriptor('native-screen'));
-  const internal=manager as any;
-  internal.nativeVideo={senderStats:async()=>[{bytes:200_000,frames:110}]};
-  internal.mediaStatsSamples.set('local/native-screen',{bytes:100_000,at:Date.now()-1000,nativeFrames:50});
-  const stats=await manager.getPeerStats('local/native-screen');
-  assert.ok(stats.fps!>=58&&stats.fps!<=62);assert.ok(stats.bitrateKbps!>=780&&stats.bitrateKbps!<=820);
-  internal.nativeVideo=null;manager.stopStream();
+  Object.assign(stream.getVideoTracks()[0], { getSettings: () => ({ frameRate: 120, width: 1280, height: 720 }) });
+  manager.shareStream(stream, 8_000_000, 120, descriptor('native-screen'));
+  const internal = manager as any;
+  let counters = { bytes: 100_000, frames: 50 };
+  internal.nativeVideo = { senderStats: async () => [counters] };
+  try {
+    await manager.getPeerStats('local/native-screen');
+    context.mock.timers.tick(1000);
+    counters = { bytes: 200_000, frames: 110 };
+    const stats = await manager.getPeerStats('local/native-screen');
+    assert.equal(stats?.fps, 60);
+    assert.equal(stats?.bitrateKbps, 800);
+  } finally {
+    internal.nativeVideo = null;
+    manager.stopStream();
+  }
 });
 
 test('native video and ordinary audio merge into the same advertised slot without replacing another source', () => {
