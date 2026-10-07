@@ -8,6 +8,7 @@ import { roomService } from '../services/room_service';
 import { listCameras, preferredCameraFrameRate, type CameraResolution } from '../video/camera_devices';
 import { useCapturePreview } from './useCapturePreview';
 import { showToast } from './useToast';
+import { logDiagnostic } from '../core/logger.ts';
 
 export function useScreenPicker(onClose?: () => void, isClosing = false) {
   const editingId = useStore((state) => state.editingStreamId);
@@ -109,7 +110,10 @@ export function useScreenPicker(onClose?: () => void, isClosing = false) {
         invoke<ScreenSourcesResponse>('list_screen_sources'),
       ]);
       if (cameraResult.status === 'fulfilled') setCameras(cameraResult.value.filter((device) => device.kind === 'videoinput'));
-      else setError(t("message.b7ee01f4e0b2"));
+      else {
+        logDiagnostic('WARN', 'capture.sources', 'Camera enumeration failed', { error: cameraResult.reason });
+        setError(t("message.b7ee01f4e0b2"));
+      }
       if (screenResult.status === 'rejected') throw screenResult.reason;
       const resp = screenResult.value;
       const monList = resp.monitors || [];
@@ -129,6 +133,7 @@ export function useScreenPicker(onClose?: () => void, isClosing = false) {
         setSelectedSourceId(winList[0].id);
       }
     } catch (err) {
+      logDiagnostic('ERROR', 'capture.sources', 'Capture source enumeration failed', { error: err });
       setError(t("message.f3ec8f258239", { v0: localizeError(err) }));
     } finally {
       setIsLoading(false);
@@ -163,6 +168,7 @@ export function useScreenPicker(onClose?: () => void, isClosing = false) {
       }
       if (onClose) onClose();
     } catch (err) {
+      logDiagnostic('ERROR', 'capture.start', 'Transmission confirmation failed', { sourceId: selectedSourceId, editingId, resolution: resConfig, fps, bitrate, error: err });
       setError(t("message.11b6606b6f25", { v0: localizeError(err) }));
       preview.retry();
     } finally {

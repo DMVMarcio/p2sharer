@@ -18,7 +18,6 @@ import { ToastContainer } from './components/common/ToastContainer';
 import { useRoom } from './hooks/useRoom';
 import { useModal } from './hooks/useModal';
 import { useAppTheme } from './hooks/useAppTheme';
-import { initFrontendLogger } from './core/logger';
 import { stateStore } from './core/state_store';
 import { PipView } from './components/room/PipView';
 import { YouTubePipView } from './apps/YouTubePipView';
@@ -48,10 +47,6 @@ const MainApp: React.FC = () => {
   const { openModal, activeModal } = useModal();
 
   useEffect(startAutomaticUpdateChecks, []);
-
-  useEffect(() => {
-    initFrontendLogger();
-  }, []);
 
   useEffect(() => {
     // Check username on initial load

@@ -1,6 +1,7 @@
 import { localizeError, t } from '../i18n/index.ts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NativeVideoBridge } from '../video/native_video_bridge';
+import { logDiagnostic } from '../core/logger.ts';
 import { acquireCamera, cameraFrameRates, cameraResolution, cameraResolutions, configureCamera, preferredCameraFrameRate, type CameraResolution } from '../video/camera_devices';
 
 export interface PreparedCapture { sourceId: string; stream: MediaStream; bridge?: NativeVideoBridge }
@@ -29,6 +30,7 @@ export function useCapturePreview(sourceId: string, resolution: { width: number;
   }, []);
 
   const recoverCamera = useCallback(async (source: string, cancelled: () => boolean) => {
+    logDiagnostic('WARN', 'capture.preview', 'Retrying camera with device default mode', { sourceId: source });
     await dispose();
     if (cancelled()) return;
     // Some USB drivers hang while switching modes. Reopen once in the device's
@@ -43,6 +45,7 @@ export function useCapturePreview(sourceId: string, resolution: { width: number;
       throw new Error(t('message.f47f39a15741'));
     }
     recoveredTracks.current.add(track);
+    logDiagnostic('INFO', 'capture.preview', 'Camera recovered without mode probing', { sourceId: source, settings: actual });
     active.current = { sourceId: source, stream: preview };
     track.onended = () => {
       if (active.current?.stream === preview) setError(t('message.a1d4a2ca6dcf'));
@@ -78,10 +81,14 @@ export function useCapturePreview(sourceId: string, resolution: { width: number;
           if (!cancelled()) options.onModes(modes);
         } else setSettings(preview.getVideoTracks()[0].getSettings());
       } catch (err) {
+        if (!cancelled()) logDiagnostic('ERROR', 'capture.preview', 'Preview acquisition/discovery failed', { sourceId, generation: version, requested: { resolution: options.resolution, fps: options.fps }, error: err });
         if (bridge) await bridge.stopCapture();
         else if (!cancelled() && !(err instanceof DOMException && ['NotAllowedError', 'NotFoundError'].includes(err.name))) {
           try { await recoverCamera(sourceId, cancelled); return; }
-          catch (recoveryError) { err = recoveryError; }
+          catch (recoveryError) {
+            logDiagnostic('ERROR', 'capture.preview', 'Camera recovery failed', { sourceId, error: recoveryError });
+            err = recoveryError;
+          }
         }
         if (!bridge) await dispose();
         if (!cancelled()) { setStream(null); setError(t("message.80e583478ab0", { v0: localizeError(err) })); }
@@ -124,10 +131,12 @@ export function useCapturePreview(sourceId: string, resolution: { width: number;
         const chosen = preferredCameraFrameRate(rates, fps);
         const actual = await configureCamera(track, mode, chosen);
         if (!stale()) { setSettings(actual); setError(''); }
-      } catch {
+      } catch (error) {
         if (!stale()) {
+          logDiagnostic('ERROR', 'camera.configure', 'Camera mode configuration failed', { sourceId, resolution, fps, error });
           try { await recoverCamera(sourceId, stale); }
           catch (recoveryError) {
+            logDiagnostic('ERROR', 'capture.preview', 'Camera recovery failed', { sourceId, error: recoveryError });
             await dispose();
             if (!stale()) { setStream(null); setError(t("message.80e583478ab0", { v0: localizeError(recoveryError) })); }
           }
@@ -155,6 +164,9 @@ export function useCapturePreview(sourceId: string, resolution: { width: number;
     const version = generation.current;
     const stale = () => generation.current !== version;
     if (!capture) return;
+    logDiagnostic('ERROR', 'capture.preview', 'Preview player failed or received no decoded frame', {
+      sourceId: capture.sourceId, sessionId: capture.bridge?.sessionId, settings: capture.stream.getVideoTracks()[0]?.getSettings(),
+    });
     setBusy(true);
     queue.current = queue.current.catch(() => {}).then(async () => {
       if (stale() || active.current !== capture) return;

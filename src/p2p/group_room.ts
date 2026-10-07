@@ -2453,6 +2453,7 @@ export class GroupRoomManager {
           pc?.getReceivers?.().find((receiver) => receiver.track === track);
         if (!endpoint?.getStats) continue;
         const reports = await endpoint.getStats();
+        if (slot.isLocal) MediaCoordinator.logSenderEncoder(endpoint as RTCRtpSender, reports, slot.mediaId);
         reports.forEach((report) => {
           if (report.type !== (slot.isLocal ? 'outbound-rtp' : 'inbound-rtp') || report.kind !== 'video') return;
           if (typeof report.framesPerSecond === 'number') result.fps = Math.round(report.framesPerSecond);

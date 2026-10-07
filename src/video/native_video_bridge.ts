@@ -7,6 +7,7 @@ import { BridgeLoadMeter } from './bridge_load_meter.ts';
 import { VideoFrameClock } from './frame_timing.ts';
 import { isNativeEncodedPacket, NativeEncodedDecoder } from './native_encoded_video.ts';
 import { registerNativeSenderSource } from './native_sender_source.ts';
+import { logDiagnostic } from '../core/logger.ts';
 
 export class NativeVideoBridge implements VideoCaptureBridge {
   public readonly sessionId: string;
@@ -148,6 +149,8 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     this.currentFps = fps;
     this.frameClock.reset();
     this.effectiveFps = Math.min(120, Math.max(15, fps));
+    const captureStarted = performance.now();
+    let wireEncoder: string | undefined;
     const generation = this.captureGeneration;
     const feedbackToken = crypto.randomUUID();
     this.encoderFeedbackToken = feedbackToken;
@@ -214,10 +217,21 @@ export class NativeVideoBridge implements VideoCaptureBridge {
 
     // 2. Start native Rust capture thread
     try {
-      let encoderPreference = getEncoderPreference();
+      const requestedEncoder = getEncoderPreference();
+      let encoderPreference = requestedEncoder;
+      logDiagnostic('INFO', 'capture.bridge', 'Native capture requested', { sessionId: this.sessionId, sourceId,
+        resolution, fps, captureMouse, quality, encoderPreference, output: this.trackGenerator ? 'MediaStreamTrackGenerator' : 'canvas' });
       if (encoderPreference === 'nvenc') {
-        const support = await invoke<NativeEncoderSupport>('get_native_encoder_support').catch(() => null);
+        const support = await invoke<NativeEncoderSupport>('get_native_encoder_support').catch((error) => {
+          logDiagnostic('WARN', 'capture.encoder', 'Native encoder capability probe failed', { sessionId: this.sessionId, error });
+          return null;
+        });
         encoderPreference = getEncoderPreference(support?.driver_api_available ?? false);
+        logDiagnostic(support?.driver_api_available ? 'INFO' : 'WARN', 'capture.encoder', 'NVENC preference validated', {
+          sessionId: this.sessionId, requestedEncoder, effectivePreference: encoderPreference,
+          available: support?.driver_api_available ?? false, reason: support?.reason ?? 'capability probe unavailable',
+          elapsedMs: Math.round(performance.now() - captureStarted),
+        });
       }
       await invoke('start_capture_session', {
         sessionId: this.sessionId,
@@ -230,11 +244,14 @@ export class NativeVideoBridge implements VideoCaptureBridge {
         feedbackToken,
         encoderPreference,
       });
+      logDiagnostic('INFO', 'capture.bridge', 'Native capture command completed; awaiting video', {
+        sessionId: this.sessionId, elapsedMs: Math.round(performance.now() - captureStarted), encoderPreference });
     } catch (err) {
       this.isCapturing = false;
       this.isDirectGpu = false;
       const reason = err instanceof Error ? err.message : String(err);
-      console.error('[NativeVideoBridge] Native capture failed to start:', reason);
+      console.error('[NativeVideoBridge] Native capture failed to start:', { sessionId: this.sessionId, sourceId,
+        elapsedMs: Math.round(performance.now() - captureStarted), error: err, reason });
       throw new Error(t("message.879ac52b7cbf", { v0: localizeError(reason) }));
     }
 
@@ -341,14 +358,19 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     try {
       await new Promise<void>((resolve, reject) => {
         let settled = false;
-        const timeout = setTimeout(() => fail(), 3000);
+        const timeout = setTimeout(() => fail('authentication_timeout'), 3000);
         const succeed = () => {
           if (settled) return;
           settled = true;
           clearTimeout(timeout);
+          logDiagnostic('INFO', 'capture.websocket', 'Native video bridge authenticated', {
+            sessionId: this.sessionId, elapsedMs: Math.round(performance.now() - captureStarted) });
           resolve();
         };
-        const fail = () => {
+        const fail = (reason = 'authentication_failed', details?: unknown) => {
+          logDiagnostic('ERROR', 'capture.websocket', 'Native video bridge failed', {
+            sessionId: this.sessionId, sourceId, reason, details, authenticated: settled,
+            elapsedMs: Math.round(performance.now() - captureStarted) });
           if (settled) return;
           settled = true;
           clearTimeout(timeout);
@@ -359,7 +381,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
         this.ws.binaryType = 'arraybuffer';
 
         this.ws.onopen = () => {
-          try { this.ws?.send(`${accessToken}:${this.sessionId}`); } catch { fail(); }
+          try { this.ws?.send(`${accessToken}:${this.sessionId}`); } catch (error) { fail('authentication_send_failed', error); }
         };
 
         this.ws.onmessage = (evt: MessageEvent) => {
@@ -379,7 +401,8 @@ export class NativeVideoBridge implements VideoCaptureBridge {
             } catch {
               reason = evt.data;
             }
-            console.warn('[NativeVideoBridge] Received capture signal from native backend:', reason);
+            console.warn('[NativeVideoBridge] Received capture signal from native backend:', { sessionId: this.sessionId, sourceId, reason,
+              elapsedMs: Math.round(performance.now() - captureStarted) });
             if (this.onFallbackNeeded) {
               this.onFallbackNeeded(reason);
             }
@@ -387,6 +410,15 @@ export class NativeVideoBridge implements VideoCaptureBridge {
           }
 
           if (evt.data instanceof ArrayBuffer) {
+            if (evt.data.byteLength > 4) {
+              const encoder = isNativeEncodedPacket(evt.data) ? 'NVENC/H264' : 'libjpeg-turbo/JPEG';
+              if (wireEncoder !== encoder) {
+                logDiagnostic('INFO', 'capture.encoder', 'Observed native video payload', {
+                  sessionId: this.sessionId, encoder, previousEncoder: wireEncoder,
+                  elapsedMs: Math.round(performance.now() - captureStarted), packetBytes: evt.data.byteLength });
+                wireEncoder = encoder;
+              }
+            }
             if (isMediaDiagnosticsActive()) {
               this.diagnosticPackets++;
               this.diagnosticLastPacket = performance.now();
@@ -421,7 +453,8 @@ export class NativeVideoBridge implements VideoCaptureBridge {
                 if (generation !== this.captureGeneration || !this.isCapturing || nativeEncodingFailed) return;
                 nativeEncodingFailed = true;
                 encodedDecoder.close();
-                console.warn('[NativeVideoBridge] Native H264 rejected; retaining native JPEG:', String(error));
+                console.warn('[NativeVideoBridge] Native H264 rejected; retaining native JPEG:', { sessionId: this.sessionId, sourceId, error,
+                  elapsedMs: Math.round(performance.now() - captureStarted) });
                 void invoke('control_capture_encoder', {sessionId:this.sessionId,feedbackToken,disable:true}).catch(() => {});
               });
               return;
@@ -439,8 +472,8 @@ export class NativeVideoBridge implements VideoCaptureBridge {
           }
         };
 
-        this.ws.onerror = fail;
-        this.ws.onclose = fail;
+        this.ws.onerror = () => fail('websocket_error');
+        this.ws.onclose = (event) => fail('websocket_closed', { code: event.code, reason: event.reason, wasClean: event.wasClean });
       });
     } catch (error) {
       await this.stopCapture();
@@ -466,12 +499,21 @@ export class NativeVideoBridge implements VideoCaptureBridge {
         const started = performance.now();
         const check = () => {
           if (this.latestBitmap || this.latestEncodedFrame) {
+            logDiagnostic('INFO', 'capture.preview', 'First native preview frame decoded', {
+              sessionId: this.sessionId, sourceId, encoder: wireEncoder,
+              width: this.latestBitmap?.width ?? this.latestEncodedFrame?.displayWidth,
+              height: this.latestBitmap?.height ?? this.latestEncodedFrame?.displayHeight,
+              elapsedMs: Math.round(performance.now() - captureStarted) });
             if (this.latestEncodedFrame && stream.getVideoTracks()[0]) {
               registerNativeSenderSource(stream.getVideoTracks()[0], { sessionId: this.sessionId, feedbackToken });
             }
             resolve(); return;
           }
           if (!this.isCapturing || performance.now() - started > 6000) {
+            logDiagnostic('ERROR', 'capture.preview', 'Native preview did not decode its first frame', {
+              sessionId: this.sessionId, sourceId, encoder: wireEncoder ?? 'no image payload received',
+              elapsedMs: Math.round(performance.now() - captureStarted), waitMs: Math.round(performance.now() - started),
+              capturing: this.isCapturing, nativeEncodingFailed });
             reject(new Error(t("message.08b5364da3c6")));
             return;
           }

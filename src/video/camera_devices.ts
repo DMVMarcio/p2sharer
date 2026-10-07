@@ -1,5 +1,6 @@
 import { MAX_MEDIA_FPS, formatFrameRate } from '../core/media_streams.ts';
 import { t } from '../i18n/index.ts';
+import { logDiagnostic } from '../core/logger.ts';
 
 export interface CameraResolution { value: string; label: string; width: number; height: number }
 
@@ -8,6 +9,7 @@ async function cameraDeadline<T>(operation: Promise<T>, onTimeout: () => void, d
   try {
     return await Promise.race([operation, new Promise<never>((_, reject) => {
       timer = setTimeout(() => {
+        logDiagnostic('ERROR', 'camera.timeout', 'Camera operation deadline exceeded', { timeoutMs: duration });
         onTimeout();
         reject(new DOMException(t('capture.cameraTimeout'), 'TimeoutError'));
       }, duration);
@@ -17,16 +19,32 @@ async function cameraDeadline<T>(operation: Promise<T>, onTimeout: () => void, d
 
 /** A late device response must not retain a camera after its caller has given up. */
 export async function acquireCamera(constraints: MediaStreamConstraints): Promise<MediaStream> {
+  const started = performance.now();
+  logDiagnostic('INFO', 'camera.open', 'Opening selected camera', { constraints });
   let expired = false;
   const opening = navigator.mediaDevices.getUserMedia(constraints).then((stream) => {
-    if (expired) stream.getTracks().forEach((track) => track.stop());
+    if (expired) {
+      stream.getTracks().forEach((track) => track.stop());
+      logDiagnostic('WARN', 'camera.open', 'Late camera acquisition released after deadline', { constraints, elapsedMs: Math.round(performance.now() - started) });
+    }
     return stream;
   });
-  return cameraDeadline(opening, () => { expired = true; }, 12000);
+  try {
+    const stream = await cameraDeadline(opening, () => { expired = true; }, 12000);
+    logDiagnostic('INFO', 'camera.open', 'Camera acquired', { elapsedMs: Math.round(performance.now() - started),
+      settings: stream.getVideoTracks?.()[0]?.getSettings?.() });
+    return stream;
+  } catch (error) {
+    logDiagnostic('ERROR', 'camera.open', 'Camera acquisition failed', { constraints, elapsedMs: Math.round(performance.now() - started), error });
+    throw error;
+  }
 }
 
 function applyCameraConstraints(track: MediaStreamTrack, options: MediaTrackConstraints) {
-  return cameraDeadline(track.applyConstraints(options), () => track.stop());
+  return cameraDeadline(track.applyConstraints(options), () => {
+    logDiagnostic('ERROR', 'camera.configure', 'Camera constraint application stalled; releasing track', { requested: options, actual: track.getSettings() });
+    track.stop();
+  });
 }
 
 /** Chromium hides device identities until a camera has been granted by the native host. */
@@ -64,6 +82,8 @@ function constraints(width: number, height: number, fps?: number): MediaTrackCon
 
 /** Validate combinations: capability ranges alone do not guarantee a usable camera mode. */
 export async function cameraResolutions(track: MediaStreamTrack, cancelled: () => boolean): Promise<CameraResolution[]> {
+  const started = performance.now();
+  const rejected: Array<{ width: number; height: number; error: unknown }> = [];
   const caps = track.getCapabilities?.() || {};
   const settings = track.getSettings();
   const candidates = [[3840, 2160], [2560, 1440], [1920, 1080], [1280, 720],
@@ -77,18 +97,24 @@ export async function cameraResolutions(track: MediaStreamTrack, cancelled: () =
       await applyCameraConstraints(track, constraints(width, height));
       const actual = track.getSettings();
       if (actual.width === width && actual.height === height) result.push(cameraResolution(width, height));
+      else rejected.push({ width, height, error: { reason: 'negotiated_dimensions_differ', actual } });
     } catch (error) {
       if (error instanceof DOMException && error.name === 'TimeoutError') throw error;
+      rejected.push({ width, height, error });
       /* Unsupported pairs are omitted, without preventing preview. */
     }
   }
   if (!cancelled() && settings.width && settings.height) {
     await configureCamera(track, cameraResolution(settings.width, settings.height), settings.frameRate || 30);
   }
+  if (!cancelled()) logDiagnostic('INFO', 'camera.modes', 'Camera resolution discovery completed', {
+    initial: settings, capabilities: caps, accepted: result, rejected, elapsedMs: Math.round(performance.now() - started) });
   return result.sort((a, b) => b.width * b.height - a.width * a.height);
 }
 
 export async function cameraFrameRates(track: MediaStreamTrack, mode: CameraResolution, cancelled: () => boolean): Promise<number[]> {
+  const started = performance.now();
+  const rejected: Array<{ fps: number; error: unknown }> = [];
   const caps = track.getCapabilities?.() || {};
   const current = track.getSettings().frameRate;
   const candidates = [...new Set([120, 60, 30, 24, 15, ...(current ? [current] : []), ...(caps.frameRate?.max ? [caps.frameRate.max] : [])])]
@@ -103,11 +129,17 @@ export async function cameraFrameRates(track: MediaStreamTrack, mode: CameraReso
       const actual = track.getSettings();
       if (actual.width === mode.width && actual.height === mode.height && Math.abs((actual.frameRate || 0) - fps) < 0.1 &&
         !result.some((rate) => formatFrameRate(rate) === formatFrameRate(fps))) result.push(fps);
+      else if (actual.width !== mode.width || actual.height !== mode.height || Math.abs((actual.frameRate || 0) - fps) >= 0.1) {
+        rejected.push({ fps, error: { reason: 'negotiated_mode_differs', actual } });
+      }
     } catch (error) {
       if (error instanceof DOMException && error.name === 'TimeoutError') throw error;
+      rejected.push({ fps, error });
       /* Probe the selected resolution, not a different camera mode. */
     }
   }
+  if (!cancelled()) logDiagnostic('INFO', 'camera.modes', 'Camera FPS discovery completed', {
+    deviceId: settings.deviceId, mode, accepted: result, rejected, elapsedMs: Math.round(performance.now() - started) });
   return result.sort((a, b) => b - a);
 }
 

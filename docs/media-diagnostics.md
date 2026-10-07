@@ -1,5 +1,17 @@
 # Opt-in media diagnostics
 
+## Ordinary session logs
+
+Release builds always write `session-<timestamp>-<pid>.log` under the application log directory, accessible through Settings > Diagnostics. These text logs include technical errors and stack traces; the application does not upload them. The header identifies the compiled version and timestamps use UTC.
+
+React root errors include the component stack and original error/cause. JavaScript exceptions, unhandled rejections, Rust warnings/errors emitted through the logger, and release panics also reach this file. Capture records correlate the requested source, native session, published media and transport route, with elapsed times for acquisition, encoder initialization/fallback, bridge authentication and the first decoded preview frame. Camera errors preserve the browser error name and failed constraint. Repeated frame failures are sampled at exponentially spaced counts rather than logged per frame.
+
+`capture.encoder` identifies the native encoder only after successful output: `NVENC/H264` or `libjpeg-turbo/JPEG`. Generic capture still requires browser WebRTC encoding for transmission. `transmission.encoder` reports the codec and encoder implementation observed in actual outgoing RTP statistics; missing implementation fields remain explicitly unreported. `transmission.native` records native H264 negotiation and the reason for browser WebRTC fallback. Capability preferences and power-efficiency hints do not prove which GPU encoder was selected.
+
+Unlike the bounded opt-in telemetry below, session logs contain raw technical errors, source/device identifiers and browser details. Review them before sharing. They do not include captured images/audio, and new capture/transport diagnostics do not record authentication tokens, SDP or ICE credentials.
+
+## Dedicated telemetry
+
 Build a diagnostic desktop executable with `pnpm run tauri:build --features media-diagnostics -- --locked`. Normal builds leave collection disabled. This feature does not change capture, encoding, adaptation, WebRTC recovery, saved encoder preferences or release versioning. Run the same diagnostic executable on both endpoints; close the installed application first. Do not install its bundles over production.
 
 Each process writes a separate `media-diagnostics-<timestamp>-<pid>.jsonl` file in the existing application log directory. Open it through Settings > Diagnostics > Open log folder. Share only these dedicated files from the reproduction, identified as sender and receiver. Ordinary session logs have a different privacy boundary.
