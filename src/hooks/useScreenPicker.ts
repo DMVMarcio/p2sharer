@@ -164,6 +164,7 @@ export function useScreenPicker(onClose?: () => void, isClosing = false) {
       if (onClose) onClose();
     } catch (err) {
       setError(t("message.11b6606b6f25", { v0: localizeError(err) }));
+      preview.retry();
     } finally {
       setIsStarting(false);
     }
@@ -181,7 +182,8 @@ export function useScreenPicker(onClose?: () => void, isClosing = false) {
     cameras,
     showCursor,
     onClose,
-    resConfig.width, resConfig.height, preview.take,
+    resConfig.width, resConfig.height, preview.take, preview.retry,
+    preview.busy,
   ]);
 
   return {

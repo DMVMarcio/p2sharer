@@ -23,7 +23,12 @@ globalThis.transmissionDefaultsFixture = {
 };
 const mocks = {
   room: 'export const roomService = { localCaptures: globalThis.transmissionDefaultsFixture.localCaptures, startCapture: (...args) => globalThis.transmissionDefaultsFixture.startCapture(...args) };',
-  preview: 'export const useCapturePreview = (_source, _res, _fps, _cursor, _quality, _closing, modes, rates) => { globalThis.transmissionDefaultsFixture.receiveModes = modes; globalThis.transmissionDefaultsFixture.receiveRates = rates; return { busy: false, take: async () => undefined }; };',
+  preview: `const take = async () => undefined;
+    const retry = () => { globalThis.transmissionDefaultsFixture.retries = (globalThis.transmissionDefaultsFixture.retries || 0) + 1; };
+    export const useCapturePreview = (_source, _res, _fps, _cursor, _quality, _closing, modes, rates) => {
+      globalThis.transmissionDefaultsFixture.receiveModes = modes; globalThis.transmissionDefaultsFixture.receiveRates = rates;
+      return { busy: !!globalThis.transmissionDefaultsFixture.previewBusy, take, retry };
+    };`,
   cameras: 'export const listCameras = async () => [{ kind: "videoinput", deviceId: "fixture-camera", label: "Camera" }]; export const preferredCameraFrameRate = (rates, fps) => rates.includes(fps) ? fps : rates[0];',
   tauri: 'export const invoke = async () => ({ monitors: [{ id: "screen:0", name: "Monitor" }], windows: [] });',
 };
@@ -102,11 +107,13 @@ test('cancelled and failed attempts preserve both stored defaults and prior runt
   await open(); await choose(); await open();
   assert.equal(picker.resolution, '1080p');
   await choose(); captureError = true;
+  const retries = globalThis.transmissionDefaultsFixture.retries || 0;
   await act(async () => picker.confirmPicker());
   captureError = false;
   assert.equal(picker.error, 'Não foi possível aplicar a transmissão: Não foi possível concluir a operação. Tente novamente.');
   assert.deepEqual(saved(), ['1080p', '60', '15000', '90', 'true']);
   assert.equal(stateStore.currentFps, 60); assert.equal(stateStore.currentBitrate, 15000);
+  assert.equal(globalThis.transmissionDefaultsFixture.retries, retries + 1);
 });
 
 test('camera capability choices and successful start preserve screen drafts and saved defaults', async () => {
@@ -135,6 +142,18 @@ test('camera capability choices and successful start preserve screen drafts and 
   await open();
   await act(async () => picker.setCurrentTab('cameras'));
   assert.equal(picker.resolution, '720p'); assert.equal(picker.fps, 30); assert.equal(picker.bitrate, 8000);
+});
+
+test('confirmation uses the current preview readiness after loading finishes without changing settings', async () => {
+  globalThis.transmissionDefaultsFixture.previewBusy = true;
+  await open();
+  const count = captures.length;
+  await act(async () => picker.confirmPicker());
+  assert.equal(captures.length, count);
+  globalThis.transmissionDefaultsFixture.previewBusy = false;
+  await act(async () => root.render(React.createElement(Harness)));
+  await act(async () => picker.confirmPicker());
+  assert.equal(captures.length, count + 1);
 });
 
 test('editing a camera preserves exact active constraints without saving them as transmission defaults', async () => {

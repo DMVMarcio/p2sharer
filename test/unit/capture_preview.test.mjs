@@ -68,6 +68,37 @@ test('late capture completion after cancellation cannot retain a live session', 
   assert.equal(captures.at(-1).track.stopped, true); assert.equal(preview.stream, null);
 });
 
+test('a camera stalled by mode discovery reopens once with its negotiated default and releases a failed recovery', async (context) => {
+  await render({ disabled: true });
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  const tracks = [], devices = [];
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { mediaDevices: {
+    getSupportedConstraints: () => ({ resizeMode: true }),
+    getUserMedia: async (constraints) => {
+      devices.push(constraints);
+      const track = { stopped: false, stop() { this.stopped = true; },
+        getCapabilities: () => ({}), getSettings: () => ({ width: 640, height: 480, frameRate: 25 }),
+        applyConstraints: () => new Promise(() => {}),
+      };
+      tracks.push(track);
+      return { id: `camera-${tracks.length}`, getVideoTracks: () => [track], getTracks: () => [track] };
+    },
+  } } });
+  await render({ source: 'camera:usb' });
+  assert.equal(preview.busy, true);
+  await act(async () => { context.mock.timers.tick(4000); });
+  assert.equal(devices.length, 2); assert.equal(tracks[0].stopped, true);
+  assert.deepEqual(devices[1].video.deviceId, { exact: 'usb' });
+  assert.equal(devices[1].video.width, undefined);
+  assert.deepEqual(preview.settings, { width: 640, height: 480, frameRate: 25 });
+  assert.equal(preview.busy, false); assert.equal(preview.error, '');
+  assert.equal(preview.stream.getVideoTracks()[0], tracks[1]);
+  await act(async () => preview.reportPlaybackError());
+  assert.equal(tracks[1].stopped, true); assert.equal(preview.stream, null);
+  assert.ok(preview.error); assert.equal(devices.length, 2);
+  await render({ source: 'camera:usb', disabled: true });
+});
+
 test('side preview crossfades only after a decoded frame and repeats loading on source switches', async () => {
   const callbacks = [];
   window.HTMLVideoElement.prototype.requestVideoFrameCallback = (callback) => { callbacks.push(callback); return callbacks.length; };
@@ -109,6 +140,23 @@ test('preview skeleton respects reduced motion while retaining frame readiness',
   await act(async () => frame());
   assert.equal(document.querySelector('.media-preview-skeleton'), null);
   window.matchMedia = () => ({ matches: false });
+});
+
+test('preview readiness falls back to a decoded frame and reports sources that never send video with a retry action', async (context) => {
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  let failures = 0, retries = 0;
+  const props = { label: 'Camera', sourceKey: 'camera:usb', busy: false, settings: {},
+    onError: () => failures++, onRetry: () => retries++ };
+  await act(async () => root.render(React.createElement(MediaPreview, { ...props, stream: { id: 'decoded' } })));
+  Object.defineProperty(document.querySelector('video'), 'readyState', { configurable: true, value: 2 });
+  await act(async () => context.mock.timers.tick(8000));
+  assert.ok(document.querySelector('.media-preview-video.ready')); assert.equal(failures, 0);
+  await act(async () => root.render(React.createElement(MediaPreview, { ...props, stream: { id: 'stalled' } })));
+  await act(async () => context.mock.timers.tick(8000));
+  assert.equal(failures, 1);
+  await act(async () => root.render(React.createElement(MediaPreview, { ...props, stream: null, error: 'Unavailable' })));
+  await act(async () => document.querySelector('.media-preview button').dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
+  assert.equal(retries, 1);
 });
 
 after(async () => { await act(async () => root.unmount()); dom.window.close(); });

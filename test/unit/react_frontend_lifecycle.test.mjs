@@ -44,7 +44,7 @@ const mocks = {
   useRoom: 'export const useRoom = () => globalThis.frontendLifecycleFixture.room;',
   useStore: 'export const useStore = selector => selector(globalThis.frontendLifecycleFixture.store);',
   state: 'export const stateStore = globalThis.frontendLifecycleFixture.store;',
-  service: 'export const roomService = { localCaptures: new Map(), requestStream() {}, roomManager: null };',
+  service: 'export const roomService = { localCaptures: new Map(), requestStream() {}, stopTransmission: id => globalThis.frontendLifecycleFixture.copied.push(id), roomManager: null };',
   apps: `export const roomAppsService = { subscribe: () => () => {},
     getInstances: () => globalThis.frontendLifecycleFixture.instances, getJoinedInstances: () => [] };`,
   appCard: `import React from 'react'; export const RoomAppCard = ({ instance, style }) =>
@@ -110,6 +110,17 @@ test('viewer identity badge remains correct when two participants share a userna
   const rows = [...document.querySelectorAll('.watchers-tooltip-item')];
   assert.equal(rows[0].querySelector('.badge-you'), null);
   assert.equal(rows[1].querySelector('.badge-you').textContent, 'VOCÊ');
+});
+
+test('the grid stop control ends only its own local transmission without changing the layout', async () => {
+  const local = { ...slot('local/camera'), isLocal: true, mediaId: 'camera-session', mediaKind: 'camera' };
+  await reset([local, slot('other')]);
+  const button = card(local.peerId).querySelector('.btn-stop-watch-stream');
+  assert.ok(button);
+  const count = actions.length;
+  await act(async () => button.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
+  assert.deepEqual(actions.slice(count), ['camera-session']);
+  assert.equal(fixture.room.layoutMode, 'grid');
 });
 
 test('React keeps video nodes and decoders stable across repeated updates, sibling churn and reordering', async () => {
