@@ -93,6 +93,8 @@ pub fn encoded_capture(id: &str, token: &str) -> Result<EncodedCapture, String> 
 
 #[derive(Default)]
 pub struct CaptureMetrics {
+    encoder_kind: std::sync::atomic::AtomicU8,
+    jpeg_errors: std::sync::atomic::AtomicU64,
     #[cfg(feature = "media-diagnostics")]
     last_callback_us: std::sync::atomic::AtomicU64,
     #[cfg(feature = "media-diagnostics")]
@@ -121,6 +123,14 @@ pub struct CaptureMetrics {
     missed_deadlines: std::sync::atomic::AtomicU64,
     queue_age_us: std::sync::atomic::AtomicU64,
     max_queue_age_us: std::sync::atomic::AtomicU64,
+}
+
+fn log_selected_encoder(metrics: &CaptureMetrics, session: &str, encoder: u8, width: u32, height: u32, fps: u32, elapsed_ms: u128) {
+    if metrics.encoder_kind.swap(encoder, Ordering::Relaxed) != encoder {
+        crate::logger::log_msg("INFO", "capture.encoder", &format!(
+            "session={session} encoder={} output={width}x{height} fps={fps} elapsed_ms={elapsed_ms} first_successful_frame=true",
+            if encoder == 1 { "NVENC/H264" } else { "libjpeg-turbo/JPEG" }));
+    }
 }
 
 #[derive(Serialize)]
@@ -194,10 +204,13 @@ pub fn report_capture_load(session_id: String, feedback_token: String, pressure_
 #[tauri::command]
 pub async fn get_native_encoder_support() -> Result<serde_json::Value, String> {
     tauri::async_runtime::spawn_blocking(|| {
+        let started = std::time::Instant::now();
         #[cfg(windows)]
         let support = crate::video_nvenc::probe_session();
         #[cfg(not(windows))]
         let support: Result<(), String> = Err("Native NVENC requires Windows".into());
+        crate::logger::log_msg(if support.is_ok() { "INFO" } else { "WARN" }, "capture.nvenc.probe", &format!(
+            "available={} elapsed_ms={} reason={:?}", support.is_ok(), started.elapsed().as_millis(), support.as_ref().err()));
         serde_json::json!({ "driver_api_available": support.is_ok(),
             "experimental_enabled": nvenc_requested(Some("auto"), std::env::var("P2SHARER_NATIVE_NVENC").ok().as_deref()),
             "reason": support.err(), "transport": "native_h264_rtp" })
@@ -220,6 +233,7 @@ pub fn control_capture_encoder(session_id: String, feedback_token: String, disab
     session.load.validate_token(&feedback_token)?;
     if disable {
         if session.nvenc_enabled.swap(false, Ordering::Relaxed) {
+            crate::logger::log_msg("WARN", "capture.encoder", &format!("session={session_id} NVENC disabled by frontend decoder/transport; fallback=libjpeg-turbo/JPEG"));
             session.metrics.nvenc_fallbacks.fetch_add(1, Ordering::Relaxed);
         }
     }
@@ -296,6 +310,7 @@ fn start_frame_delivery(delivery: FrameDelivery, active: Arc<AtomicBool>, load: 
 
 #[derive(Clone)]
 pub struct CaptureFlags {
+    pub session_id: String,
     pub nvenc_enabled: Arc<AtomicBool>,
     pub nvenc_keyframe: Arc<AtomicBool>,
     nvenc_bitrate: Arc<std::sync::atomic::AtomicU32>,
@@ -314,6 +329,7 @@ pub struct CaptureFlags {
 
 #[cfg(windows)]
 pub struct NativeWgcHandler {
+    session_id: String,
     nvenc: crate::video_nvenc::GpuEncoder,
     nvenc_enabled: Arc<AtomicBool>,
     nvenc_keyframe: Arc<AtomicBool>,
@@ -350,6 +366,7 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
         let fps = ctx.flags.target_fps.clamp(15, 120);
         let frame_interval = std::time::Duration::from_nanos(1_000_000_000 / fps as u64);
         Ok(Self {
+            session_id: ctx.flags.session_id,
             nvenc: crate::video_nvenc::GpuEncoder::default(),
             nvenc_enabled: ctx.flags.nvenc_enabled,
             nvenc_keyframe: ctx.flags.nvenc_keyframe,
@@ -416,7 +433,7 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
                 Ok(texture) => { src_width = width; src_height = height; Some(texture) },
                 Err(error) => {
                     self.gpu_scaling_disabled = true;
-                    eprintln!("[Native Video] GPU downscaling unavailable; retaining CPU resize: {error}");
+                    crate::logger::log_msg("WARN", "capture.scaling", &format!("session={} GPU downscaling failed; fallback=CPU resize error={error:?}", self.session_id));
                     None
                 }
             }
@@ -435,6 +452,7 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
             self.metrics.nvenc_us.fetch_add(encoder_started.elapsed().as_micros() as u64, Ordering::Relaxed);
             match result {
                 Ok(bytes) => {
+                    log_selected_encoder(&self.metrics, &self.session_id, 1, src_width, src_height, self.load.fps(), self.start_instant.elapsed().as_millis());
                     self.next_frame_time += self.frame_interval;
                     if arrival_time.saturating_duration_since(self.next_frame_time) >= self.frame_interval {
                         self.next_frame_time = arrival_time + self.frame_interval;
@@ -456,11 +474,13 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
                     self.nvenc_enabled.store(false, Ordering::Relaxed);
                     self.metrics.nvenc_fallbacks.fetch_add(1, Ordering::Relaxed);
                     self.nvenc = crate::video_nvenc::GpuEncoder::default();
-                    eprintln!("[Native Video] NVENC unavailable on capture device; retaining native JPEG: {error}");
+                    crate::logger::log_msg("WARN", "capture.nvenc", &format!("session={} NVENC encode/init failed output={src_width}x{src_height} fps={} attempt_ms={} elapsed_ms={} fallback=libjpeg-turbo/JPEG error={error}",
+                        self.session_id, self.load.fps(), encoder_started.elapsed().as_millis(), self.start_instant.elapsed().as_millis()));
                 }
             }
         } else {
             if self.nvenc_enabled.swap(false, Ordering::Relaxed) {
+                crate::logger::log_msg("WARN", "capture.nvenc", &format!("session={} NVENC disabled: GPU scaling unavailable for source bounds; fallback=libjpeg-turbo/JPEG", self.session_id));
                 self.metrics.nvenc_fallbacks.fetch_add(1, Ordering::Relaxed);
             }
             // A decoder rejection releases the driver session on its owner thread.
@@ -476,11 +496,14 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
         } {
             Ok(buf) => buf,
             Err(_e) => {
-                self.metrics.readback_errors.fetch_add(1, Ordering::Relaxed);
+                let failures = self.metrics.readback_errors.fetch_add(1, Ordering::Relaxed) + 1;
+                if failures.is_power_of_two() {
+                    crate::logger::log_msg("WARN", "capture.readback", &format!("session={} failures={failures} legacy={} error={_e:?}", self.session_id, self.legacy_readback));
+                }
                 self.consecutive_readback_errors = self.consecutive_readback_errors.saturating_add(1);
                 if !self.legacy_readback && self.consecutive_readback_errors >= 3 {
                     self.legacy_readback = true;
-                    eprintln!("[Native Video] Reusable readback failed repeatedly; using legacy native readback: {_e}");
+                    crate::logger::log_msg("WARN", "capture.readback", &format!("session={} reusable GPU readback failed three times; fallback=legacy readback error={_e:?}", self.session_id));
                 }
                 // Transient DXGI surface lock or swapchain mode switch (e.g. game launched / resized)
                 // Returning Ok(()) ensures windows-capture does NOT abort the capture loop!
@@ -535,13 +558,20 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
         self.metrics.resize_us.fetch_add(resize_start.elapsed().as_micros() as u64, Ordering::Relaxed);
 
         let encode_start = std::time::Instant::now();
-        if let Ok(frame_bytes) = self.jpeg_encoder.encode_rgba_strided(final_pixels, final_w, final_h, final_pitch) {
+        match self.jpeg_encoder.encode_rgba_strided(final_pixels, final_w, final_h, final_pitch) {
+          Ok(frame_bytes) => {
+            log_selected_encoder(&self.metrics, &self.session_id, 2, final_w, final_h, self.load.fps(), self.start_instant.elapsed().as_millis());
             self.load.output(final_w, final_h);
             if scaled.is_some() { self.metrics.gpu_scaled_images.fetch_add(1, Ordering::Relaxed); }
             self.metrics.images.fetch_add(1, Ordering::Relaxed);
             let frame_arc = Arc::new(frame_bytes);
             enqueue_capture_frame(&self.delivery, frame_arc, self.start_instant.elapsed().as_micros() as u64,
                 self.legacy_pacing, &self.active_flag, &self.sender, &self.metrics);
+          }
+          Err(error) => {
+            let failures = self.metrics.jpeg_errors.fetch_add(1, Ordering::Relaxed) + 1;
+            if failures.is_power_of_two() { crate::logger::log_msg("ERROR", "capture.jpeg", &format!("session={} failures={failures} output={final_w}x{final_h} error={error:?}", self.session_id)); }
+          }
         }
 
         self.metrics.jpeg_us.fetch_add(encode_start.elapsed().as_micros() as u64, Ordering::Relaxed);
@@ -559,6 +589,7 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
     }
 
     fn on_closed(&mut self) -> Result<(), Self::Error> {
+        crate::logger::log_msg("WARN", "capture.source", &format!("session={} WGC source closed elapsed_ms={}", self.session_id, self.start_instant.elapsed().as_millis()));
         let _ = self.sender.send(Message::Text(
             "{\"type\":\"fallback\",\"reason\":\"window_closed\"}".to_string(),
         ));
@@ -680,7 +711,7 @@ pub fn ensure_ws_server_running() {
         let rt = match tokio::runtime::Builder::new_current_thread().enable_all().build() {
             Ok(r) => r,
             Err(e) => {
-                eprintln!("[Native Video WS] Failed to create tokio runtime: {:?}", e);
+                crate::logger::log_msg("ERROR", "capture.websocket", &format!("Tokio runtime creation failed: {e:?}"));
                 return;
             }
         };
@@ -692,7 +723,7 @@ pub fn ensure_ws_server_running() {
                 Err(_) => match TcpListener::bind("127.0.0.1:0").await {
                     Ok(l) => l,
                     Err(e) => {
-                        eprintln!("[Native Video WS] Failed to bind any port: {:?}", e);
+                        crate::logger::log_msg("ERROR", "capture.websocket", &format!("Loopback port binding failed: {e:?}"));
                         return;
                     }
                 },
@@ -701,7 +732,7 @@ pub fn ensure_ws_server_running() {
             if let Ok(local_addr) = listener.local_addr() {
                 let port = local_addr.port();
                 WS_PORT.store(port, Ordering::SeqCst);
-                println!("[Native Video WS] Dedicated instance listening on 127.0.0.1:{}", port);
+                crate::logger::log_msg("INFO", "capture.websocket", &format!("Loopback bridge listening port={port}"));
             }
 
             while let Ok((stream, _)) = listener.accept().await {
@@ -1063,6 +1094,8 @@ pub fn start_capture_session(
     let metrics = Arc::new(CaptureMetrics::default());
     let load = Arc::new(crate::video_load::CaptureLoad::new(fps, width, height, feedback_token));
     let nvenc_enabled = Arc::new(AtomicBool::new(nvenc_requested(encoder_preference.as_deref(), std::env::var("P2SHARER_NATIVE_NVENC").ok().as_deref())));
+    crate::logger::log_msg("INFO", "capture.start", &format!("session={session_id} source={source_id} requested={width}x{height}@{fps} cursor={should_draw_mouse} jpeg_quality={jpeg_quality} preference={} nvenc_requested={}",
+        encoder_preference.as_deref().unwrap_or("auto"), nvenc_enabled.load(Ordering::Relaxed)));
     let nvenc_keyframe = Arc::new(AtomicBool::new(true));
     let nvenc_bitrate = Arc::new(std::sync::atomic::AtomicU32::new(15_000_000));
     SESSIONS.lock().map_err(|_| "Capture session lock poisoned")?.insert(session_id.clone(), CaptureSession {
@@ -1082,6 +1115,7 @@ pub fn start_capture_session(
     #[cfg(windows)]
     {
         let flags = CaptureFlags {
+            session_id: session_id.clone(),
             nvenc_enabled: nvenc_enabled.clone(), nvenc_keyframe: nvenc_keyframe.clone(), nvenc_bitrate: nvenc_bitrate.clone(),
             delivery: delivery.clone(),
             legacy_pacing,
@@ -1151,17 +1185,19 @@ pub fn start_capture_session(
                         wgc_started = true;
                     }
                     Err(err) => {
-                        eprintln!(
-                            "[Native Video] WGC window capture start failed: {:?}, falling back to xcap",
-                            err
-                        );
+                        crate::logger::log_msg("WARN", "capture.start", &format!("session={session_id} source={source_id} WGC window start failed; fallback=xcap error={err:?}"));
                     }
                 }
+            } else {
+                crate::logger::log_msg("WARN", "capture.source", &format!("session={session_id} source={source_id} WGC window target not found; fallback=xcap"));
             }
         } else {
             let target_mon_idx: usize = raw_id.parse().unwrap_or(0);
             let wgc_monitor =
-                WgcMonitor::from_index(target_mon_idx + 1).or_else(|_| WgcMonitor::primary());
+                WgcMonitor::from_index(target_mon_idx + 1).or_else(|error| {
+                    crate::logger::log_msg("WARN", "capture.source", &format!("session={session_id} source={source_id} WGC monitor lookup failed; trying primary monitor error={error:?}"));
+                    WgcMonitor::primary()
+                });
 
             if let Ok(mon) = wgc_monitor {
                 let settings = Settings::new(
@@ -1183,21 +1219,20 @@ pub fn start_capture_session(
                         wgc_started = true;
                     }
                     Err(err) => {
-                        eprintln!(
-                            "[Native Video] WGC monitor capture start failed: {:?}, falling back to xcap",
-                            err
-                        );
+                        crate::logger::log_msg("WARN", "capture.start", &format!("session={session_id} source={source_id} WGC monitor start failed; fallback=xcap error={err:?}"));
                     }
                 }
             }
         }
 
         if wgc_started {
+            crate::logger::log_msg("INFO", "capture.start", &format!("session={session_id} backend=WGC startup_ms={} awaiting_first_frame=true", start_instant.elapsed().as_millis()));
             return Ok(true);
         }
     }
 
     // Fallback capture thread (xcap) if WGC is unsupported or failed
+    crate::logger::log_msg("WARN", "capture.start", &format!("session={session_id} backend=xcap encoder=libjpeg-turbo/JPEG reason=WGC_unavailable_or_start_failed"));
     std::thread::spawn(move || {
         let _timer_guard = MultimediaTimerGuard::new();
         let mut load_controller = crate::video_load::LoadController::default();
@@ -1236,7 +1271,7 @@ pub fn start_capture_session(
         let mut jpeg_encoder = match RealtimeJpegEncoder::new(jpeg_quality) {
             Ok(encoder) => encoder,
             Err(error) => {
-                eprintln!("[Native Video] JPEG encoder initialization failed: {error}");
+                crate::logger::log_msg("ERROR", "capture.jpeg", &format!("session={session_id} initialization failed error={error:?}"));
                 let _ = sender.send(Message::Text("{\"type\":\"fallback\",\"reason\":\"capture_error\"}".into()));
                 is_capturing_clone.store(false, Ordering::Relaxed);
                 return;
@@ -1253,6 +1288,7 @@ pub fn start_capture_session(
             let captured_img = if is_window {
                 if let Some(ref win) = cached_window {
                     if win.is_minimized().unwrap_or(false) {
+                        crate::logger::log_msg("WARN", "capture.source", &format!("session={session_id} source={source_id} backend=xcap reason=window_minimized"));
                         let _ = sender.send(Message::Text(
                             "{\"type\":\"fallback\",\"reason\":\"window_minimized\"}".to_string(),
                         ));
@@ -1281,9 +1317,10 @@ pub fn start_capture_session(
                             }
                             Some(img)
                         }
-                        Err(_) => {
+                        Err(error) => {
                             cached_window = None;
                             consecutive_errors += 1;
+                            crate::logger::log_msg("WARN", "capture.source", &format!("session={session_id} source={source_id} backend=xcap attempt={consecutive_errors}/5 error={error:?}"));
                             if consecutive_errors >= 5 {
                                 let _ = sender.send(Message::Text(
                                     "{\"type\":\"fallback\",\"reason\":\"capture_error\"}"
@@ -1297,6 +1334,7 @@ pub fn start_capture_session(
                 } else {
                     consecutive_errors += 1;
                     if consecutive_errors >= 5 {
+                        crate::logger::log_msg("ERROR", "capture.source", &format!("session={session_id} source={source_id} backend=xcap reason=window_not_found"));
                         let _ = sender.send(Message::Text(
                             "{\"type\":\"fallback\",\"reason\":\"window_not_found\"}".to_string(),
                         ));
@@ -1324,9 +1362,10 @@ pub fn start_capture_session(
                             }
                             Some(img)
                         }
-                        Err(_) => {
+                        Err(error) => {
                             cached_monitor = None;
                             consecutive_errors += 1;
+                            crate::logger::log_msg("WARN", "capture.source", &format!("session={session_id} source={source_id} backend=xcap attempt={consecutive_errors}/5 error={error:?}"));
                             if consecutive_errors >= 5 {
                                 let _ = sender.send(Message::Text(
                                     "{\"type\":\"fallback\",\"reason\":\"capture_error\"}"
@@ -1340,6 +1379,7 @@ pub fn start_capture_session(
                 } else {
                     consecutive_errors += 1;
                     if consecutive_errors >= 5 {
+                        crate::logger::log_msg("ERROR", "capture.source", &format!("session={session_id} source={source_id} backend=xcap reason=monitor_not_found"));
                         let _ = sender.send(Message::Text(
                             "{\"type\":\"fallback\",\"reason\":\"monitor_not_found\"}".to_string(),
                         ));
@@ -1386,7 +1426,9 @@ pub fn start_capture_session(
                         (img.as_raw().as_slice(), src_w, src_h)
                     };
 
-                if let Ok(jpeg_bytes) = jpeg_encoder.encode_rgba(final_raw, final_w, final_h) {
+                match jpeg_encoder.encode_rgba(final_raw, final_w, final_h) {
+                  Ok(jpeg_bytes) => {
+                    log_selected_encoder(&metrics, &session_id, 2, final_w, final_h, load.fps(), start_instant.elapsed().as_millis());
                     load.output(final_w, final_h);
                     metrics.images.fetch_add(1, Ordering::Relaxed);
                     let frame_arc = Arc::new(jpeg_bytes);
@@ -1395,6 +1437,11 @@ pub fn start_capture_session(
                     let processing_us = loop_start.elapsed().as_micros() as u64;
                     metrics.processing_us.fetch_add(processing_us, Ordering::Relaxed);
                     load_controller.observe(&load, load.elapsed_ms(), processing_us);
+                  }
+                  Err(error) => {
+                    let failures = metrics.jpeg_errors.fetch_add(1, Ordering::Relaxed) + 1;
+                    if failures.is_power_of_two() { crate::logger::log_msg("ERROR", "capture.jpeg", &format!("session={session_id} backend=xcap failures={failures} output={final_w}x{final_h} error={error:?}")); }
+                  }
                 }
             }
 
@@ -1462,6 +1509,9 @@ pub fn stop_native_screen_capture() -> Result<bool, String> {
 pub fn stop_capture_session(session_id: String) -> Result<bool, String> {
     let session = SESSIONS.lock().map_err(|_| "Capture session lock poisoned")?.remove(&session_id);
     if let Some(session) = session {
+        crate::logger::log_msg("INFO", "capture.stop", &format!("session={session_id} source={} images={} nvenc_images={} nvenc_fallbacks={} readback_errors={} jpeg_errors={}", session.source,
+            session.metrics.images.load(Ordering::Relaxed), session.metrics.nvenc_images.load(Ordering::Relaxed),
+            session.metrics.nvenc_fallbacks.load(Ordering::Relaxed), session.metrics.readback_errors.load(Ordering::Relaxed), session.metrics.jpeg_errors.load(Ordering::Relaxed)));
         session.active.store(false, Ordering::SeqCst);
         #[cfg(windows)]
         if let Some(control) = session.control { safely_stop_wgc_control(control); }

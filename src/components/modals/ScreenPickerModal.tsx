@@ -89,9 +89,8 @@ export const ScreenPickerModal: React.FC = () => {
               onClick={() => setCurrentTab('windows')}
             >
               {t("message.26b90fd75350")}</button>
-            <button className={`picker-tab-btn ${currentTab === 'cameras' ? 'active' : ''}`}
-              disabled={editingKind === 'screen'}
-              onClick={() => setCurrentTab('cameras')}>{t("message.de25a5114246")}</button>
+            {editingKind !== 'screen' && <button className={`picker-tab-btn ${currentTab === 'cameras' ? 'active' : ''}`}
+              onClick={() => setCurrentTab('cameras')}>{t("message.de25a5114246")}</button>}
           </div>
 
           <div className="picker-preview-layout">
@@ -215,6 +214,7 @@ export const ScreenPickerModal: React.FC = () => {
           </div>
 
           <MediaPreview stream={preview.stream} sourceKey={selectedSourceId} busy={isLoading || preview.busy} error={preview.error} settings={preview.settings}
+            onError={preview.reportPlaybackError} onRetry={preview.retry}
             label={cameras.find((camera) => `camera:${camera.deviceId}` === selectedSourceId)?.label ||
               monitors.find((monitor) => monitor.id === selectedSourceId)?.name ||
               windows.find((window) => window.id === selectedSourceId)?.title || ''} />
@@ -308,7 +308,8 @@ export const ScreenPickerModal: React.FC = () => {
           {(() => {
             const hasAvailableSources = currentTab === 'cameras' ? cameras.length > 0 : currentTab === 'screens' ? monitors.length > 0 : windows.length > 0;
             const isConfirmDisabled = isLoading || isStarting || preview.busy || !selectedSourceId || !hasAvailableSources ||
-              (currentTab === 'cameras' && (!preview.stream || !!preview.error || !cameraModes.length || !cameraRates.length));
+              !preview.stream || !!preview.error ||
+              (currentTab === 'cameras' && (!cameraModes.length || !cameraRates.length));
             return (
               <button
                 className="btn btn-primary"

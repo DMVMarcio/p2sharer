@@ -10,7 +10,7 @@ pub fn disable_browser_shortcuts(window: tauri::WebviewWindow) -> Result<(), Str
             settings.cast::<ICoreWebView2Settings3>()?.SetAreBrowserAcceleratorKeysEnabled(false)
         })();
         if let Err(error) = result {
-            eprintln!("Could not disable browser shortcuts: {error}");
+            crate::logger::log_msg("ERROR", "webview.shortcuts", &format!("Browser shortcut configuration failed: {error:?}"));
         }
     }).map_err(|error| error.to_string())?;
     Ok(())

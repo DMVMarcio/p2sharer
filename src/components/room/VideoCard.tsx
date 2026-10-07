@@ -438,8 +438,9 @@ export const VideoCard: React.FC<VideoCardProps> = ({
       </div>
 
       {/* Stream stop actions share the tray control recipe. */}
-      {((!slot.isLocal && !isPipActive) || (slot.isLocal && inTray)) && (
+      {((!slot.isLocal && !isPipActive) || (slot.isLocal && (inTray || layoutMode === 'grid'))) && (
         <button
+          type="button"
           className="btn-stop-watch-stream"
           onClick={(event) => {
             if (slot.isLocal) { event.stopPropagation(); if (slot.mediaId) void roomService.stopTransmission(slot.mediaId); }

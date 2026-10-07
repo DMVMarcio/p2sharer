@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { listCameras, cameraResolutions, cameraFrameRates, configureCamera, preferredCameraFrameRate } from '../../src/video/camera_devices.ts';
+import { acquireCamera, listCameras, cameraResolutions, cameraFrameRates, configureCamera, preferredCameraFrameRate } from '../../src/video/camera_devices.ts';
 import { formatFrameRate } from '../../src/core/media_streams.ts';
 
 test('camera enumeration unlocks identities with one temporary device and always releases it', async () => {
@@ -70,4 +70,32 @@ test('high-speed camera choices stay within the stream protocol limit', async ()
   } as unknown as MediaStreamTrack;
   const rates = await cameraFrameRates(track, { value: '640x480', label: '', width: 640, height: 480 }, () => false);
   assert.equal(rates[0], 120); assert.ok(rates.every((rate) => rate <= 120));
+});
+
+test('a hung driver stops probing and releases its track instead of blocking the picker', async (context) => {
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  let stopped = false, applied = 0;
+  const track = { getCapabilities: () => ({}), getSettings: () => ({ width: 640, height: 480, frameRate: 30 }),
+    applyConstraints: () => { applied++; return new Promise(() => {}); }, stop: () => { stopped = true; },
+  } as unknown as MediaStreamTrack;
+  const probing = cameraResolutions(track, () => false);
+  const rejected = assert.rejects(probing, { name: 'TimeoutError' });
+  context.mock.timers.tick(4000);
+  await rejected;
+  assert.equal(stopped, true); assert.equal(applied, 1);
+});
+
+test('device acquisition releases a stream that arrives after the timeout', async (context) => {
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  let resolve!: (stream: MediaStream) => void, stopped = false;
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { mediaDevices: {
+    getUserMedia: () => new Promise<MediaStream>((done) => { resolve = done; }),
+  } } });
+  const opening = acquireCamera({ video: true });
+  const rejected = assert.rejects(opening, { name: 'TimeoutError' });
+  context.mock.timers.tick(12000);
+  await rejected;
+  resolve({ getTracks: () => [{ stop: () => { stopped = true; } }] } as unknown as MediaStream);
+  await Promise.resolve();
+  assert.equal(stopped, true);
 });

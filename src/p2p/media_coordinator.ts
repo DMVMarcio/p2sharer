@@ -1,9 +1,27 @@
 import { observeDiagnosticPeerConnection } from '../core/media_diagnostics.ts';
 import type { StreamStatusPayload } from '../core/types.ts';
+import { logDiagnostic } from '../core/logger.ts';
 
 export class MediaCoordinator {
   private static senderUpdates = new WeakMap<RTCPeerConnection, Promise<void>>();
   private static preparedVideoCodecs: RTCRtpCodec[] | null = null;
+  private static loggedEncoders = new WeakMap<RTCRtpSender, string>();
+
+  /** Actual RTP stats, not the preference list, identify the encoder selected by WebView2. */
+  public static logSenderEncoder(sender: RTCRtpSender, reports: RTCStatsReport, mediaId?: string): void {
+    reports.forEach((report) => {
+      if (report.type !== 'outbound-rtp' || report.kind !== 'video' || !(report.framesEncoded > 0)) return;
+      const codec = reports.get(report.codecId);
+      const identity = `${sender.track?.id}/${codec?.mimeType}/${codec?.sdpFmtpLine}/${report.encoderImplementation}/${report.powerEfficientEncoder}`;
+      if (MediaCoordinator.loggedEncoders.get(sender) === identity) return;
+      MediaCoordinator.loggedEncoders.set(sender, identity);
+      logDiagnostic('INFO', 'transmission.encoder', 'Observed browser WebRTC encoder', { mediaId,
+        trackId: sender.track?.id, codec: codec?.mimeType ?? 'unreported', profile: codec?.sdpFmtpLine,
+        encoderImplementation: report.encoderImplementation ?? 'unreported by WebView2',
+        powerEfficientEncoder: report.powerEfficientEncoder, width: report.frameWidth, height: report.frameHeight,
+        framesEncoded: report.framesEncoded, note: 'Codec preference and power efficiency do not identify a GPU vendor.' });
+    });
+  }
 
   private static codecContentType(codec: { mimeType: string; sdpFmtpLine?: string }): string {
     const profile = /(?:^|;)((?:profile-level-id|profile-id|profile)=[^;]+)/i.exec(codec.sdpFmtpLine || '')?.[1];

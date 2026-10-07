@@ -7,6 +7,19 @@ use std::time::{SystemTime, UNIX_EPOCH};
 static LOG_FILE: Mutex<Option<File>> = Mutex::new(None);
 static LOG_PATH: Mutex<Option<PathBuf>> = Mutex::new(None);
 const MAX_SESSION_LOGS: usize = 8;
+struct NativeLogger;
+static NATIVE_LOGGER: NativeLogger = NativeLogger;
+
+impl log::Log for NativeLogger {
+    fn enabled(&self, metadata: &log::Metadata<'_>) -> bool { metadata.level() <= log::Level::Warn }
+    fn log(&self, record: &log::Record<'_>) {
+        if self.enabled(record.metadata()) {
+            log_msg(record.level().as_str(), record.target(), &format!("{} ({}:{})", record.args(),
+                record.file().unwrap_or("unknown"), record.line().unwrap_or(0)));
+        }
+    }
+    fn flush(&self) { flush_log(); }
+}
 
 fn session_log_started_at(path: &Path) -> Option<u128> {
     let name = path.file_name()?.to_str()?;
@@ -69,13 +82,15 @@ fn write_log_header(file: &mut File, path: &Path, event: &str) -> std::io::Resul
          P2Sharer Execution & Diagnostics Log ({})\r\n\
          {}: {}\r\n\
          OS: Windows (Architecture: {})\r\n\
-         App Version: 1.0.0\r\n\
+         App Version: {} (debug={})\r\n\
          Log File: {}\r\n\
          ================================================================================\r\n\r\n",
         name,
         event,
         get_timestamp(),
         std::env::consts::ARCH,
+        env!("CARGO_PKG_VERSION"),
+        cfg!(debug_assertions),
         path.to_string_lossy()
     );
     file.write_all(header.as_bytes())?;
@@ -120,7 +135,9 @@ pub fn init_logger() {
         }
     }
 
-    // Set custom panic hook to capture crash stacktraces
+    if log::set_logger(&NATIVE_LOGGER).is_ok() { log::set_max_level(log::LevelFilter::Warn); }
+
+    // Preserve panic traces in release builds even without RUST_BACKTRACE.
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |panic_info| {
         let timestamp = get_timestamp();
@@ -139,14 +156,16 @@ pub fn init_logger() {
         };
 
         let panic_msg = format!(
-            "\r\n[{}][FATAL PANIC] Location: {}\r\nPayload: {}\r\nBacktrace:\r\n{:?}\r\n",
+            "\r\n[{}][FATAL PANIC] Location: {}\r\nThread: {:?}\r\nPayload: {}\r\nBacktrace:\r\n{:?}\r\n",
             timestamp,
             location,
+            std::thread::current().name(),
             payload,
-            std::backtrace::Backtrace::capture()
+            std::backtrace::Backtrace::force_capture()
         );
 
         log_raw(&panic_msg);
+        flush_log();
         default_hook(panic_info);
     }));
 
@@ -221,6 +240,7 @@ pub fn log_msg(level: &str, target: &str, message: &str) {
     let line = format!("[{}][{:5}][{}] {}\r\n", timestamp, level, target, message);
     print!("{}", line);
     log_raw(&line);
+    if matches!(level, "WARN" | "ERROR" | "FATAL") { flush_log(); }
 }
 
 #[tauri::command]
@@ -293,6 +313,23 @@ pub fn clear_log_file() -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn native_errors_and_version_header_are_written_to_the_session_file() {
+        let unique = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let path = std::env::temp_dir().join(format!("p2sharer-logger-test-{unique}.log"));
+        let mut file = File::create(&path).unwrap();
+        write_log_header(&mut file, &path, "Test Session").unwrap();
+        let previous = LOG_FILE.lock().unwrap().replace(file);
+        log::Log::log(&NATIVE_LOGGER, &log::Record::builder()
+            .args(format_args!("Native test failure code=42"))
+            .level(log::Level::Error).target("test.native").file(Some("fixture.rs")).line(Some(12)).build());
+        *LOG_FILE.lock().unwrap() = previous;
+        let text = fs::read_to_string(&path).unwrap();
+        assert!(text.contains(&format!("App Version: {}", env!("CARGO_PKG_VERSION"))));
+        assert!(text.contains("[ERROR][test.native] Native test failure code=42 (fixture.rs:12)"));
+        fs::remove_file(path).unwrap();
+    }
 
     #[test]
     fn rotation_keeps_eight_newest_session_logs_and_unrelated_files() {

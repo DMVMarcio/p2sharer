@@ -23,8 +23,13 @@ globalThis.transmissionDefaultsFixture = {
 };
 const mocks = {
   room: 'export const roomService = { localCaptures: globalThis.transmissionDefaultsFixture.localCaptures, startCapture: (...args) => globalThis.transmissionDefaultsFixture.startCapture(...args) };',
-  preview: 'export const useCapturePreview = () => ({ busy: false, take: async () => undefined });',
-  cameras: 'export const listCameras = async () => []; export const preferredCameraFrameRate = (rates, fps) => rates.includes(fps) ? fps : rates[0];',
+  preview: `const take = async () => undefined;
+    const retry = () => { globalThis.transmissionDefaultsFixture.retries = (globalThis.transmissionDefaultsFixture.retries || 0) + 1; };
+    export const useCapturePreview = (_source, _res, _fps, _cursor, _quality, _closing, modes, rates) => {
+      globalThis.transmissionDefaultsFixture.receiveModes = modes; globalThis.transmissionDefaultsFixture.receiveRates = rates;
+      return { busy: !!globalThis.transmissionDefaultsFixture.previewBusy, take, retry };
+    };`,
+  cameras: 'export const listCameras = async () => [{ kind: "videoinput", deviceId: "fixture-camera", label: "Camera" }]; export const preferredCameraFrameRate = (rates, fps) => rates.includes(fps) ? fps : rates[0];',
   tauri: 'export const invoke = async () => ({ monitors: [{ id: "screen:0", name: "Monitor" }], windows: [] });',
 };
 const bundle = await build({ stdin: { contents: `export { useScreenPicker } from './src/hooks/useScreenPicker.ts';
@@ -102,18 +107,70 @@ test('cancelled and failed attempts preserve both stored defaults and prior runt
   await open(); await choose(); await open();
   assert.equal(picker.resolution, '1080p');
   await choose(); captureError = true;
+  const retries = globalThis.transmissionDefaultsFixture.retries || 0;
   await act(async () => picker.confirmPicker());
   captureError = false;
   assert.equal(picker.error, 'Não foi possível aplicar a transmissão: Não foi possível concluir a operação. Tente novamente.');
   assert.deepEqual(saved(), ['1080p', '60', '15000', '90', 'true']);
   assert.equal(stateStore.currentFps, 60); assert.equal(stateStore.currentBitrate, 15000);
+  assert.equal(globalThis.transmissionDefaultsFixture.retries, retries + 1);
 });
 
-test('camera dimensions and fractional frame rates retain their exact saved values', async () => {
-  await act(async () => stateStore.saveTransmissionDefaults({ resolution: '1280x960', fps: 29.97002997002997, bitrate: 8000, quality: 85, cursor: false }));
-  const reloaded = new StateStore();
-  assert.equal(reloaded.currentResolution.width, 1280); assert.equal(reloaded.currentResolution.height, 960);
-  assert.equal(reloaded.currentFps, 29.97002997002997);
+test('camera capability choices and successful start preserve screen drafts and saved defaults', async () => {
+  await act(async () => stateStore.saveTransmissionDefaults({ resolution: '1080p', fps: 60, bitrate: 15000, quality: 90, cursor: true }));
+  await open();
+  await act(async () => { picker.setResolution('4k'); picker.setFps(120); picker.setBitrate(35000); });
+  await act(async () => picker.setCurrentTab('cameras'));
+  const cameraRate = 29.97002997002997;
+  await act(async () => {
+    globalThis.transmissionDefaultsFixture.receiveModes([{ value: '1280x960', width: 1280, height: 960, label: '1280x960' }]);
+    globalThis.transmissionDefaultsFixture.receiveRates([cameraRate, 15]);
+  });
+  assert.equal(picker.resolution, '1280x960'); assert.equal(picker.fps, cameraRate);
+  await act(async () => { picker.setFps(15); picker.setBitrate(3000); });
+  await act(async () => picker.setCurrentTab('screens'));
+  assert.equal(picker.resolution, '4k'); assert.equal(picker.fps, 120); assert.equal(picker.bitrate, 35000);
+  await act(async () => picker.setCurrentTab('cameras'));
+  assert.equal(picker.resolution, '1280x960'); assert.equal(picker.fps, 15); assert.equal(picker.bitrate, 3000);
+  await act(async () => picker.confirmPicker());
+  assert.equal(captures.at(-1)[0], 'camera:fixture-camera');
+  assert.equal(captures.at(-1)[1], 15);
+  assert.deepEqual(captures.at(-1)[2], { width: 1280, height: 960 });
+  assert.deepEqual(saved(), ['1080p', '60', '15000', '90', 'true']);
+  assert.equal(stateStore.currentResolution.label, '1080p'); assert.equal(stateStore.currentFps, 60);
+  assert.equal(stateStore.currentBitrate, 15000);
+  await open();
+  await act(async () => picker.setCurrentTab('cameras'));
+  assert.equal(picker.resolution, '720p'); assert.equal(picker.fps, 30); assert.equal(picker.bitrate, 8000);
+});
+
+test('confirmation uses the current preview readiness after loading finishes without changing settings', async () => {
+  globalThis.transmissionDefaultsFixture.previewBusy = true;
+  await open();
+  const count = captures.length;
+  await act(async () => picker.confirmPicker());
+  assert.equal(captures.length, count);
+  globalThis.transmissionDefaultsFixture.previewBusy = false;
+  await act(async () => root.render(React.createElement(Harness)));
+  await act(async () => picker.confirmPicker());
+  assert.equal(captures.length, count + 1);
+});
+
+test('editing a camera preserves exact active constraints without saving them as transmission defaults', async () => {
+  const cameraRate = 29.97002997002997;
+  globalThis.transmissionDefaultsFixture.localCaptures.set('camera-running', { kind: 'camera', sourceId: 'camera:fixture-camera',
+    resolution: { width: 1280, height: 960 }, fps: cameraRate, bitrate: 8000, quality: 85, mouse: false });
+  await act(async () => stateStore.set(state => { state.editingStreamId = 'camera-running'; }));
+  try {
+    await open();
+    assert.equal(picker.currentTab, 'cameras'); assert.equal(picker.resolution, '1280x960'); assert.equal(picker.fps, cameraRate);
+    await act(async () => picker.confirmPicker());
+    assert.equal(captures.at(-1)[1], cameraRate);
+    assert.deepEqual(saved(), ['1080p', '60', '15000', '90', 'true']);
+    assert.equal(stateStore.currentFps, 60);
+  } finally {
+    await act(async () => stateStore.set(state => { state.editingStreamId = null; }));
+  }
 });
 
 test('editing a running transmission replaces defaults only when its changes are confirmed', async () => {

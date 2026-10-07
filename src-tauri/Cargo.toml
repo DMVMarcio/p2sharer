@@ -1,6 +1,6 @@
 [package]
 name = "p2sharer"
-version = "1.2.0"
+version = "1.2.1"
 description = "P2Sharer - Serverless P2P Screen & Process Audio Sharing"
 authors = ["P2Sharer Team"]
 edition = "2021"
@@ -36,6 +36,7 @@ getrandom = "0.2"
 sha2 = "0.10"
 webrtc = "=0.17.2"
 bytes = "1"
+log = { version = "0.4", features = ["std"] }
 dirs = "6"
 rayon = "1.10"
 jpeg-encoder = { version = "0.7.1", features = ["simd"] }

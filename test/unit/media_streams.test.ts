@@ -1,9 +1,29 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { snapOverlay, resizeOverlay, streamOwner, streamSlotKey, validStreamDescriptors, type StreamDescriptor } from '../../src/core/media_streams.ts';
+import { reconcilePinnedRoomSlot, snapOverlay, resizeOverlay, streamOwner, streamSlotKey, validStreamDescriptors, type StreamDescriptor } from '../../src/core/media_streams.ts';
+import type { RoomSlotInfo } from '../../src/core/types.ts';
 import { GroupRoomManager } from '../../src/p2p/group_room.ts';
 import { MediaCoordinator } from '../../src/p2p/media_coordinator.ts';
 import { signalingManager } from '../../src/p2p/signaling_manager.ts';
+
+test('spotlight follows its participant through stream start and stop without switching an existing selected source', () => {
+  const participant: RoomSlotInfo = { peerId: 'owner', senderName: 'Same name', isLocal: false,
+    isStreaming: false, stream: null, color: '#abcdef' };
+  const other = { ...participant, peerId: 'other' };
+  const screen = { ...participant, peerId: 'owner/screen', ownerPeerId: 'owner', mediaKind: 'screen' as const, isStreaming: true };
+  const camera = { ...screen, peerId: 'owner/camera', mediaKind: 'camera' as const };
+  const secondScreen = { ...screen, peerId: 'owner/second-screen' };
+  let pinned = reconcilePinnedRoomSlot('owner', [other, participant], [other, camera, screen]);
+  assert.equal(pinned, screen.peerId);
+  pinned = reconcilePinnedRoomSlot(pinned, [other, camera, screen], [secondScreen, other, camera, screen]);
+  assert.equal(pinned, screen.peerId);
+  assert.equal(reconcilePinnedRoomSlot(camera.peerId, [camera, screen], [screen, camera]), camera.peerId);
+  pinned = reconcilePinnedRoomSlot(pinned, [other, screen], [other, participant]);
+  assert.equal(pinned, participant.peerId);
+  assert.equal(reconcilePinnedRoomSlot(pinned, [other, participant], [other]), null);
+  assert.equal(reconcilePinnedRoomSlot('app:notes', [participant], [screen]), 'app:notes');
+  assert.equal(reconcilePinnedRoomSlot(null, [participant], [screen]), null);
+});
 
 test('native publication targets only its peer, suppresses browser video and preserves audio', () => {
   const manager = new GroupRoomManager('Owner', 'test', '', true);

@@ -51,15 +51,23 @@ bool load(Encoder* encoder, char* error, size_t size) {
     const auto name = L"nvEncodeAPI.dll";
 #endif
     encoder->dll = LoadLibraryExW(name, nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
-    if (!encoder->dll) { error_text(error, size, "NVENC driver library unavailable"); return false; }
+    if (!encoder->dll) {
+        if (error && size) snprintf(error, size, "NVENC driver library unavailable in System32 (Win32 error %lu)", GetLastError());
+        return false;
+    }
     using GetMaximum = NVENCSTATUS (NVENCAPI *)(uint32_t*);
     using CreateInstance = NVENCSTATUS (NVENCAPI *)(NV_ENCODE_API_FUNCTION_LIST*);
     auto maximum = reinterpret_cast<GetMaximum>(GetProcAddress(encoder->dll, "NvEncodeAPIGetMaxSupportedVersion"));
     auto create = reinterpret_cast<CreateInstance>(GetProcAddress(encoder->dll, "NvEncodeAPICreateInstance"));
     uint32_t version = 0;
-    if (!maximum || !create || maximum(&version) != NV_ENC_SUCCESS
-        || version < ((NVENCAPI_MAJOR_VERSION << 4) | NVENCAPI_MINOR_VERSION)) {
-        error_text(error, size, "NVENC driver API is unsupported"); return false;
+    if (!maximum || !create) {
+        error_text(error, size, "NVENC driver API entrypoints missing (NvEncodeAPIGetMaxSupportedVersion/NvEncodeAPICreateInstance)"); return false;
+    }
+    NV_CHECK(maximum(&version), "Query driver API version");
+    if (version < ((NVENCAPI_MAJOR_VERSION << 4) | NVENCAPI_MINOR_VERSION)) {
+        if (error && size) snprintf(error, size, "NVENC driver API unsupported (maximum=0x%x required=0x%x)", version,
+            (NVENCAPI_MAJOR_VERSION << 4) | NVENCAPI_MINOR_VERSION);
+        return false;
     }
     encoder->api.version = NV_ENCODE_API_FUNCTION_LIST_VER;
     NV_CHECK(create(&encoder->api), "Load NVENC function table");
@@ -119,8 +127,11 @@ bool initialize(Encoder* encoder, ID3D11Device* device, uint32_t w, uint32_t h,
     D3D11_TEXTURE2D_DESC desc{};
     desc.Width = w; desc.Height = h; desc.MipLevels = 1; desc.ArraySize = 1;
     desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; desc.SampleDesc.Count = 1; desc.Usage = D3D11_USAGE_DEFAULT;
-    if (FAILED(device->CreateTexture2D(&desc, nullptr, &encoder->input))) {
-        error_text(error, size, "NVENC input texture allocation failed"); return false;
+    const HRESULT texture_result = device->CreateTexture2D(&desc, nullptr, &encoder->input);
+    if (FAILED(texture_result)) {
+        if (error && size) snprintf(error, size, "NVENC input texture allocation failed (HRESULT=0x%08lx size=%ux%u)",
+            static_cast<unsigned long>(texture_result), w, h);
+        return false;
     }
     device->GetImmediateContext(&encoder->context);
     NV_ENC_REGISTER_RESOURCE resource{}; resource.version = NV_ENC_REGISTER_RESOURCE_VER;

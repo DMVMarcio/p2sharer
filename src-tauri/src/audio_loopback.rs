@@ -922,7 +922,7 @@ pub(crate) mod win_audio {
             };
 
             if mix_format_ptr.is_null() {
-                eprintln!("[Audio Loopback] Failed to retrieve valid mix format, using standard 48kHz stereo fallback.");
+                crate::logger::log_msg("WARN", "audio.loopback", "Device mix format unavailable; fallback=48000Hz stereo");
                 mix_format_ptr = &mut fallback_format as *mut _;
             } else {
                 is_allocated_format = true;
@@ -943,7 +943,7 @@ pub(crate) mod win_audio {
                     } else if subtype == windows::core::GUID::from_u128(0x00000001_0000_0010_8000_00aa00389b71) {
                         PcmEncoding::Integer
                     } else {
-                        eprintln!("[Audio Loopback] Unsupported extensible mix subtype.");
+                        crate::logger::log_msg("ERROR", "audio.loopback", "Unsupported extensible device mix subtype");
                         if is_allocated_format {
                             CoTaskMemFree(Some(mix_format_ptr as *const _));
                         }
@@ -952,7 +952,7 @@ pub(crate) mod win_audio {
                     }
                 }
                 tag => {
-                    eprintln!("[Audio Loopback] Unsupported mix format tag {tag}; capture cannot decode audio safely.");
+                    crate::logger::log_msg("ERROR", "audio.loopback", &format!("Unsupported device mix format tag={tag}; capture cannot decode audio safely"));
                     if is_allocated_format {
                         CoTaskMemFree(Some(mix_format_ptr as *const _));
                     }
@@ -1061,7 +1061,7 @@ pub(crate) mod win_audio {
                         }
                     }
                     if !activated {
-                        eprintln!("[Audio Loopback] Native exclude failed, falling back to master loopback.");
+                        crate::logger::log_msg("WARN", "audio.loopback", "Process exclusion capture failed; fallback=master loopback");
                         if let Ok(master) = get_default_render_audio_client() {
                             if let Ok(src) = init_capture_source(master, stream_flags, buffer_duration, mix_format_ptr, 0) {
                                 multi_sources.push(src);

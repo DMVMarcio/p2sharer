@@ -3,10 +3,12 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { validStreamDescriptors, type StreamDescriptor } from '../core/media_streams.ts';
 import { nativeSenderSource, type NativeSenderSource } from '../video/native_sender_source.ts';
 import { MediaCoordinator } from './media_coordinator.ts';
+import { logDiagnostic } from '../core/logger.ts';
 
 type Signal = { id: string; kind: 'offer' | 'answer' | 'ice' | 'reject' | 'stop'; mediaId: string;
   sdp?: string; candidate?: RTCIceCandidateInit; descriptor?: StreamDescriptor };
 interface Outgoing { id: string; peer: string; descriptor: StreamDescriptor; source: NativeSenderSource; track: MediaStreamTrack;
+  started: number;
   timer: ReturnType<typeof setTimeout>; offered: boolean; answered: boolean; candidates: RTCIceCandidateInit[]; localCandidates: RTCIceCandidateInit[] }
 interface Incoming { id: string; peer: string; descriptor: StreamDescriptor; pc: RTCPeerConnection;
   timer: ReturnType<typeof setInterval>; remoteReady: boolean; candidates: RTCIceCandidateInit[]; started: number }
@@ -35,7 +37,7 @@ export class NativeVideoTransport {
     return this.listening ??= listen<{ id: string; kind: string; candidate?: RTCIceCandidateInit }>('native-video-signal', ({ payload }) => {
       const route = [...this.outgoing.values()].find(r => r.id === payload.id);
       if (!route || this.closed) return;
-      if (payload.kind === 'failed') { this.fail(route); return; }
+      if (payload.kind === 'failed') { this.fail(route, 'native_sender_failure'); return; }
       if (payload.kind === 'ice' && payload.candidate) {
         if (!route.offered) route.localCandidates.push(payload.candidate);
         else this.send(route.peer, { id: route.id, mediaId: route.descriptor.id, kind: 'ice', candidate: payload.candidate });
@@ -49,13 +51,12 @@ export class NativeVideoTransport {
     const existing = this.outgoing.get(key);
     if (existing?.track === track) return true;
     if (existing) this.closeOutgoing(existing, true);
-    const route: Outgoing = { id: crypto.randomUUID(), peer, descriptor, source, track, offered: false, answered: false,
-      candidates: [], localCandidates: [], timer: setTimeout(() => this.fail(route), 15_000) };
+    const route: Outgoing = { id: crypto.randomUUID(), peer, descriptor, source, track, offered: false, answered: false, started: performance.now(),
+      candidates: [], localCandidates: [], timer: setTimeout(() => this.fail(route, 'setup_timeout'), 15_000) };
     this.outgoing.set(key, route);
     void this.open(route).catch(error => {
       if (this.outgoing.get(key) !== route) return;
-      console.warn('[Native RTP] Using generic video after native negotiation failure:', String(error));
-      this.fail(route);
+      this.fail(route, 'create_offer_failed', error);
     });
     return true;
   }
@@ -82,11 +83,14 @@ export class NativeVideoTransport {
     const outgoing = this.outgoing.get(key);
     if (outgoing?.id === signal.id) {
       try {
-        if (signal.kind === 'reject') { this.fail(outgoing); return; }
+        if (signal.kind === 'reject') { this.fail(outgoing, 'receiver_rejected'); return; }
         if (signal.kind === 'answer' && !outgoing.answered) {
           await invoke('answer_native_video', { id: outgoing.id, feedbackToken: outgoing.source.feedbackToken, sdp: signal.sdp });
           if (!this.current(outgoing)) return;
           outgoing.answered = true;
+          logDiagnostic('INFO', 'transmission.native', 'Native H264 offer answered; awaiting transport frames', {
+            routeId: outgoing.id, mediaId: outgoing.descriptor.id, sessionId: outgoing.source.sessionId,
+            elapsedMs: Math.round(performance.now() - outgoing.started) });
           for (const candidate of outgoing.candidates.splice(0)) await this.nativeIce(outgoing,candidate);
           // The receiver sends reject if the connected RTP route does not decode frames.
           clearTimeout(outgoing.timer);
@@ -94,7 +98,7 @@ export class NativeVideoTransport {
           if (outgoing.answered) await this.nativeIce(outgoing,signal.candidate);
           else if (outgoing.candidates.length < 64) outgoing.candidates.push(signal.candidate);
         }
-      } catch { if (this.current(outgoing)) this.fail(outgoing); }
+      } catch (error) { if (this.current(outgoing)) this.fail(outgoing, 'answer_or_ice_failed', error); }
       return;
     }
     if (signal.kind === 'offer') {
@@ -107,7 +111,7 @@ export class NativeVideoTransport {
         started: performance.now(), timer: setInterval(() => { void this.checkReceiver(incoming); }, 1000) };
       this.incoming.set(key, incoming);
       pc.onconnectionstatechange = () => {
-        if (pc.connectionState === 'failed') this.reject(incoming);
+        if (pc.connectionState === 'failed') this.reject(incoming, 'connection_failed');
       };
       pc.onicecandidate = ({ candidate }) => {
         if (candidate && this.incoming.get(key) === incoming) this.send(peer, { id: signal.id, mediaId: signal.mediaId, kind: 'ice', candidate: candidate.toJSON() });
@@ -124,7 +128,7 @@ export class NativeVideoTransport {
         for (const candidate of incoming.candidates.splice(0)) await pc.addIceCandidate(candidate);
         const answer = await pc.createAnswer(); await pc.setLocalDescription(answer);
         if (this.incoming.get(key) === incoming) this.send(peer,{ id: incoming.id, mediaId: signal.mediaId, kind:'answer',sdp:answer.sdp });
-      } catch { this.reject(incoming); }
+      } catch (error) { this.reject(incoming, 'receiver_setup_failed', error); }
       return;
     }
     const incoming = this.incoming.get(key);
@@ -134,7 +138,7 @@ export class NativeVideoTransport {
       try {
         if (incoming.remoteReady) await incoming.pc.addIceCandidate(signal.candidate);
         else if (incoming.candidates.length < 64) incoming.candidates.push(signal.candidate);
-      } catch { this.reject(incoming); }
+      } catch (error) { this.reject(incoming, 'receiver_ice_failed', error); }
     }
   }
   private async checkReceiver(r: Incoming): Promise<void> {
@@ -144,20 +148,30 @@ export class NativeVideoTransport {
       const stats = await r.pc.getStats().catch(() => undefined);
       const received = stats && [...stats.values()].some(s => s.type === 'inbound-rtp' && s.kind === 'video' &&
         (s.framesDecoded > 0 || s.framesReceived > 0));
-      if (!received || r.pc.connectionState === 'failed') this.reject(r);
-      else clearInterval(r.timer); // Idle/unsubscribed viewers need not poll stable transports forever.
+      if (!received || r.pc.connectionState === 'failed') this.reject(r, r.pc.connectionState === 'failed' ? 'connection_failed' : 'no_video_before_receiver_deadline');
+      else {
+        logDiagnostic('INFO', 'transmission.native', 'Native H264 receiver has video frames', {
+          routeId: r.id, mediaId: r.descriptor.id, elapsedMs: Math.round(performance.now() - r.started) });
+        clearInterval(r.timer); // Idle/unsubscribed viewers need not poll stable transports forever.
+      }
     }
   }
-  private reject(r: Incoming): void {
+  private reject(r: Incoming, reason = 'receiver_failed', error?: unknown): void {
     if (this.incoming.get(this.key(r.peer,r.descriptor.id)) !== r) return;
+    logDiagnostic('WARN', 'transmission.native', 'Rejecting native video; requesting browser WebRTC fallback', {
+      routeId: r.id, mediaId: r.descriptor.id, reason, error, connectionState: r.pc.connectionState,
+      iceState: r.pc.iceConnectionState, elapsedMs: Math.round(performance.now() - r.started) });
     this.send(r.peer,{id:r.id,mediaId:r.descriptor.id,kind:'reject'}); this.closeIncoming(r);
   }
   private nativeIce(r: Outgoing, candidate: RTCIceCandidateInit): Promise<void> {
     return invoke('add_native_video_ice',{id:r.id,feedbackToken:r.source.feedbackToken,candidate});
   }
   private closeNative(r: Outgoing): Promise<void> { return invoke<void>('close_native_video',{id:r.id,feedbackToken:r.source.feedbackToken}).catch(() => {}); }
-  private fail(r: Outgoing): void {
+  private fail(r: Outgoing, reason = 'native_route_failed', error?: unknown): void {
     if (!this.current(r)) return;
+    logDiagnostic('WARN', 'transmission.native', 'Native sender failed; fallback=browser WebRTC', {
+      routeId: r.id, mediaId: r.descriptor.id, sessionId: r.source.sessionId, reason, error,
+      offered: r.offered, answered: r.answered, elapsedMs: Math.round(performance.now() - r.started) });
     this.blocked.add(this.key(r.peer,r.descriptor.id)); this.closeOutgoing(r,true);
     if (this.config.permitted(r.peer)) this.config.fallback(r.peer,r.descriptor.id);
   }

@@ -1,5 +1,5 @@
 import { localizeError, t } from '../i18n/index.ts';
-import { streamOwner, type MediaKind, type StreamDescriptor } from "../core/media_streams.ts";
+import { reconcilePinnedRoomSlot, streamOwner, type MediaKind, type StreamDescriptor } from "../core/media_streams.ts";
 import { StreamPointerReceiver } from './stream_pointer_receiver.ts';
 import { generateUserColor } from '../p2p/group_room.ts';
 import { validStreamPointer, validStreamPointerState, type StreamPointerState, type StreamPointerPacket } from '../core/stream_pointer.ts';
@@ -291,6 +291,7 @@ export class RoomService {
         for (const key of stateStore.subscribedStreams) if (!currentKeys.has(key)) audioContextManager.detachPeerAudio(key);
         for (const key of stateStore.activePipPeers) if (!currentKeys.has(key)) void pipService.restoreFromPip(key);
         stateStore.set((s) => {
+          s.pinnedPeerId = reconcilePinnedRoomSlot(s.pinnedPeerId, s.roomSlots, slots);
           s.roomSlots = slots;
           s.localPreviewStreams = Object.fromEntries(Object.entries(s.localPreviewStreams)
             .filter(([key]) => slots.some((slot) => slot.isLocal && slot.isStreaming && slot.peerId === key)));
@@ -477,6 +478,9 @@ export class RoomService {
     prepared?: { sourceId: string; stream: MediaStream; bridge?: NativeVideoBridge },
     bitrate = stateStore.currentBitrate): Promise<void> {
     const editingId = stateStore.editingStreamId;
+    const captureStarted = performance.now();
+    console.info('[RoomService] Capture transition requested', { sourceId, editingId, fps, resolution: res, bitrate,
+      prepared: !!prepared, nativeSession: prepared?.bridge?.sessionId });
     const manager = this.roomManager;
     const task = this.captureTransition.then(async () => {
       if (!manager || manager !== this.roomManager) throw new Error(t("message.bf66db69d5a4"));
@@ -492,6 +496,7 @@ export class RoomService {
         manager.updateMediaSettings(editingId!, fps, bitrate);
         Object.assign(previous, { fps, bitrate, resolution: res, quality, mouse });
         this.syncCaptureState();
+        console.info('[RoomService] Camera edit applied', { sourceId, mediaId: editingId, settings: previous.stream.getVideoTracks()[0].getSettings(), elapsedMs: Math.round(performance.now() - captureStarted) });
         showToast(t("message.d1943a972148"));
         return;
       }
@@ -539,6 +544,8 @@ export class RoomService {
         if (previous?.bridge) await previous.bridge.stopCapture();
         if (previous && !previous.bridge) previous.stream.getVideoTracks().filter((item) => item !== track).forEach((item) => item.stop());
         this.syncCaptureState();
+        console.info('[RoomService] Capture published', { sourceId, mediaId: id, kind,
+          nativeSession: bridge?.sessionId, settings: track.getSettings(), elapsedMs: Math.round(performance.now() - captureStarted) });
         showToast(previous ? t("message.d1943a972148") : t("message.3c3d7ea79d61"));
       } catch (error) {
         if (bridge) await bridge.stopCapture();
@@ -547,7 +554,9 @@ export class RoomService {
         throw error;
       }
     });
-    this.captureTransition = task.catch(async () => {
+    this.captureTransition = task.catch(async (error) => {
+      console.error('[RoomService] Capture transition failed', { sourceId, editingId, fps, resolution: res, bitrate,
+        nativeSession: prepared?.bridge?.sessionId, elapsedMs: Math.round(performance.now() - captureStarted), error });
       if (prepared?.bridge) await prepared.bridge.stopCapture();
       else prepared?.stream.getTracks().forEach((track) => track.stop());
     });

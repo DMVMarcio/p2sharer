@@ -29,7 +29,7 @@ pub fn install(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             view.add_PermissionRequested(&handler, &mut 0)?;
             Ok::<(), Box<dyn std::error::Error>>(())
         })();
-        if let Err(error) = result { eprintln!("Camera permission registration failed: {error}"); }
+        if let Err(error) = result { crate::logger::log_msg("ERROR", "camera.permission", &format!("WebView2 permission handler registration failed: {error:?}")); }
     })?;
     Ok(())
 }
