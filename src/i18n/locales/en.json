@@ -1009,5 +1009,7 @@
   "color.hue": "Hue",
   "color.saturation": "Saturation",
   "color.value": "Brightness",
-  "color.saturationValue": "Saturation and brightness"
+  "color.saturationValue": "Saturation and brightness",
+  "file.transferDetails": "Transfer details",
+  "file.transferProgress": "{{v0}}% · {{v1}} of {{v2}}"
 }

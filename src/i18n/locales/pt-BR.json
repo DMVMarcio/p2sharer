@@ -1009,5 +1009,7 @@
   "color.hue": "Matiz",
   "color.saturation": "Saturação",
   "color.value": "Brilho",
-  "color.saturationValue": "Saturação e brilho"
+  "color.saturationValue": "Saturação e brilho",
+  "file.transferDetails": "Detalhes da transferência",
+  "file.transferProgress": "{{v0}}% · {{v1}} de {{v2}}"
 }
