@@ -52,7 +52,7 @@ export class NativeVideoTransport {
     if (existing?.track === track) return true;
     if (existing) this.closeOutgoing(existing, true);
     const route: Outgoing = { id: crypto.randomUUID(), peer, descriptor, source, track, offered: false, answered: false, started: performance.now(),
-      candidates: [], localCandidates: [], timer: setTimeout(() => this.fail(route, 'setup_timeout'), 15_000) };
+      candidates: [], localCandidates: [], timer: setTimeout(() => this.fail(route, 'setup_timeout'), 6_000) };
     this.outgoing.set(key, route);
     void this.open(route).catch(error => {
       if (this.outgoing.get(key) !== route) return;
@@ -108,7 +108,7 @@ export class NativeVideoTransport {
       if (old) this.closeIncoming(old);
       const pc = new RTCPeerConnection(this.config.rtc());
       const incoming: Incoming = { id: signal.id, peer, descriptor: signal.descriptor, pc, candidates: [], remoteReady: false,
-        started: performance.now(), timer: setInterval(() => { void this.checkReceiver(incoming); }, 1000) };
+        started: performance.now(), timer: setInterval(() => { void this.checkReceiver(incoming); }, 500) };
       this.incoming.set(key, incoming);
       pc.onconnectionstatechange = () => {
         if (pc.connectionState === 'failed') this.reject(incoming, 'connection_failed');
@@ -144,16 +144,22 @@ export class NativeVideoTransport {
   private async checkReceiver(r: Incoming): Promise<void> {
     if (this.incoming.get(this.key(r.peer,r.descriptor.id)) !== r) return;
     if (!this.config.permitted(r.peer,r.descriptor)) { this.closeIncoming(r); return; }
-    if (r.pc.connectionState === 'failed' || performance.now()-r.started > 12_000) {
-      const stats = await r.pc.getStats().catch(() => undefined);
-      const received = stats && [...stats.values()].some(s => s.type === 'inbound-rtp' && s.kind === 'video' &&
-        (s.framesDecoded > 0 || s.framesReceived > 0));
-      if (!received || r.pc.connectionState === 'failed') this.reject(r, r.pc.connectionState === 'failed' ? 'connection_failed' : 'no_video_before_receiver_deadline');
-      else {
-        logDiagnostic('INFO', 'transmission.native', 'Native H264 receiver has video frames', {
-          routeId: r.id, mediaId: r.descriptor.id, elapsedMs: Math.round(performance.now() - r.started) });
-        clearInterval(r.timer); // Idle/unsubscribed viewers need not poll stable transports forever.
-      }
+    if (r.pc.connectionState === 'failed') {
+      this.reject(r, 'connection_failed');
+      return;
+    }
+    const elapsed = performance.now() - r.started;
+    const stats = await r.pc.getStats().catch(() => undefined);
+    const received = stats && [...stats.values()].some(s => s.type === 'inbound-rtp' && s.kind === 'video' &&
+      (s.framesDecoded > 0 || s.framesReceived > 0));
+    if (received) {
+      logDiagnostic('INFO', 'transmission.native', 'Native H264 receiver has video frames', {
+        routeId: r.id, mediaId: r.descriptor.id, elapsedMs: Math.round(elapsed) });
+      clearInterval(r.timer);
+      return;
+    }
+    if (elapsed > 3_500) {
+      this.reject(r, 'no_video_before_receiver_deadline');
     }
   }
   private reject(r: Incoming, reason = 'receiver_failed', error?: unknown): void {
