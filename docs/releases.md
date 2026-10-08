@@ -59,7 +59,7 @@ For later releases, first run `pnpm run release:version <new-version>`, validate
 2. Open the draft under **Releases**. Its assets should include `.exe` and `.msi` installers, `.sig` signatures, and `latest.json` updater metadata. A failed job or incomplete assets must be resolved before publication.
 3. Download and test the actual draft installer. Check startup, saved settings, room joining and live media. For later releases, test a real upgrade from the previous installed release.
 4. Review the generated release notes and add user-facing changes and known limitations.
-5. Select **Publish release** when ready. Publish stable releases as the latest release; keep beta tags marked as prereleases. The stable updater endpoint excludes prereleases.
+5. Select **Publish release** when ready. Publish stable releases as the latest release; keep beta tags marked as prereleases. The stable updater endpoint excludes prereleases. Both stable and beta channels query GitHub release metadata first to discover eligible newer versions before downloading `latest.json`, keeping release asset download counters accurate. Once confirmed by discovery, the official updater fetches and cryptographically verifies `latest.json`.
 
 ### Beta update channel
 

@@ -6,6 +6,15 @@ use tauri::{Manager, Webview};
 use tauri_plugin_updater::UpdaterExt;
 
 const RELEASES_URL: &str = "https://api.github.com/repos/DMVMarcio/p2sharer/releases?per_page=100";
+const LATEST_RELEASE_URL: &str = "https://api.github.com/repos/DMVMarcio/p2sharer/releases/latest";
+
+fn github_client() -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
+        .user_agent("P2Sharer updater")
+        .timeout(Duration::from_secs(15))
+        .build()
+        .map_err(|error| error.to_string())
+}
 
 #[derive(Deserialize)]
 struct ReleaseAsset {
@@ -41,6 +50,23 @@ fn newest_release(releases: &[Release], current: &Version) -> Option<(Version, S
         .max_by(|left, right| left.0.cmp_precedence(&right.0))
 }
 
+fn newest_stable_release(release: &Release, current: &Version) -> Option<(Version, String)> {
+    if release.draft
+        || !release
+            .assets
+            .iter()
+            .any(|asset| asset.name == "latest.json")
+    {
+        return None;
+    }
+    let version = Version::parse(release.tag_name.strip_prefix('v')?).ok()?;
+    if stable_update_allowed(current, &version) {
+        Some((version, release.tag_name.clone()))
+    } else {
+        None
+    }
+}
+
 fn stable_update_allowed(current: &Version, offered: &Version) -> bool {
     offered.pre.is_empty() && (!current.pre.is_empty() || offered.cmp_precedence(current).is_gt())
 }
@@ -67,16 +93,7 @@ pub async fn check_app_update(
     let updater = if include_prereleases {
         preview_updater(&webview).await?
     } else {
-        Some(
-            webview
-                .updater_builder()
-                .timeout(Duration::from_secs(15))
-                .version_comparator(|current, release| {
-                    stable_update_allowed(&current, &release.version)
-                })
-                .build()
-                .map_err(|error| error.to_string())?,
-        )
+        stable_updater(&webview).await?
     };
     let Some(updater) = updater else {
         return Ok(None);
@@ -91,15 +108,57 @@ pub async fn check_app_update(
     }))
 }
 
+async fn stable_updater(
+    webview: &Webview,
+) -> Result<Option<tauri_plugin_updater::Updater>, String> {
+    let current = webview.app_handle().package_info().version.clone();
+    let client = github_client()?;
+    let response = client
+        .get(LATEST_RELEASE_URL)
+        .header("Accept", "application/vnd.github+json")
+        .send()
+        .await
+        .map_err(|error| error.to_string())?;
+
+    if response.status() == reqwest::StatusCode::NOT_FOUND {
+        return Ok(None);
+    }
+
+    let release: Release = response
+        .error_for_status()
+        .map_err(|error| error.to_string())?
+        .json()
+        .await
+        .map_err(|error| error.to_string())?;
+
+    let Some((expected, tag)) = newest_stable_release(&release, &current) else {
+        return Ok(None);
+    };
+
+    let endpoint = reqwest::Url::parse(&format!(
+        "https://github.com/DMVMarcio/p2sharer/releases/download/{tag}/latest.json"
+    ))
+    .map_err(|error| error.to_string())?;
+
+    let updater = webview
+        .updater_builder()
+        .endpoints(vec![endpoint])
+        .map_err(|error| error.to_string())?
+        .timeout(Duration::from_secs(15))
+        .version_comparator(move |current, release| {
+            release.version == expected && stable_update_allowed(&current, &release.version)
+        })
+        .build()
+        .map_err(|error| error.to_string())?;
+
+    Ok(Some(updater))
+}
+
 async fn preview_updater(
     webview: &Webview,
 ) -> Result<Option<tauri_plugin_updater::Updater>, String> {
     let current = webview.app_handle().package_info().version.clone();
-    let client = reqwest::Client::builder()
-        .user_agent("P2Sharer updater")
-        .timeout(Duration::from_secs(15))
-        .build()
-        .map_err(|error| error.to_string())?;
+    let client = github_client()?;
     // GitHub exposes published prereleases here, while /releases/latest excludes them.
     let releases: Vec<Release> = client
         .get(RELEASES_URL)
@@ -207,5 +266,40 @@ mod tests {
             &beta,
             &Version::parse("1.1.0").unwrap()
         ));
+    }
+
+    #[test]
+    fn stable_channel_gatekeeper_selects_newer_version_and_permits_prerelease_return() {
+        let stable_new = release("v1.2.0", false, true);
+        let draft = release("v1.3.0", true, true);
+        let no_manifest = release("v1.3.0", false, false);
+        let invalid_tag = release("invalid", false, true);
+
+        // When installed is 1.1.0, 1.2.0 is selected:
+        assert_eq!(
+            newest_stable_release(&stable_new, &Version::parse("1.1.0").unwrap())
+                .unwrap()
+                .0,
+            Version::parse("1.2.0").unwrap()
+        );
+
+        // When installed is already 1.2.0, gatekeeper rejects (avoiding latest.json download):
+        assert!(newest_stable_release(&stable_new, &Version::parse("1.2.0").unwrap()).is_none());
+
+        // When installed is newer 1.3.0, no downgrade:
+        assert!(newest_stable_release(&stable_new, &Version::parse("1.3.0").unwrap()).is_none());
+
+        // When installed is a prerelease (1.3.0-beta.1), returning to stable 1.2.0 is permitted:
+        assert_eq!(
+            newest_stable_release(&stable_new, &Version::parse("1.3.0-beta.1").unwrap())
+                .unwrap()
+                .0,
+            Version::parse("1.2.0").unwrap()
+        );
+
+        // Drafts, missing manifest, or invalid tags are excluded:
+        assert!(newest_stable_release(&draft, &Version::parse("1.0.0").unwrap()).is_none());
+        assert!(newest_stable_release(&no_manifest, &Version::parse("1.0.0").unwrap()).is_none());
+        assert!(newest_stable_release(&invalid_tag, &Version::parse("1.0.0").unwrap()).is_none());
     }
 }
