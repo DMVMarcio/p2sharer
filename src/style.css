@@ -371,10 +371,47 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   min-width: 0;
 }
 
-.app-update-badge {
-  color: var(--accent-color);
+.app-update-badge,
+.btn.app-update-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
   font-size: 11px;
+  font-weight: 600;
+  border-radius: var(--radius-full);
+  background-color: var(--accent-subtle);
+  border: 1px solid var(--accent-border);
+  color: var(--accent-color);
   white-space: nowrap;
+  width: auto;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+}
+
+.app-update-badge:hover,
+.btn.app-update-badge:hover {
+  background-color: var(--accent-color);
+  border-color: var(--accent-color);
+  color: var(--accent-text-on-accent);
+  transform: translateY(-1px);
+}
+
+.app-update-badge:active,
+.btn.app-update-badge:active {
+  transform: translateY(0);
+}
+
+.app-update-badge-icon {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  transition: transform var(--transition-fast);
+}
+
+.app-update-badge:hover .app-update-badge-icon,
+.btn.app-update-badge:hover .app-update-badge-icon {
+  transform: translateY(1px);
 }
 
 .app-update-content { display: grid; gap: 12px; }
@@ -5352,6 +5389,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   .source-cards-skeleton-layer, .source-cards-content-layer, .media-preview-skeleton, .media-preview-video.ready, .skeleton-shimmer { animation: none; transition: none; }
   .context-menu button, .context-menu-row, .app-select-option, .chat-file-download-menu button { transition: none; }
   .custom-tooltip, .custom-tooltip.custom-tooltip-portal { transition: none !important; transform: none !important; }
+  .app-update-badge, .btn.app-update-badge, .app-update-badge-icon { transition: none !important; transform: none !important; }
 }
 
 

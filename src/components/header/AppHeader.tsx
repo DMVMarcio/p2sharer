@@ -5,7 +5,7 @@ import { useRoom } from '../../hooks/useRoom';
 import { useModal } from '../../hooks/useModal';
 import { showToast } from '../../hooks/useToast';
 import { Tooltip } from '../common/Tooltip';
-import { BookmarkCheck, BookmarkPlus } from 'lucide-react';
+import { BookmarkCheck, BookmarkPlus, Download } from 'lucide-react';
 import { parseRoomInvite } from '../../core/room_invite';
 import { savedRooms, type SavedRoom } from '../../core/saved_rooms';
 import { useAppUpdates } from '../../hooks/useAppUpdates';
@@ -111,7 +111,9 @@ export const AppHeader: React.FC = () => {
         {update.version && <Tooltip content={t("message.0986025090c9", { v0: update.version })}>
           <button type="button" className="btn btn-secondary btn-sm app-update-badge"
             onClick={appUpdates.open} aria-label={t("message.0986025090c9", { v0: update.version })}>
-            {t("message.0d52ab3423d3")}</button>
+            <Download size={12} className="app-update-badge-icon" aria-hidden="true" />
+            <span>{t("message.0d52ab3423d3")}</span>
+          </button>
         </Tooltip>}
       </div>
 
