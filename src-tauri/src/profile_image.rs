@@ -247,8 +247,16 @@ fn dominant_color(image: &RgbaImage) -> Option<String> {
         } * 60.0;
         // This is a color heuristic, not face detection. Warm beige/brown stays
         // eligible but yields to a substantial colored background or clothing.
-        let warm_neutral = (10.0..=50.0).contains(&hue) && saturation <= 0.65;
-        let weight = alpha * (0.15 + 0.85 * saturation) * if warm_neutral { 0.18 } else { 1.0 };
+        // Apply the same earth-tone preference at every brightness. The gradual
+        // saturation ramp avoids excluding darker, more saturated browns while
+        // allowing vivid reds and oranges to retain their accent priority.
+        let warm_family = hue <= 55.0 || hue >= 345.0;
+        let priority = if warm_family {
+            0.18 + 0.82 * ((saturation - 0.8) / 0.2).clamp(0.0, 1.0)
+        } else {
+            1.0
+        };
+        let weight = alpha * (0.15 + 0.85 * saturation) * priority;
         let bucket = &mut hues[(hue / 30.0).round() as usize % 12];
         bucket[0] += weight;
         bucket[1] += f64::from(r) * weight;
@@ -568,6 +576,80 @@ mod tests {
         assert_eq!(dominant_color(&neutral).as_deref(), Some("#969696"));
         let warm = RgbaImage::from_pixel(10, 10, image::Rgba([220, 170, 140, 255]));
         assert_eq!(dominant_color(&warm).as_deref(), Some("#dcaa8c"));
+    }
+
+    #[test]
+    fn representative_palette_treats_light_and_dark_portrait_tones_consistently() {
+        // Synthetic RGB swatches span light through very dark warm and reddish
+        // portrait tones. They are not ethnic labels or a face/skin classifier.
+        let tones: [[u8; 3]; 12] = [
+            [255, 224, 204],
+            [238, 199, 165],
+            [214, 167, 131],
+            [190, 137, 102],
+            [165, 112, 76],
+            [137, 89, 59],
+            [111, 69, 43],
+            [90, 47, 27],
+            [69, 36, 20],
+            [48, 27, 15],
+            [33, 18, 9],
+            [21, 11, 6],
+        ];
+        let balances = [[1.0, 1.0, 1.0], [1.1, 1.0, 0.9], [0.9, 1.0, 1.1]];
+        let accents = [[20, 100, 220, 255], [25, 160, 80, 255], [110, 35, 205, 255]];
+        for tone in tones {
+            for exposure in [0.6, 1.0, 1.25] {
+                for balance in balances {
+                    let mut rgba = [0u8, 0, 0, 255];
+                    for channel in 0..3 {
+                        rgba[channel] = (f64::from(tone[channel]) * exposure * balance[channel])
+                            .round()
+                            .clamp(0.0, 255.0) as u8;
+                    }
+                    let expected_tone = format!("#{:02x}{:02x}{:02x}", rgba[0], rgba[1], rgba[2]);
+                    assert_eq!(
+                        dominant_color(&RgbaImage::from_pixel(40, 40, image::Rgba(rgba))),
+                        Some(expected_tone),
+                        "A portrait tone alone must remain eligible: {rgba:?}"
+                    );
+                    for accent in accents {
+                        let mut portrait = RgbaImage::from_pixel(40, 40, image::Rgba(rgba));
+                        // Keep the exact same visible clothing area for every tone.
+                        for y in 28..40 {
+                            for x in 0..40 {
+                                portrait.put_pixel(x, y, image::Rgba(accent));
+                            }
+                        }
+                        let expected =
+                            format!("#{:02x}{:02x}{:02x}", accent[0], accent[1], accent[2]);
+                        assert_eq!(dominant_color(&portrait), Some(expected),
+                            "Accent selection must not depend on portrait brightness: {rgba:?}, accent {accent:?}");
+                    }
+                }
+            }
+        }
+        // Highly saturated warm colors still count as meaningful accents.
+        for accent in [[255, 0, 0, 255], [240, 110, 20, 255]] {
+            let mut scene = RgbaImage::from_pixel(40, 40, image::Rgba([69, 36, 20, 255]));
+            for y in 28..40 {
+                for x in 0..40 {
+                    scene.put_pixel(x, y, image::Rgba(accent));
+                }
+            }
+            let selected = dominant_color(&scene).unwrap();
+            let rgb = [1, 3, 5].map(|i| u8::from_str_radix(&selected[i..i + 2], 16).unwrap());
+            let distance = |other: [u8; 3]| {
+                rgb.iter()
+                    .zip(other)
+                    .map(|(a, b)| u32::from(a.abs_diff(b)))
+                    .sum::<u32>()
+            };
+            assert!(
+                distance([accent[0], accent[1], accent[2]]) < distance([69, 36, 20]),
+                "The warm accent must influence its hue family more than the dark earth tone"
+            );
+        }
     }
 
     #[test]

@@ -5,7 +5,9 @@ peer-to-hash associations and reactive subscriptions. Card background mode is
 saved as nullable `cardColor` (automatic by default); native `dominantColor` caches
 an alpha-weighted palette from the visible circle of the first cropped frame.
 Hue families aggregate nearby colors; meaningful chromatic regions outrank
-neutral pixels and warm beige/brown tones. A minimum visible-area threshold
+neutral pixels and warm beige/brown tones. Earth-tone priority applies across
+brightness levels, with a gradual saturation ramp that preserves vivid warm
+accents; this is a color heuristic, not a skin or ethnicity classifier. A minimum visible-area threshold
 rejects tiny accents, with quantized population fallback for neutral images.
 Existing profiles are re-evaluated on load and Save without changing image hashes.
 Automatic mode
