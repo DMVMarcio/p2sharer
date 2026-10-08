@@ -121,8 +121,8 @@ These flags enable hardware acceleration where WebView2 and the GPU driver suppo
 
 ### Elimination of Orphan WebView2 Processes
 - In Windows, child processes spawned by an application (including all `msedgewebview2.exe` renderer, GPU, utility, and crashpad processes) are not automatically terminated when the parent process exits unless managed by a Windows Job Object.
-- At startup, P2Sharer initializes a Windows Job Object with `JOBOBJECT_EXTENDED_LIMIT_INFORMATION` and `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, assigning the main process to it via `AssignProcessToJobObject`.
-- When the parent process terminates (via window close, `std::process::exit(0)`, task manager, or unexpected crash), the Windows kernel atomically and immediately terminates all child processes in the job, guaranteeing zero lingering zombie processes.
+- At startup, P2Sharer binds to a session-named Windows Job Object (`Local\P2SharerSharedJobObject`) with `JOBOBJECT_EXTENDED_LIMIT_INFORMATION` and `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, assigning each instance to it via `AssignProcessToJobObject`.
+- Because the Job Object is named across the local user session, concurrent instances share the job handle. When an earlier instance closes, the kernel preserves the shared WebView2 and media processes for the remaining instances. Only when the last instance closes does the kernel trigger `KILL_ON_JOB_CLOSE`, guaranteeing zero lingering zombie processes.
 
 ### Updater installer lifetime
 
@@ -130,7 +130,7 @@ Before the official updater launches its installer and exits, the held applicati
 
 ### Independent application instances
 
-The application supports independent concurrent desktop processes for local peer testing. Each instance keeps its own session log. Process containment uses a held Windows Job Object; closing a secondary window does not terminate the main app.
+The application supports independent concurrent desktop processes for local peer testing. Each instance keeps its own session log. Process containment uses the shared Windows Job Object (`Local\P2SharerSharedJobObject`); closing either instance first preserves running child and WebView2 processes for active instances, tearing down cleanly when all instances exit. Covered by isolated native regression tests (`concurrent_instances_share_named_job_and_teardown_only_on_last_close`).
 
 - In `NativeVideoBridge` (`src/video/native_video_bridge.ts`), incoming 1-byte dummy heartbeat ticks (`byteLength <= 4`) never overwrite real video frames (`pendingBuffer.byteLength > 4`) awaiting asynchronous decoding.
 - WebCodecs `VideoFrame` timestamps are strictly checked and advanced (`nowUs > lastTimestampUs`) to prevent pipeline rejection.
