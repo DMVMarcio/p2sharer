@@ -1724,7 +1724,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   position: absolute;
   top: calc(100% + 6px);
   left: 50%;
-  transform: translateX(-50%) translateY(4px);
+  transform: translateX(-50%) translateY(3px) scale(0.98);
   background-color: rgba(18, 18, 22, 0.96);
   backdrop-filter: blur(12px);
   border: 1px solid var(--border-focus);
@@ -1736,7 +1736,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   pointer-events: none;
   opacity: 0;
   visibility: hidden;
-  transition: opacity var(--transition-fast), transform var(--transition-fast), visibility var(--transition-fast);
+  transition: opacity 0.18s cubic-bezier(0.16, 1, 0.3, 1), transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.18s cubic-bezier(0.16, 1, 0.3, 1);
   z-index: 100;
   text-align: left;
 }
@@ -1769,19 +1769,28 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   right: auto;
   top: auto;
   bottom: auto;
-  transform: translateY(2px);
+  transform: translateY(3px) scale(0.98);
   margin: 0 !important;
   pointer-events: none;
   z-index: 99999 !important;
   opacity: 0;
   visibility: hidden;
-  transition: opacity var(--transition-fast), transform var(--transition-fast), visibility var(--transition-fast);
+  transition: opacity 0.18s cubic-bezier(0.16, 1, 0.3, 1), transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
 }
 
 .custom-tooltip.custom-tooltip-portal.visible {
   opacity: 1;
   visibility: visible;
-  transform: translateY(0);
+  transform: translateY(0) scale(1);
+}
+
+.custom-tooltip.custom-tooltip-portal.is-exiting {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(3px) scale(0.98);
+  pointer-events: none !important;
+  transition: opacity 0.14s cubic-bezier(0.16, 1, 0.3, 1), transform 0.14s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.14s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .custom-tooltip.custom-tooltip-portal.interactive {
@@ -5342,6 +5351,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 @media (prefers-reduced-motion: reduce) {
   .source-cards-skeleton-layer, .source-cards-content-layer, .media-preview-skeleton, .media-preview-video.ready, .skeleton-shimmer { animation: none; transition: none; }
   .context-menu button, .context-menu-row, .app-select-option, .chat-file-download-menu button { transition: none; }
+  .custom-tooltip, .custom-tooltip.custom-tooltip-portal { transition: none !important; transform: none !important; }
 }
 
 

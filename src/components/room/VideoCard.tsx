@@ -211,6 +211,9 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   }, [slot.isLocal, slot.peerId, slot.isStreaming, inTray]);
 
   const handleCardClick = () => {
+    if (pointer.enabled) {
+      return;
+    }
     if (didDragRef.current) {
       didDragRef.current = false;
       return;
@@ -293,13 +296,13 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   return (
     <div
       ref={cardRef}
-      className={`stream-card ${isFeatured ? 'featured' : ''} ${inTray ? 'in-tray' : ''} ${isSelectedFeatured ? 'selected-featured' : ''} ${zoom > 1.0 && !inTray ? 'is-zoomed' : ''} ${isDragging && !inTray ? 'is-dragging' : ''} ${!slot.isLocal && !inTray ? 'has-volume-controller' : ''} ${isHudPinned ? 'is-hud-pinned' : ''} ${activeTooltips > 0 ? 'is-hud-active' : ''}`}
+      className={`stream-card ${isFeatured ? 'featured' : ''} ${inTray ? 'in-tray' : ''} ${isSelectedFeatured ? 'selected-featured' : ''} ${zoom > 1.0 && !inTray ? 'is-zoomed' : ''} ${isDragging && !inTray ? 'is-dragging' : ''} ${!slot.isLocal && !inTray ? 'has-volume-controller' : ''} ${isHudPinned ? 'is-hud-pinned' : ''} ${activeTooltips > 0 ? 'is-hud-active' : ''} ${pointer.enabled ? 'is-stream-pointer-active' : ''}`}
       data-peer-id={slot.peerId}
       onClick={handleCardClick}
       onContextMenu={handleContextMenu}
       tabIndex={0}
-      onMouseDown={!inTray ? handleMouseDown : undefined}
-      onDoubleClick={!inTray ? handleDoubleClick : undefined}
+      onMouseDown={!inTray && !pointer.enabled ? handleMouseDown : undefined}
+      onDoubleClick={!inTray && !pointer.enabled ? handleDoubleClick : undefined}
     >
       <div
         className="stream-video-viewport"
@@ -386,7 +389,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
         ) : (
           <video
             ref={videoRef}
-            className={pointer.cursorActive ? 'stream-pointer-active-cursor' : undefined}
+            className={`${pointer.enabled ? 'is-stream-pointer-active ' : ''}${pointer.cursorActive ? 'stream-pointer-active-cursor' : ''}`.trim() || undefined}
             autoPlay
             playsInline
             muted
