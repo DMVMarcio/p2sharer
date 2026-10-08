@@ -983,19 +983,49 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 }
 
 /* Grid Layout */
-.streams-grid-wrapper {
-  display: grid;
+ .streams-grid-wrapper {
+  display: block;
+  position: relative;
   width: 100%;
   height: 100%;
-  gap: 8px;
-  align-content: center;
-  justify-content: center;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  overflow: auto;
 }
 
-.streams-grid-wrapper:not(.hidden) {
-  animation: viewModeEnter 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
+.room-card-canvas { position: relative; width: 100%; min-height: 100%; }
+.room-card-frame { position: relative; min-width: 0; min-height: 0; }
+.room-card-frame > .stream-card,
+.room-card-frame > .participant-card,
+.room-card-frame > .room-app-slot { width: 100%; height: 100%; aspect-ratio: auto; }
+.room-card-frame.is-dragging { z-index: 10; }
+.room-card-frame.is-dragging > :first-child { outline: 2px solid var(--accent-color); }
+.room-card-drag-handle,
+.room-card-resize-handle,
+.room-card-layout-reset {
+  position: absolute;
+  z-index: 25;
+  padding: 4px;
+  min-width: 24px;
+  min-height: 24px;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  opacity: .65;
 }
+.room-card-drag-handle { left: 6px; top: 6px; cursor: grab; touch-action: none; }
+.room-card-drag-handle:active { cursor: grabbing; }
+.room-card-resize-handle { right: 6px; bottom: 6px; cursor: nwse-resize; touch-action: none; }
+.room-card-layout-reset { top: 10px; right: 10px; }
+.room-card-drag-handle:hover,
+.room-card-resize-handle:hover,
+.room-card-layout-reset:hover,
+.room-card-frame:focus-within .room-card-drag-handle,
+.room-card-frame:focus-within .room-card-resize-handle { opacity: 1; }
+.spotlight-tray-strip { position: relative; }
+.spotlight-tray-strip > .room-card-frame { height: 100%; aspect-ratio: 16 / 9; flex-shrink: 0; }
+.spotlight-tray-strip .room-card-frame > .stream-card,
+.spotlight-tray-strip .room-card-frame > .participant-card,
+.spotlight-tray-strip .room-card-frame > .room-app-slot { width: 100%; height: 100%; }
 
 /* Spotlight Layout (Main Featured Stage + Minimizable Bottom Tray) */
 .spotlight-stage {
@@ -1007,9 +1037,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   position: relative;
 }
 
-.spotlight-stage:not(.hidden) {
-  animation: viewModeEnter 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
+/* Keep card handles and persistent app surfaces in the same stacking context. */
 
 .spotlight-featured-area {
   flex: 1;

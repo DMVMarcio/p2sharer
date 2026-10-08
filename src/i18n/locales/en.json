@@ -1011,5 +1011,8 @@
   "color.value": "Brightness",
   "color.saturationValue": "Saturation and brightness",
   "file.transferDetails": "Transfer details",
-  "file.transferProgress": "{{v0}}% · {{v1}} of {{v2}}"
+  "file.transferProgress": "{{v0}}% · {{v1}} of {{v2}}",
+  "room.cards.reorder": "Reorder card (arrow keys to move)",
+  "room.cards.resize": "Resize card (arrow keys; double-click to reset)",
+  "room.cards.reset": "Restore automatic layout"
 }

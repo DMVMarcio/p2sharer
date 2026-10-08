@@ -77,6 +77,51 @@ test('transmission menu edits sources, stops only the chosen source, and starts 
 
 after(async () => { await act(async () => root.unmount()); browser.window.close(); });
 
+test('room cards share order across modes, retain independent sizes, and preserve keyed videos', async () => {
+  const prototype = window.HTMLElement.prototype;
+  const previousWidth = Object.getOwnPropertyDescriptor(prototype, 'clientWidth');
+  const previousHeight = Object.getOwnPropertyDescriptor(prototype, 'clientHeight');
+  Object.defineProperty(prototype, 'clientWidth', { configurable: true, get() { return 1200; } });
+  Object.defineProperty(prototype, 'clientHeight', { configurable: true, get() { return 800; } });
+  const ids = [screen.peerId, camera.peerId, other.peerId];
+  const frames = () => [...document.querySelectorAll('.streams-grid-wrapper [data-sortable-id]')];
+  const width = id => frames().find(frame => frame.dataset.sortableId === id).style.width;
+  try {
+    stateStore.set(state => { state.roomSlots = [screen, camera, other]; state.subscribedStreams = new Set(ids); });
+    await render('spotlight');
+    await render('grid');
+    const video = document.querySelector(`[data-sortable-id="${screen.peerId}"] video`);
+    const otherWidth = width(other.peerId);
+    const initialWidth = width(screen.peerId);
+    await act(async () => frames()[0].querySelector('.room-card-resize-handle').dispatchEvent(
+      new window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })));
+    const resizedWidth = width(screen.peerId);
+    assert.ok(parseFloat(resizedWidth) > parseFloat(initialWidth));
+    assert.equal(width(other.peerId), otherWidth);
+    const handle = frames()[0].querySelector('.room-card-drag-handle');
+    handle.focus();
+    await act(async () => handle.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })));
+    assert.deepEqual(frames().map(frame => frame.dataset.sortableId), [camera.peerId, screen.peerId, other.peerId]);
+    assert.equal(document.querySelector(`[data-sortable-id="${screen.peerId}"] video`), video);
+    assert.equal(document.activeElement, handle);
+    await render('spotlight');
+    assert.deepEqual([...document.querySelectorAll('.spotlight-tray-strip [data-sortable-id]')].map(frame => frame.dataset.sortableId),
+      [camera.peerId, screen.peerId, other.peerId]);
+    await act(async () => document.querySelector('.spotlight-tray-strip .room-card-drag-handle').dispatchEvent(
+      new window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })));
+    await render('grid');
+    assert.deepEqual(frames().map(frame => frame.dataset.sortableId), ids);
+    assert.equal(width(screen.peerId), resizedWidth);
+    await act(async () => document.querySelector('.room-card-layout-reset').click());
+    assert.equal(width(screen.peerId), initialWidth);
+  } finally {
+    if (previousWidth) Object.defineProperty(prototype, 'clientWidth', previousWidth);
+    else delete prototype.clientWidth;
+    if (previousHeight) Object.defineProperty(prototype, 'clientHeight', previousHeight);
+    else delete prototype.clientHeight;
+  }
+});
+
 test('late audio in a stable video container reaches the canonical audio sink', async () => {
   const calls = [];
   const original = audioContextManager.attachPeerAudio;

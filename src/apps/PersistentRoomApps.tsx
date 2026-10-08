@@ -9,13 +9,14 @@ interface Props {
   layoutMode: 'grid' | 'spotlight';
   featuredId?: string;
   layoutKey: string;
+  followingGesture?: boolean;
   rootRef: React.RefObject<HTMLDivElement | null>;
   slotsRef: React.RefObject<Map<string, HTMLDivElement>>;
 }
 
 interface Placement { left: number; top: number; width: number; height: number; clipPath: string }
 
-export const PersistentRoomApps: React.FC<Props> = ({ instances, layoutMode, featuredId, layoutKey, rootRef, slotsRef }) => {
+export const PersistentRoomApps: React.FC<Props> = ({ instances, layoutMode, featuredId, layoutKey, followingGesture, rootRef, slotsRef }) => {
   useLocale();
   const [placements, setPlacements] = useState<Record<string, Placement>>({});
   const previousRef = useRef('');
@@ -61,7 +62,7 @@ export const PersistentRoomApps: React.FC<Props> = ({ instances, layoutMode, fea
     const until = performance.now() + 460;
     const followTransition = () => {
       measure();
-      if (performance.now() < until) frame = requestAnimationFrame(followTransition);
+      if (followingGesture || performance.now() < until) frame = requestAnimationFrame(followTransition);
     };
     frame = requestAnimationFrame(followTransition);
     return () => {
@@ -70,7 +71,7 @@ export const PersistentRoomApps: React.FC<Props> = ({ instances, layoutMode, fea
       root.removeEventListener('scroll', measure, true);
       window.removeEventListener('resize', measure);
     };
-  }, [measure, layoutKey]);
+  }, [measure, layoutKey, followingGesture]);
 
   return <div className="room-app-layer" aria-label={t("message.791e1b0c7eaf")}>
     {instances.map((instance) => {

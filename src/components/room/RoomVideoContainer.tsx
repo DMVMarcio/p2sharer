@@ -12,6 +12,11 @@ import { StreamOverlay } from './StreamOverlay';
 import { roomService } from '../../services/room_service';
 import { ParticipantCard } from './ParticipantCard';
 import { RoomSlotInfo } from '../../core/types';
+import { useSortableGrid } from '../../hooks/useSortableGrid';
+import { calculateCardLayout, placeCardAtPoint } from '../../core/room_card_layout';
+import { RoomCardFrame } from './RoomCardFrame';
+import { TooltipButton } from '../common/TooltipButton';
+import { RotateCcw } from 'lucide-react';
 
 export const RoomVideoContainer: React.FC = () => {
   useLocale();
@@ -40,69 +45,29 @@ export const RoomVideoContainer: React.FC = () => {
   const streamOverlays = useStore((s) => s.streamOverlays);
   const dismissedAutoOverlays = useStore((s) => s.dismissedAutoOverlays);
 
-  const gridWrapperRef = useRef<HTMLDivElement | null>(null);
+  const gridViewportRef = useRef<HTMLDivElement | null>(null);
+  const [viewport, setViewport] = useState({ width: 1, height: 1 });
+  const [cardOrder, setCardOrder] = useState<string[]>([]);
+  const [cardSizes, setCardSizes] = useState<Record<string, number>>({});
+  const [manualRows, setManualRows] = useState<string[][] | null>(null);
+  const droppedOrderRef = useRef<string[] | null>(null);
+  const currentRoomCode = useStore(s => s.currentRoomCode);
+  useEffect(() => { setCardOrder([]); setCardSizes({}); setManualRows(null); }, [currentRoomCode]);
+  useLayoutEffect(() => {
+    const node = gridViewportRef.current;
+    if (!node || layoutMode !== 'grid') return;
+    const measure = () => setViewport({ width: node.clientWidth, height: node.clientHeight });
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [layoutMode]);
   const videoContainerRef = useRef<HTMLDivElement | null>(null);
   const appSlotsRef = useRef(new Map<string, HTMLDivElement>());
   const registerAppSlot = useCallback((key: string, element: HTMLDivElement | null) => {
     if (element) appSlotsRef.current.set(key, element);
     else appSlotsRef.current.delete(key);
   }, []);
-  const trayStripRef = useRef<HTMLDivElement | null>(null);
-  const prevGridRectsRef = useRef<Map<string, DOMRect>>(new Map());
-  const prevTrayRectsRef = useRef<Map<string, DOMRect>>(new Map());
-
-  // FLIP animation helper: smoothly slides existing cards to new positions when peers join or leave
-  const applyFlipAnimation = (
-    container: HTMLElement | null,
-    prevRectsMap: Map<string, DOMRect>
-  ) => {
-    if (!container) return;
-
-    const cards = Array.from(container.children).filter((card): card is HTMLElement =>
-      card instanceof HTMLElement && card.dataset.peerId !== undefined);
-    const currentRects = new Map<string, DOMRect>();
-
-    cards.forEach((card) => {
-      const peerId = card.getAttribute('data-peer-id');
-      if (peerId) {
-        currentRects.set(peerId, card.getBoundingClientRect());
-      }
-    });
-
-    cards.forEach((card) => {
-      const peerId = card.getAttribute('data-peer-id');
-      if (!peerId) return;
-
-      const prevRect = prevRectsMap.get(peerId);
-      const currentRect = currentRects.get(peerId);
-
-      if (prevRect && currentRect) {
-        const dx = prevRect.left - currentRect.left;
-        const dy = prevRect.top - currentRect.top;
-
-        if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
-          // Invert: visually position element back at previous coordinates
-          card.style.transform = `translate(${dx}px, ${dy}px)`;
-          card.style.transition = 'none';
-
-          // Play: smoothly animate to new coordinates
-          requestAnimationFrame(() => {
-            card.style.transition = 'transform 0.45s cubic-bezier(0.16, 1, 0.3, 1)';
-            card.style.transform = '';
-            const onEnd = () => {
-              card.style.transition = '';
-              card.removeEventListener('transitionend', onEnd);
-            };
-            card.addEventListener('transitionend', onEnd);
-          });
-        }
-      }
-    });
-
-    prevRectsMap.clear();
-    currentRects.forEach((rect, id) => prevRectsMap.set(id, rect));
-  };
-
   const shouldRenderVideo = (slot: RoomSlotInfo): boolean => {
     return Boolean(
       (slot.isLocal && slot.isStreaming && slot.stream) ||
@@ -123,35 +88,58 @@ export const RoomVideoContainer: React.FC = () => {
   }, [roomSlots, streamFilter, subscribedStreams]);
 
   const visibleApps = streamFilter === 'watching' ? roomAppsService.getJoinedInstances() : appInstances;
-  const entries: Array<RoomSlotInfo | RoomAppInstance> = [...filteredSlots, ...visibleApps];
+  const availableEntries: Array<RoomSlotInfo | RoomAppInstance> = [...filteredSlots, ...visibleApps];
   const entryId = (entry: RoomSlotInfo | RoomAppInstance) => 'peerId' in entry ? entry.peerId : `app:${entry.id}`;
-  const slotIdsKey = entries.map(entryId).join(',');
-
-  const prevSlotIdsKeyRef = useRef(slotIdsKey);
-  const prevLayoutModeRef = useRef(layoutMode);
-
-  useLayoutEffect(() => {
-    const idsChanged = prevSlotIdsKeyRef.current !== slotIdsKey;
-    const modeChanged = prevLayoutModeRef.current !== layoutMode;
-    prevSlotIdsKeyRef.current = slotIdsKey;
-    prevLayoutModeRef.current = layoutMode;
-
-    if (!idsChanged && !modeChanged) {
+  const availableIds = availableEntries.map(entryId);
+  const ids = [...cardOrder.filter(id => availableIds.includes(id)), ...availableIds.filter(id => !cardOrder.includes(id))];
+  const saveOrder = (next: string[]) => {
+    if (droppedOrderRef.current) {
+      setCardOrder(droppedOrderRef.current);
+      droppedOrderRef.current = null;
       return;
     }
-
-    if (layoutMode === 'grid') {
-      applyFlipAnimation(gridWrapperRef.current, prevGridRectsRef.current);
-    } else {
-      prevGridRectsRef.current.clear();
-    }
-
-    if (layoutMode === 'spotlight') {
-      applyFlipAnimation(trayStripRef.current, prevTrayRectsRef.current);
-    } else {
-      prevTrayRectsRef.current.clear();
-    }
-  }, [slotIdsKey, layoutMode]);
+    // Hidden entries retain their places while visible entries exchange their positions.
+    const full = [...cardOrder, ...availableIds.filter(id => !cardOrder.includes(id))];
+    let index = 0;
+    setCardOrder(full.map(id => availableIds.includes(id) ? next[index++] : id));
+    setManualRows(previous => {
+      let index = 0;
+      return previous?.map(row => row.map(id => availableIds.includes(id) ? next[index++] : id)) ?? null;
+    });
+  };
+  const sortable = useSortableGrid(ids, saveOrder, {
+    preview: layoutMode === 'spotlight',
+    onDrop: layoutMode === 'grid' ? (id, x, y) => {
+      const bounds = sortable.gridRef.current!.getBoundingClientRect();
+      const rows = placeCardAtPoint(displayLayout, id, x - bounds.left, y - bounds.top);
+      // Preserve filtered-out entries in the saved row model.
+      const hidden = (manualRows || []).map(row => row.filter(key => !availableIds.includes(key))).filter(row => row.length);
+      setManualRows([...rows, ...hidden]);
+      droppedOrderRef.current = [...rows.flat(), ...hidden.flat()];
+      return rows.flat();
+    } : undefined,
+  });
+  const displayIds = [...sortable.order.filter(id => availableIds.includes(id)), ...availableIds.filter(id => !sortable.order.includes(id))];
+  const entries = displayIds.map(id => availableEntries.find(entry => entryId(entry) === id)!);
+  // Reordering in the tray changes the same positions while preserving grid row lengths.
+  const draftRows = manualRows ? (() => {
+    let index = 0;
+    return manualRows.map(row => row.map(id => availableIds.includes(id) ? displayIds[index++] : id));
+  })() : null;
+  const displayLayout = calculateCardLayout(displayIds, viewport.width, viewport.height, cardSizes, draftRows);
+  const slotIdsKey = displayIds.join(',');
+  const layoutKey = `${slotIdsKey}:${layoutMode}:${pinnedPeerId}:${isSpotlightTrayCollapsed}:${streamFilter}:${JSON.stringify(displayLayout.cards)}:${sortable.draggingId}`;
+  const renderMovableCard = (slot: RoomSlotInfo | RoomAppInstance, inTray = false) => {
+    const id = entryId(slot);
+    const placement = displayLayout.cards.find(card => card.id === id);
+    return <RoomCardFrame key={id} id={id} cardRef={sortable.cardRef(id)} dragging={sortable.draggingId === id}
+      handleProps={sortable.handleProps(id)} size={cardSizes[id] ?? 1}
+      onResize={inTray ? undefined : size => setCardSizes(previous => ({ ...previous, [id]: size }))}
+      style={inTray ? undefined : placement && { position: 'absolute', left: placement.left, top: placement.top,
+        width: placement.width, height: placement.height }}>
+      {renderSlotCard(slot, false, inTray, inTray && id === (featuredSlot && entryId(featuredSlot)))}
+    </RoomCardFrame>;
+  };
 
   const featuredSlot = entries.find((s) => entryId(s) === pinnedPeerId) || entries[0];
   const featuredMedia = featuredSlot && 'peerId' in featuredSlot ? featuredSlot : undefined;
@@ -206,13 +194,15 @@ export const RoomVideoContainer: React.FC = () => {
     <div className="video-container" id="room-video-container" ref={videoContainerRef}>
       {/* GRID VIEW */}
       <div
-        ref={gridWrapperRef}
+        ref={gridViewportRef}
         className={`streams-grid-wrapper layout-grid ${layoutMode !== 'grid' ? 'hidden' : ''}`}
         id="streams-grid-wrapper"
       >
         {layoutMode === 'grid' && (
           entries.length > 0 ? (
-            entries.map((slot) => renderSlotCard(slot, false, false, false))
+            <div className="room-card-canvas" ref={sortable.gridRef} style={{ height: displayLayout.height }}>
+              {entries.map(slot => renderMovableCard(slot))}
+            </div>
           ) : (
             <div className="stream-filter-empty-state">
               <p className="filter-empty-title">{t("message.4f9d41039012")}</p>
@@ -266,18 +256,19 @@ export const RoomVideoContainer: React.FC = () => {
                   <polyline points="6 9 12 15 18 9"/>
                 </svg>
               </button>
-              <div ref={trayStripRef} className="spotlight-tray-strip" id="spotlight-tray-strip">
-                {entries.map((slot) =>
-                  renderSlotCard(slot, false, true, entryId(slot) === (featuredSlot && entryId(featuredSlot)))
-                )}
+              <div ref={layoutMode === 'spotlight' ? sortable.gridRef : undefined} className="spotlight-tray-strip" id="spotlight-tray-strip">
+                {entries.map(slot => renderMovableCard(slot, true))}
               </div>
             </div>
           </>
         )}
       </div>
+      {(manualRows || Object.keys(cardSizes).length > 0 || cardOrder.length > 0) &&
+        <TooltipButton tooltip={t('room.cards.reset')} className="btn room-card-layout-reset"
+          onClick={() => { setManualRows(null); setCardSizes({}); setCardOrder([]); }}><RotateCcw size={15} /></TooltipButton>}
       <PersistentRoomApps instances={appInstances} layoutMode={layoutMode}
         featuredId={layoutMode === 'spotlight' && featuredSlot ? entryId(featuredSlot) : undefined}
-        layoutKey={`${slotIdsKey}:${layoutMode}:${pinnedPeerId}:${isSpotlightTrayCollapsed}:${streamFilter}`}
+        layoutKey={layoutKey} followingGesture={!!sortable.draggingId}
         rootRef={videoContainerRef} slotsRef={appSlotsRef} />
     </div>
   );
