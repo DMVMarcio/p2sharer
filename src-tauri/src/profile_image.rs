@@ -228,6 +228,38 @@ fn profile_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
     Ok(dir.join("profile-image.json"))
 }
 
+fn encode_preview(frames: &[(RgbaImage, image::Delay)], plays: u32) -> Result<Vec<u8>, String> {
+    let (width, height) = frames[0].0.dimensions();
+    // Keep the original aspect ratio, timing and loops; only reduce preview resolution.
+    for limit in [512, 256, 128, 64] {
+        let scale = (f64::from(limit) / f64::from(width.max(height))).min(1.0);
+        let preview: Vec<_> = frames
+            .iter()
+            .map(|(frame, delay)| {
+                (
+                    image::imageops::resize(
+                        frame,
+                        (f64::from(width) * scale).round().max(1.0) as u32,
+                        (f64::from(height) * scale).round().max(1.0) as u32,
+                        image::imageops::FilterType::Triangle,
+                    ),
+                    *delay,
+                )
+            })
+            .collect();
+        match encode(&preview, plays) {
+            Ok(bytes) => return Ok(bytes),
+            Err(error)
+                if error == "Processed animation exceeds the 8 MB safety limit" && limit != 64 =>
+            {
+                continue
+            }
+            Err(error) => return Err(error),
+        }
+    }
+    unreachable!()
+}
+
 #[tauri::command]
 pub async fn pick_profile_image(
     state: tauri::State<'_, ProfileImageState>,
@@ -246,15 +278,9 @@ pub async fn pick_profile_image(
             .read_to_end(&mut bytes)
             .map_err(|e| e.to_string())?;
         let _guard = IMAGE_WORK.lock().map_err(|e| e.to_string())?;
-        let (frames, _) = decode(&bytes, None)?;
+        let (frames, plays) = decode(&bytes, None)?;
         let (width, height) = frames[0].0.dimensions();
-        let preview = image::imageops::resize(
-            &frames[0].0,
-            (width as f64 * (1024.0 / width.max(height) as f64).min(1.0)).round() as u32,
-            (height as f64 * (1024.0 / width.max(height) as f64).min(1.0)).round() as u32,
-            image::imageops::FilterType::Triangle,
-        );
-        let preview = encode(&[(preview, frames[0].1)], 1)?;
+        let preview = encode_preview(&frames, plays)?;
         Ok::<_, String>(Some((bytes, width, height, preview)))
     })
     .await
@@ -476,6 +502,15 @@ mod tests {
                     .unwrap();
             }
         }
+        let (original, loops) = decode(&bytes, None).unwrap();
+        let preview = encode_preview(&original, loops).unwrap();
+        let (preview_frames, preview_loops) = decode(&preview, None).unwrap();
+        assert_eq!(preview_loops, loops);
+        assert_eq!(preview_frames.len(), original.len());
+        for (expected, actual) in original.iter().zip(&preview_frames) {
+            assert_eq!(expected.0, actual.0);
+            assert_eq!(expected.1.numer_denom_ms(), actual.1.numer_denom_ms());
+        }
         let (frames, plays) = decode(
             &bytes,
             Some(Crop {
@@ -521,6 +556,15 @@ mod tests {
         let mut bytes = b"RIFF".to_vec();
         bytes.extend_from_slice(&(contents.len() as u32).to_le_bytes());
         bytes.extend(contents);
+        let (original, loops) = decode(&bytes, None).unwrap();
+        let preview = encode_preview(&original, loops).unwrap();
+        let (preview_frames, preview_loops) = decode(&preview, None).unwrap();
+        assert_eq!(preview_loops, loops);
+        assert_eq!(preview_frames.len(), original.len());
+        for (expected, actual) in original.iter().zip(&preview_frames) {
+            assert_eq!(expected.0, actual.0);
+            assert_eq!(expected.1.numer_denom_ms(), actual.1.numer_denom_ms());
+        }
         let (frames, plays) = decode(
             &bytes,
             Some(Crop {

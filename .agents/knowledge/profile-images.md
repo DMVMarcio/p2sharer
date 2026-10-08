@@ -4,13 +4,15 @@
 peer-to-hash associations and reactive subscriptions. `ProfileAvatar` renders the
 same circular image/initial and contrast-aware fallback color across participants,
 the header, watchers and activity participants. Profile settings retain image,
-crop, removal and fallback-color drafts until Save. `ColorPicker` shares an HSV
+crop, removal and fallback-color drafts until Save. The crop stage supports
+wheel zoom, pointer dragging and keyboard zoom/panning. `ColorPicker` shares an HSV
 saturation/brightness plane, hue slider, keyboard-accessible channel sliders and
 hex input; conversion functions live in `core/hsv_color.ts`.
 
 `src-tauri/src/profile_image.rs` uses the native file picker and keeps original
 image bytes behind temporary random tokens. The frontend receives a bounded,
-static PNG preview, not an arbitrary file path. Native decoders accept PNG/APNG,
+PNG/APNG preview preserving animation, not an arbitrary file path. Native decoders
+accept PNG/APNG,
 JPEG, GIF and WebP by their contents, apply JPEG orientation, validate all frames,
 crop to a square, cap output at 512 pixels without upscaling, and encode PNG/APNG
 without imported metadata. Animation frames, transparency, loop count and bounded

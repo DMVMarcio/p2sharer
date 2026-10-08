@@ -210,15 +210,16 @@ test('profile crop survives tab changes, applies only on Save and removal remain
   };
   try {
     await act(async () => root.render(React.createElement(SettingsModal)));
-    const choose = [...document.querySelectorAll('#settings-pane-profile button')].find(button => button.textContent === 'Escolher imagem');
+    const choose = [...document.querySelectorAll('#settings-pane-profile button')].find(button => button.getAttribute('aria-label') === 'Escolher imagem');
     await act(async () => choose.click());
     assert.equal(saves.length, 0);
-    const zoom = document.querySelector('.profile-crop-dialog input[type="range"]');
-    await act(async () => {
-      Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(zoom, '51');
-      zoom.dispatchEvent(new window.Event('input', { bubbles: true }));
-      zoom.dispatchEvent(new window.Event('change', { bubbles: true }));
-    });
+    const stage = document.querySelector('.profile-crop-stage');
+    const wheel = new window.WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -150 });
+    await act(async () => stage.dispatchEvent(wheel));
+    assert.equal(wheel.defaultPrevented, true);
+    const pan = new window.KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'ArrowRight' });
+    await act(async () => stage.dispatchEvent(pan));
+    assert.equal(pan.defaultPrevented, true);
     await act(async () => document.querySelector('.profile-crop-dialog .btn-primary').click());
     await act(async () => new Promise(resolve => setTimeout(resolve, 260)));
     await act(async () => [...document.querySelectorAll('.settings-nav-sidebar button')].find(button => button.textContent.includes('Aplicação')).click());
@@ -226,17 +227,19 @@ test('profile crop survives tab changes, applies only on Save and removal remain
     await act(async () => document.getElementById('btn-save-settings').click());
     assert.equal(saves.length, 1);
     assert.equal(saves[0].token, 'draft-token');
-    assert.equal(saves[0].crop.size, 0.5);
+    assert.ok(saves[0].crop.size > 0 && saves[0].crop.size < 1);
+    assert.ok(saves[0].crop.x > 0.5);
+    assert.equal(saves[0].crop.y, 0.5);
     await act(async () => root.render(null));
     await act(async () => root.render(React.createElement(SettingsModal)));
-    await act(async () => [...document.querySelectorAll('#settings-pane-profile button')].find(button => button.textContent === 'Remover foto').click());
+    await act(async () => [...document.querySelectorAll('#settings-pane-profile button')].find(button => button.getAttribute('aria-label') === 'Remover foto').click());
     assert.ok(document.querySelector('#settings-pane-profile .custom-color-picker'));
     await act(async () => document.getElementById('btn-cancel-settings').click());
     assert.equal(saves.length, 1);
     assert.equal(profileImages.local.data, 'cGhvdG8=');
     await act(async () => root.render(null));
     await act(async () => root.render(React.createElement(SettingsModal)));
-    await act(async () => [...document.querySelectorAll('#settings-pane-profile button')].find(button => button.textContent === 'Remover foto').click());
+    await act(async () => [...document.querySelectorAll('#settings-pane-profile button')].find(button => button.getAttribute('aria-label') === 'Remover foto').click());
     await act(async () => document.getElementById('btn-save-settings').click());
     assert.equal(saves[1].remove, true);
     assert.equal(profileImages.local.data, '');

@@ -5477,12 +5477,21 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .profile-avatar.header-profile-avatar, .profile-avatar.watcher-profile-avatar { width: 24px; height: 24px; font-size: 12px; }
 .profile-avatar.profile-editor-preview { width: 96px; height: 96px; font-size: 32px; }
 .profile-editor-preview img, .profile-crop-stage img { position: absolute; max-width: none; }
-.profile-editor-row, .profile-editor-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.profile-editor-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .profile-crop-dialog { width: min(440px, calc(100vw - 32px)); }
 .profile-crop-stage { position: relative; width: min(100%, 300px); aspect-ratio: 1; overflow: hidden; margin: 16px auto; touch-action: none; cursor: grab; background: var(--bg-input); }
 .profile-crop-stage:active { cursor: grabbing; }
 .profile-crop-circle { position: absolute; inset: 0; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 0 80px rgba(0,0,0,.55); pointer-events: none; }
-.profile-crop-slider { display: grid; grid-template-columns: 140px 1fr; gap: 12px; align-items: center; margin-top: 12px; color: var(--text-secondary); }
+
+.profile-editor-photo { position: relative; display: inline-flex; }
+.btn.profile-upload-button { padding: 0; border: 0; border-radius: var(--radius-full); background: transparent; }
+.profile-upload-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, .55); color: white; opacity: 0; transition: opacity var(--transition-fast); }
+.profile-upload-button:hover .profile-upload-overlay, .profile-upload-button:focus-visible .profile-upload-overlay { opacity: 1; }
+.btn.profile-remove-button { position: absolute; top: 0; right: 0; width: 24px; height: 24px; padding: 0; border-radius: var(--radius-full); background: color-mix(in srgb, var(--danger-bg), var(--bg-surface) 70%); }
+.profile-upload-button:focus-visible, .profile-remove-button:focus-visible, .profile-crop-stage:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { .profile-upload-overlay { transition: none; } }
 .color-picker-sv { position: relative; aspect-ratio: 1; border-radius: var(--radius-md); background-image: linear-gradient(to top, black, transparent), linear-gradient(to right, white, transparent); touch-action: none; margin-bottom: 16px; cursor: crosshair; }
 .color-picker-sv-cursor { position: absolute; width: 14px; height: 14px; border: 2px solid white; box-shadow: 0 0 0 1px black; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; }
 .settings-slider-input.color-picker-hue { background: linear-gradient(to right, red, yellow, lime, cyan, blue, magenta, red); }
+
+.btn.profile-remove-button:hover { background: var(--danger-hover); color: white; }

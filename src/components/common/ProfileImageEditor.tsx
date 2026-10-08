@@ -1,10 +1,12 @@
-import { useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { Upload, X } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { t } from '../../i18n';
 import { profileImages, type ProfileDraft, type ImageCrop } from '../../core/profile_image';
-import { customAccentTokens } from '../../core/accent_color';
+import { contrastingTextColor } from '../../core/accent_color';
 import { ModalDialog } from './ModalDialog';
 import { ColorPicker } from './ColorPicker';
+import { TooltipButton } from './TooltipButton';
 import { showToast } from '../../hooks/useToast';
 
 function CropPreview({ draft, crop }: { draft: ProfileDraft; crop: ImageCrop }) {
@@ -18,13 +20,44 @@ function CropPreview({ draft, crop }: { draft: ProfileDraft; crop: ImageCrop }) 
 function CropDialog({ draft, onApply, onClose }: { draft: ProfileDraft; onApply: (draft: ProfileDraft) => void; onClose: () => void }) {
   const [crop, setCrop] = useState(draft.crop);
   const [drag, setDrag] = useState<{ x: number; y: number; crop: ImageCrop } | null>(null);
+  const stage = useRef<HTMLDivElement>(null);
+  const zoom = (current: ImageCrop, factor: number): ImageCrop => {
+    const minimum = Math.min(draft.width, draft.height);
+    const size = Math.min(1, Math.max(0.01, current.size * factor));
+    const oldSide = minimum * current.size, newSide = minimum * size;
+    const position = (axis: 'x' | 'y', dimension: number) => dimension === newSide ? 0.5 :
+      Math.min(1, Math.max(0, (current[axis] * (dimension - oldSide) + (oldSide - newSide) / 2) / (dimension - newSide)));
+    return { size, x: position('x', draft.width), y: position('y', draft.height) };
+  };
+  useEffect(() => {
+    const element = stage.current;
+    if (!element) return;
+    const wheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? element.clientHeight : 1);
+      setCrop(current => zoom(current, Math.exp(Math.min(300, Math.max(-300, delta)) * 0.002)));
+      setDrag(null);
+    };
+    element.addEventListener('wheel', wheel, { passive: false });
+    return () => element.removeEventListener('wheel', wheel);
+  }, [draft.width, draft.height]);
   return <ModalDialog title={t('profile.crop')} onClose={onClose} className="profile-crop-dialog"
     footer={close => <>
       <button className="btn btn-secondary" onClick={close}>{t('message.bb9dbb406dcb')}</button>
       <button className="btn btn-primary" onClick={() => { onApply({ ...draft, crop }); close(); }}>{t('message.3a04898a6b8b')}</button>
     </>}>
-    <p className="field-info-text">{t('profile.cropHint')}</p>
-    <div className="profile-crop-stage" onPointerDown={event => {
+    <div ref={stage} className="profile-crop-stage" tabIndex={0} role="group" aria-label={t('profile.crop')}
+      onKeyDown={event => {
+        if (['+', '=', '-', '_'].includes(event.key)) {
+          event.preventDefault(); setCrop(current => zoom(current, event.key === '+' || event.key === '=' ? 0.9 : 1 / 0.9));
+        } else if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
+          event.preventDefault();
+          setCrop(current => ({ ...current,
+            x: Math.min(1, Math.max(0, current.x + (event.key === 'ArrowLeft' ? -0.02 : event.key === 'ArrowRight' ? 0.02 : 0))),
+            y: Math.min(1, Math.max(0, current.y + (event.key === 'ArrowUp' ? -0.02 : event.key === 'ArrowDown' ? 0.02 : 0))),
+          }));
+        }
+      }} onPointerDown={event => {
       event.currentTarget.setPointerCapture(event.pointerId); setDrag({ x: event.clientX, y: event.clientY, crop });
     }} onPointerUp={() => setDrag(null)} onPointerCancel={() => setDrag(null)} onPointerMove={event => {
       if (!drag || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
@@ -39,12 +72,6 @@ function CropDialog({ draft, onApply, onClose }: { draft: ProfileDraft; onApply:
       <CropPreview draft={draft} crop={crop} />
       <span className="profile-crop-circle" />
     </div>
-    {(['size', 'x', 'y'] as const).map(key => <label className="profile-crop-slider" key={key}>
-      <span>{t(key === 'size' ? 'profile.zoom' : key === 'x' ? 'profile.horizontal' : 'profile.vertical')}</span>
-      <input autoComplete="off" className="settings-slider-input" type="range" min={key === 'size' ? 1 : 0} max={100} step={1}
-        value={key === 'size' ? Math.round((1.01 - crop.size) * 100) : Math.round(crop[key] * 100)}
-        onChange={event => setCrop({ ...crop, [key]: key === 'size' ? 1.01 - Number(event.target.value) / 100 : Number(event.target.value) / 100 })} />
-    </label>)}
   </ModalDialog>;
 }
 
@@ -70,21 +97,23 @@ export function ProfileImageEditor({ name, draft, color, remove, onDraft, onColo
   return <div className="settings-row">
     <span className="settings-label">{t('profile.photo')}</span>
     <div className="profile-editor-row">
-      <span className="profile-avatar profile-editor-preview" style={{ backgroundColor: color,
-        color: customAccentTokens(color)?.['--custom-accent-text'] }}>
-        {draft ? <CropPreview draft={draft} crop={draft.crop} /> : url ? <img src={url} alt="" /> : name.trim().charAt(0).toUpperCase() || '?'}
-      </span>
-      <div className="profile-editor-actions">
-        <button type="button" className="btn btn-secondary btn-sm" disabled={disabled || picking} onClick={() => void choose()}>{t(picking ? 'profile.loading' : 'profile.choose')}</button>
-        {hasPhoto && <button type="button" className="btn btn-outline btn-sm" disabled={disabled || picking} onClick={() => {
-          if (draft) void invoke('discard_profile_image', { token: draft.token }).catch(() => {});
-          onDraft(null); onRemove(true);
-        }}>{t('profile.remove')}</button>}
-        {draft && <button type="button" className="btn btn-outline btn-sm" disabled={disabled || picking} onClick={() => setSelection(draft)}>{t('profile.crop')}</button>}
-        {!hasPhoto && <ColorPicker label={t('profile.color')} value={color} onChange={onColor} />}
+      <div className="profile-editor-photo">
+        <TooltipButton tooltip={t(picking ? 'profile.loading' : 'profile.choose')}
+          className="btn profile-upload-button" disabled={disabled || picking} aria-busy={picking} onClick={() => void choose()}>
+          <span className="profile-avatar profile-editor-preview" style={{ backgroundColor: color,
+            color: contrastingTextColor(color) }}>
+            {draft ? <CropPreview draft={draft} crop={draft.crop} /> : url ? <img src={url} alt="" draggable={false} /> : name.trim().charAt(0).toUpperCase() || '?'}
+            <span className="profile-upload-overlay" aria-hidden="true"><Upload size={24} /></span>
+          </span>
+        </TooltipButton>
+        {hasPhoto && <TooltipButton tooltip={t('profile.remove')} className="btn btn-danger profile-remove-button"
+          disabled={disabled || picking} onClick={() => {
+            if (draft) void invoke('discard_profile_image', { token: draft.token }).catch(() => {});
+            onDraft(null); onRemove(true);
+          }}><X size={14} aria-hidden="true" /></TooltipButton>}
       </div>
+      {!hasPhoto && <ColorPicker label={t('profile.color')} value={color} onChange={onColor} />}
     </div>
-    <p className="field-info-text">{t('profile.formats')}</p>
     {selection && <CropDialog draft={selection} onClose={() => {
       if (selection.token !== draft?.token) void invoke('discard_profile_image', { token: selection.token }).catch(() => {});
       setSelection(null);

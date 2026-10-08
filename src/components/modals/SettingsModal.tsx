@@ -383,8 +383,6 @@ export const SettingsModal: React.FC = () => {
                     value={nick}
                     onChange={(e) => setNick(e.target.value)}
                   />
-                  <p className="field-info-text" style={{ marginTop: '4px' }}>
-                    {t("message.d7eb6b69801c")}</p>
                 </div>
               </div>
             )}
