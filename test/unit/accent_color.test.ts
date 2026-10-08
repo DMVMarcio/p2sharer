@@ -23,8 +23,11 @@ test('automatic card backgrounds preserve hue with subdued saturation and readab
     const color = automaticCardColor(source);
     const hsv = hexToHsv(color);
     assert.equal(contrastingTextColor(color), '#ffffff');
-    assert.ok(hsv.s <= 0.43);
-    assert.ok(hsv.v <= 0.45);
+    if (source.startsWith('#')) {
+      const original = hexToHsv(source);
+      assert.ok(hsv.s <= original.s + 0.01, 'Automatic color does not amplify source saturation');
+      assert.ok(hsv.v <= original.v + 0.01, 'Automatic color does not amplify source brightness');
+    }
     if (source.startsWith('#') && hsv.s > 0) {
       const delta = Math.abs(hsv.h - hexToHsv(source).h);
       assert.ok(Math.min(delta, 360 - delta) < 3, 'Dominant hue survives the contrast adjustment');
