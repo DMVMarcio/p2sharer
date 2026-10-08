@@ -90,6 +90,8 @@ def main(data_dir, openmoji_dir, emojione_dir):
         if has_classic:
             classic_image = Image.open(classic_path).convert("RGBA").resize((32, 32), Image.Resampling.LANCZOS)
             atlases["classic"].paste(classic_image, (x, y))
+        else:
+            atlases["classic"].paste(atlases["twemoji"].crop((x, y, x + 32, y + 32)), (x, y))
 
         catalog.append({
             "emoji": unicode_text(code),
