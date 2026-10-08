@@ -5508,6 +5508,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 
 .participant-card:not(.in-tray) .profile-avatar.participant-avatar-badge { width: clamp(52px, 28.8cqmin, 162px); height: clamp(52px, 28.8cqmin, 162px); font-size: clamp(18px, 9cqmin, 50.4px); }
 .profile-card-settings { margin-top: 16px; }
+.profile-card-settings .accent-colors-palette { margin-top: 8px; }
 
 .participant-card .badge-you { color: var(--card-text, #ffffff); background-color: color-mix(in srgb, var(--card-text, #ffffff) 12%, transparent); border-color: color-mix(in srgb, var(--card-text, #ffffff) 30%, transparent); }
 .profile-editor-identity { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 16px; align-items: start; }

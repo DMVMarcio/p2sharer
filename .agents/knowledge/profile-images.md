@@ -3,7 +3,12 @@
 `core/profile_image.ts` owns the saved local profile, process-only remote hash cache,
 peer-to-hash associations and reactive subscriptions. Card background mode is
 saved as nullable `cardColor` (automatic by default); native `dominantColor` caches
-an alpha-weighted, quantized palette from the first cropped frame. Automatic mode
+an alpha-weighted palette from the visible circle of the first cropped frame.
+Hue families aggregate nearby colors; meaningful chromatic regions outrank
+neutral pixels and warm beige/brown tones. A minimum visible-area threshold
+rejects tiny accents, with quantized population fallback for neutral images.
+Existing profiles are re-evaluated on load and Save without changing image hashes.
+Automatic mode
 preserves the extracted hue with moderate saturation and brightness caps, then
 reduces brightness only as needed for white text contrast through
 `core/profile_card_color.ts`. It also softens the initial

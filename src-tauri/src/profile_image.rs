@@ -208,18 +208,68 @@ fn encode(frames: &[(RgbaImage, image::Delay)], plays: u32) -> Result<Vec<u8>, S
 }
 
 fn dominant_color(image: &RgbaImage) -> Option<String> {
-    // Quantize similar colors together and weight by alpha, ignoring transparent pixels.
-    let mut buckets = vec![[0u64; 4]; 4096];
-    for pixel in image.pixels() {
+    // A coherent hue family is more useful than one exact RGB shade in a portrait.
+    // Keep a population-based fallback for monochrome and low-saturation images.
+    let mut fallback = vec![[0u64; 4]; 4096];
+    let mut hues = [[0.0f64; 5]; 12]; // Priority, weighted RGB, visible area.
+    let mut visible_area = 0.0;
+    let (width, height) = image.dimensions();
+    for (x, y, pixel) in image.enumerate_pixels() {
+        let nx = (f64::from(x) + 0.5) / f64::from(width) * 2.0 - 1.0;
+        let ny = (f64::from(y) + 0.5) / f64::from(height) * 2.0 - 1.0;
+        if nx * nx + ny * ny > 1.0 {
+            continue;
+        }
         let [r, g, b, a] = pixel.0;
+        let alpha = f64::from(a);
+        visible_area += alpha;
         let index = usize::from(r >> 4) * 256 + usize::from(g >> 4) * 16 + usize::from(b >> 4);
-        let bucket = &mut buckets[index];
+        let bucket = &mut fallback[index];
         bucket[0] += u64::from(a);
         bucket[1] += u64::from(r) * u64::from(a);
         bucket[2] += u64::from(g) * u64::from(a);
         bucket[3] += u64::from(b) * u64::from(a);
+
+        let max = f64::from(r.max(g).max(b));
+        let min = f64::from(r.min(g).min(b));
+        let delta = max - min;
+        let saturation = if max == 0.0 { 0.0 } else { delta / max };
+        // Near-neutral highlights and shadows cannot overwhelm a meaningful accent.
+        if a == 0 || saturation < 0.18 || max < 32.0 {
+            continue;
+        }
+        let hue = if max == f64::from(r) {
+            ((f64::from(g) - f64::from(b)) / delta).rem_euclid(6.0)
+        } else if max == f64::from(g) {
+            (f64::from(b) - f64::from(r)) / delta + 2.0
+        } else {
+            (f64::from(r) - f64::from(g)) / delta + 4.0
+        } * 60.0;
+        // This is a color heuristic, not face detection. Warm beige/brown stays
+        // eligible but yields to a substantial colored background or clothing.
+        let warm_neutral = (10.0..=50.0).contains(&hue) && saturation <= 0.65;
+        let weight = alpha * (0.15 + 0.85 * saturation) * if warm_neutral { 0.18 } else { 1.0 };
+        let bucket = &mut hues[(hue / 30.0).round() as usize % 12];
+        bucket[0] += weight;
+        bucket[1] += f64::from(r) * weight;
+        bucket[2] += f64::from(g) * weight;
+        bucket[3] += f64::from(b) * weight;
+        bucket[4] += alpha;
     }
-    let bucket = buckets.iter().max_by_key(|bucket| bucket[0])?;
+    // Tiny saturated artifacts do not get to decide the entire card background.
+    if let Some(bucket) = hues
+        .iter()
+        .filter(|bucket| bucket[0] > 0.0 && bucket[4] >= visible_area * 0.03)
+        .max_by(|a, b| a[0].total_cmp(&b[0]))
+    {
+        return Some(format!(
+            "#{:02x}{:02x}{:02x}",
+            (bucket[1] / bucket[0]).round() as u8,
+            (bucket[2] / bucket[0]).round() as u8,
+            (bucket[3] / bucket[0]).round() as u8
+        ));
+    }
+    let bucket = fallback.iter().max_by_key(|bucket| bucket[0])?;
     (bucket[0] > 0).then(|| {
         format!(
             "#{:02x}{:02x}{:02x}",
@@ -228,6 +278,21 @@ fn dominant_color(image: &RgbaImage) -> Option<String> {
             bucket[3] / bucket[0]
         )
     })
+}
+
+fn refresh_dominant_color(profile: &mut ProfileImage) -> Result<(), String> {
+    if profile.data.is_empty() {
+        profile.dominant_color = None;
+        return Ok(());
+    }
+    // Re-evaluate existing profiles too; read just the first bounded raster frame.
+    let data = STANDARD.decode(&profile.data).map_err(|e| e.to_string())?;
+    let (format, _, _) = inspect(&data)?;
+    let mut reader = ImageReader::with_format(Cursor::new(data), format);
+    reader.limits(limits());
+    let image = reader.decode().map_err(|e| e.to_string())?.to_rgba8();
+    profile.dominant_color = dominant_color(&image);
+    Ok(())
 }
 
 fn valid_color(color: &str) -> bool {
@@ -388,6 +453,8 @@ pub async fn save_profile_image(
             let bytes = encode(&frames, plays)?;
             profile.hash = format!("{:x}", Sha256::digest(&bytes));
             profile.data = STANDARD.encode(bytes);
+        } else {
+            refresh_dominant_color(&mut profile)?;
         }
         // The previous profile stays intact if decoding, compression or writing fails.
         let temp = path.with_extension("tmp");
@@ -450,14 +517,7 @@ pub async fn load_profile_image(app: tauri::AppHandle) -> Result<Option<ProfileI
     }
     if !profile.data.is_empty() {
         validate_profile_image(profile.data.clone(), profile.hash.clone()).await?;
-        if profile.dominant_color.is_none() {
-            // Older profiles have no cached palette; inspect only the first validated frame.
-            let data = STANDARD.decode(&profile.data).map_err(|e| e.to_string())?;
-            let image = image::load_from_memory(&data)
-                .map_err(|e| e.to_string())?
-                .to_rgba8();
-            profile.dominant_color = dominant_color(&image);
-        }
+        refresh_dominant_color(&mut profile)?;
     }
     Ok(Some(profile))
 }
@@ -487,6 +547,56 @@ mod tests {
         let custom: ProfileImage = serde_json::from_str(r##"{"hash":"","data":"","color":"#06b6d4","cardColor":"#112233","dominantColor":"#f0640a"}"##).unwrap();
         assert_eq!(custom.card_color.as_deref(), Some("#112233"));
         assert_eq!(custom.dominant_color.as_deref(), Some("#f0640a"));
+    }
+
+    #[test]
+    fn representative_palette_prioritizes_coherent_accents_over_skin_and_neutrals() {
+        for background in [[220, 170, 140, 255], [255, 255, 255, 255], [8, 8, 8, 255]] {
+            let mut image = RgbaImage::from_pixel(100, 1, image::Rgba(background));
+            for x in 80..100 {
+                // Several nearby blue shades collectively outrank the uniform background.
+                image.put_pixel(x, 0, image::Rgba([20, 100 + (x % 5) as u8 * 10, 220, 255]));
+            }
+            let color = dominant_color(&image).unwrap();
+            let r = u8::from_str_radix(&color[1..3], 16).unwrap();
+            let g = u8::from_str_radix(&color[3..5], 16).unwrap();
+            let b = u8::from_str_radix(&color[5..7], 16).unwrap();
+            assert!(b > g && g > r, "A coherent blue accent should remain blue");
+        }
+        let mut neutral = RgbaImage::from_pixel(100, 1, image::Rgba([150, 150, 150, 255]));
+        neutral.put_pixel(0, 0, image::Rgba([255, 0, 0, 255]));
+        assert_eq!(dominant_color(&neutral).as_deref(), Some("#969696"));
+        let warm = RgbaImage::from_pixel(10, 10, image::Rgba([220, 170, 140, 255]));
+        assert_eq!(dominant_color(&warm).as_deref(), Some("#dcaa8c"));
+    }
+
+    #[test]
+    fn representative_palette_ignores_invisible_corners_and_refreshes_saved_colors() {
+        let mut image = RgbaImage::from_pixel(10, 10, image::Rgba([0, 0, 0, 0]));
+        for y in 0..10 {
+            for x in 0..10 {
+                let nx = (f64::from(x) + 0.5) / 10.0 * 2.0 - 1.0;
+                let ny = (f64::from(y) + 0.5) / 10.0 * 2.0 - 1.0;
+                image.put_pixel(
+                    x,
+                    y,
+                    image::Rgba(if nx * nx + ny * ny > 1.0 {
+                        [255, 0, 0, 255]
+                    } else if (4..6).contains(&x) && (4..6).contains(&y) {
+                        [20, 80, 180, 255]
+                    } else {
+                        [0, 0, 0, 0]
+                    }),
+                );
+            }
+        }
+        assert_eq!(dominant_color(&image).as_deref(), Some("#1450b4"));
+        let encoded = encode(&[(image, image::Delay::from_numer_denom_ms(0, 1))], 0).unwrap();
+        let mut profile: ProfileImage = serde_json::from_str(r##"{"hash":"","data":"","color":"#06b6d4","cardColor":"#112233","dominantColor":"#ffffff"}"##).unwrap();
+        profile.data = STANDARD.encode(encoded);
+        refresh_dominant_color(&mut profile).unwrap();
+        assert_eq!(profile.dominant_color.as_deref(), Some("#1450b4"));
+        assert_eq!(profile.card_color.as_deref(), Some("#112233"));
     }
 
     #[test]

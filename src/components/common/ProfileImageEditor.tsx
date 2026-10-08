@@ -131,7 +131,6 @@ export function ProfileImageEditor({ name, draft, color, remove, onDraft, onColo
           placeholder={t('message.1b92c5e9d144')} maxLength={25} value={name} disabled={disabled || picking}
           onChange={event => onNameChange(event.target.value)} />
         <div className="profile-card-settings">
-          <span className="settings-label">{t('profile.cardBackground')}</span>
           <label className="settings-switch-row" htmlFor="profile-card-automatic">
             <span className="settings-switch-title">{t('profile.cardAutomatic')}</span>
             <div className="modern-switch">

@@ -998,7 +998,7 @@
   "profile.formats": "PNG, JPEG, WebP ou GIF · até 32 MB. Salva em até 512 × 512, preservando a animação.",
   "profile.invalid": "Não foi possível ler a imagem. Verifique formato, tamanho (32 MB), dimensões e duração da animação.",
   "profile.cardBackground": "Fundo do card",
-  "profile.cardAutomatic": "Automático",
+  "profile.cardAutomatic": "Fundo do card automático",
   "profile.cardCustom": "Personalizado",
   "profile.cardColor": "Cor do card",
   "profile.saving": "Salvando…",
