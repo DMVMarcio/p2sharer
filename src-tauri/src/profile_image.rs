@@ -228,36 +228,23 @@ fn profile_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
     Ok(dir.join("profile-image.json"))
 }
 
-fn encode_preview(frames: &[(RgbaImage, image::Delay)], plays: u32) -> Result<Vec<u8>, String> {
+fn prepare_preview(bytes: &[u8]) -> Result<(u32, u32, String), String> {
+    // Validate every frame before WebView rendering, but defer transformations to Save.
+    let (frames, _) = decode(bytes, None)?;
     let (width, height) = frames[0].0.dimensions();
-    // Keep the original aspect ratio, timing and loops; only reduce preview resolution.
-    for limit in [512, 256, 128, 64] {
-        let scale = (f64::from(limit) / f64::from(width.max(height))).min(1.0);
-        let preview: Vec<_> = frames
-            .iter()
-            .map(|(frame, delay)| {
-                (
-                    image::imageops::resize(
-                        frame,
-                        (f64::from(width) * scale).round().max(1.0) as u32,
-                        (f64::from(height) * scale).round().max(1.0) as u32,
-                        image::imageops::FilterType::Triangle,
-                    ),
-                    *delay,
-                )
-            })
-            .collect();
-        match encode(&preview, plays) {
-            Ok(bytes) => return Ok(bytes),
-            Err(error)
-                if error == "Processed animation exceeds the 8 MB safety limit" && limit != 64 =>
-            {
-                continue
-            }
-            Err(error) => return Err(error),
-        }
-    }
-    unreachable!()
+    drop(frames);
+    let mime = match inspect(bytes)?.0 {
+        ImageFormat::Png => "image/png",
+        ImageFormat::Jpeg => "image/jpeg",
+        ImageFormat::Gif => "image/gif",
+        ImageFormat::WebP => "image/webp",
+        _ => return Err("Unsupported image format".into()),
+    };
+    Ok((
+        width,
+        height,
+        format!("data:{mime};base64,{}", STANDARD.encode(bytes)),
+    ))
 }
 
 #[tauri::command]
@@ -278,9 +265,7 @@ pub async fn pick_profile_image(
             .read_to_end(&mut bytes)
             .map_err(|e| e.to_string())?;
         let _guard = IMAGE_WORK.lock().map_err(|e| e.to_string())?;
-        let (frames, plays) = decode(&bytes, None)?;
-        let (width, height) = frames[0].0.dimensions();
-        let preview = encode_preview(&frames, plays)?;
+        let (width, height, preview) = prepare_preview(&bytes)?;
         Ok::<_, String>(Some((bytes, width, height, preview)))
     })
     .await
@@ -298,7 +283,7 @@ pub async fn pick_profile_image(
     drafts.insert(token.clone(), bytes);
     Ok(Some(ProfileImageDraft {
         token,
-        preview: format!("data:image/png;base64,{}", STANDARD.encode(preview)),
+        preview,
         width,
         height,
     }))
@@ -503,7 +488,10 @@ mod tests {
             }
         }
         let (original, loops) = decode(&bytes, None).unwrap();
-        let preview = encode_preview(&original, loops).unwrap();
+        let (width, height, preview) = prepare_preview(&bytes).unwrap();
+        assert_eq!((width, height), original[0].0.dimensions());
+        let preview = STANDARD.decode(preview.split_once(',').unwrap().1).unwrap();
+        assert_eq!(preview, bytes);
         let (preview_frames, preview_loops) = decode(&preview, None).unwrap();
         assert_eq!(preview_loops, loops);
         assert_eq!(preview_frames.len(), original.len());
@@ -557,7 +545,10 @@ mod tests {
         bytes.extend_from_slice(&(contents.len() as u32).to_le_bytes());
         bytes.extend(contents);
         let (original, loops) = decode(&bytes, None).unwrap();
-        let preview = encode_preview(&original, loops).unwrap();
+        let (width, height, preview) = prepare_preview(&bytes).unwrap();
+        assert_eq!((width, height), original[0].0.dimensions());
+        let preview = STANDARD.decode(preview.split_once(',').unwrap().1).unwrap();
+        assert_eq!(preview, bytes);
         let (preview_frames, preview_loops) = decode(&preview, None).unwrap();
         assert_eq!(preview_loops, loops);
         assert_eq!(preview_frames.len(), original.len());

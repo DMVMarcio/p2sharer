@@ -103,7 +103,7 @@ export function ProfileImageEditor({ name, draft, color, remove, onDraft, onColo
           <span className="profile-avatar profile-editor-preview" style={{ backgroundColor: color,
             color: contrastingTextColor(color) }}>
             {draft ? <CropPreview draft={draft} crop={draft.crop} /> : url ? <img src={url} alt="" draggable={false} /> : name.trim().charAt(0).toUpperCase() || '?'}
-            <span className="profile-upload-overlay" aria-hidden="true"><Upload size={24} /></span>
+            <span className="profile-upload-overlay" aria-hidden="true">{picking ? <span className="loading-spinner" /> : <Upload size={24} />}</span>
           </span>
         </TooltipButton>
         {hasPhoto && <TooltipButton tooltip={t('profile.remove')} className="btn btn-danger profile-remove-button"
@@ -113,6 +113,7 @@ export function ProfileImageEditor({ name, draft, color, remove, onDraft, onColo
           }}><X size={14} aria-hidden="true" /></TooltipButton>}
       </div>
       {!hasPhoto && <ColorPicker label={t('profile.color')} value={color} onChange={onColor} />}
+      {picking && <span className="profile-loading-status" role="status">{t('profile.loading')}</span>}
     </div>
     {selection && <CropDialog draft={selection} onClose={() => {
       if (selection.token !== draft?.token) void invoke('discard_profile_image', { token: selection.token }).catch(() => {});

@@ -931,8 +931,9 @@ export const SettingsModal: React.FC = () => {
         <div className="modal-footer">
           <button type="button" className="btn btn-secondary" id="btn-cancel-settings" disabled={saving || profileBusy} onClick={closeModal}>
             {t("message.0f2bd88ef0ac")}</button>
-          <button type="button" className="btn btn-primary" id="btn-save-settings" disabled={updateBusy || saving || profileBusy} onClick={() => void handleSave()}>
-            {t("message.f28b2e26db4d")}</button>
+          <button type="button" className="btn btn-primary" id="btn-save-settings" aria-busy={saving} disabled={updateBusy || saving || profileBusy} onClick={() => void handleSave()}>
+            {saving && <span className="loading-spinner" aria-hidden="true" />}
+            {t(saving ? 'profile.saving' : 'message.f28b2e26db4d')}</button>
         </div>
       </div>
     </div>

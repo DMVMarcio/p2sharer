@@ -11,9 +11,11 @@ hex input; conversion functions live in `core/hsv_color.ts`.
 
 `src-tauri/src/profile_image.rs` uses the native file picker and keeps original
 image bytes behind temporary random tokens. The frontend receives a bounded,
-PNG/APNG preview preserving animation, not an arbitrary file path. Native decoders
-accept PNG/APNG,
-JPEG, GIF and WebP by their contents, apply JPEG orientation, validate all frames,
+data URL containing the original validated raster bytes, preserving animation and
+using the detected MIME type rather than the file extension or an arbitrary path.
+Selection validates all frames without resizing or re-encoding; transformations
+run only on Save. Native decoders accept PNG/APNG, JPEG, GIF and WebP by their
+contents, apply JPEG orientation, validate all frames,
 crop to a square, cap output at 512 pixels without upscaling, and encode PNG/APNG
 without imported metadata. Animation frames, transparency, loop count and bounded
 frame delays survive this normalization. Original files are never overwritten.

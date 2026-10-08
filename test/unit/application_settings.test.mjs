@@ -200,19 +200,29 @@ test('profile crop survives tab changes, applies only on Save and removal remain
   await act(async () => { root.render(null); setLanguage('pt-BR'); });
   profileImages.local = { hash: '', data: '', color: '#06b6d4' };
   const saves = [];
+  let finishPick, finishSave;
   globalThis.profileBackend = async (command, args) => {
-    if (command === 'pick_profile_image') return { token: 'draft-token', width: 400, height: 200,
-      preview: 'data:image/png;base64,cHJldmlldw==' };
+    if (command === 'pick_profile_image') return new Promise(resolve => { finishPick = resolve; });
     if (command === 'save_profile_image') {
       saves.push(args);
-      return { hash: args.remove ? '' : 'a'.repeat(64), data: args.remove ? '' : 'cGhvdG8=', color: args.color };
+      const result = { hash: args.remove ? '' : 'a'.repeat(64), data: args.remove ? '' : 'cGhvdG8=', color: args.color };
+      if (saves.length === 1) return new Promise(resolve => { finishSave = () => resolve(result); });
+      return result;
     }
   };
   try {
     await act(async () => root.render(React.createElement(SettingsModal)));
     const choose = [...document.querySelectorAll('#settings-pane-profile button')].find(button => button.getAttribute('aria-label') === 'Escolher imagem');
     await act(async () => choose.click());
+    assert.equal(choose.getAttribute('aria-busy'), 'true');
+    assert.equal(choose.disabled, true);
+    assert.equal(document.querySelector('#settings-pane-profile [role="status"]').textContent, 'Lendo imagem…');
+    assert.equal(document.getElementById('btn-save-settings').disabled, true);
     assert.equal(saves.length, 0);
+    await act(async () => finishPick({ token: 'draft-token', width: 400, height: 200,
+      preview: 'data:image/gif;base64,cHJldmlldw==' }));
+    assert.equal(choose.getAttribute('aria-busy'), 'false');
+    assert.equal(document.querySelector('.profile-crop-stage img').src, 'data:image/gif;base64,cHJldmlldw==');
     const stage = document.querySelector('.profile-crop-stage');
     const wheel = new window.WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -150 });
     await act(async () => stage.dispatchEvent(wheel));
@@ -222,9 +232,14 @@ test('profile crop survives tab changes, applies only on Save and removal remain
     assert.equal(pan.defaultPrevented, true);
     await act(async () => document.querySelector('.profile-crop-dialog .btn-primary').click());
     await act(async () => new Promise(resolve => setTimeout(resolve, 260)));
+    assert.equal(document.querySelector('.profile-editor-preview img').src, 'data:image/gif;base64,cHJldmlldw==');
     await act(async () => [...document.querySelectorAll('.settings-nav-sidebar button')].find(button => button.textContent.includes('Aplicação')).click());
     assert.equal(saves.length, 0);
     await act(async () => document.getElementById('btn-save-settings').click());
+    assert.equal(document.getElementById('btn-save-settings').getAttribute('aria-busy'), 'true');
+    assert.equal(document.getElementById('btn-save-settings').textContent, 'Salvando…');
+    assert.equal(document.getElementById('btn-save-settings').disabled, true);
+    await act(async () => finishSave());
     assert.equal(saves.length, 1);
     assert.equal(saves[0].token, 'draft-token');
     assert.ok(saves[0].crop.size > 0 && saves[0].crop.size < 1);

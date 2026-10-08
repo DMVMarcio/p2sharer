@@ -997,6 +997,7 @@
   "profile.cropHint": "Arraste para posicionar. O círculo é uma referência; a imagem salva permanece quadrada.",
   "profile.formats": "PNG, JPEG, WebP ou GIF · até 32 MB. Salva em até 512 × 512, preservando a animação.",
   "profile.invalid": "Não foi possível ler a imagem. Verifique formato, tamanho (32 MB), dimensões e duração da animação.",
+  "profile.saving": "Salvando…",
   "profile.saveFailed": "Não foi possível salvar a foto. A foto anterior foi mantida. Animações muito grandes podem exceder os limites de segurança.",
   "profile.zoom": "Zoom",
   "profile.horizontal": "Posição horizontal",
