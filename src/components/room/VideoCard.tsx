@@ -51,6 +51,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   const [liveFps, setLiveFps] = useState<number>(() => (slot.isLocal ? currentFps : 60));
   const [liveBitrate, setLiveBitrate] = useState<number>(0);
   const [remoteResolution, setRemoteResolution] = useState<string>('1080p');
+  const [livePing, setLivePing] = useState<number | null>(null);
 
   const [volume, setVolume] = useState<number>(100);
   const [isMuted, setIsMuted] = useState<boolean>(false);
@@ -206,6 +207,9 @@ export const VideoCard: React.FC<VideoCardProps> = ({
       if (stats?.height) {
         setRemoteResolution(`${stats.height}p`);
       }
+      if (stats?.pingMs !== null && stats?.pingMs !== undefined) {
+        setLivePing(stats.pingMs);
+      }
     };
 
     fetchStats();
@@ -291,10 +295,12 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     openContextMenu(event, actions);
   };
 
-  const pingVal = !slot.isLocal ? getPeerPing(slot.peerId) : 0;
-  const pingNum = pingVal ?? 15;
-  const pingStr = pingVal !== null && pingVal !== undefined ? `${pingVal} ms` : '15 ms';
-  const pingClass = pingNum < 80 ? 'ping-good' : pingNum < 180 ? 'ping-medium' : 'ping-poor';
+  const pingVal = !slot.isLocal ? (livePing ?? getPeerPing(slot.peerId)) : 0;
+  const pingNum = pingVal;
+  const pingStr = pingVal !== null && pingVal !== undefined ? `${pingVal} ms` : '-- ms';
+  const pingClass = pingNum !== null && pingNum !== undefined
+    ? (pingNum < 80 ? 'ping-good' : pingNum < 180 ? 'ping-medium' : 'ping-poor')
+    : 'ping-medium';
 
   const signalingStatus = roomService.roomManager?.getSignalingStatus?.();
   const transportTag = signalingStatus?.activeTransport

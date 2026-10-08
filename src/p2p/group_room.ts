@@ -2243,7 +2243,7 @@ export class GroupRoomManager {
   public getPeerPing(peerId: string): number | null {
     peerId = streamOwner(peerId);
     if (peerId === 'local' || peerId === selfId) return 0;
-    return this.peerTracker.getPing(peerId) ?? null;
+    return this.peerTracker.getPing(peerId) ?? this.peerStatsCache.get(peerId)?.stats.pingMs ?? null;
   }
 
   public async getLocalBroadcasterStats(): Promise<PeerStatsInfo> {
@@ -2468,7 +2468,10 @@ export class GroupRoomManager {
           (await pc.getStats()).forEach((report) => routeReports.push(report));
           const route = selectedIceRoute(routeReports);
           result.connectionType = route.connectionType;
-          if (route.pingMs !== null) result.pingMs = route.pingMs;
+          if (route.pingMs !== null) {
+            result.pingMs = route.pingMs;
+            this.peerTracker.setPing(slot.ownerPeerId || key, route.pingMs);
+          }
         }
       }
       if (slot.isLocal && slot.mediaId) {
