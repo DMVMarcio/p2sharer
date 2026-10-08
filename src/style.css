@@ -1454,7 +1454,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   justify-content: center;
   cursor: pointer;
   aspect-ratio: 16 / 9;
-  background: radial-gradient(circle at center, var(--card-color, var(--user-color, #1f2937)) 0%, #0d0d11 90%);
+  background: radial-gradient(circle at center, var(--card-color, var(--user-color, #1f2937)) 0%, var(--card-color, var(--user-color, #1f2937)) 60%, #0d0d11 100%);
   transition: all var(--transition-fast);
 }
 
@@ -1497,8 +1497,8 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .participant-avatar-label {
   font-size: 13px;
   font-weight: 600;
-  color: #ffffff;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+  color: var(--card-text, #ffffff);
+  text-shadow: none;
 }
 
 .badge-you {
@@ -1516,7 +1516,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 
 .participant-status-text {
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.65);
+  color: var(--card-text, #ffffff);
   margin-top: 2px;
 }
 
@@ -5506,5 +5506,12 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 
 .profile-loading-status { color: var(--text-secondary); font-size: 12px; }
 
-.participant-card:not(.in-tray) .profile-avatar.participant-avatar-badge { width: clamp(52px, 32cqmin, 180px); height: clamp(52px, 32cqmin, 180px); font-size: clamp(18px, 10cqmin, 56px); }
+.participant-card:not(.in-tray) .profile-avatar.participant-avatar-badge { width: clamp(52px, 28.8cqmin, 162px); height: clamp(52px, 28.8cqmin, 162px); font-size: clamp(18px, 9cqmin, 50.4px); }
 .profile-card-settings { margin-top: 16px; }
+
+.participant-card .badge-you { color: var(--card-text, #ffffff); background-color: color-mix(in srgb, var(--card-text, #ffffff) 12%, transparent); border-color: color-mix(in srgb, var(--card-text, #ffffff) 30%, transparent); }
+.profile-editor-identity { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 16px; align-items: start; }
+.profile-editor-avatar-column { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.profile-editor-details { min-width: 0; }
+.profile-editor-details .text-input { width: 100%; }
+@media (max-width: 480px) { .profile-editor-identity { grid-template-columns: minmax(0, 1fr); } }

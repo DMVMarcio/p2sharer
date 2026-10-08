@@ -7,7 +7,9 @@ an alpha-weighted, quantized palette from the first cropped frame. Automatic mod
 falls back to the initial color without a visible image. Old profiles are upgraded
 on load; custom and dominant colors are validated hex values. Resolved card color
 travels as optional offer metadata, independent of hash-based image transfers.
-`ProfileAvatar` renders the
+`ColorPalette` shares preset swatches and the HSV picker between appearance and
+profile card colors. `ParticipantCard` derives readable text from its background
+through the shared contrast helper. `ProfileAvatar` renders the
 same circular image/initial and contrast-aware fallback color across participants,
 the header, watchers and activity participants. Profile settings retain image,
 crop, removal and fallback-color drafts until Save. The crop stage supports

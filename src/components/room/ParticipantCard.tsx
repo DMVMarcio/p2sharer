@@ -1,3 +1,4 @@
+import { contrastingTextColor } from '../../core/accent_color';
 import { profileImages } from '../../core/profile_image';
 import { ProfileAvatar } from '../common/ProfileAvatar';
 import { t } from '../../i18n';
@@ -34,6 +35,7 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
   const { openModal } = useModal();
   const subscribedStreams = useStore((s) => s.subscribedStreams);
 
+  const background = profileImages.background(slot.ownerPeerId ?? slot.peerId, slot.isLocal, slot.color);
   const isSubscribed = subscribedStreams.has(slot.peerId);
   const watchers = slot.watchers || [];
   const watchersCount = watchers.length;
@@ -51,7 +53,7 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
     <div
       className={`participant-card ${isFeatured ? 'featured' : ''} ${inTray ? 'in-tray' : ''} ${isSelectedFeatured ? 'selected-featured' : ''}`}
       data-peer-id={slot.peerId}
-      style={{ '--user-color': slot.color, '--card-color': profileImages.background(slot.ownerPeerId ?? slot.peerId, slot.isLocal, slot.color) } as React.CSSProperties}
+      style={{ '--user-color': slot.color, '--card-color': background, '--card-text': contrastingTextColor(background) } as React.CSSProperties}
       onClick={handleCardClick}
       tabIndex={0}
       onContextMenu={(event) => {
@@ -117,7 +119,7 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
       )}
 
       {!inTray && !slot.isLocal && slot.isStreaming && isSubscribed && !slot.stream && (
-        <div className="participant-status-text" style={{ color: 'var(--accent-color)' }}>
+        <div className="participant-status-text">
           {t("message.3bc3a2cd970b")}</div>
       )}
 

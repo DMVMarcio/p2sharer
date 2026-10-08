@@ -10,8 +10,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useModal } from '../../hooks/useModal';
 import { useAppTheme, ACCENT_COLORS } from '../../hooks/useAppTheme';
-import { ColorPicker } from '../common/ColorPicker';
-import { TooltipButton } from '../common/TooltipButton';
+import { ColorPalette } from '../common/ColorPalette';
 import { roomService } from '../../services/room_service';
 import { INITIAL_TRANSMISSION_DEFAULTS, stateStore } from '../../core/state_store';
 import { soundEffects, SOUND_EVENTS, type SoundEvent } from '../../ui/sound_effects';
@@ -371,20 +370,7 @@ export const SettingsModal: React.FC = () => {
 
                 <ProfileImageEditor name={nick} draft={profileDraft} color={profileColor} remove={profileRemove}
                   onDraft={setProfileDraft} onColor={setProfileColor} onRemove={setProfileRemove}
-                  onBusy={setProfileBusy} disabled={saving} cardColor={profileCardColor} onCardColor={setProfileCardColor} />
-                <div className="settings-row">
-                  <label className="settings-label" htmlFor="settings-input-username">
-                    {t("message.295f254de3a9")}</label>
-                  <input autoComplete="off"
-                    type="text"
-                    id="settings-input-username"
-                    className="text-input"
-                    placeholder={t("message.1b92c5e9d144")}
-                    maxLength={25}
-                    value={nick}
-                    onChange={(e) => setNick(e.target.value)}
-                  />
-                </div>
+                  onBusy={setProfileBusy} disabled={saving} onNameChange={setNick} cardColor={profileCardColor} onCardColor={setProfileCardColor} />
               </div>
             )}
 
@@ -488,22 +474,8 @@ export const SettingsModal: React.FC = () => {
 
                 <div className="settings-row" style={{ marginTop: '10px' }}>
                   <label className="settings-label">{t("message.d0bc3fef4a6e")}</label>
-                  <div className="accent-colors-palette" id="accent-colors-palette">
-                    {ACCENT_COLORS.map((item) => (
-                      <TooltipButton
-                        key={item.id}
-                        tooltip={item.label}
-                        type="button"
-                        className={`accent-swatch ${accentColor === item.id ? 'active' : ''}`}
-                        style={{ '--swatch-color': item.color } as React.CSSProperties}
-                        aria-label={item.label}
-                        onClick={() => setAccentColor(item.id)}
-                      />
-                    ))}
-                    <ColorPicker label={t('color.custom')} active={accentColor.startsWith('#')}
-                      value={accentColor.startsWith('#') ? accentColor : ACCENT_COLORS.find(item => item.id === accentColor)?.color || '#06b6d4'}
-                      onChange={setAccentColor} />
-                  </div>
+                  <ColorPalette id="accent-colors-palette" label={t("message.d0bc3fef4a6e")} value={accentColor}
+                    onChange={setAccentColor} presets={ACCENT_COLORS.map(item => ({ value: item.id, color: item.color, label: item.label }))} />
                 </div>
               </div>
             )}

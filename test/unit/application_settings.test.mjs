@@ -233,10 +233,13 @@ test('profile crop survives tab changes, applies only on Save and removal remain
     await act(async () => document.querySelector('.profile-crop-dialog .btn-primary').click());
     await act(async () => new Promise(resolve => setTimeout(resolve, 260)));
     assert.equal(document.querySelector('.profile-editor-preview img').src, 'data:image/gif;base64,cHJldmlldw==');
-    const background = document.querySelector('.profile-card-settings [role="combobox"]');
-    assert.equal(background.textContent, 'Automático');
+    const background = document.getElementById('profile-card-automatic');
+    assert.equal(background.checked, true);
+    assert.equal(document.querySelector('.profile-card-settings .accent-colors-palette'), null);
     await act(async () => background.click());
-    await act(async () => [...document.querySelectorAll('[role="option"]')].find(option => option.textContent === 'Personalizado').click());
+    const preset = document.querySelector('.profile-card-settings .accent-swatch');
+    await act(async () => preset.click());
+    assert.equal(preset.getAttribute('aria-pressed'), 'true');
     await act(async () => document.querySelector('.profile-card-settings .custom-color-picker').click());
     await act(async () => {
       const hex = document.querySelector('.color-picker-dialog .text-input');

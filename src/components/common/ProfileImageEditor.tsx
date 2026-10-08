@@ -5,7 +5,8 @@ import { t } from '../../i18n';
 import { profileImages, type ProfileDraft, type ImageCrop } from '../../core/profile_image';
 import { contrastingTextColor } from '../../core/accent_color';
 import { ModalDialog } from './ModalDialog';
-import { Select } from './Select';
+import { ACCENT_COLORS } from '../../hooks/useAppTheme';
+import { ColorPalette } from './ColorPalette';
 import { ColorPicker } from './ColorPicker';
 import { TooltipButton } from './TooltipButton';
 import { showToast } from '../../hooks/useToast';
@@ -81,7 +82,8 @@ function CropDialog({ draft, onApply, onClose }: { draft: ProfileDraft; onApply:
   </ModalDialog>;
 }
 
-export function ProfileImageEditor({ name, draft, color, remove, onDraft, onColor, onRemove, onBusy, disabled, cardColor, onCardColor }: {
+export function ProfileImageEditor({ name, draft, color, remove, onDraft, onColor, onRemove, onBusy, disabled, cardColor, onCardColor, onNameChange }: {
+  onNameChange: (name: string) => void;
   cardColor: string | null; onCardColor: (color: string | null) => void;
   name: string; draft: ProfileDraft | null; color: string; remove: boolean; onDraft: (draft: ProfileDraft | null) => void;
   onColor: (color: string) => void; onRemove: (remove: boolean) => void; onBusy: (busy: boolean) => void; disabled: boolean;
@@ -103,32 +105,44 @@ export function ProfileImageEditor({ name, draft, color, remove, onDraft, onColo
   };
   return <div className="settings-row">
     <span className="settings-label">{t('profile.photo')}</span>
-    <div className="profile-editor-row">
-      <div className="profile-editor-photo">
-        <TooltipButton tooltip={t(picking ? 'profile.loading' : 'profile.choose')}
-          className="btn profile-upload-button" disabled={disabled || picking} aria-busy={picking} onClick={() => void choose()}>
-          <span className="profile-avatar profile-editor-preview" style={{ backgroundColor: color,
-            color: contrastingTextColor(color) }}>
-            {draft ? <CropPreview draft={draft} crop={draft.crop} /> : url ? <img src={url} alt="" draggable={false} /> : name.trim().charAt(0).toUpperCase() || '?'}
-            <span className="profile-upload-overlay" aria-hidden="true">{picking ? <span className="loading-spinner" /> : <Upload size={24} />}</span>
-          </span>
-        </TooltipButton>
-        {hasPhoto && <TooltipButton tooltip={t('profile.remove')} className="btn btn-danger profile-remove-button"
-          disabled={disabled || picking} onClick={() => {
-            if (draft) void invoke('discard_profile_image', { token: draft.token }).catch(() => {});
-            onDraft(null); onRemove(true);
-          }}><X size={14} aria-hidden="true" /></TooltipButton>}
+    <div className="profile-editor-identity">
+      <div className="profile-editor-avatar-column">
+        <div className="profile-editor-photo">
+          <TooltipButton tooltip={t(picking ? 'profile.loading' : 'profile.choose')}
+            className="btn profile-upload-button" disabled={disabled || picking} aria-busy={picking} onClick={() => void choose()}>
+            <span className="profile-avatar profile-editor-preview" style={{ backgroundColor: color,
+              color: contrastingTextColor(color) }}>
+              {draft ? <CropPreview draft={draft} crop={draft.crop} /> : url ? <img src={url} alt="" draggable={false} /> : name.trim().charAt(0).toUpperCase() || '?'}
+              <span className="profile-upload-overlay" aria-hidden="true">{picking ? <span className="loading-spinner" /> : <Upload size={24} />}</span>
+            </span>
+          </TooltipButton>
+          {hasPhoto && <TooltipButton tooltip={t('profile.remove')} className="btn btn-danger profile-remove-button"
+            disabled={disabled || picking} onClick={() => {
+              if (draft) void invoke('discard_profile_image', { token: draft.token }).catch(() => {});
+              onDraft(null); onRemove(true);
+            }}><X size={14} aria-hidden="true" /></TooltipButton>}
+        </div>
+        {!hasPhoto && <ColorPicker label={t('profile.color')} value={color} onChange={onColor} disabled={disabled || picking} />}
+        {picking && <span className="profile-loading-status" role="status">{t('profile.loading')}</span>}
       </div>
-      {!hasPhoto && <ColorPicker label={t('profile.color')} value={color} onChange={onColor} disabled={disabled || picking} />}
-      {picking && <span className="profile-loading-status" role="status">{t('profile.loading')}</span>}
-    </div>
-    <div className="profile-card-settings">
-      <span className="settings-label">{t('profile.cardBackground')}</span>
-      <div className="profile-editor-row">
-        <Select aria-label={t('profile.cardBackground')} value={cardColor === null ? 'auto' : 'custom'} disabled={disabled || picking}
-          options={[{ value: 'auto', label: t('profile.cardAutomatic') }, { value: 'custom', label: t('profile.cardCustom') }]}
-          onValueChange={value => onCardColor(value === 'auto' ? null : profileImages.local.dominantColor ?? color)} />
-        {cardColor !== null && <ColorPicker label={t('profile.cardColor')} value={cardColor} onChange={onCardColor} disabled={disabled || picking} />}
+      <div className="profile-editor-details">
+        <label className="settings-label" htmlFor="settings-input-username">{t('message.295f254de3a9')}</label>
+        <input autoComplete="off" type="text" id="settings-input-username" className="text-input"
+          placeholder={t('message.1b92c5e9d144')} maxLength={25} value={name} disabled={disabled || picking}
+          onChange={event => onNameChange(event.target.value)} />
+        <div className="profile-card-settings">
+          <span className="settings-label">{t('profile.cardBackground')}</span>
+          <label className="settings-switch-row" htmlFor="profile-card-automatic">
+            <span className="settings-switch-title">{t('profile.cardAutomatic')}</span>
+            <div className="modern-switch">
+              <input autoComplete="off" type="checkbox" id="profile-card-automatic" checked={cardColor === null}
+                disabled={disabled || picking} onChange={event => onCardColor(event.target.checked ? null : profileImages.local.dominantColor ?? color)} />
+              <span className="switch-slider" />
+            </div>
+          </label>
+          {cardColor !== null && <ColorPalette label={t('profile.cardColor')} value={cardColor} onChange={onCardColor}
+            disabled={disabled || picking} presets={ACCENT_COLORS.map(item => ({ value: item.color, color: item.color, label: item.label }))} />}
+        </div>
       </div>
     </div>
     {selection && <CropDialog draft={selection} onClose={() => {
