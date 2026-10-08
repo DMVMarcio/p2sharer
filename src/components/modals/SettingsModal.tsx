@@ -1,3 +1,5 @@
+import { profileImages, type ProfileDraft } from '../../core/profile_image';
+import { ProfileImageEditor } from '../common/ProfileImageEditor';
 import { getLanguage, setLanguage, t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { getEncoderPreference, normalizeEncoderPreference, saveEncoderPreference, type EncoderPreference, type NativeEncoderSupport } from '../../core/encoder_preferences';
@@ -46,6 +48,13 @@ export const SettingsModal: React.FC = () => {
   >('profile');
 
   // Form states initialized once upon mounting
+  useEffect(() => () => { void invoke('discard_profile_image').catch(() => {}); }, []);
+  const [profileDraft, setProfileDraft] = useState<ProfileDraft | null>(null);
+  const [profileColor, setProfileColor] = useState(profileImages.local.color);
+  const [profileRemove, setProfileRemove] = useState(false);
+  const [profileBusy, setProfileBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => { void profileImages.ready.then(() => setProfileColor(profileImages.local.color)); }, []);
   const [nick, setNick] = useState(() => stateStore.username);
   const [language, setLanguageDraft] = useState(getLanguage);
   const [autoUpdates, setAutoUpdates] = useState(automaticUpdateChecks);
@@ -119,7 +128,8 @@ export const SettingsModal: React.FC = () => {
     return () => { mounted = false; };
   }, []);
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (saving || profileBusy) return;
     const turnUrls = parseTurnUrls(turnUrl);
     if (turnEnabled && (turnUrls.length === 0 || turnUrls.some((url) => !isValidTurnUrl(url)))) {
       setActiveTab('network');
@@ -137,6 +147,9 @@ export const SettingsModal: React.FC = () => {
       showToast(rendezvousError);
       return;
     }
+    setSaving(true);
+    try { await profileImages.save(profileDraft, profileColor, profileRemove); }
+    catch { setSaving(false); showToast(t('profile.saveFailed')); return; }
     // Save username
     if (nick.trim()) {
       stateStore.set((s) => {
@@ -144,6 +157,8 @@ export const SettingsModal: React.FC = () => {
       });
       localStorage.setItem('p2sharer_username', nick.trim());
     }
+
+    roomService.roomManager?.refreshProfile();
 
     // Save SFX
     saveEmojiPack(emojiPack);
@@ -176,6 +191,7 @@ export const SettingsModal: React.FC = () => {
     localStorage.setItem('p2sharer_turn_force_relay', turnForceRelay ? 'true' : 'false');
     saveRendezvousPreferences(rendezvousPreferences);
 
+    setSaving(false);
     setLanguage(language);
     closeModal();
     showToast(t("message.3f84cec002ac"));
@@ -220,7 +236,7 @@ export const SettingsModal: React.FC = () => {
             <h2>{t("message.76b0fb6ad189")}</h2>
             <p className="modal-subtitle">{t("message.1c345b3f945c")}</p>
           </div>
-          <button className="btn-close" id="btn-close-settings" onClick={closeModal}>
+          <button className="btn-close" id="btn-close-settings" disabled={saving || profileBusy} onClick={closeModal}>
             &times;
           </button>
         </div>
@@ -230,6 +246,7 @@ export const SettingsModal: React.FC = () => {
           <nav className="settings-nav-sidebar">
             <button
               type="button"
+              disabled={profileBusy || saving}
               className={`settings-nav-item ${activeTab === 'profile' ? 'active' : ''}`}
               onClick={() => setActiveTab('profile')}
             >
@@ -242,6 +259,7 @@ export const SettingsModal: React.FC = () => {
 
             <button
               type="button"
+              disabled={profileBusy || saving}
               className={`settings-nav-item ${activeTab === 'conversations' ? 'active' : ''}`}
               onClick={() => setActiveTab('conversations')}
             >
@@ -253,6 +271,7 @@ export const SettingsModal: React.FC = () => {
 
             <button
               type="button"
+              disabled={profileBusy || saving}
               className={`settings-nav-item ${activeTab === 'appearance' ? 'active' : ''}`}
               onClick={() => setActiveTab('appearance')}
             >
@@ -272,6 +291,7 @@ export const SettingsModal: React.FC = () => {
 
             <button
               type="button"
+              disabled={profileBusy || saving}
               className={`settings-nav-item ${activeTab === 'audio' ? 'active' : ''}`}
               onClick={() => setActiveTab('audio')}
             >
@@ -285,6 +305,7 @@ export const SettingsModal: React.FC = () => {
 
             <button
               type="button"
+              disabled={profileBusy || saving}
               className={`settings-nav-item ${activeTab === 'stream' ? 'active' : ''}`}
               onClick={() => setActiveTab('stream')}
             >
@@ -298,6 +319,7 @@ export const SettingsModal: React.FC = () => {
 
             <button
               type="button"
+              disabled={profileBusy || saving}
               className={`settings-nav-item ${activeTab === 'network' ? 'active' : ''}`}
               onClick={() => setActiveTab('network')}
             >
@@ -311,6 +333,7 @@ export const SettingsModal: React.FC = () => {
 
             <button
               type="button"
+              disabled={profileBusy || saving}
               className={`settings-nav-item ${activeTab === 'diagnostics' ? 'active' : ''}`}
               onClick={() => setActiveTab('diagnostics')}
             >
@@ -324,6 +347,7 @@ export const SettingsModal: React.FC = () => {
             </button>
 
             <button type="button"
+              disabled={profileBusy || saving}
               className={`settings-nav-item ${activeTab === 'application' ? 'active' : ''}`}
               onClick={() => setActiveTab('application')}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -344,6 +368,9 @@ export const SettingsModal: React.FC = () => {
                   <p className="settings-pane-desc">{t("message.ea3a61eb13e1")}</p>
                 </div>
 
+                <ProfileImageEditor name={nick} draft={profileDraft} color={profileColor} remove={profileRemove}
+                  onDraft={setProfileDraft} onColor={setProfileColor} onRemove={setProfileRemove}
+                  onBusy={setProfileBusy} disabled={saving} />
                 <div className="settings-row">
                   <label className="settings-label" htmlFor="settings-input-username">
                     {t("message.295f254de3a9")}</label>
@@ -904,9 +931,9 @@ export const SettingsModal: React.FC = () => {
         </div>
 
         <div className="modal-footer">
-          <button type="button" className="btn btn-secondary" id="btn-cancel-settings" onClick={closeModal}>
+          <button type="button" className="btn btn-secondary" id="btn-cancel-settings" disabled={saving || profileBusy} onClick={closeModal}>
             {t("message.0f2bd88ef0ac")}</button>
-          <button type="button" className="btn btn-primary" id="btn-save-settings" disabled={updateBusy} onClick={handleSave}>
+          <button type="button" className="btn btn-primary" id="btn-save-settings" disabled={updateBusy || saving || profileBusy} onClick={() => void handleSave()}>
             {t("message.f28b2e26db4d")}</button>
         </div>
       </div>

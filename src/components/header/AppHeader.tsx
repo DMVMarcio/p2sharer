@@ -1,3 +1,4 @@
+import { ProfileAvatar } from '../common/ProfileAvatar';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useEffect, useState } from 'react';
@@ -124,7 +125,7 @@ export const AppHeader: React.FC = () => {
           onClick={() => openModal('settings')}
           aria-label={t("message.ee91711e6b22")}
         >
-          <span className="user-status-dot"></span>
+          <ProfileAvatar name={username} className="header-profile-avatar" />
           <span id="current-username-display">{username || t("message.f53bbaa05fae")}</span>
         </button>
 

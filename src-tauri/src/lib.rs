@@ -1,6 +1,7 @@
 #[cfg(all(test, windows))]
 mod test_support;
 
+pub mod profile_image;
 pub mod audio_loopback;
 pub mod logger;
 mod media_diagnostics;
@@ -91,6 +92,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .manage(ChatFileState::default())
+        .manage(profile_image::ProfileImageState::default())
         .manage(lan_signaling::LanSignalingState::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -114,6 +116,11 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            profile_image::pick_profile_image,
+            profile_image::discard_profile_image,
+            profile_image::save_profile_image,
+            profile_image::load_profile_image,
+            profile_image::validate_profile_image,
             media_diagnostics::media_diagnostics_enabled,
             media_diagnostics::write_media_diagnostics,
             lan_signaling::list_lan_interfaces,

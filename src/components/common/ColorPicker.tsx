@@ -3,22 +3,22 @@ import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { ModalDialog } from './ModalDialog';
 import { TooltipButton } from './TooltipButton';
+import { hexToHsv, hsvToHex, type Hsv } from '../../core/hsv_color';
 
 function ColorPickerDialog({ value, label, onApply, onClose }: {
   value: string; label: string; onApply: (color: string) => void; onClose: () => void;
 }) {
   useLocale();
   const id = useId();
-  const [color, setColor] = useState(value);
+  const [hsv, setHsv] = useState(() => hexToHsv(value));
+  const color = hsvToHex(hsv);
   const [hex, setHex] = useState(value);
   const valid = /^#[0-9a-f]{6}$/i.test(hex);
-  const channels = [1, 3, 5].map(offset => parseInt(color.slice(offset, offset + 2), 16));
-  const labels = [t('color.red'), t('color.green'), t('color.blue')];
-  const changeChannel = (index: number, channel: number) => {
-    const next = channels.map((value, position) => position === index ? channel : value);
-    const nextColor = `#${next.map(value => value.toString(16).padStart(2, '0')).join('')}`;
-    setColor(nextColor);
-    setHex(nextColor);
+  const change = (next: Hsv) => { setHsv(next); setHex(hsvToHex(next)); };
+  const move = (event: React.PointerEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    change({ ...hsv, s: Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)),
+      v: 1 - Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height)) });
   };
   return <ModalDialog title={label} className="color-picker-dialog" onClose={onClose}
     footer={close => <>
@@ -27,17 +27,23 @@ function ColorPickerDialog({ value, label, onApply, onClose }: {
         onClick={() => { onApply(hex.toLowerCase()); close(); }}>{t('message.3a04898a6b8b')}</button>
     </>}>
     <div className="color-picker-preview" style={{ backgroundColor: color }} aria-label={t('color.preview')} />
+    <div className="color-picker-sv" style={{ backgroundColor: hsvToHex({ h: hsv.h, s: 1, v: 1 }) }}
+      role="group" aria-label={t('color.saturationValue')}
+      onPointerDown={event => { event.currentTarget.setPointerCapture(event.pointerId); move(event); }}
+      onPointerMove={event => { if (event.currentTarget.hasPointerCapture(event.pointerId)) move(event); }}>
+      <span className="color-picker-sv-cursor" style={{ left: `${hsv.s * 100}%`, top: `${(1 - hsv.v) * 100}%` }} />
+    </div>
     <div className="color-picker-channels">
-      {channels.map((channel, index) => {
-        const start = channels.map((value, position) => position === index ? 0 : value);
-        const end = channels.map((value, position) => position === index ? 255 : value);
-        return <label className="color-picker-channel" key={index}>
-          <span>{labels[index]}</span>
-          <input autoComplete="off" type="range" min={0} max={255} step={1} value={channel}
-            aria-label={labels[index]} className="settings-slider-input"
-            style={{ background: `linear-gradient(to right, rgb(${start.join(',')}), rgb(${end.join(',')}))` }}
-            onChange={event => changeChannel(index, Number(event.target.value))} />
-          <output>{channel}</output>
+      {(['h', 's', 'v'] as const).map(channel => {
+        const label = t(channel === 'h' ? 'color.hue' : channel === 's' ? 'color.saturation' : 'color.value');
+        const max = channel === 'h' ? 359 : 100;
+        const value = Math.round(hsv[channel] * (channel === 'h' ? 1 : 100));
+        return <label className="color-picker-channel" key={channel}>
+          <span>{label}</span>
+          <input autoComplete="off" type="range" min={0} max={max} step={1} value={value}
+            aria-label={label} className={`settings-slider-input ${channel === 'h' ? 'color-picker-hue' : ''}`}
+            onChange={event => change({ ...hsv, [channel]: Number(event.target.value) / (channel === 'h' ? 1 : 100) })} />
+          <output>{value}{channel === 'h' ? '°' : '%'}</output>
         </label>;
       })}
     </div>
@@ -46,7 +52,7 @@ function ColorPickerDialog({ value, label, onApply, onClose }: {
       aria-invalid={!valid} spellCheck={false} onChange={event => {
         const next = event.target.value;
         setHex(next);
-        if (/^#[0-9a-f]{6}$/i.test(next)) setColor(next);
+        if (/^#[0-9a-f]{6}$/i.test(next)) setHsv(hexToHsv(next));
       }} />
   </ModalDialog>;
 }

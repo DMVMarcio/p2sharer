@@ -31,6 +31,7 @@ Chat messages carry a signed `logicalOrder` independent of the displayed wall-cl
 | `room_admission` | Signed current-host commands change roles, expulsion, and password; host-granted administrators can sign admissions after direct identity proof. Password requests go to the authenticated owner or administrator. |
 | `chat` / `history_sync` | Every revision is signed; author key and sender claims must match pinned identity and room membership. |
 | Other room actions / WebRTC streams | Direct verified peer, admitted signing key, and local admission are required; room broadcasts are addressed only to admitted peers. |
+| `profile_image_v1` | Admitted direct peer offers a hash first; bytes require a matching expiring request token, bounded ordered chunks, hash verification and full native image decoding. See [profile images](profile-images.md). |
 | `peer_exchange` / `mesh_relay` | Connectivity hints remain untrusted and cannot confer identity, membership, or host authority. |
 
 ## Security limits

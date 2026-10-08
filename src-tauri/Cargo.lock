@@ -3894,6 +3894,7 @@ dependencies = [
  "image",
  "jpeg-encoder",
  "log",
+ "png 0.18.1",
  "rayon",
  "reqwest",
  "rfd",

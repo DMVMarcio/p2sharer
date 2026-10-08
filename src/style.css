@@ -5467,3 +5467,22 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .btn.window-caption-button:active { transform: none; }
 .btn.window-caption-button:focus-visible { outline: 2px solid var(--accent-color); outline-offset: -3px; }
 .btn.window-caption-close:hover { background: var(--danger-hover); color: #ffffff; }
+
+/* Shared profile images and HSV editing. */
+.profile-avatar { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: var(--radius-full); overflow: hidden; position: relative; font-weight: 700; }
+.profile-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.profile-avatar.participant-avatar-badge { width: 52px; height: 52px; }
+.spotlight-tray-strip .profile-avatar.participant-avatar-badge { width: 36px; height: 36px; }
+.profile-avatar.participant-item-avatar { width: 28px; height: 28px; font-size: 12px; }
+.profile-avatar.header-profile-avatar, .profile-avatar.watcher-profile-avatar { width: 24px; height: 24px; font-size: 12px; }
+.profile-avatar.profile-editor-preview { width: 96px; height: 96px; font-size: 32px; }
+.profile-editor-preview img, .profile-crop-stage img { position: absolute; max-width: none; }
+.profile-editor-row, .profile-editor-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.profile-crop-dialog { width: min(440px, calc(100vw - 32px)); }
+.profile-crop-stage { position: relative; width: min(100%, 300px); aspect-ratio: 1; overflow: hidden; margin: 16px auto; touch-action: none; cursor: grab; background: var(--bg-input); }
+.profile-crop-stage:active { cursor: grabbing; }
+.profile-crop-circle { position: absolute; inset: 0; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 0 80px rgba(0,0,0,.55); pointer-events: none; }
+.profile-crop-slider { display: grid; grid-template-columns: 140px 1fr; gap: 12px; align-items: center; margin-top: 12px; color: var(--text-secondary); }
+.color-picker-sv { position: relative; aspect-ratio: 1; border-radius: var(--radius-md); background-image: linear-gradient(to top, black, transparent), linear-gradient(to right, white, transparent); touch-action: none; margin-bottom: 16px; cursor: crosshair; }
+.color-picker-sv-cursor { position: absolute; width: 14px; height: 14px; border: 2px solid white; box-shadow: 0 0 0 1px black; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; }
+.settings-slider-input.color-picker-hue { background: linear-gradient(to right, red, yellow, lime, cyan, blue, magenta, red); }
