@@ -57,12 +57,12 @@ function ColorPickerDialog({ value, label, onApply, onClose }: {
   </ModalDialog>;
 }
 
-export function ColorPicker({ value, label, onChange, active = false }: {
-  value: string; label: string; onChange: (color: string) => void; active?: boolean;
+export function ColorPicker({ value, label, onChange, active = false, disabled = false }: {
+  value: string; label: string; onChange: (color: string) => void; active?: boolean; disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   return <>
-    <TooltipButton tooltip={label} aria-haspopup="dialog" aria-expanded={open}
+    <TooltipButton tooltip={label} disabled={disabled} aria-haspopup="dialog" aria-expanded={open}
       className={`accent-swatch custom-color-picker ${active ? 'active' : ''}`}
       onClick={() => setOpen(true)}>
       <span className="custom-color-picker-swatch" style={{ backgroundColor: value }} />

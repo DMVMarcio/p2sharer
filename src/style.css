@@ -1443,6 +1443,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 
 /* Participant Colored Avatar Card (When NOT sharing screen) */
 .participant-card {
+  container-type: size;
   position: relative;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-md);
@@ -1453,7 +1454,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   justify-content: center;
   cursor: pointer;
   aspect-ratio: 16 / 9;
-  background: radial-gradient(circle at center, var(--user-color, #1f2937) 0%, #0d0d11 90%);
+  background: radial-gradient(circle at center, var(--card-color, var(--user-color, #1f2937)) 0%, #0d0d11 90%);
   transition: all var(--transition-fast);
 }
 
@@ -5504,3 +5505,6 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .btn.profile-remove-button:hover { background: var(--danger-hover); color: white; }
 
 .profile-loading-status { color: var(--text-secondary); font-size: 12px; }
+
+.participant-card:not(.in-tray) .profile-avatar.participant-avatar-badge { width: clamp(52px, 32cqmin, 180px); height: clamp(52px, 32cqmin, 180px); font-size: clamp(18px, 10cqmin, 56px); }
+.profile-card-settings { margin-top: 16px; }

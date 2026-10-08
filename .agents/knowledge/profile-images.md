@@ -1,7 +1,13 @@
 # Profile Images
 
 `core/profile_image.ts` owns the saved local profile, process-only remote hash cache,
-peer-to-hash associations and reactive subscriptions. `ProfileAvatar` renders the
+peer-to-hash associations and reactive subscriptions. Card background mode is
+saved as nullable `cardColor` (automatic by default); native `dominantColor` caches
+an alpha-weighted, quantized palette from the first cropped frame. Automatic mode
+falls back to the initial color without a visible image. Old profiles are upgraded
+on load; custom and dominant colors are validated hex values. Resolved card color
+travels as optional offer metadata, independent of hash-based image transfers.
+`ProfileAvatar` renders the
 same circular image/initial and contrast-aware fallback color across participants,
 the header, watchers and activity participants. Profile settings retain image,
 crop, removal and fallback-color drafts until Save. The crop stage supports
@@ -32,7 +38,8 @@ Selected originals are released on cancellation, replacement or settings close.
 
 `p2p/profile_transfer.ts` handles `profile_image_v1` on admitted, verified direct
 edges through the existing room action guard. Offers contain only hash, encoded
-size and fallback color. A cache miss creates a targeted request with a random,
+size, fallback color and resolved card color. A cache miss creates a targeted
+request with a random,
 expiring token. Only matching, ordered 32 KiB Base64 chunks within the announced
 size are retained. At most four transfers are pending; other offers wait, and
 duplicate hashes share cached data. Rapid offers coalesce, failed requests have

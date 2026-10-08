@@ -36,12 +36,17 @@ test('image display requires an admitted offer, matching request and successful 
     await transfer.receive({ kind: 'chunk', hash, token, index: 0, data: 'YQ==' }, 'peer');
     assert.equal(nativeCalls, 1);
     assert.equal(profileImages.url('peer'), 'data:image/png;base64,YQ==');
-    await transfer.receive(offer(), 'other');
+    await transfer.receive({ ...offer(), cardColor: '#ff8844' }, 'other');
+    assert.equal(profileImages.background('other'), '#ff8844');
     assert.equal(sent.length, 1);
     assert.equal(profileImages.url('other'), profileImages.url('peer'));
     await transfer.receive({ kind: 'offer', hash: '', size: 0, color: '#654321' }, 'peer');
     assert.equal(profileImages.url('peer'), undefined);
     assert.equal(profileImages.color('peer'), '#654321');
+    assert.equal(profileImages.background('peer'), '#654321');
+    await transfer.receive({ kind: 'offer', hash: '', size: 0, color: '#654321', cardColor: '#abcdef' }, 'peer');
+    assert.equal(profileImages.background('peer'), '#abcdef');
+    assert.equal(sent.length, 1);
   } finally { transfer.close(); }
 });
 
@@ -52,6 +57,7 @@ test('invalid images, metadata and superseded transfer tokens never render', asy
   try {
     await transfer.receive({ ...offer(badHash), size: 20_000_000 }, 'peer');
     await transfer.receive({ ...offer(badHash), color: 'url(example)' }, 'peer');
+    await transfer.receive({ ...offer(badHash), cardColor: 'url(example)' }, 'peer');
     assert.equal(sent.length, 0);
     await transfer.receive(offer(badHash), 'peer');
     const token = sent[0].packet.token;

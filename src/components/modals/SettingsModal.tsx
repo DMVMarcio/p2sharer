@@ -51,10 +51,11 @@ export const SettingsModal: React.FC = () => {
   useEffect(() => () => { void invoke('discard_profile_image').catch(() => {}); }, []);
   const [profileDraft, setProfileDraft] = useState<ProfileDraft | null>(null);
   const [profileColor, setProfileColor] = useState(profileImages.local.color);
+  const [profileCardColor, setProfileCardColor] = useState<string | null>(profileImages.local.cardColor ?? null);
   const [profileRemove, setProfileRemove] = useState(false);
   const [profileBusy, setProfileBusy] = useState(false);
   const [saving, setSaving] = useState(false);
-  useEffect(() => { void profileImages.ready.then(() => setProfileColor(profileImages.local.color)); }, []);
+  useEffect(() => { void profileImages.ready.then(() => { setProfileColor(profileImages.local.color); setProfileCardColor(profileImages.local.cardColor ?? null); }); }, []);
   const [nick, setNick] = useState(() => stateStore.username);
   const [language, setLanguageDraft] = useState(getLanguage);
   const [autoUpdates, setAutoUpdates] = useState(automaticUpdateChecks);
@@ -148,7 +149,7 @@ export const SettingsModal: React.FC = () => {
       return;
     }
     setSaving(true);
-    try { await profileImages.save(profileDraft, profileColor, profileRemove); }
+    try { await profileImages.save(profileDraft, profileColor, profileRemove, profileCardColor); }
     catch { setSaving(false); showToast(t('profile.saveFailed')); return; }
     // Save username
     if (nick.trim()) {
@@ -370,7 +371,7 @@ export const SettingsModal: React.FC = () => {
 
                 <ProfileImageEditor name={nick} draft={profileDraft} color={profileColor} remove={profileRemove}
                   onDraft={setProfileDraft} onColor={setProfileColor} onRemove={setProfileRemove}
-                  onBusy={setProfileBusy} disabled={saving} />
+                  onBusy={setProfileBusy} disabled={saving} cardColor={profileCardColor} onCardColor={setProfileCardColor} />
                 <div className="settings-row">
                   <label className="settings-label" htmlFor="settings-input-username">
                     {t("message.295f254de3a9")}</label>

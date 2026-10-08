@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 
-export interface ProfileImage { hash: string; data: string; color: string }
+export interface ProfileImage { hash: string; data: string; color: string; cardColor?: string | null; dominantColor?: string | null }
 export interface ImageCrop { x: number; y: number; size: number }
 export interface ProfileDraft { token: string; preview: string; width: number; height: number; crop: ImageCrop }
 export const PROFILE_MAX_BYTES = 8 * 1024 * 1024;
@@ -11,7 +11,7 @@ export const validProfileColor = (color: unknown): color is string => typeof col
 // Remote images and hashes live only for the current application process.
 class ProfileImages {
   local: ProfileImage = { hash: '', data: '', color: '#06b6d4' };
-  peers = new Map<string, { hash: string; color: string }>();
+  peers = new Map<string, { hash: string; color: string; cardColor: string }>();
   private cache = new Map<string, string>();
   private listeners = new Set<() => void>();
   private revision = 0;
@@ -26,9 +26,9 @@ class ProfileImages {
       if (local) { this.local = local; this.notify(); }
     } catch (error) { console.warn('[Profile] Saved image could not be loaded:', error); }
   }
-  async save(draft: ProfileDraft | null, color: string, remove: boolean) {
+  async save(draft: ProfileDraft | null, color: string, remove: boolean, cardColor: string | null = null) {
     await this.ready;
-    this.local = await invoke<ProfileImage>('save_profile_image', { token: draft?.token ?? null, crop: draft?.crop ?? null, color, remove });
+    this.local = await invoke<ProfileImage>('save_profile_image', { token: draft?.token ?? null, crop: draft?.crop ?? null, color, cardColor, remove });
     this.notify();
     void invoke('discard_profile_image').catch(() => {});
   }
@@ -37,9 +37,13 @@ class ProfileImages {
     return this.cache.get(this.peers.get(peerId)?.hash ?? '');
   }
   color(peerId: string, local = false) { return local || peerId === 'local' ? this.local.color : this.peers.get(peerId)?.color; }
+  background(peerId: string, local = false, fallback?: string) {
+    return local || peerId === 'local' ? this.local.cardColor ?? this.local.dominantColor ?? this.local.color
+      : this.peers.get(peerId)?.cardColor ?? fallback ?? '#06b6d4';
+  }
   has(hash: string) { return this.cache.has(hash) || hash === this.local.hash; }
-  announce(peerId: string, hash: string, color: string) {
-    this.peers.set(peerId, { hash, color });
+  announce(peerId: string, hash: string, color: string, cardColor = color) {
+    this.peers.set(peerId, { hash, color, cardColor });
     if (hash && hash === this.local.hash) this.cacheUrl(hash, `data:image/png;base64,${this.local.data}`);
     this.notify();
   }

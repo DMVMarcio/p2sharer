@@ -205,7 +205,7 @@ test('profile crop survives tab changes, applies only on Save and removal remain
     if (command === 'pick_profile_image') return new Promise(resolve => { finishPick = resolve; });
     if (command === 'save_profile_image') {
       saves.push(args);
-      const result = { hash: args.remove ? '' : 'a'.repeat(64), data: args.remove ? '' : 'cGhvdG8=', color: args.color };
+      const result = { hash: args.remove ? '' : 'a'.repeat(64), data: args.remove ? '' : 'cGhvdG8=', color: args.color, cardColor: args.cardColor };
       if (saves.length === 1) return new Promise(resolve => { finishSave = () => resolve(result); });
       return result;
     }
@@ -233,6 +233,20 @@ test('profile crop survives tab changes, applies only on Save and removal remain
     await act(async () => document.querySelector('.profile-crop-dialog .btn-primary').click());
     await act(async () => new Promise(resolve => setTimeout(resolve, 260)));
     assert.equal(document.querySelector('.profile-editor-preview img').src, 'data:image/gif;base64,cHJldmlldw==');
+    const background = document.querySelector('.profile-card-settings [role="combobox"]');
+    assert.equal(background.textContent, 'Automático');
+    await act(async () => background.click());
+    await act(async () => [...document.querySelectorAll('[role="option"]')].find(option => option.textContent === 'Personalizado').click());
+    await act(async () => document.querySelector('.profile-card-settings .custom-color-picker').click());
+    await act(async () => {
+      const hex = document.querySelector('.color-picker-dialog .text-input');
+      Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(hex, '#112233');
+      hex.dispatchEvent(new window.Event('input', { bubbles: true }));
+    });
+    await act(async () => document.querySelector('.color-picker-dialog .btn-primary').click());
+    await act(async () => new Promise(resolve => setTimeout(resolve, 260)));
+    assert.equal(profileImages.local.cardColor, undefined);
+
     await act(async () => [...document.querySelectorAll('.settings-nav-sidebar button')].find(button => button.textContent.includes('Aplicação')).click());
     assert.equal(saves.length, 0);
     await act(async () => document.getElementById('btn-save-settings').click());
@@ -242,6 +256,8 @@ test('profile crop survives tab changes, applies only on Save and removal remain
     await act(async () => finishSave());
     assert.equal(saves.length, 1);
     assert.equal(saves[0].token, 'draft-token');
+    assert.equal(saves[0].cardColor, '#112233');
+    assert.equal(profileImages.background('local'), '#112233');
     assert.ok(saves[0].crop.size > 0 && saves[0].crop.size < 1);
     assert.ok(saves[0].crop.x > 0.5);
     assert.equal(saves[0].crop.y, 0.5);

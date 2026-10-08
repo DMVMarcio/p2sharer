@@ -23,6 +23,10 @@ pub struct ProfileImage {
     pub hash: String,
     pub data: String,
     pub color: String,
+    #[serde(default, rename = "cardColor")]
+    pub card_color: Option<String>,
+    #[serde(default, rename = "dominantColor")]
+    pub dominant_color: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -203,6 +207,29 @@ fn encode(frames: &[(RgbaImage, image::Delay)], plays: u32) -> Result<Vec<u8>, S
     Ok(bytes)
 }
 
+fn dominant_color(image: &RgbaImage) -> Option<String> {
+    // Quantize similar colors together and weight by alpha, ignoring transparent pixels.
+    let mut buckets = vec![[0u64; 4]; 4096];
+    for pixel in image.pixels() {
+        let [r, g, b, a] = pixel.0;
+        let index = usize::from(r >> 4) * 256 + usize::from(g >> 4) * 16 + usize::from(b >> 4);
+        let bucket = &mut buckets[index];
+        bucket[0] += u64::from(a);
+        bucket[1] += u64::from(r) * u64::from(a);
+        bucket[2] += u64::from(g) * u64::from(a);
+        bucket[3] += u64::from(b) * u64::from(a);
+    }
+    let bucket = buckets.iter().max_by_key(|bucket| bucket[0])?;
+    (bucket[0] > 0).then(|| {
+        format!(
+            "#{:02x}{:02x}{:02x}",
+            bucket[1] / bucket[0],
+            bucket[2] / bucket[0],
+            bucket[3] / bucket[0]
+        )
+    })
+}
+
 fn valid_color(color: &str) -> bool {
     color.len() == 7 && color.starts_with('#') && color[1..].bytes().all(|b| b.is_ascii_hexdigit())
 }
@@ -307,9 +334,14 @@ pub async fn save_profile_image(
     token: Option<String>,
     crop: Option<Crop>,
     color: String,
+    card_color: Option<String>,
     remove: bool,
 ) -> Result<ProfileImage, String> {
-    if !valid_color(&color) {
+    if !valid_color(&color)
+        || card_color
+            .as_deref()
+            .is_some_and(|value| !valid_color(value))
+    {
         return Err("Invalid profile color".into());
     }
     let bytes = if let Some(token) = token {
@@ -331,12 +363,16 @@ pub async fn save_profile_image(
                 hash: String::new(),
                 data: String::new(),
                 color: color.clone(),
+                card_color: None,
+                dominant_color: None,
             }
         };
         profile.color = color;
+        profile.card_color = card_color;
         if remove {
             profile.hash.clear();
             profile.data.clear();
+            profile.dominant_color = None;
         }
         if let Some(bytes) = bytes {
             let crop = crop.ok_or("Missing crop")?;
@@ -348,6 +384,7 @@ pub async fn save_profile_image(
                 return Err("Invalid crop".into());
             }
             let (frames, plays) = decode(&bytes, Some(crop))?;
+            profile.dominant_color = dominant_color(&frames[0].0);
             let bytes = encode(&frames, plays)?;
             profile.hash = format!("{:x}", Sha256::digest(&bytes));
             profile.data = STANDARD.encode(bytes);
@@ -398,12 +435,29 @@ pub async fn load_profile_image(app: tauri::AppHandle) -> Result<Option<ProfileI
     if bytes.len() > OUTPUT_LIMIT * 2 {
         return Err("Invalid saved profile".into());
     }
-    let profile: ProfileImage = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
-    if !valid_color(&profile.color) {
+    let mut profile: ProfileImage = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+    if !valid_color(&profile.color)
+        || profile
+            .card_color
+            .as_deref()
+            .is_some_and(|value| !valid_color(value))
+        || profile
+            .dominant_color
+            .as_deref()
+            .is_some_and(|value| !valid_color(value))
+    {
         return Err("Invalid saved profile color".into());
     }
     if !profile.data.is_empty() {
         validate_profile_image(profile.data.clone(), profile.hash.clone()).await?;
+        if profile.dominant_color.is_none() {
+            // Older profiles have no cached palette; inspect only the first validated frame.
+            let data = STANDARD.decode(&profile.data).map_err(|e| e.to_string())?;
+            let image = image::load_from_memory(&data)
+                .map_err(|e| e.to_string())?
+                .to_rgba8();
+            profile.dominant_color = dominant_color(&image);
+        }
     }
     Ok(Some(profile))
 }
@@ -417,6 +471,22 @@ mod tests {
             RgbaImage::from_pixel(w, h, image::Rgba(rgba)),
             image::Delay::from_numer_denom_ms(ms, 1),
         )
+    }
+
+    #[test]
+    fn dominant_palette_weights_visible_pixels_and_old_profiles_default_to_automatic() {
+        let mut image = RgbaImage::from_pixel(4, 1, image::Rgba([240, 100, 10, 255]));
+        image.put_pixel(2, 0, image::Rgba([0, 0, 255, 0]));
+        image.put_pixel(3, 0, image::Rgba([0, 0, 255, 10]));
+        assert_eq!(dominant_color(&image).as_deref(), Some("#f0640a"));
+        assert_eq!(dominant_color(&RgbaImage::new(4, 4)), None);
+        let old: ProfileImage =
+            serde_json::from_str(r##"{"hash":"","data":"","color":"#06b6d4"}"##).unwrap();
+        assert!(old.card_color.is_none());
+        assert!(old.dominant_color.is_none());
+        let custom: ProfileImage = serde_json::from_str(r##"{"hash":"","data":"","color":"#06b6d4","cardColor":"#112233","dominantColor":"#f0640a"}"##).unwrap();
+        assert_eq!(custom.card_color.as_deref(), Some("#112233"));
+        assert_eq!(custom.dominant_color.as_deref(), Some("#f0640a"));
     }
 
     #[test]

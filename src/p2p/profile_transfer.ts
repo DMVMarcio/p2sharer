@@ -1,7 +1,7 @@
 import { profileImages, PROFILE_CHUNK, PROFILE_MAX_BYTES, validProfileColor, validProfileHash } from '../core/profile_image.ts';
 
 type Send = (packet: unknown, peerId: string) => Promise<unknown> | unknown;
-interface Offer { hash: string; size: number; color: string }
+interface Offer { hash: string; size: number; color: string; cardColor?: string }
 interface Pending { offer: Offer; token: string; parts: string[]; length: number; until: number; validating: boolean }
 
 // Offers grant no permission to send image bytes. Only a matching, unexpired
@@ -48,28 +48,28 @@ export class ProfileTransfer {
     await profileImages.ready;
     if (this.closed || !this.authorized(peerId)) return;
     const { hash, data, color } = profileImages.local;
-    await this.send({ kind: 'offer', hash, size: data.length, color }, peerId);
+    await this.send({ kind: 'offer', hash, size: data.length, color, cardColor: profileImages.background('local') }, peerId);
   }
   async receive(packet: unknown, peerId: string) {
     if (this.closed || !this.authorized(peerId) || !packet || typeof packet !== 'object') return;
     const p = packet as Record<string, unknown>;
     if (p.kind === 'offer') {
-      if (!validProfileColor(p.color) || !(p.hash === '' || validProfileHash(p.hash)) ||
+      if (!validProfileColor(p.color) || (p.cardColor !== undefined && !validProfileColor(p.cardColor)) || !(p.hash === '' || validProfileHash(p.hash)) ||
         !Number.isInteger(p.size) || (p.size as number) < 0 || (p.size as number) > Math.ceil(PROFILE_MAX_BYTES / 3) * 4 ||
         (p.hash === '') !== (p.size === 0)) return;
       const old = this.offers.get(peerId);
-      if (old?.hash === p.hash && old.color === p.color) {
+      if (old?.hash === p.hash && old.color === p.color && old.cardColor === (p.cardColor ?? p.color)) {
         this.deferred.delete(peerId); this.requestWaiting(); return;
       }
       if (p.hash !== '' && Date.now() - (this.lastOffer.get(peerId) ?? 0) < 1000) {
-        this.deferred.set(peerId, { hash: p.hash, size: p.size as number, color: p.color }); return;
+        this.deferred.set(peerId, { hash: p.hash, size: p.size as number, color: p.color, cardColor: (p.cardColor ?? p.color) as string }); return;
       }
       this.deferred.delete(peerId);
       this.lastOffer.set(peerId, Date.now());
-      const offer = { hash: p.hash, size: p.size as number, color: p.color };
+      const offer = { hash: p.hash, size: p.size as number, color: p.color, cardColor: (p.cardColor ?? p.color) as string };
       this.offers.set(peerId, offer);
       if (!this.pending.get(peerId)?.validating) this.pending.delete(peerId);
-      profileImages.announce(peerId, offer.hash, offer.color);
+      profileImages.announce(peerId, offer.hash, offer.color, offer.cardColor);
       // The first offer also confirms the remote receiver is admitted and ready.
       // An earlier admission-time announcement may have arrived before its gate opened.
       if (!old) void this.announce(peerId).catch(() => {});

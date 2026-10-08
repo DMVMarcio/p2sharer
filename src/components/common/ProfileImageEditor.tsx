@@ -5,6 +5,7 @@ import { t } from '../../i18n';
 import { profileImages, type ProfileDraft, type ImageCrop } from '../../core/profile_image';
 import { contrastingTextColor } from '../../core/accent_color';
 import { ModalDialog } from './ModalDialog';
+import { Select } from './Select';
 import { ColorPicker } from './ColorPicker';
 import { TooltipButton } from './TooltipButton';
 import { showToast } from '../../hooks/useToast';
@@ -80,7 +81,8 @@ function CropDialog({ draft, onApply, onClose }: { draft: ProfileDraft; onApply:
   </ModalDialog>;
 }
 
-export function ProfileImageEditor({ name, draft, color, remove, onDraft, onColor, onRemove, onBusy, disabled }: {
+export function ProfileImageEditor({ name, draft, color, remove, onDraft, onColor, onRemove, onBusy, disabled, cardColor, onCardColor }: {
+  cardColor: string | null; onCardColor: (color: string | null) => void;
   name: string; draft: ProfileDraft | null; color: string; remove: boolean; onDraft: (draft: ProfileDraft | null) => void;
   onColor: (color: string) => void; onRemove: (remove: boolean) => void; onBusy: (busy: boolean) => void; disabled: boolean;
 }) {
@@ -117,8 +119,17 @@ export function ProfileImageEditor({ name, draft, color, remove, onDraft, onColo
             onDraft(null); onRemove(true);
           }}><X size={14} aria-hidden="true" /></TooltipButton>}
       </div>
-      {!hasPhoto && <ColorPicker label={t('profile.color')} value={color} onChange={onColor} />}
+      {!hasPhoto && <ColorPicker label={t('profile.color')} value={color} onChange={onColor} disabled={disabled || picking} />}
       {picking && <span className="profile-loading-status" role="status">{t('profile.loading')}</span>}
+    </div>
+    <div className="profile-card-settings">
+      <span className="settings-label">{t('profile.cardBackground')}</span>
+      <div className="profile-editor-row">
+        <Select aria-label={t('profile.cardBackground')} value={cardColor === null ? 'auto' : 'custom'} disabled={disabled || picking}
+          options={[{ value: 'auto', label: t('profile.cardAutomatic') }, { value: 'custom', label: t('profile.cardCustom') }]}
+          onValueChange={value => onCardColor(value === 'auto' ? null : profileImages.local.dominantColor ?? color)} />
+        {cardColor !== null && <ColorPicker label={t('profile.cardColor')} value={cardColor} onChange={onCardColor} disabled={disabled || picking} />}
+      </div>
     </div>
     {selection && <CropDialog draft={selection} onClose={() => {
       if (selection.token !== draft?.token) void invoke('discard_profile_image', { token: selection.token }).catch(() => {});

@@ -1,3 +1,4 @@
+import { profileImages } from '../../core/profile_image';
 import { ProfileAvatar } from '../common/ProfileAvatar';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
@@ -27,6 +28,7 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
   isSelectedFeatured = false,
 }) => {
   useLocale();
+  React.useSyncExternalStore(profileImages.subscribe, profileImages.snapshot);
   const { togglePin, requestStream, layoutMode, returnToGrid } = useRoom();
   const openContextMenu = useContextMenu();
   const { openModal } = useModal();
@@ -49,7 +51,7 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
     <div
       className={`participant-card ${isFeatured ? 'featured' : ''} ${inTray ? 'in-tray' : ''} ${isSelectedFeatured ? 'selected-featured' : ''}`}
       data-peer-id={slot.peerId}
-      style={{ '--user-color': slot.color } as React.CSSProperties}
+      style={{ '--user-color': slot.color, '--card-color': profileImages.background(slot.ownerPeerId ?? slot.peerId, slot.isLocal, slot.color) } as React.CSSProperties}
       onClick={handleCardClick}
       tabIndex={0}
       onContextMenu={(event) => {
