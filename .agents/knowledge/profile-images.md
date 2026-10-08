@@ -5,7 +5,9 @@ peer-to-hash associations and reactive subscriptions. `ProfileAvatar` renders th
 same circular image/initial and contrast-aware fallback color across participants,
 the header, watchers and activity participants. Profile settings retain image,
 crop, removal and fallback-color drafts until Save. The crop stage supports
-wheel zoom, pointer dragging and keyboard zoom/panning. `ColorPicker` shares an HSV
+wheel zoom, pointer dragging and keyboard zoom/panning. An extended preview
+viewport shows source overflow; image geometry and drag scale remain anchored to
+the centered square crop frame. `ColorPicker` shares an HSV
 saturation/brightness plane, hue slider, keyboard-accessible channel sliders and
 hex input; conversion functions live in `core/hsv_color.ts`.
 

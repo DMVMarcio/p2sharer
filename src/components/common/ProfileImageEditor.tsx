@@ -21,6 +21,7 @@ function CropDialog({ draft, onApply, onClose }: { draft: ProfileDraft; onApply:
   const [crop, setCrop] = useState(draft.crop);
   const [drag, setDrag] = useState<{ x: number; y: number; crop: ImageCrop } | null>(null);
   const stage = useRef<HTMLDivElement>(null);
+  const cropFrame = useRef<HTMLDivElement>(null);
   const zoom = (current: ImageCrop, factor: number): ImageCrop => {
     const minimum = Math.min(draft.width, draft.height);
     const size = Math.min(1, Math.max(0.01, current.size * factor));
@@ -46,7 +47,7 @@ function CropDialog({ draft, onApply, onClose }: { draft: ProfileDraft; onApply:
       <button className="btn btn-secondary" onClick={close}>{t('message.bb9dbb406dcb')}</button>
       <button className="btn btn-primary" onClick={() => { onApply({ ...draft, crop }); close(); }}>{t('message.3a04898a6b8b')}</button>
     </>}>
-    <div ref={stage} className="profile-crop-stage" tabIndex={0} role="group" aria-label={t('profile.crop')}
+    <div ref={stage} className={`profile-crop-stage${draft.width > draft.height ? ' is-landscape' : draft.height > draft.width ? ' is-portrait' : ''}`} tabIndex={0} role="group" aria-label={t('profile.crop')}
       onKeyDown={event => {
         if (['+', '=', '-', '_'].includes(event.key)) {
           event.preventDefault(); setCrop(current => zoom(current, event.key === '+' || event.key === '=' ? 0.9 : 1 / 0.9));
@@ -62,15 +63,19 @@ function CropDialog({ draft, onApply, onClose }: { draft: ProfileDraft; onApply:
     }} onPointerUp={() => setDrag(null)} onPointerCancel={() => setDrag(null)} onPointerMove={event => {
       if (!drag || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
       const side = Math.min(draft.width, draft.height) * drag.crop.size;
-      const scale = event.currentTarget.getBoundingClientRect().width / side;
+      const frameWidth = cropFrame.current?.getBoundingClientRect().width;
+      if (!frameWidth) return;
+      const scale = frameWidth / side;
       const clamp = (n: number) => Math.min(1, Math.max(0, n));
       setCrop({ ...drag.crop,
         x: draft.width === side ? 0.5 : clamp(drag.crop.x - (event.clientX - drag.x) / scale / (draft.width - side)),
         y: draft.height === side ? 0.5 : clamp(drag.crop.y - (event.clientY - drag.y) / scale / (draft.height - side)),
       });
     }}>
-      <CropPreview draft={draft} crop={crop} />
-      <span className="profile-crop-circle" />
+      <div ref={cropFrame} className="profile-crop-frame">
+        <CropPreview draft={draft} crop={crop} />
+        <span className="profile-crop-circle" />
+      </div>
     </div>
   </ModalDialog>;
 }
