@@ -5489,7 +5489,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .profile-crop-frame { position: absolute; left: 50%; top: 50%; width: 100%; aspect-ratio: 1; transform: translate(-50%, -50%); pointer-events: none; }
 .profile-crop-stage.is-landscape .profile-crop-frame { width: calc(100% * 5 / 6); }
 .profile-crop-stage:active { cursor: grabbing; }
-.profile-crop-circle { position: absolute; inset: 0; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 0 80px rgba(0,0,0,.55); pointer-events: none; }
+.profile-crop-circle { position: absolute; inset: 0; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 0 100vmax rgba(0,0,0,.55); pointer-events: none; }
 
 .profile-editor-photo { position: relative; display: inline-flex; }
 .btn.profile-upload-button { padding: 0; border: 0; border-radius: var(--radius-full); background: transparent; }
