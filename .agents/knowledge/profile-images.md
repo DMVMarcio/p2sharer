@@ -4,7 +4,10 @@
 peer-to-hash associations and reactive subscriptions. Card background mode is
 saved as nullable `cardColor` (automatic by default); native `dominantColor` caches
 an alpha-weighted, quantized palette from the first cropped frame. Automatic mode
-falls back to the initial color without a visible image. Old profiles are upgraded
+preserves the extracted hue while capping saturation and brightness through
+`core/profile_card_color.ts` to support white text. It also softens the initial
+color without a visible image; manual colors are used verbatim. The card preset
+palette is independent of the interface accent palette. Old profiles are upgraded
 on load; custom and dominant colors are validated hex values. Resolved card color
 travels as optional offer metadata, independent of hash-based image transfers.
 `ColorPalette` shares preset swatches and the HSV picker between appearance and

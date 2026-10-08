@@ -5,7 +5,7 @@ import { t } from '../../i18n';
 import { profileImages, type ProfileDraft, type ImageCrop } from '../../core/profile_image';
 import { contrastingTextColor } from '../../core/accent_color';
 import { ModalDialog } from './ModalDialog';
-import { ACCENT_COLORS } from '../../hooks/useAppTheme';
+import { PROFILE_CARD_COLORS } from '../../core/profile_card_color';
 import { ColorPalette } from './ColorPalette';
 import { ColorPicker } from './ColorPicker';
 import { TooltipButton } from './TooltipButton';
@@ -136,12 +136,12 @@ export function ProfileImageEditor({ name, draft, color, remove, onDraft, onColo
             <span className="settings-switch-title">{t('profile.cardAutomatic')}</span>
             <div className="modern-switch">
               <input autoComplete="off" type="checkbox" id="profile-card-automatic" checked={cardColor === null}
-                disabled={disabled || picking} onChange={event => onCardColor(event.target.checked ? null : profileImages.local.dominantColor ?? color)} />
+                disabled={disabled || picking} onChange={event => onCardColor(event.target.checked ? null : profileImages.background('local'))} />
               <span className="switch-slider" />
             </div>
           </label>
           {cardColor !== null && <ColorPalette label={t('profile.cardColor')} value={cardColor} onChange={onCardColor}
-            disabled={disabled || picking} presets={ACCENT_COLORS.map(item => ({ value: item.color, color: item.color, label: item.label }))} />}
+            disabled={disabled || picking} presets={PROFILE_CARD_COLORS.map(item => ({ value: item.color, color: item.color, label: item.label }))} />}
         </div>
       </div>
     </div>

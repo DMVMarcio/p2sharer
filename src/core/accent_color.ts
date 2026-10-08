@@ -18,7 +18,7 @@ export function customAccentTokens(color: string): Record<string, string> | null
 }
 
 // Generated participant colors use HSL; persisted custom colors use hex.
-export function contrastingTextColor(color: string): string {
+export function colorToHex(color: string): string | null {
   const hsl = /^hsl\(\s*([\d.+-]+)\s*,\s*([\d.]+)%\s*,\s*([\d.]+)%\s*\)$/i.exec(color);
   if (hsl) {
     const saturation = Math.min(1, Number(hsl[2]) / 100);
@@ -26,5 +26,9 @@ export function contrastingTextColor(color: string): string {
     const value = lightness + saturation * Math.min(lightness, 1 - lightness);
     color = hsvToHex({ h: Number(hsl[1]), s: value === 0 ? 0 : 2 * (1 - lightness / value), v: value });
   }
-  return customAccentTokens(color)?.['--custom-accent-text'] ?? '#ffffff';
+  return /^#[0-9a-f]{6}$/i.test(color) ? color : null;
+}
+
+export function contrastingTextColor(color: string): string {
+  return customAccentTokens(colorToHex(color) ?? '')?.['--custom-accent-text'] ?? '#ffffff';
 }

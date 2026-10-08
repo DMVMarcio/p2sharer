@@ -110,3 +110,23 @@ test('rapid changes coalesce to the latest image and admission readiness exchang
     globalThis.clearInterval = originals.clear; Date.now = originals.now;
   }
 });
+
+test('automatic card tone is announced to peers while manual card colors remain exact', async () => {
+  const local = profileImages.local;
+  const packets = [];
+  const transfer = new ProfileTransfer(packet => packets.push(packet), () => true);
+  try {
+    profileImages.local = { hash: '', data: '', color: '#00ff00', dominantColor: '#ffff00', cardColor: null };
+    await transfer.announce('viewer');
+    const automatic = packets.at(-1).cardColor;
+    assert.equal(automatic, profileImages.background('local'));
+    assert.notEqual(automatic, '#ffff00');
+    await transfer.receive({ ...packets.at(-1) }, 'viewer');
+    assert.equal(profileImages.background('viewer'), automatic);
+    assert.equal(profileImages.color('viewer'), '#00ff00', 'Avatar fallback is independent of the card tone');
+    profileImages.local = { ...profileImages.local, cardColor: '#ffffff' };
+    await transfer.announce('viewer');
+    assert.equal(packets.at(-1).cardColor, '#ffffff');
+    assert.equal(profileImages.background('local'), '#ffffff');
+  } finally { transfer.close(); profileImages.local = local; profileImages.forget('viewer'); }
+});

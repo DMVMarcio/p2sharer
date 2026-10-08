@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { automaticCardColor } from './profile_card_color.ts';
 
 export interface ProfileImage { hash: string; data: string; color: string; cardColor?: string | null; dominantColor?: string | null }
 export interface ImageCrop { x: number; y: number; size: number }
@@ -38,8 +39,8 @@ class ProfileImages {
   }
   color(peerId: string, local = false) { return local || peerId === 'local' ? this.local.color : this.peers.get(peerId)?.color; }
   background(peerId: string, local = false, fallback?: string) {
-    return local || peerId === 'local' ? this.local.cardColor ?? this.local.dominantColor ?? this.local.color
-      : this.peers.get(peerId)?.cardColor ?? fallback ?? '#06b6d4';
+    return local || peerId === 'local' ? this.local.cardColor ?? automaticCardColor(this.local.dominantColor ?? this.local.color)
+      : this.peers.get(peerId)?.cardColor ?? automaticCardColor(fallback ?? '#06b6d4');
   }
   has(hash: string) { return this.cache.has(hash) || hash === this.local.hash; }
   announce(peerId: string, hash: string, color: string, cardColor = color) {
