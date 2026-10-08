@@ -767,7 +767,7 @@ export class RoomService {
         });
       }
     } else if (entry.status !== 'pending') this.transferRouteChecks.delete(entry.requestId);
-    if (entry.status === 'complete' && entry.previewOnly && entry.preview) {
+    if (entry.status === 'complete' && entry.preview) {
       this.imagePreviews = { ...this.imagePreviews, [entry.messageId]: entry.preview };
       if (previewBytes) this.imagePreviewBytes[entry.messageId] = previewBytes;
     }

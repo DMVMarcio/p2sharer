@@ -24,6 +24,7 @@ import { ChatFileAttachment } from './ChatFileAttachment';
 import { ChatTransferCenter } from './ChatTransferCenter';
 import { selfId } from '@trystero-p2p/core';
 import { showToast } from '../../hooks/useToast';
+import { copyImageToClipboard } from '../../core/image_clipboard';
 
 export const ChatPane: React.FC = () => {
   useLocale();
@@ -155,10 +156,14 @@ export const ChatPane: React.FC = () => {
             );
           }
 
+          const fileTransfer = msg.file ? Object.values(fileProgress).find((t) => t.messageId === msg.id && t.preview) : undefined;
+          const imagePreview = msg.file?.isImage ? (localFilePreviews[msg.id] ?? imagePreviews[msg.id] ?? fileTransfer?.preview) : undefined;
+
           const messageActions: ChatMessageActionsProps = {
             own: msg.authorId === selfId,
             onReply: () => { setReplyToId(msg.id); inputRef.current?.focus(); },
             onCopy: () => { copyText(msg.text); },
+            onCopyImage: imagePreview ? () => { void copyImageToClipboard(imagePreview); } : undefined,
             onEdit: () => { setEditingId(msg.id); setEditDraft(msg.text); setPickerTarget(null); },
             onDelete: () => { void deleteChatMessage(msg.id).then((deleted) => { if (!deleted) showToast(t("message.18d60be566e6")); }); if (editingId === msg.id) setEditingId(null); setPickerTarget(null); },
             isFile: Boolean(msg.file),

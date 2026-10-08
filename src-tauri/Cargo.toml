@@ -28,7 +28,7 @@ tokio = { version = "1", features = ["full"] }
 sysinfo = "0.32"
 byteorder = "1.5"
 base64 = "0.22"
-image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "bmp", "gif"] }
 xcap = "0.9.8"
 tokio-tungstenite = "0.24"
 futures-util = "0.3"
