@@ -1,4 +1,6 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
+import { diagnosticOpaqueId } from './diagnostic_id.ts';
+export { diagnosticOpaqueId } from './diagnostic_id.ts';
 
 const measurements = (`timestamp ssrc bytesSent bytesReceived packetsSent packetsReceived packetsLost
   framesEncoded framesDecoded framesReceived framesSent framesDropped framesPerSecond frameWidth frameHeight
@@ -20,13 +22,6 @@ let enabledDiagnostics = false;
 let renderer = 0;
 
 export function isMediaDiagnosticsActive(): boolean { return enabledDiagnostics; }
-
-/** Matches native opaque IDs; never stores raw track, stream or peer identifiers. */
-export function diagnosticOpaqueId(value: string): number {
-  let hash = 2166136261;
-  for (const byte of new TextEncoder().encode(value)) hash = Math.imul(hash ^ byte, 16777619) >>> 0;
-  return hash;
-}
 
 export function startMediaDiagnostics(): Promise<boolean> {
   if (bootstrap) return bootstrap;
