@@ -10,8 +10,12 @@ const browser = new JSDOM('<!doctype html><html><body><div id="root"></div></bod
 for (const key of ['window', 'document', 'HTMLElement', 'Element', 'Node', 'MutationObserver', 'CustomEvent', 'localStorage']) globalThis[key] = browser.window[key];
 globalThis.getComputedStyle = window.getComputedStyle;
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
-globalThis.requestAnimationFrame = (callback) => setTimeout(callback, 0);
-globalThis.cancelAnimationFrame = clearTimeout;
+// These interaction checks do not advance autoscroll. Queue animation frames
+// instead of letting a recursive timer keep React's act() waiting for updates.
+const frames = new Map();
+let frameId = 0;
+globalThis.requestAnimationFrame = callback => { frames.set(++frameId, callback); return frameId; };
+globalThis.cancelAnimationFrame = id => frames.delete(id);
 globalThis.ResizeObserver = class { observe() {} disconnect() {} };
 window.matchMedia = () => ({ matches: false });
 window.HTMLMediaElement.prototype.play = () => Promise.resolve();
@@ -176,10 +180,12 @@ test('body drag previews an empty destination, preserves one player, cancels cle
     assert.equal(document.querySelector('.room-card-placeholder'), null);
     assert.equal(active.style.left, `${original.left}px`);
     assert.equal(captured, false);
+    assert.equal(frames.size, 0);
     await act(async () => pointer('pointerdown', video, startX, startY));
     await act(async () => pointer('pointermove', window, 600, 799));
     const destinationTop = document.querySelector('.room-card-placeholder').style.top;
     await act(async () => pointer('pointerup', window, 600, 799));
+    assert.equal(frames.size, 0);
     assert.equal(active.style.top, destinationTop);
     assert.equal(active.querySelector('video'), video);
     assert.equal(videoCount(), 3);
