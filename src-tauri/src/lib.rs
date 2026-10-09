@@ -1,6 +1,7 @@
 #[cfg(all(test, windows))]
 mod test_support;
 
+pub mod profile_image;
 pub mod audio_loopback;
 pub mod logger;
 mod media_diagnostics;
@@ -45,7 +46,7 @@ use screen_sources::{
 };
 
 use tauri::{Emitter, Manager};
-use chat_files::{import_chat_files, paste_chat_files, discard_chat_file};
+use chat_files::{import_chat_files, paste_chat_files, discard_chat_file, copy_chat_image};
 
 #[tauri::command]
 fn prepare_app_update(window: tauri::Window) -> Result<(), String> {
@@ -91,6 +92,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .manage(ChatFileState::default())
+        .manage(profile_image::ProfileImageState::default())
         .manage(lan_signaling::LanSignalingState::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -114,6 +116,11 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            profile_image::pick_profile_image,
+            profile_image::discard_profile_image,
+            profile_image::save_profile_image,
+            profile_image::load_profile_image,
+            profile_image::validate_profile_image,
             media_diagnostics::media_diagnostics_enabled,
             media_diagnostics::write_media_diagnostics,
             lan_signaling::list_lan_interfaces,
@@ -179,7 +186,8 @@ pub fn run() {
             read_chat_image_preview,
             reveal_chat_download,
             remember_chat_file_source,
-            restore_chat_file_source
+            restore_chat_file_source,
+            copy_chat_image
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

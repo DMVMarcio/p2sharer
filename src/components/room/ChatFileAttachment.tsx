@@ -13,6 +13,8 @@ import { Tooltip } from '../common/Tooltip';
 import { showToast } from '../../hooks/useToast';
 import { formatTransferSpeed, type TransferSpeedUnit } from '../../core/transfer_speed';
 import { calculateFocalZoom, clampZoom } from './zoom_utils';
+import { useContextMenu, type ContextMenuAction } from '../common/ContextMenu';
+import { copyImageToClipboard } from '../../core/image_clipboard';
 
 interface Props { message: ChatMessage; transfers: FileProgress[]; preview?: string; savedRequestId?: string;
   speedUnit: TransferSpeedUnit;
@@ -21,6 +23,7 @@ interface Props { message: ChatMessage; transfers: FileProgress[]; preview?: str
 
 export function ChatFileAttachment({ message, transfers, preview, savedRequestId, speedUnit, onRequest, onPreview, onCancel, onReveal }: Props) {
   useLocale();
+  const openContextMenu = useContextMenu();
   const [menu, setMenu] = useState(false);
   const [menuBelow, setMenuBelow] = useState(false);
   const [viewer, setViewer] = useState(false);
@@ -35,7 +38,7 @@ export function ChatFileAttachment({ message, transfers, preview, savedRequestId
   const previewTransfer = transfers.find((transfer) => transfer.direction === 'receive' && transfer.previewOnly &&
     (transfer.status === 'pending' || transfer.status === 'active'));
   const sending = transfers.filter((transfer) => transfer.direction === 'send' && transfer.status === 'active');
-  const completed = transfers.find((transfer) => transfer.direction === 'receive' && transfer.previewOnly && transfer.status === 'complete');
+  const completed = transfers.find((transfer) => transfer.direction === 'receive' && transfer.status === 'complete' && Boolean(transfer.preview));
   const image = preview ?? completed?.preview;
   const own = message.authorId === selfId;
   const stageRef = useRef<HTMLDivElement>(null);
@@ -50,6 +53,28 @@ export function ChatFileAttachment({ message, transfers, preview, savedRequestId
     }
     setZoom(bounded);
     if (bounded === 1) { setPan({ x: 0, y: 0 }); drag.current = null; }
+  };
+  const handleViewerContextMenu = (event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!image) return;
+    const actions: ContextMenuAction[] = [
+      {
+        id: 'copy-image',
+        get label() { return t("message.copyImage"); },
+        icon: <Copy size={15} />,
+        onSelect: () => { void copyImageToClipboard(image); }
+      }
+    ];
+    if (zoom !== 1) {
+      actions.push({
+        id: 'reset-zoom',
+        get label() { return t("message.2a1c7eafd8bb"); },
+        icon: <ZoomOut size={15} />,
+        onSelect: () => { setZoom(1); setPan({ x: 0, y: 0 }); drag.current = null; }
+      });
+    }
+    openContextMenu(event, actions);
   };
   const copyHash = () => {
     void navigator.clipboard.writeText(file.sha256)
@@ -116,6 +141,7 @@ export function ChatFileAttachment({ message, transfers, preview, savedRequestId
       </div>}
     </div>
     {viewer && image && <div className="chat-image-viewer" role="dialog" aria-modal="true" aria-label={file.name}
+      onContextMenu={handleViewerContextMenu}
       onClick={(event) => { if (event.target === event.currentTarget) setViewer(false); }}>
       <div className="chat-image-viewer-toolbar"><span>{file.name}</span>
         <button className="btn-stream-fullscreen" aria-label={t("message.efdda80d56c0")} onClick={() => setImageZoom(zoom - .25)}><ZoomOut size={16} /></button>

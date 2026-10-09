@@ -284,7 +284,7 @@ pub fn list_audio_processes() -> Vec<ProcessItem> {
 static HELD_JOB_OBJECT: std::sync::atomic::AtomicIsize = std::sync::atomic::AtomicIsize::new(0);
 
 #[cfg(windows)]
-pub fn setup_job_object_for_clean_child_teardown() {
+pub fn setup_job_object_with_name(name: Option<&str>) -> Result<(), String> {
     unsafe {
         use windows::Win32::System::JobObjects::{
             CreateJobObjectW, SetInformationJobObject, AssignProcessToJobObject,
@@ -292,29 +292,52 @@ pub fn setup_job_object_for_clean_child_teardown() {
             JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
         };
         use windows::Win32::System::Threading::GetCurrentProcess;
+        use windows::core::{HSTRING, PCWSTR};
 
-        if let Ok(job) = CreateJobObjectW(None, None) {
-            let mut info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
-            info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-            let res = SetInformationJobObject(
-                job,
-                JobObjectExtendedLimitInformation,
-                &info as *const _ as *const std::ffi::c_void,
-                std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
-            );
-            if res.is_ok() {
-                let assign_res = AssignProcessToJobObject(job, GetCurrentProcess());
-                if assign_res.is_ok() {
-                    HELD_JOB_OBJECT.store(job.0 as isize, std::sync::atomic::Ordering::SeqCst);
-                    println!("[Process Manager] Bound P2Sharer to Windows Job Object with KILL_ON_JOB_CLOSE.");
-                }
-            }
-        }
+        let hname = name.map(HSTRING::from);
+        let pcwstr = match &hname {
+            Some(h) => PCWSTR(h.as_ptr()),
+            None => PCWSTR::null(),
+        };
+
+        let job = CreateJobObjectW(None, pcwstr)
+            .map_err(|e| format!("CreateJobObjectW failed: {e}"))?;
+
+        let mut info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+        info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        let _ = SetInformationJobObject(
+            job,
+            JobObjectExtendedLimitInformation,
+            &info as *const _ as *const std::ffi::c_void,
+            std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+        );
+
+        let _ = AssignProcessToJobObject(job, GetCurrentProcess());
+        HELD_JOB_OBJECT.store(job.0 as isize, std::sync::atomic::Ordering::SeqCst);
+        Ok(())
+    }
+}
+
+#[cfg(windows)]
+pub fn setup_job_object_for_clean_child_teardown() {
+    let is_fixture = std::env::var("P2SHARER_JOB_TEST_ROLE").is_ok();
+    let name = if is_fixture {
+        None
+    } else {
+        Some("Local\\P2SharerSharedJobObject")
+    };
+    if let Err(e) = setup_job_object_with_name(name) {
+        crate::logger::log_msg("WARN", "process_manager", &format!("Could not bind job object: {e}"));
+    } else {
+        println!("[Process Manager] Bound P2Sharer to Windows Job Object with KILL_ON_JOB_CLOSE.");
     }
 }
 
 #[cfg(not(windows))]
 pub fn setup_job_object_for_clean_child_teardown() {}
+
+#[cfg(not(windows))]
+pub fn setup_job_object_with_name(_name: Option<&str>) -> Result<(), String> { Ok(()) }
 
 /// Let the updater's installer outlive the app without releasing existing media children.
 #[cfg(windows)]
@@ -410,6 +433,122 @@ mod updater_job_tests {
         let mut line = String::new();
         std::io::stdin().read_line(&mut line).unwrap();
         assert_eq!(line.trim(), "continue");
+    }
+
+    #[test]
+    fn concurrent_instances_share_named_job_and_teardown_only_on_last_close() {
+        let unique_id = format!("{}-{}", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos());
+        let unique_job_name = format!("Local\\P2SharerTestJob-{unique_id}");
+        let test_dir = std::env::temp_dir().join(format!("p2sharer_job_test_{unique_id}"));
+        std::fs::create_dir_all(&test_dir).unwrap();
+
+        // 1. Spawn Worker 1
+        let mut worker1 = Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "process_manager::updater_job_tests::file_coordinated_worker", "--ignored"])
+            .env("P2SHARER_JOB_TEST_ROLE", "worker_1")
+            .env("P2SHARER_JOB_TEST_NAME", &unique_job_name)
+            .env("P2SHARER_JOB_TEST_DIR", &test_dir)
+            .spawn()
+            .unwrap();
+
+        // Wait for Child PID written by Worker 1
+        let child_pid_file = test_dir.join("child.pid");
+        let start = std::time::Instant::now();
+        let child_pid = loop {
+            if let Ok(content) = std::fs::read_to_string(&child_pid_file) {
+                if let Ok(pid) = content.trim().parse::<u32>() {
+                    break pid;
+                }
+            }
+            if start.elapsed().as_secs() > 10 {
+                panic!("Timeout waiting for worker 1 to spawn child");
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        };
+
+        // 2. Spawn Worker 2
+        let mut worker2 = Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "process_manager::updater_job_tests::file_coordinated_worker", "--ignored"])
+            .env("P2SHARER_JOB_TEST_ROLE", "worker_2")
+            .env("P2SHARER_JOB_TEST_NAME", &unique_job_name)
+            .env("P2SHARER_JOB_TEST_DIR", &test_dir)
+            .spawn()
+            .unwrap();
+
+        // Wait for Worker 2 ready file
+        let w2_ready_file = test_dir.join("worker_2.ready");
+        let start = std::time::Instant::now();
+        loop {
+            if w2_ready_file.exists() {
+                break;
+            }
+            if start.elapsed().as_secs() > 10 {
+                panic!("Timeout waiting for worker 2 ready");
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+
+        // Open child process handle to observe termination
+        use windows::Win32::System::Threading::{OpenProcess, PROCESS_SYNCHRONIZE, WaitForSingleObject};
+        use windows::Win32::Foundation::{WAIT_TIMEOUT, WAIT_OBJECT_0};
+        let child_handle = unsafe { OpenProcess(PROCESS_SYNCHRONIZE, false, child_pid).unwrap() };
+
+        // 3. Signal Worker 1 to exit (Primary instance closes!)
+        std::fs::write(test_dir.join("worker_1.exit"), b"1").unwrap();
+        assert!(worker1.wait().unwrap().success());
+
+        // Verify Child is STILL ALIVE (Worker 2 is still holding the job handle!)
+        let wait_res = unsafe { WaitForSingleObject(child_handle, 500) };
+        assert_eq!(wait_res, WAIT_TIMEOUT, "Child process should remain alive while Worker 2 holds job handle");
+
+        // 4. Signal Worker 2 to exit (Last instance closes!)
+        std::fs::write(test_dir.join("worker_2.exit"), b"1").unwrap();
+        assert!(worker2.wait().unwrap().success());
+
+        // Verify Child is now KILLED by Windows Job Object teardown!
+        let wait_res2 = unsafe { WaitForSingleObject(child_handle, 5000) };
+        assert_eq!(wait_res2, WAIT_OBJECT_0, "Child process should be terminated when last job handle closes");
+
+        let _ = std::fs::remove_dir_all(&test_dir);
+    }
+
+    #[test]
+    #[ignore = "Internal worker fixture; invoked by concurrent job regression test"]
+    fn file_coordinated_worker() {
+        let role = std::env::var("P2SHARER_JOB_TEST_ROLE").unwrap();
+        let job_name = std::env::var("P2SHARER_JOB_TEST_NAME").unwrap();
+        let test_dir = std::path::PathBuf::from(std::env::var("P2SHARER_JOB_TEST_DIR").unwrap());
+
+        setup_job_object_with_name(Some(&job_name)).unwrap();
+
+        let mut child_proc = None;
+        if role == "worker_1" {
+            let child = Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", "process_manager::updater_job_tests::child_runs_indefinitely", "--ignored"])
+                .env("P2SHARER_JOB_TEST_ROLE", "child")
+                .spawn()
+                .unwrap();
+            std::fs::write(test_dir.join("child.pid"), child.id().to_string()).unwrap();
+            child_proc = Some(child);
+        } else if role == "worker_2" {
+            std::fs::write(test_dir.join("worker_2.ready"), b"1").unwrap();
+        }
+
+        let exit_file = test_dir.join(format!("{role}.exit"));
+        while !exit_file.exists() {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+
+        std::mem::forget(child_proc);
+    }
+
+    #[test]
+    #[ignore = "Internal child fixture; invoked by concurrent job regression test"]
+    fn child_runs_indefinitely() {
+        assert_eq!(std::env::var("P2SHARER_JOB_TEST_ROLE").unwrap(), "child");
+        loop {
+            std::thread::sleep(std::time::Duration::from_millis(500));
+        }
     }
 }
 

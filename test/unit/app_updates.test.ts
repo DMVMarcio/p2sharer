@@ -275,3 +275,20 @@ test('automatic checks run at startup and every 30 minutes, respect opt-out and 
   context.mock.timers.tick(1_800_000);
   assert.equal(checks, 4);
 });
+
+test('startup automatic check opens update dialog when an update is detected, but periodic checks keep it closed', async context => {
+  isolatedStorage(context);
+  context.mock.timers.enable({ apis: ['setInterval'] });
+  const { controller, dependencies, update } = fixture();
+  dependencies.check = async () => update;
+  const stop = controller.startAutomaticChecks();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(controller.getSnapshot().status, 'available');
+  assert.equal(controller.getSnapshot().dialogOpen, true);
+  controller.close();
+  assert.equal(controller.getSnapshot().dialogOpen, false);
+  context.mock.timers.tick(UPDATE_CHECK_INTERVAL_MS);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(controller.getSnapshot().dialogOpen, false);
+  stop();
+});

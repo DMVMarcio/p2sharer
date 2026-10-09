@@ -1,3 +1,4 @@
+import { useRoomCardLayoutActions } from './RoomCardLayoutContext';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { stateStore } from '../../core/state_store';
@@ -51,6 +52,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   const [liveFps, setLiveFps] = useState<number>(() => (slot.isLocal ? currentFps : 60));
   const [liveBitrate, setLiveBitrate] = useState<number>(0);
   const [remoteResolution, setRemoteResolution] = useState<string>('1080p');
+  const [livePing, setLivePing] = useState<number | null>(null);
 
   const [volume, setVolume] = useState<number>(100);
   const [isMuted, setIsMuted] = useState<boolean>(false);
@@ -62,6 +64,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   });
   const [isHudPinned, setIsHudPinned] = useState<boolean>(false);
   const [activeTooltips, setActiveTooltips] = useState<number>(0);
+  const [isVideoReady, setIsVideoReady] = useState<boolean>(() => Boolean(slot.isLocal));
 
   const handleTooltipOpenChange = useCallback((open: boolean) => {
     setActiveTooltips((prev) => Math.max(0, prev + (open ? 1 : -1)));
@@ -138,12 +141,15 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           } else if (el.paused) {
             el.play().catch(() => {});
           }
+          if (!slot.isLocal && el.readyState >= 2 && el.videoWidth > 0) {
+            setIsVideoReady(true);
+          }
         } else {
           cleanupVideoElement(el);
         }
       }
     },
-    [cleanupVideoElement]
+    [cleanupVideoElement, slot.isLocal]
   );
 
   // Stream replacement updates the existing node without detaching its React ref.
@@ -151,10 +157,14 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     const element = videoElementRef.current;
     if (!element) return;
     if (slot.stream && element.srcObject !== slot.stream) {
+      if (!slot.isLocal) setIsVideoReady(false);
       element.srcObject = slot.stream;
       void element.play().catch(() => {});
-    } else if (!slot.stream && element.srcObject) cleanupVideoElement(element);
-  }, [slot.stream, cleanupVideoElement]);
+    } else if (!slot.stream && element.srcObject) {
+      cleanupVideoElement(element);
+      if (!slot.isLocal) setIsVideoReady(false);
+    }
+  }, [slot.stream, slot.isLocal, cleanupVideoElement]);
 
   useEffect(() => {
     return () => {
@@ -198,6 +208,9 @@ export const VideoCard: React.FC<VideoCardProps> = ({
       if (stats?.height) {
         setRemoteResolution(`${stats.height}p`);
       }
+      if (stats?.pingMs !== null && stats?.pingMs !== undefined) {
+        setLivePing(stats.pingMs);
+      }
     };
 
     fetchStats();
@@ -211,6 +224,9 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   }, [slot.isLocal, slot.peerId, slot.isStreaming, inTray]);
 
   const handleCardClick = () => {
+    if (pointer.enabled) {
+      return;
+    }
     if (didDragRef.current) {
       didDragRef.current = false;
       return;
@@ -252,6 +268,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
 
   const watchers = slot.watchers || [];
 
+  const layoutActions = useRoomCardLayoutActions();
   const handleContextMenu = (event: React.MouseEvent) => {
     const actions: ContextMenuAction[] = [];
     if (layoutMode === 'spotlight' && inTray && !isSelectedFeatured) actions.push({ id: 'overlay', get label() { return t("message.1c2685f76e69"); },
@@ -277,13 +294,15 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     }
     actions.push({ id: 'stop', get label() { return slot.isLocal ? t("message.6ef17b51fd93") : t("message.470b862fbd07"); }, icon: <Square size={15} />, separator: true,
       onSelect: slot.isLocal ? () => { if (slot.mediaId) roomService.stopTransmission(slot.mediaId); } : () => stopWatchingStream(slot.peerId) });
-    openContextMenu(event, actions);
+    openContextMenu(event, [...actions, ...layoutActions]);
   };
 
-  const pingVal = !slot.isLocal ? getPeerPing(slot.peerId) : 0;
-  const pingNum = pingVal ?? 15;
-  const pingStr = pingVal !== null && pingVal !== undefined ? `${pingVal} ms` : '15 ms';
-  const pingClass = pingNum < 80 ? 'ping-good' : pingNum < 180 ? 'ping-medium' : 'ping-poor';
+  const pingVal = !slot.isLocal ? (livePing ?? getPeerPing(slot.peerId)) : 0;
+  const pingNum = pingVal;
+  const pingStr = pingVal !== null && pingVal !== undefined ? `${pingVal} ms` : '-- ms';
+  const pingClass = pingNum !== null && pingNum !== undefined
+    ? (pingNum < 80 ? 'ping-good' : pingNum < 180 ? 'ping-medium' : 'ping-poor')
+    : 'ping-medium';
 
   const signalingStatus = roomService.roomManager?.getSignalingStatus?.();
   const transportTag = signalingStatus?.activeTransport
@@ -293,13 +312,13 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   return (
     <div
       ref={cardRef}
-      className={`stream-card ${isFeatured ? 'featured' : ''} ${inTray ? 'in-tray' : ''} ${isSelectedFeatured ? 'selected-featured' : ''} ${zoom > 1.0 && !inTray ? 'is-zoomed' : ''} ${isDragging && !inTray ? 'is-dragging' : ''} ${!slot.isLocal && !inTray ? 'has-volume-controller' : ''} ${isHudPinned ? 'is-hud-pinned' : ''} ${activeTooltips > 0 ? 'is-hud-active' : ''}`}
+      className={`stream-card ${isFeatured ? 'featured' : ''} ${inTray ? 'in-tray' : ''} ${isSelectedFeatured ? 'selected-featured' : ''} ${zoom > 1.0 && !inTray ? 'is-zoomed' : ''} ${isDragging && !inTray ? 'is-dragging' : ''} ${!slot.isLocal && !inTray ? 'has-volume-controller' : ''} ${isHudPinned ? 'is-hud-pinned' : ''} ${activeTooltips > 0 ? 'is-hud-active' : ''} ${pointer.enabled ? 'is-stream-pointer-active' : ''}`}
       data-peer-id={slot.peerId}
       onClick={handleCardClick}
       onContextMenu={handleContextMenu}
       tabIndex={0}
-      onMouseDown={!inTray ? handleMouseDown : undefined}
-      onDoubleClick={!inTray ? handleDoubleClick : undefined}
+      onMouseDown={!inTray && !pointer.enabled ? handleMouseDown : undefined}
+      onDoubleClick={!inTray && !pointer.enabled ? handleDoubleClick : undefined}
     >
       <div
         className="stream-video-viewport"
@@ -384,23 +403,42 @@ export const VideoCard: React.FC<VideoCardProps> = ({
             )}
           </div>
         ) : (
-          <video
-            ref={videoRef}
-            className={pointer.cursorActive ? 'stream-pointer-active-cursor' : undefined}
-            autoPlay
-            playsInline
-            muted
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'contain',
-              imageRendering: '-webkit-optimize-contrast' as any,
-              transform: zoom > 1.0 && !inTray ? `translate3d(${pan.x}px, ${pan.y}px, 0px) scale(${zoom})` : 'none',
-              transformOrigin: 'center center',
-              transition: isDragging ? 'none' : 'transform 0.08s ease-out',
-              willChange: zoom > 1.0 && !inTray ? 'transform' : 'auto',
-            }}
-          />
+          <>
+            <video
+              ref={videoRef}
+              className={`${pointer.enabled ? 'is-stream-pointer-active ' : ''}${pointer.cursorActive ? 'stream-pointer-active-cursor' : ''}`.trim() || undefined}
+              autoPlay
+              playsInline
+              muted
+              onLoadedData={() => setIsVideoReady(true)}
+              onPlaying={() => setIsVideoReady(true)}
+              onTimeUpdate={() => { if (!isVideoReady) setIsVideoReady(true); }}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+                imageRendering: '-webkit-optimize-contrast' as any,
+                transform: zoom > 1.0 && !inTray ? `translate3d(${pan.x}px, ${pan.y}px, 0px) scale(${zoom})` : 'none',
+                transformOrigin: 'center center',
+                transition: isDragging ? 'none' : 'transform 0.08s ease-out, opacity 0.2s ease-in',
+                willChange: zoom > 1.0 && !inTray ? 'transform' : 'auto',
+                opacity: isVideoReady || slot.isLocal ? 1 : 0,
+              }}
+            />
+            {!isVideoReady && !slot.isLocal && (
+              <div className="local-broadcaster-placeholder" style={{ position: 'absolute', inset: 0, zIndex: 1 }}>
+                <div className="local-broadcaster-radar-pulse">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                    <line x1="8" y1="21" x2="16" y2="21"/>
+                    <line x1="12" y1="17" x2="12" y2="21"/>
+                  </svg>
+                </div>
+                {!inTray && <span className="local-broadcaster-title">{t("message.863d929084c6")}</span>}
+                {!inTray && <span className="local-broadcaster-subtitle">{slot.senderName}</span>}
+              </div>
+            )}
+          </>
         )}
       </div>
 

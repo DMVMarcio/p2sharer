@@ -1,3 +1,4 @@
+import { ProfileAvatar } from '../common/ProfileAvatar';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useState } from 'react';
@@ -30,12 +31,8 @@ export const ParticipantsPane: React.FC = () => {
   };
 
   const getSlotColor = (peerId: string, isLocal: boolean): string => {
-    const slot = roomSlots.find((s) => s.isLocal === isLocal || s.peerId === peerId);
+    const slot = roomSlots.find((s) => isLocal ? s.isLocal : s.peerId === peerId);
     return slot?.color || 'var(--accent-color)';
-  };
-
-  const getInitial = (name: string): string => {
-    return (name || 'U').trim().charAt(0).toUpperCase();
   };
 
   const localColor = getSlotColor('local', true);
@@ -46,12 +43,7 @@ export const ParticipantsPane: React.FC = () => {
         {/* Local user */}
         <div className="participant-item">
           <div className="participant-item-identity">
-            <div
-              className="participant-item-avatar"
-              style={{ backgroundColor: localColor }}
-            >
-              <span className="participant-item-avatar-letter">{getInitial(username)}</span>
-            </div>
+            <ProfileAvatar name={username} isLocal color={localColor} className="participant-item-avatar" />
             <div className="participant-item-text">
               <span className="participant-item-name">{username || t("message.f53bbaa05fae")}</span>
               <span className="badge-you">{t("message.a03099f135b1")}</span>
@@ -81,12 +73,7 @@ export const ParticipantsPane: React.FC = () => {
           return (
             <div key={p.id} className="participant-item" onContextMenu={(event) => openContextMenu(event, actions)}>
               <div className="participant-item-identity">
-                <div
-                  className="participant-item-avatar"
-                  style={{ backgroundColor: color }}
-                >
-                  <span className="participant-item-avatar-letter">{getInitial(p.username)}</span>
-                </div>
+                <ProfileAvatar peerId={p.id} name={p.username} color={color} className="participant-item-avatar" />
                 <div className="participant-item-text">
                   <span className="participant-item-name">{p.username}</span>
                   {p.isCreator && <span className="badge-host">{t("common.hostBadge")}</span>}

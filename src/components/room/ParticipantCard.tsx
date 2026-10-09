@@ -1,3 +1,7 @@
+import { useRoomCardLayoutActions } from './RoomCardLayoutContext';
+import { contrastingTextColor } from '../../core/accent_color';
+import { profileImages } from '../../core/profile_image';
+import { ProfileAvatar } from '../common/ProfileAvatar';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { roomService } from '../../services/room_service';
@@ -26,11 +30,14 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
   isSelectedFeatured = false,
 }) => {
   useLocale();
+  React.useSyncExternalStore(profileImages.subscribe, profileImages.snapshot);
   const { togglePin, requestStream, layoutMode, returnToGrid } = useRoom();
   const openContextMenu = useContextMenu();
+  const layoutActions = useRoomCardLayoutActions();
   const { openModal } = useModal();
   const subscribedStreams = useStore((s) => s.subscribedStreams);
 
+  const background = profileImages.background(slot.ownerPeerId ?? slot.peerId, slot.isLocal, slot.color);
   const isSubscribed = subscribedStreams.has(slot.peerId);
   const watchers = slot.watchers || [];
   const watchersCount = watchers.length;
@@ -48,7 +55,7 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
     <div
       className={`participant-card ${isFeatured ? 'featured' : ''} ${inTray ? 'in-tray' : ''} ${isSelectedFeatured ? 'selected-featured' : ''}`}
       data-peer-id={slot.peerId}
-      style={{ '--user-color': slot.color } as React.CSSProperties}
+      style={{ '--user-color': slot.color, '--card-color': background, '--card-text': contrastingTextColor(background) } as React.CSSProperties}
       onClick={handleCardClick}
       tabIndex={0}
       onContextMenu={(event) => {
@@ -59,7 +66,7 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
           onSelect: returnToGrid });
         if (!slot.isLocal && slot.isStreaming && !isSubscribed) actions.push({ id: 'watch', get label() { return t("message.5a49c69bab6b"); }, icon: <Play size={15} />, onSelect: () => requestStream(slot.peerId) });
         if (slot.isLocal && !slot.isStreaming) actions.push({ id: 'share', get label() { return t("message.85344dae041c"); }, icon: <MonitorUp size={15} />, onSelect: () => { stateStore.set((state) => { state.editingStreamId = null; }); openModal('screenPicker'); } });
-        openContextMenu(event, actions);
+        openContextMenu(event, [...actions, ...layoutActions]);
       }}
     >
       {/* Featured badge when in tray */}
@@ -95,11 +102,8 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
         </>
       )}
 
-      <div className="participant-avatar-badge">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-        </svg>
-      </div>
+      <ProfileAvatar peerId={slot.ownerPeerId ?? slot.peerId} name={slot.senderName}
+        isLocal={slot.isLocal} color={slot.color} className="participant-avatar-badge" />
 
       <div className="participant-name-row">
         <span className="participant-avatar-label">{slot.senderName}{slot.mediaLabel ? ` · ${slot.mediaLabel}` : ""}</span>
@@ -117,7 +121,7 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
       )}
 
       {!inTray && !slot.isLocal && slot.isStreaming && isSubscribed && !slot.stream && (
-        <div className="participant-status-text" style={{ color: 'var(--accent-color)' }}>
+        <div className="participant-status-text">
           {t("message.3bc3a2cd970b")}</div>
       )}
 

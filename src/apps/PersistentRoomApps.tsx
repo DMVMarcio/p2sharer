@@ -9,13 +9,14 @@ interface Props {
   layoutMode: 'grid' | 'spotlight';
   featuredId?: string;
   layoutKey: string;
+  draggingId?: string | null;
   rootRef: React.RefObject<HTMLDivElement | null>;
   slotsRef: React.RefObject<Map<string, HTMLDivElement>>;
 }
 
 interface Placement { left: number; top: number; width: number; height: number; clipPath: string }
 
-export const PersistentRoomApps: React.FC<Props> = ({ instances, layoutMode, featuredId, layoutKey, rootRef, slotsRef }) => {
+export const PersistentRoomApps: React.FC<Props> = ({ instances, layoutMode, featuredId, layoutKey, draggingId, rootRef, slotsRef }) => {
   useLocale();
   const [placements, setPlacements] = useState<Record<string, Placement>>({});
   const previousRef = useRef('');
@@ -57,15 +58,7 @@ export const PersistentRoomApps: React.FC<Props> = ({ instances, layoutMode, fea
     slotsRef.current.forEach((slot) => observer.observe(slot));
     root.addEventListener('scroll', measure, true);
     window.addEventListener('resize', measure);
-    let frame = 0;
-    const until = performance.now() + 460;
-    const followTransition = () => {
-      measure();
-      if (performance.now() < until) frame = requestAnimationFrame(followTransition);
-    };
-    frame = requestAnimationFrame(followTransition);
     return () => {
-      cancelAnimationFrame(frame);
       observer.disconnect();
       root.removeEventListener('scroll', measure, true);
       window.removeEventListener('resize', measure);
@@ -77,7 +70,8 @@ export const PersistentRoomApps: React.FC<Props> = ({ instances, layoutMode, fea
       const placement = placements[instance.id];
       const isFeatured = layoutMode === 'spotlight' && featuredId === `app:${instance.id}`;
       return <RoomAppCard key={instance.id} instance={instance} isFeatured={isFeatured}
-        compact={!isFeatured} style={placement || { left: -10000, top: -10000, width: 1, height: 1,
+        compact={!isFeatured} layoutDraggable={!isFeatured} style={placement ? { ...placement,
+          zIndex: draggingId === `app:${instance.id}` ? 40 : 5 } : { left: -10000, top: -10000, width: 1, height: 1,
           visibility: 'hidden', pointerEvents: 'none' }} />;
     })}
   </div>;

@@ -26,6 +26,8 @@ export interface TooltipProps {
   showDelay?: number;
   /** Delay before hiding the tooltip in ms (default: 100ms). */
   hideDelay?: number;
+  /** Duration of exit animation in ms. */
+  exitDuration?: number;
   /** Whether the tooltip is disabled. */
   disabled?: boolean;
   /** Callback fired when the tooltip visibility state changes. */
@@ -41,25 +43,37 @@ export const Tooltip: React.FC<TooltipProps> = ({
   interactive = false,
   showDelay = 80,
   hideDelay = 100,
+  exitDuration,
   disabled = false,
   onOpenChange,
 }) => {
   const tooltipId = useId();
   const [isOpen, setIsOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  const [isExiting, setIsExiting] = useState(false);
   const [isArmed, setIsArmed] = useState(false);
   const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
 
   const triggerRef = useRef<HTMLElement | null>(null);
   const tooltipRef = useRef<HTMLDivElement | null>(null);
+  const lastCoordsRef = useRef<{ top: number; left: number } | null>(null);
 
   const showTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const exitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pointerActivationRef = useRef(false);
   const onOpenChangeRef = useRef(onOpenChange);
   onOpenChangeRef.current = onOpenChange;
   const notifiedOpenRef = useRef(false);
 
   const isCompact = compact ?? (typeof content === 'string' && !tooltipClassName);
+
+  const getExitDuration = useCallback(() => {
+    if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      return 0;
+    }
+    return exitDuration ?? (hideDelay < 20 ? 0 : 140);
+  }, [exitDuration, hideDelay]);
 
   const clearTimers = useCallback(() => {
     if (showTimeoutRef.current) {
@@ -70,14 +84,33 @@ export const Tooltip: React.FC<TooltipProps> = ({
       clearTimeout(hideTimeoutRef.current);
       hideTimeoutRef.current = null;
     }
+    if (exitTimeoutRef.current) {
+      clearTimeout(exitTimeoutRef.current);
+      exitTimeoutRef.current = null;
+    }
   }, []);
 
   const dismiss = useCallback(() => {
     clearTimers();
     setIsArmed(false);
     setIsOpen(false);
-    setCoords(null);
-  }, [clearTimers]);
+    const duration = getExitDuration();
+    if (duration <= 0) {
+      setIsExiting(false);
+      setIsMounted(false);
+      setCoords(null);
+      lastCoordsRef.current = null;
+    } else {
+      setIsExiting(true);
+      exitTimeoutRef.current = setTimeout(() => {
+        setIsExiting(false);
+        setIsMounted(false);
+        setCoords(null);
+        lastCoordsRef.current = null;
+        exitTimeoutRef.current = null;
+      }, duration);
+    }
+  }, [clearTimers, getExitDuration]);
 
   const calculatePosition = useCallback(() => {
     if (!triggerRef.current || !tooltipRef.current) return;
@@ -94,26 +127,47 @@ export const Tooltip: React.FC<TooltipProps> = ({
       gap: 6,
     });
 
-    setCoords({ top, left });
+    const nextCoords = { top, left };
+    setCoords(nextCoords);
+    lastCoordsRef.current = nextCoords;
   }, [placement]);
 
   const handleShow = useCallback(() => {
     if (disabled || !content) return;
     clearTimers();
     setIsArmed(true);
+    setIsExiting(false);
+    setIsMounted(true);
     showTimeoutRef.current = setTimeout(() => {
       setIsOpen(true);
+      showTimeoutRef.current = null;
     }, showDelay);
   }, [clearTimers, disabled, content, showDelay]);
 
   const handleHide = useCallback(() => {
     clearTimers();
     hideTimeoutRef.current = setTimeout(() => {
+      hideTimeoutRef.current = null;
       setIsOpen(false);
       setIsArmed(false);
-      setCoords(null);
+      const duration = getExitDuration();
+      if (duration <= 0) {
+        setIsExiting(false);
+        setIsMounted(false);
+        setCoords(null);
+        lastCoordsRef.current = null;
+      } else {
+        setIsExiting(true);
+        exitTimeoutRef.current = setTimeout(() => {
+          setIsExiting(false);
+          setIsMounted(false);
+          setCoords(null);
+          lastCoordsRef.current = null;
+          exitTimeoutRef.current = null;
+        }, duration);
+      }
     }, hideDelay);
-  }, [clearTimers, hideDelay]);
+  }, [clearTimers, hideDelay, getExitDuration]);
 
   // Notify each transition exactly once, including disposal of an open tooltip.
   useEffect(() => {
@@ -287,7 +341,9 @@ export const Tooltip: React.FC<TooltipProps> = ({
     'aria-describedby': isOpen ? tooltipId : undefined,
   });
 
-  const shouldRenderTooltip = isOpen && Boolean(content) && !disabled;
+  const shouldRenderTooltip = (isMounted || isOpen) && Boolean(content) && !disabled;
+  const activeCoords = coords ?? lastCoordsRef.current;
+  const isVisible = isOpen && Boolean(coords);
 
   return (
     <>
@@ -299,11 +355,11 @@ export const Tooltip: React.FC<TooltipProps> = ({
             id={tooltipId}
             role="tooltip"
             className={`custom-tooltip custom-tooltip-portal ${isCompact ? 'tooltip-compact' : ''} ${
-              interactive ? 'interactive' : ''
-            } ${coords ? 'visible' : ''} ${tooltipClassName}`.trim()}
+              interactive && !isExiting ? 'interactive' : ''
+            } ${isVisible && !isExiting ? 'visible' : ''} ${isExiting ? 'is-exiting' : ''} ${tooltipClassName}`.trim()}
             style={{
-              top: coords ? `${coords.top}px` : '-9999px',
-              left: coords ? `${coords.left}px` : '-9999px',
+              top: activeCoords ? `${activeCoords.top}px` : '-9999px',
+              left: activeCoords ? `${activeCoords.left}px` : '-9999px',
             }}
             onMouseEnter={interactive ? clearTimers : undefined}
             onMouseLeave={interactive ? handleHide : undefined}

@@ -180,9 +180,20 @@ pub async fn create_native_video_offer(
         .map_err(|e| e.to_string())?;
     let registry =
         register_default_interceptors(Registry::new(), &mut engine).map_err(|e| e.to_string())?;
+    let mut setting = webrtc::api::setting_engine::SettingEngine::default();
+    setting.set_network_types(vec![
+        webrtc::ice::network_type::NetworkType::Udp4,
+        webrtc::ice::network_type::NetworkType::Tcp4,
+    ]);
+    setting.set_ice_timeouts(
+        Some(Duration::from_secs(3)),
+        Some(Duration::from_secs(8)),
+        Some(Duration::from_secs(2)),
+    );
     let api = APIBuilder::new()
         .with_media_engine(engine)
         .with_interceptor_registry(registry)
+        .with_setting_engine(setting)
         .build();
     let servers = ice_servers
         .into_iter()

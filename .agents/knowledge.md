@@ -44,6 +44,7 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 - [P2P Message Authorization and Threat Model](knowledge/peer-security.md)
 - [Room Apps: Modular Instances and Synchronized State](knowledge/room-apps.md)
 - [Consent-Based Chat File Transfer](knowledge/chat-file-transfer.md)
+- [Profile Images, Native Processing and Hash-Based Transfer Consent](knowledge/profile-images.md)
 - [English and Brazilian Portuguese Localization](knowledge/localization.md)
 
 ---

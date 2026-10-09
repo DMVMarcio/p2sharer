@@ -1,3 +1,5 @@
+import { ProfileAvatar } from './ProfileAvatar';
+import { roomService } from '../../services/room_service';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React from 'react';
@@ -11,10 +13,9 @@ export interface ActivityParticipant {
 
 export const ActivityAvatar: React.FC<{ person: ActivityParticipant; className?: string }> =
   ({ person, className = '' }) => { useLocale(); return <Tooltip content={person.name}>
-    <span className={`room-app-participant ${className}`} style={{ backgroundColor: person.color }}
-      tabIndex={0} aria-label={person.name}>
-      {person.name.trim().charAt(0).toUpperCase() || '?'}
-    </span>
+    <ProfileAvatar peerId={person.id} name={person.name} color={person.color} tabIndex={0}
+      isLocal={person.id === roomService.roomManager?.getLocalPeerId()}
+      className={`room-app-participant ${className}`} />
   </Tooltip>; };
 
 export const ActivityParticipants: React.FC<{ people: ActivityParticipant[] }> = ({ people }) =>

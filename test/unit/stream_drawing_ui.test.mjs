@@ -219,3 +219,28 @@ test('clicking each active drawing tool again returns to Mouse', async () => {
     assert.equal(document.querySelector('[aria-label="Mouse"]').getAttribute('aria-pressed'), 'true');
   }
 });
+
+test('pen and touch tablet inputs draw properly and container has touch-action class active', async () => {
+  assert.ok(document.querySelector('.is-stream-pointer-active'));
+  await click('[aria-label="Pincel"]');
+  const initialDraws = globalThis.__pointerTestSent.filter(p => p.kind === 'draw').length;
+  await act(async () => {
+    const penDown = new window.MouseEvent('pointerdown', { bubbles: true, cancelable: true, clientX: 160, clientY: 90, button: 0 });
+    Object.defineProperties(penDown, { pointerId: { value: 2 }, pointerType: { value: 'pen' } });
+    video.dispatchEvent(penDown);
+  });
+  await act(async () => {
+    const penMove = new window.MouseEvent('pointermove', { bubbles: true, cancelable: true, clientX: 320, clientY: 180, button: -1 });
+    Object.defineProperties(penMove, { pointerId: { value: 2 }, pointerType: { value: 'pen' }, buttons: { value: 1 } });
+    video.dispatchEvent(penMove);
+  });
+  await act(async () => {
+    const penUp = new window.MouseEvent('pointerup', { bubbles: true, cancelable: true, clientX: 480, clientY: 270, button: 0 });
+    Object.defineProperties(penUp, { pointerId: { value: 2 }, pointerType: { value: 'pen' } });
+    video.dispatchEvent(penUp);
+  });
+  const penDraws = globalThis.__pointerTestSent.filter(p => p.kind === 'draw');
+  assert.equal(penDraws.length, initialDraws + 1);
+  assert.equal(penDraws.at(-1).drawing.tool, 'brush');
+  assert.deepEqual(penDraws.at(-1).drawing.points[0], { x: 0.2, y: 0.2 });
+});

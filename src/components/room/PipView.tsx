@@ -444,7 +444,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
 
   return (
     <div
-      className="pip-window-root"
+      className={`pip-window-root${pointer.enabled ? ' is-stream-pointer-active' : ''}`}
       ref={containerRef}
       onContextMenu={(event) => {
         const actions: ContextMenuAction[] = [
@@ -466,7 +466,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
       {/* Edge-to-edge Video Element */}
       <video
         ref={videoRef}
-        className={`pip-video-element${pointer.cursorActive ? ' stream-pointer-active-cursor' : ''}`}
+        className={`pip-video-element${pointer.enabled ? ' is-stream-pointer-active' : ''}${pointer.cursorActive ? ' stream-pointer-active-cursor' : ''}`}
         autoPlay
         playsInline
         muted
@@ -544,8 +544,8 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
           liveBitrateKbps={stats.bitrateKbps}
           configuredBitrateKbps={stats.configuredBitrateKbps}
           isLocal={isLocal}
-          pingText={stats.pingMs === null ? '15 ms' : `${stats.pingMs} ms`}
-          pingClass={(stats.pingMs ?? 15) < 80 ? 'ping-good' : (stats.pingMs ?? 15) < 180 ? 'ping-medium' : 'ping-poor'}
+          pingText={stats.pingMs === null || stats.pingMs === undefined ? '-- ms' : `${stats.pingMs} ms`}
+          pingClass={stats.pingMs !== null && stats.pingMs !== undefined ? (stats.pingMs < 80 ? 'ping-good' : stats.pingMs < 180 ? 'ping-medium' : 'ping-poor') : 'ping-medium'}
           transportTag={stats.transportTag}
           watchers={stats.watchers}
           onTooltipOpenChange={handleTooltipOpenChange}

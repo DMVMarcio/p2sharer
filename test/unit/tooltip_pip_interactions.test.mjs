@@ -31,9 +31,9 @@ const root = createRoot(document.getElementById('root'));
 let transitions = [];
 let anchorX = 10;
 let anchorScale = 1;
-function Fixture({ disabled = false, interactive = false, content = 'Action', callback = open => transitions.push(open) }) {
+function Fixture({ disabled = false, interactive = false, content = 'Action', exitDuration, callback = open => transitions.push(open) }) {
   return React.createElement('div', null,
-    React.createElement(Tooltip, { content, disabled, interactive, showDelay: 1, hideDelay: 5, onOpenChange: callback },
+    React.createElement(Tooltip, { content, disabled, interactive, showDelay: 1, hideDelay: 5, exitDuration, onOpenChange: callback },
       React.createElement('button', { id: 'trigger', ref: node => {
         if (node) node.getBoundingClientRect = () => {
           const size = 30 * anchorScale;
@@ -186,7 +186,22 @@ test('PiP drag cancellation, disabled interaction and unmount never leave a pend
   await act(async () => root.render(React.createElement(DragFixture, { enabled: false })));
   await dispatch(document.querySelector('#video'), 'pointerdown'); await dispatch(window, 'pointermove', { clientX: 100 });
   assert.equal(globalThis.pipDragCalls, 0);
-  await act(async () => root.render(React.createElement(DragFixture)));
   await dispatch(document.querySelector('#video'), 'pointerdown'); await act(async () => root.render(null));
   await dispatch(window, 'pointermove', { clientX: 100 }); assert.equal(globalThis.pipDragCalls, 0);
+});
+
+test('smooth exit transition retains coordinates and applies is-exiting before unmounting', async () => {
+  await render({ exitDuration: 40, hideDelay: 5 });
+  await hover();
+  const el = tooltip();
+  assert.ok(el);
+  assert.ok(el.classList.contains('visible'));
+  await dispatch(trigger(), 'mouseout', { relatedTarget: document.body });
+  await act(async () => new Promise(resolve => setTimeout(resolve, 10)));
+  const exitingEl = tooltip();
+  assert.ok(exitingEl);
+  assert.ok(exitingEl.classList.contains('is-exiting'));
+  assert.ok(!exitingEl.classList.contains('visible'));
+  await act(async () => new Promise(resolve => setTimeout(resolve, 45)));
+  assert.equal(tooltip(), null);
 });

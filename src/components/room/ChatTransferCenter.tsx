@@ -2,18 +2,20 @@ import { getLanguage, localizeText, t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { useDropdownPresence } from '../../hooks/useDropdownPresence';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { Download, File, FolderSearch, Image as ImageIcon, Square, Upload, X } from 'lucide-react';
+import { Download, File, FolderSearch, Image as ImageIcon, Info, Square, Upload, X } from 'lucide-react';
 import { useRoom } from '../../hooks/useRoom';
 import { showToast } from '../../hooks/useToast';
+import { Tooltip } from '../common/Tooltip';
+import { TooltipButton } from '../common/TooltipButton';
 import { formatFileSize } from '../../core/file_size';
 import type { FileProgress } from '../../p2p/group_room';
 import { formatTransferSpeed, getTransferSpeedUnit, subscribeTransferSpeedUnit,
   type TransferSpeedUnit } from '../../core/transfer_speed';
 
-function statusText(transfer: FileProgress, unit: TransferSpeedUnit): string {
+function statusText(transfer: FileProgress): string {
   switch (transfer.status) {
     case 'pending': return t('message.a6c8547e96c9');
-    case 'active': return t('message.913cec09c978', { v0: Math.round(transfer.total ? transfer.bytes / transfer.total * 100 : 100), v1: formatFileSize(transfer.bytes), v2: formatFileSize(transfer.total), v3: formatTransferSpeed(transfer.bytesPerSecond ?? 0, unit) });
+    case 'active': return t('file.transferProgress', { v0: Math.round(transfer.total ? transfer.bytes / transfer.total * 100 : 100), v1: formatFileSize(transfer.bytes), v2: formatFileSize(transfer.total) });
     case 'complete': return t('message.2801cb53f1fa');
     case 'cancelled': return t('message.f407384e2f30');
     case 'error': return t('message.253acf999f5d');
@@ -46,6 +48,21 @@ function transportText(transfer: FileProgress, unit: TransferSpeedUnit): string 
   }
   if (details.packetsDiscardedOnSend) parts.push(t("message.56ef2c33fdc6", { v0: details.packetsDiscardedOnSend }));
   return parts.length ? parts.join(' · ') : null;
+}
+
+function TransferDetailsHint({ transfer, unit }: { transfer: FileProgress; unit: TransferSpeedUnit }) {
+  const connection = [transfer.connectionType ? localizeText(transfer.connectionType) : null,
+    transfer.rttMs !== null && transfer.rttMs !== undefined ? `${transfer.rttMs} ms` : null]
+    .filter(Boolean).join(' · ');
+  const details = [connection, transportText(transfer, unit), timingText(transfer)].filter(Boolean);
+  if (!details.length) return null;
+  return <Tooltip content={<div className="chat-transfer-details">
+    {details.map((detail, index) => <div key={index}>{detail}</div>)}
+  </div>}>
+    <button type="button" className="btn chat-transfer-details-trigger" aria-label={t('file.transferDetails')}>
+      <Info size={13} aria-hidden="true" />
+    </button>
+  </Tooltip>;
 }
 
 export function ChatTransferCenter() {
@@ -88,16 +105,17 @@ export function ChatTransferCenter() {
           <div className="chat-transfer-item-copy">
             <strong>{transfer.fileName ?? t("message.ba8a452f2f83")}{transfer.previewOnly ? t("message.169a3563ed9b") : ''}</strong>
             <span>{presence.value === 'send' ? t("message.237b14cbb480") : t("message.e2eca64bd73c")} {transfer.peerName ?? t("message.1e97ddf60a0f")}</span>
-            <small>{statusText(transfer, speedUnit)}</small>
-            {transfer.connectionType && <small>{localizeText(transfer.connectionType)}
-              {transfer.rttMs !== null && transfer.rttMs !== undefined ? ` · ${transfer.rttMs} ms` : ''}</small>}
-            {transportText(transfer, speedUnit) && <small>{transportText(transfer, speedUnit)}</small>}
-            {timingText(transfer) && <small>{timingText(transfer)}</small>}
+            <small>{statusText(transfer)}
+              {transfer.status === 'active' ? <> · <span className="chat-transfer-speed">
+                {formatTransferSpeed(transfer.bytesPerSecond ?? 0, speedUnit)}
+                <TransferDetailsHint transfer={transfer} unit={speedUnit} />
+              </span></> : <TransferDetailsHint transfer={transfer} unit={speedUnit} />}
+            </small>
           </div>
           {transfer.status === 'complete' && transfer.direction === 'receive' && transfer.saved &&
-            <button type="button" aria-label={t("message.9392dee15ee6")} title={t("message.effbe5e6d9fb")}
+            <TooltipButton tooltip={t("message.effbe5e6d9fb")} aria-label={t("message.9392dee15ee6")}
               onClick={() => void revealSavedFile(transfer.messageId, transfer.requestId)
-                .catch(() => showToast(t("message.bf86d73f16f0")))}><FolderSearch size={15} /></button>}
+                .catch(() => showToast(t("message.bf86d73f16f0")))}><FolderSearch size={15} /></TooltipButton>}
           {transfer.status === 'pending' || transfer.status === 'active' ?
             <button type="button" aria-label={t("message.01427c7bb274")} onClick={() => void cancelFileTransfer(transfer.requestId)}><Square size={13} fill="currentColor" /></button> :
             <button type="button" aria-label={t("message.fc1dca8fdd97")} onClick={() => dismissFileProgress(transfer.requestId)}><X size={14} /></button>}

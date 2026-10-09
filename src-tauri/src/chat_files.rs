@@ -293,6 +293,39 @@ pub fn reveal_chat_download(state: State<'_, ChatFileState>, id: String) -> Resu
     Ok(())
 }
 
+fn decode_image_bytes(data_base64: &str) -> Result<(usize, usize, Vec<u8>), String> {
+    let base64_str = if let Some(idx) = data_base64.find(";base64,") {
+        &data_base64[idx + 8..]
+    } else {
+        data_base64
+    };
+    let bytes = STANDARD.decode(base64_str.trim()).map_err(|e| e.to_string())?;
+    if bytes.len() > 64 * 1024 * 1024 {
+        return Err("Image too large".into());
+    }
+    let dynamic_image = image::load_from_memory(&bytes).map_err(|e| e.to_string())?;
+    let rgba = dynamic_image.to_rgba8();
+    let width = usize::try_from(rgba.width()).map_err(|_| "Image too wide")?;
+    let height = usize::try_from(rgba.height()).map_err(|_| "Image too tall")?;
+    Ok((width, height, rgba.into_raw()))
+}
+
+#[tauri::command]
+pub async fn copy_chat_image(data_base64: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let (width, height, raw) = decode_image_bytes(&data_base64)?;
+        let image_data = arboard::ImageData {
+            width,
+            height,
+            bytes: std::borrow::Cow::Borrowed(&raw),
+        };
+        let mut clipboard = arboard::Clipboard::new().map_err(|e| e.to_string())?;
+        clipboard.set_image(image_data).map_err(|e| e.to_string())?;
+        Ok(())
+    }).await.map_err(|e| e.to_string())?
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -347,5 +380,18 @@ mod tests {
         fs::remove_file(path).unwrap();
         assert_eq!(result.0, 3);
         assert_eq!(result.1, "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+    }
+
+    #[test]
+    fn decodes_image_for_clipboard() {
+        let img = image::RgbaImage::from_pixel(3, 4, image::Rgba([10, 20, 30, 255]));
+        let mut png_bytes = Vec::new();
+        img.write_to(&mut std::io::Cursor::new(&mut png_bytes), image::ImageFormat::Png).unwrap();
+        let encoded = format!("data:image/png;base64,{}", STANDARD.encode(&png_bytes));
+        let (w, h, raw) = decode_image_bytes(&encoded).unwrap();
+        assert_eq!(w, 3);
+        assert_eq!(h, 4);
+        assert_eq!(raw.len(), 3 * 4 * 4);
+        assert_eq!(&raw[0..4], &[10, 20, 30, 255]);
     }
 }

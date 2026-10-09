@@ -1,6 +1,6 @@
 [package]
 name = "p2sharer"
-version = "1.2.1"
+version = "1.2.2"
 description = "P2Sharer - Serverless P2P Screen & Process Audio Sharing"
 authors = ["P2Sharer Team"]
 edition = "2021"
@@ -28,12 +28,13 @@ tokio = { version = "1", features = ["full"] }
 sysinfo = "0.32"
 byteorder = "1.5"
 base64 = "0.22"
-image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "bmp", "gif"] }
 xcap = "0.9.8"
 tokio-tungstenite = "0.24"
 futures-util = "0.3"
 getrandom = "0.2"
 sha2 = "0.10"
+png = "0.18"
 webrtc = "=0.17.2"
 bytes = "1"
 log = { version = "0.4", features = ["std"] }

@@ -283,7 +283,7 @@ export class PipService {
         sendSignal({
           type: 'stats',
           stats: {
-            pingMs: ping ?? null,
+            pingMs: (stats?.pingMs !== null && stats?.pingMs !== undefined ? stats.pingMs : ping) ?? null,
             fps: stats?.fps ?? (streamOwner(peerId) === 'local' ? stateStore.currentFps : 60),
             bitrateKbps: stats?.bitrateKbps ?? 0,
             height: stats?.height ? `${stats.height}p` : '1080p',
