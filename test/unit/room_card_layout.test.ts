@@ -12,7 +12,11 @@ test('every border and corner resizes outward consistently and clamps unsafe siz
   assert.equal(resizeCardScale(1, 200, 100, 'se', 10000, 10000), 2.5);
 });
 
-test('automatic layout maximizes usable card size and centers the short row', () => {
+test('automatic layout keeps pairs horizontal and optimizes larger groups', () => {
+  for (const [width, height] of [[1200, 800], [480, 900]]) {
+    assert.deepEqual(calculateCardLayout(['a', 'b'], width, height).rows, [['a', 'b']]);
+    assert.deepEqual(calculateCardLayout(['a', 'b'], width, height, {}, [['a'], ['b']]).rows, [['a'], ['b']]);
+  }
   const layout = calculateCardLayout(['a', 'b', 'c'], 1200, 800);
   assert.deepEqual(layout.rows, [['a'], ['b', 'c']]);
   assert.ok(layout.cards[0].width > 1200 / 3);
@@ -44,7 +48,7 @@ test('dropping beside and below creates manual rows that survive viewport change
 
 test('layout retains every visible card exactly once and stays within horizontal bounds', () => {
   assert.deepEqual(reconcileCardRows([['a', 'b'], ['b', 'gone']], ['a', 'b', 'new']), [['a', 'b'], ['new']]);
-  for (const width of [120, 320, 800, 1600]) for (const height of [200, 700]) for (const count of [0, 1, 3, 9, 24]) {
+  for (const width of [120, 320, 800, 1600]) for (const height of [200, 700]) for (const count of [0, 1, 2, 3, 9, 24]) {
     const ids = Array.from({ length: count }, (_, index) => String(index));
     for (const rows of [null, [ids]]) {
       const layout = calculateCardLayout(ids, width, height, { '0': 2, '1': .5 }, rows);

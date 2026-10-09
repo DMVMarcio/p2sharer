@@ -12,12 +12,12 @@ export function resizeCardScale(initial: number, width: number, height: number, 
 const GAP = 8;
 const ASPECT = 16 / 9;
 
-/** Choose the largest equal cards that fit both viewport dimensions. Short rows come first. */
+/** Keep pairs side by side; otherwise maximize equal card size. Short rows come first. */
 export function automaticCardRows(ids: string[], width: number, height: number): { rows: string[][]; baseWidth: number } {
   if (!ids.length) return { rows: [], baseWidth: 0 };
   let columns = 1;
   let best = 0;
-  for (let count = 1; count <= ids.length; count++) {
+  for (let count = ids.length === 2 ? 2 : 1; count <= ids.length; count++) {
     const rows = Math.ceil(ids.length / count);
     const size = Math.min((width - GAP * (count - 1)) / count, (height - GAP * (rows - 1)) / rows * ASPECT);
     if (size > best) { best = size; columns = count; }
