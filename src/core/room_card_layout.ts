@@ -1,5 +1,13 @@
 export interface CardPlacement { id: string; left: number; top: number; width: number; height: number }
 export interface CardLayout { cards: CardPlacement[]; rows: string[][]; height: number; baseWidth: number }
+export type CardResizeEdge = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
+
+export function resizeCardScale(initial: number, width: number, height: number, edge: CardResizeEdge, dx: number, dy: number): number {
+  const horizontal = edge.includes('e') ? dx / Math.max(1, width) : edge.includes('w') ? -dx / Math.max(1, width) : 0;
+  const vertical = edge.includes('s') ? dy / Math.max(1, height) : edge.includes('n') ? -dy / Math.max(1, height) : 0;
+  const delta = Math.abs(horizontal) >= Math.abs(vertical) ? horizontal : vertical;
+  return Math.max(.4, Math.min(2.5, initial * (1 + delta)));
+}
 
 const GAP = 8;
 const ASPECT = 16 / 9;
@@ -79,17 +87,23 @@ export function calculateCardLayout(ids: string[], width: number, height: number
 /** Drop into a row, or create a row above/below it when the pointer crosses its edge. */
 export function placeCardAtPoint(layout: CardLayout, id: string, x: number, y: number): string[][] {
   const rows = layout.rows.map(row => row.filter(key => key !== id));
-  let closest = 0;
+  let target: CardPlacement | undefined;
   let distance = Infinity;
-  layout.rows.forEach((row, index) => {
-    const cards = layout.cards.filter(card => row.includes(card.id));
-    const center = (Math.min(...cards.map(card => card.top)) + Math.max(...cards.map(card => card.top + card.height))) / 2;
-    if (Math.abs(y - center) < distance) { distance = Math.abs(y - center); closest = index; }
-  });
-  const targets = layout.cards.filter(card => layout.rows[closest]?.includes(card.id));
-  if (!targets.length) return [[id]];
-  const top = Math.min(...targets.map(card => card.top));
-  const bottom = Math.max(...targets.map(card => card.top + card.height));
+  let centerDistance = Infinity;
+  for (const card of layout.cards) {
+    if (card.id === id) continue;
+    const dx = Math.max(card.left - x, 0, x - card.left - card.width);
+    const dy = Math.max(card.top - y, 0, y - card.top - card.height);
+    const next = dx * dx + dy * dy;
+    const center = (x - card.left - card.width / 2) ** 2 + (y - card.top - card.height / 2) ** 2;
+    if (next < distance || next === distance && center < centerDistance) {
+      distance = next; centerDistance = center; target = card;
+    }
+  }
+  if (!target) return [[id]];
+  const closest = layout.rows.findIndex(row => row.includes(target.id));
+  const top = target.top;
+  const bottom = target.top + target.height;
   if (y < top + (bottom - top) * .18) rows.splice(closest, 0, [id]);
   else if (y > bottom - (bottom - top) * .18) rows.splice(closest + 1, 0, [id]);
   else {

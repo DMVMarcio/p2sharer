@@ -1,3 +1,4 @@
+import { useRoomCardLayoutActions } from './RoomCardLayoutContext';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { stateStore } from '../../core/state_store';
@@ -267,6 +268,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
 
   const watchers = slot.watchers || [];
 
+  const layoutActions = useRoomCardLayoutActions();
   const handleContextMenu = (event: React.MouseEvent) => {
     const actions: ContextMenuAction[] = [];
     if (layoutMode === 'spotlight' && inTray && !isSelectedFeatured) actions.push({ id: 'overlay', get label() { return t("message.1c2685f76e69"); },
@@ -292,7 +294,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     }
     actions.push({ id: 'stop', get label() { return slot.isLocal ? t("message.6ef17b51fd93") : t("message.470b862fbd07"); }, icon: <Square size={15} />, separator: true,
       onSelect: slot.isLocal ? () => { if (slot.mediaId) roomService.stopTransmission(slot.mediaId); } : () => stopWatchingStream(slot.peerId) });
-    openContextMenu(event, actions);
+    openContextMenu(event, [...actions, ...layoutActions]);
   };
 
   const pingVal = !slot.isLocal ? (livePing ?? getPeerPing(slot.peerId)) : 0;

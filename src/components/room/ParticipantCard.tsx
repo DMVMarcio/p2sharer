@@ -1,3 +1,4 @@
+import { useRoomCardLayoutActions } from './RoomCardLayoutContext';
 import { contrastingTextColor } from '../../core/accent_color';
 import { profileImages } from '../../core/profile_image';
 import { ProfileAvatar } from '../common/ProfileAvatar';
@@ -32,6 +33,7 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
   React.useSyncExternalStore(profileImages.subscribe, profileImages.snapshot);
   const { togglePin, requestStream, layoutMode, returnToGrid } = useRoom();
   const openContextMenu = useContextMenu();
+  const layoutActions = useRoomCardLayoutActions();
   const { openModal } = useModal();
   const subscribedStreams = useStore((s) => s.subscribedStreams);
 
@@ -64,7 +66,7 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
           onSelect: returnToGrid });
         if (!slot.isLocal && slot.isStreaming && !isSubscribed) actions.push({ id: 'watch', get label() { return t("message.5a49c69bab6b"); }, icon: <Play size={15} />, onSelect: () => requestStream(slot.peerId) });
         if (slot.isLocal && !slot.isStreaming) actions.push({ id: 'share', get label() { return t("message.85344dae041c"); }, icon: <MonitorUp size={15} />, onSelect: () => { stateStore.set((state) => { state.editingStreamId = null; }); openModal('screenPicker'); } });
-        openContextMenu(event, actions);
+        openContextMenu(event, [...actions, ...layoutActions]);
       }}
     >
       {/* Featured badge when in tray */}

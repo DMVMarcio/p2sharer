@@ -1012,7 +1012,7 @@
   "color.saturationValue": "Saturation and brightness",
   "file.transferDetails": "Transfer details",
   "file.transferProgress": "{{v0}}% · {{v1}} of {{v2}}",
-  "room.cards.reorder": "Reorder card (arrow keys to move)",
-  "room.cards.resize": "Resize card (arrow keys; double-click to reset)",
-  "room.cards.reset": "Restore automatic layout"
+  "room.cards.reset": "Restore automatic layout",
+  "room.cards.gestures": "Drag card to move; resize from edges. Alt+arrows moves; Alt+Shift+arrows resizes.",
+  "room.cards.dropPreview": "Drop card here"
 }

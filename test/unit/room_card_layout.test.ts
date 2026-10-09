@@ -1,6 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { calculateCardLayout, placeCardAtPoint, reconcileCardRows } from '../../src/core/room_card_layout.ts';
+import { calculateCardLayout, placeCardAtPoint, reconcileCardRows, resizeCardScale, type CardResizeEdge } from '../../src/core/room_card_layout.ts';
+
+test('every border and corner resizes outward consistently and clamps unsafe sizes', () => {
+  for (const edge of ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'] as CardResizeEdge[]) {
+    const dx = edge.includes('e') ? 100 : edge.includes('w') ? -100 : 0;
+    const dy = edge.includes('s') ? 50 : edge.includes('n') ? -50 : 0;
+    assert.equal(resizeCardScale(1, 200, 100, edge, dx, dy), 1.5);
+    assert.equal(resizeCardScale(1, 200, 100, edge, -dx * 10, -dy * 10), .4);
+  }
+  assert.equal(resizeCardScale(1, 200, 100, 'se', 10000, 10000), 2.5);
+});
 
 test('automatic layout maximizes usable card size and centers the short row', () => {
   const layout = calculateCardLayout(['a', 'b', 'c'], 1200, 800);

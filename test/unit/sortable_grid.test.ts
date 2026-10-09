@@ -43,13 +43,8 @@ test('grid drag previews order, Escape cancels, drop commits, and keyboard prese
     return { cancel() {}, onfinish: null } as unknown as Animation;
   };
   const commits: string[][] = [];
-  let manualPlacement = false;
-  const drops: Array<{ id: string; x: number; y: number }> = [];
   function Fixture() {
-    const sort = useSortableGrid(['a', 'b', 'c', 'd'], (ids) => { commits.push(ids); }, manualPlacement ? {
-      preview: false,
-      onDrop: (id, x, y, order) => { drops.push({ id, x, y }); return order; },
-    } : {});
+    const sort = useSortableGrid(['a', 'b', 'c', 'd'], (ids) => { commits.push(ids); });
     return React.createElement('div', { ref: sort.gridRef, style: { '--transition-normal': '0.22s cubic-bezier(0.16, 1, 0.3, 1)' } }, sort.order.map((id) =>
       React.createElement('article', { key: id, ref: sort.cardRef(id), 'data-sortable-id': id },
         React.createElement('button', { ...sort.handleProps(id), 'data-handle': id }, id))));
@@ -90,22 +85,6 @@ test('grid drag previews order, Escape cancels, drop commits, and keyboard prese
     await act(() => handle().dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Home', bubbles: true })));
     assert.deepEqual(order(), ['a', 'b', 'c', 'd']);
     assert.equal(animationCount, before);
-    manualPlacement = true;
-    await act(() => root.render(React.createElement(Fixture)));
-    await act(() => pointer('pointerdown', handle(), 10, 10));
-    await act(() => pointer('pointermove', dom.window, 230, 130));
-    await step();
-    assert.deepEqual(order(), ['a', 'b', 'c', 'd']);
-    await act(() => dom.window.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape' })));
-    assert.equal(drops.length, 0);
-    const commitCount = commits.length;
-    await act(() => pointer('pointerdown', handle(), 10, 10));
-    await act(() => pointer('pointermove', dom.window, 230, 130));
-    await step();
-    await act(() => pointer('pointerup', dom.window, 230, 130));
-    assert.deepEqual(drops, [{ id: 'a', x: 320, y: 170 }]);
-    // Row membership can change even when the flattened order remains the same.
-    assert.equal(commits.length, commitCount + 1);
   } finally {
     await act(() => root.unmount());
     dom.window.close();

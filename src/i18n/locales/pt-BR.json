@@ -1012,7 +1012,7 @@
   "color.saturationValue": "Saturação e brilho",
   "file.transferDetails": "Detalhes da transferência",
   "file.transferProgress": "{{v0}}% · {{v1}} de {{v2}}",
-  "room.cards.reorder": "Reordenar card (setas para mover)",
-  "room.cards.resize": "Redimensionar card (setas; clique duplo para restaurar)",
-  "room.cards.reset": "Restaurar layout automático"
+  "room.cards.reset": "Restaurar layout automático",
+  "room.cards.gestures": "Arraste o card para mover; redimensione pelas bordas. Alt+setas move; Alt+Shift+setas redimensiona.",
+  "room.cards.dropPreview": "Solte o card aqui"
 }

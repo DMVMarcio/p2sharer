@@ -4,16 +4,10 @@ import { moveOrderedItem } from '../core/ordered_items.ts';
 interface Drag {
   id: string; pointerId: number; initial: string[]; x: number; y: number;
   offsetX: number; offsetY: number; handle: HTMLButtonElement;
-  startX: number; startY: number;
-}
-
-interface SortableOptions {
-  preview?: boolean;
-  onDrop?: (id: string, x: number, y: number, order: string[]) => string[];
 }
 
 // Pointer and keyboard sorting share one draft; only a completed gesture is persisted.
-export function useSortableGrid(ids: string[], onCommit: (ids: string[]) => boolean | void, options: SortableOptions = {}) {
+export function useSortableGrid(ids: string[], onCommit: (ids: string[]) => boolean | void) {
   const gridRef = useRef<HTMLDivElement>(null);
   const cardElements = useRef(new Map<string, HTMLElement>());
   const cardCallbacks = useRef(new Map<string, (element: HTMLElement | null) => void>());
@@ -31,14 +25,12 @@ export function useSortableGrid(ids: string[], onCommit: (ids: string[]) => bool
   const [order, setOrder] = useState(ids);
   const orderRef = useRef(order);
   const commitRef = useRef(onCommit);
-  const optionsRef = useRef(options);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const dragRef = useRef<Drag | null>(null);
   const previousRects = useRef(new Map<string, DOMRect>());
   const animations = useRef(new Map<HTMLElement, Animation>());
   const idsKey = JSON.stringify(ids);
   commitRef.current = onCommit;
-  optionsRef.current = options;
 
   const cards = () => orderRef.current.map(id => cardElements.current.get(id))
     .filter((element): element is HTMLElement => Boolean(element));
@@ -68,18 +60,12 @@ export function useSortableGrid(ids: string[], onCommit: (ids: string[]) => bool
   const finish = (cancel: boolean) => {
     const drag = dragRef.current;
     if (!drag) return;
-    const node = cardElements.current.get(drag.id);
-    const customDrop = !cancel && node && optionsRef.current.onDrop && Math.hypot(drag.x - drag.startX, drag.y - drag.startY) > 4;
-    if (customDrop) {
-      changeOrder(optionsRef.current.onDrop!(drag.id, drag.x - drag.offsetX + node.offsetWidth / 2,
-        drag.y - drag.offsetY + node.offsetHeight / 2, orderRef.current));
-    }
     measure();
     dragRef.current = null;
     if (drag.handle.hasPointerCapture?.(drag.pointerId)) drag.handle.releasePointerCapture(drag.pointerId);
     setDraggingId(null);
     if (cancel) changeOrder(drag.initial);
-    else if ((customDrop || JSON.stringify(orderRef.current) !== JSON.stringify(drag.initial)) &&
+    else if (JSON.stringify(orderRef.current) !== JSON.stringify(drag.initial) &&
       commitRef.current(orderRef.current) === false) changeOrder(drag.initial);
     drag.handle.focus({ preventScroll: true });
   };
@@ -126,13 +112,7 @@ export function useSortableGrid(ids: string[], onCommit: (ids: string[]) => bool
     const tick = () => {
       const drag = dragRef.current;
       if (drag && gridRef.current) {
-        const grid = gridRef.current;
-        if (/auto|scroll/.test(getComputedStyle(grid).overflowX)) {
-          const rect = grid.getBoundingClientRect();
-          grid.scrollLeft += drag.x < rect.left + 48 ? -Math.min(12, (rect.left + 48 - drag.x) / 4)
-            : drag.x > rect.right - 48 ? Math.min(12, (drag.x - rect.right + 48) / 4) : 0;
-        }
-        let scrollHost: HTMLElement | null = grid;
+        let scrollHost: HTMLElement | null = gridRef.current.parentElement;
         while (scrollHost && !/auto|scroll/.test(getComputedStyle(scrollHost).overflowY)) scrollHost = scrollHost.parentElement;
         if (scrollHost) {
           const rect = scrollHost.getBoundingClientRect();
@@ -153,7 +133,7 @@ export function useSortableGrid(ids: string[], onCommit: (ids: string[]) => bool
             const next = (x - rect.left - rect.width / 2) ** 2 + (y - rect.top - rect.height / 2) ** 2;
             if (next < distance) { distance = next; closest = node.dataset.sortableId!; }
           }
-          if (optionsRef.current.preview !== false) changeOrder(moveOrderedItem(orderRef.current, drag.id, orderRef.current.indexOf(closest)));
+          changeOrder(moveOrderedItem(orderRef.current, drag.id, orderRef.current.indexOf(closest)));
         }
         paintDrag();
       }
@@ -196,7 +176,7 @@ export function useSortableGrid(ids: string[], onCommit: (ids: string[]) => bool
       event.currentTarget.setPointerCapture(event.pointerId);
       dragRef.current = { id, pointerId: event.pointerId, initial: [...orderRef.current],
         x: event.clientX, y: event.clientY, offsetX: event.clientX - rect.left,
-        offsetY: event.clientY - rect.top, handle: event.currentTarget, startX: event.clientX, startY: event.clientY };
+        offsetY: event.clientY - rect.top, handle: event.currentTarget };
       setDraggingId(id);
     },
     onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => {

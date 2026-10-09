@@ -11,6 +11,7 @@ import { isContextMenuEditor, useContextMenu, type ContextMenuAction } from '../
 import { RoomAppIcon } from './RoomAppIcon';
 import { ActivityParticipants } from '../components/common/ActivityParticipants';
 import { Tooltip } from '../components/common/Tooltip';
+import { useRoomCardLayoutActions } from '../components/room/RoomCardLayoutContext';
 
 const views = new Map<string, React.LazyExoticComponent<React.ComponentType<RoomAppViewProps>>>();
 function viewFor(kind: string) {
@@ -28,12 +29,14 @@ interface Props {
   isFeatured?: boolean;
   compact?: boolean;
   style?: React.CSSProperties;
+  layoutDraggable?: boolean;
 }
 
-export const RoomAppCard: React.FC<Props> = ({ instance, isFeatured = false, compact = false, style }) => {
+export const RoomAppCard: React.FC<Props> = ({ instance, isFeatured = false, compact = false, style, layoutDraggable = false }) => {
   useLocale();
   const { togglePin, peers, roomSlots, username, returnToGrid } = useRoom();
   const openContextMenu = useContextMenu();
+  const layoutActions = useRoomCardLayoutActions();
   const { detached, detach, restore } = useAppWindow(instance);
   const [, setPresenceTick] = useState(0);
   useEffect(() => roomAppsService.subscribe(() => setPresenceTick((tick) => tick + 1)), []);
@@ -64,8 +67,8 @@ export const RoomAppCard: React.FC<Props> = ({ instance, isFeatured = false, com
   if (!isFeatured) actions.push({ id: 'feature', get label() { return t("message.76178e9a949c"); }, icon: <Focus size={15} />, onSelect: () => togglePin(`app:${instance.id}`) });
   if (joined && !instance.personal) actions.push({ id: 'leave', get label() { return t("message.2703fc8c0c31"); }, icon: <ArrowLeft size={15} />, onSelect: leave });
   actions.push({ id: 'stop', get label() { return instance.personal ? t("message.be00cfb71be4") : t("message.8021e45fdba2"); }, icon: <SquareX size={15} />, danger: true, separator: true, onSelect: () => roomAppsService.stop(instance.id) });
-  return <div onContextMenu={(event) => { if (!isContextMenuEditor(event.target)) openContextMenu(event, actions); }} className={`room-app-card room-app-kind-${instance.kind} ${isFeatured ? 'featured' : ''} ${compact ? 'compact' : ''}`}
-    style={style} data-peer-id={`app:${instance.id}`}>
+  return <div onContextMenu={(event) => { if (!isContextMenuEditor(event.target)) openContextMenu(event, [...actions, ...layoutActions]); }} className={`room-app-card room-app-kind-${instance.kind} ${isFeatured ? 'featured' : ''} ${compact ? 'compact' : ''}`}
+    style={style} data-peer-id={`app:${instance.id}`} data-room-layout-id={layoutDraggable ? `app:${instance.id}` : undefined}>
     <div className="room-app-card-header">
       <span className="room-app-card-title"><RoomAppIcon kind={instance.kind} size={20} />{label}
         <span className="room-app-shared-label">{instance.personal ? t('apps.personal') : t("message.916b7359e7e0")}</span></span>
