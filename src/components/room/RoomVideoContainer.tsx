@@ -111,14 +111,16 @@ export const RoomVideoContainer: React.FC = () => {
   const gestures = useRoomCardGestures({ mode: layoutMode, ids, layout, sizes: cardSizes,
     rootRef: videoContainerRef, surfaceRef, onOrder: saveOrder,
     onResize: (id, size) => setCardSizes(previous => ({ ...previous, [id]: size })) });
-  const displayIds = gestures.draft && !gestures.draft.edge ? gestures.draft.order : ids;
+  const validDraft = gestures.draft && gestures.draft.initial.length === ids.length &&
+    gestures.draft.initial.every((id, index) => id === ids[index]) ? gestures.draft : null;
+  const displayIds = validDraft && !validDraft.edge ? validDraft.order : ids;
   const entries = displayIds.map(id => availableEntries.find(entry => entryId(entry) === id)!);
-  const draftRows = gestures.draft?.rows ?? (manualRows ? (() => {
+  const draftRows = validDraft?.rows ?? (manualRows ? (() => {
     let index = 0;
     return manualRows.map(row => row.map(id => availableIds.includes(id) ? displayIds[index++] : id));
   })() : null);
   const displayLayout = calculateCardLayout(displayIds, viewport.width, viewport.height, cardSizes, draftRows);
-  const floating = gestures.floatingStyle();
+  const floating = validDraft ? gestures.floatingStyle() : undefined;
   const slotIdsKey = displayIds.join(',');
   const layoutKey = `${slotIdsKey}:${layoutMode}:${pinnedPeerId}:${isSpotlightTrayCollapsed}:${streamFilter}:${JSON.stringify(displayLayout.cards)}:${JSON.stringify(floating)}`;
   const resetLayout = () => { setManualRows(null); setCardSizes({}); setCardOrder([]); };

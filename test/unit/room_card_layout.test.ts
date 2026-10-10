@@ -35,6 +35,8 @@ test('resizing changes only the chosen card size and reflows without overlaps', 
 test('dropping beside and below creates manual rows that survive viewport changes', () => {
   const layout = calculateCardLayout(['a', 'b', 'c'], 1200, 800);
   const b = layout.cards.find(card => card.id === 'b')!;
+  assert.deepEqual(placeCardAtPoint(layout, 'a', b.left + b.width / 2, b.top + b.height * .3), [['a'], ['b', 'c']]);
+  assert.deepEqual(placeCardAtPoint(layout, 'a', b.left + b.width / 2, b.top + b.height * .7), [['b', 'c'], ['a']]);
   const beside = placeCardAtPoint(layout, 'a', 0, b.top + b.height / 2);
   assert.deepEqual(beside, [['a', 'b', 'c']]);
   const manual = calculateCardLayout(['a', 'b', 'c'], 1200, 800, {}, beside);
@@ -44,6 +46,8 @@ test('dropping beside and below creates manual rows that survive viewport change
   const narrow = calculateCardLayout(['a', 'c', 'b'], 240, 600, {}, below);
   assert.deepEqual(narrow.rows.flat(), ['a', 'c', 'b']);
   assert.deepEqual(calculateCardLayout(['a', 'c', 'b'], 1200, 800, {}, below).rows, below);
+  const stacked = calculateCardLayout(['a', 'b', 'c'], 1200, 800, {}, [['a'], ['b'], ['c']]);
+  assert.equal(stacked.height, 800);
 });
 
 test('layout retains every visible card exactly once and stays within horizontal bounds', () => {
