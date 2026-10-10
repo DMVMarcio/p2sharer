@@ -1,9 +1,11 @@
 import { useId, useState } from 'react';
+import { Pencil } from 'lucide-react';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { ModalDialog } from './ModalDialog';
 import { TooltipButton } from './TooltipButton';
 import { hexToHsv, hsvToHex, type Hsv } from '../../core/hsv_color';
+import { contrastingTextColor } from '../../core/accent_color';
 
 function ColorPickerDialog({ value, label, onApply, onClose }: {
   value: string; label: string; onApply: (color: string) => void; onClose: () => void;
@@ -57,15 +59,18 @@ function ColorPickerDialog({ value, label, onApply, onClose }: {
   </ModalDialog>;
 }
 
-export function ColorPicker({ value, label, onChange, active = false, disabled = false }: {
+export function ColorPicker({ value, label, onChange, active = false, disabled = false, variant = 'swatch' }: {
   value: string; label: string; onChange: (color: string) => void; active?: boolean; disabled?: boolean;
+  variant?: 'swatch' | 'tile';
 }) {
   const [open, setOpen] = useState(false);
   return <>
     <TooltipButton tooltip={label} disabled={disabled} aria-haspopup="dialog" aria-expanded={open}
-      className={`accent-swatch custom-color-picker ${active ? 'active' : ''}`}
+      className={`accent-swatch custom-color-picker ${variant === 'tile' ? 'custom-color-picker-tile' : ''} ${active ? 'active' : ''}`}
       onClick={() => setOpen(true)}>
       <span className="custom-color-picker-swatch" style={{ backgroundColor: value }} />
+      {variant === 'tile' && <Pencil className="custom-color-picker-edit" size={16} aria-hidden="true"
+        style={{ color: contrastingTextColor(value) }} />}
     </TooltipButton>
     {open && <ColorPickerDialog value={value} label={label} onApply={onChange} onClose={() => setOpen(false)} />}
   </>;

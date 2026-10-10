@@ -41,23 +41,26 @@ export function ProfileImageEditor({ name, draft, color, remove, onDraft, onColo
     <div className="profile-editor-identity">
       <div className="profile-editor-avatar-column">
         <span className="settings-label profile-editor-avatar-label">{t('profile.photo')}</span>
-        <div className="profile-editor-photo">
-          <TooltipButton tooltip={t(picking ? 'profile.loading' : 'profile.choose')}
-            className="btn profile-upload-button" disabled={disabled || picking} aria-busy={picking} onClick={() => void choose()}>
-            <span className="profile-avatar profile-editor-preview" style={{ backgroundColor: color,
-              color: contrastingTextColor(color) }}>
-              {draft ? <CropPreview draft={draft} crop={draft.crop} /> : url ? <img src={url} alt="" draggable={false} /> : name.trim().charAt(0).toUpperCase() || '?'}
-              <span className="profile-upload-overlay" aria-hidden="true">{picking ? <span className="loading-spinner" /> : <Upload size={24} />}</span>
-            </span>
-          </TooltipButton>
-          {hasPhoto && <TooltipButton tooltip={t('profile.remove')} className="btn btn-danger profile-remove-button"
-            disabled={disabled || picking} onClick={() => {
-              if (draft) void invoke('discard_profile_image', { token: draft.token }).catch(() => {});
-              onDraft(null); onRemove(true);
-            }}><X size={14} aria-hidden="true" /></TooltipButton>}
-        </div>
-        <div className="profile-editor-avatar-color">
-          <ColorPicker label={t(hasPhoto ? 'profile.borderColor' : 'profile.color')} value={color} onChange={onColor} disabled={disabled || picking} />
+        <div className="profile-editor-avatar-media">
+          <div className="profile-editor-photo">
+            <TooltipButton tooltip={t(picking ? 'profile.loading' : 'profile.choose')}
+              className="btn profile-upload-button" disabled={disabled || picking} aria-busy={picking} onClick={() => void choose()}>
+              <span className="profile-avatar profile-editor-preview" style={{ backgroundColor: color,
+                color: contrastingTextColor(color) }}>
+                {draft ? <CropPreview draft={draft} crop={draft.crop} /> : url ? <img src={url} alt="" draggable={false} /> : name.trim().charAt(0).toUpperCase() || '?'}
+                <span className="profile-upload-overlay" aria-hidden="true">{picking ? <span className="loading-spinner" /> : <Upload size={24} />}</span>
+              </span>
+            </TooltipButton>
+            {hasPhoto && <TooltipButton tooltip={t('profile.remove')} className="btn btn-danger profile-remove-button"
+              disabled={disabled || picking} onClick={() => {
+                if (draft) void invoke('discard_profile_image', { token: draft.token }).catch(() => {});
+                onDraft(null); onRemove(true);
+              }}><X size={14} aria-hidden="true" /></TooltipButton>}
+          </div>
+          <div className="profile-editor-avatar-color">
+            <ColorPicker label={t(hasPhoto ? 'profile.borderColor' : 'profile.color')} value={color} onChange={onColor}
+              disabled={disabled || picking} variant="tile" />
+          </div>
         </div>
         {picking && <span className="profile-loading-status" role="status">{t('profile.loading')}</span>}
       </div>
