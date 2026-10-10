@@ -5,6 +5,8 @@ import { roomAppsService } from '../../apps/room_apps_service';
 import { RoomAppSlot } from '../../apps/RoomAppSlot';
 import { PersistentRoomApps } from '../../apps/PersistentRoomApps';
 import type { RoomAppInstance } from '../../apps/types';
+import { usePanelSize } from '../../hooks/usePanelSize';
+import { PanelResizeHandle } from '../common/PanelResizeHandle';
 import { useRoom } from '../../hooks/useRoom';
 import { useStore } from '../../hooks/useStore';
 import { VideoCard } from './VideoCard';
@@ -40,6 +42,8 @@ export const RoomVideoContainer: React.FC = () => {
     streamFilter,
     setStreamFilter,
   } = useRoom();
+  const stageRef = useRef<HTMLDivElement>(null);
+  const traySize = usePanelSize(stageRef, 'height', 'p2sharer_spotlight_tray_height', 110, 90, 168, layoutMode === 'spotlight');
   const subscribedStreams = useStore((s) => s.subscribedStreams);
   const streamOverlays = useStore((s) => s.streamOverlays);
   const dismissedAutoOverlays = useStore((s) => s.dismissedAutoOverlays);
@@ -111,14 +115,16 @@ export const RoomVideoContainer: React.FC = () => {
   const gestures = useRoomCardGestures({ mode: layoutMode, ids, layout, sizes: cardSizes,
     rootRef: videoContainerRef, surfaceRef, onOrder: saveOrder,
     onResize: (id, size) => setCardSizes(previous => ({ ...previous, [id]: size })) });
-  const displayIds = gestures.draft && !gestures.draft.edge ? gestures.draft.order : ids;
+  const validDraft = gestures.draft && gestures.draft.initial.length === ids.length &&
+    gestures.draft.initial.every((id, index) => id === ids[index]) ? gestures.draft : null;
+  const displayIds = validDraft && !validDraft.edge ? validDraft.order : ids;
   const entries = displayIds.map(id => availableEntries.find(entry => entryId(entry) === id)!);
-  const draftRows = gestures.draft?.rows ?? (manualRows ? (() => {
+  const draftRows = validDraft?.rows ?? (manualRows ? (() => {
     let index = 0;
     return manualRows.map(row => row.map(id => availableIds.includes(id) ? displayIds[index++] : id));
   })() : null);
   const displayLayout = calculateCardLayout(displayIds, viewport.width, viewport.height, cardSizes, draftRows);
-  const floating = gestures.floatingStyle();
+  const floating = validDraft ? gestures.floatingStyle() : undefined;
   const slotIdsKey = displayIds.join(',');
   const layoutKey = `${slotIdsKey}:${layoutMode}:${pinnedPeerId}:${isSpotlightTrayCollapsed}:${streamFilter}:${JSON.stringify(displayLayout.cards)}:${JSON.stringify(floating)}`;
   const resetLayout = () => { setManualRows(null); setCardSizes({}); setCardOrder([]); };
@@ -221,7 +227,8 @@ export const RoomVideoContainer: React.FC = () => {
       {/* SPOTLIGHT STAGE */}
       <div
         className={`spotlight-stage ${layoutMode !== 'spotlight' ? 'hidden' : ''}`}
-        id="spotlight-stage"
+        id="spotlight-stage" ref={stageRef}
+        style={{ '--spotlight-tray-height': `${traySize.size}px` } as React.CSSProperties}
       >
         {layoutMode === 'spotlight' && (
           <>
@@ -247,6 +254,7 @@ export const RoomVideoContainer: React.FC = () => {
               className={`spotlight-tray-container ${isSpotlightTrayCollapsed ? 'collapsed' : ''}`}
               id="spotlight-tray-container"
             >
+              {!isSpotlightTrayCollapsed && <PanelResizeHandle axis="height" label={t('layout.resizeParticipants')} controls="spotlight-tray-container" {...traySize} />}
               <button
                 className="btn-toggle-spotlight-tray"
                 id="btn-toggle-spotlight-tray"

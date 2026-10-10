@@ -973,6 +973,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 
 .video-container {
   flex: 1;
+  min-width: 0;
   min-height: 0;
   position: relative;
   background-color: #000000;
@@ -984,11 +985,18 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 
 /* Grid Layout */
 .streams-grid-wrapper {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  contain: size;
   display: block;
   position: relative;
   width: 100%;
   height: 100%;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overflow-anchor: none;
+  scrollbar-gutter: stable;
 }
 
 .room-card-canvas { position: relative; width: 100%; min-height: 100%; }
@@ -1106,7 +1114,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 }
 
 .spotlight-tray-container {
-  height: 110px;
+  height: var(--spotlight-tray-height, 110px);
   display: flex;
   flex-direction: column;
   position: relative;
@@ -1115,12 +1123,12 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   padding: 6px;
-  transition: all var(--transition-normal);
+  transition: background-color var(--transition-normal), border-color var(--transition-normal);
   flex-shrink: 0;
 }
 
 .spotlight-tray-container.collapsed {
-  height: 18px;
+  height: 38px;
   padding: 0;
   background-color: transparent;
   border-color: transparent;
@@ -1128,7 +1136,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 
 .btn-toggle-spotlight-tray {
   position: absolute;
-  top: -12px;
+  top: 6px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 30;
@@ -2411,7 +2419,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
    ========================================================================== */
 
 .room-sidebar {
-  width: 320px;
+  width: var(--room-sidebar-width, 320px);
   height: 100%;
   min-height: 0;
   background-color: var(--bg-surface);
@@ -2419,7 +2427,6 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-  transition: width var(--transition-normal);
 }
 
 .room-sidebar.collapsed {
@@ -2433,14 +2440,13 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  right: 320px;
+  right: var(--room-sidebar-width, 320px);
   width: 28px;
   height: 220px;
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 45;
-  transition: right var(--transition-normal);
   pointer-events: auto;
   margin-right: -14px;
 }
@@ -2451,6 +2457,9 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   width: 24px;
   justify-content: flex-end;
 }
+
+.sidebar-toggle-edge.expanded { pointer-events: none; }
+.sidebar-toggle-edge.expanded .sidebar-edge-toggle-btn { pointer-events: auto; }
 
 .sidebar-edge-toggle-btn {
   opacity: 0;
@@ -4383,7 +4392,8 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 }
 
 /* Sober Informational Status Box */
-.audio-info-box {
+.audio-info-box,
+.inline-notice {
   font-size: 12px;
   line-height: 1.4;
   color: var(--text-secondary);
@@ -4392,6 +4402,9 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
 }
+
+.inline-notice { display: flex; align-items: flex-start; gap: 8px; margin: 12px 0; }
+.inline-notice > svg { flex-shrink: 0; color: var(--text-primary); }
 
 .audio-info-box strong {
   color: var(--text-primary);
@@ -5257,8 +5270,10 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 
 
 .rendezvous-header { margin-top: 22px; }
+.settings-subtabs { height: 40px; }
+.rendezvous-panel { display: flex; flex-direction: column; gap: 10px; }
 .rendezvous-editor { display: flex; flex-direction: column; gap: 10px; }
-.rendezvous-tabs, .rendezvous-add { display: flex; flex-wrap: wrap; gap: 8px; }
+.rendezvous-add { display: flex; flex-wrap: wrap; gap: 8px; }
 .rendezvous-bulk-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .rendezvous-add .text-input-sm { flex: 1; min-width: 180px; }
 .rendezvous-list { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; }
@@ -5495,6 +5510,14 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .window-titlebar-drag img { pointer-events: none; flex-shrink: 0; }
 .window-titlebar-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .window-titlebar.is-inactive .window-titlebar-drag { color: var(--text-muted); }
+.window-titlebar-actions { display: flex; align-items: center; padding: 0 8px; }
+.window-titlebar-actions .app-update-badge { height: 24px; }
+.panel-resize-handle { position: absolute; z-index: 40; touch-action: none; user-select: none; }
+.panel-resize-width { top: 0; bottom: 0; right: calc(var(--room-sidebar-width, 320px) - 4px); width: 8px; cursor: ew-resize; }
+.panel-resize-height { top: -5px; left: 0; right: 0; height: 8px; cursor: ns-resize; }
+.spotlight-tray-container > .panel-resize-handle { z-index: 20; }
+.panel-resize-handle:hover, .panel-resize-handle:focus-visible { background: var(--accent-glow); }
+.panel-resize-handle:focus-visible { outline: 2px solid var(--accent-color); outline-offset: -2px; }
 .window-caption-controls { display: flex; align-self: stretch; }
 .btn.window-caption-button {
   width: 46px;
@@ -5556,3 +5579,10 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .profile-editor-details { min-width: 0; }
 .profile-editor-details .text-input { width: 100%; }
 @media (max-width: 480px) { .profile-editor-identity { grid-template-columns: minmax(0, 1fr); } }
+
+.join-room-participants { display: grid; gap: 8px; list-style: none; padding: 0; margin: 16px 0; max-height: 240px; overflow-y: auto; }
+.join-room-participants li { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--bg-elevated); font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
+.join-room-participants li > span { min-width: 0; }
+.join-room-participants .profile-avatar { width: 30px; height: 30px; flex-shrink: 0; }
+.join-room-loading { display: flex; justify-content: center; padding: 16px; }
+.join-room-error { color: var(--danger-text); margin-top: 12px; }

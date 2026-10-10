@@ -531,7 +531,7 @@
   "message.071f649adb47": "Conversas",
   "message.04f9f0a78dbe": "Aparência",
   "message.a11f1b879793": "Som",
-  "message.55393a891023": "Rede & P2P",
+  "message.55393a891023": "Rede",
   "message.2a5815044d04": "Diagnóstico & Logs",
   "message.d16122f3087d": "Perfil do Participante",
   "message.ea3a61eb13e1": "Defina seu nome exibido na lista de participantes, cards e chat.",
@@ -992,6 +992,7 @@
   "profile.choose": "Escolher imagem",
   "profile.loading": "Lendo imagem…",
   "profile.remove": "Remover foto",
+  "profile.borderColor": "Cor da borda do avatar",
   "profile.color": "Cor do avatar padrão",
   "profile.crop": "Recortar imagem",
   "profile.cropHint": "Arraste para posicionar. O círculo é uma referência; a imagem salva permanece quadrada.",
@@ -1014,5 +1015,14 @@
   "file.transferProgress": "{{v0}}% · {{v1}} de {{v2}}",
   "room.cards.reset": "Restaurar layout automático",
   "room.cards.gestures": "Arraste o card para mover; redimensione pelas bordas. Alt+setas move; Alt+Shift+setas redimensiona.",
-  "room.cards.dropPreview": "Solte o card aqui"
+  "room.cards.dropPreview": "Solte o card aqui",
+  "layout.resizeChat": "Redimensionar chat lateral",
+  "layout.resizeParticipants": "Redimensionar participantes do destaque",
+  "join.inspect": "Consultar sala",
+  "join.searching": "Procurando uma sala ativa…",
+  "join.noResponse": "Ainda não encontramos participantes.",
+  "join.online": "Participantes online: {{count}}",
+  "join.participants": "Pessoas na sala",
+  "join.timeout": "Não foi possível confirmar a conexão. Confira a senha ou tente novamente.",
+  "join.waiting": "Aguardando participantes e autorização da sala…"
 }

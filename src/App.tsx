@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AppHeader } from './components/header/AppHeader';
 import { WindowTitlebar } from './components/header/WindowTitlebar';
 import { HomeView } from './components/home/HomeView';
@@ -43,8 +43,9 @@ export const App: React.FC = () => {
 };
 
 const MainApp: React.FC = () => {
-  const { isInRoom, stopScreenSharing, leaveRoom, isSharingScreen } = useRoom();
-  const { openModal, activeModal } = useModal();
+  const [titlebarVisible, setTitlebarVisible] = useState(false);
+  const { isInRoom, stopScreenSharing, leaveRoom, isSharingScreen, joinDialogRevision } = useRoom();
+  const { openModal, activeModal, modalRevision } = useModal();
 
   useEffect(startAutomaticUpdateChecks, []);
 
@@ -69,8 +70,8 @@ const MainApp: React.FC = () => {
 
   return (
     <>
-      <WindowTitlebar />
-      <AppHeader />
+      <WindowTitlebar onVisibilityChange={setTitlebarVisible} />
+      <AppHeader showUpdate={!titlebarVisible} />
       <main className="app-main" id="app-main">
         {isInRoom ? <RoomView /> : <HomeView />}
       </main>
@@ -81,7 +82,7 @@ const MainApp: React.FC = () => {
       {activeModal === 'username' && <UsernameModal />}
       {activeModal === 'audioFilter' && <AudioFilterModal />}
       {activeModal === 'createRoom' && <CreateRoomModal />}
-      {activeModal === 'joinRoom' && <JoinRoomModal />}
+      {activeModal === 'joinRoom' && <JoinRoomModal key={`${modalRevision}:${joinDialogRevision}`} />}
       {activeModal === 'saveInvite' && <SaveInviteModal />}
       {activeModal === 'roomSecurity' && <RoomSecurityModal />}
       {activeModal === 'externalLink' && <ExternalLinkModal />}

@@ -102,10 +102,14 @@ export function useStreamPointer(container: RefObject<HTMLDivElement | null>,
         const p = v && streamPointerPosition(v.getBoundingClientRect(), v.videoWidth, v.videoHeight, event.clientX, event.clientY);
         if (p) {
           if (drawing.tool === 'brush') {
-            if (drawing.points.length >= STREAM_DRAWING_MAX_POINTS) drawing.points = drawing.points.filter((_, i) => i % 2 === 0);
-            drawing.points.push(p);
-          } else drawing.points = [drawing.points[0], p];
-          setDraft({ ...drawing, points: [...drawing.points] });
+            if (drawing.points.length < STREAM_DRAWING_MAX_POINTS) {
+              drawing.points.push(p);
+              setDraft({ ...drawing, points: [...drawing.points] });
+            }
+          } else {
+            drawing.points = [drawing.points[0], p];
+            setDraft({ ...drawing, points: [...drawing.points] });
+          }
         }
       }
       const v = video.current;

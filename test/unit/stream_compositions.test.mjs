@@ -121,6 +121,12 @@ test('room cards share order across modes, retain independent sizes, and preserv
       new window.MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 80, clientY: 80 })));
     await act(async () => [...document.querySelectorAll('[role="menuitem"]')].find(item => item.textContent === 'Restaurar layout automático').click());
     assert.equal(width(screen.peerId), initialWidth);
+    await act(async () => stateStore.set(state => { state.roomSlots = [screen, camera]; }));
+    assert.equal(new Set(frames().map(frame => frame.style.top)).size, 1);
+    await act(async () => stateStore.set(state => { state.roomSlots = [screen, camera, other]; }));
+    assert.equal(new Set(frames().map(frame => frame.style.top)).size, 2);
+    await act(async () => stateStore.set(state => { state.roomSlots = [{ ...screen, isStreaming: false, stream: undefined }, camera, other]; }));
+    assert.equal(new Set(frames().map(frame => frame.style.top)).size, 2);
   } finally {
     if (previousWidth) Object.defineProperty(prototype, 'clientWidth', previousWidth);
     else delete prototype.clientWidth;
@@ -176,6 +182,7 @@ test('body drag previews an empty destination, preserves one player, cancels cle
     assert.equal(videoCount(), 3);
     assert.equal(active.querySelector('video'), video);
     assert.notEqual(active.style.left, `${original.left}px`);
+    assert.equal(frames.size, 0);
     await act(async () => window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', cancelable: true })));
     assert.equal(document.querySelector('.room-card-placeholder'), null);
     assert.equal(active.style.left, `${original.left}px`);
@@ -184,6 +191,9 @@ test('body drag previews an empty destination, preserves one player, cancels cle
     await act(async () => pointer('pointerdown', video, startX, startY));
     await act(async () => pointer('pointermove', window, 600, 799));
     const destinationTop = document.querySelector('.room-card-placeholder').style.top;
+    const viewport = document.querySelector('.streams-grid-wrapper');
+    assert.equal(viewport.scrollTop, 0);
+    assert.equal(viewport.scrollLeft, 0);
     await act(async () => pointer('pointerup', window, 600, 799));
     assert.equal(frames.size, 0);
     assert.equal(active.style.top, destinationTop);
@@ -198,6 +208,11 @@ test('body drag previews an empty destination, preserves one player, cancels cle
     assert.ok(parseFloat(active.style.width) > before);
     await act(async () => pointer('pointercancel', window, 0, 0));
     assert.equal(parseFloat(active.style.width), before);
+    await act(async () => pointer('pointerdown', video, active.getBoundingClientRect().left + 20, active.getBoundingClientRect().top + 20));
+    await act(async () => pointer('pointermove', window, 600, 400));
+    await act(async () => stateStore.set(state => { state.roomSlots = [camera, other]; }));
+    assert.equal(document.querySelector('.room-card-placeholder'), null);
+    assert.equal(document.querySelectorAll('.streams-grid-wrapper video').length, 2);
     // Persistent app content receives the same body gesture without a second rendered app.
     await act(async () => roomAppsService.initializeLocalView({ id: appId, kind: 'notepad', createdBy: 'fixture', createdAt: 0 }));
     const app = document.querySelector(`.room-app-card[data-peer-id="app:${appId}"]`);

@@ -47,7 +47,10 @@ export function useRoomCardGestures(options: Options) {
       suppressClick.current = { id: gesture.id, until: Date.now() + 350 };
       if (gesture.edge) {
         if (cancel) current.onResize(gesture.id, gesture.size);
-      } else if (!cancel) current.onOrder(gesture.order, gesture.rows);
+      } else if (!cancel && (gesture.order.some((id, index) => id !== gesture.initial[index]) ||
+        gesture.rows && JSON.stringify(gesture.rows) !== JSON.stringify(gesture.targets.rows))) {
+        current.onOrder(gesture.order, gesture.rows);
+      }
       nodes.current.get(gesture.id)?.focus({ preventScroll: true });
     }
     if (current.rootRef.current?.hasPointerCapture?.(gesture.pointerId)) current.rootRef.current.releasePointerCapture(gesture.pointerId);
@@ -116,28 +119,30 @@ export function useRoomCardGestures(options: Options) {
   useEffect(() => { finishRef.current(true); }, [options.mode, membershipKey]);
   const activeId = draft?.active && !draft.edge ? draft.id : null;
   useEffect(() => {
-    if (!activeId) return;
+    // The grid stays still during placement. Only an overflowing spotlight
+    // tray needs edge scrolling to reach cards outside the visible strip.
+    if (!activeId || options.mode !== 'spotlight') return;
     let frame = 0;
     const tick = () => {
       const gesture = pending.current;
       const current = optionsRef.current;
       const surface = current.surfaceRef.current;
-      const host = current.mode === 'grid' ? surface?.parentElement : surface;
+      const host = surface;
       if (gesture?.active && host) {
         const bounds = host.getBoundingClientRect();
         const speed = (position: number, start: number, end: number) => position < start + 40 ? -Math.min(12, (start + 40 - position) / 4)
           : position > end - 40 ? Math.min(12, (position - end + 40) / 4) : 0;
-        const before = current.mode === 'grid' ? host.scrollTop : host.scrollLeft;
-        if (current.mode === 'grid') host.scrollTop += speed(gesture.y, bounds.top, bounds.bottom);
-        else host.scrollLeft += speed(gesture.x, bounds.left, bounds.right);
-        if (before !== (current.mode === 'grid' ? host.scrollTop : host.scrollLeft)) updateRef.current({ pointerId: gesture.pointerId,
+        const before = host.scrollLeft;
+        host.scrollLeft = Math.max(0, Math.min(Math.max(0, host.scrollWidth - host.clientWidth),
+          before + speed(gesture.x, bounds.left, bounds.right)));
+        if (before !== host.scrollLeft) updateRef.current({ pointerId: gesture.pointerId,
           clientX: gesture.x, clientY: gesture.y, preventDefault() {} } as globalThis.PointerEvent);
       }
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [activeId]);
+  }, [activeId, options.mode]);
   const identity = (target: EventTarget | null) => target instanceof Element
     ? target.closest<HTMLElement>('[data-sortable-id], [data-room-layout-id]')?.dataset : undefined;
   const onPointerDownCapture = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -176,9 +181,14 @@ export function useRoomCardGestures(options: Options) {
   };
   const floatingStyle = (): CSSProperties | undefined => {
     if (!draft || draft.edge || !options.surfaceRef.current) return;
-    const bounds = options.surfaceRef.current.getBoundingClientRect();
-    return { position: 'absolute', left: draft.rect.left + draft.x - draft.startX - bounds.left + options.surfaceRef.current.scrollLeft,
-      top: draft.rect.top + draft.y - draft.startY - bounds.top + options.surfaceRef.current.scrollTop,
+    const host = options.mode === 'grid' ? options.surfaceRef.current.parentElement : options.surfaceRef.current;
+    if (!host) return;
+    const bounds = host.getBoundingClientRect();
+    // A fixed, bounded card cannot enlarge the canvas or move its scrollbars.
+    return { position: 'fixed', left: Math.max(bounds.left, Math.min(bounds.right - draft.rect.width,
+      draft.rect.left + draft.x - draft.startX)),
+      top: Math.max(bounds.top, Math.min(bounds.bottom - draft.rect.height,
+        draft.rect.top + draft.y - draft.startY)),
       width: draft.rect.width, height: draft.rect.height };
   };
   return { cardRef, draft, draggingId: draft && !draft.edge ? draft.id : null, floatingStyle,

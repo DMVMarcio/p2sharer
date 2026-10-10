@@ -21,6 +21,9 @@ class ModalManager {
   private closeTimer: ReturnType<typeof setTimeout> | null = null;
   private listeners = new Set<() => void>();
   private externalLinkUrl: string | null = null;
+  private revision = 0;
+
+  public getRevision(): number { return this.revision; }
 
   public getActive(): ModalType {
     return this.activeModal;
@@ -42,6 +45,7 @@ class ModalManager {
   }
 
   public open(modal: ModalType): void {
+    this.revision++;
     if (modal !== 'externalLink') this.externalLinkUrl = null;
     if (this.closeTimer) {
       clearTimeout(this.closeTimer);
@@ -82,6 +86,8 @@ class ModalManager {
 export const modalManager = new ModalManager();
 
 export function useModal() {
+  const modalRevision = useSyncExternalStore(
+    cb => modalManager.subscribe(cb), () => modalManager.getRevision(), () => modalManager.getRevision());
   const activeModal = useSyncExternalStore(
     (cb) => modalManager.subscribe(cb),
     () => modalManager.getActive(),
@@ -108,6 +114,7 @@ export function useModal() {
   );
 
   return {
+    modalRevision,
     activeModal,
     isClosing,
     openModal,

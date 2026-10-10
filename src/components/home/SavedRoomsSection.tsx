@@ -20,7 +20,7 @@ export const SavedRoomsSection: React.FC = () => {
   const [editingRoom, setEditingRoom] = useState<SavedRoom | null>(null);
   const [removingRoom, setRemovingRoom] = useState<SavedRoom | null>(null);
   const { openModal } = useModal();
-  const { joinRoom, username } = useRoom();
+  const { username } = useRoom();
   const sortable = useSortableGrid(rooms.map((room) => room.roomId), (ids) => {
     try {
       savedRooms.reorder(ids);
@@ -53,13 +53,11 @@ export const SavedRoomsSection: React.FC = () => {
 
   const openSaved = (room: SavedRoom) => {
     if (!username) { openModal('username'); return; }
-    if (room.protected !== false && room.password === undefined) {
-      roomService.pendingJoinInvite = room.invite;
-      roomService.pendingJoinAsOwner = room.owned;
-      openModal('joinRoom');
-      return;
-    }
-    joinRoom(room.invite, room.password ?? '', room.owned);
+    roomService.pendingJoinInvite = room.invite;
+    roomService.pendingJoinAsOwner = room.owned;
+    roomService.pendingJoinPassword = room.password ?? '';
+    roomService.pendingJoinError = '';
+    openModal('joinRoom');
   };
 
   const removeSaved = async (room: SavedRoom) => {

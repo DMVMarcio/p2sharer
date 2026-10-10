@@ -9,6 +9,7 @@ import React, { act } from 'react';
 const dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost' });
 for (const key of ['window', 'document', 'HTMLElement', 'localStorage']) globalThis[key] = dom.window[key];
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+globalThis.ResizeObserver = class { observe() {} disconnect() {} };
 const require = createRequire(import.meta.url);
 const bundle = await build({
   stdin: { contents: `export { RoomView } from './src/components/room/RoomView.tsx'; export { stateStore } from './src/core/state_store.ts';`, resolveDir: process.cwd() },

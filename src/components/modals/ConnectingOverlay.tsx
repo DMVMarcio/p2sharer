@@ -2,12 +2,14 @@ import { localizeText, t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React from 'react';
 import { useRoom } from '../../hooks/useRoom';
+import { useModal } from '../../hooks/useModal';
 
 export const ConnectingOverlay: React.FC = () => {
   useLocale();
+  const { activeModal } = useModal();
   const { connectingOverlay, hideConnecting, leaveRoom, currentRoomPassword } = useRoom();
 
-  if (!connectingOverlay.visible) return null;
+  if (!connectingOverlay.visible || activeModal === 'joinRoom') return null;
 
   const handleCancel = () => {
     hideConnecting();

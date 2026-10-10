@@ -12,12 +12,12 @@ export function resizeCardScale(initial: number, width: number, height: number, 
 const GAP = 8;
 const ASPECT = 16 / 9;
 
-/** Choose the largest equal cards that fit both viewport dimensions. Short rows come first. */
+/** Keep pairs side by side; otherwise maximize equal card size. Short rows come first. */
 export function automaticCardRows(ids: string[], width: number, height: number): { rows: string[][]; baseWidth: number } {
   if (!ids.length) return { rows: [], baseWidth: 0 };
   let columns = 1;
   let best = 0;
-  for (let count = 1; count <= ids.length; count++) {
+  for (let count = ids.length === 2 ? 2 : 1; count <= ids.length; count++) {
     const rows = Math.ceil(ids.length / count);
     const size = Math.min((width - GAP * (count - 1)) / count, (height - GAP * (rows - 1)) / rows * ASPECT);
     if (size > best) { best = size; columns = count; }
@@ -45,8 +45,11 @@ export function calculateCardLayout(ids: string[], width: number, height: number
   sizes: Record<string, number> = {}, manualRows: string[][] | null = null): CardLayout {
   width = Math.max(1, width); height = Math.max(1, height);
   const automatic = automaticCardRows(ids, width, height);
-  const baseWidth = automatic.baseWidth;
   const source = manualRows ? reconcileCardRows(manualRows, ids) : automatic.rows;
+  // Row placement alone must not create oversized vertical stacks. Explicit
+  // size overrides can still grow individual cards beyond the fitted layout.
+  const baseWidth = manualRows && source.length ? Math.min(automatic.baseWidth,
+    Math.max(1, (height - GAP * (source.length - 1)) / source.length * ASPECT)) : automatic.baseWidth;
   const rows: string[][] = [];
   // Wrap oversized manual rows on narrow windows without changing the saved arrangement.
   for (const row of source) {
@@ -84,7 +87,7 @@ export function calculateCardLayout(ids: string[], width: number, height: number
   return { cards, rows, height: Math.max(height, contentHeight), baseWidth };
 }
 
-/** Drop into a row, or create a row above/below it when the pointer crosses its edge. */
+/** The nearest card offers four broad directional drop zones around its center. */
 export function placeCardAtPoint(layout: CardLayout, id: string, x: number, y: number): string[][] {
   const rows = layout.rows.map(row => row.filter(key => key !== id));
   let target: CardPlacement | undefined;
@@ -102,10 +105,9 @@ export function placeCardAtPoint(layout: CardLayout, id: string, x: number, y: n
   }
   if (!target) return [[id]];
   const closest = layout.rows.findIndex(row => row.includes(target.id));
-  const top = target.top;
-  const bottom = target.top + target.height;
-  if (y < top + (bottom - top) * .18) rows.splice(closest, 0, [id]);
-  else if (y > bottom - (bottom - top) * .18) rows.splice(closest + 1, 0, [id]);
+  const dx = (x - target.left - target.width / 2) / Math.max(1, target.width / 2);
+  const dy = (y - target.top - target.height / 2) / Math.max(1, target.height / 2);
+  if (Math.abs(dy) > Math.abs(dx)) rows.splice(closest + (dy > 0 ? 1 : 0), 0, [id]);
   else {
     const index = rows[closest].findIndex(key => {
       const card = layout.cards.find(card => card.id === key)!;

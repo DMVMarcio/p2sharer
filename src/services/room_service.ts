@@ -16,11 +16,12 @@ import { CHAT_FILE_CHUNK_BYTES, MAX_IMAGE_PREVIEW_BYTES } from '../core/chat_fil
 import { verifyRoomInvite } from '../core/room_invite_validation.ts';
 import { savedRooms } from '../core/saved_rooms.ts';
 import type { ChatMessage, PeerInfo, RoomSlotInfo } from '../core/types.ts';
-import { generateRandomRoomSlug, GroupRoomManager, type FileProgress, type FileRequest, type NativeChatFile } from '../p2p/group_room.ts';
+import { generateRandomRoomSlug, GroupRoomManager, type RoomCallbacks, type FileProgress, type FileRequest, type NativeChatFile } from '../p2p/group_room.ts';
 import { soundEffects } from '../ui/sound_effects.ts';
 import { NativeVideoBridge } from '../video/native_video_bridge.ts';
 import { MediaCoordinator } from '../p2p/media_coordinator.ts';
 import { showToast } from '../hooks/useToast.ts';
+import { modalManager } from '../hooks/useModal.ts';
 import { pipService } from './pip_service.ts';
 
 export interface ConnectingOverlayState {
@@ -36,8 +37,14 @@ export class RoomService {
   private static instance: RoomService | null = null;
 
   public roomManager: GroupRoomManager | null = null;
+  private roomPreview: GroupRoomManager | null = null;
   public pendingJoinInvite = '';
   public pendingJoinAsOwner = false;
+  public pendingJoinPassword = '';
+  public pendingJoinError = '';
+  public joinDialogRevision = 0;
+  public joinOutcome: 'idle' | 'connecting' | 'waiting' | 'admitted' | 'error' = 'idle';
+  public joinError = '';
   public nativeVideoBridge = new NativeVideoBridge();
   public audioBridge = new AudioBridge();
   public localCaptures = new Map<string, { sourceId: string; kind: MediaKind; stream: MediaStream;
@@ -167,18 +174,45 @@ export class RoomService {
     }
   }
 
-  public async joinRoom(code: string, pass: string, isCreator: boolean): Promise<void> {
-    const transition = this.roomTransition.then(() => this.joinRoomNow(code, pass, isCreator));
+  public async joinRoom(code: string, pass: string, isCreator: boolean,
+    options: { waitForAdmission?: boolean; preview?: GroupRoomManager; signal?: AbortSignal } = {}): Promise<void> {
+    const transition = this.roomTransition.then(() => options.signal?.aborted ? undefined :
+      this.joinRoomNow(code, pass, isCreator, options.waitForAdmission !== false, options.preview, options.signal));
     this.roomTransition = transition.catch((err) => {
       console.error('[RoomService] Room transition failed:', err);
     });
     return transition;
   }
 
-  private async joinRoomNow(code: string, pass: string, isCreator: boolean): Promise<void> {
+  public startRoomPreview(manager: GroupRoomManager, callbacks: RoomCallbacks, signal: AbortSignal): Promise<void> {
+    const transition = this.roomTransition.then(async () => {
+      if (signal.aborted) return;
+      if (this.roomPreview) await this.roomPreview.leave();
+      if (signal.aborted) return;
+      this.roomPreview = manager;
+      await manager.join(callbacks, true);
+    });
+    this.roomTransition = transition.catch(error => console.warn('[Rooms] Discovery failed:', error));
+    return transition;
+  }
+
+  public stopRoomPreview(manager: GroupRoomManager): Promise<void> {
+    const transition = this.roomTransition.then(async () => {
+      await manager.leave();
+      if (this.roomPreview === manager) this.roomPreview = null;
+    });
+    this.roomTransition = transition.catch(error => console.warn('[Rooms] Discovery cleanup failed:', error));
+    return transition;
+  }
+
+  private async joinRoomNow(code: string, pass: string, isCreator: boolean, waitForAdmission: boolean,
+    preview?: GroupRoomManager, signal?: AbortSignal): Promise<void> {
+    this.joinOutcome = 'connecting';
+    this.joinError = '';
     streamPointerView.clear();
     roomAppsService.reset();
     const parsed = await verifyRoomInvite(code);
+    if (signal?.aborted) return;
     if (!parsed && typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
       throw new Error(t("message.a07036fbd08c"));
     }
@@ -222,14 +256,20 @@ export class RoomService {
     }
     // Dismiss the overlay, but keep searching and describe the actual state.
     this.roomConnectingTimeout = setTimeout(() => {
-      if (!isCreator && this.peers.every((peer) => peer.connectionState !== 'connected')) {
+      if (!isCreator && this.joinOutcome === 'connecting') {
         this.roomStatusText = t("message.5ea38d33d5af");
+        if (this.joinOutcome === 'connecting') {
+          this.joinOutcome = 'error';
+          this.joinError = t('join.timeout');
+        }
       }
       this.hideConnecting();
       this.notify();
     }, isCreator ? 3000 : 12000);
 
-    if (this.roomManager) {
+    const reusable = preview && this.roomPreview === preview ? preview :
+      this.roomManager?.canResumeRoom(code) ? this.roomManager : undefined;
+    if (this.roomManager && this.roomManager !== reusable) {
       const oldManager = this.roomManager;
       this.stopScreenSharing();
       this.roomManager = null;
@@ -240,13 +280,15 @@ export class RoomService {
       }
     }
 
-    const manager = new GroupRoomManager(
+    const manager = reusable ?? new GroupRoomManager(
       stateStore.username || t("message.f53bbaa05fae"),
       code,
       pass,
       isCreator,
       stateStore.getTurnConfig()
     );
+    if (this.roomPreview === manager) this.roomPreview = null;
+    if (signal?.aborted) { await manager.leave(); return; }
     this.roomManager = manager;
     roomAppsService.attach((event, target) => manager.sendAppEvent(event, target), manager.getLocalPeerId(),
       (action, instance) => {
@@ -254,6 +296,8 @@ export class RoomService {
           console.warn('[Chat] Failed to publish app notice:', error));
       });
 
+    const abort = () => { this.hideConnecting(); void manager.leave(); };
+    signal?.addEventListener('abort', abort, { once: true });
     await manager.join({
       onFileRequestCancelled: (requestId) => {
         if (this.roomManager !== manager) return;
@@ -299,7 +343,7 @@ export class RoomService {
           s.streamOverlays = Object.fromEntries(Object.entries(s.streamOverlays).filter(([target]) => currentKeys.has(target))
             .map(([target, keys]) => [target, keys.filter((key) => currentKeys.has(key))]));
         });
-        if (isCreator || slots.some((slot) => !slot.isLocal)) this.hideConnecting();
+        if (manager.hasAdmission() && (isCreator || slots.some((slot) => !slot.isLocal))) this.hideConnecting();
       },
       onChat: (msg: ChatMessage) => {
         if (this.roomManager !== manager) return;
@@ -329,7 +373,7 @@ export class RoomService {
       onPeersUpdate: (peers: PeerInfo[]) => {
         if (this.roomManager !== manager) return;
         this.peers = peers;
-        if (isCreator || peers.some((peer) => peer.connectionState === 'connected')) this.hideConnecting();
+        if (manager.hasAdmission() && (isCreator || peers.some((peer) => peer.connectionState === 'connected'))) this.hideConnecting();
         this.notify();
       },
       onPeerJoined: (peer, isInitial) => {
@@ -374,19 +418,30 @@ export class RoomService {
         soundEffects.playWatchStreamStop();
       },
       onStatusChange: (status) => {
-        if (this.roomManager !== manager) return;
+        if (this.roomManager !== manager || signal?.aborted) return;
+        const wasWaiting = this.joinOutcome === 'waiting';
         this.roomStatusText = status;
-        if (
+        if (manager.hasAdmission()) this.joinOutcome = 'admitted';
+        if (manager.hasAdmission() && (
           status.includes('Conectado') ||
           status === 'Sala Ativa' ||
           status === 'Ao Vivo' ||
           status.includes('P2P') ||
           status.includes('Participante')
-        ) {
+        )) {
           this.hideConnecting();
         } else if (status.startsWith('Erro') || status.startsWith('Senha incorreta') || status === t('lan.connectFailed')) {
+          this.joinOutcome = 'error';
+          this.joinError = status;
           this.hideConnecting();
-          showToast(status, 5000);
+          if (wasWaiting && (!modalManager.getActive() || modalManager.getActive() === 'joinRoom')) {
+            this.pendingJoinInvite = code;
+            this.pendingJoinPassword = pass;
+            this.pendingJoinAsOwner = isCreator;
+            this.pendingJoinError = status;
+            this.joinDialogRevision++;
+            modalManager.open('joinRoom');
+          } else if (this.pendingJoinInvite === '') showToast(status, 5000);
         }
         this.notify();
       },
@@ -416,8 +471,15 @@ export class RoomService {
           s.currentRoomName = name;
         });
       },
-    });
+    }, false, pass);
+    signal?.removeEventListener('abort', abort);
+    if (signal?.aborted) return;
 
+    if (!waitForAdmission && this.roomManager === manager && this.joinOutcome === 'connecting') {
+      this.joinOutcome = 'waiting';
+      this.roomStatusText = t('join.waiting');
+      this.hideConnecting();
+    }
     this.notify();
   }
 
@@ -615,6 +677,7 @@ export class RoomService {
   }
 
   public async leaveRoom(): Promise<void> {
+    this.hideConnecting();
     const transition = this.roomTransition.then(() => this.leaveRoomNow());
     this.roomTransition = transition.catch((err) => {
       console.error('[RoomService] Room exit failed:', err);
@@ -623,6 +686,13 @@ export class RoomService {
   }
 
   private async leaveRoomNow(): Promise<void> {
+    if (this.roomPreview) {
+      const preview = this.roomPreview;
+      this.roomPreview = null;
+      await preview.leave();
+    }
+    this.joinOutcome = 'idle';
+    this.joinError = '';
     this.pointerReceiver.clear();
     streamPointerView.clear();
     roomAppsService.reset();

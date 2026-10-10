@@ -87,6 +87,38 @@ When a remote track enters `ended` state, produces zero frames, or reports a str
 - **Relay-Only Mode**: Supports `iceTransportPolicy: 'relay'` for restrictive NAT/firewall environments.
 - **Accurate Traversal Diagnostics**: WebRTC connection timeouts (`could not connect to peer after exchanging SDP`) are classified honestly as potential NAT/ICE routing timeouts rather than falsely claiming both users have restrictive symmetric NAT routers.
 
+## Room discovery before admission
+
+`GroupRoomManager.join(callbacks, true)` opens a discovery connection on the same
+signaling topic without requesting admission, announcing presence, receiving room
+content, or rewriting saved credentials. `room_preview_v1` returns nonce-bound,
+signed summaries from authenticated members, with membership proofs when needed,
+room name, password requirement, and bounded static avatar thumbnails. Summaries
+never authorize admission or contain the password. `RoomService` serializes
+discovery, cleanup and room entry. Entry promotes the existing discovery manager
+without replacing its transport or authenticated identity; password retries reuse
+that same room connection. Cancellation aborts entry and retires the discovery
+connection before the next attempt. Saved rooms use this same path. An unanswered
+query cannot distinguish an empty room from an
+unreachable room. Older clients do not answer the discovery action, but the modal
+still permits a normal admission attempt.
+
+Discovery does not block entry after invitation validation. With no preview
+response, the room service can open a local waiting session as soon as transport
+setup finishes, keeping discovery and admission active without a participant
+timeout. This is distinct from signed admission: room content remains gated,
+and a later password rejection resumes the join dialog. A confirmed occupied
+room or a password retry still waits for admission before dismissing the dialog.
+
+Preview rosters exclude the requester and require admitted direct peers with
+announced names and live transport edges. A failed handshake with an individual
+peer remains a diagnostic while the admission attempt and signaling retries
+continue; it is not a fatal room setup error. The main window's close-request
+handler waits for room teardown before destroying the window, so the native
+process exits after its leave messages and transport cleanup.
+
 ## Diagnostic interpretation
 
 Signaling reachability, SDP exchange, a relay candidate, and a connected MQTT probe do not establish a complete peer mesh. Inspect actual Trystero subscriptions and each ICE edge. Partial meshes can occur with or without TURN; a smaller offer pool or a configured relay alone is not proof of recovery. Warnings from an unused prewarmed connection do not prove an active route failed. Rate-limit duplicate errors from prewarmed connections and correlate sanitized process-local timing with relay logs when needed. Relay-only configuration omits unnecessary STUN lookups.
+
+Ordinary ICE summaries sample pending negotiations at five and twelve seconds and include allowlisted candidate-pair checks, selected route metadata and DTLS state. Counts include peer-reflexive candidates; browser-unavailable measurements remain explicit. Reuse `selectedIcePair` for route selection and the shared opaque identifier function; never log raw ICE reports. See [diagnostic collection](../../docs/media-diagnostics.md) for comparing failed and successful admission on unchanged networks.

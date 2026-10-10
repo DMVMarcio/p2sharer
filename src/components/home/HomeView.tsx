@@ -23,6 +23,8 @@ export const HomeView: React.FC = () => {
   const handleJoinRoom = () => {
     roomService.pendingJoinInvite = '';
     roomService.pendingJoinAsOwner = false;
+    roomService.pendingJoinPassword = '';
+    roomService.pendingJoinError = '';
     if (!username) {
       openModal('username');
     } else {

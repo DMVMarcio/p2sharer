@@ -12,22 +12,26 @@ interface Props {
   className?: string;
   busy?: boolean;
   onClose: () => void;
+  onCloseStart?: () => void;
 }
 
-export function ModalDialog({ title, subtitle, icon, children, footer, className = '', busy = false, onClose }: Props) {
+export function ModalDialog({ title, subtitle, icon, children, footer, className = '', busy = false, onClose, onCloseStart }: Props) {
   useLocale();
   const titleId = useId();
   const cardRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
   const busyRef = useRef(busy);
+  const closeStartRef = useRef(onCloseStart);
   const closingRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [closing, setClosing] = useState(false);
   closeRef.current = onClose;
   busyRef.current = busy;
+  closeStartRef.current = onCloseStart;
   const close = () => {
     if (busyRef.current || closingRef.current) return;
     closingRef.current = true;
+    closeStartRef.current?.();
     setClosing(true);
     timerRef.current = setTimeout(() => closeRef.current(), 240);
   };

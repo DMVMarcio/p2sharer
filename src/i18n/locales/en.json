@@ -531,7 +531,7 @@
   "message.071f649adb47": "Chats",
   "message.04f9f0a78dbe": "Appearance",
   "message.a11f1b879793": "Sound",
-  "message.55393a891023": "Network & P2P",
+  "message.55393a891023": "Network",
   "message.2a5815044d04": "Diagnostics & logs",
   "message.d16122f3087d": "Participant profile",
   "message.ea3a61eb13e1": "Set your name displayed in participants, cards and chat.",
@@ -992,6 +992,7 @@
   "profile.choose": "Choose image",
   "profile.loading": "Reading image…",
   "profile.remove": "Remove photo",
+  "profile.borderColor": "Avatar border color",
   "profile.color": "Default avatar color",
   "profile.crop": "Crop image",
   "profile.cropHint": "Drag to position. The circle is a preview; the saved image stays square.",
@@ -1014,5 +1015,14 @@
   "file.transferProgress": "{{v0}}% · {{v1}} of {{v2}}",
   "room.cards.reset": "Restore automatic layout",
   "room.cards.gestures": "Drag card to move; resize from edges. Alt+arrows moves; Alt+Shift+arrows resizes.",
-  "room.cards.dropPreview": "Drop card here"
+  "room.cards.dropPreview": "Drop card here",
+  "layout.resizeChat": "Resize chat sidebar",
+  "layout.resizeParticipants": "Resize spotlight participants",
+  "join.inspect": "Check room",
+  "join.searching": "Looking for an active room…",
+  "join.noResponse": "No participants found yet.",
+  "join.online": "Online participants: {{count}}",
+  "join.participants": "People in the room",
+  "join.timeout": "The connection could not be confirmed. Check the password or try again.",
+  "join.waiting": "Waiting for participants and room admission…"
 }
