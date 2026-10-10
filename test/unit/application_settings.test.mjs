@@ -20,7 +20,8 @@ const bundle = await build({
   stdin: { contents: `export { ApplicationSettings } from './src/components/modals/ApplicationSettings.tsx';
     export { SettingsModal } from './src/components/modals/SettingsModal.tsx';
     export { getLanguage, setLanguage } from './src/i18n/index.ts';
-    export { profileImages } from './src/core/profile_image.ts';`, resolveDir: process.cwd() },
+    export { stateStore } from './src/core/state_store.ts';
+    export { profileImages, profileBanners } from './src/core/profile_image.ts';`, resolveDir: process.cwd() },
   bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic',
   plugins: [{ name: 'updater-fixture', setup(builder) {
     builder.onResolve({ filter: /room_service|useModal|@tauri-apps\/api\/core/ }, args => ({
@@ -50,7 +51,7 @@ const controller = new AppUpdateController({
 });
 controller.setPreferences(false, false);
 globalThis.applicationSettingsController = controller;
-const { ApplicationSettings, SettingsModal, getLanguage, setLanguage, profileImages } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text + '\n//# sourceURL=application-settings-test.js').toString('base64')}`);
+const { ApplicationSettings, SettingsModal, getLanguage, setLanguage, profileImages, profileBanners, stateStore } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text + '\n//# sourceURL=application-settings-test.js').toString('base64')}`);
 const { createRoot } = await import('react-dom/client');
 const root = createRoot(document.getElementById('root'));
 function Harness() {
@@ -195,6 +196,110 @@ test('the actual settings modal discards a closed language draft and applies it 
   delete globalThis.settingsClosed;
 });
 
+
+test('nickname preview keeps a cancellable draft and saves the style independently of the name', async () => {
+  await act(async () => { root.render(null); setLanguage('pt-BR'); });
+  const original = stateStore.nicknameStyle;
+  async function open() {
+    await act(async () => root.render(React.createElement(SettingsModal)));
+  }
+  async function chooseRainbow() {
+    const selector = document.querySelector('.nickname-editor [id$="-effect"]');
+    await act(async () => selector.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Home', bubbles: true })));
+    for (let index = 0; index < 4; index++) {
+      await act(async () => selector.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })));
+    }
+    await act(async () => selector.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  }
+  await open();
+  const name = document.getElementById('settings-input-username').value;
+  const customize = () => document.querySelector('.nickname-customize-button');
+  await act(async () => { customize().focus(); customize().click(); });
+  await chooseRainbow();
+  assert.equal(document.querySelector('.nickname-editor [id$="-effect"]').textContent.trim(), 'Arco-íris em movimento');
+  assert.deepEqual(stateStore.nicknameStyle, original);
+  assert.equal(localStorage.getItem('p2sharer_nickname_style_v1'), JSON.stringify(original));
+  await act(async () => document.querySelector('.nickname-style-dialog .modal-footer .btn-secondary').click());
+  await act(async () => new Promise(resolve => setTimeout(resolve, 260)));
+  assert.ok(document.activeElement === customize());
+  await act(async () => { customize().focus(); customize().click(); });
+  assert.equal(document.querySelector('.nickname-editor [id$="-effect"]').textContent.trim(), 'Cor padrão');
+  await chooseRainbow();
+  await act(async () => document.querySelector('.nickname-style-dialog .modal-footer .btn-primary').click());
+  await act(async () => new Promise(resolve => setTimeout(resolve, 260)));
+  assert.deepEqual(stateStore.nicknameStyle, original);
+  await act(async () => document.getElementById('btn-cancel-settings').click());
+  await act(async () => root.render(null));
+  await open();
+  await act(async () => { customize().focus(); customize().click(); });
+  assert.equal(document.querySelector('.nickname-editor [id$="-effect"]').textContent.trim(), 'Cor padrão');
+  await chooseRainbow();
+  await act(async () => document.querySelector('.nickname-style-dialog .modal-footer .btn-primary').click());
+  await act(async () => new Promise(resolve => setTimeout(resolve, 260)));
+  await act(async () => document.getElementById('btn-save-settings').click());
+  assert.equal(stateStore.nicknameStyle.effect, 'rainbow');
+  assert.equal(JSON.parse(localStorage.getItem('p2sharer_nickname_style_v1')).effect, 'rainbow');
+  assert.equal(document.getElementById('settings-input-username').value, name);
+  await act(async () => stateStore.set(s => { s.nicknameStyle = original; }));
+  localStorage.setItem('p2sharer_nickname_style_v1', JSON.stringify(original));
+});
+
+test('banner crop and card preferences remain drafts until Save and never replace the avatar', async () => {
+  await act(async () => { root.render(null); setLanguage('pt-BR'); });
+  const previous = profileBanners.local;
+  const avatar = profileImages.local;
+  profileBanners.local = { hash: '', data: '', color: '#06b6d4' };
+  const saves = [], discarded = [];
+  globalThis.profileBackend = async (command, args) => {
+    if (command === 'pick_profile_image') return { token: 'banner-draft', width: 1200, height: 800, preview: 'data:image/png;base64,cHJldmlldw==' };
+    if (command === 'discard_profile_image') { discarded.push(args?.token); return; }
+    if (command === 'save_profile_image') {
+      saves.push(args);
+      return args.banner ? { hash: args.remove ? '' : '7'.repeat(64), data: args.remove ? '' : 'YmFubmVy', color: args.color,
+        bannerEnabled: args.bannerEnabled, bannerBlur: args.bannerBlur } : avatar;
+    }
+  };
+  const choose = async () => {
+    await act(async () => document.querySelector('[aria-label="Escolher banner"]').click());
+    await act(async () => document.querySelector('.profile-crop-stage').dispatchEvent(new window.KeyboardEvent('keydown', { bubbles: true, key: '+' })));
+    await act(async () => document.querySelector('.profile-crop-dialog .btn-primary').click());
+    await act(async () => new Promise(resolve => setTimeout(resolve, 260)));
+  };
+  try {
+    await act(async () => root.render(React.createElement(SettingsModal)));
+    await choose();
+    assert.equal(document.getElementById('profile-card-automatic'), null);
+    await act(async () => document.getElementById('profile-banner-blur').click());
+    await act(async () => document.getElementById('btn-cancel-settings').click());
+    assert.equal(saves.length, 0);
+    assert.equal(profileBanners.local.data, '');
+    await act(async () => root.render(null));
+    await act(async () => root.render(React.createElement(SettingsModal)));
+    await choose();
+    await act(async () => document.getElementById('profile-banner-blur').click());
+    await act(async () => document.getElementById('profile-banner-enabled').click());
+    assert.equal(document.getElementById('profile-banner-blur'), null);
+    assert.ok(document.getElementById('profile-card-automatic'));
+    await act(async () => document.getElementById('profile-banner-enabled').click());
+    assert.equal(document.getElementById('profile-banner-blur').checked, false);
+    assert.equal(document.getElementById('profile-card-automatic'), null);
+    await act(async () => document.getElementById('profile-banner-enabled').click());
+    await act(async () => document.getElementById('btn-save-settings').click());
+    assert.equal(saves[0].banner, true);
+    assert.equal(saves[0].token, 'banner-draft');
+    assert.ok(saves[0].crop.size < 1);
+    assert.equal(saves[0].bannerEnabled, false);
+    assert.equal(saves[0].bannerBlur, false);
+    assert.equal(profileBanners.url('local'), 'data:image/png;base64,YmFubmVy');
+    assert.equal(profileBanners.cardBanner('local'), undefined);
+    assert.equal(profileImages.local, avatar);
+    assert.ok(!discarded.includes('banner-draft'), 'Applying a crop keeps its source available until the parent closes');
+  } finally {
+    await act(async () => root.render(null));
+    profileBanners.local = previous;
+    delete globalThis.profileBackend;
+  }
+});
 
 test('profile crop survives tab changes, applies only on Save and removal remains a cancellable draft', async () => {
   await act(async () => { root.render(null); setLanguage('pt-BR'); });

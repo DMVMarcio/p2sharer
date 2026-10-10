@@ -9,16 +9,55 @@ globalThis.__profileInvoke = async (command, args) => {
   return `data:image/png;base64,${args.data}`;
 };
 const bundle = await build({
-  stdin: { contents: `export { ProfileTransfer } from './src/p2p/profile_transfer.ts'; export { profileImages } from './src/core/profile_image.ts'; export { contrastingTextColor } from './src/core/accent_color.ts';`, resolveDir: process.cwd() },
+  stdin: { contents: `export { ProfileTransfer } from './src/p2p/profile_transfer.ts'; export { profileImages, profileBanners } from './src/core/profile_image.ts'; export { contrastingTextColor } from './src/core/accent_color.ts';`, resolveDir: process.cwd() },
   bundle: true, write: false, format: 'esm', platform: 'node',
   plugins: [{ name: 'native', setup(builder) {
     builder.onResolve({ filter: /^@tauri-apps\/api\/core$/ }, () => ({ path: 'native', namespace: 'fixture' }));
     builder.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({ contents: 'export const invoke = (command, args) => globalThis.__profileInvoke(command, args);' }));
   } }],
 });
-const { ProfileTransfer, profileImages } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
+const { ProfileTransfer, profileImages, profileBanners } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
 const hash = 'a'.repeat(64);
 const offer = (hash = 'a'.repeat(64)) => ({ kind: 'offer', hash, color: '#123456', size: 4 });
+
+test('banners use independent consent and caches; display preferences update without transferring the image again', async () => {
+  const sent = [];
+  const transfer = new ProfileTransfer((packet, peer) => { if (packet.kind !== 'offer') sent.push({ packet, peer }); }, peer => peer !== 'stranger', profileBanners);
+  const originals = { now: Date.now, invoke: globalThis.__profileInvoke };
+  let now = 20000;
+  Date.now = () => now;
+  const validations = [];
+  globalThis.__profileInvoke = async (command, args) => {
+    assert.equal(command, 'validate_profile_image');
+    assert.equal(args.banner, true);
+    validations.push(args);
+    return `data:image/png;base64,${args.data}`;
+  };
+  const bannerOffer = { ...offer('9'.repeat(64)), bannerEnabled: true, bannerBlur: true };
+  try {
+    await transfer.receive(bannerOffer, 'stranger');
+    await transfer.receive({ ...bannerOffer, bannerBlur: 'yes' }, 'peer');
+    assert.equal(sent.length, 0);
+    await transfer.receive(bannerOffer, 'peer');
+    const request = sent[0].packet;
+    await transfer.receive({ kind: 'chunk', hash: request.hash, token: 'wrong', index: 0, data: 'YQ==' }, 'peer');
+    assert.equal(validations.length, 0);
+    await transfer.receive({ kind: 'chunk', hash: request.hash, token: request.token, index: 0, data: 'YQ==' }, 'peer');
+    assert.equal(profileBanners.cardBanner('peer'), 'data:image/png;base64,YQ==');
+    assert.equal(profileImages.url('peer'), undefined, 'Banner bytes never enter the avatar cache');
+    now += 1500;
+    await transfer.receive({ ...bannerOffer, bannerEnabled: false, bannerBlur: false }, 'peer');
+    assert.equal(profileBanners.cardBanner('peer'), undefined);
+    assert.equal(profileBanners.url('peer'), 'data:image/png;base64,YQ==', 'The future profile keeps the image when card display is off');
+    assert.equal(profileBanners.blur('peer'), false);
+    now += 1500;
+    await transfer.receive({ ...bannerOffer, bannerBlur: false }, 'peer');
+    assert.equal(profileBanners.cardBanner('peer'), 'data:image/png;base64,YQ==');
+    assert.equal(sent.length, 1);
+    transfer.forget('peer');
+    assert.equal(profileBanners.cardBanner('peer'), undefined);
+  } finally { transfer.close(); Date.now = originals.now; globalThis.__profileInvoke = originals.invoke; }
+});
 
 test('image display requires an admitted offer, matching request and successful native validation; hashes deduplicate', async () => {
   const sent = [];

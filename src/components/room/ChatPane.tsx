@@ -1,3 +1,8 @@
+import { profileImages } from '../../core/profile_image';
+import { Nickname } from '../common/Nickname';
+import { ProfileAvatar } from '../common/ProfileAvatar';
+import { profileAction } from '../common/profile_actions';
+import { modalManager } from '../../hooks/useModal';
 import { getLanguage, t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useState, useEffect, useRef, useSyncExternalStore } from 'react';
@@ -29,7 +34,8 @@ import { copyImageToClipboard } from '../../core/image_clipboard';
 export const ChatPane: React.FC = () => {
   useLocale();
   const openContextMenu = useContextMenu();
-  const { chatMessages, sendChatMessage, editChatMessage, deleteChatMessage, offerFile,
+  useSyncExternalStore(profileImages.subscribe, profileImages.snapshot);
+  const { roomSlots, chatMessages, sendChatMessage, editChatMessage, deleteChatMessage, offerFile,
     requestFile, requestFilePreview, cancelFileTransfer, fileProgress,
     localFilePreviews, imagePreviews, savedDownloads, revealSavedFile } = useRoom();
   const [inputText, setInputText] = useState('');
@@ -159,6 +165,7 @@ export const ChatPane: React.FC = () => {
           const fileTransfer = msg.file ? Object.values(fileProgress).find((t) => t.messageId === msg.id && t.preview) : undefined;
           const imagePreview = msg.file?.isImage ? (localFilePreviews[msg.id] ?? imagePreviews[msg.id] ?? fileTransfer?.preview) : undefined;
 
+          const authorSlot = roomSlots.find(slot => (slot.ownerPeerId ?? slot.peerId) === msg.authorId || (msg.authorId === selfId && slot.isLocal));
           const messageActions: ChatMessageActionsProps = {
             own: msg.authorId === selfId,
             onReply: () => { setReplyToId(msg.id); inputRef.current?.focus(); },
@@ -172,8 +179,18 @@ export const ChatPane: React.FC = () => {
 
           return (
             <div key={msg.id || index} onContextMenu={event => { if (!isContextMenuEditor(event.target)) openContextMenu(event, getChatMessageActions(messageActions)); }} className={`chat-msg ${highlightedId === msg.id ? 'chat-msg-highlighted' : ''}`} ref={(element) => { if (element) messageRefs.current.set(msg.id, element); else messageRefs.current.delete(msg.id); }}>
-              <div className="chat-msg-header">
-                <span className="chat-msg-sender">{msg.sender}</span>
+              <div className="chat-msg-header" onContextMenu={event => {
+                if (!(event.target instanceof Element) || !event.target.closest('.profile-identity-button')) return;
+                event.stopPropagation();
+                openContextMenu(event, [profileAction({ peerId: msg.authorId ?? '', name: msg.sender,
+                  isLocal: msg.authorId === selfId, color: authorSlot?.color })]);
+              }}>
+                <button type="button" className="profile-identity-button" aria-label={t('profile.viewName', { name: msg.sender })}
+                  onClick={() => modalManager.openProfile({ peerId: msg.authorId ?? '', name: msg.sender, isLocal: msg.authorId === selfId, color: authorSlot?.color })}>
+                  <ProfileAvatar peerId={msg.authorId ?? ''} name={msg.sender} isLocal={msg.authorId === selfId}
+                    color={authorSlot?.color} className="chat-msg-avatar" />
+                  <span className="chat-msg-sender"><Nickname name={msg.sender} peerId={msg.authorId} isLocal={msg.authorId === selfId} defaultColor={profileImages.background(msg.authorId ?? '', msg.authorId === selfId, authorSlot?.color)} /></span>
+                </button>
                 {msg.isHost && <span className="badge-host">{t("common.hostBadge")}</span>}
                 {msg.editedAt && <EditedMessageMarker editedAt={msg.editedAt} />}
                 <span className="chat-msg-time">{timeStr}</span>

@@ -82,6 +82,8 @@ src/
 
 ## 2. State Management (`src/core/state_store.ts`)
 
+Nickname appearance is separate from identity text. `core/nickname_style.ts` owns the font registry, effect/animation allowlists, hexadecimal color validation, defaults and versioned local persistence. `NicknameField` owns a cancellable `NicknameStyleEditor` dialog within the parent profile/username draft; only the parent Save persists appearance. `Nickname` renders shared appearance with grapheme-aware letters, independently clipped glyph effects for animated letters, and reduced-motion/forced-color fallbacks. Chat default name colors subscribe to the same ProfileImages background used by participant cards. Direct admitted presence carries normalized styles; gossip does not. RoomService publishes styles by peer ID into StateStore and clears them on room changes. PiP receives current names/styles through its existing offer/stats channel and watcher snapshots. Font identifiers refer to bundled registry entries with localized labels; peer-provided CSS and font URLs are unsupported.
+
 `StateStore` is a singleton holding the client's operational state:
 - **User Identity & Room**: `username`, `currentRoomCode`, `currentRoomPassword`, `isCreator`.
 - **Layout & Subscriptions**: `layoutMode` (`'grid'` or `'spotlight'`), `pinnedPeerId`, `subscribedStreams` (Set of peer IDs), `roomSlots` (array of `RoomSlotInfo`).

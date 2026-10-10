@@ -174,6 +174,7 @@ export class PipService {
         const audioState = audioContextManager.getPeerVolumeState(peerId);
         sendSignal({
           type: 'offer',
+          nicknameStyle: streamOwner(peerId) === 'local' ? stateStore.nicknameStyle : stateStore.peerNicknameStyles[streamOwner(peerId)],
           sdp: pc.localDescription?.sdp || offer.sdp,
           senderName,
           isLocal: streamOwner(peerId) === 'local',
@@ -282,6 +283,8 @@ export class PipService {
 
         sendSignal({
           type: 'stats',
+          senderName: slot?.senderName ?? senderName,
+          nicknameStyle: streamOwner(peerId) === 'local' ? stateStore.nicknameStyle : stateStore.peerNicknameStyles[streamOwner(peerId)],
           stats: {
             pingMs: (stats?.pingMs !== null && stats?.pingMs !== undefined ? stats.pingMs : ping) ?? null,
             fps: stats?.fps ?? (streamOwner(peerId) === 'local' ? stateStore.currentFps : 60),

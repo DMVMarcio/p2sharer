@@ -27,6 +27,18 @@ pub struct ProfileImage {
     pub card_color: Option<String>,
     #[serde(default, rename = "dominantColor")]
     pub dominant_color: Option<String>,
+    #[serde(
+        default,
+        rename = "bannerEnabled",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub banner_enabled: Option<bool>,
+    #[serde(
+        default,
+        rename = "bannerBlur",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub banner_blur: Option<bool>,
 }
 
 #[derive(Serialize)]
@@ -72,8 +84,28 @@ fn inspect(bytes: &[u8]) -> Result<(ImageFormat, u32, u32), String> {
     Ok((format, w, h))
 }
 
+#[cfg(test)]
 fn crop_frame(frame: RgbaImage, crop: Crop) -> RgbaImage {
+    crop_frame_as(frame, crop, false)
+}
+
+fn crop_frame_as(frame: RgbaImage, crop: Crop, banner: bool) -> RgbaImage {
     let (w, h) = frame.dimensions();
+    if banner {
+        // A fixed profile aspect, independent of room card geometry. Never upscale.
+        let height = (crop.size * f64::from((w / 3).min(h)))
+            .round()
+            .clamp(1.0, f64::from((w / 3).min(h).max(1))) as u32;
+        let width = height * 3;
+        let x = (crop.x * f64::from(w - width)).round() as u32;
+        let y = (crop.y * f64::from(h - height)).round() as u32;
+        let cropped = image::imageops::crop_imm(&frame, x, y, width, height).to_image();
+        return if width > 960 {
+            image::imageops::resize(&cropped, 960, 320, image::imageops::FilterType::Lanczos3)
+        } else {
+            cropped
+        };
+    }
     let side = (crop.size * f64::from(w.min(h)))
         .round()
         .clamp(1.0, f64::from(w.min(h))) as u32;
@@ -91,7 +123,18 @@ fn decode(
     bytes: &[u8],
     crop: Option<Crop>,
 ) -> Result<(Vec<(RgbaImage, image::Delay)>, u32), String> {
+    decode_as(bytes, crop, false)
+}
+
+fn decode_as(
+    bytes: &[u8],
+    crop: Option<Crop>,
+    banner: bool,
+) -> Result<(Vec<(RgbaImage, image::Delay)>, u32), String> {
     let (format, w, h) = inspect(bytes)?;
+    if banner && crop.is_some() && w < 3 {
+        return Err("Image is too narrow for a banner".into());
+    }
     let cursor = Cursor::new(bytes);
     let mut animation = None;
     let mut plays = 1;
@@ -137,7 +180,7 @@ fn decode(
             let delay = frame.delay();
             let image = frame.into_buffer();
             let image = if let Some(crop) = crop {
-                crop_frame(image, crop)
+                crop_frame_as(image, crop, banner)
             } else {
                 image
             };
@@ -156,7 +199,10 @@ fn decode(
         image.apply_orientation(orientation);
         let image = image.to_rgba8();
         let image = if let Some(crop) = crop {
-            crop_frame(image, crop)
+            if banner && image.width() < 3 {
+                return Err("Image is too narrow for a banner".into());
+            }
+            crop_frame_as(image, crop, banner)
         } else {
             image
         };
@@ -322,10 +368,14 @@ fn frame_delay(n: u32, d: u32) -> (u16, u16) {
     )
 }
 
-fn profile_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+fn profile_path(app: &tauri::AppHandle, banner: bool) -> Result<std::path::PathBuf, String> {
     let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    Ok(dir.join("profile-image.json"))
+    Ok(dir.join(if banner {
+        "profile-banner.json"
+    } else {
+        "profile-image.json"
+    }))
 }
 
 fn prepare_preview(bytes: &[u8]) -> Result<(u32, u32, String), String> {
@@ -377,7 +427,7 @@ pub async fn pick_profile_image(
     getrandom::getrandom(&mut nonce).map_err(|e| e.to_string())?;
     let token = STANDARD.encode(nonce);
     let mut drafts = state.0.lock().map_err(|e| e.to_string())?;
-    if drafts.len() >= 2 {
+    if drafts.len() >= 4 {
         return Err("Too many pending image selections".into());
     }
     drafts.insert(token.clone(), bytes);
@@ -409,7 +459,11 @@ pub async fn save_profile_image(
     color: String,
     card_color: Option<String>,
     remove: bool,
+    banner: Option<bool>,
+    banner_enabled: Option<bool>,
+    banner_blur: Option<bool>,
 ) -> Result<ProfileImage, String> {
+    let banner = banner.unwrap_or(false);
     if !valid_color(&color)
         || card_color
             .as_deref()
@@ -425,7 +479,7 @@ pub async fn save_profile_image(
     };
     tauri::async_runtime::spawn_blocking(move || {
         let _guard = IMAGE_WORK.lock().map_err(|e| e.to_string())?;
-        let path = profile_path(&app)?;
+        let path = profile_path(&app, banner)?;
         let mut profile = if path.exists() {
             serde_json::from_slice::<ProfileImage>(
                 &std::fs::read(&path).map_err(|e| e.to_string())?,
@@ -438,10 +492,16 @@ pub async fn save_profile_image(
                 color: color.clone(),
                 card_color: None,
                 dominant_color: None,
+                banner_enabled: None,
+                banner_blur: None,
             }
         };
         profile.color = color;
         profile.card_color = card_color;
+        if banner {
+            profile.banner_enabled = Some(banner_enabled.unwrap_or(true));
+            profile.banner_blur = Some(banner_blur.unwrap_or(true));
+        }
         if remove {
             profile.hash.clear();
             profile.data.clear();
@@ -456,12 +516,16 @@ pub async fn save_profile_image(
             {
                 return Err("Invalid crop".into());
             }
-            let (frames, plays) = decode(&bytes, Some(crop))?;
-            profile.dominant_color = dominant_color(&frames[0].0);
+            let (frames, plays) = decode_as(&bytes, Some(crop), banner)?;
+            profile.dominant_color = if banner {
+                None
+            } else {
+                dominant_color(&frames[0].0)
+            };
             let bytes = encode(&frames, plays)?;
             profile.hash = format!("{:x}", Sha256::digest(&bytes));
             profile.data = STANDARD.encode(bytes);
-        } else {
+        } else if !banner {
             refresh_dominant_color(&mut profile)?;
         }
         // The previous profile stays intact if decoding, compression or writing fails.
@@ -479,7 +543,11 @@ pub async fn save_profile_image(
 }
 
 #[tauri::command]
-pub async fn validate_profile_image(data: String, hash: String) -> Result<String, String> {
+pub async fn validate_profile_image(
+    data: String,
+    hash: String,
+    banner: Option<bool>,
+) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
         if data.len() > OUTPUT_LIMIT.div_ceil(3) * 4 {
             return Err("Profile image is too large".into());
@@ -489,7 +557,12 @@ pub async fn validate_profile_image(data: String, hash: String) -> Result<String
             return Err("Profile hash mismatch".into());
         }
         let (format, w, h) = inspect(&bytes)?;
-        if format != ImageFormat::Png || w != h || w > 512 {
+        let valid_dimensions = if banner.unwrap_or(false) {
+            w == h * 3 && w <= 960
+        } else {
+            w == h && w <= 512
+        };
+        if format != ImageFormat::Png || !valid_dimensions {
             return Err("Invalid profile dimensions or format".into());
         }
         let _guard = IMAGE_WORK.lock().map_err(|e| e.to_string())?;
@@ -501,8 +574,11 @@ pub async fn validate_profile_image(data: String, hash: String) -> Result<String
 }
 
 #[tauri::command]
-pub async fn load_profile_image(app: tauri::AppHandle) -> Result<Option<ProfileImage>, String> {
-    let path = profile_path(&app)?;
+pub async fn load_profile_image(
+    app: tauri::AppHandle,
+    banner: Option<bool>,
+) -> Result<Option<ProfileImage>, String> {
+    let path = profile_path(&app, banner.unwrap_or(false))?;
     if !path.exists() {
         return Ok(None);
     }
@@ -524,8 +600,10 @@ pub async fn load_profile_image(app: tauri::AppHandle) -> Result<Option<ProfileI
         return Err("Invalid saved profile color".into());
     }
     if !profile.data.is_empty() {
-        validate_profile_image(profile.data.clone(), profile.hash.clone()).await?;
-        refresh_dominant_color(&mut profile)?;
+        validate_profile_image(profile.data.clone(), profile.hash.clone(), banner).await?;
+        if !banner.unwrap_or(false) {
+            refresh_dominant_color(&mut profile)?;
+        }
     }
     Ok(Some(profile))
 }
@@ -533,6 +611,71 @@ pub async fn load_profile_image(app: tauri::AppHandle) -> Result<Option<ProfileI
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn banners_use_profile_aspect_preserve_animation_and_validate_independently() {
+        let crop = Crop {
+            x: 1.0,
+            y: 1.0,
+            size: 1.0,
+        };
+        for (width, height, expected) in [
+            (2100, 900, (960, 320)),
+            (90, 300, (90, 30)),
+            (31, 15, (30, 10)),
+        ] {
+            let mut source = RgbaImage::from_pixel(width, height, image::Rgba([255, 0, 0, 255]));
+            source.put_pixel(width - 1, height - 1, image::Rgba([0, 255, 0, 255]));
+            let banner = crop_frame_as(source, crop, true);
+            assert_eq!(banner.dimensions(), expected);
+            if width < 960 {
+                assert_eq!(
+                    banner.get_pixel(expected.0 - 1, expected.1 - 1).0,
+                    [0, 255, 0, 255]
+                );
+            }
+        }
+        let bytes = encode(
+            &[
+                frame(90, 60, [255, 0, 0, 255], 70),
+                frame(90, 60, [0, 0, 255, 80], 120),
+            ],
+            0,
+        )
+        .unwrap();
+        let (frames, plays) = decode_as(&bytes, Some(crop), true).unwrap();
+        assert_eq!(frames.len(), 2);
+        assert_eq!(frames[0].0.dimensions(), (90, 30));
+        assert_eq!(frames[1].1.numer_denom_ms(), (120, 1));
+        assert_eq!(frames[1].0.get_pixel(0, 0).0[3], 80);
+        assert_eq!(plays, 0);
+        let processed = encode(&frames, plays).unwrap();
+        let hash = format!("{:x}", Sha256::digest(&processed));
+        assert!(
+            validate_profile_image(STANDARD.encode(&processed), hash.clone(), Some(true))
+                .await
+                .is_ok()
+        );
+        assert!(
+            validate_profile_image(STANDARD.encode(&processed), hash, None)
+                .await
+                .is_err()
+        );
+        assert!(
+            validate_profile_image(STANDARD.encode(&processed), "0".repeat(64), Some(true))
+                .await
+                .is_err()
+        );
+        let oversized = encode(&[frame(963, 321, [0, 0, 0, 255], 0)], 1).unwrap();
+        let hash = format!("{:x}", Sha256::digest(&oversized));
+        assert!(
+            validate_profile_image(STANDARD.encode(oversized), hash, Some(true))
+                .await
+                .is_err()
+        );
+        let narrow = encode(&[frame(1, 5, [0, 0, 0, 255], 0)], 1).unwrap();
+        assert!(decode_as(&narrow, Some(crop), true).is_err());
+    }
 
     fn frame(w: u32, h: u32, rgba: [u8; 4], ms: u32) -> (RgbaImage, image::Delay) {
         (
@@ -856,18 +999,18 @@ mod tests {
     async fn received_images_require_matching_hash_and_bounded_square_png() {
         let bytes = encode(&[frame(8, 8, [255, 0, 0, 255], 0)], 1).unwrap();
         let hash = format!("{:x}", Sha256::digest(&bytes));
-        assert!(validate_profile_image(STANDARD.encode(&bytes), hash)
+        assert!(validate_profile_image(STANDARD.encode(&bytes), hash, None)
             .await
             .unwrap()
             .starts_with("data:image/png;base64,"));
         assert!(
-            validate_profile_image(STANDARD.encode(&bytes), "0".repeat(64))
+            validate_profile_image(STANDARD.encode(&bytes), "0".repeat(64), None)
                 .await
                 .is_err()
         );
         let bytes = encode(&[frame(10, 8, [255, 0, 0, 255], 0)], 1).unwrap();
         let hash = format!("{:x}", Sha256::digest(&bytes));
-        assert!(validate_profile_image(STANDARD.encode(bytes), hash)
+        assert!(validate_profile_image(STANDARD.encode(bytes), hash, None)
             .await
             .is_err());
         assert!(decode(b"<svg onload='alert(1)'/>", None).is_err());

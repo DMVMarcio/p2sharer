@@ -3,6 +3,7 @@ import { safeChatUrl } from '../core/chat_links.ts';
 import { stateStore } from '../core/state_store.ts';
 
 export type ModalType =
+  | 'profile'
   | 'settings'
   | 'screenPicker'
   | 'username'
@@ -15,6 +16,8 @@ export type ModalType =
   | 'apps'
   | null;
 
+export interface ProfileTarget { peerId: string; name: string; isLocal?: boolean; color?: string }
+
 class ModalManager {
   private activeModal: ModalType = null;
   private isClosing: boolean = false;
@@ -22,6 +25,9 @@ class ModalManager {
   private listeners = new Set<() => void>();
   private externalLinkUrl: string | null = null;
   private revision = 0;
+  private profileTarget: ProfileTarget | null = null;
+  public getProfileTarget() { return this.profileTarget; }
+  public openProfile(target: ProfileTarget) { this.profileTarget = { ...target }; this.open('profile'); }
 
   public getRevision(): number { return this.revision; }
 
@@ -46,6 +52,7 @@ class ModalManager {
 
   public open(modal: ModalType): void {
     this.revision++;
+    if (modal !== 'profile') this.profileTarget = null;
     if (modal !== 'externalLink') this.externalLinkUrl = null;
     if (this.closeTimer) {
       clearTimeout(this.closeTimer);

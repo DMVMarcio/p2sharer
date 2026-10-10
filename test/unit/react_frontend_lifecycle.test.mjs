@@ -54,7 +54,7 @@ const mocks = {
     getPeerVolumeState: () => ({ volume: 100, isMuted: false }), setPeerVolume() {} };`,
   pip: 'export const pipService = { updateStream() {}, restoreFromPip() {} };',
   pointer: 'export const useStreamPointer = () => ({ enabled: false, toggle() {}, toolbar: null, indicator: null });',
-  modal: 'export const useModal = () => ({ openModal() {} }); export const modalManager = { open() {} };',
+  modal: 'export const useModal = () => ({ openModal() {} }); export const modalManager = { open() {}, openProfile: target => globalThis.frontendLifecycleFixture.profileTarget = target };',
   toast: 'export const showToast = () => {};',
   files: 'export const useChatFileInput = () => ({ selectedFile: null, dragging: false, close() {}, markOffered() {}, pickFile() {} });',
   composer: `import React from 'react'; export const EmojiComposerInput = React.forwardRef((props, ref) => {
@@ -67,7 +67,10 @@ const names = { useRoom: 'useRoom', useStore: 'useStore', state_store: 'state', 
 const require = createRequire(import.meta.url);
 const bundle = await build({ stdin: { contents: `export { RoomVideoContainer } from './src/components/room/RoomVideoContainer.tsx';
 export { ChatPane } from './src/components/room/ChatPane.tsx';
+export { ParticipantsPane } from './src/components/room/ParticipantsPane.tsx';
 export { WatchersTooltipContent } from './src/components/room/WatchersTooltipContent.tsx';
+export { Nickname } from './src/components/common/Nickname.tsx';
+export { profileImages, profileBanners } from './src/core/profile_image.ts';
 export { ContextMenuProvider } from './src/components/common/ContextMenu.tsx';`, resolveDir: process.cwd() },
   bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic', loader: { '.css': 'empty' }, plugins: [{ name: 'fixtures', setup(builder) {
     builder.onResolve({ filter: /\/(useRoom|useStore|state_store|room_service|room_apps_service|RoomAppCard|audio_context_manager|pip_service|useStreamPointer|useModal|useToast|useChatFileInput|EmojiComposerInput)$/ }, args => ({
@@ -76,7 +79,7 @@ export { ContextMenuProvider } from './src/components/common/ContextMenu.tsx';`,
     builder.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: mocks[args.path], loader: 'js' }));
     builder.onResolve({ filter: /^[^./]/ }, args => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
   } }] });
-const { RoomVideoContainer, ChatPane, ContextMenuProvider, WatchersTooltipContent } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
+const { RoomVideoContainer, ChatPane, ParticipantsPane, ContextMenuProvider, WatchersTooltipContent, Nickname, profileImages, profileBanners } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
 const { createRoot } = await import('react-dom/client');
 const root = createRoot(document.getElementById('root'));
 const render = async (Component = RoomVideoContainer) => act(async () => root.render(React.createElement(ContextMenuProvider, null, React.createElement(Component))));
@@ -94,6 +97,105 @@ const reset = async slots => {
   await render();
 };
 after(async () => { await clear(); await act(async () => root.unmount()); dom.window.close(); });
+
+test('profile menus target participant owners from streaming cards, chat identity and the people list', async () => {
+  const openProfile = async element => {
+    await act(async () => element.dispatchEvent(new window.MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 30, clientY: 30 })));
+    const action = [...document.querySelectorAll('[role="menuitem"]')].find(item => /Ver perfil|View profile/.test(item.textContent));
+    assert.ok(action);
+    await act(async () => action.click());
+    assert.equal(fixture.profileTarget.peerId, 'profile-owner');
+  };
+  try {
+    await reset([{ ...slot('profile-owner::camera', 'Profile owner'), ownerPeerId: 'profile-owner' }]);
+    await openProfile(card('profile-owner::camera'));
+    await clear();
+    fixture.room.chatMessages = [{ id: 'profile-chat', authorId: 'profile-owner', sender: 'Profile owner', text: 'Hello', timestamp: Date.now() }];
+    await render(ChatPane);
+    assert.ok(document.querySelector('.profile-identity-button').getAttribute('aria-label').includes('Profile owner'));
+    await openProfile(document.querySelector('.chat-msg-avatar'));
+    await openProfile(document.querySelector('.chat-msg-sender'));
+    for (const identity of document.querySelectorAll('.chat-msg-avatar, .chat-msg-sender')) {
+      delete fixture.profileTarget;
+      await act(async () => identity.click());
+      assert.equal(fixture.profileTarget.peerId, 'profile-owner');
+    }
+    await clear();
+    fixture.room.peers = [{ id: 'profile-owner', username: 'Profile owner', connectionState: 'connected' }];
+    await render(ParticipantsPane);
+    await openProfile(document.querySelectorAll('.participant-item')[1]);
+    delete fixture.profileTarget;
+    await act(async () => document.querySelectorAll('.participant-item-identity')[1].click());
+    assert.equal(fixture.profileTarget.peerId, 'profile-owner');
+    await act(async () => document.querySelector('.participant-item-identity').click());
+    assert.equal(fixture.profileTarget.isLocal, true);
+  } finally {
+    await clear(); fixture.room.peers = []; fixture.room.chatMessages = []; delete fixture.profileTarget;
+  }
+});
+
+test('participant banners react to remote metadata and return to the preserved card color when disabled', async () => {
+  const entry = { ...slot('banner-peer'), isStreaming: false, stream: null };
+  const previous = profileBanners.local;
+  profileBanners.local = { hash: '8'.repeat(64), data: 'YmFubmVy', color: '#06b6d4' };
+  try {
+    await reset([entry]);
+    await act(async () => {
+      profileImages.announce('banner-peer', '', '#123456', '#fafafa');
+      profileBanners.announce('banner-peer', profileBanners.local.hash, '#06b6d4', '#06b6d4', true, true);
+    });
+    assert.equal(card('banner-peer').querySelector('.profile-card-banner img').src, 'data:image/png;base64,YmFubmVy');
+    assert.equal(card('banner-peer').style.getPropertyValue('--card-text'), '#ffffff');
+    await act(async () => profileBanners.announce('banner-peer', profileBanners.local.hash, '#06b6d4', '#06b6d4', false, false));
+    assert.equal(card('banner-peer').querySelector('.profile-card-banner'), null);
+    assert.equal(card('banner-peer').style.getPropertyValue('--card-color'), '#fafafa');
+    assert.notEqual(card('banner-peer').style.getPropertyValue('--card-text'), '#ffffff');
+  } finally {
+    await clear(); profileBanners.local = previous;
+    profileBanners.forget('banner-peer'); profileImages.forget('banner-peer');
+  }
+});
+
+test('per-letter nicknames preserve emoji and combining characters with one accessible name', async () => {
+  await clear();
+  const name = 'A👩‍💻e\u0301';
+  await act(async () => root.render(React.createElement(Nickname, { name,
+    appearance: { font: 'default', effect: 'letters', animation: 'wave', color: '#abcdef', secondaryColor: '#123456' },
+  })));
+  const identity = document.querySelector('[role="img"]');
+  assert.equal(identity.getAttribute('aria-label'), name);
+  assert.deepEqual([...identity.querySelectorAll('[aria-hidden="true"]')].map(letter => letter.textContent), ['A', '👩‍💻', 'e\u0301']);
+});
+
+test('default chat nickname color follows the author card background and its profile updates', async () => {
+  await clear();
+  fixture.room.roomSlots = [slot('chat-author')];
+  fixture.room.chatMessages = [{ id: 'card-color-message', authorId: 'chat-author', sender: 'Author', text: 'Hello', timestamp: Date.now() }];
+  profileImages.announce('chat-author', '', '#abcdef', '#123456');
+  await render(ChatPane);
+  const sender = document.querySelector('.chat-msg-sender .nickname');
+  assert.equal(sender.style.color, 'rgb(18, 52, 86)');
+  assert.equal(document.querySelector('.chat-msg-avatar').getAttribute('aria-label'), 'Author');
+  await act(async () => profileImages.announce('chat-author', '', '#abcdef', '#654321'));
+  assert.equal(sender.style.color, 'rgb(101, 67, 33)');
+  await clear();
+  profileImages.forget('chat-author');
+});
+
+test('stream avatars resolve the owner profile rather than the media slot and react to updates', async () => {
+  const previous = profileImages.local;
+  profileImages.local = { hash: '9'.repeat(64), data: 'YXZhdGFy', color: '#123456' };
+  try {
+    await reset([{ ...slot('owner::camera', 'Owner'), ownerPeerId: 'avatar-owner' }]);
+    await act(async () => profileImages.announce('avatar-owner', profileImages.local.hash, '#123456'));
+    assert.equal(card('owner::camera').querySelector('.stream-profile-avatar img').src, 'data:image/png;base64,YXZhdGFy');
+    await act(async () => profileImages.announce('avatar-owner', '', '#654321'));
+    assert.equal(card('owner::camera').querySelector('.stream-profile-avatar img'), null);
+    assert.equal(card('owner::camera').querySelector('.stream-profile-avatar').textContent, 'O');
+  } finally {
+    await clear(); profileImages.local = previous; profileImages.forget('avatar-owner');
+  }
+});
 
 test('stream controls place volume before pointing and distinguish interface visibility from window pinning', async () => {
   await reset([slot('controls')]);

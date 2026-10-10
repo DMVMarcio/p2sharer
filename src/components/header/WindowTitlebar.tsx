@@ -5,7 +5,7 @@ import { invoke, isTauri } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { Minus, Square, Copy, X } from 'lucide-react';
 import { Tooltip } from '../common/Tooltip';
-import logoImg from '../../assets/logo.png';
+import logoImg from '../../assets/logo.svg';
 import { AppUpdateButton } from './AppUpdateButton';
 import { useStore } from '../../hooks/useStore';
 import { roomService } from '../../services/room_service';

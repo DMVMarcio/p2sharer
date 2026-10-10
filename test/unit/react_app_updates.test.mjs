@@ -32,7 +32,7 @@ test('the real header badge opens the update dialog and installation remains an 
         const mocks = {
           app_updates: 'export const appUpdates = globalThis.appUpdateUiFixture;',
           useRoom: 'export const useRoom = () => ({ isInRoom: false, username: "Test", currentRoomInvite: "" });',
-          useModal: 'export const useModal = () => ({ openModal() {} });',
+          useModal: 'export const useModal = () => ({ openModal() {} }); export const modalManager = { openProfile() {} };',
           useToast: 'export const showToast = () => {};',
           saved_rooms: 'export const savedRooms = { subscribe: () => () => {} };',
         };

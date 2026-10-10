@@ -1,4 +1,7 @@
-import { profileImages, type ProfileDraft } from '../../core/profile_image';
+import { profileStats } from '../../core/profile_stats';
+import { NICKNAME_STYLE_KEY } from '../../core/nickname_style';
+import { profileImages, profileBanners, type ProfileDraft } from '../../core/profile_image';
+import type { BannerDraft } from '../common/ProfileBannerEditor';
 import { ProfileImageEditor } from '../common/ProfileImageEditor';
 import { getLanguage, setLanguage, t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
@@ -39,6 +42,7 @@ const SOUND_LABELS: Record<SoundEvent, string> = {
 
 export const SettingsModal: React.FC = () => {
   useLocale();
+  const [nicknameStyle, setNicknameStyle] = useState(() => stateStore.nicknameStyle);
   const { closeModal, isClosing } = useModal();
   const { themeMode, accentColor, setThemeMode, setAccentColor } = useAppTheme();
 
@@ -49,12 +53,17 @@ export const SettingsModal: React.FC = () => {
   // Form states initialized once upon mounting
   useEffect(() => () => { void invoke('discard_profile_image').catch(() => {}); }, []);
   const [profileDraft, setProfileDraft] = useState<ProfileDraft | null>(null);
+  const [bannerDraft, setBannerDraft] = useState<BannerDraft>(() => ({ image: null, remove: false,
+    enabled: profileBanners.local.bannerEnabled !== false, blur: profileBanners.local.bannerBlur !== false }));
   const [profileColor, setProfileColor] = useState(profileImages.local.color);
   const [profileCardColor, setProfileCardColor] = useState<string | null>(profileImages.local.cardColor ?? null);
   const [profileRemove, setProfileRemove] = useState(false);
+  const [showProfileStats, setShowProfileStats] = useState(profileStats.isSharing);
   const [profileBusy, setProfileBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   useEffect(() => { void profileImages.ready.then(() => { setProfileColor(profileImages.local.color); setProfileCardColor(profileImages.local.cardColor ?? null); }); }, []);
+  useEffect(() => { void profileBanners.ready.then(() => setBannerDraft(current => ({ ...current,
+    enabled: profileBanners.local.bannerEnabled !== false, blur: profileBanners.local.bannerBlur !== false }))); }, []);
   const [nick, setNick] = useState(() => stateStore.username);
   const [language, setLanguageDraft] = useState(getLanguage);
   const [autoUpdates, setAutoUpdates] = useState(automaticUpdateChecks);
@@ -148,8 +157,15 @@ export const SettingsModal: React.FC = () => {
       return;
     }
     setSaving(true);
-    try { await profileImages.save(profileDraft, profileColor, profileRemove, profileCardColor); }
+    try {
+      if (bannerDraft.image || bannerDraft.remove || bannerDraft.enabled !== (profileBanners.local.bannerEnabled !== false) ||
+        bannerDraft.blur !== (profileBanners.local.bannerBlur !== false)) {
+        await profileBanners.save(bannerDraft.image, profileBanners.local.color, bannerDraft.remove, null, bannerDraft.enabled, bannerDraft.blur);
+      }
+      await profileImages.save(profileDraft, profileColor, profileRemove, profileCardColor);
+    }
     catch { setSaving(false); showToast(t('profile.saveFailed')); return; }
+    profileStats.setSharing(showProfileStats);
     // Save username
     if (nick.trim()) {
       stateStore.set((s) => {
@@ -158,6 +174,8 @@ export const SettingsModal: React.FC = () => {
       localStorage.setItem('p2sharer_username', nick.trim());
     }
 
+    localStorage.setItem(NICKNAME_STYLE_KEY, JSON.stringify(nicknameStyle));
+    stateStore.set(s => { s.nicknameStyle = nicknameStyle; });
     roomService.roomManager?.refreshProfile();
 
     // Save SFX
@@ -369,8 +387,17 @@ export const SettingsModal: React.FC = () => {
                 </div>
 
                 <ProfileImageEditor name={nick} draft={profileDraft} color={profileColor} remove={profileRemove}
+                  banner={bannerDraft} onBanner={setBannerDraft}
                   onDraft={setProfileDraft} onColor={setProfileColor} onRemove={setProfileRemove}
-                  onBusy={setProfileBusy} disabled={saving} onNameChange={setNick} cardColor={profileCardColor} onCardColor={setProfileCardColor} />
+                  onBusy={setProfileBusy} disabled={saving || profileBusy} onNameChange={setNick} cardColor={profileCardColor} onCardColor={setProfileCardColor} nicknameStyle={nicknameStyle} onNicknameStyle={setNicknameStyle} />
+                <label className="settings-switch-row" htmlFor="profile-stats-visible">
+                  <span className="settings-switch-title">{t('profile.stats.visible')}</span>
+                  <div className="modern-switch">
+                    <input autoComplete="off" type="checkbox" id="profile-stats-visible" checked={showProfileStats}
+                      disabled={saving || profileBusy} onChange={event => setShowProfileStats(event.target.checked)} />
+                    <span className="switch-slider" />
+                  </div>
+                </label>
               </div>
             )}
 

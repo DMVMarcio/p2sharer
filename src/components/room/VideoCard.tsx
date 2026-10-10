@@ -1,3 +1,6 @@
+import { Nickname } from '../common/Nickname';
+import { ProfileAvatar } from '../common/ProfileAvatar';
+import { profileAction } from '../common/profile_actions';
 import { useRoomCardLayoutActions } from './RoomCardLayoutContext';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
@@ -270,7 +273,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
 
   const layoutActions = useRoomCardLayoutActions();
   const handleContextMenu = (event: React.MouseEvent) => {
-    const actions: ContextMenuAction[] = [];
+    const actions: ContextMenuAction[] = [profileAction({ peerId: slot.ownerPeerId ?? slot.peerId, name: slot.senderName, isLocal: slot.isLocal, color: slot.color })];
     if (layoutMode === 'spotlight' && inTray && !isSelectedFeatured) actions.push({ id: 'overlay', get label() { return t("message.1c2685f76e69"); },
       icon: <PictureInPicture2 size={15} />, onSelect: () => roomService.overlayStream(slot.peerId) });
     if (slot.isLocal && slot.mediaId) actions.push({ id: 'edit', get label() { return t("message.eb9fb0e94a23"); }, icon: <MonitorUp size={15} />,
@@ -435,7 +438,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
                   </svg>
                 </div>
                 {!inTray && <span className="local-broadcaster-title">{t("message.863d929084c6")}</span>}
-                {!inTray && <span className="local-broadcaster-subtitle">{slot.senderName}</span>}
+                {!inTray && <span className="local-broadcaster-subtitle"><Nickname name={slot.senderName} peerId={slot.ownerPeerId ?? slot.peerId} isLocal={slot.isLocal} /></span>}
               </div>
             )}
           </>
@@ -470,8 +473,9 @@ export const VideoCard: React.FC<VideoCardProps> = ({
 
       {/* User overlay at bottom-left */}
       <div className="stream-card-overlay">
-        <span className="user-status-dot"></span>
-        <span className="stream-user-name">{slot.senderName}{slot.mediaLabel ? ` · ${slot.mediaLabel}` : ""}</span>
+        <ProfileAvatar peerId={slot.ownerPeerId ?? slot.peerId} name={slot.senderName}
+          isLocal={slot.isLocal} color={slot.color} className="stream-profile-avatar" />
+        <span className="stream-user-name"><Nickname name={slot.senderName} peerId={slot.ownerPeerId ?? slot.peerId} isLocal={slot.isLocal} />{slot.mediaLabel ? ` · ${slot.mediaLabel}` : ""}</span>
         {slot.isLocal && <span className="badge-you">{t("message.a03099f135b1")}</span>}
       </div>
 

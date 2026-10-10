@@ -66,3 +66,53 @@ new members. Photo changes do not restart media or synchronize chat history.
 Automatic regressions cover crop/save/cancel behavior, consent and hash reuse,
 queue bounds, malformed data and GIF/APNG/animated WebP normalization. Live
 two-process desktop interoperability is a separate runtime check.
+
+## Profile banners
+
+`profileBanners` is an independent instance of the shared image store. The native
+image commands accept an optional `banner` flag and use `profile-banner.json`
+instead of the avatar file. The same bounded decoders, orientation handling,
+metadata stripping, high-compression PNG/APNG encoder and hash validation apply.
+Banner crops have a fixed 3:1 profile aspect, capped at 960 by 320 without upscaling;
+the card aspect never changes the stored crop. `ProfileCropDialog` and
+`core/profile_crop.ts` share preview, zoom and pan geometry between both assets.
+Four native source tokens allow replacement drafts for both images; settings
+retains applied sources until close so failed saves can be retried.
+
+`profile_banner_v1` uses `ProfileTransfer` with the banner store, preserving the
+same direct-peer admission, request-token, chunk, cache and native validation
+boundaries. Its independent hash namespace also carries boolean `bannerEnabled`
+and `bannerBlur` preferences. Card display defaults to enabled and blurred when
+an image is present. Disabling card display retains the image for future profile
+surfaces and reveals the unchanged avatar-derived or custom card color.
+`ParticipantCard` renders a decorative cover layer with optional blur and a dark
+scrim for readable foreground text. Settings owns banner upload, removal and
+display-option drafts. `ProfileModal` displays the full banner regardless of its
+card visibility/blur settings and uses the shared nickname and avatar components.
+
+## Profile statistics and viewing
+
+`core/profile_stats.ts` stores versioned aggregate totals in the main WebView local
+storage. RoomService starts/stops admitted room sessions (including solo sessions),
+counts successfully published new messages, and counts acknowledged complete file
+transfers once per request, excluding image previews and local copies of cached
+images. Call time uses a monotonic
+clock, checkpoints every 15 seconds and flushes on departure/beforeunload; an abrupt
+process termination can lose the final checkpoint interval. Calls, longest call,
+messages, sent/received files and byte totals accumulate on this device from the
+feature's introduction; history replay and message edits do not increase totals.
+
+`profile_stats_v1` shares only bounded aggregate counters on direct admitted edges
+through the room action guard, with coalesced updates and admission announcements.
+Remote totals are self-reported, remain in process memory, and disappear on room
+exit. The persisted visibility preference keeps local counting active while
+publishing a null snapshot instead of counters when disabled. Receivers discard
+previous totals and omit the statistics section on that snapshot. Settings uses a
+cancellable visibility draft, applied only on Save. Remote snapshots never
+overwrite local storage or trigger announcement loops. The shared
+`profile_actions.tsx` action opens `ProfileModal` through ModalManager with the
+owner identity, including media slots, chat identity context menus, participant
+lists and the local header. Unknown/older clients display an unavailable state.
+Chat identities and participant-list identity buttons also open profiles directly.
+The headerless ModalDialog variant preserves focus trapping, dismissal and its
+shared closing lifecycle without a visible heading or footer.

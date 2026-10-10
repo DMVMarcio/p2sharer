@@ -34,7 +34,7 @@ globalThis.windowChromeFixture = {
 const require = createRequire(import.meta.url);
 const bundle = await build({
   stdin: { contents: `export { WindowTitlebar } from './src/components/header/WindowTitlebar.tsx'; export { stateStore } from './src/core/state_store.ts'; export { setLanguage } from './src/i18n/index.ts';`, resolveDir: process.cwd() },
-  bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic', loader: { '.png': 'dataurl' },
+  bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic', loader: { '.png': 'dataurl', '.svg': 'dataurl' },
   plugins: [{ name: 'native-window-fixture', setup(builder) {
     builder.onResolve({ filter: /services\/room_service$/ }, args => ({ path: args.path, namespace: 'room-fixture' }));
     builder.onLoad({ filter: /.*/, namespace: 'room-fixture' }, () => ({ contents:

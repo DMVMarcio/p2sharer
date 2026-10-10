@@ -1,3 +1,4 @@
+import { Nickname } from '../common/Nickname';
 import { ProfileAvatar } from '../common/ProfileAvatar';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
@@ -10,9 +11,12 @@ import { BookmarkCheck, BookmarkPlus } from 'lucide-react';
 import { parseRoomInvite } from '../../core/room_invite';
 import { savedRooms, type SavedRoom } from '../../core/saved_rooms';
 import { AppUpdateButton } from './AppUpdateButton';
+import { useContextMenu } from '../common/ContextMenu';
+import { profileAction } from '../common/profile_actions';
 
 export const AppHeader: React.FC<{ showUpdate?: boolean }> = ({ showUpdate = true }) => {
   useLocale();
+  const openContextMenu = useContextMenu();
   const { currentRoomCode, currentRoomInvite, currentRoomName, currentRoomPassword, username, isInRoom } = useRoom();
   const { openModal } = useModal();
   const [savedRecord, setSavedRecord] = useState<SavedRoom | null>(null);
@@ -114,11 +118,12 @@ export const AppHeader: React.FC<{ showUpdate?: boolean }> = ({ showUpdate = tru
         <button
           className="user-pill"
           id="user-pill"
+          onContextMenu={event => openContextMenu(event, [profileAction({ peerId: 'local', name: username, isLocal: true })])}
           onClick={() => openModal('settings')}
           aria-label={t("message.ee91711e6b22")}
         >
           <ProfileAvatar name={username} className="header-profile-avatar" />
-          <span id="current-username-display">{username || t("message.f53bbaa05fae")}</span>
+          <span id="current-username-display"><Nickname name={username || t("message.f53bbaa05fae")} isLocal /></span>
         </button>
 
         <button
