@@ -1,4 +1,10 @@
 {
+  "profile.banner": "Banner do perfil",
+  "profile.chooseBanner": "Escolher banner",
+  "profile.removeBanner": "Remover banner",
+  "profile.cropBanner": "Recortar banner",
+  "profile.bannerOnCard": "Usar banner nos cards",
+  "profile.bannerBlur": "Desfocar banner nos cards",
   "ice.lanTimeout": "Tempo esgotado na conexão WebRTC{{peer}} pela LAN/VPN. Verifique a negociação, a rede e o firewall dos participantes.",
   "ice.connectionTimeout": "Tempo esgotado na conexão WebRTC{{peer}}. Verifique a negociação e a conectividade ICE; este erro não identifica a causa.",
   "lan.connectionMode": "Conexão",

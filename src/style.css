@@ -5640,3 +5640,20 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .nickname-field-appearance > .nickname-customize-button { flex: 0 0 auto; width: auto; padding: 6px; border: 0; background: transparent; }
 .nickname-field-appearance > .nickname-customize-button:hover:not(:disabled) { background: var(--bg-card-hover); }
 .nickname-style-dialog .nickname-editor { margin-top: 0; }
+
+.profile-banner-editor { margin-bottom: 16px; }
+.profile-banner-upload { position: relative; margin-top: 8px; }
+.btn.profile-banner-button { display: block; width: 100%; border: 1px solid var(--border-default); border-radius: var(--radius-md); overflow: hidden; }
+.profile-banner-preview { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; aspect-ratio: 3; overflow: hidden; background: var(--bg-input); color: var(--text-muted); }
+.profile-banner-preview img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.profile-banner-preview > img[style] { position: absolute; max-width: none; }
+.profile-banner-options { display: grid; gap: 8px; margin-top: 8px; }
+.profile-banner-crop-dialog { width: min(560px, calc(100vw - 32px)); }
+.profile-crop-stage.is-banner { width: 100%; aspect-ratio: 2; }
+.profile-crop-stage.is-banner .profile-crop-frame { width: 100%; }
+.profile-crop-circle.is-banner { border-radius: 0; }
+.participant-card { isolation: isolate; }
+.profile-card-banner { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+.profile-card-banner img { width: 100%; height: 100%; object-fit: cover; }
+.profile-card-banner.is-blurred img { filter: blur(12px); transform: scale(1.12); }
+.profile-card-banner::after { content: ''; position: absolute; inset: 0; background: rgba(0, 0, 0, 0.6); }

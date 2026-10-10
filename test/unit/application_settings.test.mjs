@@ -21,7 +21,7 @@ const bundle = await build({
     export { SettingsModal } from './src/components/modals/SettingsModal.tsx';
     export { getLanguage, setLanguage } from './src/i18n/index.ts';
     export { stateStore } from './src/core/state_store.ts';
-    export { profileImages } from './src/core/profile_image.ts';`, resolveDir: process.cwd() },
+    export { profileImages, profileBanners } from './src/core/profile_image.ts';`, resolveDir: process.cwd() },
   bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic',
   plugins: [{ name: 'updater-fixture', setup(builder) {
     builder.onResolve({ filter: /room_service|useModal|@tauri-apps\/api\/core/ }, args => ({
@@ -51,7 +51,7 @@ const controller = new AppUpdateController({
 });
 controller.setPreferences(false, false);
 globalThis.applicationSettingsController = controller;
-const { ApplicationSettings, SettingsModal, getLanguage, setLanguage, profileImages, stateStore } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text + '\n//# sourceURL=application-settings-test.js').toString('base64')}`);
+const { ApplicationSettings, SettingsModal, getLanguage, setLanguage, profileImages, profileBanners, stateStore } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text + '\n//# sourceURL=application-settings-test.js').toString('base64')}`);
 const { createRoot } = await import('react-dom/client');
 const root = createRoot(document.getElementById('root'));
 function Harness() {
@@ -242,6 +242,57 @@ test('nickname preview keeps a cancellable draft and saves the style independent
   assert.equal(document.getElementById('settings-input-username').value, name);
   await act(async () => stateStore.set(s => { s.nicknameStyle = original; }));
   localStorage.setItem('p2sharer_nickname_style_v1', JSON.stringify(original));
+});
+
+test('banner crop and card preferences remain drafts until Save and never replace the avatar', async () => {
+  await act(async () => { root.render(null); setLanguage('pt-BR'); });
+  const previous = profileBanners.local;
+  const avatar = profileImages.local;
+  profileBanners.local = { hash: '', data: '', color: '#06b6d4' };
+  const saves = [], discarded = [];
+  globalThis.profileBackend = async (command, args) => {
+    if (command === 'pick_profile_image') return { token: 'banner-draft', width: 1200, height: 800, preview: 'data:image/png;base64,cHJldmlldw==' };
+    if (command === 'discard_profile_image') { discarded.push(args?.token); return; }
+    if (command === 'save_profile_image') {
+      saves.push(args);
+      return args.banner ? { hash: args.remove ? '' : '7'.repeat(64), data: args.remove ? '' : 'YmFubmVy', color: args.color,
+        bannerEnabled: args.bannerEnabled, bannerBlur: args.bannerBlur } : avatar;
+    }
+  };
+  const choose = async () => {
+    await act(async () => document.querySelector('[aria-label="Escolher banner"]').click());
+    await act(async () => document.querySelector('.profile-crop-stage').dispatchEvent(new window.KeyboardEvent('keydown', { bubbles: true, key: '+' })));
+    await act(async () => document.querySelector('.profile-crop-dialog .btn-primary').click());
+    await act(async () => new Promise(resolve => setTimeout(resolve, 260)));
+  };
+  try {
+    await act(async () => root.render(React.createElement(SettingsModal)));
+    await choose();
+    await act(async () => document.getElementById('profile-banner-blur').click());
+    await act(async () => document.getElementById('btn-cancel-settings').click());
+    assert.equal(saves.length, 0);
+    assert.equal(profileBanners.local.data, '');
+    await act(async () => root.render(null));
+    await act(async () => root.render(React.createElement(SettingsModal)));
+    await choose();
+    await act(async () => document.getElementById('profile-banner-blur').click());
+    await act(async () => document.getElementById('profile-banner-enabled').click());
+    assert.equal(document.getElementById('profile-banner-blur').disabled, true);
+    await act(async () => document.getElementById('btn-save-settings').click());
+    assert.equal(saves[0].banner, true);
+    assert.equal(saves[0].token, 'banner-draft');
+    assert.ok(saves[0].crop.size < 1);
+    assert.equal(saves[0].bannerEnabled, false);
+    assert.equal(saves[0].bannerBlur, false);
+    assert.equal(profileBanners.url('local'), 'data:image/png;base64,YmFubmVy');
+    assert.equal(profileBanners.cardBanner('local'), undefined);
+    assert.equal(profileImages.local, avatar);
+    assert.ok(!discarded.includes('banner-draft'), 'Applying a crop keeps its source available until the parent closes');
+  } finally {
+    await act(async () => root.render(null));
+    profileBanners.local = previous;
+    delete globalThis.profileBackend;
+  }
 });
 
 test('profile crop survives tab changes, applies only on Save and removal remains a cancellable draft', async () => {

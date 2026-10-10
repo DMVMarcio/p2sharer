@@ -1,4 +1,10 @@
 {
+  "profile.banner": "Profile banner",
+  "profile.chooseBanner": "Choose banner",
+  "profile.removeBanner": "Remove banner",
+  "profile.cropBanner": "Crop banner",
+  "profile.bannerOnCard": "Use banner on cards",
+  "profile.bannerBlur": "Blur banner on cards",
   "ice.lanTimeout": "WebRTC connection timed out{{peer}} over LAN/VPN. Check negotiation, the network and participants' firewalls.",
   "ice.connectionTimeout": "WebRTC connection timed out{{peer}}. Check negotiation and ICE connectivity; this error does not identify the cause.",
   "lan.connectionMode": "Connection",

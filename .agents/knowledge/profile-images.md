@@ -66,3 +66,25 @@ new members. Photo changes do not restart media or synchronize chat history.
 Automatic regressions cover crop/save/cancel behavior, consent and hash reuse,
 queue bounds, malformed data and GIF/APNG/animated WebP normalization. Live
 two-process desktop interoperability is a separate runtime check.
+
+## Profile banners
+
+`profileBanners` is an independent instance of the shared image store. The native
+image commands accept an optional `banner` flag and use `profile-banner.json`
+instead of the avatar file. The same bounded decoders, orientation handling,
+metadata stripping, high-compression PNG/APNG encoder and hash validation apply.
+Banner crops have a fixed 3:1 profile aspect, capped at 960 by 320 without upscaling;
+the card aspect never changes the stored crop. `ProfileCropDialog` and
+`core/profile_crop.ts` share preview, zoom and pan geometry between both assets.
+Four native source tokens allow replacement drafts for both images; settings
+retains applied sources until close so failed saves can be retried.
+
+`profile_banner_v1` uses `ProfileTransfer` with the banner store, preserving the
+same direct-peer admission, request-token, chunk, cache and native validation
+boundaries. Its independent hash namespace also carries boolean `bannerEnabled`
+and `bannerBlur` preferences. Card display defaults to enabled and blurred when
+an image is present. Disabling card display retains the image for future profile
+surfaces and reveals the unchanged avatar-derived or custom card color.
+`ParticipantCard` renders a decorative cover layer with optional blur and a dark
+scrim for readable foreground text. Settings owns banner upload, removal and
+display-option drafts; no profile page is implemented.

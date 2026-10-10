@@ -1,5 +1,6 @@
 import { NICKNAME_STYLE_KEY } from '../../core/nickname_style';
-import { profileImages, type ProfileDraft } from '../../core/profile_image';
+import { profileImages, profileBanners, type ProfileDraft } from '../../core/profile_image';
+import type { BannerDraft } from '../common/ProfileBannerEditor';
 import { ProfileImageEditor } from '../common/ProfileImageEditor';
 import { getLanguage, setLanguage, t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
@@ -51,12 +52,16 @@ export const SettingsModal: React.FC = () => {
   // Form states initialized once upon mounting
   useEffect(() => () => { void invoke('discard_profile_image').catch(() => {}); }, []);
   const [profileDraft, setProfileDraft] = useState<ProfileDraft | null>(null);
+  const [bannerDraft, setBannerDraft] = useState<BannerDraft>(() => ({ image: null, remove: false,
+    enabled: profileBanners.local.bannerEnabled !== false, blur: profileBanners.local.bannerBlur !== false }));
   const [profileColor, setProfileColor] = useState(profileImages.local.color);
   const [profileCardColor, setProfileCardColor] = useState<string | null>(profileImages.local.cardColor ?? null);
   const [profileRemove, setProfileRemove] = useState(false);
   const [profileBusy, setProfileBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   useEffect(() => { void profileImages.ready.then(() => { setProfileColor(profileImages.local.color); setProfileCardColor(profileImages.local.cardColor ?? null); }); }, []);
+  useEffect(() => { void profileBanners.ready.then(() => setBannerDraft(current => ({ ...current,
+    enabled: profileBanners.local.bannerEnabled !== false, blur: profileBanners.local.bannerBlur !== false }))); }, []);
   const [nick, setNick] = useState(() => stateStore.username);
   const [language, setLanguageDraft] = useState(getLanguage);
   const [autoUpdates, setAutoUpdates] = useState(automaticUpdateChecks);
@@ -150,7 +155,13 @@ export const SettingsModal: React.FC = () => {
       return;
     }
     setSaving(true);
-    try { await profileImages.save(profileDraft, profileColor, profileRemove, profileCardColor); }
+    try {
+      if (bannerDraft.image || bannerDraft.remove || bannerDraft.enabled !== (profileBanners.local.bannerEnabled !== false) ||
+        bannerDraft.blur !== (profileBanners.local.bannerBlur !== false)) {
+        await profileBanners.save(bannerDraft.image, profileBanners.local.color, bannerDraft.remove, null, bannerDraft.enabled, bannerDraft.blur);
+      }
+      await profileImages.save(profileDraft, profileColor, profileRemove, profileCardColor);
+    }
     catch { setSaving(false); showToast(t('profile.saveFailed')); return; }
     // Save username
     if (nick.trim()) {
@@ -373,8 +384,9 @@ export const SettingsModal: React.FC = () => {
                 </div>
 
                 <ProfileImageEditor name={nick} draft={profileDraft} color={profileColor} remove={profileRemove}
+                  banner={bannerDraft} onBanner={setBannerDraft}
                   onDraft={setProfileDraft} onColor={setProfileColor} onRemove={setProfileRemove}
-                  onBusy={setProfileBusy} disabled={saving} onNameChange={setNick} cardColor={profileCardColor} onCardColor={setProfileCardColor} nicknameStyle={nicknameStyle} onNicknameStyle={setNicknameStyle} />
+                  onBusy={setProfileBusy} disabled={saving || profileBusy} onNameChange={setNick} cardColor={profileCardColor} onCardColor={setProfileCardColor} nicknameStyle={nicknameStyle} onNicknameStyle={setNicknameStyle} />
               </div>
             )}
 

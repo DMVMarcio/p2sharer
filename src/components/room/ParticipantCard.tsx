@@ -1,7 +1,7 @@
 import { Nickname } from '../common/Nickname';
 import { useRoomCardLayoutActions } from './RoomCardLayoutContext';
 import { contrastingTextColor } from '../../core/accent_color';
-import { profileImages } from '../../core/profile_image';
+import { profileImages, profileBanners } from '../../core/profile_image';
 import { ProfileAvatar } from '../common/ProfileAvatar';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
@@ -32,6 +32,7 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
 }) => {
   useLocale();
   React.useSyncExternalStore(profileImages.subscribe, profileImages.snapshot);
+  React.useSyncExternalStore(profileBanners.subscribe, profileBanners.snapshot);
   const { togglePin, requestStream, layoutMode, returnToGrid } = useRoom();
   const openContextMenu = useContextMenu();
   const layoutActions = useRoomCardLayoutActions();
@@ -39,6 +40,8 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
   const subscribedStreams = useStore((s) => s.subscribedStreams);
 
   const background = profileImages.background(slot.ownerPeerId ?? slot.peerId, slot.isLocal, slot.color);
+  const banner = profileBanners.cardBanner(slot.ownerPeerId ?? slot.peerId, slot.isLocal);
+  const blurBanner = profileBanners.blur(slot.ownerPeerId ?? slot.peerId, slot.isLocal);
   const isSubscribed = subscribedStreams.has(slot.peerId);
   const watchers = slot.watchers || [];
   const watchersCount = watchers.length;
@@ -56,7 +59,7 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
     <div
       className={`participant-card ${isFeatured ? 'featured' : ''} ${inTray ? 'in-tray' : ''} ${isSelectedFeatured ? 'selected-featured' : ''}`}
       data-peer-id={slot.peerId}
-      style={{ '--user-color': slot.color, '--card-color': background, '--card-text': contrastingTextColor(background) } as React.CSSProperties}
+      style={{ '--user-color': slot.color, '--card-color': background, '--card-text': banner ? '#ffffff' : contrastingTextColor(background) } as React.CSSProperties}
       onClick={handleCardClick}
       tabIndex={0}
       onContextMenu={(event) => {
@@ -70,6 +73,9 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
         openContextMenu(event, [...actions, ...layoutActions]);
       }}
     >
+      {banner && <div className={`profile-card-banner${blurBanner ? ' is-blurred' : ''}`} aria-hidden="true">
+        <img src={banner} alt="" draggable={false} />
+      </div>}
       {/* Featured badge when in tray */}
       {inTray && isSelectedFeatured && (
         <span className="selected-featured-badge">

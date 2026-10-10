@@ -69,7 +69,7 @@ const bundle = await build({ stdin: { contents: `export { RoomVideoContainer } f
 export { ChatPane } from './src/components/room/ChatPane.tsx';
 export { WatchersTooltipContent } from './src/components/room/WatchersTooltipContent.tsx';
 export { Nickname } from './src/components/common/Nickname.tsx';
-export { profileImages } from './src/core/profile_image.ts';
+export { profileImages, profileBanners } from './src/core/profile_image.ts';
 export { ContextMenuProvider } from './src/components/common/ContextMenu.tsx';`, resolveDir: process.cwd() },
   bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic', loader: { '.css': 'empty' }, plugins: [{ name: 'fixtures', setup(builder) {
     builder.onResolve({ filter: /\/(useRoom|useStore|state_store|room_service|room_apps_service|RoomAppCard|audio_context_manager|pip_service|useStreamPointer|useModal|useToast|useChatFileInput|EmojiComposerInput)$/ }, args => ({
@@ -78,7 +78,7 @@ export { ContextMenuProvider } from './src/components/common/ContextMenu.tsx';`,
     builder.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: mocks[args.path], loader: 'js' }));
     builder.onResolve({ filter: /^[^./]/ }, args => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
   } }] });
-const { RoomVideoContainer, ChatPane, ContextMenuProvider, WatchersTooltipContent, Nickname, profileImages } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
+const { RoomVideoContainer, ChatPane, ContextMenuProvider, WatchersTooltipContent, Nickname, profileImages, profileBanners } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
 const { createRoot } = await import('react-dom/client');
 const root = createRoot(document.getElementById('root'));
 const render = async (Component = RoomVideoContainer) => act(async () => root.render(React.createElement(ContextMenuProvider, null, React.createElement(Component))));
@@ -96,6 +96,28 @@ const reset = async slots => {
   await render();
 };
 after(async () => { await clear(); await act(async () => root.unmount()); dom.window.close(); });
+
+test('participant banners react to remote metadata and return to the preserved card color when disabled', async () => {
+  const entry = { ...slot('banner-peer'), isStreaming: false, stream: null };
+  const previous = profileBanners.local;
+  profileBanners.local = { hash: '8'.repeat(64), data: 'YmFubmVy', color: '#06b6d4' };
+  try {
+    await reset([entry]);
+    await act(async () => {
+      profileImages.announce('banner-peer', '', '#123456', '#fafafa');
+      profileBanners.announce('banner-peer', profileBanners.local.hash, '#06b6d4', '#06b6d4', true, true);
+    });
+    assert.equal(card('banner-peer').querySelector('.profile-card-banner img').src, 'data:image/png;base64,YmFubmVy');
+    assert.equal(card('banner-peer').style.getPropertyValue('--card-text'), '#ffffff');
+    await act(async () => profileBanners.announce('banner-peer', profileBanners.local.hash, '#06b6d4', '#06b6d4', false, false));
+    assert.equal(card('banner-peer').querySelector('.profile-card-banner'), null);
+    assert.equal(card('banner-peer').style.getPropertyValue('--card-color'), '#fafafa');
+    assert.notEqual(card('banner-peer').style.getPropertyValue('--card-text'), '#ffffff');
+  } finally {
+    await clear(); profileBanners.local = previous;
+    profileBanners.forget('banner-peer'); profileImages.forget('banner-peer');
+  }
+});
 
 test('per-letter nicknames preserve emoji and combining characters with one accessible name', async () => {
   await clear();

@@ -1,7 +1,7 @@
 import { normalizeNicknameStyle, type NicknameStyle } from '../core/nickname_style.ts';
 import { stateStore } from '../core/state_store.ts';
 import { ProfileTransfer } from './profile_transfer.ts';
-import { profileImages } from '../core/profile_image.ts';
+import { profileImages, profileBanners } from '../core/profile_image.ts';
 import { validStreamDescriptors, streamSlotKey, streamOwner, type StreamDescriptor } from "../core/media_streams.ts";
 import { validStreamPointer, validStreamPointerState, type StreamPointerState, type StreamPointerPacket } from '../core/stream_pointer.ts';
 import { selfId } from '@trystero-p2p/core';
@@ -197,6 +197,8 @@ export class GroupRoomManager {
   private profileAction: any = null;
   private peerNicknameStyles = new Map<string, NicknameStyle>();
   private profileTransfer: ProfileTransfer | null = null;
+  private bannerAction: any = null;
+  private bannerTransfer: ProfileTransfer | null = null;
 
   public refreshProfile(): void {
     const name = stateStore.username || this.username;
@@ -206,6 +208,7 @@ export class GroupRoomManager {
       watching: [...this.localWatching], watchRevision: this.watchRevision });
     for (const peerId of this.admittedTargets()) {
       void this.profileTransfer?.announce(peerId).catch(() => {});
+      void this.bannerTransfer?.announce(peerId).catch(() => {});
     }
     this.notifyPeersUpdate();
     this.notifyStreamsUpdate();
@@ -744,6 +747,7 @@ export class GroupRoomManager {
       watching: [...this.localWatching], watchRevision: this.watchRevision,
     }, { target: peerId });
     void this.profileTransfer?.announce(peerId).catch(() => {});
+    void this.bannerTransfer?.announce(peerId).catch(() => {});
     this.pexAction?.send({ peers: this.getPeersPayload() }, { target: peerId });
     this.historyAction?.send({ history: this.chatHistory }, { target: peerId });
     this.historyAction?.send({ request: true }, { target: peerId });
@@ -1222,6 +1226,17 @@ export class GroupRoomManager {
     this.profileAction.onMessage = (packet: unknown, meta: { peerId: string }) => {
       void this.profileTransfer?.receive(packet, meta.peerId).catch(() => {});
     };
+    this.bannerTransfer?.close();
+    this.bannerAction = this.room.makeAction('profile_banner_v1');
+    this.bannerTransfer = new ProfileTransfer(
+      (packet, peerId) => this.bannerAction?.send(packet, { target: peerId }),
+      (peerId) => Boolean(this.room && this.peerTracker.isVerified(peerId) &&
+        (!this.authority || (this.localAdmitted && this.isAdmittedPeer(peerId)))),
+      profileBanners,
+    );
+    this.bannerAction.onMessage = (packet: unknown, meta: { peerId: string }) => {
+      void this.bannerTransfer?.receive(packet, meta.peerId).catch(() => {});
+    };
     this.fileAction = this.room.makeAction('chat_file_v2');
     this.fileAction.onMessage = (packet: FilePacket, meta: { peerId: string }) => {
       if (packet instanceof Uint8Array) return;
@@ -1634,7 +1649,7 @@ export class GroupRoomManager {
       this.pexAction, this.meshRelayAction, this.watchAction,
       this.pingAction, this.pongAction, this.identityAction,
       this.authorityAction, this.admissionAction, this.inviteAction,
-      this.previewAction, this.appAction, this.fileAction, this.pointerAction, this.nativeVideoAction, this.profileAction,
+      this.previewAction, this.appAction, this.fileAction, this.pointerAction, this.nativeVideoAction, this.profileAction, this.bannerAction,
     ].forEach((action) => {
       if (!action?.onMessage) return;
       const handler = action.onMessage;
@@ -1944,6 +1959,7 @@ export class GroupRoomManager {
 
   private removePeer(peerId: string) {
     this.profileTransfer?.forget(peerId);
+    this.bannerTransfer?.forget(peerId);
     this.cleanupStreamWatchers(peerId, '');
     this.remoteWatchRevisions.delete(peerId);
     this.nativeVideo?.stop(undefined, peerId);
@@ -3296,6 +3312,8 @@ export class GroupRoomManager {
     this.previewRequests.clear();
     this.profileTransfer?.close();
     this.profileTransfer = null;
+    this.bannerTransfer?.close();
+    this.bannerTransfer = null;
     this.stopStream();
     if (this.room) {
       await this.sendSystemMessage(`${this.username} saiu`, 'leave', this.username);
