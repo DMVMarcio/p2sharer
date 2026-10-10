@@ -131,6 +131,7 @@ export function useRoom() {
     connectingOverlay: roomService.connectingOverlay,
     joinOutcome: roomService.joinOutcome,
     joinError: roomService.joinError,
+    joinDialogRevision: roomService.joinDialogRevision,
     isInRoom: roomSlots.length > 0 && Boolean(currentRoomCode),
     isRoomHost: roomService.isRoomHost(),
     isRoomAdmin: roomService.isRoomAdmin(),

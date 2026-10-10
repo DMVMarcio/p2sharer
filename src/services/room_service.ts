@@ -21,6 +21,7 @@ import { soundEffects } from '../ui/sound_effects.ts';
 import { NativeVideoBridge } from '../video/native_video_bridge.ts';
 import { MediaCoordinator } from '../p2p/media_coordinator.ts';
 import { showToast } from '../hooks/useToast.ts';
+import { modalManager } from '../hooks/useModal.ts';
 import { pipService } from './pip_service.ts';
 
 export interface ConnectingOverlayState {
@@ -39,7 +40,9 @@ export class RoomService {
   public pendingJoinInvite = '';
   public pendingJoinAsOwner = false;
   public pendingJoinPassword = '';
-  public joinOutcome: 'idle' | 'connecting' | 'admitted' | 'error' = 'idle';
+  public pendingJoinError = '';
+  public joinDialogRevision = 0;
+  public joinOutcome: 'idle' | 'connecting' | 'waiting' | 'admitted' | 'error' = 'idle';
   public joinError = '';
   public nativeVideoBridge = new NativeVideoBridge();
   public audioBridge = new AudioBridge();
@@ -170,15 +173,16 @@ export class RoomService {
     }
   }
 
-  public async joinRoom(code: string, pass: string, isCreator: boolean): Promise<void> {
-    const transition = this.roomTransition.then(() => this.joinRoomNow(code, pass, isCreator));
+  public async joinRoom(code: string, pass: string, isCreator: boolean,
+    options: { waitForAdmission?: boolean } = {}): Promise<void> {
+    const transition = this.roomTransition.then(() => this.joinRoomNow(code, pass, isCreator, options.waitForAdmission !== false));
     this.roomTransition = transition.catch((err) => {
       console.error('[RoomService] Room transition failed:', err);
     });
     return transition;
   }
 
-  private async joinRoomNow(code: string, pass: string, isCreator: boolean): Promise<void> {
+  private async joinRoomNow(code: string, pass: string, isCreator: boolean, waitForAdmission: boolean): Promise<void> {
     this.joinOutcome = 'connecting';
     this.joinError = '';
     streamPointerView.clear();
@@ -384,6 +388,7 @@ export class RoomService {
       },
       onStatusChange: (status) => {
         if (this.roomManager !== manager) return;
+        const wasWaiting = this.joinOutcome === 'waiting';
         this.roomStatusText = status;
         if (manager.hasAdmission()) this.joinOutcome = 'admitted';
         if (manager.hasAdmission() && (
@@ -398,7 +403,14 @@ export class RoomService {
           this.joinOutcome = 'error';
           this.joinError = status;
           this.hideConnecting();
-          if (this.pendingJoinInvite === '') showToast(status, 5000);
+          if (wasWaiting && (!modalManager.getActive() || modalManager.getActive() === 'joinRoom')) {
+            this.pendingJoinInvite = code;
+            this.pendingJoinPassword = pass;
+            this.pendingJoinAsOwner = isCreator;
+            this.pendingJoinError = status;
+            this.joinDialogRevision++;
+            modalManager.open('joinRoom');
+          } else if (this.pendingJoinInvite === '') showToast(status, 5000);
         }
         this.notify();
       },
@@ -430,6 +442,11 @@ export class RoomService {
       },
     });
 
+    if (!waitForAdmission && this.roomManager === manager && this.joinOutcome === 'connecting') {
+      this.joinOutcome = 'waiting';
+      this.roomStatusText = t('join.waiting');
+      this.hideConnecting();
+    }
     this.notify();
   }
 

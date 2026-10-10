@@ -1020,8 +1020,9 @@
   "layout.resizeParticipants": "Redimensionar participantes do destaque",
   "join.inspect": "Consultar sala",
   "join.searching": "Procurando uma sala ativa…",
-  "join.noResponse": "Nenhum participante respondeu. A sala pode estar vazia ou inacessível. Você ainda pode tentar entrar.",
+  "join.noResponse": "Ainda não encontramos participantes. Você pode entrar enquanto a busca continua.",
   "join.online": "Participantes online: {{count}}",
   "join.participants": "Pessoas na sala",
-  "join.timeout": "Não foi possível confirmar a conexão. Confira a senha ou tente novamente."
+  "join.timeout": "Não foi possível confirmar a conexão. Confira a senha ou tente novamente.",
+  "join.waiting": "Aguardando participantes e autorização da sala…"
 }

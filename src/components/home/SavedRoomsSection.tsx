@@ -56,6 +56,7 @@ export const SavedRoomsSection: React.FC = () => {
     roomService.pendingJoinInvite = room.invite;
     roomService.pendingJoinAsOwner = room.owned;
     roomService.pendingJoinPassword = room.password ?? '';
+    roomService.pendingJoinError = '';
     openModal('joinRoom');
   };
 

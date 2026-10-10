@@ -19,6 +19,7 @@ let discovery;
 let ready = Promise.resolve();
 globalThis.previewUi = {
   roomService: { pendingJoinInvite: 'saved-fixture', pendingJoinPassword: 'remembered-fixture', pendingJoinAsOwner: true,
+    pendingJoinError: '',
     joinOutcome: 'admitted', joinError: '', roomStatusText: 'Connecting',
     async joinRoom(...args) { joined.push(args); }, async leaveRoom() { left++; } },
   store: { username: 'Viewer', getTurnConfig: () => undefined },
@@ -63,7 +64,7 @@ test('a saved room previews people and keeps connection and password errors in t
   await submit();
   assert.equal(closed, 0, 'an old admission result must not close a new attempt');
   assert.equal(joined.length, 1);
-  assert.deepEqual(joined[0], ['saved-fixture', 'remembered-fixture', true]);
+  assert.deepEqual(joined[0], ['saved-fixture', 'remembered-fixture', true, { waitForAdmission: true }]);
   assert.equal(document.querySelector('button[type="submit"]').disabled, true);
   await outcome('error', 'Senha incorreta para esta sala');
   assert.ok(document.querySelector('[role="alert"]'));
@@ -87,4 +88,34 @@ test('unmount during discovery releases the connection after initialization with
   await act(async () => { resolve(); await ready; });
   assert.equal(left, before + 1);
   assert.equal(joined.length, 2);
+});
+
+test('an unanswered discovery allows immediate entry and closes on local waiting readiness', async () => {
+  ready = Promise.resolve();
+  Object.assign(previewUi.roomService, { pendingJoinInvite: 'empty-fixture', pendingJoinPassword: '',
+    pendingJoinAsOwner: false, pendingJoinError: '', joinOutcome: 'admitted' });
+  const before = closed;
+  await act(async () => root.render(React.createElement(JoinRoomModal)));
+  assert.equal(document.querySelector('button[type="submit"]').disabled, false,
+    'participant discovery must not disable joining after invite validation');
+  await submit();
+  assert.deepEqual(joined.at(-1), ['empty-fixture', '', false, { waitForAdmission: false }]);
+  assert.equal(closed, before);
+  await outcome('waiting');
+  assert.equal(closed, before + 1);
+  await act(async () => root.render(null));
+});
+
+test('a deferred password rejection resumes the same dialog without another discovery delay', async () => {
+  Object.assign(previewUi.roomService, { pendingJoinInvite: 'protected-fixture', pendingJoinPassword: 'wrong-fixture',
+    pendingJoinAsOwner: false, pendingJoinError: 'Senha incorreta para esta sala', joinOutcome: 'error' });
+  const before = closed;
+  await act(async () => root.render(React.createElement(JoinRoomModal)));
+  assert.ok(document.querySelector('[role="alert"]'));
+  assert.equal(document.getElementById('join-room-password').value, 'wrong-fixture');
+  await submit();
+  assert.deepEqual(joined.at(-1), ['protected-fixture', 'wrong-fixture', false, { waitForAdmission: true }]);
+  assert.equal(closed, before);
+  await outcome('admitted');
+  await act(async () => root.render(null));
 });

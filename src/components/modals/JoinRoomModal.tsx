@@ -19,14 +19,16 @@ export function JoinRoomModal() {
   const [code, setCode] = useState(() => roomService.pendingJoinInvite);
   const [password, setPassword] = useState(() => roomService.pendingJoinPassword);
   const [showPassword, setShowPassword] = useState(false);
-  const [phase, setPhase] = useState<'code' | 'searching' | 'preview' | 'joining'>('code');
+  const retryError = useRef(roomService.pendingJoinError);
+  const [phase, setPhase] = useState<'code' | 'searching' | 'preview' | 'joining'>(() => retryError.current ? 'preview' : 'code');
+  const [canEnter, setCanEnter] = useState(() => Boolean(retryError.current));
   const [preview, setPreview] = useState<RoomPreview | null>(null);
-  const [roomName, setRoomName] = useState('');
-  const [error, setError] = useState('');
+  const [roomName, setRoomName] = useState(() => retryError.current ? stateStore.currentRoomName : '');
+  const [error, setError] = useState(() => localizeText(retryError.current));
   const owner = useRef(roomService.pendingJoinAsOwner);
   const session = useRef<{ manager: GroupRoomManager; ready: Promise<void>; release?: Promise<void> } | null>(null);
   const mounted = useRef(true);
-  const joining = useRef(false);
+  const joining = useRef(Boolean(retryError.current));
   const release = async () => {
     const current = session.current;
     if (!current) return;
@@ -40,11 +42,12 @@ export function JoinRoomModal() {
   }, []);
   useEffect(() => {
     if (!joining.current) return;
-    if (joinOutcome === 'admitted') {
+    if (joinOutcome === 'admitted' || joinOutcome === 'waiting') {
       joining.current = false;
       roomService.pendingJoinInvite = '';
       roomService.pendingJoinPassword = '';
       roomService.pendingJoinAsOwner = false;
+      roomService.pendingJoinError = '';
       closeModal();
     } else if (joinOutcome === 'error' && phase === 'joining') {
       setError(localizeText(joinError));
@@ -52,13 +55,13 @@ export function JoinRoomModal() {
     }
   }, [phase, joinOutcome, joinError, closeModal]);
   useEffect(() => {
-    if (phase !== 'searching' && phase !== 'preview') return;
+    if (!canEnter || (phase !== 'searching' && phase !== 'preview')) return;
     const interval = setInterval(() => session.current?.manager.requestPreview(), 2500);
     const timeout = setTimeout(() => {
       if (mounted.current) setPhase(current => current === 'searching' ? 'preview' : current);
-    }, 12000);
+    }, 1500);
     return () => { clearInterval(interval); clearTimeout(timeout); };
-  }, [phase]);
+  }, [phase, canEnter]);
 
   const discover = async () => {
     if (phase !== 'code') return;
@@ -68,6 +71,7 @@ export function JoinRoomModal() {
       if (!invite) throw new Error(t('message.5348364ca0b6'));
       if (!mounted.current) return;
       setRoomName(invite.version === 3 ? invite.roomId.slice(0, 8) : invite.name);
+      setCanEnter(true);
       roomService.pendingJoinInvite = code.trim();
       const manager = new GroupRoomManager(stateStore.username, code.trim(), '', owner.current, stateStore.getTurnConfig());
       const current = { manager, ready: Promise.resolve() };
@@ -87,20 +91,21 @@ export function JoinRoomModal() {
       }, true);
       await current.ready;
     } catch (cause) {
-      if (mounted.current) { setError(cause instanceof Error ? cause.message : t('error.unknown')); setPhase('code'); }
+      if (mounted.current) { setCanEnter(false); setError(cause instanceof Error ? cause.message : t('error.unknown')); setPhase('code'); }
     }
   };
-  useEffect(() => { if (roomService.pendingJoinInvite) void discover(); }, []);
+  useEffect(() => { if (roomService.pendingJoinInvite && !retryError.current) void discover(); }, []);
 
   const enter = async () => {
     if (joining.current && phase === 'joining') return;
+    const waitForAdmission = Boolean(preview || error || retryError.current);
     roomService.joinOutcome = 'connecting';
     roomService.joinError = '';
     joining.current = true; setError(''); setPhase('joining');
     try {
       await release();
       if (!mounted.current) return;
-      await roomService.joinRoom(code.trim(), password.trim(), owner.current);
+      await roomService.joinRoom(code.trim(), password.trim(), owner.current, { waitForAdmission });
     } catch {
       if (mounted.current) { setError(t('error.unknown')); setPhase('preview'); }
     }
@@ -110,9 +115,10 @@ export function JoinRoomModal() {
     void release();
     if (joining.current) void roomService.leaveRoom();
     roomService.pendingJoinInvite = ''; roomService.pendingJoinPassword = ''; roomService.pendingJoinAsOwner = false;
+    roomService.pendingJoinError = '';
     closeModal();
   };
-  const busy = phase === 'searching' || phase === 'joining';
+  const busy = (phase === 'searching' && !canEnter) || phase === 'joining';
   return <ModalDialog title={preview?.name || roomName || t('message.3b24015dc709')} icon={<LogIn size={20} />}
     onClose={cancel} footer={close => <>
       <button type="button" className="btn btn-secondary" onClick={close}>{t('message.bb9dbb406dcb')}</button>
@@ -131,7 +137,7 @@ export function JoinRoomModal() {
           {phase === 'joining' ? localizeText(roomStatusText) : phase === 'searching' ? t('join.searching') :
             preview ? t('join.online', { count: preview.participants.length }) : t('join.noResponse')}
         </p>
-        {busy && <div className="join-room-loading"><div className="connecting-spinner" /></div>}
+        {(phase === 'searching' || phase === 'joining') && <div className="join-room-loading"><div className="connecting-spinner" /></div>}
         {preview && <ul className="join-room-participants" aria-label={t('join.participants')}>
           {preview.participants.map(person => <li key={person.id}>
             <ProfileAvatar peerId={person.id} name={person.name} color={person.color} imageUrl={person.avatar} />

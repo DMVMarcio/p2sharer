@@ -100,6 +100,13 @@ same path. An unanswered query cannot distinguish an empty room from an
 unreachable room. Older clients do not answer the discovery action, but the modal
 still permits a normal admission attempt.
 
+Discovery does not block entry after invitation validation. With no preview
+response, the room service can open a local waiting session as soon as transport
+setup finishes, keeping discovery and admission active without a participant
+timeout. This is distinct from signed admission: room content remains gated,
+and a later password rejection resumes the join dialog. A confirmed occupied
+room or a password retry still waits for admission before dismissing the dialog.
+
 ## Diagnostic interpretation
 
 Signaling reachability, SDP exchange, a relay candidate, and a connected MQTT probe do not establish a complete peer mesh. Inspect actual Trystero subscriptions and each ICE edge. Partial meshes can occur with or without TURN; a smaller offer pool or a configured relay alone is not proof of recovery. Warnings from an unused prewarmed connection do not prove an active route failed. Rate-limit duplicate errors from prewarmed connections and correlate sanitized process-local timing with relay logs when needed. Relay-only configuration omits unnecessary STUN lookups.

@@ -24,6 +24,7 @@ export const HomeView: React.FC = () => {
     roomService.pendingJoinInvite = '';
     roomService.pendingJoinAsOwner = false;
     roomService.pendingJoinPassword = '';
+    roomService.pendingJoinError = '';
     if (!username) {
       openModal('username');
     } else {
