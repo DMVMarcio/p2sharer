@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createAuthenticatedInvite, parseRoomInvite } from '../../src/core/room_invite.ts';
 import { PeerAuthenticator } from '../../src/core/peer_auth.ts';
+import { RoomAuthority } from '../../src/core/room_authority.ts';
 import { savedRooms } from '../../src/core/saved_rooms.ts';
 import { validRoomPreview } from '../../src/core/room_preview.ts';
 import { GroupRoomManager } from '../../src/p2p/group_room.ts';
@@ -22,7 +23,8 @@ test('discovery authenticates identities without requesting admission or sending
     } }; actions.set(name, action); return action;
   }, getPeers: () => ({}), onPeerJoin: (_id: string) => {}, onPeerLeave: (_id: string) => {} };
   const original = { join: signalingManager.joinRoom, leave: signalingManager.leaveRoom, announce: signalingManager.reannounce };
-  signalingManager.joinRoom = () => room;
+  let transportJoins = 0;
+  signalingManager.joinRoom = () => { transportJoins++; return room; };
   signalingManager.leaveRoom = async () => {};
   signalingManager.reannounce = async () => {};
   const manager = new GroupRoomManager('Owner', created.invite, '', true);
@@ -71,6 +73,14 @@ test('discovery authenticates identities without requesting admission or sending
     assert.deepEqual(previews, [preview]);
     (room as any).onPeerStream({ getTracks: () => [] }, 'member');
     assert.equal((manager as any).remoteStreams.size, 0, 'discovery must reject media even with saved host credentials');
+    sent.length = 0;
+    await manager.join({ onStreamsUpdate: () => {}, onSlotsUpdate: () => {}, onChat: () => {},
+      onChatHistory: () => {}, onPeersUpdate: () => {}, onStatusChange: () => {} }, false, 'fixture-password');
+    assert.equal(transportJoins, 1, 'promotion must preserve the existing transport and authenticated identity');
+    assert.equal(manager.hasAdmission(), true, 'the saved host can activate its own room');
+    assert.equal((await savedRooms.get(invite.roomId))?.identity?.publicKey,
+      (manager as any).chatAuth.exportIdentity().publicKey);
+    assert.ok(sent.some(packet => packet.action === 'room_admission' && packet.data.kind === 'prompt'));
   } finally {
     (manager as any).previewOnly = true;
     await manager.leave();
@@ -94,5 +104,54 @@ test('preview bounds reject remote URLs, oversized avatars, and duplicate partic
   for (const participants of [[person, person], [{ ...person, avatar: 'https://example.com/avatar.png' }],
     [{ ...person, avatar: 'data:image/png;base64,' + 'A'.repeat(8192) }]]) {
     assert.equal(validRoomPreview({ name: 'Room', protected: true, participants }), false);
+  }
+});
+
+test('promoting a guest preserves the authenticated edge and still requires signed admission', async () => {
+  const created = await createAuthenticatedInvite();
+  const invite = parseRoomInvite(created.invite)!;
+  const actions = new Map<string, any>();
+  const sent: Array<{ action: string; data: any }> = [];
+  const room = { makeAction(name: string) {
+    const action = { send: async (data: any) => { sent.push({ action: name, data }); } };
+    actions.set(name, action); return action;
+  }, getPeers: () => ({ host: {} }), onPeerJoin: (_id: string) => {}, onPeerLeave: (_id: string) => {} };
+  const original = { join: signalingManager.joinRoom, leave: signalingManager.leaveRoom, announce: signalingManager.reannounce };
+  let connections = 0;
+  signalingManager.joinRoom = () => { connections++; return room; };
+  signalingManager.leaveRoom = async () => {};
+  signalingManager.reannounce = async () => {};
+  const manager = new GroupRoomManager('Guest', created.invite, '', false);
+  const callbacks = { onStreamsUpdate: () => {}, onSlotsUpdate: () => {}, onChat: () => {},
+    onChatHistory: () => {}, onPeersUpdate: () => {}, onStatusChange: () => {} };
+  try {
+    await manager.join(callbacks, true);
+    room.onPeerJoin('host');
+    const host = await PeerAuthenticator.create(invite.roomId, 'host', created.identity);
+    const nonce = sent.findLast(packet => packet.action === 'peer_identity' && packet.data.kind === 'challenge')!.data.nonce;
+    await actions.get('peer_identity').onMessage({ kind: 'proof', nonce, key: host.publicKey,
+      signature: await host.signControl('identity', [invite.roomId, 'host', nonce]) }, { peerId: 'host' });
+    const identity = (manager as any).chatAuth.publicKey;
+    sent.length = 0;
+    await manager.join(callbacks, false, 'fixture-password');
+    assert.equal(connections, 1);
+    assert.equal((manager as any).chatAuth.publicKey, identity);
+    assert.equal(manager.hasAdmission(), false);
+    assert.ok(sent.some(packet => packet.action === 'room_admission' && packet.data.kind === 'request' &&
+      packet.data.password === 'fixture-password'));
+    assert.equal(sent.some(packet => packet.action === 'presence'), false);
+    await actions.get('room_admission').onMessage({ kind: 'denied' }, { peerId: 'host' });
+    await manager.join(callbacks, false, 'corrected-fixture');
+    assert.equal(connections, 1, 'password retries must preserve the same transport too');
+    assert.equal(manager.hasAdmission(), false);
+    const authority = new RoomAuthority(invite.roomId, invite.rootKey, host);
+    const command = await authority.makeCommand('admit', { targetPeerId: manager.getLocalPeerId(), targetKey: identity });
+    await actions.get('room_admission').onMessage({ kind: 'command', command }, { peerId: 'host' });
+    assert.equal(manager.hasAdmission(), true);
+  } finally {
+    await manager.leave();
+    signalingManager.joinRoom = original.join;
+    signalingManager.leaveRoom = original.leave;
+    signalingManager.reannounce = original.announce;
   }
 });

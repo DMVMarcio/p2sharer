@@ -5580,8 +5580,9 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .profile-editor-details .text-input { width: 100%; }
 @media (max-width: 480px) { .profile-editor-identity { grid-template-columns: minmax(0, 1fr); } }
 
-.join-room-participants { list-style: none; padding: 0; margin: 16px 0; max-height: 240px; overflow-y: auto; }
-.join-room-participants li { display: flex; align-items: center; gap: 12px; padding: 8px 0; overflow-wrap: anywhere; }
-.join-room-participants .profile-avatar { width: 36px; height: 36px; flex-shrink: 0; }
+.join-room-participants { display: grid; gap: 8px; list-style: none; padding: 0; margin: 16px 0; max-height: 240px; overflow-y: auto; }
+.join-room-participants li { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--bg-elevated); font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
+.join-room-participants li > span { min-width: 0; }
+.join-room-participants .profile-avatar { width: 30px; height: 30px; flex-shrink: 0; }
 .join-room-loading { display: flex; justify-content: center; padding: 16px; }
 .join-room-error { color: var(--danger-text); margin-top: 12px; }

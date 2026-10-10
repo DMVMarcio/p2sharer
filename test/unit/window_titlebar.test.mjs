@@ -24,6 +24,9 @@ globalThis.windowChromeFixture = {
   setTitle: async title => { titles.push(title); },
   isMaximized: async () => maximized, isFullscreen: async () => fullscreen, isFocused: async () => focused,
   onResized: callback => subscribe('resize', callback), onFocusChanged: callback => subscribe('focus', callback),
+  onCloseRequested: callback => subscribe('close', callback),
+  leaveRoom: async () => { actions.push('leaveRoom'); },
+  destroy: async () => { actions.push('destroy'); },
   minimize: async () => { actions.push('minimize'); },
   toggleMaximize: async () => { actions.push('toggleMaximize'); maximized = !maximized; callbacks.get('resize')?.(); },
   close: async () => { actions.push('close'); },
@@ -33,6 +36,9 @@ const bundle = await build({
   stdin: { contents: `export { WindowTitlebar } from './src/components/header/WindowTitlebar.tsx'; export { stateStore } from './src/core/state_store.ts'; export { setLanguage } from './src/i18n/index.ts';`, resolveDir: process.cwd() },
   bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic', loader: { '.png': 'dataurl' },
   plugins: [{ name: 'native-window-fixture', setup(builder) {
+    builder.onResolve({ filter: /services\/room_service$/ }, args => ({ path: args.path, namespace: 'room-fixture' }));
+    builder.onLoad({ filter: /.*/, namespace: 'room-fixture' }, () => ({ contents:
+      'export const roomService = { leaveRoom: () => globalThis.windowChromeFixture.leaveRoom() };' }));
     builder.onResolve({ filter: /^@tauri-apps\/api\/(core|window)$/ }, args => ({ path: args.path, namespace: 'fixture' }));
     builder.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: args.path.endsWith('core')
       ? 'export const isTauri = () => globalThis.windowChromeFixture.isTauri(); export const invoke = async command => globalThis.windowChromeFixture.menuCommand = command;'
@@ -79,6 +85,20 @@ test('native and custom titles follow room join, rename, missing name and leave'
   assert.equal(document.querySelector('.window-titlebar-title').textContent, defaultTitle);
 });
 
+test('native close waits for room teardown before destroying the main window', async () => {
+  let finish;
+  const teardown = new Promise(resolve => { finish = resolve; });
+  windowChromeFixture.leaveRoom = () => teardown;
+  let prevented = false;
+  const before = actions.length;
+  const closing = callbacks.get('close')({ preventDefault: () => { prevented = true; } });
+  assert.equal(prevented, true);
+  assert.equal(actions.length, before, 'the window must remain alive until the leave notice is flushed');
+  finish();
+  await closing;
+  assert.equal(actions.at(-1), 'destroy');
+});
+
 test('caption right click invokes Windows menu and suppresses the application fallback', async () => {
   let fallback = 0;
   const listener = () => { fallback++; };
@@ -119,7 +139,7 @@ test('external window changes update chrome, fullscreen hides it, and teardown r
   assert.equal(titlebarVisible, true);
   await act(async () => root.render(null));
   assert.equal(callbacks.size, 0);
-  assert.equal(unlistens, 2);
+  assert.equal(unlistens, 3);
   desktop = false;
   await act(async () => root.render(React.createElement(WindowTitlebar, { onVisibilityChange })));
   assert.equal(document.querySelector('.window-titlebar'), null);

@@ -21,7 +21,14 @@ globalThis.previewUi = {
   roomService: { pendingJoinInvite: 'saved-fixture', pendingJoinPassword: 'remembered-fixture', pendingJoinAsOwner: true,
     pendingJoinError: '',
     joinOutcome: 'admitted', joinError: '', roomStatusText: 'Connecting',
-    async joinRoom(...args) { joined.push(args); }, async leaveRoom() { left++; } },
+    async startRoomPreview(manager, callbacks) { await manager.join(callbacks); },
+    async stopRoomPreview(manager) { await ready.catch(() => {}); await manager.leave(); },
+    async joinRoom(...args) {
+      const { preview, signal, ...options } = args[3];
+      joined.push([...args.slice(0, 3), options]);
+      previewUi.adopted = preview;
+      previewUi.signal = signal;
+    }, async leaveRoom() { left++; } },
   store: { username: 'Viewer', getTurnConfig: () => undefined },
   subscribe: fn => { listeners.add(fn); return () => listeners.delete(fn); }, snapshot: () => revision,
   close: () => closed++,
@@ -67,7 +74,10 @@ test('a saved room previews people and keeps connection and password errors in t
     participants: [{ id: 'host', name: 'Host', color: '#06b6d4' }] }));
   assert.ok(document.querySelector('li').textContent.includes('Host'));
   assert.equal(document.getElementById('join-room-password').value, 'remembered-fixture');
+  const releasedBefore = left;
   await submit();
+  assert.ok(previewUi.adopted, 'entry must adopt the discovery connection');
+  assert.equal(left, releasedBefore, 'entry must not disconnect and redo the WebRTC handshake');
   assert.equal(closed, 0, 'an old admission result must not close a new attempt');
   assert.equal(joined.length, 1);
   assert.deepEqual(joined[0], ['saved-fixture', 'remembered-fixture', true, { waitForAdmission: true }]);
@@ -124,5 +134,28 @@ test('a deferred password rejection resumes the same dialog without another disc
   assert.deepEqual(joined.at(-1), ['protected-fixture', 'wrong-fixture', false, { waitForAdmission: true }]);
   assert.equal(closed, before);
   await outcome('admitted');
+  await act(async () => root.render(null));
+});
+
+test('closing during initialization cancels admission immediately and a fresh dialog can enter again', async () => {
+  Object.assign(previewUi.roomService, { pendingJoinInvite: 'cancelled-fixture', pendingJoinPassword: '',
+    pendingJoinAsOwner: false, pendingJoinError: '', joinOutcome: 'idle' });
+  let resolve;
+  ready = new Promise(done => { resolve = done; });
+  await act(async () => root.render(React.createElement(JoinRoomModal, { key: 'cancelled' })));
+  const before = joined.length;
+  await act(async () => {
+    document.querySelector('form').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+    document.querySelector('.btn-close').click();
+  });
+  await act(async () => { resolve(); await ready; });
+  assert.equal(joined.length, before, 'a cancelled initialization must never promote into the room');
+  await act(async () => root.render(null));
+  ready = Promise.resolve();
+  Object.assign(previewUi.roomService, { pendingJoinInvite: 'fresh-fixture', joinOutcome: 'idle' });
+  await act(async () => root.render(React.createElement(JoinRoomModal, { key: 'fresh' })));
+  await submit();
+  assert.equal(joined.length, before + 1, 'a subsequent room entry must remain usable');
+  await outcome('waiting');
   await act(async () => root.render(null));
 });

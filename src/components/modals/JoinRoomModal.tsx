@@ -31,10 +31,11 @@ export function JoinRoomModal() {
   const session = useRef<{ manager: GroupRoomManager; ready: Promise<void>; release?: Promise<void> } | null>(null);
   const mounted = useRef(true);
   const joining = useRef(Boolean(retryError.current));
+  const attempt = useRef(new AbortController());
   const release = async () => {
     const current = session.current;
     if (!current) return;
-    current.release ??= current.ready.catch(() => {}).then(() => current.manager.leave());
+    current.release ??= roomService.stopRoomPreview(current.manager);
     await current.release;
     if (session.current === current) session.current = null;
   };
@@ -79,7 +80,7 @@ export function JoinRoomModal() {
       const manager = new GroupRoomManager(stateStore.username, code.trim(), '', owner.current, stateStore.getTurnConfig());
       const current = { manager, ready: Promise.resolve() };
       session.current = current;
-      current.ready = manager.join({
+      current.ready = roomService.startRoomPreview(manager, {
         onPreview: summary => {
           if (!mounted.current || joining.current || session.current !== current) return;
           setPreview(summary); setRequiresPassword(summary.protected); setPhase('preview');
@@ -91,7 +92,7 @@ export function JoinRoomModal() {
             setError(localizeText(status)); setPhase('preview');
           }
         },
-      }, true);
+      }, attempt.current.signal);
       await current.ready;
     } catch (cause) {
       if (mounted.current) { setCanEnter(false); setError(cause instanceof Error ? cause.message : t('error.unknown')); setPhase('code'); }
@@ -106,24 +107,30 @@ export function JoinRoomModal() {
     roomService.joinError = '';
     joining.current = true; setError(''); setPhase('joining');
     try {
-      await release();
+      const current = session.current;
+      await current?.ready;
       if (!mounted.current) return;
-      await roomService.joinRoom(code.trim(), password.trim(), owner.current, { waitForAdmission });
+      session.current = null;
+      await roomService.joinRoom(code.trim(), password.trim(), owner.current,
+        { waitForAdmission, preview: current?.manager, signal: attempt.current.signal });
     } catch {
       if (mounted.current) { setError(t('error.unknown')); setPhase('preview'); }
     }
   };
-  const cancel = () => {
+  const cancelConnection = () => {
     mounted.current = false;
+    attempt.current.abort();
     void release();
     if (joining.current) void roomService.leaveRoom();
+  };
+  const cancel = () => {
     roomService.pendingJoinInvite = ''; roomService.pendingJoinPassword = ''; roomService.pendingJoinAsOwner = false;
     roomService.pendingJoinError = '';
     closeModal();
   };
   const busy = (phase === 'searching' && !canEnter) || phase === 'joining';
   return <ModalDialog title={preview?.name || roomName || t('message.3b24015dc709')} icon={<LogIn size={20} />}
-    onClose={cancel} footer={close => <>
+    onCloseStart={cancelConnection} onClose={cancel} footer={close => <>
       <button type="button" className="btn btn-secondary" onClick={close}>{t('message.bb9dbb406dcb')}</button>
       <button type="submit" form="join-room-form" className="btn btn-primary" disabled={busy}>
         {t(phase === 'code' ? 'join.inspect' : 'message.ad207d12bdc1')}

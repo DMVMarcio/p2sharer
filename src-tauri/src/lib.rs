@@ -108,11 +108,13 @@ pub fn run() {
                 if label == "main" {
                     let _ = stop_native_screen_capture();
                     let _ = stop_audio_capture();
-                    std::process::exit(0);
                 } else if label.starts_with("pip-") {
                     let peer_id = label.trim_start_matches("pip-").to_string();
                     let _ = window.app_handle().emit("pip-window-closed", peer_id);
                 }
+            }
+            if matches!(event, tauri::WindowEvent::Destroyed) && window.label() == "main" {
+                std::process::exit(0);
             }
         })
         .invoke_handler(tauri::generate_handler![

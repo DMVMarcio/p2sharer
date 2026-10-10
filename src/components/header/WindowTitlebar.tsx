@@ -8,6 +8,7 @@ import { Tooltip } from '../common/Tooltip';
 import logoImg from '../../assets/logo.png';
 import { AppUpdateButton } from './AppUpdateButton';
 import { useStore } from '../../hooks/useStore';
+import { roomService } from '../../services/room_service';
 
 /** Main-window chrome; detached media windows keep their existing controls. */
 export const WindowTitlebar: React.FC<{ onVisibilityChange: (visible: boolean) => void }> = ({ onVisibilityChange }) => {
@@ -51,6 +52,15 @@ export const WindowTitlebar: React.FC<{ onVisibilityChange: (visible: boolean) =
     };
     retain(nativeWindow.onResized(() => { void refresh().catch(report); }));
     retain(nativeWindow.onFocusChanged(() => { void refresh().catch(report); }));
+    let closing = false;
+    retain(nativeWindow.onCloseRequested(async event => {
+      event.preventDefault();
+      if (closing) return;
+      closing = true;
+      try { await roomService.leaveRoom(); }
+      catch (error) { console.warn('[Window] Room shutdown failed:', error); }
+      await nativeWindow.destroy();
+    }));
     void refresh().catch(report);
     return () => { disposed = true; listeners.forEach((unlisten) => unlisten()); };
   }, [nativeWindow]);

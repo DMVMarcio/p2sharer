@@ -94,9 +94,12 @@ signaling topic without requesting admission, announcing presence, receiving roo
 content, or rewriting saved credentials. `room_preview_v1` returns nonce-bound,
 signed summaries from authenticated members, with membership proofs when needed,
 room name, password requirement, and bounded static avatar thumbnails. Summaries
-never authorize admission or contain the password. `JoinRoomModal` owns discovery
-cleanup before starting the normal room service connection; saved rooms use this
-same path. An unanswered query cannot distinguish an empty room from an
+never authorize admission or contain the password. `RoomService` serializes
+discovery, cleanup and room entry. Entry promotes the existing discovery manager
+without replacing its transport or authenticated identity; password retries reuse
+that same room connection. Cancellation aborts entry and retires the discovery
+connection before the next attempt. Saved rooms use this same path. An unanswered
+query cannot distinguish an empty room from an
 unreachable room. Older clients do not answer the discovery action, but the modal
 still permits a normal admission attempt.
 
@@ -106,6 +109,13 @@ setup finishes, keeping discovery and admission active without a participant
 timeout. This is distinct from signed admission: room content remains gated,
 and a later password rejection resumes the join dialog. A confirmed occupied
 room or a password retry still waits for admission before dismissing the dialog.
+
+Preview rosters exclude the requester and require admitted direct peers with
+announced names and live transport edges. A failed handshake with an individual
+peer remains a diagnostic while the admission attempt and signaling retries
+continue; it is not a fatal room setup error. The main window's close-request
+handler waits for room teardown before destroying the window, so the native
+process exits after its leave messages and transport cleanup.
 
 ## Diagnostic interpretation
 

@@ -45,7 +45,7 @@ export const App: React.FC = () => {
 const MainApp: React.FC = () => {
   const [titlebarVisible, setTitlebarVisible] = useState(false);
   const { isInRoom, stopScreenSharing, leaveRoom, isSharingScreen, joinDialogRevision } = useRoom();
-  const { openModal, activeModal } = useModal();
+  const { openModal, activeModal, modalRevision } = useModal();
 
   useEffect(startAutomaticUpdateChecks, []);
 
@@ -82,7 +82,7 @@ const MainApp: React.FC = () => {
       {activeModal === 'username' && <UsernameModal />}
       {activeModal === 'audioFilter' && <AudioFilterModal />}
       {activeModal === 'createRoom' && <CreateRoomModal />}
-      {activeModal === 'joinRoom' && <JoinRoomModal key={joinDialogRevision} />}
+      {activeModal === 'joinRoom' && <JoinRoomModal key={`${modalRevision}:${joinDialogRevision}`} />}
       {activeModal === 'saveInvite' && <SaveInviteModal />}
       {activeModal === 'roomSecurity' && <RoomSecurityModal />}
       {activeModal === 'externalLink' && <ExternalLinkModal />}
