@@ -6,15 +6,13 @@ import { useRoom } from '../../hooks/useRoom';
 import { useModal } from '../../hooks/useModal';
 import { showToast } from '../../hooks/useToast';
 import { Tooltip } from '../common/Tooltip';
-import { BookmarkCheck, BookmarkPlus, Download } from 'lucide-react';
+import { BookmarkCheck, BookmarkPlus } from 'lucide-react';
 import { parseRoomInvite } from '../../core/room_invite';
 import { savedRooms, type SavedRoom } from '../../core/saved_rooms';
-import { useAppUpdates } from '../../hooks/useAppUpdates';
-import { appUpdates } from '../../services/app_updates';
+import { AppUpdateButton } from './AppUpdateButton';
 
-export const AppHeader: React.FC = () => {
+export const AppHeader: React.FC<{ showUpdate?: boolean }> = ({ showUpdate = true }) => {
   useLocale();
-  const update = useAppUpdates();
   const { currentRoomCode, currentRoomInvite, currentRoomName, currentRoomPassword, username, isInRoom } = useRoom();
   const { openModal } = useModal();
   const [savedRecord, setSavedRecord] = useState<SavedRoom | null>(null);
@@ -109,13 +107,7 @@ export const AppHeader: React.FC = () => {
           </Tooltip>
         )}
 
-        {update.version && <Tooltip content={t("message.0986025090c9", { v0: update.version })}>
-          <button type="button" className="btn btn-secondary btn-sm app-update-badge"
-            onClick={appUpdates.open} aria-label={t("message.0986025090c9", { v0: update.version })}>
-            <Download size={12} className="app-update-badge-icon" aria-hidden="true" />
-            <span>{t("message.0d52ab3423d3")}</span>
-          </button>
-        </Tooltip>}
+        {showUpdate && <AppUpdateButton />}
       </div>
 
       <div className="header-user-info">

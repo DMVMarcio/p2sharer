@@ -1014,5 +1014,7 @@
   "file.transferProgress": "{{v0}}% · {{v1}} of {{v2}}",
   "room.cards.reset": "Restore automatic layout",
   "room.cards.gestures": "Drag card to move; resize from edges. Alt+arrows moves; Alt+Shift+arrows resizes.",
-  "room.cards.dropPreview": "Drop card here"
+  "room.cards.dropPreview": "Drop card here",
+  "layout.resizeChat": "Resize chat sidebar",
+  "layout.resizeParticipants": "Resize spotlight participants"
 }

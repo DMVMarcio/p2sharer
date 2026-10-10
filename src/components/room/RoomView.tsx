@@ -1,6 +1,8 @@
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
-import React from 'react';
+import React, { useRef } from 'react';
+import { usePanelSize } from '../../hooks/usePanelSize';
+import { PanelResizeHandle } from '../common/PanelResizeHandle';
 import { UnreadChatBadge } from './UnreadChatBadge';
 import { StreamHeaderBar } from './StreamHeaderBar';
 import { RoomVideoContainer } from './RoomVideoContainer';
@@ -11,10 +13,13 @@ import { useRoom } from '../../hooks/useRoom';
 export const RoomView: React.FC = () => {
   useLocale();
   const { isSidebarCollapsed, toggleSidebar, unreadChatMessages } = useRoom();
+  const layoutRef = useRef<HTMLDivElement>(null);
+  const sidebarSize = usePanelSize(layoutRef, 'width', 'p2sharer_sidebar_width', 320, 240, 240);
 
   return (
     <section className="view active" id="view-group-room">
-      <div className="room-layout" id="room-layout-container">
+      <div className="room-layout" id="room-layout-container" ref={layoutRef}
+        style={{ '--room-sidebar-width': `${sidebarSize.size}px` } as React.CSSProperties}>
         <div className="stream-area">
           <StreamHeaderBar />
           <RoomVideoContainer />
@@ -51,6 +56,7 @@ export const RoomView: React.FC = () => {
           </button>
         </div>
 
+        {!isSidebarCollapsed && <PanelResizeHandle axis="width" label={t('layout.resizeChat')} controls="room-sidebar" {...sidebarSize} />}
         <RoomSidebar />
       </div>
       <ChatFileRequests />

@@ -6,10 +6,11 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { Minus, Square, Copy, X } from 'lucide-react';
 import { Tooltip } from '../common/Tooltip';
 import logoImg from '../../assets/logo.png';
+import { AppUpdateButton } from './AppUpdateButton';
 import { useStore } from '../../hooks/useStore';
 
 /** Main-window chrome; detached media windows keep their existing controls. */
-export const WindowTitlebar: React.FC = () => {
+export const WindowTitlebar: React.FC<{ onVisibilityChange: (visible: boolean) => void }> = ({ onVisibilityChange }) => {
   useLocale();
   const nativeWindow = useMemo(() => isTauri() ? getCurrentWindow() : null, []);
   const title = useStore((state) => state.currentRoomCode && state.roomSlots.length > 0
@@ -54,6 +55,8 @@ export const WindowTitlebar: React.FC = () => {
     return () => { disposed = true; listeners.forEach((unlisten) => unlisten()); };
   }, [nativeWindow]);
 
+  useEffect(() => { onVisibilityChange(Boolean(nativeWindow) && !fullscreen); }, [nativeWindow, fullscreen, onVisibilityChange]);
+
   if (!nativeWindow || fullscreen) return null;
   const run = (action: 'minimize' | 'toggleMaximize' | 'close') => {
     void nativeWindow[action]().catch((error) => console.warn('[Window] Window action failed:', error));
@@ -69,6 +72,7 @@ export const WindowTitlebar: React.FC = () => {
         <img src={logoImg} width="16" height="16" alt="" draggable={false} data-tauri-drag-region />
         <span className="window-titlebar-title" data-tauri-drag-region>{title}</span>
       </div>
+      <div className="window-titlebar-actions"><AppUpdateButton /></div>
       <div className="window-caption-controls" role="group" aria-label={t("message.a64ca0dc164b")}>
         <Tooltip content={t("message.3fc5f90b27f1")}>
           <button type="button" className="btn window-caption-button" aria-label={t("message.3fc5f90b27f1")}

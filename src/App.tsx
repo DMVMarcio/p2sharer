@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AppHeader } from './components/header/AppHeader';
 import { WindowTitlebar } from './components/header/WindowTitlebar';
 import { HomeView } from './components/home/HomeView';
@@ -43,6 +43,7 @@ export const App: React.FC = () => {
 };
 
 const MainApp: React.FC = () => {
+  const [titlebarVisible, setTitlebarVisible] = useState(false);
   const { isInRoom, stopScreenSharing, leaveRoom, isSharingScreen } = useRoom();
   const { openModal, activeModal } = useModal();
 
@@ -69,8 +70,8 @@ const MainApp: React.FC = () => {
 
   return (
     <>
-      <WindowTitlebar />
-      <AppHeader />
+      <WindowTitlebar onVisibilityChange={setTitlebarVisible} />
+      <AppHeader showUpdate={!titlebarVisible} />
       <main className="app-main" id="app-main">
         {isInRoom ? <RoomView /> : <HomeView />}
       </main>

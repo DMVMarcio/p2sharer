@@ -197,16 +197,20 @@ test('inline text preserves Shift+Enter and confirms once on outside clicks with
   assert.equal(document.querySelector('[aria-label="Texto do rabisco"]'), null);
 });
 
-test('continuous brush strokes retain 192 points before simplifying their path', async () => {
+test('brush strokes stop at capacity and preserve every point until pointer release', async () => {
   await click('[aria-label="Pincel"]');
+  const before = globalThis.__pointerTestSent.filter(p => p.kind === 'draw').length;
   await pointer('pointerdown', 0, 225);
-  for (let i = 0; i < 190; i++) await pointer('pointermove', 1 + i * 3, 225);
+  for (let i = 0; i < 300; i++) await pointer('pointermove', 1 + i * 2, 225);
+  assert.equal(globalThis.__pointerTestSent.filter(p => p.kind === 'draw').length, before);
   await pointer('pointerup', 799, 225);
   const packet = globalThis.__pointerTestSent.at(-1);
   assert.equal(packet.kind, 'draw');
   assert.equal(packet.drawing.points.length, 192);
-  assert.deepEqual(packet.drawing.points[0], { x: 0, y: .5 });
-  assert.deepEqual(packet.drawing.points.at(-1), { x: 799 / 800, y: .5 });
+  assert.deepEqual(packet.drawing.points, [
+    { x: 0, y: .5 },
+    ...Array.from({ length: 191 }, (_, i) => ({ x: (1 + i * 2) / 800, y: .5 })),
+  ]);
 });
 
 test('clicking each active drawing tool again returns to Mouse', async () => {

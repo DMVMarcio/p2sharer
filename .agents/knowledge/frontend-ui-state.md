@@ -91,6 +91,8 @@ src/
 
 Persistent settings are automatically synchronized to and restored from `localStorage`.
 
+`usePanelSize` retains device-local preferred panel sizes independently of temporary viewport constraints. `PanelResizeHandle` shares pointer capture and keyboard separator semantics for right/bottom-anchored panels; container ResizeObservers bound the rendered size while preserving room for the main surface. Collapsing a panel does not overwrite its preference.
+
 ---
 
 ## 3. React Media Rendering (`RoomVideoContainer` and `VideoCard`)

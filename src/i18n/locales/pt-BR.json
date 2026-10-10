@@ -1014,5 +1014,7 @@
   "file.transferProgress": "{{v0}}% · {{v1}} de {{v2}}",
   "room.cards.reset": "Restaurar layout automático",
   "room.cards.gestures": "Arraste o card para mover; redimensione pelas bordas. Alt+setas move; Alt+Shift+setas redimensiona.",
-  "room.cards.dropPreview": "Solte o card aqui"
+  "room.cards.dropPreview": "Solte o card aqui",
+  "layout.resizeChat": "Redimensionar chat lateral",
+  "layout.resizeParticipants": "Redimensionar participantes do destaque"
 }

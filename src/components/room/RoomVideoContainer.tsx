@@ -5,6 +5,8 @@ import { roomAppsService } from '../../apps/room_apps_service';
 import { RoomAppSlot } from '../../apps/RoomAppSlot';
 import { PersistentRoomApps } from '../../apps/PersistentRoomApps';
 import type { RoomAppInstance } from '../../apps/types';
+import { usePanelSize } from '../../hooks/usePanelSize';
+import { PanelResizeHandle } from '../common/PanelResizeHandle';
 import { useRoom } from '../../hooks/useRoom';
 import { useStore } from '../../hooks/useStore';
 import { VideoCard } from './VideoCard';
@@ -40,6 +42,8 @@ export const RoomVideoContainer: React.FC = () => {
     streamFilter,
     setStreamFilter,
   } = useRoom();
+  const stageRef = useRef<HTMLDivElement>(null);
+  const traySize = usePanelSize(stageRef, 'height', 'p2sharer_spotlight_tray_height', 110, 90, 168, layoutMode === 'spotlight');
   const subscribedStreams = useStore((s) => s.subscribedStreams);
   const streamOverlays = useStore((s) => s.streamOverlays);
   const dismissedAutoOverlays = useStore((s) => s.dismissedAutoOverlays);
@@ -223,7 +227,8 @@ export const RoomVideoContainer: React.FC = () => {
       {/* SPOTLIGHT STAGE */}
       <div
         className={`spotlight-stage ${layoutMode !== 'spotlight' ? 'hidden' : ''}`}
-        id="spotlight-stage"
+        id="spotlight-stage" ref={stageRef}
+        style={{ '--spotlight-tray-height': `${traySize.size}px` } as React.CSSProperties}
       >
         {layoutMode === 'spotlight' && (
           <>
@@ -249,6 +254,7 @@ export const RoomVideoContainer: React.FC = () => {
               className={`spotlight-tray-container ${isSpotlightTrayCollapsed ? 'collapsed' : ''}`}
               id="spotlight-tray-container"
             >
+              {!isSpotlightTrayCollapsed && <PanelResizeHandle axis="height" label={t('layout.resizeParticipants')} controls="spotlight-tray-container" {...traySize} />}
               <button
                 className="btn-toggle-spotlight-tray"
                 id="btn-toggle-spotlight-tray"
