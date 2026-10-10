@@ -277,7 +277,10 @@ test('banner crop and card preferences remain drafts until Save and never replac
     await choose();
     await act(async () => document.getElementById('profile-banner-blur').click());
     await act(async () => document.getElementById('profile-banner-enabled').click());
-    assert.equal(document.getElementById('profile-banner-blur').disabled, true);
+    assert.equal(document.getElementById('profile-banner-blur'), null);
+    await act(async () => document.getElementById('profile-banner-enabled').click());
+    assert.equal(document.getElementById('profile-banner-blur').checked, false);
+    await act(async () => document.getElementById('profile-banner-enabled').click());
     await act(async () => document.getElementById('btn-save-settings').click());
     assert.equal(saves[0].banner, true);
     assert.equal(saves[0].token, 'banner-draft');

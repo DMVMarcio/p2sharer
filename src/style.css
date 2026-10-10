@@ -5574,11 +5574,26 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .profile-card-settings .accent-colors-palette { margin-top: 8px; }
 
 .participant-card .badge-you { color: var(--card-text, #ffffff); background-color: color-mix(in srgb, var(--card-text, #ffffff) 12%, transparent); border-color: color-mix(in srgb, var(--card-text, #ffffff) 30%, transparent); }
-.profile-editor-identity { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 16px; align-items: start; }
-.profile-editor-avatar-column { display: flex; flex-direction: column; align-items: center; gap: 12px; }
-.profile-editor-details { min-width: 0; }
+.profile-editor-identity { display: grid; grid-template-columns: 96px minmax(0, 1fr); column-gap: 16px; row-gap: 8px; align-items: start; }
+.profile-editor-avatar-column, .profile-editor-details { display: contents; }
+.profile-editor-avatar-label { grid-column: 1; grid-row: 1; }
+.profile-editor-photo { grid-column: 1; grid-row: 2; }
+.profile-editor-avatar-color { grid-column: 1; grid-row: 5; justify-self: center; margin-top: 8px; }
+.profile-editor-avatar-column > .profile-loading-status { grid-column: 1; grid-row: 3; }
+.profile-editor-name { grid-column: 2; grid-row: 4; min-width: 0; margin-top: 8px; }
+.profile-editor-identity .profile-card-settings { grid-column: 2; grid-row: 5; min-width: 0; margin-top: 8px; }
+.profile-editor-identity .profile-banner-editor { display: contents; }
+.profile-editor-identity .profile-banner-label { grid-column: 2; grid-row: 1; }
+.profile-editor-identity .profile-banner-upload { grid-column: 2; grid-row: 2; margin-top: 0; min-width: 0; }
+.profile-editor-identity .profile-banner-options, .profile-editor-identity .profile-banner-editor > .profile-loading-status { grid-column: 2; grid-row: 3; }
 .profile-editor-details .text-input { width: 100%; }
-@media (max-width: 480px) { .profile-editor-identity { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 480px) {
+  .profile-editor-identity { display: flex; flex-direction: column; gap: 16px; }
+  .profile-editor-avatar-column { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .profile-editor-details { display: block; width: 100%; min-width: 0; }
+  .profile-editor-identity .profile-banner-editor { display: block; }
+  .profile-editor-identity .profile-banner-upload { margin-top: 8px; }
+}
 
 .join-room-participants { display: grid; gap: 8px; list-style: none; padding: 0; margin: 16px 0; max-height: 240px; overflow-y: auto; }
 .join-room-participants li { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--bg-elevated); font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }

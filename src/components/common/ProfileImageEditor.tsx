@@ -38,9 +38,9 @@ export function ProfileImageEditor({ name, draft, color, remove, onDraft, onColo
     finally { setPicking(false); onBusy(false); }
   };
   return <div className="settings-row">
-    <span className="settings-label">{t('profile.photo')}</span>
     <div className="profile-editor-identity">
       <div className="profile-editor-avatar-column">
+        <span className="settings-label profile-editor-avatar-label">{t('profile.photo')}</span>
         <div className="profile-editor-photo">
           <TooltipButton tooltip={t(picking ? 'profile.loading' : 'profile.choose')}
             className="btn profile-upload-button" disabled={disabled || picking} aria-busy={picking} onClick={() => void choose()}>
@@ -56,15 +56,19 @@ export function ProfileImageEditor({ name, draft, color, remove, onDraft, onColo
               onDraft(null); onRemove(true);
             }}><X size={14} aria-hidden="true" /></TooltipButton>}
         </div>
-        <ColorPicker label={t(hasPhoto ? 'profile.borderColor' : 'profile.color')} value={color} onChange={onColor} disabled={disabled || picking} />
+        <div className="profile-editor-avatar-color">
+          <ColorPicker label={t(hasPhoto ? 'profile.borderColor' : 'profile.color')} value={color} onChange={onColor} disabled={disabled || picking} />
+        </div>
         {picking && <span className="profile-loading-status" role="status">{t('profile.loading')}</span>}
       </div>
       <div className="profile-editor-details">
         <ProfileBannerEditor value={banner} onChange={onBanner} disabled={disabled || picking} onBusy={onBusy} />
-        <label className="settings-label" htmlFor="settings-input-username">{t('message.295f254de3a9')}</label>
-        <NicknameField id="settings-input-username" name={name} onNameChange={onNameChange}
-          appearance={nicknameStyle} onAppearanceChange={onNicknameStyle} disabled={disabled || picking}
-          placeholder={t('message.1b92c5e9d144')} />
+        <div className="profile-editor-name">
+          <label className="settings-label" htmlFor="settings-input-username">{t('message.295f254de3a9')}</label>
+          <NicknameField id="settings-input-username" name={name} onNameChange={onNameChange}
+            appearance={nicknameStyle} onAppearanceChange={onNicknameStyle} disabled={disabled || picking}
+            placeholder={t('message.1b92c5e9d144')} />
+        </div>
         <div className="profile-card-settings">
           <label className="settings-switch-row" htmlFor="profile-card-automatic">
             <span className="settings-switch-title">{t('profile.cardAutomatic')}</span>

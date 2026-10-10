@@ -48,7 +48,7 @@ export function ProfileBannerEditor({ value, onChange, disabled, onBusy }: {
     finally { if (mounted.current) setPicking(false); onBusy(false); }
   };
   return <div className="profile-banner-editor">
-    <span className="settings-label">{t('profile.banner')}</span>
+    <span className="settings-label profile-banner-label">{t('profile.banner')}</span>
     <div className="profile-banner-upload">
       <TooltipButton tooltip={t(picking ? 'profile.loading' : 'profile.chooseBanner')}
         className="btn profile-upload-button profile-banner-button" disabled={disabled || picking}
@@ -74,14 +74,14 @@ export function ProfileBannerEditor({ value, onChange, disabled, onBusy }: {
           <span className="switch-slider" />
         </div>
       </label>
-      <label className="settings-switch-row" htmlFor="profile-banner-blur">
+      {value.enabled && <label className="settings-switch-row" htmlFor="profile-banner-blur">
         <span className="settings-switch-title">{t('profile.bannerBlur')}</span>
         <div className="modern-switch">
           <input autoComplete="off" type="checkbox" id="profile-banner-blur" checked={value.blur}
             disabled={disabled || picking || !value.enabled} onChange={event => onChange({ ...value, blur: event.target.checked })} />
           <span className="switch-slider" />
         </div>
-      </label>
+      </label>}
     </div>}
     {picking && <span className="profile-loading-status" role="status">{t('profile.loading')}</span>}
     {selection && <ProfileCropDialog draft={selection} aspect={BANNER_ASPECT} label={t('profile.cropBanner')}
