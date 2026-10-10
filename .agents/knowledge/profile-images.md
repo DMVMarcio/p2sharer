@@ -87,4 +87,25 @@ an image is present. Disabling card display retains the image for future profile
 surfaces and reveals the unchanged avatar-derived or custom card color.
 `ParticipantCard` renders a decorative cover layer with optional blur and a dark
 scrim for readable foreground text. Settings owns banner upload, removal and
-display-option drafts; no profile page is implemented.
+display-option drafts. `ProfileModal` displays the full banner regardless of its
+card visibility/blur settings and uses the shared nickname and avatar components.
+
+## Profile statistics and viewing
+
+`core/profile_stats.ts` stores versioned aggregate totals in the main WebView local
+storage. RoomService starts/stops admitted room sessions (including solo sessions),
+counts successfully published new messages, and counts acknowledged complete file
+transfers once per request, excluding image previews and local copies of cached
+images. Call time uses a monotonic
+clock, checkpoints every 15 seconds and flushes on departure/beforeunload; an abrupt
+process termination can lose the final checkpoint interval. Calls, longest call,
+messages, sent/received files and byte totals accumulate on this device from the
+feature's introduction; history replay and message edits do not increase totals.
+
+`profile_stats_v1` shares only bounded aggregate counters on direct admitted edges
+through the room action guard, with coalesced updates and admission announcements.
+Remote totals are self-reported, remain in process memory, and disappear on room
+exit. They never overwrite local storage or trigger announcement loops. The shared
+`profile_actions.tsx` action opens `ProfileModal` through ModalManager with the
+owner identity, including media slots, chat identity context menus, participant
+lists and the local header. Unknown/older clients display an unavailable state.

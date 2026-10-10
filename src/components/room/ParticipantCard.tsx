@@ -3,6 +3,7 @@ import { useRoomCardLayoutActions } from './RoomCardLayoutContext';
 import { contrastingTextColor } from '../../core/accent_color';
 import { profileImages, profileBanners } from '../../core/profile_image';
 import { ProfileAvatar } from '../common/ProfileAvatar';
+import { profileAction } from '../common/profile_actions';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { roomService } from '../../services/room_service';
@@ -63,7 +64,7 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
       onClick={handleCardClick}
       tabIndex={0}
       onContextMenu={(event) => {
-        const actions: ContextMenuAction[] = [];
+        const actions: ContextMenuAction[] = [profileAction({ peerId: slot.ownerPeerId ?? slot.peerId, name: slot.senderName, isLocal: slot.isLocal, color: slot.color })];
         if (layoutMode === 'spotlight' && inTray && !isSelectedFeatured && slot.isStreaming) actions.push({ id: 'overlay', get label() { return t("message.1c2685f76e69"); }, onSelect: () => roomService.overlayStream(slot.peerId) });
         if (!isFeatured && !isSelectedFeatured) actions.push({ id: 'feature', get label() { return t("message.3c31d7d451bc"); }, icon: <Focus size={15} />, onSelect: () => togglePin(slot.peerId) });
         if (layoutMode === 'spotlight') actions.push({ id: 'grid', get label() { return t("message.2e00d3a9b870"); }, icon: <Grid2X2 size={15} />,

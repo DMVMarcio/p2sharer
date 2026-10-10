@@ -54,7 +54,7 @@ const mocks = {
     getPeerVolumeState: () => ({ volume: 100, isMuted: false }), setPeerVolume() {} };`,
   pip: 'export const pipService = { updateStream() {}, restoreFromPip() {} };',
   pointer: 'export const useStreamPointer = () => ({ enabled: false, toggle() {}, toolbar: null, indicator: null });',
-  modal: 'export const useModal = () => ({ openModal() {} }); export const modalManager = { open() {} };',
+  modal: 'export const useModal = () => ({ openModal() {} }); export const modalManager = { open() {}, openProfile: target => globalThis.frontendLifecycleFixture.profileTarget = target };',
   toast: 'export const showToast = () => {};',
   files: 'export const useChatFileInput = () => ({ selectedFile: null, dragging: false, close() {}, markOffered() {}, pickFile() {} });',
   composer: `import React from 'react'; export const EmojiComposerInput = React.forwardRef((props, ref) => {
@@ -67,6 +67,7 @@ const names = { useRoom: 'useRoom', useStore: 'useStore', state_store: 'state', 
 const require = createRequire(import.meta.url);
 const bundle = await build({ stdin: { contents: `export { RoomVideoContainer } from './src/components/room/RoomVideoContainer.tsx';
 export { ChatPane } from './src/components/room/ChatPane.tsx';
+export { ParticipantsPane } from './src/components/room/ParticipantsPane.tsx';
 export { WatchersTooltipContent } from './src/components/room/WatchersTooltipContent.tsx';
 export { Nickname } from './src/components/common/Nickname.tsx';
 export { profileImages, profileBanners } from './src/core/profile_image.ts';
@@ -78,7 +79,7 @@ export { ContextMenuProvider } from './src/components/common/ContextMenu.tsx';`,
     builder.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: mocks[args.path], loader: 'js' }));
     builder.onResolve({ filter: /^[^./]/ }, args => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
   } }] });
-const { RoomVideoContainer, ChatPane, ContextMenuProvider, WatchersTooltipContent, Nickname, profileImages, profileBanners } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
+const { RoomVideoContainer, ChatPane, ParticipantsPane, ContextMenuProvider, WatchersTooltipContent, Nickname, profileImages, profileBanners } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
 const { createRoot } = await import('react-dom/client');
 const root = createRoot(document.getElementById('root'));
 const render = async (Component = RoomVideoContainer) => act(async () => root.render(React.createElement(ContextMenuProvider, null, React.createElement(Component))));
@@ -96,6 +97,31 @@ const reset = async slots => {
   await render();
 };
 after(async () => { await clear(); await act(async () => root.unmount()); dom.window.close(); });
+
+test('profile menus target participant owners from streaming cards, chat identity and the people list', async () => {
+  const openProfile = async element => {
+    await act(async () => element.dispatchEvent(new window.MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 30, clientY: 30 })));
+    const action = [...document.querySelectorAll('[role="menuitem"]')].find(item => /Ver perfil|View profile/.test(item.textContent));
+    assert.ok(action);
+    await act(async () => action.click());
+    assert.equal(fixture.profileTarget.peerId, 'profile-owner');
+  };
+  try {
+    await reset([{ ...slot('profile-owner::camera', 'Profile owner'), ownerPeerId: 'profile-owner' }]);
+    await openProfile(card('profile-owner::camera'));
+    await clear();
+    fixture.room.chatMessages = [{ id: 'profile-chat', authorId: 'profile-owner', sender: 'Profile owner', text: 'Hello', timestamp: Date.now() }];
+    await render(ChatPane);
+    await openProfile(document.querySelector('.chat-msg-avatar'));
+    await openProfile(document.querySelector('.chat-msg-sender'));
+    await clear();
+    fixture.room.peers = [{ id: 'profile-owner', username: 'Profile owner', connectionState: 'connected' }];
+    await render(ParticipantsPane);
+    await openProfile(document.querySelectorAll('.participant-item')[1]);
+  } finally {
+    await clear(); fixture.room.peers = []; fixture.room.chatMessages = []; delete fixture.profileTarget;
+  }
+});
 
 test('participant banners react to remote metadata and return to the preserved card color when disabled', async () => {
   const entry = { ...slot('banner-peer'), isStreaming: false, stream: null };

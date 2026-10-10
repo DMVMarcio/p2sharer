@@ -22,6 +22,7 @@ import { NativeVideoBridge } from '../video/native_video_bridge.ts';
 import { MediaCoordinator } from '../p2p/media_coordinator.ts';
 import { showToast } from '../hooks/useToast.ts';
 import { modalManager } from '../hooks/useModal.ts';
+import { profileStats } from '../core/profile_stats.ts';
 import { pipService } from './pip_service.ts';
 
 export interface ConnectingOverlayState {
@@ -271,6 +272,7 @@ export class RoomService {
     const reusable = preview && this.roomPreview === preview ? preview :
       this.roomManager?.canResumeRoom(code) ? this.roomManager : undefined;
     if (this.roomManager && this.roomManager !== reusable) {
+      profileStats.setInCall(false);
       const oldManager = this.roomManager;
       this.stopScreenSharing();
       this.roomManager = null;
@@ -373,6 +375,7 @@ export class RoomService {
       },
       onPeersUpdate: (peers: PeerInfo[]) => {
         if (this.roomManager !== manager) return;
+        profileStats.setInCall(manager.hasAdmission());
         this.peers = peers;
         stateStore.set(s => { s.peerNicknameStyles = Object.fromEntries(peers.filter(peer => peer.nicknameStyle).map(peer => [peer.id, peer.nicknameStyle!])); });
         if (manager.hasAdmission() && (isCreator || peers.some((peer) => peer.connectionState === 'connected'))) this.hideConnecting();
@@ -421,6 +424,7 @@ export class RoomService {
       },
       onStatusChange: (status) => {
         if (this.roomManager !== manager || signal?.aborted) return;
+        profileStats.setInCall(manager.hasAdmission());
         const wasWaiting = this.joinOutcome === 'waiting';
         this.roomStatusText = status;
         if (manager.hasAdmission()) this.joinOutcome = 'admitted';
@@ -476,6 +480,8 @@ export class RoomService {
     }, false, pass);
     signal?.removeEventListener('abort', abort);
     if (signal?.aborted) return;
+
+    if (this.roomManager === manager) profileStats.setInCall(manager.hasAdmission());
 
     if (!waitForAdmission && this.roomManager === manager && this.joinOutcome === 'connecting') {
       this.joinOutcome = 'waiting';
@@ -679,6 +685,7 @@ export class RoomService {
   }
 
   public async leaveRoom(): Promise<void> {
+    profileStats.setInCall(false);
     this.hideConnecting();
     const transition = this.roomTransition.then(() => this.leaveRoomNow());
     this.roomTransition = transition.catch((err) => {
@@ -755,7 +762,7 @@ export class RoomService {
 
   public sendChatMessage(text: string, replyToId?: string): void {
     if (!text.trim() || !this.roomManager) return;
-    void this.roomManager.sendChatMessage(text.trim(), replyToId).catch((error) =>
+    void this.roomManager.sendChatMessage(text.trim(), replyToId).then(() => profileStats.messageSent()).catch((error) =>
       console.warn('[Chat] Failed to sign or send message:', error));
   }
 
@@ -817,6 +824,9 @@ export class RoomService {
       timings: progress.timings ?? previous?.timings,
     };
     this.fileProgress = { ...this.fileProgress, [entry.requestId]: entry };
+    if (entry.status === 'complete' && previous?.status !== 'complete' && !this.localSaveIds.has(entry.requestId)) {
+      profileStats.transferCompleted(entry.requestId, entry.direction, entry.total, Boolean(entry.previewOnly));
+    }
     if (entry.status === 'active' && entry.peerId && this.roomManager) {
       const now = performance.now();
       const last = this.transferRouteChecks.get(entry.requestId);

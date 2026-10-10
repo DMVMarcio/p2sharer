@@ -1052,5 +1052,20 @@
   "nickname.animation.pulse": "Pulsar",
   "nickname.animation.wave": "Onda nas letras",
   "nickname.customize": "Personalizar Nome",
-  "nickname.shineColor": "Cor do brilho"
+  "nickname.shineColor": "Cor do brilho",
+  "profile.view": "Ver perfil",
+  "profile.title": "Perfil do participante",
+  "profile.edit": "Editar perfil",
+  "profile.stats.title": "Estatísticas",
+  "profile.stats.callTime": "Tempo em chamadas",
+  "profile.stats.messages": "Mensagens enviadas",
+  "profile.stats.filesSent": "Arquivos enviados",
+  "profile.stats.filesReceived": "Arquivos recebidos",
+  "profile.stats.calls": "Chamadas participadas",
+  "profile.stats.longestCall": "Maior chamada",
+  "profile.stats.bytesSent": "Dados enviados",
+  "profile.stats.bytesReceived": "Dados recebidos",
+  "profile.stats.unavailable": "Este participante ainda não compartilhou estatísticas.",
+  "profile.stats.localNote": "Os totais são salvos neste dispositivo a partir de agora. O tempo conta sessões em salas após a admissão; os arquivos contam transferências concluídas e excluem prévias.",
+  "profile.stats.remoteNote": "Totais informados pelo dispositivo deste participante. A contagem de arquivos exclui prévias."
 }

@@ -1052,5 +1052,20 @@
   "nickname.animation.pulse": "Pulse",
   "nickname.animation.wave": "Letter wave",
   "nickname.customize": "Customize Name",
-  "nickname.shineColor": "Shine color"
+  "nickname.shineColor": "Shine color",
+  "profile.view": "View profile",
+  "profile.title": "Participant profile",
+  "profile.edit": "Edit profile",
+  "profile.stats.title": "Statistics",
+  "profile.stats.callTime": "Time in calls",
+  "profile.stats.messages": "Messages sent",
+  "profile.stats.filesSent": "Files sent",
+  "profile.stats.filesReceived": "Files received",
+  "profile.stats.calls": "Calls joined",
+  "profile.stats.longestCall": "Longest call",
+  "profile.stats.bytesSent": "Data sent",
+  "profile.stats.bytesReceived": "Data received",
+  "profile.stats.unavailable": "This participant has not shared statistics yet.",
+  "profile.stats.localNote": "Totals are saved on this device from now on. Call time counts admitted room sessions; file totals count completed transfers and exclude previews.",
+  "profile.stats.remoteNote": "Totals reported by this participant’s device. File totals exclude previews."
 }

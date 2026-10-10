@@ -4,6 +4,7 @@ import { WindowTitlebar } from './components/header/WindowTitlebar';
 import { HomeView } from './components/home/HomeView';
 import { RoomView } from './components/room/RoomView';
 import { SettingsModal } from './components/modals/SettingsModal';
+import { ProfileModal } from './components/modals/ProfileModal';
 import { ScreenPickerModal } from './components/modals/ScreenPickerModal';
 import { UsernameModal } from './components/modals/UsernameModal';
 import { AudioFilterModal } from './components/modals/AudioFilterModal';
@@ -77,6 +78,7 @@ const MainApp: React.FC = () => {
       </main>
 
       {/* Modals & Overlays */}
+      {activeModal === 'profile' && <ProfileModal key={modalRevision} />}
       {activeModal === 'settings' && <SettingsModal />}
       {activeModal === 'screenPicker' && <ScreenPickerModal />}
       {activeModal === 'username' && <UsernameModal />}

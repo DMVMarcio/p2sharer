@@ -2,6 +2,7 @@ import { normalizeNicknameStyle, type NicknameStyle } from '../core/nickname_sty
 import { stateStore } from '../core/state_store.ts';
 import { ProfileTransfer } from './profile_transfer.ts';
 import { profileImages, profileBanners } from '../core/profile_image.ts';
+import { profileStats } from '../core/profile_stats.ts';
 import { validStreamDescriptors, streamSlotKey, streamOwner, type StreamDescriptor } from "../core/media_streams.ts";
 import { validStreamPointer, validStreamPointerState, type StreamPointerState, type StreamPointerPacket } from '../core/stream_pointer.ts';
 import { selfId } from '@trystero-p2p/core';
@@ -199,6 +200,9 @@ export class GroupRoomManager {
   private profileTransfer: ProfileTransfer | null = null;
   private bannerAction: any = null;
   private bannerTransfer: ProfileTransfer | null = null;
+  private profileStatsAction: any = null;
+  private unsubscribeProfileStats: (() => void) | undefined;
+  private profileStatsTimer: ReturnType<typeof setTimeout> | undefined;
 
   public refreshProfile(): void {
     const name = stateStore.username || this.username;
@@ -748,6 +752,7 @@ export class GroupRoomManager {
     }, { target: peerId });
     void this.profileTransfer?.announce(peerId).catch(() => {});
     void this.bannerTransfer?.announce(peerId).catch(() => {});
+    this.profileStatsAction?.send(profileStats.get(), { target: peerId });
     this.pexAction?.send({ peers: this.getPeersPayload() }, { target: peerId });
     this.historyAction?.send({ history: this.chatHistory }, { target: peerId });
     this.historyAction?.send({ request: true }, { target: peerId });
@@ -1238,6 +1243,17 @@ export class GroupRoomManager {
       void this.bannerTransfer?.receive(packet, meta.peerId).catch(() => {});
     };
     this.fileAction = this.room.makeAction('chat_file_v2');
+    this.profileStatsAction = this.room.makeAction('profile_stats_v1');
+    this.profileStatsAction.onMessage = (packet: unknown, meta: { peerId: string }) => profileStats.receive(meta.peerId, packet);
+    this.unsubscribeProfileStats?.();
+    clearTimeout(this.profileStatsTimer);
+    this.unsubscribeProfileStats = profileStats.subscribeLocal(() => {
+      if (this.profileStatsTimer) return;
+      this.profileStatsTimer = setTimeout(() => {
+        this.profileStatsTimer = undefined;
+        this.sendRoomAction(this.profileStatsAction, profileStats.get());
+      }, 1000);
+    });
     this.fileAction.onMessage = (packet: FilePacket, meta: { peerId: string }) => {
       if (packet instanceof Uint8Array) return;
       void this.handleFilePacket(packet, meta.peerId);
@@ -1649,7 +1665,7 @@ export class GroupRoomManager {
       this.pexAction, this.meshRelayAction, this.watchAction,
       this.pingAction, this.pongAction, this.identityAction,
       this.authorityAction, this.admissionAction, this.inviteAction,
-      this.previewAction, this.appAction, this.fileAction, this.pointerAction, this.nativeVideoAction, this.profileAction, this.bannerAction,
+      this.previewAction, this.appAction, this.fileAction, this.pointerAction, this.nativeVideoAction, this.profileAction, this.bannerAction, this.profileStatsAction,
     ].forEach((action) => {
       if (!action?.onMessage) return;
       const handler = action.onMessage;
@@ -1958,6 +1974,7 @@ export class GroupRoomManager {
   }
 
   private removePeer(peerId: string) {
+    profileStats.forget(peerId);
     this.profileTransfer?.forget(peerId);
     this.bannerTransfer?.forget(peerId);
     this.cleanupStreamWatchers(peerId, '');
@@ -3309,6 +3326,9 @@ export class GroupRoomManager {
   }
 
   private async leaveNow(): Promise<void> {
+    this.unsubscribeProfileStats?.(); this.unsubscribeProfileStats = undefined;
+    clearTimeout(this.profileStatsTimer); this.profileStatsTimer = undefined;
+    if (!this.previewOnly) profileStats.clearPeers();
     this.previewRequests.clear();
     this.profileTransfer?.close();
     this.profileTransfer = null;

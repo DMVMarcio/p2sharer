@@ -1,5 +1,6 @@
 import { Nickname } from '../common/Nickname';
 import { ProfileAvatar } from '../common/ProfileAvatar';
+import { profileAction } from '../common/profile_actions';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useState } from 'react';
@@ -42,7 +43,8 @@ export const ParticipantsPane: React.FC = () => {
     <div className="sidebar-tab-content active" id="tab-content-participants">
       <div className="participants-list" id="participants-list">
         {/* Local user */}
-        <div className="participant-item">
+        <div className="participant-item" onContextMenu={event => openContextMenu(event,
+          [profileAction({ peerId: 'local', name: username, isLocal: true, color: localColor })])}>
           <div className="participant-item-identity">
             <ProfileAvatar name={username} isLocal color={localColor} className="participant-item-avatar" />
             <div className="participant-item-text">
@@ -60,7 +62,7 @@ export const ParticipantsPane: React.FC = () => {
           const color = getSlotColor(p.id, false);
           const slot = roomSlots.find((s) => s.peerId === p.id);
           const isStreaming = slot?.isStreaming;
-          const actions: ContextMenuAction[] = [];
+          const actions: ContextMenuAction[] = [profileAction({ peerId: p.id, name: p.username, color })];
           if (isStreaming) actions.push({ id: 'watch', get label() { return t("message.5a49c69bab6b"); }, icon: <Play size={15} />, onSelect: () => requestStream(p.id) });
           if (isRoomHost && p.connectionState === 'connected' && !p.isCreator) actions.push(
             { id: 'admin', get label() { return p.isAdmin ? t("message.a1073128f2dc") : t("message.1c6f1047e43c"); }, icon: <Shield size={15} />,
