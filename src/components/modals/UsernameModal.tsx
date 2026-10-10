@@ -1,5 +1,5 @@
 import { roomService } from '../../services/room_service';
-import { NicknameStyleEditor } from '../common/NicknameStyleEditor';
+import { NicknameField } from '../common/NicknameField';
 import { NICKNAME_STYLE_KEY } from '../../core/nickname_style';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
@@ -50,17 +50,8 @@ export const UsernameModal: React.FC = () => {
         </div>
         <div className="modal-body">
           <p>{t("message.647904045700")}</p>
-          <input autoComplete="off"
-            type="text"
-            id="input-username"
-            className="text-input"
-            placeholder={t("message.6541e1023005")}
-            maxLength={25}
-            value={val}
-            onChange={(e) => setVal(e.target.value)}
-            autoFocus
-          />
-          <NicknameStyleEditor name={val} value={nicknameStyle} onChange={setNicknameStyle} disabled={pending || isClosing} />
+          <NicknameField id="input-username" name={val} onNameChange={setVal} appearance={nicknameStyle}
+            onAppearanceChange={setNicknameStyle} placeholder={t("message.6541e1023005")} autoFocus disabled={pending || isClosing} />
         </div>
         <div className="modal-footer">
           <button className="btn btn-primary" id="btn-save-username" type="submit" disabled={pending || isClosing}>

@@ -1044,5 +1044,7 @@
   "nickname.animation.none": "Nenhuma",
   "nickname.animation.float": "Flutuar",
   "nickname.animation.pulse": "Pulsar",
-  "nickname.animation.wave": "Onda nas letras"
+  "nickname.animation.wave": "Onda nas letras",
+  "nickname.customize": "Personalizar Nome",
+  "nickname.shineColor": "Cor do brilho"
 }

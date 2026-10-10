@@ -6,21 +6,22 @@ const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
 const palette = ['#f87171', '#fb923c', '#facc15', '#4ade80', '#38bdf8', '#a78bfa', '#f472b6'];
 
 /** Shared visual identity; names stay plain text in messages, labels and storage. */
-export function Nickname({ name, peerId, isLocal = false, appearance, className = '' }: {
-  name: string; peerId?: string; isLocal?: boolean; appearance?: NicknameStyle; className?: string;
+export function Nickname({ name, peerId, isLocal = false, appearance, className = '', defaultColor }: {
+  name: string; peerId?: string; isLocal?: boolean; appearance?: NicknameStyle; className?: string; defaultColor?: string;
 }) {
   const saved = useStore(s => isLocal ? s.nicknameStyle : peerId ? s.peerNicknameStyles?.[peerId] : undefined);
   const style = normalizeNicknameStyle(appearance ?? saved);
-  const variables = { '--nickname-color': style.color, '--nickname-secondary': style.secondaryColor,
+  const variables = { '--nickname-color': style.color, '--nickname-secondary': style.secondaryColor, '--nickname-shine': style.shineColor,
+    color: style.effect === 'none' ? defaultColor : undefined,
     fontFamily: NICKNAME_FONTS[style.font] } as CSSProperties;
   const letters = style.effect === 'letters' || style.animation === 'wave';
   return <span className={`nickname ${className}`} style={variables} role={letters ? 'img' : undefined} aria-label={letters ? name : undefined}>
     <span className={`nickname-motion nickname-animation-${style.animation}`}>
-      <span className={`nickname-ink nickname-effect-${style.effect}`}>
+      <span className={letters ? 'nickname-letters' : `nickname-ink nickname-effect-${style.effect}`}>
         {letters ? [...segmenter.segment(name.slice(0, 80))].map(({ segment }, index) =>
           <span key={index} aria-hidden="true" className="nickname-letter" style={{
             '--nickname-index': index, color: style.effect === 'letters' ? palette[index % palette.length] : undefined,
-          } as CSSProperties}>{segment}</span>) : name}
+          } as CSSProperties}><span className={`nickname-ink nickname-effect-${style.effect}`}>{segment}</span></span>) : name}
       </span>
     </span>
   </span>;

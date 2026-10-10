@@ -8,9 +8,10 @@ export interface NicknameStyle {
   animation: typeof NICKNAME_ANIMATIONS[number];
   color: string;
   secondaryColor: string;
+  shineColor: string;
 }
 export const DEFAULT_NICKNAME_STYLE: NicknameStyle = {
-  font: 'default', effect: 'none', animation: 'none', color: '#38bdf8', secondaryColor: '#c084fc',
+  font: 'default', effect: 'none', animation: 'none', color: '#38bdf8', secondaryColor: '#c084fc', shineColor: '#ffffff',
 };
 export function normalizeNicknameStyle(value: unknown): NicknameStyle {
   const source = value && typeof value === 'object' && !Array.isArray(value)
@@ -26,6 +27,7 @@ export function normalizeNicknameStyle(value: unknown): NicknameStyle {
       ? source.animation as NicknameStyle['animation'] : 'none',
     color: color(source.color, DEFAULT_NICKNAME_STYLE.color),
     secondaryColor: color(source.secondaryColor, DEFAULT_NICKNAME_STYLE.secondaryColor),
+    shineColor: color(source.shineColor, DEFAULT_NICKNAME_STYLE.shineColor),
   };
 }
 export const NICKNAME_STYLE_KEY = 'p2sharer_nickname_style_v1';

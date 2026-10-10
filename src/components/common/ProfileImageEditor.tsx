@@ -1,3 +1,5 @@
+import { NicknameField } from './NicknameField';
+import type { NicknameStyle } from '../../core/nickname_style';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Upload, X } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
@@ -82,7 +84,8 @@ function CropDialog({ draft, onApply, onClose }: { draft: ProfileDraft; onApply:
   </ModalDialog>;
 }
 
-export function ProfileImageEditor({ name, draft, color, remove, onDraft, onColor, onRemove, onBusy, disabled, cardColor, onCardColor, onNameChange }: {
+export function ProfileImageEditor({ name, draft, color, remove, onDraft, onColor, onRemove, onBusy, disabled, cardColor, onCardColor, onNameChange, nicknameStyle, onNicknameStyle }: {
+  nicknameStyle: NicknameStyle; onNicknameStyle: (style: NicknameStyle) => void;
   onNameChange: (name: string) => void;
   cardColor: string | null; onCardColor: (color: string | null) => void;
   name: string; draft: ProfileDraft | null; color: string; remove: boolean; onDraft: (draft: ProfileDraft | null) => void;
@@ -127,9 +130,9 @@ export function ProfileImageEditor({ name, draft, color, remove, onDraft, onColo
       </div>
       <div className="profile-editor-details">
         <label className="settings-label" htmlFor="settings-input-username">{t('message.295f254de3a9')}</label>
-        <input autoComplete="off" type="text" id="settings-input-username" className="text-input"
-          placeholder={t('message.1b92c5e9d144')} maxLength={25} value={name} disabled={disabled || picking}
-          onChange={event => onNameChange(event.target.value)} />
+        <NicknameField id="settings-input-username" name={name} onNameChange={onNameChange}
+          appearance={nicknameStyle} onAppearanceChange={onNicknameStyle} disabled={disabled || picking}
+          placeholder={t('message.1b92c5e9d144')} />
         <div className="profile-card-settings">
           <label className="settings-switch-row" htmlFor="profile-card-automatic">
             <span className="settings-switch-title">{t('profile.cardAutomatic')}</span>

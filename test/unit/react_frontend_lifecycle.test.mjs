@@ -69,6 +69,7 @@ const bundle = await build({ stdin: { contents: `export { RoomVideoContainer } f
 export { ChatPane } from './src/components/room/ChatPane.tsx';
 export { WatchersTooltipContent } from './src/components/room/WatchersTooltipContent.tsx';
 export { Nickname } from './src/components/common/Nickname.tsx';
+export { profileImages } from './src/core/profile_image.ts';
 export { ContextMenuProvider } from './src/components/common/ContextMenu.tsx';`, resolveDir: process.cwd() },
   bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic', loader: { '.css': 'empty' }, plugins: [{ name: 'fixtures', setup(builder) {
     builder.onResolve({ filter: /\/(useRoom|useStore|state_store|room_service|room_apps_service|RoomAppCard|audio_context_manager|pip_service|useStreamPointer|useModal|useToast|useChatFileInput|EmojiComposerInput)$/ }, args => ({
@@ -77,7 +78,7 @@ export { ContextMenuProvider } from './src/components/common/ContextMenu.tsx';`,
     builder.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: mocks[args.path], loader: 'js' }));
     builder.onResolve({ filter: /^[^./]/ }, args => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
   } }] });
-const { RoomVideoContainer, ChatPane, ContextMenuProvider, WatchersTooltipContent, Nickname } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
+const { RoomVideoContainer, ChatPane, ContextMenuProvider, WatchersTooltipContent, Nickname, profileImages } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
 const { createRoot } = await import('react-dom/client');
 const root = createRoot(document.getElementById('root'));
 const render = async (Component = RoomVideoContainer) => act(async () => root.render(React.createElement(ContextMenuProvider, null, React.createElement(Component))));
@@ -105,6 +106,20 @@ test('per-letter nicknames preserve emoji and combining characters with one acce
   const identity = document.querySelector('[role="img"]');
   assert.equal(identity.getAttribute('aria-label'), name);
   assert.deepEqual([...identity.querySelectorAll('[aria-hidden="true"]')].map(letter => letter.textContent), ['A', '👩‍💻', 'e\u0301']);
+});
+
+test('default chat nickname color follows the author card background and its profile updates', async () => {
+  await clear();
+  fixture.room.roomSlots = [slot('chat-author')];
+  fixture.room.chatMessages = [{ id: 'card-color-message', authorId: 'chat-author', sender: 'Author', text: 'Hello', timestamp: Date.now() }];
+  profileImages.announce('chat-author', '', '#abcdef', '#123456');
+  await render(ChatPane);
+  const sender = document.querySelector('.chat-msg-sender .nickname');
+  assert.equal(sender.style.color, 'rgb(18, 52, 86)');
+  await act(async () => profileImages.announce('chat-author', '', '#abcdef', '#654321'));
+  assert.equal(sender.style.color, 'rgb(101, 67, 33)');
+  await clear();
+  profileImages.forget('chat-author');
 });
 
 test('stream controls place volume before pointing and distinguish interface visibility from window pinning', async () => {

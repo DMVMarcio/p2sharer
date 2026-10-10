@@ -31,6 +31,8 @@ export function NicknameStyleEditor({ name, value, onChange, disabled = false }:
         <ColorPicker label={t('nickname.color')} value={value.color} onChange={color => change({ color })} disabled={disabled} />
         {value.effect === 'gradient' && <ColorPicker label={t('nickname.secondaryColor')} value={value.secondaryColor}
           onChange={secondaryColor => change({ secondaryColor })} disabled={disabled} />}
+        {value.effect === 'shine' && <ColorPicker label={t('nickname.shineColor')} value={value.shineColor}
+          onChange={shineColor => change({ shineColor })} disabled={disabled} />}
       </div>}
       <label className="settings-label" htmlFor={`${id}-animation`}>{t('nickname.animation')}</label>
       <Select id={`${id}-animation`} value={value.animation} disabled={disabled}

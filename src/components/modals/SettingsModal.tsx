@@ -1,4 +1,3 @@
-import { NicknameStyleEditor } from '../common/NicknameStyleEditor';
 import { NICKNAME_STYLE_KEY } from '../../core/nickname_style';
 import { profileImages, type ProfileDraft } from '../../core/profile_image';
 import { ProfileImageEditor } from '../common/ProfileImageEditor';
@@ -375,8 +374,7 @@ export const SettingsModal: React.FC = () => {
 
                 <ProfileImageEditor name={nick} draft={profileDraft} color={profileColor} remove={profileRemove}
                   onDraft={setProfileDraft} onColor={setProfileColor} onRemove={setProfileRemove}
-                  onBusy={setProfileBusy} disabled={saving} onNameChange={setNick} cardColor={profileCardColor} onCardColor={setProfileCardColor} />
-                <NicknameStyleEditor name={nick} value={nicknameStyle} onChange={setNicknameStyle} disabled={saving || profileBusy} />
+                  onBusy={setProfileBusy} disabled={saving} onNameChange={setNick} cardColor={profileCardColor} onCardColor={setProfileCardColor} nicknameStyle={nicknameStyle} onNicknameStyle={setNicknameStyle} />
               </div>
             )}
 

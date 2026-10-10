@@ -1044,5 +1044,7 @@
   "nickname.animation.none": "None",
   "nickname.animation.float": "Float",
   "nickname.animation.pulse": "Pulse",
-  "nickname.animation.wave": "Letter wave"
+  "nickname.animation.wave": "Letter wave",
+  "nickname.customize": "Customize Name",
+  "nickname.shineColor": "Shine color"
 }
