@@ -5586,3 +5586,48 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .join-room-participants .profile-avatar { width: 30px; height: 30px; flex-shrink: 0; }
 .join-room-loading { display: flex; justify-content: center; padding: 16px; }
 .join-room-error { color: var(--danger-text); margin-top: 12px; }
+/* Shared nickname presentation across profile, room, chat and native PiP. */
+.nickname { display: inline; }
+.nickname-motion, .nickname-ink { display: inline-block; max-width: 100%; }
+.nickname-letter { display: inline-block; white-space: pre; }
+.nickname-effect-solid, .nickname-effect-glow { color: var(--nickname-color); }
+.nickname-effect-gradient, .nickname-effect-rainbow, .nickname-effect-shine {
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+.nickname-effect-gradient { background-image: linear-gradient(100deg, var(--nickname-color), var(--nickname-secondary)); }
+.nickname-effect-rainbow {
+  background-image: linear-gradient(90deg, #f87171, #facc15, #4ade80, #38bdf8, #a78bfa, #f87171);
+  background-size: 200% 100%;
+  animation: nickname-rainbow 5s linear infinite;
+}
+.nickname-effect-glow { animation: nickname-glow 3s ease-in-out infinite; }
+.nickname-effect-shine {
+  background-image: linear-gradient(110deg, var(--nickname-color) 35%, #ffffff 50%, var(--nickname-color) 65%);
+  background-size: 250% 100%;
+  animation: nickname-shine 4s ease-in-out infinite;
+}
+.nickname-animation-float { animation: nickname-float 3s ease-in-out infinite; }
+.nickname-animation-pulse { animation: nickname-pulse 2.5s ease-in-out infinite; }
+.nickname-animation-wave .nickname-letter {
+  animation: nickname-float 2s ease-in-out infinite;
+  animation-delay: calc(var(--nickname-index) * -90ms);
+}
+@keyframes nickname-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-0.12em); } }
+@keyframes nickname-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.65; } }
+@keyframes nickname-glow { 0%, 100% { text-shadow: 0 0 0.12em var(--nickname-color); } 50% { text-shadow: 0 0 0.5em var(--nickname-color); } }
+@keyframes nickname-rainbow { from { background-position: 0% 50%; } to { background-position: 200% 50%; } }
+@keyframes nickname-shine { 0%, 15% { background-position: 100% 50%; } 75%, 100% { background-position: 0% 50%; } }
+.nickname-editor { display: grid; gap: 12px; margin-top: 16px; }
+.nickname-preview { padding: 20px; text-align: center; font-size: 1.4rem; font-weight: 700; background: var(--bg-input); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); }
+.nickname-editor-fields { display: grid; gap: 8px; }
+.nickname-editor-fields p { margin: 0 0 4px; color: var(--text-muted); font-size: 0.75rem; }
+.nickname-colors { display: flex; align-items: center; gap: 8px; }
+.nickname-editor > .btn { justify-self: start; }
+@media (prefers-reduced-motion: reduce) {
+  .nickname-motion, .nickname-ink, .nickname-letter { animation: none !important; }
+}
+@media (forced-colors: active) {
+  .nickname-ink, .nickname-letter { color: CanvasText !important; background: none; text-shadow: none; }
+}

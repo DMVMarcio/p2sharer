@@ -1,3 +1,4 @@
+import { Nickname } from '../common/Nickname';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useEffect, useRef, useState } from 'react';
@@ -102,7 +103,7 @@ export function StreamOverlay({ slot, target, index }: Props) {
       const video = videoRef.current;
       if (video?.videoWidth && video.videoHeight) setAspect(video.videoWidth / video.videoHeight);
     }} /> : <div className="stream-overlay-loading">{t("message.744a6cf3f2d0")}</div>}
-    <div className="stream-overlay-toolbar"><span>{slot.senderName} · {slot.mediaLabel || t("message.bc10c86c24b5")}</span>
+    <div className="stream-overlay-toolbar"><span><Nickname name={slot.senderName} peerId={slot.ownerPeerId ?? slot.peerId} isLocal={slot.isLocal} /> · {slot.mediaLabel || t("message.bc10c86c24b5")}</span>
       <TooltipButton tooltip={t("message.4f3ceac0cb5c")} className="btn btn-sm btn-outline" aria-label={t("message.4f3ceac0cb5c")} onClick={remove}><X size={14} /></TooltipButton>
     </div>
     {(['nw', 'ne', 'sw', 'se'] as const).map(corner => <div key={corner} className={`stream-overlay-resize ${corner}`} onPointerDown={(event) => start(event, corner)} aria-hidden="true" />)}

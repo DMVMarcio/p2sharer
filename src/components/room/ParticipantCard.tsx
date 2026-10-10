@@ -1,3 +1,4 @@
+import { Nickname } from '../common/Nickname';
 import { useRoomCardLayoutActions } from './RoomCardLayoutContext';
 import { contrastingTextColor } from '../../core/accent_color';
 import { profileImages } from '../../core/profile_image';
@@ -106,7 +107,7 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
         isLocal={slot.isLocal} color={slot.color} className="participant-avatar-badge" />
 
       <div className="participant-name-row">
-        <span className="participant-avatar-label">{slot.senderName}{slot.mediaLabel ? ` · ${slot.mediaLabel}` : ""}</span>
+        <span className="participant-avatar-label"><Nickname name={slot.senderName} peerId={slot.ownerPeerId ?? slot.peerId} isLocal={slot.isLocal} />{slot.mediaLabel ? ` · ${slot.mediaLabel}` : ""}</span>
         {slot.isLocal && <span className="badge-you">{t("message.a03099f135b1")}</span>}
       </div>
 

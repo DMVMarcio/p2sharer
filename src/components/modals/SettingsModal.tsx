@@ -1,3 +1,5 @@
+import { NicknameStyleEditor } from '../common/NicknameStyleEditor';
+import { NICKNAME_STYLE_KEY } from '../../core/nickname_style';
 import { profileImages, type ProfileDraft } from '../../core/profile_image';
 import { ProfileImageEditor } from '../common/ProfileImageEditor';
 import { getLanguage, setLanguage, t } from '../../i18n';
@@ -39,6 +41,7 @@ const SOUND_LABELS: Record<SoundEvent, string> = {
 
 export const SettingsModal: React.FC = () => {
   useLocale();
+  const [nicknameStyle, setNicknameStyle] = useState(() => stateStore.nicknameStyle);
   const { closeModal, isClosing } = useModal();
   const { themeMode, accentColor, setThemeMode, setAccentColor } = useAppTheme();
 
@@ -158,6 +161,8 @@ export const SettingsModal: React.FC = () => {
       localStorage.setItem('p2sharer_username', nick.trim());
     }
 
+    localStorage.setItem(NICKNAME_STYLE_KEY, JSON.stringify(nicknameStyle));
+    stateStore.set(s => { s.nicknameStyle = nicknameStyle; });
     roomService.roomManager?.refreshProfile();
 
     // Save SFX
@@ -371,6 +376,7 @@ export const SettingsModal: React.FC = () => {
                 <ProfileImageEditor name={nick} draft={profileDraft} color={profileColor} remove={profileRemove}
                   onDraft={setProfileDraft} onColor={setProfileColor} onRemove={setProfileRemove}
                   onBusy={setProfileBusy} disabled={saving} onNameChange={setNick} cardColor={profileCardColor} onCardColor={setProfileCardColor} />
+                <NicknameStyleEditor name={nick} value={nicknameStyle} onChange={setNicknameStyle} disabled={saving || profileBusy} />
               </div>
             )}
 

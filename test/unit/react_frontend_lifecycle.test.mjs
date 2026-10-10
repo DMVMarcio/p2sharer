@@ -68,6 +68,7 @@ const require = createRequire(import.meta.url);
 const bundle = await build({ stdin: { contents: `export { RoomVideoContainer } from './src/components/room/RoomVideoContainer.tsx';
 export { ChatPane } from './src/components/room/ChatPane.tsx';
 export { WatchersTooltipContent } from './src/components/room/WatchersTooltipContent.tsx';
+export { Nickname } from './src/components/common/Nickname.tsx';
 export { ContextMenuProvider } from './src/components/common/ContextMenu.tsx';`, resolveDir: process.cwd() },
   bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic', loader: { '.css': 'empty' }, plugins: [{ name: 'fixtures', setup(builder) {
     builder.onResolve({ filter: /\/(useRoom|useStore|state_store|room_service|room_apps_service|RoomAppCard|audio_context_manager|pip_service|useStreamPointer|useModal|useToast|useChatFileInput|EmojiComposerInput)$/ }, args => ({
@@ -76,7 +77,7 @@ export { ContextMenuProvider } from './src/components/common/ContextMenu.tsx';`,
     builder.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: mocks[args.path], loader: 'js' }));
     builder.onResolve({ filter: /^[^./]/ }, args => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
   } }] });
-const { RoomVideoContainer, ChatPane, ContextMenuProvider, WatchersTooltipContent } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
+const { RoomVideoContainer, ChatPane, ContextMenuProvider, WatchersTooltipContent, Nickname } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
 const { createRoot } = await import('react-dom/client');
 const root = createRoot(document.getElementById('root'));
 const render = async (Component = RoomVideoContainer) => act(async () => root.render(React.createElement(ContextMenuProvider, null, React.createElement(Component))));
@@ -94,6 +95,17 @@ const reset = async slots => {
   await render();
 };
 after(async () => { await clear(); await act(async () => root.unmount()); dom.window.close(); });
+
+test('per-letter nicknames preserve emoji and combining characters with one accessible name', async () => {
+  await clear();
+  const name = 'A👩‍💻e\u0301';
+  await act(async () => root.render(React.createElement(Nickname, { name,
+    appearance: { font: 'default', effect: 'letters', animation: 'wave', color: '#abcdef', secondaryColor: '#123456' },
+  })));
+  const identity = document.querySelector('[role="img"]');
+  assert.equal(identity.getAttribute('aria-label'), name);
+  assert.deepEqual([...identity.querySelectorAll('[aria-hidden="true"]')].map(letter => letter.textContent), ['A', '👩‍💻', 'e\u0301']);
+});
 
 test('stream controls place volume before pointing and distinguish interface visibility from window pinning', async () => {
   await reset([slot('controls')]);

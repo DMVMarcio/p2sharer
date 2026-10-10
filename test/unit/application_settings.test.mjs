@@ -20,6 +20,7 @@ const bundle = await build({
   stdin: { contents: `export { ApplicationSettings } from './src/components/modals/ApplicationSettings.tsx';
     export { SettingsModal } from './src/components/modals/SettingsModal.tsx';
     export { getLanguage, setLanguage } from './src/i18n/index.ts';
+    export { stateStore } from './src/core/state_store.ts';
     export { profileImages } from './src/core/profile_image.ts';`, resolveDir: process.cwd() },
   bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic',
   plugins: [{ name: 'updater-fixture', setup(builder) {
@@ -50,7 +51,7 @@ const controller = new AppUpdateController({
 });
 controller.setPreferences(false, false);
 globalThis.applicationSettingsController = controller;
-const { ApplicationSettings, SettingsModal, getLanguage, setLanguage, profileImages } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text + '\n//# sourceURL=application-settings-test.js').toString('base64')}`);
+const { ApplicationSettings, SettingsModal, getLanguage, setLanguage, profileImages, stateStore } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text + '\n//# sourceURL=application-settings-test.js').toString('base64')}`);
 const { createRoot } = await import('react-dom/client');
 const root = createRoot(document.getElementById('root'));
 function Harness() {
@@ -195,6 +196,39 @@ test('the actual settings modal discards a closed language draft and applies it 
   delete globalThis.settingsClosed;
 });
 
+
+test('nickname preview keeps a cancellable draft and saves the style independently of the name', async () => {
+  await act(async () => { root.render(null); setLanguage('pt-BR'); });
+  const original = stateStore.nicknameStyle;
+  async function open() {
+    await act(async () => root.render(React.createElement(SettingsModal)));
+  }
+  async function chooseRainbow() {
+    const selector = document.querySelector('.nickname-editor [id$="-effect"]');
+    await act(async () => selector.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Home', bubbles: true })));
+    for (let index = 0; index < 4; index++) {
+      await act(async () => selector.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })));
+    }
+    await act(async () => selector.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  }
+  await open();
+  const name = document.getElementById('settings-input-username').value;
+  await chooseRainbow();
+  assert.equal(document.querySelector('.nickname-editor [id$="-effect"]').textContent.trim(), 'Arco-íris em movimento');
+  assert.deepEqual(stateStore.nicknameStyle, original);
+  assert.equal(localStorage.getItem('p2sharer_nickname_style_v1'), JSON.stringify(original));
+  await act(async () => document.getElementById('btn-cancel-settings').click());
+  await act(async () => root.render(null));
+  await open();
+  assert.equal(document.querySelector('.nickname-editor [id$="-effect"]').textContent.trim(), 'Cor padrão');
+  await chooseRainbow();
+  await act(async () => document.getElementById('btn-save-settings').click());
+  assert.equal(stateStore.nicknameStyle.effect, 'rainbow');
+  assert.equal(JSON.parse(localStorage.getItem('p2sharer_nickname_style_v1')).effect, 'rainbow');
+  assert.equal(document.getElementById('settings-input-username').value, name);
+  await act(async () => stateStore.set(s => { s.nicknameStyle = original; }));
+  localStorage.setItem('p2sharer_nickname_style_v1', JSON.stringify(original));
+});
 
 test('profile crop survives tab changes, applies only on Save and removal remains a cancellable draft', async () => {
   await act(async () => { root.render(null); setLanguage('pt-BR'); });

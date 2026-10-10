@@ -1,3 +1,4 @@
+import { Nickname } from '../common/Nickname';
 import { ProfileAvatar } from '../common/ProfileAvatar';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
@@ -118,7 +119,7 @@ export const AppHeader: React.FC<{ showUpdate?: boolean }> = ({ showUpdate = tru
           aria-label={t("message.ee91711e6b22")}
         >
           <ProfileAvatar name={username} className="header-profile-avatar" />
-          <span id="current-username-display">{username || t("message.f53bbaa05fae")}</span>
+          <span id="current-username-display"><Nickname name={username || t("message.f53bbaa05fae")} isLocal /></span>
         </button>
 
         <button

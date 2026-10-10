@@ -246,6 +246,7 @@ export class RoomService {
     this.savedDownloads = {};
     this.localFilePreviews = {};
     this.peers = [];
+    stateStore.set(s => { s.peerNicknameStyles = {}; });
     this.roomStatusText = t("message.93b8343c85ed");
 
     this.showConnecting(parsed ? parsed.roomId.slice(0, 8) : code,
@@ -373,6 +374,7 @@ export class RoomService {
       onPeersUpdate: (peers: PeerInfo[]) => {
         if (this.roomManager !== manager) return;
         this.peers = peers;
+        stateStore.set(s => { s.peerNicknameStyles = Object.fromEntries(peers.filter(peer => peer.nicknameStyle).map(peer => [peer.id, peer.nicknameStyle!])); });
         if (manager.hasAdmission() && (isCreator || peers.some((peer) => peer.connectionState === 'connected'))) this.hideConnecting();
         this.notify();
       },
@@ -745,6 +747,7 @@ export class RoomService {
     this.localSaveIds.clear();
     this.cancelledLocalSaves.clear();
     this.peers = [];
+    stateStore.set(s => { s.peerNicknameStyles = {}; });
     this.hideConnecting();
     showToast(t("message.b520e8324025"));
     this.notify();

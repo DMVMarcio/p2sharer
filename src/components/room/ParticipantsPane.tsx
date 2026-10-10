@@ -1,3 +1,4 @@
+import { Nickname } from '../common/Nickname';
 import { ProfileAvatar } from '../common/ProfileAvatar';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
@@ -45,7 +46,7 @@ export const ParticipantsPane: React.FC = () => {
           <div className="participant-item-identity">
             <ProfileAvatar name={username} isLocal color={localColor} className="participant-item-avatar" />
             <div className="participant-item-text">
-              <span className="participant-item-name">{username || t("message.f53bbaa05fae")}</span>
+              <span className="participant-item-name"><Nickname name={username || t("message.f53bbaa05fae")} isLocal /></span>
               <span className="badge-you">{t("message.a03099f135b1")}</span>
               {isCreator && <span className="badge-host">{t("common.hostBadge")}</span>}
               {isRoomAdmin && !isCreator && <span className="badge-host">{t("common.adminBadge")}</span>}
@@ -75,7 +76,7 @@ export const ParticipantsPane: React.FC = () => {
               <div className="participant-item-identity">
                 <ProfileAvatar peerId={p.id} name={p.username} color={color} className="participant-item-avatar" />
                 <div className="participant-item-text">
-                  <span className="participant-item-name">{p.username}</span>
+                  <span className="participant-item-name"><Nickname name={p.username} peerId={p.id} /></span>
                   {p.isCreator && <span className="badge-host">{t("common.hostBadge")}</span>}
                   {p.isAdmin && !p.isCreator && <span className="badge-host">{t("common.adminBadge")}</span>}
                   {isStreaming && <span className="badge-live-stream-mini">{t("message.b7c19868a9a8")}</span>}

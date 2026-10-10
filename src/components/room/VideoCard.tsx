@@ -1,3 +1,4 @@
+import { Nickname } from '../common/Nickname';
 import { useRoomCardLayoutActions } from './RoomCardLayoutContext';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
@@ -435,7 +436,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
                   </svg>
                 </div>
                 {!inTray && <span className="local-broadcaster-title">{t("message.863d929084c6")}</span>}
-                {!inTray && <span className="local-broadcaster-subtitle">{slot.senderName}</span>}
+                {!inTray && <span className="local-broadcaster-subtitle"><Nickname name={slot.senderName} peerId={slot.ownerPeerId ?? slot.peerId} isLocal={slot.isLocal} /></span>}
               </div>
             )}
           </>
@@ -471,7 +472,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
       {/* User overlay at bottom-left */}
       <div className="stream-card-overlay">
         <span className="user-status-dot"></span>
-        <span className="stream-user-name">{slot.senderName}{slot.mediaLabel ? ` · ${slot.mediaLabel}` : ""}</span>
+        <span className="stream-user-name"><Nickname name={slot.senderName} peerId={slot.ownerPeerId ?? slot.peerId} isLocal={slot.isLocal} />{slot.mediaLabel ? ` · ${slot.mediaLabel}` : ""}</span>
         {slot.isLocal && <span className="badge-you">{t("message.a03099f135b1")}</span>}
       </div>
 

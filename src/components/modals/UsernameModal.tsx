@@ -1,3 +1,6 @@
+import { roomService } from '../../services/room_service';
+import { NicknameStyleEditor } from '../common/NicknameStyleEditor';
+import { NICKNAME_STYLE_KEY } from '../../core/nickname_style';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useState } from 'react';
@@ -8,6 +11,7 @@ import { showToast } from '../../hooks/useToast';
 
 export const UsernameModal: React.FC = () => {
   useLocale();
+  const [nicknameStyle, setNicknameStyle] = useState(() => stateStore.nicknameStyle);
   const { closeModal, isClosing } = useModal();
   const [val, setVal] = useState(
     () => stateStore.username || `User_${Math.floor(1000 + Math.random() * 9000)}`
@@ -21,8 +25,11 @@ export const UsernameModal: React.FC = () => {
     }
     stateStore.set((s) => {
       s.username = trimmed;
+      s.nicknameStyle = nicknameStyle;
     });
     localStorage.setItem('p2sharer_username', trimmed);
+    localStorage.setItem(NICKNAME_STYLE_KEY, JSON.stringify(nicknameStyle));
+    roomService.roomManager?.refreshProfile();
     closeModal();
     showToast(t("message.de936d0d1b4d", { v0: trimmed }));
   };
@@ -53,6 +60,7 @@ export const UsernameModal: React.FC = () => {
             onChange={(e) => setVal(e.target.value)}
             autoFocus
           />
+          <NicknameStyleEditor name={val} value={nicknameStyle} onChange={setNicknameStyle} disabled={pending || isClosing} />
         </div>
         <div className="modal-footer">
           <button className="btn btn-primary" id="btn-save-username" type="submit" disabled={pending || isClosing}>

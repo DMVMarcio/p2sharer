@@ -1,3 +1,4 @@
+import { readNicknameStyle, type NicknameStyle } from './nickname_style.ts';
 import { streamDrawingLimit, STREAM_DRAWING_MAX } from './stream_pointer.ts';
 import type { ResolutionConfig, RoomSlotInfo, StreamFilterMode, ThemeMode, TurnConfig } from './types.ts';
 import { parseTurnUrls } from '../p2p/ice_config.ts';
@@ -16,6 +17,8 @@ export class StateStore {
   private static instance: StateStore | null = null;
 
   public username: string = '';
+  public nicknameStyle = readNicknameStyle();
+  public peerNicknameStyles: Record<string, NicknameStyle> = {};
   public currentRoomCode: string = '';
   public currentRoomInvite: string = '';
   public currentRoomName: string = '';

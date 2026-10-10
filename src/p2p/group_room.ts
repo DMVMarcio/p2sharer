@@ -1,3 +1,4 @@
+import { normalizeNicknameStyle, type NicknameStyle } from '../core/nickname_style.ts';
 import { stateStore } from '../core/state_store.ts';
 import { ProfileTransfer } from './profile_transfer.ts';
 import { profileImages } from '../core/profile_image.ts';
@@ -194,16 +195,15 @@ export class GroupRoomManager {
   private revokedFileMessages = new Set<string>();
   private fileAction: any = null;
   private profileAction: any = null;
+  private peerNicknameStyles = new Map<string, NicknameStyle>();
   private profileTransfer: ProfileTransfer | null = null;
 
   public refreshProfile(): void {
     const name = stateStore.username || this.username;
-    if (name !== this.username) {
-      this.username = name;
-      this.sendRoomAction(this.presenceAction, { username: this.username, isCreator: this.isRoomHost(),
-        isStreaming: Boolean(this.localStream), joinedAt: this.myJoinedAt,
-        watching: [...this.localWatching], watchRevision: this.watchRevision });
-    }
+    this.username = name;
+    this.sendRoomAction(this.presenceAction, { nicknameStyle: stateStore.nicknameStyle, username: this.username, isCreator: this.isRoomHost(),
+      isStreaming: Boolean(this.localStream), joinedAt: this.myJoinedAt,
+      watching: [...this.localWatching], watchRevision: this.watchRevision });
     for (const peerId of this.admittedTargets()) {
       void this.profileTransfer?.announce(peerId).catch(() => {});
     }
@@ -650,7 +650,7 @@ export class GroupRoomManager {
     // Re-announce presence and PEX
     if (this.presenceAction) {
       this.sendRoomAction(this.presenceAction, {
-        username: this.username,
+        nicknameStyle: stateStore.nicknameStyle, username: this.username,
         isCreator: this.isCreator,
         isStreaming: Boolean(this.localStream),
         joinedAt: this.myJoinedAt,
@@ -739,7 +739,7 @@ export class GroupRoomManager {
     if (!this.room || !this.peerTracker.isVerified(peerId)) return;
     if (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(peerId))) return;
     this.presenceAction?.send({
-      username: this.username, isCreator: this.isRoomHost(),
+      nicknameStyle: stateStore.nicknameStyle, username: this.username, isCreator: this.isRoomHost(),
       isStreaming: Boolean(this.localStream), joinedAt: this.myJoinedAt,
       watching: [...this.localWatching], watchRevision: this.watchRevision,
     }, { target: peerId });
@@ -1258,7 +1258,7 @@ export class GroupRoomManager {
     // 3. Setup Presence Action (Exchange usernames, host status & broadcast stream state)
     this.presenceAction = this.room.makeAction('presence');
     this.presenceAction.onMessage = (
-      data: { username: string; isCreator?: boolean; isStreaming?: boolean; joinedAt?: number; watching?: unknown; watchRevision?: unknown },
+      data: { username: string; nicknameStyle?: unknown; isCreator?: boolean; isStreaming?: boolean; joinedAt?: number; watching?: unknown; watchRevision?: unknown },
       meta: { peerId: string }
     ) => {
       const peerId = meta.peerId;
@@ -1266,6 +1266,7 @@ export class GroupRoomManager {
           (data.joinedAt !== undefined && !Number.isFinite(data.joinedAt)) ||
           (data.isCreator !== undefined && typeof data.isCreator !== 'boolean') ||
           (data.isStreaming !== undefined && typeof data.isStreaming !== 'boolean')) return;
+      this.peerNicknameStyles.set(peerId, normalizeNicknameStyle(data.nicknameStyle));
       this.peerTracker.touchPeer(peerId);
 
       const suppliedName = typeof data.username === 'string' ? data.username.trim() : '';
@@ -1695,7 +1696,7 @@ export class GroupRoomManager {
       if (this.presenceAction) {
         this.presenceAction.send(
           {
-            username: this.username,
+            nicknameStyle: stateStore.nicknameStyle, username: this.username,
             isCreator: this.isCreator,
             isStreaming: Boolean(this.localStream),
             joinedAt: this.myJoinedAt,
@@ -1842,7 +1843,7 @@ export class GroupRoomManager {
       // Broadcast presence
       if (this.presenceAction) {
         this.sendRoomAction(this.presenceAction, {
-          username: this.username,
+          nicknameStyle: stateStore.nicknameStyle, username: this.username,
           isCreator: this.isCreator,
           isStreaming: Boolean(this.localStream),
           joinedAt: this.myJoinedAt,
@@ -1931,7 +1932,7 @@ export class GroupRoomManager {
       }
       if (this.presenceAction) {
         this.sendRoomAction(this.presenceAction, {
-          username: this.username,
+          nicknameStyle: stateStore.nicknameStyle, username: this.username,
           isCreator: this.isCreator,
           isStreaming: Boolean(this.localStream),
           joinedAt: this.myJoinedAt,
@@ -1959,6 +1960,7 @@ export class GroupRoomManager {
       if (request.peerId === peerId) this.removePendingFileRequest(requestId);
     }
     const announcedName = this.announcedPeerNames.get(peerId);
+    this.peerNicknameStyles.delete(peerId);
     this.announcedPeerNames.delete(peerId);
     this.pendingJoinNotices.delete(peerId);
     this.existingAtJoinIds.delete(peerId);
@@ -2380,6 +2382,7 @@ export class GroupRoomManager {
     const ids = new Set(keys.flatMap((key) => this.peerTracker.getWatchers(key).map((watcher) => watcher.peerId)));
     return [...ids].filter((id) => id !== streamOwner(target) && (id === selfId || this.peerTracker.isVerified(id)))
       .map((id) => ({ peerId: id, username: id === selfId ? this.username : this.peerTracker.getUsername(id) || 'Participante',
+        nicknameStyle: id === selfId ? stateStore.nicknameStyle : this.peerNicknameStyles.get(id),
         isSelf: id === selfId }));
   }
 
@@ -3173,7 +3176,7 @@ export class GroupRoomManager {
   public getConnectedPeers(): PeerInfo[] {
     return this.peerTracker.getAllRoomPeers().filter((peer) =>
       !this.authority || this.isAdmittedPeer(peer.id))
-      .map((peer) => ({ ...peer, isAdmin: this.isPeerAdmin(peer.id) }));
+      .map((peer) => ({ ...peer, nicknameStyle: this.peerNicknameStyles.get(peer.id), isAdmin: this.isPeerAdmin(peer.id) }));
   }
 
   private notifyPeersUpdate() {
@@ -3344,6 +3347,7 @@ export class GroupRoomManager {
     this.lastStreamRecoveryRequests.clear();
     this.lastBridgeAttempts.clear();
     this.rumorIntermediaries.clear();
+    this.peerNicknameStyles.clear();
     this.announcedPeerNames.clear();
     this.existingAtJoinIds.clear();
     this.pendingJoinNotices.clear();
