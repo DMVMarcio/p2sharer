@@ -31,11 +31,13 @@ export function NicknameField({ id, name, onNameChange, appearance, onAppearance
   return <div className="nickname-field">
     <input autoComplete="off" id={id} type="text" className="text-input" maxLength={25} value={name}
       placeholder={placeholder} disabled={disabled} autoFocus={autoFocus} onChange={event => onNameChange(event.target.value)} />
-    <span className="nickname-field-preview" role="group" aria-label={t('nickname.preview')}>
-      <Nickname name={name.trim() || t('common.participant')} appearance={appearance} />
-    </span>
-    <TooltipButton tooltip={t('nickname.customize')} className="btn btn-secondary nickname-customize-button" disabled={disabled}
-      aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}><Palette size={18} aria-hidden="true" /></TooltipButton>
+    <div className="nickname-field-appearance" role="group" aria-label={t('nickname.preview')}>
+      <span className="nickname-field-preview">
+        <Nickname name={name.trim() || t('common.participant')} appearance={appearance} />
+      </span>
+      <TooltipButton tooltip={t('nickname.customize')} className="btn btn-secondary nickname-customize-button" disabled={disabled}
+        aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}><Palette size={18} aria-hidden="true" /></TooltipButton>
+    </div>
     {open && <NicknameStyleDialog name={name} value={appearance} onApply={onAppearanceChange} onClose={() => setOpen(false)} />}
   </div>;
 }
