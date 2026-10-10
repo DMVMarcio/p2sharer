@@ -1128,7 +1128,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 }
 
 .spotlight-tray-container.collapsed {
-  height: 18px;
+  height: 38px;
   padding: 0;
   background-color: transparent;
   border-color: transparent;
@@ -1136,7 +1136,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 
 .btn-toggle-spotlight-tray {
   position: absolute;
-  top: -12px;
+  top: 6px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 30;
