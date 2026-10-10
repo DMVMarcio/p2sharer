@@ -1,3 +1,4 @@
+import { profileStats } from '../../core/profile_stats';
 import { NICKNAME_STYLE_KEY } from '../../core/nickname_style';
 import { profileImages, profileBanners, type ProfileDraft } from '../../core/profile_image';
 import type { BannerDraft } from '../common/ProfileBannerEditor';
@@ -57,6 +58,7 @@ export const SettingsModal: React.FC = () => {
   const [profileColor, setProfileColor] = useState(profileImages.local.color);
   const [profileCardColor, setProfileCardColor] = useState<string | null>(profileImages.local.cardColor ?? null);
   const [profileRemove, setProfileRemove] = useState(false);
+  const [showProfileStats, setShowProfileStats] = useState(profileStats.isSharing);
   const [profileBusy, setProfileBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   useEffect(() => { void profileImages.ready.then(() => { setProfileColor(profileImages.local.color); setProfileCardColor(profileImages.local.cardColor ?? null); }); }, []);
@@ -163,6 +165,7 @@ export const SettingsModal: React.FC = () => {
       await profileImages.save(profileDraft, profileColor, profileRemove, profileCardColor);
     }
     catch { setSaving(false); showToast(t('profile.saveFailed')); return; }
+    profileStats.setSharing(showProfileStats);
     // Save username
     if (nick.trim()) {
       stateStore.set((s) => {
@@ -387,6 +390,14 @@ export const SettingsModal: React.FC = () => {
                   banner={bannerDraft} onBanner={setBannerDraft}
                   onDraft={setProfileDraft} onColor={setProfileColor} onRemove={setProfileRemove}
                   onBusy={setProfileBusy} disabled={saving || profileBusy} onNameChange={setNick} cardColor={profileCardColor} onCardColor={setProfileCardColor} nicknameStyle={nicknameStyle} onNicknameStyle={setNicknameStyle} />
+                <label className="settings-switch-row" htmlFor="profile-stats-visible">
+                  <span className="settings-switch-title">{t('profile.stats.visible')}</span>
+                  <div className="modern-switch">
+                    <input autoComplete="off" type="checkbox" id="profile-stats-visible" checked={showProfileStats}
+                      disabled={saving || profileBusy} onChange={event => setShowProfileStats(event.target.checked)} />
+                    <span className="switch-slider" />
+                  </div>
+                </label>
               </div>
             )}
 

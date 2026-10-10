@@ -1067,5 +1067,7 @@
   "profile.stats.bytesReceived": "Dados recebidos",
   "profile.stats.unavailable": "Este participante ainda não compartilhou estatísticas.",
   "profile.stats.localNote": "Os totais são salvos neste dispositivo a partir de agora. O tempo conta sessões em salas após a admissão; os arquivos contam transferências concluídas e excluem prévias.",
-  "profile.stats.remoteNote": "Totais informados pelo dispositivo deste participante. A contagem de arquivos exclui prévias."
+  "profile.stats.remoteNote": "Totais informados pelo dispositivo deste participante. A contagem de arquivos exclui prévias.",
+  "profile.stats.visible": "Mostrar estatísticas para outras pessoas",
+  "profile.viewName": "Ver perfil de {{name}}"
 }

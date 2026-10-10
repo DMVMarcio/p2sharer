@@ -7,6 +7,7 @@ interface Props {
   title: string;
   subtitle?: string;
   icon?: ReactNode;
+  headerless?: boolean;
   children: ReactNode;
   footer?: ReactNode | ((close: () => void) => ReactNode);
   className?: string;
@@ -15,7 +16,7 @@ interface Props {
   onCloseStart?: () => void;
 }
 
-export function ModalDialog({ title, subtitle, icon, children, footer, className = '', busy = false, onClose, onCloseStart }: Props) {
+export function ModalDialog({ title, subtitle, icon, headerless = false, children, footer, className = '', busy = false, onClose, onCloseStart }: Props) {
   useLocale();
   const titleId = useId();
   const cardRef = useRef<HTMLDivElement>(null);
@@ -67,12 +68,12 @@ export function ModalDialog({ title, subtitle, icon, children, footer, className
   return createPortal(<div className={`modal-overlay ${closing ? 'closing' : ''}`}
     onClick={(event) => event.stopPropagation()}
     onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
-    <div ref={cardRef} className={`modal-card ${className}`} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} inert={closing || undefined}>
-      <div className="modal-header">
+    <div ref={cardRef} className={`modal-card ${className}`} role="dialog" aria-modal="true" aria-labelledby={headerless ? undefined : titleId} aria-label={headerless ? title : undefined} tabIndex={-1} inert={closing || undefined}>
+      {headerless ? <button type="button" className="btn-close modal-overlay-close" aria-label={t('message.0f2bd88ef0ac')} disabled={busy || closing} onClick={close}>&times;</button> : <div className="modal-header">
         {icon && <div className="modal-header-icon">{icon}</div>}
         <div><h2 id={titleId}>{title}</h2>{subtitle && <p className="modal-subtitle">{subtitle}</p>}</div>
         <button type="button" className="btn-close" aria-label={t("message.0f2bd88ef0ac")} disabled={busy || closing} onClick={close}>&times;</button>
-      </div>
+      </div>}
       <div className="modal-body">{children}</div>
       {footer && <div className="modal-footer">{typeof footer === 'function' ? footer(close) : footer}</div>}
     </div>

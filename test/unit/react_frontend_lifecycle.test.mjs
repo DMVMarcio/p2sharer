@@ -112,12 +112,23 @@ test('profile menus target participant owners from streaming cards, chat identit
     await clear();
     fixture.room.chatMessages = [{ id: 'profile-chat', authorId: 'profile-owner', sender: 'Profile owner', text: 'Hello', timestamp: Date.now() }];
     await render(ChatPane);
+    assert.ok(document.querySelector('.profile-identity-button').getAttribute('aria-label').includes('Profile owner'));
     await openProfile(document.querySelector('.chat-msg-avatar'));
     await openProfile(document.querySelector('.chat-msg-sender'));
+    for (const identity of document.querySelectorAll('.chat-msg-avatar, .chat-msg-sender')) {
+      delete fixture.profileTarget;
+      await act(async () => identity.click());
+      assert.equal(fixture.profileTarget.peerId, 'profile-owner');
+    }
     await clear();
     fixture.room.peers = [{ id: 'profile-owner', username: 'Profile owner', connectionState: 'connected' }];
     await render(ParticipantsPane);
     await openProfile(document.querySelectorAll('.participant-item')[1]);
+    delete fixture.profileTarget;
+    await act(async () => document.querySelectorAll('.participant-item-identity')[1].click());
+    assert.equal(fixture.profileTarget.peerId, 'profile-owner');
+    await act(async () => document.querySelector('.participant-item-identity').click());
+    assert.equal(fixture.profileTarget.isLocal, true);
   } finally {
     await clear(); fixture.room.peers = []; fixture.room.chatMessages = []; delete fixture.profileTarget;
   }

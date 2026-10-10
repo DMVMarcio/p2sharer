@@ -49,3 +49,21 @@ test('completed transfers exclude previews and duplicates while received snapsho
   assert.equal(parseProfileStats({ ...peer, longestCallMs: 1 }), undefined);
   assert.equal(parseProfileStats({ ...peer, extra: true }), undefined);
 });
+
+test('statistics privacy persists, revokes remote totals and keeps counting locally', () => {
+  const data = new Map<string, string>();
+  const storage = { getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => { data.set(key, value); } };
+  const owner = new ProfileStatistics(storage);
+  const viewer = new ProfileStatistics();
+  owner.messageSent(); viewer.receive('owner', owner.sharedSnapshot());
+  assert.equal(viewer.get('owner')!.messages, 1);
+  owner.setSharing(false); owner.messageSent();
+  assert.equal(owner.sharedSnapshot(), null);
+  viewer.receive('owner', owner.sharedSnapshot());
+  assert.equal(viewer.get('owner'), null);
+  const loaded = new ProfileStatistics(storage);
+  assert.equal(loaded.isSharing(), false); assert.equal(loaded.get()!.messages, 2);
+  assert.equal(loaded.sharedSnapshot(), null);
+  loaded.setSharing(true); viewer.receive('owner', loaded.sharedSnapshot());
+  assert.equal(viewer.get('owner')!.messages, 2);
+});

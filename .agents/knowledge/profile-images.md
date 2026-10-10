@@ -105,7 +105,14 @@ feature's introduction; history replay and message edits do not increase totals.
 `profile_stats_v1` shares only bounded aggregate counters on direct admitted edges
 through the room action guard, with coalesced updates and admission announcements.
 Remote totals are self-reported, remain in process memory, and disappear on room
-exit. They never overwrite local storage or trigger announcement loops. The shared
+exit. The persisted visibility preference keeps local counting active while
+publishing a null snapshot instead of counters when disabled. Receivers discard
+previous totals and omit the statistics section on that snapshot. Settings uses a
+cancellable visibility draft, applied only on Save. Remote snapshots never
+overwrite local storage or trigger announcement loops. The shared
 `profile_actions.tsx` action opens `ProfileModal` through ModalManager with the
 owner identity, including media slots, chat identity context menus, participant
 lists and the local header. Unknown/older clients display an unavailable state.
+Chat identities and participant-list identity buttons also open profiles directly.
+The headerless ModalDialog variant preserves focus trapping, dismissal and its
+shared closing lifecycle without a visible heading or footer.

@@ -9,6 +9,7 @@ import { MoreHorizontal, Shield, Crown, UserX, Play } from 'lucide-react';
 import { useContextMenu, type ContextMenuAction } from '../common/ContextMenu';
 import { useRoom } from '../../hooks/useRoom';
 import { showToast } from '../../hooks/useToast';
+import { modalManager } from '../../hooks/useModal';
 
 export const ParticipantsPane: React.FC = () => {
   useLocale();
@@ -45,15 +46,16 @@ export const ParticipantsPane: React.FC = () => {
         {/* Local user */}
         <div className="participant-item" onContextMenu={event => openContextMenu(event,
           [profileAction({ peerId: 'local', name: username, isLocal: true, color: localColor })])}>
-          <div className="participant-item-identity">
+          <button type="button" className="participant-item-identity profile-identity-button" aria-label={t('profile.viewName', { name: username })}
+            onClick={() => modalManager.openProfile({ peerId: 'local', name: username, isLocal: true, color: localColor })}>
             <ProfileAvatar name={username} isLocal color={localColor} className="participant-item-avatar" />
-            <div className="participant-item-text">
+            <span className="participant-item-text">
               <span className="participant-item-name"><Nickname name={username || t("message.f53bbaa05fae")} isLocal /></span>
               <span className="badge-you">{t("message.a03099f135b1")}</span>
               {isCreator && <span className="badge-host">{t("common.hostBadge")}</span>}
               {isRoomAdmin && !isCreator && <span className="badge-host">{t("common.adminBadge")}</span>}
-            </div>
-          </div>
+            </span>
+          </button>
           <span className="user-status-dot online"></span>
         </div>
 
@@ -75,15 +77,16 @@ export const ParticipantsPane: React.FC = () => {
 
           return (
             <div key={p.id} className="participant-item" onContextMenu={(event) => openContextMenu(event, actions)}>
-              <div className="participant-item-identity">
+              <button type="button" className="participant-item-identity profile-identity-button" aria-label={t('profile.viewName', { name: p.username })}
+                onClick={() => modalManager.openProfile({ peerId: p.id, name: p.username, color })}>
                 <ProfileAvatar peerId={p.id} name={p.username} color={color} className="participant-item-avatar" />
-                <div className="participant-item-text">
+                <span className="participant-item-text">
                   <span className="participant-item-name"><Nickname name={p.username} peerId={p.id} /></span>
                   {p.isCreator && <span className="badge-host">{t("common.hostBadge")}</span>}
                   {p.isAdmin && !p.isCreator && <span className="badge-host">{t("common.adminBadge")}</span>}
                   {isStreaming && <span className="badge-live-stream-mini">{t("message.b7c19868a9a8")}</span>}
-                </div>
-              </div>
+                </span>
+              </button>
               <div className="participant-end-actions">
                 <span className={`user-status-dot ${p.connectionState === 'connected' ? 'online' : 'connecting'}`}></span>
                 {actions.length > 0 && <button className="participant-menu-trigger" aria-label={t("message.b52de8210f9a", { v0: p.username })}

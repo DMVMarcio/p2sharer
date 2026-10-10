@@ -752,7 +752,7 @@ export class GroupRoomManager {
     }, { target: peerId });
     void this.profileTransfer?.announce(peerId).catch(() => {});
     void this.bannerTransfer?.announce(peerId).catch(() => {});
-    this.profileStatsAction?.send(profileStats.get(), { target: peerId });
+    this.profileStatsAction?.send(profileStats.sharedSnapshot(), { target: peerId });
     this.pexAction?.send({ peers: this.getPeersPayload() }, { target: peerId });
     this.historyAction?.send({ history: this.chatHistory }, { target: peerId });
     this.historyAction?.send({ request: true }, { target: peerId });
@@ -1251,7 +1251,7 @@ export class GroupRoomManager {
       if (this.profileStatsTimer) return;
       this.profileStatsTimer = setTimeout(() => {
         this.profileStatsTimer = undefined;
-        this.sendRoomAction(this.profileStatsAction, profileStats.get());
+        this.sendRoomAction(this.profileStatsAction, profileStats.sharedSnapshot());
       }, 1000);
     });
     this.fileAction.onMessage = (packet: FilePacket, meta: { peerId: string }) => {

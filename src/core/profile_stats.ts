@@ -5,6 +5,7 @@ export interface ProfileStats {
 const keys = ['callMs', 'calls', 'longestCallMs', 'messages', 'filesSent', 'filesReceived', 'bytesSent', 'bytesReceived'] as const;
 const empty = (): ProfileStats => Object.fromEntries(keys.map(key => [key, 0])) as unknown as ProfileStats;
 const STORAGE_KEY = 'p2sharer_profile_stats_v1';
+const SHARING_KEY = 'p2sharer_profile_stats_visible';
 export function parseProfileStats(value: unknown): ProfileStats | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return;
   const record = value as Record<string, unknown>;
@@ -17,7 +18,8 @@ export class ProfileStatistics {
   private value = empty();
   private listeners = new Set<() => void>();
   private localListeners = new Set<() => void>();
-  private peers = new Map<string, ProfileStats>();
+  private peers = new Map<string, ProfileStats | null>();
+  private sharing = true;
   private revision = 0;
   private lastTick: number | null = null;
   private sessionMs = 0;
@@ -28,12 +30,23 @@ export class ProfileStatistics {
   constructor(storage?: Pick<Storage, 'getItem' | 'setItem'>, now = () => performance.now()) {
     this.storage = storage; this.now = now;
     try { this.value = parseProfileStats(JSON.parse(storage?.getItem(STORAGE_KEY) ?? 'null')) ?? empty(); } catch {}
+    try { this.sharing = storage?.getItem(SHARING_KEY) !== 'false'; } catch {}
   }
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   snapshot = () => this.revision;
   subscribeLocal = (listener: () => void) => { this.localListeners.add(listener); return () => { this.localListeners.delete(listener); }; };
-  get(peerId = 'local', local = false): ProfileStats | undefined {
+  get(peerId = 'local', local = false): ProfileStats | null | undefined {
     return local || peerId === 'local' ? { ...this.value } : this.peers.get(peerId);
+  }
+  isSharing = () => this.sharing;
+  sharedSnapshot = () => this.sharing ? { ...this.value } : null;
+  setSharing(visible: boolean) {
+    if (visible === this.sharing) return;
+    this.sharing = visible;
+    try { this.storage?.setItem(SHARING_KEY, String(visible)); } catch (error) {
+      console.warn('[Profile] Statistics visibility could not be saved:', error);
+    }
+    this.publish();
   }
   private publish() {
     try { this.storage?.setItem(STORAGE_KEY, JSON.stringify(this.value)); } catch (error) {
@@ -71,6 +84,10 @@ export class ProfileStatistics {
     this.add(direction === 'send' ? 'bytesSent' : 'bytesReceived', bytes); this.publish();
   }
   receive(peerId: string, value: unknown) {
+    if (value === null) {
+      this.peers.set(peerId, null); this.revision++; this.listeners.forEach(listener => listener());
+      return;
+    }
     const stats = parseProfileStats(value);
     if (!stats) return;
     this.peers.set(peerId, stats); this.revision++; this.listeners.forEach(listener => listener());
