@@ -5575,3 +5575,9 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .profile-editor-details { min-width: 0; }
 .profile-editor-details .text-input { width: 100%; }
 @media (max-width: 480px) { .profile-editor-identity { grid-template-columns: minmax(0, 1fr); } }
+
+.join-room-participants { list-style: none; padding: 0; margin: 16px 0; max-height: 240px; overflow-y: auto; }
+.join-room-participants li { display: flex; align-items: center; gap: 12px; padding: 8px 0; overflow-wrap: anywhere; }
+.join-room-participants .profile-avatar { width: 36px; height: 36px; flex-shrink: 0; }
+.join-room-loading { display: flex; justify-content: center; padding: 16px; }
+.join-room-error { color: var(--danger-text); margin-top: 12px; }

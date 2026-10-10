@@ -38,6 +38,9 @@ export class RoomService {
   public roomManager: GroupRoomManager | null = null;
   public pendingJoinInvite = '';
   public pendingJoinAsOwner = false;
+  public pendingJoinPassword = '';
+  public joinOutcome: 'idle' | 'connecting' | 'admitted' | 'error' = 'idle';
+  public joinError = '';
   public nativeVideoBridge = new NativeVideoBridge();
   public audioBridge = new AudioBridge();
   public localCaptures = new Map<string, { sourceId: string; kind: MediaKind; stream: MediaStream;
@@ -176,6 +179,8 @@ export class RoomService {
   }
 
   private async joinRoomNow(code: string, pass: string, isCreator: boolean): Promise<void> {
+    this.joinOutcome = 'connecting';
+    this.joinError = '';
     streamPointerView.clear();
     roomAppsService.reset();
     const parsed = await verifyRoomInvite(code);
@@ -222,8 +227,12 @@ export class RoomService {
     }
     // Dismiss the overlay, but keep searching and describe the actual state.
     this.roomConnectingTimeout = setTimeout(() => {
-      if (!isCreator && this.peers.every((peer) => peer.connectionState !== 'connected')) {
+      if (!isCreator && this.joinOutcome === 'connecting') {
         this.roomStatusText = t("message.5ea38d33d5af");
+        if (this.joinOutcome === 'connecting') {
+          this.joinOutcome = 'error';
+          this.joinError = t('join.timeout');
+        }
       }
       this.hideConnecting();
       this.notify();
@@ -299,7 +308,7 @@ export class RoomService {
           s.streamOverlays = Object.fromEntries(Object.entries(s.streamOverlays).filter(([target]) => currentKeys.has(target))
             .map(([target, keys]) => [target, keys.filter((key) => currentKeys.has(key))]));
         });
-        if (isCreator || slots.some((slot) => !slot.isLocal)) this.hideConnecting();
+        if (manager.hasAdmission() && (isCreator || slots.some((slot) => !slot.isLocal))) this.hideConnecting();
       },
       onChat: (msg: ChatMessage) => {
         if (this.roomManager !== manager) return;
@@ -329,7 +338,7 @@ export class RoomService {
       onPeersUpdate: (peers: PeerInfo[]) => {
         if (this.roomManager !== manager) return;
         this.peers = peers;
-        if (isCreator || peers.some((peer) => peer.connectionState === 'connected')) this.hideConnecting();
+        if (manager.hasAdmission() && (isCreator || peers.some((peer) => peer.connectionState === 'connected'))) this.hideConnecting();
         this.notify();
       },
       onPeerJoined: (peer, isInitial) => {
@@ -376,17 +385,20 @@ export class RoomService {
       onStatusChange: (status) => {
         if (this.roomManager !== manager) return;
         this.roomStatusText = status;
-        if (
+        if (manager.hasAdmission()) this.joinOutcome = 'admitted';
+        if (manager.hasAdmission() && (
           status.includes('Conectado') ||
           status === 'Sala Ativa' ||
           status === 'Ao Vivo' ||
           status.includes('P2P') ||
           status.includes('Participante')
-        ) {
+        )) {
           this.hideConnecting();
         } else if (status.startsWith('Erro') || status.startsWith('Senha incorreta') || status === t('lan.connectFailed')) {
+          this.joinOutcome = 'error';
+          this.joinError = status;
           this.hideConnecting();
-          showToast(status, 5000);
+          if (this.pendingJoinInvite === '') showToast(status, 5000);
         }
         this.notify();
       },

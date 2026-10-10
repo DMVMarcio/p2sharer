@@ -129,6 +129,8 @@ export function useRoom() {
     peers: roomService.peers,
     roomStatusText: roomService.roomStatusText,
     connectingOverlay: roomService.connectingOverlay,
+    joinOutcome: roomService.joinOutcome,
+    joinError: roomService.joinError,
     isInRoom: roomSlots.length > 0 && Boolean(currentRoomCode),
     isRoomHost: roomService.isRoomHost(),
     isRoomAdmin: roomService.isRoomAdmin(),

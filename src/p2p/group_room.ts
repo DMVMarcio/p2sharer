@@ -44,6 +44,7 @@ import { MediaCoordinator } from './media_coordinator.ts';
 import { PeerTracker } from './peer_tracker.ts';
 import { signalingManager } from './signaling_manager.ts';
 import { t } from '../i18n/index.ts';
+import { profileThumbnail, validRoomPreview, type RoomPreview } from '../core/room_preview.ts';
 
 const APP_ID = 'p2sharer-multi-stream-v5';
 
@@ -91,6 +92,7 @@ export function generateUserColor(name: string): string {
 }
 
 export interface RoomCallbacks {
+  onPreview?: (preview: RoomPreview, peerId: string) => void;
   onFileRequest?: (request: FileRequest) => void;
   onFileRequestCancelled?: (requestId: string) => void;
   onFileProgress?: (transfer: FileProgress) => void;
@@ -135,6 +137,25 @@ interface PeerExchangeItem {
 }
 
 export class GroupRoomManager {
+  private previewOnly = false;
+  private previewAction: any = null;
+  private previewNonce = crypto.randomUUID();
+  private previewRequests = new Map<string, number>();
+
+  public hasAdmission(): boolean { return this.localAdmitted && !this.previewOnly; }
+
+  public requestPreview(): void {
+    if (!this.previewOnly) return;
+    for (const peerId of this.peerTracker.directConnectedPeers) {
+      if (this.chatAuth?.getKnownKey(peerId)) void this.previewAction?.send(
+        { kind: 'request', nonce: this.previewNonce }, { target: peerId });
+    }
+  }
+
+  private async requestAdmission(peerId: string): Promise<void> {
+    if (this.previewOnly) { this.requestPreview(); return; }
+    await this.admissionAction?.send({ kind: 'request', password: this.password }, { target: peerId });
+  }
   private username: string;
   private roomId: string;
   private password: string = '';
@@ -437,7 +458,7 @@ export class GroupRoomManager {
   // Room content must be addressed only to established members.
   private sendRoomAction(action: { send: (data: unknown, options?: { target: string }) => unknown } | null,
     data: unknown): void {
-    if (!action) return;
+    if (!action || this.previewOnly) return;
     if (!this.authority) {
       void action.send(data);
       return;
@@ -445,7 +466,8 @@ export class GroupRoomManager {
     for (const peerId of this.admittedTargets()) void action.send(data, { target: peerId });
   }
 
-  public async join(callbacks: RoomCallbacks) {
+  public async join(callbacks: RoomCallbacks, previewOnly = false) {
+    this.previewOnly = previewOnly;
     this.callbacks = callbacks;
     callbacks.onStatusChange('Conectando...');
     console.log(
@@ -496,7 +518,7 @@ export class GroupRoomManager {
           for (const command of saved.hostCommands) await this.acceptHostCommand(command);
         }
         if (this.isRoomAdmin()) this.localAdmitted = true;
-        if (!this.guestInOwnedRoom) await savedRooms.put({
+        if (!this.guestInOwnedRoom && !this.previewOnly) await savedRooms.put({
           roomId: this.roomId, invite: this.invite!, name: this.roomName,
           customName: saved ? savedRoomCustomName(saved) : undefined,
           saved: saved?.saved ?? this.isCreator, owned: this.isCreator,
@@ -519,7 +541,7 @@ export class GroupRoomManager {
         });
       }
       this.setupRoomInstance();
-      if (this.isCreator && (!this.snapshot || this.snapshot.epoch < this.authority!.epoch)) {
+      if (!this.previewOnly && this.isCreator && (!this.snapshot || this.snapshot.epoch < this.authority!.epoch)) {
         await this.publishSnapshot(this.roomName);
       }
       this.callbacks?.onInviteChange?.(this.invite ?? '', this.roomName);
@@ -564,7 +586,7 @@ export class GroupRoomManager {
 
     this.bindRoomActions();
     this.bindRoomListeners();
-    this.startHeartbeatLoop();
+    if (!this.previewOnly) this.startHeartbeatLoop();
 
     // Proactive rendezvous beacons on room join:
     // Repeatedly broadcast presence on MQTT brokers at rapid intervals so existing peers in the room
@@ -663,7 +685,7 @@ export class GroupRoomManager {
     if (host) this.admittedPeers.set(host.id, this.authority.currentKey);
     this.peerTracker.setAuthenticatedHost(host?.id ?? null);
     this.callbacks?.onHostChange?.(this.isCreator);
-    if (this.invite && (!this.guestInOwnedRoom || this.authority.isLocalHost())) {
+    if (!this.previewOnly && this.invite && (!this.guestInOwnedRoom || this.authority.isLocalHost())) {
       void savedRooms.get(this.roomId).then((record) => {
         if (record && this.authority && this.chatAuth) {
           if (this.authority.isLocalHost()) this.guestInOwnedRoom = false;
@@ -678,6 +700,7 @@ export class GroupRoomManager {
   }
 
   private announceToPeer(peerId: string): void {
+    if (this.previewOnly) return;
     if (!this.room || !this.peerTracker.isVerified(peerId)) return;
     if (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(peerId))) return;
     this.presenceAction?.send({
@@ -693,6 +716,7 @@ export class GroupRoomManager {
   }
 
   private applyAdmittedPeer(peerId: string, key: string): void {
+    if (this.previewOnly && peerId === selfId) return;
     if (this.bannedKeys.has(key)) return;
     this.admittedPeers.set(peerId, key);
     if (peerId === selfId) {
@@ -722,6 +746,7 @@ export class GroupRoomManager {
   }
 
   private async issueAdmission(peerId: string): Promise<void> {
+    if (this.previewOnly) return;
     if (!this.authority?.isLocalHost() || !this.chatAuth) return;
     const key = this.chatAuth.getKnownKey(peerId);
     if (!key || this.bannedKeys.has(key) || this.admissionHistory.some((item) =>
@@ -736,6 +761,7 @@ export class GroupRoomManager {
   }
 
   private async issueAdminAdmission(peerId: string): Promise<void> {
+    if (this.previewOnly) return;
     if (!this.authority || !this.chatAuth || !this.localAdmitted) return;
     const key = peerId === selfId ? this.chatAuth.publicKey : this.chatAuth.getKnownKey(peerId);
     const grant = this.adminGrant(this.chatAuth.publicKey);
@@ -766,18 +792,21 @@ export class GroupRoomManager {
   }
 
   private async persistHostCommands(): Promise<void> {
+    if (this.previewOnly) return;
     if (!this.invite || !this.authority) return;
     const record = await savedRooms.get(this.roomId);
     if (record) await savedRooms.put({ ...record, hostCommands: this.admissionHistory.slice(-200) });
   }
 
   private async persistRememberedPassword(): Promise<void> {
+    if (this.previewOnly) return;
     if (!this.invite) return;
     const record = await savedRooms.get(this.roomId);
     if (record?.password !== undefined) await savedRooms.put({ ...record, password: this.password });
   }
 
   private async persistSnapshot(): Promise<void> {
+    if (this.previewOnly) return;
     if (!this.invite) return;
     const record = await savedRooms.get(this.roomId);
     if (record) await savedRooms.put({ ...record, invite: this.invite, name: this.roomName,
@@ -929,6 +958,45 @@ export class GroupRoomManager {
       await this.acceptSnapshot(data.invite);
     };
 
+    this.previewAction = this.room.makeAction('room_preview_v1');
+    this.previewAction.onMessage = async (data: { kind?: string; nonce?: string; preview?: unknown; signature?: string;
+      membership?: HostCommand; adminMembership?: AdminAdmission }, meta: { peerId: string }) => {
+      const key = this.chatAuth?.getKnownKey(meta.peerId);
+      if (!key || this.bannedKeys.has(key) || !this.chatAuth || !data || typeof data.nonce !== 'string' ||
+          !/^[0-9a-f-]{36}$/.test(data.nonce)) return;
+      if (data.kind === 'request' && !this.previewOnly && this.localAdmitted) {
+        const now = Date.now();
+        if (now - (this.previewRequests.get(meta.peerId) ?? 0) < 1500) return;
+        this.previewRequests.set(meta.peerId, now);
+        const people = [{ id: selfId, name: this.username, local: true },
+          ...this.peerTracker.getAllRoomPeers().filter(peer => this.isAdmittedPeer(peer.id))
+            .map(peer => ({ id: peer.id, name: peer.username, local: false }))].slice(0, 64);
+        const preview: RoomPreview = { name: this.roomName, protected: Boolean(this.password),
+          participants: await Promise.all(people.map(async person => ({ id: person.id,
+            name: person.name.slice(0, 100), color: profileImages.color(person.id, person.local) ?? '#06b6d4',
+            avatar: await profileThumbnail(profileImages.url(person.id, person.local)) }))) };
+        const signature = await this.chatAuth.signControl('room-preview', [data.nonce, preview]);
+        const membership = [...this.admissionHistory].reverse().find(command => command.kind === 'admit' &&
+          command.epoch === this.authority?.epoch && command.targetPeerId === selfId &&
+          command.targetKey === this.chatAuth?.publicKey);
+        if (this.room === boundRoom) await this.previewAction.send(
+          { kind: 'response', nonce: data.nonce, preview, signature, membership,
+            adminMembership: this.adminAdmissions.get(selfId) }, { target: meta.peerId });
+      } else if (data.kind === 'response' && this.previewOnly && data.nonce === this.previewNonce &&
+                 validRoomPreview(data.preview) && typeof data.signature === 'string' &&
+                 await this.chatAuth.verifyControl('room-preview', [data.nonce, data.preview], data.signature, key)) {
+        let member = this.authority?.isPeerHost(meta.peerId) || this.isPeerAdmin(meta.peerId) || this.isAdmittedPeer(meta.peerId);
+        if (!member && data.membership?.kind === 'admit' && data.membership.targetPeerId === meta.peerId &&
+            data.membership.targetKey === key && await this.authority?.verifyCommand(data.membership)) member = true;
+        if (!member && data.adminMembership?.targetPeerId === meta.peerId && data.adminMembership.targetKey === key &&
+            await this.authority?.verifyAdminAdmission(data.adminMembership)) member = true;
+        if (this.room === boundRoom && member) {
+          this.admittedPeers.set(meta.peerId, key);
+          this.callbacks?.onPreview?.(data.preview, meta.peerId);
+        }
+      }
+    };
+
     this.identityAction = this.room.makeAction('peer_identity');
     this.identityAction.onMessage = async (data: {
       kind?: string; nonce?: string; key?: string; signature?: string;
@@ -951,6 +1019,7 @@ export class GroupRoomManager {
           await this.inviteAction?.send({ invite: this.invite }, { target: meta.peerId });
         }
         this.syncHostRole();
+        if (this.previewOnly) { this.requestPreview(); return; }
         if (this.authority?.isPeerHost(meta.peerId)) {
           this.admittedPeers.set(meta.peerId, data.key);
         }
@@ -966,7 +1035,7 @@ export class GroupRoomManager {
           await this.sendAuthoritySummary(meta.peerId);
         }
         if (this.authority?.isPeerHost(meta.peerId) || this.isPeerAdmin(meta.peerId)) {
-          await this.admissionAction?.send({ kind: 'request', password: this.password }, { target: meta.peerId });
+          await this.requestAdmission(meta.peerId);
         } else if (this.authority?.isLocalHost() || this.isRoomAdmin()) {
           if (this.isRoomAdmin()) await this.issueAdminAdmission(selfId);
           await this.admissionAction?.send({ kind: 'prompt' }, { target: meta.peerId });
@@ -982,15 +1051,17 @@ export class GroupRoomManager {
       proposal?: Omit<AuthorityTransfer, 'nextSignature'>; transfer?: AuthorityTransfer;
     }, meta: { peerId: string }) => {
       if (!this.authority || !data) return;
+      if (this.previewOnly && data.kind !== 'request' && data.kind !== 'chain') return;
       if (data.kind === 'request') {
         await this.authorityAction.send({ kind: 'chain', chain: this.authority.history() }, { target: meta.peerId });
       } else if (data.kind === 'chain' && data.chain && await this.authority.importChain(data.chain)) {
         if (this.room !== boundRoom) return;
         this.syncHostRole();
+        if (this.previewOnly) { this.requestPreview(); return; }
         await this.admissionAction?.send({ kind: 'sync-request' }, { target: meta.peerId });
         for (const peerId of this.peerTracker.directConnectedPeers) {
           if (this.authority.isPeerHost(peerId) || this.isPeerAdmin(peerId)) {
-            await this.admissionAction?.send({ kind: 'request', password: this.password }, { target: peerId });
+            await this.requestAdmission(peerId);
           }
         }
       } else if (data.kind === 'offer' && data.proposal?.nextPeerId === selfId) {
@@ -1015,7 +1086,7 @@ export class GroupRoomManager {
       kind?: string; password?: string; command?: HostCommand; commands?: HostCommand[];
       admission?: AdminAdmission; epoch?: number; fingerprint?: string;
     }, meta: { peerId: string }) => {
-      if (!this.authority || !this.chatAuth || !data) return;
+      if (this.previewOnly || !this.authority || !this.chatAuth || !data) return;
       const senderKey = this.chatAuth.getKnownKey(meta.peerId);
       const trustedStateSender = Boolean(senderKey &&
         (this.authority.isPeerHost(meta.peerId) || this.isPeerAdmin(meta.peerId) ||
@@ -1031,7 +1102,7 @@ export class GroupRoomManager {
           await this.admissionAction.send({ kind: 'denied' }, { target: meta.peerId });
         }
       } else if (data.kind === 'prompt' && (this.authority.isPeerHost(meta.peerId) || this.isPeerAdmin(meta.peerId))) {
-        await this.admissionAction.send({ kind: 'request', password: this.password }, { target: meta.peerId });
+        await this.requestAdmission(meta.peerId);
       } else if (data.kind === 'admin-hello-request' && this.isRoomAdmin()) {
         await this.issueAdminAdmission(selfId);
       } else if (data.kind === 'sync-request' && this.localAdmitted && senderKey &&
@@ -1056,7 +1127,7 @@ export class GroupRoomManager {
                  data.admission.adminKey === this.chatAuth.getKnownKey(meta.peerId)) {
         await this.acceptAdminAdmission(data.admission);
         if (data.admission.targetPeerId === meta.peerId && this.isPeerAdmin(meta.peerId)) {
-          await this.admissionAction.send({ kind: 'request', password: this.password }, { target: meta.peerId });
+          await this.requestAdmission(meta.peerId);
         }
       } else if (data.kind === 'denied' &&
                  (this.authority.isPeerHost(meta.peerId) || this.isPeerAdmin(meta.peerId))) {
@@ -1525,7 +1596,7 @@ export class GroupRoomManager {
       this.pexAction, this.meshRelayAction, this.watchAction,
       this.pingAction, this.pongAction, this.identityAction,
       this.authorityAction, this.admissionAction, this.inviteAction,
-      this.appAction, this.fileAction, this.pointerAction, this.nativeVideoAction, this.profileAction,
+      this.previewAction, this.appAction, this.fileAction, this.pointerAction, this.nativeVideoAction, this.profileAction,
     ].forEach((action) => {
       if (!action?.onMessage) return;
       const handler = action.onMessage;
@@ -1534,9 +1605,9 @@ export class GroupRoomManager {
         if (this.room !== boundRoom) return;
         if (!this.peerTracker.isVerified(args[1]?.peerId)) return;
         if (this.authority && ![this.identityAction, this.authorityAction, this.admissionAction,
-          this.inviteAction].includes(action)) {
+          this.inviteAction, this.previewAction].includes(action)) {
           const peerId = args[1]?.peerId;
-          if (!this.localAdmitted || !this.chatAuth?.getKnownKey(peerId) ||
+          if (this.previewOnly || !this.localAdmitted || !this.chatAuth?.getKnownKey(peerId) ||
               this.admittedPeers.get(peerId) !== this.chatAuth.getKnownKey(peerId)) return;
         }
         return handler(...args);
@@ -1625,6 +1696,7 @@ export class GroupRoomManager {
 
     this.room.onPeerLeave = (peerId: string) => {
       if (this.room !== boundRoom) return;
+      this.previewRequests.delete(peerId);
       console.log(`[P2P] Peer left room: ${peerId}`);
       this.removePeer(peerId);
     };
@@ -1642,6 +1714,7 @@ export class GroupRoomManager {
   }
 
   private receivePeerStream(stream: MediaStream, peerId: string, metadata?: StreamDescriptor): void {
+      if (this.previewOnly) return;
       if (!this.peerTracker.isVerified(peerId)) return;
       if (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(peerId))) return;
       if (metadata !== undefined && !validStreamDescriptors([metadata])) return;
@@ -3175,6 +3248,7 @@ export class GroupRoomManager {
   }
 
   public async leave(): Promise<void> {
+    this.previewRequests.clear();
     this.profileTransfer?.close();
     this.profileTransfer = null;
     this.stopStream();

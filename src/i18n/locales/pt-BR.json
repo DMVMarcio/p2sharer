@@ -1017,5 +1017,11 @@
   "room.cards.gestures": "Arraste o card para mover; redimensione pelas bordas. Alt+setas move; Alt+Shift+setas redimensiona.",
   "room.cards.dropPreview": "Solte o card aqui",
   "layout.resizeChat": "Redimensionar chat lateral",
-  "layout.resizeParticipants": "Redimensionar participantes do destaque"
+  "layout.resizeParticipants": "Redimensionar participantes do destaque",
+  "join.inspect": "Consultar sala",
+  "join.searching": "Procurando uma sala ativa…",
+  "join.noResponse": "Nenhum participante respondeu. A sala pode estar vazia ou inacessível. Você ainda pode tentar entrar.",
+  "join.online": "Participantes online: {{count}}",
+  "join.participants": "Pessoas na sala",
+  "join.timeout": "Não foi possível confirmar a conexão. Confira a senha ou tente novamente."
 }

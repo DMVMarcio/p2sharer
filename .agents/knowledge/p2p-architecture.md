@@ -87,6 +87,19 @@ When a remote track enters `ended` state, produces zero frames, or reports a str
 - **Relay-Only Mode**: Supports `iceTransportPolicy: 'relay'` for restrictive NAT/firewall environments.
 - **Accurate Traversal Diagnostics**: WebRTC connection timeouts (`could not connect to peer after exchanging SDP`) are classified honestly as potential NAT/ICE routing timeouts rather than falsely claiming both users have restrictive symmetric NAT routers.
 
+## Room discovery before admission
+
+`GroupRoomManager.join(callbacks, true)` opens a discovery connection on the same
+signaling topic without requesting admission, announcing presence, receiving room
+content, or rewriting saved credentials. `room_preview_v1` returns nonce-bound,
+signed summaries from authenticated members, with membership proofs when needed,
+room name, password requirement, and bounded static avatar thumbnails. Summaries
+never authorize admission or contain the password. `JoinRoomModal` owns discovery
+cleanup before starting the normal room service connection; saved rooms use this
+same path. An unanswered query cannot distinguish an empty room from an
+unreachable room. Older clients do not answer the discovery action, but the modal
+still permits a normal admission attempt.
+
 ## Diagnostic interpretation
 
 Signaling reachability, SDP exchange, a relay candidate, and a connected MQTT probe do not establish a complete peer mesh. Inspect actual Trystero subscriptions and each ICE edge. Partial meshes can occur with or without TURN; a smaller offer pool or a configured relay alone is not proof of recovery. Warnings from an unused prewarmed connection do not prove an active route failed. Rate-limit duplicate errors from prewarmed connections and correlate sanitized process-local timing with relay logs when needed. Relay-only configuration omits unnecessary STUN lookups.
