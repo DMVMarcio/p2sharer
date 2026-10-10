@@ -1020,7 +1020,7 @@
   "layout.resizeParticipants": "Resize spotlight participants",
   "join.inspect": "Check room",
   "join.searching": "Looking for an active room…",
-  "join.noResponse": "No participants found yet. You can enter while the search continues.",
+  "join.noResponse": "No participants found yet.",
   "join.online": "Online participants: {{count}}",
   "join.participants": "People in the room",
   "join.timeout": "The connection could not be confirmed. Check the password or try again.",

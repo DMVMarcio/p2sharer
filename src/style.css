@@ -4392,7 +4392,8 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 }
 
 /* Sober Informational Status Box */
-.audio-info-box {
+.audio-info-box,
+.inline-notice {
   font-size: 12px;
   line-height: 1.4;
   color: var(--text-secondary);
@@ -4401,6 +4402,9 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
 }
+
+.inline-notice { display: flex; align-items: flex-start; gap: 8px; margin: 12px 0; }
+.inline-notice > svg { flex-shrink: 0; color: var(--text-primary); }
 
 .audio-info-box strong {
   color: var(--text-primary);

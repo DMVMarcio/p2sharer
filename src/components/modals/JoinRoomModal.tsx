@@ -6,6 +6,7 @@ import { useModal } from '../../hooks/useModal';
 import { useRoom } from '../../hooks/useRoom';
 import { ModalDialog } from '../common/ModalDialog';
 import { ProfileAvatar } from '../common/ProfileAvatar';
+import { StatusNotice } from '../common/StatusNotice';
 import { verifyRoomInvite } from '../../core/room_invite_validation';
 import type { RoomPreview } from '../../core/room_preview';
 import { GroupRoomManager } from '../../p2p/group_room';
@@ -20,6 +21,7 @@ export function JoinRoomModal() {
   const [password, setPassword] = useState(() => roomService.pendingJoinPassword);
   const [showPassword, setShowPassword] = useState(false);
   const retryError = useRef(roomService.pendingJoinError);
+  const [requiresPassword, setRequiresPassword] = useState(() => retryError.current.startsWith('Senha incorreta'));
   const [phase, setPhase] = useState<'code' | 'searching' | 'preview' | 'joining'>(() => retryError.current ? 'preview' : 'code');
   const [canEnter, setCanEnter] = useState(() => Boolean(retryError.current));
   const [preview, setPreview] = useState<RoomPreview | null>(null);
@@ -50,6 +52,7 @@ export function JoinRoomModal() {
       roomService.pendingJoinError = '';
       closeModal();
     } else if (joinOutcome === 'error' && phase === 'joining') {
+      if (joinError.startsWith('Senha incorreta')) setRequiresPassword(true);
       setError(localizeText(joinError));
       setPhase('preview');
     }
@@ -79,7 +82,7 @@ export function JoinRoomModal() {
       current.ready = manager.join({
         onPreview: summary => {
           if (!mounted.current || joining.current || session.current !== current) return;
-          setPreview(summary); setPhase('preview');
+          setPreview(summary); setRequiresPassword(summary.protected); setPhase('preview');
         },
         onStreamsUpdate: () => {}, onSlotsUpdate: () => {}, onChat: () => {},
         onChatHistory: () => {}, onPeersUpdate: () => {},
@@ -133,10 +136,11 @@ export function JoinRoomModal() {
         <input autoComplete="off" data-autofocus id="join-room-code" className="text-input" value={code}
           onChange={event => setCode(event.target.value)} />
       </div> : <>
+        {phase === 'preview' && !preview ? <StatusNotice>{t('join.noResponse')}</StatusNotice> :
         <p className="modal-subtitle" role="status" aria-live="polite">
           {phase === 'joining' ? localizeText(roomStatusText) : phase === 'searching' ? t('join.searching') :
             preview ? t('join.online', { count: preview.participants.length }) : t('join.noResponse')}
-        </p>
+        </p>}
         {(phase === 'searching' || phase === 'joining') && <div className="join-room-loading"><div className="connecting-spinner" /></div>}
         {preview && <ul className="join-room-participants" aria-label={t('join.participants')}>
           {preview.participants.map(person => <li key={person.id}>
@@ -144,7 +148,7 @@ export function JoinRoomModal() {
             <span>{person.name}</span>
           </li>)}
         </ul>}
-        {(preview?.protected || !preview || password) && <div className="form-group">
+        {requiresPassword && <div className="form-group">
           <label className="form-label" htmlFor="join-room-password">{t('message.4c92bf162674')}</label>
           <div className="input-with-action">
             <input autoComplete="off" id="join-room-password" className="text-input" type={showPassword ? 'text' : 'password'}

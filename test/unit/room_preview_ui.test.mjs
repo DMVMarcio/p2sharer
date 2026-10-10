@@ -57,6 +57,12 @@ test('a saved room previews people and keeps connection and password errors in t
   await act(async () => root.render(React.createElement(JoinRoomModal)));
   assert.ok(document.querySelector('[role="dialog"]'));
   assert.equal(joined.length, 0);
+  assert.equal(document.getElementById('join-room-password'), null,
+    'a remembered password must not expose the field before protection is confirmed');
+  await act(async () => discovery.onPreview({ name: 'Online room', protected: false,
+    participants: [{ id: 'host', name: 'Host', color: '#06b6d4' }] }));
+  assert.equal(document.getElementById('join-room-password'), null,
+    'an unprotected room must not request a password');
   await act(async () => discovery.onPreview({ name: 'Online room', protected: true,
     participants: [{ id: 'host', name: 'Host', color: '#06b6d4' }] }));
   assert.ok(document.querySelector('li').textContent.includes('Host'));
@@ -96,6 +102,7 @@ test('an unanswered discovery allows immediate entry and closes on local waiting
     pendingJoinAsOwner: false, pendingJoinError: '', joinOutcome: 'admitted' });
   const before = closed;
   await act(async () => root.render(React.createElement(JoinRoomModal)));
+  assert.equal(document.getElementById('join-room-password'), null);
   assert.equal(document.querySelector('button[type="submit"]').disabled, false,
     'participant discovery must not disable joining after invite validation');
   await submit();
