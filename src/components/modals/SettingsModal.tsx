@@ -663,10 +663,10 @@ export const SettingsModal: React.FC = () => {
                 </div>
 
                 <div className="settings-row" style={{ marginTop: '14px' }}>
-                  <div className="theme-mode-pills" role="tablist" aria-label={t("message.f45b43b042cf")}>
+                  <div className="sidebar-tabs settings-subtabs" role="tablist" aria-label={t("message.f45b43b042cf")}>
                     {(['advanced', 'pointing'] as const).map(tab => <button key={tab} type="button"
                       ref={element => { if (element) streamOptionRefs.current[tab] = element; else delete streamOptionRefs.current[tab]; }}
-                      className={`pill-btn ${streamOptionsTab === tab ? 'active' : ''}`} role="tab"
+                      className={`tab-btn ${streamOptionsTab === tab ? 'active' : ''}`} role="tab"
                       id={`stream-options-${tab}`} aria-selected={streamOptionsTab === tab}
                       aria-controls={`stream-options-panel-${tab}`} tabIndex={streamOptionsTab === tab ? 0 : -1}
                       onClick={() => setStreamOptionsTab(tab)} onKeyDown={event => {

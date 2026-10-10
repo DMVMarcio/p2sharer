@@ -5266,8 +5266,10 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 
 
 .rendezvous-header { margin-top: 22px; }
+.settings-subtabs { height: 40px; }
+.rendezvous-panel { display: flex; flex-direction: column; gap: 10px; }
 .rendezvous-editor { display: flex; flex-direction: column; gap: 10px; }
-.rendezvous-tabs, .rendezvous-add { display: flex; flex-wrap: wrap; gap: 8px; }
+.rendezvous-add { display: flex; flex-wrap: wrap; gap: 8px; }
 .rendezvous-bulk-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .rendezvous-add .text-input-sm { flex: 1; min-width: 180px; }
 .rendezvous-list { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; }
