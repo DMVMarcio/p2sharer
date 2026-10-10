@@ -5545,6 +5545,8 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .profile-avatar.participant-avatar-badge { width: 52px; height: 52px; }
 .spotlight-tray-strip .profile-avatar.participant-avatar-badge { width: 36px; height: 36px; }
 .profile-avatar.participant-item-avatar { width: 28px; height: 28px; font-size: 12px; }
+.profile-avatar.chat-msg-avatar, .profile-avatar.stream-profile-avatar { width: 24px; height: 24px; font-size: 11px; flex-shrink: 0; }
+.spotlight-tray-strip .profile-avatar.stream-profile-avatar { width: 20px; height: 20px; font-size: 10px; }
 .profile-avatar.header-profile-avatar, .profile-avatar.watcher-profile-avatar { width: 24px; height: 24px; font-size: 12px; }
 .profile-avatar.profile-editor-preview { width: 96px; height: 96px; font-size: 32px; }
 .profile-editor-preview img, .profile-crop-stage img { position: absolute; max-width: none; }

@@ -1,5 +1,6 @@
 import { profileImages } from '../../core/profile_image';
 import { Nickname } from '../common/Nickname';
+import { ProfileAvatar } from '../common/ProfileAvatar';
 import { getLanguage, t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useState, useEffect, useRef, useSyncExternalStore } from 'react';
@@ -177,6 +178,8 @@ export const ChatPane: React.FC = () => {
           return (
             <div key={msg.id || index} onContextMenu={event => { if (!isContextMenuEditor(event.target)) openContextMenu(event, getChatMessageActions(messageActions)); }} className={`chat-msg ${highlightedId === msg.id ? 'chat-msg-highlighted' : ''}`} ref={(element) => { if (element) messageRefs.current.set(msg.id, element); else messageRefs.current.delete(msg.id); }}>
               <div className="chat-msg-header">
+                <ProfileAvatar peerId={msg.authorId ?? ''} name={msg.sender} isLocal={msg.authorId === selfId}
+                  color={authorSlot?.color} className="chat-msg-avatar" />
                 <span className="chat-msg-sender"><Nickname name={msg.sender} peerId={msg.authorId} isLocal={msg.authorId === selfId} defaultColor={profileImages.background(msg.authorId ?? '', msg.authorId === selfId, authorSlot?.color)} /></span>
                 {msg.isHost && <span className="badge-host">{t("common.hostBadge")}</span>}
                 {msg.editedAt && <EditedMessageMarker editedAt={msg.editedAt} />}

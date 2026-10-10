@@ -138,10 +138,26 @@ test('default chat nickname color follows the author card background and its pro
   await render(ChatPane);
   const sender = document.querySelector('.chat-msg-sender .nickname');
   assert.equal(sender.style.color, 'rgb(18, 52, 86)');
+  assert.equal(document.querySelector('.chat-msg-avatar').getAttribute('aria-label'), 'Author');
   await act(async () => profileImages.announce('chat-author', '', '#abcdef', '#654321'));
   assert.equal(sender.style.color, 'rgb(101, 67, 33)');
   await clear();
   profileImages.forget('chat-author');
+});
+
+test('stream avatars resolve the owner profile rather than the media slot and react to updates', async () => {
+  const previous = profileImages.local;
+  profileImages.local = { hash: '9'.repeat(64), data: 'YXZhdGFy', color: '#123456' };
+  try {
+    await reset([{ ...slot('owner::camera', 'Owner'), ownerPeerId: 'avatar-owner' }]);
+    await act(async () => profileImages.announce('avatar-owner', profileImages.local.hash, '#123456'));
+    assert.equal(card('owner::camera').querySelector('.stream-profile-avatar img').src, 'data:image/png;base64,YXZhdGFy');
+    await act(async () => profileImages.announce('avatar-owner', '', '#654321'));
+    assert.equal(card('owner::camera').querySelector('.stream-profile-avatar img'), null);
+    assert.equal(card('owner::camera').querySelector('.stream-profile-avatar').textContent, 'O');
+  } finally {
+    await clear(); profileImages.local = previous; profileImages.forget('avatar-owner');
+  }
 });
 
 test('stream controls place volume before pointing and distinguish interface visibility from window pinning', async () => {

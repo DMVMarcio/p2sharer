@@ -268,6 +268,7 @@ test('banner crop and card preferences remain drafts until Save and never replac
   try {
     await act(async () => root.render(React.createElement(SettingsModal)));
     await choose();
+    assert.equal(document.getElementById('profile-card-automatic'), null);
     await act(async () => document.getElementById('profile-banner-blur').click());
     await act(async () => document.getElementById('btn-cancel-settings').click());
     assert.equal(saves.length, 0);
@@ -278,8 +279,10 @@ test('banner crop and card preferences remain drafts until Save and never replac
     await act(async () => document.getElementById('profile-banner-blur').click());
     await act(async () => document.getElementById('profile-banner-enabled').click());
     assert.equal(document.getElementById('profile-banner-blur'), null);
+    assert.ok(document.getElementById('profile-card-automatic'));
     await act(async () => document.getElementById('profile-banner-enabled').click());
     assert.equal(document.getElementById('profile-banner-blur').checked, false);
+    assert.equal(document.getElementById('profile-card-automatic'), null);
     await act(async () => document.getElementById('profile-banner-enabled').click());
     await act(async () => document.getElementById('btn-save-settings').click());
     assert.equal(saves[0].banner, true);

@@ -5,7 +5,7 @@ import { useState, useSyncExternalStore } from 'react';
 import { Upload, X } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { t } from '../../i18n';
-import { profileImages, type ProfileDraft } from '../../core/profile_image';
+import { profileImages, profileBanners, type ProfileDraft } from '../../core/profile_image';
 import { contrastingTextColor } from '../../core/accent_color';
 import { CropPreview, ProfileCropDialog } from './ProfileCropDialog';
 import { PROFILE_CARD_COLORS } from '../../core/profile_card_color';
@@ -23,10 +23,12 @@ export function ProfileImageEditor({ name, draft, color, remove, onDraft, onColo
   onColor: (color: string) => void; onRemove: (remove: boolean) => void; onBusy: (busy: boolean) => void; disabled: boolean;
 }) {
   useSyncExternalStore(profileImages.subscribe, profileImages.snapshot);
+  useSyncExternalStore(profileBanners.subscribe, profileBanners.snapshot);
   const [selection, setSelection] = useState<ProfileDraft | null>(null);
   const [picking, setPicking] = useState(false);
   const url = remove ? undefined : profileImages.url('local');
   const hasPhoto = Boolean(draft || url);
+  const usesBannerOnCards = banner.enabled && Boolean(banner.image || (!banner.remove && profileBanners.url('local')));
   const choose = async () => {
     setPicking(true); onBusy(true);
     try {
@@ -72,7 +74,7 @@ export function ProfileImageEditor({ name, draft, color, remove, onDraft, onColo
             appearance={nicknameStyle} onAppearanceChange={onNicknameStyle} disabled={disabled || picking}
             placeholder={t('message.1b92c5e9d144')} />
         </div>
-        <div className="profile-card-settings">
+        {!usesBannerOnCards && <div className="profile-card-settings">
           <label className="settings-switch-row" htmlFor="profile-card-automatic">
             <span className="settings-switch-title">{t('profile.cardAutomatic')}</span>
             <div className="modern-switch">
@@ -83,7 +85,7 @@ export function ProfileImageEditor({ name, draft, color, remove, onDraft, onColo
           </label>
           {cardColor !== null && <ColorPalette label={t('profile.cardColor')} value={cardColor} onChange={onCardColor}
             disabled={disabled || picking} presets={PROFILE_CARD_COLORS.map(item => ({ value: item.color, color: item.color, label: item.label }))} />}
-        </div>
+        </div>}
       </div>
     </div>
     {selection && <ProfileCropDialog draft={selection} onClose={() => {
