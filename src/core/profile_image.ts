@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { automaticCardColor } from './profile_card_color.ts';
+import { hsvToHex } from './hsv_color.ts';
 
 export interface ProfileImage { hash: string; data: string; color: string; cardColor?: string | null; dominantColor?: string | null }
 export interface ImageCrop { x: number; y: number; size: number }
@@ -11,7 +12,8 @@ export const validProfileColor = (color: unknown): color is string => typeof col
 
 // Remote images and hashes live only for the current application process.
 class ProfileImages {
-  local: ProfileImage = { hash: '', data: '', color: '#06b6d4' };
+  local: ProfileImage = { hash: '', data: '',
+    color: automaticCardColor(hsvToHex({ h: Math.random() * 360, s: 0.65, v: 0.8 })) };
   peers = new Map<string, { hash: string; color: string; cardColor: string }>();
   private cache = new Map<string, string>();
   private listeners = new Set<() => void>();
@@ -24,7 +26,10 @@ class ProfileImages {
     if (typeof window === 'undefined' || !('__TAURI_INTERNALS__' in window)) return;
     try {
       const local = await invoke<ProfileImage | null>('load_profile_image');
-      if (local) { this.local = local; this.notify(); }
+      this.local = local ?? await invoke<ProfileImage>('save_profile_image', {
+        token: null, crop: null, color: this.local.color, cardColor: null, remove: false,
+      });
+      this.notify();
     } catch (error) { console.warn('[Profile] Saved image could not be loaded:', error); }
   }
   async save(draft: ProfileDraft | null, color: string, remove: boolean, cardColor: string | null = null) {

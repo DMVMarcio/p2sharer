@@ -9,7 +9,7 @@ globalThis.__profileInvoke = async (command, args) => {
   return `data:image/png;base64,${args.data}`;
 };
 const bundle = await build({
-  stdin: { contents: `export { ProfileTransfer } from './src/p2p/profile_transfer.ts'; export { profileImages } from './src/core/profile_image.ts';`, resolveDir: process.cwd() },
+  stdin: { contents: `export { ProfileTransfer } from './src/p2p/profile_transfer.ts'; export { profileImages } from './src/core/profile_image.ts'; export { contrastingTextColor } from './src/core/accent_color.ts';`, resolveDir: process.cwd() },
   bundle: true, write: false, format: 'esm', platform: 'node',
   plugins: [{ name: 'native', setup(builder) {
     builder.onResolve({ filter: /^@tauri-apps\/api\/core$/ }, () => ({ path: 'native', namespace: 'fixture' }));
@@ -129,4 +129,51 @@ test('automatic card tone is announced to peers while manual card colors remain 
     assert.equal(packets.at(-1).cardColor, '#ffffff');
     assert.equal(profileImages.background('local'), '#ffffff');
   } finally { transfer.close(); profileImages.local = local; profileImages.forget('viewer'); }
+});
+
+
+test('new profiles persist a random color with white text; saved colors survive initialization', async () => {
+  const originalInvoke = globalThis.__profileInvoke;
+  const originalWindow = globalThis.window;
+  const originalRandom = Math.random;
+  let saved = null;
+  let writes = 0;
+  globalThis.window = { __TAURI_INTERNALS__: {} };
+  globalThis.__profileInvoke = async (command, args) => {
+    if (command === 'load_profile_image') return saved;
+    assert.equal(command, 'save_profile_image');
+    assert.equal(args.token, null);
+    assert.equal(args.remove, false);
+    writes++;
+    return saved = { hash: '', data: '', color: args.color, cardColor: args.cardColor };
+  };
+  const load = async suffix => {
+    const source = bundle.outputFiles[0].text + `\n// isolated profile fixture ${suffix}`;
+    const module = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
+    await module.profileImages.ready;
+    return module;
+  };
+  try {
+    const colors = new Set();
+    for (let hue = 0; hue < 360; hue += 10) {
+      saved = null; Math.random = () => hue / 360;
+      const { profileImages: profile, contrastingTextColor } = await load(`hue-${hue}`);
+      assert.equal(contrastingTextColor(profile.local.color), '#ffffff');
+      assert.equal(profile.local.color, saved.color);
+      colors.add(saved.color);
+    }
+    assert.ok(colors.size > 1);
+    const writeCount = writes;
+    const color = saved.color;
+    Math.random = () => 0.5;
+    assert.equal((await load('reload')).profileImages.local.color, color);
+    saved = { hash: '', data: '', color: '#ffffff', cardColor: '#123456' };
+    assert.deepEqual((await load('custom')).profileImages.local, saved);
+    assert.equal(writes, writeCount);
+  } finally {
+    Math.random = originalRandom;
+    globalThis.__profileInvoke = originalInvoke;
+    if (originalWindow === undefined) delete globalThis.window;
+    else globalThis.window = originalWindow;
+  }
 });
