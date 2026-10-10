@@ -122,7 +122,7 @@ export function ProfileImageEditor({ name, draft, color, remove, onDraft, onColo
               onDraft(null); onRemove(true);
             }}><X size={14} aria-hidden="true" /></TooltipButton>}
         </div>
-        {!hasPhoto && <ColorPicker label={t('profile.color')} value={color} onChange={onColor} disabled={disabled || picking} />}
+        <ColorPicker label={t(hasPhoto ? 'profile.borderColor' : 'profile.color')} value={color} onChange={onColor} disabled={disabled || picking} />
         {picking && <span className="profile-loading-status" role="status">{t('profile.loading')}</span>}
       </div>
       <div className="profile-editor-details">

@@ -992,6 +992,7 @@
   "profile.choose": "Escolher imagem",
   "profile.loading": "Lendo imagem…",
   "profile.remove": "Remover foto",
+  "profile.borderColor": "Cor da borda do avatar",
   "profile.color": "Cor do avatar padrão",
   "profile.crop": "Recortar imagem",
   "profile.cropHint": "Arraste para posicionar. O círculo é uma referência; a imagem salva permanece quadrada.",
