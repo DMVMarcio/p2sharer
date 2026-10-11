@@ -25,11 +25,11 @@ test('shared dialogs trap focus, protect busy work and drafts, and dismiss child
   const { createRoot } = await import('react-dom/client');
   const root = createRoot(document.getElementById('root'));
   let closed = 0;
-  const Harness = ({ busy = false, outside = false, child = false }) => {
+  const Harness = ({ busy = false, outside = false, child = false, inertFirst = false }) => {
     const ref = useModalDialogBehavior(() => closed++, busy, outside);
     return React.createElement('div', { className: 'overlay' },
       React.createElement('div', { ref }, React.createElement('h2', null, 'Dialog'),
-        React.createElement('button', { id: 'first' }, 'First'), React.createElement('button', { id: 'last' }, 'Last')),
+        React.createElement('div', { inert: inertFirst || undefined }, React.createElement('button', { id: 'first' }, 'First')), React.createElement('button', { id: 'last' }, 'Last')),
       child && React.createElement(Child));
   };
   const Child = () => {
@@ -67,6 +67,10 @@ test('shared dialogs trap focus, protect busy work and drafts, and dismiss child
     await render({});
     key('Escape');
     assert.equal(closed, 13);
+    await render({ inertFirst: true });
+    document.getElementById('last').focus();
+    key('Tab');
+    assert.equal(document.activeElement.id, 'last', 'focus skips controls in outgoing inert panes');
     await act(async () => root.unmount());
     assert.equal(document.activeElement.id, 'launcher');
   } finally {

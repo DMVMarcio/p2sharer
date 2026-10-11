@@ -17,7 +17,7 @@ export function useModalDialogBehavior(onClose: () => void, busy = false, closeO
       if (heading) card.setAttribute('aria-label', heading.textContent ?? '');
     }
     const controls = () => Array.from(card.querySelectorAll<HTMLElement>(
-      'button:not(:disabled), input:not(:disabled), textarea:not(:disabled), [tabindex="0"]'));
+      'button:not(:disabled), input:not(:disabled), textarea:not(:disabled), [tabindex="0"]')).filter(control => !control.closest('[inert]'));
     (card.querySelector<HTMLElement>('[data-autofocus]') ?? controls()[0] ?? card).focus();
     const isTop = () => {
       const dialogs = document.querySelectorAll('[aria-modal="true"]');

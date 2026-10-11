@@ -1,3 +1,4 @@
+import { ContentTransition } from './components/common/ContentTransition';
 import React, { useEffect, useState } from 'react';
 import { AppHeader } from './components/header/AppHeader';
 import { WindowTitlebar } from './components/header/WindowTitlebar';
@@ -74,7 +75,9 @@ const MainApp: React.FC = () => {
       <WindowTitlebar onVisibilityChange={setTitlebarVisible} />
       <AppHeader showUpdate={!titlebarVisible} />
       <main className="app-main" id="app-main">
-        {isInRoom ? <RoomView /> : <HomeView />}
+        <ContentTransition value={isInRoom ? 'room' : 'home'} className="content-transition-fill">
+          {view => view === 'room' ? <RoomView /> : <HomeView />}
+        </ContentTransition>
       </main>
 
       {/* Modals & Overlays */}

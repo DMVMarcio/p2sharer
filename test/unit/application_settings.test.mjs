@@ -14,7 +14,8 @@ globalThis.getComputedStyle = window.getComputedStyle;
 globalThis.requestAnimationFrame = window.requestAnimationFrame.bind(window);
 globalThis.cancelAnimationFrame = window.cancelAnimationFrame.bind(window);
 HTMLElement.prototype.scrollIntoView = () => {};
-window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+// These regressions exercise settings data; motion has separate lifecycle coverage.
+window.matchMedia = query => ({ matches: query.includes('prefers-reduced-motion'), addEventListener() {}, removeEventListener() {} });
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const require = createRequire(import.meta.url);
 const bundle = await build({

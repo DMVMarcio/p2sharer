@@ -1,3 +1,4 @@
+import { useContentPresence } from '../../hooks/useContentPresence';
 import { useModalDialogBehavior } from '../common/useModalDialogBehavior';
 import { profileStats } from '../../core/profile_stats';
 import { NICKNAME_STYLE_KEY } from '../../core/nickname_style';
@@ -242,6 +243,8 @@ export const SettingsModal: React.FC = () => {
     }
   };
 
+  const panePresence = useContentPresence(activeTab);
+  const optionsPresence = useContentPresence(streamOptionsTab);
   const dialogRef = useModalDialogBehavior(closeModal, saving || profileBusy || isClosing, false);
 
   return (
@@ -381,9 +384,10 @@ export const SettingsModal: React.FC = () => {
           </nav>
 
           {/* Right Content Panes */}
-          <div className="settings-tab-content-area">
+          <div key={panePresence.value} className={`settings-tab-content-area content-transition ${panePresence.closing ? 'content-exiting' : ''}`}
+            inert={panePresence.closing || undefined} aria-hidden={panePresence.closing || undefined}>
             {/* TAB 1: PERFIL */}
-            {activeTab === 'profile' && (
+            {panePresence.value === 'profile' && (
               <div className="settings-tab-pane active" id="settings-pane-profile">
                 <div className="settings-pane-header">
                   <h3 className="settings-pane-title">{t("message.d16122f3087d")}</h3>
@@ -404,10 +408,10 @@ export const SettingsModal: React.FC = () => {
               </div>
             )}
 
-            {activeTab === 'application' && <ApplicationSettings language={language} onLanguageChange={setLanguageDraft} automatic={autoUpdates}
+            {panePresence.value === 'application' && <ApplicationSettings language={language} onLanguageChange={setLanguageDraft} automatic={autoUpdates}
               includePrereleases={betaUpdates} onAutomaticChange={setAutoUpdates} onPrereleasesChange={setBetaUpdates} />}
 
-            {activeTab === 'conversations' && (
+            {panePresence.value === 'conversations' && (
               <div className="settings-tab-pane active" id="settings-pane-conversations">
                 <div className="settings-pane-header">
                   <h3 className="settings-pane-title">{t("message.071f649adb47")}</h3>
@@ -454,7 +458,7 @@ export const SettingsModal: React.FC = () => {
             )}
 
             {/* TAB 2: APARÊNCIA */}
-            {activeTab === 'appearance' && (
+            {panePresence.value === 'appearance' && (
               <div className="settings-tab-pane active" id="settings-pane-appearance">
                 <div className="settings-pane-header">
                   <h3 className="settings-pane-title">{t("message.36ad11f3f98f")}</h3>
@@ -522,7 +526,7 @@ export const SettingsModal: React.FC = () => {
             )}
 
             {/* Sound settings */}
-            {activeTab === 'audio' && (
+            {panePresence.value === 'audio' && (
               <div className="settings-tab-pane active" id="settings-pane-audio">
                 <div className="settings-pane-header">
                   <h3 className="settings-pane-title">{t("message.a11f1b879793")}</h3>
@@ -601,7 +605,7 @@ export const SettingsModal: React.FC = () => {
             )}
 
             {/* TAB 4: TRANSMISSÃO */}
-            {activeTab === 'stream' && (
+            {panePresence.value === 'stream' && (
               <div className="settings-tab-pane active" id="settings-pane-stream">
                 <div className="settings-pane-header">
                   <h3 className="settings-pane-title">{t("message.ff7b5832d9e8")}</h3>
@@ -719,7 +723,8 @@ export const SettingsModal: React.FC = () => {
                         }
                       }}>{tab === 'pointing' ? t("message.fc4d44253740") : t("message.5427a20ed7f7")}</button>)}
                   </div>
-                  {streamOptionsTab === 'pointing' && <div key={streamOptionsTab} className="settings-row settings-options-panel" role="tabpanel" id="stream-options-panel-pointing" aria-labelledby="stream-options-pointing">
+                  {optionsPresence.value === 'pointing' && <div key={optionsPresence.value} className={`settings-row settings-options-panel content-transition ${optionsPresence.closing ? 'content-exiting' : ''}`}
+                    inert={optionsPresence.closing || undefined} aria-hidden={optionsPresence.closing || undefined} role="tabpanel" id="stream-options-panel-pointing" aria-labelledby="stream-options-pointing">
                   {[
                     { id: 'participant-cursors', get label() { return t("message.0cdd1ad3fe1c"); }, description: t("message.6052f362cfdc"), checked: participantCursors, change: setParticipantCursors },
                     { id: 'participant-drawings', get label() { return t("message.cda3e4551d5a"); }, description: t("message.2254b260a6cc"), checked: participantDrawings, change: setParticipantDrawings },
@@ -744,7 +749,8 @@ export const SettingsModal: React.FC = () => {
                     </div>
                   </div>
                   </div>}
-                  {streamOptionsTab === 'advanced' && <div key={streamOptionsTab} className="settings-row settings-options-panel" role="tabpanel" id="stream-options-panel-advanced" aria-labelledby="stream-options-advanced">
+                  {optionsPresence.value === 'advanced' && <div key={optionsPresence.value} className={`settings-row settings-options-panel content-transition ${optionsPresence.closing ? 'content-exiting' : ''}`}
+                    inert={optionsPresence.closing || undefined} aria-hidden={optionsPresence.closing || undefined} role="tabpanel" id="stream-options-panel-advanced" aria-labelledby="stream-options-advanced">
                   <div className="settings-row">
                     <label className="settings-label" htmlFor="settings-video-encoder">{t("message.e13520183b92")}</label>
                     <Select id="settings-video-encoder" className="select-input-sm" value={encoder}
@@ -778,7 +784,7 @@ export const SettingsModal: React.FC = () => {
             )}
 
             {/* TAB 5: REDE & TURN */}
-            {activeTab === 'network' && (
+            {panePresence.value === 'network' && (
               <div className="settings-tab-pane active" id="settings-pane-network">
                 <div className="settings-pane-header">
                   <h3 className="settings-pane-title">{t("message.da60254327a5")}</h3>
@@ -877,7 +883,7 @@ export const SettingsModal: React.FC = () => {
             )}
 
             {/* TAB 6: DIAGNÓSTICO & LOGS */}
-            {activeTab === 'diagnostics' && (
+            {panePresence.value === 'diagnostics' && (
               <div className="settings-tab-pane active" id="settings-pane-diagnostics">
                 <div className="settings-pane-header">
                   <h3 className="settings-pane-title">{t("message.b750226b7613")}</h3>
