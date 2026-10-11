@@ -34,6 +34,8 @@ export const RoomView: React.FC = () => {
             className="sidebar-edge-toggle-btn"
             id="btn-sidebar-edge-toggle"
             onClick={toggleSidebar}
+            aria-expanded={!isSidebarCollapsed}
+            aria-controls="room-sidebar"
             aria-label={isSidebarCollapsed ? t("message.86d416fc47cf") : t("message.182641374267")}
           >
             <svg

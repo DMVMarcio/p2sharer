@@ -21,6 +21,8 @@ export const RoomSidebar: React.FC = () => {
     <aside
       className={`room-sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}
       id="room-sidebar"
+      inert={isSidebarCollapsed}
+      aria-hidden={isSidebarCollapsed}
     >
       <div className="sidebar-tabs">
         <button
