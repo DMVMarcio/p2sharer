@@ -4717,7 +4717,10 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   animation: toastIn var(--transition-normal) both;
 }
 
-@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
+.toast-stack-item { width: 100%; }
+.toast.is-exiting { pointer-events: none; animation: toastOut var(--transition-fast) both; }
+@keyframes toastOut { to { opacity: 0; transform: translateY(6px) scale(0.98); } }
+@media (prefers-reduced-motion: reduce) { .toast, .toast.is-exiting { animation: none; } }
 
 @keyframes toastIn {
   from {
