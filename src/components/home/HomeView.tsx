@@ -9,7 +9,7 @@ import { SavedRoomsSection } from './SavedRoomsSection';
 import { AppVersion } from '../common/AppVersion';
 import { roomService } from '../../services/room_service';
 
-export const HomeView: React.FC = () => {
+export const HomeView: React.FC<{ onScrollChange?: (scrolled: boolean) => void }> = ({ onScrollChange }) => {
   useLocale();
   const { openModal } = useModal();
   const { username } = useRoom();
@@ -35,7 +35,8 @@ export const HomeView: React.FC = () => {
   };
 
   return (
-    <section className="view active" id="view-home">
+    <section className="view active" id="view-home"
+      onScroll={event => onScrollChange?.(event.currentTarget.scrollTop > 8)}>
       <div className="hero-container">
         <div className="home-hero">
           <div className="hero-text">

@@ -46,10 +46,12 @@ export const App: React.FC = () => {
 
 const MainApp: React.FC = () => {
   const [titlebarVisible, setTitlebarVisible] = useState(false);
+  const [homeScrolled, setHomeScrolled] = useState(false);
   const { isInRoom, stopScreenSharing, leaveRoom, isSharingScreen, joinDialogRevision } = useRoom();
   const { openModal, activeModal, modalRevision } = useModal();
 
   useEffect(startAutomaticUpdateChecks, []);
+  useEffect(() => setHomeScrolled(false), [isInRoom]);
 
   useEffect(() => {
     // Check username on initial load
@@ -73,12 +75,14 @@ const MainApp: React.FC = () => {
   return (
     <>
       <WindowTitlebar onVisibilityChange={setTitlebarVisible} />
-      <AppHeader showUpdate={!titlebarVisible} />
-      <main className="app-main" id="app-main">
-        <ContentTransition value={isInRoom ? 'room' : 'home'} className="content-transition-fill">
-          {view => view === 'room' ? <RoomView /> : <HomeView />}
-        </ContentTransition>
-      </main>
+      <div className={`app-workspace${isInRoom ? '' : ' is-home'}`}>
+        <AppHeader showUpdate={!titlebarVisible} homeScrolled={homeScrolled} />
+        <main className="app-main" id="app-main">
+          <ContentTransition value={isInRoom ? 'room' : 'home'} className="content-transition-fill">
+            {view => view === 'room' ? <RoomView /> : <HomeView onScrollChange={setHomeScrolled} />}
+          </ContentTransition>
+        </main>
+      </div>
 
       {/* Modals & Overlays */}
       {activeModal === 'profile' && <ProfileModal key={modalRevision} />}

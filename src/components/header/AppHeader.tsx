@@ -15,7 +15,7 @@ import { profileAction } from '../common/profile_actions';
 import { TooltipButton } from '../common/TooltipButton';
 import { useClipboardFeedback } from '../../hooks/useClipboardFeedback';
 
-export const AppHeader: React.FC<{ showUpdate?: boolean }> = ({ showUpdate = true }) => {
+export const AppHeader: React.FC<{ showUpdate?: boolean; homeScrolled?: boolean }> = ({ showUpdate = true, homeScrolled = false }) => {
   useLocale();
   const openContextMenu = useContextMenu();
   const { currentRoomCode, currentRoomInvite, currentRoomName, currentRoomPassword, username, isInRoom, leaveRoom } = useRoom();
@@ -57,7 +57,7 @@ export const AppHeader: React.FC<{ showUpdate?: boolean }> = ({ showUpdate = tru
   };
 
   return (
-    <header className={`app-header${isInRoom ? ' is-in-room' : ''}`} data-tauri-drag-region>
+    <header className={`app-header${isInRoom ? ' is-in-room' : homeScrolled ? ' is-home-scrolled' : ''}`} data-tauri-drag-region>
       <div className="header-room-info">
         {isInRoom && (
           <>

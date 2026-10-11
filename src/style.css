@@ -528,6 +528,11 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
    APP MAIN & VIEWS
    ========================================================================== */
 
+.app-workspace { display: flex; flex: 1; flex-direction: column; min-height: 0; overflow: hidden; }
+.app-workspace.is-home { background: radial-gradient(ellipse at 100% 0%, color-mix(in srgb, var(--ambient-glow, #00225c) 12%, transparent), transparent 65%); }
+.app-workspace.is-home .app-header { background-color: transparent; transition: background-color var(--transition-fast), box-shadow var(--transition-fast); }
+.app-workspace.is-home .app-header.is-home-scrolled { background-color: color-mix(in srgb, var(--bg-app) 94%, transparent); box-shadow: var(--shadow-sm); backdrop-filter: blur(8px); }
+
 .app-main {
   flex: 1;
   display: flex;
@@ -558,7 +563,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-gutter: stable;
-  background: radial-gradient(ellipse at 100% 0%, color-mix(in srgb, var(--ambient-glow, #00225c) 12%, transparent), transparent 65%);
+  background: transparent;
 }
 
 .hero-container {
