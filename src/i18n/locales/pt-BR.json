@@ -12,6 +12,8 @@
   "appearance.backgrounds.rose": "Rosa",
   "appearance.backgrounds.oled": "OLED",
   "header.invite": "Convidar",
+  "header.save": "Salvar",
+  "header.saved": "Salva",
   "profile.banner": "Banner do perfil",
   "profile.chooseBanner": "Escolher banner",
   "profile.removeBanner": "Remover banner",

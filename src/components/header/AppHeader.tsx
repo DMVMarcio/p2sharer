@@ -7,7 +7,7 @@ import { useRoom } from '../../hooks/useRoom';
 import { modalManager, useModal } from '../../hooks/useModal';
 import { showToast } from '../../hooks/useToast';
 import { Tooltip } from '../common/Tooltip';
-import { BookmarkCheck, BookmarkPlus, Settings2 } from 'lucide-react';
+import { BookmarkCheck, BookmarkPlus, Copy, LockKeyhole, LogOut, Settings2 } from 'lucide-react';
 import { parseRoomInvite } from '../../core/room_invite';
 import { savedRooms, type SavedRoom } from '../../core/saved_rooms';
 import { AppUpdateButton } from './AppUpdateButton';
@@ -18,7 +18,7 @@ import { TooltipButton } from '../common/TooltipButton';
 export const AppHeader: React.FC<{ showUpdate?: boolean }> = ({ showUpdate = true }) => {
   useLocale();
   const openContextMenu = useContextMenu();
-  const { currentRoomCode, currentRoomInvite, currentRoomName, currentRoomPassword, username, isInRoom } = useRoom();
+  const { currentRoomCode, currentRoomInvite, currentRoomName, currentRoomPassword, username, isInRoom, leaveRoom } = useRoom();
   const { openModal } = useModal();
   const [savedRecord, setSavedRecord] = useState<SavedRoom | null>(null);
   const [savingRoom, setSavingRoom] = useState(false);
@@ -64,50 +64,31 @@ export const AppHeader: React.FC<{ showUpdate?: boolean }> = ({ showUpdate = tru
   };
 
   return (
-    <header className="app-header" data-tauri-drag-region>
+    <header className={`app-header${isInRoom ? ' is-in-room' : ''}`} data-tauri-drag-region>
       <div className="header-room-info">
         {isInRoom && (
-          <Tooltip
-            content={t("message.70fad3f21d89", { v0: currentRoomName || currentRoomCode })}
-          >
-            <button
-              className="room-code-header-pill"
-              id="header-room-code-pill"
-              onClick={handleCopyRoomCode}
-              aria-label={t("message.159e49453544")}
-            >
+          <>
+            <div className="header-room-name">
               <strong id="display-room-code">{currentRoomName || currentRoomCode}</strong>
-              <span
-                className="room-lock-icon"
-                id="header-room-lock-icon"
-              >
-                {currentRoomPassword ? (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                  </svg>
-                ) : (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                    <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
-                  </svg>
-                )}
-              </span>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
-                <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
-              </svg>
+              {currentRoomPassword && <LockKeyhole size={14} className="room-lock-icon" aria-hidden="true" />}
+            </div>
+            <TooltipButton tooltip={t("message.70fad3f21d89", { v0: currentRoomName || currentRoomCode })}
+              className="btn btn-secondary btn-sm header-room-action"
+              id="header-room-code-pill" onClick={handleCopyRoomCode}
+              aria-label={t("message.159e49453544")}>
+              <Copy size={15} aria-hidden="true" />
               <span className="header-invite-label">{t('header.invite')}</span>
-            </button>
-          </Tooltip>
+            </TooltipButton>
+          </>
         )}
         {isInRoom && currentRoomInvite && (
           <Tooltip content={savedRecord?.saved ? t("message.1fd26e5f3f0e") : t("message.3caaf5a72320")}>
-            <button className={`btn-icon-header ${savedRecord?.saved ? 'is-saved' : ''}`}
+            <button className={`btn btn-secondary btn-sm header-room-action ${savedRecord?.saved ? 'is-saved' : ''}`}
               onClick={() => void toggleSavedRoom()}
               aria-label={savedRecord?.saved ? t("message.1fd26e5f3f0e") : t("message.7b07e948b7c7")}
               aria-pressed={Boolean(savedRecord?.saved)} disabled={savingRoom || !savedRecord}>
-              {savedRecord?.saved ? <BookmarkCheck size={16} /> : <BookmarkPlus size={16} />}
+              {savedRecord?.saved ? <BookmarkCheck size={16} aria-hidden="true" /> : <BookmarkPlus size={16} aria-hidden="true" />}
+              <span className="header-save-label">{t(savedRecord?.saved ? 'header.saved' : 'header.save')}</span>
             </button>
           </Tooltip>
         )}
@@ -135,6 +116,13 @@ export const AppHeader: React.FC<{ showUpdate?: boolean }> = ({ showUpdate = tru
         >
           <Settings2 size={18} aria-hidden="true" />
         </TooltipButton>
+        {isInRoom && (
+          <TooltipButton tooltip={t("message.7b7b91d7fe87")}
+            className="btn-icon-header header-leave-room" id="btn-leave-room"
+            onClick={leaveRoom} aria-label={t("message.7b7b91d7fe87")}>
+            <LogOut size={18} aria-hidden="true" />
+          </TooltipButton>
+        )}
       </div>
     </header>
   );
