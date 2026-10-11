@@ -15,6 +15,13 @@ test('background preferences reject invalid storage and preserve custom colors a
   assert.equal(normalizeBackground('#AbC123'), '#AbC123');
   for (const mode of ['dark', 'light'] as const) {
     assert.equal(backgroundTokens('oled', mode).tokens['--bg-app'], '#000000');
+    const oled = backgroundTokens('oled', mode).tokens;
+    const customBlack = backgroundTokens('#000000', mode).tokens;
+    assert.deepEqual(customBlack, oled);
+    assert.equal(oled['--hero-background'], oled['--bg-card']);
+    assert.notEqual(oled['--hero-background'], oled['--bg-app']);
+    assert.notEqual(oled['--bg-control'], oled['--bg-card']);
+    assert.notEqual(oled['--bg-control-hover'], oled['--bg-card']);
     assert.equal(backgroundTokens('invalid', mode).tokens['--bg-app'], backgroundTokens('graphite', mode).tokens['--bg-app']);
   }
 });

@@ -1,10 +1,10 @@
 export const BACKGROUND_PRESETS = [
-  { id: 'graphite', dark: '#24262b', light: '#e9eaed' },
-  { id: 'slate', dark: '#173951', light: '#bfdcf1' },
-  { id: 'forest', dark: '#1b4234', light: '#bcdcc9' },
-  { id: 'sand', dark: '#493020', light: '#f2d5a7' },
-  { id: 'plum', dark: '#39224b', light: '#d9c4ef' },
-  { id: 'rose', dark: '#4c2536', light: '#efc2cf' },
+  { id: 'graphite', dark: '#303b50', light: '#e3e8f2' },
+  { id: 'slate', dark: '#105bd0', light: '#bed7ff' },
+  { id: 'forest', dark: '#087b54', light: '#b3efd4' },
+  { id: 'sand', dark: '#b65a18', light: '#ffe1af' },
+  { id: 'plum', dark: '#752bce', light: '#dfc5ff' },
+  { id: 'rose', dark: '#ba285a', light: '#ffc0d4' },
   { id: 'oled', dark: '#000000', light: '#000000' },
 ] as const;
 
@@ -34,18 +34,22 @@ export function backgroundTokens(value: string, mode: 'dark' | 'light') {
   const preset = BACKGROUND_PRESETS.find(item => item.id === value);
   const seed = preset ? preset[mode] : value;
   const light = mode === 'light' && luminance(seed) > 0.179;
-  const base = light ? seed : mix(seed, '#000000', luminance(seed) > 0.179 ? 0.72 : 0.45);
+  const black = seed.toLowerCase() === '#000000';
+  const vivid = luminance(seed) < 0.179;
+  const base = light ? seed : mix(seed, '#000000', 0.82);
   const ink = light ? '#161616' : '#ffffff';
-  const surface = (amount: number) => light
+  const surface = (amount: number, lift = 0.02) => light
     ? mix(base, '#ffffff', amount)
-    : mix(mix(base, seed, amount), '#ffffff', amount * 0.35);
+    : mix(mix(base, seed, amount), '#ffffff', lift);
   const surfaces = {
     '--bg-app': base,
-    '--bg-surface': surface(light ? 0.28 : 0.07),
-    '--bg-elevated': surface(light ? 0.55 : 0.14),
-    '--bg-card': surface(light ? 0.36 : 0.1),
-    '--bg-card-hover': surface(light ? 0.65 : 0.18),
-    '--bg-input': surface(light ? 0.1 : 0.12),
+    '--bg-surface': surface(light ? 0.28 : 0.035),
+    '--bg-elevated': surface(light ? 0.55 : 0.09, 0.03),
+    '--bg-card': surface(light ? 0.36 : 0.065, 0.03),
+    '--bg-card-hover': surface(light ? 0.65 : 0.09, 0.035),
+    '--bg-input': surface(light ? 0.1 : 0.04),
+    '--bg-control': surface(light ? 0.08 : vivid ? 0.32 : 0.18, black ? 0.1 : 0.05),
+    '--bg-control-hover': surface(light ? 0.16 : vivid ? 0.46 : 0.29, black ? 0.18 : 0.06),
   };
   const readable = (amount: number) => {
     for (; amount < 1; amount += 0.025) {
@@ -61,6 +65,10 @@ export function backgroundTokens(value: string, mode: 'dark' | 'light') {
     ...surfaces,
     '--bg-surface-elevated': surfaces['--bg-elevated'],
     '--bg-surface-hover': surfaces['--bg-card-hover'],
+    '--hero-background': black ? surfaces['--bg-card'] : '#000000',
+    '--hero-control': black ? surfaces['--bg-control'] : mix(seed, '#000000', 0.72),
+    '--hero-control-hover': black ? surfaces['--bg-control-hover'] : mix(mix(seed, '#000000', 0.58), '#ffffff', 0.035),
+    '--ambient-glow': mix(seed, '#000000', light ? 0 : 0.35),
     '--text-primary': readable(0.96),
     '--text-secondary': readable(0.76),
     '--text-muted': readable(0.65),

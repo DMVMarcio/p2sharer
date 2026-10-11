@@ -6,6 +6,7 @@ import { build } from 'esbuild';
 import { JSDOM } from 'jsdom';
 import React, { act, useState } from 'react';
 import { AppUpdateController } from '../../src/core/app_updates.ts';
+import { backgroundTokens } from '../../src/core/background_color.ts';
 
 const dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost', pretendToBeVisual: true });
 for (const key of ['window', 'document', 'HTMLElement', 'Element', 'Node', 'MutationObserver', 'Event', 'CustomEvent', 'localStorage']) globalThis[key] = dom.window[key];
@@ -84,7 +85,7 @@ test('appearance applies and persists custom colors and restores preset tokens',
   const forest = document.querySelector('#background-colors-palette [aria-label="Floresta"]');
   await act(async () => forest.click());
   assert.equal(localStorage.getItem('p2sharer_background_color'), 'forest');
-  assert.equal(document.documentElement.style.getPropertyValue('--bg-app'), forest.style.getPropertyValue('--swatch-color'));
+  assert.equal(document.documentElement.style.getPropertyValue('--bg-app'), backgroundTokens('forest', 'dark').tokens['--bg-app']);
   assert.notEqual(document.documentElement.style.getPropertyValue('--bg-card'), document.documentElement.style.getPropertyValue('--bg-app'));
   const picker = document.querySelector('#accent-colors-palette .custom-color-picker');
   assert.equal(picker.getAttribute('aria-label'), 'Cor personalizada');

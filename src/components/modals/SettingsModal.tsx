@@ -14,7 +14,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { useModal } from '../../hooks/useModal';
 import { useAppTheme, ACCENT_COLORS } from '../../hooks/useAppTheme';
 import { ColorPalette } from '../common/ColorPalette';
-import { BACKGROUND_PRESETS, backgroundTokens } from '../../core/background_color';
+import { BACKGROUND_PRESETS } from '../../core/background_color';
 import { roomService } from '../../services/room_service';
 import { INITIAL_TRANSMISSION_DEFAULTS, stateStore } from '../../core/state_store';
 import { soundEffects, SOUND_EVENTS, type SoundEvent } from '../../ui/sound_effects';
@@ -507,7 +507,7 @@ export const SettingsModal: React.FC = () => {
                     value={backgroundColor} onChange={setBackgroundColor}
                     presets={BACKGROUND_PRESETS.map(preset => ({ value: preset.id,
                       label: t(`appearance.backgrounds.${preset.id}`),
-                      color: backgroundTokens(preset.id, themeMode === 'light' || (themeMode === 'system' && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark').tokens['--bg-app'],
+                      color: preset[themeMode === 'light' || (themeMode === 'system' && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark'],
                     }))} />
                 </div>
 

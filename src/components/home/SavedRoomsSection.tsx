@@ -1,7 +1,7 @@
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useEffect, useState } from 'react';
-import { ArrowRight, BookmarkPlus, GripVertical, LockKeyhole, Pencil, Trash2 } from 'lucide-react';
+import { ArrowRight, BookmarkPlus, Crown, GripVertical, LockKeyhole, Pencil, Trash2, Users } from 'lucide-react';
 import { savedRooms, type SavedRoom } from '../../core/saved_rooms';
 import { useModal } from '../../hooks/useModal';
 import { useRoom } from '../../hooks/useRoom';
@@ -81,7 +81,7 @@ export const SavedRoomsSection: React.FC = () => {
       ) : (
         <div className={`saved-rooms-grid ${sortable.draggingId ? 'is-sorting' : ''}`} ref={sortable.gridRef}>
           {orderedRooms.map((room) => (
-            <article className={`saved-room-card ${sortable.draggingId === room.roomId ? 'is-dragging' : ''}`}
+            <article className={`saved-room-card ${room.owned ? 'is-owned' : ''} ${sortable.draggingId === room.roomId ? 'is-dragging' : ''}`}
               data-sortable-id={room.roomId} key={room.roomId} ref={sortable.cardRef(room.roomId)} onContextMenu={(event) => openContextMenu(event, [
               { id: 'enter', get label() { return t("message.f1388bfdc0f9"); }, icon: <ArrowRight size={15} />, onSelect: () => openSaved(room) },
               { id: 'edit', get label() { return t("message.4c6b05644363"); }, icon: <Pencil size={15} />, onSelect: () => setEditingRoom(room) },
@@ -96,8 +96,14 @@ export const SavedRoomsSection: React.FC = () => {
                 </button>
                 <div className="saved-room-details">
                   <strong>{room.customName ?? room.name}</strong>
-                  <span>{room.owned ? t("message.66abaa8c669e") : t("message.1e97ddf60a0f")} · {room.roomId.slice(0, 8)}
-                    {room.password !== undefined && <LockKeyhole size={12} aria-label={t("message.3ef5534f852c")} />}</span>
+                  <div className="saved-room-meta">
+                    <span className="badge-host saved-room-role">
+                      {room.owned ? <Crown size={12} aria-hidden="true" /> : <Users size={12} aria-hidden="true" />}
+                      {room.owned ? t("message.66abaa8c669e") : t("message.1e97ddf60a0f")}
+                    </span>
+                    <span className="saved-room-id">{room.roomId.slice(0, 8)}</span>
+                    {room.password !== undefined && <LockKeyhole size={12} aria-label={t("message.3ef5534f852c")} />}
+                  </div>
                 </div>
               </div>
               <div className="saved-room-actions">
