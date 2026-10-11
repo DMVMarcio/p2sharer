@@ -450,7 +450,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   gap: 8px;
 }
 
-.app-header.is-in-room { padding-inline: 18px; gap: 16px; }
+.app-header.is-in-room { padding-inline: 18px; gap: 16px; background-color: color-mix(in srgb, var(--bg-app) 98.5%, #fff); }
 .header-room-info { flex: 1; }
 .header-room-name { display: flex; align-items: center; gap: 8px; min-width: 0; margin-right: 8px; }
 .header-room-name strong { max-width: min(28vw, 360px); overflow: hidden; text-overflow: ellipsis;
