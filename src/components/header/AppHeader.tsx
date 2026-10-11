@@ -4,15 +4,16 @@ import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useEffect, useState } from 'react';
 import { useRoom } from '../../hooks/useRoom';
-import { useModal } from '../../hooks/useModal';
+import { modalManager, useModal } from '../../hooks/useModal';
 import { showToast } from '../../hooks/useToast';
 import { Tooltip } from '../common/Tooltip';
-import { BookmarkCheck, BookmarkPlus } from 'lucide-react';
+import { BookmarkCheck, BookmarkPlus, Settings2 } from 'lucide-react';
 import { parseRoomInvite } from '../../core/room_invite';
 import { savedRooms, type SavedRoom } from '../../core/saved_rooms';
 import { AppUpdateButton } from './AppUpdateButton';
 import { useContextMenu } from '../common/ContextMenu';
 import { profileAction } from '../common/profile_actions';
+import { TooltipButton } from '../common/TooltipButton';
 
 export const AppHeader: React.FC<{ showUpdate?: boolean }> = ({ showUpdate = true }) => {
   useLocale();
@@ -75,7 +76,6 @@ export const AppHeader: React.FC<{ showUpdate?: boolean }> = ({ showUpdate = tru
               onClick={handleCopyRoomCode}
               aria-label={t("message.159e49453544")}
             >
-              <span className="header-pill-label">{t("message.d17ac7cc9c93")}</span>
               <strong id="display-room-code">{currentRoomName || currentRoomCode}</strong>
               <span
                 className="room-lock-icon"
@@ -97,6 +97,7 @@ export const AppHeader: React.FC<{ showUpdate?: boolean }> = ({ showUpdate = tru
                 <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
                 <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
               </svg>
+              <span className="header-invite-label">{t('header.invite')}</span>
             </button>
           </Tooltip>
         )}
@@ -119,24 +120,21 @@ export const AppHeader: React.FC<{ showUpdate?: boolean }> = ({ showUpdate = tru
           className="user-pill"
           id="user-pill"
           onContextMenu={event => openContextMenu(event, [profileAction({ peerId: 'local', name: username, isLocal: true })])}
-          onClick={() => openModal('settings')}
-          aria-label={t("message.ee91711e6b22")}
+          onClick={() => modalManager.openProfile({ peerId: 'local', name: username, isLocal: true })}
+          aria-label={t('profile.view')}
         >
           <ProfileAvatar name={username} className="header-profile-avatar" />
           <span id="current-username-display"><Nickname name={username || t("message.f53bbaa05fae")} isLocal /></span>
         </button>
 
-        <button
+        <TooltipButton tooltip={t("message.76b0fb6ad189")}
           className="btn-icon-header"
           id="btn-open-settings"
           onClick={() => openModal('settings')}
           aria-label={t("message.76b0fb6ad189")}
         >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
-            <circle cx="12" cy="12" r="3"/>
-          </svg>
-        </button>
+          <Settings2 size={18} aria-hidden="true" />
+        </TooltipButton>
       </div>
     </header>
   );

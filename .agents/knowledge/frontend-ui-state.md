@@ -115,6 +115,7 @@ Persistent settings are automatically synchronized to and restored from `localSt
 
 - **Design System Tokens**:
   - CSS Custom Properties define all surfaces (`--bg-app`, `--bg-surface`, `--bg-elevated`, `--bg-card`, `--bg-input`), borders (`--border-subtle`, `--border-focus`), text (`--text-primary`, `--text-muted`), and accent hues.
+  - Background preferences are normalized and persisted as preset IDs or hexadecimal colors under `p2sharer_background_color`. `core/background_color.ts` derives opaque surfaces and readable text; `useAppTheme` applies them in the main and detached WebViews. Presets follow dark/light/system mode, while custom colors and OLED determine their own effective contrast scheme. Appearance palettes reuse `ColorPalette` and the cancellable `ColorPicker` dialog; background and accent selections apply immediately.
   - Accent colors dynamically update `--accent-color`, `--accent-glow`, and `--accent-hover`.
 - **Accessibility & Feedback**:
   - Custom SVG icons from `lucide`.

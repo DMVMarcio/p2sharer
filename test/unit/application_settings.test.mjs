@@ -81,7 +81,11 @@ test('appearance applies and persists custom colors and restores preset tokens',
   await act(async () => document.querySelector('[aria-label="Marrom"]').focus());
   await act(async () => new Promise(resolve => setTimeout(resolve, 100)));
   assert.equal(document.querySelector('[role="tooltip"]').textContent, 'Marrom');
-  const picker = document.querySelector('.custom-color-picker');
+  await act(async () => document.querySelector('#background-colors-palette [aria-label="Floresta"]').click());
+  assert.equal(localStorage.getItem('p2sharer_background_color'), 'forest');
+  assert.equal(document.documentElement.style.getPropertyValue('--bg-app'), '#25312c');
+  assert.notEqual(document.documentElement.style.getPropertyValue('--bg-card'), '#25312c');
+  const picker = document.querySelector('#accent-colors-palette .custom-color-picker');
   assert.equal(picker.getAttribute('aria-label'), 'Cor personalizada');
   await act(async () => {
     picker.dispatchEvent(new window.MouseEvent('pointerdown', { bubbles: true }));
@@ -111,7 +115,7 @@ test('appearance applies and persists custom colors and restores preset tokens',
   await act(async () => root.render(React.createElement(SettingsModal)));
   await act(async () => [...document.querySelectorAll('.settings-nav-sidebar button')]
     .find(button => button.textContent.includes('Aparência')).click());
-  await act(async () => document.querySelector('.custom-color-picker').click());
+  await act(async () => document.querySelector('#accent-colors-palette .custom-color-picker').click());
   assert.equal(document.querySelector('.color-picker-dialog .text-input').value, '#ffffff');
   const brightness = document.querySelector('.color-picker-dialog [aria-label="Brilho"]');
   await act(async () => {

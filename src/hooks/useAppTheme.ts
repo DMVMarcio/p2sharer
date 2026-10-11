@@ -4,6 +4,7 @@ import { stateStore } from '../core/state_store';
 import { ThemeMode } from '../core/types';
 import { useStore } from './useStore';
 import { customAccentTokens } from '../core/accent_color';
+import { backgroundTokens, normalizeBackground } from '../core/background_color';
 
 export const ACCENT_COLORS = [
   { id: 'cyan', get label() { return t("message.c954e4de2019"); }, color: '#06b6d4' },
@@ -29,18 +30,19 @@ export const ACCENT_COLORS = [
 export function useAppTheme() {
   const currentThemeMode = useStore((s) => s.currentThemeMode);
   const currentAccentColor = useStore((s) => s.currentAccentColor);
+  const currentBackgroundColor = useStore((s) => s.currentBackgroundColor);
+
+  const applyBackgroundColor = useCallback((color: string) => {
+    const normalized = normalizeBackground(color);
+    localStorage.setItem('p2sharer_background_color', normalized);
+    stateStore.set(s => { s.currentBackgroundColor = normalized; });
+  }, []);
 
   const applyThemeMode = useCallback((mode: ThemeMode) => {
     stateStore.set((s) => {
       s.currentThemeMode = mode;
     });
 
-    let effectiveTheme = mode;
-    if (mode === 'system') {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      effectiveTheme = prefersDark ? 'dark' : 'light';
-    }
-    document.documentElement.setAttribute('data-theme', effectiveTheme);
     localStorage.setItem('p2sharer_theme_mode', mode);
   }, []);
 
@@ -53,24 +55,18 @@ export function useAppTheme() {
 
   // Initialize and handle system theme media query listener
   useEffect(() => {
-    let effectiveTheme = currentThemeMode;
-    if (currentThemeMode === 'system') {
-      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-      effectiveTheme = mediaQuery.matches ? 'dark' : 'light';
-
-      const handleChange = (e: MediaQueryListEvent) => {
-        if (stateStore.currentThemeMode === 'system') {
-          document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
-        }
-      };
-
-      mediaQuery.addEventListener('change', handleChange);
-      document.documentElement.setAttribute('data-theme', effectiveTheme);
-      return () => mediaQuery.removeEventListener('change', handleChange);
-    } else {
-      document.documentElement.setAttribute('data-theme', currentThemeMode);
-    }
-  }, [currentThemeMode]);
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const apply = () => {
+      const mode = currentThemeMode === 'system' ? (mediaQuery.matches ? 'dark' : 'light') : currentThemeMode;
+      const { light, tokens } = backgroundTokens(currentBackgroundColor, mode);
+      const root = document.documentElement;
+      root.setAttribute('data-theme', light ? 'light' : 'dark');
+      for (const [key, value] of Object.entries(tokens)) root.style.setProperty(key, value);
+    };
+    apply();
+    if (currentThemeMode === 'system') mediaQuery.addEventListener('change', apply);
+    return () => mediaQuery.removeEventListener('change', apply);
+  }, [currentThemeMode, currentBackgroundColor]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -86,6 +82,8 @@ export function useAppTheme() {
   return {
     themeMode: currentThemeMode,
     accentColor: currentAccentColor,
+    backgroundColor: currentBackgroundColor,
+    setBackgroundColor: applyBackgroundColor,
     setThemeMode: applyThemeMode,
     setAccentColor: applyAccentColor,
   };

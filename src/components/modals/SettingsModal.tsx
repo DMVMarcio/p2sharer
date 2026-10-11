@@ -14,6 +14,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { useModal } from '../../hooks/useModal';
 import { useAppTheme, ACCENT_COLORS } from '../../hooks/useAppTheme';
 import { ColorPalette } from '../common/ColorPalette';
+import { BACKGROUND_PRESETS, backgroundTokens } from '../../core/background_color';
 import { roomService } from '../../services/room_service';
 import { INITIAL_TRANSMISSION_DEFAULTS, stateStore } from '../../core/state_store';
 import { soundEffects, SOUND_EVENTS, type SoundEvent } from '../../ui/sound_effects';
@@ -44,7 +45,7 @@ export const SettingsModal: React.FC = () => {
   useLocale();
   const [nicknameStyle, setNicknameStyle] = useState(() => stateStore.nicknameStyle);
   const { closeModal, isClosing } = useModal();
-  const { themeMode, accentColor, setThemeMode, setAccentColor } = useAppTheme();
+  const { themeMode, accentColor, backgroundColor, setThemeMode, setAccentColor, setBackgroundColor } = useAppTheme();
 
   const [activeTab, setActiveTab] = useState<
     'profile' | 'application' | 'conversations' | 'appearance' | 'audio' | 'stream' | 'network' | 'diagnostics'
@@ -497,6 +498,17 @@ export const SettingsModal: React.FC = () => {
                       </button>
                     ))}
                   </div>
+                </div>
+
+                <div className="settings-row background-settings">
+                  <span className="settings-label">{t('appearance.background')}</span>
+                  <p className="settings-pane-desc">{t('appearance.backgroundDescription')}</p>
+                  <ColorPalette id="background-colors-palette" variant="tile" label={t('appearance.background')}
+                    value={backgroundColor} onChange={setBackgroundColor}
+                    presets={BACKGROUND_PRESETS.map(preset => ({ value: preset.id,
+                      label: t(`appearance.backgrounds.${preset.id}`),
+                      color: backgroundTokens(preset.id, themeMode === 'light' || (themeMode === 'system' && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark').tokens['--bg-app'],
+                    }))} />
                 </div>
 
                 <div className="settings-row" style={{ marginTop: '10px' }}>
