@@ -108,15 +108,15 @@ export const ChatPane: React.FC = () => {
   const saveEdit = async (id: string) => {
     const content = editRef.current?.getMarkdown() ?? editDraft;
     if (!content.trim()) { showToast(t("message.31233377e60e")); return; }
-    if (!await editChatMessage(id, content)) { showToast(t("message.c3ad01e4bc4e")); return; }
+    if (!await editChatMessage(id, content)) { showToast(t("message.c3ad01e4bc4e"), 3500, 'error'); return; }
     setEditingId(null);
     setPickerTarget(null);
   };
 
   const copyText = (text: string) => {
     void navigator.clipboard.writeText(text)
-      .then(() => showToast(t("message.6f569a9bd431")))
-      .catch(() => showToast(t("message.c871a73a0bce")));
+      .then(() => showToast(t("message.6f569a9bd431"), 3500, 'success'))
+      .catch(() => showToast(t("message.c871a73a0bce"), 3500, 'error'));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -127,7 +127,7 @@ export const ChatPane: React.FC = () => {
   const startDownload = (messageId: string, saveAs: boolean) => {
     void requestFile(messageId, saveAs).catch((error) => {
       console.warn('[Files] Could not save download:', error);
-      showToast(t("message.fa6c1d18a7c8"));
+      showToast(t("message.fa6c1d18a7c8"), 3500, 'error');
     });
   };
   const revealDownload = (messageId: string, requestId: string) => {
@@ -172,7 +172,7 @@ export const ChatPane: React.FC = () => {
             onCopy: () => { copyText(msg.text); },
             onCopyImage: imagePreview ? () => { void copyImageToClipboard(imagePreview); } : undefined,
             onEdit: () => { setEditingId(msg.id); setEditDraft(msg.text); setPickerTarget(null); },
-            onDelete: () => { void deleteChatMessage(msg.id).then((deleted) => { if (!deleted) showToast(t("message.18d60be566e6")); }); if (editingId === msg.id) setEditingId(null); setPickerTarget(null); },
+            onDelete: () => { void deleteChatMessage(msg.id).then((deleted) => { if (!deleted) showToast(t("message.18d60be566e6"), 3500, 'error'); }); if (editingId === msg.id) setEditingId(null); setPickerTarget(null); },
             isFile: Boolean(msg.file),
             onSaveAs: () => { startDownload(msg.id, true); }
           };
@@ -196,7 +196,7 @@ export const ChatPane: React.FC = () => {
                 <span className="chat-msg-time">{timeStr}</span>
                 <ChatMessageMenu {...messageActions} />
               </div>
-              <div className="chat-msg-bubble">
+              <div className={`chat-msg-bubble${msg.file ? '' : ' chat-msg-text'}`}>
                 {msg.replyTo && !repliedMessage?.deletedAt && <button type="button" className="chat-msg-reply" onClick={() => jumpToMessage(msg.replyTo!.id)}>
                   <span>{msg.replyTo.sender}</span>
                   <span>{repliedMessage?.text ?? msg.replyTo.text}</span>

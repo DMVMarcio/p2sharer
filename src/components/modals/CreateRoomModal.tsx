@@ -1,3 +1,4 @@
+import { useModalDialogBehavior } from '../common/useModalDialogBehavior';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useEffect, useState } from 'react';
@@ -55,18 +56,20 @@ export const CreateRoomModal: React.FC = () => {
         saved: true, owned: true, protected: Boolean(finalPass), password: finalPass || undefined, identity });
       closeModal();
       joinRoom(invite, finalPass, true);
-      showToast(t("message.71421eda382c"));
+      showToast(t("message.71421eda382c"), 3500, 'success');
     } catch (error) {
       console.error('[Rooms] Failed to create room:', error);
-      showToast(t("message.6504d77e15a6"));
+      showToast(t("message.6504d77e15a6"), 3500, 'error');
     }
   };
 
   const { submit, pending } = useFormSubmit(handleConfirm, isClosing);
 
+  const dialogRef = useModalDialogBehavior(closeModal, pending || isClosing, false);
+
   return (
     <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} id="modal-create-room-dialog">
-      <form autoComplete="off" onSubmit={submit} aria-busy={pending} className="modal-card">
+      <form autoComplete="off" onSubmit={submit} aria-busy={pending} className="modal-card" ref={dialogRef} inert={isClosing || undefined}>
         <div className="modal-header">
           <div className="modal-header-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

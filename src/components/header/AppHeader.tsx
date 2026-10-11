@@ -4,23 +4,25 @@ import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useEffect, useState } from 'react';
 import { useRoom } from '../../hooks/useRoom';
-import { useModal } from '../../hooks/useModal';
+import { modalManager, useModal } from '../../hooks/useModal';
 import { showToast } from '../../hooks/useToast';
-import { Tooltip } from '../common/Tooltip';
-import { BookmarkCheck, BookmarkPlus } from 'lucide-react';
+import { BookmarkCheck, BookmarkPlus, Check, Copy, LockKeyhole, LogOut, Settings2 } from 'lucide-react';
 import { parseRoomInvite } from '../../core/room_invite';
 import { savedRooms, type SavedRoom } from '../../core/saved_rooms';
 import { AppUpdateButton } from './AppUpdateButton';
 import { useContextMenu } from '../common/ContextMenu';
 import { profileAction } from '../common/profile_actions';
+import { TooltipButton } from '../common/TooltipButton';
+import { useClipboardFeedback } from '../../hooks/useClipboardFeedback';
 
-export const AppHeader: React.FC<{ showUpdate?: boolean }> = ({ showUpdate = true }) => {
+export const AppHeader: React.FC<{ showUpdate?: boolean; homeScrolled?: boolean }> = ({ showUpdate = true, homeScrolled = false }) => {
   useLocale();
   const openContextMenu = useContextMenu();
-  const { currentRoomCode, currentRoomInvite, currentRoomName, currentRoomPassword, username, isInRoom } = useRoom();
+  const { currentRoomCode, currentRoomInvite, currentRoomName, currentRoomPassword, username, isInRoom, leaveRoom } = useRoom();
   const { openModal } = useModal();
   const [savedRecord, setSavedRecord] = useState<SavedRoom | null>(null);
   const [savingRoom, setSavingRoom] = useState(false);
+  const { copied, copy } = useClipboardFeedback(currentRoomInvite || currentRoomCode);
 
   useEffect(() => {
     const roomId = parseRoomInvite(currentRoomInvite)?.roomId;
@@ -36,14 +38,6 @@ export const AppHeader: React.FC<{ showUpdate?: boolean }> = ({ showUpdate = tru
     return () => { active = false; unsubscribe(); };
   }, [currentRoomInvite]);
 
-  const handleCopyRoomCode = () => {
-    const copyText = currentRoomInvite || currentRoomCode;
-    navigator.clipboard
-      .writeText(copyText)
-      .then(() => showToast(t("message.d78cc8e1cef4")))
-      .catch(() => {});
-  };
-
   const toggleSavedRoom = async () => {
     const roomId = parseRoomInvite(currentRoomInvite)?.roomId;
     if (!roomId || savingRoom) return;
@@ -53,62 +47,43 @@ export const AppHeader: React.FC<{ showUpdate?: boolean }> = ({ showUpdate = tru
       if (!record) throw new Error('Room record is missing');
       const saved = !record.saved;
       await savedRooms.put({ ...record, saved, password: saved ? record.password : undefined });
-      showToast(saved ? t("message.08064fa0da8c") : t("message.7611fbde28f9"));
+      showToast(saved ? t("message.08064fa0da8c") : t("message.7611fbde28f9"), 3500, 'success');
     } catch (error) {
       console.warn('[Rooms] Could not toggle saved room:', error);
-      showToast(t("message.d94a6e24bf10"));
+      showToast(t("message.d94a6e24bf10"), 3500, 'error');
     } finally {
       setSavingRoom(false);
     }
   };
 
   return (
-    <header className="app-header" data-tauri-drag-region>
+    <header className={`app-header${isInRoom ? ' is-in-room' : homeScrolled ? ' is-home-scrolled' : ''}`} data-tauri-drag-region>
       <div className="header-room-info">
         {isInRoom && (
-          <Tooltip
-            content={t("message.70fad3f21d89", { v0: currentRoomName || currentRoomCode })}
-          >
-            <button
-              className="room-code-header-pill"
-              id="header-room-code-pill"
-              onClick={handleCopyRoomCode}
-              aria-label={t("message.159e49453544")}
-            >
-              <span className="header-pill-label">{t("message.d17ac7cc9c93")}</span>
+          <>
+            <div className="header-room-name">
               <strong id="display-room-code">{currentRoomName || currentRoomCode}</strong>
-              <span
-                className="room-lock-icon"
-                id="header-room-lock-icon"
-              >
-                {currentRoomPassword ? (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                  </svg>
-                ) : (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                    <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
-                  </svg>
-                )}
+              {currentRoomPassword && <LockKeyhole size={14} className="room-lock-icon" aria-hidden="true" />}
+              {currentRoomInvite && (
+                <TooltipButton tooltip={savedRecord?.saved ? t("message.1fd26e5f3f0e") : t("message.3caaf5a72320")}
+                  className={`btn-icon-header header-room-save ${savedRecord?.saved ? 'is-saved' : ''}`}
+                  onClick={() => void toggleSavedRoom()}
+                  aria-label={savedRecord?.saved ? t("message.1fd26e5f3f0e") : t("message.7b07e948b7c7")}
+                  aria-pressed={Boolean(savedRecord?.saved)} disabled={savingRoom || !savedRecord}>
+                  {savedRecord?.saved ? <BookmarkCheck size={16} aria-hidden="true" /> : <BookmarkPlus size={16} aria-hidden="true" />}
+                </TooltipButton>
+              )}
+            </div>
+            <TooltipButton tooltip={copied ? t('header.copied') : t("message.70fad3f21d89", { v0: currentRoomName || currentRoomCode })}
+              className={`btn btn-secondary btn-sm header-room-action${copied ? ' is-copied' : ''}`}
+              id="header-room-code-pill" onClick={() => void copy()}
+              aria-label={copied ? t('header.copied') : t("message.159e49453544")}>
+              <span className="header-invite-icon" key={copied ? 'copied' : 'invite'}>
+                {copied ? <Check size={15} aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}
               </span>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
-                <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
-              </svg>
-            </button>
-          </Tooltip>
-        )}
-        {isInRoom && currentRoomInvite && (
-          <Tooltip content={savedRecord?.saved ? t("message.1fd26e5f3f0e") : t("message.3caaf5a72320")}>
-            <button className={`btn-icon-header ${savedRecord?.saved ? 'is-saved' : ''}`}
-              onClick={() => void toggleSavedRoom()}
-              aria-label={savedRecord?.saved ? t("message.1fd26e5f3f0e") : t("message.7b07e948b7c7")}
-              aria-pressed={Boolean(savedRecord?.saved)} disabled={savingRoom || !savedRecord}>
-              {savedRecord?.saved ? <BookmarkCheck size={16} /> : <BookmarkPlus size={16} />}
-            </button>
-          </Tooltip>
+              <span className="header-invite-label" aria-live="polite">{t(copied ? 'header.copied' : 'header.invite')}</span>
+            </TooltipButton>
+          </>
         )}
 
         {showUpdate && <AppUpdateButton />}
@@ -119,24 +94,28 @@ export const AppHeader: React.FC<{ showUpdate?: boolean }> = ({ showUpdate = tru
           className="user-pill"
           id="user-pill"
           onContextMenu={event => openContextMenu(event, [profileAction({ peerId: 'local', name: username, isLocal: true })])}
-          onClick={() => openModal('settings')}
-          aria-label={t("message.ee91711e6b22")}
+          onClick={() => modalManager.openProfile({ peerId: 'local', name: username, isLocal: true })}
+          aria-label={t('profile.view')}
         >
           <ProfileAvatar name={username} className="header-profile-avatar" />
           <span id="current-username-display"><Nickname name={username || t("message.f53bbaa05fae")} isLocal /></span>
         </button>
 
-        <button
+        <TooltipButton tooltip={t("message.76b0fb6ad189")}
           className="btn-icon-header"
           id="btn-open-settings"
           onClick={() => openModal('settings')}
           aria-label={t("message.76b0fb6ad189")}
         >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
-            <circle cx="12" cy="12" r="3"/>
-          </svg>
-        </button>
+          <Settings2 size={18} aria-hidden="true" />
+        </TooltipButton>
+        {isInRoom && (
+          <TooltipButton tooltip={t("message.7b7b91d7fe87")}
+            className="btn-icon-header header-leave-room" id="btn-leave-room"
+            onClick={leaveRoom} aria-label={t("message.7b7b91d7fe87")}>
+            <LogOut size={18} aria-hidden="true" />
+          </TooltipButton>
+        )}
       </div>
     </header>
   );

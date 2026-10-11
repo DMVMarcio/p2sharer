@@ -1,3 +1,5 @@
+import { useContentPresence } from '../../hooks/useContentPresence';
+import { useModalDialogBehavior } from '../common/useModalDialogBehavior';
 import { profileStats } from '../../core/profile_stats';
 import { NICKNAME_STYLE_KEY } from '../../core/nickname_style';
 import { profileImages, profileBanners, type ProfileDraft } from '../../core/profile_image';
@@ -14,6 +16,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { useModal } from '../../hooks/useModal';
 import { useAppTheme, ACCENT_COLORS } from '../../hooks/useAppTheme';
 import { ColorPalette } from '../common/ColorPalette';
+import { BACKGROUND_PRESETS } from '../../core/background_color';
 import { roomService } from '../../services/room_service';
 import { INITIAL_TRANSMISSION_DEFAULTS, stateStore } from '../../core/state_store';
 import { soundEffects, SOUND_EVENTS, type SoundEvent } from '../../ui/sound_effects';
@@ -44,7 +47,7 @@ export const SettingsModal: React.FC = () => {
   useLocale();
   const [nicknameStyle, setNicknameStyle] = useState(() => stateStore.nicknameStyle);
   const { closeModal, isClosing } = useModal();
-  const { themeMode, accentColor, setThemeMode, setAccentColor } = useAppTheme();
+  const { themeMode, accentColor, backgroundColor, setThemeMode, setAccentColor, setBackgroundColor } = useAppTheme();
 
   const [activeTab, setActiveTab] = useState<
     'profile' | 'application' | 'conversations' | 'appearance' | 'audio' | 'stream' | 'network' | 'diagnostics'
@@ -164,7 +167,7 @@ export const SettingsModal: React.FC = () => {
       }
       await profileImages.save(profileDraft, profileColor, profileRemove, profileCardColor);
     }
-    catch { setSaving(false); showToast(t('profile.saveFailed')); return; }
+    catch { setSaving(false); showToast(t('profile.saveFailed'), 3500, 'error'); return; }
     profileStats.setSharing(showProfileStats);
     // Save username
     if (nick.trim()) {
@@ -212,14 +215,14 @@ export const SettingsModal: React.FC = () => {
     setSaving(false);
     setLanguage(language);
     closeModal();
-    showToast(t("message.3f84cec002ac"));
+    showToast(t("message.3f84cec002ac"), 3500, 'success');
   };
 
   const handleOpenLatestLog = async () => {
     try {
       await invoke('open_latest_log');
     } catch (err) {
-      showToast(t("message.1d56d35310c9", { v0: err }));
+      showToast(t("message.1d56d35310c9", { v0: err }), 3500, 'error');
     }
   };
 
@@ -227,22 +230,26 @@ export const SettingsModal: React.FC = () => {
     try {
       await invoke('open_log_folder');
     } catch (err) {
-      showToast(t("message.1d56d35310c9", { v0: err }));
+      showToast(t("message.1d56d35310c9", { v0: err }), 3500, 'error');
     }
   };
 
   const handleClearLog = async () => {
     try {
       await invoke('clear_log_file');
-      showToast(t("message.0485a9c10162"));
+      showToast(t("message.0485a9c10162"), 3500, 'success');
     } catch (err) {
-      showToast(t("message.1d56d35310c9", { v0: err }));
+      showToast(t("message.1d56d35310c9", { v0: err }), 3500, 'error');
     }
   };
 
+  const panePresence = useContentPresence(activeTab);
+  const optionsPresence = useContentPresence(streamOptionsTab);
+  const dialogRef = useModalDialogBehavior(closeModal, saving || profileBusy || isClosing, false);
+
   return (
     <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} id="modal-settings">
-      <div className="modal-card modal-settings">
+      <div className="modal-card modal-settings" ref={dialogRef} inert={isClosing || undefined}>
         <div className="modal-header">
           <div className="modal-header-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -377,13 +384,13 @@ export const SettingsModal: React.FC = () => {
           </nav>
 
           {/* Right Content Panes */}
-          <div className="settings-tab-content-area">
+          <div key={panePresence.value} className={`settings-tab-content-area content-transition ${panePresence.closing ? 'content-exiting' : ''}`}
+            inert={panePresence.closing || undefined} aria-hidden={panePresence.closing || undefined}>
             {/* TAB 1: PERFIL */}
-            {activeTab === 'profile' && (
+            {panePresence.value === 'profile' && (
               <div className="settings-tab-pane active" id="settings-pane-profile">
                 <div className="settings-pane-header">
                   <h3 className="settings-pane-title">{t("message.d16122f3087d")}</h3>
-                  <p className="settings-pane-desc">{t("message.ea3a61eb13e1")}</p>
                 </div>
 
                 <ProfileImageEditor name={nick} draft={profileDraft} color={profileColor} remove={profileRemove}
@@ -401,10 +408,10 @@ export const SettingsModal: React.FC = () => {
               </div>
             )}
 
-            {activeTab === 'application' && <ApplicationSettings language={language} onLanguageChange={setLanguageDraft} automatic={autoUpdates}
+            {panePresence.value === 'application' && <ApplicationSettings language={language} onLanguageChange={setLanguageDraft} automatic={autoUpdates}
               includePrereleases={betaUpdates} onAutomaticChange={setAutoUpdates} onPrereleasesChange={setBetaUpdates} />}
 
-            {activeTab === 'conversations' && (
+            {panePresence.value === 'conversations' && (
               <div className="settings-tab-pane active" id="settings-pane-conversations">
                 <div className="settings-pane-header">
                   <h3 className="settings-pane-title">{t("message.071f649adb47")}</h3>
@@ -451,7 +458,7 @@ export const SettingsModal: React.FC = () => {
             )}
 
             {/* TAB 2: APARÊNCIA */}
-            {activeTab === 'appearance' && (
+            {panePresence.value === 'appearance' && (
               <div className="settings-tab-pane active" id="settings-pane-appearance">
                 <div className="settings-pane-header">
                   <h3 className="settings-pane-title">{t("message.36ad11f3f98f")}</h3>
@@ -499,7 +506,18 @@ export const SettingsModal: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="settings-row" style={{ marginTop: '10px' }}>
+                <div className="settings-row background-settings">
+                  <span className="settings-label">{t('appearance.background')}</span>
+                  <p className="settings-pane-desc">{t('appearance.backgroundDescription')}</p>
+                  <ColorPalette id="background-colors-palette" variant="tile" label={t('appearance.background')}
+                    value={backgroundColor} onChange={setBackgroundColor}
+                    presets={BACKGROUND_PRESETS.map(preset => ({ value: preset.id,
+                      label: t(`appearance.backgrounds.${preset.id}`),
+                      color: preset[themeMode === 'light' || (themeMode === 'system' && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark'],
+                    }))} />
+                </div>
+
+                <div className="settings-row">
                   <label className="settings-label">{t("message.d0bc3fef4a6e")}</label>
                   <ColorPalette id="accent-colors-palette" label={t("message.d0bc3fef4a6e")} value={accentColor}
                     onChange={setAccentColor} presets={ACCENT_COLORS.map(item => ({ value: item.id, color: item.color, label: item.label }))} />
@@ -508,7 +526,7 @@ export const SettingsModal: React.FC = () => {
             )}
 
             {/* Sound settings */}
-            {activeTab === 'audio' && (
+            {panePresence.value === 'audio' && (
               <div className="settings-tab-pane active" id="settings-pane-audio">
                 <div className="settings-pane-header">
                   <h3 className="settings-pane-title">{t("message.a11f1b879793")}</h3>
@@ -535,7 +553,7 @@ export const SettingsModal: React.FC = () => {
                   </label>
                 </div>
 
-                <div className="settings-row" id="settings-sfx-volume-row" style={{ marginTop: '12px' }}>
+                <div className="settings-row" id="settings-sfx-volume-row">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                     <label className="settings-label" htmlFor="settings-slider-sfx-volume" style={{ marginBottom: 0 }}>
                       {t("common.volumeLabel")}
@@ -587,7 +605,7 @@ export const SettingsModal: React.FC = () => {
             )}
 
             {/* TAB 4: TRANSMISSÃO */}
-            {activeTab === 'stream' && (
+            {panePresence.value === 'stream' && (
               <div className="settings-tab-pane active" id="settings-pane-stream">
                 <div className="settings-pane-header">
                   <h3 className="settings-pane-title">{t("message.ff7b5832d9e8")}</h3>
@@ -689,7 +707,7 @@ export const SettingsModal: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="settings-row" style={{ marginTop: '14px' }}>
+                <div className="settings-row">
                   <div className="sidebar-tabs settings-subtabs" role="tablist" aria-label={t("message.f45b43b042cf")}>
                     {(['advanced', 'pointing'] as const).map(tab => <button key={tab} type="button"
                       ref={element => { if (element) streamOptionRefs.current[tab] = element; else delete streamOptionRefs.current[tab]; }}
@@ -705,7 +723,8 @@ export const SettingsModal: React.FC = () => {
                         }
                       }}>{tab === 'pointing' ? t("message.fc4d44253740") : t("message.5427a20ed7f7")}</button>)}
                   </div>
-                  {streamOptionsTab === 'pointing' && <div className="settings-row settings-options-panel" role="tabpanel" id="stream-options-panel-pointing" aria-labelledby="stream-options-pointing">
+                  {optionsPresence.value === 'pointing' && <div key={optionsPresence.value} className={`settings-row settings-options-panel content-transition ${optionsPresence.closing ? 'content-exiting' : ''}`}
+                    inert={optionsPresence.closing || undefined} aria-hidden={optionsPresence.closing || undefined} role="tabpanel" id="stream-options-panel-pointing" aria-labelledby="stream-options-pointing">
                   {[
                     { id: 'participant-cursors', get label() { return t("message.0cdd1ad3fe1c"); }, description: t("message.6052f362cfdc"), checked: participantCursors, change: setParticipantCursors },
                     { id: 'participant-drawings', get label() { return t("message.cda3e4551d5a"); }, description: t("message.2254b260a6cc"), checked: participantDrawings, change: setParticipantDrawings },
@@ -730,7 +749,8 @@ export const SettingsModal: React.FC = () => {
                     </div>
                   </div>
                   </div>}
-                  {streamOptionsTab === 'advanced' && <div className="settings-row settings-options-panel" role="tabpanel" id="stream-options-panel-advanced" aria-labelledby="stream-options-advanced">
+                  {optionsPresence.value === 'advanced' && <div key={optionsPresence.value} className={`settings-row settings-options-panel content-transition ${optionsPresence.closing ? 'content-exiting' : ''}`}
+                    inert={optionsPresence.closing || undefined} aria-hidden={optionsPresence.closing || undefined} role="tabpanel" id="stream-options-panel-advanced" aria-labelledby="stream-options-advanced">
                   <div className="settings-row">
                     <label className="settings-label" htmlFor="settings-video-encoder">{t("message.e13520183b92")}</label>
                     <Select id="settings-video-encoder" className="select-input-sm" value={encoder}
@@ -764,7 +784,7 @@ export const SettingsModal: React.FC = () => {
             )}
 
             {/* TAB 5: REDE & TURN */}
-            {activeTab === 'network' && (
+            {panePresence.value === 'network' && (
               <div className="settings-tab-pane active" id="settings-pane-network">
                 <div className="settings-pane-header">
                   <h3 className="settings-pane-title">{t("message.da60254327a5")}</h3>
@@ -792,7 +812,7 @@ export const SettingsModal: React.FC = () => {
                 </div>
 
                 {turnEnabled && (
-                  <div className="turn-config-box" id="turn-config-fields" style={{ display: 'flex', marginTop: '10px' }}>
+                  <div className="turn-config-box" id="turn-config-fields" style={{ display: 'flex' }}>
                     <div className="settings-row">
                       <label className="settings-label" htmlFor="settings-turn-url">
                         {t("message.87949ccf803a")}</label>
@@ -806,7 +826,7 @@ export const SettingsModal: React.FC = () => {
                       />
                     </div>
 
-                    <div className="settings-row-grid settings-row-grid-2col" style={{ marginTop: '8px' }}>
+                    <div className="settings-row-grid settings-row-grid-2col">
                       <div className="settings-col">
                         <label className="settings-label" htmlFor="settings-turn-username">
                           {t("message.e69e86de6c04")}</label>
@@ -833,7 +853,7 @@ export const SettingsModal: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="settings-row" style={{ marginTop: '8px' }}>
+                    <div className="settings-row">
                       <label className="settings-switch-row" htmlFor="settings-turn-force-relay">
                         <div className="settings-switch-label-group">
                           <span className="settings-switch-title">{t("message.3fa5703adf75")}</span>
@@ -863,7 +883,7 @@ export const SettingsModal: React.FC = () => {
             )}
 
             {/* TAB 6: DIAGNÓSTICO & LOGS */}
-            {activeTab === 'diagnostics' && (
+            {panePresence.value === 'diagnostics' && (
               <div className="settings-tab-pane active" id="settings-pane-diagnostics">
                 <div className="settings-pane-header">
                   <h3 className="settings-pane-title">{t("message.b750226b7613")}</h3>

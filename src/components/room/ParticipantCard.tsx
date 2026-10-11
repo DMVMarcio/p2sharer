@@ -118,13 +118,9 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
         {slot.isLocal && <span className="badge-you">{t("message.a03099f135b1")}</span>}
       </div>
 
-      {!inTray && slot.isLocal && !slot.isStreaming && (
-        <div className="participant-status-text">{t("message.f502620127f2")}</div>
-      )}
-
-      {!inTray && !slot.isLocal && !slot.isStreaming && (
+      {!inTray && !slot.isLocal && !slot.isStreaming && slot.connectionState === 'connecting' && (
         <div className="participant-status-text">
-          {slot.connectionState === 'connecting' ? t("message.de1237d241d3") : t("message.5e06d5da9c12")}
+          {t("message.de1237d241d3")}
         </div>
       )}
 

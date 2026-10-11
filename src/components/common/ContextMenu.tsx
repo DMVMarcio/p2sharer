@@ -149,8 +149,8 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
   const retained = presence.value;
   const select = (action: Pick<ContextMenuAction, 'onSelect'>) => {
     close(true);
-    try { Promise.resolve(action.onSelect()).catch(() => showToast(t("message.1776fea88e1f"))); }
-    catch { showToast(t("message.1776fea88e1f")); }
+    try { Promise.resolve(action.onSelect()).catch(() => showToast(t("message.1776fea88e1f"), 3500, 'error')); }
+    catch { showToast(t("message.1776fea88e1f"), 3500, 'error'); }
   };
   return <MenuContext.Provider value={open}>
     {children}

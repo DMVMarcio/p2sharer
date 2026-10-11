@@ -1,4 +1,5 @@
 import { readNicknameStyle, type NicknameStyle } from './nickname_style.ts';
+import { normalizeBackground } from './background_color.ts';
 import { streamDrawingLimit, STREAM_DRAWING_MAX } from './stream_pointer.ts';
 import type { ResolutionConfig, RoomSlotInfo, StreamFilterMode, ThemeMode, TurnConfig } from './types.ts';
 import { parseTurnUrls } from '../p2p/ice_config.ts';
@@ -44,6 +45,7 @@ export class StateStore {
 
   public currentThemeMode: ThemeMode = 'dark';
   public currentAccentColor: string = 'cyan';
+  public currentBackgroundColor: string = 'graphite';
 
   public currentFps: number = INITIAL_TRANSMISSION_DEFAULTS.fps;
   public currentBitrate: number = this.getDefaultBitrateForResolution(INITIAL_TRANSMISSION_DEFAULTS.resolution);
@@ -122,6 +124,7 @@ export class StateStore {
     this.username = localStorage.getItem('p2sharer_username') || '';
     this.currentThemeMode = (localStorage.getItem('p2sharer_theme_mode') as ThemeMode) || 'dark';
     this.currentAccentColor = localStorage.getItem('p2sharer_accent_color') || 'cyan';
+    this.currentBackgroundColor = normalizeBackground(localStorage.getItem('p2sharer_background_color') || 'graphite');
 
     this.rememberTransmissionSettings = localStorage.getItem('p2sharer_remember_transmission_settings') !== 'false';
     const savedRes = localStorage.getItem('p2sharer_default_res') || INITIAL_TRANSMISSION_DEFAULTS.resolution;

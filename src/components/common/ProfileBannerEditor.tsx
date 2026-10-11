@@ -38,13 +38,13 @@ export function ProfileBannerEditor({ value, onChange, disabled, onBusy }: {
       if (picked) {
         if (!mounted.current || picked.width < BANNER_ASPECT) {
           void invoke('discard_profile_image', { token: picked.token }).catch(() => {});
-          if (mounted.current) showToast(t('profile.invalid'));
+          if (mounted.current) showToast(t('profile.invalid'), 3500, 'error');
         } else {
           pendingToken.current = picked.token;
           setSelection({ ...picked, crop: { x: 0.5, y: 0.5, size: 1 } });
         }
       }
-    } catch { showToast(t('profile.invalid')); }
+    } catch { showToast(t('profile.invalid'), 3500, 'error'); }
     finally { if (mounted.current) setPicking(false); onBusy(false); }
   };
   return <div className="profile-banner-editor">

@@ -41,7 +41,7 @@ function QueueActionDialog({ action, currentCount, onImport, onClose }: {
         showToast(t("message.bd5d65e0df35"));
       } else if (action.kind === 'overwrite') {
         savedYouTubeQueues.save(action.queue.name, action.entries, action.queue.id);
-        showToast(t("message.b47a76414d09"));
+        showToast(t("message.b47a76414d09"), 3500, 'success');
       }
       committed.current = true;
       close();
@@ -100,7 +100,7 @@ export function YouTubeSavedQueuesDialog({ entries, onImport, onClose }: Props) 
     if (!entries.length || !name.trim() || loadFailed) return;
     setError('');
     if (existing) { setAction({ kind: 'overwrite', queue: existing, entries: entries.map((entry) => ({ ...entry })) }); return; }
-    try { savedYouTubeQueues.save(name, entries); setName(''); showToast(t("message.aac0486d4806")); }
+    try { savedYouTubeQueues.save(name, entries); setName(''); showToast(t("message.aac0486d4806"), 3500, 'success'); }
     catch (reason) { console.warn('[YouTube] Could not save queue:', reason); setError(t("message.f5475ff2e3e7")); }
   };
   return <>

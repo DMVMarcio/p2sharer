@@ -1,3 +1,4 @@
+import { ContentTransition } from '../common/ContentTransition';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React from 'react';
@@ -21,6 +22,8 @@ export const RoomSidebar: React.FC = () => {
     <aside
       className={`room-sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}
       id="room-sidebar"
+      inert={isSidebarCollapsed}
+      aria-hidden={isSidebarCollapsed}
     >
       <div className="sidebar-tabs">
         <button
@@ -39,7 +42,9 @@ export const RoomSidebar: React.FC = () => {
         </button>
       </div>
 
-      {activeTab === 'chat' ? <ChatPane /> : <ParticipantsPane />}
+      <ContentTransition value={activeTab} className="content-transition-fill">
+        {tab => tab === 'chat' ? <ChatPane /> : <ParticipantsPane />}
+      </ContentTransition>
     </aside>
   );
 };

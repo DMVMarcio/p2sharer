@@ -78,8 +78,8 @@ export function ChatFileAttachment({ message, transfers, preview, savedRequestId
   };
   const copyHash = () => {
     void navigator.clipboard.writeText(file.sha256)
-      .then(() => showToast(t("message.e5d6c96e9104")))
-      .catch(() => showToast(t("message.e50839e7a83c")));
+      .then(() => showToast(t("message.e5d6c96e9104"), 3500, 'success'))
+      .catch(() => showToast(t("message.e50839e7a83c"), 3500, 'error'));
   };
   useEffect(() => {
     if (!viewer) return;

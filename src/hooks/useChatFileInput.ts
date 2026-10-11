@@ -27,7 +27,7 @@ export function useChatFileInput(paneRef: RefObject<HTMLDivElement | null>) {
       setFiles(incoming);
     } catch (error) {
       console.warn('[Files] Could not prepare attachment:', error);
-      if (mounted.current) showToast(t("message.3ac7f82e95fe"));
+      if (mounted.current) showToast(t("message.3ac7f82e95fe"), 3500, 'error');
     } finally { busy.current = false; }
   };
 

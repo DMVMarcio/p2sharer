@@ -5,7 +5,6 @@ import { useLocale } from '../../hooks/useLocale';
 import { ModalDialog } from './ModalDialog';
 import { TooltipButton } from './TooltipButton';
 import { hexToHsv, hsvToHex, type Hsv } from '../../core/hsv_color';
-import { contrastingTextColor } from '../../core/accent_color';
 
 function ColorPickerDialog({ value, label, onApply, onClose }: {
   value: string; label: string; onApply: (color: string) => void; onClose: () => void;
@@ -69,8 +68,7 @@ export function ColorPicker({ value, label, onChange, active = false, disabled =
       className={`accent-swatch custom-color-picker ${variant === 'tile' ? 'custom-color-picker-tile' : ''} ${active ? 'active' : ''}`}
       onClick={() => setOpen(true)}>
       <span className="custom-color-picker-swatch" style={{ backgroundColor: value }} />
-      {variant === 'tile' && <Pencil className="custom-color-picker-edit" size={16} aria-hidden="true"
-        style={{ color: contrastingTextColor(value) }} />}
+      {variant === 'tile' && <Pencil className="custom-color-picker-edit" size={16} aria-hidden="true" />}
     </TooltipButton>
     {open && <ColorPickerDialog value={value} label={label} onApply={onChange} onClose={() => setOpen(false)} />}
   </>;

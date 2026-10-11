@@ -258,6 +258,8 @@ export const RoomVideoContainer: React.FC = () => {
               <button
                 className="btn-toggle-spotlight-tray"
                 id="btn-toggle-spotlight-tray"
+                aria-expanded={!isSpotlightTrayCollapsed}
+                aria-controls="spotlight-tray-strip"
                 aria-label={t("message.b4479dd728f5")}
                 onClick={toggleSpotlightTray}
               >
@@ -265,7 +267,8 @@ export const RoomVideoContainer: React.FC = () => {
                   <polyline points="6 9 12 15 18 9"/>
                 </svg>
               </button>
-              <div ref={layoutMode === 'spotlight' ? surfaceRef : undefined} className="spotlight-tray-strip" id="spotlight-tray-strip">
+              <div ref={layoutMode === 'spotlight' ? surfaceRef : undefined} className="spotlight-tray-strip" id="spotlight-tray-strip"
+                inert={isSpotlightTrayCollapsed} aria-hidden={isSpotlightTrayCollapsed}>
                 {entries.map(slot => renderMovableCard(slot, true))}
               </div>
             </div>

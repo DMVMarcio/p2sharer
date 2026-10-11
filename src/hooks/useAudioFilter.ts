@@ -56,7 +56,7 @@ export function useAudioFilter() {
       setDraftIncludePids(inPids);
     } catch (err) {
       console.error('Failed to list processes:', err);
-      showToast(t("message.67523526cb3c"));
+      showToast(t("message.67523526cb3c"), 3500, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -208,7 +208,7 @@ export function useAudioFilter() {
         return true;
       } catch (err) {
         console.error('Error applying audio filter:', err);
-        showToast(t("message.e6c4f27405a7"));
+        showToast(t("message.e6c4f27405a7"), 3500, 'error');
         return false;
       }
     }
@@ -226,7 +226,7 @@ export function useAudioFilter() {
       return true;
     } catch (err) {
       console.error('Error applying audio filter:', err);
-      showToast(t("message.e6c4f27405a7"));
+      showToast(t("message.e6c4f27405a7"), 3500, 'error');
       return false;
     }
   }, [

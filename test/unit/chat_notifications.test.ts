@@ -26,12 +26,17 @@ test('sound switches persist independently and previews leave saved settings unt
   const saved = new Map<string, string>([['p2sharer_sfx_enabled', 'false'], ['p2sharer_sfx_volume', '0.35']]);
   const originalStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
   const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
-  let tones = 0;
-  const param = { setValueAtTime() {}, exponentialRampToValueAtTime() {} };
+  let tones = 0, disconnectedSources = 0, buffersCreated = 0;
+  const levels: number[] = [];
   class AudioContextFixture {
-    currentTime = 0; state = 'running'; destination = {};
-    createGain() { return { gain: param, connect() {}, disconnect() {} }; }
-    createOscillator() { return { frequency: param, connect() {}, disconnect() {}, start() { tones++; }, stop() {} }; }
+    currentTime = 0; sampleRate = 48000; state = 'running'; destination = {};
+    createGain() {
+      const index = levels.length;
+      levels.push(0);
+      return { gain: { setValueAtTime(value: number) { levels[index] = value; } }, connect() {}, disconnect() {} };
+    }
+    createBuffer(_channels: number, length: number) { buffersCreated++; return { length, copyToChannel(samples: Float32Array) { assert.equal(samples.length, length); } }; }
+    createBufferSource() { return { buffer: null, onended: null as (() => void) | null, connect() {}, disconnect() { disconnectedSources++; }, start() { tones++; this.onended?.(); } }; }
   }
   Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {
     getItem: (key: string) => saved.get(key) ?? null,
@@ -50,7 +55,11 @@ test('sound switches persist independently and previews leave saved settings unt
     assert.equal(tones, 0);
     const persisted = [...saved];
     for (const event of SOUND_EVENTS) sounds.preview(event, 0.7);
-    assert.ok(tones > 0);
+    assert.equal(tones, SOUND_EVENTS.length);
+    assert.equal(disconnectedSources, tones);
+    assert.equal(levels[0], 0.35, 'preview does not change the master volume');
+    assert.ok(levels.slice(1).every(level => level === 0.7));
+    assert.equal(buffersCreated, SOUND_EVENTS.length);
     assert.deepEqual([...saved], persisted);
     assert.equal(sounds.getEnabled(), false);
     assert.equal(sounds.getVolume(), 0.35);
@@ -62,6 +71,8 @@ test('sound switches persist independently and previews leave saved settings unt
     assert.equal(tones, afterPreview);
     sounds.playUserJoin();
     assert.ok(tones > afterPreview);
+    assert.equal(buffersCreated, SOUND_EVENTS.length, 'ordinary playback reuses the rendered cue');
+    assert.equal(disconnectedSources, tones);
   } finally {
     if (originalStorage) Object.defineProperty(globalThis, 'localStorage', originalStorage);
     else Reflect.deleteProperty(globalThis, 'localStorage');

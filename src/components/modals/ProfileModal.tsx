@@ -1,7 +1,8 @@
 import { useSyncExternalStore } from 'react';
-import { Clock, MessageCircle, Files, Download, Phone, Trophy } from 'lucide-react';
+import { Clock, MessageCircle, Files, Download, Pencil, Phone, Trophy } from 'lucide-react';
 import { ModalDialog } from '../common/ModalDialog';
 import { ProfileAvatar } from '../common/ProfileAvatar';
+import { TooltipButton } from '../common/TooltipButton';
 import { Nickname } from '../common/Nickname';
 import { modalManager } from '../../hooks/useModal';
 import { useStore } from '../../hooks/useStore';
@@ -32,7 +33,9 @@ export function ProfileModal() {
     { label: 'profile.stats.calls', value: number(stats.calls), icon: Phone },
     { label: 'profile.stats.longestCall', value: formatProfileDuration(stats.longestCallMs), icon: Trophy },
   ] : [];
-  return <ModalDialog title={t('profile.title')} headerless className="profile-view-modal"
+  return <ModalDialog closeOnOutside title={t('profile.title')} headerless className="profile-view-modal"
+    headerActions={target.isLocal && <TooltipButton className="btn-close modal-overlay-close"
+      tooltip={t('profile.edit')} onClick={() => modalManager.open('settings')}><Pencil size={16} aria-hidden="true" /></TooltipButton>}
     onClose={() => modalManager.open(null)}>
     <div className={`profile-view-banner${banner ? '' : ' is-empty'}`} style={{ backgroundColor: profileImages.background(target.peerId, target.isLocal, target.color) }}>
       {banner && <img src={banner} alt="" draggable={false} />}

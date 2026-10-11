@@ -315,7 +315,7 @@ export class RoomService {
       onFileProgress: (progress) => {
         if (this.roomManager !== manager) return;
         this.recordFileProgress(progress);
-        if (progress.status === 'error') showToast(t("message.fd2175809652"));
+        if (progress.status === 'error') showToast(t("message.fd2175809652"), 3500, 'error');
       },
       onStreamPointerState: (snapshot, broadcasterId) => {
         const slot = stateStore.roomSlots.find((slot) => (slot.ownerPeerId || slot.peerId) === broadcasterId && slot.pointerEligible !== false && (!snapshot.mediaId || slot.mediaId === snapshot.mediaId));
@@ -456,7 +456,7 @@ export class RoomService {
         stateStore.set((s) => {
           s.currentRoomPassword = newPassword;
         });
-        showToast(t("message.6fef198fc542", { v0: updatedBy }));
+        showToast(t("message.6fef198fc542", { v0: updatedBy }), 3500, 'success');
         if (parsed) {
           void savedRooms.get(parsed.roomId).then((record) => {
             if (record) return savedRooms.put({ ...record, protected: Boolean(newPassword),
@@ -567,7 +567,7 @@ export class RoomService {
         Object.assign(previous, { fps, bitrate, resolution: res, quality, mouse });
         this.syncCaptureState();
         console.info('[RoomService] Camera edit applied', { sourceId, mediaId: editingId, settings: previous.stream.getVideoTracks()[0].getSettings(), elapsedMs: Math.round(performance.now() - captureStarted) });
-        showToast(t("message.d1943a972148"));
+        showToast(t("message.d1943a972148"), 3500, 'success');
         return;
       }
       const id = editingId || crypto.randomUUID();
@@ -620,7 +620,7 @@ export class RoomService {
       } catch (error) {
         if (bridge) await bridge.stopCapture();
         else if (stream && stream !== previous?.stream) stream.getTracks().forEach((track) => track.stop());
-        showToast(t("message.5a1156df731c", { v0: localizeError(error) }));
+        showToast(t("message.5a1156df731c", { v0: localizeError(error) }), 3500, 'error');
         throw error;
       }
     });

@@ -29,7 +29,7 @@ export const PersistentRoomApps: React.FC<Props> = ({ instances, layoutMode, fea
     for (const instance of instances) {
       const role = layoutMode === 'grid' ? 'grid' : featuredId === `app:${instance.id}` ? 'featured' : 'tray';
       const slot = slotsRef.current.get(`${role}:${instance.id}`);
-      if (!slot) continue;
+      if (!slot || slot.closest('[inert]')) continue;
       const rect = slot.getBoundingClientRect();
       if (!rect.width || !rect.height) continue;
       const viewport = slot.closest<HTMLElement>('.streams-grid-wrapper, .spotlight-featured-area, .spotlight-tray-strip');
