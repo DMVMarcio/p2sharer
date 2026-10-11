@@ -2,6 +2,7 @@ import type { TurnConfig } from '../core/types.ts';
 import { t } from '../i18n/index.ts';
 import { selectedIcePair } from '../core/ice_route.ts';
 import { diagnosticOpaqueId } from '../core/diagnostic_id.ts';
+import { classifyIceAddress, fingerprintIceAddress } from '../core/ice_address_diagnostics.ts';
 
 export const DEFAULT_STUN_SERVERS = [
   'stun:stun.cloudflare.com:3478',
@@ -38,7 +39,8 @@ export function summarizeIceDescription(description: RTCSessionDescription | nul
 }
 
 /** Allowlist route metadata and counters; never copy raw candidate reports. */
-export function summarizeIceStats(stats: RTCStatsReport) {
+export function summarizeIceStats(stats: RTCStatsReport,
+  identities = new Map<string, Awaited<ReturnType<typeof fingerprintIceAddress>>>()) {
   const reports = Array.from(stats.values());
   const byId = new Map(reports.map(report => [report.id, report]));
   const candidates = { local: { host: 0, srflx: 0, prflx: 0, relay: 0 }, remote: { host: 0, srflx: 0, prflx: 0, relay: 0 } };
@@ -52,11 +54,11 @@ export function summarizeIceStats(stats: RTCStatsReport) {
   const allowed = (value: unknown, values: string[]) => typeof value === 'string' && values.includes(value) ? value : null;
   const candidate = (id: string) => {
     const report = byId.get(id);
+    const address = classifyIceAddress(report?.address);
     return report ? { id: diagnosticOpaqueId(id),
       type: allowed(report.candidateType, ['host', 'srflx', 'prflx', 'relay']),
       protocol: allowed(report.protocol, ['udp', 'tcp']),
-      family: typeof report.address === 'string' ? (report.address.includes(':') ? 'ipv6' :
-        /^\d{1,3}(?:\.\d{1,3}){3}$/.test(report.address) ? 'ipv4' : 'unknown') : null,
+      family: address.family, scope: address.scope,
       tcpType: allowed(report.tcpType, ['active', 'passive', 'so']) } : null;
   };
   const counters = ['requestsSent', 'requestsReceived', 'responsesSent', 'responsesReceived',
@@ -65,12 +67,25 @@ export function summarizeIceStats(stats: RTCStatsReport) {
   // Preserve the selected route even if a large checklist exceeds the log limit.
   pairs.sort((a, b) => Number(b.id === selected?.id) - Number(a.id === selected?.id) ||
     (b.responsesReceived || 0) - (a.responsesReceived || 0) || (b.requestsSent || 0) - (a.requestsSent || 0));
-  const totals = Object.fromEntries(counters.filter(key => key !== 'currentRoundTripTime').flatMap(key => {
-    const values = pairs.map(pair => pair[key]).filter(value => typeof value === 'number' && Number.isFinite(value) && value >= 0);
+  const sumCounters = (items: typeof pairs) => Object.fromEntries(counters.filter(key => key !== 'currentRoundTripTime').flatMap(key => {
+    const values = items.map(pair => pair[key]).filter(value => typeof value === 'number' && Number.isFinite(value) && value >= 0);
     return values.length ? [[key, values.reduce((total, value) => total + value, 0)]] : [];
   }));
-  return { candidates, pairCount: pairs.length, omittedPairs: Math.max(0, pairs.length - 24),
-    totals,
+  const groups = new Map<string, typeof pairs>();
+  for (const pair of pairs) {
+    const key = `${candidate(pair.localCandidateId)?.scope ?? 'unavailable'}->${candidate(pair.remoteCandidateId)?.scope ?? 'unavailable'}`;
+    const group = groups.get(key) ?? [];
+    group.push(pair);
+    groups.set(key, group);
+  }
+  const inventory = reports.filter(report => report.type === 'local-candidate' || report.type === 'remote-candidate');
+  return { schema: 2, candidates, pairCount: pairs.length, omittedPairs: Math.max(0, pairs.length - 24),
+    totals: sumCounters(pairs),
+    routeGroups: Array.from(groups, ([route, items]) => ({ route, pairCount: items.length, ...sumCounters(items) })),
+    // Inventory includes candidates omitted from the pair list; tokens do not reveal addresses or ports.
+    candidateInventory: inventory.slice(0, 64).map(report => ({ side: report.type === 'local-candidate' ? 'local' : 'remote',
+      ...candidate(report.id), ...identities.get(report.id) })),
+    omittedCandidates: Math.max(0, inventory.length - 64),
     pairs: pairs.slice(0, 24).map(pair => ({ id: diagnosticOpaqueId(pair.id),
       state: allowed(pair.state, ['frozen', 'waiting', 'in-progress', 'failed', 'succeeded']),
       selected: pair.id === selected?.id, nominated: pair.nominated === true,
@@ -86,10 +101,16 @@ export function summarizeIceStats(stats: RTCStatsReport) {
 async function sampleIceStats(connection: RTCPeerConnection) {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    const stats = await Promise.race([connection.getStats(), new Promise<null>(resolve => {
+    const stats = await Promise.race([connection.getStats().then(async stats => {
+      const candidates = Array.from(stats.values()).filter(report =>
+        report.type === 'local-candidate' || report.type === 'remote-candidate').slice(0, 64);
+      const identities = new Map(await Promise.all(candidates.map(async report =>
+        [report.id, await fingerprintIceAddress(report.address, report.port, report.protocol)] as const)));
+      return summarizeIceStats(stats, identities);
+    }), new Promise<null>(resolve => {
       timer = setTimeout(() => resolve(null), 1_000);
     })]);
-    return stats ? { status: 'available', ...summarizeIceStats(stats) } : { status: 'timeout' };
+    return stats ? { status: 'available', ...stats } : { status: 'timeout' };
   } catch {
     return { status: 'unavailable' };
   } finally {
