@@ -196,7 +196,7 @@ export const ChatPane: React.FC = () => {
                 <span className="chat-msg-time">{timeStr}</span>
                 <ChatMessageMenu {...messageActions} />
               </div>
-              <div className="chat-msg-bubble">
+              <div className={`chat-msg-bubble${msg.file ? '' : ' chat-msg-text'}`}>
                 {msg.replyTo && !repliedMessage?.deletedAt && <button type="button" className="chat-msg-reply" onClick={() => jumpToMessage(msg.replyTo!.id)}>
                   <span>{msg.replyTo.sender}</span>
                   <span>{repliedMessage?.text ?? msg.replyTo.text}</span>

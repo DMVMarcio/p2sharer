@@ -41,6 +41,8 @@ export function backgroundTokens(value: string, mode: 'dark' | 'light') {
   const surface = (amount: number, lift = 0.02) => light
     ? mix(base, '#ffffff', amount)
     : mix(mix(base, seed, amount), '#ffffff', lift);
+  const control = (amount: number) => light && luminance(base) < 0.32
+    ? surface(amount) : mix(base, ink, amount);
   const surfaces = {
     '--bg-app': base,
     '--bg-surface': surface(light ? 0.28 : 0.035),
@@ -48,8 +50,9 @@ export function backgroundTokens(value: string, mode: 'dark' | 'light') {
     '--bg-card': surface(light ? 0.36 : 0.065, 0.03),
     '--bg-card-hover': surface(light ? 0.65 : 0.09, 0.035),
     '--bg-input': surface(light ? 0.03 : vivid ? 0.2 : 0.1, black ? 0.1 : 0.065),
-    '--bg-control': surface(light ? 0.08 : vivid ? 0.32 : 0.18, black ? 0.1 : 0.05),
-    '--bg-control-hover': surface(light ? 0.16 : vivid ? 0.46 : 0.29, black ? 0.18 : 0.06),
+    '--bg-control': light ? control(0.1) : surface(vivid ? 0.32 : 0.18, black ? 0.1 : 0.05),
+    '--bg-control-hover': light ? control(0.16) : surface(vivid ? 0.46 : 0.29, black ? 0.18 : 0.06),
+    '--bg-selected': control(light ? 0.18 : 0.22),
   };
   const readable = (amount: number) => {
     for (; amount < 1; amount += 0.025) {
@@ -68,6 +71,8 @@ export function backgroundTokens(value: string, mode: 'dark' | 'light') {
     '--hero-background': black ? surfaces['--bg-card'] : '#000000',
     '--hero-control': black ? surfaces['--bg-control'] : mix(seed, '#000000', 0.72),
     '--hero-control-hover': black ? surfaces['--bg-control-hover'] : mix(mix(seed, '#000000', 0.58), '#ffffff', 0.035),
+    '--switch-track': mix(base, ink, light ? 0.48 : 0.32),
+    '--switch-thumb': light ? surfaces['--bg-elevated'] : readable(0.96),
     '--ambient-glow': mix(seed, '#000000', light ? 0 : 0.35),
     '--text-primary': readable(0.96),
     '--text-secondary': readable(0.76),

@@ -6,7 +6,6 @@ import React, { useEffect, useState } from 'react';
 import { useRoom } from '../../hooks/useRoom';
 import { modalManager, useModal } from '../../hooks/useModal';
 import { showToast } from '../../hooks/useToast';
-import { Tooltip } from '../common/Tooltip';
 import { BookmarkCheck, BookmarkPlus, Copy, LockKeyhole, LogOut, Settings2 } from 'lucide-react';
 import { parseRoomInvite } from '../../core/room_invite';
 import { savedRooms, type SavedRoom } from '../../core/saved_rooms';
@@ -71,6 +70,15 @@ export const AppHeader: React.FC<{ showUpdate?: boolean }> = ({ showUpdate = tru
             <div className="header-room-name">
               <strong id="display-room-code">{currentRoomName || currentRoomCode}</strong>
               {currentRoomPassword && <LockKeyhole size={14} className="room-lock-icon" aria-hidden="true" />}
+              {currentRoomInvite && (
+                <TooltipButton tooltip={savedRecord?.saved ? t("message.1fd26e5f3f0e") : t("message.3caaf5a72320")}
+                  className={`btn-icon-header header-room-save ${savedRecord?.saved ? 'is-saved' : ''}`}
+                  onClick={() => void toggleSavedRoom()}
+                  aria-label={savedRecord?.saved ? t("message.1fd26e5f3f0e") : t("message.7b07e948b7c7")}
+                  aria-pressed={Boolean(savedRecord?.saved)} disabled={savingRoom || !savedRecord}>
+                  {savedRecord?.saved ? <BookmarkCheck size={16} aria-hidden="true" /> : <BookmarkPlus size={16} aria-hidden="true" />}
+                </TooltipButton>
+              )}
             </div>
             <TooltipButton tooltip={t("message.70fad3f21d89", { v0: currentRoomName || currentRoomCode })}
               className="btn btn-secondary btn-sm header-room-action"
@@ -80,17 +88,6 @@ export const AppHeader: React.FC<{ showUpdate?: boolean }> = ({ showUpdate = tru
               <span className="header-invite-label">{t('header.invite')}</span>
             </TooltipButton>
           </>
-        )}
-        {isInRoom && currentRoomInvite && (
-          <Tooltip content={savedRecord?.saved ? t("message.1fd26e5f3f0e") : t("message.3caaf5a72320")}>
-            <button className={`btn btn-secondary btn-sm header-room-action ${savedRecord?.saved ? 'is-saved' : ''}`}
-              onClick={() => void toggleSavedRoom()}
-              aria-label={savedRecord?.saved ? t("message.1fd26e5f3f0e") : t("message.7b07e948b7c7")}
-              aria-pressed={Boolean(savedRecord?.saved)} disabled={savingRoom || !savedRecord}>
-              {savedRecord?.saved ? <BookmarkCheck size={16} aria-hidden="true" /> : <BookmarkPlus size={16} aria-hidden="true" />}
-              <span className="header-save-label">{t(savedRecord?.saved ? 'header.saved' : 'header.save')}</span>
-            </button>
-          </Tooltip>
         )}
 
         {showUpdate && <AppUpdateButton />}
