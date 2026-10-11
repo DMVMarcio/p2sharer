@@ -1808,7 +1808,7 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   top: calc(100% + 6px);
   left: 50%;
   transform: translateX(-50%) translateY(3px) scale(0.98);
-  background-color: var(--bg-control-hover);
+  background-color: color-mix(in srgb, var(--bg-control) 90%, #000);
   color: var(--text-primary);
   border: 0;
   border-radius: var(--radius-md);
@@ -3271,7 +3271,8 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   height: 194px;
   overflow-y: auto;
   padding-right: 4px;
-  scrollbar-width: thin;
+  scrollbar-width: auto;
+  scrollbar-color: auto;
 }
 
 .emoji-pack-option {
@@ -3985,7 +3986,7 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 .custom-color-picker.custom-color-picker-tile { position: relative; width: 100%; height: 51px; padding: 0; border-radius: var(--radius-md); background: transparent; border-color: var(--border-subtle); }
 .custom-color-picker-tile:hover { transform: none; border-color: var(--accent-color); }
 .custom-color-picker-tile .custom-color-picker-swatch { border-radius: inherit; }
-.custom-color-picker-edit { position: absolute; top: 8px; right: 8px; pointer-events: none; }
+.custom-color-picker-edit { position: absolute; top: 8px; right: 8px; color: #fff; filter: drop-shadow(0 1px 2px rgb(0 0 0 / 55%)); pointer-events: none; }
 .color-picker-dialog { width: min(340px, calc(100vw - 32px)); }
 .color-picker-preview { height: 64px; border: 1px solid var(--border-default); border-radius: var(--radius-sm); margin-bottom: 16px; }
 .color-picker-channels { display: flex; flex-direction: column; gap: 16px; margin-bottom: 20px; }
@@ -5002,17 +5003,16 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   justify-content: space-between;
   gap: 16px;
   padding: 10px 14px;
-  background-color: var(--bg-surface-elevated);
-  border: 1px solid var(--border-subtle);
+  background-color: var(--bg-card);
+  border: 0;
   border-radius: var(--radius-md);
   cursor: pointer;
   user-select: none;
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast);
 }
 
 .settings-switch-row:hover {
-  background-color: var(--bg-surface-hover);
-  border-color: var(--border-default);
+  background-color: var(--bg-card-hover);
 }
 
 .settings-switch-label-group {
@@ -5746,15 +5746,17 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 .emoji-picker-categories { gap: 5px; }
 .emoji-picker-categories button { min-width: 34px; height: 34px; border-radius: var(--radius-md); }
 .emoji-picker-categories button.active { color: var(--text-primary); background: var(--bg-selected); }
+.emoji-picker-categories button:hover, .emoji-picker-categories button:focus-visible, .emoji-picker-grid button:hover, .emoji-picker-grid button:focus-visible { background: var(--bg-control-hover); color: var(--text-primary); }
 .emoji-picker-categories button:hover, .emoji-picker-categories button.active, .emoji-picker-grid button:hover { outline: none; }
+.emoji-picker-categories button:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
 .emoji-picker-grid button:focus-visible, .emoji-picker-search:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
 .source-card { position: relative; border: 0; border-radius: var(--radius-md); padding: 10px; background: var(--bg-card); color: var(--text-primary); font: inherit; text-align: left; }
 .source-card:hover { border: 0; background: var(--bg-card-hover); }
 .source-card.selected { border: 0; background: var(--bg-card-hover); box-shadow: inset 0 0 0 2px var(--accent-color); }
 .source-card:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 3px; }
 .source-card-thumb { border-radius: var(--radius-sm); background: var(--bg-input); }
-.media-preview { border: 0; border-radius: var(--radius-lg); background: var(--bg-control); }
-.media-preview-stage:not(:has(video.ready)) { background: var(--bg-input); }
+.media-preview { border: 0; border-radius: var(--radius-lg); background: var(--bg-card); }
+.media-preview-stage:not(:has(video.ready)) { background: var(--bg-card); }
 .media-preview-caption { padding: 14px; color: var(--text-primary); }
 .picker-tabs { border: 0; }
 .picker-tab-btn { font-weight: 600; border: 0; border-radius: var(--radius-md); }
