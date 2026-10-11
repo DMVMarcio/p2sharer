@@ -3522,7 +3522,7 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 
 .modal-card {
   background-color: var(--bg-surface);
-  border: 1px solid var(--border-default);
+  border: 0;
   border-radius: var(--radius-lg);
   width: 100%;
   max-width: 480px;

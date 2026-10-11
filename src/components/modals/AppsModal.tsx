@@ -46,6 +46,7 @@ export const AppsModal: React.FC = () => {
         <div className={`apps-library-banner ${app.bannerClass || ''} ${app.bannerImage ? 'has-image' : ''}`}
           style={app.bannerImage ? { backgroundImage: `url("${app.bannerImage}")` } : undefined}
           aria-hidden="true">
+          <span className="apps-library-banner-glow" />
           <RoomAppIcon kind={app.kind} size={34} strokeWidth={1.7} />
         </div>
         <div className="apps-library-card-content">
