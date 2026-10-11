@@ -6,13 +6,14 @@ import React, { useEffect, useState } from 'react';
 import { useRoom } from '../../hooks/useRoom';
 import { modalManager, useModal } from '../../hooks/useModal';
 import { showToast } from '../../hooks/useToast';
-import { BookmarkCheck, BookmarkPlus, Copy, LockKeyhole, LogOut, Settings2 } from 'lucide-react';
+import { BookmarkCheck, BookmarkPlus, Check, Copy, LockKeyhole, LogOut, Settings2 } from 'lucide-react';
 import { parseRoomInvite } from '../../core/room_invite';
 import { savedRooms, type SavedRoom } from '../../core/saved_rooms';
 import { AppUpdateButton } from './AppUpdateButton';
 import { useContextMenu } from '../common/ContextMenu';
 import { profileAction } from '../common/profile_actions';
 import { TooltipButton } from '../common/TooltipButton';
+import { useClipboardFeedback } from '../../hooks/useClipboardFeedback';
 
 export const AppHeader: React.FC<{ showUpdate?: boolean }> = ({ showUpdate = true }) => {
   useLocale();
@@ -21,6 +22,7 @@ export const AppHeader: React.FC<{ showUpdate?: boolean }> = ({ showUpdate = tru
   const { openModal } = useModal();
   const [savedRecord, setSavedRecord] = useState<SavedRoom | null>(null);
   const [savingRoom, setSavingRoom] = useState(false);
+  const { copied, copy } = useClipboardFeedback(currentRoomInvite || currentRoomCode);
 
   useEffect(() => {
     const roomId = parseRoomInvite(currentRoomInvite)?.roomId;
@@ -35,14 +37,6 @@ export const AppHeader: React.FC<{ showUpdate?: boolean }> = ({ showUpdate = tru
     const unsubscribe = savedRooms.subscribe(reload);
     return () => { active = false; unsubscribe(); };
   }, [currentRoomInvite]);
-
-  const handleCopyRoomCode = () => {
-    const copyText = currentRoomInvite || currentRoomCode;
-    navigator.clipboard
-      .writeText(copyText)
-      .then(() => showToast(t("message.d78cc8e1cef4")))
-      .catch(() => {});
-  };
 
   const toggleSavedRoom = async () => {
     const roomId = parseRoomInvite(currentRoomInvite)?.roomId;
@@ -80,12 +74,14 @@ export const AppHeader: React.FC<{ showUpdate?: boolean }> = ({ showUpdate = tru
                 </TooltipButton>
               )}
             </div>
-            <TooltipButton tooltip={t("message.70fad3f21d89", { v0: currentRoomName || currentRoomCode })}
-              className="btn btn-secondary btn-sm header-room-action"
-              id="header-room-code-pill" onClick={handleCopyRoomCode}
-              aria-label={t("message.159e49453544")}>
-              <Copy size={15} aria-hidden="true" />
-              <span className="header-invite-label">{t('header.invite')}</span>
+            <TooltipButton tooltip={copied ? t('header.copied') : t("message.70fad3f21d89", { v0: currentRoomName || currentRoomCode })}
+              className={`btn btn-secondary btn-sm header-room-action${copied ? ' is-copied' : ''}`}
+              id="header-room-code-pill" onClick={() => void copy()}
+              aria-label={copied ? t('header.copied') : t("message.159e49453544")}>
+              <span className="header-invite-icon" key={copied ? 'copied' : 'invite'}>
+                {copied ? <Check size={15} aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}
+              </span>
+              <span className="header-invite-label" aria-live="polite">{t(copied ? 'header.copied' : 'header.invite')}</span>
             </TooltipButton>
           </>
         )}

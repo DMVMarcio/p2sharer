@@ -12,7 +12,7 @@ export const ToastContainer: React.FC = () => {
   return (
     <div id="toast-container" className="toast-container">
       {toasts.map((toast) => (
-        <div key={toast.id} className="toast">
+        <div key={toast.id} className="toast" role="status">
           {localizeText(toast.message)}
         </div>
       ))}

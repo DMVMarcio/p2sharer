@@ -71,6 +71,7 @@ export const StreamHeaderBar: React.FC = () => {
           <button
             type="button"
             className={`btn-stream-filter ${streamFilter === 'all' ? 'active' : ''}`}
+            aria-pressed={streamFilter === 'all'}
             onClick={() => setStreamFilter('all')}
             aria-label={t("message.1d5d07001ab4")}
           >
@@ -83,6 +84,7 @@ export const StreamHeaderBar: React.FC = () => {
           <button
             type="button"
             className={`btn-stream-filter ${streamFilter === 'streaming' ? 'active' : ''}`}
+            aria-pressed={streamFilter === 'streaming'}
             onClick={() => setStreamFilter(streamFilter === 'streaming' ? 'all' : 'streaming')}
             aria-label={t("message.41b29c6a3cb4")}
           >
@@ -96,6 +98,7 @@ export const StreamHeaderBar: React.FC = () => {
           <button
             type="button"
             className={`btn-stream-filter ${streamFilter === 'watching' ? 'active' : ''}`}
+            aria-pressed={streamFilter === 'watching'}
             onClick={() => setStreamFilter(streamFilter === 'watching' ? 'all' : 'watching')}
             aria-label={t("message.9e3dd618b896")}
           >

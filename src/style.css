@@ -453,7 +453,11 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .header-room-name strong { max-width: min(28vw, 360px); overflow: hidden; text-overflow: ellipsis;
   white-space: nowrap; font-size: 15px; font-weight: 600; color: color-mix(in srgb, var(--text-primary) 92%, var(--text-muted)); }
 .header-room-name .room-lock-icon { flex: none; color: var(--text-muted); }
-.btn.header-room-action { width: auto; min-height: 32px; padding: 6px 16px; flex: none; border-radius: var(--radius-full); }
+.btn.header-room-action { min-width: 112px; width: auto; min-height: 32px; padding: 6px 16px; flex: none; border-radius: var(--radius-full); }
+.btn.header-room-action.is-copied { background: var(--success-bg); color: color-mix(in srgb, var(--success-text) 55%, var(--text-primary)); }
+.header-invite-icon { display: grid; place-items: center; animation: inviteFeedback var(--transition-normal); }
+@keyframes inviteFeedback { from { opacity: 0; transform: scale(.8) translateY(2px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .header-invite-icon { animation: none; } }
 .btn-icon-header.header-room-save { width: 28px; height: 28px; flex: none; background: transparent; color: var(--text-muted); }
 .btn-icon-header.header-room-save:hover { background: var(--bg-control-hover); color: var(--text-primary); }
 .btn-icon-header.header-room-save.is-saved { color: color-mix(in srgb, var(--accent-color) 45%, var(--text-primary)); }
@@ -632,6 +636,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   .hero-brand { display: none; }
   .hero-actions .btn { width: 100%; }
   .header-invite-label { display: none; }
+  .btn.header-room-action { min-width: 0; }
   .app-header.is-in-room { padding-inline: 12px; gap: 8px; }
   .header-room-name { margin-right: 0; }
   .is-in-room .user-pill #current-username-display { display: none; }
@@ -825,7 +830,7 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 .stream-header-bar {
   height: 48px;
   background-color: var(--bg-surface);
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -840,12 +845,11 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 .stream-filter-group {
   display: inline-flex;
   align-items: center;
-  background-color: var(--bg-control);
-  backdrop-filter: blur(8px);
-  border: 1px solid var(--border-default);
+  background-color: transparent;
+  border: 0;
   border-radius: var(--radius-full);
-  padding: 2px;
-  gap: 3px;
+  padding: 0;
+  gap: 6px;
   margin-left: 0;
   flex-shrink: 0;
 }
@@ -859,7 +863,7 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   color: var(--text-secondary);
   font-size: 11px;
   font-weight: 500;
-  padding: 3px 9px;
+  padding: 7px 11px;
   border-radius: var(--radius-full);
   cursor: pointer;
   transition: all var(--transition-fast);
@@ -874,22 +878,27 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 .btn-stream-filter.active {
   background-color: var(--bg-selected);
   color: var(--text-primary);
-  font-weight: 700;
-  box-shadow: var(--shadow-sm);
+  font-weight: 600;
+  box-shadow: none;
+}
+
+:is(.btn-stream-filter, .tab-btn, .btn-chat-emoji, .btn-chat-send, .btn-toggle-spotlight-tray, .sidebar-edge-toggle-btn, .participant-card, .stream-card):focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 2px;
 }
 
 .filter-count-badge {
   font-size: 9px;
   font-family: var(--font-mono);
   font-weight: 700;
-  padding: 0 4px;
-  border-radius: 6px;
-  background-color: var(--border-default);
+  padding: 0 2px;
+  border-radius: var(--radius-xs);
+  background-color: transparent;
   color: inherit;
 }
 
 .btn-stream-filter.active .filter-count-badge {
-  background-color: var(--border-default);
+  background-color: transparent;
   color: inherit;
 }
 
@@ -1101,9 +1110,8 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   flex-direction: column;
   position: relative;
   background-color: var(--bg-surface);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
+  border: 0;
+  border-radius: var(--radius-lg);
   padding: 6px;
   transition: height var(--transition-normal), padding var(--transition-normal), background-color var(--transition-normal), border-color var(--transition-normal);
   flex-shrink: 0;
@@ -1126,7 +1134,7 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   height: 26px;
   border-radius: var(--radius-full);
   background-color: var(--bg-surface);
-  border: 1px solid var(--border-default);
+  border: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1214,6 +1222,7 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 }
 
 .spotlight-tray-strip .stream-card-overlay {
+  border: 0;
   max-width: calc(100% - 10px);
   box-sizing: border-box;
   bottom: 5px;
@@ -1301,7 +1310,7 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 .stream-card {
   position: relative;
   background-color: var(--bg-card);
-  border: 1px solid var(--border-subtle);
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
   overflow: hidden;
   display: flex;
@@ -1313,7 +1322,7 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 }
 
 .stream-card:hover {
-  border-color: var(--accent-border);
+  border-color: transparent;
 }
 
 .stream-card.selected {
@@ -1477,7 +1486,7 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 .participant-card {
   container-type: size;
   position: relative;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
   overflow: hidden;
   display: flex;
@@ -1491,7 +1500,7 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 }
 
 .participant-card:hover {
-  border-color: rgba(255, 255, 255, 0.25);
+  border-color: transparent;
   transform: scale(1.005);
 }
 
@@ -2415,7 +2424,7 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   height: 100%;
   min-height: 0;
   background-color: var(--bg-surface);
-  border-left: 1px solid var(--border-subtle);
+  border-left: 0;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -2461,16 +2470,16 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   opacity: 0;
   width: 22px;
   height: 48px;
-  background-color: rgba(15, 15, 20, 0.88);
+  background-color: var(--bg-control);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 0;
   border-radius: var(--radius-sm);
   color: var(--text-muted);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-md);
   transition: opacity 0.2s ease, background-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast), border-color var(--transition-fast);
   outline: none;
 }
@@ -2487,18 +2496,16 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 }
 
 .sidebar-edge-toggle-btn:hover {
-  background-color: rgba(22, 22, 30, 0.98);
-  color: var(--accent-color, #06b6d4);
-  border-color: var(--accent-color, #06b6d4);
-  box-shadow: 0 0 12px rgba(6, 182, 212, 0.35), 0 4px 16px rgba(0, 0, 0, 0.6);
-  transform: scale(1.06);
+  background-color: var(--bg-control-hover);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-md);
 }
 
 .sidebar-tabs {
   display: flex;
   height: 48px;
   box-sizing: border-box;
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 0;
   flex-shrink: 0;
 }
 
@@ -2524,9 +2531,9 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 }
 
 .tab-btn.active {
-  color: var(--text-primary);
-  background: var(--bg-selected);
-  border-bottom-color: var(--text-primary);
+  color: color-mix(in srgb, var(--accent-color) 35%, var(--text-primary));
+  background: transparent;
+  border-bottom-color: currentColor;
 }
 
 .sidebar-tab-content {
@@ -2708,7 +2715,7 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 .chat-file-copy-hash:hover { color: var(--accent-color); background: var(--bg-card-hover); }
 .custom-tooltip.chat-file-hash-tooltip { max-width: 270px; width: auto; overflow-wrap: anywhere; word-break: break-all; white-space: normal; font-family: var(--font-sans); font-size: 11px; font-weight: 500; line-height: 1.45; }
 .chat-file-download-wrap { position: relative; display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
-.chat-file-download-button, .chat-file-reveal-button { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; line-height: 0; border: 1px solid var(--border-default); border-radius: 50%; background: var(--bg-card); color: var(--accent-color); cursor: pointer; }
+.chat-file-download-button, .chat-file-reveal-button { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; line-height: 0; border: 0; border-radius: 50%; background: var(--bg-control); color: var(--text-primary); cursor: pointer; }
 .chat-file-reveal-button { color: var(--text-secondary); }
 .chat-file-reveal-button:hover { color: var(--accent-color); border-color: var(--accent-border); }
 .chat-file-download-button svg, .chat-file-reveal-button svg { display: block; }
@@ -2743,13 +2750,13 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 .chat-file-detail span:last-child { font-family: var(--font-mono); font-size: 10px; }
 .chat-file-error { color: #ef4444; }
 .chat-file-toasts { position: fixed; z-index: 1200; right: 340px; top: 118px; display: flex; flex-direction: column; gap: 10px; width: min(300px, calc(100vw - 40px)); }
-.chat-file-toast { display: flex; flex-direction: column; gap: 8px; padding: 13px; border: 1px solid var(--border-default); border-radius: var(--radius-sm); background: var(--bg-card); box-shadow: 0 12px 30px rgba(0,0,0,.3); overflow-wrap: anywhere; }
+.chat-file-toast { display: flex; flex-direction: column; gap: 8px; padding: 16px; border: 0; border-radius: var(--radius-lg); background: var(--bg-input); box-shadow: var(--shadow-lg); overflow-wrap: anywhere; }
 .chat-file-toast-title { margin: 0; color: var(--text-primary); font-size: 12px; line-height: 1.5; font-weight: 400; }
 .chat-file-toast-title .chat-file-toast-person { color: var(--accent-color); font-weight: 700; }
 .chat-file-toast-title .chat-file-toast-name { color: var(--text-primary); font-weight: 700; }
 .chat-file-toast span { font-size: 11px; color: var(--text-secondary); }
 .chat-file-toast > div { display: flex; justify-content: flex-end; gap: 8px; }
-.chat-file-toast button { padding: 6px 10px; border: 1px solid var(--border-default); border-radius: var(--radius-sm); background: var(--bg-elevated); color: var(--text-primary); cursor: pointer; }
+.chat-file-toast button { padding: 6px 10px; border: 0; border-radius: var(--radius-md); background: var(--bg-control); color: var(--text-primary); cursor: pointer; }
 .chat-file-toast button.btn-primary { background: var(--accent-color); color: var(--accent-text-on-accent); }
 .chat-file-toast progress { width: 100%; accent-color: var(--accent-color); }
 @media (max-width: 800px) { .chat-file-toasts { right: 16px; top: 118px; } }
@@ -2796,7 +2803,7 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 .chat-msg-reply span:first-child { color: var(--accent-color); font-weight: 600; }
 .chat-msg-edit .chat-composer-editor { max-height: 180px; }
 .chat-msg-edit-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 6px; }
-.chat-msg-edit-actions button { border: 1px solid var(--border-default); border-radius: 4px; padding: 4px 8px; background: var(--bg-card); color: var(--text-primary); cursor: pointer; }
+.chat-msg-edit-actions button { border: 0; border-radius: var(--radius-sm); padding: 4px 8px; background: var(--bg-card); color: var(--text-primary); cursor: pointer; }
 .chat-msg-edit-actions button:last-child { background: var(--accent-color); border-color: var(--accent-color); color: var(--accent-text-on-accent); }
 .chat-msg-edit-actions .chat-msg-edit-emoji { display: grid; place-items: center; margin-right: auto; padding: 4px; color: var(--text-secondary); }
 .chat-msg-edit-actions .chat-msg-edit-emoji.active { color: var(--accent-color); border-color: var(--accent-color); }
@@ -2931,7 +2938,7 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 
 .chat-input-bar {
   padding: 10px;
-  border-top: 1px solid var(--border-subtle);
+  border-top: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -3084,7 +3091,7 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   background-color: var(--accent-color);
   color: var(--accent-text-on-accent);
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   width: 36px;
   height: 36px;
   display: flex;
@@ -3106,9 +3113,9 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   align-items: center;
   justify-content: center;
   color: var(--text-secondary);
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: all var(--transition-fast);
 }
@@ -3338,8 +3345,8 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   justify-content: space-between;
   padding: 8px 12px;
   background-color: var(--bg-elevated);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
+  border: 0;
+  border-radius: var(--radius-md);
   font-size: 12px;
   color: var(--text-primary);
   transition: all var(--transition-fast);
@@ -4693,16 +4700,18 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   line-height: 1.5;
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border-default);
+  background-color: var(--bg-input);
+  border: 0;
   color: var(--text-primary);
-  padding: 10px 16px;
-  border-radius: var(--radius-md);
+  padding: 13px 18px;
+  border-radius: var(--radius-lg);
   font-size: 12px;
   font-weight: 500;
   box-shadow: var(--shadow-lg);
-  animation: toastIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: toastIn var(--transition-normal) both;
 }
+
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
 
 @keyframes toastIn {
   from {
