@@ -39,7 +39,6 @@ export const HomeView: React.FC = () => {
       <div className="hero-container">
         <div className="home-hero">
           <div className="hero-text">
-            <span className="hero-eyebrow">P2Sharer</span>
             <h1 className="hero-title">{t('home.headline')}</h1>
             <p className="hero-subtitle">{t('home.description')}</p>
             <div className="hero-actions">

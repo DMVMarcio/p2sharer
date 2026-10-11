@@ -1,10 +1,10 @@
 export const BACKGROUND_PRESETS = [
   { id: 'graphite', dark: '#24262b', light: '#e9eaed' },
-  { id: 'slate', dark: '#202b38', light: '#e3eaf1' },
-  { id: 'forest', dark: '#25312c', light: '#e5ece5' },
-  { id: 'sand', dark: '#342d27', light: '#eee7dc' },
-  { id: 'plum', dark: '#302837', light: '#ede5f0' },
-  { id: 'rose', dark: '#372a2d', light: '#f0e4e5' },
+  { id: 'slate', dark: '#173951', light: '#bfdcf1' },
+  { id: 'forest', dark: '#1b4234', light: '#bcdcc9' },
+  { id: 'sand', dark: '#493020', light: '#f2d5a7' },
+  { id: 'plum', dark: '#39224b', light: '#d9c4ef' },
+  { id: 'rose', dark: '#4c2536', light: '#efc2cf' },
   { id: 'oled', dark: '#000000', light: '#000000' },
 ] as const;
 

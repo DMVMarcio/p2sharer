@@ -511,7 +511,7 @@ export const SettingsModal: React.FC = () => {
                     }))} />
                 </div>
 
-                <div className="settings-row" style={{ marginTop: '10px' }}>
+                <div className="settings-row">
                   <label className="settings-label">{t("message.d0bc3fef4a6e")}</label>
                   <ColorPalette id="accent-colors-palette" label={t("message.d0bc3fef4a6e")} value={accentColor}
                     onChange={setAccentColor} presets={ACCENT_COLORS.map(item => ({ value: item.id, color: item.color, label: item.label }))} />
@@ -547,7 +547,7 @@ export const SettingsModal: React.FC = () => {
                   </label>
                 </div>
 
-                <div className="settings-row" id="settings-sfx-volume-row" style={{ marginTop: '12px' }}>
+                <div className="settings-row" id="settings-sfx-volume-row">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                     <label className="settings-label" htmlFor="settings-slider-sfx-volume" style={{ marginBottom: 0 }}>
                       {t("common.volumeLabel")}
@@ -701,7 +701,7 @@ export const SettingsModal: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="settings-row" style={{ marginTop: '14px' }}>
+                <div className="settings-row">
                   <div className="sidebar-tabs settings-subtabs" role="tablist" aria-label={t("message.f45b43b042cf")}>
                     {(['advanced', 'pointing'] as const).map(tab => <button key={tab} type="button"
                       ref={element => { if (element) streamOptionRefs.current[tab] = element; else delete streamOptionRefs.current[tab]; }}
@@ -804,7 +804,7 @@ export const SettingsModal: React.FC = () => {
                 </div>
 
                 {turnEnabled && (
-                  <div className="turn-config-box" id="turn-config-fields" style={{ display: 'flex', marginTop: '10px' }}>
+                  <div className="turn-config-box" id="turn-config-fields" style={{ display: 'flex' }}>
                     <div className="settings-row">
                       <label className="settings-label" htmlFor="settings-turn-url">
                         {t("message.87949ccf803a")}</label>
@@ -818,7 +818,7 @@ export const SettingsModal: React.FC = () => {
                       />
                     </div>
 
-                    <div className="settings-row-grid settings-row-grid-2col" style={{ marginTop: '8px' }}>
+                    <div className="settings-row-grid settings-row-grid-2col">
                       <div className="settings-col">
                         <label className="settings-label" htmlFor="settings-turn-username">
                           {t("message.e69e86de6c04")}</label>
@@ -845,7 +845,7 @@ export const SettingsModal: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="settings-row" style={{ marginTop: '8px' }}>
+                    <div className="settings-row">
                       <label className="settings-switch-row" htmlFor="settings-turn-force-relay">
                         <div className="settings-switch-label-group">
                           <span className="settings-switch-title">{t("message.3fa5703adf75")}</span>
