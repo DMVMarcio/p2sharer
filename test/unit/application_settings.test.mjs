@@ -20,17 +20,21 @@ const require = createRequire(import.meta.url);
 const bundle = await build({
   stdin: { contents: `export { ApplicationSettings } from './src/components/modals/ApplicationSettings.tsx';
     export { SettingsModal } from './src/components/modals/SettingsModal.tsx';
+    export { ProfileModal } from './src/components/modals/ProfileModal.tsx';
     export { getLanguage, setLanguage } from './src/i18n/index.ts';
     export { stateStore } from './src/core/state_store.ts';
     export { profileImages, profileBanners } from './src/core/profile_image.ts';`, resolveDir: process.cwd() },
   bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic',
   plugins: [{ name: 'updater-fixture', setup(builder) {
-    builder.onResolve({ filter: /room_service|useModal|@tauri-apps\/api\/core/ }, args => ({
-      path: args.path.includes('room_service') ? 'room' : args.path.includes('useModal') ? 'modal' : 'native', namespace: 'settings-fixture',
+    builder.onResolve({ filter: /room_service|useRoom|useModal|@tauri-apps\/api\/core/ }, args => ({
+      path: args.path.includes('room_service') ? 'room' : args.path.includes('useRoom') ? 'room-hook' : args.path.includes('useModal') ? 'modal' : 'native', namespace: 'settings-fixture',
     }));
     builder.onLoad({ filter: /.*/, namespace: 'settings-fixture' }, args => ({ contents: {
       room: 'export const roomService = { refreshStreamPointerPermissions() {} };',
-      modal: 'export const useModal = () => ({ isClosing: false, closeModal: () => globalThis.settingsClosed++ });',
+      'room-hook': 'export const useRoom = () => ({ peers: [] });',
+      modal: `export const useModal = () => ({ isClosing: false, closeModal: () => globalThis.settingsClosed++ });
+        export const modalManager = { getProfileTarget: () => globalThis.profileTarget,
+          open: destination => { globalThis.profileDestination = destination; } };`,
       native: `export const invoke = async (command, args) => {
         if (globalThis.profileBackend && command.includes('profile_image')) return globalThis.profileBackend(command, args);
         if (command === 'save_profile_image') return { hash: '', data: '', color: args.color };
@@ -52,7 +56,7 @@ const controller = new AppUpdateController({
 });
 controller.setPreferences(false, false);
 globalThis.applicationSettingsController = controller;
-const { ApplicationSettings, SettingsModal, getLanguage, setLanguage, profileImages, profileBanners, stateStore } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text + '\n//# sourceURL=application-settings-test.js').toString('base64')}`);
+const { ApplicationSettings, SettingsModal, ProfileModal, getLanguage, setLanguage, profileImages, profileBanners, stateStore } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text + '\n//# sourceURL=application-settings-test.js').toString('base64')}`);
 const { createRoot } = await import('react-dom/client');
 const root = createRoot(document.getElementById('root'));
 function Harness() {
@@ -68,6 +72,23 @@ after(async () => {
   await act(async () => root.unmount());
   dom.window.close();
   delete globalThis.applicationSettingsController;
+  delete globalThis.profileTarget;
+  delete globalThis.profileDestination;
+});
+
+test('profile editing opens settings only for the local profile', async () => {
+  await act(async () => setLanguage('pt-BR'));
+  globalThis.profileTarget = { peerId: 'local-fixture', name: 'Local', isLocal: true };
+  await act(async () => root.render(React.createElement(ProfileModal)));
+  const edit = document.querySelector('button[aria-label="Editar perfil"]');
+  assert.ok(edit);
+  assert.ok(document.querySelector('button[aria-label="Fechar"]'));
+  await act(async () => edit.click());
+  assert.equal(globalThis.profileDestination, 'settings');
+  globalThis.profileTarget = { peerId: 'remote-fixture', name: 'Guest', isLocal: false };
+  await act(async () => root.render(React.createElement(ProfileModal)));
+  assert.equal(document.querySelector('button[aria-label="Editar perfil"]'), null);
+  await act(async () => root.render(null));
 });
 
 test('appearance applies and persists custom colors and restores preset tokens', async () => {

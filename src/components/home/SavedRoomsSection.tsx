@@ -1,7 +1,7 @@
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useEffect, useState } from 'react';
-import { ArrowRight, BookmarkPlus, Crown, GripVertical, LockKeyhole, Pencil, Trash2, Users } from 'lucide-react';
+import { ArrowRight, BookmarkPlus, GripVertical, LockKeyhole, Pencil, Trash2 } from 'lucide-react';
 import { savedRooms, type SavedRoom } from '../../core/saved_rooms';
 import { useModal } from '../../hooks/useModal';
 import { useRoom } from '../../hooks/useRoom';
@@ -12,6 +12,7 @@ import { EditSavedRoomDialog } from '../modals/EditSavedRoomDialog';
 import { orderSavedRooms } from '../../core/saved_room_order';
 import { useSortableGrid } from '../../hooks/useSortableGrid';
 import { ModalDialog } from '../common/ModalDialog';
+import { TooltipButton } from '../common/TooltipButton';
 
 export const SavedRoomsSection: React.FC = () => {
   useLocale();
@@ -98,7 +99,6 @@ export const SavedRoomsSection: React.FC = () => {
                   <strong>{room.customName ?? room.name}</strong>
                   <div className="saved-room-meta">
                     <span className="badge-host saved-room-role">
-                      {room.owned ? <Crown size={12} aria-hidden="true" /> : <Users size={12} aria-hidden="true" />}
                       {room.owned ? t("message.66abaa8c669e") : t("message.1e97ddf60a0f")}
                     </span>
                     <span className="saved-room-id">{room.roomId.slice(0, 8)}</span>
@@ -110,12 +110,12 @@ export const SavedRoomsSection: React.FC = () => {
                 <button className="btn btn-secondary saved-room-enter" onClick={() => openSaved(room)}>
                   {t("message.4105811890ae")}<ArrowRight size={14} />
                 </button>
-                <button className="btn btn-secondary saved-room-icon-button"
-                  onClick={() => setEditingRoom(room)} aria-label={t("message.c0a6f99cb765", { v0: room.name })}>
+                <TooltipButton className="btn btn-secondary saved-room-icon-button"
+                  onClick={() => setEditingRoom(room)} tooltip={t("message.c0a6f99cb765", { v0: room.name })}>
                   <Pencil size={14} />
-                </button>
-                <button className="btn btn-secondary saved-room-remove" onClick={() => setRemovingRoom(room)}
-                  aria-label={t("message.4814bd50cf7c", { v0: room.name })}><Trash2 size={14} /></button>
+                </TooltipButton>
+                <TooltipButton className="btn btn-secondary saved-room-remove" onClick={() => setRemovingRoom(room)}
+                  tooltip={t("message.4814bd50cf7c", { v0: room.name })}><Trash2 size={14} /></TooltipButton>
               </div>
             </article>
           ))}

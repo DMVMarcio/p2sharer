@@ -47,7 +47,7 @@ export function backgroundTokens(value: string, mode: 'dark' | 'light') {
     '--bg-elevated': surface(light ? 0.55 : 0.09, 0.03),
     '--bg-card': surface(light ? 0.36 : 0.065, 0.03),
     '--bg-card-hover': surface(light ? 0.65 : 0.09, 0.035),
-    '--bg-input': surface(light ? 0.1 : 0.04),
+    '--bg-input': surface(light ? 0.03 : vivid ? 0.2 : 0.1, black ? 0.1 : 0.065),
     '--bg-control': surface(light ? 0.08 : vivid ? 0.32 : 0.18, black ? 0.1 : 0.05),
     '--bg-control-hover': surface(light ? 0.16 : vivid ? 0.46 : 0.29, black ? 0.18 : 0.06),
   };

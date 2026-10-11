@@ -603,7 +603,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   position: absolute;
   right: 0;
   bottom: 0;
-  width: calc(var(--hero-art-width) * 2.5);
+  width: calc(var(--hero-art-width) * 1.75);
   height: 100%;
   pointer-events: none;
   background: radial-gradient(ellipse 100% 100% at 100% 100%, #00225c 0%, #00225c 32%, transparent 90%);
@@ -681,7 +681,6 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 .saved-rooms-grid { position: relative; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 18px; }
 .saved-room-card {
   --room-role-text: #8aeaca;
-  --room-role-bg: color-mix(in srgb, #8aeaca 9%, var(--bg-card));
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -691,10 +690,10 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   border: 0;
   border-radius: var(--radius-lg);
 }
-.saved-room-card.is-owned { --room-role-text: #ffd09a; --room-role-bg: color-mix(in srgb, #ffd09a 9%, var(--bg-card)); }
+.saved-room-card.is-owned { --room-role-text: #ffd09a; }
 .saved-room-card:hover { box-shadow: var(--shadow-md); }
-html[data-theme="light"] .saved-room-card { --room-role-text: #075443; --room-role-bg: #d4f9e9; }
-html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; --room-role-bg: #ffecd5; }
+html[data-theme="light"] .saved-room-card { --room-role-text: #075443; }
+html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; }
 .saved-room-card { position: relative; transition: background-color var(--transition-fast), box-shadow var(--transition-normal); }
 .saved-room-card-heading { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .saved-room-card-heading .saved-room-drag-handle { width: 28px; min-width: 28px; height: 32px; padding: 0;
@@ -708,7 +707,7 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 .saved-room-details { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 6px; }
 .saved-room-details strong { color: var(--text-primary); font-size: 17px; letter-spacing: -0.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .saved-room-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--text-muted); }
-.saved-room-role.badge-host { display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border-radius: var(--radius-full); color: var(--room-role-text); background: var(--room-role-bg); font-size: 11px; letter-spacing: 0; }
+.saved-room-role.badge-host { color: var(--room-role-text); font-size: 11px; font-weight: 500; letter-spacing: 0; line-height: 1.5; }
 .saved-room-id { color: var(--text-muted); font: 10px var(--font-mono); }
 .saved-room-actions { display: flex; align-items: center; gap: 8px; }
 .saved-room-actions .btn { min-height: 40px; border-radius: var(--radius-md); font-size: 13px; }
@@ -1811,10 +1810,10 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   top: calc(100% + 6px);
   left: 50%;
   transform: translateX(-50%) translateY(3px) scale(0.98);
-  background-color: rgba(18, 18, 22, 0.96);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--border-focus);
-  border-radius: var(--radius-sm);
+  background-color: var(--bg-control-hover);
+  color: var(--text-primary);
+  border: 0;
+  border-radius: var(--radius-md);
   padding: 8px 12px;
   min-width: 170px;
   max-width: 250px;
@@ -1832,8 +1831,8 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   min-width: auto;
   max-width: min(280px, calc(100vw - 16px));
   width: max-content;
-  padding: 5px 9px;
-  font-size: 11px;
+  padding: 8px 12px;
+  font-size: 12px;
   font-weight: 500;
   font-family: var(--font-sans);
   color: var(--text-primary);
@@ -1841,8 +1840,8 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   overflow-wrap: anywhere;
   line-height: 1.5;
   text-align: center;
-  border-radius: var(--radius-sm);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
 }
 
 /* Portal-based Custom Tooltip (immune to card overflow clipping and viewport boundary leaks) */
@@ -2965,11 +2964,11 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 .chat-composer-editor {
   display: block;
   width: 100%;
-  min-height: 36px;
+  min-height: 42px;
   max-height: 130px;
   margin: 0;
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
+  padding: 11px 14px;
+  border-radius: var(--radius-md);
   font-family: inherit;
   font-size: 13px;
   line-height: 18px;
@@ -2977,7 +2976,7 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   overflow-wrap: break-word;
   tab-size: 4;
   background-color: var(--bg-input);
-  border: 1px solid var(--border-default);
+  border: 1px solid transparent;
   color: var(--text-primary);
   overflow-y: auto;
   caret-color: var(--text-primary);
@@ -2995,7 +2994,8 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 }
 
 .chat-composer-editor:focus {
-  border-color: var(--border-focus);
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px var(--accent-subtle);
 }
 
 .chat-composer-editor p + p,
@@ -3663,8 +3663,9 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   background-color: var(--bg-input);
   border: 1px solid transparent;
   border-radius: var(--radius-md);
-  padding: 9px 12px;
-  font-size: 13px;
+  min-height: 44px;
+  padding: 11px 14px;
+  font-size: 14px;
   color: var(--text-primary);
   outline: none;
   font-family: inherit;
@@ -3672,9 +3673,10 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 }
 
 .text-input-sm {
-  padding: 8px 12px;
+  min-height: 38px;
+  padding: 9px 12px;
   font-size: 12.5px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
 }
 
 .text-input:focus,
@@ -3685,9 +3687,10 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 
 .select-input-sm {
   background-color: var(--bg-input);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-sm);
-  padding: 6px 10px;
+  min-height: 38px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  padding: 9px 12px;
   font-size: 12px;
   color: var(--text-primary);
   outline: none;
@@ -5406,10 +5409,10 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   gap: 10px;
   width: 100%;
   min-width: 0;
-  min-height: 30px;
-  padding: 6px 10px;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-sm);
+  min-height: 38px;
+  padding: 9px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
   background: var(--bg-input);
   color: var(--text-primary);
   font: inherit;
@@ -5418,7 +5421,7 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   cursor: pointer;
   transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
 }
-.app-select:hover:not(:disabled) { border-color: var(--border-focus); }
+.app-select:hover:not(:disabled) { background: color-mix(in srgb, var(--bg-input) 90%, var(--text-primary) 10%); }
 .app-select:focus-visible, .app-select.is-open { outline: none; border-color: var(--accent-color); box-shadow: 0 0 0 2px var(--accent-subtle); }
 .app-select:disabled { opacity: .45; cursor: default; }
 .app-select-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -5708,7 +5711,8 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 
 /* Participant profiles share the existing media assets and modal lifecycle. */
 .modal-card.profile-view-modal { position: relative; width: min(580px, calc(100vw - 32px)); max-width: 580px; border: none; }
-.modal-overlay-close { z-index: 1; width: 32px; height: 32px; border-radius: var(--radius-full); color: white; background: rgba(0, 0, 0, .55); }
+.modal-overlay-actions { position: absolute; top: 18px; right: 18px; z-index: 1; display: flex; gap: 8px; }
+.modal-overlay-actions .modal-overlay-close { position: static; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: var(--radius-md); color: white; background: rgba(0, 0, 0, .65); }
 .modal-overlay-close:hover { color: white; background: rgba(0, 0, 0, .75); }
 .profile-view-modal .modal-body { display: block; padding: 0; }
 .profile-view-banner { aspect-ratio: 3; overflow: hidden; }
