@@ -3290,18 +3290,16 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   padding: 9px 11px;
   text-align: left;
   color: var(--text-primary);
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+  border: 0;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
-.emoji-pack-option:hover,
-.emoji-pack-option.active {
-  background: var(--dropdown-hover-bg);
-  border-color: var(--accent-color);
-}
+.emoji-pack-option:hover { background: var(--bg-control); }
+.emoji-pack-option.active { background: var(--bg-selected); }
+.emoji-pack-option:focus-visible { outline: 2px solid var(--text-primary); outline-offset: -2px; }
 
 .emoji-pack-preview {
   display: grid;
@@ -5779,7 +5777,9 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 .toast-error { --toast-color: var(--danger-text); }
 .toast-warning { --toast-color: var(--warning-text); }
 .toast-icon { display: flex; flex: none; color: var(--toast-color); }
-.toast-message { min-width: 0; }
+.toast-message { flex: 1; min-width: 0; }
+.toast .toast-close { flex: none; width: 26px; height: 26px; margin-left: auto; color: var(--text-secondary); border-radius: var(--radius-sm); }
+.toast .toast-close:hover { background: var(--bg-control-hover); color: var(--text-primary); }
 .toast-progress { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: var(--toast-color); transform-origin: left; animation: toastCountdown linear forwards; }
 @keyframes toastCountdown { to { transform: scaleX(0); } }
 @media (prefers-reduced-motion: reduce) {

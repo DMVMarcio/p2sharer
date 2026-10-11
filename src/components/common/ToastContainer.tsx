@@ -1,13 +1,14 @@
 import { useLocale } from '../../hooks/useLocale';
-import { localizeText } from '../../i18n';
+import { localizeText, t } from '../../i18n';
 import React from 'react';
-import { Check, Info, TriangleAlert, CircleX } from 'lucide-react';
+import { Check, Info, TriangleAlert, CircleX, X } from 'lucide-react';
 import { toastManager } from '../../hooks/useToast';
 import { useToast } from '../../hooks/useToast';
+import { TooltipButton } from './TooltipButton';
 
 export const ToastContainer: React.FC = () => {
   useLocale();
-  const { toasts } = useToast();
+  const { toasts, removeToast } = useToast();
 
   if (toasts.length === 0) return null;
 
@@ -15,9 +16,14 @@ export const ToastContainer: React.FC = () => {
     <div id="toast-container" className="toast-container">
       {toasts.map((toast) => (
         <div key={toast.id} className={`toast toast-${toast.type}`} role={toast.type === 'error' ? 'alert' : 'status'}
-          onMouseEnter={() => toastManager.pause(toast.id)} onMouseLeave={() => toastManager.resume(toast.id)}>
+          onMouseEnter={() => toastManager.pause(toast.id)}
+          onMouseLeave={event => { if (!event.currentTarget.contains(document.activeElement)) toastManager.resume(toast.id); }}
+          onFocus={() => toastManager.pause(toast.id)}
+          onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget) && !event.currentTarget.matches(':hover')) toastManager.resume(toast.id); }}>
           <span className="toast-icon" aria-hidden="true">{toast.type === 'success' ? <Check size={20} /> : toast.type === 'error' ? <CircleX size={20} /> : toast.type === 'warning' ? <TriangleAlert size={20} /> : <Info size={20} />}</span>
           <span className="toast-message">{localizeText(toast.message)}</span>
+          <TooltipButton className="btn-close toast-close" tooltip={t('message.0f2bd88ef0ac')}
+            onClick={() => removeToast(toast.id)}><X size={16} aria-hidden="true" /></TooltipButton>
           <span className="toast-progress" aria-hidden="true" style={{ animationDuration: `${toast.durationMs}ms`, animationPlayState: toast.paused ? 'paused' : 'running' }} />
         </div>
       ))}
