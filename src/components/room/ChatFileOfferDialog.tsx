@@ -1,3 +1,4 @@
+import { useModalDialogBehavior } from '../common/useModalDialogBehavior';
 import { localizeText, t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { useState } from 'react';
@@ -19,8 +20,9 @@ export function ChatFileOfferDialog({ file, onClose, onOffer }: Props) {
     catch { setError(t("message.fb1fa51a323d")); }
     finally { setBusy(false); }
   };
-  return <div className="modal-overlay" onMouseDown={(event) => { if (!busy && event.target === event.currentTarget) onClose(); }}>
-    <div className="modal-card chat-file-dialog" role="dialog" aria-modal="true" aria-labelledby="chat-file-dialog-title">
+  const dialogRef = useModalDialogBehavior(onClose, busy, false);
+  return <div className="modal-overlay">
+    <div ref={dialogRef} className="modal-card chat-file-dialog" role="dialog" aria-modal="true" aria-labelledby="chat-file-dialog-title">
       <div className="modal-header"><div className="modal-header-icon"><Paperclip size={19} /></div><div><h2 id="chat-file-dialog-title">{t("message.0176661d7e81")}</h2>
         <p className="modal-subtitle">{t("message.a9477d069b1b")}</p></div>
         <button className="btn-close" aria-label={t("message.0f2bd88ef0ac")} disabled={busy} onClick={onClose}>&times;</button></div>

@@ -1,3 +1,4 @@
+import { useModalDialogBehavior } from '../common/useModalDialogBehavior';
 import { profileStats } from '../../core/profile_stats';
 import { NICKNAME_STYLE_KEY } from '../../core/nickname_style';
 import { profileImages, profileBanners, type ProfileDraft } from '../../core/profile_image';
@@ -165,7 +166,7 @@ export const SettingsModal: React.FC = () => {
       }
       await profileImages.save(profileDraft, profileColor, profileRemove, profileCardColor);
     }
-    catch { setSaving(false); showToast(t('profile.saveFailed')); return; }
+    catch { setSaving(false); showToast(t('profile.saveFailed'), 3500, 'error'); return; }
     profileStats.setSharing(showProfileStats);
     // Save username
     if (nick.trim()) {
@@ -213,14 +214,14 @@ export const SettingsModal: React.FC = () => {
     setSaving(false);
     setLanguage(language);
     closeModal();
-    showToast(t("message.3f84cec002ac"));
+    showToast(t("message.3f84cec002ac"), 3500, 'success');
   };
 
   const handleOpenLatestLog = async () => {
     try {
       await invoke('open_latest_log');
     } catch (err) {
-      showToast(t("message.1d56d35310c9", { v0: err }));
+      showToast(t("message.1d56d35310c9", { v0: err }), 3500, 'error');
     }
   };
 
@@ -228,22 +229,24 @@ export const SettingsModal: React.FC = () => {
     try {
       await invoke('open_log_folder');
     } catch (err) {
-      showToast(t("message.1d56d35310c9", { v0: err }));
+      showToast(t("message.1d56d35310c9", { v0: err }), 3500, 'error');
     }
   };
 
   const handleClearLog = async () => {
     try {
       await invoke('clear_log_file');
-      showToast(t("message.0485a9c10162"));
+      showToast(t("message.0485a9c10162"), 3500, 'success');
     } catch (err) {
-      showToast(t("message.1d56d35310c9", { v0: err }));
+      showToast(t("message.1d56d35310c9", { v0: err }), 3500, 'error');
     }
   };
 
+  const dialogRef = useModalDialogBehavior(closeModal, saving || profileBusy || isClosing, false);
+
   return (
     <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} id="modal-settings">
-      <div className="modal-card modal-settings">
+      <div className="modal-card modal-settings" ref={dialogRef} inert={isClosing || undefined}>
         <div className="modal-header">
           <div className="modal-header-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -384,7 +387,6 @@ export const SettingsModal: React.FC = () => {
               <div className="settings-tab-pane active" id="settings-pane-profile">
                 <div className="settings-pane-header">
                   <h3 className="settings-pane-title">{t("message.d16122f3087d")}</h3>
-                  <p className="settings-pane-desc">{t("message.ea3a61eb13e1")}</p>
                 </div>
 
                 <ProfileImageEditor name={nick} draft={profileDraft} color={profileColor} remove={profileRemove}
@@ -717,7 +719,7 @@ export const SettingsModal: React.FC = () => {
                         }
                       }}>{tab === 'pointing' ? t("message.fc4d44253740") : t("message.5427a20ed7f7")}</button>)}
                   </div>
-                  {streamOptionsTab === 'pointing' && <div className="settings-row settings-options-panel" role="tabpanel" id="stream-options-panel-pointing" aria-labelledby="stream-options-pointing">
+                  {streamOptionsTab === 'pointing' && <div key={streamOptionsTab} className="settings-row settings-options-panel" role="tabpanel" id="stream-options-panel-pointing" aria-labelledby="stream-options-pointing">
                   {[
                     { id: 'participant-cursors', get label() { return t("message.0cdd1ad3fe1c"); }, description: t("message.6052f362cfdc"), checked: participantCursors, change: setParticipantCursors },
                     { id: 'participant-drawings', get label() { return t("message.cda3e4551d5a"); }, description: t("message.2254b260a6cc"), checked: participantDrawings, change: setParticipantDrawings },
@@ -742,7 +744,7 @@ export const SettingsModal: React.FC = () => {
                     </div>
                   </div>
                   </div>}
-                  {streamOptionsTab === 'advanced' && <div className="settings-row settings-options-panel" role="tabpanel" id="stream-options-panel-advanced" aria-labelledby="stream-options-advanced">
+                  {streamOptionsTab === 'advanced' && <div key={streamOptionsTab} className="settings-row settings-options-panel" role="tabpanel" id="stream-options-panel-advanced" aria-labelledby="stream-options-advanced">
                   <div className="settings-row">
                     <label className="settings-label" htmlFor="settings-video-encoder">{t("message.e13520183b92")}</label>
                     <Select id="settings-video-encoder" className="select-input-sm" value={encoder}

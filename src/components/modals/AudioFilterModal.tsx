@@ -1,3 +1,4 @@
+import { useModalDialogBehavior } from '../common/useModalDialogBehavior';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useEffect, useState } from 'react';
@@ -31,16 +32,6 @@ export const AudioFilterModal: React.FC = () => {
     loadProcesses();
   }, [loadProcesses]);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        closeModal();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [closeModal]);
-
   const handleApply = async () => {
     const success = await applyFilters();
     if (success) {
@@ -51,17 +42,14 @@ export const AudioFilterModal: React.FC = () => {
   const isExclude = selectedFilterMode === 'exclude';
   const selectedCount = selectedNames.size;
 
+  const dialogRef = useModalDialogBehavior(closeModal, isClosing, false);
+
   return (
     <div
       className={`modal-overlay ${isClosing ? 'closing' : ''}`}
       id="modal-audio-filter"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          closeModal();
-        }
-      }}
     >
-      <div className="modal-card modal-lg audio-filter-modal-card">
+      <div className="modal-card modal-lg audio-filter-modal-card" ref={dialogRef} inert={isClosing || undefined}>
         {/* Modal Header */}
         <div className="modal-header">
           <div>

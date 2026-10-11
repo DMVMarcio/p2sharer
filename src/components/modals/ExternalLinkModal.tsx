@@ -1,3 +1,4 @@
+import { useModalDialogBehavior } from '../common/useModalDialogBehavior';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useEffect, useRef } from 'react';
@@ -14,24 +15,19 @@ export const ExternalLinkModal: React.FC = () => {
 
   useEffect(() => {
     cancelRef.current?.focus();
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') closeModal();
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
   }, [closeModal]);
 
   const proceed = () => {
     if (!destination) return;
     closeModal();
-    void openUrl(destination).catch(() => showToast(t("message.3c3c85fd6b50")));
+    void openUrl(destination).catch(() => showToast(t("message.3c3c85fd6b50"), 3500, 'error'));
   };
 
+  const dialogRef = useModalDialogBehavior(closeModal, isClosing, true);
+
   return (
-    <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} role="presentation" onMouseDown={(event) => {
-      if (event.target === event.currentTarget) closeModal();
-    }}>
-      <div className="modal-card external-link-modal" role="dialog" aria-modal="true" aria-labelledby="external-link-title" aria-describedby="external-link-description">
+    <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} role="presentation">
+      <div className="modal-card external-link-modal" role="dialog" aria-modal="true" aria-labelledby="external-link-title" aria-describedby="external-link-description" ref={dialogRef} inert={isClosing || undefined}>
         <div className="modal-header">
           <div className="modal-header-icon"><ExternalLink size={20} aria-hidden="true" /></div>
           <div>

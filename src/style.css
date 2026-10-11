@@ -66,6 +66,7 @@ html[data-theme="dark"],
   --success-bg: rgba(16, 185, 129, 0.12);
   --success-border: rgba(16, 185, 129, 0.3);
   --success-text: #34d399;
+  --warning-text: #e6ad55;
 
   --skeleton-base: rgba(255, 255, 255, 0.05);
   --skeleton-highlight: rgba(255, 255, 255, 0.12);
@@ -98,6 +99,7 @@ html[data-theme="light"] {
   --success-bg: rgba(16, 185, 129, 0.08);
   --success-border: rgba(16, 185, 129, 0.25);
   --success-text: #059669;
+  --warning-text: #99600f;
 
   --skeleton-base: rgba(0, 0, 0, 0.05);
   --skeleton-highlight: rgba(0, 0, 0, 0.12);
@@ -855,6 +857,7 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 }
 
 .btn-stream-filter {
+  font-variant-numeric: tabular-nums;
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -862,7 +865,7 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   border: none;
   color: var(--text-secondary);
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
   padding: 7px 11px;
   border-radius: var(--radius-full);
   cursor: pointer;
@@ -2445,25 +2448,25 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   top: 50%;
   transform: translateY(-50%);
   right: var(--room-sidebar-width, 320px);
-  width: 28px;
-  height: 220px;
+  width: 52px;
+  height: 280px;
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 45;
   pointer-events: auto;
-  margin-right: -14px;
+  margin-right: -26px;
   transition: right var(--transition-normal), margin-right var(--transition-normal), width var(--transition-normal);
 }
 
 .sidebar-toggle-edge.collapsed {
-  right: 0px;
+  right: 8px;
   margin-right: 0px;
-  width: 24px;
-  justify-content: flex-end;
+  width: 52px;
+  justify-content: center;
 }
 
-.sidebar-toggle-edge.expanded { pointer-events: none; }
+.sidebar-toggle-edge.expanded { pointer-events: auto; }
 .sidebar-toggle-edge.expanded .sidebar-edge-toggle-btn { pointer-events: auto; }
 
 .sidebar-edge-toggle-btn {
@@ -2490,9 +2493,7 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 }
 
 .sidebar-toggle-edge.collapsed .sidebar-edge-toggle-btn {
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
-  border-right: none;
+  border-radius: var(--radius-sm);
 }
 
 .sidebar-edge-toggle-btn:hover {
@@ -5732,3 +5733,44 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 .profile-identity-button { display: inline-flex; align-items: center; gap: 8px; min-width: 0; padding: 0; border: none; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: var(--radius-sm); }
 .profile-identity-button:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 3px; }
 .participant-item-identity.profile-identity-button { flex: 1; }
+
+/* Comfortable shared surfaces and short, layout-independent tab motion. */
+:where(button, [role="button"]) {
+  transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), opacity var(--transition-fast), transform var(--transition-fast);
+}
+.inline-notice { background: var(--bg-control); border: 0; padding: 12px 14px; border-radius: var(--radius-lg); }
+.inline-notice > svg { color: var(--accent-color); }
+.emoji-picker { background: var(--bg-elevated); border: 0; border-radius: var(--radius-lg); padding: 16px; }
+.emoji-picker-search { min-height: 40px; padding: 10px 12px; border: 0; border-radius: var(--radius-md); background: var(--bg-input); box-shadow: inset 0 0 0 1px var(--border-subtle); }
+.emoji-picker-categories { gap: 5px; }
+.emoji-picker-categories button { min-width: 34px; height: 34px; border-radius: var(--radius-md); }
+.emoji-picker-categories button.active { color: var(--text-primary); background: var(--bg-selected); }
+.emoji-picker-categories button:hover, .emoji-picker-categories button.active, .emoji-picker-grid button:hover { outline: none; }
+.emoji-picker-grid button:focus-visible, .emoji-picker-search:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
+.source-card { position: relative; border: 0; border-radius: var(--radius-lg); padding: 10px; background: var(--bg-control); color: var(--text-primary); font: inherit; text-align: left; }
+.source-card:hover { border: 0; background: var(--bg-control-hover); }
+.source-card.selected { border: 0; background: var(--bg-selected); box-shadow: inset 0 0 0 2px var(--accent-color); }
+.source-card:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 3px; }
+.source-card-thumb { border-radius: var(--radius-md); background: var(--bg-input); }
+.media-preview { border: 0; border-radius: var(--radius-lg); background: var(--bg-control); }
+.media-preview-stage:not(:has(video.ready)) { background: var(--bg-input); }
+.media-preview-caption { padding: 14px; color: var(--text-primary); }
+.picker-tabs { border: 0; }
+.picker-tab-btn { font-weight: 600; border: 0; border-radius: var(--radius-md); }
+.picker-tab-btn:hover { background: var(--bg-control-hover); }
+.picker-tab-btn.active { color: var(--text-primary); background: var(--bg-selected); }
+.settings-tab-pane.active, .settings-options-panel, .rendezvous-panel, .sidebar-tab-content.active { animation: tabContentEnter var(--transition-normal) both; }
+@keyframes tabContentEnter { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.toast-container { width: min(410px, calc(100vw - 40px)); max-width: min(410px, calc(100vw - 40px)); gap: 12px; }
+.toast { --toast-color: var(--text-secondary); position: relative; display: flex; align-items: center; gap: 12px; width: 100%; min-height: 66px; padding: 18px 20px 21px; overflow: hidden; font-size: 13px; background: var(--bg-elevated); box-shadow: var(--shadow-lg), inset 0 0 0 1px var(--border-subtle); }
+.toast-success { --toast-color: var(--accent-color); }
+.toast-error { --toast-color: var(--danger-text); }
+.toast-warning { --toast-color: var(--warning-text); }
+.toast-icon { display: flex; flex: none; color: var(--toast-color); }
+.toast-message { min-width: 0; }
+.toast-progress { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: var(--toast-color); transform-origin: left; animation: toastCountdown linear forwards; }
+@keyframes toastCountdown { to { transform: scaleX(0); } }
+@media (prefers-reduced-motion: reduce) {
+  :where(button, [role="button"]) { transition: none !important; }
+  .settings-tab-pane.active, .settings-options-panel, .rendezvous-panel, .sidebar-tab-content.active { animation: none; }
+}

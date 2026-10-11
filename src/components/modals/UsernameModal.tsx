@@ -1,3 +1,4 @@
+import { useModalDialogBehavior } from '../common/useModalDialogBehavior';
 import { roomService } from '../../services/room_service';
 import { NicknameField } from '../common/NicknameField';
 import { NICKNAME_STYLE_KEY } from '../../core/nickname_style';
@@ -36,9 +37,11 @@ export const UsernameModal: React.FC = () => {
 
   const { submit, pending } = useFormSubmit(handleSave, isClosing);
 
+  const dialogRef = useModalDialogBehavior(closeModal, pending || isClosing, false);
+
   return (
     <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} id="modal-username">
-      <form autoComplete="off" onSubmit={submit} aria-busy={pending} className="modal-card">
+      <form autoComplete="off" onSubmit={submit} aria-busy={pending} className="modal-card" ref={dialogRef} inert={isClosing || undefined}>
         <div className="modal-header">
           <div className="modal-header-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

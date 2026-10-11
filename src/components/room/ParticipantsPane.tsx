@@ -1,3 +1,4 @@
+import { useModalDialogBehavior } from '../common/useModalDialogBehavior';
 import { Nickname } from '../common/Nickname';
 import { ProfileAvatar } from '../common/ProfileAvatar';
 import { profileAction } from '../common/profile_actions';
@@ -19,6 +20,8 @@ export const ParticipantsPane: React.FC = () => {
   const [pendingAction, setPendingAction] = useState<{
     kind: 'kick' | 'transfer' | 'admin' | 'revoke-admin'; id: string; name: string;
   } | null>(null);
+
+  const dialogRef = useModalDialogBehavior(() => setPendingAction(null), false, false, Boolean(pendingAction));
 
   const confirmAction = async () => {
     if (!pendingAction) return;
@@ -101,7 +104,7 @@ export const ParticipantsPane: React.FC = () => {
         })}
       </div>
       {pendingAction && createPortal(<div className="modal-overlay" role="presentation">
-        <div className="modal-card participant-confirm-dialog" role="alertdialog" aria-modal="true"
+        <div ref={dialogRef} className="modal-card participant-confirm-dialog" role="alertdialog" aria-modal="true"
           aria-label={pendingAction.kind === 'kick' ? t("message.c8441cf46109") : t("message.31da2f84aa1c")}>
           <div className="modal-header"><h2>{pendingAction.kind === 'kick' ? t("message.dd71f6a23c60")
             : pendingAction.kind === 'transfer' ? t("message.2ffa385a1bc4") : t("message.159c8a918684")}</h2></div>

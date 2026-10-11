@@ -65,7 +65,7 @@ export async function copyImageToClipboard(src: string): Promise<boolean> {
     const dataBase64 = await imageSrcToBase64(src);
     try {
       await invoke('copy_chat_image', { dataBase64 });
-      showToast(t("message.copyImageSuccess"));
+      showToast(t("message.copyImageSuccess"), 3500, 'success');
       return true;
     } catch (invokeError) {
       if (typeof navigator !== 'undefined' && navigator.clipboard && typeof ClipboardItem !== 'undefined') {
@@ -73,14 +73,14 @@ export async function copyImageToClipboard(src: string): Promise<boolean> {
         const originalBlob = await response.blob();
         const pngBlob = await blobToPngBlob(originalBlob);
         await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
-        showToast(t("message.copyImageSuccess"));
+        showToast(t("message.copyImageSuccess"), 3500, 'success');
         return true;
       }
       throw invokeError;
     }
   } catch (error) {
     console.warn('[Clipboard] Failed to copy image:', error);
-    showToast(t("message.copyImageError"));
+    showToast(t("message.copyImageError"), 3500, 'error');
     return false;
   }
 }

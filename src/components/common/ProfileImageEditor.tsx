@@ -36,7 +36,7 @@ export function ProfileImageEditor({ name, draft, color, remove, onDraft, onColo
       if (picked) {
         setSelection({ ...picked, crop: { x: 0.5, y: 0.5, size: 1 } });
       }
-    } catch { showToast(t('profile.invalid')); }
+    } catch { showToast(t('profile.invalid'), 3500, 'error'); }
     finally { setPicking(false); onBusy(false); }
   };
   return <div className="settings-row">

@@ -20,10 +20,10 @@ export const AppsModal: React.FC = () => {
 
   const start = (close: () => void) => {
     try { roomAppsService.start(selectedKind, personal); close(); }
-    catch (error) { showToast(localizeError(error)); }
+    catch (error) { showToast(localizeError(error), 3500, 'error'); }
   };
 
-  return <ModalDialog title={t("message.791e1b0c7eaf")} subtitle={t("message.beb35c20f071")}
+  return <ModalDialog closeOnOutside title={t("message.791e1b0c7eaf")} subtitle={t("message.beb35c20f071")}
     icon={<AppWindow size={20} strokeWidth={1.8} />} className="modal-lg apps-library-modal"
     onClose={closeModal} footer={(close) => <div className="apps-library-footer">
       <label className="apps-library-personal">

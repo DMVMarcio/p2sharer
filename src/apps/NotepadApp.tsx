@@ -69,7 +69,7 @@ export const NotepadApp: React.FC<Props> = ({ instanceId, compact = false }) => 
     try {
       const file = await invoke<[string, string] | null>('open_note_file', { language: getLanguage() });
       if (file !== null) editor.commands.setContent(file[0], file[1] === 'html' ? {} : { contentType: 'markdown' });
-    } catch (error) { showToast(t("message.ccd428f79523", { v0: localizeError(error) })); }
+    } catch (error) { showToast(t("message.ccd428f79523", { v0: localizeError(error) }), 3500, 'error'); }
     finally { setBusy(false); }
   };
   const save = async () => {
@@ -77,8 +77,8 @@ export const NotepadApp: React.FC<Props> = ({ instanceId, compact = false }) => 
     setBusy(true);
     try {
       const saved = await invoke<boolean>('save_note_file', { content: editor.getHTML(), language: getLanguage() });
-      if (saved) showToast(t("message.6896081fcc11"));
-    } catch (error) { showToast(t("message.9e3916f5a733", { v0: localizeError(error) })); }
+      if (saved) showToast(t("message.6896081fcc11"), 3500, 'success');
+    } catch (error) { showToast(t("message.9e3916f5a733", { v0: localizeError(error) }), 3500, 'error'); }
     finally { setBusy(false); }
   };
   const applyLink = () => {

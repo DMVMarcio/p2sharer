@@ -47,10 +47,10 @@ export const AppHeader: React.FC<{ showUpdate?: boolean }> = ({ showUpdate = tru
       if (!record) throw new Error('Room record is missing');
       const saved = !record.saved;
       await savedRooms.put({ ...record, saved, password: saved ? record.password : undefined });
-      showToast(saved ? t("message.08064fa0da8c") : t("message.7611fbde28f9"));
+      showToast(saved ? t("message.08064fa0da8c") : t("message.7611fbde28f9"), 3500, 'success');
     } catch (error) {
       console.warn('[Rooms] Could not toggle saved room:', error);
-      showToast(t("message.d94a6e24bf10"));
+      showToast(t("message.d94a6e24bf10"), 3500, 'error');
     } finally {
       setSavingRoom(false);
     }

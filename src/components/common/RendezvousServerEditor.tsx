@@ -68,7 +68,7 @@ export const RendezvousServerEditor: React.FC<Props> = ({ preferences, onChange 
           </button>
         ))}
       </div>
-      <div className="rendezvous-panel" role="tabpanel" id={`${id}-panel`} aria-labelledby={`${id}-${transport}`}>
+      <div key={transport} className="rendezvous-panel" role="tabpanel" id={`${id}-panel`} aria-labelledby={`${id}-${transport}`}>
       <div className="rendezvous-bulk-actions" role="group" aria-label={t("message.c8d0c8a15130", { v0: labels[transport] })}>
         <button type="button" className="btn btn-sm btn-outline"
           disabled={!preferences[transport].some((server) => !server.enabled)}

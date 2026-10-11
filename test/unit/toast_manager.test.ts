@@ -1,0 +1,33 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { ToastManager, type ToastItem } from '../../src/core/toast_manager.ts';
+
+test('toast lifetime pauses, resumes with the remaining time, and stays independent of other notifications', context => {
+  context.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 1000 });
+  const manager = new ToastManager();
+  let items: ToastItem[] = [];
+  const unsubscribe = manager.subscribe(value => { items = value; });
+  manager.show('Saved', 1000, 'success');
+  const id = items[0].id;
+  assert.equal(items[0].type, 'success');
+  context.mock.timers.tick(400);
+  manager.pause(id);
+  manager.pause(id);
+  manager.show('Failed', 200, 'error');
+  context.mock.timers.tick(5000);
+  assert.deepEqual(items.map(item => item.id), [id]);
+  assert.equal(items[0].paused, true);
+  manager.resume(id);
+  manager.resume(id);
+  context.mock.timers.tick(599);
+  assert.equal(items.length, 1);
+  context.mock.timers.tick(1);
+  assert.equal(items.length, 0);
+  manager.show('Removed', 100);
+  manager.pause(items[0].id);
+  manager.remove(items[0].id);
+  manager.resume(id);
+  context.mock.timers.tick(1000);
+  assert.equal(items.length, 0);
+  unsubscribe();
+});

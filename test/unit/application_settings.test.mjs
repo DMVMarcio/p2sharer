@@ -26,7 +26,7 @@ const bundle = await build({
     export { profileImages, profileBanners } from './src/core/profile_image.ts';`, resolveDir: process.cwd() },
   bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic',
   plugins: [{ name: 'updater-fixture', setup(builder) {
-    builder.onResolve({ filter: /room_service|useRoom|useModal|@tauri-apps\/api\/core/ }, args => ({
+    builder.onResolve({ filter: /room_service|useRoom|useModal$|@tauri-apps\/api\/core/ }, args => ({
       path: args.path.includes('room_service') ? 'room' : args.path.includes('useRoom') ? 'room-hook' : args.path.includes('useModal') ? 'modal' : 'native', namespace: 'settings-fixture',
     }));
     builder.onLoad({ filter: /.*/, namespace: 'settings-fixture' }, args => ({ contents: {

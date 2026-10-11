@@ -1,3 +1,4 @@
+import { useModalDialogBehavior } from '../common/useModalDialogBehavior';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useState } from 'react';
@@ -42,13 +43,13 @@ export const EditSavedRoomDialog: React.FC<EditSavedRoomDialogProps> = ({ room, 
       const versionOrder = compareRoomInvites(nextInvite, currentInvite);
       if (nextInvite.roomId === room.roomId && (versionOrder < 0 ||
           (versionOrder === 0 && inviteCode.trim() !== current.invite))) {
-        showToast(t("message.e3fc89f91ba3"));
+        showToast(t("message.e3fc89f91ba3"), 3500, 'warning');
         return;
       }
       const nextPassword = password.trim();
       if (nextInvite.roomId !== room.roomId) {
         if (await savedRooms.get(nextInvite.roomId)) {
-          showToast(t("message.da8fbc860300"));
+          showToast(t("message.da8fbc860300"), 3500, 'warning');
           return;
         }
         await savedRooms.put({ roomId: nextInvite.roomId, invite: inviteCode.trim(),
@@ -68,11 +69,11 @@ export const EditSavedRoomDialog: React.FC<EditSavedRoomDialogProps> = ({ room, 
           password: nextPassword || undefined,
           protected: Boolean(nextPassword) || current.protected });
       }
-      showToast(t("message.029c27a8024d"));
+      showToast(t("message.029c27a8024d"), 3500, 'success');
       onClose();
     } catch (error) {
       console.warn('[Rooms] Could not edit saved room:', error);
-      showToast(t("message.d94a6e24bf10"));
+      showToast(t("message.d94a6e24bf10"), 3500, 'error');
     } finally {
       setBusy(false);
     }
@@ -80,11 +81,11 @@ export const EditSavedRoomDialog: React.FC<EditSavedRoomDialogProps> = ({ room, 
 
   const { submit, pending } = useFormSubmit(save);
 
+  const dialogRef = useModalDialogBehavior(onClose, busy || pending, false);
+
   return createPortal(
-    <div className="modal-overlay" role="presentation" onMouseDown={(event) => {
-      if (event.target === event.currentTarget) onClose();
-    }}>
-      <form autoComplete="off" onSubmit={submit} aria-busy={pending} className="modal-card" role="dialog" aria-modal="true" aria-labelledby="edit-saved-room-title">
+    <div className="modal-overlay" role="presentation">
+      <form autoComplete="off" onSubmit={submit} aria-busy={pending} className="modal-card" role="dialog" aria-modal="true" aria-labelledby="edit-saved-room-title" ref={dialogRef}>
         <div className="modal-header">
           <div><h2 id="edit-saved-room-title">{t("message.4c6b05644363")}</h2></div>
           <button type="button" className="btn-close" aria-label={t("message.0f2bd88ef0ac")} onClick={onClose}>&times;</button>

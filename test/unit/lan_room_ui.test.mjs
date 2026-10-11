@@ -30,7 +30,7 @@ const bundle = await build({
   stdin: { contents: `export { CreateRoomModal } from './src/components/modals/CreateRoomModal.tsx';`, resolveDir: process.cwd() },
   bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic',
   plugins: [{ name: 'lan-ui-fixture', setup(builder) {
-    builder.onResolve({ filter: /useModal|useRoom|useToast|saved_rooms|@tauri-apps\/api\/core/ }, args => ({ path: args.path, namespace: 'lan-fixture' }));
+    builder.onResolve({ filter: /useModal$|useRoom|useToast|saved_rooms|@tauri-apps\/api\/core/ }, args => ({ path: args.path, namespace: 'lan-fixture' }));
     builder.onLoad({ filter: /.*/, namespace: 'lan-fixture' }, args => ({ contents:
       args.path.includes('useModal') ? 'export const useModal = () => ({ isClosing: false, closeModal() {} });' :
       args.path.includes('useRoom') ? 'export const useRoom = () => ({ joinRoom: (...args) => globalThis.lanUiJoin(...args) });' :

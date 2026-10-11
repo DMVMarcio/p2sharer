@@ -163,7 +163,7 @@ export function useScreenPicker(onClose?: () => void, isClosing = false) {
           stateStore.saveTransmissionDefaults({ resolution: resConfig.label.toLowerCase(), fps, bitrate, quality, cursor: showCursor });
         } catch (error) {
           console.warn('[Transmission] Could not save the last configuration:', error);
-          showToast(t("message.01791eb9ee03"));
+          showToast(t("message.01791eb9ee03"), 3500, 'error');
         }
       }
       if (onClose) onClose();

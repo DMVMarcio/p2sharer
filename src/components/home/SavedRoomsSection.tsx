@@ -28,7 +28,7 @@ export const SavedRoomsSection: React.FC = () => {
       setRooms((records) => orderSavedRooms(records, ids));
       return true;
     } catch {
-      showToast(t("message.128c78d2ee24"));
+      showToast(t("message.128c78d2ee24"), 3500, 'error');
       return false;
     }
   });
@@ -64,8 +64,8 @@ export const SavedRoomsSection: React.FC = () => {
   const removeSaved = async (room: SavedRoom) => {
     try {
       await savedRooms.put({ ...room, saved: false, password: undefined });
-      showToast(t("message.8f1e60abcf3e"));
-    } catch { showToast(t("message.bef29a92c3b0")); }
+      showToast(t("message.8f1e60abcf3e"), 3500, 'success');
+    } catch { showToast(t("message.bef29a92c3b0"), 3500, 'error'); }
   };
 
   return (
