@@ -101,14 +101,14 @@ export const SavedRoomsSection: React.FC = () => {
                 </div>
               </div>
               <div className="saved-room-actions">
-                <button className="btn btn-primary btn-sm saved-room-enter" onClick={() => openSaved(room)}>
+                <button className="btn btn-secondary saved-room-enter" onClick={() => openSaved(room)}>
                   {t("message.4105811890ae")}<ArrowRight size={14} />
                 </button>
-                <button className="btn btn-outline btn-sm saved-room-icon-button"
+                <button className="btn btn-secondary saved-room-icon-button"
                   onClick={() => setEditingRoom(room)} aria-label={t("message.c0a6f99cb765", { v0: room.name })}>
                   <Pencil size={14} />
                 </button>
-                <button className="btn btn-outline btn-sm saved-room-remove" onClick={() => setRemovingRoom(room)}
+                <button className="btn btn-secondary saved-room-remove" onClick={() => setRemovingRoom(room)}
                   aria-label={t("message.4814bd50cf7c", { v0: room.name })}><Trash2 size={14} /></button>
               </div>
             </article>

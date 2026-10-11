@@ -32,17 +32,20 @@ function mix(base: string, tint: string, amount: number): string {
 export function backgroundTokens(value: string, mode: 'dark' | 'light') {
   value = normalizeBackground(value);
   const preset = BACKGROUND_PRESETS.find(item => item.id === value);
-  const base = preset ? preset[mode] : value;
-  const light = luminance(base) > 0.179;
+  const seed = preset ? preset[mode] : value;
+  const light = mode === 'light' && luminance(seed) > 0.179;
+  const base = light ? seed : mix(seed, '#000000', luminance(seed) > 0.179 ? 0.72 : 0.45);
   const ink = light ? '#161616' : '#ffffff';
-  const tint = light ? '#ffffff' : luminance(base) > 0.09 ? '#000000' : '#ffffff';
+  const surface = (amount: number) => light
+    ? mix(base, '#ffffff', amount)
+    : mix(mix(base, seed, amount), '#ffffff', amount * 0.35);
   const surfaces = {
     '--bg-app': base,
-    '--bg-surface': mix(base, tint, light ? 0.28 : 0.04),
-    '--bg-elevated': mix(base, tint, light ? 0.55 : 0.09),
-    '--bg-card': mix(base, tint, light ? 0.36 : 0.06),
-    '--bg-card-hover': mix(base, tint, light ? 0.65 : 0.14),
-    '--bg-input': mix(base, tint, light ? 0.1 : 0.12),
+    '--bg-surface': surface(light ? 0.28 : 0.07),
+    '--bg-elevated': surface(light ? 0.55 : 0.14),
+    '--bg-card': surface(light ? 0.36 : 0.1),
+    '--bg-card-hover': surface(light ? 0.65 : 0.18),
+    '--bg-input': surface(light ? 0.1 : 0.12),
   };
   const readable = (amount: number) => {
     for (; amount < 1; amount += 0.025) {
