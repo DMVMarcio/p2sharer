@@ -1,4 +1,5 @@
 {
+  "virtualNetwork.interfaceConfigurationError": "O Windows recusou a configuração do adaptador virtual (código {{v0}}).",
   "virtualNetwork.ip": "IP virtual",
   "virtualNetwork.refresh": "Gerar novo IP",
   "virtualNetwork.refreshConfirm": "Gerar outro IP virtual? Os endereços salvos precisarão ser atualizados. Todos os túneis virtuais precisam estar desativados primeiro.",

@@ -289,6 +289,9 @@ impl Device {
                 ..Default::default()
             };
             checked(GetIpInterfaceEntry(&mut interface), "interface lookup")?;
+            // GetIpInterfaceEntry can return a nonzero site prefix for IPv4,
+            // but SetIpInterfaceEntry requires it to be zero (otherwise error 87).
+            interface.SitePrefixLength = 0;
             interface.NlMtu = MTU as u32;
             interface.UseAutomaticMetric = BOOLEAN(0);
             interface.Metric = 5;

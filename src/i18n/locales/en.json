@@ -1,4 +1,5 @@
 {
+  "virtualNetwork.interfaceConfigurationError": "Virtual adapter initialization: Virtual network interface configuration failed (Windows code {{v0}})",
   "virtualNetwork.ip": "Virtual IP",
   "virtualNetwork.refresh": "Generate a new IP",
   "virtualNetwork.refreshConfirm": "Generate a new virtual IP? Saved addresses will need to be updated. All virtual tunnels must be disabled first.",

@@ -102,6 +102,17 @@ test('mounted notices, unread plurals and number formats change without translat
   assert.equal(api.localizeError(new Error('Unknown platform detail')), api.t('error.unknown'));
 });
 
+test('virtual interface failures preserve the Windows error code in both languages', () => {
+  const previous = api.getLanguage();
+  const error = new Error('Virtual adapter initialization: Virtual network interface configuration failed (Windows code 87)');
+  try {
+    api.setLanguage('pt-BR');
+    assert.equal(api.localizeError(error), 'O Windows recusou a configuração do adaptador virtual (código 87).');
+    api.setLanguage('en');
+    assert.equal(api.localizeError(error), error.message);
+  } finally { api.setLanguage(previous); }
+});
+
 test('both catalogs cover every literal translation key and preserve interpolation variables', () => {
   const en = JSON.parse(readFileSync('src/i18n/locales/en.json', 'utf8'));
   const pt = JSON.parse(readFileSync('src/i18n/locales/pt-BR.json', 'utf8'));
