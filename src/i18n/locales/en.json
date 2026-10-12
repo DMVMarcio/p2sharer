@@ -230,7 +230,7 @@
   "message.f47f39a15741": "The camera does not support this mode.",
   "message.3ac7f82e95fe": "Could not open files. Select up to 32 files, up to 2 GB each.",
   "message.29014ff38240": "Could not complete the operation. Try again.",
-  "message.b7ee01f4e0b2": "Could not list cameras. Check Windows camera permissions.",
+  "message.b7ee01f4e0b2": "Could not list cameras. Check camera permissions in your system settings.",
   "message.f3ec8f258239": "Could not list sources: {{v0}}",
   "message.01791eb9ee03": "Stream settings applied, but the new defaults could not be saved.",
   "message.11b6606b6f25": "Could not apply stream settings: {{v0}}",

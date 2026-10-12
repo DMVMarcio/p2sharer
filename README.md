@@ -1,10 +1,12 @@
 # P2Sharer
 
-P2Sharer is a Windows desktop app for sharing screens, application audio and cameras with other people in a room. Watch multiple streams, exchange messages and files, take notes together, and watch YouTube with synchronized playback.
+P2Sharer is a Windows and macOS desktop app for sharing screens, application audio and cameras with other people in a room. Watch multiple streams, exchange messages and files, take notes together, and watch YouTube with synchronized playback.
 
 **[Latest release](https://github.com/DMVMarcio/p2sharer/releases/latest)** · [All releases](https://github.com/DMVMarcio/p2sharer/releases)
 
 Windows installers will be available on GitHub Releases as versions are published. Choose the `.exe` setup or `.msi` installer from the release's **Assets** section; the source-code archives are for development.
+
+This branch adds macOS 13+ builds (`.app` and `.dmg`), system audio through ScreenCaptureKit, and protected room storage through Keychain. See [macOS setup and testing](docs/macos.md) for local installation, permissions, current capture limitations and signing prerequisites. Official Mac release downloads become available after a signed release is built and published.
 
 ## What you can do
 
@@ -19,7 +21,7 @@ Rooms use WebRTC connections between participants. Internet (P2P) rooms use publ
 
 ## Get started
 
-1. Install a published Windows release and open P2Sharer.
+1. Install a published release, or a local macOS test build, and open P2Sharer.
 2. Choose a display name, create a room and share its invitation, or join with an invitation you received. Enter the room password if required.
 3. Select a screen, window or camera to share. Choose other participants' streams to watch and open room apps when you want to collaborate.
 
@@ -27,10 +29,10 @@ For the experimental LAN/VPN mode, choose **Local network / VPN** when creating 
 
 ## Development
 
-P2Sharer uses Tauri v2 and Rust for the Windows host, with React, TypeScript and Vite for the interface. Development requires:
+P2Sharer uses Tauri v2 and Rust for the desktop host, with React, TypeScript and Vite for the interface. Development requires:
 
 - Node.js 22.14 or newer and pnpm 10.30.1, pinned in `package.json`.
-- Rust and Microsoft Visual Studio C++ build tools.
+- Rust, with Microsoft Visual Studio C++ build tools on Windows or Xcode Command Line Tools on macOS.
 - CMake and NASM for native media dependencies. The launcher discovers standalone or Visual Studio-bundled CMake when it is not on PATH.
 
 With Corepack available, run `corepack enable` and `corepack install` from the checkout. Then install dependencies and start the desktop app:
@@ -47,13 +49,13 @@ pnpm run tauri:dev
 | `pnpm run tauri:dev` | Run the desktop application in development mode. |
 | `pnpm run dev` | Run the Vite frontend development server. |
 | `pnpm run build` | Check TypeScript and build the frontend. |
-| `pnpm run tauri:build` | Build the production desktop executable and Windows installers. |
+| `pnpm run tauri:build` | Build the production desktop executable and platform installers. |
 | `pnpm test` | Run frontend regression tests. |
-| `pnpm run test:native --release` | Run native library and integration tests on Windows. |
+| `pnpm run test:native --release` | Run native library and integration tests on Windows or macOS. |
 
-The application runs inside Tauri/WebView2; a browser preview checks only the frontend. Native capture and desktop integration require the desktop runtime. See [test instructions](test/README.md) for manual hardware checks and benchmark scope.
+The application runs inside Tauri (WebView2 on Windows, WKWebView on macOS); a browser preview checks only the frontend. Native capture and desktop integration require the desktop runtime. See [test instructions](test/README.md) for manual hardware checks and benchmark scope.
 
-Production output is written to `src-tauri/target/release/p2sharer.exe`, with installers under `src-tauri/target/release/bundle/`. Close the application before rebuilding and use the default Cargo target directory.
+Production output is written to `src-tauri/target/release/p2sharer.exe` on Windows or `src-tauri/target/release/p2sharer` on macOS, with installers under `src-tauri/target/release/bundle/`. Close the application before rebuilding and use the default Cargo target directory.
 
 See [releases and application updates](docs/releases.md) for version commands, signing setup and the GitHub draft-release workflow. The app checks for updates automatically; this can be disabled in settings. Available updates appear beside the header logo and install when you choose to restart.
 

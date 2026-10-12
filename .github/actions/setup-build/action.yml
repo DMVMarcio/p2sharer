@@ -1,4 +1,4 @@
-name: Prepare Windows build environment
+name: Prepare desktop build environment
 description: Shared pinned tooling and dependency caches for validation and releases.
 inputs:
   save-rust-cache:
@@ -21,6 +21,7 @@ runs:
       with:
         toolchain: stable
     - name: Install native build prerequisites
+      if: runner.os == 'Windows'
       shell: pwsh
       env:
         BUILD_SETUP_PATH: ${{ github.action_path }}
@@ -33,16 +34,25 @@ runs:
         $setupHash = (Get-FileHash -LiteralPath (Join-Path $env:BUILD_SETUP_PATH 'action.yml') -Algorithm SHA256).Hash
         $nativeEnvironmentHash = (Get-FileHash -LiteralPath 'tools/native-build-env.mjs' -Algorithm SHA256).Hash
         Add-Content -LiteralPath $env:GITHUB_ENV -Value "P2SHARER_NATIVE_ENV=$env:ImageVersion $nasmVersion $setupHash $nativeEnvironmentHash"
+    - name: Install macOS build prerequisites
+      if: runner.os == 'macOS'
+      shell: bash
+      run: |
+        brew install cmake nasm
+        native_tools="$(cmake --version | head -1) $(nasm -v) $(xcodebuild -version | tr '\n' ' ')"
+        setup_hash="$(shasum -a 256 '${{ github.action_path }}/action.yml' | cut -d ' ' -f 1)"
+        environment_hash="$(shasum -a 256 tools/native-build-env.mjs | cut -d ' ' -f 1)"
+        echo "P2SHARER_NATIVE_ENV=$native_tools $setup_hash $environment_hash" >> "$GITHUB_ENV"
     - name: Restore Rust dependencies
       uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       with:
         workspaces: src-tauri -> target
-        shared-key: windows-2022-x64-release-v1
+        shared-key: ${{ runner.os }}-${{ runner.arch }}-release-v2
         env-vars: CARGO CC CFLAGS CXX CMAKE RUST P2SHARER_NATIVE
         cache-bin: 'false'
         cache-workspace-crates: 'false'
         cache-on-failure: 'false'
         save-if: ${{ inputs.save-rust-cache == 'true' && github.ref == 'refs/heads/main' }}
     - name: Install dependencies
-      shell: pwsh
+      shell: bash
       run: pnpm install --frozen-lockfile

@@ -2,6 +2,8 @@
 mod test_support;
 
 pub mod audio_loopback;
+#[cfg(target_os = "macos")]
+mod macos_audio;
 pub mod logger;
 mod media_diagnostics;
 pub mod note_files;
@@ -90,6 +92,16 @@ pub fn run() {
     ensure_ws_server_running();
 
     tauri::Builder::default()
+        .on_permission_request(|webview, kind| {
+            #[cfg(target_os = "macos")]
+            if matches!(kind, tauri::webview::PermissionKind::Camera | tauri::webview::PermissionKind::Microphone) {
+                // WKWebView prompts in the main window; OS consent remains authoritative.
+                return if webview.label() == "main" { tauri::webview::PermissionResponse::Default }
+                    else { tauri::webview::PermissionResponse::Deny };
+            }
+            let _ = (webview, kind);
+            tauri::webview::PermissionResponse::Default
+        })
         .manage(ChatFileState::default())
         .manage(lan_signaling::LanSignalingState::default())
         .plugin(tauri_plugin_opener::init())

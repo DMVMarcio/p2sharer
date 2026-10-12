@@ -9,7 +9,15 @@ pub fn get_system_locale() -> Result<String, String> {
         if length == 0 { return Err("Could not read Windows language".into()); }
         return String::from_utf16(&buffer[..length as usize - 1]).map_err(|error| error.to_string());
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "macos")]
+    {
+        let output = std::process::Command::new("/usr/bin/defaults").args(["read", "-g", "AppleLanguages"])
+            .output().map_err(|error| error.to_string())?;
+        let text = String::from_utf8_lossy(&output.stdout);
+        return Ok(text.lines().map(|line| line.trim().trim_matches(|c| c == '"' || c == ','))
+            .find(|line| !line.is_empty() && *line != "(" && *line != ")").unwrap_or("en").to_owned());
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
     Ok("en".into())
 }
 

@@ -82,16 +82,17 @@ export function normalizeConfiguredPublicKey(directory = root) {
   return normalized;
 }
 
-export function verifyArtifacts(directory = root) {
+export function verifyArtifacts(directory = root, requiredPlatforms = ['windows-x86_64-nsis', 'windows-x86_64-msi']) {
   const version = checkRelease(directory);
   const manifest = JSON.parse(readFileSync(resolve(directory, 'latest.json'), 'utf8'));
   if (manifest.version !== version) throw new Error('Updater manifest version does not match the application.');
   const config = JSON.parse(readFileSync(resolve(directory, 'src-tauri/tauri.conf.json'), 'utf8'));
   const publicLines = Buffer.from(config.plugins.updater.pubkey, 'base64').toString('utf8').trim().split(/\r?\n/);
   const keyId = Buffer.from(publicLines[1], 'base64').subarray(2, 10);
-  for (const type of ['nsis', 'msi']) {
-    const entry = manifest.platforms?.[`windows-x86_64-${type}`];
-    if (!entry?.signature || !entry?.url) throw new Error(`Missing signed Windows ${type} updater entry.`);
+  const platforms = new Set([...requiredPlatforms, ...Object.keys(manifest.platforms || {}).filter(key => key.startsWith('darwin-'))]);
+  for (const platform of platforms) {
+    const entry = manifest.platforms?.[platform];
+    if (!entry?.signature || !entry?.url) throw new Error(`Missing signed ${platform} updater entry.`);
     const url = new URL(entry.url);
     if (url.protocol !== 'https:' || url.hostname !== 'api.github.com' ||
       !/^\/repos\/DMVMarcio\/p2sharer\/releases\/assets\/\d+$/.test(url.pathname)) {
@@ -122,8 +123,10 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     } else if (command === 'normalize-key' && args.length === 1) {
       normalizeConfiguredPublicKey(resolve(args[0]));
       console.log('Public updater key encoding validated; cryptographic key unchanged.');
-    } else if (command === 'artifacts' && args.length === 0) {
-      console.log(`Signed updater manifest verified: ${verifyArtifacts()}`);
+    } else if (command === 'artifacts' && args.length <= 1) {
+      const required = ['windows-x86_64-nsis', 'windows-x86_64-msi'];
+      if (process.platform === 'darwin') required.push(`darwin-${process.arch === 'arm64' ? 'aarch64' : 'x86_64'}`);
+      console.log(`Signed updater manifest verified: ${verifyArtifacts(args[0] ? resolve(args[0]) : root, required)}`);
     } else if (command === 'check' && (args.length === 0 ||
       (args.length === 1 && args[0] === '--signing') ||
       ((args.length === 2 || (args.length === 3 && args[2] === '--signing')) && args[0] === '--tag'))) {
@@ -131,6 +134,6 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
         throw new Error('Set TAURI_SIGNING_PRIVATE_KEY or TAURI_SIGNING_PRIVATE_KEY_PATH for a signed release build.');
       }
       console.log(`Release version verified: ${checkRelease(root, args[0] === '--tag' ? args[1] : undefined)}`);
-    } else throw new Error('Usage: release.mjs version <version> | check [--tag vX.Y.Z] [--signing] | key <public-key-file> | normalize-key <directory> | artifacts');
+    } else throw new Error('Usage: release.mjs version <version> | check [--tag vX.Y.Z] [--signing] | key <public-key-file> | normalize-key <directory> | artifacts [directory]');
   } catch (error) { console.error(error.message); process.exitCode = 1; }
 }

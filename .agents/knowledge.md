@@ -32,6 +32,7 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 ---
 
 ## 3. Subsystem Architectural Deep Dives
+- [macOS Runtime, Permissions, Keychain and Distribution](../docs/macos.md)
 - [Release Versioning, Signing and GitHub Distribution](../docs/releases.md)
 - [Public Repository Safety and Historical Audits](knowledge/repository-publication.md)
 - [P2P Networking, Signaling Failover & WebRTC Mesh](knowledge/p2p-architecture.md)

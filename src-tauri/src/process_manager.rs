@@ -188,6 +188,9 @@ pub fn list_audio_processes() -> Vec<ProcessItem> {
         let _ = EnumWindows(Some(enum_windows_callback), lparam);
     }
 
+    #[cfg(target_os = "macos")]
+    let mac_windows = xcap::Window::all().unwrap_or_default();
+
     // Group processes by executable name so users see 1 clean entry per application
     // rather than multiple PID entries for multi-process apps (e.g. Discord, Chrome, Steam)
     let mut app_map: std::collections::HashMap<String, ProcessItem> = std::collections::HashMap::new();
@@ -219,7 +222,10 @@ pub fn list_audio_processes() -> Vec<ProcessItem> {
             .find(|w| w.pid == pid_u32)
             .map(|w| w.title.clone());
 
-        #[cfg(not(windows))]
+        #[cfg(target_os = "macos")]
+        let window_title = mac_windows.iter().find(|window| window.pid().ok() == Some(pid_u32))
+            .and_then(|window| window.title().ok()).filter(|title| !title.is_empty());
+        #[cfg(not(any(windows, target_os = "macos")))]
         let window_title: Option<String> = None;
 
         let self_pid = std::process::id();

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>NSCameraUsageDescription</key><string>P2Sharer uses your camera when you choose to share camera video with your room.</string>
+<key>NSMicrophoneUsageDescription</key><string>P2Sharer uses your microphone when you choose to share microphone audio with your room.</string>
+<key>NSScreenCaptureUsageDescription</key><string>P2Sharer captures your selected screen or window and application audio when you start sharing.</string>
+<key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>
+</dict></plist>

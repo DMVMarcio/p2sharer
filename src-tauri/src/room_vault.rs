@@ -2,7 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 use tauri::Manager;
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 #[cfg(windows)]
 use std::fs::{File, OpenOptions};
@@ -57,7 +57,7 @@ fn unprotect(bytes: &[u8]) -> Result<Vec<u8>, String> {
     }
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 fn invite_version(record: &serde_json::Value) -> Result<(String, u64, u64), String> {
     let invite = record.get("invite").and_then(|value| value.as_str())
         .ok_or("Missing room invitation")?;
@@ -73,7 +73,7 @@ fn invite_version(record: &serde_json::Value) -> Result<(String, u64, u64), Stri
     Ok((root, epoch, revision))
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 fn retain_newer_invite(incoming: &mut serde_json::Value, current: &serde_json::Value) -> Result<(), String> {
     let (incoming_key, incoming_epoch, incoming_revision) = invite_version(incoming)?;
     let (current_key, current_epoch, current_revision) = invite_version(current)?;
@@ -126,7 +126,23 @@ pub fn save_room_record(app: tauri::AppHandle, room_id: String, data: String) ->
         let ciphertext = protect(&serialized)?;
         fs::write(path, ciphertext).map_err(|e| e.to_string())
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "macos")]
+    {
+        use security_framework::passwords::{get_generic_password, set_generic_password};
+        let _lock = lock_macos_room(&path)?;
+        let account = path.file_stem().and_then(|value| value.to_str()).ok_or("Invalid room identifier")?;
+        let mut incoming = serde_json::from_str(&data).map_err(|error| error.to_string())?;
+        match get_generic_password("com.p2sharer.desktop.rooms", account) {
+            Ok(previous) => retain_newer_invite(&mut incoming, &serde_json::from_slice(&previous).map_err(|error| error.to_string())?)?,
+            Err(error) if error.code() == -25300 => {},
+            Err(error) => return Err(error.to_string()),
+        }
+        let bytes = serde_json::to_vec(&incoming).map_err(|error| error.to_string())?;
+        // The file is only a discovery marker; room credentials remain in Keychain.
+        fs::write(&path, b"P2Sharer Keychain room\n").map_err(|error| error.to_string())?;
+        set_generic_password("com.p2sharer.desktop.rooms", account, &bytes).map_err(|error| error.to_string())
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
     { let _ = path; Err("Protected room storage requires Windows".into()) }
 }
 
@@ -140,10 +156,22 @@ pub fn list_room_records(app: tauri::AppHandle) -> Result<Vec<String>, String> {
         if entry.path().extension().and_then(|e| e.to_str()) != Some("vault") { continue; }
         #[cfg(windows)]
         let _lock = lock_room_file(&entry.path())?;
+        #[cfg(not(target_os = "macos"))]
         let ciphertext = fs::read(entry.path()).map_err(|e| e.to_string())?;
         #[cfg(windows)]
         records.push(String::from_utf8(unprotect(&ciphertext)?).map_err(|e| e.to_string())?);
-        #[cfg(not(windows))]
+        #[cfg(target_os = "macos")]
+        {
+            let _lock = lock_macos_room(&entry.path())?;
+            let account = entry.path().file_stem().and_then(|value| value.to_str()).ok_or("Invalid room identifier")?.to_owned();
+            if account.len() != 32 || !account.bytes().all(|c| c.is_ascii_hexdigit()) { continue; }
+            match security_framework::passwords::get_generic_password("com.p2sharer.desktop.rooms", &account) {
+                Ok(bytes) => records.push(String::from_utf8(bytes).map_err(|error| error.to_string())?),
+                Err(error) if error.code() == -25300 => continue,
+                Err(error) => return Err(error.to_string()),
+            }
+        }
+        #[cfg(not(any(windows, target_os = "macos")))]
         { let _ = ciphertext; return Err("Protected room storage requires Windows".into()); }
     }
     Ok(records)
@@ -154,11 +182,35 @@ pub fn delete_room_record(app: tauri::AppHandle, room_id: String) -> Result<(), 
     let path = room_path(&app, &room_id)?;
     #[cfg(windows)]
     let _lock = lock_room_file(&path)?;
+    #[cfg(target_os = "macos")]
+    let _lock = lock_macos_room(&path)?;
+    #[cfg(target_os = "macos")]
+    match security_framework::passwords::delete_generic_password("com.p2sharer.desktop.rooms", &room_id.to_ascii_lowercase()) {
+        Ok(()) => {},
+        Err(error) if error.code() == -25300 => {},
+        Err(error) => return Err(error.to_string()),
+    }
     if path.exists() { fs::remove_file(path).map_err(|e| e.to_string())?; }
     Ok(())
 }
 
-#[cfg(all(test, windows))]
+#[cfg(target_os = "macos")]
+fn lock_macos_room(path: &std::path::Path) -> Result<std::fs::File, String> {
+    use fs2::FileExt;
+    let file = std::fs::OpenOptions::new().create(true).truncate(false).read(true).write(true)
+        .open(path.with_extension("lock")).map_err(|error| error.to_string())?;
+    for _ in 0..100 {
+        match file.try_lock_exclusive() {
+            Ok(()) => return Ok(file),
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock =>
+                std::thread::sleep(std::time::Duration::from_millis(20)),
+            Err(error) => return Err(error.to_string()),
+        }
+    }
+    Err("Room vault is busy".into())
+}
+
+#[cfg(all(test, any(windows, target_os = "macos")))]
 mod tests {
     use super::*;
 
