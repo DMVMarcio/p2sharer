@@ -257,7 +257,8 @@ impl VirtualNetworkState {
             write_frame(&mut stream, &(1, initial)).await?;
             let ready = tokio::time::timeout(Duration::from_secs(30), read_frame(&mut stream))
                 .await
-                .map_err(|_| "Virtual adapter startup timed out")??;
+                .map_err(|_| "Virtual adapter startup timed out")?
+                .map_err(|error| format!("Virtual adapter helper disconnected during startup: {error}. Check the native helper log for the failed setup stage."))?;
             if ready.0 == 4 {
                 return Err(String::from_utf8_lossy(&ready.1).into_owned());
             }
@@ -653,7 +654,10 @@ pub fn run_helper_if_requested() -> bool {
     if args.len() == 4 && args[3].len() == 64 && args[3].bytes().all(|b| b.is_ascii_hexdigit()) {
         if let Ok(port) = args[2].parse::<u16>() {
             if port != 0 {
-                let _ = helper(port, &args[3]);
+                crate::logger::init_logger();
+                if let Err(error) = helper(port, &args[3]) {
+                    crate::logger::log_msg("ERROR", "virtual_network_helper", &error);
+                }
             }
         }
     }
@@ -712,22 +716,32 @@ fn helper(port: u16, token: &str) -> Result<(), String> {
     stream.set_nodelay(true).map_err(|e| e.to_string())?;
     write(&mut stream, &(0, token.as_bytes().to_vec()))?;
     let setup = (|| {
-        let guard = NetworkLock::acquire()?;
+        // Consume the complete configuration before any fallible native operation.
+        // Closing with unread peer data can reset TCP and hide the setup error.
         let (kind, bytes) = read(&mut stream)?;
         if kind != 1 {
             return Err("Missing virtual adapter settings".into());
         }
         let config = settings(&bytes)?;
-        let firewall = Firewall::new()?;
-        let device = Arc::new(Device::open(config.ip)?);
-        device.routes(&config.peers)?;
-        firewall.configure(config.ip, &config.peers, &config.own)?;
+        let guard = NetworkLock::acquire().map_err(|e| format!("Virtual network lock: {e}"))?;
+        let firewall =
+            Firewall::new().map_err(|e| format!("Virtual firewall initialization: {e}"))?;
+        let device = Arc::new(
+            Device::open(config.ip).map_err(|e| format!("Virtual adapter initialization: {e}"))?,
+        );
+        device
+            .routes(&config.peers)
+            .map_err(|e| format!("Virtual peer route configuration: {e}"))?;
+        firewall
+            .configure(config.ip, &config.peers, &config.own)
+            .map_err(|e| format!("Virtual firewall configuration: {e}"))?;
         Ok::<_, String>((guard, firewall, device, config))
     })();
     let (_guard, firewall, device, mut config) = match setup {
         Ok(x) => x,
         Err(error) => {
             let _ = write(&mut stream, &(4, error.as_bytes().to_vec()));
+            finish_helper_error(&mut stream);
             return Err(error);
         }
     };
@@ -811,4 +825,52 @@ fn helper(port: u16, token: &str) -> Result<(), String> {
     let _ = writer_thread.join();
     // Device and firewall RAII remove exact routes, address, rules and the created adapter.
     result
+}
+
+#[cfg(all(windows, target_arch = "x86_64"))]
+fn finish_helper_error(stream: &mut std::net::TcpStream) {
+    use std::io::Read;
+    // Deliver the error before closing; the parent closes after receiving it.
+    // Bound both elapsed time and drained bytes if the parent is unresponsive.
+    let _ = stream.shutdown(std::net::Shutdown::Write);
+    let _ = stream.set_read_timeout(Some(Duration::from_secs(1)));
+    let _ = std::io::copy(&mut stream.take(65_536), &mut std::io::sink());
+}
+
+#[cfg(all(test, windows, target_arch = "x86_64"))]
+mod startup_tests {
+    use super::*;
+    use std::io::{Read, Write};
+
+    #[test]
+    fn startup_error_is_delivered_even_with_unread_configuration() {
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let address = listener.local_addr().unwrap();
+        let helper = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let message = b"Virtual adapter initialization: synthetic setup failure";
+            stream
+                .write_all(&((message.len() + 1) as u32).to_be_bytes())
+                .unwrap();
+            stream.write_all(&[4]).unwrap();
+            stream.write_all(message).unwrap();
+            finish_helper_error(&mut stream);
+        });
+        let mut parent = std::net::TcpStream::connect(address).unwrap();
+        parent
+            .set_read_timeout(Some(Duration::from_secs(3)))
+            .unwrap();
+        parent.write_all(&[0; 1024]).unwrap();
+        let mut response = [0; 4];
+        parent.read_exact(&mut response).unwrap();
+        let mut body = vec![0; u32::from_be_bytes(response) as usize];
+        parent.read_exact(&mut body).unwrap();
+        assert_eq!(body[0], 4);
+        assert_eq!(
+            &body[1..],
+            b"Virtual adapter initialization: synthetic setup failure"
+        );
+        drop(parent);
+        helper.join().unwrap();
+    }
 }
