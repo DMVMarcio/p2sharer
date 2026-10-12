@@ -9,12 +9,15 @@ export interface RoomAppModel {
   snapshot(): unknown;
   apply(payload: unknown, actor: string, fromSnapshot: boolean, receivedAt?: number): void;
   destroy(): void;
+  setParticipants?(participants: string[]): void;
 }
 
 export interface RoomAppModelContext {
   localActor: string;
   emit(payload: unknown): void;
   changed(): void;
+  instanceId?: string;
+  send?(payload: unknown, target: string): Promise<void>;
 }
 
 const MAX_NOTE = 500_000;

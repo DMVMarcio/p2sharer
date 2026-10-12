@@ -30,6 +30,7 @@ mod localization;
 mod app_data_migration;
 mod app_updates;
 pub mod lan_signaling;
+pub mod port_tunnel;
 
 use audio_loopback::{start_audio_capture, stop_audio_capture};
 use logger::{clear_log_file, get_log_file_path, open_latest_log, open_log_folder, write_frontend_log};
@@ -94,6 +95,7 @@ pub fn run() {
         .manage(ChatFileState::default())
         .manage(profile_image::ProfileImageState::default())
         .manage(lan_signaling::LanSignalingState::default())
+        .manage(port_tunnel::TunnelState::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
@@ -118,6 +120,12 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            port_tunnel::configure_port_tunnels,
+            port_tunnel::stop_port_tunnels,
+            port_tunnel::get_port_tunnel_status,
+            port_tunnel::connect_port_tunnel,
+            port_tunnel::disconnect_port_tunnel,
+            port_tunnel::receive_port_tunnel,
             profile_image::pick_profile_image,
             profile_image::discard_profile_image,
             profile_image::save_profile_image,

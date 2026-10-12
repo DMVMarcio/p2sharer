@@ -76,7 +76,7 @@ export const RoomAppCard: React.FC<Props> = ({ instance, isFeatured = false, com
         <ActivityParticipants people={people} />
         {isFeatured && <button className="room-app-leave-button" onClick={backToGrid}>
           <ArrowLeft size={14} /> {t("message.eaa0deef79c1")}</button>}
-        {isFeatured && joined && !detached && <Tooltip content={t("message.8b605bc96459")}>
+        {isFeatured && joined && !detached && definition?.detachable !== false && <Tooltip content={t("message.8b605bc96459")}>
           <button className="room-app-context-trigger" aria-label={t("message.8b605bc96459")}
             onClick={() => void detach()}><ExternalLink size={18} /></button>
         </Tooltip>}

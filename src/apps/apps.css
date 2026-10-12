@@ -1,3 +1,5 @@
+@import './tunnels.css';
+
 /* Room App library */
 .apps-library-modal { max-width: 720px; }
 .apps-library-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }

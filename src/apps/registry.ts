@@ -1,9 +1,10 @@
 import { t } from '../i18n/index.ts';
 import protocolLabels from '../i18n/protocol.json' with { type: 'json' };
 import type React from 'react';
-import { FileText } from 'lucide-react';
+import { FileText, Network } from 'lucide-react';
 import { SiYoutube } from 'react-icons/si';
 import { NotepadModel, YouTubeModel, type RoomAppModel, type RoomAppModelContext } from './models.ts';
+import { TunnelModel } from './tunnel_model.ts';
 
 export interface RoomAppViewProps { instanceId: string; compact?: boolean }
 export interface RoomAppDefinition {
@@ -16,6 +17,7 @@ export interface RoomAppDefinition {
   iconStyle?: 'outline' | 'filled';
   bannerClass?: string;
   bannerImage?: string;
+  detachable?: boolean;
   createModel(context: RoomAppModelContext): RoomAppModel;
   loadView(): Promise<{ default: React.ComponentType<RoomAppViewProps> }>;
 }
@@ -49,3 +51,7 @@ registerRoomApp({ kind: 'youtube', label: 'YouTube',
   get description() { return t("message.22dea6587836"); },
   icon: SiYoutube, iconStyle: 'filled', bannerClass: 'youtube', createModel: (context) => new YouTubeModel(context),
   loadView: () => import('./YouTubeApp').then((module) => ({ default: module.YouTubeApp })) });
+registerRoomApp({ kind: 'tunnels', protocolLabel: 'Tunnels', get label() { return t('tunnels.title'); },
+  get description() { return t('tunnels.description'); }, icon: Network, bannerClass: 'tunnels', detachable: false,
+  createModel: (context) => new TunnelModel(context),
+  loadView: () => import('./TunnelApp').then((module) => ({ default: module.TunnelApp })) });

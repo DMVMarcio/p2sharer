@@ -348,13 +348,14 @@ export class GroupRoomManager {
     void Promise.resolve(this.pointerAction.send(packet, { target })).catch(() => {});
   }
 
-  public sendAppEvent(event: AppWireEvent, target?: string): void {
+  public async sendAppEvent(event: AppWireEvent, target?: string): Promise<void> {
     if (!this.appAction || (this.authority && !this.localAdmitted)) return;
     if (target) {
       const key = this.chatAuth?.getKnownKey(target);
       if (this.peerTracker.isVerified(target) &&
           (!this.authority || (key && this.admittedPeers.get(target) === key)))
-        void this.appAction.send(event, { target });
+        await this.appAction.send(event, { target });
+      else throw new Error('Activity peer unavailable');
     } else {
       this.sendRoomAction(this.appAction, event);
     }

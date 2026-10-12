@@ -3,7 +3,7 @@ import { getRoomApp, isRoomAppKind } from './registry.ts';
 import type { RoomAppModel } from './models.ts';
 import type { AppWireEvent, RoomAppInstance } from './types.ts';
 
-type Sender = (event: AppWireEvent, target?: string) => void;
+type Sender = (event: AppWireEvent, target?: string) => unknown;
 type Listener = () => void;
 type LifecycleListener = (action: 'start' | 'stop', instance: RoomAppInstance) => void;
 const MAX_INSTANCES = 24;
@@ -31,6 +31,9 @@ export class RoomAppsService {
     return () => this.listeners.delete(listener);
   }
   private notify(): void { this.listeners.forEach((listener) => listener()); }
+  private dispatch(event: AppWireEvent, target?: string): void {
+    void Promise.resolve(this.sender?.(event, target)).catch((error) => console.warn('[Apps] Send failed:', error));
+  }
   getInstances(): RoomAppInstance[] { return [...this.instances.values()].sort((a, b) => a.createdAt - b.createdAt); }
   getJoinedInstances(): RoomAppInstance[] { return this.getInstances().filter((instance) => this.isJoined(instance.id)); }
   getInstance(id: string): RoomAppInstance | undefined { return this.instances.get(id); }
@@ -40,7 +43,7 @@ export class RoomAppsService {
   isJoined(id: string): boolean { return Boolean(this.localActor && this.participants.get(id)?.has(this.localActor)); }
 
   private sendInstanceEvent(id: string, event: AppWireEvent, target?: string): void {
-    if (this.instances.has(id) && !this.instances.get(id)?.personal) this.sender?.(event, target);
+    if (this.instances.has(id) && !this.instances.get(id)?.personal) this.dispatch(event, target);
   }
 
   // Trusted device-local bootstrap for detached windows, never for room packets.
@@ -83,6 +86,7 @@ export class RoomAppsService {
     if (joined) members.add(actor);
     else members.delete(actor);
     this.participants.set(id, members);
+    this.models.get(id)?.setParticipants?.([...members]);
     this.notify();
   }
 
@@ -112,7 +116,7 @@ export class RoomAppsService {
     this.addInstance(instance);
     if (personal) this.setPresence(instance.id, this.localActor, true);
     else {
-      this.sender({ kind: 'start', instance });
+      this.dispatch({ kind: 'start', instance });
       this.onLocalLifecycle?.('start', instance);
     }
     return instance.id;
@@ -123,7 +127,7 @@ export class RoomAppsService {
     if (!instance || !this.sender) return;
     this.removeInstance(id);
     if (!instance.personal) {
-      this.sender({ kind: 'stop', id });
+      this.dispatch({ kind: 'stop', id });
       this.onLocalLifecycle?.('stop', instance);
     }
   }
@@ -133,10 +137,16 @@ export class RoomAppsService {
     const definition = getRoomApp(instance.kind);
     if (!definition) return;
     const model = definition.createModel({
+      instanceId: instance.id,
       localActor: this.localActor,
+      send: async (payload, target) => {
+        if (!this.isJoined(instance.id) || !this.participants.get(instance.id)?.has(target) || instance.personal)
+          throw new Error('Activity participant unavailable');
+        await this.sender?.({ kind: 'data', id: instance.id, payload }, target);
+      },
       emit: (payload) => {
         const event: AppWireEvent = { kind: 'data', id: instance.id, payload };
-        if (localView) this.sender?.(event);
+        if (localView) this.dispatch(event);
         else this.sendInstanceEvent(instance.id, event);
       },
       changed: () => this.notify(),
@@ -155,14 +165,14 @@ export class RoomAppsService {
     this.notify();
   }
 
-  requestSync(): void { this.sender?.({ kind: 'sync-request' }); }
+  requestSync(): void { this.dispatch({ kind: 'sync-request' }); }
   sendSync(target: string): void {
     if (!this.sender) return;
-    this.sender({ kind: 'sync', instances: this.getInstances().filter((instance) => !instance.personal), snapshots: {},
+    this.dispatch({ kind: 'sync', instances: this.getInstances().filter((instance) => !instance.personal), snapshots: {},
       closed: [...this.closed].slice(-100) }, target);
     for (const [id, model] of this.models) {
       const instance = this.instances.get(id);
-      if (instance && !instance.personal) this.sender({ kind: 'sync', instances: [instance],
+      if (instance && !instance.personal) this.dispatch({ kind: 'sync', instances: [instance],
         snapshots: { [id]: model.snapshot() }, closed: [] }, target);
     }
     for (const id of this.instances.keys()) if (this.isJoined(id))
