@@ -1,10 +1,10 @@
 import type { CSSProperties } from 'react';
-import { EMOJI_CATALOG, getEmojiIndex } from './emoji_catalog';
+import { getEmojiIndex } from './emoji_catalog';
 import type { EmojiPack } from './emoji_preferences';
 
 export function getEmojiVisual(emoji: string, pack: EmojiPack, size: number): { native: boolean; className: string; style: CSSProperties } {
   const index = getEmojiIndex(emoji);
-  if (pack === 'native' || index === undefined || (pack === 'classic' && !EMOJI_CATALOG[index].classic)) {
+  if (pack === 'native' || index === undefined) {
     return {
       native: true,
       className: 'emoji-glyph emoji-glyph-native',

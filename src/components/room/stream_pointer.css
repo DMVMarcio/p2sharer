@@ -1,5 +1,14 @@
 .stream-pointer-active-cursor { cursor: none !important; }
-.stream-pointer-video-layer { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 8; }
+.is-stream-pointer-active,
+.is-stream-pointer-active .stream-video-viewport,
+.is-stream-pointer-active video,
+.stream-card.is-stream-pointer-active,
+.pip-window-root.is-stream-pointer-active {
+  touch-action: none !important;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.stream-pointer-video-layer { position: absolute; inset: 0; overflow: hidden; pointer-events: none; touch-action: none !important; z-index: 8; }
 html.stream-pointer-desktop, .stream-pointer-desktop body, .stream-pointer-desktop #root { background: transparent !important; margin: 0; width: 100%; height: 100%; overflow: hidden; pointer-events: none; }
 .stream-pointer-native-layer { position: fixed; inset: 0; overflow: hidden; pointer-events: none; }
 .stream-pointer-remote { position: absolute; filter: drop-shadow(0 1px 2px #000); pointer-events: none; }
@@ -8,7 +17,7 @@ html.stream-pointer-desktop, .stream-pointer-desktop body, .stream-pointer-deskt
 .stream-pointer-remote.is-interpolated { --stream-pointer-move-duration: 70ms; transition: left var(--stream-pointer-move-duration) linear, top var(--stream-pointer-move-duration) linear; }
 .stream-pointer-remote svg { display: block; transform: translate(-3px, -3px); stroke: white; stroke-width: 1.5px; }
 .stream-pointer-remote span { display: block; margin: 2px 0 0 10px; padding: 2px 5px; border-radius: var(--radius-sm, 4px); background: rgba(0,0,0,.75); font-size: 12px; white-space: nowrap; max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
-.stream-pointer-ripple { position: absolute; width: 16px; height: 16px; border: 2px solid currentColor; border-radius: 50%; animation: streamPointerRipple 1s ease-out forwards; }
+.stream-pointer-ripple { position: absolute; width: 16px; height: 16px; border: 2px solid currentColor; border-radius: 50%; animation: streamPointerRipple 1s ease-out forwards; pointer-events: none; }
 @keyframes streamPointerRipple { from { transform: translate(-50%, -50%) scale(.5); opacity: 1; } to { transform: translate(-50%, -50%) scale(4); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
   .stream-pointer-remote.is-interpolated { transition: none; }

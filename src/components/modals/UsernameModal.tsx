@@ -1,3 +1,7 @@
+import { useModalDialogBehavior } from '../common/useModalDialogBehavior';
+import { roomService } from '../../services/room_service';
+import { NicknameField } from '../common/NicknameField';
+import { NICKNAME_STYLE_KEY } from '../../core/nickname_style';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useState } from 'react';
@@ -8,6 +12,7 @@ import { showToast } from '../../hooks/useToast';
 
 export const UsernameModal: React.FC = () => {
   useLocale();
+  const [nicknameStyle, setNicknameStyle] = useState(() => stateStore.nicknameStyle);
   const { closeModal, isClosing, overlayRef } = useModal();
   const [val, setVal] = useState(
     () => stateStore.username || `User_${Math.floor(1000 + Math.random() * 9000)}`
@@ -21,17 +26,22 @@ export const UsernameModal: React.FC = () => {
     }
     stateStore.set((s) => {
       s.username = trimmed;
+      s.nicknameStyle = nicknameStyle;
     });
     localStorage.setItem('p2sharer_username', trimmed);
+    localStorage.setItem(NICKNAME_STYLE_KEY, JSON.stringify(nicknameStyle));
+    roomService.roomManager?.refreshProfile();
     closeModal();
     showToast(t("message.de936d0d1b4d", { v0: trimmed }));
   };
 
   const { submit, pending } = useFormSubmit(handleSave, isClosing);
 
+  const dialogRef = useModalDialogBehavior(closeModal, pending || isClosing, false);
+
   return (
     <div ref={overlayRef} inert={isClosing || undefined} className={`modal-overlay ${isClosing ? 'closing' : ''}`} id="modal-username">
-      <form autoComplete="off" onSubmit={submit} aria-busy={pending} className="modal-card">
+      <form autoComplete="off" onSubmit={submit} aria-busy={pending} className="modal-card" ref={dialogRef} inert={isClosing || undefined}>
         <div className="modal-header">
           <div className="modal-header-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -43,16 +53,8 @@ export const UsernameModal: React.FC = () => {
         </div>
         <div className="modal-body">
           <p>{t("message.647904045700")}</p>
-          <input autoComplete="off"
-            type="text"
-            id="input-username"
-            className="text-input"
-            placeholder={t("message.6541e1023005")}
-            maxLength={25}
-            value={val}
-            onChange={(e) => setVal(e.target.value)}
-            autoFocus
-          />
+          <NicknameField id="input-username" name={val} onNameChange={setVal} appearance={nicknameStyle}
+            onAppearanceChange={setNicknameStyle} placeholder={t("message.6541e1023005")} autoFocus disabled={pending || isClosing} />
         </div>
         <div className="modal-footer">
           <button className="btn btn-primary" id="btn-save-username" type="submit" disabled={pending || isClosing}>

@@ -1,9 +1,11 @@
-import React, { useEffect } from 'react';
+import { ContentTransition } from './components/common/ContentTransition';
+import React, { useEffect, useState } from 'react';
 import { AppHeader } from './components/header/AppHeader';
 import { WindowTitlebar } from './components/header/WindowTitlebar';
 import { HomeView } from './components/home/HomeView';
 import { RoomView } from './components/room/RoomView';
 import { SettingsModal } from './components/modals/SettingsModal';
+import { ProfileModal } from './components/modals/ProfileModal';
 import { ScreenPickerModal } from './components/modals/ScreenPickerModal';
 import { UsernameModal } from './components/modals/UsernameModal';
 import { AudioFilterModal } from './components/modals/AudioFilterModal';
@@ -43,10 +45,13 @@ export const App: React.FC = () => {
 };
 
 const MainApp: React.FC = () => {
-  const { isInRoom, stopScreenSharing, leaveRoom, isSharingScreen } = useRoom();
-  const { openModal, activeModal } = useModal();
+  const [titlebarVisible, setTitlebarVisible] = useState(false);
+  const [homeScrolled, setHomeScrolled] = useState(false);
+  const { isInRoom, stopScreenSharing, leaveRoom, isSharingScreen, joinDialogRevision } = useRoom();
+  const { openModal, activeModal, modalRevision } = useModal();
 
   useEffect(startAutomaticUpdateChecks, []);
+  useEffect(() => setHomeScrolled(false), [isInRoom]);
 
   useEffect(() => {
     // Check username on initial load
@@ -69,19 +74,24 @@ const MainApp: React.FC = () => {
 
   return (
     <>
-      <WindowTitlebar />
-      <AppHeader />
-      <main className="app-main" id="app-main">
-        {isInRoom ? <RoomView /> : <HomeView />}
-      </main>
+      <WindowTitlebar onVisibilityChange={setTitlebarVisible} />
+      <div className={`app-workspace${isInRoom ? '' : ' is-home'}`}>
+        <AppHeader showUpdate={!titlebarVisible} homeScrolled={homeScrolled} />
+        <main className="app-main" id="app-main">
+          <ContentTransition value={isInRoom ? 'room' : 'home'} className="content-transition-fill">
+            {view => view === 'room' ? <RoomView /> : <HomeView onScrollChange={setHomeScrolled} />}
+          </ContentTransition>
+        </main>
+      </div>
 
       {/* Modals & Overlays */}
+      {activeModal === 'profile' && <ProfileModal key={modalRevision} />}
       {activeModal === 'settings' && <SettingsModal />}
       {activeModal === 'screenPicker' && <ScreenPickerModal />}
       {activeModal === 'username' && <UsernameModal />}
       {activeModal === 'audioFilter' && <AudioFilterModal />}
       {activeModal === 'createRoom' && <CreateRoomModal />}
-      {activeModal === 'joinRoom' && <JoinRoomModal />}
+      {activeModal === 'joinRoom' && <JoinRoomModal key={`${modalRevision}:${joinDialogRevision}`} />}
       {activeModal === 'saveInvite' && <SaveInviteModal />}
       {activeModal === 'roomSecurity' && <RoomSecurityModal />}
       {activeModal === 'externalLink' && <ExternalLinkModal />}

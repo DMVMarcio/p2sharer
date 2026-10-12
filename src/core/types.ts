@@ -35,6 +35,7 @@ export interface ScreenSourcesResponse {
 }
 
 export interface PeerInfo {
+  nicknameStyle?: import("./nickname_style").NicknameStyle;
   id: string;
   username: string;
   connectionState: 'connected' | 'connecting' | 'disconnected';
@@ -44,6 +45,7 @@ export interface PeerInfo {
 }
 
 export interface StreamWatcher {
+  nicknameStyle?: import("./nickname_style").NicknameStyle;
   peerId: string;
   username: string;
   isSelf?: boolean;

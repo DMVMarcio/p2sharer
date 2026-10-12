@@ -1,6 +1,7 @@
 #[cfg(all(test, windows))]
 mod test_support;
 
+pub mod profile_image;
 pub mod audio_loopback;
 #[cfg(target_os = "macos")]
 mod macos_audio;
@@ -47,7 +48,7 @@ use screen_sources::{
 };
 
 use tauri::{Emitter, Manager};
-use chat_files::{import_chat_files, paste_chat_files, discard_chat_file};
+use chat_files::{import_chat_files, paste_chat_files, discard_chat_file, copy_chat_image};
 
 #[tauri::command]
 fn prepare_app_update(window: tauri::Window) -> Result<(), String> {
@@ -104,6 +105,7 @@ pub fn run() {
             tauri::webview::PermissionResponse::Default
         })
         .manage(ChatFileState::default())
+        .manage(profile_image::ProfileImageState::default())
         .manage(lan_signaling::LanSignalingState::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -119,14 +121,21 @@ pub fn run() {
                 if label == "main" {
                     let _ = stop_native_screen_capture();
                     let _ = stop_audio_capture();
-                    std::process::exit(0);
                 } else if label.starts_with("pip-") {
                     let peer_id = label.trim_start_matches("pip-").to_string();
                     let _ = window.app_handle().emit("pip-window-closed", peer_id);
                 }
             }
+            if matches!(event, tauri::WindowEvent::Destroyed) && window.label() == "main" {
+                std::process::exit(0);
+            }
         })
         .invoke_handler(tauri::generate_handler![
+            profile_image::pick_profile_image,
+            profile_image::discard_profile_image,
+            profile_image::save_profile_image,
+            profile_image::load_profile_image,
+            profile_image::validate_profile_image,
             media_diagnostics::media_diagnostics_enabled,
             media_diagnostics::write_media_diagnostics,
             lan_signaling::list_lan_interfaces,
@@ -192,7 +201,8 @@ pub fn run() {
             read_chat_image_preview,
             reveal_chat_download,
             remember_chat_file_source,
-            restore_chat_file_source
+            restore_chat_file_source,
+            copy_chat_image
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

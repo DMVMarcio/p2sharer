@@ -1,3 +1,4 @@
+import { useModalDialogBehavior } from '../common/useModalDialogBehavior';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useState } from 'react';
@@ -26,14 +27,14 @@ export const SaveInviteModal: React.FC = () => {
     try {
       const existing = await savedRooms.get(invite.roomId);
       if (existing && parseRoomInvite(existing.invite)?.rootKey !== invite.rootKey) {
-        showToast(t("message.801d8b7098fe"));
+        showToast(t("message.801d8b7098fe"), 3500, 'warning');
         return;
       }
       const remembered = password.trim() || existing?.password;
       const existingInvite = existing ? parseRoomInvite(existing.invite) : null;
       const versionOrder = existingInvite ? compareRoomInvites(existingInvite, invite) : -1;
       if (versionOrder === 0 && existing?.invite !== code.trim()) {
-        showToast(t("message.3b1c350d9ca6"));
+        showToast(t("message.3b1c350d9ca6"), 3500, 'warning');
         return;
       }
       const retainNewer = versionOrder >= 0;
@@ -49,10 +50,10 @@ export const SaveInviteModal: React.FC = () => {
         password: remembered,
       });
       closeModal();
-      showToast(t("message.14005848dc1b"));
+      showToast(t("message.14005848dc1b"), 3500, 'success');
     } catch (error) {
       console.error('[Rooms] Could not save invitation:', error);
-      showToast(t("message.657f2b97bedf"));
+      showToast(t("message.657f2b97bedf"), 3500, 'error');
     } finally {
       setBusy(false);
     }
@@ -60,9 +61,11 @@ export const SaveInviteModal: React.FC = () => {
 
   const { submit, pending } = useFormSubmit(save, isClosing);
 
+  const dialogRef = useModalDialogBehavior(closeModal, busy || pending || isClosing, false);
+
   return (
     <div ref={overlayRef} inert={isClosing || undefined} className={`modal-overlay ${isClosing ? 'closing' : ''}`}>
-      <form autoComplete="off" onSubmit={submit} aria-busy={pending} className="modal-card" role="dialog" aria-modal="true" aria-labelledby="save-invite-title">
+      <form autoComplete="off" onSubmit={submit} aria-busy={pending} className="modal-card" role="dialog" aria-modal="true" aria-labelledby="save-invite-title" ref={dialogRef} inert={isClosing || undefined}>
         <div className="modal-header">
           <div className="modal-header-icon"><BookmarkPlus size={20} /></div>
           <div>

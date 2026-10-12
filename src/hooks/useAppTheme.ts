@@ -7,13 +7,13 @@ import { stateStore } from '../core/state_store';
 import { ThemeMode } from '../core/types';
 import { useStore } from './useStore';
 import { customAccentTokens } from '../core/accent_color';
+import { backgroundTokens, normalizeBackground } from '../core/background_color';
 
 export const ACCENT_COLORS = [
-  { id: 'brown', get label() { return t('color.brown'); }, color: '#a47754' },
-  { id: 'navy', get label() { return t('color.navy'); }, color: '#1e40af' },
   { id: 'cyan', get label() { return t("message.c954e4de2019"); }, color: '#06b6d4' },
   { id: 'sky', get label() { return t("message.db6b0018a206"); }, color: '#0284c7' },
   { id: 'blue', get label() { return t("message.b0bf526b23af"); }, color: '#3b82f6' },
+  { id: 'navy', get label() { return t('color.navy'); }, color: '#1e40af' },
   { id: 'indigo', get label() { return t("message.46a5f1fafbac"); }, color: '#6366f1' },
   { id: 'violet', get label() { return t("message.264f2ba06e85"); }, color: '#8b5cf6' },
   { id: 'purple', get label() { return t("message.57a73ede5f6f"); }, color: '#a855f7' },
@@ -22,6 +22,7 @@ export const ACCENT_COLORS = [
   { id: 'rose', get label() { return t('color.rose'); }, color: '#f43f5e' },
   { id: 'red', get label() { return t("message.6741b8b5e1c2"); }, color: '#ef4444' },
   { id: 'orange', get label() { return t("message.2b2b4ad00333"); }, color: '#f97316' },
+  { id: 'brown', get label() { return t('color.brown'); }, color: '#a47754' },
   { id: 'amber', get label() { return t("message.a2c334da46a3"); }, color: '#f59e0b' },
   { id: 'lime', get label() { return t("message.aaf2d054d5f7"); }, color: '#84cc16' },
   { id: 'emerald', get label() { return t("message.f22f3a4a6cd6"); }, color: '#10b981' },
@@ -32,6 +33,13 @@ export const ACCENT_COLORS = [
 export function useAppTheme() {
   const currentThemeMode = useStore((s) => s.currentThemeMode);
   const currentAccentColor = useStore((s) => s.currentAccentColor);
+  const currentBackgroundColor = useStore((s) => s.currentBackgroundColor);
+
+  const applyBackgroundColor = useCallback((color: string) => {
+    const normalized = normalizeBackground(color);
+    localStorage.setItem('p2sharer_background_color', normalized);
+    stateStore.set(s => { s.currentBackgroundColor = normalized; });
+  }, []);
 
   const applyThemeMode = useCallback((mode: ThemeMode) => {
     stateStore.set((s) => {
@@ -57,6 +65,9 @@ export function useAppTheme() {
       } else if (event.key === 'p2sharer_accent_color') {
         const accent = event.newValue || 'cyan';
         if (accent !== stateStore.currentAccentColor) stateStore.set(state => { state.currentAccentColor = accent; });
+      } else if (event.key === 'p2sharer_background_color') {
+        const background = normalizeBackground(event.newValue || 'graphite');
+        if (background !== stateStore.currentBackgroundColor) stateStore.set(state => { state.currentBackgroundColor = background; });
       }
     };
     window.addEventListener('storage', sync);
@@ -68,10 +79,16 @@ export function useAppTheme() {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const apply = () => {
       const theme = effectiveTheme(currentThemeMode, mediaQuery.matches);
-      document.documentElement.setAttribute('data-theme', theme);
-      document.documentElement.style.colorScheme = theme === 'light' ? 'light' : 'dark';
+      const { light, tokens } = backgroundTokens(currentBackgroundColor, theme === 'light' ? 'light' : 'dark');
+      const root = document.documentElement;
+      root.setAttribute('data-theme', theme === 'amoled' ? 'amoled' : light ? 'light' : 'dark');
+      for (const [key, value] of Object.entries(tokens)) {
+        if (theme === 'amoled') root.style.removeProperty(key);
+        else root.style.setProperty(key, value);
+      }
+      root.style.colorScheme = theme !== 'amoled' && light ? 'light' : 'dark';
       if (isTauri()) {
-        void getCurrentWindow().setTheme(currentThemeMode === 'system' ? null : theme === 'light' ? 'light' : 'dark')
+        void getCurrentWindow().setTheme(currentThemeMode === 'system' ? null : theme !== 'amoled' && light ? 'light' : 'dark')
           .catch((error) => console.warn('[Theme] Could not synchronize native appearance:', error));
       }
     };
@@ -79,7 +96,7 @@ export function useAppTheme() {
     if (currentThemeMode !== 'system') return;
     mediaQuery.addEventListener('change', apply);
     return () => mediaQuery.removeEventListener('change', apply);
-  }, [currentThemeMode]);
+  }, [currentThemeMode, currentBackgroundColor]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -97,6 +114,8 @@ export function useAppTheme() {
   return {
     themeMode: currentThemeMode,
     accentColor: currentAccentColor,
+    backgroundColor: currentBackgroundColor,
+    setBackgroundColor: applyBackgroundColor,
     setThemeMode: applyThemeMode,
     setAccentColor: applyAccentColor,
   };

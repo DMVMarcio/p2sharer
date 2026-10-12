@@ -1,3 +1,5 @@
+import { Nickname } from '../common/Nickname';
+import { normalizeNicknameStyle } from '../../core/nickname_style';
 import { localizeText, t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { useStreamPointer } from '../../hooks/useStreamPointer';
@@ -42,6 +44,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [nicknameStyle, setNicknameStyle] = useState(() => normalizeNicknameStyle(null));
   const [senderName, setSenderName] = useState<string>(
     () => new URLSearchParams(window.location.search).get('name') || t("message.15589e9e374d")
   );
@@ -187,6 +190,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
 
       switch (data.type) {
         case 'offer': {
+          setNicknameStyle(normalizeNicknameStyle(data.nicknameStyle));
           setPointerEligible(data.pointerEligible !== false);
           hasReceivedOffer = true;
           setConnectionError(null);
@@ -248,6 +252,8 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
           break;
         }
         case 'stats': {
+          setNicknameStyle(normalizeNicknameStyle(data.nicknameStyle));
+          if (typeof data.senderName === 'string') setSenderName(data.senderName);
           if (data.stats && typeof data.stats === 'object') {
             setStats(data.stats as PeerStats);
           }
@@ -444,7 +450,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
 
   return (
     <div
-      className="pip-window-root"
+      className={`pip-window-root${pointer.enabled ? ' is-stream-pointer-active' : ''}`}
       ref={containerRef}
       onContextMenu={(event) => {
         const actions: ContextMenuAction[] = [
@@ -466,7 +472,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
       {/* Edge-to-edge Video Element */}
       <video
         ref={videoRef}
-        className={`pip-video-element${pointer.cursorActive ? ' stream-pointer-active-cursor' : ''}`}
+        className={`pip-video-element${pointer.enabled ? ' is-stream-pointer-active' : ''}${pointer.cursorActive ? ' stream-pointer-active-cursor' : ''}`}
         autoPlay
         playsInline
         muted
@@ -505,7 +511,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
           <div className="pip-top-left">
             <span className="pip-status-dot" aria-hidden="true" />
             <span className="pip-title">
-              {senderName}
+              <Nickname name={senderName} appearance={nicknameStyle} />
             </span>
           </div>
 
@@ -544,8 +550,8 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
           liveBitrateKbps={stats.bitrateKbps}
           configuredBitrateKbps={stats.configuredBitrateKbps}
           isLocal={isLocal}
-          pingText={stats.pingMs === null ? '15 ms' : `${stats.pingMs} ms`}
-          pingClass={(stats.pingMs ?? 15) < 80 ? 'ping-good' : (stats.pingMs ?? 15) < 180 ? 'ping-medium' : 'ping-poor'}
+          pingText={stats.pingMs === null || stats.pingMs === undefined ? '-- ms' : `${stats.pingMs} ms`}
+          pingClass={stats.pingMs !== null && stats.pingMs !== undefined ? (stats.pingMs < 80 ? 'ping-good' : stats.pingMs < 180 ? 'ping-medium' : 'ping-poor') : 'ping-medium'}
           transportTag={stats.transportTag}
           watchers={stats.watchers}
           onTooltipOpenChange={handleTooltipOpenChange}

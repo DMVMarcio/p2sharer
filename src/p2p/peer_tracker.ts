@@ -162,7 +162,7 @@ export class PeerTracker {
   }
 
   public setPing(peerId: string, pingMs: number): void {
-    if (this.directConnectedPeers.has(peerId)) {
+    if (this.directConnectedPeers.has(peerId) || this.peers.has(peerId)) {
       this.peerPings.set(peerId, pingMs);
     }
   }

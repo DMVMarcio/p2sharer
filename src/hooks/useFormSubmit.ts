@@ -15,7 +15,7 @@ export function useFormSubmit(action: () => void | Promise<void>, disabled = fal
       await action();
     } catch (error) {
       console.error('[Form] Submission failed:', error);
-      showToast(t("message.29014ff38240"));
+      showToast(t("message.29014ff38240"), 3500, 'error');
     } finally {
       running.current = false;
       setPending(false);

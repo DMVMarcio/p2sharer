@@ -26,7 +26,6 @@ export const StreamHeaderBar: React.FC = () => {
   }), []);
   const {
     roomSlots,
-    leaveRoom,
     streamFilter,
     setStreamFilter,
   } = useRoom();
@@ -72,6 +71,7 @@ export const StreamHeaderBar: React.FC = () => {
           <button
             type="button"
             className={`btn-stream-filter ${streamFilter === 'all' ? 'active' : ''}`}
+            aria-pressed={streamFilter === 'all'}
             onClick={() => setStreamFilter('all')}
             aria-label={t("message.1d5d07001ab4")}
           >
@@ -84,6 +84,7 @@ export const StreamHeaderBar: React.FC = () => {
           <button
             type="button"
             className={`btn-stream-filter ${streamFilter === 'streaming' ? 'active' : ''}`}
+            aria-pressed={streamFilter === 'streaming'}
             onClick={() => setStreamFilter(streamFilter === 'streaming' ? 'all' : 'streaming')}
             aria-label={t("message.41b29c6a3cb4")}
           >
@@ -97,6 +98,7 @@ export const StreamHeaderBar: React.FC = () => {
           <button
             type="button"
             className={`btn-stream-filter ${streamFilter === 'watching' ? 'active' : ''}`}
+            aria-pressed={streamFilter === 'watching'}
             onClick={() => setStreamFilter(streamFilter === 'watching' ? 'all' : 'watching')}
             aria-label={t("message.9e3dd618b896")}
           >
@@ -175,22 +177,6 @@ export const StreamHeaderBar: React.FC = () => {
           </button>
         </Tooltip>
 
-        {/* Leave Room */}
-        <Tooltip content={t("message.7b7b91d7fe87")}>
-          <button
-            className="btn btn-sm btn-danger btn-compact"
-            id="btn-leave-room"
-            onClick={leaveRoom}
-            aria-label={t("message.7b7b91d7fe87")}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-              <polyline points="16 17 21 12 16 7" />
-              <line x1="21" x2="9" y1="12" y2="12" />
-            </svg>
-            <span className="btn-text">{t("message.2d023dea2a9d")}</span>
-          </button>
-        </Tooltip>
       </div>
     </div>
   );

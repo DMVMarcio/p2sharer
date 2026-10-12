@@ -1,3 +1,4 @@
+import { useModalDialogBehavior } from '../common/useModalDialogBehavior';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useState } from 'react';
@@ -24,10 +25,10 @@ export const RoomSecurityModal: React.FC = () => {
     const oldPassword = currentRoomPassword;
 
     if (finalName !== currentRoomName && !await updateRoomName(finalName)) {
-      showToast(t("message.02a4133c9995")); return;
+      showToast(t("message.02a4133c9995"), 3500, 'error'); return;
     }
     if (finalPass !== oldPassword && !await updateRoomPassword(finalPass)) {
-      showToast(t("message.7a7e235c15fa")); return;
+      showToast(t("message.7a7e235c15fa"), 3500, 'error'); return;
     }
     closeModal();
 
@@ -36,15 +37,17 @@ export const RoomSecurityModal: React.FC = () => {
     } else if (oldPassword && !finalPass) {
       showToast(t("message.8374fc2ef03e"), 4000);
     } else {
-      showToast(t("message.2c4bbfd95e13"));
+      showToast(t("message.2c4bbfd95e13"), 3500, 'success');
     }
   };
 
   const { submit, pending } = useFormSubmit(handleSave, isClosing);
 
+  const dialogRef = useModalDialogBehavior(closeModal, pending || isClosing, false);
+
   return (
     <div ref={overlayRef} inert={isClosing || undefined} className={`modal-overlay ${isClosing ? 'closing' : ''}`} id="modal-room-security">
-      <form autoComplete="off" onSubmit={submit} aria-busy={pending} className="modal-card">
+      <form autoComplete="off" onSubmit={submit} aria-busy={pending} className="modal-card" ref={dialogRef} inert={isClosing || undefined}>
         <div className="modal-header">
           <div className="modal-header-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

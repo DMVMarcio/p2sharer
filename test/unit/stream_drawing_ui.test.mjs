@@ -197,16 +197,20 @@ test('inline text preserves Shift+Enter and confirms once on outside clicks with
   assert.equal(document.querySelector('[aria-label="Texto do rabisco"]'), null);
 });
 
-test('continuous brush strokes retain 192 points before simplifying their path', async () => {
+test('brush strokes stop at capacity and preserve every point until pointer release', async () => {
   await click('[aria-label="Pincel"]');
+  const before = globalThis.__pointerTestSent.filter(p => p.kind === 'draw').length;
   await pointer('pointerdown', 0, 225);
-  for (let i = 0; i < 190; i++) await pointer('pointermove', 1 + i * 3, 225);
+  for (let i = 0; i < 300; i++) await pointer('pointermove', 1 + i * 2, 225);
+  assert.equal(globalThis.__pointerTestSent.filter(p => p.kind === 'draw').length, before);
   await pointer('pointerup', 799, 225);
   const packet = globalThis.__pointerTestSent.at(-1);
   assert.equal(packet.kind, 'draw');
   assert.equal(packet.drawing.points.length, 192);
-  assert.deepEqual(packet.drawing.points[0], { x: 0, y: .5 });
-  assert.deepEqual(packet.drawing.points.at(-1), { x: 799 / 800, y: .5 });
+  assert.deepEqual(packet.drawing.points, [
+    { x: 0, y: .5 },
+    ...Array.from({ length: 191 }, (_, i) => ({ x: (1 + i * 2) / 800, y: .5 })),
+  ]);
 });
 
 test('clicking each active drawing tool again returns to Mouse', async () => {
@@ -218,4 +222,29 @@ test('clicking each active drawing tool again returns to Mouse', async () => {
     assert.equal(document.querySelector(`[aria-label="${label}"]`).getAttribute('aria-pressed'), 'false');
     assert.equal(document.querySelector('[aria-label="Mouse"]').getAttribute('aria-pressed'), 'true');
   }
+});
+
+test('pen and touch tablet inputs draw properly and container has touch-action class active', async () => {
+  assert.ok(document.querySelector('.is-stream-pointer-active'));
+  await click('[aria-label="Pincel"]');
+  const initialDraws = globalThis.__pointerTestSent.filter(p => p.kind === 'draw').length;
+  await act(async () => {
+    const penDown = new window.MouseEvent('pointerdown', { bubbles: true, cancelable: true, clientX: 160, clientY: 90, button: 0 });
+    Object.defineProperties(penDown, { pointerId: { value: 2 }, pointerType: { value: 'pen' } });
+    video.dispatchEvent(penDown);
+  });
+  await act(async () => {
+    const penMove = new window.MouseEvent('pointermove', { bubbles: true, cancelable: true, clientX: 320, clientY: 180, button: -1 });
+    Object.defineProperties(penMove, { pointerId: { value: 2 }, pointerType: { value: 'pen' }, buttons: { value: 1 } });
+    video.dispatchEvent(penMove);
+  });
+  await act(async () => {
+    const penUp = new window.MouseEvent('pointerup', { bubbles: true, cancelable: true, clientX: 480, clientY: 270, button: 0 });
+    Object.defineProperties(penUp, { pointerId: { value: 2 }, pointerType: { value: 'pen' } });
+    video.dispatchEvent(penUp);
+  });
+  const penDraws = globalThis.__pointerTestSent.filter(p => p.kind === 'draw');
+  assert.equal(penDraws.length, initialDraws + 1);
+  assert.equal(penDraws.at(-1).drawing.tool, 'brush');
+  assert.deepEqual(penDraws.at(-1).drawing.points[0], { x: 0.2, y: 0.2 });
 });

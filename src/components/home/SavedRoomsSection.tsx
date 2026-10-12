@@ -12,6 +12,7 @@ import { EditSavedRoomDialog } from '../modals/EditSavedRoomDialog';
 import { orderSavedRooms } from '../../core/saved_room_order';
 import { useSortableGrid } from '../../hooks/useSortableGrid';
 import { ModalDialog } from '../common/ModalDialog';
+import { TooltipButton } from '../common/TooltipButton';
 
 export const SavedRoomsSection: React.FC = () => {
   useLocale();
@@ -20,14 +21,14 @@ export const SavedRoomsSection: React.FC = () => {
   const [editingRoom, setEditingRoom] = useState<SavedRoom | null>(null);
   const [removingRoom, setRemovingRoom] = useState<SavedRoom | null>(null);
   const { openModal } = useModal();
-  const { joinRoom, username } = useRoom();
+  const { username } = useRoom();
   const sortable = useSortableGrid(rooms.map((room) => room.roomId), (ids) => {
     try {
       savedRooms.reorder(ids);
       setRooms((records) => orderSavedRooms(records, ids));
       return true;
     } catch {
-      showToast(t("message.128c78d2ee24"));
+      showToast(t("message.128c78d2ee24"), 3500, 'error');
       return false;
     }
   });
@@ -53,20 +54,18 @@ export const SavedRoomsSection: React.FC = () => {
 
   const openSaved = (room: SavedRoom) => {
     if (!username) { openModal('username'); return; }
-    if (room.protected !== false && room.password === undefined) {
-      roomService.pendingJoinInvite = room.invite;
-      roomService.pendingJoinAsOwner = room.owned;
-      openModal('joinRoom');
-      return;
-    }
-    joinRoom(room.invite, room.password ?? '', room.owned);
+    roomService.pendingJoinInvite = room.invite;
+    roomService.pendingJoinAsOwner = room.owned;
+    roomService.pendingJoinPassword = room.password ?? '';
+    roomService.pendingJoinError = '';
+    openModal('joinRoom');
   };
 
   const removeSaved = async (room: SavedRoom) => {
     try {
       await savedRooms.put({ ...room, saved: false, password: undefined });
-      showToast(t("message.8f1e60abcf3e"));
-    } catch { showToast(t("message.bef29a92c3b0")); }
+      showToast(t("message.8f1e60abcf3e"), 3500, 'success');
+    } catch { showToast(t("message.bef29a92c3b0"), 3500, 'error'); }
   };
 
   return (
@@ -83,7 +82,7 @@ export const SavedRoomsSection: React.FC = () => {
       ) : (
         <div className={`saved-rooms-grid ${sortable.draggingId ? 'is-sorting' : ''}`} ref={sortable.gridRef}>
           {orderedRooms.map((room) => (
-            <article className={`saved-room-card ${sortable.draggingId === room.roomId ? 'is-dragging' : ''}`}
+            <article className={`saved-room-card ${room.owned ? 'is-owned' : ''} ${sortable.draggingId === room.roomId ? 'is-dragging' : ''}`}
               data-sortable-id={room.roomId} key={room.roomId} ref={sortable.cardRef(room.roomId)} onContextMenu={(event) => openContextMenu(event, [
               { id: 'enter', get label() { return t("message.f1388bfdc0f9"); }, icon: <ArrowRight size={15} />, onSelect: () => openSaved(room) },
               { id: 'edit', get label() { return t("message.4c6b05644363"); }, icon: <Pencil size={15} />, onSelect: () => setEditingRoom(room) },
@@ -98,20 +97,25 @@ export const SavedRoomsSection: React.FC = () => {
                 </button>
                 <div className="saved-room-details">
                   <strong>{room.customName ?? room.name}</strong>
-                  <span>{room.owned ? t("message.66abaa8c669e") : t("message.1e97ddf60a0f")} · {room.roomId.slice(0, 8)}
-                    {room.password !== undefined && <LockKeyhole size={12} aria-label={t("message.3ef5534f852c")} />}</span>
+                  <div className="saved-room-meta">
+                    <span className="badge-host saved-room-role">
+                      {room.owned ? t("message.66abaa8c669e") : t("message.1e97ddf60a0f")}
+                    </span>
+                    <span className="saved-room-id">{room.roomId.slice(0, 8)}</span>
+                    {room.password !== undefined && <LockKeyhole size={12} aria-label={t("message.3ef5534f852c")} />}
+                  </div>
                 </div>
               </div>
               <div className="saved-room-actions">
-                <button className="btn btn-primary btn-sm saved-room-enter" onClick={() => openSaved(room)}>
+                <button className="btn btn-secondary saved-room-enter" onClick={() => openSaved(room)}>
                   {t("message.4105811890ae")}<ArrowRight size={14} />
                 </button>
-                <button className="btn btn-outline btn-sm saved-room-icon-button"
-                  onClick={() => setEditingRoom(room)} aria-label={t("message.c0a6f99cb765", { v0: room.name })}>
+                <TooltipButton className="btn btn-secondary saved-room-icon-button"
+                  onClick={() => setEditingRoom(room)} tooltip={t("message.c0a6f99cb765", { v0: room.name })}>
                   <Pencil size={14} />
-                </button>
-                <button className="btn btn-outline btn-sm saved-room-remove" onClick={() => setRemovingRoom(room)}
-                  aria-label={t("message.4814bd50cf7c", { v0: room.name })}><Trash2 size={14} /></button>
+                </TooltipButton>
+                <TooltipButton className="btn btn-secondary saved-room-remove" onClick={() => setRemovingRoom(room)}
+                  tooltip={t("message.4814bd50cf7c", { v0: room.name })}><Trash2 size={14} /></TooltipButton>
               </div>
             </article>
           ))}

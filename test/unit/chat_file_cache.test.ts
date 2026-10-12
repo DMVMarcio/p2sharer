@@ -4,6 +4,7 @@ import { setupTestDOM } from '../helpers/browser_mocks.ts';
 import { RoomService } from '../../src/services/room_service.ts';
 import { GroupRoomManager } from '../../src/p2p/group_room.ts';
 import { CHAT_FILE_CHUNK_BYTES, MAX_IMAGE_PREVIEW_BYTES } from '../../src/core/chat_file_limits.ts';
+import { profileStats } from '../../src/core/profile_stats.ts';
 
 test('saving a verified image preview writes cached bytes without contacting its author', async () => {
   const dom = setupTestDOM();
@@ -17,6 +18,7 @@ test('saving a verified image preview writes cached bytes without contacting its
   const previousFetch = globalThis.fetch;
   const content = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]);
   const writes: Uint8Array[] = [];
+  const previousStats = profileStats.get();
   let peerRequested = false;
   try {
     service.roomManager = { requestFile: async () => { peerRequested = true; throw new Error('unexpected peer request'); } };
@@ -47,6 +49,7 @@ test('saving a verified image preview writes cached bytes without contacting its
     assert.equal(peerRequested, false);
     assert.deepEqual(Buffer.concat(writes), Buffer.from(content));
     assert.equal(service.savedDownloads.image, requestId);
+    assert.deepEqual(profileStats.get(), previousStats, 'Cached image previews and local saves cannot count as network transfers');
   } finally {
     globalThis.fetch = previousFetch;
     service.roomManager = previousManager;
@@ -74,6 +77,7 @@ test('own clipboard images save locally, restore their source, and never request
   manager.chatHistory = [message];
   let peerRequests = 0, restored = 0, written = 0, chunks = 0, cancelled = 0;
   let choose = true, changed = false, cancelDuringRead = false;
+  const previousStats = profileStats.get();
   const destinations: boolean[] = [];
   manager.requestFile = async () => { peerRequests++; throw new Error('Self transfer is forbidden'); };
   try {
@@ -114,6 +118,7 @@ test('own clipboard images save locally, restore their source, and never request
     const priorChunks = chunks;
     assert.equal(await service.requestFile(message.id, false), null);
     assert.equal(chunks, priorChunks); assert.equal(cancelled, 1); assert.equal(peerRequests, 0);
+    assert.deepEqual(profileStats.get(), previousStats, 'Saving an own image cannot count as received data');
   } finally {
     service.roomManager = previous.manager; service.chatMessages = previous.messages; service.fileProgress = previous.progress;
     service.imagePreviewBytes = previous.bytes; service.savedDownloads = previous.saved;

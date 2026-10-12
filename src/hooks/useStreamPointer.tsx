@@ -54,6 +54,27 @@ export function useStreamPointer(container: RefObject<HTMLDivElement | null>,
   useEffect(() => {
     const element = container.current;
     if (!enabled || !available || !element) { setIndicator(null); return; }
+
+    const isControlTarget = (target: EventTarget | null) => {
+      return target instanceof Element && Boolean(
+        target.closest('button, input, textarea, a, select, [role="button"], [role="dialog"], [role="menu"], .stream-drawing-toolbar, .stream-zoom-bar, .stream-volume-controller, .stream-card-stats-hud, .stream-controls-group')
+      );
+    };
+    const isVideoInteractionTarget = (target: EventTarget | null) => {
+      const v = video.current;
+      if (!v || !target || isControlTarget(target)) return false;
+      return target === v || element.contains(target as Node);
+    };
+    const isPrimaryPointer = (event: PointerEvent) => {
+      if (event.pointerType === 'pen' || event.pointerType === 'touch') {
+        return event.button === 0 || event.button === -1 || (event.buttons & 1) !== 0 || event.buttons === 0;
+      }
+      return event.button === 0;
+    };
+
+    element.classList.add('is-stream-pointer-active');
+    video.current?.classList.add('is-stream-pointer-active');
+
     const hadTabIndex = element.hasAttribute('tabindex');
     if (!hadTabIndex) element.tabIndex = -1;
     const focusSurface = () => { activePointerSurface = element; element.focus({ preventScroll: true }); };
@@ -65,26 +86,34 @@ export function useStreamPointer(container: RefObject<HTMLDivElement | null>,
     let drawing: StreamDrawing | null = null;
     let drawingPointer: number | null = null;
     const cancel = () => {
-      if (drawingPointer !== null && video.current?.hasPointerCapture(drawingPointer)) video.current.releasePointerCapture(drawingPointer);
+      if (drawingPointer !== null && video.current) {
+        try {
+          if (video.current.hasPointerCapture(drawingPointer)) video.current.releasePointerCapture(drawingPointer);
+        } catch {}
+      }
       drawing = null; drawingPointer = null; setDraft(null);
     };
     const leave = () => { if (point) send({ kind: 'leave' }); point = null; setIndicator(null); };
     const move = (event: PointerEvent) => {
-      if (event.target === video.current) activePointerSurface = element;
+      if (isVideoInteractionTarget(event.target)) activePointerSurface = element;
       if (drawing && event.pointerId === drawingPointer) {
         if (!config.current.drawingAllowed) { cancel(); return; }
         const v = video.current;
         const p = v && streamPointerPosition(v.getBoundingClientRect(), v.videoWidth, v.videoHeight, event.clientX, event.clientY);
         if (p) {
           if (drawing.tool === 'brush') {
-            if (drawing.points.length >= STREAM_DRAWING_MAX_POINTS) drawing.points = drawing.points.filter((_, i) => i % 2 === 0);
-            drawing.points.push(p);
-          } else drawing.points = [drawing.points[0], p];
-          setDraft({ ...drawing, points: [...drawing.points] });
+            if (drawing.points.length < STREAM_DRAWING_MAX_POINTS) {
+              drawing.points.push(p);
+              setDraft({ ...drawing, points: [...drawing.points] });
+            }
+          } else {
+            drawing.points = [drawing.points[0], p];
+            setDraft({ ...drawing, points: [...drawing.points] });
+          }
         }
       }
       const v = video.current;
-      if (!v || event.target !== v || document.hidden) { leave(); return; }
+      if (!v || !isVideoInteractionTarget(event.target) || document.hidden) { leave(); return; }
       const nextPoint = streamPointerPosition(v.getBoundingClientRect(), v.videoWidth, v.videoHeight, event.clientX, event.clientY);
       if (!nextPoint) { leave(); return; }
       point = nextPoint;
@@ -93,18 +122,18 @@ export function useStreamPointer(container: RefObject<HTMLDivElement | null>,
       if (Date.now() - lastSent.current >= 40) { send({ kind: 'move', ...point }); lastSent.current = Date.now(); }
     };
     const click = (event: MouseEvent) => {
-      if (event.target !== video.current) return;
+      if (!isVideoInteractionTarget(event.target)) return;
       event.preventDefault(); event.stopPropagation();
       const v = video.current;
       const position = v && streamPointerPosition(v.getBoundingClientRect(), v.videoWidth, v.videoHeight, event.clientX, event.clientY);
       if (!config.current.settings.tool && position && event.button === 0) send({ kind: 'ping', ...position });
     };
     // Pointing owns primary clicks; it never forwards native input or starts a pan drag.
-    const down = (event: MouseEvent) => { if (event.target === video.current && event.button === 0) { if (!editingText.current) focusSurface(); event.stopPropagation(); } };
+    const down = (event: MouseEvent) => { if (isVideoInteractionTarget(event.target) && event.button === 0) { if (!editingText.current) focusSurface(); event.stopPropagation(); } };
     const drawDown = (event: PointerEvent) => {
       const v = video.current;
       const { settings: options, drawingAllowed } = config.current;
-      if (!v || event.target !== v || event.button !== 0 || !options.tool || !drawingAllowed) return;
+      if (!v || !isVideoInteractionTarget(event.target) || !isPrimaryPointer(event) || !options.tool || !drawingAllowed) return;
       const position = streamPointerPosition(v.getBoundingClientRect(), v.videoWidth, v.videoHeight, event.clientX, event.clientY);
       if (!position) return;
       if (editingText.current) {
@@ -116,7 +145,8 @@ export function useStreamPointer(container: RefObject<HTMLDivElement | null>,
       const next: StreamDrawing = { tool: options.tool, color: options.color, size: options.size, points: [position] };
       if (options.tool === 'text') { editingText.current = true; setTextDraft(next); return; }
       drawing = next; drawingPointer = event.pointerId;
-      v.setPointerCapture(event.pointerId); setDraft(next);
+      try { v.setPointerCapture(event.pointerId); } catch {}
+      setDraft(next);
     };
     const drawUp = (event: PointerEvent) => {
       if (!drawing || event.pointerId !== drawingPointer) return;
@@ -161,6 +191,8 @@ export function useStreamPointer(container: RefObject<HTMLDivElement | null>,
     document.addEventListener('visibilitychange', deactivate);
     return () => {
       cancel();
+      element.classList.remove('is-stream-pointer-active');
+      video.current?.classList.remove('is-stream-pointer-active');
       document.removeEventListener('pointerdown', outsideText, true);
       window.removeEventListener('keydown', key);
       element.removeEventListener('focusin', activate);

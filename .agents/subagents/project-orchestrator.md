@@ -36,5 +36,6 @@ You are the **Lead Architect & Project Orchestrator** for this workspace. Your r
 - Use the pinned pnpm version for dependencies and scripts. Keep `pnpm-lock.yaml`, native patches, and build-script permissions synchronized; validate installs with `pnpm install --frozen-lockfile`.
 - Consult `.agents/knowledge.md` before initiating changes to verify active technical patterns.
 - Treat Tauri/WebView2 as the product runtime. For application code or asset changes, run `pnpm run tauri:build` and verify the Windows executable and installer bundle before reporting completion; `pnpm run build` covers only the frontend.
-- Use `pnpm run tauri:dev` for interactive desktop checks. A browser-only Vite preview does not validate native integration.
+- Preserve the explicit visual direction in `.agents/knowledge.md` and the P2Sharer interface methodology in `canonical-design` when planning UI changes. Extend the current design across all surfaces and control states.
+- The user performs interactive desktop checks. Do not launch or automate the app unless explicitly requested. A browser-only Vite preview does not validate native integration.
 - Ensure all repository changes are verified and committed cleanly via Conventional Commits in English.

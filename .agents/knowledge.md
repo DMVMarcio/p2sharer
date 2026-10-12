@@ -45,6 +45,7 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 - [P2P Message Authorization and Threat Model](knowledge/peer-security.md)
 - [Room Apps: Modular Instances and Synchronized State](knowledge/room-apps.md)
 - [Consent-Based Chat File Transfer](knowledge/chat-file-transfer.md)
+- [Profile Images, Native Processing and Hash-Based Transfer Consent](knowledge/profile-images.md)
 - [English and Brazilian Portuguese Localization](knowledge/localization.md)
 
 ---
@@ -56,8 +57,10 @@ Record only instructions explicitly intended to govern future work. Do not infer
 - `[Memory]` Keep knowledge limited to explicit standing rules and useful verified architecture. Do not record every request, inferred preference, task approval, completed-work report, or incidental UI detail.
 - `[Package Manager]` Use pinned pnpm for dependencies, scripts, local tools, and Tauri hooks; keep the tracked lockfile and tool instructions consistent.
 - `[Desktop Builds]` Use the default `src-tauri/target/` directory. If the application locks the executable, ask the user to close it and wait for confirmation. Never terminate it automatically or bypass the lock with another target directory.
+- `[Interactive Verification]` The user performs interactive application checks on their computer. Do not launch or automate the app for verification unless explicitly requested; retain automated regressions and native packaging validation.
 - `[Git]` Commit completed task changes after required validation, using English Conventional Commits. Preserve unrelated edits and report the commit hash and remaining changes. Push only when authorized.
 - `[Canonical UI]` Reuse shared components, CSS recipes, and design tokens across application surfaces. The standard covers all control families. Selection fields use the canonical `Select`, and contextual actions and tooltips use the application implementations.
+- `[Visual Direction]` Preserve the current comfortable, distinctive interface in future UI work: theme-derived surfaces, subtle depth and restrained borders, readable layer separation, balanced spacing, and short complete transitions. Extend the existing design rather than introducing generic Material-style replacements; preserve keyboard focus and accessibility.
 - `[Text Input History]` Disable Chromium/WebView2 input-history suggestions with `autoComplete="off"` on application inputs and forms.
 - `[Frontend Maintenance]` Prefer React state, events, and refs over independent DOM renderers; retain native DOM APIs at actual media, editor, geometry, and accessibility boundaries.
 - `[External Repositories]` Repositories inspected as references remain read-only unless their modification is explicitly authorized.

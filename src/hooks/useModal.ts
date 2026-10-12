@@ -5,6 +5,7 @@ import { safeChatUrl } from '../core/chat_links.ts';
 import { stateStore } from '../core/state_store.ts';
 
 export type ModalType =
+  | 'profile'
   | 'settings'
   | 'screenPicker'
   | 'username'
@@ -17,6 +18,8 @@ export type ModalType =
   | 'apps'
   | null;
 
+export interface ProfileTarget { peerId: string; name: string; isLocal?: boolean; color?: string }
+
 class ModalManager {
   private activeModal: ModalType = null;
   private isClosing: boolean = false;
@@ -24,6 +27,12 @@ class ModalManager {
   private listeners = new Set<() => void>();
   private externalLinkUrl: string | null = null;
   private pending: { modal: ModalType; url: string | null } | null = null;
+  private revision = 0;
+  private profileTarget: ProfileTarget | null = null;
+  public getProfileTarget() { return this.profileTarget; }
+  public openProfile(target: ProfileTarget) { this.profileTarget = { ...target }; this.open('profile'); }
+
+  public getRevision(): number { return this.revision; }
 
   public getActive(): ModalType {
     return this.activeModal;
@@ -50,6 +59,8 @@ class ModalManager {
       this.close();
       return;
     }
+    this.revision++;
+    if (modal !== 'profile') this.profileTarget = null;
     this.pending = null;
     this.externalLinkUrl = url;
     if (this.closeTimer) {
@@ -68,7 +79,9 @@ class ModalManager {
 
     const finish = () => {
       if (this.activeModal === 'screenPicker') stateStore.set((state) => { state.editingStreamId = null; });
+      if (this.pending) this.revision++;
       this.activeModal = this.pending?.modal ?? null;
+      if (this.activeModal !== 'profile') this.profileTarget = null;
       this.externalLinkUrl = this.pending?.url ?? null;
       this.pending = null;
       this.isClosing = false;
@@ -94,6 +107,8 @@ class ModalManager {
 export const modalManager = new ModalManager();
 
 export function useModal() {
+  const modalRevision = useSyncExternalStore(
+    cb => modalManager.subscribe(cb), () => modalManager.getRevision(), () => modalManager.getRevision());
   const activeModal = useSyncExternalStore(
     (cb) => modalManager.subscribe(cb),
     () => modalManager.getActive(),
@@ -124,6 +139,7 @@ export function useModal() {
   );
 
   return {
+    modalRevision,
     activeModal,
     isClosing,
     overlayRef,

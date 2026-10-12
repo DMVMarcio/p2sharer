@@ -82,6 +82,8 @@ src/
 
 ## 2. State Management (`src/core/state_store.ts`)
 
+Nickname appearance is separate from identity text. `core/nickname_style.ts` owns the font registry, effect/animation allowlists, hexadecimal color validation, defaults and versioned local persistence. `NicknameField` owns a cancellable `NicknameStyleEditor` dialog within the parent profile/username draft; only the parent Save persists appearance. `Nickname` renders shared appearance with grapheme-aware letters, independently clipped glyph effects for animated letters, and reduced-motion/forced-color fallbacks. Chat default name colors subscribe to the same ProfileImages background used by participant cards. Direct admitted presence carries normalized styles; gossip does not. RoomService publishes styles by peer ID into StateStore and clears them on room changes. PiP receives current names/styles through its existing offer/stats channel and watcher snapshots. Font identifiers refer to bundled registry entries with localized labels; peer-provided CSS and font URLs are unsupported.
+
 `StateStore` is a singleton holding the client's operational state:
 - **User Identity & Room**: `username`, `currentRoomCode`, `currentRoomPassword`, `isCreator`.
 - **Layout & Subscriptions**: `layoutMode` (`'grid'` or `'spotlight'`), `pinnedPeerId`, `subscribedStreams` (Set of peer IDs), `roomSlots` (array of `RoomSlotInfo`).
@@ -90,6 +92,8 @@ src/
 - **Theme & Appearance**: `currentThemeMode` (`'dark'` | `'light'`), `currentAccentColor` (`cyan`, `emerald`, `amber`, `rose`, `indigo`).
 
 Persistent settings are automatically synchronized to and restored from `localStorage`.
+
+`usePanelSize` retains device-local preferred panel sizes independently of temporary viewport constraints. `PanelResizeHandle` shares pointer capture and keyboard separator semantics for right/bottom-anchored panels; container ResizeObservers bound the rendered size while preserving room for the main surface. Collapsing a panel does not overwrite its preference.
 
 ---
 
@@ -101,6 +105,7 @@ Persistent settings are automatically synchronized to and restored from `localSt
 - Only the active grid or spotlight layout mounts cards. The selected spotlight tray entry keeps its lightweight placeholder, preventing duplicate decoders for the featured stream.
 - Persistent room apps retain keyed player/editor components while React callback refs register their grid, featured, and tray slots. Layout measurement and ResizeObserver follow those refs and preserve clipping and transitions.
 - Saved-room sorting registers cards through useSortableGrid.cardRef; keyboard and pointer gestures share the existing draft, focus, rollback, and animation lifecycle.
+- Room cards share a keyed session-local order across grid and spotlight. `core/room_card_layout.ts` fits automatic and manual 16:9 rows against the viewport while retaining independent size overrides. `useRoomCardGestures` starts body dragging after a movement threshold, protects controls/editors and stream annotation mode, resizes from invisible border hit areas, and supports keyboard alternatives. Draft geometry uses the same keyed card plus an empty destination, with no cloned content or competing FLIP transforms. The grid viewport uses size containment and disables scroll anchoring; bounded fixed-position dragging cannot enlarge its scrollable area. Only the spotlight tray edge-scrolls. Membership changes discard stale previews before rendering removed cards. Persistent apps measure slot placement synchronously before paint. Reset actions come from `RoomCardLayoutContext` through the canonical right-click menus. Narrow viewports reflow saved rows without replacing their arrangement; room changes reset the session-local layout.
 - Selector options, context-menu buttons, transmission tabs, and inline drawing editors use refs instead of selector lookups. Chat right-click actions use React onContextMenu and the same action builder as dots menus.
 - Native DOM APIs remain at explicit boundaries: React's root mount, media playback/capture, third-party editor/player integrations, geometry/animation measurements, selection highlighting, document-level dismissal, and modal focus traps. These are necessary browser contracts; do not replace them with HTML strings or duplicate feature renderers.
 
@@ -110,6 +115,7 @@ Persistent settings are automatically synchronized to and restored from `localSt
 
 - **Design System Tokens**:
   - CSS Custom Properties define all surfaces (`--bg-app`, `--bg-surface`, `--bg-elevated`, `--bg-card`, `--bg-input`), borders (`--border-subtle`, `--border-focus`), text (`--text-primary`, `--text-muted`), and accent hues.
+  - Background preferences are normalized and persisted as preset IDs or hexadecimal colors under `p2sharer_background_color`. `core/background_color.ts` derives opaque surfaces, independent control/hover colors, and readable text; `useAppTheme` applies them in the main and detached WebViews. Dark mode deepens preset and custom colors, with subtly lighter content surfaces. Light mode uses the selected color's luminance to determine the effective contrast scheme; OLED retains a black application background in either mode. Hero tokens have their own dark contrast scheme, with OLED and custom black sharing the card surface. Appearance palettes reuse `ColorPalette` and the cancellable `ColorPicker` dialog; swatches show the source hues, and background and accent selections apply immediately.
   - Accent colors dynamically update `--accent-color`, `--accent-glow`, and `--accent-hover`.
 - **Accessibility & Feedback**:
   - Custom SVG icons from `lucide`.
@@ -184,3 +190,8 @@ The default-on `StateStore.rememberTransmissionSettings` preference is persisted
 ## Overlay motion lifecycle
 
 `core/overlay_motion.ts` reads shared dialog/menu duration tokens and reduced-motion preferences. `useOverlayMotion` owns only native animation properties (opacity, scale and translate), leaving portal placement transforms untouched. Interrupted opens/closes resume the computed frame; completed players release their compositor effects. CSS animations remain the fallback when the Web Animations API is unavailable. Menu presence and modal dismissal retain inert content for the matching exit duration. Standalone dialogs use `useDialogDismiss`; manager-backed `ModalDialog` callers dismiss the manager immediately after that standalone exit to avoid a second delay.
+Dialog focus trapping, focus restoration, Escape priority for child menus, and opt-in backdrop dismissal are shared through `useModalDialogBehavior`, including custom modal layouts. `ModalDialog` owns its animated presence; custom layouts retain the modal manager lifecycle. Draft editors protect against backdrop dismissal and pending operations guard dismissal. Toast lifetime is owned by `core/toast_manager.ts`; explicit notification types drive icons and progress colors, and hover or keyboard focus pauses both the countdown animation and its removal timer. `useToastStack` retains inert outgoing notifications and animates stack geometry independently of each toast's entrance/exit; resize, interrupted motion, reduced-motion changes, timers, and unmount share cleanup.
+
+UI sound playback remains centralized in `ui/sound_effects.ts`, preserving global/event preferences and the public event methods. Original mono waveforms are rendered by `core/sound_cues.ts` at the AudioContext sample rate and cached per event. Sources disconnect after playback; settings previews use independent gains without changing saved preferences or the master gain.
+
+Screen and tab replacement uses `useContentPresence` and `ContentTransition`: the previous keyed content stays mounted but inert for the shared content exit duration, then the latest requested content enters. Changing the destination cancels obsolete swaps; reduced-motion preferences skip the delay. UI retention does not delay room-service teardown. Custom settings layouts apply the same lifecycle directly to their existing pane roots.

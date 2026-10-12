@@ -17,7 +17,7 @@ Use pnpm 10.30.1, pinned in `package.json`, with Node.js 22.14 or newer. Run `pn
 - Inspect the build result and verify the native executable and installer bundle under `src-tauri/target/release/` and `src-tauri/target/release/bundle/`.
 - Always use the default `src-tauri/target/` build directory. Never create or use alternate build directories. If the application is open or the executable is locked, present a questionnaire asking the user to close it and wait for confirmation before retrying. Do not terminate the application automatically or bypass the lock with a different Cargo target directory.
 - If the desktop build cannot finish, report the specific failure and treat native packaging as unverified.
-- Use `pnpm run tauri:dev` for interactive app checks when needed. Do not describe a browser-only preview as a desktop app check.
+- The user performs interactive checks on their computer. Do not launch or automate the application for interactive verification unless the user explicitly requests it. Automated tests and the mandatory Tauri packaging build still apply. Do not describe a browser-only preview as a desktop app check.
 
 ## Workspace conventions
 

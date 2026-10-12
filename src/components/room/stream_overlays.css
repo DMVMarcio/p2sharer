@@ -25,6 +25,5 @@
 .stream-overlay-resize.ne { top: 0; right: 0; cursor: nesw-resize; transform: rotate(270deg); }
 .stream-overlay-resize.sw { bottom: 0; left: 0; cursor: nesw-resize; transform: rotate(90deg); }
 .stream-overlay-resize.se { bottom: 0; right: 0; cursor: nwse-resize; }
-.stream-overlay-resize::after { content: ''; position: absolute; right: 4px; bottom: 4px; width: 8px; height: 8px; border-right: 2px solid var(--text-secondary); border-bottom: 2px solid var(--text-secondary); }
 .stream-overlay-loading { height: 100%; display: grid; place-items: center; color: var(--text-secondary); font-size: 12px; }
 @media (prefers-reduced-motion: reduce) { .stream-overlay, .stream-overlay-toolbar { transition: none; } }

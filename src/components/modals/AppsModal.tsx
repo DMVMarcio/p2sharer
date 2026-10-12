@@ -1,7 +1,7 @@
 import { localizeError, t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useEffect, useState } from 'react';
-import { AppWindow, Plus } from 'lucide-react';
+import { AppWindow, Play } from 'lucide-react';
 import { listRoomApps, onRoomAppRegistryChange } from '../../apps/registry';
 import { RoomAppIcon } from '../../apps/RoomAppIcon';
 import { roomAppsService } from '../../apps/room_apps_service';
@@ -20,15 +20,15 @@ export const AppsModal: React.FC = () => {
 
   const start = (close: () => void) => {
     try { roomAppsService.start(selectedKind, personal); close(); }
-    catch (error) { showToast(localizeError(error)); }
+    catch (error) { showToast(localizeError(error), 3500, 'error'); }
   };
 
-  return <ModalDialog title={t("message.791e1b0c7eaf")} subtitle={t("message.beb35c20f071")}
+  return <ModalDialog closeOnOutside title={t("message.791e1b0c7eaf")} subtitle={t("message.beb35c20f071")}
     icon={<AppWindow size={20} strokeWidth={1.8} />} className="modal-lg apps-library-modal"
     closing={isClosing} onClose={dismissModal} footer={(close) => <div className="apps-library-footer">
       <label className="apps-library-personal">
         <span className="modern-switch">
-          <input type="checkbox" checked={personal} onChange={(event) => setPersonal(event.target.checked)}
+          <input autoComplete="off" type="checkbox" checked={personal} onChange={(event) => setPersonal(event.target.checked)}
             aria-describedby="apps-personal-description" />
           <span className="switch-slider" />
         </span>
@@ -37,7 +37,7 @@ export const AppsModal: React.FC = () => {
         </span>
       </label>
       <button type="button" className="btn btn-primary apps-library-start" disabled={!selectedKind}
-        onClick={() => start(close)}><Plus size={15} strokeWidth={2} />  {t("message.99bae897c2a6")}</button>
+        onClick={() => start(close)}><Play size={15} strokeWidth={2} aria-hidden="true" />  {t("message.99bae897c2a6")}</button>
     </div>}>
     <div className="apps-library-grid">
       {listRoomApps().map((app) => <button type="button"
@@ -46,7 +46,7 @@ export const AppsModal: React.FC = () => {
         <div className={`apps-library-banner ${app.bannerClass || ''} ${app.bannerImage ? 'has-image' : ''}`}
           style={app.bannerImage ? { backgroundImage: `url("${app.bannerImage}")` } : undefined}
           aria-hidden="true">
-          {!app.bannerImage && <div className="apps-library-banner-glow" />}
+          <span className="apps-library-banner-glow" />
           <RoomAppIcon kind={app.kind} size={34} strokeWidth={1.7} />
         </div>
         <div className="apps-library-card-content">

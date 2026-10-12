@@ -1,3 +1,5 @@
+import { Nickname } from '../common/Nickname';
+import { ProfileAvatar } from '../common/ProfileAvatar';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React from 'react';
@@ -43,8 +45,8 @@ export const WatchersTooltipContent: React.FC<WatchersTooltipContentProps> = ({
             const isSelf = w.isSelf === true;
             return (
               <div key={w.peerId} className="watchers-tooltip-item">
-                <span className="watchers-tooltip-dot"></span>
-                <span className="watchers-tooltip-name">{w.username}</span>
+                <ProfileAvatar peerId={w.peerId} name={w.username} isLocal={isSelf} className="watcher-profile-avatar" />
+                <span className="watchers-tooltip-name"><Nickname name={w.username} peerId={w.peerId} isLocal={isSelf} appearance={w.nicknameStyle} /></span>
                 {isSelf && <span className="badge-you">{t("message.a03099f135b1")}</span>}
               </div>
             );

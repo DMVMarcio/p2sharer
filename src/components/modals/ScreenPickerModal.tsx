@@ -1,3 +1,4 @@
+import { useModalDialogBehavior } from '../common/useModalDialogBehavior';
 import { localizeText, t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { Select } from '../common/Select';
@@ -51,9 +52,11 @@ export const ScreenPickerModal: React.FC = () => {
 
   const skeletonCount = getSkeletonCountForTab(currentTab === 'cameras' ? 'screens' : currentTab, monitors.length);
 
+  const dialogRef = useModalDialogBehavior(closeModal, isStarting || isClosing, true);
+
   return (
     <div ref={overlayRef} inert={isClosing || undefined} className={`modal-overlay ${isClosing ? 'closing' : ''}`} id="modal-screen-picker">
-      <div className="modal-card modal-xl screen-picker-card">
+      <div className="modal-card modal-xl screen-picker-card" ref={dialogRef} inert={isClosing || undefined}>
         <div className="modal-header">
           <div className="modal-header-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -137,7 +140,7 @@ export const ScreenPickerModal: React.FC = () => {
               <div className="source-cards-grid source-cards-content-layer">
                 {currentTab === 'cameras' && cameras.length === 0 && <div className="source-cards-empty-state">{t("message.f95f9dbef95a")}</div>}
                 {currentTab === 'cameras' && cameras.map((camera, index) => <button type="button" key={camera.deviceId || index}
-                  className={`source-card ${selectedSourceId === `camera:${camera.deviceId}` ? 'selected' : ''}`}
+                  aria-pressed={selectedSourceId === `camera:${camera.deviceId}`} className={`source-card ${selectedSourceId === `camera:${camera.deviceId}` ? 'selected' : ''}`}
                   onClick={() => setSelectedSourceId(`camera:${camera.deviceId}`)}>
                   <div className="source-card-thumb camera-device-thumb"><Camera size={28} aria-hidden="true" /></div>
                   <div className="source-card-info"><div className="source-card-title">{camera.label || t("message.6c0ba75d2838", { v0: index + 1 })}</div></div>
@@ -156,7 +159,7 @@ export const ScreenPickerModal: React.FC = () => {
                 {currentTab === 'screens' && monitors.map((mon) => {
                   const isSelected = selectedSourceId === mon.id;
                   return (
-                    <div
+                    <button type="button" aria-pressed={isSelected}
                       key={mon.id}
                       className={`source-card ${isSelected ? 'selected' : ''}`}
                       onClick={() => setSelectedSourceId(mon.id)}
@@ -172,7 +175,7 @@ export const ScreenPickerModal: React.FC = () => {
                         <div className="source-card-title">{mon.name}</div>
                         <div className="source-card-subtitle">{mon.width}x{mon.height}</div>
                       </div>
-                    </div>
+                    </button>
                   );
                 })}
 
@@ -190,7 +193,7 @@ export const ScreenPickerModal: React.FC = () => {
                 {currentTab === 'windows' && windows.map((win) => {
                   const isSelected = selectedSourceId === win.id;
                   return (
-                    <div
+                    <button type="button" aria-pressed={isSelected}
                       key={win.id}
                       className={`source-card ${isSelected ? 'selected' : ''}`}
                       onClick={() => setSelectedSourceId(win.id)}
@@ -206,7 +209,7 @@ export const ScreenPickerModal: React.FC = () => {
                         <div className="source-card-title">{win.title || win.process_name}</div>
                         <div className="source-card-subtitle">{win.process_name}</div>
                       </div>
-                    </div>
+                    </button>
                   );
                 })}
               </div>

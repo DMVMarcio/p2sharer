@@ -71,9 +71,9 @@ export class AppUpdateController {
   setAutomatic(enabled: boolean) {
     this.setPreferences(enabled, this.state.includePrereleases);
   }
-  startAutomaticChecks(): () => void {
-    void this.check();
-    const timer = setInterval(() => void this.check(), UPDATE_CHECK_INTERVAL_MS);
+  startAutomaticChecks(onStartup = true): () => void {
+    void this.check(false, false, onStartup);
+    const timer = setInterval(() => void this.check(false, false, false), UPDATE_CHECK_INTERVAL_MS);
     return () => clearInterval(timer);
   }
   setPreferences(enabled: boolean, includePrereleases: boolean) {
@@ -101,7 +101,7 @@ export class AppUpdateController {
   open = () => { this.set({ dialogOpen: true }); };
   close = () => { if (!this.busy) this.set({ dialogOpen: false }); };
 
-  async check(manual = false, preferenceChange = false): Promise<void> {
+  async check(manual = false, preferenceChange = false, onStartup = false): Promise<void> {
     if (manual) this.open();
     if (this.busy || (!manual && !preferenceChange && !this.state.automatic) || this.state.status === 'ready') return;
     this.busy = true;
@@ -127,6 +127,9 @@ export class AppUpdateController {
       this.set({ status: result ? 'available' : 'current', version: result?.version ?? null,
         notes: result?.body ?? '', progress: null,
         returnToStable: !this.state.includePrereleases && !!result?.currentVersion?.split('+')[0].includes('-') });
+      if (onStartup && result) {
+        this.open();
+      }
     } catch {
       if (channel === this.channelGeneration) {
         this.set({ status: 'error', error: t("message.94a3bbaf45de") });

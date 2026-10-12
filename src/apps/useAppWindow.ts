@@ -81,7 +81,7 @@ export function useAppWindow(instance: RoomAppInstance) {
     } catch (error) {
       active.current = false;
       setDetached(false);
-      showToast(t("message.cd3c7e1436f8", { v0: localizeError(error) }));
+      showToast(t("message.cd3c7e1436f8", { v0: localizeError(error) }), 3500, 'error');
     } finally { opening.current = false; }
   };
   return { detached, detach, restore };
