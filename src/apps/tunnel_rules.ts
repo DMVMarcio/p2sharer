@@ -1,15 +1,23 @@
-export interface TunnelRule { id: string; name: string; port: number; protocol: 'tcp' | 'udp' }
+export interface TunnelRule { id: string; name: string; port: number; protocol: 'tcp' | 'udp' | 'any'; mode?: 'virtual' }
 export interface TunnelExport extends TunnelRule { generation: string }
 export interface TunnelAdvertisement extends TunnelExport { enabled: boolean }
 export const TUNNEL_RULES_KEY = 'p2sharer_port_tunnels_v1';
 const storageListeners = new WeakMap<object, Set<() => void>>();
 export const isTunnelId = (value: unknown): value is string => typeof value === 'string' && /^[a-f0-9-]{36}$/.test(value);
+export function isVirtualIp(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^\d+\.\d+\.\d+\.\d+$/.test(value)) return false;
+  const bytes = value.split('.').map(Number);
+  return bytes.every((n) => n >= 0 && n <= 255) && ((bytes[0] === 10 && bytes[1] >= 160 && bytes[1] < 192) ||
+    (bytes[0] === 172 && bytes[1] >= 16 && bytes[1] < 32) || (bytes[0] === 192 && bytes[1] === 168)) &&
+    bytes[3] > 0 && bytes[3] < 255 && bytes.join('.') === value;
+}
 export function validTunnelRule(value: unknown): value is TunnelRule {
   if (!value || typeof value !== 'object') return false;
   const row = value as TunnelRule;
   return isTunnelId(row.id) && typeof row.name === 'string' && Boolean(row.name.trim()) && row.name.length <= 80 &&
-    !/[\u0000-\u001f\u007f]/.test(row.name) && Number.isInteger(row.port) && row.port >= 1 && row.port <= 65535 &&
-    (row.protocol === 'tcp' || row.protocol === 'udp');
+    !/[\u0000-\u001f\u007f]/.test(row.name) && (row.mode === undefined || row.mode === 'virtual') && Number.isInteger(row.port) &&
+    ((row.port >= 1 && row.port <= 65535 && (row.protocol === 'tcp' || row.protocol === 'udp')) ||
+      (row.mode === 'virtual' && row.protocol === 'any' && row.port === 0));
 }
 export function validTunnelExports(value: unknown): value is TunnelExport[] {
   return Array.isArray(value) && value.length <= 32 && value.every((row) => validTunnelRule(row) &&
@@ -55,12 +63,12 @@ export function createTunnelRules(storage: Pick<Storage, 'getItem' | 'setItem'>)
       if (!Array.isArray(rows) || rows.length > 32 || !rows.every(validTunnelRule) || new Set(rows.map((row) => row.id)).size !== rows.length)
         throw new Error('Invalid saved tunnels');
       // Never restore activation or untrusted extra fields from disk.
-      return rows.map(({ id, name, port, protocol }) => ({ id, name, port, protocol }));
+      return rows.map(({ id, name, port, protocol, mode }) => ({ id, name, port, protocol, ...(mode ? { mode } : {}) }));
     },
     write(rows: TunnelRule[]): void {
       if (rows.length > 32 || !rows.every(validTunnelRule) || new Set(rows.map((row) => row.id)).size !== rows.length)
         throw new Error('Invalid saved tunnels');
-      storage.setItem(TUNNEL_RULES_KEY, JSON.stringify(rows.map(({ id, name, port, protocol }) => ({ id, name, port, protocol }))));
+      storage.setItem(TUNNEL_RULES_KEY, JSON.stringify(rows.map(({ id, name, port, protocol, mode }) => ({ id, name, port, protocol, ...(mode ? { mode } : {}) }))));
       listeners.forEach((listener) => listener());
     },
   };

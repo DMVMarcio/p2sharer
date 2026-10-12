@@ -1,5 +1,8 @@
 .apps-library-banner.tunnels { background: linear-gradient(125deg, #278f9b, #215475 65%, #233247); }
 .room-app-tunnels { height: 100%; min-height: 0; display: flex; flex-direction: column; background: var(--bg-card); color: var(--text-primary); }
+.tunnel-network-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 10px 16px; background: var(--room-app-panel-bg); font-size: 12px; }
+.tunnel-network-toolbar code { user-select: text; }
+.tunnel-form .tunnel-access-option { flex-direction: row; align-items: center; justify-content: space-between; }
 .tunnel-hint, .tunnel-empty { color: var(--text-secondary); font-size: 12px; line-height: 1.6; margin: 0; }
 .tunnel-lists { flex: 1; overflow: hidden; padding: 16px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); min-height: 0; }
 .tunnel-lists section { min-width: 0; min-height: 0; display: flex; flex-direction: column; }

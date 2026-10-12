@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Network, Plus, Pencil, Trash2, Copy } from 'lucide-react';
+import { Network, Plus, Pencil, Trash2, Copy, RefreshCw } from 'lucide-react';
 import { t, localizeError } from '../i18n';
 import { useLocale } from '../hooks/useLocale';
 import { useRoom } from '../hooks/useRoom';
@@ -10,12 +10,13 @@ import { Tooltip } from '../components/common/Tooltip';
 import { TooltipButton } from '../components/common/TooltipButton';
 import { ProfileAvatar } from '../components/common/ProfileAvatar';
 import { roomAppsService } from './room_apps_service';
-import { TunnelModel, type TunnelCounters } from './tunnel_model';
+import { TunnelModel, type TunnelCounters, type NetworkCounters } from './tunnel_model';
 import { validTunnelRule, type TunnelRule } from './tunnel_rules';
 
-function TunnelStats({ counters }: { counters?: TunnelCounters }) {
+function TunnelStats({ counters }: { counters?: TunnelCounters | NetworkCounters }) {
   if (!counters) return null;
-  return <span className="tunnel-stats">{t('tunnels.stats', { sessions: counters.sessions,
+  return <span className="tunnel-stats">{t('sessions' in counters ? 'tunnels.stats' : 'virtualNetwork.stats', { sessions: 'sessions' in counters ? counters.sessions : 0,
+    dropped: 'dropped' in counters ? counters.dropped : 0,
     sent: (counters.sent / 1024).toLocaleString(undefined, { maximumFractionDigits: 1 }),
     received: (counters.received / 1024).toLocaleString(undefined, { maximumFractionDigits: 1 }) })}</span>;
 }
@@ -24,10 +25,13 @@ function TunnelRuleDialog({ rule, model, onClose }: { rule: TunnelRule; model: T
   const [name, setName] = useState(rule.name);
   const [port, setPort] = useState(String(rule.port));
   const [protocol, setProtocol] = useState(rule.protocol);
+  const [mode, setMode] = useState(rule.mode || 'proxy');
+  const [allPorts, setAllPorts] = useState(rule.protocol === 'any');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const save = async () => {
-    const next = { id: rule.id, name: name.trim(), port: Number(port), protocol };
+    const next: TunnelRule = { id: rule.id, name: name.trim(), port: allPorts ? 0 : Number(port),
+      protocol: allPorts ? 'any' : protocol, ...(mode === 'virtual' ? { mode: 'virtual' } : {}) };
     if (!validTunnelRule(next)) { setError(t('tunnels.invalid')); return; }
     setBusy(true);
     try { await model.save(next); onClose(); }
@@ -42,10 +46,20 @@ function TunnelRuleDialog({ rule, model, onClose }: { rule: TunnelRule; model: T
     <form className="tunnel-form" autoComplete="off" onSubmit={(event) => { event.preventDefault(); void save(); }}>
       <label>{t('tunnels.name')}<input className="text-input" autoComplete="off" autoFocus maxLength={80} value={name}
         onChange={(event) => setName(event.target.value)} disabled={busy} /></label>
+      <label>{t('virtualNetwork.mode')}<Select value={mode} disabled={busy}
+        options={[{ value: 'virtual', label: t('virtualNetwork.virtualMode') }, { value: 'proxy', label: t('virtualNetwork.proxyMode') }]}
+        onValueChange={(value) => { setMode(value); if (value === 'proxy') { setAllPorts(false); if (protocol === 'any') setProtocol('tcp'); if (Number(port) === 0) setPort('25565'); } }} /></label>
+      {mode === 'virtual' && <label className="tunnel-access-option">{t('virtualNetwork.allPorts')}
+        <span className="modern-switch"><input type="checkbox" checked={allPorts} disabled={busy}
+          onChange={(event) => { setAllPorts(event.target.checked); if (!event.target.checked && protocol === 'any') setProtocol('tcp'); }} /><span className="switch-slider" /></span>
+      </label>}
+      {!allPorts && <>
       <label>{t('tunnels.protocol')}<Select value={protocol} options={[{ value: 'tcp', label: 'TCP' }, { value: 'udp', label: 'UDP' }]}
         onValueChange={(value) => setProtocol(value as 'tcp' | 'udp')} disabled={busy} /></label>
       <label>{t('tunnels.servicePort')}<input className="text-input" autoComplete="off" type="number" min={1} max={65535}
         value={port} onChange={(event) => setPort(event.target.value)} disabled={busy} /></label>
+      </>}
+      {mode === 'virtual' && <p className="tunnel-hint">{t('virtualNetwork.consent')}</p>}
       {rule.name && <p className="tunnel-hint">{t('tunnels.editDisables')}</p>}
       {error && <p role="alert" className="tunnel-error">{error}</p>}
     </form>
@@ -84,6 +98,7 @@ export function TunnelApp({ instanceId, compact = false }: { instanceId: string;
   const [editing, setEditing] = useState<TunnelRule | null>(null);
   const [deleting, setDeleting] = useState<TunnelRule | null>(null);
   const [connecting, setConnecting] = useState<{ peer: string; rule: TunnelRule } | null>(null);
+  const [regenerating, setRegenerating] = useState(false);
   if (!model) return null;
   const run = (operation: Promise<void>) => void operation.catch((reason) => showToast(localizeError(reason), 4000, 'error'));
   const localName = username || t('tunnels.you');
@@ -92,13 +107,20 @@ export function TunnelApp({ instanceId, compact = false }: { instanceId: string;
     <ProfileAvatar className="room-app-participant" name={name} peerId={peer} isLocal={local} tabIndex={0} />
   </Tooltip>;
   return <div className={`room-app-tunnels ${compact ? 'compact' : ''}`} onClick={(event) => event.stopPropagation()}>
+    {!compact && model.ip && <div className="tunnel-network-toolbar">
+      <Network size={16} /><span>{t('virtualNetwork.ip')}</span><code>{model.ip}</code>
+      <TooltipButton tooltip={t('tunnels.copy')} aria-label={t('tunnels.copy')} className="btn btn-sm btn-secondary"
+        onClick={() => { void navigator.clipboard.writeText(model.ip).catch((reason) => showToast(localizeError(reason), 3500, 'error')); }}><Copy size={15} /></TooltipButton>
+      <TooltipButton tooltip={t('virtualNetwork.refresh')} aria-label={t('virtualNetwork.refresh')} className="btn btn-sm btn-secondary"
+        disabled={model.busy || model.networkRunning} onClick={() => setRegenerating(true)}><RefreshCw size={15} /></TooltipButton>
+    </div>}
     {!model.available && <p role="status" className="tunnel-hint">{t('tunnels.desktopOnly')}</p>}
     {model.error && <p role="alert" className="tunnel-error">{localizeError(model.error)}</p>}
     <div className="tunnel-lists">
       <section aria-label={t('tunnels.mine')}>
         <div className="tunnel-list-header"><h3>{t('tunnels.mine')}</h3>
           {!compact && <button className="btn btn-sm btn-primary" disabled={model.busy || model.rules.length >= 32}
-            onClick={() => setEditing({ id: crypto.randomUUID(), name: '', port: 25565, protocol: 'tcp' })}>
+            onClick={() => setEditing({ id: crypto.randomUUID(), name: '', port: 25565, protocol: 'tcp', mode: 'virtual' })}>
             <Plus size={15} />{t('tunnels.create')}</button>}
         </div>
         <div className="tunnel-list-content">
@@ -106,8 +128,9 @@ export function TunnelApp({ instanceId, compact = false }: { instanceId: string;
         {model.rules.map((rule) => <div className="tunnel-row" key={rule.id}>
           {avatar('local', localName, true)}
           <div className="tunnel-details"><strong>{rule.name}</strong>
-            <span>{rule.protocol.toUpperCase()} · {rule.port} · {model.active.has(rule.id) ? t('tunnels.active') : t('tunnels.inactive')}</span>
-            <TunnelStats counters={model.status.counters[rule.id]} /></div>
+            <span>{rule.protocol === 'any' ? t('virtualNetwork.allPorts') : `${rule.protocol.toUpperCase()} · ${rule.port}`}
+              {rule.mode === 'virtual' && model.ip ? ` · ${model.ip}` : ''}</span>
+            <TunnelStats counters={rule.mode === 'virtual' ? model.networkCounters[rule.id] : model.status.counters[rule.id]} /></div>
           {!compact && <div className="tunnel-actions">
             <label className="modern-switch"><input type="checkbox" checked={model.active.has(rule.id)}
               aria-label={t('tunnels.enable', { name: rule.name })} disabled={model.busy || !model.available}
@@ -127,18 +150,22 @@ export function TunnelApp({ instanceId, compact = false }: { instanceId: string;
         {remoteRows.map(({ peer, rule }) => {
           const name = peers.find((p) => p.id === peer)?.username || t('tunnels.participant');
           const forward = model.status.forwards.find((f) => f.peer === peer && f.tunnel === rule.id);
-          const address = forward ? `127.0.0.1:${forward.port}` : '';
+          const virtual = rule.mode === 'virtual';
+          const networkConnected = model.networkConnections.has(model.networkKey(peer, rule.id));
+          const ip = model.remoteIPs.get(peer);
+          const address = virtual && ip ? (rule.protocol === 'any' ? ip : `${ip}:${rule.port}`) : forward ? `127.0.0.1:${forward.port}` : '';
           return <div className="tunnel-row" key={`${peer}:${rule.id}`}>
             {avatar(peer, name)}<div className="tunnel-details"><strong>{rule.name}</strong>
-              <span>{rule.protocol.toUpperCase()} · {rule.port} · {name} · {rule.enabled ? t('tunnels.active') : t('tunnels.inactive')}</span>
-              {forward && <><code>{address}</code><TunnelStats counters={model.status.counters[forward.id]} /></>}
+              <span>{rule.protocol === 'any' ? t('virtualNetwork.allPorts') : `${rule.protocol.toUpperCase()} · ${rule.port}`} · {name}</span>
+              {(forward || virtual && ip) && <code>{address}</code>}
+              <TunnelStats counters={virtual ? model.networkCounters[rule.id] : forward ? model.status.counters[forward.id] : undefined} />
             </div>
             {!compact && <div className="tunnel-actions">
-              {forward && <TooltipButton tooltip={t('tunnels.copy')} aria-label={t('tunnels.copy')} className="btn btn-sm btn-secondary"
+              {address && <TooltipButton tooltip={t('tunnels.copy')} aria-label={t('tunnels.copy')} className="btn btn-sm btn-secondary"
                 onClick={() => { void navigator.clipboard.writeText(address).then(() => showToast(t('tunnels.copied'), 2000, 'success')).catch((reason) => showToast(localizeError(reason), 3500, 'error')); }}><Copy size={15} /></TooltipButton>}
-              <label className="modern-switch"><input type="checkbox" checked={Boolean(forward)}
-                aria-label={t('tunnels.connectTo', { name: rule.name })} disabled={model.busy || !model.available || (!rule.enabled && !forward)}
-                onChange={() => forward ? run(model.disconnect(forward.id)) : setConnecting({ peer, rule })} /><span className="switch-slider" /></label>
+              <label className="modern-switch"><input type="checkbox" checked={virtual ? networkConnected : Boolean(forward)}
+                aria-label={t('tunnels.connectTo', { name: rule.name })} disabled={model.busy || !model.available || (!rule.enabled && !forward && !networkConnected) || virtual && !ip}
+                onChange={() => virtual ? run(model.toggleNetwork(peer, rule.id, !networkConnected)) : forward ? run(model.disconnect(forward.id)) : setConnecting({ peer, rule })} /><span className="switch-slider" /></label>
             </div>}
           </div>;
         })}
@@ -147,6 +174,11 @@ export function TunnelApp({ instanceId, compact = false }: { instanceId: string;
     </div>
     {editing && <TunnelRuleDialog rule={editing} model={model} onClose={() => setEditing(null)} />}
     {connecting && <TunnelConnectDialog {...connecting} model={model} onClose={() => setConnecting(null)} />}
+    {regenerating && <ModalDialog title={t('virtualNetwork.refresh')} onClose={() => setRegenerating(false)} busy={model.busy}
+      footer={(close) => <><button className="btn btn-secondary" disabled={model.busy} onClick={close}>{t('tunnels.cancel')}</button>
+        <button className="btn btn-primary" disabled={model.busy} onClick={() => run(model.regenerateIP().then(() => setRegenerating(false)))}>{t('virtualNetwork.refresh')}</button></>}>
+      <p>{t('virtualNetwork.refreshConfirm')}</p>
+    </ModalDialog>}
     {deleting && <ModalDialog title={t('tunnels.delete')} onClose={() => setDeleting(null)} busy={model.busy}
       footer={(close) => <><button className="btn btn-secondary" onClick={close} disabled={model.busy}>{t('tunnels.cancel')}</button>
         <button className="btn btn-danger" disabled={model.busy} onClick={() => run(model.delete(deleting.id).then(() => setDeleting(null)))}>{t('tunnels.delete')}</button></>}>

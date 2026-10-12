@@ -1,20 +1,24 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import type { RoomAppModel, RoomAppModelContext } from './models.ts';
-import { createTunnelRules, validTunnelAdvertisements, validTunnelRule, type TunnelAdvertisement, type TunnelExport, type TunnelRule } from './tunnel_rules.ts';
+import { createTunnelRules, isVirtualIp, validTunnelAdvertisements, validTunnelRule, type TunnelAdvertisement, type TunnelExport, type TunnelRule } from './tunnel_rules.ts';
 
 export interface TunnelCounters { sent: number; received: number; sessions: number }
 export interface TunnelForward { id: string; peer: string; tunnel: string; port: number; protocol: string }
 interface Status { counters: Record<string, TunnelCounters>; forwards: TunnelForward[] }
 interface NativeEvent { scope: string; peer: string; packet: { kind: string; session: string } }
+interface NetworkEvent { scope?: string; peer?: string; data?: string; sequence?: number; ip?: string; error?: string }
+export interface NetworkCounters { sent: number; received: number; dropped: number }
 export interface TunnelNative {
   available: boolean;
   call<T>(command: string, args: Record<string, unknown>): Promise<T>;
   listen(handler: (event: NativeEvent) => void): Promise<() => void>;
+  listenVirtual?(handler: (event: NetworkEvent) => void): Promise<() => void>;
 }
 const native: TunnelNative = {
   available: isTauri(), call: (command, args) => invoke(command, args),
   listen: async (handler) => listen<NativeEvent>('port-tunnel-event', ({ payload }) => handler(payload)),
+  listenVirtual: async (handler) => listen<NetworkEvent>('virtual-network-event', ({ payload }) => handler(payload)),
 };
 
 /** Room state is owner-authored advertisements only; socket state stays on its device. */
@@ -26,6 +30,11 @@ export class TunnelModel implements RoomAppModel {
   error = '';
   busy = false;
   readonly available: boolean;
+  ip = '';
+  remoteIPs = new Map<string, string>();
+  networkConnections = new Map<string, { peer: string; rule: TunnelAdvertisement }>();
+  networkCounters: Record<string, NetworkCounters> = {};
+  networkRunning = false;
   private members = new Set<string>();
   private revision = 0;
   private revisions = new Map<string, number>();
@@ -34,6 +43,9 @@ export class TunnelModel implements RoomAppModel {
   private disposed = false;
   private removeListener?: () => void;
   private removeStorageListener?: () => void;
+  private removeNetworkListener?: () => void;
+  private networkReady: Promise<void>;
+  private networkPending = 0;
   private timer?: ReturnType<typeof setInterval>;
   private serial = Promise.resolve();
   private readonly store: ReturnType<typeof createTunnelRules> | null;
@@ -56,7 +68,7 @@ export class TunnelModel implements RoomAppModel {
         let revoked = false;
         for (const [id, active] of this.active) {
           const rule = rules.find((row) => row.id === id);
-          if (!rule || rule.name !== active.name || rule.port !== active.port || rule.protocol !== active.protocol) {
+          if (!rule || rule.name !== active.name || rule.port !== active.port || rule.protocol !== active.protocol || rule.mode !== active.mode) {
             this.active.delete(id); revoked = true;
           }
         }
@@ -76,6 +88,29 @@ export class TunnelModel implements RoomAppModel {
       .catch((error) => { this.error = String(error); this.context.changed(); throw error; }) : Promise.resolve();
     // Listener setup failures are displayed and block activation, without an unhandled rejection.
     void this.listening.catch(() => {});
+    this.networkReady = bridge.available && bridge.listenVirtual ? Promise.all([
+      bridge.call<{ ip: string }>('get_virtual_network_identity', {}).then((identity) => {
+        if (!isVirtualIp(identity?.ip)) throw new Error('Invalid virtual IP');
+        this.ip = identity.ip; if (!this.disposed) { this.context.changed(); this.revision++; this.advertise(); }
+      }),
+      bridge.listenVirtual((event) => {
+        if (this.disposed) return;
+        if (event.error) {
+          for (const [id, rule] of this.active) if (rule.mode === 'virtual') this.active.delete(id);
+          this.networkConnections.clear(); this.networkRunning = false; this.error = event.error;
+          this.revision++; this.advertise(); this.context.changed(); return;
+        }
+        if (isVirtualIp(event.ip)) { this.ip = event.ip; this.revision++; this.advertise(); this.context.changed(); return; }
+        if (event.scope !== this.scope || typeof event.peer !== 'string' || typeof event.data !== 'string' || !Number.isSafeInteger(event.sequence)) return;
+        const sequence = event.sequence!;
+        if (this.networkPending >= 32) { void this.bridge.call('virtual_network_sent', { scope: this.scope, sequence, failed: true }).catch(() => {}); return; }
+        this.networkPending++;
+        let failed = !this.joined || !this.members.has(event.peer) || !this.context.send;
+        const sent = !failed ? this.context.send!({ type: 'virtual-packet', data: event.data }, event.peer) : Promise.resolve();
+        void Promise.resolve(sent).catch(() => { failed = true; }).finally(() => { this.networkPending--; return this.bridge.call('virtual_network_sent', { scope: this.scope, sequence, failed }).catch(() => {}); });
+      }).then((remove) => { if (this.disposed) remove(); else this.removeNetworkListener = remove; }),
+    ]).then(() => {}).catch((error) => { this.error = String(error); this.context.changed(); throw error; }) : Promise.resolve();
+    void this.networkReady.catch(() => {});
   }
   private command(operation: () => Promise<void>): Promise<void> {
     const next = this.serial.then(async () => {
@@ -97,13 +132,29 @@ export class TunnelModel implements RoomAppModel {
   private async configure(): Promise<void> {
     if (!this.available) return;
     await this.bridge.call('configure_port_tunnels', { scope: this.scope,
-      exports: this.joined ? [...this.active.values()] : [],
+      exports: this.joined ? [...this.active.values()].filter((row) => row.mode !== 'virtual') : [],
       peers: this.joined ? [...this.members].filter((id) => id !== this.context.localActor) : [] }).catch(async (error) => {
         this.active.clear();
         await this.bridge.call('stop_port_tunnels', { scope: this.scope }).catch(() => {});
         this.revision++; this.advertise();
         throw error;
       });
+    if (this.bridge.listenVirtual) {
+      try {
+        await this.networkReady;
+        const grant = (row: TunnelExport) => ({ id: row.id, port: row.port, protocol: row.protocol, generation: row.generation });
+        await this.bridge.call('configure_virtual_network', { scope: this.scope, permissions: {
+          own: this.joined ? [...this.active.values()].filter((row) => row.mode === 'virtual').map(grant) : [],
+          peers: this.joined ? [...this.remoteIPs].filter(([peer]) => this.members.has(peer)).map(([id, ip]) => ({ id, ip,
+            grants: [...this.networkConnections.values()].filter((c) => c.peer === id).map((c) => grant(c.rule)) })) : [],
+        } });
+      } catch (error) {
+        for (const [id, rule] of this.active) if (rule.mode === 'virtual') this.active.delete(id);
+        this.networkConnections.clear();
+        await this.bridge.call('stop_virtual_network_scope', { scope: this.scope }).catch(() => {});
+        this.revision++; this.advertise(); throw error;
+      }
+    }
   }
   setParticipants(participants: string[]): void {
     const previous = this.members;
@@ -113,9 +164,12 @@ export class TunnelModel implements RoomAppModel {
     if (wasJoined !== this.joined) this.epoch++;
     for (const actor of this.remote.keys()) if (!this.members.has(actor)) {
       this.remote.delete(actor); this.revisions.delete(actor);
+      this.remoteIPs.delete(actor);
+      for (const [key, c] of this.networkConnections) if (c.peer === actor) this.networkConnections.delete(key);
     }
     if (wasJoined && !this.joined) {
       this.active.clear(); this.revision++; this.remote.clear(); this.revisions.clear();
+      this.remoteIPs.clear(); this.networkConnections.clear(); this.networkCounters = {};
       this.status = { counters: {}, forwards: [] };
       clearInterval(this.timer); this.timer = undefined;
     }
@@ -152,6 +206,7 @@ export class TunnelModel implements RoomAppModel {
       if (!this.available || !this.joined || epoch !== this.epoch) throw new Error('Tunnel participant unavailable');
       const rule = this.rules.find((row) => row.id === id);
       if (!rule) throw new Error('Tunnel no longer exists');
+      if (rule.mode === 'virtual' && !this.bridge.listenVirtual) throw new Error('Virtual networking requires Windows x64');
       if (enabled) this.active.set(id, { ...rule, generation: crypto.randomUUID() });
       else this.active.delete(id);
       await this.configure();
@@ -185,24 +240,68 @@ export class TunnelModel implements RoomAppModel {
   disconnect(id: string): Promise<void> {
     return this.command(async () => { await this.bridge.call('disconnect_port_tunnel', { scope: this.scope, id }); this.remoteGenerations.delete(id); await this.refresh(); });
   }
+  networkKey(peer: string, id: string): string { return `${peer}:${id}`; }
+  toggleNetwork(peer: string, id: string, enabled: boolean): Promise<void> {
+    const epoch = this.epoch;
+    return this.command(async () => {
+      if (!this.bridge.listenVirtual || !this.joined || epoch !== this.epoch) throw new Error('Tunnel participant unavailable');
+      const key = this.networkKey(peer, id);
+      if (enabled) {
+        const rule = this.remote.get(peer)?.find((r) => r.id === id);
+        if (!rule?.enabled || rule.mode !== 'virtual' || !this.remoteIPs.has(peer)) throw new Error('Tunnel participant unavailable');
+        this.networkConnections.set(key, { peer, rule });
+      } else this.networkConnections.delete(key);
+      await this.configure(); await this.refresh();
+    });
+  }
+  regenerateIP(): Promise<void> {
+    return this.command(async () => {
+      await this.networkReady;
+      const identity = await this.bridge.call<{ ip: string }>('regenerate_virtual_network_ip', {});
+      if (!isVirtualIp(identity?.ip)) throw new Error('Invalid virtual IP');
+      this.ip = identity.ip; this.revision++; this.advertise();
+    });
+  }
   async refresh(): Promise<void> {
     if (this.disposed || !this.available || !this.joined) return;
     const result = await this.bridge.call<Status>('get_port_tunnel_status', { scope: this.scope });
     if (this.disposed || !this.joined) return;
     this.status = result; this.context.changed();
+    if (this.bridge.listenVirtual) {
+      const network = await this.bridge.call<{ ip: string; running: boolean; active: boolean; counters: Record<string, NetworkCounters> }>('get_virtual_network_status', { scope: this.scope });
+      if (this.disposed || !this.joined) return;
+      this.networkRunning = network.running; this.networkCounters = network.counters;
+      if (!network.active && (this.networkConnections.size || [...this.active.values()].some((r) => r.mode === 'virtual'))) {
+        this.networkConnections.clear();
+        for (const [id, rule] of this.active) if (rule.mode === 'virtual') this.active.delete(id);
+        this.revision++; this.advertise();
+      }
+      this.context.changed();
+    }
   }
   localPort(id: string, fallback: number): number { return this.store?.localPort(id, fallback) ?? fallback; }
   snapshot(): unknown {
-    return { type: 'advertise', revision: this.revision, exports: this.joined ? this.rules.map((rule) => ({ ...rule,
+    return { type: 'advertise', revision: this.revision, ...(this.ip ? { ip: this.ip } : {}), exports: this.joined ? this.rules.map((rule) => ({ ...rule,
       enabled: this.active.has(rule.id), generation: this.active.get(rule.id)?.generation ?? '00000000-0000-0000-0000-000000000000' })) : [] };
   }
   apply(payload: unknown, actor: string, fromSnapshot: boolean): void {
     if (this.disposed || !this.joined || actor === this.context.localActor || !this.members.has(actor) || !payload || typeof payload !== 'object') return;
-    const data = payload as { type?: string; revision?: number; exports?: unknown; packet?: unknown };
+    const data = payload as { type?: string; revision?: number; exports?: unknown; packet?: unknown; ip?: unknown; data?: unknown };
     if (data.type === 'advertise' && Number.isSafeInteger(data.revision) && data.revision! >= 0 && validTunnelAdvertisements(data.exports)) {
       if (data.revision! < (this.revisions.get(actor) ?? -1)) return;
       this.revisions.set(actor, data.revision!);
       this.remote.set(actor, data.exports);
+      const previousIP = this.remoteIPs.get(actor);
+      if (isVirtualIp(data.ip)) this.remoteIPs.set(actor, data.ip); else this.remoteIPs.delete(actor);
+      const ipChanged = previousIP !== this.remoteIPs.get(actor);
+      let networkChanged = ipChanged;
+      for (const [key, connection] of this.networkConnections) if (connection.peer === actor) {
+        const current = data.exports.find((rule) => rule.id === connection.rule.id);
+        if (!current?.enabled || current.mode !== 'virtual' || current.generation !== connection.rule.generation || ipChanged) {
+          this.networkConnections.delete(key); networkChanged = true;
+        }
+      }
+      if (networkChanged) void this.command(async () => { await this.configure(); }).catch(() => {});
       for (const forward of this.status.forwards) if (forward.peer === actor) {
         const previous = this.remoteGenerations.get(forward.id);
         const item = data.exports.find((row) => row.id === forward.tunnel);
@@ -214,6 +313,9 @@ export class TunnelModel implements RoomAppModel {
         if (item) this.remoteGenerations.set(forward.id, item.generation);
       }
       this.context.changed();
+    } else if (!fromSnapshot && data.type === 'virtual-packet' && this.available && this.bridge.listenVirtual) {
+      if (typeof data.data !== 'string' || data.data.length > 1708) return;
+      void this.bridge.call('receive_virtual_network_packet', { scope: this.scope, peer: actor, data: data.data }).catch(() => {});
     } else if (!fromSnapshot && data.type === 'wire' && this.available && data.packet && typeof data.packet === 'object') {
       const packet = data.packet as { kind?: string; data?: unknown };
       if (!['open', 'ready', 'data', 'ack', 'end', 'close'].includes(packet.kind || '') ||
@@ -223,10 +325,12 @@ export class TunnelModel implements RoomAppModel {
   }
   private remoteGenerations = new Map<string, string>();
   destroy(): void {
-    this.disposed = true; this.joined = false; this.active.clear(); clearInterval(this.timer); this.removeListener?.(); this.removeStorageListener?.();
+    this.disposed = true; this.joined = false; this.active.clear(); clearInterval(this.timer); this.removeListener?.(); this.removeStorageListener?.(); this.removeNetworkListener?.();
+    if (this.available && this.bridge.listenVirtual) void this.bridge.call('stop_virtual_network_scope', { scope: this.scope }).catch(() => {});
     // Finish any pending bind/configure before removing the scope, preventing late task resurrection.
     void this.serial.finally(async () => {
       if (this.available) await this.bridge.call('stop_port_tunnels', { scope: this.scope }).catch(() => {});
+      if (this.available && this.bridge.listenVirtual) await this.bridge.call('stop_virtual_network_scope', { scope: this.scope }).catch(() => {});
     });
   }
 }

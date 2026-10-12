@@ -31,6 +31,10 @@ mod app_data_migration;
 mod app_updates;
 pub mod lan_signaling;
 pub mod port_tunnel;
+pub mod virtual_network;
+mod virtual_network_policy;
+#[cfg(all(windows, target_arch = "x86_64"))]
+mod virtual_network_driver;
 
 use audio_loopback::{start_audio_capture, stop_audio_capture};
 use logger::{clear_log_file, get_log_file_path, open_latest_log, open_log_folder, write_frontend_log};
@@ -50,10 +54,11 @@ use tauri::{Emitter, Manager};
 use chat_files::{import_chat_files, paste_chat_files, discard_chat_file, copy_chat_image};
 
 #[tauri::command]
-fn prepare_app_update(window: tauri::Window) -> Result<(), String> {
+async fn prepare_app_update(window: tauri::Window, network: tauri::State<'_, virtual_network::VirtualNetworkState>) -> Result<(), String> {
     if window.label() != "main" { return Err("Only the main window can install updates".into()); }
     stop_native_screen_capture()?;
     stop_audio_capture()?;
+    network.shutdown().await?;
     process_manager::set_update_installer_breakaway(true)?;
     Ok(())
 }
@@ -96,6 +101,7 @@ pub fn run() {
         .manage(profile_image::ProfileImageState::default())
         .manage(lan_signaling::LanSignalingState::default())
         .manage(port_tunnel::TunnelState::default())
+        .manage(virtual_network::VirtualNetworkState::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
@@ -120,6 +126,13 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            virtual_network::get_virtual_network_identity,
+            virtual_network::regenerate_virtual_network_ip,
+            virtual_network::configure_virtual_network,
+            virtual_network::stop_virtual_network_scope,
+            virtual_network::get_virtual_network_status,
+            virtual_network::virtual_network_sent,
+            virtual_network::receive_virtual_network_packet,
             port_tunnel::configure_port_tunnels,
             port_tunnel::stop_port_tunnels,
             port_tunnel::get_port_tunnel_status,
