@@ -502,19 +502,37 @@ impl Drop for Device {
         }
     }
 }
+struct ComApartment;
+impl ComApartment {
+    fn new() -> Result<Self, String> {
+        unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED).ok() }
+            .map_err(|e| e.to_string())?;
+        Ok(Self)
+    }
+}
+impl Drop for ComApartment {
+    fn drop(&mut self) {
+        unsafe {
+            CoUninitialize();
+        }
+    }
+}
 pub struct Firewall {
     rules: INetFwRules,
+    // Rust drops fields in declaration order: release COM interfaces first.
+    _apartment: ComApartment,
+    configured: std::cell::Cell<bool>,
 }
 impl Firewall {
     pub fn new() -> Result<Self, String> {
         unsafe {
-            CoInitializeEx(None, COINIT_APARTMENTTHREADED)
-                .ok()
-                .map_err(|e| e.to_string())?;
+            let apartment = ComApartment::new()?;
             let policy: INetFwPolicy2 = CoCreateInstance(&NetFwPolicy2, None, CLSCTX_INPROC_SERVER)
                 .map_err(|e| e.to_string())?;
             Ok(Self {
                 rules: policy.Rules().map_err(|e| e.to_string())?,
+                _apartment: apartment,
+                configured: std::cell::Cell::new(false),
             })
         }
     }
@@ -533,6 +551,7 @@ impl Firewall {
         peers: &[Ipv4Addr],
         grants: &[Grant],
     ) -> Result<(), String> {
+        self.configured.set(true);
         self.remove();
         if peers.is_empty() || grants.is_empty() {
             return Ok(());
@@ -592,9 +611,31 @@ impl Firewall {
 }
 impl Drop for Firewall {
     fn drop(&mut self) {
-        self.remove();
-        unsafe {
-            CoUninitialize();
+        if self.configured.get() {
+            self.remove();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn firewall_interfaces_are_released_before_the_apartment_closes() {
+        // A separate thread starts without another component's COM reference.
+        // Read-only initialization exercises the production destruction order;
+        // never configure or remove firewall rules during automatic tests.
+        std::thread::spawn(|| {
+            for _ in 0..3 {
+                let firewall = Firewall::new().unwrap();
+                unsafe {
+                    firewall.rules.Count().unwrap();
+                }
+                drop(firewall);
+            }
+        })
+        .join()
+        .unwrap();
     }
 }
