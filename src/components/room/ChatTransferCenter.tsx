@@ -1,3 +1,4 @@
+import { useOverlayMotion } from '../../hooks/useOverlayMotion';
 import { getLanguage, localizeText, t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { useDropdownPresence } from '../../hooks/useDropdownPresence';
@@ -53,6 +54,8 @@ export function ChatTransferCenter() {
   const { fileProgress, cancelFileTransfer, dismissFileProgress, revealSavedFile } = useRoom();
   const [open, setOpen] = useState<'send' | 'receive' | null>(null);
   const presence = useDropdownPresence(open);
+  const menuMotion = useRef<HTMLDivElement>(null);
+  useOverlayMotion(menuMotion, open !== null, 'menu');
   const speedUnit = useSyncExternalStore(subscribeTransferSpeedUnit, getTransferSpeedUnit);
   const root = useRef<HTMLDivElement>(null);
   const all = Object.values(fileProgress);
@@ -78,7 +81,7 @@ export function ChatTransferCenter() {
         {active > 0 && <span className="chat-transfer-count">{active}</span>}
       </button>;
     })}
-    {presence.value && <div key={presence.value} className={`chat-transfer-menu ${presence.closing ? 'dropdown-closing' : ''}`} inert={presence.closing} aria-hidden={presence.closing} role="dialog" aria-label={presence.value === 'send' ? t("message.6c67c66d4c9c") : t("message.4e9e0fbfcfb3")}>
+    {presence.value && <div ref={menuMotion} key={presence.value} className={`chat-transfer-menu ${presence.closing ? 'dropdown-closing' : ''}`} inert={presence.closing} aria-hidden={presence.closing} role="dialog" aria-label={presence.value === 'send' ? t("message.6c67c66d4c9c") : t("message.4e9e0fbfcfb3")}>
       <strong className="chat-transfer-title">{presence.value === 'send' ? t("message.0b1ee3b4ecdd") : t("common.downloads")}</strong>
       {visible.length === 0 ? <p className="chat-transfer-empty">{t("message.eec6ee5a72d8")}</p> :
         <div className="chat-transfer-list">{visible.map((transfer) => <div className="chat-transfer-item" key={transfer.requestId}>

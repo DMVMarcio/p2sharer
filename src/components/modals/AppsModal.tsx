@@ -11,7 +11,7 @@ import { showToast } from '../../hooks/useToast';
 
 export const AppsModal: React.FC = () => {
   useLocale();
-  const { closeModal } = useModal();
+  const { dismissModal, isClosing } = useModal();
   const [, setRegistryTick] = useState(0);
   const [selectedKind, setSelectedKind] = useState('');
   const [personal, setPersonal] = useState(false);
@@ -25,7 +25,7 @@ export const AppsModal: React.FC = () => {
 
   return <ModalDialog title={t("message.791e1b0c7eaf")} subtitle={t("message.beb35c20f071")}
     icon={<AppWindow size={20} strokeWidth={1.8} />} className="modal-lg apps-library-modal"
-    onClose={closeModal} footer={(close) => <div className="apps-library-footer">
+    closing={isClosing} onClose={dismissModal} footer={(close) => <div className="apps-library-footer">
       <label className="apps-library-personal">
         <span className="modern-switch">
           <input type="checkbox" checked={personal} onChange={(event) => setPersonal(event.target.checked)}

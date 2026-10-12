@@ -17,6 +17,8 @@
   /* Base Transitions */
   --transition-fast: 0.15s cubic-bezier(0.16, 1, 0.3, 1);
   --transition-normal: 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  --dialog-enter-duration: 280ms;
+  --dialog-exit-duration: 240ms;
   --dropdown-enter-duration: 320ms;
   --dropdown-exit-duration: 260ms;
   --source-loading-duration: 400ms;
@@ -3396,21 +3398,21 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   justify-content: center;
   z-index: 1000;
   padding: 20px;
-  animation: modalFadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: modalFadeIn var(--dialog-enter-duration) cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .modal-overlay.closing {
-  animation: modalFadeOut 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: modalFadeOut var(--dialog-exit-duration) cubic-bezier(0.16, 1, 0.3, 1) forwards;
   pointer-events: none;
 }
 
 .modal-overlay .modal-card {
-  animation: modalCardEnter 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: modalCardEnter var(--dialog-enter-duration) cubic-bezier(0.16, 1, 0.3, 1) both;
   will-change: transform, opacity;
 }
 
 .modal-overlay.closing .modal-card {
-  animation: modalCardExit 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: modalCardExit var(--dialog-exit-duration) cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .modal-overlay.hidden {
@@ -4631,7 +4633,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   max-width: 400px;
   width: 90%;
   box-shadow: var(--shadow-lg);
-  animation: modalCardEnter 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: modalCardEnter var(--dialog-enter-duration) cubic-bezier(0.16, 1, 0.3, 1) both;
   will-change: transform, opacity;
 }
 
@@ -5511,4 +5513,11 @@ html[data-platform="macos"] .skeleton-shimmer::after {
     transition-delay: 0s !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* React motion hooks own interrupted transitions; CSS remains the fallback. */
+[data-overlay-motion="controlled"],
+.modal-overlay[data-overlay-motion="controlled"] .modal-card {
+  animation: none !important;
+  will-change: auto;
 }

@@ -12,7 +12,7 @@ import { useSkeletonPresence } from '../../hooks/useSkeletonPresence';
 
 export const ScreenPickerModal: React.FC = () => {
   useLocale();
-  const { closeModal, isClosing } = useModal();
+  const { closeModal, isClosing, overlayRef } = useModal();
   const {
     cameras,
     cameraModes,
@@ -52,7 +52,7 @@ export const ScreenPickerModal: React.FC = () => {
   const skeletonCount = getSkeletonCountForTab(currentTab === 'cameras' ? 'screens' : currentTab, monitors.length);
 
   return (
-    <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} id="modal-screen-picker">
+    <div ref={overlayRef} inert={isClosing || undefined} className={`modal-overlay ${isClosing ? 'closing' : ''}`} id="modal-screen-picker">
       <div className="modal-card modal-xl screen-picker-card">
         <div className="modal-header">
           <div className="modal-header-icon">

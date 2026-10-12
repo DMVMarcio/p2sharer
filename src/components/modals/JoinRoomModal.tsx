@@ -11,7 +11,7 @@ import { roomService } from '../../services/room_service';
 
 export const JoinRoomModal: React.FC = () => {
   useLocale();
-  const { closeModal, isClosing } = useModal();
+  const { closeModal, isClosing, overlayRef } = useModal();
   const { joinRoom } = useRoom();
 
   const [code, setCode] = useState(() => roomService.pendingJoinInvite);
@@ -33,7 +33,7 @@ export const JoinRoomModal: React.FC = () => {
   const { submit, pending } = useFormSubmit(handleConfirm, isClosing);
 
   return (
-    <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} id="modal-join-room-dialog">
+    <div ref={overlayRef} inert={isClosing || undefined} className={`modal-overlay ${isClosing ? 'closing' : ''}`} id="modal-join-room-dialog">
       <form autoComplete="off" onSubmit={submit} aria-busy={pending} className="modal-card">
         <div className="modal-header">
           <div className="modal-header-icon">

@@ -11,7 +11,7 @@ import { showToast } from '../../hooks/useToast';
 
 export const SaveInviteModal: React.FC = () => {
   useLocale();
-  const { closeModal, isClosing } = useModal();
+  const { closeModal, isClosing, overlayRef } = useModal();
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
@@ -61,7 +61,7 @@ export const SaveInviteModal: React.FC = () => {
   const { submit, pending } = useFormSubmit(save, isClosing);
 
   return (
-    <div className={`modal-overlay ${isClosing ? 'closing' : ''}`}>
+    <div ref={overlayRef} inert={isClosing || undefined} className={`modal-overlay ${isClosing ? 'closing' : ''}`}>
       <form autoComplete="off" onSubmit={submit} aria-busy={pending} className="modal-card" role="dialog" aria-modal="true" aria-labelledby="save-invite-title">
         <div className="modal-header">
           <div className="modal-header-icon"><BookmarkPlus size={20} /></div>

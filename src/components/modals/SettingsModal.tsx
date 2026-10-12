@@ -39,7 +39,7 @@ const SOUND_LABELS: Record<SoundEvent, string> = {
 
 export const SettingsModal: React.FC = () => {
   useLocale();
-  const { closeModal, isClosing } = useModal();
+  const { closeModal, isClosing, overlayRef } = useModal();
   const { themeMode, accentColor, setThemeMode, setAccentColor } = useAppTheme();
 
   const [activeTab, setActiveTab] = useState<
@@ -208,7 +208,7 @@ export const SettingsModal: React.FC = () => {
   };
 
   return (
-    <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} id="modal-settings">
+    <div ref={overlayRef} inert={isClosing || undefined} className={`modal-overlay ${isClosing ? 'closing' : ''}`} id="modal-settings">
       <div className="modal-card modal-settings">
         <div className="modal-header">
           <div className="modal-header-icon">

@@ -179,3 +179,8 @@ The default-on `StateStore.rememberTransmissionSettings` preference is persisted
 ## Saved room ordering
 
 `SavedRoomsSection` displays device-local order from `core/saved_room_order.ts`, persisted as room IDs under `p2sharer_saved_room_order_v1`; it never rewrites signed invitations, identities, or passwords to reorder cards. Existing rooms initially use their display-name alphabetical order. New records absent from the manual order append afterward, and renames retain their positions. `useSortableGrid` provides shared pointer/keyboard sorting with a six-dot handle, a transient draft, grid-aware nearest-slot placement, scroll-edge movement, and FLIP animations using the shared normal transition and reduced-motion setting. Drop commits once; Escape, pointer cancellation, and blur restore the initial order. Storage failures roll back the gesture and show a toast. The focused handle remains attached to its keyed card. Unit DOM checks verify gestures, keyboard focus, animations, and reduced motion; storage tests cover corruption and write failure.
+
+
+## Overlay motion lifecycle
+
+`core/overlay_motion.ts` reads shared dialog/menu duration tokens and reduced-motion preferences. `useOverlayMotion` owns only native animation properties (opacity, scale and translate), leaving portal placement transforms untouched. Interrupted opens/closes resume the computed frame; completed players release their compositor effects. CSS animations remain the fallback when the Web Animations API is unavailable. Menu presence and modal dismissal retain inert content for the matching exit duration. Standalone dialogs use `useDialogDismiss`; manager-backed `ModalDialog` callers dismiss the manager immediately after that standalone exit to avoid a second delay.

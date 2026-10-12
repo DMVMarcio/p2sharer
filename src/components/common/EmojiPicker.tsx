@@ -1,3 +1,4 @@
+import { useOverlayMotion } from '../../hooks/useOverlayMotion';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -14,6 +15,8 @@ const normalize = (value: string) => value.toLocaleLowerCase().normalize('NFD').
 
 export const EmojiPicker: React.FC<Props> = ({ pack, onSelect, closing = false }) => {
   const language = useLocale();
+  const motionRef = useRef<HTMLDivElement>(null);
+  useOverlayMotion(motionRef, !closing, 'menu');
   const [activeCategory, setActiveCategory] = useState<EmojiCategory>(EMOJI_CATEGORIES[0].id);
   const [query, setQuery] = useState('');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -70,7 +73,7 @@ export const EmojiPicker: React.FC<Props> = ({ pack, onSelect, closing = false }
 
   let remaining = visibleCount;
   return (
-    <div className={`emoji-picker ${closing ? 'dropdown-closing' : ''}`} inert={closing} aria-hidden={closing} role="dialog" aria-label={t("message.393abe74ad54")}>
+    <div ref={motionRef} className={`emoji-picker ${closing ? 'dropdown-closing' : ''}`} inert={closing} aria-hidden={closing} role="dialog" aria-label={t("message.393abe74ad54")}>
       <div className="emoji-picker-header"><strong>{t("common.emojis")}</strong></div>
       <input autoComplete="off"
         className="emoji-picker-search"

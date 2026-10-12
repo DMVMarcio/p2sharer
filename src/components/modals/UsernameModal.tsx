@@ -8,7 +8,7 @@ import { showToast } from '../../hooks/useToast';
 
 export const UsernameModal: React.FC = () => {
   useLocale();
-  const { closeModal, isClosing } = useModal();
+  const { closeModal, isClosing, overlayRef } = useModal();
   const [val, setVal] = useState(
     () => stateStore.username || `User_${Math.floor(1000 + Math.random() * 9000)}`
   );
@@ -30,7 +30,7 @@ export const UsernameModal: React.FC = () => {
   const { submit, pending } = useFormSubmit(handleSave, isClosing);
 
   return (
-    <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} id="modal-username">
+    <div ref={overlayRef} inert={isClosing || undefined} className={`modal-overlay ${isClosing ? 'closing' : ''}`} id="modal-username">
       <form autoComplete="off" onSubmit={submit} aria-busy={pending} className="modal-card">
         <div className="modal-header">
           <div className="modal-header-icon">

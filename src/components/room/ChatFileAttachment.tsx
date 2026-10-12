@@ -1,3 +1,4 @@
+import { useOverlayMotion } from '../../hooks/useOverlayMotion';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { useDropdownPresence } from '../../hooks/useDropdownPresence';
@@ -32,6 +33,8 @@ export function ChatFileAttachment({ message, transfers, preview, savedRequestId
   const receiving = transfers.find((transfer) => transfer.direction === 'receive' && !transfer.previewOnly &&
     (transfer.status === 'pending' || transfer.status === 'active'));
   const menuPresence = useDropdownPresence(menu && !receiving ? true : null);
+  const menuMotion = useRef<HTMLDivElement>(null);
+  useOverlayMotion(menuMotion, menu && !receiving, 'menu');
   const previewTransfer = transfers.find((transfer) => transfer.direction === 'receive' && transfer.previewOnly &&
     (transfer.status === 'pending' || transfer.status === 'active'));
   const sending = transfers.filter((transfer) => transfer.direction === 'send' && transfer.status === 'active');
@@ -109,7 +112,7 @@ export function ChatFileAttachment({ message, transfers, preview, savedRequestId
             setMenuBelow((downloadWrap.current?.getBoundingClientRect().top ?? 0) < 130);
             setMenu(!menu);
           }}><Download size={17} /></button>}
-        {menuPresence.value && <div className={`chat-file-download-menu ${menuBelow ? 'is-below' : ''} ${menuPresence.closing ? 'dropdown-closing' : ''}`} inert={menuPresence.closing} aria-hidden={menuPresence.closing}>
+        {menuPresence.value && <div ref={menuMotion} className={`chat-file-download-menu ${menuBelow ? 'is-below' : ''} ${menuPresence.closing ? 'dropdown-closing' : ''}`} inert={menuPresence.closing} aria-hidden={menuPresence.closing}>
           <button onClick={() => { setMenu(false); onRequest(false); }}>{t("message.aef7cd5b2081")}</button>
           <button onClick={() => { setMenu(false); onRequest(true); }}>{t("message.38d8e7eee23d")}</button>
         </div>}

@@ -1,7 +1,6 @@
+import { overlayMotionDuration, prefersReducedMotion } from '../core/overlay_motion.ts';
 import { useLayoutEffect, useState } from 'react';
 
-// Keep in sync with --dropdown-exit-duration in style.css.
-const EXIT_DURATION_MS = 260;
 
 /** Retain the last menu content while its noninteractive exit animation finishes. */
 export function useDropdownPresence<T>(value: T | null) {
@@ -11,12 +10,12 @@ export function useDropdownPresence<T>(value: T | null) {
       setRetained(value);
       return;
     }
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reducedMotion = prefersReducedMotion();
     if (reducedMotion) {
       setRetained(null);
       return;
     }
-    const timer = window.setTimeout(() => setRetained(null), EXIT_DURATION_MS);
+    const timer = window.setTimeout(() => setRetained(null), overlayMotionDuration('menu', false));
     return () => window.clearTimeout(timer);
   }, [value]);
   return { value: value ?? retained, closing: value === null && retained !== null };
