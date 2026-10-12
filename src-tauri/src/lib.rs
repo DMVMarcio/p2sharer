@@ -92,6 +92,7 @@ pub fn run() {
     ensure_ws_server_running();
 
     tauri::Builder::default()
+        .append_invoke_initialization_script(format!("window.__P2SHARER_PLATFORM__ = {:?};", std::env::consts::OS))
         .on_permission_request(|webview, kind| {
             #[cfg(target_os = "macos")]
             if matches!(kind, tauri::webview::PermissionKind::Camera | tauri::webview::PermissionKind::Microphone) {

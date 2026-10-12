@@ -1,3 +1,6 @@
+import { isTauri } from '@tauri-apps/api/core';
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import { effectiveTheme, readThemeMode } from '../core/desktop_appearance';
 import { t } from '../i18n/index.ts';
 import { useEffect, useCallback } from 'react';
 import { stateStore } from '../core/state_store';
@@ -35,12 +38,6 @@ export function useAppTheme() {
       s.currentThemeMode = mode;
     });
 
-    let effectiveTheme = mode;
-    if (mode === 'system') {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      effectiveTheme = prefersDark ? 'dark' : 'light';
-    }
-    document.documentElement.setAttribute('data-theme', effectiveTheme);
     localStorage.setItem('p2sharer_theme_mode', mode);
   }, []);
 
@@ -51,31 +48,45 @@ export function useAppTheme() {
     localStorage.setItem('p2sharer_accent_color', accent);
   }, []);
 
-  // Initialize and handle system theme media query listener
+  // Shared-origin webviews receive persisted appearance changes without reopening PiP.
   useEffect(() => {
-    let effectiveTheme = currentThemeMode;
-    if (currentThemeMode === 'system') {
-      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-      effectiveTheme = mediaQuery.matches ? 'dark' : 'light';
+    const sync = (event: StorageEvent) => {
+      if (event.key === 'p2sharer_theme_mode') {
+        const mode = readThemeMode(event.newValue);
+        if (mode !== stateStore.currentThemeMode) stateStore.set(state => { state.currentThemeMode = mode; });
+      } else if (event.key === 'p2sharer_accent_color') {
+        const accent = event.newValue || 'cyan';
+        if (accent !== stateStore.currentAccentColor) stateStore.set(state => { state.currentAccentColor = accent; });
+      }
+    };
+    window.addEventListener('storage', sync);
+    return () => window.removeEventListener('storage', sync);
+  }, []);
 
-      const handleChange = (e: MediaQueryListEvent) => {
-        if (stateStore.currentThemeMode === 'system') {
-          document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
-        }
-      };
-
-      mediaQuery.addEventListener('change', handleChange);
-      document.documentElement.setAttribute('data-theme', effectiveTheme);
-      return () => mediaQuery.removeEventListener('change', handleChange);
-    } else {
-      document.documentElement.setAttribute('data-theme', currentThemeMode);
-    }
+  // Keep native controls and every webview on the same effective appearance.
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const apply = () => {
+      const theme = effectiveTheme(currentThemeMode, mediaQuery.matches);
+      document.documentElement.setAttribute('data-theme', theme);
+      document.documentElement.style.colorScheme = theme === 'light' ? 'light' : 'dark';
+      if (isTauri()) {
+        void getCurrentWindow().setTheme(currentThemeMode === 'system' ? null : theme === 'light' ? 'light' : 'dark')
+          .catch((error) => console.warn('[Theme] Could not synchronize native appearance:', error));
+      }
+    };
+    apply();
+    if (currentThemeMode !== 'system') return;
+    mediaQuery.addEventListener('change', apply);
+    return () => mediaQuery.removeEventListener('change', apply);
   }, [currentThemeMode]);
 
   useEffect(() => {
     const root = document.documentElement;
     const tokens = customAccentTokens(currentAccentColor);
     root.setAttribute('data-accent', tokens ? 'custom' : currentAccentColor);
+    const accent = ACCENT_COLORS.find(item => item.id === currentAccentColor)?.color ?? currentAccentColor;
+    root.style.setProperty('--amoled-accent-text', customAccentTokens(accent)?.['--custom-accent-text'] ?? '#ffffff');
     if (tokens) {
       for (const [key, value] of Object.entries(tokens)) root.style.setProperty(key, value);
     } else {

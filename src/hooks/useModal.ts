@@ -64,7 +64,7 @@ class ModalManager {
       this.isClosing = false;
       this.closeTimer = null;
       this.notify();
-    }, 240);
+    }, typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 240);
   }
 
   public subscribe(listener: () => void): () => void {

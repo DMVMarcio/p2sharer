@@ -1,3 +1,4 @@
+import { readThemeMode } from './desktop_appearance.ts';
 import { streamDrawingLimit, STREAM_DRAWING_MAX } from './stream_pointer.ts';
 import type { ResolutionConfig, RoomSlotInfo, StreamFilterMode, ThemeMode, TurnConfig } from './types.ts';
 import { parseTurnUrls } from '../p2p/ice_config.ts';
@@ -39,7 +40,7 @@ export class StateStore {
   public overlayPositions: Record<string, import('./media_streams').OverlayPosition> = {};
   public streamFilter: StreamFilterMode = 'all';
 
-  public currentThemeMode: ThemeMode = 'dark';
+  public currentThemeMode: ThemeMode = readThemeMode(null);
   public currentAccentColor: string = 'cyan';
 
   public currentFps: number = INITIAL_TRANSMISSION_DEFAULTS.fps;
@@ -117,7 +118,7 @@ export class StateStore {
     this.allowParticipantDrawings = localStorage.getItem('p2sharer_participant_drawings') !== 'false';
     this.allowParticipantPings = localStorage.getItem('p2sharer_participant_pings') !== 'false';
     this.username = localStorage.getItem('p2sharer_username') || '';
-    this.currentThemeMode = (localStorage.getItem('p2sharer_theme_mode') as ThemeMode) || 'dark';
+    this.currentThemeMode = readThemeMode(localStorage.getItem('p2sharer_theme_mode'));
     this.currentAccentColor = localStorage.getItem('p2sharer_accent_color') || 'cyan';
 
     this.rememberTransmissionSettings = localStorage.getItem('p2sharer_remember_transmission_settings') !== 'false';

@@ -1,3 +1,4 @@
+import { getDesktopPlatform } from '../../core/desktop_appearance';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -11,6 +12,7 @@ import { useStore } from '../../hooks/useStore';
 /** Main-window chrome; detached media windows keep their existing controls. */
 export const WindowTitlebar: React.FC = () => {
   useLocale();
+  const isMac = getDesktopPlatform() === 'macos';
   const nativeWindow = useMemo(() => isTauri() ? getCurrentWindow() : null, []);
   const title = useStore((state) => state.currentRoomCode && state.roomSlots.length > 0
     ? `P2Sharer - ${state.currentRoomName || state.currentRoomCode}`
@@ -60,16 +62,17 @@ export const WindowTitlebar: React.FC = () => {
   };
 
   return (
-    <div className={`window-titlebar ${focused ? '' : 'is-inactive'}`} onContextMenu={(event) => {
+    <div className={`window-titlebar ${isMac ? 'window-titlebar--macos' : ''} ${focused ? '' : 'is-inactive'}`} onContextMenu={(event) => {
       event.preventDefault();
       event.stopPropagation();
+      if (isMac) return;
       void invoke('show_window_menu').catch((error) => console.warn('[Window] Could not open system menu:', error));
     }}>
       <div className="window-titlebar-drag" data-tauri-drag-region>
-        <img src={logoImg} width="16" height="16" alt="" draggable={false} data-tauri-drag-region />
+        {!isMac && <img src={logoImg} width="16" height="16" alt="" draggable={false} data-tauri-drag-region />}
         <span className="window-titlebar-title" data-tauri-drag-region>{title}</span>
       </div>
-      <div className="window-caption-controls" role="group" aria-label={t("message.a64ca0dc164b")}>
+      {!isMac && <div className="window-caption-controls" role="group" aria-label={t("message.a64ca0dc164b")}>
         <Tooltip content={t("message.3fc5f90b27f1")}>
           <button type="button" className="btn window-caption-button" aria-label={t("message.3fc5f90b27f1")}
             onClick={() => run('minimize')}><Minus size={12} aria-hidden="true" /></button>
@@ -84,7 +87,7 @@ export const WindowTitlebar: React.FC = () => {
           <button type="button" className="btn window-caption-button window-caption-close" aria-label={t("message.0f2bd88ef0ac")}
             onClick={() => run('close')}><X size={14} aria-hidden="true" /></button>
         </Tooltip>
-      </div>
+      </div>}
     </div>
   );
 };

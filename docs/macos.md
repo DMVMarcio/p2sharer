@@ -16,6 +16,14 @@ pnpm run tauri:build -- --locked
 
 Tauri automatically merges `src-tauri/tauri.macos.conf.json`. The native executable is `src-tauri/target/release/p2sharer`; the application is `src-tauri/target/release/bundle/macos/P2Sharer.app`; the installer is under `src-tauri/target/release/bundle/dmg/`. Open the disk image and drag P2Sharer into Applications before testing. A local unsigned build is for development; public distribution uses Developer ID signing and Apple notarization.
 
+## Native appearance and motion
+
+The main macOS window uses Tauri's decorated overlay title bar and real AppKit traffic lights. The React title region reserves space for native controls; fullscreen, Option-click zoom, hover symbols and accessibility remain owned by macOS. Windows retains its existing custom caption controls. Native appearance follows the selected application theme.
+
+Appearance settings include an AMOLED palette with a pure black canvas and distinct panel, input, hover and focus tokens. Fresh macOS profiles default to AMOLED; stored Dark, Light, System and AMOLED choices are preserved. The native host injects presentation-only platform metadata before React initializes, including detached webviews.
+
+The macOS motion recipes preserve shared popup/dialog lifetimes while using smaller transform/opacity transitions, explicit hover transition properties, an opaque modal backdrop instead of filtering live video, and a transform-based skeleton highlight. They avoid permanent compositor promotion on dialog surfaces. System Reduce Motion disables decorative motion and removes modal exit delays. Compare responsiveness while receiving media during interactive checks; packaging and DOM tests do not measure frame rate.
+
 ## Permissions and media
 
 - Screen and window enumeration/capture use the existing xcap/JPEG/WebSocket bridge. On first use, macOS requests Screen Recording access. Enable P2Sharer in System Settings > Privacy & Security > Screen Recording (Screen & System Audio Recording on newer systems), then quit and reopen it if requested.

@@ -29,7 +29,7 @@ export function ModalDialog({ title, subtitle, icon, children, footer, className
     if (busyRef.current || closingRef.current) return;
     closingRef.current = true;
     setClosing(true);
-    timerRef.current = setTimeout(() => closeRef.current(), 240);
+    timerRef.current = setTimeout(() => closeRef.current(), window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 240);
   };
   useEffect(() => {
     const previousFocus = document.activeElement as HTMLElement | null;

@@ -1,7 +1,30 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
+  "app": {
+    "windows": [
+      {
+        "title": "P2Sharer - Compartilhamento de tela e áudio",
+        "decorations": true,
+        "shadow": true,
+        "width": 1200,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 600,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": {
+          "x": 14,
+          "y": 12
+        },
+        "backgroundColor": "#000000"
+      }
+    ]
+  },
   "bundle": {
-    "targets": ["app", "dmg"],
+    "targets": [
+      "app",
+      "dmg"
+    ],
     "macOS": {
       "minimumSystemVersion": "13.0",
       "entitlements": "macos/Entitlements.plist",

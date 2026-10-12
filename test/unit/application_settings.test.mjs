@@ -28,7 +28,7 @@ const bundle = await build({
     builder.onLoad({ filter: /.*/, namespace: 'settings-fixture' }, args => ({ contents: {
       room: 'export const roomService = { refreshStreamPointerPermissions() {} };',
       modal: 'export const useModal = () => ({ isClosing: false, closeModal: () => globalThis.settingsClosed++ });',
-      native: 'export const invoke = async command => command === "get_log_file_path" ? "fixture.log" : { driver_api_available: false };',
+      native: 'export const isTauri = () => false; export const invoke = async command => command === "get_log_file_path" ? "fixture.log" : { driver_api_available: false };',
     }[args.path] }));
     builder.onResolve({ filter: /services\/app_updates/ }, () => ({ path: 'updater', namespace: 'fixture' }));
     builder.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({
@@ -69,6 +69,14 @@ test('appearance applies and persists custom colors and restores preset tokens',
   const appearance = [...document.querySelectorAll('.settings-nav-sidebar button')]
     .find(button => button.textContent.includes('Aparência'));
   await act(async () => appearance.click());
+  const amoled = [...document.querySelectorAll('.theme-mode-pills button')].find(button => button.textContent === 'AMOLED');
+  assert.ok(amoled);
+  await act(async () => amoled.click());
+  assert.equal(document.documentElement.dataset.theme, 'amoled');
+  assert.equal(localStorage.getItem('p2sharer_theme_mode'), 'amoled');
+  assert.equal(amoled.getAttribute('aria-pressed'), 'true');
+  assert.equal(document.documentElement.style.colorScheme, 'dark');
+  assert.equal(document.documentElement.style.getPropertyValue('--amoled-accent-text'), '#000000');
   assert.ok(document.querySelector('[aria-label="Marrom"]'));
   assert.ok(document.querySelector('[aria-label="Azul escuro"]'));
   await act(async () => document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Tab', bubbles: true })));

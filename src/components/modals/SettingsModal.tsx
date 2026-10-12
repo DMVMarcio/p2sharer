@@ -1,3 +1,4 @@
+import { CircleDot } from 'lucide-react';
 import { getLanguage, setLanguage, t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { getEncoderPreference, normalizeEncoderPreference, saveEncoderPreference, type EncoderPreference, type NativeEncoderSupport } from '../../core/encoder_preferences';
@@ -422,11 +423,12 @@ export const SettingsModal: React.FC = () => {
                 <div className="settings-row">
                   <label className="settings-label">{t("message.fe873b85b31b")}</label>
                   <div className="theme-mode-pills">
-                    {(['dark', 'light', 'system'] as ThemeMode[]).map((mode) => (
+                    {(['dark', 'amoled', 'light', 'system'] as ThemeMode[]).map((mode) => (
                       <button
                         key={mode}
                         type="button"
                         className={`pill-btn ${themeMode === mode ? 'active' : ''}`}
+                        aria-pressed={themeMode === mode}
                         onClick={() => setThemeMode(mode)}
                       >
                         {mode === 'dark' && (
@@ -434,6 +436,7 @@ export const SettingsModal: React.FC = () => {
                             <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
                           </svg>
                         )}
+                        {mode === 'amoled' && <CircleDot size={14} aria-hidden="true" />}
                         {mode === 'light' && (
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <circle cx="12" cy="12" r="4"/>
@@ -454,7 +457,7 @@ export const SettingsModal: React.FC = () => {
                             <line x1="12" x2="12" y1="17" y2="21"/>
                           </svg>
                         )}
-                        <span>{mode === 'dark' ? t("message.fde8bb83362a") : mode === 'light' ? t("message.2f3e8dcc2464") : t("message.f150afd3c599")}</span>
+                        <span>{mode === 'amoled' ? t('theme.amoled') : mode === 'dark' ? t("message.fde8bb83362a") : mode === 'light' ? t("message.2f3e8dcc2464") : t("message.f150afd3c599")}</span>
                       </button>
                     ))}
                   </div>

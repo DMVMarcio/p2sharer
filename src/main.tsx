@@ -1,3 +1,4 @@
+import { getDesktopPlatform } from './core/desktop_appearance.ts';
 import { startMediaDiagnostics } from './core/media_diagnostics.ts';
 import { StreamPointerOverlay } from './components/room/StreamPointerOverlay';
 import React from 'react';
@@ -13,6 +14,8 @@ import './components/room/stream_pointer.css';
 import './apps/apps.css';
 import { MediaCoordinator } from './p2p/media_coordinator';
 import { initializeLanguage } from './i18n';
+
+document.documentElement.dataset.platform = getDesktopPlatform();
 
 // Initialize global WebRTC SDP bitrate munging at startup before any peer connection is created
 initFrontendLogger();
