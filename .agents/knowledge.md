@@ -60,6 +60,7 @@ Record only instructions explicitly intended to govern future work. Do not infer
 - `[Interactive Verification]` The user performs interactive application checks on their computer. Do not launch or automate the app for verification unless explicitly requested; retain automated regressions and native packaging validation.
 - `[Git]` Commit completed task changes after required validation, using English Conventional Commits. Preserve unrelated edits and report the commit hash and remaining changes. Push only when authorized.
 - `[Canonical UI]` Reuse shared components, CSS recipes, and design tokens across application surfaces. The standard covers all control families. Selection fields use the canonical `Select`, and contextual actions and tooltips use the application implementations.
+- `[Room App Terminology]` Refer to room apps as "apps", not "activities", in user-facing copy.
 - `[Visual Direction]` Preserve the current comfortable, distinctive interface in future UI work: theme-derived surfaces, subtle depth and restrained borders, readable layer separation, balanced spacing, and short complete transitions. Extend the existing design rather than introducing generic Material-style replacements; preserve keyboard focus and accessibility.
 - `[Text Input History]` Disable Chromium/WebView2 input-history suggestions with `autoComplete="off"` on application inputs and forms.
 - `[Frontend Maintenance]` Prefer React state, events, and refs over independent DOM renderers; retain native DOM APIs at actual media, editor, geometry, and accessibility boundaries.

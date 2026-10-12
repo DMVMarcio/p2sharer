@@ -46,7 +46,6 @@ function TunnelRuleDialog({ rule, model, onClose }: { rule: TunnelRule; model: T
         onValueChange={(value) => setProtocol(value as 'tcp' | 'udp')} disabled={busy} /></label>
       <label>{t('tunnels.servicePort')}<input className="text-input" autoComplete="off" type="number" min={1} max={65535}
         value={port} onChange={(event) => setPort(event.target.value)} disabled={busy} /></label>
-      <p className="tunnel-hint">{t('tunnels.localService')}</p>
       {rule.name && <p className="tunnel-hint">{t('tunnels.editDisables')}</p>}
       {error && <p role="alert" className="tunnel-error">{error}</p>}
     </form>
@@ -93,16 +92,16 @@ export function TunnelApp({ instanceId, compact = false }: { instanceId: string;
     <ProfileAvatar className="room-app-participant" name={name} peerId={peer} isLocal={local} tabIndex={0} />
   </Tooltip>;
   return <div className={`room-app-tunnels ${compact ? 'compact' : ''}`} onClick={(event) => event.stopPropagation()}>
-    {!compact && <div className="tunnel-toolbar">
-      <p className="tunnel-hint">{t('tunnels.manual')}</p>
-      <button className="btn btn-sm btn-primary" disabled={model.busy || model.rules.length >= 32}
-        onClick={() => setEditing({ id: crypto.randomUUID(), name: '', port: 25565, protocol: 'tcp' })}>
-        <Plus size={15} />{t('tunnels.create')}</button>
-    </div>}
     {!model.available && <p role="status" className="tunnel-hint">{t('tunnels.desktopOnly')}</p>}
     {model.error && <p role="alert" className="tunnel-error">{localizeError(model.error)}</p>}
     <div className="tunnel-lists">
-      <section aria-label={t('tunnels.mine')}><h3>{t('tunnels.mine')}</h3>
+      <section aria-label={t('tunnels.mine')}>
+        <div className="tunnel-list-header"><h3>{t('tunnels.mine')}</h3>
+          {!compact && <button className="btn btn-sm btn-primary" disabled={model.busy || model.rules.length >= 32}
+            onClick={() => setEditing({ id: crypto.randomUUID(), name: '', port: 25565, protocol: 'tcp' })}>
+            <Plus size={15} />{t('tunnels.create')}</button>}
+        </div>
+        <div className="tunnel-list-content">
         {!model.rules.length && <p className="tunnel-empty">{t('tunnels.emptyMine')}</p>}
         {model.rules.map((rule) => <div className="tunnel-row" key={rule.id}>
           {avatar('local', localName, true)}
@@ -119,8 +118,11 @@ export function TunnelApp({ instanceId, compact = false }: { instanceId: string;
               disabled={model.busy} onClick={() => setDeleting(rule)}><Trash2 size={15} /></TooltipButton>
           </div>}
         </div>)}
+        </div>
       </section>
-      <section aria-label={t('tunnels.others')}><h3>{t('tunnels.others')}</h3>
+      <section aria-label={t('tunnels.others')}>
+        <div className="tunnel-list-header"><h3>{t('tunnels.others')}</h3></div>
+        <div className="tunnel-list-content">
         {!remoteRows.length && <p className="tunnel-empty">{t('tunnels.emptyOthers')}</p>}
         {remoteRows.map(({ peer, rule }) => {
           const name = peers.find((p) => p.id === peer)?.username || t('tunnels.participant');
@@ -140,6 +142,7 @@ export function TunnelApp({ instanceId, compact = false }: { instanceId: string;
             </div>}
           </div>;
         })}
+        </div>
       </section>
     </div>
     {editing && <TunnelRuleDialog rule={editing} model={model} onClose={() => setEditing(null)} />}
