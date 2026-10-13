@@ -51,6 +51,9 @@
     }
   },
   "plugins": {
+    "deep-link": {
+      "desktop": { "schemes": ["p2sharer"] }
+    },
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDI2Q0Y0MkM2N0IwNTUxNTYKUldSV1VRVjd4a0xQSnVXeFlzc2ZPdzFhY2crRWRtRDNnaW95M3BUSzZiNzdyb0oxWEpYTG9QeWMK",
       "endpoints": [

@@ -15,6 +15,8 @@ clears and removes the auxiliary element without stopping shared remote tracks.
 ## Overview
 The frontend is built using TypeScript 5.6, HTML5, and CSS3, bundled via Vite 6. React owns rendering and lifecycle; shared services coordinate state and native/P2P boundaries.
 
+External room invitations use `p2sharer://invite/<signed-code>` (with `convite` accepted as an alias). The code belongs in the case-sensitive path. Tauri's deep-link plugin registers the scheme through Windows installers; the single-instance plugin forwards subsequent launches and restores the main window. Only `MainApp` listens. `services/room_deep_links.ts` verifies signatures and retains the latest pending invitation while profile setup, another modal or a connection is active, then opens the existing `JoinRoomModal` preview without joining. Manual join/save fields also unwrap links through `core/room_deep_links.ts`; stored credentials remain raw signed codes. Packaging does not register the workspace executable on the user's machine; testing OS dispatch requires installing the generated bundle.
+
 ---
 
 ## 1. Directory & Layer Organization (`src/`)

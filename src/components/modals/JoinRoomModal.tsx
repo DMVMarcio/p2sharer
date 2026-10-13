@@ -8,6 +8,7 @@ import { ModalDialog } from '../common/ModalDialog';
 import { ProfileAvatar } from '../common/ProfileAvatar';
 import { StatusNotice } from '../common/StatusNotice';
 import { verifyRoomInvite } from '../../core/room_invite_validation';
+import { extractRoomInvite } from '../../core/room_deep_links';
 import type { RoomPreview } from '../../core/room_preview';
 import { GroupRoomManager } from '../../p2p/group_room';
 import { stateStore } from '../../core/state_store';
@@ -71,13 +72,15 @@ export function JoinRoomModal() {
     if (phase !== 'code') return;
     setError(''); setPhase('searching');
     try {
-      const invite = await verifyRoomInvite(code.trim());
+      const normalized = extractRoomInvite(code) ?? code.trim();
+      const invite = await verifyRoomInvite(normalized);
       if (!invite) throw new Error(t('message.5348364ca0b6'));
       if (!mounted.current) return;
       setRoomName(invite.version === 3 ? invite.roomId.slice(0, 8) : invite.name);
       setCanEnter(true);
-      roomService.pendingJoinInvite = code.trim();
-      const manager = new GroupRoomManager(stateStore.username, code.trim(), '', owner.current, stateStore.getTurnConfig());
+      setCode(normalized);
+      roomService.pendingJoinInvite = normalized;
+      const manager = new GroupRoomManager(stateStore.username, normalized, '', owner.current, stateStore.getTurnConfig());
       const current = { manager, ready: Promise.resolve() };
       session.current = current;
       current.ready = roomService.startRoomPreview(manager, {

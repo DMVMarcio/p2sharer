@@ -26,6 +26,7 @@ import { YouTubePipView } from './apps/YouTubePipView';
 import { RoomAppWindow } from './apps/RoomAppWindow';
 import { AppUpdateDialog } from './components/modals/AppUpdateDialog';
 import { startAutomaticUpdateChecks } from './services/app_updates';
+import { startRoomDeepLinks } from './services/room_deep_links';
 
 export const App: React.FC = () => {
   useAppTheme(); // Sets data-theme & data-accent
@@ -51,6 +52,7 @@ const MainApp: React.FC = () => {
   const { openModal, activeModal, modalRevision } = useModal();
 
   useEffect(startAutomaticUpdateChecks, []);
+  useEffect(startRoomDeepLinks, []);
   useEffect(() => setHomeScrolled(false), [isInRoom]);
 
   useEffect(() => {

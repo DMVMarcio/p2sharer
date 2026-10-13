@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import { BookmarkPlus, Eye, EyeOff } from 'lucide-react';
 import { compareRoomInvites, parseRoomInvite } from '../../core/room_invite';
 import { verifyRoomInvite } from '../../core/room_invite_validation';
+import { extractRoomInvite } from '../../core/room_deep_links';
 import { savedRooms } from '../../core/saved_rooms';
 import { useFormSubmit } from '../../hooks/useFormSubmit';
 import { useModal } from '../../hooks/useModal';
@@ -21,7 +22,8 @@ export const SaveInviteModal: React.FC = () => {
 
   const save = async () => {
     if (busy) return;
-    const invite = await verifyRoomInvite(code);
+    const normalized = extractRoomInvite(code) ?? code.trim();
+    const invite = await verifyRoomInvite(normalized);
     if (!invite) { showToast(t("message.5348364ca0b6")); return; }
     setBusy(true);
     try {
@@ -33,7 +35,7 @@ export const SaveInviteModal: React.FC = () => {
       const remembered = password.trim() || existing?.password;
       const existingInvite = existing ? parseRoomInvite(existing.invite) : null;
       const versionOrder = existingInvite ? compareRoomInvites(existingInvite, invite) : -1;
-      if (versionOrder === 0 && existing?.invite !== code.trim()) {
+      if (versionOrder === 0 && existing?.invite !== normalized) {
         showToast(t("message.3b1c350d9ca6"), 3500, 'warning');
         return;
       }
@@ -41,7 +43,7 @@ export const SaveInviteModal: React.FC = () => {
       await savedRooms.put({
         ...existing,
         roomId: invite.roomId,
-        invite: retainNewer ? existing!.invite : code.trim(),
+        invite: retainNewer ? existing!.invite : normalized,
         name: retainNewer ? existing!.name : invite.version !== 3 ? invite.name : existing?.name ?? invite.roomId.slice(0, 8),
         customName: name.trim() || existing?.customName,
         saved: true,

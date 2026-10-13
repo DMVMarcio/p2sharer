@@ -8,6 +8,7 @@ import { modalManager, useModal } from '../../hooks/useModal';
 import { showToast } from '../../hooks/useToast';
 import { BookmarkCheck, BookmarkPlus, Check, Copy, LockKeyhole, LogOut, Settings2 } from 'lucide-react';
 import { parseRoomInvite } from '../../core/room_invite';
+import { roomInviteLink } from '../../core/room_deep_links';
 import { savedRooms, type SavedRoom } from '../../core/saved_rooms';
 import { AppUpdateButton } from './AppUpdateButton';
 import { useContextMenu } from '../common/ContextMenu';
@@ -22,7 +23,7 @@ export const AppHeader: React.FC<{ showUpdate?: boolean; homeScrolled?: boolean 
   const { openModal } = useModal();
   const [savedRecord, setSavedRecord] = useState<SavedRoom | null>(null);
   const [savingRoom, setSavingRoom] = useState(false);
-  const { copied, copy } = useClipboardFeedback(currentRoomInvite || currentRoomCode);
+  const { copied, copy } = useClipboardFeedback(roomInviteLink(currentRoomInvite) || currentRoomCode);
 
   useEffect(() => {
     const roomId = parseRoomInvite(currentRoomInvite)?.roomId;
