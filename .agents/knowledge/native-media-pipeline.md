@@ -166,10 +166,12 @@ Automatic capture uses capability-probed NVENC where supported and generic JPEG 
 `stream_pointer.rs` presents broadcaster annotations in a transparent DirectComposition
 WebView. Click-through styles, capture exclusion, and visibility are applied on the
 window's owning thread; the WebView readiness handshake cannot show an unprepared
-surface. Failed exclusion keeps the overlay hidden. Native overlays require Windows
-10 version 2004 (build 19041) or newer; earlier versions retain peer/viewer annotations
-without a broadcaster desktop overlay because `WDA_MONITOR` cannot remove that surface
-from monitor capture. Affinity readback verifies the OS flag, not the final captured
-pixels; cross-version composition behavior still requires interactive verification.
+surface. Broadcaster cursors and drawings remain visible independently of capture
+exclusion support. Exclusion requires Windows 10 version 2004 (build 19041) or newer;
+earlier versions do not receive `WDA_MONITOR`, which cannot remove that surface from
+monitor capture. Unsupported or failed exclusion logs a warning once per overlay
+lifecycle while preserving annotations; retransmission remains possible in that case.
+Affinity readback verifies the OS flag, not the final captured pixels; cross-version
+composition behavior still requires interactive verification.
 
 Use production frame-pacer tests for deterministic timing invariants and explicit hardware checks for actual capture/driver behavior. Software cadence models and local RTP loopback do not establish physical high-refresh, game, remote Internet, or audio/video synchronization results. See [test instructions](../../test/README.md); application changes require the default Tauri packaging build.

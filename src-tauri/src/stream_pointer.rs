@@ -8,6 +8,8 @@ use tauri::{
 
 static READY: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
 static PREPARED: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
+static EXCLUSION_WARNED: LazyLock<Mutex<HashSet<String>>> =
+    LazyLock::new(|| Mutex::new(HashSet::new()));
 static SOURCE: Mutex<Option<String>> = Mutex::new(None);
 static VISUALS: LazyLock<Mutex<HashMap<String, Vec<PointerVisual>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -27,12 +29,6 @@ static CAPTURE_EXCLUSION_SUPPORTED: LazyLock<bool> = LazyLock::new(|| {
     let supported = unsafe { RtlGetVersion(&mut version) }.is_ok()
         && (version.dwMajorVersion > 10
             || (version.dwMajorVersion == 10 && version.dwBuildNumber >= 19041));
-    if !supported {
-        crate::logger::log_msg(
-            "WARN", "stream.pointer",
-            "Native pointer overlays require Windows 10 version 2004 or newer; viewer annotations remain available",
-        );
-    }
     supported
 });
 
@@ -110,7 +106,7 @@ pub async fn get_stream_pointer_visuals(
     // The WebView calls this only after its transparent page has painted.
     READY.lock().unwrap().insert(window.label().to_string());
     // Loading can finish before the host has configured capture protection and bounds.
-    // Never let this handshake expose a partially initialized (or failed) overlay.
+    // Never let this handshake expose a partially initialized overlay.
     let prepared = PREPARED.lock().unwrap().contains(window.label());
     if prepared {
         present_overlay(&window, true).await?;
@@ -136,34 +132,43 @@ async fn present_overlay(window: &tauri::WebviewWindow, show: bool) -> Result<()
                     .map_err(|e| e.to_string())?;
                 #[cfg(windows)]
                 unsafe {
-                    if !*CAPTURE_EXCLUSION_SUPPORTED {
-                        return Err(
-                            "This Windows version cannot exclude pointer overlays from capture"
-                                .into(),
-                        );
-                    }
                     use windows::Win32::UI::WindowsAndMessaging::{
                         GetWindowDisplayAffinity, SetWindowDisplayAffinity, WDA_EXCLUDEFROMCAPTURE,
                     };
                     let hwnd = target.hwnd().map_err(|e| e.to_string())?;
                     let hwnd = windows::Win32::Foundation::HWND(hwnd.0);
-                    let mut affinity = 0;
-                    let already_protected = PREPARED.lock().unwrap().contains(target.label())
-                        && GetWindowDisplayAffinity(hwnd, &mut affinity).is_ok()
-                        && affinity == WDA_EXCLUDEFROMCAPTURE.0;
-                    if !already_protected {
-                        SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE).map_err(|e| {
-                            format!("Pointer overlay capture exclusion failed: {e}")
+                    let exclusion = (|| -> Result<(), String> {
+                        if !*CAPTURE_EXCLUSION_SUPPORTED {
+                            return Err("Capture exclusion requires Windows 10 version 2004 or newer".into());
+                        }
+                        let mut affinity = 0;
+                        let already_protected = PREPARED.lock().unwrap().contains(target.label())
+                            && GetWindowDisplayAffinity(hwnd, &mut affinity).is_ok()
+                            && affinity == WDA_EXCLUDEFROMCAPTURE.0;
+                        if !already_protected {
+                            SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE).map_err(|e| {
+                                format!("Pointer overlay capture exclusion failed: {e}")
+                            })?;
+                        }
+                        GetWindowDisplayAffinity(hwnd, &mut affinity).map_err(|e| {
+                            format!("Pointer overlay capture exclusion verification failed: {e}")
                         })?;
-                    }
-                    GetWindowDisplayAffinity(hwnd, &mut affinity).map_err(|e| {
-                        format!("Pointer overlay capture exclusion verification failed: {e}")
-                    })?;
-                    if affinity != WDA_EXCLUDEFROMCAPTURE.0 {
-                        return Err(
-                            "This Windows version cannot exclude pointer overlays from capture"
-                                .into(),
-                        );
+                        if affinity != WDA_EXCLUDEFROMCAPTURE.0 {
+                            return Err("Pointer overlay capture exclusion was not retained".into());
+                        }
+                        Ok(())
+                    })();
+                    if let Err(error) = exclusion {
+                        // Pointing is useful only if the broadcaster can see it. Capture
+                        // exclusion is independent of visibility; never disable annotations
+                        // when the OS cannot honor it. Warn once per overlay lifecycle.
+                        if EXCLUSION_WARNED.lock().unwrap().insert(target.label().into()) {
+                            crate::logger::log_msg("WARN", "stream.pointer", &format!(
+                                "{error}; broadcaster annotations remain visible; capture may include them"
+                            ));
+                        }
+                    } else {
+                        EXCLUSION_WARNED.lock().unwrap().remove(target.label());
                     }
                 }
                 if show {
@@ -311,6 +316,7 @@ pub async fn update_stream_pointer_overlay(
     if source.is_none() {
         READY.lock().unwrap().remove(&label);
         PREPARED.lock().unwrap().remove(&label);
+        EXCLUSION_WARNED.lock().unwrap().remove(&label);
         VISUALS.lock().unwrap().remove(&label);
         if let Some(win) = app.get_webview_window(&label) {
             win.emit("stream-pointer-visuals", Vec::<PointerVisual>::new())
@@ -331,12 +337,6 @@ pub async fn update_stream_pointer_overlay(
     // Cache changes even while a shared window is minimized; its next cursor-only frame must retain them.
     VISUALS.lock().unwrap().insert(label.clone(), visuals);
     #[cfg(windows)]
-    if !*CAPTURE_EXCLUSION_SUPPORTED {
-        // Keep annotations in the peer protocol, but do not create a desktop
-        // surface that this OS cannot omit from a full-monitor capture.
-        return Ok(());
-    }
-    #[cfg(windows)]
     if let Some((x, y, width, height)) = source_bounds(source.as_deref().unwrap()) {
         let win = if let Some(win) = app.get_webview_window(&label) {
             win
@@ -352,7 +352,9 @@ pub async fn update_stream_pointer_overlay(
             // Use DirectComposition rather than Tao's legacy blur-behind surface.
             // The latter interacts poorly with layered click-through windows on Windows 10.
             .no_redirection_bitmap(true)
-            .content_protected(true)
+            // Earlier Windows maps exclusion to a blank captured surface. Preserve
+            // the feature without applying that incompatible affinity fallback.
+            .content_protected(*CAPTURE_EXCLUSION_SUPPORTED)
             .decorations(false)
             .shadow(false)
             .always_on_top(true)
