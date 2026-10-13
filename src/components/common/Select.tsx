@@ -1,3 +1,4 @@
+import { useOverlayMotion } from '../../hooks/useOverlayMotion';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type KeyboardEvent } from 'react';
@@ -32,6 +33,7 @@ export function Select({ value, options, onValueChange, placeholder = t("message
   const selectedIndex = options.findIndex((option) => String(option.value) === String(value));
   const [activeIndex, setActiveIndex] = useState(selectedIndex);
   const [positioned, setPositioned] = useState(false);
+  useOverlayMotion(listRef, open, 'menu', positioned);
   const [placement, setPlacement] = useState('bottom');
   const [position, setPosition] = useState({ left: 0, top: 0 });
   const enabled = options.map((option, index) => !option.disabled ? index : -1).filter((index) => index >= 0);

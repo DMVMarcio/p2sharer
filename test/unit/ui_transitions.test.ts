@@ -18,3 +18,22 @@ describe('Modal lifecycle', () => {
     assert.equal(modalManager.getIsClosing(), false);
   });
 });
+
+
+it('reopening cancels obsolete modal removal and completed standalone exits dismiss once', async () => {
+  modalManager.open('settings');
+  modalManager.close();
+  modalManager.open('settings');
+  await new Promise(resolve => setTimeout(resolve, 260));
+  assert.equal(modalManager.getActive(), 'settings');
+  assert.equal(modalManager.getIsClosing(), false);
+  modalManager.open('joinRoom');
+  assert.equal(modalManager.getActive(), 'settings');
+  assert.equal(modalManager.getIsClosing(), true);
+  await new Promise(resolve => setTimeout(resolve, 260));
+  assert.equal(modalManager.getActive(), 'joinRoom');
+  assert.equal(modalManager.getIsClosing(), false);
+  modalManager.close(true);
+  assert.equal(modalManager.getActive(), null);
+  assert.equal(modalManager.getIsClosing(), false);
+});

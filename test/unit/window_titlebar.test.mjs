@@ -33,7 +33,7 @@ globalThis.windowChromeFixture = {
 };
 const require = createRequire(import.meta.url);
 const bundle = await build({
-  stdin: { contents: `export { WindowTitlebar } from './src/components/header/WindowTitlebar.tsx'; export { stateStore } from './src/core/state_store.ts'; export { setLanguage } from './src/i18n/index.ts';`, resolveDir: process.cwd() },
+  stdin: { contents: `export { WindowTitlebar } from './src/components/header/WindowTitlebar.tsx'; export { stateStore, StateStore } from './src/core/state_store.ts'; export { setLanguage } from './src/i18n/index.ts';`, resolveDir: process.cwd() },
   bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic', loader: { '.png': 'dataurl', '.svg': 'dataurl' },
   plugins: [{ name: 'native-window-fixture', setup(builder) {
     builder.onResolve({ filter: /services\/room_service$/ }, args => ({ path: args.path, namespace: 'room-fixture' }));
@@ -46,12 +46,13 @@ const bundle = await build({
     builder.onResolve({ filter: /^[^./]/ }, args => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
   } }],
 });
-const { WindowTitlebar, stateStore, setLanguage } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
+const { WindowTitlebar, stateStore, StateStore, setLanguage } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
 const { createRoot } = await import('react-dom/client');
 const root = createRoot(document.getElementById('root'));
 after(async () => { await act(async () => root.unmount()); dom.window.close(); delete globalThis.windowChromeFixture; });
 
 test('caption buttons invoke native actions without becoming drag regions', async () => {
+  await act(async () => setLanguage('pt-BR'));
   await act(async () => root.render(React.createElement(WindowTitlebar, { onVisibilityChange })));
   assert.ok(document.querySelector('.window-titlebar-drag').hasAttribute('data-tauri-drag-region'));
   assert.ok([...document.querySelectorAll('button')].every(button => !button.hasAttribute('data-tauri-drag-region')));
@@ -122,6 +123,49 @@ test('language switches update native and custom captions while room names remai
   await act(async () => setLanguage('pt-BR'));
   assert.equal(titles.at(-1), 'P2Sharer - Sala');
   await act(async () => stateStore.set(state => { state.currentRoomCode = ''; state.currentRoomName = ''; state.roomSlots = []; }));
+});
+
+test('macOS chrome reserves the native control region and preserves authored room titles', async () => {
+  globalThis.__P2SHARER_PLATFORM__ = 'macos';
+  try {
+    await act(async () => root.render(React.createElement(WindowTitlebar, { onVisibilityChange })));
+    assert.ok(document.querySelector('.window-titlebar--macos'));
+    assert.equal(document.querySelector('.window-caption-controls'), null);
+    assert.ok(document.querySelector('.window-titlebar-drag').hasAttribute('data-tauri-drag-region'));
+    await act(async () => stateStore.set(state => {
+      state.currentRoomCode = 'example'; state.currentRoomName = 'Mac room'; state.roomSlots = [{ peerId: 'local', isLocal: true }];
+    }));
+    assert.equal(document.querySelector('.window-titlebar-title').textContent, 'P2Sharer - Mac room');
+    assert.equal(titles.at(-1), 'P2Sharer - Mac room');
+    globalThis.windowChromeFixture.menuCommand = null;
+    await act(async () => document.querySelector('.window-titlebar-title').dispatchEvent(
+      new dom.window.MouseEvent('contextmenu', { bubbles: true, cancelable: true })));
+    assert.equal(globalThis.windowChromeFixture.menuCommand, null);
+  } finally {
+    delete globalThis.__P2SHARER_PLATFORM__;
+    await act(async () => stateStore.set(state => { state.currentRoomCode = ''; state.currentRoomName = ''; state.roomSlots = []; }));
+  }
+});
+
+test('fresh macOS profiles default to AMOLED while existing theme choices survive reload', () => {
+  globalThis.localStorage = dom.window.localStorage;
+  globalThis.__P2SHARER_PLATFORM__ = 'macos';
+  try {
+    localStorage.clear();
+    assert.equal(new StateStore().currentThemeMode, 'amoled');
+    for (const mode of ['light', 'dark', 'amoled', 'system']) {
+      localStorage.setItem('p2sharer_theme_mode', mode);
+      assert.equal(new StateStore().currentThemeMode, mode);
+    }
+    localStorage.setItem('p2sharer_theme_mode', 'invalid');
+    assert.equal(new StateStore().currentThemeMode, 'amoled');
+    delete globalThis.__P2SHARER_PLATFORM__;
+    localStorage.clear();
+    assert.equal(new StateStore().currentThemeMode, 'dark');
+  } finally {
+    delete globalThis.__P2SHARER_PLATFORM__;
+    delete globalThis.localStorage;
+  }
 });
 
 test('external window changes update chrome, fullscreen hides it, and teardown releases listeners', async () => {

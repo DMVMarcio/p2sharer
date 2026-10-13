@@ -13,7 +13,7 @@ import { useSkeletonPresence } from '../../hooks/useSkeletonPresence';
 
 export const ScreenPickerModal: React.FC = () => {
   useLocale();
-  const { closeModal, isClosing } = useModal();
+  const { closeModal, isClosing, overlayRef } = useModal();
   const {
     cameras,
     cameraModes,
@@ -55,7 +55,7 @@ export const ScreenPickerModal: React.FC = () => {
   const dialogRef = useModalDialogBehavior(closeModal, isStarting || isClosing, true);
 
   return (
-    <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} id="modal-screen-picker">
+    <div ref={overlayRef} inert={isClosing || undefined} className={`modal-overlay ${isClosing ? 'closing' : ''}`} id="modal-screen-picker">
       <div className="modal-card modal-xl screen-picker-card" ref={dialogRef} inert={isClosing || undefined}>
         <div className="modal-header">
           <div className="modal-header-icon">

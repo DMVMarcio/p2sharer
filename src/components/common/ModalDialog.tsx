@@ -1,6 +1,8 @@
+import { useOverlayMotion } from '../../hooks/useOverlayMotion';
+import { useDialogDismiss } from '../../hooks/useDialogDismiss';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useId, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useModalDialogBehavior } from './useModalDialogBehavior';
 import { TooltipButton } from './TooltipButton';
@@ -15,33 +17,21 @@ interface Props {
   footer?: ReactNode | ((close: () => void) => ReactNode);
   className?: string;
   busy?: boolean;
+  closing?: boolean;
   closeOnOutside?: boolean;
   onClose: () => void;
   onCloseStart?: () => void;
 }
 
-export function ModalDialog({ title, subtitle, icon, headerless = false, headerActions, children, footer, className = '', busy = false, closeOnOutside = false, onClose, onCloseStart }: Props) {
+export function ModalDialog({ title, subtitle, icon, headerless = false, headerActions, children, footer, className = '', busy = false, closing: externalClosing = false, closeOnOutside = false, onClose, onCloseStart }: Props) {
   useLocale();
   const titleId = useId();
-  const closeRef = useRef(onClose);
-  const busyRef = useRef(busy);
-  const closeStartRef = useRef(onCloseStart);
-  const closingRef = useRef(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const [closing, setClosing] = useState(false);
-  closeRef.current = onClose;
-  busyRef.current = busy;
-  closeStartRef.current = onCloseStart;
-  const close = () => {
-    if (busyRef.current || closingRef.current) return;
-    closingRef.current = true;
-    closeStartRef.current?.();
-    setClosing(true);
-    timerRef.current = setTimeout(() => closeRef.current(), 240);
-  };
+  const { closing: localClosing, close } = useDialogDismiss(onClose, busy, onCloseStart);
+  const closing = externalClosing || localClosing;
+  const overlayRef = useRef<HTMLDivElement>(null);
+  useOverlayMotion(overlayRef, !closing, 'dialog');
   const cardRef = useModalDialogBehavior(close, busy || closing, closeOnOutside);
-  useEffect(() => () => clearTimeout(timerRef.current), []);
-  return createPortal(<div className={`modal-overlay ${closing ? 'closing' : ''}`}
+  return createPortal(<div ref={overlayRef} inert={closing || undefined} className={`modal-overlay ${closing ? 'closing' : ''}`}
     onClick={(event) => event.stopPropagation()}
     >
     <div ref={cardRef} className={`modal-card ${className}`} role="dialog" aria-modal="true" aria-labelledby={headerless ? undefined : titleId} aria-label={headerless ? title : undefined} tabIndex={-1} inert={closing || undefined}>

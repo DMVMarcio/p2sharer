@@ -151,3 +151,7 @@ https://github.com/DMVMarcio/p2sharer/releases/latest/download/latest.json
 The release repository/assets must be publicly downloadable for anonymous installed clients. Before the first stable release, this URL is unavailable and a manual check reports that it could not complete. Never embed GitHub authentication in the application.
 
 Older builds without this updater require a manual installation of the first updater-enabled release. The identifier migration copies the previous Windows application data before opening WebView2, keeps the old directory for recovery, and never replaces an existing new profile. Test an installed version A updating to a signed higher version B before describing the full delivery path as validated.
+
+## macOS distribution
+
+See [macos.md](macos.md) for native prerequisites, permissions, Keychain storage, Intel/Apple Silicon validation, signing secrets and the `.dmg`/`.app.tar.gz` release path. Official macOS jobs extend the existing draft release and updater manifest without replacing the Windows installers or updater signing key.

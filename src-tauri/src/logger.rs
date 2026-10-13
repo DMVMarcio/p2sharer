@@ -69,9 +69,12 @@ fn rotate_session_logs(log_dir: &Path, current_path: &Path) -> std::io::Result<(
 }
 
 pub fn get_log_dir() -> PathBuf {
+    #[cfg(windows)]
     let base = std::env::var("APPDATA")
         .map(PathBuf::from)
         .unwrap_or_else(|_| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+    #[cfg(not(windows))]
+    let base = dirs::data_local_dir().unwrap_or_else(|| PathBuf::from("."));
     base.join("p2sharer").join("logs")
 }
 
@@ -81,13 +84,14 @@ fn write_log_header(file: &mut File, path: &Path, event: &str) -> std::io::Resul
         "================================================================================\r\n\
          P2Sharer Execution & Diagnostics Log ({})\r\n\
          {}: {}\r\n\
-         OS: Windows (Architecture: {})\r\n\
+         OS: {} (Architecture: {})\r\n\
          App Version: {} (debug={})\r\n\
          Log File: {}\r\n\
          ================================================================================\r\n\r\n",
         name,
         event,
         get_timestamp(),
+        std::env::consts::OS,
         std::env::consts::ARCH,
         env!("CARGO_PKG_VERSION"),
         cfg!(debug_assertions),
@@ -270,12 +274,7 @@ pub fn open_log_folder() -> Result<(), String> {
     let log_dir = get_log_dir();
     fs::create_dir_all(&log_dir)
         .map_err(|error| format!("Falha ao acessar a pasta de logs: {}", error))?;
-    // Command handles path quoting; embedded quotes confuse Explorer's argument parser.
-    std::process::Command::new("explorer.exe")
-        .arg(&log_dir)
-        .spawn()
-        .map_err(|error| format!("Falha ao abrir a pasta de logs: {}", error))?;
-    Ok(())
+    tauri_plugin_opener::open_path(&log_dir, None::<&str>).map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -286,13 +285,11 @@ pub fn open_latest_log() -> Result<(), String> {
         return Err("Arquivo de log ainda não foi criado.".into());
     }
 
-    // Open directly with Notepad or default viewer
-    let _ = std::process::Command::new("notepad.exe")
-        .arg(current_path.to_string_lossy().to_string())
-        .spawn()
-        .map_err(|e| format!("Falha ao abrir o bloco de notas: {}", e))?;
-
-    Ok(())
+    #[cfg(windows)]
+    let viewer = Some("notepad.exe");
+    #[cfg(not(windows))]
+    let viewer: Option<&str> = None;
+    tauri_plugin_opener::open_path(&current_path, viewer).map_err(|error| error.to_string())
 }
 
 #[tauri::command]

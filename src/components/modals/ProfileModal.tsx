@@ -4,7 +4,7 @@ import { ModalDialog } from '../common/ModalDialog';
 import { ProfileAvatar } from '../common/ProfileAvatar';
 import { TooltipButton } from '../common/TooltipButton';
 import { Nickname } from '../common/Nickname';
-import { modalManager } from '../../hooks/useModal';
+import { modalManager, useModal } from '../../hooks/useModal';
 import { useStore } from '../../hooks/useStore';
 import { useRoom } from '../../hooks/useRoom';
 import { profileImages, profileBanners } from '../../core/profile_image';
@@ -14,6 +14,7 @@ import { useLocale } from '../../hooks/useLocale';
 
 export function ProfileModal() {
   useLocale();
+  const { isClosing, dismissModal } = useModal();
   useSyncExternalStore(profileImages.subscribe, profileImages.snapshot);
   useSyncExternalStore(profileBanners.subscribe, profileBanners.snapshot);
   useSyncExternalStore(profileStats.subscribe, profileStats.snapshot);
@@ -33,10 +34,10 @@ export function ProfileModal() {
     { label: 'profile.stats.calls', value: number(stats.calls), icon: Phone },
     { label: 'profile.stats.longestCall', value: formatProfileDuration(stats.longestCallMs), icon: Trophy },
   ] : [];
-  return <ModalDialog closeOnOutside title={t('profile.title')} headerless className="profile-view-modal"
+  return <ModalDialog closing={isClosing} closeOnOutside title={t('profile.title')} headerless className="profile-view-modal"
     headerActions={target.isLocal && <TooltipButton className="btn-close modal-overlay-close"
       tooltip={t('profile.edit')} onClick={() => modalManager.open('settings')}><Pencil size={16} aria-hidden="true" /></TooltipButton>}
-    onClose={() => modalManager.open(null)}>
+    onClose={dismissModal}>
     <div className={`profile-view-banner${banner ? '' : ' is-empty'}`} style={{ backgroundColor: profileImages.background(target.peerId, target.isLocal, target.color) }}>
       {banner && <img src={banner} alt="" draggable={false} />}
     </div>

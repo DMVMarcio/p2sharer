@@ -15,7 +15,7 @@ import { roomService } from '../../services/room_service';
 
 export function JoinRoomModal() {
   useLocale();
-  const { closeModal } = useModal();
+  const { closeModal, dismissModal, isClosing } = useModal();
   const { joinOutcome, joinError, roomStatusText } = useRoom();
   const [code, setCode] = useState(() => roomService.pendingJoinInvite);
   const [password, setPassword] = useState(() => roomService.pendingJoinPassword);
@@ -126,11 +126,11 @@ export function JoinRoomModal() {
   const cancel = () => {
     roomService.pendingJoinInvite = ''; roomService.pendingJoinPassword = ''; roomService.pendingJoinAsOwner = false;
     roomService.pendingJoinError = '';
-    closeModal();
+    dismissModal();
   };
   const busy = (phase === 'searching' && !canEnter) || phase === 'joining';
   return <ModalDialog title={preview?.name || roomName || t('message.3b24015dc709')} icon={<LogIn size={20} />}
-    onCloseStart={cancelConnection} onClose={cancel} footer={close => <>
+    closing={isClosing} onCloseStart={cancelConnection} onClose={cancel} footer={close => <>
       <button type="button" className="btn btn-secondary" onClick={close}>{t('message.bb9dbb406dcb')}</button>
       <button type="submit" form="join-room-form" className="btn btn-primary" disabled={busy}>
         {t(phase === 'code' ? 'join.inspect' : 'message.ad207d12bdc1')}

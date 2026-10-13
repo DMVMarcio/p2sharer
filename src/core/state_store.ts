@@ -1,3 +1,4 @@
+import { readThemeMode } from './desktop_appearance.ts';
 import { readNicknameStyle, type NicknameStyle } from './nickname_style.ts';
 import { normalizeBackground } from './background_color.ts';
 import { streamDrawingLimit, STREAM_DRAWING_MAX } from './stream_pointer.ts';
@@ -43,7 +44,7 @@ export class StateStore {
   public overlayPositions: Record<string, import('./media_streams').OverlayPosition> = {};
   public streamFilter: StreamFilterMode = 'all';
 
-  public currentThemeMode: ThemeMode = 'dark';
+  public currentThemeMode: ThemeMode = readThemeMode(null);
   public currentAccentColor: string = 'cyan';
   public currentBackgroundColor: string = 'graphite';
 
@@ -122,7 +123,7 @@ export class StateStore {
     this.allowParticipantDrawings = localStorage.getItem('p2sharer_participant_drawings') !== 'false';
     this.allowParticipantPings = localStorage.getItem('p2sharer_participant_pings') !== 'false';
     this.username = localStorage.getItem('p2sharer_username') || '';
-    this.currentThemeMode = (localStorage.getItem('p2sharer_theme_mode') as ThemeMode) || 'dark';
+    this.currentThemeMode = readThemeMode(localStorage.getItem('p2sharer_theme_mode'));
     this.currentAccentColor = localStorage.getItem('p2sharer_accent_color') || 'cyan';
     this.currentBackgroundColor = normalizeBackground(localStorage.getItem('p2sharer_background_color') || 'graphite');
 

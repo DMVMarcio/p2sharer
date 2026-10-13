@@ -33,10 +33,10 @@ const bundle = await build({
     builder.onLoad({ filter: /.*/, namespace: 'settings-fixture' }, args => ({ contents: {
       room: 'export const roomService = { refreshStreamPointerPermissions() {} };',
       'room-hook': 'export const useRoom = () => ({ peers: [] });',
-      modal: `export const useModal = () => ({ isClosing: false, closeModal: () => globalThis.settingsClosed++ });
+      modal: `export const useModal = () => ({ isClosing: false, dismissModal: () => globalThis.settingsClosed++, closeModal: () => globalThis.settingsClosed++ });
         export const modalManager = { getProfileTarget: () => globalThis.profileTarget,
           open: destination => { globalThis.profileDestination = destination; } };`,
-      native: `export const invoke = async (command, args) => {
+      native: `export const isTauri = () => false; export const invoke = async (command, args) => {
         if (globalThis.profileBackend && command.includes('profile_image')) return globalThis.profileBackend(command, args);
         if (command === 'save_profile_image') return { hash: '', data: '', color: args.color };
         return command === 'get_log_file_path' ? 'fixture.log' : { driver_api_available: false };
@@ -98,12 +98,21 @@ test('appearance applies and persists custom colors and restores preset tokens',
   const appearance = [...document.querySelectorAll('.settings-nav-sidebar button')]
     .find(button => button.textContent.includes('Aparência'));
   await act(async () => appearance.click());
+  const amoled = [...document.querySelectorAll('.theme-mode-pills button')].find(button => button.textContent === 'AMOLED');
+  assert.ok(amoled);
+  await act(async () => amoled.click());
+  assert.equal(document.documentElement.dataset.theme, 'amoled');
+  assert.equal(localStorage.getItem('p2sharer_theme_mode'), 'amoled');
+  assert.equal(amoled.getAttribute('aria-pressed'), 'true');
+  assert.equal(document.documentElement.style.colorScheme, 'dark');
+  assert.equal(document.documentElement.style.getPropertyValue('--amoled-accent-text'), '#000000');
   assert.ok(document.querySelector('[aria-label="Marrom"]'));
   assert.ok(document.querySelector('[aria-label="Azul escuro"]'));
   await act(async () => document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Tab', bubbles: true })));
   await act(async () => document.querySelector('[aria-label="Marrom"]').focus());
   await act(async () => new Promise(resolve => setTimeout(resolve, 100)));
   assert.equal(document.querySelector('[role="tooltip"]').textContent, 'Marrom');
+  await act(async () => [...document.querySelectorAll('.theme-mode-pills button')].find(button => button.textContent === 'Escuro').click());
   const forest = document.querySelector('#background-colors-palette [aria-label="Floresta"]');
   await act(async () => forest.click());
   assert.equal(localStorage.getItem('p2sharer_background_color'), 'forest');

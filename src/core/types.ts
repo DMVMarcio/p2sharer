@@ -142,7 +142,7 @@ export interface PeerAudioSinkState {
   isMuted: boolean;
 }
 
-export type ThemeMode = 'dark' | 'light' | 'system';
+export type ThemeMode = 'dark' | 'light' | 'system' | 'amoled';
 export type StreamFilterMode = 'all' | 'streaming' | 'watching';
 
 export type RendezvousTransport = 'mqtt' | 'nostr' | 'torrent';

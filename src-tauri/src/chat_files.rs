@@ -288,9 +288,7 @@ pub fn reveal_chat_download(state: State<'_, ChatFileState>, id: String) -> Resu
     let path = state.completed.lock().map_err(|e| e.to_string())?.get(&id).cloned()
         .ok_or("Download unavailable")?;
     if !path.is_file() { return Err("Downloaded file is no longer available".into()); }
-    std::process::Command::new("explorer.exe").arg("/select,").arg(path)
-        .spawn().map_err(|e| e.to_string())?;
-    Ok(())
+    tauri_plugin_opener::reveal_item_in_dir(&path).map_err(|error| error.to_string())
 }
 
 fn decode_image_bytes(data_base64: &str) -> Result<(usize, usize, Vec<u8>), String> {

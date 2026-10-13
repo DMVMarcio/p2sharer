@@ -1348,7 +1348,7 @@ pub(crate) mod win_audio {
 }
 
 #[tauri::command]
-pub fn start_audio_capture(app: AppHandle, config: Option<AudioConfig>) -> Result<bool, String> {
+pub async fn start_audio_capture(app: AppHandle, config: Option<AudioConfig>) -> Result<bool, String> {
     // 1. Stop any currently running capture loop
     if let Ok(mut guard) = CURRENT_STOP_FLAG.lock() {
         if let Some(flag) = guard.take() {
@@ -1370,11 +1370,18 @@ pub fn start_audio_capture(app: AppHandle, config: Option<AudioConfig>) -> Resul
         *guard = Some(stop_flag);
     }
 
+    #[cfg(target_os = "macos")]
+    return crate::macos_audio::start(app, cfg, stop_clone).await;
+
+    #[cfg(windows)]
     std::thread::spawn(move || {
         #[cfg(windows)]
         win_audio::run_capture_loop(app, cfg, stop_clone);
     });
 
+    #[cfg(not(any(windows, target_os = "macos")))]
+    return Err("System audio capture is unsupported on this platform".into());
+    #[cfg(windows)]
     Ok(true)
 }
 

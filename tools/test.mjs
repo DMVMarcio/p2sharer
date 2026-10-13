@@ -8,8 +8,8 @@ const args = process.argv.slice(2);
 const native = args[0] === '--native';
 if (native) {
   args.shift();
-  if (process.platform !== 'win32') {
-    console.error('Native tests require Windows, the supported desktop platform.');
+  if (!['win32', 'darwin'].includes(process.platform)) {
+    console.error('Native tests require Windows or macOS.');
     process.exit(1);
   }
   configureNativeBuildEnvironment();

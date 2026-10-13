@@ -120,3 +120,98 @@ jobs:
                 await github.rest.repos.deleteReleaseAsset({ ...context.repo, asset_id: asset.id });
               }
             }
+
+  macos:
+    needs: windows
+    strategy:
+      fail-fast: false
+      # Serialize latest.json updates so all platform entries survive.
+      max-parallel: 1
+      matrix:
+        runner: [macos-15, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
+          persist-credentials: false
+      - name: Check out build setup from the workflow revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: .release-workflow
+          sparse-checkout: |
+            /.github/actions/setup-build/
+            /tools/release.mjs
+            /src-tauri/tauri.macos.conf.json
+            /src-tauri/macos/
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - uses: ./.release-workflow/.github/actions/setup-build
+      - name: Apply macOS packaging configuration
+        run: |
+          cp .release-workflow/src-tauri/tauri.macos.conf.json src-tauri/tauri.macos.conf.json
+          mkdir -p src-tauri/macos
+          cp .release-workflow/src-tauri/macos/*.plist src-tauri/macos/
+          node .release-workflow/tools/release.mjs normalize-key .
+      - name: Validate release version
+        run: pnpm run release:check --tag "$RELEASE_TAG"
+      - name: Protect published releases
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const releases = await github.paginate(github.rest.repos.listReleases, { ...context.repo, per_page: 100 });
+            if (releases.some(release => release.tag_name === process.env.RELEASE_TAG && !release.draft)) {
+              throw new Error('Published releases are immutable. Prepare a new version instead.');
+            }
+      - name: Review repository hygiene
+        run: pnpm run check:repository
+      - name: Run frontend regressions
+        run: pnpm test
+      - name: Check frontend compilation
+        run: pnpm run build
+      - name: Run portable native regressions
+        run: pnpm run test:native --release --locked
+      - name: Validate Apple and updater signing setup
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          pnpm run release:check --signing
+          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            if [ -z "${!name}" ]; then echo "Missing GitHub Actions secret: $name" >&2; exit 1; fi
+          done
+      - name: Build signed and notarized macOS release assets
+        uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          tauriScript: pnpm run tauri
+          args: --config src-tauri/tauri.release.conf.json -- --locked
+          tagName: ${{ env.RELEASE_TAG }}
+          releaseName: P2Sharer v__VERSION__
+          releaseAssetNamePattern: '[name]_[version]_[arch][ext]'
+          releaseDraft: true
+          prerelease: ${{ contains(env.RELEASE_TAG, '-') }}
+          uploadUpdaterJson: true
+          uploadUpdaterSignatures: true
+      - name: Verify merged platform updater entries
+        run: node .release-workflow/tools/release.mjs artifacts .

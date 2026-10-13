@@ -1,7 +1,9 @@
+import { useDialogDismiss } from '../../hooks/useDialogDismiss';
+import { useOverlayMotion } from '../../hooks/useOverlayMotion';
 import { useModalDialogBehavior } from '../common/useModalDialogBehavior';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import { savedRooms, type SavedRoom } from '../../core/saved_rooms';
@@ -23,6 +25,9 @@ export const EditSavedRoomDialog: React.FC<EditSavedRoomDialogProps> = ({ room, 
   const [password, setPassword] = useState(room.password ?? '');
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
+  const { close, closing } = useDialogDismiss(onClose);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  useOverlayMotion(overlayRef, !closing, 'dialog');
 
   const save = async () => {
     if (busy) return;
@@ -70,7 +75,7 @@ export const EditSavedRoomDialog: React.FC<EditSavedRoomDialogProps> = ({ room, 
           protected: Boolean(nextPassword) || current.protected });
       }
       showToast(t("message.029c27a8024d"), 3500, 'success');
-      onClose();
+      close();
     } catch (error) {
       console.warn('[Rooms] Could not edit saved room:', error);
       showToast(t("message.d94a6e24bf10"), 3500, 'error');
@@ -79,16 +84,16 @@ export const EditSavedRoomDialog: React.FC<EditSavedRoomDialogProps> = ({ room, 
     }
   };
 
-  const { submit, pending } = useFormSubmit(save);
+  const { submit, pending } = useFormSubmit(save, closing);
 
-  const dialogRef = useModalDialogBehavior(onClose, busy || pending, false);
+  const dialogRef = useModalDialogBehavior(close, busy || pending || closing, false);
 
   return createPortal(
-    <div className="modal-overlay" role="presentation">
+    <div ref={overlayRef} inert={closing || undefined} className={`modal-overlay ${closing ? 'closing' : ''}`} role="presentation">
       <form autoComplete="off" onSubmit={submit} aria-busy={pending} className="modal-card" role="dialog" aria-modal="true" aria-labelledby="edit-saved-room-title" ref={dialogRef}>
         <div className="modal-header">
           <div><h2 id="edit-saved-room-title">{t("message.4c6b05644363")}</h2></div>
-          <button type="button" className="btn-close" aria-label={t("message.0f2bd88ef0ac")} onClick={onClose}>&times;</button>
+          <button type="button" className="btn-close" aria-label={t("message.0f2bd88ef0ac")} onClick={close} disabled={busy || closing}>&times;</button>
         </div>
         <div className="modal-body">
           <div className="form-group">
@@ -120,7 +125,7 @@ export const EditSavedRoomDialog: React.FC<EditSavedRoomDialogProps> = ({ room, 
           </div>
         </div>
         <div className="modal-footer">
-          <button type="button" className="btn btn-secondary" onClick={onClose}>{t("message.bb9dbb406dcb")}</button>
+          <button type="button" className="btn btn-secondary" onClick={close} disabled={busy || closing}>{t("message.bb9dbb406dcb")}</button>
           <button type="submit" className="btn btn-primary" disabled={busy || pending}>{t("message.aef7cd5b2081")}</button>
         </div>
       </form>

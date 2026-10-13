@@ -1,3 +1,4 @@
+import { useOverlayMotion } from '../../hooks/useOverlayMotion';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
@@ -46,6 +47,7 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
   const [menu, setMenu] = useState<MenuState | null>(null);
   const presence = useDropdownPresence(menu);
   const menuRef = useRef<HTMLDivElement>(null);
+  useOverlayMotion(menuRef, menu !== null, 'menu');
   const buttonRefs = useRef(new Map<string, HTMLButtonElement>());
   const enabledButtons = (actions: ContextMenuAction[]) => actions.flatMap(action =>
     [buttonRefs.current.get(action.id), buttonRefs.current.get(`${action.id}:secondary`)]

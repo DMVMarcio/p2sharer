@@ -141,3 +141,39 @@ test('application UI enforces the canonical selector rule', () => {
   scan('src');
   assert.deepEqual(offenders, []);
 });
+
+
+test('interrupted menu motion resumes its displayed frame and releases completed players', async () => {
+  const calls = [];
+  HTMLElement.prototype.animate = function (frames, options) {
+    const player = { canceled: false, onfinish: null, cancel() { this.canceled = true; } };
+    calls.push({ element: this, frames, options, player });
+    return player;
+  };
+  try {
+    await render();
+    await click('#first');
+    const list = document.querySelector('[role="listbox"]');
+    assert.ok(list);
+    const enter = calls.at(-1);
+    list.style.opacity = '0.45';
+    list.style.scale = '0.99';
+    list.style.translate = '0 -2px';
+    await key('Escape');
+    const exit = calls.at(-1);
+    assert.equal(enter.player.canceled, true);
+    assert.equal(exit.frames[0].opacity, '0.45');
+    assert.equal(exit.frames[0].scale, '0.99');
+    assert.equal(list.getAttribute('inert'), '');
+    list.style.opacity = '0.2';
+    await click('#first');
+    const reopen = calls.at(-1);
+    assert.equal(exit.player.canceled, true);
+    assert.equal(reopen.frames[0].opacity, '0.2');
+    assert.equal(list.hasAttribute('inert'), false);
+    reopen.player.onfinish();
+    assert.equal(list.style.opacity, '1');
+    assert.equal(reopen.player.canceled, true);
+    await act(async () => root.render(null));
+  } finally { delete HTMLElement.prototype.animate; }
+});

@@ -1,4 +1,6 @@
-import { useCallback, useSyncExternalStore } from 'react';
+import { overlayMotionDuration } from '../core/overlay_motion.ts';
+import { useOverlayMotion } from './useOverlayMotion.ts';
+import { useCallback, useRef, useSyncExternalStore } from 'react';
 import { safeChatUrl } from '../core/chat_links.ts';
 import { stateStore } from '../core/state_store.ts';
 
@@ -24,6 +26,7 @@ class ModalManager {
   private closeTimer: ReturnType<typeof setTimeout> | null = null;
   private listeners = new Set<() => void>();
   private externalLinkUrl: string | null = null;
+  private pending: { modal: ModalType; url: string | null } | null = null;
   private revision = 0;
   private profileTarget: ProfileTarget | null = null;
   public getProfileTarget() { return this.profileTarget; }
@@ -46,14 +49,20 @@ class ModalManager {
   public openExternalLink(url: string): void {
     const safeUrl = safeChatUrl(url);
     if (!safeUrl) return;
-    this.externalLinkUrl = safeUrl;
-    this.open('externalLink');
+    this.open('externalLink', safeUrl);
   }
 
-  public open(modal: ModalType): void {
+  public open(modal: ModalType, externalUrl: string | null = null): void {
+    const url = modal === 'externalLink' ? externalUrl ?? this.externalLinkUrl : null;
+    if (this.activeModal && modal && modal !== this.activeModal && overlayMotionDuration('dialog', false) > 0) {
+      this.pending = { modal, url };
+      this.close();
+      return;
+    }
     this.revision++;
     if (modal !== 'profile') this.profileTarget = null;
-    if (modal !== 'externalLink') this.externalLinkUrl = null;
+    this.pending = null;
+    this.externalLinkUrl = url;
     if (this.closeTimer) {
       clearTimeout(this.closeTimer);
       this.closeTimer = null;
@@ -63,19 +72,24 @@ class ModalManager {
     this.notify();
   }
 
-  public close(): void {
-    if (!this.activeModal || this.isClosing) return;
+  public close(immediate = false): void {
+    if (!this.activeModal || (this.isClosing && !immediate)) return;
     this.isClosing = true;
     this.notify();
 
-    this.closeTimer = setTimeout(() => {
+    const finish = () => {
       if (this.activeModal === 'screenPicker') stateStore.set((state) => { state.editingStreamId = null; });
-      this.activeModal = null;
-      this.externalLinkUrl = null;
+      if (this.pending) this.revision++;
+      this.activeModal = this.pending?.modal ?? null;
+      if (this.activeModal !== 'profile') this.profileTarget = null;
+      this.externalLinkUrl = this.pending?.url ?? null;
+      this.pending = null;
       this.isClosing = false;
       this.closeTimer = null;
       this.notify();
-    }, 240);
+    };
+    if (immediate) { if (this.closeTimer) clearTimeout(this.closeTimer); finish(); }
+    else this.closeTimer = setTimeout(finish, overlayMotionDuration('dialog', false));
   }
 
   public subscribe(listener: () => void): () => void {
@@ -107,6 +121,10 @@ export function useModal() {
     () => modalManager.getIsClosing()
   );
 
+  const overlayRef = useRef<HTMLDivElement>(null);
+  useOverlayMotion(overlayRef, activeModal !== null && !isClosing, 'dialog');
+  const dismissModal = useCallback(() => modalManager.close(true), []);
+
   const openModal = useCallback((modal: ModalType) => {
     modalManager.open(modal);
   }, []);
@@ -124,6 +142,8 @@ export function useModal() {
     modalRevision,
     activeModal,
     isClosing,
+    overlayRef,
+    dismissModal,
     openModal,
     closeModal,
     isOpen,

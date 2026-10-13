@@ -9,7 +9,7 @@ import { showToast } from '../../hooks/useToast';
 
 export const ExternalLinkModal: React.FC = () => {
   useLocale();
-  const { closeModal, isClosing } = useModal();
+  const { closeModal, isClosing, overlayRef } = useModal();
   const destination = modalManager.getExternalLinkUrl();
   const cancelRef = useRef<HTMLButtonElement>(null);
 
@@ -26,7 +26,7 @@ export const ExternalLinkModal: React.FC = () => {
   const dialogRef = useModalDialogBehavior(closeModal, isClosing, true);
 
   return (
-    <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} role="presentation">
+    <div ref={overlayRef} inert={isClosing || undefined} className={`modal-overlay ${isClosing ? 'closing' : ''}`} role="presentation">
       <div className="modal-card external-link-modal" role="dialog" aria-modal="true" aria-labelledby="external-link-title" aria-describedby="external-link-description" ref={dialogRef} inert={isClosing || undefined}>
         <div className="modal-header">
           <div className="modal-header-icon"><ExternalLink size={20} aria-hidden="true" /></div>

@@ -9,7 +9,7 @@ import { showToast } from '../../hooks/useToast';
 
 export const RoomSecurityModal: React.FC = () => {
   useLocale();
-  const { closeModal, isClosing } = useModal();
+  const { closeModal, isClosing, overlayRef } = useModal();
   const { currentRoomCode, currentRoomName, currentRoomPassword,
     updateRoomName, updateRoomPassword, isRoomHost } = useRoom();
 
@@ -46,7 +46,7 @@ export const RoomSecurityModal: React.FC = () => {
   const dialogRef = useModalDialogBehavior(closeModal, pending || isClosing, false);
 
   return (
-    <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} id="modal-room-security">
+    <div ref={overlayRef} inert={isClosing || undefined} className={`modal-overlay ${isClosing ? 'closing' : ''}`} id="modal-room-security">
       <form autoComplete="off" onSubmit={submit} aria-busy={pending} className="modal-card" ref={dialogRef} inert={isClosing || undefined}>
         <div className="modal-header">
           <div className="modal-header-icon">

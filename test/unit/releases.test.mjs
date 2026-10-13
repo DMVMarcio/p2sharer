@@ -31,6 +31,17 @@ test('release version updates all declarations without changing dependency versi
     const saveManifest = () => writeFileSync(join(root, 'latest.json'), JSON.stringify(manifest));
     saveManifest();
     assert.equal(verifyArtifacts(root), '1.1.0-beta.1');
+    const macPlatforms = ['windows-x86_64-nsis', 'windows-x86_64-msi', 'darwin-aarch64', 'darwin-x86_64'];
+    assert.throws(() => verifyArtifacts(root, macPlatforms), /darwin-aarch64/);
+    manifest.platforms['darwin-aarch64'] = { signature, url: 'https://api.github.com/repos/DMVMarcio/p2sharer/releases/assets/3' };
+    manifest.platforms['darwin-x86_64'] = { signature, url: 'https://api.github.com/repos/DMVMarcio/p2sharer/releases/assets/4' };
+    saveManifest();
+    assert.equal(verifyArtifacts(root, macPlatforms), '1.1.0-beta.1');
+    manifest.platforms['darwin-x86_64'].signature = Buffer.from('wrong-key fixture').toString('base64');
+    saveManifest();
+    assert.throws(() => verifyArtifacts(root), /signing key/);
+    manifest.platforms['darwin-x86_64'].signature = signature;
+
     manifest.platforms['windows-x86_64-msi'].signature = Buffer.from('wrong-key fixture').toString('base64');
     saveManifest();
     assert.throws(() => verifyArtifacts(root), /signing key/);

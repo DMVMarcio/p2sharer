@@ -9,7 +9,7 @@ import { Tooltip } from '../common/Tooltip';
 export const AudioFilterModal: React.FC = () => {
   useLocale();
   const [failedIcons, setFailedIcons] = useState<Set<string>>(() => new Set());
-  const { closeModal, isClosing } = useModal();
+  const { closeModal, isClosing, overlayRef } = useModal();
   const {
     processes,
     rawProcessCount,
@@ -46,6 +46,7 @@ export const AudioFilterModal: React.FC = () => {
 
   return (
     <div
+      ref={overlayRef} inert={isClosing || undefined}
       className={`modal-overlay ${isClosing ? 'closing' : ''}`}
       id="modal-audio-filter"
     >

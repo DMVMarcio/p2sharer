@@ -800,6 +800,11 @@ pub fn ensure_ws_server_running() {
 
 #[tauri::command]
 pub fn list_screen_sources() -> ScreenSourcesResponse {
+    #[cfg(target_os = "macos")]
+    if !crate::macos_audio::screen_capture_allowed() {
+        crate::logger::log_msg("WARN", "capture.permission", "Screen Recording permission is required in macOS System Settings");
+        return ScreenSourcesResponse { monitors: Vec::new(), windows: Vec::new() };
+    }
     let mut monitors_out = Vec::new();
     let mut windows_out = Vec::new();
 
@@ -900,7 +905,7 @@ pub fn list_screen_sources() -> ScreenSourcesResponse {
             windows_out.push(WindowSource {
                 id: format!("window:{}", win_id),
                 title: title_trim,
-                process_name: format!("{}.exe", app_name),
+                process_name: if cfg!(windows) { format!("{}.exe", app_name) } else { app_name },
                 pid,
                 width,
                 height,
@@ -1072,6 +1077,10 @@ pub fn start_capture_session(
     if source_id.trim().is_empty() {
         return Err("sourceId cannot be empty".to_string());
     }
+    #[cfg(target_os = "macos")]
+    if !crate::macos_audio::screen_capture_allowed() {
+        return Err("Allow P2Sharer in System Settings > Privacy & Security > Screen Recording, then reopen the app".into());
+    }
     ensure_ws_server_running();
 
     // Stop any existing capture session first
@@ -1093,7 +1102,7 @@ pub fn start_capture_session(
     let sender = if session_id == "default" { get_frame_sender().clone() } else { broadcast::channel(32).0 };
     let metrics = Arc::new(CaptureMetrics::default());
     let load = Arc::new(crate::video_load::CaptureLoad::new(fps, width, height, feedback_token));
-    let nvenc_enabled = Arc::new(AtomicBool::new(nvenc_requested(encoder_preference.as_deref(), std::env::var("P2SHARER_NATIVE_NVENC").ok().as_deref())));
+    let nvenc_enabled = Arc::new(AtomicBool::new(cfg!(windows) && nvenc_requested(encoder_preference.as_deref(), std::env::var("P2SHARER_NATIVE_NVENC").ok().as_deref())));
     crate::logger::log_msg("INFO", "capture.start", &format!("session={session_id} source={source_id} requested={width}x{height}@{fps} cursor={should_draw_mouse} jpeg_quality={jpeg_quality} preference={} nvenc_requested={}",
         encoder_preference.as_deref().unwrap_or("auto"), nvenc_enabled.load(Ordering::Relaxed)));
     let nvenc_keyframe = Arc::new(AtomicBool::new(true));
