@@ -1,3 +1,4 @@
+import { audioProcessKey, type AudioCaptureChoice } from '../core/audio_filter_presets.ts';
 import { t } from '../i18n/index.ts';
 import { useState, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
@@ -12,16 +13,17 @@ export function useAudioFilter() {
   const [isFullAudio, setIsFullAudio] = useState<boolean>(
     () => stateStore.isAudioFilterFullAudio
   );
+  const [isAllMuted, setIsAllMuted] = useState(() => !stateStore.isAudioFilterFullAudio && stateStore.selectedFilterMode === 'include' && stateStore.includeProcessNames.size === 0 && stateStore.includePids.size === 0);
   const [processes, setProcesses] = useState<ProcessItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [searchText, setSearchText] = useState<string>('');
 
   // Local draft selections initialized from persistent stateStore
   const [draftExcludeNames, setDraftExcludeNames] = useState<Set<string>>(
-    () => new Set(stateStore.excludeProcessNames)
+    () => new Set(Array.from(stateStore.excludeProcessNames, audioProcessKey))
   );
   const [draftIncludeNames, setDraftIncludeNames] = useState<Set<string>>(
-    () => new Set(stateStore.includeProcessNames)
+    () => new Set(Array.from(stateStore.includeProcessNames, audioProcessKey))
   );
   const [draftExcludePids, setDraftExcludePids] = useState<Set<number>>(
     () => new Set(stateStore.excludePids)
@@ -47,7 +49,7 @@ export function useAudioFilter() {
       const inPids = new Set<number>();
 
       items.forEach((p) => {
-        const nameLower = p.name.toLowerCase();
+        const nameLower = audioProcessKey(p.name);
         if (exNames.has(nameLower)) exPids.add(p.pid);
         if (inNames.has(nameLower)) inPids.add(p.pid);
       });
@@ -62,17 +64,25 @@ export function useAudioFilter() {
     }
   }, []);
 
+  const setCaptureChoice = useCallback((choice: AudioCaptureChoice) => {
+    setIsFullAudio(choice === 'full');
+    setIsAllMuted(choice === 'none');
+    if (choice === 'include' || choice === 'exclude') setSelectedFilterMode(choice);
+  }, []);
+
   const setFilterMode = useCallback((mode: 'exclude' | 'include') => {
     setSelectedFilterMode(mode);
+    setIsAllMuted(false);
   }, []);
 
   const setFullAudioMode = useCallback((enabled: boolean) => {
     setIsFullAudio(enabled);
+    setIsAllMuted(false);
   }, []);
 
   const toggleProcess = useCallback(
     (item: ProcessItem, checked: boolean) => {
-      const nameLower = item.name.toLowerCase();
+      const nameLower = audioProcessKey(item.name);
       if (selectedFilterMode === 'exclude') {
         setDraftExcludeNames((prev) => {
           const next = new Set(prev);
@@ -83,7 +93,7 @@ export function useAudioFilter() {
         setDraftExcludePids((prev) => {
           const next = new Set(prev);
           processes.forEach((p) => {
-            if (p.name.toLowerCase() === nameLower) {
+            if (audioProcessKey(p.name) === nameLower) {
               if (checked) next.add(p.pid);
               else next.delete(p.pid);
             }
@@ -100,7 +110,7 @@ export function useAudioFilter() {
         setDraftIncludePids((prev) => {
           const next = new Set(prev);
           processes.forEach((p) => {
-            if (p.name.toLowerCase() === nameLower) {
+            if (audioProcessKey(p.name) === nameLower) {
               if (checked) next.add(p.pid);
               else next.delete(p.pid);
             }
@@ -114,7 +124,7 @@ export function useAudioFilter() {
 
   const selectSingleProcess = useCallback(
     (item: ProcessItem) => {
-      const nameLower = item.name.toLowerCase();
+      const nameLower = audioProcessKey(item.name);
       if (selectedFilterMode === 'exclude') {
         setDraftExcludeNames(new Set([nameLower]));
         setDraftExcludePids(new Set([item.pid]));
@@ -142,7 +152,7 @@ export function useAudioFilter() {
 
     processes.forEach((p) => {
       if (p.is_likely_chat_or_voice) {
-        nextNames.add(p.name.toLowerCase());
+        nextNames.add(audioProcessKey(p.name));
         nextPids.add(p.pid);
       }
     });
@@ -157,25 +167,28 @@ export function useAudioFilter() {
   }, [processes, selectedFilterMode]);
 
   const applyFilters = useCallback(async () => {
+    const effectiveMode = isAllMuted ? 'include' : selectedFilterMode;
+    const effectiveIncludeNames = isAllMuted ? new Set<string>() : draftIncludeNames;
+    const effectiveIncludePids = isAllMuted ? new Set<number>() : draftIncludePids;
     // 1. Commit draft state to persistent store and localStorage
     stateStore.set((s) => {
       s.isAudioFilterFullAudio = isFullAudio;
-      s.selectedFilterMode = selectedFilterMode;
+      s.selectedFilterMode = effectiveMode;
       s.excludeProcessNames = new Set(draftExcludeNames);
-      s.includeProcessNames = new Set(draftIncludeNames);
+      s.includeProcessNames = new Set(effectiveIncludeNames);
       s.excludePids = new Set(draftExcludePids);
-      s.includePids = new Set(draftIncludePids);
+      s.includePids = new Set(effectiveIncludePids);
       s.saveAudioFilterPresets();
     });
 
-    const pidsArray = Array.from(selectedFilterMode === 'exclude' ? draftExcludePids : draftIncludePids);
-    const namesArray = Array.from(selectedFilterMode === 'exclude' ? draftExcludeNames : draftIncludeNames);
+    const pidsArray = Array.from(effectiveMode === 'exclude' ? draftExcludePids : effectiveIncludePids);
+    const namesArray = Array.from(effectiveMode === 'exclude' ? draftExcludeNames : effectiveIncludeNames);
     const count = namesArray.length || pidsArray.length;
 
     let successMsg = '';
     if (isFullAudio) {
       successMsg = t("message.bd5c0e60c469");
-    } else if (selectedFilterMode === 'exclude') {
+    } else if (effectiveMode === 'exclude') {
       successMsg =
         count === 0
           ? t("message.0fab559c6e07")
@@ -216,7 +229,7 @@ export function useAudioFilter() {
     try {
       await invoke('start_audio_capture', {
         config: {
-          mode: selectedFilterMode,
+          mode: effectiveMode,
           target_pids: pidsArray,
           target_names: namesArray,
           sample_rate: 48000,
@@ -230,6 +243,7 @@ export function useAudioFilter() {
       return false;
     }
   }, [
+    isAllMuted,
     isFullAudio,
     selectedFilterMode,
     draftExcludeNames,
@@ -252,6 +266,8 @@ export function useAudioFilter() {
   const selectedPids = selectedFilterMode === 'exclude' ? draftExcludePids : draftIncludePids;
 
   return {
+    captureChoice: (isFullAudio ? 'full' : isAllMuted ? 'none' : selectedFilterMode) as AudioCaptureChoice,
+    setCaptureChoice,
     processes: filteredProcesses,
     rawProcessCount: processes.length,
     isLoading,

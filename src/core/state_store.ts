@@ -1,3 +1,4 @@
+import { DEFAULT_AUDIO_EXCLUSIONS } from './audio_filter_presets.ts';
 import { readNicknameStyle, type NicknameStyle } from './nickname_style.ts';
 import { normalizeBackground } from './background_color.ts';
 import { streamDrawingLimit, STREAM_DRAWING_MAX } from './stream_pointer.ts';
@@ -55,7 +56,7 @@ export class StateStore {
 
   public isAudioFilterFullAudio: boolean = false;
   public selectedFilterMode: 'exclude' | 'include' = 'exclude';
-  public excludeProcessNames: Set<string> = new Set(['p2sharer', 'p2sharer.exe']);
+  public excludeProcessNames: Set<string> = new Set(DEFAULT_AUDIO_EXCLUSIONS);
   public includeProcessNames: Set<string> = new Set();
   public excludePids: Set<number> = new Set();
   public includePids: Set<number> = new Set();
@@ -145,13 +146,13 @@ export class StateStore {
         if (Array.isArray(savedExclude)) {
           this.excludeProcessNames = new Set(savedExclude.map((n: string) => n.toLowerCase()));
         } else {
-          this.excludeProcessNames = new Set(['p2sharer', 'p2sharer.exe']);
+          this.excludeProcessNames = new Set(DEFAULT_AUDIO_EXCLUSIONS);
         }
       } catch {
-        this.excludeProcessNames = new Set(['p2sharer', 'p2sharer.exe']);
+        this.excludeProcessNames = new Set(DEFAULT_AUDIO_EXCLUSIONS);
       }
     } else {
-      this.excludeProcessNames = new Set();
+      this.excludeProcessNames = new Set(DEFAULT_AUDIO_EXCLUSIONS);
     }
 
     try {
