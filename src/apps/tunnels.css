@@ -12,6 +12,8 @@
 .tunnel-list-header .btn { margin-left: auto; }
 .tunnel-lists h3 { font-size: 13px; font-weight: 600; margin: 0; }
 .tunnel-list-content { flex: 1; min-height: 0; overflow: auto; }
+.tunnel-participant-list { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 8px; }
+.tunnel-participant-list > .tunnel-row { flex: 0 1 280px; min-width: 0; max-width: 100%; margin-bottom: 0; }
 .tunnel-row { display: flex; align-items: center; gap: 10px; padding: 12px; margin-bottom: 8px; background: var(--bg-card-hover); border-radius: var(--radius-md); }
 .tunnel-row .profile-avatar { flex-shrink: 0; }
 .tunnel-details { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 4px; }
@@ -26,7 +28,7 @@
 .tunnel-preview > svg { color: color-mix(in srgb, var(--accent-color) 65%, var(--text-primary)); }
 .tunnel-preview strong { font-size: 12px; color: var(--text-primary); }
 .tunnel-details > span { font-size: 11px; color: var(--text-secondary); overflow-wrap: anywhere; }
-.tunnel-details code { font-size: 12px; user-select: text; }
+.tunnel-details code { font-size: 12px; user-select: text; overflow-wrap: anywhere; }
 .tunnel-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .tunnel-form { display: flex; flex-direction: column; gap: 16px; }
 .tunnel-form label { display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: var(--text-primary); }

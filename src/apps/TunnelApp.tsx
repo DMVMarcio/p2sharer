@@ -125,7 +125,7 @@ export function TunnelApp({ instanceId, compact = false }: { instanceId: string;
       </section>
       <section aria-label={t('tunnels.others')}>
         <div className="tunnel-list-header"><h3>{t('tunnels.others')}</h3></div>
-        <div className="tunnel-list-content">
+        <div className="tunnel-list-content tunnel-participant-list">
         {!remoteRows.length && <p className="tunnel-empty">{t('tunnels.emptyOthers')}</p>}
         {remoteRows.map(({ peer, rule }) => {
           const name = peers.find((p) => p.id === peer)?.username || t('tunnels.participant');
