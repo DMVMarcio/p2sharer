@@ -5407,14 +5407,17 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 .audio-choice-hint { margin: -6px 0 0; color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
 .audio-filter-search { display: flex; align-items: center; gap: 8px; color: var(--text-secondary); }
 .audio-filter-search > .text-input { flex: 1; min-width: 0; }
-.audio-filter-refresh { flex: none; }
+.audio-filter-search > svg { flex: none; }
+.btn.audio-filter-refresh { flex: 0 0 44px; width: 44px; height: 44px; padding: 0; }
 .audio-filter-app-list { display: flex; flex-direction: column; gap: 7px; height: 270px; overflow-y: auto; padding-right: 4px; }
 .audio-filter-app { gap: 12px; min-height: 54px; flex: none; }
 .audio-filter-app.selected { background: var(--bg-control); }
 .audio-filter-app.selected:hover { background: var(--bg-control-hover); }
 .audio-filter-app-icon { display: grid; place-items: center; flex: none; width: 28px; height: 28px; color: var(--text-secondary); }
 .audio-filter-app-icon img { width: 24px; height: 24px; object-fit: contain; border-radius: var(--radius-sm); }
-.audio-filter-app-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--text-primary); }
+.audio-filter-app-details { display: flex; flex: 1; flex-direction: column; gap: 3px; min-width: 0; }
+.audio-filter-app-executable { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--text-secondary); }
+.audio-filter-app-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--text-primary); }
 .audio-filter-list-state { display: flex; align-items: center; justify-content: center; gap: 10px; height: 100%; padding: 16px; color: var(--text-secondary); font-size: 13px; text-align: center; }
 .audio-clear-selection { align-self: flex-start; }
 .audio-refresh-spinning { animation: spin .8s linear infinite; }

@@ -4,7 +4,7 @@ import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { useModal } from '../../hooks/useModal';
 import { useAudioFilter } from '../../hooks/useAudioFilter';
-import { audioProcessKey, type AudioCaptureChoice } from '../../core/audio_filter_presets';
+import { audioProcessKey, audioProcessLabels, type AudioCaptureChoice } from '../../core/audio_filter_presets';
 import { ModalDialog } from '../common/ModalDialog';
 import { Select } from '../common/Select';
 import { TooltipButton } from '../common/TooltipButton';
@@ -52,7 +52,7 @@ export const AudioFilterModal = () => {
               onChange={event => filter.setSearchText(event.target.value)} />
             {filter.searchText && <TooltipButton className="btn-close" tooltip={t('message.9f3ebbde555a')}
               onClick={() => filter.setSearchText('')}><X size={15} /></TooltipButton>}
-            <TooltipButton className="btn btn-icon audio-filter-refresh" disabled={filter.isLoading || pending}
+            <TooltipButton className="btn btn-secondary audio-filter-refresh" disabled={filter.isLoading || pending}
               tooltip={t('message.cea1be571207')} onClick={() => void loadProcesses()}>
               <RefreshCw size={17} className={filter.isLoading ? 'audio-refresh-spinning' : ''} />
             </TooltipButton>
@@ -62,13 +62,17 @@ export const AudioFilterModal = () => {
               : filter.processes.length === 0 ? <div className="audio-filter-list-state">{t('audio.noApps')}</div>
               : filter.processes.map(process => {
                 const selected = filter.selectedNames.has(audioProcessKey(process.name));
+                const labels = audioProcessLabels(process.name, process.window_title);
                 return <label key={`${process.pid}_${process.name}`} className={`settings-switch-row audio-filter-app ${selected ? 'selected' : ''}`}>
                   <span className="audio-filter-app-icon">
                     {process.icon_base64 && !failedIcons.has(process.icon_base64)
                       ? <img src={process.icon_base64} alt="" onError={() => setFailedIcons(previous => new Set(previous).add(process.icon_base64!))} />
                       : <AppWindow size={20} aria-hidden="true" />}
                   </span>
-                  <span className="audio-filter-app-name">{process.name.replace(/\.exe$/i, '')}</span>
+                  <span className="audio-filter-app-details">
+                    <span className="audio-filter-app-name">{labels.title}</span>
+                    <span className="audio-filter-app-executable">{labels.executable}</span>
+                  </span>
                   <span className="modern-switch">
                     <input autoComplete="off" type="checkbox" disabled={pending} checked={selected}
                       aria-label={t(choice === 'exclude' ? 'audio.muteApp' : 'audio.allowApp', { app: process.name })}
