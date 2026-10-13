@@ -131,6 +131,7 @@ export class TunnelModel implements RoomAppModel {
   }
   private async configure(): Promise<void> {
     if (!this.available) return;
+    this.updateNetworkConnections();
     await this.bridge.call('configure_port_tunnels', { scope: this.scope,
       exports: this.joined ? [...this.active.values()].filter((row) => row.mode !== 'virtual') : [],
       peers: this.joined ? [...this.members].filter((id) => id !== this.context.localActor) : [] }).catch(async (error) => {
@@ -156,6 +157,31 @@ export class TunnelModel implements RoomAppModel {
       }
     }
   }
+  private updateNetworkConnections(): void {
+    this.networkConnections.clear();
+    if (!this.joined) return;
+    for (const [peer, rules] of this.remote) {
+      if (!this.members.has(peer) || !this.remoteIPs.has(peer)) continue;
+      for (const rule of rules) if (rule.enabled && rule.mode === 'virtual')
+        this.networkConnections.set(this.networkKey(peer, rule.id), { peer, rule });
+    }
+  }
+  private async reconcileRemoteProxies(): Promise<void> {
+    if (!this.available || !this.joined) return;
+    for (const forward of [...this.status.forwards]) {
+      const rule = this.remote.get(forward.peer)?.find((row) => row.id === forward.tunnel);
+      if (!rule?.enabled || rule.mode === 'virtual' || this.remoteGenerations.get(forward.id) !== rule.generation) {
+        await this.bridge.call('disconnect_port_tunnel', { scope: this.scope, id: forward.id });
+        this.remoteGenerations.delete(forward.id);
+      }
+    }
+    await this.refresh();
+    for (const [peer, rules] of this.remote) for (const rule of rules) {
+      if (!rule.enabled || rule.mode === 'virtual' || this.disposed || !this.joined) continue;
+      if (!this.status.forwards.some((f) => f.peer === peer && f.tunnel === rule.id))
+        await this.connectForward(peer, rule.id, 0, this.epoch, false);
+    }
+  }
   setParticipants(participants: string[]): void {
     const previous = this.members;
     this.members = new Set(participants);
@@ -175,6 +201,7 @@ export class TunnelModel implements RoomAppModel {
     }
     void this.command(async () => {
       await this.configure();
+      await this.reconcileRemoteProxies();
       if (this.joined) {
         for (const actor of this.members) if (actor !== this.context.localActor && (!previous.has(actor) || !wasJoined)) this.advertise(actor);
         if (!this.timer && this.available) this.timer = setInterval(() => { void this.refresh().catch(() => {}); }, 1000);
@@ -215,7 +242,9 @@ export class TunnelModel implements RoomAppModel {
   }
   connect(peer: string, id: string, port: number): Promise<void> {
     const epoch = this.epoch;
-    return this.command(async () => {
+    return this.command(() => this.connectForward(peer, id, port, epoch));
+  }
+  private async connectForward(peer: string, id: string, port: number, epoch: number, persist = true): Promise<void> {
       const item = this.remote.get(peer)?.find((row) => row.id === id);
       if (!this.joined || epoch !== this.epoch || !this.members.has(peer) || !item?.enabled || !Number.isInteger(port) || port < 0 || port > 65535)
         throw new Error('Tunnel participant unavailable');
@@ -229,31 +258,17 @@ export class TunnelModel implements RoomAppModel {
         await this.bridge.call('disconnect_port_tunnel', { scope: this.scope, id: forward.id });
         throw new Error('Tunnel participant unavailable');
       }
-      try { this.store?.saveLocalPort(id, port); }
+      try { if (persist) this.store?.saveLocalPort(id, port); }
       catch (error) {
         await this.bridge.call('disconnect_port_tunnel', { scope: this.scope, id: forward.id });
         throw error;
       }
       await this.refresh();
-    });
   }
   disconnect(id: string): Promise<void> {
     return this.command(async () => { await this.bridge.call('disconnect_port_tunnel', { scope: this.scope, id }); this.remoteGenerations.delete(id); await this.refresh(); });
   }
   networkKey(peer: string, id: string): string { return `${peer}:${id}`; }
-  toggleNetwork(peer: string, id: string, enabled: boolean): Promise<void> {
-    const epoch = this.epoch;
-    return this.command(async () => {
-      if (!this.bridge.listenVirtual || !this.joined || epoch !== this.epoch) throw new Error('Tunnel participant unavailable');
-      const key = this.networkKey(peer, id);
-      if (enabled) {
-        const rule = this.remote.get(peer)?.find((r) => r.id === id);
-        if (!rule?.enabled || rule.mode !== 'virtual' || !this.remoteIPs.has(peer)) throw new Error('Tunnel participant unavailable');
-        this.networkConnections.set(key, { peer, rule });
-      } else this.networkConnections.delete(key);
-      await this.configure(); await this.refresh();
-    });
-  }
   regenerateIP(): Promise<void> {
     return this.command(async () => {
       await this.networkReady;
@@ -290,28 +305,13 @@ export class TunnelModel implements RoomAppModel {
     if (data.type === 'advertise' && Number.isSafeInteger(data.revision) && data.revision! >= 0 && validTunnelAdvertisements(data.exports)) {
       if (data.revision! < (this.revisions.get(actor) ?? -1)) return;
       this.revisions.set(actor, data.revision!);
+      const previousRules = this.remote.get(actor);
       this.remote.set(actor, data.exports);
       const previousIP = this.remoteIPs.get(actor);
       if (isVirtualIp(data.ip)) this.remoteIPs.set(actor, data.ip); else this.remoteIPs.delete(actor);
-      const ipChanged = previousIP !== this.remoteIPs.get(actor);
-      let networkChanged = ipChanged;
-      for (const [key, connection] of this.networkConnections) if (connection.peer === actor) {
-        const current = data.exports.find((rule) => rule.id === connection.rule.id);
-        if (!current?.enabled || current.mode !== 'virtual' || current.generation !== connection.rule.generation || ipChanged) {
-          this.networkConnections.delete(key); networkChanged = true;
-        }
-      }
-      if (networkChanged) void this.command(async () => { await this.configure(); }).catch(() => {});
-      for (const forward of this.status.forwards) if (forward.peer === actor) {
-        const previous = this.remoteGenerations.get(forward.id);
-        const item = data.exports.find((row) => row.id === forward.tunnel);
-        if (!item?.enabled || (previous !== undefined && previous !== item.generation))
-          void this.disconnect(forward.id).catch(() => {});
-      }
-      for (const forward of this.status.forwards) if (forward.peer === actor) {
-        const item = data.exports.find((row) => row.id === forward.tunnel);
-        if (item) this.remoteGenerations.set(forward.id, item.generation);
-      }
+      this.updateNetworkConnections();
+      if (previousIP !== this.remoteIPs.get(actor) || JSON.stringify(previousRules) !== JSON.stringify(data.exports))
+        void this.command(async () => { await this.configure(); await this.reconcileRemoteProxies(); await this.refresh(); }).catch(() => {});
       this.context.changed();
     } else if (!fromSnapshot && data.type === 'virtual-packet' && this.available && this.bridge.listenVirtual) {
       if (typeof data.data !== 'string' || data.data.length > 1708) return;

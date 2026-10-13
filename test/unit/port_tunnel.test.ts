@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createTunnelRules, TUNNEL_RULES_KEY, type TunnelRule } from '../../src/apps/tunnel_rules.ts';
-import { TunnelModel, type TunnelNative } from '../../src/apps/tunnel_model.ts';
+import { TunnelModel, type TunnelNative, type TunnelForward } from '../../src/apps/tunnel_model.ts';
 
 const rule: TunnelRule = { id: '11111111-1111-4111-8111-111111111111', name: 'Local service', port: 12345, protocol: 'tcp' };
 const generation = '22222222-2222-4222-8222-222222222222';
@@ -9,18 +9,41 @@ function fixture() {
   const memory = new Map<string, string>();
   const storage = { getItem: (key: string) => memory.get(key) ?? null, setItem: (key: string, value: string) => { memory.set(key, value); } };
   const calls: { command: string; args: Record<string, unknown> }[] = [];
+  let forwards: TunnelForward[] = [];
   const native: TunnelNative = {
     available: true, listen: async () => () => {},
     call: async <T>(command: string, args: Record<string, unknown>) => {
       calls.push({ command, args });
-      return (command === 'get_port_tunnel_status' ? { counters: {}, forwards: [] } : undefined) as T;
+      if (command === 'connect_port_tunnel') {
+        const exported = args.export as TunnelRule;
+        const forward = { id: crypto.randomUUID(), peer: args.peer as string, tunnel: exported.id, port: (args.port as number) || 23456, protocol: exported.protocol };
+        forwards.push(forward); return forward as T;
+      }
+      if (command === 'disconnect_port_tunnel') forwards = forwards.filter((f) => f.id !== args.id);
+      if (command === 'stop_port_tunnels') forwards = [];
+      return (command === 'get_port_tunnel_status' ? { counters: {}, forwards: [...forwards] } : undefined) as T;
     },
   };
   const sent: { payload: unknown; target?: string }[] = [];
   const model = new TunnelModel({ localActor: 'alice', instanceId: crypto.randomUUID(), changed: () => {},
     emit: (payload) => { sent.push({ payload }); }, send: async (payload, target) => { sent.push({ payload, target }); } }, native, storage);
-  return { model, native, calls, sent, storage, memory };
+  return { model, native, calls, sent, storage, memory, settle: () => new Promise<void>((resolve) => setImmediate(resolve)) };
 }
+
+test('published proxies connect automatically on a free port and revoke on owner deactivation', async () => {
+  const f = fixture(); f.model.setParticipants(['alice', 'bob']); await f.model.save(rule);
+  const advertisement = { type: 'advertise', revision: 1, exports: [{ ...rule, generation, enabled: true }] };
+  f.model.apply(advertisement, 'bob', false);
+  await f.settle();
+  assert.equal(f.model.status.forwards.length, 1);
+  assert.equal(f.calls.find((c) => c.command === 'connect_port_tunnel')!.args.port, 0);
+  f.model.apply(advertisement, 'bob', false); await f.settle();
+  assert.equal(f.calls.filter((c) => c.command === 'connect_port_tunnel').length, 1);
+  f.model.apply({ ...advertisement, revision: 2, exports: [{ ...rule, generation, enabled: false }] }, 'bob', false);
+  await f.settle();
+  assert.equal(f.model.status.forwards.length, 0);
+  f.model.destroy();
+});
 
 test('saved tunnel rules never restore activation and storage failures do not report success', async () => {
   const f = fixture();

@@ -1,4 +1,12 @@
 {
+  "tunnels.previewActive_one": "{{count}} active tunnel",
+  "tunnels.previewActive_other": "{{count}} active tunnels",
+  "tunnels.upload": "Upload: {{amount}} KiB",
+  "tunnels.download": "Download: {{amount}} KiB",
+  "tunnels.dropped_one": "{{count}} dropped packet",
+  "tunnels.dropped_other": "{{count}} dropped packets",
+  "tunnels.connections_one": "{{count}} connection",
+  "tunnels.connections_other": "{{count}} connections",
   "virtualNetwork.interfaceConfigurationError": "Virtual adapter initialization: Virtual network interface configuration failed (Windows code {{v0}})",
   "virtualNetwork.ip": "Virtual IP",
   "virtualNetwork.refresh": "Generate a new IP",

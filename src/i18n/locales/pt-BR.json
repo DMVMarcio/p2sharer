@@ -1,4 +1,12 @@
 {
+  "tunnels.previewActive_one": "{{count}} túnel ativo",
+  "tunnels.previewActive_other": "{{count}} túneis ativos",
+  "tunnels.upload": "Upload: {{amount}} KiB",
+  "tunnels.download": "Download: {{amount}} KiB",
+  "tunnels.dropped_one": "{{count}} pacote descartado",
+  "tunnels.dropped_other": "{{count}} pacotes descartados",
+  "tunnels.connections_one": "{{count}} conexão",
+  "tunnels.connections_other": "{{count}} conexões",
   "virtualNetwork.interfaceConfigurationError": "O Windows recusou a configuração do adaptador virtual (código {{v0}}).",
   "virtualNetwork.ip": "IP virtual",
   "virtualNetwork.refresh": "Gerar novo IP",

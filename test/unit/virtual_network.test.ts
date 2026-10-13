@@ -31,7 +31,7 @@ function fixture() {
     },
   };
   const model = new TunnelModel({instanceId:crypto.randomUUID(),localActor:'alice',emit:()=>{},changed:()=>{},send:async()=>{}},bridge,storage);
-  return {model,storage,calls,bridge,event:(payload:Parameters<typeof event>[0])=>event(payload),deny:()=>{deny=true;}};
+  return {model,storage,calls,bridge,event:(payload:Parameters<typeof event>[0])=>event(payload),deny:()=>{deny=true;},settle:()=>new Promise<void>((resolve)=>setImmediate(resolve))};
 }
 test('virtual all-port definitions persist without activation and cannot be downgraded to a proxy', async () => {
   const f = fixture(); f.model.setParticipants(['alice','bob']); await f.model.save(rule);
@@ -55,7 +55,7 @@ test('virtual packets require live membership and snapshots cannot inject IP pac
   const f = fixture(); f.model.setParticipants(['alice','bob']); await f.model.save(rule);
   const advertisement = {type:'advertise',revision:1,ip:peerIP,exports:[{...rule,generation,enabled:true}]};
   f.model.apply(advertisement,'bob',false);
-  await f.model.toggleNetwork('bob',rule.id,true);
+  await f.settle();
   const permissions = f.calls.filter((c)=>c.command==='configure_virtual_network').at(-1)!.args.permissions as {peers:{ip:string;grants:unknown[]}[]};
   assert.equal(permissions.peers[0].ip,peerIP); assert.equal(permissions.peers[0].grants.length,1);
   const packet = {type:'virtual-packet',data:'AAAA'};
@@ -79,23 +79,26 @@ test('cancelled elevation and helper failure cannot leave virtual access enabled
   assert.equal(g.model.active.size,0); assert.equal(g.model.networkConnections.size,0); assert.equal(g.model.networkRunning,false);
   g.model.destroy();
 });
-test('remote revocation and IP changes remove selected virtual connections', async () => {
+test('remote activation, revocation and IP changes automatically reconcile virtual access', async () => {
   const f = fixture(); f.model.setParticipants(['alice','bob']); await f.model.save(rule);
   f.model.apply({type:'advertise',revision:1,ip:peerIP,exports:[{...rule,generation,enabled:true}]},'bob',false);
-  await f.model.toggleNetwork('bob',rule.id,true);
+  await f.settle();
   f.model.apply({type:'advertise',revision:2,ip:peerIP,exports:[{...rule,generation,enabled:false}]},'bob',false);
   assert.equal(f.model.networkConnections.size,0);
   f.model.apply({type:'advertise',revision:3,ip:peerIP,exports:[{...rule,generation,enabled:true}]},'bob',false);
-  await f.model.toggleNetwork('bob',rule.id,true);
+  await f.settle();
   f.model.apply({type:'advertise',revision:4,ip:[10,160,1,3].join('.'),exports:[{...rule,generation,enabled:true}]},'bob',false);
-  assert.equal(f.model.networkConnections.size,0);
+  await f.settle();
+  assert.equal(f.model.networkConnections.size,1);
+  const peers = (f.calls.filter((c)=>c.command==='configure_virtual_network').at(-1)!.args.permissions as {peers:{ip:string}[]}).peers;
+  assert.equal(peers[0].ip,[10,160,1,3].join('.'));
   f.model.destroy();
 });
-test('revoking one remote rule leaves the other selected rule enabled', async () => {
+test('revoking one remote rule leaves the other published rule enabled', async () => {
   const f = fixture(); f.model.setParticipants(['alice','bob']); await f.model.save(rule);
   const second = { ...rule, id: '66666666-6666-4666-8666-666666666666', name: 'Another server', port: 23456, protocol: 'udp' as const };
   f.model.apply({type:'advertise',revision:1,ip:peerIP,exports:[{...rule,generation,enabled:true},{...second,generation,enabled:true}]},'bob',false);
-  await f.model.toggleNetwork('bob',rule.id,true); await f.model.toggleNetwork('bob',second.id,true);
+  await f.settle();
   f.model.apply({type:'advertise',revision:2,ip:peerIP,exports:[{...rule,generation,enabled:false},{...second,generation,enabled:true}]},'bob',false);
   assert.equal(f.model.networkConnections.size,1);
   assert.equal(f.model.networkConnections.has(f.model.networkKey('bob',second.id)),true);

@@ -16,6 +16,15 @@
 .tunnel-row .profile-avatar { flex-shrink: 0; }
 .tunnel-details { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 4px; }
 .tunnel-details strong { font-size: 13px; overflow-wrap: anywhere; }
+.tunnel-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.tunnel-title .room-app-participant { width: 22px; height: 22px; font-size: 11px; }
+.tunnel-stats { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--text-secondary); }
+.tunnel-traffic { display: flex; flex-wrap: wrap; gap: 10px; }
+.tunnel-upload { color: color-mix(in srgb, var(--accent-color) 65%, var(--text-primary)); }
+.tunnel-download { color: var(--success-text); }
+.tunnel-preview { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 12px; background: var(--room-app-panel-bg); color: var(--text-secondary); text-align: center; }
+.tunnel-preview > svg { color: color-mix(in srgb, var(--accent-color) 65%, var(--text-primary)); }
+.tunnel-preview strong { font-size: 12px; color: var(--text-primary); }
 .tunnel-details > span { font-size: 11px; color: var(--text-secondary); overflow-wrap: anywhere; }
 .tunnel-details code { font-size: 12px; user-select: text; }
 .tunnel-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
