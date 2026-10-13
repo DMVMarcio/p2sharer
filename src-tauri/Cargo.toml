@@ -56,6 +56,7 @@ windows-capture-api = { package = "windows", version = "0.62.2", features = ["Wi
 webview2-com = "0.39.1"
 windows = { version = "0.58", features = [
     "implement",
+    "Wdk_System_SystemServices",
     "Win32_Globalization",
     "Win32_NetworkManagement_IpHelper",
     "Win32_NetworkManagement_Ndis",
@@ -64,6 +65,7 @@ windows = { version = "0.58", features = [
     "Win32_System_LibraryLoader",
     "Win32_System_Registry",
     "Win32_System_SystemServices",
+    "Win32_System_SystemInformation",
     "Win32_Foundation",
     "Win32_Media",
     "Win32_Media_Audio",
