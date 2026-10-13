@@ -35,6 +35,8 @@ pub mod virtual_network;
 mod virtual_network_policy;
 #[cfg(all(windows, target_arch = "x86_64"))]
 mod virtual_network_driver;
+#[cfg(all(windows, target_arch = "x86_64"))]
+mod virtual_network_service;
 
 use audio_loopback::{start_audio_capture, stop_audio_capture};
 use logger::{clear_log_file, get_log_file_path, open_latest_log, open_log_folder, write_frontend_log};
@@ -127,6 +129,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             virtual_network::get_virtual_network_identity,
+            virtual_network::prepare_virtual_network_app,
             virtual_network::regenerate_virtual_network_ip,
             virtual_network::configure_virtual_network,
             virtual_network::stop_virtual_network_scope,

@@ -1,4 +1,5 @@
-import { t } from '../i18n';
+import { t, localizeError } from '../i18n';
+import { showToast } from '../hooks/useToast';
 import { useLocale } from '../hooks/useLocale';
 import React, { Suspense, lazy, useEffect, useState } from 'react';
 import type { RoomAppInstance } from './types';
@@ -49,8 +50,9 @@ export const RoomAppCard: React.FC<Props> = ({ instance, isFeatured = false, com
     return { id, name, color: slot?.color || 'var(--accent-color)' };
   });
   const enter = () => {
-    roomAppsService.join(instance.id);
-    if (compact) togglePin(`app:${instance.id}`);
+    void roomAppsService.join(instance.id).then(() => {
+      if (compact && roomAppsService.isJoined(instance.id)) togglePin(`app:${instance.id}`);
+    }).catch((error) => showToast(localizeError(error), 4000, 'error'));
   };
   const leave = () => {
     roomAppsService.leave(instance.id);

@@ -123,6 +123,14 @@ export class TunnelModel implements RoomAppModel {
     this.serial = next.catch(() => {});
     return next;
   }
+  prepareJoin(): Promise<void> {
+    return this.command(async () => {
+      if (!this.available) throw new Error('Virtual networking requires Windows x64');
+      await this.networkReady;
+      await this.bridge.call('prepare_virtual_network_app', { scope: this.scope });
+      if (this.disposed) await this.bridge.call('stop_virtual_network_scope', { scope: this.scope });
+    });
+  }
   private advertise(target?: string): void {
     if (!this.joined || this.disposed) return;
     const payload = this.snapshot();

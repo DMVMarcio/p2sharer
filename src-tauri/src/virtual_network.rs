@@ -3,7 +3,7 @@ use crate::virtual_network_policy::{virtual_ip, Grant, Policy, Scope, MTU};
 use base64::{engine::general_purpose::STANDARD, Engine};
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     net::Ipv4Addr,
     sync::{Arc, Mutex},
     time::{Duration, Instant},
@@ -60,6 +60,7 @@ struct PacketEvent {
 }
 #[derive(Default)]
 struct Inner {
+    leases: HashSet<String>,
     identity: Option<Identity>,
     policy: Policy,
     connection: Option<Connection>,
@@ -166,6 +167,10 @@ async fn write_frame<W: AsyncWrite + Unpin>(writer: &mut W, frame: &Frame) -> Re
     writer.write_all(&frame.1).await.map_err(|e| e.to_string())
 }
 impl VirtualNetworkState {
+    fn idle(&self) -> bool {
+        let inner = self.inner.lock().unwrap();
+        inner.policy.scopes.is_empty() && inner.leases.is_empty()
+    }
     fn identity(&self, app: &tauri::AppHandle) -> Result<Identity, String> {
         let mut state = self.inner.lock().unwrap();
         if let Some(identity) = &state.identity {
@@ -221,6 +226,16 @@ impl VirtualNetworkState {
         }
         #[cfg(all(windows, target_arch = "x86_64"))]
         {
+            let helpers = self.inner.lock().unwrap().helpers.clone();
+            tokio::task::spawn_blocking(move || {
+                for helper in helpers {
+                    helper.wait()?;
+                }
+                Ok::<_, String>(())
+            })
+            .await
+            .map_err(|e| e.to_string())??;
+            self.inner.lock().unwrap().helpers.retain(|p| !p.exited());
             let listener = TcpListener::bind(("127.0.0.1", 0))
                 .await
                 .map_err(|e| e.to_string())?;
@@ -265,7 +280,7 @@ impl VirtualNetworkState {
             if ready.0 != 3 || ready.1 != settings.revision.to_be_bytes() {
                 return Err("Invalid virtual adapter startup response".into());
             }
-            if self.inner.lock().unwrap().policy.scopes.is_empty() {
+            if self.idle() {
                 return Err("Virtual network activation was cancelled".into());
             }
             let (sender, mut frames) = mpsc::channel::<Frame>(64);
@@ -419,7 +434,7 @@ impl VirtualNetworkState {
                 .policy
                 .configure(&scope_id, scope, identity.ip)?;
         }
-        if self.inner.lock().unwrap().policy.scopes.is_empty() {
+        if self.idle() {
             if let Some(connection) = self.inner.lock().unwrap().connection.take() {
                 let _ = connection.cancel.send(true);
             }
@@ -465,10 +480,11 @@ impl VirtualNetworkState {
     }
     pub fn stop(&self, scope: &str) {
         let mut state = self.inner.lock().unwrap();
+        state.leases.remove(scope);
         state.policy.remove(scope);
         state.counters.remove(scope);
         state.credits.retain(|_, (id, _, _)| id != scope);
-        if state.policy.scopes.is_empty() {
+        if state.policy.scopes.is_empty() && state.leases.is_empty() {
             if let Some(connection) = state.connection.take() {
                 let _ = connection.cancel.send(true);
             }
@@ -479,6 +495,7 @@ impl VirtualNetworkState {
         {
             let mut state = self.inner.lock().unwrap();
             state.policy.clear();
+            state.leases.clear();
             state.credits.clear();
             if let Some(connection) = state.connection.take() {
                 let _ = connection.cancel.send(true);
@@ -502,6 +519,31 @@ impl VirtualNetworkState {
     }
 }
 #[tauri::command]
+pub async fn prepare_virtual_network_app(
+    window: tauri::Window,
+    state: State<'_, VirtualNetworkState>,
+    scope: String,
+) -> Result<(), String> {
+    main_only(&window)?;
+    if scope.len() != 36 || !scope.bytes().all(|b| b.is_ascii_hexdigit() || b == b'-') {
+        return Err("Invalid virtual app scope".into());
+    }
+    {
+        let mut inner = state.inner.lock().unwrap();
+        if inner.leases.len() >= 24 && !inner.leases.contains(&scope) {
+            return Err("Too many virtual apps".into());
+        }
+        inner.leases.insert(scope.clone());
+    }
+    let result = state
+        .configure(window.app_handle().clone(), scope.clone(), Scope::default())
+        .await;
+    if result.is_err() {
+        state.stop(&scope);
+    }
+    result
+}
+#[tauri::command]
 pub fn get_virtual_network_identity(
     window: tauri::Window,
     state: State<'_, VirtualNetworkState>,
@@ -510,24 +552,56 @@ pub fn get_virtual_network_identity(
     state.identity(window.app_handle())
 }
 #[tauri::command]
-pub fn regenerate_virtual_network_ip(
+pub async fn regenerate_virtual_network_ip(
     window: tauri::Window,
     state: State<'_, VirtualNetworkState>,
 ) -> Result<Identity, String> {
     main_only(&window)?;
-    let mut inner = state.inner.lock().unwrap();
-    if inner.connection.is_some() || !inner.policy.scopes.is_empty() {
-        return Err("Disable all virtual tunnels before changing the IP".into());
+    let operation = state.operation.lock().await;
+    {
+        let mut inner = state.inner.lock().unwrap();
+        if !inner.policy.scopes.is_empty() {
+            return Err("Disable all virtual tunnels before changing the IP".into());
+        }
+        if let Some(connection) = inner.connection.take() {
+            let _ = connection.cancel.send(true);
+        }
+        inner.credits.clear();
     }
     #[cfg(all(windows, target_arch = "x86_64"))]
-    let _guard = crate::virtual_network_driver::NetworkLock::acquire()?;
-    let identity = identity_file(window.app_handle(), true)?;
-    inner.identity = Some(identity.clone());
+    {
+        let helpers = state.inner.lock().unwrap().helpers.clone();
+        tokio::task::spawn_blocking(move || {
+            for helper in helpers {
+                helper.wait()?;
+            }
+            Ok::<_, String>(())
+        })
+        .await
+        .map_err(|e| e.to_string())??;
+        state.inner.lock().unwrap().helpers.retain(|p| !p.exited());
+    }
+    let identity = {
+        #[cfg(all(windows, target_arch = "x86_64"))]
+        let _guard = crate::virtual_network_driver::NetworkLock::acquire()?;
+        identity_file(window.app_handle(), true)?
+    };
+    let lease = {
+        let mut inner = state.inner.lock().unwrap();
+        inner.identity = Some(identity.clone());
+        inner.leases.iter().next().cloned()
+    };
     let _ = window.app_handle().emit_to(
         "main",
         "virtual-network-event",
         serde_json::json!({"ip": identity.ip}),
     );
+    drop(operation);
+    if let Some(scope) = lease {
+        state
+            .configure(window.app_handle().clone(), scope, Scope::default())
+            .await?;
+    }
     Ok(identity)
 }
 #[tauri::command]
@@ -647,6 +721,10 @@ pub fn receive_virtual_network_packet(
 // The helper uses a separate, synchronous runtime and cannot invoke Tauri commands.
 pub fn run_helper_if_requested() -> bool {
     let args: Vec<String> = std::env::args().collect();
+    #[cfg(all(windows, target_arch = "x86_64"))]
+    if crate::virtual_network_service::run_if_requested(&args) {
+        return true;
+    }
     if args.get(1).is_none_or(|s| s != "--p2sharer-vnet-helper") {
         return false;
     }
@@ -664,7 +742,7 @@ pub fn run_helper_if_requested() -> bool {
     true
 }
 #[cfg(all(windows, target_arch = "x86_64"))]
-fn helper(port: u16, token: &str) -> Result<(), String> {
+pub(crate) fn helper(port: u16, token: &str) -> Result<(), String> {
     use crate::virtual_network_driver::{Device, Firewall, NetworkLock};
     use std::{
         io::{Read, Write},
@@ -778,7 +856,7 @@ fn helper(port: u16, token: &str) -> Result<(), String> {
         stopped.store(true, Ordering::Release);
     });
     let result = (|| -> Result<(), String> {
-        while !cancelled.load(Ordering::Acquire) {
+        while !cancelled.load(Ordering::Acquire) && !crate::virtual_network_service::stopping() {
             let (kind, bytes) = read(&mut stream)?;
             match kind {
                 1 => {
@@ -841,6 +919,25 @@ fn finish_helper_error(stream: &mut std::net::TcpStream) {
 mod startup_tests {
     use super::*;
     use std::io::{Read, Write};
+
+    #[test]
+    fn app_leases_keep_an_idle_session_until_the_last_app_leaves() {
+        let state = VirtualNetworkState::default();
+        assert!(state.idle());
+        state
+            .inner
+            .lock()
+            .unwrap()
+            .leases
+            .extend(["one".into(), "two".into()]);
+        // An empty permission policy must not discard app preparation.
+        state.inner.lock().unwrap().policy.clear();
+        assert!(!state.idle());
+        state.stop("one");
+        assert!(!state.idle());
+        state.stop("two");
+        assert!(state.idle());
+    }
 
     #[test]
     fn startup_error_is_delivered_even_with_unread_configuration() {

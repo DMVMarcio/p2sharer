@@ -93,7 +93,7 @@ export function TunnelApp({ instanceId, compact = false }: { instanceId: string;
       <TooltipButton tooltip={t('tunnels.copy')} aria-label={t('tunnels.copy')} className="btn btn-sm btn-secondary"
         onClick={() => { void navigator.clipboard.writeText(model.ip).catch((reason) => showToast(localizeError(reason), 3500, 'error')); }}><Copy size={15} /></TooltipButton>
       <TooltipButton tooltip={t('virtualNetwork.refresh')} aria-label={t('virtualNetwork.refresh')} className="btn btn-sm btn-secondary"
-        disabled={model.busy || model.networkRunning} onClick={() => setRegenerating(true)}><RefreshCw size={15} /></TooltipButton>
+        disabled={model.busy || model.networkConnections.size > 0 || [...model.active.values()].some((r) => r.mode === 'virtual')} onClick={() => setRegenerating(true)}><RefreshCw size={15} /></TooltipButton>
     </div>}
     {!model.available && <p role="status" className="tunnel-hint">{t('tunnels.desktopOnly')}</p>}
     {model.error && <p role="alert" className="tunnel-error">{localizeError(model.error)}</p>}

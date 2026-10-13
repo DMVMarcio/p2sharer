@@ -6,6 +6,30 @@ import { registerRoomApp } from '../../src/apps/registry.ts';
 import type { AppWireEvent } from '../../src/apps/types.ts';
 import * as Y from 'yjs';
 
+test('app entry waits for preparation, shares duplicate requests and refuses failed preparation', async () => {
+  let approve;
+  let rejectPreparation = false;
+  let preparations = 0;
+  registerRoomApp({ kind: 'prepared-fixture', label: 'Prepared fixture',
+    createModel: () => ({ snapshot: () => ({}), apply: () => {}, destroy: () => {},
+      prepareJoin: () => { preparations++; return rejectPreparation ? Promise.reject(new Error('consent cancelled')) : new Promise((resolve) => { approve = resolve; }); } }),
+    loadView: async () => ({ default: () => null }) });
+  const service = new RoomAppsService();
+  service.attach(() => {}, 'alice');
+  const id = service.start('prepared-fixture');
+  const first = service.join(id); const second = service.join(id);
+  assert.equal(preparations, 1); assert.equal(service.isJoined(id), false);
+  approve(); await Promise.all([first, second]);
+  assert.equal(service.isJoined(id), true);
+  service.leave(id); rejectPreparation = true;
+  await assert.rejects(service.join(id), /consent cancelled/);
+  assert.equal(service.isJoined(id), false);
+  rejectPreparation = false;
+  const pending = service.join(id); service.stop(id); approve(); await pending;
+  assert.equal(service.isJoined(id), false);
+  service.reset();
+});
+
 test('multiple instances of the same app stay independent and late peers recover state', () => {
   const first = new RoomAppsService();
   const second = new RoomAppsService();

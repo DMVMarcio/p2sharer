@@ -57,7 +57,7 @@ Record only instructions explicitly intended to govern future work. Do not infer
 
 - `[Memory]` Keep knowledge limited to explicit standing rules and useful verified architecture. Do not record every request, inferred preference, task approval, completed-work report, or incidental UI detail.
 - `[Package Manager]` Use pinned pnpm for dependencies, scripts, local tools, and Tauri hooks; keep the tracked lockfile and tool instructions consistent.
-- `[Desktop Builds]` Use the default `src-tauri/target/` directory. If the application locks the executable, ask the user to close it and wait for confirmation. Never terminate it automatically or bypass the lock with another target directory.
+- `[Desktop Builds]` Use the default `src-tauri/target/` directory. Identify running processes by executable path. An installed copy outside the workspace does not block builds; ask for closure only when a workspace build/test process or confirmed output lock blocks the build. Wait for confirmation; never terminate it or use another target directory.
 - `[Interactive Verification]` The user performs interactive application checks on their computer. Do not launch or automate the app for verification unless explicitly requested; retain automated regressions and native packaging validation.
 - `[Git]` Commit completed task changes after required validation, using English Conventional Commits. Preserve unrelated edits and report the commit hash and remaining changes. Push only when authorized.
 - `[Canonical UI]` Reuse shared components, CSS recipes, and design tokens across application surfaces. The standard covers all control families. Selection fields use the canonical `Select`, and contextual actions and tooltips use the application implementations.

@@ -25,6 +25,7 @@ export class RoomAppsService {
   private sender: Sender | null = null;
   private onLocalLifecycle: LifecycleListener | null = null;
   private localActor = '';
+  private joining = new Map<string, Promise<void>>();
 
   subscribe(listener: Listener): () => void {
     this.listeners.add(listener);
@@ -63,10 +64,21 @@ export class RoomAppsService {
     this.notify();
   }
 
-  join(id: string): void {
-    if (!this.sender || !this.instances.has(id) || this.isJoined(id)) return;
-    this.setPresence(id, this.localActor, true);
-    this.sendInstanceEvent(id, { kind: 'presence', id, joined: true });
+  join(id: string): Promise<void> {
+    if (!this.sender || !this.instances.has(id) || this.isJoined(id)) return Promise.resolve();
+    const pending = this.joining.get(id);
+    if (pending) return pending;
+    const model = this.models.get(id);
+    const actor = this.localActor;
+    const finish = () => {
+      if (this.models.get(id) !== model || this.localActor !== actor || !this.sender) return;
+      this.setPresence(id, actor, true);
+      this.sendInstanceEvent(id, { kind: 'presence', id, joined: true });
+    };
+    if (!model?.prepareJoin) { finish(); return Promise.resolve(); }
+    const operation = model.prepareJoin().then(finish).finally(() => { if (this.joining.get(id) === operation) this.joining.delete(id); });
+    this.joining.set(id, operation);
+    return operation;
   }
 
   leave(id: string): void {
@@ -99,6 +111,7 @@ export class RoomAppsService {
 
   reset(): void {
     this.sender = null;
+    this.joining.clear();
     this.onLocalLifecycle = null;
     this.instances.clear();
     this.participants.clear();

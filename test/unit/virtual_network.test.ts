@@ -51,6 +51,20 @@ test('virtual all-port definitions persist without activation and cannot be down
   const restored = new TunnelModel({localActor:'alice',emit:()=>{},changed:()=>{}},f.bridge,f.storage);
   assert.equal(restored.active.size,0); assert.equal(restored.networkConnections.size,0); restored.destroy();
 });
+test('preparing entry is mandatory but never enables saved tunnel definitions', async () => {
+  const f = fixture(); await f.model.save(rule);
+  await f.model.prepareJoin();
+  assert.ok(f.calls.some((c) => c.command === 'prepare_virtual_network_app'));
+  assert.equal(f.model.active.size, 0);
+  f.model.destroy();
+  const g = fixture();
+  g.bridge.call = async (command) => {
+    if (command === 'prepare_virtual_network_app') throw new Error('consent cancelled');
+    return undefined;
+  };
+  await assert.rejects(g.model.prepareJoin(), /consent cancelled/);
+  assert.equal(g.model.active.size, 0); g.model.destroy();
+});
 test('virtual packets require live membership and snapshots cannot inject IP packets', async () => {
   const f = fixture(); f.model.setParticipants(['alice','bob']); await f.model.save(rule);
   const advertisement = {type:'advertise',revision:1,ip:peerIP,exports:[{...rule,generation,enabled:true}]};

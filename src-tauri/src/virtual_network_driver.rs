@@ -23,10 +23,6 @@ use windows::{
             LibraryLoader::{GetProcAddress, LoadLibraryExW, LOAD_LIBRARY_SEARCH_SYSTEM32},
             Threading::{CreateMutexW, ReleaseMutex, WaitForSingleObject},
         },
-        UI::{
-            Shell::{ShellExecuteExW, SEE_MASK_NOCLOSEPROCESS, SHELLEXECUTEINFOW},
-            WindowsAndMessaging::SW_HIDE,
-        },
     },
 };
 
@@ -155,51 +151,17 @@ impl Drop for NetworkLock {
         }
     }
 }
-pub struct HelperProcess(usize);
+pub struct HelperProcess(crate::virtual_network_service::ServiceProcess);
 impl HelperProcess {
     pub fn exited(&self) -> bool {
-        unsafe { WaitForSingleObject(HANDLE(self.0 as _), 0) == WAIT_OBJECT_0 }
+        self.0.exited()
     }
     pub fn wait(&self) -> Result<(), String> {
-        if unsafe { WaitForSingleObject(HANDLE(self.0 as _), 15_000) } == WAIT_OBJECT_0 {
-            Ok(())
-        } else {
-            Err("Virtual network helper is still shutting down; retry after it finishes".into())
-        }
-    }
-}
-impl Drop for HelperProcess {
-    fn drop(&mut self) {
-        unsafe {
-            let _ = CloseHandle(HANDLE(self.0 as _));
-        }
+        self.0.wait()
     }
 }
 pub fn elevate(port: u16, token: &str) -> Result<HelperProcess, String> {
-    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-    let path: Vec<u16> = exe.as_os_str().encode_wide().chain(Some(0)).collect();
-    let parameters: Vec<u16> = format!("--p2sharer-vnet-helper {port} {token}")
-        .encode_utf16()
-        .chain(Some(0))
-        .collect();
-    let mut info = SHELLEXECUTEINFOW {
-        cbSize: std::mem::size_of::<SHELLEXECUTEINFOW>() as u32,
-        fMask: SEE_MASK_NOCLOSEPROCESS,
-        lpVerb: w!("runas"),
-        lpFile: PCWSTR(path.as_ptr()),
-        lpParameters: PCWSTR(parameters.as_ptr()),
-        nShow: SW_HIDE.0,
-        ..Default::default()
-    };
-    unsafe {
-        ShellExecuteExW(&mut info).map_err(|e| {
-            format!("Virtual network activation requires Windows administrator consent: {e}")
-        })?;
-    }
-    if info.hProcess.is_invalid() {
-        return Err("Windows did not return a virtual helper process handle".into());
-    }
-    Ok(HelperProcess(info.hProcess.0 as usize))
+    crate::virtual_network_service::start(port, token).map(HelperProcess)
 }
 fn socket(ip: Ipv4Addr) -> SOCKADDR_INET {
     SOCKADDR_INET {
