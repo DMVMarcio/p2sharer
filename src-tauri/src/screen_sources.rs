@@ -267,6 +267,7 @@ fn enqueue_capture_frame(delivery: &FrameDelivery, frame: Arc<Vec<u8>>, ready_us
     legacy: bool, active: &AtomicBool, sender: &broadcast::Sender<Message>, metrics: &CaptureMetrics) -> bool {
     if !active.load(Ordering::Relaxed) { return false; }
     if let Ok(mut pacer) = delivery.0.lock() {
+        if !active.load(Ordering::Acquire) { return false; }
         if legacy { pacer.record_immediate(frame.clone(), ready_us); }
         else if frame.starts_with(b"P2NV") {
             if !pacer.enqueue_dependent(frame.clone(), ready_us) { return false; }
@@ -310,6 +311,8 @@ fn start_frame_delivery(delivery: FrameDelivery, active: Arc<AtomicBool>, load: 
 
 #[derive(Clone)]
 pub struct CaptureFlags {
+    lifecycle: Arc<WgcLifecycle>,
+    nvenc_sequence: Arc<std::sync::atomic::AtomicU32>,
     pub session_id: String,
     pub nvenc_enabled: Arc<AtomicBool>,
     pub nvenc_keyframe: Arc<AtomicBool>,
@@ -327,8 +330,17 @@ pub struct CaptureFlags {
     pub metrics: Arc<CaptureMetrics>,
 }
 
+struct WgcLifecycle {
+    active: AtomicBool,
+    closed: AtomicBool,
+}
+impl WgcLifecycle {
+    fn new() -> Self { Self { active: AtomicBool::new(true), closed: AtomicBool::new(false) } }
+}
+
 #[cfg(windows)]
 pub struct NativeWgcHandler {
+    lifecycle: Arc<WgcLifecycle>,
     session_id: String,
     nvenc: crate::video_nvenc::GpuEncoder,
     nvenc_enabled: Arc<AtomicBool>,
@@ -366,8 +378,9 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
         let fps = ctx.flags.target_fps.clamp(15, 120);
         let frame_interval = std::time::Duration::from_nanos(1_000_000_000 / fps as u64);
         Ok(Self {
+            lifecycle: ctx.flags.lifecycle,
             session_id: ctx.flags.session_id,
-            nvenc: crate::video_nvenc::GpuEncoder::default(),
+            nvenc: crate::video_nvenc::GpuEncoder::with_sequence(ctx.flags.nvenc_sequence),
             nvenc_enabled: ctx.flags.nvenc_enabled,
             nvenc_keyframe: ctx.flags.nvenc_keyframe,
             nvenc_bitrate: ctx.flags.nvenc_bitrate,
@@ -400,7 +413,7 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
         frame: &mut Frame,
         capture_control: InternalCaptureControl,
     ) -> Result<(), Self::Error> {
-        if !self.active_flag.load(Ordering::Relaxed) {
+        if !self.active_flag.load(Ordering::Relaxed) || !self.lifecycle.active.load(Ordering::Relaxed) {
             capture_control.stop();
             return Ok(());
         }
@@ -462,7 +475,7 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
                     self.metrics.nvenc_images.fetch_add(1, Ordering::Relaxed);
                     if scaled.is_some() { self.metrics.gpu_scaled_images.fetch_add(1, Ordering::Relaxed); }
                     if !enqueue_capture_frame(&self.delivery, Arc::new(bytes), self.start_instant.elapsed().as_micros() as u64,
-                        self.legacy_pacing, &self.active_flag, &self.sender, &self.metrics) {
+                        self.legacy_pacing, &self.lifecycle.active, &self.sender, &self.metrics) {
                         self.nvenc_keyframe.store(true, Ordering::Relaxed);
                     }
                     let processing_us = arrival_time.elapsed().as_micros() as u64;
@@ -566,7 +579,7 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
             self.metrics.images.fetch_add(1, Ordering::Relaxed);
             let frame_arc = Arc::new(frame_bytes);
             enqueue_capture_frame(&self.delivery, frame_arc, self.start_instant.elapsed().as_micros() as u64,
-                self.legacy_pacing, &self.active_flag, &self.sender, &self.metrics);
+                self.legacy_pacing, &self.lifecycle.active, &self.sender, &self.metrics);
           }
           Err(error) => {
             let failures = self.metrics.jpeg_errors.fetch_add(1, Ordering::Relaxed) + 1;
@@ -590,9 +603,9 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
 
     fn on_closed(&mut self) -> Result<(), Self::Error> {
         crate::logger::log_msg("WARN", "capture.source", &format!("session={} WGC source closed elapsed_ms={}", self.session_id, self.start_instant.elapsed().as_millis()));
-        let _ = self.sender.send(Message::Text(
-            "{\"type\":\"fallback\",\"reason\":\"window_closed\"}".to_string(),
-        ));
+        // A monitor's WGC item can close during a secure desktop transition.
+        // The supervisor confirms source loss or recreates capture after returning.
+        self.lifecycle.closed.store(true, Ordering::Release);
         Ok(())
     }
 }
@@ -600,6 +613,121 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
 #[cfg(windows)]
 type ActiveCaptureControl =
     CaptureControl<NativeWgcHandler, Box<dyn std::error::Error + Send + Sync>>;
+
+#[cfg(windows)]
+fn start_wgc_capture(source: &str, capture_mouse: bool, flags: CaptureFlags) -> Result<ActiveCaptureControl, String> {
+    let cursor = if capture_mouse { CursorCaptureSettings::WithCursor } else { CursorCaptureSettings::WithoutCursor };
+    let (kind, raw) = source.split_once(':').ok_or("Invalid capture source")?;
+    if kind == "window" {
+        let hwnd = raw.parse::<usize>().map_err(|e| e.to_string())?;
+        let window = WgcWindow::from_raw_hwnd(hwnd as *mut std::ffi::c_void);
+        if !window.is_valid() { return Err("Capture window no longer exists".into()); }
+        NativeWgcHandler::start_free_threaded(Settings::new(window, cursor,
+            DrawBorderSettings::WithoutBorder, SecondaryWindowSettings::Default,
+            capture_update_interval(), DirtyRegionSettings::Default, ColorFormat::Rgba8, flags))
+            .map_err(|e| e.to_string())
+    } else {
+        let index = raw.parse::<usize>().map_err(|e| e.to_string())?;
+        let monitor = WgcMonitor::from_index(index + 1).map_err(|e| e.to_string())?;
+        NativeWgcHandler::start_free_threaded(Settings::new(monitor, cursor,
+            DrawBorderSettings::WithoutBorder, SecondaryWindowSettings::Default,
+            capture_update_interval(), DirtyRegionSettings::Default, ColorFormat::Rgba8, flags))
+            .map_err(|e| e.to_string())
+    }
+}
+
+#[cfg(windows)]
+fn start_capture_supervisor(source: String, capture_mouse: bool, mut flags: CaptureFlags) {
+    std::thread::spawn(move || {
+        use crate::capture_recovery::{CaptureRecovery, RecoveryAction, input_desktop_available};
+        let mut recovery = CaptureRecovery::default();
+        let mut paused = false;
+        loop {
+            std::thread::sleep(std::time::Duration::from_millis(250));
+            if !flags.active_flag.load(Ordering::Acquire) { break; }
+            let desktop_available = input_desktop_available();
+            if !desktop_available {
+                // Retire this producer, preserving the session, delivery pacer and transports.
+                flags.lifecycle.active.store(false, Ordering::Release);
+                if !paused {
+                    crate::logger::log_msg("INFO", "capture.recovery", &format!("session={} paused for desktop switch", flags.session_id));
+                    paused = true;
+                }
+            }
+            let source_exists = if !desktop_available { false }
+                else if let Some(raw) = source.strip_prefix("window:") {
+                    raw.parse::<usize>().ok().map_or(false, |hwnd| unsafe {
+                        windows::Win32::UI::WindowsAndMessaging::IsWindow(
+                            windows::Win32::Foundation::HWND(hwnd as _)).as_bool()
+                    })
+                } else {
+                    source.strip_prefix("screen:").and_then(|raw| raw.parse::<usize>().ok())
+                        .map_or(false, |index| WgcMonitor::from_index(index + 1).is_ok())
+                };
+            let finished = {
+                let Ok(sessions) = SESSIONS.lock() else { break; };
+                let Some(session) = sessions.get(&flags.session_id) else { break; };
+                if !Arc::ptr_eq(&session.active, &flags.active_flag) { break; }
+                session.control.as_ref().map_or(true, |control| control.is_finished())
+                    || flags.lifecycle.closed.load(Ordering::Acquire)
+            };
+            let now = flags.start_instant.elapsed().as_millis() as u64;
+            match recovery.observe(flags.active_flag.load(Ordering::Acquire), desktop_available, source_exists, finished, now) {
+                RecoveryAction::Continue | RecoveryAction::Wait => continue,
+                RecoveryAction::Stop => break,
+                RecoveryAction::SourceGone | RecoveryAction::Failed => {
+                    let reason = if source_exists { "capture_error" } else if source.starts_with("window:") { "window_closed" } else { "monitor_not_found" };
+                    if let Ok(sessions) = SESSIONS.lock() {
+                        if let Some(session) = sessions.get(&flags.session_id) {
+                            if Arc::ptr_eq(&session.active, &flags.active_flag) && session.active.load(Ordering::Acquire) {
+                                let _ = flags.sender.send(Message::Text(format!("{{\"type\":\"fallback\",\"reason\":\"{reason}\"}}")));
+                            }
+                        }
+                    }
+                    break;
+                }
+                RecoveryAction::Restart => {}
+            }
+            flags.lifecycle.active.store(false, Ordering::Release);
+            let previous = {
+                let Ok(mut sessions) = SESSIONS.lock() else { break; };
+                let Some(session) = sessions.get_mut(&flags.session_id) else { break; };
+                if !Arc::ptr_eq(&session.active, &flags.active_flag) { break; }
+                session.control.take()
+            };
+            // Allow the retired handler to release its GPU/encoder before rebuilding.
+            // Cleanup is bounded and runs off the UI thread.
+            if let Some(control) = previous { let _ = safely_stop_wgc_control(control).join(); }
+            if !flags.active_flag.load(Ordering::Acquire) { break; }
+            flags.lifecycle = Arc::new(WgcLifecycle::new());
+            flags.nvenc_keyframe.store(true, Ordering::Release);
+            match start_wgc_capture(&source, capture_mouse, flags.clone()) {
+                Ok(control) => {
+                    let mut control = Some(control);
+                    if let Ok(mut sessions) = SESSIONS.lock() {
+                        if let Some(session) = sessions.get_mut(&flags.session_id) {
+                            if Arc::ptr_eq(&session.active, &flags.active_flag) && session.active.load(Ordering::Acquire) {
+                                session.control = control.take();
+                            }
+                        }
+                    }
+                    if let Some(control) = control {
+                        flags.lifecycle.active.store(false, Ordering::Release);
+                        safely_stop_wgc_control(control);
+                        break;
+                    }
+                    recovery.restarted(true, now);
+                    paused = false;
+                    crate::logger::log_msg("INFO", "capture.recovery", &format!("session={} WGC capture resumed", flags.session_id));
+                }
+                Err(error) => {
+                    recovery.restarted(false, now);
+                    crate::logger::log_msg("WARN", "capture.recovery", &format!("session={} restart failed error={error}", flags.session_id));
+                }
+            }
+        }
+    });
+}
 
 #[cfg(windows)]
 fn capture_update_interval() -> MinimumUpdateIntervalSettings {
@@ -1115,6 +1243,8 @@ pub fn start_capture_session(
     #[cfg(windows)]
     {
         let flags = CaptureFlags {
+            lifecycle: Arc::new(WgcLifecycle::new()),
+            nvenc_sequence: Arc::new(std::sync::atomic::AtomicU32::new(0)),
             session_id: session_id.clone(),
             nvenc_enabled: nvenc_enabled.clone(), nvenc_keyframe: nvenc_keyframe.clone(), nvenc_bitrate: nvenc_bitrate.clone(),
             delivery: delivery.clone(),
@@ -1130,104 +1260,26 @@ pub fn start_capture_session(
             start_instant,
         };
 
-        let cursor_settings = if should_draw_mouse {
-            CursorCaptureSettings::WithCursor
-        } else {
-            CursorCaptureSettings::WithoutCursor
-        };
-
-        let is_window = source_id.starts_with("window:");
-        let raw_id = source_id.split(':').nth(1).unwrap_or("0");
-
-        let mut wgc_started = false;
-
-        if is_window {
-            let wgc_window = if let Ok(hwnd_int) = raw_id.parse::<usize>() {
-                let candidate = WgcWindow::from_raw_hwnd(hwnd_int as *mut std::ffi::c_void);
-                if candidate.is_valid() {
-                    Some(candidate)
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
-
-            let wgc_window = wgc_window.or_else(|| {
-                if let Ok(windows) = WgcWindow::enumerate() {
-                    if let Ok(target_pid) = raw_id.parse::<u32>() {
-                        windows.into_iter().find(|w| w.process_id().unwrap_or(0) == target_pid)
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            });
-
-            if let Some(win) = wgc_window {
-                let settings = Settings::new(
-                    win,
-                    cursor_settings,
-                    DrawBorderSettings::WithoutBorder,
-                    SecondaryWindowSettings::Default,
-                    capture_update_interval(),
-                    DirtyRegionSettings::Default,
-                    ColorFormat::Rgba8,
-                    flags.clone(),
-                );
-
-                match NativeWgcHandler::start_free_threaded(settings) {
-                    Ok(control) => {
-                        if let Ok(mut guard) = SESSIONS.lock() {
-                            if let Some(session) = guard.get_mut(&session_id) { session.control = Some(control); }
+        match start_wgc_capture(&source_id, should_draw_mouse, flags.clone()) {
+            Ok(control) => {
+                let mut control = Some(control);
+                if let Ok(mut sessions) = SESSIONS.lock() {
+                    if let Some(session) = sessions.get_mut(&session_id) {
+                        if Arc::ptr_eq(&session.active, &flags.active_flag) && session.active.load(Ordering::Acquire) {
+                            session.control = control.take();
                         }
-                        wgc_started = true;
-                    }
-                    Err(err) => {
-                        crate::logger::log_msg("WARN", "capture.start", &format!("session={session_id} source={source_id} WGC window start failed; fallback=xcap error={err:?}"));
                     }
                 }
-            } else {
-                crate::logger::log_msg("WARN", "capture.source", &format!("session={session_id} source={source_id} WGC window target not found; fallback=xcap"));
-            }
-        } else {
-            let target_mon_idx: usize = raw_id.parse().unwrap_or(0);
-            let wgc_monitor =
-                WgcMonitor::from_index(target_mon_idx + 1).or_else(|error| {
-                    crate::logger::log_msg("WARN", "capture.source", &format!("session={session_id} source={source_id} WGC monitor lookup failed; trying primary monitor error={error:?}"));
-                    WgcMonitor::primary()
-                });
-
-            if let Ok(mon) = wgc_monitor {
-                let settings = Settings::new(
-                    mon,
-                    cursor_settings,
-                    DrawBorderSettings::WithoutBorder,
-                    SecondaryWindowSettings::Default,
-                    capture_update_interval(),
-                    DirtyRegionSettings::Default,
-                    ColorFormat::Rgba8,
-                    flags.clone(),
-                );
-
-                match NativeWgcHandler::start_free_threaded(settings) {
-                    Ok(control) => {
-                        if let Ok(mut guard) = SESSIONS.lock() {
-                            if let Some(session) = guard.get_mut(&session_id) { session.control = Some(control); }
-                        }
-                        wgc_started = true;
-                    }
-                    Err(err) => {
-                        crate::logger::log_msg("WARN", "capture.start", &format!("session={session_id} source={source_id} WGC monitor start failed; fallback=xcap error={err:?}"));
-                    }
+                if let Some(control) = control {
+                    flags.lifecycle.active.store(false, Ordering::Release);
+                    safely_stop_wgc_control(control);
+                    return Ok(false);
                 }
+                start_capture_supervisor(source_id.clone(), should_draw_mouse, flags);
+                crate::logger::log_msg("INFO", "capture.start", &format!("session={session_id} backend=WGC startup_ms={} awaiting_first_frame=true", start_instant.elapsed().as_millis()));
+                return Ok(true);
             }
-        }
-
-        if wgc_started {
-            crate::logger::log_msg("INFO", "capture.start", &format!("session={session_id} backend=WGC startup_ms={} awaiting_first_frame=true", start_instant.elapsed().as_millis()));
-            return Ok(true);
+            Err(error) => crate::logger::log_msg("WARN", "capture.start", &format!("session={session_id} WGC start failed; fallback=xcap error={error}")),
         }
     }
 
@@ -1268,6 +1320,10 @@ pub fn start_capture_session(
 
         let mut last_retry = std::time::Instant::now();
         let mut consecutive_errors: u32 = 0;
+        #[cfg(windows)]
+        let mut desktop_paused = false;
+        #[cfg(windows)]
+        let mut recovery_grace = std::time::Instant::now();
         let mut jpeg_encoder = match RealtimeJpegEncoder::new(jpeg_quality) {
             Ok(encoder) => encoder,
             Err(error) => {
@@ -1284,6 +1340,28 @@ pub fn start_capture_session(
         {
             let loop_start = std::time::Instant::now();
             let frame_interval = std::time::Duration::from_nanos(1_000_000_000 / u64::from(load.fps()));
+
+            #[cfg(windows)]
+            {
+                if !crate::capture_recovery::input_desktop_available() {
+                    if !desktop_paused {
+                        crate::logger::log_msg("INFO", "capture.recovery", &format!("session={session_id} xcap paused for desktop switch"));
+                    }
+                    desktop_paused = true;
+                    consecutive_errors = 0;
+                    std::thread::sleep(std::time::Duration::from_millis(250));
+                    continue;
+                }
+                if desktop_paused {
+                    cached_monitor = None;
+                    cached_window = None;
+                    last_retry = std::time::Instant::now() - std::time::Duration::from_millis(501);
+                    recovery_grace = std::time::Instant::now() + std::time::Duration::from_secs(3);
+                    desktop_paused = false;
+                    crate::logger::log_msg("INFO", "capture.recovery", &format!("session={session_id} xcap desktop returned; reacquiring source"));
+                }
+                if std::time::Instant::now() < recovery_grace { consecutive_errors = 0; }
+            }
 
             let captured_img = if is_window {
                 if let Some(ref win) = cached_window {
@@ -1456,7 +1534,7 @@ pub fn start_capture_session(
 }
 
 #[cfg(windows)]
-fn safely_stop_wgc_control(control: ActiveCaptureControl) {
+fn safely_stop_wgc_control(control: ActiveCaptureControl) -> std::thread::JoinHandle<()> {
     use std::os::windows::prelude::AsRawHandle;
     use windows::Win32::Foundation::{HANDLE, LPARAM, WPARAM};
     use windows::Win32::System::Threading::GetThreadId;
@@ -1495,7 +1573,7 @@ fn safely_stop_wgc_control(control: ActiveCaptureControl) {
         if thread_handle.is_finished() {
             let _ = thread_handle.join();
         }
-    });
+    })
 }
 
 #[tauri::command]
@@ -1547,6 +1625,25 @@ pub(crate) fn fit_capture_dimensions(width: u32, height: u32, max_width: u32, ma
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn retired_capture_producer_cannot_publish_into_preserved_transport() {
+        let delivery = Arc::new((std::sync::Mutex::new(FramePacer::new(60)), std::sync::Condvar::new()));
+        let (sender, mut receiver) = broadcast::channel(32);
+        let metrics = CaptureMetrics::default();
+        let active = AtomicBool::new(false);
+        for legacy in [false, true] {
+            assert!(!enqueue_capture_frame(&delivery, Arc::new(vec![1, 2, 3]), 0,
+                legacy, &active, &sender, &metrics));
+        }
+        assert!(delivery.0.lock().unwrap().tick(1_000_000).is_none());
+        assert!(matches!(receiver.try_recv(), Err(broadcast::error::TryRecvError::Empty)));
+        // The same delivery resources can accept the replacement producer.
+        active.store(true, Ordering::Release);
+        assert!(enqueue_capture_frame(&delivery, Arc::new(vec![4, 5, 6]), 1_000_000,
+            false, &active, &sender, &metrics));
+        assert!(matches!(delivery.0.lock().unwrap().tick(1_020_000), Some(PacedFrame::Fresh { .. })));
+    }
 
     #[test]
     fn encoder_selection_defaults_and_diagnostic_override_are_safe() {

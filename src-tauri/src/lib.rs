@@ -13,6 +13,7 @@ pub mod stream_pointer;
 pub mod process_manager;
 pub mod room_vault;
 pub mod screen_sources;
+mod capture_recovery;
 mod video_jpeg;
 mod video_load;
 mod video_pacer;

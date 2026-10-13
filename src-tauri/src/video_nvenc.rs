@@ -1,6 +1,7 @@
 //! Optional driver-loaded GPU encoding; ownership is confined to one capture handler.
 use std::ffi::{c_char, c_void, CStr};
 use std::ptr::NonNull;
+use std::sync::{Arc, atomic::{AtomicU32, Ordering}};
 use windows_capture_api::core::Interface;
 use windows_capture_api::Win32::Graphics::Direct3D11::{ID3D11Device, ID3D11Texture2D};
 
@@ -38,8 +39,10 @@ unsafe impl Send for Session {}
 impl Drop for Session { fn drop(&mut self) { unsafe { p2_nvenc_destroy(self.handle.as_ptr()); } } }
 
 #[derive(Default)]
-pub struct GpuEncoder { session: Option<Session>, sequence: u32 }
+pub struct GpuEncoder { session: Option<Session>, sequence: Arc<AtomicU32> }
 impl GpuEncoder {
+    pub fn with_sequence(sequence: Arc<AtomicU32>) -> Self { Self { session: None, sequence } }
+    fn next_sequence(&self) -> u32 { self.sequence.fetch_add(1, Ordering::Relaxed).wrapping_add(1) }
     pub fn encode(&mut self, device: &ID3D11Device, texture: &ID3D11Texture2D,
         width: u32, height: u32, fps: u32, bitrate: u32, timestamp: u64, force_key: bool) -> Result<Vec<u8>, String> {
         if width == 0 || height == 0 || width > 8192 || height > 8192 || !(15..=120).contains(&fps) || !(100_000..=50_000_000).contains(&bitrate) {
@@ -67,11 +70,11 @@ impl GpuEncoder {
             return Err(message(&error));
         }
         if bytes.is_null() || len == 0 || len > 16 * 1024 * 1024 { return Err("NVENC output size invalid".into()); }
-        self.sequence = self.sequence.wrapping_add(1);
+        let sequence = self.next_sequence();
         let mut packet = Vec::with_capacity(28 + len);
         packet.extend_from_slice(b"P2NV"); packet.push(1); packet.push(u8::from(key != 0)); packet.extend_from_slice(&[0, 0]);
         packet.extend_from_slice(&width.to_le_bytes()); packet.extend_from_slice(&height.to_le_bytes());
-        packet.extend_from_slice(&self.sequence.to_le_bytes()); packet.extend_from_slice(&timestamp.to_le_bytes());
+        packet.extend_from_slice(&sequence.to_le_bytes()); packet.extend_from_slice(&timestamp.to_le_bytes());
         // Driver bytes remain owned by this encoder until its next synchronous call.
         packet.extend_from_slice(unsafe { std::slice::from_raw_parts(bytes, len) });
         Ok(packet)
@@ -81,6 +84,17 @@ impl GpuEncoder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn capture_restarts_preserve_packet_sequence_without_gpu() {
+        let sequence = Arc::new(AtomicU32::new(0));
+        let first = GpuEncoder::with_sequence(sequence.clone());
+        assert_eq!(first.next_sequence(), 1);
+        drop(first);
+        let replacement = GpuEncoder::with_sequence(sequence.clone());
+        assert_eq!(replacement.next_sequence(), 2);
+        sequence.store(u32::MAX, Ordering::Relaxed);
+        assert_eq!(replacement.next_sequence(), 0);
+    }
     use windows_capture_api::Win32::Graphics::Direct3D11::*;
     use windows_capture_api::Win32::Graphics::Dxgi::Common::*;
     fn texture(device: &ID3D11Device, width: u32, height: u32) -> ID3D11Texture2D {

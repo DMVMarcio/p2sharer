@@ -104,6 +104,18 @@ These flags enable hardware acceleration where WebView2 and the GPU driver suppo
 - The capture test must report JPEG image frames separately from one-byte static heartbeat messages. Heartbeat throughput is not evidence of live capture FPS; a static desktop can produce many heartbeats and few new images.
 
 ### Transient DXGI Error Recovery in `on_frame_arrived`
+
+Secure desktop switches (UAC and locking) pause capture without closing the sharing
+session. `capture_recovery.rs` compares the input desktop with the capture thread's
+desktop without switching desktops or requesting elevation. A per-session WGC
+supervisor retires the old producer and recreates capture on return, preserving
+the WebSocket sender, frame pacer, timestamps, H264 packet sequence and encoder settings and requesting
+a new H264 keyframe. Closed callbacks defer terminal source-loss signals to the
+supervisor. Session identity prevents a retired supervisor from replacing another
+session with the same ID. xcap pauses its error counter and reacquires its source
+after return. The protected desktop itself is not captured; real source loss and
+persistent restart failure still end sharing. Interactive UAC verification is needed
+in addition to the hardware-independent recovery-policy regressions.
 - When a game launches, switches resolutions, or alters swapchain presentation formats, mapping Direct3D11 staging textures via `frame.buffer()` can temporarily fail with transient DXGI errors (`DXGI_ERROR_INVALID_CALL` or surface lock contention).
 - In `windows-capture`, returning `Err` from `on_frame_arrived` immediately posts `WM_QUIT` and permanently terminates the capture loop.
 - Handling `frame.buffer()` with `match` and returning `Ok(())` on transient error skips the single corrupted frame while keeping the WGC capture loop alive.
