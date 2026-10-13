@@ -9,7 +9,7 @@ description: Governs native Windows WASAPI audio loopback, ITU-R BS.775 downmix,
 Applies to native audio and video capture pipelines spanning Rust backend (`src-tauri/src/*`) and TypeScript bridges (`src/audio/*`, `src/video/*`).
 
 ## Validation Scope
-Apply the central validation matrix. Select native regressions for changed Rust behavior and frontend regressions for affected TypeScript bridges; a change on one side does not automatically require both full suites. Rust/native contract changes require desktop packaging. Presentation-only changes and documentation do not require media or hardware tests. Hardware diagnostics are opt-in with documented prerequisites.
+Apply the central validation matrix. Select native regressions for changed Rust behavior and frontend regressions for affected TypeScript bridges; a change on one side does not automatically require both full suites. Every application change requires final desktop packaging, including changes confined to TypeScript bridges. Presentation-only changes and documentation do not require media or hardware tests. Hardware diagnostics are opt-in with documented prerequisites.
 
 ## Directives
 1. **WASAPI Loopback Latency**: Keep the WASAPI capture loop strictly event-driven with `SetEventHandle`. Never introduce sleep polling.

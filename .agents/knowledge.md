@@ -66,7 +66,7 @@ Record only instructions explicitly intended to govern future work. Do not infer
 - `[Text Input History]` Disable Chromium/WebView2 input-history suggestions with `autoComplete="off"` on application inputs and forms.
 - `[Frontend Maintenance]` Prefer React state, events, and refs over independent DOM renderers; retain native DOM APIs at actual media, editor, geometry, and accessibility boundaries.
 - `[External Repositories]` Repositories inspected as references remain read-only unless their modification is explicitly authorized.
-- `[Validation Scope]` Match checks to actual impact: documentation/agent edits need review only; presentation-only frontend changes need a frontend build; behavior changes need relevant tests; native/desktop contracts need native validation and packaging. Avoid unrelated suites and repeat checks only after relevant changes, failures or new evidence.
+- `[Validation Scope]` Match checks to actual impact: documentation/agent edits need review only; every application change, including CSS and copy, must generate the final executable and installers with `pnpm run tauri:build`. Presentation-only changes need no behavior tests; behavior changes need relevant regressions; native tests apply only to affected native behavior/contracts. Avoid unrelated suites and repeat checks only after relevant changes, failures or new evidence.
 - `[Test Maintenance]` Keep tests that exercise production behavior or meaningful invariants. Do not create a test for every request or freeze incidental appearance through source matching. Automatic checks must not depend on personal paths or physical devices; hardware diagnostics are explicit opt-in checks.
 
 ## 5. Build, Test & Run Commands
@@ -84,6 +84,6 @@ Use pnpm 10.30.1 and Node.js 22.14+ as pinned in `package.json`. Install with `p
 | `pnpm run check:repository --staged` | Proposed commit hygiene |
 | `pnpm run check:repository` | Full tracked-tree hygiene for audits |
 
-Choose checks with the [central validation matrix](rules/agent-persistence.md#2-desktop-runtime--build-validation). Frontend-only presentation changes need `pnpm run build`, not Rust regressions or installer generation. When native packaging is required, inspect `src-tauri/target/release/p2sharer.exe` and `src-tauri/target/release/bundle/`. Stop after applicable checks pass.
+Choose checks with the [central validation matrix](rules/agent-persistence.md#2-desktop-runtime--build-validation). Every application change requires final `pnpm run tauri:build`, including frontend presentation changes; those changes need no Rust regressions. Inspect `src-tauri/target/release/p2sharer.exe` and `src-tauri/target/release/bundle/`. Stop after applicable checks pass.
 
 When selected for the task, native integration tests rebuild the application binary with `tauri/custom-protocol`; run the frontend build first so a clean checkout has embedded `dist` assets, then run native tests before final packaging. `tools/tauri.mjs` and the native test runner share CMake discovery. Native JPEG compilation requires MSVC, CMake, and NASM; the recipients of a packaged application do not need them. See [test instructions](../test/README.md) and [release instructions](../docs/releases.md).

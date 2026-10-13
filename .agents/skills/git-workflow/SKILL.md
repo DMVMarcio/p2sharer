@@ -25,7 +25,7 @@ Before running `git add` or committing, ensure `.gitignore` exists and covers th
 ## P2Sharer Package Manager
 - Use the pnpm version pinned in `package.json`; validate installations with `pnpm install --frozen-lockfile`.
 - Track `pnpm-lock.yaml`, `pnpm-workspace.yaml`, and native dependency patches. Do not add lockfiles from other package managers. Ignore `.pnpm-store/` if a project-local store is used.
-- Before committing, complete only the checks required by the central impact-based validation matrix. Do not rebuild the app for documentation or agent edits, or run native suites for frontend presentation changes.
+- Before committing, complete the relevant tests from the central validation matrix and the mandatory final Tauri build for every application change. Do not rebuild the app for documentation or agent edits, or run native suites for frontend presentation changes.
 
 ## 2. Commit Standards
 

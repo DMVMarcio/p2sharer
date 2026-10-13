@@ -10,7 +10,7 @@ Applies to all modifications, diagnostics, and extensions of P2P networking in `
 
 ## Dependency Patch Maintenance
 - Use pnpm native patches registered in `pnpm-workspace.yaml` for Trystero core changes. Run `pnpm patch @trystero-p2p/core@0.25.3`, edit the returned directory, then run `pnpm patch-commit <directory>` and commit the patch plus `pnpm-lock.yaml`.
-- Keep the version-specific patch aligned with Trystero upgrades and run `pnpm exec node --experimental-strip-types --import ./test/support/locale.mjs --test test/unit/turn_offer_pool.test.ts test/unit/trystero_media_identity.test.mjs`. Apply the central validation matrix; frontend signaling changes do not require native tests or packaging unless a native contract changes.
+- Keep the version-specific patch aligned with Trystero upgrades and run `pnpm exec node --experimental-strip-types --import ./test/support/locale.mjs --test test/unit/turn_offer_pool.test.ts test/unit/trystero_media_identity.test.mjs`. Apply the central validation matrix; frontend signaling changes need relevant tests and final `pnpm run tauri:build`; native regressions apply only when a native contract is affected.
 
 ## Validation Scope
 Use the central validation matrix and existing tests for affected admission, signaling, peer tracking or recovery behavior. Expand to the full frontend suite only for broad shared impact or relevant failures. Do not run media/native suites merely because WebRTC uses native browser facilities.

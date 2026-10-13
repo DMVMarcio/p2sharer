@@ -78,7 +78,7 @@ As the project evolves, the orchestrator must not remain static. Update `.agents
 ---
 
 ## Validation Ownership
-- Apply the central impact-based validation matrix; specialist prompts must not require both full suites or packaging for every edit.
+- Apply the central impact-based validation matrix; specialist prompts must not require both full test suites for every edit. Every application change still requires one final Tauri packaging build; documentation and agent instructions do not.
 - Keep small tasks with one agent. Delegate only when distinct domain work benefits from specialization or parallel execution.
 - Assign one owner for final builds and shared checks. Specialists report changed files, commands, results and limitations; the coordinator reuses valid results instead of repeating them.
 - Review only changed agent metadata, referenced paths/skills and affected instructions for routine prompt updates. Full drift audits belong to explicit audits or major architectural changes.
