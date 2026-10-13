@@ -721,10 +721,6 @@ pub fn receive_virtual_network_packet(
 // The helper uses a separate, synchronous runtime and cannot invoke Tauri commands.
 pub fn run_helper_if_requested() -> bool {
     let args: Vec<String> = std::env::args().collect();
-    #[cfg(all(windows, target_arch = "x86_64"))]
-    if crate::virtual_network_service::run_if_requested(&args) {
-        return true;
-    }
     if args.get(1).is_none_or(|s| s != "--p2sharer-vnet-helper") {
         return false;
     }
@@ -742,7 +738,7 @@ pub fn run_helper_if_requested() -> bool {
     true
 }
 #[cfg(all(windows, target_arch = "x86_64"))]
-pub(crate) fn helper(port: u16, token: &str) -> Result<(), String> {
+fn helper(port: u16, token: &str) -> Result<(), String> {
     use crate::virtual_network_driver::{Device, Firewall, NetworkLock};
     use std::{
         io::{Read, Write},
@@ -856,7 +852,7 @@ pub(crate) fn helper(port: u16, token: &str) -> Result<(), String> {
         stopped.store(true, Ordering::Release);
     });
     let result = (|| -> Result<(), String> {
-        while !cancelled.load(Ordering::Acquire) && !crate::virtual_network_service::stopping() {
+        while !cancelled.load(Ordering::Acquire) {
             let (kind, bytes) = read(&mut stream)?;
             match kind {
                 1 => {

@@ -35,8 +35,6 @@ pub mod virtual_network;
 mod virtual_network_policy;
 #[cfg(all(windows, target_arch = "x86_64"))]
 mod virtual_network_driver;
-#[cfg(all(windows, target_arch = "x86_64"))]
-mod virtual_network_service;
 
 use audio_loopback::{start_audio_capture, stop_audio_capture};
 use logger::{clear_log_file, get_log_file_path, open_latest_log, open_log_folder, write_frontend_log};
