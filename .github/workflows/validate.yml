@@ -2,7 +2,7 @@ name: Validate and warm build caches
 
 on:
   push:
-    branches: [main, feat/macos-support]
+    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -61,12 +61,12 @@ jobs:
       - name: Run portable native regressions
         run: pnpm run test:native --release --locked
       - name: Package macOS test build
-        if: github.ref == 'refs/heads/feat/macos-support' || github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request'
         run: |
           pnpm run tauri:build -- --locked
           tar -czf src-tauri/target/release/bundle/macos/P2Sharer.app.tar.gz -C src-tauri/target/release/bundle/macos P2Sharer.app
       - name: Upload macOS test application and disk image
-        if: github.ref == 'refs/heads/feat/macos-support' || github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: P2Sharer-macos-${{ runner.arch }}-test
