@@ -266,3 +266,33 @@ test('personal detached models forward only device-local edits and retain main t
   mirror.reset(); main.reset();
   assert.deepEqual(sent, []);
 });
+
+
+test('app lifecycle feedback fires once for shared local and remote events, never sync or personal apps', () => {
+  const service = new RoomAppsService();
+  const feedback: string[] = [];
+  const notices: string[] = [];
+  service.attach(() => {}, 'local', action => notices.push(action), action => feedback.push(action));
+  const local = service.start('youtube');
+  service.stop(local);
+  service.stop(local);
+  assert.deepEqual(feedback, ['start', 'stop']);
+  assert.deepEqual(notices, ['start', 'stop']);
+  const remote = { id: crypto.randomUUID(), kind: 'youtube', createdBy: 'remote', createdAt: 1 };
+  service.receive({ kind: 'start', instance: remote }, 'wrong-actor');
+  service.receive({ kind: 'start', instance: remote }, 'remote');
+  service.receive({ kind: 'start', instance: remote }, 'remote');
+  service.receive({ kind: 'stop', id: remote.id }, 'remote');
+  service.receive({ kind: 'stop', id: remote.id }, 'remote');
+  service.receive({ kind: 'start', instance: remote }, 'remote');
+  assert.deepEqual(feedback, ['start', 'stop', 'start', 'stop']);
+  assert.deepEqual(notices, ['start', 'stop'], 'remote events never republish chat notices');
+  const synced = { ...remote, id: crypto.randomUUID() };
+  service.receive({ kind: 'sync', instances: [synced], closed: [], snapshots: {} }, 'remote');
+  service.join(synced.id);
+  service.leave(synced.id);
+  const personal = service.start('youtube', true);
+  service.stop(personal);
+  service.reset();
+  assert.deepEqual(feedback, ['start', 'stop', 'start', 'stop']);
+});

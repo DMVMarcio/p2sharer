@@ -42,3 +42,6 @@ Detached app placeholders retain the compact card focus overlay, allowing grid/t
 
 
 Personal room apps use optional local-only `RoomAppInstance.personal` metadata. The library selects a kind by card, then launches from a footer with a default-off "Somente para mim" switch. Personal launches join the local actor immediately. `RoomAppsService` excludes these instances from room sends, snapshots, presence, closed-ID history, and lifecycle chat callbacks; incoming room updates and tombstones cannot affect them. Leaving a personal instance disposes it. Detached windows bootstrap through `initializeLocalView` and forward model edits over targeted device-local Tauri events; the main service retains the room-send privacy gate. Unit tests cover notes, awareness, YouTube, late-peer synchronization, mixed shared/personal instances, hostile room packets, detached edits, and teardown.
+
+
+`RoomAppsService.attach` separates local lifecycle notices from accepted shared-app lifecycle feedback. The optional feedback callback runs once for live local or remote starts/stops; duplicate/invalid packets, snapshots, local mirrors, personal apps, presence changes, and reset remain silent. `RoomService` connects this callback to the canonical sound manager, keeping playback preferences and previews centralized.

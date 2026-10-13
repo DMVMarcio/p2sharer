@@ -1,11 +1,13 @@
 /** Original, softly voiced notification cues; no external recordings or playback dependencies. */
-export const SOUND_EVENTS = ['message', 'userJoin', 'userLeave', 'screenShareStart', 'screenShareStop', 'watchStreamStart', 'watchStreamStop'] as const;
+export const SOUND_EVENTS = ['message', 'userJoin', 'userLeave', 'screenShareStart', 'screenShareStop', 'watchStreamStart', 'watchStreamStop', 'appStart', 'appStop'] as const;
 export type SoundEvent = typeof SOUND_EVENTS[number];
 export type SoundPreferences = Record<SoundEvent, boolean>;
 
 interface Note { frequency: number; delay: number; duration: number; level: number; }
 const note = (frequency: number, delay: number, duration: number, level: number): Note => ({ frequency, delay, duration, level });
 const CUES: Record<SoundEvent, readonly Note[]> = {
+  appStart: [note(349.23, 0, 0.24, 0.06), note(523.25, 0, 0.24, 0.04), note(698.46, 0.12, 0.26, 0.055)],
+  appStop: [note(523.25, 0, 0.22, 0.045), note(349.23, 0, 0.22, 0.055), note(261.63, 0.10, 0.28, 0.065)],
   message: [note(440, 0, 0.26, 0.085), note(659.25, 0.025, 0.21, 0.025)],
   userJoin: [note(220, 0, 0.30, 0.075), note(277.18, 0.075, 0.29, 0.065), note(329.63, 0.15, 0.30, 0.06)],
   userLeave: [note(329.63, 0, 0.29, 0.07), note(220, 0.10, 0.32, 0.075)],

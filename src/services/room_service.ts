@@ -297,6 +297,9 @@ export class RoomService {
       (action, instance) => {
         void manager.sendAppLifecycleNotice(action, instance.kind).catch((error) =>
           console.warn('[Chat] Failed to publish app notice:', error));
+      }, action => {
+        if (action === 'start') soundEffects.playAppStart();
+        else soundEffects.playAppStop();
       });
 
     const abort = () => { this.hideConnecting(); void manager.leave(); };

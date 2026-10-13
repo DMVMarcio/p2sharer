@@ -1,4 +1,6 @@
 {
+  "sound.appStart": "App iniciado na sala",
+  "sound.appStop": "App encerrado na sala",
   "tunnels.previewActive_one": "{{count}} túnel ativo",
   "tunnels.previewActive_other": "{{count}} túneis ativos",
   "tunnels.upload": "Upload: {{amount}} KiB",

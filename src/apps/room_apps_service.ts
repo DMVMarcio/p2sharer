@@ -24,6 +24,7 @@ export class RoomAppsService {
   private listeners = new Set<Listener>();
   private sender: Sender | null = null;
   private onLocalLifecycle: LifecycleListener | null = null;
+  private onLifecycle: LifecycleListener | null = null;
   private localActor = '';
   private joining = new Map<string, Promise<void>>();
 
@@ -102,17 +103,19 @@ export class RoomAppsService {
     this.notify();
   }
 
-  attach(sender: Sender, localActor: string, onLocalLifecycle?: LifecycleListener): void {
+  attach(sender: Sender, localActor: string, onLocalLifecycle?: LifecycleListener, onLifecycle?: LifecycleListener): void {
     this.reset();
     this.sender = sender;
     this.localActor = localActor;
     this.onLocalLifecycle = onLocalLifecycle || null;
+    this.onLifecycle = onLifecycle || null;
   }
 
   reset(): void {
     this.sender = null;
     this.joining.clear();
     this.onLocalLifecycle = null;
+    this.onLifecycle = null;
     this.instances.clear();
     this.participants.clear();
     this.closed.clear();
@@ -131,6 +134,7 @@ export class RoomAppsService {
     else {
       this.dispatch({ kind: 'start', instance });
       this.onLocalLifecycle?.('start', instance);
+      this.onLifecycle?.('start', instance);
     }
     return instance.id;
   }
@@ -142,13 +146,14 @@ export class RoomAppsService {
     if (!instance.personal) {
       this.dispatch({ kind: 'stop', id });
       this.onLocalLifecycle?.('stop', instance);
+      this.onLifecycle?.('stop', instance);
     }
   }
 
-  private addInstance(instance: RoomAppInstance, localView = false): void {
-    if (this.closed.has(instance.id) || this.instances.has(instance.id) || this.instances.size >= MAX_INSTANCES) return;
+  private addInstance(instance: RoomAppInstance, localView = false): boolean {
+    if (this.closed.has(instance.id) || this.instances.has(instance.id) || this.instances.size >= MAX_INSTANCES) return false;
     const definition = getRoomApp(instance.kind);
-    if (!definition) return;
+    if (!definition) return false;
     const model = definition.createModel({
       instanceId: instance.id,
       localActor: this.localActor,
@@ -167,6 +172,7 @@ export class RoomAppsService {
     this.instances.set(instance.id, instance);
     this.models.set(instance.id, model);
     this.notify();
+    return true;
   }
 
   private removeInstance(id: string): void {
@@ -198,11 +204,13 @@ export class RoomAppsService {
     if ('id' in data && this.instances.get(data.id)?.personal) return;
     if (data.kind === 'sync-request') { this.sendSync(actor); return; }
     if (data.kind === 'start') {
-      if (validInstance(data.instance) && data.instance.createdBy === actor) this.addInstance(data.instance);
+      if (validInstance(data.instance) && data.instance.createdBy === actor && this.addInstance(data.instance))
+        this.onLifecycle?.('start', data.instance);
       return;
     }
     if (data.kind === 'stop') {
-      if (typeof data.id === 'string' && this.instances.has(data.id)) this.removeInstance(data.id);
+      const instance = typeof data.id === 'string' ? this.instances.get(data.id) : undefined;
+      if (instance) { this.removeInstance(instance.id); this.onLifecycle?.('stop', instance); }
       return;
     }
     if (data.kind === 'data') {

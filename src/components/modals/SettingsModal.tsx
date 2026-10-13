@@ -34,6 +34,8 @@ import { ApplicationSettings } from './ApplicationSettings';
 import { useAppUpdates } from '../../hooks/useAppUpdates';
 
 const SOUND_LABELS: Record<SoundEvent, string> = {
+  get appStart() { return t('sound.appStart'); },
+  get appStop() { return t('sound.appStop'); },
   get message() { return t("message.c53540ce0e08"); },
   get userJoin() { return t("message.61593d3f4699"); },
   get userLeave() { return t("message.49d982c54975"); },

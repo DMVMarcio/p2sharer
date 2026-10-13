@@ -76,6 +76,9 @@ export class SoundEffectsManager {
     this.play(event, Math.max(0, Math.min(1, volume)));
   }
 
+  public playAppStart() { this.play('appStart'); }
+  public playAppStop() { this.play('appStop'); }
+
   public playMessage() { this.play('message'); }
   public playUserJoin() { this.play('userJoin'); }
   public playUserLeave() { this.play('userLeave'); }
