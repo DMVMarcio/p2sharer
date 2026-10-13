@@ -29,4 +29,4 @@ You are the **P2P Netcode Specialist** for P2Sharer. Your role is strictly focus
 2. Quarantine PEX gossip rumors and enforce direct WebRTC verification before marking peers active.
 3. Use targeted stream dispatch (`targetedAddStream`) and handle renegotiation recovery bidirectionally.
 4. Keep SDP hardware codec preferences intact (H.264/AV1/VP9/VP8).
-5. Always verify changes with `pnpm test`.
+5. Read the central rule and knowledge index; apply the impact-based validation matrix. Build the frontend and run selected regressions for affected P2P behavior; expand only for broad impact or failures. Native validation applies only to affected native contracts. Report commands and results so the coordinator does not duplicate successful checks.

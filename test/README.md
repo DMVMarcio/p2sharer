@@ -4,7 +4,11 @@ Install the pinned toolchain dependencies with `pnpm install --frozen-lockfile`.
 
 - `pnpm test` runs every `test/unit/*.test.ts` and `*.test.mjs` file using Node's test runner. It covers actual React components, hooks, application services, security, chat/file transfer, synchronization, P2P signaling and media bridges with isolated browser/native fixtures.
 - `pnpm run test:native --release` runs the Rust library and integration tests on Windows. Install the native development prerequisites from the project README. The runner reuses the build's CMake discovery and Cargo's standard `src-tauri/target/` directory.
-- `pnpm run tauri:build` validates the production desktop executable and installers after application changes. Unit tests and benchmarks do not replace this build.
+- `pnpm run tauri:build` validates the production desktop executable and installers when native/desktop contracts, packaging or release work require it. Select local checks using the [central validation matrix](../.agents/rules/agent-persistence.md#2-desktop-runtime--build-validation); frontend presentation changes need only `pnpm run build`, and documentation needs no application build.
+
+For selected frontend files, use `pnpm exec node --experimental-strip-types --import ./test/support/locale.mjs --test test/unit/<name>.test.ts` (or `.mjs`; multiple paths are supported). Do not pass a filename to `pnpm run test` expecting selection: the script appends the full suite. For native selection, use `pnpm run test:native --release <filter>`. Native tests need frontend `dist` assets first; build them when required, then run selected tests before final packaging. Skip an extra standalone frontend build when packaging itself supplies all needed compilation.
+
+Run full suites only for broad impact, impractical selection, relevant failures or an explicit request. Reuse passed checks until their relevant inputs change.
 
 Both test commands derive their checkout directory from the runner's own location. They do not require a specific username, drive, checkout directory, application installation, GPU, audio device, camera, or display configuration. Native tests require Windows because the product uses Windows APIs. D3D11 texture checks use Windows WARP software rendering.
 

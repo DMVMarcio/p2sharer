@@ -2,7 +2,7 @@
 
 ## Commit hygiene
 
-Use `pnpm run check:repository` for the tracked working tree and `pnpm run check:repository --staged` for staged additions and modifications. Inspect the complete staged diff, including binary paths and sizes. Run `git diff --cached --check` and a redacted Gitleaks staged scan. The built-in check is a selected-pattern guard, not a guarantee that all secrets or personal information have been detected.
+For ordinary commits, use `pnpm run check:repository --staged` for proposed additions and modifications. Use the full tracked-tree `pnpm run check:repository` for repository audits or hygiene-checker changes, rather than duplicating it before every staged scan. Inspect the complete staged diff, including binary paths and sizes. Run `git diff --cached --check` and a redacted Gitleaks staged scan. The built-in check is a selected-pattern guard, not a guarantee that all secrets or personal information have been detected.
 
 Do not commit logs, runtime captures, machine-specific reports, private environment variants, signing material, generated outputs, or user data. Keep sanitized `.env.example` templates and necessary licensed application assets. Use verified GitHub `noreply` email addresses for new author and committer metadata. Record technical conclusions without identifying participants, private room names, home-directory paths, personal connection measurements, or unnecessary host identifiers.
 

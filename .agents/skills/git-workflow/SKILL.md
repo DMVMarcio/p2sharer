@@ -25,14 +25,14 @@ Before running `git add` or committing, ensure `.gitignore` exists and covers th
 ## P2Sharer Package Manager
 - Use the pnpm version pinned in `package.json`; validate installations with `pnpm install --frozen-lockfile`.
 - Track `pnpm-lock.yaml`, `pnpm-workspace.yaml`, and native dependency patches. Do not add lockfiles from other package managers. Ignore `.pnpm-store/` if a project-local store is used.
-- Validate application changes with `pnpm run tauri:build` before committing; `pnpm run build` covers only the frontend.
+- Before committing, complete only the checks required by the central impact-based validation matrix. Do not rebuild the app for documentation or agent edits, or run native suites for frontend presentation changes.
 
 ## 2. Commit Standards
 
 ### Public repository review
 - Apply `.agents/rules/agent-persistence.md` repository safety checks before every commit.
-- Include network identifiers in staged and historical audits: IPv4/IPv6 literals, private DNS names, URL user information, and server logs. Do not disclose real infrastructure addresses in reports or public agent memory. Keep required loopback bindings and public services after review; use reserved documentation addresses for examples.
-- Use `pnpm run check:repository` and `pnpm run check:repository --staged`; inspect `git diff --cached` and run `git diff --cached --check`.
+- Review network identifiers in proposed commits; historical audits apply only to publication, suspected exposure or explicit audit requests: IPv4/IPv6 literals, private DNS names, URL user information, and server logs. Do not disclose real infrastructure addresses in reports or public agent memory. Keep required loopback bindings and public services after review; use reserved documentation addresses for examples.
+- For ordinary commits, use `pnpm run check:repository --staged`, inspect `git diff --cached` and run `git diff --cached --check`. Reserve the full-tree `pnpm run check:repository` for audits or hygiene-checker changes; do not scan the same unchanged inputs repeatedly.
 - Run `gitleaks git . --pre-commit --staged --redact=100 --no-banner` for staged secret detection. For a full historical review use `gitleaks git . --log-opts "--all --full-history" --redact=100 --no-banner`, together with an inventory of every commit tree and blob size. Keep reports outside the repository and do not print secret values.
 - Do not stage ignored files with `git add -f`, commit personal reports, or bundle installers into Git. Review binary assets and licenses explicitly. Environment templates must contain placeholders only. Preserve pnpm/Cargo lockfiles, dependency patches, required application assets, and source licenses.
 - Publication and history rewrites require a reviewed plan, a recoverable backup, validated branch tips, and explicit approval before replacing remote history. Include author/committer email privacy and GitHub-only metadata in the review.

@@ -77,6 +77,12 @@ As the project evolves, the orchestrator must not remain static. Update `.agents
 
 ---
 
+## Validation Ownership
+- Apply the central impact-based validation matrix; specialist prompts must not require both full suites or packaging for every edit.
+- Keep small tasks with one agent. Delegate only when distinct domain work benefits from specialization or parallel execution.
+- Assign one owner for final builds and shared checks. Specialists report changed files, commands, results and limitations; the coordinator reuses valid results instead of repeating them.
+- Review only changed agent metadata, referenced paths/skills and affected instructions for routine prompt updates. Full drift audits belong to explicit audits or major architectural changes.
+
 ## 4. Subagent Concreteness & Drift Validation Protocol
 
 As a codebase evolves, agents can suffer from **Instruction Drift**. When auditing existing agents or creating new ones, validate them against:

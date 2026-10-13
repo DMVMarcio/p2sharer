@@ -6,7 +6,7 @@ description: Audits new or unfamiliar repositories, bootstraps the knowledge bas
 # Skill: Initial Discovery, Sectoral Audit & Subagent Validation
 
 ## Scope
-Executed on first contact with a repository, when `.agents/knowledge.md` is missing or incomplete, or during periodic architectural reviews to prevent agent drift.
+Use for initial setup, a missing knowledge index, or an explicitly requested architectural audit. An existing index with a small gap needs a focused update, not a full repository audit. Do not trigger periodic audits during ordinary feature, styling or documentation tasks.
 
 ## Knowledge Maintenance
 Knowledge is a navigation aid for current architecture and explicit standing user rules. It is not a conversation archive, feature specification, task backlog, or completed-work log. Apply the memory criteria in `.agents/rules/agent-persistence.md` when bootstrapping or cleaning it.

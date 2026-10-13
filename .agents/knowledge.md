@@ -58,7 +58,7 @@ Record only instructions explicitly intended to govern future work. Do not infer
 - `[Memory]` Keep knowledge limited to explicit standing rules and useful verified architecture. Do not record every request, inferred preference, task approval, completed-work report, or incidental UI detail.
 - `[Package Manager]` Use pinned pnpm for dependencies, scripts, local tools, and Tauri hooks; keep the tracked lockfile and tool instructions consistent.
 - `[Desktop Builds]` Use the default `src-tauri/target/` directory. Identify running processes by executable path. An installed copy outside the workspace does not block builds; ask for closure only when a workspace build/test process or confirmed output lock blocks the build. Wait for confirmation; never terminate it or use another target directory.
-- `[Interactive Verification]` The user performs interactive application checks on their computer. Do not launch or automate the app for verification unless explicitly requested; retain automated regressions and native packaging validation.
+- `[Interactive Verification]` The user performs interactive application checks on their computer. Do not launch or automate the app for verification unless explicitly requested; select automated checks by the central validation matrix.
 - `[Git]` Commit completed task changes after required validation, using English Conventional Commits. Preserve unrelated edits and report the commit hash and remaining changes. Push only when authorized.
 - `[Canonical UI]` Reuse shared components, CSS recipes, and design tokens across application surfaces. The standard covers all control families. Selection fields use the canonical `Select`, and contextual actions and tooltips use the application implementations.
 - `[Room App Terminology]` Refer to room apps as "apps", not "activities", in user-facing copy.
@@ -66,6 +66,7 @@ Record only instructions explicitly intended to govern future work. Do not infer
 - `[Text Input History]` Disable Chromium/WebView2 input-history suggestions with `autoComplete="off"` on application inputs and forms.
 - `[Frontend Maintenance]` Prefer React state, events, and refs over independent DOM renderers; retain native DOM APIs at actual media, editor, geometry, and accessibility boundaries.
 - `[External Repositories]` Repositories inspected as references remain read-only unless their modification is explicitly authorized.
+- `[Validation Scope]` Match checks to actual impact: documentation/agent edits need review only; presentation-only frontend changes need a frontend build; behavior changes need relevant tests; native/desktop contracts need native validation and packaging. Avoid unrelated suites and repeat checks only after relevant changes, failures or new evidence.
 - `[Test Maintenance]` Keep tests that exercise production behavior or meaningful invariants. Do not create a test for every request or freeze incidental appearance through source matching. Automatic checks must not depend on personal paths or physical devices; hardware diagnostics are explicit opt-in checks.
 
 ## 5. Build, Test & Run Commands
@@ -80,8 +81,9 @@ Use pnpm 10.30.1 and Node.js 22.14+ as pinned in `package.json`. Install with `p
 | `pnpm run test` | Frontend behavior and invariant regressions |
 | `pnpm run test:native --release` | Windows library and integration regressions; hardware checks opt-in |
 | `pnpm run tauri:build` | Production desktop executable and installer bundles |
-| `pnpm run check:repository` | Repository hygiene before staging |
+| `pnpm run check:repository --staged` | Proposed commit hygiene |
+| `pnpm run check:repository` | Full tracked-tree hygiene for audits |
 
-For application code or assets, finish with the Tauri packaging build and inspect `src-tauri/target/release/p2sharer.exe` and `src-tauri/target/release/bundle/`. Documentation and test-only maintenance do not change the product binary.
+Choose checks with the [central validation matrix](rules/agent-persistence.md#2-desktop-runtime--build-validation). Frontend-only presentation changes need `pnpm run build`, not Rust regressions or installer generation. When native packaging is required, inspect `src-tauri/target/release/p2sharer.exe` and `src-tauri/target/release/bundle/`. Stop after applicable checks pass.
 
-Native integration tests rebuild the application binary with `tauri/custom-protocol`; run the frontend build first so a clean checkout has embedded `dist` assets, then run native tests before final packaging. `tools/tauri.mjs` and the native test runner share CMake discovery. Native JPEG compilation requires MSVC, CMake, and NASM; the recipients of a packaged application do not need them. See [test instructions](../test/README.md) and [release instructions](../docs/releases.md).
+When selected for the task, native integration tests rebuild the application binary with `tauri/custom-protocol`; run the frontend build first so a clean checkout has embedded `dist` assets, then run native tests before final packaging. `tools/tauri.mjs` and the native test runner share CMake discovery. Native JPEG compilation requires MSVC, CMake, and NASM; the recipients of a packaged application do not need them. See [test instructions](../test/README.md) and [release instructions](../docs/releases.md).

@@ -12,12 +12,14 @@ Use pnpm 10.30.1, pinned in `package.json`, with Node.js 22.14 or newer. Run `pn
 
 ## Build and validation
 
-- For code or asset changes intended for the application, run `pnpm run tauri:build` before reporting the work as validated or complete. This command runs the frontend build through Tauri's `beforeBuildCommand`, compiles the Rust application, and creates desktop bundles.
-- `pnpm run build` checks only TypeScript and Vite. It does not replace `pnpm run tauri:build`.
-- Inspect the build result and verify the native executable and installer bundle under `src-tauri/target/release/` and `src-tauri/target/release/bundle/`.
+- Select validation by impact using the matrix in `.agents/rules/agent-persistence.md`; do not run every suite for every task.
+- Documentation and agent instruction changes need content/link/metadata review only. CSS, layout, copy, translations and frontend-only assets need `pnpm run build`; tests apply only to affected behavior or accessibility contracts.
+- Frontend behavior changes need the frontend build and relevant regressions. Rust, IPC, native dependencies, capabilities, WebView configuration and native/bundle asset changes need the native checks specified in the matrix and `pnpm run tauri:build`.
+- When packaging is required, inspect the native executable and installer bundle under `src-tauri/target/release/` and `src-tauri/target/release/bundle/`. Tauri already runs the frontend build; avoid a separate build unless tests or diagnosis require it.
+- Reuse successful checks while relevant inputs remain unchanged. Expand validation only for broader impact, failures, new evidence or an explicit request; stop once the required checks pass.
 - Always use the default `src-tauri/target/` build directory. Never create or use alternate build directories. Check running processes by resolved executable path. A separately installed P2Sharer outside this workspace does not block the build. Request closure only for a process running a build/test executable under this workspace's `src-tauri/target/`, or one confirmed to lock a required build output, and wait for confirmation before retrying. Do not terminate the application automatically or bypass the lock with a different Cargo target directory.
 - If the desktop build cannot finish, report the specific failure and treat native packaging as unverified.
-- The user performs interactive checks on their computer. Do not launch or automate the application for interactive verification unless the user explicitly requests it. Automated tests and the mandatory Tauri packaging build still apply. Do not describe a browser-only preview as a desktop app check.
+- The user performs interactive checks on their computer. Do not launch or automate the application for interactive verification unless the user explicitly requests it. Automated checks follow the impact-based validation matrix. Do not describe a browser-only preview as a desktop app check.
 
 ## Workspace conventions
 
