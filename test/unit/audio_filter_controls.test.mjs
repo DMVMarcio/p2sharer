@@ -30,7 +30,7 @@ test('audio filtering defaults, draft switching, mute-all and native apply use t
   globalThis.audioFilterInvoke = async (command, args) => {
     calls.push({ command, args });
     if (command === 'list_audio_processes') return [
-      { pid: 1, name: 'Discord.exe' }, { pid: 2, name: 'P2Sharer.exe' }, { pid: 3, name: 'Game.exe' },
+      { pid: 3, name: 'Game.exe' }, { pid: 1, name: 'Discord.exe' }, { pid: 2, name: 'P2Sharer.exe' },
     ];
   };
   const { useAudioFilter, stateStore } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
@@ -52,11 +52,18 @@ test('audio filtering defaults, draft switching, mute-all and native apply use t
     await act(async () => filter.loadProcesses());
     assert.deepEqual([...filter.selectedPids], [1, 2]);
     assert.equal(filter.selectedNames.size, 2, 'executable aliases share one selection');
+    const openingOrder = filter.processes.map(process => process.name);
+    assert.deepEqual(openingOrder, ['Discord.exe', 'P2Sharer.exe', 'Game.exe']);
+    await act(async () => filter.toggleProcess(filter.processes[0], false));
+    assert.deepEqual(filter.processes.map(process => process.name), openingOrder);
+    await act(async () => filter.loadProcesses());
+    assert.deepEqual(filter.processes.map(process => process.name), openingOrder, 'refresh keeps the opening order');
+    await act(async () => filter.toggleProcess(filter.processes[0], true));
     await act(async () => filter.setSearchText('Discord.exe'));
     assert.equal(filter.processes.length, 1);
     await act(async () => filter.setSearchText(''));
     await act(async () => filter.setCaptureChoice('include'));
-    await act(async () => filter.toggleProcess(filter.processes[2], true));
+    await act(async () => filter.toggleProcess(filter.processes.find(process => process.name === 'Game.exe'), true));
     await act(async () => filter.setCaptureChoice('none'));
     assert.equal(filter.captureChoice, 'none');
     assert.equal(stateStore.selectedFilterMode, 'exclude', 'draft changes do not commit');
@@ -80,11 +87,11 @@ test('audio filtering defaults, draft switching, mute-all and native apply use t
     assert.equal(calls.at(-1).args.config.mode, 'full');
     await act(async () => filter.loadProcesses());
     await act(async () => filter.setCaptureChoice('include'));
-    await act(async () => filter.toggleProcess(filter.processes[2], true));
+    await act(async () => filter.toggleProcess(filter.processes.find(process => process.name === 'Game.exe'), true));
     await act(async () => filter.applyFilters());
     assert.deepEqual(calls.at(-1).args.config, { mode: 'include', target_pids: [3], target_names: ['game'], sample_rate: 48000 });
     await act(async () => filter.setCaptureChoice('exclude'));
-    await act(async () => filter.toggleProcess(filter.processes[0], false));
+    await act(async () => filter.toggleProcess(filter.processes.find(process => process.name === 'Discord.exe'), false));
     await act(async () => filter.applyFilters());
     assert.deepEqual(calls.at(-1).args.config, { mode: 'exclude', target_pids: [2], target_names: ['p2sharer'], sample_rate: 48000 });
     await act(async () => root.unmount());

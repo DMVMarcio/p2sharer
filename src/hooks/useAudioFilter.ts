@@ -32,6 +32,12 @@ export function useAudioFilter() {
     () => new Set(stateStore.includePids)
   );
 
+  // Freeze the opening selection/order so controls never move beneath the pointer.
+  const openingSelection = useRef(new Set(Array.from(
+    stateStore.selectedFilterMode === 'exclude' ? stateStore.excludeProcessNames : stateStore.includeProcessNames,
+    audioProcessKey,
+  )));
+  const processOrder = useRef<Map<string, number> | null>(null);
   const draftExcludeNamesRef = useRef(draftExcludeNames);
   draftExcludeNamesRef.current = draftExcludeNames;
   const draftIncludeNamesRef = useRef(draftIncludeNames);
@@ -41,7 +47,16 @@ export function useAudioFilter() {
     setIsLoading(true);
     try {
       const items = await invoke<ProcessItem[]>('list_audio_processes');
-      setProcesses(items);
+      if (!processOrder.current) {
+        const initial = [...items].sort((a, b) => Number(openingSelection.current.has(audioProcessKey(b.name)))
+          - Number(openingSelection.current.has(audioProcessKey(a.name))));
+        processOrder.current = new Map(initial.map((item, index) => [audioProcessKey(item.name), index]));
+      }
+      const order = processOrder.current;
+      const ordered = [...items].sort((a, b) => (order.get(audioProcessKey(a.name)) ?? Number.MAX_SAFE_INTEGER)
+        - (order.get(audioProcessKey(b.name)) ?? Number.MAX_SAFE_INTEGER));
+      ordered.forEach(item => { const key = audioProcessKey(item.name); if (!order.has(key)) order.set(key, order.size); });
+      setProcesses(ordered);
 
       const exNames = draftExcludeNamesRef.current;
       const inNames = draftIncludeNamesRef.current;

@@ -8,7 +8,6 @@ import { audioProcessKey, audioProcessLabels, type AudioCaptureChoice } from '..
 import { ModalDialog } from '../common/ModalDialog';
 import { Select } from '../common/Select';
 import { TooltipButton } from '../common/TooltipButton';
-import { ContentTransition } from '../common/ContentTransition';
 
 export const AudioFilterModal = () => {
   useLocale();
@@ -18,6 +17,7 @@ export const AudioFilterModal = () => {
   const filter = useAudioFilter();
   const { loadProcesses } = filter;
   useEffect(() => { void loadProcesses(); }, [loadProcesses]);
+  const choice = filter.captureChoice;
   const options = (['exclude', 'include', 'full', 'none'] as const).map(value => ({ value, label: t(`audio.choice.${value}`) }));
 
   return <ModalDialog title={t('message.cd9f9a4fe6f8')} icon={<Headphones size={20} />}
@@ -35,8 +35,7 @@ export const AudioFilterModal = () => {
       <Select id="audio-capture-choice" className="text-input" disabled={pending}
         value={filter.captureChoice} options={options}
         onValueChange={value => filter.setCaptureChoice(value as AudioCaptureChoice)} />
-      <ContentTransition value={filter.captureChoice}>
-        {choice => choice === 'full' || choice === 'none' ? <div className="audio-choice-notice">
+      {choice === 'full' || choice === 'none' ? <div className="audio-choice-notice">
           {choice === 'full' ? <Volume2 size={23} /> : <VolumeX size={23} />}
           <span>{t(`audio.hint.${choice}`)}</span>
         </div> : <div className="audio-app-controls">
@@ -85,7 +84,6 @@ export const AudioFilterModal = () => {
           {filter.selectedNames.size > 0 && <button type="button" disabled={pending} className="btn btn-ghost btn-sm audio-clear-selection"
             onClick={filter.clearSelection}>{t('message.4af6af276835')}</button>}
         </div>}
-      </ContentTransition>
     </div>
   </ModalDialog>;
 };

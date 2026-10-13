@@ -27,18 +27,26 @@ export function ModalDialog({ title, subtitle, icon, headerless = false, headerA
   const busyRef = useRef(busy);
   const closeStartRef = useRef(onCloseStart);
   const closingRef = useRef(false);
+  const requestedCloseRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [closing, setClosing] = useState(false);
   closeRef.current = onClose;
   busyRef.current = busy;
   closeStartRef.current = onCloseStart;
   const close = () => {
-    if (busyRef.current || closingRef.current) return;
+    if (closingRef.current) return;
+    if (busyRef.current) { requestedCloseRef.current = true; return; }
     closingRef.current = true;
     closeStartRef.current?.();
     setClosing(true);
     timerRef.current = setTimeout(() => closeRef.current(), 240);
   };
+  useEffect(() => {
+    if (!busy && requestedCloseRef.current) {
+      requestedCloseRef.current = false;
+      close();
+    }
+  }, [busy]);
   const cardRef = useModalDialogBehavior(close, busy || closing, closeOnOutside);
   useEffect(() => () => clearTimeout(timerRef.current), []);
   return createPortal(<div className={`modal-overlay ${closing ? 'closing' : ''}`}
