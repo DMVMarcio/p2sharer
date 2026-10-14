@@ -22,6 +22,9 @@ mod favicon;
 #[cfg(windows)]
 #[path = "browser_window.rs"]
 mod capture_window;
+#[cfg(windows)]
+#[path = "browser_audio.rs"]
+mod local_audio;
 #[path = "browser_extension_packages.rs"]
 mod extension_packages;
 const BROWSER_HOME: &str = "https://www.google.com/";
@@ -46,6 +49,8 @@ struct Session {
     temporary: bool,
     directory: PathBuf,
     audio: Option<Arc<AtomicBool>>,
+    #[cfg(windows)]
+    local_audio: Option<local_audio::LocalAudio>,
     serial: u64,
     pointer: (f64, f64),
     buttons: u8,
@@ -273,6 +278,8 @@ pub async fn start_shared_browser(
                 temporary,
                 directory: directory.clone(),
                 audio: None,
+                #[cfg(windows)]
+                local_audio: None,
                 serial: 0,
                 pointer: (0.0, 0.0),
                 buttons: 0,
@@ -333,6 +340,7 @@ pub async fn start_shared_browser(
             let _ = tx.send(result);
         })
         .await?;
+        let speakers = local_audio::LocalAudio::start(pid)?;
         let audio = crate::audio_loopback::start_browser_audio(
             app.clone(),
             pid,
@@ -340,6 +348,7 @@ pub async fn start_shared_browser(
         );
         if let Some(session) = state.0.lock().unwrap().get_mut(&scope) {
             session.audio = Some(audio);
+            session.local_audio = Some(speakers);
         } else {
             audio.store(false, Ordering::SeqCst);
             return Err("Browser closed".into());
@@ -530,6 +539,8 @@ async fn browser_state(
 fn close_session(app: &AppHandle, state: &BrowserState, scope: &str) {
     let session = { state.0.lock().unwrap().remove(scope) };
     if let Some(session) = session {
+        #[cfg(windows)]
+        drop(session.local_audio);
         if let Some(id) = session.capture_id { let _ = crate::screen_sources::stop_capture_session(id); }
         if let Some(flag) = session.audio {
             flag.store(false, Ordering::SeqCst);
@@ -556,6 +567,23 @@ fn cleanup_directory(directory: PathBuf) {
             std::thread::sleep(std::time::Duration::from_secs(1));
         }
     });
+}
+
+#[tauri::command]
+pub fn set_shared_browser_volume(
+    window: WebviewWindow,
+    state: tauri::State<'_, BrowserState>,
+    scope: String,
+    volume: f32,
+    muted: bool,
+) -> Result<(), String> {
+    trusted(&window, &scope)?;
+    let sessions = state.0.lock().map_err(|e| e.to_string())?;
+    let session = sessions.get(&scope).ok_or("Browser closed")?;
+    #[cfg(windows)]
+    return session.local_audio.as_ref().ok_or("Browser audio unavailable")?.set(volume, muted);
+    #[cfg(not(windows))]
+    { let _ = (session, volume, muted); Err("Browser audio requires Windows".into()) }
 }
 
 #[tauri::command]

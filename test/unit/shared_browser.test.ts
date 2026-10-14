@@ -66,6 +66,25 @@ function fixture(local = 'host', onCall?: (command: string, args: Record<string,
   return { model, calls, sent };
 }
 
+test('host speaker volume stays local, bypasses shared controls and rejects viewer changes', async () => {
+  const host = fixture(); const viewer = fixture('alice');
+  try {
+    const before = structuredClone(host.model.snapshot());
+    await host.model.setLocalVolume(0.25, false);
+    await host.model.setLocalVolume(0.25, true);
+    assert.deepEqual(host.calls.map(call => [call.command, call.args.volume, call.args.muted]), [
+      ['set_shared_browser_volume', 0.25, false], ['set_shared_browser_volume', 0.25, true],
+    ]);
+    assert.deepEqual(host.model.snapshot(), before);
+    assert.equal(host.sent.length, 0);
+    await viewer.model.setLocalVolume(0, true);
+    assert.equal(viewer.calls.length, 0);
+    for (const value of [-1, 2, NaN, Infinity]) await host.model.setLocalVolume(value, false);
+    host.model.running = false; await host.model.setLocalVolume(1, false);
+    assert.equal(host.calls.length, 2);
+  } finally { host.model.destroy(); viewer.model.destroy(); }
+});
+
 test('busy native input keeps the virtual cursor current and coalesces movement behind click barriers', async () => {
   let unblock: () => void = () => {};
   let blocked = false;

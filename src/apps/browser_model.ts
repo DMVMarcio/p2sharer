@@ -302,6 +302,14 @@ export class BrowserModel implements RoomAppModel {
     try { await this.native.call('stop_shared_browser', { scope: this.scope }); }
     finally { await this.ownership.release().catch(() => {}); this.busy = false; this.context.changed(); }
   }
+  async setLocalVolume(volume: number, muted: boolean): Promise<void> {
+    if (!this.isHost || !this.joined || !this.running || this.disposed) return;
+    if (!Number.isFinite(volume) || volume < 0 || volume > 1) return;
+    // This local IPC never enters the shared input queue or room snapshots.
+    const epoch = this.epoch;
+    try { await this.native.call('set_shared_browser_volume', { scope: this.scope, volume, muted }); }
+    catch (error) { if (epoch === this.epoch && this.running && !this.disposed) throw error; }
+  }
   async clear(mode: 'cache' | 'sites' | 'history' | 'reset'): Promise<void> {
     if (!this.isHost || !this.joined || !this.running || this.busy) return;
     this.busy = true; this.context.changed();

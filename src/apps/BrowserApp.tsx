@@ -137,7 +137,11 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
     video.current = element;
     if (element) { element.srcObject = model?.stream ?? null; if (element.srcObject) void element.play().catch(() => {}); }
   }, [model?.stream]);
-  useEffect(() => { if (video.current) video.current.volume = volume; }, [volume]);
+  useEffect(() => {
+    if (model?.isHost && model.running) void model.setLocalVolume(volume, muted).catch(error => {
+      showToast(localizeError(error), 4000, 'error');
+    });
+  }, [model, model?.isHost, model?.running, volume, muted]);
   const remoteAudioTrack = model?.isHost ? undefined : model?.stream?.getAudioTracks()[0];
   useEffect(() => {
     if (!remoteAudioTrack || !model?.stream) return;
@@ -239,8 +243,8 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
         {model.isHost && model.running && icon('finish', <Square size={15} />, () => {
           setSettings(false); void model.finish().catch(e => showToast(localizeError(e), 4000, 'error'));
         }, model.busy)}
-        {fullscreen && model.running && !model.isHost && icon(muted ? 'unmute' : 'mute', muted ? <VolumeX size={15} /> : <Volume2 size={15} />, () => setMuted(!muted))}
-        {fullscreen && model.running && !model.isHost && <input className="settings-slider-input browser-volume" autoComplete="off"
+        {fullscreen && model.running && icon(muted ? 'unmute' : 'mute', muted ? <VolumeX size={15} /> : <Volume2 size={15} />, () => setMuted(!muted))}
+        {fullscreen && model.running && <input className="settings-slider-input browser-volume" autoComplete="off"
           type="range" min="0" max="1" step="0.01" value={volume} aria-label={t('browser.volume')} onChange={e => setVolume(Number(e.target.value))} />}
         {icon(fullscreen ? 'exitFullscreen' : 'fullscreen', fullscreen ? <Minimize size={15} /> : <Maximize size={15} />, expand)}
       </form>
@@ -283,8 +287,8 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
       {model.running && model.isHost && model.media && <span>{t('browser.captureTarget', {
         resolution: model.media.quality.quality.height, fps: model.media.quality.quality.fps })}</span>}
       <span role="status">{model.controller ? t('browser.controlling', { name: participantName(model.controller) }) : t('browser.controlAvailable')}</span>
-      {model.running && !model.isHost && icon(muted ? 'unmute' : 'mute', muted ? <VolumeX size={15} /> : <Volume2 size={15} />, () => setMuted(!muted))}
-      {model.running && !model.isHost && <input className="settings-slider-input" autoComplete="off" type="range" min="0" max="1" step="0.01" value={volume} aria-label={t('browser.volume')} onChange={e => setVolume(Number(e.target.value))} />}
+      {model.running && icon(muted ? 'unmute' : 'mute', muted ? <VolumeX size={15} /> : <Volume2 size={15} />, () => setMuted(!muted))}
+      {model.running && <input className="settings-slider-input" autoComplete="off" type="range" min="0" max="1" step="0.01" value={volume} aria-label={t('browser.volume')} onChange={e => setVolume(Number(e.target.value))} />}
     </div>}
     {active?.loading && fullscreen && <div className="browser-loading fullscreen-loading" role="progressbar" aria-label={t('browser.loading')}><span /></div>}
     {model.error && !minimized && <p className="browser-error" role="alert">{localizeError(model.error)}</p>}
