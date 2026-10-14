@@ -1173,7 +1173,7 @@
   "notepad.exportHint": "Exporte um arquivo separado. Markdown mantém a formatação compatível; TXT remove a formatação. Sua nota local continua vinculada a Salvar.",
   "notepad.exported": "Nota exportada.",
   "notepad.untitled": "Nota sem título",
-  "notepad.new": "Novo",
+  "notepad.new": "Novo Arquivo",
   "notepad.saving": "Salvando…",
   "notepad.saved": "Salvo neste computador",
   "notepad.modified": "Alterações não salvas neste computador",

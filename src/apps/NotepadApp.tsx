@@ -2,6 +2,7 @@ import { localizeError, getLanguage, t } from '../i18n';
 import { useLocale } from '../hooks/useLocale';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { Download, FilePlus2, FolderOpen, Save } from 'lucide-react';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Markdown } from '@tiptap/markdown';
@@ -173,10 +174,14 @@ export const NotepadApp: React.FC<Props> = ({ instanceId, compact = false }) => 
       {editor && <NotepadToolbar editor={editor} onLink={() => {
         setLinkUrl(editor.getAttributes('link').href || ''); setEditingLink(true);
       }} fileActions={<>
-        <button className="btn btn-sm btn-outline" disabled={busy} onClick={() => requestReplace('new')}>{t('notepad.new')}</button>
-        <button className="btn btn-sm btn-outline" disabled={busy} onClick={() => setDialog('open')}>{t("message.a01a5fce396e")}</button>
-        <button className="btn btn-sm btn-outline" disabled={busy} onClick={save}>{t("message.aef7cd5b2081")}</button>
-        <button className="btn btn-sm btn-outline" disabled={busy} onClick={() => setDialog('export')}>{t('notepad.export')}</button>
+        <div className="room-app-toolbar-actions">
+          <button className="btn btn-sm btn-outline" disabled={busy} onClick={() => requestReplace('new')}><FilePlus2 size={14} aria-hidden="true" />{t('notepad.new')}</button>
+          <button className="btn btn-sm btn-outline" disabled={busy} onClick={() => setDialog('open')}><FolderOpen size={14} aria-hidden="true" />{t("message.a01a5fce396e")}</button>
+        </div>
+        <div className="room-app-toolbar-actions">
+          <button className="btn btn-sm btn-outline" disabled={busy} onClick={save}><Save size={14} aria-hidden="true" />{t("message.aef7cd5b2081")}</button>
+          <button className="btn btn-sm btn-outline" disabled={busy} onClick={() => setDialog('export')}><Download size={14} aria-hidden="true" />{t('notepad.export')}</button>
+        </div>
       </>} />}
       <div className="notepad-file-status" role="status"><strong>{identity?.name ?? t('notepad.untitled')}</strong>
         <span>{t(busy ? 'notepad.saving' : clean ? 'notepad.saved' : localNote ? 'notepad.modified' : 'notepad.unsaved')}</span></div>

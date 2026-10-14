@@ -84,7 +84,7 @@ test('notes save to the library, reopen with identity, and update the same file 
   })));
   assert.equal(fixture.notes.size, 1);
   assert.equal(fixture.notes.get(instanceId).content, '<p>Updated</p>');
-  await click('New', toolbar());
+  await click('New File', toolbar());
   await click('Replace content', document.querySelector('[role="dialog"]'));
   assert.equal(fixture.editor.isEmpty, true);
   assert.notEqual(fixture.model.noteIdentity.id, instanceId);

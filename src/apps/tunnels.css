@@ -24,7 +24,7 @@
 .tunnel-traffic { display: flex; flex-wrap: wrap; gap: 10px; }
 .tunnel-upload { color: color-mix(in srgb, var(--accent-color) 65%, var(--text-primary)); }
 .tunnel-download { color: var(--success-text); }
-.tunnel-preview { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 12px; background: var(--room-app-panel-bg); color: var(--text-secondary); text-align: center; }
+.tunnel-preview { box-sizing: border-box; width: 100%; height: 100%; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 12px; background: var(--room-app-panel-bg); color: var(--text-secondary); text-align: center; }
 .tunnel-preview > svg { color: color-mix(in srgb, var(--accent-color) 65%, var(--text-primary)); }
 .tunnel-preview strong { font-size: 12px; color: var(--text-primary); }
 .tunnel-details > span { font-size: 11px; color: var(--text-secondary); overflow-wrap: anywhere; }

@@ -1173,7 +1173,7 @@
   "notepad.exportHint": "Export a separate file. Markdown preserves supported formatting; plain text removes formatting. Your local note remains linked to Save.",
   "notepad.exported": "Note exported.",
   "notepad.untitled": "Untitled note",
-  "notepad.new": "New",
+  "notepad.new": "New File",
   "notepad.saving": "Saving…",
   "notepad.saved": "Saved on this computer",
   "notepad.modified": "Unsaved changes on this computer",
