@@ -1189,6 +1189,8 @@
   "browser.description": "Browse together in one isolated browser, hosted by the participant who starts it.",
   "browser.settings": "Browser settings",
   "browser.home": "Home page",
+  "browser.finish": "Stop Browser",
+  "browser.loading": "Loading page",
   "browser.contentMode": "Content mode",
   "browser.mode.auto": "Automatic video detection",
   "browser.mode.reading": "Reading",

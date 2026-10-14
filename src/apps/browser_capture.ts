@@ -58,9 +58,12 @@ export class BrowserCapture {
     this.refreshing = true; const generation = this.generation; let successful = false;
     try {
       const quality = this.quality.quality;
-      const frame = await this.native.call<{ sourceId: string; state: BrowserState; playing: boolean | null }>('prepare_shared_browser_capture',
+      const frame = await this.native.call<{ sourceId: string | null; state: BrowserState; playing: boolean | null }>('prepare_shared_browser_capture',
         { scope: this.scope, width: quality.width, probe: true, sessionId: this.sessionId });
       if (this.stopped || generation !== this.generation) return;
+      if (frame.sourceId === null) {
+        this.metadata(frame.state); this.refreshAgain = true; successful = true; return;
+      }
       const profile = JSON.stringify(quality);
       if (frame.sourceId !== this.source) {
         const stream = await this.bridge.startCapture(frame.sourceId, quality.fps, quality, false, 90);

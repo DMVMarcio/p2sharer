@@ -1,12 +1,20 @@
 .apps-library-banner.browser { background: linear-gradient(125deg, #316bc9, #614fa5 65%, #242b46); }
-.room-app-browser { display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 0; color: var(--text-primary); background: var(--bg-card); }
+.room-app-browser { position: relative; display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 0; color: var(--text-primary); background: var(--bg-card); }
+.browser-chrome { flex-shrink: 0; }
 .browser-tabs { display: flex; align-items: center; gap: 4px; padding: 5px 8px; overflow-x: auto; flex-shrink: 0; }
-.browser-tab { display: flex; align-items: center; border-radius: var(--radius-sm); background: var(--bg-elevated); }
-.browser-tab.selected { background: var(--accent-subtle); box-shadow: inset 0 -2px var(--accent-color); }
-.browser-tab > button:first-child { min-width: 70px; max-width: 180px; }
+.browser-tab { position: relative; flex-shrink: 0; display: flex; align-items: center; border-radius: var(--radius-sm); background: var(--bg-elevated); }
+.browser-tab.selected { background: var(--accent-subtle); }
+.browser-tab:has(:focus-visible) { outline: 2px solid var(--accent-color); outline-offset: -2px; }
+.browser-tab > .browser-tab-label { width: auto; min-width: 90px; max-width: 210px; padding-right: 32px; border: 0; box-shadow: none; background: transparent; }
+.browser-tab > .browser-tab-close { position: absolute; right: 3px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; padding: 0; border: 0; box-shadow: none; background: transparent; }
+.browser-tab > .browser-tab-close:hover:not(:disabled) { background: var(--bg-control-hover); }
+.browser-tab > .btn.browser-tab-label:hover:not(:disabled) { background: transparent; }
+.browser-tab:hover { background: var(--bg-control-hover); }
+.browser-tab.selected:hover { background: var(--accent-subtle); }
 .browser-tab span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .browser-toolbar { display: flex; gap: 5px; padding: 5px 8px; align-items: center; flex-shrink: 0; }
 .browser-toolbar input { flex: 1; min-width: 40px; }
+.browser-toolbar > .browser-volume { flex: 0 0 75px; width: 75px; }
 .browser-surface { position: relative; flex: 1; min-height: 0; overflow: hidden; background: #000; overscroll-behavior: contain; touch-action: none; }
 .browser-surface video { width: 100%; height: 100%; object-fit: contain; display: block; pointer-events: none; }
 .browser-cursor-layer { position: absolute; width: min(100%, calc(100cqh * 16 / 9)); height: min(100%, calc(100cqw * 9 / 16)); aspect-ratio: 16 / 9; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; }
@@ -17,6 +25,15 @@
 .browser-surface:focus-within { outline: 2px solid var(--accent-color); outline-offset: -2px; }
 .browser-empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: var(--bg-card); color: var(--text-secondary); padding: 20px; text-align: center; }
 .browser-empty p { max-width: 480px; margin: 0; font-size: 12px; }
+.browser-empty > .btn { width: auto; align-self: center; }
+.browser-loading { position: absolute; inset: 0 0 auto; height: 3px; z-index: 4; overflow: hidden; pointer-events: none; background: var(--accent-subtle); }
+.browser-loading span { display: block; width: 35%; height: 100%; background: var(--accent-color); animation: browserLoading 1.2s ease-in-out infinite; }
+.browser-loading.fullscreen-loading { z-index: 11; }
+@keyframes browserLoading { from { transform: translateX(-100%); } to { transform: translateX(390%); } }
+.room-app-browser.fullscreen .browser-chrome { position: absolute; inset: 0 0 auto; z-index: 10; background: var(--bg-card); opacity: 0; transform: translateY(-100%); pointer-events: none; transition: opacity var(--transition-normal), transform var(--transition-normal); }
+.room-app-browser.fullscreen .browser-chrome.visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
+.room-app-browser.fullscreen .browser-error { position: absolute; bottom: 0; left: 0; right: 0; z-index: 5; background: var(--bg-card); }
+@media (prefers-reduced-motion: reduce) { .browser-loading span { animation: none; width: 100%; opacity: .7; } .room-app-browser.fullscreen .browser-chrome { transition: none; } }
 .browser-temporary { display: flex; align-items: center; gap: 8px; font-size: 12px; }
 .browser-status { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 5px 9px; color: var(--text-secondary); font-size: 10px; }
 .browser-status > span:nth-child(2) { flex: 1; }

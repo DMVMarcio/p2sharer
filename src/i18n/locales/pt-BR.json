@@ -1189,6 +1189,8 @@
   "browser.description": "Naveguem juntos em um browser isolado, hospedado por quem inicia o App.",
   "browser.settings": "Configurações do Browser",
   "browser.home": "Página inicial",
+  "browser.finish": "Finalizar Browser",
+  "browser.loading": "Carregando página",
   "browser.contentMode": "Modo de conteúdo",
   "browser.mode.auto": "Detectar vídeos automaticamente",
   "browser.mode.reading": "Leitura",

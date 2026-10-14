@@ -54,6 +54,23 @@ test('retired native browser captures cannot publish a late track or reuse anoth
   assert.equal(delivered, 0); assert.equal(stopped, 2);
 });
 
+test('a tab changed during a native probe refreshes metadata before attaching its new capture', async () => {
+  let stale = true; const sources: string[] = []; let metadata = 0;
+  const native: BrowserCaptureDependencies = {
+    async call(command) { return (command === 'get_capture_metrics' ? { images: 0, processing_us: 0 } :
+      { sourceId: stale ? null : 'window:2', state: { tabs: [], active: 2, temporary: false }, playing: false }) as never; },
+    bridge() { return { async startCapture(source) { sources.push(source); return {} as MediaStream; },
+      updateProfile: async () => {}, getProcessingCost: () => 0, stopCapture: async () => {} }; },
+  };
+  const quality = new BrowserQualityController({ mode: 'reading', video: '720p30' });
+  const capture = new BrowserCapture(crypto.randomUUID(), quality, () => {}, () => metadata++, () => {}, error => { throw error; }, native);
+  try {
+    await capture.start(); assert.deepEqual(sources, []); assert.equal(metadata, 1);
+    stale = false; capture.requestRefresh(); await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(sources, ['window:2']);
+  } finally { capture.stop(); }
+});
+
 test('browser quality detects playback, holds through short pauses and restores reading', () => {
   const quality = new BrowserQualityController({ mode: 'auto', video: '1080p30' });
   assert.deepEqual(quality.quality, { width: 1280, height: 720, fps: 15, video: false });

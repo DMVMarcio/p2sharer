@@ -57,6 +57,54 @@ function fixture(local = 'host', onCall?: (command: string, args: Record<string,
   model.setParticipants(['host', 'alice', 'bob']); model.state = structuredClone(state); model.running = true;
   return { model, calls, sent };
 }
+
+test('busy native input keeps the virtual cursor current and coalesces movement behind click barriers', async () => {
+  let unblock: () => void = () => {};
+  let blocked = false;
+  const { model, calls } = fixture('host', async (command, args) => {
+    if (command === 'control_shared_browser' && !blocked) {
+      blocked = true; await new Promise<void>(resolve => { unblock = resolve; });
+    }
+    return null;
+  });
+  try {
+    model.command(move(1)); await settle();
+    for (let x = 2; x <= 100; x++) model.command(move(x));
+    assert.equal(model.pointer?.x, 100, 'the overlay does not wait for a busy renderer');
+    model.command({ ...move(100), event: 'mousePressed', button: 'left', buttons: 1, clicks: 1 } as BrowserCommand);
+    for (let x = 101; x <= 200; x++) model.command(move(x));
+    unblock(); await settle(); await settle();
+    const commands = calls.filter(call => call.command === 'control_shared_browser').map(call => call.args.command as BrowserCommand);
+    assert.deepEqual(commands.filter(command => command.kind === 'mouse').map(command => [command.event, command.x]),
+      [['mouseMoved', 1], ['mouseMoved', 100], ['mousePressed', 100], ['mouseMoved', 200]]);
+    assert.equal(model.pointer?.x, 200);
+  } finally { unblock(); model.destroy(); }
+});
+
+test('only the browser creator can finish its session and reopen controls without removing the room app', async () => {
+  const host = fixture(); const peer = fixture('alice');
+  try {
+    await peer.model.finish(); assert.equal(peer.model.running, true); assert.equal(peer.calls.length, 0);
+    await host.model.finish();
+    assert.equal(host.model.running, false); assert.equal(host.model.busy, false);
+    assert.deepEqual(host.model.state.tabs, []);
+    assert.ok(host.calls.some(call => call.command === 'stop_shared_browser'));
+    assert.ok(host.sent.some(message => (message.payload as {running?:boolean}).running === false));
+    assert.equal(host.model.joined, true);
+  } finally { host.model.destroy(); peer.model.destroy(); }
+});
+
+test('commands from another browser session cannot execute after the browser restarts', async () => {
+  const { model, calls } = fixture();
+  const internals = model as unknown as { session: string };
+  internals.session = crypto.randomUUID();
+  try {
+    model.apply({ type: 'command', command: move(), sequence: 1, tab: 1, session: crypto.randomUUID() }, 'alice', false);
+    await settle(); assert.equal(calls.length, 0);
+    model.apply({ type: 'command', command: move(), sequence: 2, tab: 1, session: internals.session }, 'alice', false);
+    await settle(); assert.equal(calls.filter(call => call.command === 'control_shared_browser').length, 1);
+  } finally { model.destroy(); }
+});
 test('creator owns browser state; remote snapshots and commands cannot impersonate its host', async () => {
   const { model, calls } = fixture('alice');
   model.apply({ type: 'state', state, revision: 10, running: true, paused: false, controller: '' }, 'bob', false);

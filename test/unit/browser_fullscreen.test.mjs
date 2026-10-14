@@ -6,6 +6,48 @@ import { build } from 'esbuild';
 import { JSDOM } from 'jsdom';
 import React, { act, useRef } from 'react';
 
+test('fullscreen controls hide after idle, reveal on movement and retain active keyboard controls', async context => {
+  const require = createRequire(import.meta.url);
+  const bundle = await build({ stdin: { contents: "export { useIdleControls } from './src/hooks/useIdleControls';", resolveDir: process.cwd() },
+    bundle: true, write: false, format: 'esm', platform: 'node',
+    plugins: [{ name: 'idle-controls-fixture', setup(builder) {
+      builder.onResolve({ filter: /^[^./]/ }, args => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
+    } }] });
+  const { useIdleControls } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
+  const dom = new JSDOM('<div id="root"></div>', { pretendToBeVisual: true });
+  const keys = ['window','document','HTMLElement','Element','Node','IS_REACT_ACT_ENVIRONMENT'];
+  const previous = new Map(keys.map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+  for (const key of keys.slice(0,-1)) Object.defineProperty(globalThis, key, { configurable: true, value: dom.window[key] });
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  const { createRoot } = await import('react-dom/client');
+  const root = createRoot(document.getElementById('root'));
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  const Harness = () => {
+    const controls = useIdleControls(true, 50);
+    return React.createElement('div', null,
+      React.createElement('div', { id: 'controls', inert: !controls.visible }, 'Controls'),
+      React.createElement('button', { id: 'move', onClick: controls.reveal }, 'Move'),
+      React.createElement('button', { id: 'hold', onClick: () => controls.hold('focus') }, 'Focus'),
+      React.createElement('button', { id: 'release', onClick: () => controls.release('focus') }, 'Blur'));
+  };
+  try {
+    await act(async () => root.render(React.createElement(Harness)));
+    await act(async () => context.mock.timers.tick(51));
+    assert.equal(document.getElementById('controls').hasAttribute('inert'), true);
+    await act(async () => document.getElementById('move').click());
+    assert.equal(document.getElementById('controls').hasAttribute('inert'), false);
+    await act(async () => document.getElementById('hold').click());
+    await act(async () => context.mock.timers.tick(100));
+    assert.equal(document.getElementById('controls').hasAttribute('inert'), false);
+    await act(async () => document.getElementById('release').click());
+    await act(async () => context.mock.timers.tick(51));
+    assert.equal(document.getElementById('controls').hasAttribute('inert'), true);
+  } finally {
+    await act(async () => root.unmount()); context.mock.timers.reset(); dom.window.close();
+    for (const [key, descriptor] of previous) { if (descriptor) Object.defineProperty(globalThis, key, descriptor); else Reflect.deleteProperty(globalThis, key); }
+  }
+});
+
 test('fullscreen remains operable under StrictMode and uses the canonical dialog close lifecycle', async () => {
   const require = createRequire(import.meta.url);
   const bundle = await build({ stdin: { contents: `

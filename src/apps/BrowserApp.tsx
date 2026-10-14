@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
-import { ArrowLeft, ArrowRight, RotateCw, Plus, X, Globe, Home, Settings, Maximize, Minimize, Lock, Unlock, Puzzle, Trash2, MousePointer2, Volume2, VolumeX } from 'lucide-react';
+import { ArrowLeft, ArrowRight, RotateCw, Plus, X, Globe, Home, Square, Settings, Maximize, Minimize, Lock, Unlock, Puzzle, Trash2, MousePointer2, Volume2, VolumeX } from 'lucide-react';
 import { roomAppsService } from './room_apps_service';
 import type { BrowserModel } from './browser_model';
 import { browserUrl, browserPointerPosition, BROWSER_HOME, BROWSER_HEIGHT, BROWSER_WIDTH, type BrowserCommand } from './browser_protocol';
@@ -13,6 +13,7 @@ import { showToast } from '../hooks/useToast';
 import { AudioContextManager } from '../audio/audio_context_manager';
 import { FullscreenDialog } from '../components/common/FullscreenDialog';
 import { useNativeFullscreen } from '../hooks/useNativeFullscreen';
+import { useIdleControls } from '../hooks/useIdleControls';
 import type { BrowserContentMode, BrowserVideoQuality } from './browser_quality';
 
 function BrowserSettings({ model, onClose }: { model: BrowserModel; onClose: () => void }) {
@@ -94,9 +95,15 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
   const [url, setUrl] = useState(''); const [temporary, setTemporary] = useState(false);
   const [settings, setSettings] = useState(false);
   const { fullscreen, enterFullscreen, exitFullscreen } = useNativeFullscreen();
+  const controls = useIdleControls(fullscreen);
   const fullscreenClose = useRef<(() => void) | null>(null);
   const minimized = compact && !fullscreen;
   const [muted, setMuted] = useState(false); const [volume, setVolume] = useState(1);
+  useEffect(() => {
+    if (!fullscreen) return;
+    const frame = requestAnimationFrame(() => keyboard.current?.focus({ preventScroll: true }));
+    return () => cancelAnimationFrame(frame);
+  }, [fullscreen]);
   const active = model?.state.tabs.find(tab => tab.id === model.state.active);
   useEffect(() => { setUrl(active?.url === 'about:blank' ? '' : active?.url ?? ''); }, [active?.url, active?.id]);
   const attachVideo = useCallback((element: HTMLVideoElement | null) => {
@@ -160,7 +167,9 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
     }
     if (e.ctrlKey && ['l', 't', 'w'].includes(e.key.toLowerCase())) {
       e.preventDefault(); if (event === 'keyUp') return;
-      if (e.key.toLowerCase() === 'l') { address.current?.focus(); address.current?.select(); }
+      if (e.key.toLowerCase() === 'l') {
+        controls.reveal(); requestAnimationFrame(() => { address.current?.focus(); address.current?.select(); });
+      }
       if (e.key.toLowerCase() === 't') send({ kind: 'new-tab', url: BROWSER_HOME });
       if (e.key.toLowerCase() === 'w') send({ kind: 'close-tab', id: model.state.active }); return;
     }
@@ -169,16 +178,21 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
   };
   const icon = (name: string, content: React.ReactNode, action: () => void, disabled = false) =>
     <TooltipButton className="btn btn-secondary btn-sm" tooltip={t(`browser.${name}`)} aria-label={t(`browser.${name}`)} disabled={disabled} onClick={action}>{content}</TooltipButton>;
-  const content = <div className={`room-app-browser${minimized ? ' compact' : ''}`} ref={wrapper} onClick={e => e.stopPropagation()}>
-    {!minimized && <>
-      <div className="browser-tabs" role="group" aria-label={t('browser.tabs')}>
+  const chromeVisible = controls.visible || settings || Boolean(model.dialog);
+  const content = <div className={`room-app-browser${minimized ? ' compact' : ''}${fullscreen ? ' fullscreen' : ''}`} ref={wrapper}
+    onPointerMove={() => { if (fullscreen) controls.reveal(); }} onClick={e => e.stopPropagation()}>
+    {!minimized && <div className={`browser-chrome${chromeVisible ? ' visible' : ''}`} inert={!chromeVisible} aria-hidden={!chromeVisible}
+      onPointerEnter={() => controls.hold('pointer')} onPointerLeave={() => controls.release('pointer')}
+      onFocusCapture={() => controls.hold('focus')} onBlurCapture={e => { if (!e.currentTarget.contains(e.relatedTarget)) controls.release('focus'); }}>
+      {!fullscreen && <div className="browser-tabs" role="group" aria-label={t('browser.tabs')}>
         {model.state.tabs.map(tab => <div className={`browser-tab${tab.id === model.state.active ? ' selected' : ''}`} key={tab.id}>
-          <button aria-pressed={tab.id === model.state.active} className="btn btn-secondary btn-sm" disabled={!model.canControl}
+          <button aria-pressed={tab.id === model.state.active} className="btn btn-secondary btn-sm browser-tab-label" disabled={!model.canControl}
             onClick={() => send({ kind: 'select-tab', id: tab.id })}><Globe size={13} /><span>{tab.title || t('browser.newTab')}</span></button>
-          {icon('closeTab', <X size={13} />, () => send({ kind: 'close-tab', id: tab.id }), !model.canControl)}
+          <TooltipButton className="btn btn-secondary btn-sm browser-tab-close" tooltip={t('browser.closeTab')}
+            disabled={!model.canControl} onClick={() => send({ kind: 'close-tab', id: tab.id })}><X size={13} /></TooltipButton>
         </div>)}
         {model.running && icon('newTab', <Plus size={15} />, () => send({ kind: 'new-tab', url: BROWSER_HOME }), !model.canControl || model.state.tabs.length >= 16)}
-      </div>
+      </div>}
       <form className="browser-toolbar" autoComplete="off" onSubmit={e => {
         e.preventDefault(); const parsed = browserUrl(url);
         if (parsed) send({ kind: 'navigate', url: parsed }); else showToast(t('browser.invalidUrl'), 3500, 'error');
@@ -192,9 +206,15 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
           placeholder={t('browser.address')} disabled={!model.canControl} onChange={e => setUrl(e.target.value)} />
         {model.isHost && icon(model.paused ? 'allowControl' : 'pauseControl', model.paused ? <Lock size={15} /> : <Unlock size={15} />, () => model.togglePause(), !model.running)}
         {model.isHost && icon('settings', <Settings size={15} />, () => setSettings(true), !model.running || model.busy)}
+        {model.isHost && model.running && icon('finish', <Square size={15} />, () => {
+          setSettings(false); void model.finish().catch(e => showToast(localizeError(e), 4000, 'error'));
+        }, model.busy)}
+        {fullscreen && model.running && !model.isHost && icon(muted ? 'unmute' : 'mute', muted ? <VolumeX size={15} /> : <Volume2 size={15} />, () => setMuted(!muted))}
+        {fullscreen && model.running && !model.isHost && <input className="settings-slider-input browser-volume" autoComplete="off"
+          type="range" min="0" max="1" step="0.01" value={volume} aria-label={t('browser.volume')} onChange={e => setVolume(Number(e.target.value))} />}
         {icon(fullscreen ? 'exitFullscreen' : 'fullscreen', fullscreen ? <Minimize size={15} /> : <Maximize size={15} />, expand)}
       </form>
-    </>}
+    </div>}
     <div className="browser-surface" ref={surface} onPointerMove={e => pointer(e, 'mouseMoved')}
       onPointerDown={e => pointer(e, 'mousePressed')} onPointerUp={e => pointer(e, 'mouseReleased')}
       onPointerCancel={() => send({ kind: 'release' })} onContextMenu={e => e.preventDefault()}
@@ -206,6 +226,7 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
           delta_y: Math.max(-5000, Math.min(5000, e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 720 : 1))), modifiers: modifiers(e), clicks: 0 });
       }}>
       <video ref={attachVideo} autoPlay playsInline muted aria-label={t('browser.title')} />
+      {active?.loading && !fullscreen && <div className="browser-loading" role="progressbar" aria-label={t('browser.loading')}><span /></div>}
       {model.pointer && model.controller === model.pointer.actor && <div className="browser-cursor-layer"><div className="browser-cursor"
         style={{ left: `${model.pointer.x / BROWSER_WIDTH * 100}%`, top: `${model.pointer.y / BROWSER_HEIGHT * 100}%` }}>
         <MousePointer2 size={20} fill="var(--accent-color)" /><span>{participantName(model.pointer.actor)}</span>
@@ -226,7 +247,7 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
         </> : <p>{t(model.hostOnline ? 'browser.waiting' : 'browser.hostOffline')}</p>}
       </div>}
     </div>
-    {!minimized && <div className="browser-status">
+    {!minimized && !fullscreen && <div className="browser-status">
       <span>{t('browser.host', { name: participantName(model.host) })}</span>
       {model.running && model.isHost && model.media && <span>{t('browser.captureTarget', {
         resolution: model.media.quality.quality.height, fps: model.media.quality.quality.fps })}</span>}
@@ -234,6 +255,7 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
       {model.running && !model.isHost && icon(muted ? 'unmute' : 'mute', muted ? <VolumeX size={15} /> : <Volume2 size={15} />, () => setMuted(!muted))}
       {model.running && !model.isHost && <input className="settings-slider-input" autoComplete="off" type="range" min="0" max="1" step="0.01" value={volume} aria-label={t('browser.volume')} onChange={e => setVolume(Number(e.target.value))} />}
     </div>}
+    {active?.loading && fullscreen && <div className="browser-loading fullscreen-loading" role="progressbar" aria-label={t('browser.loading')}><span /></div>}
     {model.error && !minimized && <p className="browser-error" role="alert">{localizeError(model.error)}</p>}
     {settings && <BrowserSettings model={model} onClose={() => setSettings(false)} />}
     {!minimized && model.dialog && <BrowserPageDialog model={model} key={model.dialog.id} />}

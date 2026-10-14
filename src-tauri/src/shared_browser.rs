@@ -5,7 +5,7 @@ use std::{
     collections::HashMap,
     path::PathBuf,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         Arc, Mutex,
     },
 };
@@ -13,7 +13,11 @@ use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindo
 #[cfg(windows)]
 #[path = "browser_dialogs.rs"]
 mod dialogs;
+#[cfg(windows)]
+#[path = "browser_navigation.rs"]
+mod navigation;
 const BROWSER_HOME: &str = "https://www.google.com/";
+static NEXT_BROWSER_GENERATION: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Default)]
 pub struct BrowserState(Mutex<HashMap<String, Session>>, tokio::sync::Mutex<()>);
@@ -27,6 +31,7 @@ impl BrowserState {
     }
 }
 struct Session {
+    generation: u64,
     tabs: Vec<Tab>,
     active: u32,
     next: u32,
@@ -46,11 +51,15 @@ struct SavedTabs {
     urls: Vec<String>,
     active_index: usize,
 }
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Default, Clone, Serialize, Deserialize)]
 pub struct Tab {
     pub id: u32,
     pub url: String,
     pub title: String,
+    #[serde(default)]
+    pub loading: bool,
+    #[serde(skip)]
+    navigation_id: u64,
 }
 
 fn trusted(window: &WebviewWindow, scope: &str) -> Result<(), String> {
@@ -233,6 +242,7 @@ pub async fn start_shared_browser(
         sessions.insert(
             scope.clone(),
             Session {
+                generation: NEXT_BROWSER_GENERATION.fetch_add(1, Ordering::Relaxed),
                 tabs: vec![],
                 active: 0,
                 next: 1,
@@ -351,6 +361,7 @@ async fn add_tab(
                 id,
                 url: url.into(),
                 title: String::new(),
+                ..Default::default()
             });
         } else {
             let _ = view.close();
@@ -385,12 +396,8 @@ async fn add_tab(
             let _ = tx.send(result);
         })
         .await?;
-        cdp(
-            &view,
-            "Emulation.setDeviceMetricsOverride",
-            json!({"width":1280,"height":720,"deviceScaleFactor":1,"mobile":false}),
-        )
-        .await?;
+        configure_viewport(&view, 1280).await?;
+        navigation::install(&view, app.clone(), scope.to_string(), id).await?;
         dialogs::install(&view, app.clone(), scope.to_string(), id).await?;
     }
     if url != "about:blank" {
@@ -448,6 +455,11 @@ async fn browser_state(
     let serial = {
         let mut sessions = state.0.lock().unwrap();
         let session = sessions.get_mut(scope).ok_or("Browser closed")?;
+        for tab in &mut updated {
+            if let Some(current) = session.tabs.iter().find(|t| t.id == tab.id) {
+                tab.loading = current.loading; tab.navigation_id = current.navigation_id;
+            }
+        }
         session.tabs = updated.clone();
         session.serial = session.serial.saturating_add(1);
         session.serial
@@ -521,7 +533,7 @@ pub async fn stop_shared_browser(
     scope: String,
 ) -> Result<(), String> {
     trusted(&window, &scope)?;
-    let _operation = state.1.lock().await;
+    // Closing the target cancels pending page work instead of waiting for its input queue.
     close_session(&app, &state, &scope);
     Ok(())
 }
@@ -677,13 +689,7 @@ pub async fn control_shared_browser(
     trusted(&window, &scope)?;
     let _operation = state.1.lock().await;
     let active = {
-        state
-            .0
-            .lock()
-            .unwrap()
-            .get(&scope)
-            .ok_or("Browser closed")?
-            .active
+        state.0.lock().unwrap().get(&scope).ok_or("Browser closed")?.active
     };
     let view = app
         .get_webview_window(&label(&scope, active))
@@ -820,14 +826,10 @@ pub async fn prepare_shared_browser_capture(
         return Err("Invalid browser capture session".into());
     }
     let _operation = state.1.lock().await;
-    let active = {
-        state
-            .0
-            .lock()
-            .unwrap()
-            .get(&scope)
-            .ok_or("Browser closed")?
-            .active
+    let (active, generation) = {
+        let sessions = state.0.lock().unwrap();
+        let session = sessions.get(&scope).ok_or("Browser closed")?;
+        (session.active, session.generation)
     };
     let view = app
         .get_webview_window(&label(&scope, active))
@@ -836,26 +838,37 @@ pub async fn prepare_shared_browser_capture(
     {
         let prepared_width = state.0.lock().unwrap().get(&scope)
             .and_then(|session| session.capture_widths.get(&active)).copied();
-        let previous_width = prepared_width.unwrap_or(1280);
-        if previous_width != width {
-            cdp(&view, "Emulation.setDeviceMetricsOverride",
-                json!({"width":1280,"height":720,"deviceScaleFactor":width as f64 / 1280.0,"mobile":false})).await?;
-        }
         // WGC captures a live compositor surface; hidden/minimized windows have none.
         // Keep the source outside the entire virtual desktop and never activate it.
         let height = width * 9 / 16;
-        if prepared_width != Some(width) {
-            view.set_size(tauri::PhysicalSize::new(width, height)).map_err(|e| e.to_string())?;
+        let size = tauri::PhysicalSize::new(width, height);
+        if prepared_width != Some(width) || view.inner_size().map_err(|e| e.to_string())? != size {
             let desktop_left = unsafe { windows::Win32::UI::WindowsAndMessaging::GetSystemMetrics(windows::Win32::UI::WindowsAndMessaging::SM_XVIRTUALSCREEN) };
             view.set_position(tauri::PhysicalPosition::new(desktop_left.saturating_sub(width as i32 + 128), 0)).map_err(|e| e.to_string())?;
+            // Position first: WM_DPICHANGED may apply a different suggested size.
+            view.set_size(size).map_err(|e| e.to_string())?;
             state.0.lock().unwrap().get_mut(&scope).ok_or("Browser closed")?.capture_widths.insert(active, width);
         }
         if !view.is_visible().map_err(|e| e.to_string())? { view.show().map_err(|e| e.to_string())?; }
+        configure_viewport(&view, width).await?;
         let tabs = state.0.lock().unwrap().get(&scope).ok_or("Browser closed")?.tabs.clone();
         for tab in tabs { if tab.id != active { if let Some(other) = app.get_webview_window(&label(&scope, tab.id)) { if other.is_visible().unwrap_or(false) { let _ = other.hide(); } } } }
         let previous_id = state.0.lock().unwrap().get_mut(&scope).ok_or("Browser closed")?.capture_id.replace(session_id.clone());
         if let Some(previous) = previous_id { if previous != session_id { let _ = crate::screen_sources::stop_capture_session(previous); } }
+        // A busy page must not hold the input lock while the optional JS probe runs.
+        drop(_operation);
         let playing = if probe { Some(probe_video(&view).await.unwrap_or(false)) } else { None };
+        let _metadata_operation = state.1.lock().await;
+        let current = {
+            let sessions = state.0.lock().unwrap();
+            let session = sessions.get(&scope).ok_or("Browser closed")?;
+            if session.generation != generation { return Err("Browser closed".into()); }
+            session.active
+        };
+        if current != active {
+            let state = browser_state(&app, &state, &scope).await?;
+            return Ok(json!({"sourceId":null, "state":state, "playing":null}));
+        }
         let source_id = format!("window:{}", view.hwnd().map_err(|e| e.to_string())?.0 as usize);
         let state = browser_state(&app, &state, &scope).await?;
         Ok(json!({"sourceId":source_id, "state": state, "playing": playing}))
@@ -865,6 +878,38 @@ pub async fn prepare_shared_browser_capture(
         let _ = (view, probe);
         Err("Shared browser requires Windows".into())
     }
+}
+
+#[cfg(windows)]
+async fn configure_viewport(view: &WebviewWindow, width: u32) -> Result<(), String> {
+    use webview2_com::Microsoft::Web::WebView2::Win32::{ICoreWebView2Controller3, COREWEBVIEW2_BOUNDS_MODE_USE_RAW_PIXELS};
+    use windows_capture_api::{core::Interface, Win32::Foundation::RECT};
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    view.with_webview(move |webview| unsafe {
+        let result = (|| {
+            let controller = webview.controller();
+            let scaled = controller.cast::<ICoreWebView2Controller3>()?;
+            scaled.SetShouldDetectMonitorScaleChanges(false)?;
+            scaled.SetBoundsMode(COREWEBVIEW2_BOUNDS_MODE_USE_RAW_PIXELS)?;
+            let mut scale = 0.0;
+            scaled.RasterizationScale(&mut scale)?;
+            let target_scale = width as f64 / 1280.0;
+            if (scale - target_scale).abs() > 0.001 { scaled.SetRasterizationScale(target_scale)?; }
+            let bounds = RECT { left: 0, top: 0, right: width as i32, bottom: (width * 9 / 16) as i32 };
+            let mut current = RECT::default(); controller.Bounds(&mut current)?;
+            if current != bounds { controller.SetBounds(bounds)?; }
+            controller.SetIsVisible(true)?;
+            Ok::<(), windows_capture_api::core::Error>(())
+        })().map_err(|e| e.to_string());
+        let _ = tx.send(result);
+    }).map_err(|e| e.to_string())?;
+    rx.await.map_err(|e| e.to_string())?
+}
+
+fn update_navigation(tab: &mut Tab, id: u64, loading: bool) -> bool {
+    if loading { if id < tab.navigation_id { return false; } tab.navigation_id = id; }
+    else if id != tab.navigation_id { return false; }
+    tab.loading = loading; true
 }
 
 fn release_buttons(mut buttons: u8) -> Vec<(&'static str, u8)> {
@@ -1099,6 +1144,17 @@ pub async fn browser_extensions(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn stale_navigation_completion_cannot_hide_a_new_page_loading() {
+        let mut tab = Tab::default();
+        assert!(update_navigation(&mut tab, 1, true));
+        assert!(tab.loading);
+        assert!(update_navigation(&mut tab, 2, true));
+        assert!(!update_navigation(&mut tab, 1, false));
+        assert!(tab.loading);
+        assert!(update_navigation(&mut tab, 2, false));
+        assert!(!tab.loading);
+    }
     #[test]
     fn idle_release_never_synthesizes_a_right_click() {
         assert!(release_buttons(0).is_empty());
