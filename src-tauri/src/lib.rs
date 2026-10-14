@@ -30,6 +30,7 @@ pub mod shared_browser;
 mod window_chrome;
 mod localization;
 mod app_data_migration;
+mod invitation_routing;
 mod app_updates;
 pub mod lan_signaling;
 pub mod port_tunnel;
@@ -74,6 +75,7 @@ fn cancel_app_update(window: tauri::Window) -> Result<(), String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    if invitation_routing::forward_startup_invitation() { return; }
     app_data_migration::migrate_legacy_data().expect("Could not migrate previous application data; close older P2Sharer instances and retry");
     // Bind process to Windows Job Object to guarantee atomic child teardown on exit.
     setup_job_object_for_clean_child_teardown();
@@ -100,13 +102,6 @@ pub fn run() {
     ensure_ws_server_running();
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.unminimize();
-                let _ = window.show();
-                let _ = window.set_focus();
-            }
-        }))
         .plugin(tauri_plugin_deep_link::init())
         .manage(ChatFileState::default())
         .manage(shared_browser::BrowserState::default())
@@ -118,6 +113,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
+            invitation_routing::install(app.handle())?;
             camera_permission::install(app)?;
             browser_shortcuts::disable_browser_shortcuts(app.get_webview_window("main").ok_or("main webview missing")?)?;
             Ok(())
