@@ -85,6 +85,42 @@ test('host speaker volume stays local, bypasses shared controls and rejects view
   } finally { host.model.destroy(); viewer.model.destroy(); }
 });
 
+test('leaving the viewport immediately frees control and stale queued motion cannot reclaim it', async () => {
+  let unblock = () => {}; let blocked = false;
+  const { model, calls } = fixture('host', async (command, args) => {
+    if (command === 'control_shared_browser' && (args.command as BrowserCommand).kind === 'mouse' && !blocked) {
+      blocked = true; await new Promise<void>(resolve => { unblock = resolve; });
+    }
+    return null;
+  });
+  const input = (actor: string, sequence: number, command: BrowserCommand) => model.apply({ type: 'command', sequence, tab: 1, command }, actor, false);
+  try {
+    input('alice', 1, move(10)); await settle();
+    input('alice', 2, move(20)); input('alice', 3, { kind: 'cursor-leave' });
+    assert.equal(model.pointer, null); assert.equal(model.controller, '');
+    input('bob', 1, move(30)); unblock(); await settle(); await settle();
+    assert.equal(model.controller, 'bob'); assert.equal(model.pointer?.x, 30);
+    assert.equal(calls.some(call => (call.args.command as { x?: number })?.x === 20), false);
+  } finally { unblock(); model.destroy(); }
+});
+
+test('only accepted navigation produces activity, without replaying snapshots or pointer and keyboard input', async () => {
+  const host = fixture(); const peer = fixture('bob');
+  try {
+    host.model.command(move(10)); await settle(); assert.equal(host.model.activity, null);
+    host.model.command({ kind: 'reload' }); await settle();
+    assert.equal(host.model.activity?.action, 'reload');
+    const packet = host.sent.find(item => (item.payload as { type?: string }).type === 'activity')!.payload;
+    peer.model.apply(packet, 'host', true); assert.equal(peer.model.activity, null);
+    peer.model.apply(packet, 'alice', false); assert.equal(peer.model.activity, null);
+    peer.model.apply(packet, 'host', false); assert.equal(peer.model.activity?.action, 'reload');
+    const current = peer.model.activity;
+    peer.model.apply(packet, 'host', false); assert.equal(peer.model.activity, current);
+    peer.model.apply({ ...(packet as object), id: 999, action: 'mouse' }, 'host', false); assert.equal(peer.model.activity, current);
+    peer.model.apply({ ...(packet as object), id: 999, session: crypto.randomUUID() }, 'host', false); assert.equal(peer.model.activity, current);
+  } finally { host.model.destroy(); peer.model.destroy(); }
+});
+
 test('busy native input keeps the virtual cursor current and coalesces movement behind click barriers', async () => {
   let unblock: () => void = () => {};
   let blocked = false;

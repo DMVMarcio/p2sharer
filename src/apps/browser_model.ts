@@ -7,6 +7,7 @@ import { getLanguage } from '../i18n/index.ts';
 import { BrowserOwnership } from './browser_ownership.ts';
 
 export interface BrowserNative { call<T>(command: string, args: Record<string, unknown>): Promise<T> }
+const ACTIVITY_ACTIONS = ['navigate', 'home', 'new-tab', 'close-tab', 'select-tab', 'back', 'forward', 'reload'];
 export class BrowserModel implements RoomAppModel {
   private ownership: BrowserOwnership;
   get host(): string { return this.ownership.host; }
@@ -15,6 +16,10 @@ export class BrowserModel implements RoomAppModel {
   state: BrowserState = { tabs: [], active: 0, temporary: false };
   controller = '';
   pointer: { x: number; y: number; actor: string } | null = null;
+  activity: { id: number; actor: string; action: string } | null = null;
+  extensionRequest: string | null = null;
+  private activityId = 0;
+  private leftSequences = new Map<string, number>();
   running = false;
   busy = false;
   paused = false;
@@ -53,6 +58,7 @@ export class BrowserModel implements RoomAppModel {
       if (wasRunning && previous === context.localActor && this.desktop) void this.native.call('stop_shared_browser', { scope: this.scope }).catch(() => {});
       this.lease = new BrowserControlLease(next); this.state = { tabs: [], active: 0, temporary: false };
       this.revision = 0; this.paused = false; this.pointer = null; this.extensions = [];
+      this.activity = null; this.activityId = 0; this.leftSequences.clear(); this.extensionRequest = null;
       if (next && this.joined && !this.isHost) {
         this.ensureMedia(); void this.media?.start().then(() => this.context.send?.({ type: 'media-request' }, next)).catch(e => this.fail(e));
       }
@@ -137,7 +143,12 @@ export class BrowserModel implements RoomAppModel {
               this.changed();
             });
           } catch (error) { removeDialog(); throw error; }
-          const remove = () => { removePopup(); removeDialog(); removeLoading(); };
+          const removeExtension = await listen<{ scope: string; url: string }>('shared-browser-extension-request', ({ payload }) => {
+            if (this.isHost && this.running && this.joined && !this.extensionRequest && payload.scope === this.scope && typeof payload.url === 'string' && payload.url.length <= 4096) {
+              this.extensionRequest = payload.url; this.context.changed();
+            }
+          }).catch(error => { removeDialog(); removeLoading(); throw error; });
+          const remove = () => { removePopup(); removeDialog(); removeLoading(); removeExtension(); };
           if (this.disposed) remove(); else this.unlisten = remove;
         } catch (error) { removePopup(); throw error; }
       })();
@@ -197,6 +208,14 @@ export class BrowserModel implements RoomAppModel {
     if (this.disposed || !payload || typeof payload !== 'object') return;
     const data = payload as Record<string, unknown>;
     if (this.ownership.handle(payload, actor, fromSnapshot)) return;
+    if (data.type === 'cursor-hidden' && actor === this.host && !fromSnapshot && this.joined && data.session === this.session) {
+      this.pointer = null; this.context.changed(); return;
+    }
+    if (data.type === 'activity' && !this.isHost && actor === this.host && !fromSnapshot && this.joined && this.running
+      && data.session === this.session && data.hostTerm === this.ownership.term && typeof data.actor === 'string' && this.members.has(data.actor)
+      && typeof data.action === 'string' && ACTIVITY_ACTIONS.includes(data.action) && Number.isSafeInteger(data.id) && Number(data.id) > this.activityId) {
+      this.activityId = Number(data.id); this.activity = { id: this.activityId, actor: data.actor, action: data.action }; this.context.changed(); return;
+    }
     if (fromSnapshot && data.ownership && typeof data.ownership === 'object')
       this.ownership.handle({ ...data.ownership, type: 'ownership' }, actor, true);
     if (data.type === 'cursor' && actor === this.host && !this.isHost && !fromSnapshot && this.joined && this.hostOnline
@@ -249,6 +268,16 @@ export class BrowserModel implements RoomAppModel {
     this.received.set(actor, Number(data.sequence));
     if (this.paused && actor !== this.host) return;
     const command = data.command;
+    if (command.kind === 'cursor-leave') {
+      this.leftSequences.set(actor, Number(data.sequence)); this.visualSequences.set(actor, Number(data.sequence)); this.pendingMoves.delete(actor);
+      if (actor === this.host) this.hostPriorityUntil = 0;
+      if (this.controller === actor) {
+        this.pointer = null; this.controller = '';
+        for (const peer of this.members) if (peer !== this.host) void this.context.send?.({ type: 'cursor-hidden', session: this.session }, peer).catch(() => {});
+        void this.release().catch(() => {}); this.changed();
+      }
+      return;
+    }
     const epoch = this.epoch;
     const memberEpoch = this.memberEpochs.get(actor) ?? 0;
     if (actor === this.host && command.kind !== 'release') this.hostPriorityUntil = Date.now() + 1000;
@@ -270,6 +299,7 @@ export class BrowserModel implements RoomAppModel {
     void this.queue(async () => {
       const packet = move?.packet ?? data;
       const command = packet.command as BrowserCommand;
+      if (Number(packet.sequence) <= (this.leftSequences.get(actor) ?? 0)) return;
       if (move && this.pendingMoves.get(actor) === move) this.pendingMoves.delete(actor);
       if (!this.joined || !this.members.has(actor) || !this.running || this.paused && actor !== this.host) return;
       if ((this.memberEpochs.get(actor) ?? 0) !== memberEpoch) return;
@@ -287,7 +317,16 @@ export class BrowserModel implements RoomAppModel {
       }
       if (oldOwner !== actor) this.changed();
       const state = await this.native.call<BrowserState | null>('control_shared_browser', { scope: this.scope, command });
-      if (epoch === this.epoch) this.acceptNativeState(state);
+      if (epoch === this.epoch) {
+        this.acceptNativeState(state);
+        if (ACTIVITY_ACTIONS.includes(command.kind)) {
+          const action = command.kind === 'navigate' && command.url === 'https://www.google.com/' ? 'home' : command.kind;
+          this.activity = { id: ++this.activityId, actor, action };
+          for (const peer of this.members) if (peer !== this.host) void this.context.send?.({ type: 'activity', ...this.activity,
+            session: this.session, hostTerm: this.ownership.term }, peer).catch(() => {});
+          this.context.changed();
+        }
+      }
     }).catch(() => {});
   }
   togglePause(): void {
@@ -310,6 +349,8 @@ export class BrowserModel implements RoomAppModel {
     try { await this.native.call('set_shared_browser_volume', { scope: this.scope, volume, muted }); }
     catch (error) { if (epoch === this.epoch && this.running && !this.disposed) throw error; }
   }
+  dismissExtensionRequest(): void { this.extensionRequest = null; this.context.changed(); }
+  requestExtension(url: string): void { if (this.isHost && this.running) { this.extensionRequest = url; this.context.changed(); } }
   async clear(mode: 'cache' | 'sites' | 'history' | 'reset'): Promise<void> {
     if (!this.isHost || !this.joined || !this.running || this.busy) return;
     this.busy = true; this.context.changed();
@@ -326,7 +367,7 @@ export class BrowserModel implements RoomAppModel {
     } finally { this.busy = false; this.context.changed(); }
     if (mode === 'reset' && this.joined && this.isHost) await this.startNative(temporary);
   }
-  async manageExtensions(action: 'install' | 'install-folder' | 'list' | 'enable' | 'disable' | 'remove' | 'popup', id?: string): Promise<void> {
+  async manageExtensions(action: 'install' | 'install-folder' | 'install-store' | 'list' | 'enable' | 'disable' | 'remove' | 'popup', id?: string): Promise<void> {
     if (!this.isHost || !this.joined || !this.running || this.busy) return;
     this.busy = true; this.context.changed();
     try {
@@ -342,6 +383,7 @@ export class BrowserModel implements RoomAppModel {
       this.memberEpochs.set(peer, (this.memberEpochs.get(peer) ?? 0) + 1);
       this.media?.remove(peer); this.received.delete(peer);
       this.pendingMoves.delete(peer); this.visualSequences.delete(peer);
+      this.leftSequences.delete(peer);
       if (this.lease.owner === peer && this.isHost) void this.queue(() => this.release()).catch(() => {});
     }
     if (!this.joined) { this.stop(); return; }
@@ -359,6 +401,7 @@ export class BrowserModel implements RoomAppModel {
     this.epoch++; clearInterval(this.timer); this.media?.stop(); this.media = null;
     this.session = '';
     this.pendingMoves.clear(); this.visualSequences.clear();
+    this.leftSequences.clear(); this.activity = null; this.extensionRequest = null;
     this.lease.clear(); this.controller = ''; this.running = false;
     this.dialog = null;
     if (native && this.isHost && this.desktop) void this.native.call('stop_shared_browser', { scope: this.scope }).catch(() => {});

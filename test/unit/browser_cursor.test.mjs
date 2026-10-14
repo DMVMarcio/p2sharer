@@ -36,6 +36,10 @@ test('local cursor follows the latest display frame without changing authority a
     await act(async () => frame());
     assert.equal(cursor.pointer.x, 30); assert.equal(authoritative.x, 10);
     await render({}); assert.equal(cursor.pointer.x, 30, 'an older acknowledgement cannot rewind the local visual');
+    await act(async () => cursor.leave());
+    assert.equal(cursor.pointer, null, 'leaving immediately suppresses the last authoritative local pointer');
+    await render({}); assert.equal(cursor.pointer, null);
+    await act(async () => { cursor.preview({ x: 30, y: 30 }); frame(); });
     await render({ allowed: false }); assert.equal(cursor.pointer.x, 10); assert.equal(cursor.predicted, false);
     await render({}); await act(async () => { cursor.preview({ x: 40, y: 40 }); frame(); });
     await render({ tab: 2 }); assert.equal(cursor.pointer.x, 10);

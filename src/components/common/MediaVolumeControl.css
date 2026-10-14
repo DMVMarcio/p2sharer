@@ -1,4 +1,4 @@
 .media-volume-control { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; padding: 2px 6px 2px 2px; border-radius: var(--radius-sm); background: var(--bg-elevated); }
 .media-volume-control > .media-volume-toggle { padding: 4px; width: 26px; min-width: 26px; background: transparent; border: 0; box-shadow: none; }
-.media-volume-control > input[type=range] { flex: 0 0 65px; width: 65px; min-width: 0; margin: 0; }
+.media-volume-control > input[type=range] { flex: 0 0 65px; width: 65px; min-width: 0; margin: 0; background: color-mix(in srgb, var(--text-secondary) 38%, var(--bg-elevated)); border-color: color-mix(in srgb, var(--text-secondary) 55%, transparent); }
 .media-volume-control:focus-within { outline: 2px solid var(--accent-color); outline-offset: 2px; }

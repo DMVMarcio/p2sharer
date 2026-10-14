@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
-import { ArrowLeft, ArrowRight, RotateCw, Plus, X, Globe, Home, Square, Settings, Maximize, Minimize, Lock, Unlock, Puzzle, Trash2, MousePointer2, FolderOpen, ChevronUp, ChevronDown } from 'lucide-react';
+import { ArrowLeft, ArrowRight, RotateCw, Plus, X, Globe, Home, Settings, Maximize, Minimize, Lock, Unlock, Puzzle, Trash2, MousePointer2, FolderOpen, ChevronUp, ChevronDown } from 'lucide-react';
 import { roomAppsService } from './room_apps_service';
 import type { BrowserModel } from './browser_model';
 import { browserUrl, browserPointerPosition, BROWSER_HOME, BROWSER_HEIGHT, BROWSER_WIDTH, type BrowserCommand } from './browser_protocol';
@@ -16,6 +16,7 @@ import { useNativeFullscreen } from '../hooks/useNativeFullscreen';
 import { useBrowserChrome } from '../hooks/useBrowserChrome';
 import { MediaVolumeControl } from '../components/common/MediaVolumeControl';
 import { useMediaVolume } from '../hooks/useMediaVolume';
+import { ActivityToast } from '../components/common/ActivityToast';
 import { useBrowserCursor } from '../hooks/useBrowserCursor';
 import type { BrowserContentMode, BrowserVideoQuality } from './browser_quality';
 
@@ -29,12 +30,13 @@ function BrowserSettings({ model, onClose }: { model: BrowserModel; onClose: () 
   const [mode, setMode] = useState('cache');
   const [confirm, setConfirm] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
+  const [installLink, setInstallLink] = useState(false);
   const run = (operation: Promise<void>) => void operation.catch(e => showToast(localizeError(e), 4000, 'error'));
   useEffect(() => { run(model.manageExtensions('list')); }, [model]);
   return <ModalDialog title={t('browser.settings')} icon={<Settings size={20} />} className="browser-settings-dialog" onClose={onClose} busy={model.busy}>
     <div className="browser-settings">
       <div className="browser-settings-column">
-      <p>{t(model.state.temporary ? 'browser.temporaryInfo' : 'browser.persistentInfo')}</p>
+      {model.state.temporary && <p>{t('browser.temporaryInfo')}</p>}
       {model.media && <>
         <label>{t('browser.contentMode')}<Select value={model.media.quality.settings.mode}
           onValueChange={value => model.media?.configure({ ...model.media.quality.settings, mode: value as BrowserContentMode })}
@@ -51,6 +53,7 @@ function BrowserSettings({ model, onClose }: { model: BrowserModel; onClose: () 
         <button className="btn btn-secondary btn-sm" disabled={model.busy} onClick={() => run(model.manageExtensions('install'))}><Plus size={15} />{t('browser.installExtension')}</button>
         <TooltipButton className="btn btn-secondary btn-sm" disabled={model.busy} tooltip={t('browser.installFolder')}
           onClick={() => run(model.manageExtensions('install-folder'))}><FolderOpen size={15} /></TooltipButton></div>
+      <button className="btn btn-secondary btn-sm" disabled={model.busy} onClick={() => setInstallLink(true)}>{t('browser.installLink')}</button>
       <p>{t('browser.extensionsInfo')}</p>
       {!model.extensions.length && <p>{t('browser.noExtensions')}</p>}
       {model.extensions.map(extension => <div className="browser-extension" key={extension.id}>
@@ -69,12 +72,27 @@ function BrowserSettings({ model, onClose }: { model: BrowserModel; onClose: () 
         <button className="btn btn-danger" disabled={model.busy} onClick={() => {
           void model.clear(mode as 'cache' | 'sites' | 'history' | 'reset').then(() => { setConfirm(false); if (mode === 'reset') onClose(); })
             .catch(e => showToast(localizeError(e), 4000, 'error'));
-        }}>{t('browser.confirm')}</button></>}><p>{t(mode === 'reset' ? 'browser.resetWarning' : 'browser.clearWarning')}</p></ModalDialog>}
+        }}>{t('browser.confirm')}</button></>}><p>{t(`browser.clearWarning.${mode}`)}</p></ModalDialog>}
+    {installLink && <BrowserExtensionInstall model={model} onClose={() => setInstallLink(false)} />}
     {removing && <ModalDialog title={t('browser.removeExtension')} onClose={() => setRemoving(null)} busy={model.busy}
       footer={close => <><button className="btn btn-secondary" disabled={model.busy} onClick={close}>{t('browser.cancel')}</button>
         <button className="btn btn-danger" disabled={model.busy} onClick={() => {
           void model.manageExtensions('remove', removing).then(() => setRemoving(null)).catch(e => showToast(localizeError(e), 4000, 'error'));
         }}>{t('browser.confirm')}</button></>}><p>{t('browser.removeWarning')}</p></ModalDialog>}
+  </ModalDialog>;
+}
+
+function BrowserExtensionInstall({ model, initial = '', onClose }: { model: BrowserModel; initial?: string; onClose: () => void }) {
+  const [url, setUrl] = useState(initial);
+  const install = () => { void model.manageExtensions('install-store', url).then(() => { showToast(t('browser.extensionInstalled'), 4000, 'success'); onClose(); })
+    .catch(error => showToast(localizeError(error), 4000, 'error')); };
+  return <ModalDialog title={t('browser.installExtension')} icon={<Puzzle size={20} />} onClose={onClose} busy={model.busy}
+    footer={<><button className="btn btn-secondary" disabled={model.busy} onClick={onClose}>{t('browser.cancel')}</button>
+      <button className="btn btn-primary" disabled={model.busy || !url.trim()} onClick={install}>{t('browser.installExtension')}</button></>}>
+    <p>{t('browser.storeLinkInfo')}</p>
+    <form autoComplete="off" onSubmit={event => { event.preventDefault(); if (!model.busy && url.trim()) install(); }}>
+      <input className="text-input" autoComplete="off" autoFocus maxLength={4096} value={url} onChange={event => setUrl(event.target.value)} aria-label={t('browser.storeLink')} disabled={model.busy} />
+    </form>
   </ModalDialog>;
 }
 
@@ -106,6 +124,7 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
   const wrapper = useRef<HTMLDivElement>(null); const keyboard = useRef<HTMLTextAreaElement>(null);
   const address = useRef<HTMLInputElement>(null); const composing = useRef(false);
   const lastMove = useRef(0);
+  const pointerInside = useRef(false);
   const lastClick = useRef({ time: 0, x: 0, y: 0, button: -1, count: 0 });
   const [url, setUrl] = useState(''); const [temporary, setTemporary] = useState(false);
   const [settings, setSettings] = useState(false);
@@ -124,6 +143,13 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
   }, [fullscreen]);
   const minimized = compact && !fullscreen;
   const { muted, volume, changeVolume, toggleMute } = useMediaVolume();
+  const [activity, setActivity] = useState<BrowserModel['activity']>(null);
+  useEffect(() => {
+    if (!model?.activity) { setActivity(null); return; }
+    setActivity(model.activity);
+    const timer = setTimeout(() => setActivity(null), 3800);
+    return () => clearTimeout(timer);
+  }, [model?.activity]);
   useEffect(() => {
     if (!fullscreen) return;
     const frame = requestAnimationFrame(() => keyboard.current?.focus({ preventScroll: true }));
@@ -165,9 +191,17 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
     (e.altKey ? 1 : 0) | (e.ctrlKey ? 2 : 0) | (e.metaKey ? 4 : 0) | (e.shiftKey ? 8 : 0);
   const position = (e: { clientX: number; clientY: number }, clamp = false) =>
     browserPointerPosition(e.clientX, e.clientY, surface.current!.getBoundingClientRect(), clamp);
+  const leavePointer = () => {
+    cursor.leave();
+    if (pointerInside.current) { pointerInside.current = false; send({ kind: 'cursor-leave' }); }
+  };
   const pointer = (e: PointerEvent<HTMLDivElement>, event: 'mouseMoved' | 'mousePressed' | 'mouseReleased') => {
     if (minimized || !model.canControl || e.pointerType !== 'mouse' && e.pointerType !== 'pen') return;
-    const point = position(e, e.currentTarget.hasPointerCapture(e.pointerId)); if (!point) return;
+    const point = position(e); if (!point) {
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+      leavePointer(); return;
+    }
+    pointerInside.current = true;
     cursor.preview(point);
     if (event === 'mouseMoved' && performance.now() - lastMove.current < 16) return;
     lastMove.current = performance.now();
@@ -213,7 +247,9 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
     send({ kind: 'key', event, key: e.key, code: e.code, modifiers: modifiers(e), virtual_key: Math.min(255, e.keyCode) });
   };
   const icon = (name: string, content: React.ReactNode, action: () => void, disabled = false) =>
-    <TooltipButton className="btn btn-secondary btn-sm" tooltip={t(`browser.${name}`)} aria-label={t(`browser.${name}`)} disabled={disabled} onClick={action}>{content}</TooltipButton>;
+    <TooltipButton className={`btn btn-secondary btn-sm${['fullscreen', 'exitFullscreen'].includes(name) ? ' browser-window-action' : ''}`} tooltip={t(`browser.${name}`)} aria-label={t(`browser.${name}`)} disabled={disabled} onClick={action}>{content}</TooltipButton>;
+  const finishControl = model.isHost && model.running && <TooltipButton className="btn btn-secondary btn-sm browser-finish" tooltip={t('browser.finish')}
+    disabled={model.busy} onClick={() => { setSettings(false); void model.finish().catch(error => showToast(localizeError(error), 4000, 'error')); }}><X size={15} /></TooltipButton>;
   const chromeVisible = !controls.collapsed && (controls.visible || settings || Boolean(model.dialog));
   const volumeControl = <MediaVolumeControl volume={volume} muted={muted} label={t('browser.volume')}
     muteLabel={t('browser.mute')} unmuteLabel={t('browser.unmute')} onVolumeChange={changeVolume} onToggleMute={toggleMute} />;
@@ -226,7 +262,7 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
       onPointerEnter={() => controls.hold('pointer')} onPointerLeave={() => controls.release('pointer')}
       onFocusCapture={() => controls.hold('focus')} onBlurCapture={e => { if (!e.currentTarget.contains(e.relatedTarget)) controls.release('focus'); }}>
       <div className="browser-chrome-content">
-      {!fullscreen && <div className="browser-tabs" role="group" aria-label={t('browser.tabs')}>
+      {!fullscreen && <div className="browser-tab-strip"><div className="browser-tabs" role="group" aria-label={t('browser.tabs')}>
         {model.state.tabs.map(tab => <div className={`browser-tab${tab.id === model.state.active ? ' selected' : ''}`} key={tab.id}>
           <button aria-pressed={tab.id === model.state.active} className="btn btn-secondary btn-sm browser-tab-label" disabled={!model.canControl}
             onClick={() => send({ kind: 'select-tab', id: tab.id })}><BrowserFavicon value={tab.favicon} /><span>{tab.title || t('browser.newTab')}</span></button>
@@ -234,7 +270,7 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
             disabled={!model.canControl} onClick={() => send({ kind: 'close-tab', id: tab.id })}><X size={13} /></TooltipButton>
         </div>)}
         {model.running && icon('newTab', <Plus size={15} />, () => send({ kind: 'new-tab', url: BROWSER_HOME }), !model.canControl || model.state.tabs.length >= 16)}
-      </div>}
+      </div>{finishControl}</div>}
       <form className="browser-toolbar" autoComplete="off" onSubmit={e => {
         e.preventDefault(); const parsed = browserUrl(url);
         if (parsed) send({ kind: 'navigate', url: parsed }); else showToast(t('browser.invalidUrl'), 3500, 'error');
@@ -248,18 +284,18 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
           placeholder={t('browser.address')} disabled={!model.canControl} onChange={e => setUrl(e.target.value)} />
         {model.isHost && icon(model.paused ? 'allowControl' : 'pauseControl', model.paused ? <Lock size={15} /> : <Unlock size={15} />, () => model.togglePause(), !model.running)}
         {model.isHost && icon('settings', <Settings size={15} />, () => setSettings(true), !model.running || model.busy)}
-        {model.isHost && model.running && icon('finish', <Square size={15} />, () => {
-          setSettings(false); void model.finish().catch(e => showToast(localizeError(e), 4000, 'error'));
-        }, model.busy)}
+        {model.isHost && model.running && active && /^https:\/\/(?:chromewebstore\.google\.com\/detail\/|microsoftedge\.microsoft\.com\/addons\/detail\/)/.test(active.url)
+          && icon('installExtension', <Puzzle size={15} />, () => model.requestExtension(active.url), model.busy)}
+        {fullscreen && finishControl}
         {fullscreen && model.running && volumeControl}
         {icon(fullscreen ? 'exitFullscreen' : 'fullscreen', fullscreen ? <Minimize size={15} /> : <Maximize size={15} />, expand)}
-        <TooltipButton className="btn btn-secondary btn-sm" tooltip={t('browser.hideToolbar')} aria-expanded={true}
+        <TooltipButton className="btn btn-secondary btn-sm browser-window-action" tooltip={t('browser.hideToolbar')} aria-expanded={true}
           aria-controls={`browser-chrome-${instanceId}`} onClick={() => { keyboard.current?.focus({ preventScroll: true }); controls.collapse(); }}><ChevronUp size={15} /></TooltipButton>
       </form>
       </div>
     </div>}
     <div className={`browser-surface${!minimized && model.running && model.hostOnline && cursor.pointer ? ' virtual-cursor' : ''}`} ref={surface} onPointerMove={e => pointer(e, 'mouseMoved')}
-      onPointerLeave={e => { if (!e.currentTarget.hasPointerCapture(e.pointerId)) cursor.clear(); }}
+      onPointerLeave={leavePointer}
       onPointerDown={e => pointer(e, 'mousePressed')} onPointerUp={e => pointer(e, 'mouseReleased')}
       onPointerCancel={() => send({ kind: 'release' })} onContextMenu={e => e.preventDefault()}
       onWheel={e => {
@@ -300,8 +336,11 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
     </div>}
     {active?.loading && fullscreen && <div className="browser-loading fullscreen-loading" role="progressbar" aria-label={t('browser.loading')}><span /></div>}
     {model.error && !minimized && <p className="browser-error" role="alert">{localizeError(model.error)}</p>}
+    {activity && !minimized && <ActivityToast key={activity.id} className="browser-activity-toast"
+      person={{ id: activity.actor, name: participantName(activity.actor), color: 'var(--accent-color)' }} message={t(`browser.activity.${activity.action}`)} />}
     {settings && <BrowserSettings model={model} onClose={() => setSettings(false)} />}
     {!minimized && model.dialog && <BrowserPageDialog model={model} key={model.dialog.id} />}
+    {!minimized && model.isHost && model.extensionRequest && <BrowserExtensionInstall model={model} initial={model.extensionRequest} onClose={() => model.dismissExtensionRequest()} />}
   </div>;
   return fullscreen ? <FullscreenDialog title={t('browser.title')} closeRef={fullscreenClose}
     onClose={() => exitFullscreen().catch(e => { showToast(localizeError(e), 4000, 'error'); throw e; })}>{content}</FullscreenDialog> : content;

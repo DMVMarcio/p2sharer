@@ -4,6 +4,7 @@ interface Point { x: number; y: number; actor: string }
 /** Local visual feedback runs at display cadence, independently of host acknowledgements. */
 export function useBrowserCursor(authoritative: Point | null, canPredict: boolean, actor: string, tab: number) {
   const [local, setLocal] = useState<(Point & { tab: number }) | null>(null);
+  const [outside, setOutside] = useState(false);
   const pending = useRef<(Point & { tab: number }) | null>(null);
   const frame = useRef<number | undefined>(undefined);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -16,6 +17,7 @@ export function useBrowserCursor(authoritative: Point | null, canPredict: boolea
     return () => { if (frame.current !== undefined) cancelAnimationFrame(frame.current); clearTimeout(timer.current); };
   }, [canPredict, actor, tab]);
   const preview = (point: { x: number; y: number }) => {
+    setOutside(false);
     if (!canPredict) return;
     pending.current = { ...point, actor, tab };
     if (frame.current === undefined) frame.current = requestAnimationFrame(() => {
@@ -24,5 +26,6 @@ export function useBrowserCursor(authoritative: Point | null, canPredict: boolea
     clearTimeout(timer.current); timer.current = setTimeout(clear, 1000);
   };
   const predicted = canPredict && local?.tab === tab;
-  return { pointer: predicted ? local : authoritative, predicted, preview, clear };
+  return { pointer: outside && authoritative?.actor === actor ? null : predicted ? local : authoritative, predicted, preview, clear,
+    leave() { clear(); setOutside(true); } };
 }

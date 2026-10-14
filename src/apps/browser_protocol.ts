@@ -17,7 +17,7 @@ export function validBrowserDialog(value: unknown): value is BrowserPageDialog {
 export type BrowserCommand =
   | { kind: 'navigate' | 'new-tab'; url: string }
   | { kind: 'select-tab' | 'close-tab'; id: number }
-  | { kind: 'back' | 'forward' | 'reload' | 'release' }
+  | { kind: 'back' | 'forward' | 'reload' | 'release' | 'cursor-leave' }
   | { kind: 'mouse'; event: 'mouseMoved' | 'mousePressed' | 'mouseReleased' | 'mouseWheel'; x: number; y: number;
       button: 'none' | 'left' | 'middle' | 'right'; buttons: number; delta_x: number; delta_y: number; modifiers: number; clicks: number }
   | { kind: 'key'; event: 'keyDown' | 'keyUp'; key: string; code: string; modifiers: number; virtual_key: number }
@@ -44,7 +44,7 @@ export function validBrowserCommand(value: unknown): value is BrowserCommand {
   switch (v.kind) {
     case 'navigate': case 'new-tab': return typeof v.url === 'string' && v.url.length <= 4096 && browserUrl(v.url) === v.url;
     case 'select-tab': case 'close-tab': return integer(v.id, 1_000_000);
-    case 'back': case 'forward': case 'reload': case 'release': return true;
+    case 'back': case 'forward': case 'reload': case 'release': case 'cursor-leave': return true;
     case 'text': return typeof v.text === 'string' && v.text.length > 0 && v.text.length <= 4096;
     case 'key': return ['keyDown', 'keyUp'].includes(String(v.event)) && typeof v.key === 'string' && v.key.length <= 80
       && typeof v.code === 'string' && v.code.length <= 80 && integer(v.modifiers, 15) && integer(v.virtual_key, 255);

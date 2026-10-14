@@ -27,6 +27,8 @@ mod capture_window;
 mod local_audio;
 #[path = "browser_extension_packages.rs"]
 mod extension_packages;
+#[path = "browser_extension_store.rs"]
+mod extension_store;
 const BROWSER_HOME: &str = "https://www.google.com/";
 static NEXT_BROWSER_GENERATION: AtomicU64 = AtomicU64::new(1);
 
@@ -201,6 +203,7 @@ fn build_tab(
     let popup_app = app.clone();
     let popup_scope = scope.to_string();
     let navigation_app = app.clone(); let navigation_scope = scope.to_string();
+    let download_app = app.clone(); let download_scope = scope.to_string();
     let copy = crate::localization::browser_dialog_copy(language);
     let view = WebviewWindowBuilder::new(app, label(scope, id), WebviewUrl::External(tauri::Url::parse("about:blank").map_err(|e| e.to_string())?))
         .title(if language == Some("pt-BR") { "P2Sharer Navegador" } else { "P2Sharer Browser" }).inner_size(1280.0, 720.0).visible(false).decorations(false)
@@ -216,9 +219,14 @@ fn build_tab(
             }
             tauri::webview::NewWindowResponse::Deny
         })
-        .on_download(move |_, event| {
-            if let tauri::webview::DownloadEvent::Requested { destination, .. } = event {
+        .on_download(move |view, event| {
+            if let tauri::webview::DownloadEvent::Requested { destination, url, .. } = event {
                 let name = destination.file_name().unwrap_or_default().to_string_lossy();
+                if destination.extension().is_some_and(|extension| extension.eq_ignore_ascii_case("crx")) {
+                    let store = extension_store::intercepted_request(url.as_str()).or_else(|| view.url().ok().and_then(|url| extension_store::StoreExtension::parse(url.as_str())));
+                    if let Some(store) = store { let _ = download_app.emit_to("main", "shared-browser-extension-request", json!({"scope":download_scope,"url":store.page()})); }
+                    return false;
+                }
                 if let Some(path) = rfd::FileDialog::new().set_title(copy.download_title).set_file_name(name.as_ref()).save_file() {
                     *destination = path; return true;
                 }
@@ -433,6 +441,7 @@ async fn add_tab(
         // Keep every tab alive offscreen, including background media playback.
         view.show().map_err(|e| e.to_string())?;
         navigation::install(&view, app.clone(), scope.to_string(), id).await?;
+        extension_store::install_interceptor(&view, app.clone(), scope.to_string()).await?;
         dialogs::install(&view, app.clone(), scope.to_string(), id).await?;
     }
     if url != "about:blank" {
@@ -1102,12 +1111,20 @@ pub async fn browser_extensions(
         };
         use windows_capture_api::core::{Interface, HSTRING, PCWSTR};
         let profile_directory = state.0.lock().unwrap().get(&scope).ok_or("Browser closed")?.directory.clone();
-        if action == "install" || action == "install-folder" {
-            let picker = rfd::AsyncFileDialog::new().set_title(crate::localization::browser_dialog_copy(language.as_deref()).extension_title);
+        if action == "install" || action == "install-folder" || action == "install-store" {
+            let package = if action == "install-store" {
+                let version = on_view(&view, move |core, tx| unsafe {
+                    let result = (|| { let mut version = Default::default(); core.cast::<ICoreWebView2_2>()?.Environment()?.BrowserVersionString(&mut version)?;
+                        Ok::<_, windows_capture_api::core::Error>(CoTaskMemPWSTR::from(version).to_string()) })().map_err(|e| e.to_string()); let _ = tx.send(result);
+                }).await?;
+                extension_store::download(id.as_deref().ok_or("Use a Chrome Web Store or Edge Add-ons link")?, &profile_directory, version.split_whitespace().next().unwrap_or(&version)).await?
+            } else {
+            let picker = rfd::AsyncFileDialog::new().set_parent(&window).set_title(crate::localization::browser_dialog_copy(language.as_deref()).extension_title);
             let selected = if action == "install-folder" { picker.pick_folder().await }
                 else { picker.add_filter("ZIP / CRX", &["zip", "crx"]).pick_file().await }.ok_or("Extension installation cancelled")?;
             let source = selected.path().to_path_buf(); let directory = profile_directory.clone();
-            let package = tokio::task::spawn_blocking(move || extension_packages::import(&source, &directory)).await.map_err(|e| e.to_string())??;
+            tokio::task::spawn_blocking(move || extension_packages::import(&source, &directory)).await.map_err(|e| e.to_string())??
+            };
             let path = package.directory.to_string_lossy().to_string();
             let installed: String = on_view(&view, move |core, tx| unsafe {
                 let tx = Arc::new(Mutex::new(Some(tx)));
@@ -1141,7 +1158,7 @@ pub async fn browser_extensions(
             .await?;
             extension_packages::remember(&profile_directory, installed, package)?;
         }
-        if !["install", "install-folder", "list", "remove", "enable", "disable", "popup"].contains(&action.as_str()) {
+        if !["install", "install-folder", "install-store", "list", "remove", "enable", "disable", "popup"].contains(&action.as_str()) {
             return Err("Invalid extension action".into());
         }
         let requested_id = id.clone(); let popup_action = action == "popup"; let remove_action = action == "remove";
