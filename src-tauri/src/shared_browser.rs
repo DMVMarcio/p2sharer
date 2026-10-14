@@ -16,6 +16,9 @@ mod dialogs;
 #[cfg(windows)]
 #[path = "browser_navigation.rs"]
 mod navigation;
+#[cfg(windows)]
+#[path = "browser_favicon.rs"]
+mod favicon;
 const BROWSER_HOME: &str = "https://www.google.com/";
 static NEXT_BROWSER_GENERATION: AtomicU64 = AtomicU64::new(1);
 
@@ -58,6 +61,10 @@ pub struct Tab {
     pub title: String,
     #[serde(default)]
     pub loading: bool,
+    #[serde(default)]
+    pub favicon: String,
+    #[serde(skip)]
+    favicon_uri: String,
     #[serde(skip)]
     navigation_id: u64,
 }
@@ -178,7 +185,7 @@ fn build_tab(
         .title("P2Sharer Browser").inner_size(1280.0, 720.0).visible(false).decorations(false)
         .shadow(false).skip_taskbar(true).focused(false).focusable(false)
         .data_directory(directory).incognito(temporary).browser_extensions_enabled(true)
-        .additional_browser_args(&format!("{} --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows",
+        .additional_browser_args(&format!("{} --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows --disable-direct-composition-video-overlays --disable-direct-composition-sw-video-overlays",
             std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS").unwrap_or_default()))
         .on_navigation(|url| allowed_url(url.as_str()))
         .on_new_window(move |url, _| {
@@ -428,7 +435,7 @@ async fn browser_state(
     for mut tab in tabs {
         #[cfg(windows)]
         if let Some(view) = app.get_webview_window(&label(scope, tab.id)) {
-            use webview2_com::{CoTaskMemPWSTR, Microsoft::Web::WebView2::Win32::ICoreWebView2_8};
+            use webview2_com::{CoTaskMemPWSTR, Microsoft::Web::WebView2::Win32::{ICoreWebView2_8, ICoreWebView2_15}};
             use windows_capture_api::core::Interface;
             let metadata = on_view(&view, move |core, tx| unsafe {
                 let result = (|| {
@@ -436,11 +443,14 @@ async fn browser_state(
                     let mut title = Default::default();
                     core.Source(&mut url)?;
                     core.DocumentTitle(&mut title)?;
+                    let mut icon = Default::default();
+                    if let Ok(favicons) = core.cast::<ICoreWebView2_15>() { let _ = favicons.FaviconUri(&mut icon); }
                     core.cast::<ICoreWebView2_8>()?
                         .SetIsMuted(tab.id != active)?;
                     Ok::<_, windows_capture_api::core::Error>((
                         CoTaskMemPWSTR::from(url).to_string(),
                         CoTaskMemPWSTR::from(title).to_string(),
+                        CoTaskMemPWSTR::from(icon).to_string(),
                     ))
                 })()
                 .map_err(|e| e.to_string());
@@ -449,6 +459,12 @@ async fn browser_state(
             .await?;
             tab.url = metadata.0;
             tab.title = metadata.1.chars().take(200).collect();
+            if tab.favicon_uri != metadata.2 {
+                if metadata.2.is_empty() { tab.favicon.clear(); tab.favicon_uri.clear(); }
+                else if let Ok(Ok(icon)) = tokio::time::timeout(std::time::Duration::from_millis(500), favicon::read(&view)).await {
+                    if !icon.is_empty() { tab.favicon = icon; tab.favicon_uri = metadata.2; }
+                }
+            }
         }
         updated.push(tab);
     }

@@ -52,6 +52,8 @@ export const WindowTitlebar: React.FC<{ onVisibilityChange: (visible: boolean) =
     };
     retain(nativeWindow.onResized(() => { void refresh().catch(report); }));
     retain(nativeWindow.onFocusChanged(() => { void refresh().catch(report); }));
+    const fullscreenChanged = () => { void refresh().catch(report); };
+    window.addEventListener('p2sharer-native-fullscreen-changed', fullscreenChanged);
     let closing = false;
     retain(nativeWindow.onCloseRequested(async event => {
       event.preventDefault();
@@ -62,7 +64,7 @@ export const WindowTitlebar: React.FC<{ onVisibilityChange: (visible: boolean) =
       await nativeWindow.destroy();
     }));
     void refresh().catch(report);
-    return () => { disposed = true; listeners.forEach((unlisten) => unlisten()); };
+    return () => { disposed = true; listeners.forEach((unlisten) => unlisten()); window.removeEventListener('p2sharer-native-fullscreen-changed', fullscreenChanged); };
   }, [nativeWindow]);
 
   useEffect(() => { onVisibilityChange(Boolean(nativeWindow) && !fullscreen); }, [nativeWindow, fullscreen, onVisibilityChange]);

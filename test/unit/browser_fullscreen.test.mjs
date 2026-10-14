@@ -68,7 +68,10 @@ test('fullscreen remains operable under StrictMode and uses the canonical dialog
   for (const key of keys.slice(0,-1)) Object.defineProperty(globalThis,key,{configurable:true,value:dom.window[key]});
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const values = [];
-  globalThis.nativeFullscreenFixture = {isFullscreen:async()=>false,setFullscreen:async value=>{values.push(value);}};
+  let failExit = false;
+  globalThis.nativeFullscreenFixture = {isFullscreen:async()=>false,setFullscreen:async value=>{
+    values.push(value); if (!value && failExit) { failExit = false; throw new Error('Fixture native exit failure'); }
+  }};
   const { createRoot } = await import('react-dom/client');
   const root = createRoot(document.getElementById('root'));
   let remoteTabs = 0;
@@ -88,12 +91,16 @@ test('fullscreen remains operable under StrictMode and uses the canonical dialog
     const input = document.getElementById('remote-input'); input.focus();
     await act(async()=>input.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Tab',bubbles:true,cancelable:true})));
     assert.equal(remoteTabs,1); assert.equal(document.activeElement,input);
+    failExit = true;
+    await act(async()=>document.getElementById('exit').click());
+    await act(async()=>new Promise(resolve=>setTimeout(resolve,280)));
+    assert.equal(document.querySelector('.fullscreen-dialog').hasAttribute('inert'),false, 'failed native exits keep the browser operable');
     await act(async()=>document.getElementById('exit').click());
     assert.equal(document.querySelector('.fullscreen-dialog').hasAttribute('inert'),true);
     await act(async()=>new Promise(resolve=>setTimeout(resolve,280)));
-    assert.equal(document.querySelector('.fullscreen-dialog'),null); assert.deepEqual(values,[true,false]);
+    assert.equal(document.querySelector('.fullscreen-dialog'),null); assert.deepEqual(values,[true,false,false]);
     await act(async()=>document.getElementById('enter').click());
-    await act(async()=>root.unmount()); assert.deepEqual(values,[true,false,true,false]);
+    await act(async()=>root.unmount()); assert.deepEqual(values,[true,false,false,true,false]);
   } finally {
     await act(async()=>root.unmount()); dom.window.close(); delete globalThis.nativeFullscreenFixture;
     for (const [key,descriptor] of previous) { if (descriptor) Object.defineProperty(globalThis,key,descriptor); else Reflect.deleteProperty(globalThis,key); }

@@ -130,11 +130,11 @@ test('external window changes update chrome, fullscreen hides it, and teardown r
   assert.ok(document.querySelector('.window-titlebar.is-inactive'));
   assert.ok(document.querySelector('[aria-label="Restaurar"]'));
   fullscreen = true;
-  await act(async () => callbacks.get('resize')());
+  await act(async () => window.dispatchEvent(new dom.window.Event('p2sharer-native-fullscreen-changed')));
   assert.equal(document.querySelector('.window-titlebar'), null);
   assert.equal(titlebarVisible, false);
   fullscreen = false;
-  await act(async () => callbacks.get('resize')());
+  await act(async () => window.dispatchEvent(new dom.window.Event('p2sharer-native-fullscreen-changed')));
   assert.ok(document.querySelector('.window-titlebar'));
   assert.equal(titlebarVisible, true);
   await act(async () => root.render(null));

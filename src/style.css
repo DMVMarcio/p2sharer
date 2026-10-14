@@ -5425,6 +5425,8 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 
 /* Native fullscreen content retains the common dialog lifecycle and focus boundary. */
 .modal-overlay:has(> .fullscreen-dialog) { padding: 0; }
+/* Fullscreen chrome must not depend on a native resize/focus event being delivered. */
+body:has(.fullscreen-dialog) .window-titlebar { display: none; }
 .modal-card.fullscreen-dialog { width: 100vw; max-width: none; height: 100vh; max-height: none; border-radius: 0; }
 .fullscreen-dialog > .modal-body { flex: 1; min-height: 0; padding: 0; gap: 0; overflow: hidden; }
 .fullscreen-dialog > .modal-footer, .fullscreen-dialog > .modal-overlay-actions { display: none; }

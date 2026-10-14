@@ -36,6 +36,11 @@ test('browser input and snapshots reject unsafe URLs, oversized data and invalid
   assert.equal(validBrowserState(state), true);
   assert.equal(validBrowserState({ ...state, active: 2 }), false);
   assert.equal(validBrowserState({ ...state, tabs: [state.tabs[0], state.tabs[0]] }), false);
+  const iconState = (favicon: string) => ({ ...state, tabs: [{ ...state.tabs[0], favicon }] });
+  assert.equal(validBrowserState(iconState('data:image/png;base64,iVBORw0KGgo=')), true);
+  for (const icon of ['https://example.com/favicon.ico', 'data:image/svg+xml;base64,PHN2Zz4=', 'data:image/png;base64,' + 'A'.repeat(8192)]) {
+    assert.equal(validBrowserState(iconState(icon)), false, 'room icons must be bounded PNGs supplied by the host');
+  }
 });
 
 test('contained browser coordinates remain correct in full screen and letterboxed cards', () => {

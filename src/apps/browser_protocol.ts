@@ -1,6 +1,10 @@
 export const BROWSER_WIDTH = 1280;
 export const BROWSER_HEIGHT = 720;
-export interface BrowserTab { id: number; url: string; title: string; loading?: boolean }
+export interface BrowserTab { id: number; url: string; title: string; loading?: boolean; favicon?: string }
+export function validBrowserFavicon(value: unknown): boolean {
+  return value === undefined || value === '' || typeof value === 'string' && value.length <= 8192
+    && /^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(value);
+}
 export interface BrowserState { tabs: BrowserTab[]; active: number; temporary: boolean; serial?: number }
 export interface BrowserPageDialog { id: string; tab: number; kind: 'alert' | 'confirm' | 'prompt'; message: string; defaultText: string }
 export function validBrowserDialog(value: unknown): value is BrowserPageDialog {
@@ -57,7 +61,7 @@ export function validBrowserState(value: unknown): value is BrowserState {
   return typeof s.temporary === 'boolean' && (s.serial === undefined || integer(s.serial, Number.MAX_SAFE_INTEGER))
     && integer(s.active, 1_000_000) && Array.isArray(s.tabs) && s.tabs.length <= 16
     && s.tabs.every(t => t && integer(t.id, 1_000_000) && typeof t.url === 'string' && t.url.length <= 4096
-      && typeof t.title === 'string' && t.title.length <= 400 && (t.loading === undefined || typeof t.loading === 'boolean'))
+      && typeof t.title === 'string' && t.title.length <= 400 && (t.loading === undefined || typeof t.loading === 'boolean') && validBrowserFavicon(t.favicon))
     && new Set(s.tabs.map(t => t.id)).size === s.tabs.length && (!s.tabs.length || s.tabs.some(t => t.id === s.active));
 }
 

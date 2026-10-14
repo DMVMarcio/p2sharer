@@ -16,14 +16,21 @@ import { useNativeFullscreen } from '../hooks/useNativeFullscreen';
 import { useIdleControls } from '../hooks/useIdleControls';
 import type { BrowserContentMode, BrowserVideoQuality } from './browser_quality';
 
+function BrowserFavicon({ value }: { value?: string }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [value]);
+  return value && !failed ? <img className="browser-favicon" src={value} alt="" draggable={false} onError={() => setFailed(true)} /> : <Globe size={13} />;
+}
+
 function BrowserSettings({ model, onClose }: { model: BrowserModel; onClose: () => void }) {
   const [mode, setMode] = useState('cache');
   const [confirm, setConfirm] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
   const run = (operation: Promise<void>) => void operation.catch(e => showToast(localizeError(e), 4000, 'error'));
   useEffect(() => { run(model.manageExtensions('list')); }, [model]);
-  return <ModalDialog title={t('browser.settings')} icon={<Settings size={20} />} onClose={onClose} busy={model.busy}>
+  return <ModalDialog title={t('browser.settings')} icon={<Settings size={20} />} className="browser-settings-dialog" onClose={onClose} busy={model.busy}>
     <div className="browser-settings">
+      <div className="browser-settings-column">
       <p>{t(model.state.temporary ? 'browser.temporaryInfo' : 'browser.persistentInfo')}</p>
       {model.media && <>
         <label>{t('browser.contentMode')}<Select value={model.media.quality.settings.mode}
@@ -37,6 +44,7 @@ function BrowserSettings({ model, onClose }: { model: BrowserModel; onClose: () 
       <label>{t('browser.clearData')}<Select value={mode} disabled={model.busy} onValueChange={setMode}
         options={['cache', 'sites', 'history', 'reset'].map(value => ({ value, label: t(`browser.clear.${value}`) }))} /></label>
       <button className="btn btn-secondary" disabled={model.busy} onClick={() => setConfirm(true)}>{t('browser.clearData')}</button>
+      </div><div className="browser-settings-column">
       <div className="browser-extension-heading"><h3>{t('browser.extensions')}</h3>
         <button className="btn btn-secondary btn-sm" disabled={model.busy} onClick={() => run(model.manageExtensions('install'))}><Plus size={15} />{t('browser.installExtension')}</button></div>
       <p>{t('browser.extensionsInfo')}</p>
@@ -48,6 +56,7 @@ function BrowserSettings({ model, onClose }: { model: BrowserModel; onClose: () 
         <TooltipButton className="btn btn-secondary btn-sm" tooltip={t('browser.removeExtension')} aria-label={t('browser.removeExtension')}
           disabled={model.busy} onClick={() => setRemoving(extension.id)}><Trash2 size={15} /></TooltipButton>
       </div>)}
+      </div>
     </div>
     {confirm && <ModalDialog title={t(`browser.clear.${mode}`)} onClose={() => setConfirm(false)} busy={model.busy}
       footer={close => <><button className="btn btn-secondary" disabled={model.busy} onClick={close}>{t('browser.cancel')}</button>
@@ -97,6 +106,16 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
   const { fullscreen, enterFullscreen, exitFullscreen } = useNativeFullscreen();
   const controls = useIdleControls(fullscreen);
   const fullscreenClose = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    if (!fullscreen) return;
+    const key = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'F11') return;
+      event.preventDefault(); event.stopImmediatePropagation();
+      if (event.type === 'keydown' && !event.repeat) fullscreenClose.current?.();
+    };
+    document.addEventListener('keydown', key, true); document.addEventListener('keyup', key, true);
+    return () => { document.removeEventListener('keydown', key, true); document.removeEventListener('keyup', key, true); };
+  }, [fullscreen]);
   const minimized = compact && !fullscreen;
   const [muted, setMuted] = useState(false); const [volume, setVolume] = useState(1);
   useEffect(() => {
@@ -151,7 +170,10 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
     if (event === 'mouseReleased' && !e.buttons && e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
   };
   const expand = () => {
-    if (fullscreen) fullscreenClose.current?.();
+    if (fullscreen) {
+      if (fullscreenClose.current) fullscreenClose.current();
+      else void exitFullscreen().catch(e => showToast(localizeError(e), 4000, 'error'));
+    }
     else void enterFullscreen().catch(e => showToast(localizeError(e), 4000, 'error'));
   };
   const key = (e: KeyboardEvent<HTMLTextAreaElement>, event: 'keyDown' | 'keyUp') => {
@@ -159,7 +181,7 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
     // Let the local textarea receive paste; never paste the host's personal clipboard.
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') return;
     if (e.key === 'Dead') return;
-    if (event === 'keyDown' && e.key === 'F11') { e.preventDefault(); expand(); return; }
+    if (e.key === 'F11') { e.preventDefault(); if (event === 'keyDown') expand(); return; }
     if (e.ctrlKey && e.key === 'Tab') {
       e.preventDefault(); if (event === 'keyUp' || !model.state.tabs.length) return;
       const tabs = model.state.tabs; const index = tabs.findIndex(tab => tab.id === model.state.active);
@@ -187,7 +209,7 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
       {!fullscreen && <div className="browser-tabs" role="group" aria-label={t('browser.tabs')}>
         {model.state.tabs.map(tab => <div className={`browser-tab${tab.id === model.state.active ? ' selected' : ''}`} key={tab.id}>
           <button aria-pressed={tab.id === model.state.active} className="btn btn-secondary btn-sm browser-tab-label" disabled={!model.canControl}
-            onClick={() => send({ kind: 'select-tab', id: tab.id })}><Globe size={13} /><span>{tab.title || t('browser.newTab')}</span></button>
+            onClick={() => send({ kind: 'select-tab', id: tab.id })}><BrowserFavicon value={tab.favicon} /><span>{tab.title || t('browser.newTab')}</span></button>
           <TooltipButton className="btn btn-secondary btn-sm browser-tab-close" tooltip={t('browser.closeTab')}
             disabled={!model.canControl} onClick={() => send({ kind: 'close-tab', id: tab.id })}><X size={13} /></TooltipButton>
         </div>)}
@@ -215,7 +237,7 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
         {icon(fullscreen ? 'exitFullscreen' : 'fullscreen', fullscreen ? <Minimize size={15} /> : <Maximize size={15} />, expand)}
       </form>
     </div>}
-    <div className="browser-surface" ref={surface} onPointerMove={e => pointer(e, 'mouseMoved')}
+    <div className={`browser-surface${!minimized && model.running && model.hostOnline && model.pointer && model.controller === model.pointer.actor ? ' virtual-cursor' : ''}`} ref={surface} onPointerMove={e => pointer(e, 'mouseMoved')}
       onPointerDown={e => pointer(e, 'mousePressed')} onPointerUp={e => pointer(e, 'mouseReleased')}
       onPointerCancel={() => send({ kind: 'release' })} onContextMenu={e => e.preventDefault()}
       onWheel={e => {
@@ -261,5 +283,5 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
     {!minimized && model.dialog && <BrowserPageDialog model={model} key={model.dialog.id} />}
   </div>;
   return fullscreen ? <FullscreenDialog title={t('browser.title')} closeRef={fullscreenClose}
-    onClose={() => { void exitFullscreen().catch(e => showToast(localizeError(e), 4000, 'error')); }}>{content}</FullscreenDialog> : content;
+    onClose={() => exitFullscreen().catch(e => { showToast(localizeError(e), 4000, 'error'); throw e; })}>{content}</FullscreenDialog> : content;
 }

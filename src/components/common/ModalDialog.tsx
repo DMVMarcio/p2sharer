@@ -16,7 +16,7 @@ interface Props {
   className?: string;
   busy?: boolean;
   closeOnOutside?: boolean;
-  onClose: () => void;
+  onClose: () => void | Promise<void>;
   onCloseStart?: () => void;
 }
 
@@ -39,7 +39,12 @@ export function ModalDialog({ title, subtitle, icon, headerless = false, headerA
     closingRef.current = true;
     closeStartRef.current?.();
     setClosing(true);
-    timerRef.current = setTimeout(() => closeRef.current(), 240);
+    timerRef.current = setTimeout(() => {
+      // A failed native close must leave controls usable for a retry.
+      void Promise.resolve().then(() => closeRef.current()).catch(() => {
+        closingRef.current = false; setClosing(false);
+      });
+    }, 240);
   };
   useEffect(() => {
     if (!busy && requestedCloseRef.current) {

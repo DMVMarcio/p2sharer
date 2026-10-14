@@ -13,6 +13,21 @@ test('fullscreen restores the inherited native window state on exit and disposal
     assert.deepEqual(values, [true, previous, true, previous]); assert.equal(await session.enter(), false);
   }
 });
+test('exit requested during entry waits for the native transition and failed exits can be retried', async () => {
+  let complete!: () => void;
+  const entered = new Promise<void>(resolve => { complete = resolve; });
+  const values: boolean[] = []; let fail = true;
+  const session = new NativeFullscreenSession({ isFullscreen: async () => false, setFullscreen: async value => {
+    values.push(value); if (value) await entered;
+    else if (fail) { fail = false; throw new Error('Fixture IPC failure'); }
+  } });
+  const entering = session.enter(); const exiting = session.exit();
+  complete(); assert.equal(await entering, true);
+  await assert.rejects(exiting, /Fixture IPC failure/);
+  assert.equal(session.active, true);
+  await session.exit(); assert.equal(session.active, false);
+  assert.deepEqual(values, [true, false, false]);
+});
 test('disposing during fullscreen entry restores the window instead of leaving an orphaned fullscreen session', async () => {
   let complete!: () => void;
   const entered = new Promise<void>(resolve => { complete = resolve; });

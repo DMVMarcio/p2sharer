@@ -12,7 +12,7 @@ export function useNativeFullscreen() {
     return () => { session.dispose(); if (sessionRef.current === session) sessionRef.current = null; };
   }, []);
   return { fullscreen,
-    enterFullscreen: async () => { const session = sessionRef.current; if (session) { const active = await session.enter(); if (sessionRef.current === session) setFullscreen(active); } },
-    exitFullscreen: async () => { const session = sessionRef.current; if (session) { await session.exit(); if (sessionRef.current === session) setFullscreen(false); } },
+    enterFullscreen: async () => { const session = sessionRef.current; if (session) { const active = await session.enter(); if (sessionRef.current === session) setFullscreen(active); window.dispatchEvent(new window.Event('p2sharer-native-fullscreen-changed')); } },
+    exitFullscreen: async () => { const session = sessionRef.current; if (session) { await session.exit(); if (sessionRef.current === session) setFullscreen(false); window.dispatchEvent(new window.Event('p2sharer-native-fullscreen-changed')); } },
   };
 }
