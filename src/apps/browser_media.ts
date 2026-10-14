@@ -1,20 +1,19 @@
-import { invoke } from '@tauri-apps/api/core';
 import { AudioBridge } from '../audio/audio_bridge.ts';
 import { buildRtcConfiguration } from '../p2p/ice_config.ts';
 import { stateStore } from '../core/state_store.ts';
 import { MediaCoordinator } from '../p2p/media_coordinator.ts';
-import { BROWSER_HEIGHT, BROWSER_WIDTH, type BrowserState } from './browser_protocol.ts';
+import type { BrowserState } from './browser_protocol.ts';
 import { BrowserQualityController, loadBrowserQuality, type BrowserQualitySettings } from './browser_quality.ts';
+import { BrowserCapture } from './browser_capture.ts';
 
 /** Media stays outside snapshots; bounded capture never queues stale frames. */
 export class BrowserMedia {
   readonly quality = new BrowserQualityController(loadBrowserQuality());
   stream: MediaStream | null = null;
   private audio?: AudioBridge;
-  private canvas?: HTMLCanvasElement;
+  private capture?: BrowserCapture;
   private stopped = true;
   private generation = 0;
-  private timer?: ReturnType<typeof setTimeout>;
   private peers = new Map<string, { pc: RTCPeerConnection; token: string; pending: RTCIceCandidateInit[];
     local: RTCIceCandidateInit[]; announced: boolean }>();
   private retries = new Map<string, ReturnType<typeof setTimeout>>();
@@ -38,56 +37,41 @@ export class BrowserMedia {
     this.stop(); this.stopped = false; const generation = ++this.generation;
     if (!this.host) return;
     this.quality.reset();
-    this.canvas = document.createElement('canvas'); this.canvas.width = BROWSER_WIDTH; this.canvas.height = BROWSER_HEIGHT;
-    this.stream = this.canvas.captureStream(0);
-    for (const track of this.stream.getVideoTracks()) track.contentHint = 'detail';
+    this.stream = new MediaStream();
     this.audio = new AudioBridge(); const track = this.audio.init();
     if (track) this.stream.addTrack(track);
     await this.audio.startListening(`shared-browser-audio-${this.scope}`);
     if (this.stopped || generation !== this.generation) return;
-    this.changed(); let nextMetadata = 0; let nextProbe = 0; let lastQuality = '';
-    const capture = async () => {
-      const started = performance.now();
-      const quality = this.quality.quality;
-      try {
-        const metadata = started >= nextMetadata; const probe = started >= nextProbe;
-        if (metadata) nextMetadata = started + 1000;
-        if (probe) nextProbe = started + 1000;
-        const frame = await invoke<{ image: string; state: BrowserState | null; playing: boolean | null }>('capture_shared_browser',
-          { scope: this.scope, metadata, width: quality.width, probe });
-        if (this.stopped || generation !== this.generation) return;
-        const bytes = Uint8Array.from(atob(frame.image), c => c.charCodeAt(0));
-        const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/jpeg' }));
-        if (!this.stopped && generation === this.generation) {
-          const canvas = this.canvas!;
-          if (canvas.width !== quality.width || canvas.height !== quality.height) { canvas.width = quality.width; canvas.height = quality.height; }
-          canvas.getContext('2d')?.drawImage(bitmap, 0, 0, quality.width, quality.height);
-          for (const track of this.stream?.getVideoTracks() ?? []) {
-            track.contentHint = quality.video ? 'motion' : 'detail';
-            (track as CanvasCaptureMediaStreamTrack).requestFrame();
-          }
-          if (typeof frame.playing === 'boolean') this.quality.detect(frame.playing, performance.now());
-          this.quality.sample(performance.now() - started, performance.now());
-          const signature = JSON.stringify(this.quality.quality);
-          if (signature !== lastQuality) { lastQuality = signature; this.changed(); for (const { pc } of this.peers.values()) this.configureEncoding(pc); }
-          if (frame.state) this.metadata(frame.state);
-        }
-        bitmap.close();
-      } catch (error) { if (!this.stopped && generation === this.generation) this.failed(error); }
-      if (!this.stopped && generation === this.generation) {
-        // Capture/IPC/decoding time is part of the frame period, not an additional delay.
-        this.timer = setTimeout(() => void capture(), Math.max(0, 1000 / this.quality.quality.fps - (performance.now() - started)));
-      }
-    };
-    void capture();
+    this.capture = new BrowserCapture(this.scope, this.quality, stream => this.installVideo(stream), this.metadata,
+      () => { this.changed(); for (const { pc } of this.peers.values()) this.configureEncoding(pc); },
+      error => { if (!this.stopped && generation === this.generation) this.failed(error); });
+    await this.capture.start();
+    if (!this.stopped && generation === this.generation) this.changed();
+  }
+  refreshCapture(): void { this.capture?.requestRefresh(); }
+  private installVideo(stream: MediaStream): void {
+    const track = stream.getVideoTracks()[0]; if (!track || !this.stream || this.stopped) return;
+    // Rebind the host video element even if its previous source ended between tabs.
+    this.stream = new MediaStream([track, ...this.stream.getAudioTracks()]);
+    track.contentHint = this.quality.quality.video ? 'motion' : 'detail';
+    for (const [peer, { pc }] of this.peers) {
+      const sender = pc.getSenders().find(sender => sender.track?.kind === 'video');
+      if (sender) void sender.replaceTrack(track).catch(() => {
+        this.lastOffers.delete(peer); return this.offer(peer);
+      }).catch(this.failed);
+      else { this.lastOffers.delete(peer); void this.offer(peer).catch(this.failed); }
+    }
+    this.changed();
   }
   configure(settings: BrowserQualitySettings): void {
     this.quality.configure(settings);
+    this.capture?.requestRefresh();
     try { localStorage.setItem('browser-quality-v1', JSON.stringify(settings)); } catch {}
     this.changed();
   }
   private configureEncoding(pc: RTCPeerConnection): void {
     const quality = this.quality.quality;
+    for (const track of this.stream?.getVideoTracks() ?? []) track.contentHint = quality.video ? 'motion' : 'detail';
     for (const sender of pc.getSenders()) if (sender.track?.kind === 'video') {
       const parameters = sender.getParameters();
       if (!parameters.encodings?.length) continue;
@@ -173,9 +157,9 @@ export class BrowserMedia {
     if (!this.host && entry) { this.stream?.getTracks().forEach(t => t.stop()); this.stream = null; this.changed(); }
   }
   stop(): void {
-    this.stopped = true; this.generation++; clearTimeout(this.timer);
+    this.stopped = true; this.generation++; this.capture?.stop(); this.capture = undefined;
     for (const peer of this.peers.keys()) this.remove(peer);
     this.stream?.getTracks().forEach(t => t.stop()); this.stream = null;
-    this.audio?.stop(); this.audio = undefined; this.canvas = undefined;
+    this.audio?.stop(); this.audio = undefined;
   }
 }

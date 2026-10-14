@@ -92,3 +92,4 @@ export class BrowserControlLease {
   }
   clear(): void { this.owner = ''; this.buttons = 0; this.keys.clear(); }
 }
+export const BROWSER_HOME = 'https://www.google.com/';

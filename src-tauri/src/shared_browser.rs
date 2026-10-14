@@ -13,6 +13,7 @@ use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindo
 #[cfg(windows)]
 #[path = "browser_dialogs.rs"]
 mod dialogs;
+const BROWSER_HOME: &str = "https://www.google.com/";
 
 #[derive(Default)]
 pub struct BrowserState(Mutex<HashMap<String, Session>>, tokio::sync::Mutex<()>);
@@ -34,9 +35,11 @@ struct Session {
     audio: Option<Arc<AtomicBool>>,
     serial: u64,
     pointer: (f64, f64),
+    buttons: u8,
     saved: Option<SavedTabs>,
     language: Option<String>,
     capture_widths: HashMap<u32, u32>,
+    capture_id: Option<String>,
 }
 #[derive(Default, Clone, PartialEq, Serialize, Deserialize)]
 struct SavedTabs {
@@ -164,6 +167,7 @@ fn build_tab(
     let copy = crate::localization::browser_dialog_copy(language);
     let view = WebviewWindowBuilder::new(app, label(scope, id), WebviewUrl::External(tauri::Url::parse("about:blank").map_err(|e| e.to_string())?))
         .title("P2Sharer Browser").inner_size(1280.0, 720.0).visible(false).decorations(false)
+        .shadow(false).skip_taskbar(true).focused(false).focusable(false)
         .data_directory(directory).incognito(temporary).browser_extensions_enabled(true)
         .additional_browser_args(&format!("{} --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows",
             std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS").unwrap_or_default()))
@@ -237,9 +241,11 @@ pub async fn start_shared_browser(
                 audio: None,
                 serial: 0,
                 pointer: (0.0, 0.0),
+                buttons: 0,
                 saved: None,
                 language,
                 capture_widths: HashMap::new(),
+                capture_id: None,
             },
         );
     }
@@ -258,9 +264,10 @@ pub async fn start_shared_browser(
         .take(16)
         .collect();
     if urls.is_empty() {
-        urls.push("about:blank".into());
+        urls.push(BROWSER_HOME.into());
     }
     for url in urls {
+        let url = if url == "about:blank" { BROWSER_HOME } else { &url };
         if let Err(e) = add_tab(&app, &state, &scope, &url).await {
             close_session(&app, &state, &scope);
             return Err(e);
@@ -478,6 +485,7 @@ async fn browser_state(
 fn close_session(app: &AppHandle, state: &BrowserState, scope: &str) {
     let session = { state.0.lock().unwrap().remove(scope) };
     if let Some(session) = session {
+        if let Some(id) = session.capture_id { let _ = crate::screen_sources::stop_capture_session(id); }
         if let Some(flag) = session.audio {
             flag.store(false, Ordering::SeqCst);
         }
@@ -735,7 +743,7 @@ pub async fn control_shared_browser(
                     .is_empty()
             };
             if empty {
-                add_tab(&app, &state, &scope, "about:blank").await?;
+                add_tab(&app, &state, &scope, BROWSER_HOME).await?;
             }
         }
         BrowserCommand::Back | BrowserCommand::Forward => {
@@ -763,27 +771,25 @@ pub async fn control_shared_browser(
             .await?;
         }
         BrowserCommand::Release => {
-            let pointer = {
-                state
-                    .0
-                    .lock()
-                    .unwrap()
-                    .get(&scope)
-                    .ok_or("Browser closed")?
-                    .pointer
+            let (pointer, buttons) = {
+                let mut sessions = state.0.lock().unwrap();
+                let session = sessions.get_mut(&scope).ok_or("Browser closed")?;
+                let buttons = session.buttons; session.buttons = 0;
+                (session.pointer, buttons)
             };
             #[cfg(windows)]
-            for button in ["left", "middle", "right"] {
-                cdp(&view, "Input.dispatchMouseEvent", json!({"type":"mouseReleased","x":pointer.0,"y":pointer.1,"button":button,"buttons":0})).await?;
+            for (button, remaining) in release_buttons(buttons) {
+                cdp(&view, "Input.dispatchMouseEvent", json!({"type":"mouseReleased","x":pointer.0,"y":pointer.1,"button":button,"buttons":remaining})).await?;
             }
         }
         input => {
             let (method, params) = input_method(&input)?;
             #[cfg(windows)]
             cdp(&view, method, params).await?;
-            if let BrowserCommand::Mouse { x, y, .. } = input {
+            if let BrowserCommand::Mouse { x, y, buttons, .. } = input {
                 if let Some(session) = state.0.lock().unwrap().get_mut(&scope) {
                     session.pointer = (x, y);
+                    session.buttons = buttons as u8;
                 }
             }
         }
@@ -796,18 +802,22 @@ pub async fn control_shared_browser(
 }
 
 #[tauri::command]
-pub async fn capture_shared_browser(
+pub async fn prepare_shared_browser_capture(
     app: AppHandle,
     window: WebviewWindow,
     state: tauri::State<'_, BrowserState>,
     scope: String,
-    metadata: bool,
     width: u32,
     probe: bool,
+    session_id: String,
 ) -> Result<Value, String> {
     trusted(&window, &scope)?;
     if !valid_capture_width(width) {
         return Err("Invalid browser capture size".into());
+    }
+    if !session_id.starts_with(&format!("browser-{scope}-")) || session_id.len() > 100
+        || !session_id.bytes().all(|b| b.is_ascii_hexdigit() || b.is_ascii_lowercase() || b == b'-') {
+        return Err("Invalid browser capture session".into());
     }
     let _operation = state.1.lock().await;
     let active = {
@@ -824,38 +834,45 @@ pub async fn capture_shared_browser(
         .ok_or("Browser closed")?;
     #[cfg(windows)]
     {
-        let previous_width = state.0.lock().unwrap().get(&scope)
-            .and_then(|session| session.capture_widths.get(&active)).copied().unwrap_or(1280);
+        let prepared_width = state.0.lock().unwrap().get(&scope)
+            .and_then(|session| session.capture_widths.get(&active)).copied();
+        let previous_width = prepared_width.unwrap_or(1280);
         if previous_width != width {
             cdp(&view, "Emulation.setDeviceMetricsOverride",
                 json!({"width":1280,"height":720,"deviceScaleFactor":width as f64 / 1280.0,"mobile":false})).await?;
-            if let Some(session) = state.0.lock().unwrap().get_mut(&scope) {
-                session.capture_widths.insert(active, width);
-            }
         }
+        // WGC captures a live compositor surface; hidden/minimized windows have none.
+        // Keep the source outside the entire virtual desktop and never activate it.
+        let height = width * 9 / 16;
+        if prepared_width != Some(width) {
+            view.set_size(tauri::PhysicalSize::new(width, height)).map_err(|e| e.to_string())?;
+            let desktop_left = unsafe { windows::Win32::UI::WindowsAndMessaging::GetSystemMetrics(windows::Win32::UI::WindowsAndMessaging::SM_XVIRTUALSCREEN) };
+            view.set_position(tauri::PhysicalPosition::new(desktop_left.saturating_sub(width as i32 + 128), 0)).map_err(|e| e.to_string())?;
+            state.0.lock().unwrap().get_mut(&scope).ok_or("Browser closed")?.capture_widths.insert(active, width);
+        }
+        if !view.is_visible().map_err(|e| e.to_string())? { view.show().map_err(|e| e.to_string())?; }
+        let tabs = state.0.lock().unwrap().get(&scope).ok_or("Browser closed")?.tabs.clone();
+        for tab in tabs { if tab.id != active { if let Some(other) = app.get_webview_window(&label(&scope, tab.id)) { if other.is_visible().unwrap_or(false) { let _ = other.hide(); } } } }
+        let previous_id = state.0.lock().unwrap().get_mut(&scope).ok_or("Browser closed")?.capture_id.replace(session_id.clone());
+        if let Some(previous) = previous_id { if previous != session_id { let _ = crate::screen_sources::stop_capture_session(previous); } }
         let playing = if probe { Some(probe_video(&view).await.unwrap_or(false)) } else { None };
-        let frame = cdp(
-            &view,
-            "Page.captureScreenshot",
-            json!({"format":"jpeg","quality":90,"fromSurface":true,"captureBeyondViewport":false,"optimizeForSpeed":true}),
-        )
-        .await?;
-        let image = frame["data"].as_str().ok_or("Browser capture failed")?;
-        if image.len() > 4_000_000 {
-            return Err("Browser capture exceeds limit".into());
-        }
-        let state = if metadata {
-            browser_state(&app, &state, &scope).await?
-        } else {
-            Value::Null
-        };
-        Ok(json!({"image": image, "state": state, "playing": playing}))
+        let source_id = format!("window:{}", view.hwnd().map_err(|e| e.to_string())?.0 as usize);
+        let state = browser_state(&app, &state, &scope).await?;
+        Ok(json!({"sourceId":source_id, "state": state, "playing": playing}))
     }
     #[cfg(not(windows))]
     {
-        let _ = (view, metadata);
+        let _ = (view, probe);
         Err("Shared browser requires Windows".into())
     }
+}
+
+fn release_buttons(mut buttons: u8) -> Vec<(&'static str, u8)> {
+    let mut released = vec![];
+    for (name, mask) in [("left", 1), ("right", 2), ("middle", 4)] {
+        if buttons & mask != 0 { buttons &= !mask; released.push((name, buttons)); }
+    }
+    released
 }
 
 #[cfg(windows)]
@@ -1082,6 +1099,13 @@ pub async fn browser_extensions(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn idle_release_never_synthesizes_a_right_click() {
+        assert!(release_buttons(0).is_empty());
+        assert_eq!(release_buttons(1), vec![("left", 0)]);
+        assert_eq!(release_buttons(5), vec![("left", 4), ("middle", 0)]);
+        assert_eq!(release_buttons(2), vec![("right", 0)]);
+    }
     #[test]
     fn capture_allows_only_bounded_quality_profiles() {
         assert!(valid_capture_width(1280));

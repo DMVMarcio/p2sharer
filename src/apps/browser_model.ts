@@ -64,7 +64,10 @@ export class BrowserModel implements RoomAppModel {
   private changed(): void { this.revision++; this.publish(); }
   private acceptNativeState(state: unknown): void {
     if (!this.joined || !this.running || !validBrowserState(state) || (state.serial ?? 0) < (this.state.serial ?? 0)) return;
-    if (JSON.stringify(state) !== JSON.stringify(this.state)) { this.state = state; this.changed(); }
+    if (JSON.stringify(state) !== JSON.stringify(this.state)) {
+      const activeChanged = state.active !== this.state.active;
+      this.state = state; this.changed(); if (activeChanged) this.media?.refreshCapture();
+    }
   }
   private fail(error: unknown): void { if (!this.disposed) { this.error = String(error); this.context.changed(); } }
   private queue(operation: () => Promise<void>): Promise<void> {

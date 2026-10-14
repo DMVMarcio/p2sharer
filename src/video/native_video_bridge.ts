@@ -29,6 +29,8 @@ export class NativeVideoBridge implements VideoCaptureBridge {
   private trackWriter: any = null;
   private frameClock = new VideoFrameClock();
   private effectiveFps = 60;
+  private loadMeter: BridgeLoadMeter | null = null;
+  private processingCost = 0;
   private disposeDiagnostics: (() => void) | null = null;
   private diagnosticPackets = 0;
   private diagnosticLastPacket = 0;
@@ -166,6 +168,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
       pressure_percent: this.diagnosticPressure, ...this.encodedDecoder?.diagnosticSnapshot(),
     }));
     const loadMeter = new BridgeLoadMeter(fps, performance.now());
+    this.loadMeter = loadMeter; this.processingCost = 0;
     let feedbackPending = false;
     let nativeEncodingFailed = false;
     let receivedNativeEncoding = false;
@@ -347,7 +350,9 @@ export class NativeVideoBridge implements VideoCaptureBridge {
       } finally {
         if (generation === this.captureGeneration) {
           if (buffer.byteLength > 4 || buffer.byteLength === 4 && new Uint8Array(buffer)[0] === 1) {
-            loadMeter.complete(performance.now() - processingStarted);
+            const cost = performance.now() - processingStarted;
+            loadMeter.complete(cost);
+            this.processingCost = this.processingCost ? this.processingCost * 0.9 + cost * 0.1 : cost;
           }
           this.isDecoding = false;
           if (this.pendingBuffer) pumpNextFrame();
@@ -484,7 +489,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     if (this.trackGenerator) {
       stream = new MediaStream([this.trackGenerator]);
     } else if (this.canvas) {
-      stream = this.canvas.captureStream(fps);
+      stream = this.canvas.captureStream(0);
       const videoTrack = stream.getVideoTracks()[0];
       if (videoTrack && 'contentHint' in videoTrack) {
         videoTrack.contentHint = 'detail';
@@ -567,6 +572,14 @@ export class NativeVideoBridge implements VideoCaptureBridge {
   public getCurrentFps(): number {
     return this.currentFps;
   }
+  public getProcessingCost(): number { return this.processingCost; }
+  public async updateProfile(fps: number, width: number, height: number): Promise<void> {
+    if (!this.isCapturingNative() || !this.encoderFeedbackToken) return;
+    await invoke('update_capture_profile', { sessionId: this.sessionId, feedbackToken: this.encoderFeedbackToken,
+      targetFps: fps, targetWidth: width, targetHeight: height });
+    this.currentFps = this.effectiveFps = fps;
+    this.loadMeter?.setEffectiveFps(fps);
+  }
 
   public async stop(): Promise<void> {
     await this.stopCapture();
@@ -583,6 +596,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     this.disposeDiagnostics?.(); this.disposeDiagnostics = null;
     this.captureGeneration++;
     this.encoderFeedbackToken = null;
+    this.loadMeter = null;
     this.isCapturing = false;
     this.isDirectGpu = false;
     this.pendingBuffer = null;

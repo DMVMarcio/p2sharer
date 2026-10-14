@@ -3,48 +3,55 @@ import test from 'node:test';
 import { BrowserMedia } from '../../src/apps/browser_media.ts';
 import { MockMediaStream, MockMediaStreamTrack } from '../helpers/browser_mocks.ts';
 import { BrowserQualityController, validBrowserQuality } from '../../src/apps/browser_quality.ts';
-import { AudioBridge } from '../../src/audio/audio_bridge.ts';
+import { BrowserCapture, type BrowserCaptureDependencies } from '../../src/apps/browser_capture.ts';
 
-test('host capture requests completed frames, subtracts processing time and discards retired captures', async () => {
-  const originals = new Map(['window', 'document', 'performance', 'createImageBitmap', 'setTimeout', 'clearTimeout']
-    .map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
-  const init = AudioBridge.prototype.init; const listen = AudioBridge.prototype.startListening;
-  let now = 0; let requests = 0; let frames = 0; let draws = 0; let closed = 0;
-  let resolveCapture: (value: unknown) => void = () => {};
-  let scheduled: (() => void) | null = null; let delay = 0;
-  const track = new MockMediaStreamTrack('video'); Object.assign(track, { requestFrame: () => frames++ });
-  const stream = new MockMediaStream(); stream.addTrack(track);
-  const canvas = { width: 0, height: 0, captureStream: (fps: number) => { assert.equal(fps, 0); return stream; },
-    getContext: () => ({ drawImage: () => draws++ }) };
-  const replace = (key: string, value: unknown) => Object.defineProperty(globalThis, key, { configurable: true, writable: true, value });
-  replace('window', { __TAURI_INTERNALS__: { invoke: (command: string, args: Record<string, unknown>) => {
-    assert.equal(command, 'capture_shared_browser'); assert.equal(args.width, 1280); requests++;
-    return new Promise(resolve => { resolveCapture = resolve; });
-  } } });
-  replace('document', { createElement: () => canvas }); replace('performance', { now: () => now });
-  replace('createImageBitmap', async () => { now += 5; return { close: () => closed++ }; });
-  replace('setTimeout', (callback: () => void, milliseconds: number) => { scheduled = callback; delay = milliseconds; return 1; });
-  replace('clearTimeout', () => { scheduled = null; });
-  AudioBridge.prototype.init = () => null; AudioBridge.prototype.startListening = async () => {};
-  const media = new BrowserMedia(crypto.randomUUID(), true, async () => {}, () => {}, () => {}, error => { throw error; });
+test('browser capture uses a scoped native stream, updates profiles in place and replaces only changed tabs', async () => {
+  let source = 'window:1'; let starts = 0; let profiles = 0; let stops = 0; let deliveries = 0;
+  const quality = new BrowserQualityController({ mode: 'reading', video: '1080p30' });
+  const calls: string[] = [];
+  const native: BrowserCaptureDependencies = {
+    async call(command) {
+      calls.push(command);
+      return (command === 'get_capture_metrics' ? { images: 0, processing_us: 0 } :
+        { sourceId: source, state: { tabs: [], active: 1, temporary: false }, playing: false }) as never;
+    },
+    bridge(session) {
+      assert.ok(session.startsWith('browser-'));
+      return { async startCapture(_source, fps, size, cursor) {
+        starts++; assert.equal(cursor, false); assert.ok([15, 30].includes(fps)); assert.equal(size.width, 1280);
+        return {} as MediaStream;
+      }, async updateProfile(fps, width) { profiles++; assert.equal(fps, 30); assert.equal(width, 1280); },
+      getProcessingCost: () => 1, async stopCapture() { stops++; } };
+    },
+  };
+  const capture = new BrowserCapture(crypto.randomUUID(), quality, () => deliveries++, () => {}, () => {}, error => { throw error; }, native);
   try {
-    media.configure({ mode: 'video', video: '720p30' }); await media.start();
-    assert.equal(requests, 1); assert.equal(scheduled, null, 'an unfinished capture never queues another');
-    now = 12; resolveCapture({ image: 'AA==', state: null, playing: true });
+    await capture.start(); assert.equal(starts, 1); assert.equal(deliveries, 1);
+    quality.configure({ mode: 'video', video: '720p30' }); capture.requestRefresh();
     await new Promise(resolve => setImmediate(resolve));
-    assert.equal(frames, 1); assert.equal(draws, 1); assert.equal(closed, 1);
-    assert.ok(Math.abs(delay - (1000 / 30 - 17)) < 0.01, 'processing belongs inside the frame period');
-    assert.equal(track.contentHint, 'motion'); assert.equal(canvas.height, 720);
-    scheduled!(); assert.equal(requests, 2); media.stop();
-    resolveCapture({ image: 'AA==', state: null, playing: true });
+    assert.equal(profiles, 1); assert.equal(starts, 1);
+    source = 'window:2'; capture.requestRefresh();
     await new Promise(resolve => setImmediate(resolve));
-    assert.equal(draws, 1); assert.equal(scheduled, null); assert.equal(track.readyState, 'ended');
-  } finally {
-    media.stop(); AudioBridge.prototype.init = init; AudioBridge.prototype.startListening = listen;
-    for (const [key, descriptor] of originals) {
-      if (descriptor) Object.defineProperty(globalThis, key, descriptor); else Reflect.deleteProperty(globalThis, key);
-    }
-  }
+    assert.equal(starts, 2); assert.equal(deliveries, 2);
+    assert.ok(calls.every(command => ['prepare_shared_browser_capture', 'get_capture_metrics'].includes(command)));
+  } finally { capture.stop(); }
+  assert.equal(stops, 1);
+});
+
+test('retired native browser captures cannot publish a late track or reuse another generation', async () => {
+  let resolveStart: (stream: MediaStream) => void = () => {}; let delivered = 0; let stopped = 0;
+  const native: BrowserCaptureDependencies = {
+    async call() { return { sourceId: 'window:1', state: { tabs: [], active: 1, temporary: false }, playing: false } as never; },
+    bridge() { return { startCapture: () => new Promise(resolve => { resolveStart = resolve; }),
+      updateProfile: async () => {}, getProcessingCost: () => 0, stopCapture: async () => { stopped++; } }; },
+  };
+  const scope = crypto.randomUUID(); const quality = new BrowserQualityController({ mode: 'reading', video: '720p30' });
+  const capture = new BrowserCapture(scope, quality, () => delivered++, () => {}, () => {}, () => {}, native);
+  const next = new BrowserCapture(scope, quality, () => {}, () => {}, () => {}, () => {}, native);
+  assert.notEqual(capture.sessionId, next.sessionId);
+  const start = capture.start(); await new Promise(resolve => setImmediate(resolve));
+  capture.stop(); resolveStart({} as MediaStream); await start;
+  assert.equal(delivered, 0); assert.equal(stopped, 2);
 });
 
 test('browser quality detects playback, holds through short pauses and restores reading', () => {

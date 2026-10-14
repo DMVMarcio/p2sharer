@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
-import { ArrowLeft, ArrowRight, RotateCw, Plus, X, Globe, Settings, Maximize, Minimize, Lock, Unlock, Puzzle, Trash2, MousePointer2, Volume2, VolumeX } from 'lucide-react';
+import { ArrowLeft, ArrowRight, RotateCw, Plus, X, Globe, Home, Settings, Maximize, Minimize, Lock, Unlock, Puzzle, Trash2, MousePointer2, Volume2, VolumeX } from 'lucide-react';
 import { roomAppsService } from './room_apps_service';
 import type { BrowserModel } from './browser_model';
-import { browserUrl, browserPointerPosition, BROWSER_HEIGHT, BROWSER_WIDTH, type BrowserCommand } from './browser_protocol';
+import { browserUrl, browserPointerPosition, BROWSER_HOME, BROWSER_HEIGHT, BROWSER_WIDTH, type BrowserCommand } from './browser_protocol';
 import { TooltipButton } from '../components/common/TooltipButton';
 import { ModalDialog } from '../components/common/ModalDialog';
 import { Select } from '../components/common/Select';
@@ -161,7 +161,7 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
     if (e.ctrlKey && ['l', 't', 'w'].includes(e.key.toLowerCase())) {
       e.preventDefault(); if (event === 'keyUp') return;
       if (e.key.toLowerCase() === 'l') { address.current?.focus(); address.current?.select(); }
-      if (e.key.toLowerCase() === 't') send({ kind: 'new-tab', url: 'about:blank' });
+      if (e.key.toLowerCase() === 't') send({ kind: 'new-tab', url: BROWSER_HOME });
       if (e.key.toLowerCase() === 'w') send({ kind: 'close-tab', id: model.state.active }); return;
     }
     if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) e.preventDefault();
@@ -177,7 +177,7 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
             onClick={() => send({ kind: 'select-tab', id: tab.id })}><Globe size={13} /><span>{tab.title || t('browser.newTab')}</span></button>
           {icon('closeTab', <X size={13} />, () => send({ kind: 'close-tab', id: tab.id }), !model.canControl)}
         </div>)}
-        {model.running && icon('newTab', <Plus size={15} />, () => send({ kind: 'new-tab', url: 'about:blank' }), !model.canControl || model.state.tabs.length >= 16)}
+        {model.running && icon('newTab', <Plus size={15} />, () => send({ kind: 'new-tab', url: BROWSER_HOME }), !model.canControl || model.state.tabs.length >= 16)}
       </div>
       <form className="browser-toolbar" autoComplete="off" onSubmit={e => {
         e.preventDefault(); const parsed = browserUrl(url);
@@ -187,6 +187,7 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
         {icon('back', <ArrowLeft size={15} />, () => send({ kind: 'back' }), !model.canControl)}
         {icon('forward', <ArrowRight size={15} />, () => send({ kind: 'forward' }), !model.canControl)}
         {icon('reload', <RotateCw size={15} />, () => send({ kind: 'reload' }), !model.canControl)}
+        {icon('home', <Home size={15} />, () => send({ kind: 'navigate', url: BROWSER_HOME }), !model.canControl)}
         <input ref={address} className="text-input-sm" autoComplete="off" value={url} maxLength={4096} aria-label={t('browser.address')}
           placeholder={t('browser.address')} disabled={!model.canControl} onChange={e => setUrl(e.target.value)} />
         {model.isHost && icon(model.paused ? 'allowControl' : 'pauseControl', model.paused ? <Lock size={15} /> : <Unlock size={15} />, () => model.togglePause(), !model.running)}

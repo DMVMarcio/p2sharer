@@ -202,6 +202,15 @@ pub fn report_capture_load(session_id: String, feedback_token: String, pressure_
 }
 
 #[tauri::command]
+pub fn update_capture_profile(window: tauri::Window, session_id: String, feedback_token: String,
+    target_fps: u32, target_width: u32, target_height: u32) -> Result<(), String> {
+    if window.label() != "main" { return Err("Only the main window can update capture profiles".into()); }
+    let sessions = SESSIONS.lock().map_err(|_| "Capture session lock poisoned")?;
+    let load = &sessions.get(&session_id).ok_or("Capture session is no longer active")?.load;
+    load.set_profile(&feedback_token, target_fps, target_width, target_height)
+}
+
+#[tauri::command]
 pub async fn get_native_encoder_support() -> Result<serde_json::Value, String> {
     tauri::async_runtime::spawn_blocking(|| {
         let started = std::time::Instant::now();
@@ -621,7 +630,14 @@ fn start_wgc_capture(source: &str, capture_mouse: bool, flags: CaptureFlags) -> 
     if kind == "window" {
         let hwnd = raw.parse::<usize>().map_err(|e| e.to_string())?;
         let window = WgcWindow::from_raw_hwnd(hwnd as *mut std::ffi::c_void);
-        if !window.is_valid() { return Err("Capture window no longer exists".into()); }
+        // The picker excludes tool windows; the app-owned browser intentionally uses one.
+        let mut pid = 0;
+        let browser_source = flags.session_id.starts_with("browser-") && unsafe {
+            let hwnd = windows::Win32::Foundation::HWND(hwnd as *mut std::ffi::c_void);
+            windows::Win32::UI::WindowsAndMessaging::GetWindowThreadProcessId(hwnd, Some(&mut pid));
+            pid == std::process::id() && windows::Win32::UI::WindowsAndMessaging::IsWindowVisible(hwnd).as_bool()
+        };
+        if !window.is_valid() && !browser_source { return Err("Capture window no longer exists".into()); }
         NativeWgcHandler::start_free_threaded(Settings::new(window, cursor,
             DrawBorderSettings::WithoutBorder, SecondaryWindowSettings::Default,
             capture_update_interval(), DirtyRegionSettings::Default, ColorFormat::Rgba8, flags))

@@ -6,9 +6,9 @@ use std::time::Instant;
 const SCALES: [u32; 6] = [100, 85, 70, 55, 55, 55];
 
 pub struct CaptureLoad {
-    requested_fps: u32,
-    requested_width: u32,
-    requested_height: u32,
+    requested_fps: AtomicU32,
+    requested_width: AtomicU32,
+    requested_height: AtomicU32,
     feedback_token: Option<String>,
     started: Instant,
     feedback: Mutex<Option<(u32, u64)>>,
@@ -34,7 +34,7 @@ pub struct LoadSnapshot {
 impl CaptureLoad {
     pub fn new(fps: u32, width: u32, height: u32, feedback_token: Option<String>) -> Self {
         let fps = fps.clamp(15, 120);
-        Self { requested_fps: fps, requested_width: width, requested_height: height,
+        Self { requested_fps: AtomicU32::new(fps), requested_width: AtomicU32::new(width), requested_height: AtomicU32::new(height),
             feedback_token, started: Instant::now(), feedback: Mutex::new(None),
             level: AtomicU8::new(0), effective_fps: AtomicU32::new(fps),
             output_width: AtomicU32::new(0), output_height: AtomicU32::new(0),
@@ -43,10 +43,21 @@ impl CaptureLoad {
 
     pub fn elapsed_ms(&self) -> u64 { self.started.elapsed().as_millis() as u64 }
     pub fn fps(&self) -> u32 { self.effective_fps.load(Ordering::Relaxed) }
+    pub fn set_profile(&self, token: &str, fps: u32, width: u32, height: u32) -> Result<(), String> {
+        self.validate_token(token)?;
+        if !matches!((width, height), (1280, 720) | (1920, 1080)) || !matches!(fps, 15 | 30 | 60) {
+            return Err("Invalid capture profile".into());
+        }
+        self.requested_width.store(width, Ordering::Relaxed);
+        self.requested_height.store(height, Ordering::Relaxed);
+        self.requested_fps.store(fps, Ordering::Relaxed);
+        self.effective_fps.store(self.level_fps(self.level.load(Ordering::Relaxed)), Ordering::Relaxed);
+        Ok(())
+    }
 
     pub fn bounds(&self, source_width: u32, source_height: u32) -> (u32, u32) {
         let (width, height) = crate::screen_sources::fit_capture_dimensions(
-            source_width, source_height, self.requested_width, self.requested_height);
+            source_width, source_height, self.requested_width.load(Ordering::Relaxed), self.requested_height.load(Ordering::Relaxed));
         let scale = SCALES[self.level.load(Ordering::Relaxed) as usize];
         ((width as u64 * scale as u64 / 100).max(1) as u32,
          (height as u64 * scale as u64 / 100).max(1) as u32)
@@ -77,13 +88,14 @@ impl CaptureLoad {
     }
 
     fn level_fps(&self, level: u8) -> u32 {
-        match level { 4 => self.requested_fps * 3 / 4,
-            5 => self.requested_fps / 2, _ => self.requested_fps }.max(15)
+        let requested = self.requested_fps.load(Ordering::Relaxed);
+        match level { 4 => requested * 3 / 4,
+            5 => requested / 2, _ => requested }.max(15)
     }
 
     fn max_level(&self) -> u8 {
         if self.level_fps(5) < self.level_fps(4) { 5 }
-        else if self.level_fps(4) < self.requested_fps { 4 } else { 3 }
+        else if self.level_fps(4) < self.requested_fps.load(Ordering::Relaxed) { 4 } else { 3 }
     }
 
     fn apply(&self, level: u8, reason: u8) {
@@ -94,7 +106,7 @@ impl CaptureLoad {
     }
 
     pub fn snapshot(&self) -> LoadSnapshot {
-        LoadSnapshot { requested_fps: self.requested_fps, effective_fps: self.fps(),
+        LoadSnapshot { requested_fps: self.requested_fps.load(Ordering::Relaxed), effective_fps: self.fps(),
             resolution_scale_percent: SCALES[self.level.load(Ordering::Relaxed) as usize],
             output_width: self.output_width.load(Ordering::Relaxed),
             output_height: self.output_height.load(Ordering::Relaxed),
@@ -165,6 +177,18 @@ impl LoadController {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn profile_changes_preserve_generation_and_reject_retired_feedback() {
+        let load = CaptureLoad::new(15, 1280, 720, Some("fixture-generation".into()));
+        assert!(load.set_profile("retired-generation", 60, 1920, 1080).is_err());
+        load.set_profile("fixture-generation", 60, 1920, 1080).unwrap();
+        assert_eq!(load.fps(), 60);
+        assert_eq!(load.bounds(1920, 1080), (1920, 1080));
+        load.set_profile("fixture-generation", 15, 1280, 720).unwrap();
+        assert_eq!(load.fps(), 15);
+        assert_eq!(load.bounds(1920, 1080), (1280, 720));
+        assert!(load.set_profile("fixture-generation", 120, 3840, 2160).is_err());
+    }
     fn window(controller: &mut LoadController, load: &CaptureLoad, at: u64, cost: u64) {
         for _ in 0..60 { controller.observe(load, at - 1, cost); }
         controller.observe(load, at, cost);
