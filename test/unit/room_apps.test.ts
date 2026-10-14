@@ -6,6 +6,26 @@ import { registerRoomApp } from '../../src/apps/registry.ts';
 import type { AppWireEvent } from '../../src/apps/types.ts';
 import * as Y from 'yjs';
 
+test('note file identity follows synchronized content and snapshots without machine paths', () => {
+  const first = new NotepadModel({ localActor: 'alice', changed() {}, emit(payload) { second.apply(payload, 'alice', false); } });
+  const second = new NotepadModel({ localActor: 'bob', changed() {}, emit() {} });
+  const late = new NotepadModel({ localActor: 'charlie', changed() {}, emit() {} });
+  try {
+    const id = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+    first.setNoteIdentity(id, 'Shared note');
+    first.replace('Content');
+    assert.deepEqual(second.noteIdentity, { id, name: 'Shared note' });
+    late.apply(first.snapshot(), 'alice', true);
+    assert.deepEqual(late.noteIdentity, first.noteIdentity);
+    assert.equal(late.text.toString(), 'Content');
+    assert.throws(() => first.setNoteIdentity('../outside', 'Invalid'));
+    first.document.getMap('note-file').set('id', '../outside');
+    assert.equal(second.noteIdentity, null);
+    first.setNoteIdentity('11111111-2222-3333-4444-555555555555', 'Reopened note');
+    assert.equal(second.noteIdentity?.name, 'Reopened note');
+  } finally { first.destroy(); second.destroy(); late.destroy(); }
+});
+
 test('app entry waits for preparation, shares duplicate requests and refuses failed preparation', async () => {
   let approve;
   let rejectPreparation = false;

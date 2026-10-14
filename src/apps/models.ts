@@ -66,6 +66,22 @@ export class NotepadModel implements RoomAppModel {
   get text(): Y.Text { return this.doc.getText('content'); }
   get richContent(): Y.XmlFragment { return this.doc.getXmlFragment('rich-content'); }
   get document(): Y.Doc { return this.doc; }
+  get noteIdentity(): { id: string; name: string } | null {
+    const metadata = this.doc.getMap('note-file');
+    const id = metadata.get('id');
+    const name = metadata.get('name');
+    return typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+      && typeof name === 'string' && name.trim().length > 0 && name.length <= 80 ? { id, name } : null;
+  }
+  setNoteIdentity(id: string, name: string): void {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) || !name.trim() || name.length > 80)
+      throw new Error('Invalid note identity');
+    this.doc.transact(() => {
+      const metadata = this.doc.getMap('note-file');
+      metadata.set('id', id.toLowerCase());
+      metadata.set('name', name.trim());
+    });
+  }
   replace(content: string): void {
     if (content.length > MAX_NOTE) throw new Error(t("message.c915d1570950"));
     const text = this.text;
