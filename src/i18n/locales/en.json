@@ -1247,6 +1247,7 @@
   "browser.activity.home": "went to the home page",
   "browser.activity.navigate": "opened a page",
   "browser.activity.new-tab": "opened a tab",
+  "browser.activity.move-tab": "reordered the tabs",
   "browser.activity.reload": "reloaded the page",
   "browser.activity.select-tab": "switched tabs",
   "browser.clearWarning.cache": "Clears temporary files. Keeps accounts and tabs.",

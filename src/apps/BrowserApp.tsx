@@ -18,13 +18,10 @@ import { MediaVolumeControl } from '../components/common/MediaVolumeControl';
 import { useMediaVolume } from '../hooks/useMediaVolume';
 import { ActivityToast } from '../components/common/ActivityToast';
 import { useBrowserCursor } from '../hooks/useBrowserCursor';
+import { BrowserTabs } from './BrowserTabs';
+import { browserHistoryButton, browserShortcut } from './browser_shortcuts';
+import { useSelectAllOnFocus } from '../hooks/useSelectAllOnFocus';
 import type { BrowserContentMode, BrowserVideoQuality } from './browser_quality';
-
-function BrowserFavicon({ value }: { value?: string }) {
-  const [failed, setFailed] = useState(false);
-  useEffect(() => setFailed(false), [value]);
-  return value && !failed ? <img className="browser-favicon" src={value} alt="" draggable={false} onError={() => setFailed(true)} /> : <Globe size={13} />;
-}
 
 function BrowserSettings({ model, onClose }: { model: BrowserModel; onClose: () => void }) {
   const [mode, setMode] = useState('cache');
@@ -123,6 +120,7 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
   const video = useRef<HTMLVideoElement>(null); const surface = useRef<HTMLDivElement>(null);
   const wrapper = useRef<HTMLDivElement>(null); const keyboard = useRef<HTMLTextAreaElement>(null);
   const address = useRef<HTMLInputElement>(null); const composing = useRef(false);
+  const addressSelection = useSelectAllOnFocus();
   const lastMove = useRef(0);
   const pointerInside = useRef(false);
   const lastClick = useRef({ time: 0, x: 0, y: 0, button: -1, count: 0 });
@@ -187,6 +185,14 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
   if (!model) return null;
   const participantName = (id: string) => id === roomAppsService.getLocalActor() ? username || t('browser.you') : peers.find(peer => peer.id === id)?.username || t('browser.participant');
   const send = (command: BrowserCommand) => model.command(command);
+  const focusAddress = () => { controls.expand(); requestAnimationFrame(() => { address.current?.focus(); address.current?.select(); }); };
+  const navigationKey = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (settings || model.dialog || model.extensionRequest || !event.currentTarget.contains(event.target as Node) || event.nativeEvent.isComposing) return;
+    const shortcut = browserShortcut(event); if (!shortcut) return;
+    event.preventDefault(); event.stopPropagation();
+    if (event.type !== 'keydown' || event.repeat) return;
+    if (shortcut === 'address') focusAddress(); else send(shortcut);
+  };
   const modifiers = (e: { altKey: boolean; ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }) =>
     (e.altKey ? 1 : 0) | (e.ctrlKey ? 2 : 0) | (e.metaKey ? 4 : 0) | (e.shiftKey ? 8 : 0);
   const position = (e: { clientX: number; clientY: number }, clamp = false) =>
@@ -254,6 +260,13 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
   const volumeControl = <MediaVolumeControl volume={volume} muted={muted} label={t('browser.volume')}
     muteLabel={t('browser.mute')} unmuteLabel={t('browser.unmute')} onVolumeChange={changeVolume} onToggleMute={toggleMute} />;
   const content = <div className={`room-app-browser${minimized ? ' compact' : ''}${fullscreen ? ' fullscreen' : ''}`} ref={wrapper}
+    onKeyDownCapture={navigationKey} onKeyUpCapture={navigationKey}
+    onPointerDownCapture={event => {
+      const history = browserHistoryButton(event.button);
+      if (!history || minimized || settings || model.dialog || model.extensionRequest || !event.currentTarget.contains(event.target as Node)) return;
+      event.preventDefault(); event.stopPropagation(); send(history);
+    }} onPointerUpCapture={event => { if (browserHistoryButton(event.button)) { event.preventDefault(); event.stopPropagation(); } }}
+    onAuxClickCapture={event => { if (browserHistoryButton(event.button)) { event.preventDefault(); event.stopPropagation(); } }}
     onPointerMove={() => { if (fullscreen) controls.reveal(); }} onClick={e => e.stopPropagation()}>
     {!minimized && controls.collapsed && <TooltipButton className="btn btn-secondary btn-sm browser-chrome-expand"
       tooltip={t('browser.showToolbar')} aria-expanded={false} aria-controls={`browser-chrome-${instanceId}`}
@@ -262,15 +275,8 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
       onPointerEnter={() => controls.hold('pointer')} onPointerLeave={() => controls.release('pointer')}
       onFocusCapture={() => controls.hold('focus')} onBlurCapture={e => { if (!e.currentTarget.contains(e.relatedTarget)) controls.release('focus'); }}>
       <div className="browser-chrome-content">
-      {!fullscreen && <div className="browser-tab-strip"><div className="browser-tabs" role="group" aria-label={t('browser.tabs')}>
-        {model.state.tabs.map(tab => <div className={`browser-tab${tab.id === model.state.active ? ' selected' : ''}`} key={tab.id}>
-          <button aria-pressed={tab.id === model.state.active} className="btn btn-secondary btn-sm browser-tab-label" disabled={!model.canControl}
-            onClick={() => send({ kind: 'select-tab', id: tab.id })}><BrowserFavicon value={tab.favicon} /><span>{tab.title || t('browser.newTab')}</span></button>
-          <TooltipButton className="btn btn-secondary btn-sm browser-tab-close" tooltip={t('browser.closeTab')}
-            disabled={!model.canControl} onClick={() => send({ kind: 'close-tab', id: tab.id })}><X size={13} /></TooltipButton>
-        </div>)}
-        {model.running && icon('newTab', <Plus size={15} />, () => send({ kind: 'new-tab', url: BROWSER_HOME }), !model.canControl || model.state.tabs.length >= 16)}
-      </div>{finishControl}</div>}
+      {!fullscreen && <div className="browser-tab-strip"><BrowserTabs tabs={model.state.tabs} active={model.state.active}
+        canControl={model.canControl} running={model.running} command={send} />{finishControl}</div>}
       <form className="browser-toolbar" autoComplete="off" onSubmit={e => {
         e.preventDefault(); const parsed = browserUrl(url);
         if (parsed) send({ kind: 'navigate', url: parsed }); else showToast(t('browser.invalidUrl'), 3500, 'error');
@@ -280,12 +286,10 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
         {icon('forward', <ArrowRight size={15} />, () => send({ kind: 'forward' }), !model.canControl)}
         {icon('reload', <RotateCw size={15} />, () => send({ kind: 'reload' }), !model.canControl)}
         {icon('home', <Home size={15} />, () => send({ kind: 'navigate', url: BROWSER_HOME }), !model.canControl)}
-        <input ref={address} className="text-input-sm" autoComplete="off" value={url} maxLength={4096} aria-label={t('browser.address')}
+        <input ref={address} {...addressSelection} className="text-input-sm" autoComplete="off" value={url} maxLength={4096} aria-label={t('browser.address')}
           placeholder={t('browser.address')} disabled={!model.canControl} onChange={e => setUrl(e.target.value)} />
         {model.isHost && icon(model.paused ? 'allowControl' : 'pauseControl', model.paused ? <Lock size={15} /> : <Unlock size={15} />, () => model.togglePause(), !model.running)}
         {model.isHost && icon('settings', <Settings size={15} />, () => setSettings(true), !model.running || model.busy)}
-        {model.isHost && model.running && active && /^https:\/\/(?:chromewebstore\.google\.com\/detail\/|microsoftedge\.microsoft\.com\/addons\/detail\/)/.test(active.url)
-          && icon('installExtension', <Puzzle size={15} />, () => model.requestExtension(active.url), model.busy)}
         {fullscreen && finishControl}
         {fullscreen && model.running && volumeControl}
         {icon(fullscreen ? 'exitFullscreen' : 'fullscreen', fullscreen ? <Minimize size={15} /> : <Maximize size={15} />, expand)}

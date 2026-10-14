@@ -5,6 +5,17 @@
 .browser-chrome-content { min-height: 0; overflow: hidden; }
 .browser-chrome-expand { position: absolute; top: 6px; right: 8px; z-index: 12; box-shadow: var(--shadow-sm); }
 .browser-tabs { display: flex; align-items: center; gap: 4px; padding: 5px 8px; overflow-x: auto; flex-shrink: 0; }
+.browser-tab-slot { position: relative; display: flex; flex-shrink: 0; max-width: 240px; overflow: hidden; }
+.browser-tab-slot.entering { animation: browserTabOpen var(--transition-fast) both; }
+.browser-tab-slot.exiting { overflow: hidden; animation: browserTabClose var(--content-exit-duration) ease-out both; }
+.browser-tab-slot.dragging { opacity: .55; }
+.browser-tab-slot.drop-before::before, .browser-tab-drop-end { content: ''; position: absolute; z-index: 2; left: 0; top: 2px; bottom: 2px; width: 2px; background: var(--accent-color); border-radius: var(--radius-full); }
+.browser-tab-drop-end { position: static; align-self: stretch; flex: 0 0 2px; }
+.browser-tabs.reordering { user-select: none; }
+.browser-tab-label { touch-action: none; }
+@keyframes browserTabOpen { from { max-width: 0; opacity: 0; transform: translateY(3px); } to { max-width: 240px; opacity: 1; transform: translateY(0); } }
+@keyframes browserTabClose { from { max-width: 240px; opacity: 1; } to { max-width: 0; opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .browser-tab-slot.entering, .browser-tab-slot.exiting { animation: none; } }
 .browser-tab-strip { display: flex; align-items: center; gap: 8px; padding-right: 8px; }
 .browser-tab-strip > .browser-tabs { flex: 1; min-width: 0; }
 .btn.browser-finish { flex-shrink: 0; color: var(--danger-text); background: color-mix(in srgb, var(--danger-text) 12%, transparent); border: 0; box-shadow: none; }

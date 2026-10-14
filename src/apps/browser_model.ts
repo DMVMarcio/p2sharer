@@ -7,7 +7,7 @@ import { getLanguage } from '../i18n/index.ts';
 import { BrowserOwnership } from './browser_ownership.ts';
 
 export interface BrowserNative { call<T>(command: string, args: Record<string, unknown>): Promise<T> }
-const ACTIVITY_ACTIONS = ['navigate', 'home', 'new-tab', 'close-tab', 'select-tab', 'back', 'forward', 'reload'];
+const ACTIVITY_ACTIONS = ['navigate', 'home', 'new-tab', 'close-tab', 'select-tab', 'move-tab', 'back', 'forward', 'reload'];
 export class BrowserModel implements RoomAppModel {
   private ownership: BrowserOwnership;
   get host(): string { return this.ownership.host; }
@@ -308,7 +308,7 @@ export class BrowserModel implements RoomAppModel {
       if (actor !== this.host && Date.now() < this.hostPriorityUntil) return;
       if (!this.lease.accepts(actor, Date.now())) return;
       if (this.lease.owner && this.lease.owner !== actor) await this.release();
-      if (['navigate', 'select-tab', 'close-tab', 'new-tab', 'back', 'forward', 'reload'].includes(command.kind)
+      if (['navigate', 'select-tab', 'close-tab', 'move-tab', 'new-tab', 'back', 'forward', 'reload'].includes(command.kind)
         && (this.lease.buttons || this.lease.keys.size)) await this.release();
       const oldOwner = this.lease.owner;
       this.lease.update(actor, command, Date.now()); this.controller = actor;
@@ -350,7 +350,6 @@ export class BrowserModel implements RoomAppModel {
     catch (error) { if (epoch === this.epoch && this.running && !this.disposed) throw error; }
   }
   dismissExtensionRequest(): void { this.extensionRequest = null; this.context.changed(); }
-  requestExtension(url: string): void { if (this.isHost && this.running) { this.extensionRequest = url; this.context.changed(); } }
   async clear(mode: 'cache' | 'sites' | 'history' | 'reset'): Promise<void> {
     if (!this.isHost || !this.joined || !this.running || this.busy) return;
     this.busy = true; this.context.changed();

@@ -1247,6 +1247,7 @@
   "browser.activity.home": "voltou para o início",
   "browser.activity.navigate": "acessou uma página",
   "browser.activity.new-tab": "abriu uma aba",
+  "browser.activity.move-tab": "reordenou as abas",
   "browser.activity.reload": "recarregou a página",
   "browser.activity.select-tab": "trocou de aba",
   "browser.clearWarning.cache": "Limpa arquivos temporários. Mantém contas e abas.",

@@ -13,7 +13,7 @@ async function fixture() {
   for (const key of keys.slice(0, -1)) Object.defineProperty(globalThis, key, { configurable: true, value: dom.window[key] });
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const require = createRequire(import.meta.url);
-  const bundle = await build({ stdin: { contents: "export { useBrowserChrome } from './src/hooks/useBrowserChrome'; export { useMediaVolume } from './src/hooks/useMediaVolume'; export { MediaVolumeControl } from './src/components/common/MediaVolumeControl';", resolveDir: process.cwd() },
+  const bundle = await build({ stdin: { contents: "export { useBrowserChrome } from './src/hooks/useBrowserChrome'; export { useMediaVolume } from './src/hooks/useMediaVolume'; export { MediaVolumeControl } from './src/components/common/MediaVolumeControl'; export { useSelectAllOnFocus } from './src/hooks/useSelectAllOnFocus'; export { BrowserTabs } from './src/apps/BrowserTabs';", resolveDir: process.cwd() },
     bundle: true, write: false, format: 'esm', platform: 'node', loader: { '.css': 'empty' },
     plugins: [{ name: 'browser-controls-fixture', setup(builder) {
       builder.onResolve({ filter: /^[^./]/ }, args => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
@@ -52,6 +52,58 @@ test('manual toolbar collapse survives pointer movement and fullscreen changes u
     await click('move'); assert.equal(hidden(), false);
     await click('collapse'); await click('fullscreen'); assert.equal(hidden(), true);
     await click('expand'); assert.equal(hidden(), false);
+  } finally { await f.cleanup(); context.mock.timers.reset(); }
+});
+
+test('address activation selects everything once and subsequent clicks preserve caret placement', async () => {
+  const f = await fixture();
+  const Harness = () => React.createElement('input', { ...f.useSelectAllOnFocus(), defaultValue: 'https://example.com/' });
+  try {
+    await act(async () => f.root.render(React.createElement(Harness)));
+    const input = document.querySelector('input');
+    await act(async () => input.dispatchEvent(new f.dom.window.MouseEvent('pointerdown', { bubbles: true, button: 0, cancelable: true })));
+    await act(async () => input.click());
+    assert.equal(document.activeElement, input); assert.equal(input.selectionStart, 0); assert.equal(input.selectionEnd, input.value.length);
+    const second = new f.dom.window.MouseEvent('pointerdown', { bubbles: true, button: 0, cancelable: true });
+    await act(async () => input.dispatchEvent(second)); assert.equal(second.defaultPrevented, false);
+    input.setSelectionRange(4, 4); await act(async () => input.click()); assert.equal(input.selectionStart, 4); assert.equal(input.selectionEnd, 4);
+    await act(async () => { input.blur(); input.focus(); }); assert.equal(input.selectionStart, 0); assert.equal(input.selectionEnd, input.value.length);
+  } finally { await f.cleanup(); }
+});
+
+test('tab dragging emits relative moves and closed tabs retire inertly without losing the active tab focus', async context => {
+  const f = await fixture(); const commands = [];
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  const tabs = [1, 2, 3].map(id => ({ id, url: `https://example.com/${id}`, title: `Tab ${id}` }));
+  const render = list => act(async () => f.root.render(React.createElement(f.BrowserTabs, { tabs: list, active: 3, running: true, canControl: true, command: command => commands.push(command) })));
+  const pointer = async (target, type, x) => act(async () => {
+    const event = new f.dom.window.MouseEvent(type, { bubbles: true, button: 0, clientX: x, cancelable: true });
+    Object.defineProperty(event, 'pointerId', { value: 7 }); target.dispatchEvent(event);
+  });
+  try {
+    const captures = new WeakSet();
+    f.dom.window.HTMLElement.prototype.setPointerCapture = function() { captures.add(this); };
+    f.dom.window.HTMLElement.prototype.hasPointerCapture = function() { return captures.has(this); };
+    f.dom.window.HTMLElement.prototype.releasePointerCapture = function() { captures.delete(this); };
+    await render(tabs);
+    const row = document.querySelector('[role=group]'); row.getBoundingClientRect = () => ({ left: 0, right: 360 });
+    [...row.querySelectorAll('[data-browser-tab]')].forEach((element, index) => { element.getBoundingClientRect = () => ({ left: index * 120, width: 120 }); });
+    const first = row.querySelector('[data-browser-tab="1"] button');
+    await pointer(first, 'pointerdown', 40); await pointer(first, 'pointermove', 400); await pointer(first, 'pointerup', 400);
+    await act(async () => first.click());
+    assert.deepEqual(commands, [{ kind: 'move-tab', id: 1, before: null }]);
+    await render([tabs[1], tabs[2], tabs[0]]);
+    const close = row.querySelector('[data-browser-tab="2"] .browser-tab-close');
+    await act(async () => { close.focus(); close.click(); });
+    assert.deepEqual(commands.at(-1), { kind: 'close-tab', id: 2 });
+    await render([tabs[2], tabs[0]]);
+    assert.equal(row.querySelector('[data-browser-tab="2"]').hasAttribute('inert'), true);
+    assert.equal(document.activeElement, row.querySelector('[data-browser-tab="3"] .browser-tab-label'));
+    await act(async () => context.mock.timers.tick(151));
+    assert.equal(row.querySelector('[data-browser-tab="2"]'), null);
+    assert.deepEqual([...row.querySelectorAll('[data-browser-tab]')].map(element => Number(element.dataset.browserTab)), [3, 1]);
+    f.dom.window.matchMedia = () => ({ matches: true });
+    await render([tabs[0]]); assert.equal(row.querySelector('[data-browser-tab="3"]'), null);
   } finally { await f.cleanup(); context.mock.timers.reset(); }
 });
 

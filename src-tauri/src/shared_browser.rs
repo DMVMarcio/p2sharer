@@ -657,9 +657,10 @@ pub enum BrowserCommand {
     CloseTab {
         id: u32,
     },
+    MoveTab { id: u32, before: Option<u32> },
     Back,
     Forward,
-    Reload,
+    Reload { #[serde(default)] ignore_cache: bool },
     Mouse {
         event: String,
         x: f64,
@@ -682,6 +683,14 @@ pub enum BrowserCommand {
         text: String,
     },
     Release,
+}
+fn move_tab(tabs: &mut Vec<Tab>, id: u32, before: Option<u32>) -> Result<(), String> {
+    let index = tabs.iter().position(|tab| tab.id == id).ok_or("Unknown browser tab")?;
+    if before.is_some_and(|target| !tabs.iter().any(|tab| tab.id == target)) { return Err("Unknown browser tab".into()); }
+    if before == Some(id) { return Ok(()); }
+    let tab = tabs.remove(index);
+    let target = before.and_then(|id| tabs.iter().position(|tab| tab.id == id)).unwrap_or(tabs.len());
+    tabs.insert(target, tab); Ok(())
 }
 fn input_method(command: &BrowserCommand) -> Result<(&'static str, Value), String> {
     match command {
@@ -790,6 +799,11 @@ pub async fn control_shared_browser(
             }
             session.active = id;
         }
+        BrowserCommand::MoveTab { id, before } => {
+            let mut sessions = state.0.lock().unwrap();
+            let session = sessions.get_mut(&scope).ok_or("Browser closed")?;
+            move_tab(&mut session.tabs, id, before)?;
+        }
         BrowserCommand::CloseTab { id } => {
             {
                 let mut sessions = state.0.lock().unwrap();
@@ -838,12 +852,17 @@ pub async fn control_shared_browser(
                 .await?;
             }
         }
-        BrowserCommand::Reload => {
+        BrowserCommand::Reload { ignore_cache } => {
+            if ignore_cache {
+                #[cfg(windows)]
+                cdp(&view, "Page.reload", json!({"ignoreCache":true})).await?;
+            } else {
             #[cfg(windows)]
             on_view(&view, |core, tx| unsafe {
                 let _ = tx.send(core.Reload().map_err(|e| e.to_string()));
             })
             .await?;
+            }
         }
         BrowserCommand::Release => {
             let (pointer, buttons) = {
@@ -1233,6 +1252,23 @@ pub async fn browser_extensions(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn tab_moves_preserve_live_tab_data_and_reject_stale_targets_atomically() {
+        let mut tabs: Vec<Tab> = (1..=3).map(|id| Tab { id, title: format!("Tab {id}"), url: format!("https://example.com/{id}"), ..Default::default() }).collect();
+        move_tab(&mut tabs, 3, Some(1)).unwrap();
+        assert_eq!(tabs.iter().map(|tab| tab.id).collect::<Vec<_>>(), [3, 1, 2]);
+        move_tab(&mut tabs, 3, None).unwrap();
+        assert_eq!(tabs.iter().map(|tab| tab.id).collect::<Vec<_>>(), [1, 2, 3]);
+        move_tab(&mut tabs, 2, Some(2)).unwrap();
+        let previous = tabs.clone();
+        assert!(move_tab(&mut tabs, 2, Some(99)).is_err());
+        assert!(move_tab(&mut tabs, 99, None).is_err());
+        assert_eq!(serde_json::to_value(&tabs).unwrap(), serde_json::to_value(previous).unwrap());
+        assert_eq!(tabs[1].url, "https://example.com/2");
+        let reload: BrowserCommand = serde_json::from_value(json!({"kind":"reload","ignore_cache":true})).unwrap();
+        assert!(matches!(reload, BrowserCommand::Reload { ignore_cache: true }));
+        assert!(serde_json::from_value::<BrowserCommand>(json!({"kind":"reload","ignore_cache":"yes"})).is_err());
+    }
     #[test]
     fn extension_pages_require_an_enumerated_enabled_origin() {
         let ids = HashSet::from(["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string()]);
