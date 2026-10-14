@@ -2,7 +2,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::PathBuf,
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
@@ -22,6 +22,8 @@ mod favicon;
 #[cfg(windows)]
 #[path = "browser_window.rs"]
 mod capture_window;
+#[path = "browser_extension_packages.rs"]
+mod extension_packages;
 const BROWSER_HOME: &str = "https://www.google.com/";
 static NEXT_BROWSER_GENERATION: AtomicU64 = AtomicU64::new(1);
 
@@ -50,6 +52,7 @@ struct Session {
     saved: Option<SavedTabs>,
     language: Option<String>,
     capture_id: Option<String>,
+    extension_ids: HashSet<String>,
 }
 #[derive(Default, Clone, PartialEq, Serialize, Deserialize)]
 struct SavedTabs {
@@ -107,6 +110,16 @@ fn allowed_url(raw: &str) -> bool {
         && !(url.host_str() == Some("localhost") && url.port() == Some(1420))
         && url.username().is_empty()
         && url.password().is_none()
+}
+fn allowed_session_url(app: &AppHandle, scope: &str, raw: &str) -> bool {
+    if allowed_url(raw) { return true; }
+    app.state::<BrowserState>().0.lock().unwrap().get(scope)
+        .is_some_and(|session| allowed_extension_url(raw, &session.extension_ids))
+}
+fn allowed_extension_url(raw: &str, ids: &HashSet<String>) -> bool {
+    let Ok(url) = tauri::Url::parse(raw) else { return false; };
+    url.scheme() == "chrome-extension" && raw.len() <= 4096 && url.username().is_empty() && url.password().is_none() && url.port().is_none()
+        && url.host_str().is_some_and(|id| ids.contains(id))
 }
 
 #[cfg(windows)]
@@ -177,20 +190,21 @@ fn build_tab(
     url: &str,
     language: Option<&str>,
 ) -> Result<WebviewWindow, String> {
-    if !allowed_url(url) {
+    if !allowed_session_url(app, scope, url) {
         return Err("Only HTTP and HTTPS pages are supported".into());
     }
     let popup_app = app.clone();
     let popup_scope = scope.to_string();
+    let navigation_app = app.clone(); let navigation_scope = scope.to_string();
     let copy = crate::localization::browser_dialog_copy(language);
     let view = WebviewWindowBuilder::new(app, label(scope, id), WebviewUrl::External(tauri::Url::parse("about:blank").map_err(|e| e.to_string())?))
-        .title("P2Sharer Browser").inner_size(1280.0, 720.0).visible(false).decorations(false)
+        .title(if language == Some("pt-BR") { "P2Sharer Navegador" } else { "P2Sharer Browser" }).inner_size(1280.0, 720.0).visible(false).decorations(false)
         .resizable(false)
         .shadow(false).skip_taskbar(true).focused(false).focusable(false)
         .data_directory(directory).incognito(temporary).browser_extensions_enabled(true)
         .additional_browser_args(&format!("{} --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows --disable-direct-composition-video-overlays --disable-direct-composition-sw-video-overlays",
             std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS").unwrap_or_default()))
-        .on_navigation(|url| allowed_url(url.as_str()))
+        .on_navigation(move |url| allowed_session_url(&navigation_app, &navigation_scope, url.as_str()))
         .on_new_window(move |url, _| {
             if allowed_url(url.as_str()) {
                 let _ = popup_app.emit_to("main", "shared-browser-popup", json!({"scope": popup_scope, "url": url.as_str()}));
@@ -265,6 +279,7 @@ pub async fn start_shared_browser(
                 saved: None,
                 language,
                 capture_id: None,
+                extension_ids: HashSet::new(),
             },
         );
     }
@@ -1059,25 +1074,26 @@ pub async fn browser_extensions(
             ProfileGetBrowserExtensionsCompletedHandler,
         };
         use windows_capture_api::core::{Interface, HSTRING, PCWSTR};
-        if action == "install" {
-            let folder = rfd::AsyncFileDialog::new()
-                .set_title(
-                    crate::localization::browser_dialog_copy(language.as_deref()).extension_title,
-                )
-                .pick_folder()
-                .await
-                .ok_or("Extension installation cancelled")?;
-            if !folder.path().join("manifest.json").is_file() {
-                return Err("Extension folder must contain manifest.json".into());
-            }
-            let path = folder.path().to_string_lossy().to_string();
-            on_view(&view, move |core, tx| unsafe {
+        let profile_directory = state.0.lock().unwrap().get(&scope).ok_or("Browser closed")?.directory.clone();
+        if action == "install" || action == "install-folder" {
+            let picker = rfd::AsyncFileDialog::new().set_title(crate::localization::browser_dialog_copy(language.as_deref()).extension_title);
+            let selected = if action == "install-folder" { picker.pick_folder().await }
+                else { picker.add_filter("ZIP / CRX", &["zip", "crx"]).pick_file().await }.ok_or("Extension installation cancelled")?;
+            let source = selected.path().to_path_buf(); let directory = profile_directory.clone();
+            let package = tokio::task::spawn_blocking(move || extension_packages::import(&source, &directory)).await.map_err(|e| e.to_string())??;
+            let path = package.directory.to_string_lossy().to_string();
+            let installed: String = on_view(&view, move |core, tx| unsafe {
                 let tx = Arc::new(Mutex::new(Some(tx)));
                 let done = tx.clone();
                 let callback = ProfileAddBrowserExtensionCompletedHandler::create(Box::new(
-                    move |result, _| {
+                    move |result, extension| {
                         if let Some(tx) = done.lock().unwrap().take() {
-                            let _ = tx.send(result.map_err(|e| e.to_string()));
+                            let result = result.and_then(|_| {
+                                let extension = extension.ok_or_else(windows_capture_api::core::Error::empty)?;
+                                let mut id = Default::default(); extension.Id(&mut id)?;
+                                Ok(CoTaskMemPWSTR::from(id).to_string())
+                            }).map_err(|e| e.to_string());
+                            let _ = tx.send(result);
                         }
                         Ok(())
                     },
@@ -1096,11 +1112,13 @@ pub async fn browser_extensions(
                 }
             })
             .await?;
+            extension_packages::remember(&profile_directory, installed, package)?;
         }
-        if !["install", "list", "remove", "enable", "disable"].contains(&action.as_str()) {
+        if !["install", "install-folder", "list", "remove", "enable", "disable", "popup"].contains(&action.as_str()) {
             return Err("Invalid extension action".into());
         }
-        let extensions = on_view(&view, move |core, tx| unsafe {
+        let requested_id = id.clone(); let popup_action = action == "popup"; let remove_action = action == "remove";
+        let mut extensions = on_view(&view, move |core, tx| unsafe {
             let tx = Arc::new(Mutex::new(Some(tx))); let done = tx.clone();
             let callback = ProfileGetBrowserExtensionsCompletedHandler::create(Box::new(move |result, list| {
                 let mut mutation_pending = false;
@@ -1140,6 +1158,25 @@ pub async fn browser_extensions(
             let result = core.cast::<ICoreWebView2_13>().and_then(|c| c.Profile()).and_then(|p| p.cast::<ICoreWebView2Profile7>()).and_then(|p| p.GetBrowserExtensions(&callback));
             if let Err(e) = result { if let Some(tx) = tx.lock().unwrap().take() { let _ = tx.send(Err(e.to_string())); } }
         }).await?;
+        if remove_action { if let Some(id) = requested_id.as_ref() { extension_packages::forget(&profile_directory, id)?; } }
+        let registry = extension_packages::registry(&profile_directory);
+        if let Some(rows) = extensions.as_array_mut() {
+            let mut sessions = state.0.lock().unwrap(); let session = sessions.get_mut(&scope).ok_or("Browser closed")?;
+            session.extension_ids.clear();
+            for row in rows {
+                let id = row["id"].as_str().unwrap_or("").to_string();
+                if row["enabled"].as_bool() == Some(true) { session.extension_ids.insert(id.clone()); }
+                row["popup"] = json!(registry.get(&id).is_some_and(|package| package.popup.is_some()));
+            }
+        }
+        if popup_action {
+            let id = requested_id.ok_or("Extension popup unavailable")?;
+            if !state.0.lock().unwrap().get(&scope).is_some_and(|session| session.extension_ids.contains(&id)) { return Err("Extension popup unavailable".into()); }
+            let popup = registry.get(&id).and_then(|package| package.popup.as_ref()).ok_or("Extension popup unavailable")?;
+            let url = tauri::Url::parse(&format!("chrome-extension://{id}/")).and_then(|url| url.join(popup)).map_err(|_| "Extension popup unavailable")?;
+            add_tab(&app, &state, &scope, url.as_str()).await?;
+            return browser_state(&app, &state, &scope).await;
+        }
         return Ok(extensions);
     }
     #[cfg(not(windows))]
@@ -1152,6 +1189,15 @@ pub async fn browser_extensions(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn extension_pages_require_an_enumerated_enabled_origin() {
+        let ids = HashSet::from(["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string()]);
+        assert!(allowed_extension_url("chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/popup.html", &ids));
+        for url in ["chrome-extension://bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/popup.html", "file:///popup.html", "chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:80/popup.html"] {
+            assert!(!allowed_extension_url(url, &ids));
+        }
+        assert!(!allowed_url("chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/popup.html"));
+    }
     #[test]
     fn stale_navigation_completion_cannot_hide_a_new_page_loading() {
         let mut tab = Tab::default();

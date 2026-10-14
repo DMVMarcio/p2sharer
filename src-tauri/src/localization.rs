@@ -38,9 +38,9 @@ pub struct BrowserDialogCopy {
 
 pub fn browser_dialog_copy(language: Option<&str>) -> BrowserDialogCopy {
     if language == Some("pt-BR") {
-        BrowserDialogCopy { extension_title: "Selecionar extensão descompactada", download_title: "Salvar download do Browser compartilhado" }
+        BrowserDialogCopy { extension_title: "Selecionar extensão", download_title: "Salvar download do Navegador" }
     } else {
-        BrowserDialogCopy { extension_title: "Select an unpacked browser extension", download_title: "Save shared browser download" }
+        BrowserDialogCopy { extension_title: "Select extension", download_title: "Save shared browser download" }
     }
 }
 
@@ -58,7 +58,7 @@ mod tests {
         assert_eq!(note_dialog_copy(Some("pt-BR")).file_name, "nota.html");
         assert_eq!(note_dialog_copy(Some("en")).open_title, "Open note");
         assert_eq!(note_dialog_copy(None).file_name, "note.html");
-        assert_eq!(browser_dialog_copy(Some("pt-BR")).extension_title, "Selecionar extensão descompactada");
+        assert_eq!(browser_dialog_copy(Some("pt-BR")).extension_title, "Selecionar extensão");
         assert_eq!(browser_dialog_copy(Some("en")).download_title, "Save shared browser download");
     }
 }

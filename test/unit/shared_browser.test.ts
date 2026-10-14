@@ -5,6 +5,7 @@ import { BrowserModel, type BrowserNative } from '../../src/apps/browser_model.t
 
 const move = (x = 100): BrowserCommand => ({ kind: 'mouse', event: 'mouseMoved', x, y: 100, button: 'none', buttons: 0, delta_x: 0, delta_y: 0, modifiers: 0, clicks: 0 });
 const state = { tabs: [{ id: 1, title: 'Example', url: 'https://example.com/' }], active: 1, temporary: false };
+const hostTerm = '00000000-0000-4000-8000-000000000001';
 const settle = () => new Promise<void>(resolve => setImmediate(resolve));
 
 test('control lease holds gestures, renews typing, grants host preemption and expires lost input', () => {
@@ -59,7 +60,9 @@ function fixture(local = 'host', onCall?: (command: string, args: Record<string,
   } };
   const model = new BrowserModel({ localActor: local, createdBy: 'host', instanceId: crypto.randomUUID(), changed() {}, emit() {},
     send: async (payload, target) => { sent.push({ payload, target }); } }, native, false);
-  model.setParticipants(['host', 'alice', 'bob']); model.state = structuredClone(state); model.running = true;
+  model.setParticipants(['host', 'alice', 'bob']);
+  model.apply({ type: 'ownership', host: 'host', term: hostTerm, version: 2 }, 'alice', false);
+  model.state = structuredClone(state); model.running = true; sent.length = 0;
   return { model, calls, sent };
 }
 
@@ -86,7 +89,7 @@ test('busy native input keeps the virtual cursor current and coalesces movement 
   } finally { unblock(); model.destroy(); }
 });
 
-test('only the browser creator can finish its session and reopen controls without removing the room app', async () => {
+test('only the accepted browser host can finish its session without removing the room app', async () => {
   const host = fixture(); const peer = fixture('alice');
   try {
     await peer.model.finish(); assert.equal(peer.model.running, true); assert.equal(peer.calls.length, 0);
@@ -110,16 +113,27 @@ test('commands from another browser session cannot execute after the browser res
     await settle(); assert.equal(calls.filter(call => call.command === 'control_shared_browser').length, 1);
   } finally { model.destroy(); }
 });
-test('creator owns browser state; remote snapshots and commands cannot impersonate its host', async () => {
+test('the accepted host owns browser state; remote snapshots and commands cannot impersonate it', async () => {
   const { model, calls } = fixture('alice');
-  model.apply({ type: 'state', state, revision: 10, running: true, paused: false, controller: '' }, 'bob', false);
+  model.apply({ type: 'state', hostTerm, state, revision: 10, running: true, paused: false, controller: '' }, 'bob', false);
   assert.equal(model.revision, 0);
-  model.apply({ type: 'state', state, revision: 10, running: true, paused: false, controller: '' }, 'host', true);
+  model.apply({ type: 'state', hostTerm, state, revision: 10, running: true, paused: false, controller: '' }, 'host', true);
   assert.equal(model.revision, 10);
-  model.apply({ type: 'state', state: { ...state, active: 2 }, revision: 11, running: true, paused: false, controller: '' }, 'host', false);
+  model.apply({ type: 'state', hostTerm, state: { ...state, active: 2 }, revision: 11, running: true, paused: false, controller: '' }, 'host', false);
   assert.equal(model.revision, 10);
   model.apply({ type: 'command', command: move(), sequence: 1, tab: 1 }, 'bob', false);
   await settle(); assert.equal(calls.length, 0); model.destroy();
+});
+test('a granted starter becomes native host even when someone else created the room app', async () => {
+  const starter = fixture('bob'); const creator = fixture('host'); const term = crypto.randomUUID();
+  try {
+    for (const { model } of [starter, creator]) model.apply({ type: 'ownership', host: 'bob', term, version: 3 }, 'alice', false);
+    assert.equal(starter.model.isHost, true); assert.equal(creator.model.isHost, false);
+    starter.model.state = structuredClone(state); starter.model.running = true;
+    starter.model.command(move()); await settle();
+    assert.ok(starter.calls.some(call => call.command === 'control_shared_browser'));
+    await creator.model.finish(); assert.equal(creator.calls.length, 0);
+  } finally { starter.model.destroy(); creator.model.destroy(); }
 });
 test('only joined live actors control the native browser; replay, snapshots and stale tabs cannot execute', async () => {
   const { model, calls } = fixture();

@@ -4,11 +4,14 @@ import type { RoomAppModel, RoomAppModelContext } from './models.ts';
 import { BrowserControlLease, validBrowserCommand, validBrowserState, validBrowserDialog, type BrowserCommand, type BrowserState, type BrowserPageDialog } from './browser_protocol.ts';
 import { BrowserMedia } from './browser_media.ts';
 import { getLanguage } from '../i18n/index.ts';
+import { BrowserOwnership } from './browser_ownership.ts';
 
 export interface BrowserNative { call<T>(command: string, args: Record<string, unknown>): Promise<T> }
 export class BrowserModel implements RoomAppModel {
-  readonly host: string;
-  readonly isHost: boolean;
+  private ownership: BrowserOwnership;
+  get host(): string { return this.ownership.host; }
+  get isHost(): boolean { return this.host === this.context.localActor; }
+  get canStart(): boolean { return this.joined && (!this.host || this.isHost) && !this.running && !this.busy; }
   state: BrowserState = { tabs: [], active: 0, temporary: false };
   controller = '';
   pointer: { x: number; y: number; actor: string } | null = null;
@@ -18,7 +21,7 @@ export class BrowserModel implements RoomAppModel {
   error = '';
   revision = 0;
   media: BrowserMedia | null = null;
-  extensions: { id: string; name: string; enabled: boolean }[] = [];
+  extensions: { id: string; name: string; enabled: boolean; popup?: boolean }[] = [];
   dialog: BrowserPageDialog | null = null;
   private dialogOpenedAt = 0;
   private answering = false;
@@ -44,7 +47,17 @@ export class BrowserModel implements RoomAppModel {
   private desktop: boolean;
   constructor(context: RoomAppModelContext, native: BrowserNative = { call: invoke }, desktop = isTauri()) {
     this.context = context; this.native = native; this.desktop = desktop;
-    this.host = context.createdBy ?? context.localActor; this.isHost = this.host === context.localActor;
+    this.ownership = new BrowserOwnership(context.localActor, async (packet, peer) => { await context.send?.(packet, peer); }, (previous, next) => {
+      const wasRunning = this.running;
+      this.stop(false);
+      if (wasRunning && previous === context.localActor && this.desktop) void this.native.call('stop_shared_browser', { scope: this.scope }).catch(() => {});
+      this.lease = new BrowserControlLease(next); this.state = { tabs: [], active: 0, temporary: false };
+      this.revision = 0; this.paused = false; this.pointer = null; this.extensions = [];
+      if (next && this.joined && !this.isHost) {
+        this.ensureMedia(); void this.media?.start().then(() => this.context.send?.({ type: 'media-request' }, next)).catch(e => this.fail(e));
+      }
+      this.context.changed();
+    });
     this.scope = context.instanceId!; this.lease = new BrowserControlLease(this.host);
   }
   get joined(): boolean { return this.members.has(this.context.localActor); }
@@ -56,7 +69,7 @@ export class BrowserModel implements RoomAppModel {
       || !this.members.has(this.controller) || Date.now() - this.dialogOpenedAt >= 1000);
   }
   snapshot(): unknown {
-    return { type: 'state', state: this.state, revision: this.revision, running: this.running, controller: this.controller, paused: this.paused, dialog: this.dialog, session: this.session };
+    return { type: 'state', ownership: this.ownership.snapshot(), hostTerm: this.ownership.term, state: this.state, revision: this.revision, running: this.running, controller: this.controller, paused: this.paused, dialog: this.dialog, session: this.session };
   }
   private publish(target?: string): void {
     if (!this.isHost || !this.joined || this.disposed) return;
@@ -66,7 +79,7 @@ export class BrowserModel implements RoomAppModel {
   }
   private changed(): void { this.revision++; this.publish(); }
   private acceptNativeState(state: unknown): void {
-    if (!this.joined || !this.running || !validBrowserState(state) || (state.serial ?? 0) < (this.state.serial ?? 0)) return;
+    if (!this.isHost || !this.joined || !this.running || !validBrowserState(state) || (state.serial ?? 0) < (this.state.serial ?? 0)) return;
     if (JSON.stringify(state) !== JSON.stringify(this.state)) {
       const activeChanged = state.active !== this.state.active;
       this.state = state; this.changed(); if (activeChanged) this.media?.refreshCapture();
@@ -89,13 +102,18 @@ export class BrowserModel implements RoomAppModel {
     }, () => this.context.changed(), state => this.acceptNativeState(state), error => this.fail(error), this.context.rtcConfiguration);
   }
   async start(temporary = false): Promise<void> {
-    if (!this.isHost || !this.joined || this.busy || this.running || !this.desktop) return;
+    if (!this.canStart || !this.desktop) return;
+    this.busy = true; this.error = ''; this.context.changed();
+    try { if ((this.isHost || await this.ownership.request()) && this.joined && this.isHost) await this.startNative(temporary); }
+    finally { this.busy = false; this.context.changed(); }
+  }
+  private async startNative(temporary: boolean): Promise<void> {
     this.busy = true; this.error = ''; this.context.changed();
     const epoch = this.epoch;
     try {
       this.listening ??= (async () => {
         const removePopup = await listen<{ scope: string; url: string }>('shared-browser-popup', ({ payload }) => {
-        if (payload.scope === this.scope && this.running && this.joined && validBrowserCommand({ kind: 'new-tab', url: payload.url })) {
+        if (this.isHost && payload.scope === this.scope && this.running && this.joined && validBrowserCommand({ kind: 'new-tab', url: payload.url })) {
           void this.queue(async () => {
             const state = await this.native.call<BrowserState>('control_shared_browser', { scope: this.scope, command: { kind: 'new-tab', url: payload.url } });
             this.acceptNativeState(state);
@@ -104,14 +122,14 @@ export class BrowserModel implements RoomAppModel {
         });
         try {
           const removeDialog = await listen<{ scope: string; dialog: unknown }>('shared-browser-dialog', ({ payload }) => {
-            if (payload.scope === this.scope && this.joined && !this.disposed && (this.running || this.busy) && validBrowserDialog(payload.dialog)) {
+            if (this.isHost && payload.scope === this.scope && this.joined && !this.disposed && (this.running || this.busy) && validBrowserDialog(payload.dialog)) {
               this.dialog = payload.dialog; this.dialogOpenedAt = Date.now(); this.changed();
             }
           });
           let removeLoading: () => void;
           try {
             removeLoading = await listen<{ scope: string; tab: number; loading: boolean; serial: number }>('shared-browser-loading', ({ payload }) => {
-              if (payload.scope !== this.scope || !this.joined || !this.running || !Number.isSafeInteger(payload.serial)
+              if (!this.isHost || payload.scope !== this.scope || !this.joined || !this.running || !Number.isSafeInteger(payload.serial)
                 || payload.serial <= (this.state.serial ?? 0) || typeof payload.loading !== 'boolean') return;
               if (!this.state.tabs.some(tab => tab.id === payload.tab)) return;
               this.state = { ...this.state, serial: payload.serial,
@@ -138,10 +156,14 @@ export class BrowserModel implements RoomAppModel {
       this.changed();
       for (const peer of this.members) if (peer !== this.host) void this.media?.offer(peer).catch(e => this.fail(e));
     } catch (error) {
+      if (this.disposed || epoch !== this.epoch || !this.isHost) {
+        await this.native.call('stop_shared_browser', { scope: this.scope }).catch(() => {}); return;
+      }
       if (!this.unlisten) this.listening = undefined;
       this.running = false; this.media?.stop();
       await this.native.call('stop_shared_browser', { scope: this.scope }).catch(() => {});
       this.dialog = null; this.changed(); this.fail(error);
+      await this.ownership.release().catch(() => {});
     } finally { this.busy = false; this.context.changed(); }
   }
   private async release(): Promise<void> {
@@ -174,6 +196,9 @@ export class BrowserModel implements RoomAppModel {
   apply(payload: unknown, actor: string, fromSnapshot: boolean): void {
     if (this.disposed || !payload || typeof payload !== 'object') return;
     const data = payload as Record<string, unknown>;
+    if (this.ownership.handle(payload, actor, fromSnapshot)) return;
+    if (fromSnapshot && data.ownership && typeof data.ownership === 'object')
+      this.ownership.handle({ ...data.ownership, type: 'ownership' }, actor, true);
     if (data.type === 'cursor' && actor === this.host && !this.isHost && !fromSnapshot && this.joined && this.hostOnline
       && typeof data.x === 'number' && Number.isFinite(data.x) && data.x >= 0 && data.x <= 1280
       && typeof data.y === 'number' && Number.isFinite(data.y) && data.y >= 0 && data.y <= 720
@@ -181,7 +206,7 @@ export class BrowserModel implements RoomAppModel {
       this.pointer = { x: data.x, y: data.y, actor: data.actor }; this.context.changed(); return;
     }
     if (data.type === 'state') {
-      if (this.isHost || actor !== this.host || !validBrowserState(data.state) ||
+      if (this.isHost || actor !== this.host || data.hostTerm !== this.ownership.term || !validBrowserState(data.state) ||
         !Number.isSafeInteger(data.revision) || Number(data.revision) < this.revision ||
         typeof data.running !== 'boolean' || typeof data.paused !== 'boolean' ||
         typeof data.controller !== 'string' || data.controller.length > 100 || data.dialog !== undefined && data.dialog !== null && !validBrowserDialog(data.dialog)
@@ -275,7 +300,7 @@ export class BrowserModel implements RoomAppModel {
     this.state = { tabs: [], active: 0, temporary: this.state.temporary };
     this.pointer = null; this.changed();
     try { await this.native.call('stop_shared_browser', { scope: this.scope }); }
-    finally { this.busy = false; this.context.changed(); }
+    finally { await this.ownership.release().catch(() => {}); this.busy = false; this.context.changed(); }
   }
   async clear(mode: 'cache' | 'sites' | 'history' | 'reset'): Promise<void> {
     if (!this.isHost || !this.joined || !this.running || this.busy) return;
@@ -291,18 +316,20 @@ export class BrowserModel implements RoomAppModel {
       if (mode === 'reset') { this.stop(); this.state = { tabs: [], active: 0, temporary }; this.changed(); }
       throw error;
     } finally { this.busy = false; this.context.changed(); }
-    if (mode === 'reset' && this.joined) await this.start(temporary);
+    if (mode === 'reset' && this.joined && this.isHost) await this.startNative(temporary);
   }
-  async manageExtensions(action: 'install' | 'list' | 'enable' | 'disable' | 'remove', id?: string): Promise<void> {
+  async manageExtensions(action: 'install' | 'install-folder' | 'list' | 'enable' | 'disable' | 'remove' | 'popup', id?: string): Promise<void> {
     if (!this.isHost || !this.joined || !this.running || this.busy) return;
     this.busy = true; this.context.changed();
     try {
-      await this.native.call('browser_extensions', { scope: this.scope, action, id: id ?? null, language: getLanguage() });
+      const result = await this.native.call('browser_extensions', { scope: this.scope, action, id: id ?? null, language: getLanguage() });
+      if (action === 'popup') this.acceptNativeState(result);
       this.extensions = await this.native.call('browser_extensions', { scope: this.scope, action: 'list', id: null, language: getLanguage() });
     } finally { this.busy = false; this.context.changed(); }
   }
   setParticipants(participants: string[]): void {
     const previous = this.members; this.members = new Set(participants);
+    this.ownership.updateMembers(participants);
     for (const peer of previous) if (!this.members.has(peer)) {
       this.memberEpochs.set(peer, (this.memberEpochs.get(peer) ?? 0) + 1);
       this.media?.remove(peer); this.received.delete(peer);
@@ -328,5 +355,5 @@ export class BrowserModel implements RoomAppModel {
     this.dialog = null;
     if (native && this.isHost && this.desktop) void this.native.call('stop_shared_browser', { scope: this.scope }).catch(() => {});
   }
-  destroy(): void { this.disposed = true; this.stop(); this.unlisten?.(); }
+  destroy(): void { this.disposed = true; this.ownership.cancel(); this.stop(); this.unlisten?.(); }
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
-import { ArrowLeft, ArrowRight, RotateCw, Plus, X, Globe, Home, Square, Settings, Maximize, Minimize, Lock, Unlock, Puzzle, Trash2, MousePointer2, Volume2, VolumeX } from 'lucide-react';
+import { ArrowLeft, ArrowRight, RotateCw, Plus, X, Globe, Home, Square, Settings, Maximize, Minimize, Lock, Unlock, Puzzle, Trash2, MousePointer2, Volume2, VolumeX, FolderOpen } from 'lucide-react';
 import { roomAppsService } from './room_apps_service';
 import type { BrowserModel } from './browser_model';
 import { browserUrl, browserPointerPosition, BROWSER_HOME, BROWSER_HEIGHT, BROWSER_WIDTH, type BrowserCommand } from './browser_protocol';
@@ -40,18 +40,21 @@ function BrowserSettings({ model, onClose }: { model: BrowserModel; onClose: () 
         <label>{t('browser.videoQuality')}<Select value={model.media.quality.settings.video}
           onValueChange={value => model.media?.configure({ ...model.media.quality.settings, video: value as BrowserVideoQuality })}
           options={['720p30', '1080p30', '1080p60'].map(value => ({ value, label: t(`browser.quality.${value}`) }))} /></label>
-        <p>{t('browser.qualityInfo')}</p>
       </>}
       <label>{t('browser.clearData')}<Select value={mode} disabled={model.busy} onValueChange={setMode}
         options={['cache', 'sites', 'history', 'reset'].map(value => ({ value, label: t(`browser.clear.${value}`) }))} /></label>
       <button className="btn btn-secondary" disabled={model.busy} onClick={() => setConfirm(true)}>{t('browser.clearData')}</button>
       </div><div className="browser-settings-column">
       <div className="browser-extension-heading"><h3>{t('browser.extensions')}</h3>
-        <button className="btn btn-secondary btn-sm" disabled={model.busy} onClick={() => run(model.manageExtensions('install'))}><Plus size={15} />{t('browser.installExtension')}</button></div>
+        <button className="btn btn-secondary btn-sm" disabled={model.busy} onClick={() => run(model.manageExtensions('install'))}><Plus size={15} />{t('browser.installExtension')}</button>
+        <TooltipButton className="btn btn-secondary btn-sm" disabled={model.busy} tooltip={t('browser.installFolder')}
+          onClick={() => run(model.manageExtensions('install-folder'))}><FolderOpen size={15} /></TooltipButton></div>
       <p>{t('browser.extensionsInfo')}</p>
       {!model.extensions.length && <p>{t('browser.noExtensions')}</p>}
       {model.extensions.map(extension => <div className="browser-extension" key={extension.id}>
         <Puzzle size={17} /><span>{extension.name}</span>
+        {extension.popup && <TooltipButton className="btn btn-secondary btn-sm" disabled={model.busy || !extension.enabled} tooltip={t('browser.openExtension')}
+          onClick={() => { void model.manageExtensions('popup', extension.id).then(onClose).catch(e => showToast(localizeError(e), 4000, 'error')); }}><Maximize size={15} /></TooltipButton>}
         <label className="modern-switch"><input type="checkbox" checked={extension.enabled} aria-label={t('browser.enableExtension', { name: extension.name })}
           disabled={model.busy} onChange={() => run(model.manageExtensions(extension.enabled ? 'disable' : 'enable', extension.id))} /><span className="switch-slider" /></label>
         <TooltipButton className="btn btn-secondary btn-sm" tooltip={t('browser.removeExtension')} aria-label={t('browser.removeExtension')}
@@ -267,7 +270,7 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
         onPaste={e => { e.preventDefault(); const text = e.clipboardData.getData('text/plain'); if (text) send({ kind: 'text', text: text.slice(0, 4096) }); }} />}
       {(!model.running || !model.hostOnline) && <div className="browser-empty">
         <Globe size={36} strokeWidth={1.5} />
-        {model.isHost && model.hostOnline && !minimized ? <>
+        {(!model.host || model.isHost) && !minimized ? <>
           <p>{t('browser.profileInfo')}</p>
           <label className="browser-temporary"><span className="modern-switch"><input type="checkbox" checked={temporary} disabled={model.busy}
             onChange={e => setTemporary(e.target.checked)} /><span className="switch-slider" /></span>{t('browser.temporary')}</label>
@@ -276,7 +279,7 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
       </div>}
     </div>
     {!minimized && !fullscreen && <div className="browser-status">
-      <span>{t('browser.host', { name: participantName(model.host) })}</span>
+      {model.host && <span>{t('browser.host', { name: participantName(model.host) })}</span>}
       {model.running && model.isHost && model.media && <span>{t('browser.captureTarget', {
         resolution: model.media.quality.quality.height, fps: model.media.quality.quality.fps })}</span>}
       <span role="status">{model.controller ? t('browser.controlling', { name: participantName(model.controller) }) : t('browser.controlAvailable')}</span>
