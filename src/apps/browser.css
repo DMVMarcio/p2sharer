@@ -22,6 +22,8 @@
 .browser-surface { container-type: size; }
 .browser-surface.virtual-cursor, .browser-surface.virtual-cursor * { cursor: none; }
 .browser-cursor { position: absolute; display: flex; align-items: flex-start; gap: 3px; color: var(--text-primary); }
+.browser-cursor:not(.predicted) { transition: left 16ms linear, top 16ms linear; }
+@media (prefers-reduced-motion: reduce) { .browser-cursor:not(.predicted) { transition: none; } }
 .browser-cursor span { margin-top: 15px; padding: 2px 5px; border-radius: var(--radius-sm); background: var(--bg-card); font-size: 10px; white-space: nowrap; }
 .browser-keyboard { position: absolute; left: 0; bottom: 0; width: 1px; height: 1px; padding: 0; border: 0; opacity: 0; resize: none; }
 .browser-surface:focus-within { outline: 2px solid var(--accent-color); outline-offset: -2px; }

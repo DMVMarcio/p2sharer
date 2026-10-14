@@ -94,6 +94,7 @@ export class BrowserMedia {
     } };
     pc.ontrack = e => {
       if (this.host || this.peers.get(peer) !== entry) return;
+      MediaCoordinator.tuneReceiverJitterBuffer(pc);
       const stream = this.stream ?? new MediaStream(); stream.addTrack(e.track); this.stream = stream; this.changed();
     };
     pc.onconnectionstatechange = () => {
@@ -133,6 +134,7 @@ export class BrowserMedia {
       if (description.type === 'offer' && !this.host) {
         const pc = this.connection(peer, value.token); entry = this.peers.get(peer)!;
         await pc.setRemoteDescription(description);
+        MediaCoordinator.tuneReceiverJitterBuffer(pc);
         await pc.setLocalDescription(await pc.createAnswer());
         if (this.peers.get(peer) !== entry) return;
         await this.send({ type: 'media', token: value.token, description: pc.localDescription?.toJSON() }, peer);

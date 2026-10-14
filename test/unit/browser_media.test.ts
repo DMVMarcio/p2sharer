@@ -119,6 +119,7 @@ test('browser media announces SDP before trickle ICE, rejects stale candidates a
     connectionState = 'new';
     signalingState = 'stable';
     closed = false;
+    receiver = { track: { kind: 'video' }, jitterBufferTarget: 100, playoutDelayHint: .1 };
     candidates: unknown[] = [];
     constructor(configuration: unknown) { this.configuration = configuration; created.push(this); }
     async setRemoteDescription(value: unknown) { this.remoteDescription = value; }
@@ -128,6 +129,7 @@ test('browser media announces SDP before trickle ICE, rejects stale candidates a
       this.onicecandidate?.({ candidate: { toJSON: () => ({candidate:'test-local-candidate'}) } });
     }
     async addIceCandidate(value: unknown) { this.candidates.push(value); }
+    getReceivers() { return [this.receiver]; }
     close() { this.closed = true; }
   }
   globalThis.RTCPeerConnection = Connection as unknown as typeof RTCPeerConnection;
@@ -140,6 +142,8 @@ test('browser media announces SDP before trickle ICE, rejects stale candidates a
     const token = crypto.randomUUID();
     await media.receive('host', { token, description: {type:'offer', sdp:'test-offer'} });
     assert.deepEqual(created[0].configuration, configuration);
+    assert.equal(created[0].receiver.jitterBufferTarget, 20);
+    assert.equal(created[0].receiver.playoutDelayHint, .02);
     assert.equal((sent[0].description as {type:string}).type, 'answer');
     assert.deepEqual(sent[1].candidate, {candidate:'test-local-candidate'});
     await media.receive('host', {token:crypto.randomUUID(), candidate:{candidate:'stale'}});

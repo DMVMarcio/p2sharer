@@ -19,6 +19,9 @@ mod navigation;
 #[cfg(windows)]
 #[path = "browser_favicon.rs"]
 mod favicon;
+#[cfg(windows)]
+#[path = "browser_window.rs"]
+mod capture_window;
 const BROWSER_HOME: &str = "https://www.google.com/";
 static NEXT_BROWSER_GENERATION: AtomicU64 = AtomicU64::new(1);
 
@@ -46,7 +49,6 @@ struct Session {
     buttons: u8,
     saved: Option<SavedTabs>,
     language: Option<String>,
-    capture_widths: HashMap<u32, u32>,
     capture_id: Option<String>,
 }
 #[derive(Default, Clone, PartialEq, Serialize, Deserialize)]
@@ -183,6 +185,7 @@ fn build_tab(
     let copy = crate::localization::browser_dialog_copy(language);
     let view = WebviewWindowBuilder::new(app, label(scope, id), WebviewUrl::External(tauri::Url::parse("about:blank").map_err(|e| e.to_string())?))
         .title("P2Sharer Browser").inner_size(1280.0, 720.0).visible(false).decorations(false)
+        .resizable(false)
         .shadow(false).skip_taskbar(true).focused(false).focusable(false)
         .data_directory(directory).incognito(temporary).browser_extensions_enabled(true)
         .additional_browser_args(&format!("{} --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows --disable-direct-composition-video-overlays --disable-direct-composition-sw-video-overlays",
@@ -261,7 +264,6 @@ pub async fn start_shared_browser(
                 buttons: 0,
                 saved: None,
                 language,
-                capture_widths: HashMap::new(),
                 capture_id: None,
             },
         );
@@ -744,7 +746,6 @@ pub async fn control_shared_browser(
                     return Err("Unknown browser tab".into());
                 }
                 session.tabs.retain(|t| t.id != id);
-                session.capture_widths.remove(&id);
                 if session.active == id {
                     session.active = session.tabs.first().map(|t| t.id).unwrap_or(0);
                 }
@@ -852,21 +853,10 @@ pub async fn prepare_shared_browser_capture(
         .ok_or("Browser closed")?;
     #[cfg(windows)]
     {
-        let prepared_width = state.0.lock().unwrap().get(&scope)
-            .and_then(|session| session.capture_widths.get(&active)).copied();
         // WGC captures a live compositor surface; hidden/minimized windows have none.
-        // Keep the source outside the entire virtual desktop and never activate it.
-        let height = width * 9 / 16;
-        let size = tauri::PhysicalSize::new(width, height);
-        if prepared_width != Some(width) || view.inner_size().map_err(|e| e.to_string())? != size {
-            let desktop_left = unsafe { windows::Win32::UI::WindowsAndMessaging::GetSystemMetrics(windows::Win32::UI::WindowsAndMessaging::SM_XVIRTUALSCREEN) };
-            view.set_position(tauri::PhysicalPosition::new(desktop_left.saturating_sub(width as i32 + 128), 0)).map_err(|e| e.to_string())?;
-            // Position first: WM_DPICHANGED may apply a different suggested size.
-            view.set_size(size).map_err(|e| e.to_string())?;
-            state.0.lock().unwrap().get_mut(&scope).ok_or("Browser closed")?.capture_widths.insert(active, width);
-        }
-        if !view.is_visible().map_err(|e| e.to_string())? { view.show().map_err(|e| e.to_string())?; }
+        // The owning-thread subclass confines even runtime-driven fullscreen moves.
         configure_viewport(&view, width).await?;
+        if !view.is_visible().map_err(|e| e.to_string())? { view.show().map_err(|e| e.to_string())?; }
         let tabs = state.0.lock().unwrap().get(&scope).ok_or("Browser closed")?.tabs.clone();
         for tab in tabs { if tab.id != active { if let Some(other) = app.get_webview_window(&label(&scope, tab.id)) { if other.is_visible().unwrap_or(false) { let _ = other.hide(); } } } }
         let previous_id = state.0.lock().unwrap().get_mut(&scope).ok_or("Browser closed")?.capture_id.replace(session_id.clone());
@@ -901,7 +891,9 @@ async fn configure_viewport(view: &WebviewWindow, width: u32) -> Result<(), Stri
     use webview2_com::Microsoft::Web::WebView2::Win32::{ICoreWebView2Controller3, COREWEBVIEW2_BOUNDS_MODE_USE_RAW_PIXELS};
     use windows_capture_api::{core::Interface, Win32::Foundation::RECT};
     let (tx, rx) = tokio::sync::oneshot::channel();
+    let hwnd = view.hwnd().map_err(|e| e.to_string())?.0 as usize;
     view.with_webview(move |webview| unsafe {
+        if let Err(e) = capture_window::install(windows::Win32::Foundation::HWND(hwnd as *mut _), width) { let _ = tx.send(Err(e)); return; }
         let result = (|| {
             let controller = webview.controller();
             let scaled = controller.cast::<ICoreWebView2Controller3>()?;

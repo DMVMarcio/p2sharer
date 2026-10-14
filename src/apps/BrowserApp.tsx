@@ -14,6 +14,7 @@ import { AudioContextManager } from '../audio/audio_context_manager';
 import { FullscreenDialog } from '../components/common/FullscreenDialog';
 import { useNativeFullscreen } from '../hooks/useNativeFullscreen';
 import { useIdleControls } from '../hooks/useIdleControls';
+import { useBrowserCursor } from '../hooks/useBrowserCursor';
 import type { BrowserContentMode, BrowserVideoQuality } from './browser_quality';
 
 function BrowserFavicon({ value }: { value?: string }) {
@@ -124,6 +125,9 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
     return () => cancelAnimationFrame(frame);
   }, [fullscreen]);
   const active = model?.state.tabs.find(tab => tab.id === model.state.active);
+  const localActor = roomAppsService.getLocalActor();
+  const cursor = useBrowserCursor(model?.pointer && model.controller === model.pointer.actor ? model.pointer : null,
+    Boolean(!minimized && model?.canControl && (model.isHost || !model.controller || model.controller === localActor)), localActor, model?.state.active ?? 0);
   useEffect(() => { setUrl(active?.url === 'about:blank' ? '' : active?.url ?? ''); }, [active?.url, active?.id]);
   const attachVideo = useCallback((element: HTMLVideoElement | null) => {
     if (video.current && video.current !== element) video.current.srcObject = null;
@@ -154,8 +158,9 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
     browserPointerPosition(e.clientX, e.clientY, surface.current!.getBoundingClientRect(), clamp);
   const pointer = (e: PointerEvent<HTMLDivElement>, event: 'mouseMoved' | 'mousePressed' | 'mouseReleased') => {
     if (minimized || !model.canControl || e.pointerType !== 'mouse' && e.pointerType !== 'pen') return;
-    if (event === 'mouseMoved' && performance.now() - lastMove.current < 33) return;
     const point = position(e, e.currentTarget.hasPointerCapture(e.pointerId)); if (!point) return;
+    cursor.preview(point);
+    if (event === 'mouseMoved' && performance.now() - lastMove.current < 16) return;
     lastMove.current = performance.now();
     e.preventDefault();
     if (event === 'mousePressed') {
@@ -237,7 +242,8 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
         {icon(fullscreen ? 'exitFullscreen' : 'fullscreen', fullscreen ? <Minimize size={15} /> : <Maximize size={15} />, expand)}
       </form>
     </div>}
-    <div className={`browser-surface${!minimized && model.running && model.hostOnline && model.pointer && model.controller === model.pointer.actor ? ' virtual-cursor' : ''}`} ref={surface} onPointerMove={e => pointer(e, 'mouseMoved')}
+    <div className={`browser-surface${!minimized && model.running && model.hostOnline && cursor.pointer ? ' virtual-cursor' : ''}`} ref={surface} onPointerMove={e => pointer(e, 'mouseMoved')}
+      onPointerLeave={e => { if (!e.currentTarget.hasPointerCapture(e.pointerId)) cursor.clear(); }}
       onPointerDown={e => pointer(e, 'mousePressed')} onPointerUp={e => pointer(e, 'mouseReleased')}
       onPointerCancel={() => send({ kind: 'release' })} onContextMenu={e => e.preventDefault()}
       onWheel={e => {
@@ -249,9 +255,9 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
       }}>
       <video ref={attachVideo} autoPlay playsInline muted aria-label={t('browser.title')} />
       {active?.loading && !fullscreen && <div className="browser-loading" role="progressbar" aria-label={t('browser.loading')}><span /></div>}
-      {model.pointer && model.controller === model.pointer.actor && <div className="browser-cursor-layer"><div className="browser-cursor"
-        style={{ left: `${model.pointer.x / BROWSER_WIDTH * 100}%`, top: `${model.pointer.y / BROWSER_HEIGHT * 100}%` }}>
-        <MousePointer2 size={20} fill="var(--accent-color)" /><span>{participantName(model.pointer.actor)}</span>
+      {cursor.pointer && <div className="browser-cursor-layer"><div className={`browser-cursor${cursor.predicted ? ' predicted' : ''}`}
+        style={{ left: `${cursor.pointer.x / BROWSER_WIDTH * 100}%`, top: `${cursor.pointer.y / BROWSER_HEIGHT * 100}%` }}>
+        <MousePointer2 size={20} fill="var(--accent-color)" /><span>{participantName(cursor.pointer.actor)}</span>
       </div></div>}
       {!minimized && <textarea ref={keyboard} className="browser-keyboard" data-remote-keyboard autoComplete="off" aria-label={t('browser.keyboard')}
         disabled={!model.canControl} onKeyDown={e => key(e, 'keyDown')} onKeyUp={e => key(e, 'keyUp')}
