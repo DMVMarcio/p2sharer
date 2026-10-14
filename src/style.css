@@ -5422,3 +5422,9 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 .audio-clear-selection { align-self: flex-start; }
 .audio-refresh-spinning { animation: spin .8s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .audio-refresh-spinning { animation: none; } }
+
+/* Native fullscreen content retains the common dialog lifecycle and focus boundary. */
+.modal-overlay:has(> .fullscreen-dialog) { padding: 0; }
+.modal-card.fullscreen-dialog { width: 100vw; max-width: none; height: 100vh; max-height: none; border-radius: 0; }
+.fullscreen-dialog > .modal-body { flex: 1; min-height: 0; padding: 0; gap: 0; overflow: hidden; }
+.fullscreen-dialog > .modal-footer, .fullscreen-dialog > .modal-overlay-actions { display: none; }

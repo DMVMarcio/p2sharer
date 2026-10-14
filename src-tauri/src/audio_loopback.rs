@@ -449,6 +449,17 @@ pub fn convert_and_downmix_encoded(
 
 static CURRENT_STOP_FLAG: Mutex<Option<Arc<AtomicBool>>> = Mutex::new(None);
 
+/// Independent process-tree capture owned by a browser session, never replacing screen audio.
+#[cfg(windows)]
+pub fn start_browser_audio(app: AppHandle, pid: u32, event_name: String) -> Arc<AtomicBool> {
+    let running = Arc::new(AtomicBool::new(true));
+    let flag = running.clone();
+    std::thread::spawn(move || win_audio::run_capture_loop(app, AudioConfig {
+        mode: "include".into(), target_pids: vec![pid], target_names: vec![], sample_rate: 48000,
+    }, flag, event_name));
+    running
+}
+
 #[cfg(windows)]
 pub(crate) mod win_audio {
     use super::*;
@@ -890,7 +901,7 @@ pub(crate) mod win_audio {
         }
     }
 
-    pub fn run_capture_loop(app: AppHandle, config: AudioConfig, stop_flag: Arc<AtomicBool>) {
+    pub fn run_capture_loop(app: AppHandle, config: AudioConfig, stop_flag: Arc<AtomicBool>, event_name: String) {
         unsafe {
             let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
             let _ = windows::Win32::Media::timeBeginPeriod(1);
@@ -1279,7 +1290,7 @@ pub(crate) mod win_audio {
                         timestamp_us,
                     };
 
-                    let _ = app.emit("p2sharer://audio-stream", payload);
+                    let _ = app.emit_to("main", &event_name, payload);
 
                     standardized_buffer.drain(..min_samples);
                 }
@@ -1318,7 +1329,7 @@ pub(crate) mod win_audio {
                         timestamp_us,
                     };
 
-                    let _ = app.emit("p2sharer://audio-stream", payload);
+                    let _ = app.emit_to("main", &event_name, payload);
 
                     standardized_buffer.clear();
                 }
@@ -1372,7 +1383,7 @@ pub fn start_audio_capture(app: AppHandle, config: Option<AudioConfig>) -> Resul
 
     std::thread::spawn(move || {
         #[cfg(windows)]
-        win_audio::run_capture_loop(app, cfg, stop_clone);
+        win_audio::run_capture_loop(app, cfg, stop_clone, "p2sharer://audio-stream".into());
     });
 
     Ok(true)

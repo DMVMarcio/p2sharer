@@ -1,4 +1,5 @@
 @import './tunnels.css';
+@import './browser.css';
 
 /* Room App library */
 .apps-library-modal { max-width: 720px; }

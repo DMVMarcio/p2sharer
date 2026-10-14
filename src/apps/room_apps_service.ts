@@ -26,6 +26,7 @@ export class RoomAppsService {
   private onLocalLifecycle: LifecycleListener | null = null;
   private onLifecycle: LifecycleListener | null = null;
   private localActor = '';
+  private rtcConfiguration?: () => RTCConfiguration;
   private joining = new Map<string, Promise<void>>();
 
   subscribe(listener: Listener): () => void {
@@ -103,16 +104,18 @@ export class RoomAppsService {
     this.notify();
   }
 
-  attach(sender: Sender, localActor: string, onLocalLifecycle?: LifecycleListener, onLifecycle?: LifecycleListener): void {
+  attach(sender: Sender, localActor: string, onLocalLifecycle?: LifecycleListener, onLifecycle?: LifecycleListener, rtcConfiguration?: () => RTCConfiguration): void {
     this.reset();
     this.sender = sender;
     this.localActor = localActor;
+    this.rtcConfiguration = rtcConfiguration;
     this.onLocalLifecycle = onLocalLifecycle || null;
     this.onLifecycle = onLifecycle || null;
   }
 
   reset(): void {
     this.sender = null;
+    this.rtcConfiguration = undefined;
     this.joining.clear();
     this.onLocalLifecycle = null;
     this.onLifecycle = null;
@@ -156,6 +159,8 @@ export class RoomAppsService {
     if (!definition) return false;
     const model = definition.createModel({
       instanceId: instance.id,
+      createdBy: instance.createdBy,
+      rtcConfiguration: this.rtcConfiguration,
       localActor: this.localActor,
       send: async (payload, target) => {
         if (!this.isJoined(instance.id) || !this.participants.get(instance.id)?.has(target) || instance.personal)

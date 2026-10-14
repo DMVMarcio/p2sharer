@@ -331,6 +331,7 @@ export class GroupRoomManager {
   }
 
   public getLocalPeerId(): string { return selfId; }
+  public getRtcConfiguration(): RTCConfiguration { return structuredClone(this.rtcConfig ?? buildRtcConfiguration(this.turnConfig)); }
 
   public sendStreamPointerState(state: StreamPointerState): void {
     if (!validStreamPointerState(state)) return;

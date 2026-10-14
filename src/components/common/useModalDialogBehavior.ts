@@ -31,6 +31,8 @@ export function useModalDialogBehavior(onClose: () => void, busy = false, closeO
           (event.target instanceof Element && event.target.closest('[role="combobox"][aria-expanded="true"]'))) return;
       if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); dismiss(); }
       if (event.key === 'Tab') {
+        // A remote keyboard surface owns Tab inside its hosted content, while focus stays in this dialog.
+        if (event.target instanceof Element && card.contains(event.target) && event.target.closest('[data-remote-keyboard]')) return;
         const items = controls();
         const target = document.activeElement;
         if (!items.length) { event.preventDefault(); card.focus(); }

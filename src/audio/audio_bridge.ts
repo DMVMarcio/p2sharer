@@ -10,6 +10,7 @@ export class AudioBridge {
   private unlisten: UnlistenFn | null = null;
   private onLevelCallback: ((level: number) => void) | null = null;
   private isCapturing = false;
+  private listenerGeneration = 0;
   private nextPlayTime = 0;
   private lastAudioTimestampUs = 0;
   private targetLead = 0.05;
@@ -68,12 +69,13 @@ export class AudioBridge {
     return track;
   }
 
-  public async startListening(): Promise<void> {
+  public async startListening(eventName = 'p2sharer://audio-stream'): Promise<void> {
     if (this.isCapturing) return;
     this.isCapturing = true;
+    const generation = ++this.listenerGeneration;
 
     try {
-      this.unlisten = await listen<AudioStreamPayload>('p2sharer://audio-stream', (event) => {
+      const remove = await listen<AudioStreamPayload>(eventName, (event) => {
         const payload = event.payload;
         if (this.onLevelCallback) {
           this.onLevelCallback(payload.rms_level);
@@ -83,6 +85,8 @@ export class AudioBridge {
           this.playPCMChunk(payload);
         }
       });
+      if (!this.isCapturing || generation !== this.listenerGeneration) remove();
+      else this.unlisten = remove;
     } catch (err) {
       console.warn('Tauri audio event listening failed:', err);
     }
@@ -177,6 +181,7 @@ export class AudioBridge {
 
   public stop(): void {
     this.isCapturing = false;
+    this.listenerGeneration++;
     this.nextPlayTime = 0;
     this.targetLead = 0.05;
     this.stableChunks = 0;

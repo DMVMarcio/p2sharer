@@ -1,0 +1,34 @@
+.apps-library-banner.browser { background: linear-gradient(125deg, #316bc9, #614fa5 65%, #242b46); }
+.room-app-browser { display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 0; color: var(--text-primary); background: var(--bg-card); }
+.browser-tabs { display: flex; align-items: center; gap: 4px; padding: 5px 8px; overflow-x: auto; flex-shrink: 0; }
+.browser-tab { display: flex; align-items: center; border-radius: var(--radius-sm); background: var(--bg-elevated); }
+.browser-tab.selected { background: var(--accent-subtle); box-shadow: inset 0 -2px var(--accent-color); }
+.browser-tab > button:first-child { min-width: 70px; max-width: 180px; }
+.browser-tab span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.browser-toolbar { display: flex; gap: 5px; padding: 5px 8px; align-items: center; flex-shrink: 0; }
+.browser-toolbar input { flex: 1; min-width: 40px; }
+.browser-surface { position: relative; flex: 1; min-height: 0; overflow: hidden; background: #000; overscroll-behavior: contain; touch-action: none; }
+.browser-surface video { width: 100%; height: 100%; object-fit: contain; display: block; pointer-events: none; }
+.browser-cursor-layer { position: absolute; width: min(100%, calc(100cqh * 16 / 9)); height: min(100%, calc(100cqw * 9 / 16)); aspect-ratio: 16 / 9; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; }
+.browser-surface { container-type: size; }
+.browser-cursor { position: absolute; display: flex; align-items: flex-start; gap: 3px; color: var(--text-primary); }
+.browser-cursor span { margin-top: 15px; padding: 2px 5px; border-radius: var(--radius-sm); background: var(--bg-card); font-size: 10px; white-space: nowrap; }
+.browser-keyboard { position: absolute; left: 0; bottom: 0; width: 1px; height: 1px; padding: 0; border: 0; opacity: 0; resize: none; }
+.browser-surface:focus-within { outline: 2px solid var(--accent-color); outline-offset: -2px; }
+.browser-empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: var(--bg-card); color: var(--text-secondary); padding: 20px; text-align: center; }
+.browser-empty p { max-width: 480px; margin: 0; font-size: 12px; }
+.browser-temporary { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.browser-status { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 5px 9px; color: var(--text-secondary); font-size: 10px; }
+.browser-status > span:nth-child(2) { flex: 1; }
+.browser-status label { display: flex; gap: 4px; align-items: center; }
+.browser-status input[type=range] { width: 75px; accent-color: var(--accent-color); }
+.browser-error { color: var(--danger-text); margin: 4px 8px; font-size: 12px; overflow-wrap: anywhere; }
+.browser-settings { display: flex; flex-direction: column; gap: 12px; }
+.browser-settings p { margin: 0; font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+.browser-settings > label { display: flex; flex-direction: column; gap: 7px; font-size: 12px; }
+.browser-extension-heading, .browser-extension { display: flex; gap: 10px; align-items: center; }
+.browser-extension-heading h3, .browser-extension > span { flex: 1; margin: 0; font-size: 13px; overflow-wrap: anywhere; }
+.browser-page-message { white-space: pre-wrap; overflow-wrap: anywhere; }
+.room-app-browser.compact .browser-empty { padding: 8px; gap: 5px; }
+.room-app-browser.compact .browser-empty p { font-size: 10px; }
+@media (max-width: 650px) { .browser-tab > button:first-child { max-width: 110px; } .browser-toolbar { gap: 3px; padding-inline: 4px; } }

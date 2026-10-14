@@ -18,6 +18,8 @@ export interface RoomAppModelContext {
   emit(payload: unknown): void;
   changed(): void;
   instanceId?: string;
+  createdBy?: string;
+  rtcConfiguration?(): RTCConfiguration;
   send?(payload: unknown, target: string): Promise<void>;
 }
 

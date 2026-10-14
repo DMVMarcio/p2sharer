@@ -1,10 +1,11 @@
 import { t } from '../i18n/index.ts';
 import protocolLabels from '../i18n/protocol.json' with { type: 'json' };
 import type React from 'react';
-import { FileText, Network } from 'lucide-react';
+import { FileText, Network, Globe } from 'lucide-react';
 import { SiYoutube } from 'react-icons/si';
 import { NotepadModel, YouTubeModel, type RoomAppModel, type RoomAppModelContext } from './models.ts';
 import { TunnelModel } from './tunnel_model.ts';
+import { BrowserModel } from './browser_model.ts';
 
 export interface RoomAppViewProps { instanceId: string; compact?: boolean }
 export interface RoomAppDefinition {
@@ -55,3 +56,7 @@ registerRoomApp({ kind: 'tunnels', protocolLabel: 'Tunnels', get label() { retur
   get description() { return t('tunnels.description'); }, icon: Network, bannerClass: 'tunnels', detachable: false,
   createModel: (context) => new TunnelModel(context),
   loadView: () => import('./TunnelApp').then((module) => ({ default: module.TunnelApp })) });
+registerRoomApp({ kind: 'browser', protocolLabel: 'Browser', get label() { return t('browser.title'); },
+  get description() { return t('browser.description'); }, icon: Globe, bannerClass: 'browser', detachable: false,
+  createModel: context => new BrowserModel(context),
+  loadView: () => import('./BrowserApp').then(module => ({ default: module.BrowserApp })) });

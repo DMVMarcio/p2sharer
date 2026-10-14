@@ -26,6 +26,7 @@ mod video_gpu_scale;
 mod video_nvenc;
 mod camera_permission;
 mod browser_shortcuts;
+pub mod shared_browser;
 mod window_chrome;
 mod localization;
 mod app_data_migration;
@@ -55,10 +56,11 @@ use tauri::{Emitter, Manager};
 use chat_files::{import_chat_files, paste_chat_files, discard_chat_file, copy_chat_image};
 
 #[tauri::command]
-async fn prepare_app_update(window: tauri::Window, network: tauri::State<'_, virtual_network::VirtualNetworkState>) -> Result<(), String> {
+async fn prepare_app_update(app: tauri::AppHandle, window: tauri::Window, network: tauri::State<'_, virtual_network::VirtualNetworkState>, browser: tauri::State<'_, shared_browser::BrowserState>) -> Result<(), String> {
     if window.label() != "main" { return Err("Only the main window can install updates".into()); }
     stop_native_screen_capture()?;
     stop_audio_capture()?;
+    browser.shutdown(&app).await;
     network.shutdown().await?;
     process_manager::set_update_installer_breakaway(true)?;
     Ok(())
@@ -107,6 +109,7 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_deep_link::init())
         .manage(ChatFileState::default())
+        .manage(shared_browser::BrowserState::default())
         .manage(profile_image::ProfileImageState::default())
         .manage(lan_signaling::LanSignalingState::default())
         .manage(port_tunnel::TunnelState::default())
@@ -134,7 +137,19 @@ pub fn run() {
                 std::process::exit(0);
             }
         })
-        .invoke_handler(tauri::generate_handler![
+        .invoke_handler(|invoke| {
+            if invoke.message.webview().label().starts_with("browser-") {
+                invoke.resolver.reject("Browser pages cannot invoke application commands");
+                return true;
+            }
+            let handler: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool = tauri::generate_handler![
+            shared_browser::start_shared_browser,
+            shared_browser::stop_shared_browser,
+            shared_browser::control_shared_browser,
+            shared_browser::capture_shared_browser,
+            shared_browser::clear_shared_browser,
+            shared_browser::browser_extensions,
+            shared_browser::resolve_browser_dialog,
             virtual_network::get_virtual_network_identity,
             virtual_network::prepare_virtual_network_app,
             virtual_network::regenerate_virtual_network_ip,
@@ -224,7 +239,9 @@ pub fn run() {
             remember_chat_file_source,
             restore_chat_file_source,
             copy_chat_image
-        ])
+            ];
+            handler(invoke)
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
