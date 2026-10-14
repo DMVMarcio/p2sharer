@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
-import { ArrowLeft, ArrowRight, RotateCw, Plus, X, Globe, Home, Square, Settings, Maximize, Minimize, Lock, Unlock, Puzzle, Trash2, MousePointer2, Volume2, VolumeX, FolderOpen } from 'lucide-react';
+import { ArrowLeft, ArrowRight, RotateCw, Plus, X, Globe, Home, Square, Settings, Maximize, Minimize, Lock, Unlock, Puzzle, Trash2, MousePointer2, FolderOpen, ChevronUp, ChevronDown } from 'lucide-react';
 import { roomAppsService } from './room_apps_service';
 import type { BrowserModel } from './browser_model';
 import { browserUrl, browserPointerPosition, BROWSER_HOME, BROWSER_HEIGHT, BROWSER_WIDTH, type BrowserCommand } from './browser_protocol';
@@ -13,7 +13,9 @@ import { showToast } from '../hooks/useToast';
 import { AudioContextManager } from '../audio/audio_context_manager';
 import { FullscreenDialog } from '../components/common/FullscreenDialog';
 import { useNativeFullscreen } from '../hooks/useNativeFullscreen';
-import { useIdleControls } from '../hooks/useIdleControls';
+import { useBrowserChrome } from '../hooks/useBrowserChrome';
+import { MediaVolumeControl } from '../components/common/MediaVolumeControl';
+import { useMediaVolume } from '../hooks/useMediaVolume';
 import { useBrowserCursor } from '../hooks/useBrowserCursor';
 import type { BrowserContentMode, BrowserVideoQuality } from './browser_quality';
 
@@ -108,7 +110,7 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
   const [url, setUrl] = useState(''); const [temporary, setTemporary] = useState(false);
   const [settings, setSettings] = useState(false);
   const { fullscreen, enterFullscreen, exitFullscreen } = useNativeFullscreen();
-  const controls = useIdleControls(fullscreen);
+  const controls = useBrowserChrome(fullscreen);
   const fullscreenClose = useRef<(() => void) | null>(null);
   useEffect(() => {
     if (!fullscreen) return;
@@ -121,7 +123,7 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
     return () => { document.removeEventListener('keydown', key, true); document.removeEventListener('keyup', key, true); };
   }, [fullscreen]);
   const minimized = compact && !fullscreen;
-  const [muted, setMuted] = useState(false); const [volume, setVolume] = useState(1);
+  const { muted, volume, changeVolume, toggleMute } = useMediaVolume();
   useEffect(() => {
     if (!fullscreen) return;
     const frame = requestAnimationFrame(() => keyboard.current?.focus({ preventScroll: true }));
@@ -202,7 +204,7 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
     if (e.ctrlKey && ['l', 't', 'w'].includes(e.key.toLowerCase())) {
       e.preventDefault(); if (event === 'keyUp') return;
       if (e.key.toLowerCase() === 'l') {
-        controls.reveal(); requestAnimationFrame(() => { address.current?.focus(); address.current?.select(); });
+        controls.expand(); requestAnimationFrame(() => { address.current?.focus(); address.current?.select(); });
       }
       if (e.key.toLowerCase() === 't') send({ kind: 'new-tab', url: BROWSER_HOME });
       if (e.key.toLowerCase() === 'w') send({ kind: 'close-tab', id: model.state.active }); return;
@@ -212,12 +214,18 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
   };
   const icon = (name: string, content: React.ReactNode, action: () => void, disabled = false) =>
     <TooltipButton className="btn btn-secondary btn-sm" tooltip={t(`browser.${name}`)} aria-label={t(`browser.${name}`)} disabled={disabled} onClick={action}>{content}</TooltipButton>;
-  const chromeVisible = controls.visible || settings || Boolean(model.dialog);
+  const chromeVisible = !controls.collapsed && (controls.visible || settings || Boolean(model.dialog));
+  const volumeControl = <MediaVolumeControl volume={volume} muted={muted} label={t('browser.volume')}
+    muteLabel={t('browser.mute')} unmuteLabel={t('browser.unmute')} onVolumeChange={changeVolume} onToggleMute={toggleMute} />;
   const content = <div className={`room-app-browser${minimized ? ' compact' : ''}${fullscreen ? ' fullscreen' : ''}`} ref={wrapper}
     onPointerMove={() => { if (fullscreen) controls.reveal(); }} onClick={e => e.stopPropagation()}>
-    {!minimized && <div className={`browser-chrome${chromeVisible ? ' visible' : ''}`} inert={!chromeVisible} aria-hidden={!chromeVisible}
+    {!minimized && controls.collapsed && <TooltipButton className="btn btn-secondary btn-sm browser-chrome-expand"
+      tooltip={t('browser.showToolbar')} aria-expanded={false} aria-controls={`browser-chrome-${instanceId}`}
+      onClick={() => { controls.expand(); requestAnimationFrame(() => address.current?.focus()); }}><ChevronDown size={15} /></TooltipButton>}
+    {!minimized && <div id={`browser-chrome-${instanceId}`} className={`browser-chrome${chromeVisible ? ' visible' : ''}${controls.collapsed ? ' collapsed' : ''}`} inert={!chromeVisible} aria-hidden={!chromeVisible}
       onPointerEnter={() => controls.hold('pointer')} onPointerLeave={() => controls.release('pointer')}
       onFocusCapture={() => controls.hold('focus')} onBlurCapture={e => { if (!e.currentTarget.contains(e.relatedTarget)) controls.release('focus'); }}>
+      <div className="browser-chrome-content">
       {!fullscreen && <div className="browser-tabs" role="group" aria-label={t('browser.tabs')}>
         {model.state.tabs.map(tab => <div className={`browser-tab${tab.id === model.state.active ? ' selected' : ''}`} key={tab.id}>
           <button aria-pressed={tab.id === model.state.active} className="btn btn-secondary btn-sm browser-tab-label" disabled={!model.canControl}
@@ -243,11 +251,12 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
         {model.isHost && model.running && icon('finish', <Square size={15} />, () => {
           setSettings(false); void model.finish().catch(e => showToast(localizeError(e), 4000, 'error'));
         }, model.busy)}
-        {fullscreen && model.running && icon(muted ? 'unmute' : 'mute', muted ? <VolumeX size={15} /> : <Volume2 size={15} />, () => setMuted(!muted))}
-        {fullscreen && model.running && <input className="settings-slider-input browser-volume" autoComplete="off"
-          type="range" min="0" max="1" step="0.01" value={volume} aria-label={t('browser.volume')} onChange={e => setVolume(Number(e.target.value))} />}
+        {fullscreen && model.running && volumeControl}
         {icon(fullscreen ? 'exitFullscreen' : 'fullscreen', fullscreen ? <Minimize size={15} /> : <Maximize size={15} />, expand)}
+        <TooltipButton className="btn btn-secondary btn-sm" tooltip={t('browser.hideToolbar')} aria-expanded={true}
+          aria-controls={`browser-chrome-${instanceId}`} onClick={() => { keyboard.current?.focus({ preventScroll: true }); controls.collapse(); }}><ChevronUp size={15} /></TooltipButton>
       </form>
+      </div>
     </div>}
     <div className={`browser-surface${!minimized && model.running && model.hostOnline && cursor.pointer ? ' virtual-cursor' : ''}`} ref={surface} onPointerMove={e => pointer(e, 'mouseMoved')}
       onPointerLeave={e => { if (!e.currentTarget.hasPointerCapture(e.pointerId)) cursor.clear(); }}
@@ -287,8 +296,7 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
       {model.running && model.isHost && model.media && <span>{t('browser.captureTarget', {
         resolution: model.media.quality.quality.height, fps: model.media.quality.quality.fps })}</span>}
       <span role="status">{model.controller ? t('browser.controlling', { name: participantName(model.controller) }) : t('browser.controlAvailable')}</span>
-      {model.running && icon(muted ? 'unmute' : 'mute', muted ? <VolumeX size={15} /> : <Volume2 size={15} />, () => setMuted(!muted))}
-      {model.running && <input className="settings-slider-input" autoComplete="off" type="range" min="0" max="1" step="0.01" value={volume} aria-label={t('browser.volume')} onChange={e => setVolume(Number(e.target.value))} />}
+      {model.running && volumeControl}
     </div>}
     {active?.loading && fullscreen && <div className="browser-loading fullscreen-loading" role="progressbar" aria-label={t('browser.loading')}><span /></div>}
     {model.error && !minimized && <p className="browser-error" role="alert">{localizeError(model.error)}</p>}

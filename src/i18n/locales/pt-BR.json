@@ -1244,6 +1244,8 @@
   "browser.controlAvailable": "Controle disponível",
   "browser.mute": "Silenciar",
   "browser.volume": "Volume",
+  "browser.showToolbar": "Mostrar barra",
+  "browser.hideToolbar": "Recolher barra",
   "browser.unmute": "Ativar áudio",
   "browser.error.another": "Já existe outro Navegador compartilhado em execução neste computador",
   "browser.error.timeout": "A operação do Navegador demorou demais",

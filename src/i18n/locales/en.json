@@ -1244,6 +1244,8 @@
   "browser.controlAvailable": "Control available",
   "browser.mute": "Mute",
   "browser.volume": "Volume",
+  "browser.showToolbar": "Show toolbar",
+  "browser.hideToolbar": "Hide toolbar",
   "browser.unmute": "Unmute",
   "browser.error.another": "Another shared browser is already running on this device",
   "browser.error.timeout": "Browser operation timed out",

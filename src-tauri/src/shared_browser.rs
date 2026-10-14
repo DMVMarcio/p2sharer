@@ -430,6 +430,8 @@ async fn add_tab(
         })
         .await?;
         configure_viewport(&view, 1280).await?;
+        // Keep every tab alive offscreen, including background media playback.
+        view.show().map_err(|e| e.to_string())?;
         navigation::install(&view, app.clone(), scope.to_string(), id).await?;
         dialogs::install(&view, app.clone(), scope.to_string(), id).await?;
     }
@@ -461,7 +463,7 @@ async fn browser_state(
     for mut tab in tabs {
         #[cfg(windows)]
         if let Some(view) = app.get_webview_window(&label(scope, tab.id)) {
-            use webview2_com::{CoTaskMemPWSTR, Microsoft::Web::WebView2::Win32::{ICoreWebView2_8, ICoreWebView2_15}};
+            use webview2_com::{CoTaskMemPWSTR, Microsoft::Web::WebView2::Win32::ICoreWebView2_15};
             use windows_capture_api::core::Interface;
             let metadata = on_view(&view, move |core, tx| unsafe {
                 let result = (|| {
@@ -471,8 +473,6 @@ async fn browser_state(
                     core.DocumentTitle(&mut title)?;
                     let mut icon = Default::default();
                     if let Ok(favicons) = core.cast::<ICoreWebView2_15>() { let _ = favicons.FaviconUri(&mut icon); }
-                    core.cast::<ICoreWebView2_8>()?
-                        .SetIsMuted(tab.id != active)?;
                     Ok::<_, windows_capture_api::core::Error>((
                         CoTaskMemPWSTR::from(url).to_string(),
                         CoTaskMemPWSTR::from(title).to_string(),
@@ -900,8 +900,7 @@ pub async fn prepare_shared_browser_capture(
         // The owning-thread subclass confines even runtime-driven fullscreen moves.
         configure_viewport(&view, width).await?;
         if !view.is_visible().map_err(|e| e.to_string())? { view.show().map_err(|e| e.to_string())?; }
-        let tabs = state.0.lock().unwrap().get(&scope).ok_or("Browser closed")?.tabs.clone();
-        for tab in tabs { if tab.id != active { if let Some(other) = app.get_webview_window(&label(&scope, tab.id)) { if other.is_visible().unwrap_or(false) { let _ = other.hide(); } } } }
+        // Selection switches capture only; background tabs keep their native surfaces and audio.
         let previous_id = state.0.lock().unwrap().get_mut(&scope).ok_or("Browser closed")?.capture_id.replace(session_id.clone());
         if let Some(previous) = previous_id { if previous != session_id { let _ = crate::screen_sources::stop_capture_session(previous); } }
         // A busy page must not hold the input lock while the optional JS probe runs.

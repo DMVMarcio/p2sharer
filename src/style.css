@@ -2,6 +2,8 @@
    P2Sharer shared interface tokens and surfaces
    ========================================================================== */
 
+@import './components/common/MediaVolumeControl.css';
+
 :root {
   /* Fonts */
   --font-sans: 'Plus Jakarta Sans Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
