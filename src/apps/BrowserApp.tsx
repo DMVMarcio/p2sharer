@@ -13,6 +13,7 @@ import { showToast } from '../hooks/useToast';
 import { AudioContextManager } from '../audio/audio_context_manager';
 import { FullscreenDialog } from '../components/common/FullscreenDialog';
 import { useNativeFullscreen } from '../hooks/useNativeFullscreen';
+import type { BrowserContentMode, BrowserVideoQuality } from './browser_quality';
 
 function BrowserSettings({ model, onClose }: { model: BrowserModel; onClose: () => void }) {
   const [mode, setMode] = useState('cache');
@@ -23,6 +24,15 @@ function BrowserSettings({ model, onClose }: { model: BrowserModel; onClose: () 
   return <ModalDialog title={t('browser.settings')} icon={<Settings size={20} />} onClose={onClose} busy={model.busy}>
     <div className="browser-settings">
       <p>{t(model.state.temporary ? 'browser.temporaryInfo' : 'browser.persistentInfo')}</p>
+      {model.media && <>
+        <label>{t('browser.contentMode')}<Select value={model.media.quality.settings.mode}
+          onValueChange={value => model.media?.configure({ ...model.media.quality.settings, mode: value as BrowserContentMode })}
+          options={['auto', 'reading', 'video'].map(value => ({ value, label: t(`browser.mode.${value}`) }))} /></label>
+        <label>{t('browser.videoQuality')}<Select value={model.media.quality.settings.video}
+          onValueChange={value => model.media?.configure({ ...model.media.quality.settings, video: value as BrowserVideoQuality })}
+          options={['720p30', '1080p30', '1080p60'].map(value => ({ value, label: t(`browser.quality.${value}`) }))} /></label>
+        <p>{t('browser.qualityInfo')}</p>
+      </>}
       <label>{t('browser.clearData')}<Select value={mode} disabled={model.busy} onValueChange={setMode}
         options={['cache', 'sites', 'history', 'reset'].map(value => ({ value, label: t(`browser.clear.${value}`) }))} /></label>
       <button className="btn btn-secondary" disabled={model.busy} onClick={() => setConfirm(true)}>{t('browser.clearData')}</button>
@@ -217,6 +227,8 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
     </div>
     {!minimized && <div className="browser-status">
       <span>{t('browser.host', { name: participantName(model.host) })}</span>
+      {model.running && model.isHost && model.media && <span>{t('browser.captureTarget', {
+        resolution: model.media.quality.quality.height, fps: model.media.quality.quality.fps })}</span>}
       <span role="status">{model.controller ? t('browser.controlling', { name: participantName(model.controller) }) : t('browser.controlAvailable')}</span>
       {model.running && !model.isHost && icon(muted ? 'unmute' : 'mute', muted ? <VolumeX size={15} /> : <Volume2 size={15} />, () => setMuted(!muted))}
       {model.running && !model.isHost && <input className="settings-slider-input" autoComplete="off" type="range" min="0" max="1" step="0.01" value={volume} aria-label={t('browser.volume')} onChange={e => setVolume(Number(e.target.value))} />}

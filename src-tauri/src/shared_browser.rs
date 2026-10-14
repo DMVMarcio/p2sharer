@@ -36,6 +36,7 @@ struct Session {
     pointer: (f64, f64),
     saved: Option<SavedTabs>,
     language: Option<String>,
+    capture_widths: HashMap<u32, u32>,
 }
 #[derive(Default, Clone, PartialEq, Serialize, Deserialize)]
 struct SavedTabs {
@@ -60,6 +61,9 @@ fn trusted(window: &WebviewWindow, scope: &str) -> Result<(), String> {
 }
 fn label(scope: &str, tab: u32) -> String {
     format!("browser-{scope}-{tab}")
+}
+fn valid_capture_width(width: u32) -> bool {
+    matches!(width, 1280 | 1920)
 }
 fn root(app: &AppHandle) -> Result<PathBuf, String> {
     app.path()
@@ -235,6 +239,7 @@ pub async fn start_shared_browser(
                 pointer: (0.0, 0.0),
                 saved: None,
                 language,
+                capture_widths: HashMap::new(),
             },
         );
     }
@@ -709,6 +714,7 @@ pub async fn control_shared_browser(
                     return Err("Unknown browser tab".into());
                 }
                 session.tabs.retain(|t| t.id != id);
+                session.capture_widths.remove(&id);
                 if session.active == id {
                     session.active = session.tabs.first().map(|t| t.id).unwrap_or(0);
                 }
@@ -796,8 +802,13 @@ pub async fn capture_shared_browser(
     state: tauri::State<'_, BrowserState>,
     scope: String,
     metadata: bool,
+    width: u32,
+    probe: bool,
 ) -> Result<Value, String> {
     trusted(&window, &scope)?;
+    if !valid_capture_width(width) {
+        return Err("Invalid browser capture size".into());
+    }
     let _operation = state.1.lock().await;
     let active = {
         state
@@ -813,10 +824,20 @@ pub async fn capture_shared_browser(
         .ok_or("Browser closed")?;
     #[cfg(windows)]
     {
+        let previous_width = state.0.lock().unwrap().get(&scope)
+            .and_then(|session| session.capture_widths.get(&active)).copied().unwrap_or(1280);
+        if previous_width != width {
+            cdp(&view, "Emulation.setDeviceMetricsOverride",
+                json!({"width":1280,"height":720,"deviceScaleFactor":width as f64 / 1280.0,"mobile":false})).await?;
+            if let Some(session) = state.0.lock().unwrap().get_mut(&scope) {
+                session.capture_widths.insert(active, width);
+            }
+        }
+        let playing = if probe { Some(probe_video(&view).await.unwrap_or(false)) } else { None };
         let frame = cdp(
             &view,
             "Page.captureScreenshot",
-            json!({"format":"jpeg","quality":80,"fromSurface":true,"captureBeyondViewport":false}),
+            json!({"format":"jpeg","quality":90,"fromSurface":true,"captureBeyondViewport":false,"optimizeForSpeed":true}),
         )
         .await?;
         let image = frame["data"].as_str().ok_or("Browser capture failed")?;
@@ -828,13 +849,36 @@ pub async fn capture_shared_browser(
         } else {
             Value::Null
         };
-        Ok(json!({"image": image, "state": state}))
+        Ok(json!({"image": image, "state": state, "playing": playing}))
     }
     #[cfg(not(windows))]
     {
         let _ = (view, metadata);
         Err("Shared browser requires Windows".into())
     }
+}
+
+#[cfg(windows)]
+async fn probe_video(view: &WebviewWindow) -> Result<bool, String> {
+    // Isolated worlds also inspect embedded players without granting cross-origin access.
+    let tree = cdp(view, "Page.getFrameTree", json!({})).await?;
+    let mut pending = vec![&tree["frameTree"]];
+    let mut frames = 0;
+    while let Some(frame) = pending.pop() {
+        frames += 1;
+        if frames > 16 { break; }
+        if let Some(children) = frame["childFrames"].as_array() { pending.extend(children); }
+        let Some(id) = frame["frame"]["id"].as_str() else { continue; };
+        let Ok(world) = cdp(view, "Page.createIsolatedWorld",
+            json!({"frameId":id,"worldName":"p2sharer-media-probe"})).await else { continue; };
+        let Some(context) = world["executionContextId"].as_u64() else { continue; };
+        let Ok(result) = cdp(view, "Runtime.evaluate", json!({
+            "expression":include_str!("browser_video_probe.js"),"contextId":context,
+            "returnByValue":true,"timeout":50,"silent":true
+        })).await else { continue; };
+        if result["result"]["value"].as_bool() == Some(true) { return Ok(true); }
+    }
+    Ok(false)
 }
 
 #[tauri::command]
@@ -1038,6 +1082,12 @@ pub async fn browser_extensions(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn capture_allows_only_bounded_quality_profiles() {
+        assert!(valid_capture_width(1280));
+        assert!(valid_capture_width(1920));
+        for width in [0, 1, 3840, u32::MAX] { assert!(!valid_capture_width(width)); }
+    }
     #[test]
     fn navigation_cannot_reach_application_origins_or_protocols() {
         for url in [
