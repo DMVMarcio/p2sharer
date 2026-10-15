@@ -102,6 +102,19 @@ test('mounted notices, unread plurals and number formats change without translat
   assert.equal(api.localizeError(new Error('Unknown platform detail')), api.t('error.unknown'));
 });
 
+test('extension import failures distinguish file count from package size in both languages', () => {
+  const previous = api.getLanguage();
+  try {
+    api.setLanguage('pt-BR');
+    assert.equal(api.localizeError(new Error('Extension contains too many files')), 'A extensão contém arquivos demais.');
+    assert.equal(api.localizeError(new Error('Extension package exceeds size limit')), 'A extensão excede o limite de tamanho.');
+    assert.equal(api.localizeError(new Error('Extension folder nesting exceeds limit')), 'A extensão contém pastas aninhadas demais.');
+    assert.equal(api.localizeError(new Error('Too many installed extensions')), 'O limite de extensões instaladas foi atingido.');
+    api.setLanguage('en');
+    assert.equal(api.localizeError(new Error('Extension contains too many files')), 'Extension contains too many files');
+  } finally { api.setLanguage(previous); }
+});
+
 test('virtual interface failures preserve the Windows error code in both languages', () => {
   const previous = api.getLanguage();
   const error = new Error('Virtual adapter initialization: Virtual network interface configuration failed (Windows code 87)');

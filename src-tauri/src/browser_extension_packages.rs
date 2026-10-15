@@ -3,6 +3,10 @@ use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fs, io::{Read, Write}, path::{Component, Path, PathBuf}};
 const INVALID: &str = "Could not open extension package";
 const LIMIT: &str = "Extension package exceeds size limit";
+const FILE_LIMIT: &str = "Extension contains too many files";
+const DEPTH_LIMIT: &str = "Extension folder nesting exceeds limit";
+const REGISTRY_LIMIT: &str = "Too many installed extensions";
+const MAX_ENTRIES: usize = 50_000;
 const MAX_FILE: u64 = 32 * 1024 * 1024;
 const MAX_TOTAL: u64 = 200 * 1024 * 1024;
 
@@ -15,7 +19,7 @@ pub fn registry(profile: &Path) -> Registry {
 }
 pub fn remember(profile: &Path, id: String, package: Package) -> Result<(), String> {
     let mut entries = registry(profile); entries.insert(id, package);
-    if entries.len() > 100 { return Err(LIMIT.into()); }
+    if entries.len() > 100 { return Err(REGISTRY_LIMIT.into()); }
     write_registry(profile, &entries)
 }
 fn write_registry(profile: &Path, entries: &Registry) -> Result<(), String> {
@@ -62,10 +66,10 @@ fn copy<R: Read>(mut source: R, target: &Path, declared: u64, total: &mut u64) -
     output.flush().map_err(|_| INVALID)?; Ok(())
 }
 fn copy_folder(source: &Path, target: &Path, total: &mut u64, count: &mut usize, depth: usize) -> Result<(), String> {
-    if depth > 32 { return Err(LIMIT.into()); }
+    if depth > 32 { return Err(DEPTH_LIMIT.into()); }
     for entry in fs::read_dir(source).map_err(|_| INVALID)? {
         let entry = entry.map_err(|_| INVALID)?; *count += 1;
-        if *count > 10000 { return Err(LIMIT.into()); }
+        if *count > MAX_ENTRIES { return Err(FILE_LIMIT.into()); }
         if !safe_path(Path::new(&entry.file_name())) { return Err(INVALID.into()); }
         let metadata = fs::symlink_metadata(entry.path()).map_err(|_| INVALID)?;
         if metadata.file_type().is_symlink() { return Err(INVALID.into()); }
@@ -96,7 +100,7 @@ fn unpack(source: &Path, target: &Path, total: &mut u64) -> Result<(), String> {
     if fs::metadata(source).map_err(|_| INVALID)?.len() > 64 * 1024 * 1024 { return Err(LIMIT.into()); }
     let bytes = fs::read(source).map_err(|_| INVALID)?;
     let mut archive = zip::ZipArchive::new(std::io::Cursor::new(archive_payload(&bytes)?)).map_err(|_| INVALID)?;
-    if archive.len() > 10000 { return Err(LIMIT.into()); }
+    if archive.len() > MAX_ENTRIES { return Err(FILE_LIMIT.into()); }
     for index in 0..archive.len() {
         let mut entry = archive.by_index(index).map_err(|_| INVALID)?;
         let path = entry.enclosed_name().filter(|p| safe_path(p)).ok_or(INVALID)?;
@@ -140,6 +144,33 @@ pub fn import(source: &Path, profile: &Path) -> Result<Package, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn large_file_catalog_imports_without_confusing_count_and_size_limits() {
+        let mut unique = [0;16]; getrandom::getrandom(&mut unique).unwrap();
+        let directory = std::env::temp_dir().join(format!("p2sharer-extension-catalog-{:032x}", u128::from_le_bytes(unique)));
+        struct Cleanup(PathBuf); impl Drop for Cleanup { fn drop(&mut self) { let _ = fs::remove_dir_all(&self.0); } }
+        fs::create_dir(&directory).unwrap(); let _cleanup = Cleanup(directory.clone());
+        let profile = directory.join("profile"); fs::create_dir(&profile).unwrap();
+        let source = directory.join("catalog.zip");
+        let options = zip::write::SimpleFileOptions::default();
+        let mut zip = zip::ZipWriter::new(fs::File::create(&source).unwrap());
+        zip.start_file("manifest.json", options).unwrap();
+        zip.write_all(br#"{"manifest_version":3,"name":"Catalog fixture","version":"1"}"#).unwrap();
+        for index in 0..13_500 {
+            zip.start_file(format!("icons/{index}.svg"), options).unwrap();
+            zip.write_all(b"<svg/>").unwrap();
+        }
+        zip.finish().unwrap();
+        let package = import(&source, &profile).unwrap();
+        assert!(package.directory.join("icons/13499.svg").is_file());
+        let mut zip = zip::ZipWriter::new(fs::File::create(&source).unwrap());
+        for index in 0..=MAX_ENTRIES { zip.start_file(format!("{index}.txt"), options).unwrap(); }
+        zip.finish().unwrap();
+        assert_eq!(import(&source, &profile).err().as_deref(), Some(FILE_LIMIT));
+        assert_eq!(copy(std::io::empty(), &directory.join("oversized"), MAX_FILE + 1, &mut 0).err().as_deref(), Some(LIMIT));
+        assert!(!directory.join("oversized").exists());
+    }
+
     #[test]
     fn zip_import_is_owned_persistent_and_rejects_traversal() {
         let mut unique = [0;16]; getrandom::getrandom(&mut unique).unwrap();
