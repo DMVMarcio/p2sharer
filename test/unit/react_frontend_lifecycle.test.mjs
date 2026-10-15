@@ -51,7 +51,8 @@ const mocks = {
     React.createElement('div', { className: 'room-app-card', 'data-instance': instance.id, style });`,
   audio: `export const audioContextManager = {
     attachPeerAudio: (id, stream) => globalThis.frontendLifecycleFixture.sinks.set(id, stream),
-    getPeerVolumeState: () => ({ volume: 100, isMuted: false }), setPeerVolume() {} };`,
+    getPeerVolumeState: () => ({ volume: 100, isMuted: false }), setPeerVolume() {} };
+    export class AudioContextManager { static getInstance() { return audioContextManager; } }`,
   pip: 'export const pipService = { updateStream() {}, restoreFromPip() {} };',
   pointer: 'export const useStreamPointer = () => ({ enabled: false, toggle() {}, toolbar: null, indicator: null });',
   modal: 'export const useModal = () => ({ openModal() {} }); export const modalManager = { open() {}, openProfile: target => globalThis.frontendLifecycleFixture.profileTarget = target };',
