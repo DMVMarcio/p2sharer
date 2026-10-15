@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<WixLocalization Culture="ru-ru" xmlns="http://schemas.microsoft.com/wix/2006/localization">
-  <String Id="TauriLanguage">1049</String>
-  <String Id="TauriCodepage">1251</String>
-  <String Id="LaunchApp">Запустить P2Sharer</String>
-  <String Id="DowngradeErrorMessage">Более новая версия P2Sharer уже установлена.</String>
-  <String Id="PathEnvVarFeature">Добавляет папку установки P2Sharer в системную переменную PATH, чтобы программу можно было запускать из любого расположения.</String>
-  <String Id="InstallAppFeature">Устанавливает P2Sharer.</String>
-</WixLocalization>

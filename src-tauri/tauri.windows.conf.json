@@ -3,44 +3,7 @@
   "bundle": {
     "windows": {
       "wix": {
-        "language": {
-          "en-US": {
-            "localePath": "windows/locales/en-US.wxl"
-          },
-          "pt-BR": {
-            "localePath": "windows/locales/pt-BR.wxl"
-          },
-          "es-ES": {
-            "localePath": "windows/locales/es-ES.wxl"
-          },
-          "fr-FR": {
-            "localePath": "windows/locales/fr-FR.wxl"
-          },
-          "de-DE": {
-            "localePath": "windows/locales/de-DE.wxl"
-          },
-          "it-IT": {
-            "localePath": "windows/locales/it-IT.wxl"
-          },
-          "zh-CN": {
-            "localePath": "windows/locales/zh-CN.wxl"
-          },
-          "zh-TW": {
-            "localePath": "windows/locales/zh-TW.wxl"
-          },
-          "ja-JP": {
-            "localePath": "windows/locales/ja-JP.wxl"
-          },
-          "ko-KR": {
-            "localePath": "windows/locales/ko-KR.wxl"
-          },
-          "fi-FI": {
-            "localePath": "windows/locales/fi-FI.wxl"
-          },
-          "ru-RU": {
-            "localePath": "windows/locales/ru-RU.wxl"
-          }
-        },
+        "language": "en-US",
         "fragmentPaths": [
           "windows/nsis-migration.wxs"
         ],
