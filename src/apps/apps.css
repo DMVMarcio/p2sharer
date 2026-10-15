@@ -382,6 +382,8 @@
 .room-app-youtube.is-theater .youtube-queue-header, .room-app-youtube.is-theater .youtube-queue-list,
 .room-app-youtube.is-theater .youtube-discover-pane { display: none; }
 .room-app-youtube.is-theater .youtube-activity-toast { bottom: 82px; }
+.room-app-youtube:fullscreen, .youtube-pip-root:fullscreen { width: 100vw; height: 100vh; border: 0; border-radius: 0; }
+.room-app-youtube:fullscreen .youtube-player-frame { flex-basis: 100%; }
 .room-app-youtube.compact .youtube-watch-pane, .room-app-youtube.compact .youtube-player-frame { flex: 1 1 100%; }
 .room-app-youtube.compact .youtube-watch-meta, .room-app-youtube.compact .youtube-control-deck,
 .room-app-youtube.compact .youtube-queue-header, .room-app-youtube.compact .youtube-queue-list,

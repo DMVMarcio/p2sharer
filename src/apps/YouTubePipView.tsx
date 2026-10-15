@@ -1,5 +1,6 @@
 import { localizeError, localizeText, t } from '../i18n';
 import { useLocale } from '../hooks/useLocale';
+import { useElementFullscreen } from '../hooks/useElementFullscreen';
 import React, { useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event';
@@ -21,6 +22,7 @@ const CAPTIONS_STORAGE = 'p2sharer_youtube_captions';
 
 export const YouTubePipView: React.FC<{ instanceId: string }> = ({ instanceId }) => {
   useLocale();
+  const { ref: fullscreenRef, fullscreen, toggleFullscreen } = useElementFullscreen<HTMLDivElement>();
   const openContextMenu = useContextMenu();
   const [state, setState] = useState<YouTubeState | null>(null);
   const [playerReady, setPlayerReady] = useState(false);
@@ -205,7 +207,7 @@ export const YouTubePipView: React.FC<{ instanceId: string }> = ({ instanceId })
     } catch (reason) { setError(t("message.f97d9af8dc31", { v0: localizeError(String(reason)) })); }
   };
 
-  return <div className="pip-window-root youtube-pip-root" onContextMenu={(event) => openContextMenu(event, [
+  return <div ref={fullscreenRef} className="pip-window-root youtube-pip-root" onContextMenu={(event) => openContextMenu(event, [
     { id: 'restore', get label() { return t("message.5899ac52fbbf"); }, icon: <PictureInPicture2 size={15} />, onSelect: close },
     { id: 'playback', get label() { return state?.playing ? t("message.c1301275ce3f") : t("message.ca0709c34209"); }, icon: state?.playing ? <Pause size={15} /> : <Play size={15} />,
       disabled: !current, onSelect: () => command({ action: 'toggle' }) },
@@ -218,10 +220,10 @@ export const YouTubePipView: React.FC<{ instanceId: string }> = ({ instanceId })
       aria-label={state?.playing ? t("message.c1301275ce3f") : t("message.ca0709c34209")} />}
     {(!current || error) && <div className="pip-loading-placeholder">{localizeText(error) || t("message.75a89a91ea35")}</div>}
     <div className="pip-overlay">
-      <div className="pip-top-bar" data-tauri-drag-region>
-        <div className="pip-top-left" data-tauri-drag-region>
+      <div className="pip-top-bar" data-tauri-drag-region={!fullscreen || undefined}>
+        <div className="pip-top-left" data-tauri-drag-region={!fullscreen || undefined}>
           <span className="pip-status-dot" aria-hidden="true" />
-          <span className="pip-title" data-tauri-drag-region>{current?.title || t("message.74e9d4b5b312")}</span>
+          <span className="pip-title" data-tauri-drag-region={!fullscreen || undefined}>{current?.title || t("message.74e9d4b5b312")}</span>
         </div>
         <div className="pip-top-right">
           <TooltipButton tooltip={alwaysOnTop ? t("message.9edf08040405") : t("message.5c73f9df033a")}
@@ -238,7 +240,8 @@ export const YouTubePipView: React.FC<{ instanceId: string }> = ({ instanceId })
         onTogglePlayback={() => command({ action: 'toggle' })}
         onPrevious={() => command({ action: 'previous' })} onNext={() => command({ action: 'next' })}
         onSeek={(next) => command({ action: 'seek', position: next })}
-        onVolume={setLocalVolume} onToggleMute={toggleMute} onToggleCaptions={toggleCaptions} />
+        onVolume={setLocalVolume} onToggleMute={toggleMute} onToggleCaptions={toggleCaptions}
+        fullscreen={fullscreen} onToggleFullscreen={() => void toggleFullscreen().catch((error) => setError(localizeError(error)))} />
     </div>
   </div>;
 };

@@ -366,7 +366,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
           >
             {content}
           </div>,
-          document.body
+          document.fullscreenElement ?? document.body
         )}
     </>
   );

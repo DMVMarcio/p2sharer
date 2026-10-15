@@ -1,5 +1,7 @@
 import { localizeError, localizeText, t } from '../i18n';
 import { useLocale } from '../hooks/useLocale';
+import { useElementFullscreen } from '../hooks/useElementFullscreen';
+import { showToast } from '../hooks/useToast';
 import React, { useEffect, useRef, useState } from 'react';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event';
@@ -34,6 +36,7 @@ const CAPTIONS_STORAGE = 'p2sharer_youtube_captions';
 
 export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => {
   useLocale();
+  const { ref: fullscreenRef, fullscreen, toggleFullscreen } = useElementFullscreen<HTMLDivElement>();
   const { username, peers, roomSlots } = useRoom();
   const [state, setState] = useState<YouTubeState>(() => roomAppsService.getModel<YouTubeModel>(instanceId)?.state ||
     { queue: [], index: 0, playing: false, position: 0, repeat: 'off', shuffle: false,
@@ -523,7 +526,7 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
   const toggleRemovePlayed = () => publish({ ...stateRef.current,
     removePlayed: !stateRef.current.removePlayed });
 
-  return <div className={`room-app-youtube ${compact ? 'compact' : ''} ${theater ? 'is-theater' : ''} ${mobilePanel === 'discover' ? 'show-discover' : ''}`}
+  return <div ref={fullscreenRef} className={`room-app-youtube ${compact && !fullscreen ? 'compact' : ''} ${theater || fullscreen ? 'is-theater' : ''} ${mobilePanel === 'discover' ? 'show-discover' : ''}`}
     onClick={(event) => event.stopPropagation()}>
     {savedQueuesOpen && <YouTubeSavedQueuesDialog
       entries={state.queue.map((entry) => ({ ...entry, title: displayTitle(entry) }))}
@@ -540,7 +543,7 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
     <section className="youtube-watch-pane" aria-label={t("message.51cb40efcb46")}>
       <div className="youtube-player-frame">
         <div ref={mountRef} className="room-app-player-mount" />
-        {current && !compact && !pipActive && <button className="youtube-player-hit-area"
+        {current && (!compact || fullscreen) && !pipActive && <button className="youtube-player-hit-area"
           aria-label={state.playing ? t("message.1eca39ec3896") : t("message.4f6c4ff51751")}
           onClick={togglePlayback} />}
         {pipActive && !compact && <div className="youtube-pip-placeholder">
@@ -552,7 +555,7 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
           <SquarePlay size={30} strokeWidth={1.5} />
           <span>{t("message.75a89a91ea35")}</span>
         </div>}
-        {!pipActive && <TooltipButton tooltip={theater ? t("message.dc787df84d37") : t("message.d071dd31e6d6")} className="youtube-theater-toggle"
+        {!pipActive && !fullscreen && <TooltipButton tooltip={theater ? t("message.dc787df84d37") : t("message.d071dd31e6d6")} className="youtube-theater-toggle"
           onClick={() => setTheater(!theater)}>
           {theater ? <Minimize2 size={16} /> : <Expand size={16} />}
           <span>{theater ? t("message.d7cdba9fbe87") : t("message.501b0f7fd09e")}</span>
@@ -574,7 +577,8 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
         onPrevious={() => state.index > 0 ? select(state.index - 1) : seek(0)}
         onNext={next} onSeek={seek} onVolume={setLocalVolume}
         onToggleMute={toggleMute} onToggleCaptions={toggleCaptions}
-        onPictureInPicture={isTauri() && current && !pipActive ? () => void openPip() : undefined} />
+        fullscreen={fullscreen} onToggleFullscreen={() => void toggleFullscreen().catch((error) => showToast(localizeError(error), 4000, 'error'))}
+        onPictureInPicture={isTauri() && current && !pipActive && !fullscreen ? () => void openPip() : undefined} />
       <div className="youtube-queue-header">
         <div><ListVideo size={16} /><strong>{t("message.65d9dcef50e7")}</strong><span>{state.queue.length}</span>
           <TooltipButton tooltip={t("message.13ebb5489523")} className="youtube-saved-queues-button" aria-haspopup="dialog"

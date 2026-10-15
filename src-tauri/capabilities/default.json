@@ -9,6 +9,7 @@
     "core:window:default",
     "core:window:allow-start-dragging",
     "core:window:allow-set-always-on-top",
+    "core:window:allow-set-fullscreen",
     "opener:default"
   ]
 }

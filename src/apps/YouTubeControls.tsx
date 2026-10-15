@@ -1,7 +1,7 @@
 import { t } from '../i18n';
 import { useLocale } from '../hooks/useLocale';
 import React from 'react';
-import { Captions, CaptionsOff, Pause, PictureInPicture2, Play, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react';
+import { Captions, CaptionsOff, Maximize, Minimize, Pause, PictureInPicture2, Play, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react';
 import { MediaSeekBar } from '../components/common/MediaSeekBar';
 import { TooltipButton } from '../components/common/TooltipButton';
 import { formatMediaTime } from '../core/media_time';
@@ -26,11 +26,13 @@ interface Props {
   onToggleMute: () => void;
   onToggleCaptions: () => void;
   onPictureInPicture?: () => void;
+  fullscreen: boolean;
+  onToggleFullscreen: () => void;
 }
 
 export const YouTubeControls: React.FC<Props> = ({ hasVideo, playing, hasPrevious, hasNext,
   position, duration, buffered, volume, muted, onTogglePlayback, onPrevious, onNext, onSeek,
-  onVolume, onToggleMute, captions, onToggleCaptions, onPictureInPicture, live = false }) => {
+  onVolume, onToggleMute, captions, onToggleCaptions, onPictureInPicture, fullscreen, onToggleFullscreen, live = false }) => {
   useLocale();
   const timelineDuration = Math.max(duration, position);
   return <div className="youtube-control-deck" aria-label={t("message.167ca79b3dab")}>
@@ -68,6 +70,10 @@ export const YouTubeControls: React.FC<Props> = ({ hasVideo, playing, hasPreviou
           onChange={(event) => onVolume(Number(event.target.value))}
           style={{ '--volume-progress': `${muted ? 0 : volume}%` } as React.CSSProperties} />
         <span>{muted ? 0 : volume}%</span>
+        <TooltipButton tooltip={t(fullscreen ? 'browser.exitFullscreen' : 'browser.fullscreen')}
+          className="youtube-control-button" aria-pressed={fullscreen} disabled={!hasVideo && !fullscreen} onClick={onToggleFullscreen}>
+          {fullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
+        </TooltipButton>
       </div>
     </div>
   </div>;
