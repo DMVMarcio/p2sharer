@@ -2,6 +2,26 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { NativeFullscreenSession } from '../../src/core/native_fullscreen.ts';
 
+test('fullscreen snapshots placement before resizing and restores it after native exit', async () => {
+  const initial = { x: 100, y: 80, width: 640, height: 360, maximized: false };
+  let placement = { ...initial };
+  const calls: string[] = [];
+  const session = new NativeFullscreenSession({
+    isFullscreen: async () => false,
+    capturePlacement: async () => { calls.push('capture'); return { ...placement }; },
+    setFullscreen: async active => {
+      calls.push(active ? 'enter' : 'exit');
+      if (active) placement = { x: 0, y: 0, width: 1920, height: 1080, maximized: false };
+    },
+    restorePlacement: async saved => { calls.push('restore'); placement = saved; },
+  });
+  await session.enter();
+  assert.notDeepEqual(placement, initial);
+  await session.exit();
+  assert.deepEqual(placement, initial);
+  assert.deepEqual(calls, ['capture', 'enter', 'exit', 'restore']);
+});
+
 test('fullscreen restores the inherited native window state on exit and disposal', async () => {
   for (const previous of [false, true]) {
     const values: boolean[] = [];

@@ -69,7 +69,10 @@ test('fullscreen remains operable under StrictMode and uses the canonical dialog
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const values = [];
   let failExit = false;
-  globalThis.nativeFullscreenFixture = {isFullscreen:async()=>false,setFullscreen:async value=>{
+  globalThis.nativeFullscreenFixture = {
+    outerPosition: async () => ({x: 40, y: 60}), innerSize: async () => ({width: 960, height: 540}),
+    isMaximized: async () => false, setSize: async () => {}, setPosition: async () => {},
+    isFullscreen:async()=>false,setFullscreen:async value=>{
     values.push(value); if (!value && failExit) { failExit = false; throw new Error('Fixture native exit failure'); }
   }};
   const { createRoot } = await import('react-dom/client');

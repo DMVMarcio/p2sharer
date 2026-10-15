@@ -29,15 +29,25 @@ test('YouTube fullscreen control preserves the player and follows fullscreen exi
   const root = createRoot(document.getElementById('root'));
   let active = null, fail = false, failure = null;
   let nativeFullscreen = false;
+  const initialBounds = { x: 80, y: 120, width: 640, height: 360 };
+  let bounds = { ...initialBounds };
   globalThis.youtubeFullscreenWindow = {
     isFullscreen: async () => nativeFullscreen,
     setFullscreen: async value => { nativeFullscreen = value; },
+    outerPosition: async () => ({ x: bounds.x, y: bounds.y }),
+    innerSize: async () => ({ width: bounds.width, height: bounds.height }),
+    isMaximized: async () => false,
+    setSize: async size => { bounds.width = size.width; bounds.height = size.height; },
+    setPosition: async position => { bounds.x = position.x; bounds.y = position.y; },
   };
   Object.defineProperty(document, 'fullscreenElement', { get: () => active });
   const changed = () => document.dispatchEvent(new window.Event('fullscreenchange'));
   document.exitFullscreen = async () => { active = null; changed(); };
   window.HTMLElement.prototype.requestFullscreen = async function () {
     if (fail) throw new Error('Fullscreen denied');
+    // Model WebView2's host transition as well as its DOM top layer.
+    nativeFullscreen = true;
+    bounds = { x: 0, y: 0, width: 1920, height: 1080 };
     active = this; changed();
   };
   const noop = () => {};
@@ -63,10 +73,12 @@ test('YouTube fullscreen control preserves the player and follows fullscreen exi
     await act(async () => button().click());
     assert.equal(active, null);
     assert.equal(nativeFullscreen, false);
+    assert.deepEqual(bounds, initialBounds);
     await act(async () => button().click());
     await act(async () => document.exitFullscreen()); // Escape/system exit.
     assert.equal(button().getAttribute('aria-pressed'), 'false');
     assert.equal(nativeFullscreen, false);
+    assert.deepEqual(bounds, initialBounds);
     fail = true;
     await act(async () => button().click());
     assert.match(failure.message, /denied/);

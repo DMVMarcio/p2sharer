@@ -30,11 +30,12 @@ export function useElementFullscreen<T extends HTMLElement>() {
     }
     else {
       try {
-        // Start the DOM request within the click's user activation, while the shared
-        // native session expands the actual Windows host and remembers its prior state.
-        const results = await Promise.allSettled([nativeRef.current.enterFullscreen(), element.requestFullscreen()]);
-        const failed = results.find(result => result.status === 'rejected');
-        if (failed?.status === 'rejected') throw failed.reason;
+        // Snapshot the host before WebView2's DOM fullscreen transition can resize it
+        // or change the value returned by isFullscreen(). User activation persists
+        // across this short IPC operation.
+        await nativeRef.current.enterFullscreen();
+        if (!element.isConnected) { await nativeRef.current.exitFullscreen(); return; }
+        await element.requestFullscreen();
       } catch (error) {
         if (document.fullscreenElement === element) await document.exitFullscreen();
         await nativeRef.current.exitFullscreen();
