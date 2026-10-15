@@ -1,6 +1,6 @@
 export type BrowserVideoQuality = '720p30' | '1080p30' | '1080p60';
 export type BrowserContentMode = 'auto' | 'reading' | 'video';
-export interface BrowserQualitySettings { mode: BrowserContentMode; video: BrowserVideoQuality }
+export interface BrowserQualitySettings { mode: BrowserContentMode; video: BrowserVideoQuality; bitrate?: 'balanced' | 'high' }
 export interface BrowserCaptureQuality { width: number; height: number; fps: number; video: boolean }
 const levels = [
   { width: 1280, height: 720, fps: 30 },
@@ -10,7 +10,13 @@ const levels = [
 export function validBrowserQuality(value: unknown): value is BrowserQualitySettings {
   if (!value || typeof value !== 'object') return false;
   const settings = value as BrowserQualitySettings;
-  return ['auto', 'reading', 'video'].includes(settings.mode) && ['720p30', '1080p30', '1080p60'].includes(settings.video);
+  return ['auto', 'reading', 'video'].includes(settings.mode) && ['720p30', '1080p30', '1080p60'].includes(settings.video)
+    && (settings.bitrate === undefined || ['balanced', 'high'].includes(settings.bitrate));
+}
+export function browserVideoBitrate(quality: BrowserCaptureQuality, setting: BrowserQualitySettings['bitrate']): number {
+  if (!quality.video) return 3_000_000;
+  if (setting === 'balanced') return quality.width === 1920 ? (quality.fps === 60 ? 9_000_000 : 6_000_000) : 4_000_000;
+  return quality.width === 1920 ? (quality.fps === 60 ? 20_000_000 : 12_000_000) : 8_000_000;
 }
 export function loadBrowserQuality(): BrowserQualitySettings {
   try { const saved: unknown = JSON.parse(localStorage.getItem('browser-quality-v1') ?? 'null'); if (validBrowserQuality(saved)) return saved; } catch {}

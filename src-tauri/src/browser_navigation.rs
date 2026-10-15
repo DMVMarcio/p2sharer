@@ -1,11 +1,26 @@
 //! Native navigation events drive loading state without waiting for page scripts.
 use super::*;
-use webview2_com::{HistoryChangedEventHandler, NavigationStartingEventHandler, NavigationCompletedEventHandler};
+use webview2_com::{CoTaskMemPWSTR, HistoryChangedEventHandler, NavigationStartingEventHandler, NavigationCompletedEventHandler, NewWindowRequestedEventHandler};
 
 pub async fn install(view: &WebviewWindow, app: AppHandle, scope: String, tab: u32) -> Result<(), String> {
     let generation = app.state::<BrowserState>().0.lock().unwrap().get(&scope).ok_or("Browser closed")?.generation;
     on_view(view, move |core, tx| unsafe {
         let result = (|| {
+            let popup_app = app.clone(); let popup_scope = scope.clone();
+            // Resolve target=_blank directly on the WebView apartment. Creating the shared
+            // tab happens later in the shell, without holding a new-window COM deferral.
+            let popup = NewWindowRequestedEventHandler::create(Box::new(move |_, args| {
+                let Some(args) = args else { return Ok(()); };
+                args.SetHandled(true)?;
+                let mut uri = Default::default(); args.Uri(&mut uri)?;
+                let uri = CoTaskMemPWSTR::from(uri).to_string();
+                let current = popup_app.state::<BrowserState>().0.lock().unwrap().get(&popup_scope)
+                    .is_some_and(|session| session.generation == generation && session.active == tab);
+                if current && allowed_url(&uri) {
+                    let _ = popup_app.emit_to("main", "shared-browser-popup", json!({"scope":popup_scope,"tab":tab,"url":uri}));
+                }
+                Ok(())
+            }));
             let start_app = app.clone(); let start_scope = scope.clone();
             let starting = NavigationStartingEventHandler::create(Box::new(move |_, args| {
                 if let Some(args) = args { let mut id = 0; args.NavigationId(&mut id)?;
@@ -38,6 +53,7 @@ pub async fn install(view: &WebviewWindow, app: AppHandle, scope: String, tab: u
             core.add_NavigationStarting(&starting, &mut token)?;
             core.add_NavigationCompleted(&complete, &mut token)?;
             core.add_HistoryChanged(&history, &mut token)?;
+            core.add_NewWindowRequested(&popup, &mut token)?;
             Ok::<(), windows_capture_api::core::Error>(())
         })().map_err(|e| e.to_string());
         let _ = tx.send(result);

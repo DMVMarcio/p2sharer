@@ -90,6 +90,30 @@ function fixture(local = 'host', onCall?: (command: string, args: Record<string,
   return { model, calls, sent };
 }
 
+test('browser hardware preferences persist locally and only the browser owner can change them', () => {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  const saved = new Map<string, string>();
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {
+    getItem: (key: string) => saved.get(key) ?? null, setItem: (key: string, value: string) => saved.set(key, value),
+  } });
+  const owner = fixture(); const viewer = fixture('alice');
+  try {
+    assert.equal(owner.model.hardwareAcceleration, true);
+    viewer.model.configureHardwareAcceleration(false);
+    assert.equal(viewer.model.hardwareAcceleration, true);
+    owner.model.configureHardwareAcceleration(false);
+    assert.equal(owner.model.hardwareAcceleration, false);
+    assert.equal(owner.calls.length, 0, 'running browser is not silently restarted');
+    assert.equal(owner.sent.length, 0, 'device preference is not published to room peers');
+    const reopened = fixture();
+    try { assert.equal(reopened.model.hardwareAcceleration, false); } finally { reopened.model.destroy(); }
+    assert.equal('hardwareAcceleration' in (owner.model.snapshot() as object), false);
+  } finally {
+    owner.model.destroy(); viewer.model.destroy();
+    if (descriptor) Object.defineProperty(globalThis, 'localStorage', descriptor); else Reflect.deleteProperty(globalThis, 'localStorage');
+  }
+});
+
 test('page context is accepted only from the live host session with safe bounded data', () => {
   const { model } = fixture('alice');
   const menu = { tab: 1, x: 50, y: 60, link: 'https://example.com/', source: '', selection: 'Selected', editable: false };

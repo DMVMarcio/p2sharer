@@ -6,6 +6,49 @@ import { registerRoomApp } from '../../src/apps/registry.ts';
 import type { AppWireEvent } from '../../src/apps/types.ts';
 import * as Y from 'yjs';
 
+test('only app owners and current room moderators can stop shared apps, including through sync', () => {
+  const sent: AppWireEvent[] = [];
+  const moderators = new Set(['admin', 'host']);
+  const service = new RoomAppsService();
+  service.attach(event => sent.push(event), 'viewer', undefined, undefined, undefined, actor => moderators.has(actor));
+  const instance = { id: crypto.randomUUID(), kind: 'notepad', createdBy: 'owner', createdAt: 1 };
+  service.receive({ kind: 'start', instance }, 'owner');
+  assert.equal(service.canStop(instance.id), false);
+  service.stop(instance.id);
+  assert.equal(sent.length, 0);
+  service.receive({ kind: 'stop', id: instance.id }, 'viewer');
+  service.receive({ kind: 'sync', instances: [], snapshots: {}, closed: [instance.id] }, 'viewer');
+  assert.ok(service.getInstance(instance.id));
+  assert.equal(service.canStop(instance.id, 'admin'), true);
+  moderators.delete('admin');
+  service.receive({ kind: 'stop', id: instance.id }, 'admin');
+  assert.ok(service.getInstance(instance.id));
+  service.receive({ kind: 'stop', id: instance.id }, 'host');
+  assert.equal(service.getInstance(instance.id), undefined);
+  const another = { ...instance, id: crypto.randomUUID() };
+  service.receive({ kind: 'start', instance: another }, 'owner');
+  service.receive({ kind: 'stop', id: another.id }, 'owner');
+  assert.equal(service.getInstance(another.id), undefined);
+  service.reset();
+});
+
+test('owner departure closes their shared apps while leaving an app only changes participation', () => {
+  const service = new RoomAppsService();
+  service.attach(() => {}, 'viewer');
+  const own = service.start('notepad');
+  const remote = { id: crypto.randomUUID(), kind: 'notepad', createdBy: 'owner', createdAt: 1 };
+  service.receive({ kind: 'start', instance: remote }, 'owner');
+  service.receive({ kind: 'presence', id: remote.id, joined: true }, 'owner');
+  service.receive({ kind: 'presence', id: remote.id, joined: false }, 'owner');
+  assert.ok(service.getInstance(remote.id));
+  service.forgetPeer('owner');
+  assert.equal(service.getInstance(remote.id), undefined);
+  assert.ok(service.getInstance(own));
+  service.receive({ kind: 'sync', instances: [remote], snapshots: {}, closed: [] }, 'viewer');
+  assert.equal(service.getInstance(remote.id), undefined);
+  service.reset();
+});
+
 test('note file identity follows synchronized content and snapshots without machine paths', () => {
   const first = new NotepadModel({ localActor: 'alice', changed() {}, emit(payload) { second.apply(payload, 'alice', false); } });
   const second = new NotepadModel({ localActor: 'bob', changed() {}, emit() {} });

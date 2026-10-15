@@ -300,7 +300,7 @@ export class RoomService {
       }, action => {
         if (action === 'start') soundEffects.playAppStart();
         else soundEffects.playAppStop();
-      }, () => manager.getRtcConfiguration());
+      }, () => manager.getRtcConfiguration(), actor => manager.canManageRoomApps(actor));
 
     const abort = () => { this.hideConnecting(); void manager.leave(); };
     signal?.addEventListener('abort', abort, { once: true });

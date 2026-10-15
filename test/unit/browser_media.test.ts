@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { BrowserMedia } from '../../src/apps/browser_media.ts';
 import { MockMediaStream, MockMediaStreamTrack } from '../helpers/browser_mocks.ts';
-import { BrowserQualityController, validBrowserQuality } from '../../src/apps/browser_quality.ts';
+import { BrowserQualityController, validBrowserQuality, browserVideoBitrate } from '../../src/apps/browser_quality.ts';
 import { BrowserCapture, type BrowserCaptureDependencies } from '../../src/apps/browser_capture.ts';
 
 test('browser capture uses a scoped native stream, updates profiles in place and replaces only changed tabs', async () => {
@@ -85,6 +85,19 @@ test('browser quality detects playback, holds through short pauses and restores 
   quality.reset(); quality.configure({ mode: 'auto', video: '1080p30' });
   assert.equal(quality.quality.video, false);
   assert.equal(validBrowserQuality({ mode: 'video', video: '4k120' }), false);
+});
+
+test('motion bitrate follows the selected quality and preserves saved settings without the new preference', () => {
+  const quality = new BrowserQualityController({ mode: 'video', video: '1080p60' });
+  assert.equal(validBrowserQuality(quality.settings), true);
+  assert.equal(browserVideoBitrate(quality.quality, undefined), 8_000_000);
+  assert.equal(browserVideoBitrate(quality.quality, 'balanced'), 4_000_000);
+  for (let now = 0; now <= 23000; now += 100) quality.sample(5, now);
+  assert.equal(quality.quality.fps, 60);
+  assert.equal(browserVideoBitrate(quality.quality, 'high'), 20_000_000);
+  quality.configure({ mode: 'reading', video: '1080p60', bitrate: 'high' });
+  assert.equal(browserVideoBitrate(quality.quality, 'high'), 3_000_000);
+  assert.equal(validBrowserQuality({ mode: 'video', video: '1080p30', bitrate: 'unbounded' }), false);
 });
 
 test('a local media relay preserves source quality hints and never takes ownership of capture tracks', async () => {

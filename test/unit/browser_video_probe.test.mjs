@@ -34,3 +34,20 @@ test('native browser probe detects visible playback, including shadow players, a
     embedded.style.visibility = 'hidden'; assert.equal(window.eval(probe), false);
   } finally { window.close(); }
 });
+
+test('native browser probe recognizes prominent visible game canvases without creating GPU contexts', () => {
+  const dom = new JSDOM('<canvas width="800" height="600"></canvas>', { runScripts: 'outside-only' });
+  const { window } = dom;
+  const canvas = window.document.querySelector('canvas');
+  canvas.style.opacity = '1';
+  let visible = true; let width = 800; let height = 600;
+  canvas.checkVisibility = () => visible;
+  canvas.getBoundingClientRect = () => ({ left: 0, top: 0, right: width, bottom: height, width, height });
+  canvas.getContext = () => { throw new Error('Detection must not allocate or change the game context'); };
+  try {
+    assert.equal(window.eval(probe), true);
+    visible = false; assert.equal(window.eval(probe), false);
+    visible = true; width = height = 100; assert.equal(window.eval(probe), false);
+    width = 800; height = 600; canvas.style.display = 'none'; assert.equal(window.eval(probe), false);
+  } finally { window.close(); }
+});

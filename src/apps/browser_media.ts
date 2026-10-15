@@ -3,7 +3,7 @@ import { buildRtcConfiguration } from '../p2p/ice_config.ts';
 import { stateStore } from '../core/state_store.ts';
 import { MediaCoordinator } from '../p2p/media_coordinator.ts';
 import type { BrowserState } from './browser_protocol.ts';
-import { BrowserQualityController, loadBrowserQuality, type BrowserQualitySettings } from './browser_quality.ts';
+import { BrowserQualityController, loadBrowserQuality, browserVideoBitrate, type BrowserQualitySettings } from './browser_quality.ts';
 import { BrowserCapture } from './browser_capture.ts';
 
 /** Media stays outside snapshots; bounded capture never queues stale frames. */
@@ -85,6 +85,7 @@ export class BrowserMedia {
   }
   configure(settings: BrowserQualitySettings): void {
     this.quality.configure(settings);
+    for (const { pc } of this.peers.values()) this.configureEncoding(pc);
     this.capture?.requestRefresh();
     try { localStorage.setItem('browser-quality-v1', JSON.stringify(settings)); } catch {}
     this.changed();
@@ -100,7 +101,7 @@ export class BrowserMedia {
       parameters.degradationPreference = quality.video ? 'balanced' : 'maintain-resolution';
       for (const encoding of parameters.encodings) {
         encoding.maxFramerate = quality.fps;
-        encoding.maxBitrate = quality.width === 1920 ? (quality.fps === 60 ? 9_000_000 : 6_000_000) : (quality.video ? 4_000_000 : 3_000_000);
+        encoding.maxBitrate = browserVideoBitrate(quality, this.quality.settings.bitrate);
       }
       // Some runtimes reject parameters during negotiation; retry on the next quality change.
       void sender.setParameters(parameters).catch(() => {});

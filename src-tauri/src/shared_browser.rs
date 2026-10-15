@@ -35,6 +35,8 @@ mod local_audio;
 mod extension_packages;
 #[path = "browser_extension_store.rs"]
 mod extension_store;
+#[path = "browser_runtime.rs"]
+mod runtime;
 const BROWSER_HOME: &str = "https://www.google.com/";
 static NEXT_BROWSER_GENERATION: AtomicU64 = AtomicU64::new(1);
 
@@ -64,6 +66,7 @@ struct Session {
     buttons: u8,
     saved: Option<SavedTabs>,
     language: Option<String>,
+    hardware_acceleration: bool,
     capture_id: Option<String>,
     cursor_shape: String,
     extension_ids: HashSet<String>,
@@ -219,12 +222,11 @@ fn build_tab(
     temporary: bool,
     url: &str,
     language: Option<&str>,
+    hardware_acceleration: bool,
 ) -> Result<WebviewWindow, String> {
     if !allowed_session_url(app, scope, url) {
         return Err("Only HTTP and HTTPS pages are supported".into());
     }
-    let popup_app = app.clone();
-    let popup_scope = scope.to_string();
     let navigation_app = app.clone(); let navigation_scope = scope.to_string();
     let download_app = app.clone(); let download_scope = scope.to_string();
     let copy = crate::localization::browser_dialog_copy(language);
@@ -233,15 +235,8 @@ fn build_tab(
         .resizable(false)
         .shadow(false).skip_taskbar(true).focused(false).focusable(false)
         .data_directory(directory).incognito(temporary).browser_extensions_enabled(true)
-        .additional_browser_args(&format!("{} --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows --disable-direct-composition-video-overlays --disable-direct-composition-sw-video-overlays",
-            std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS").unwrap_or_default()))
+        .additional_browser_args(&runtime::arguments(&std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS").unwrap_or_default(), hardware_acceleration))
         .on_navigation(move |url| allowed_session_url(&navigation_app, &navigation_scope, url.as_str()))
-        .on_new_window(move |url, _| {
-            if allowed_url(url.as_str()) {
-                let _ = popup_app.emit_to("main", "shared-browser-popup", json!({"scope": popup_scope, "url": url.as_str()}));
-            }
-            tauri::webview::NewWindowResponse::Deny
-        })
         .on_download(move |view, event| {
             if let tauri::webview::DownloadEvent::Requested { destination, url, .. } = event {
                 let name = destination.file_name().unwrap_or_default().to_string_lossy();
@@ -269,6 +264,7 @@ pub async fn start_shared_browser(
     scope: String,
     temporary: bool,
     language: Option<String>,
+    hardware_acceleration: Option<bool>,
 ) -> Result<Value, String> {
     trusted(&window, &scope)?;
     let _operation = state.1.lock().await;
@@ -316,6 +312,7 @@ pub async fn start_shared_browser(
                 buttons: 0,
                 saved: None,
                 language,
+                hardware_acceleration: hardware_acceleration.unwrap_or(true),
                 capture_id: None,
                 cursor_shape: "default".into(),
                 extension_ids: HashSet::new(),
@@ -395,7 +392,7 @@ async fn add_tab(
     scope: &str,
     url: &str,
 ) -> Result<u32, String> {
-    let (id, directory, temporary, language) = {
+    let (id, directory, temporary, language, hardware_acceleration) = {
         let mut sessions = state.0.lock().unwrap();
         let session = sessions.get_mut(scope).ok_or("Browser closed")?;
         if session.tabs.len() >= 16 {
@@ -408,6 +405,7 @@ async fn add_tab(
             session.directory.clone(),
             session.temporary,
             session.language.clone(),
+            session.hardware_acceleration,
         )
     };
     let view = build_tab(
@@ -418,6 +416,7 @@ async fn add_tab(
         temporary,
         url,
         language.as_deref(),
+        hardware_acceleration,
     )?;
     {
         let mut sessions = state.0.lock().unwrap();

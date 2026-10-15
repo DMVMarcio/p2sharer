@@ -27,6 +27,7 @@ export class RoomAppsService {
   private onLifecycle: LifecycleListener | null = null;
   private localActor = '';
   private rtcConfiguration?: () => RTCConfiguration;
+  private canModerate: (actor: string) => boolean = () => false;
   private joining = new Map<string, Promise<void>>();
 
   subscribe(listener: Listener): () => void {
@@ -44,6 +45,10 @@ export class RoomAppsService {
   getLocalActor(): string { return this.localActor; }
   getParticipants(id: string): string[] { return [...(this.participants.get(id) || [])]; }
   isJoined(id: string): boolean { return Boolean(this.localActor && this.participants.get(id)?.has(this.localActor)); }
+  canStop(id: string, actor = this.localActor): boolean {
+    const instance = this.instances.get(id);
+    return Boolean(instance && actor && (instance.createdBy === actor || !instance.personal && this.canModerate(actor)));
+  }
 
   private sendInstanceEvent(id: string, event: AppWireEvent, target?: string): void {
     if (this.instances.has(id) && !this.instances.get(id)?.personal) this.dispatch(event, target);
@@ -96,6 +101,9 @@ export class RoomAppsService {
   }
 
   forgetPeer(actor: string): void {
+    for (const instance of this.getInstances()) if (!instance.personal && instance.createdBy === actor) {
+      this.removeInstance(instance.id); this.onLifecycle?.('stop', instance);
+    }
     for (const id of this.participants.keys()) this.setPresence(id, actor, false);
   }
 
@@ -109,11 +117,12 @@ export class RoomAppsService {
     this.notify();
   }
 
-  attach(sender: Sender, localActor: string, onLocalLifecycle?: LifecycleListener, onLifecycle?: LifecycleListener, rtcConfiguration?: () => RTCConfiguration): void {
+  attach(sender: Sender, localActor: string, onLocalLifecycle?: LifecycleListener, onLifecycle?: LifecycleListener, rtcConfiguration?: () => RTCConfiguration, canModerate?: (actor: string) => boolean): void {
     this.reset();
     this.sender = sender;
     this.localActor = localActor;
     this.rtcConfiguration = rtcConfiguration;
+    this.canModerate = canModerate ?? (() => false);
     this.onLocalLifecycle = onLocalLifecycle || null;
     this.onLifecycle = onLifecycle || null;
   }
@@ -121,6 +130,7 @@ export class RoomAppsService {
   reset(): void {
     this.sender = null;
     this.rtcConfiguration = undefined;
+    this.canModerate = () => false;
     this.joining.clear();
     this.onLocalLifecycle = null;
     this.onLifecycle = null;
@@ -149,7 +159,7 @@ export class RoomAppsService {
 
   stop(id: string): void {
     const instance = this.instances.get(id);
-    if (!instance || !this.sender) return;
+    if (!instance || !this.sender || !this.canStop(id)) return;
     this.removeInstance(id);
     if (!instance.personal) {
       this.dispatch({ kind: 'stop', id });
@@ -221,7 +231,7 @@ export class RoomAppsService {
     }
     if (data.kind === 'stop') {
       const instance = typeof data.id === 'string' ? this.instances.get(data.id) : undefined;
-      if (instance) { this.removeInstance(instance.id); this.onLifecycle?.('stop', instance); }
+      if (instance && this.canStop(instance.id, actor)) { this.removeInstance(instance.id); this.onLifecycle?.('stop', instance); }
       return;
     }
     if (data.kind === 'data') {
@@ -240,7 +250,7 @@ export class RoomAppsService {
       Array.isArray(data.closed) && data.closed.length <= 100 && data.snapshots &&
       typeof data.snapshots === 'object') {
       for (const id of data.closed) if (typeof id === 'string' && /^[a-f0-9-]{36}$/.test(id) &&
-        !this.instances.get(id)?.personal) this.removeInstance(id);
+        !this.instances.get(id)?.personal && this.canStop(id, actor)) this.removeInstance(id);
       for (const instance of data.instances) if (validInstance(instance)) this.addInstance(instance);
       for (const [id, payload] of Object.entries(data.snapshots)) {
         if (this.instances.get(id)?.personal) continue;

@@ -95,6 +95,9 @@ test('admitted peers reconcile signed commands; unauthenticated peers cannot req
       item.data.commands.some((command: { kind: string }) => command.kind === 'admit')));
 
     assert.equal(await manager.setAdministrator('member', true), true);
+    assert.equal(manager.canManageRoomApps('member'), true);
+    assert.equal(manager.canManageRoomApps(manager.getLocalPeerId()), true);
+    assert.equal(manager.canManageRoomApps('unproved'), false);
     const updatedInvite = parseRoomInvite(manager.getInvite()!);
     assert.ok(updatedInvite && updatedInvite.version === 4);
     assert.equal(updatedInvite.adminKeys.length, 1);
@@ -119,6 +122,7 @@ test('admitted peers reconcile signed commands; unauthenticated peers cannot req
     await actions.get('room_admission')!.onMessage!(
       { kind: 'sync', commands: [revoke] }, { peerId: 'member' });
     assert.equal(manager.isPeerAdmin('member'), false);
+    assert.equal(manager.canManageRoomApps('member'), false);
     await actions.get('room_admission')!.onMessage!(
       { kind: 'sync', commands: [revoke] }, { peerId: 'member' });
     assert.equal(manager.isPeerAdmin('member'), false);

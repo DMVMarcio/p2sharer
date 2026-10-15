@@ -394,6 +394,12 @@ export class GroupRoomManager {
     return Boolean(key && this.hasAdminGrant(key));
   }
 
+  public canManageRoomApps(peerId: string): boolean {
+    if (peerId === selfId) return this.isRoomHost() || this.isRoomAdmin();
+    return Boolean(this.authority?.isPeerHost(peerId) || this.isPeerAdmin(peerId) ||
+      !this.authority && this.peerTracker.getHostPeerId(selfId, this.myJoinedAt, this.isCreator) === peerId);
+  }
+
   private hasAdminGrant(key: string): boolean {
     if (!this.authority || this.bannedKeys.has(key)) return false;
     const latest = latestAdminCommand(this.admissionHistory, this.authority.epoch, key);

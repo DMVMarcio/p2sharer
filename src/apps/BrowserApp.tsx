@@ -38,6 +38,10 @@ function BrowserSettings({ model, onClose }: { model: BrowserModel; onClose: () 
     <div className="browser-settings">
       <div className="browser-settings-column">
       {model.state.temporary && <p>{t('browser.temporaryInfo')}</p>}
+      <label>{t('browser.hardwareAcceleration')}<Select value={model.hardwareAcceleration ? 'on' : 'off'} disabled={model.busy}
+        onValueChange={value => model.configureHardwareAcceleration(value === 'on')}
+        options={[{ value: 'on', label: t('browser.hardwareOn') }, { value: 'off', label: t('browser.hardwareOff') }]} /></label>
+      <p>{t('browser.hardwareRestart')}</p>
       {model.media && <>
         <label>{t('browser.contentMode')}<Select value={model.media.quality.settings.mode}
           onValueChange={value => model.configureQuality({ ...model.media!.quality.settings, mode: value as BrowserContentMode })}
@@ -45,6 +49,9 @@ function BrowserSettings({ model, onClose }: { model: BrowserModel; onClose: () 
         <label>{t('browser.videoQuality')}<Select value={model.media.quality.settings.video}
           onValueChange={value => model.configureQuality({ ...model.media!.quality.settings, video: value as BrowserVideoQuality })}
           options={['720p30', '1080p30', '1080p60'].map(value => ({ value, label: t(`browser.quality.${value}`) }))} /></label>
+        <label>{t('browser.motionDetail')}<Select value={model.media.quality.settings.bitrate ?? 'high'}
+          onValueChange={value => model.configureQuality({ ...model.media!.quality.settings, bitrate: value as 'balanced' | 'high' })}
+          options={['balanced', 'high'].map(value => ({ value, label: t(`browser.bitrate.${value}`) }))} /></label>
       </>}
       <label>{t('browser.clearData')}<Select value={mode} disabled={model.busy} onValueChange={setMode}
         options={['cache', 'sites', 'history', 'reset'].map(value => ({ value, label: t(`browser.clear.${value}`) }))} /></label>

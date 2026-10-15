@@ -40,6 +40,7 @@ export class BrowserModel implements RoomAppModel {
   presentation = 0;
   private mirroredContextId = 0;
   media: BrowserMedia | null = null;
+  hardwareAcceleration = (() => { try { return localStorage.getItem('browser-hardware-acceleration') !== 'false'; } catch { return true; } })();
   extensions: { id: string; name: string; enabled: boolean; popup?: boolean }[] = [];
   dialog: BrowserPageDialog | null = null;
   private dialogOpenedAt = 0;
@@ -96,7 +97,7 @@ export class BrowserModel implements RoomAppModel {
     return { state: this.state, host: this.host, running: this.running, busy: this.busy, paused: this.paused,
       controller: this.controller, pointer: this.pointer, activity: this.activity, contextMenu: this.contextMenu,
       extensions: this.extensions, extensionRequest: this.extensionRequest, dialog: this.dialog,
-      quality: this.media?.quality.settings, session: this.session, presentation: this.presentation };
+      quality: this.media?.quality.settings, hardwareAcceleration: this.hardwareAcceleration, session: this.session, presentation: this.presentation };
   }
   applyLocalSnapshot(value: unknown): void {
     if (!this.localView || !value || typeof value !== 'object') return;
@@ -104,6 +105,7 @@ export class BrowserModel implements RoomAppModel {
     if (!validBrowserState(data.state) || typeof data.host !== 'string') return;
     this.state = data.state; this.mirrorHost = data.host; this.running = data.running === true;
     this.busy = data.busy === true; this.paused = data.paused === true; this.controller = data.controller;
+    this.hardwareAcceleration = data.hardwareAcceleration !== false;
     this.pointer = data.pointer;
     if (this.activity?.id !== data.activity?.id) this.activity = data.activity;
     if (data.contextMenu && data.contextMenu.id !== this.mirroredContextId) { this.contextMenu = data.contextMenu; this.mirroredContextId = data.contextMenu.id; }
@@ -126,6 +128,7 @@ export class BrowserModel implements RoomAppModel {
       case 'pause': this.togglePause(); break;
       case 'volume': if (typeof first === 'number' && typeof second === 'boolean') await this.setLocalVolume(first, second); break;
       case 'quality': if (validBrowserQuality(first)) this.configureQuality(first); break;
+      case 'hardware': if (typeof first === 'boolean') this.configureHardwareAcceleration(first); break;
       case 'dismiss-extension': this.dismissExtensionRequest(); break;
       case 'dismiss-context': if (this.contextMenu?.id === first) { this.contextMenu = null; this.context.changed(); } break;
       case 'answer': if (typeof first === 'boolean' && typeof second === 'string') this.answerDialog(first, second); break;
@@ -137,6 +140,13 @@ export class BrowserModel implements RoomAppModel {
   configureQuality(settings: BrowserQualitySettings): void {
     if (this.localView) { void this.localRequests.request('quality', [settings]).catch(error => this.fail(error)); return; }
     this.media?.configure(settings);
+  }
+  configureHardwareAcceleration(enabled: boolean): void {
+    if (this.localView) { void this.localRequests.request('hardware', [enabled]).catch(error => this.fail(error)); return; }
+    if (!this.isHost || !this.joined || this.busy) return;
+    this.hardwareAcceleration = enabled;
+    try { localStorage.setItem('browser-hardware-acceleration', String(enabled)); } catch {}
+    this.context.changed();
   }
   consumeContextMenu(): void {
     const id = this.contextMenu?.id; this.contextMenu = null;
@@ -192,8 +202,8 @@ export class BrowserModel implements RoomAppModel {
     const epoch = this.epoch;
     try {
       this.listening ??= (async () => {
-        const removePopup = await listen<{ scope: string; url: string }>('shared-browser-popup', ({ payload }) => {
-        if (this.isHost && payload.scope === this.scope && this.running && this.joined && validBrowserCommand({ kind: 'new-tab', url: payload.url })) {
+        const removePopup = await listen<{ scope: string; tab: number; url: string }>('shared-browser-popup', ({ payload }) => {
+        if (this.isHost && payload.scope === this.scope && payload.tab === this.state.active && this.running && this.joined && validBrowserCommand({ kind: 'new-tab', url: payload.url })) {
           void this.queue(async () => {
             const state = await this.native.call<BrowserState>('control_shared_browser', { scope: this.scope, command: { kind: 'new-tab', url: payload.url } });
             this.acceptNativeState(state);
@@ -242,7 +252,7 @@ export class BrowserModel implements RoomAppModel {
         } catch (error) { removePopup(); throw error; }
       })();
       await this.listening;
-      const state = await this.native.call<BrowserState>('start_shared_browser', { scope: this.scope, temporary, language: getLanguage() });
+      const state = await this.native.call<BrowserState>('start_shared_browser', { scope: this.scope, temporary, language: getLanguage(), hardwareAcceleration: this.hardwareAcceleration });
       if (this.disposed || epoch !== this.epoch || !this.joined) {
         await this.native.call('stop_shared_browser', { scope: this.scope }); return;
       }

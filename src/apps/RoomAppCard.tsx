@@ -68,7 +68,7 @@ export const RoomAppCard: React.FC<Props> = ({ instance, isFeatured = false, com
   if (!joined) actions.push({ id: 'join', get label() { return t("message.2d903fc4b914"); }, icon: <Play size={15} />, onSelect: enter });
   if (!isFeatured) actions.push({ id: 'feature', get label() { return t("message.76178e9a949c"); }, icon: <Focus size={15} />, onSelect: () => togglePin(`app:${instance.id}`) });
   if (joined && !instance.personal) actions.push({ id: 'leave', get label() { return t("message.2703fc8c0c31"); }, icon: <ArrowLeft size={15} />, onSelect: leave });
-  actions.push({ id: 'stop', get label() { return instance.personal ? t("message.be00cfb71be4") : t("message.8021e45fdba2"); }, icon: <SquareX size={15} />, danger: true, separator: true, onSelect: () => roomAppsService.stop(instance.id) });
+  if (roomAppsService.canStop(instance.id)) actions.push({ id: 'stop', get label() { return instance.personal ? t("message.be00cfb71be4") : t("message.8021e45fdba2"); }, icon: <SquareX size={15} />, danger: true, separator: true, onSelect: () => roomAppsService.stop(instance.id) });
   return <div onContextMenu={(event) => { if (!isContextMenuEditor(event.target)) openContextMenu(event, [...actions, ...layoutActions]); }} className={`room-app-card room-app-kind-${instance.kind} ${isFeatured ? 'featured' : ''} ${compact ? 'compact' : ''}`}
     style={style} data-peer-id={`app:${instance.id}`} data-room-layout-id={layoutDraggable ? `app:${instance.id}` : undefined}>
     <div className="room-app-card-header">
