@@ -32,8 +32,13 @@ fn note_path(directory: &Path, id: &str) -> Result<PathBuf, String> {
     Ok(directory.join(format!("{}.json", id.to_ascii_lowercase())))
 }
 
-fn note_directory(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    let directory = app.path().document_dir().map_err(|e| e.to_string())?.join("P2Sharer").join("Notes");
+fn library_folder(library: Option<&str>) -> Result<&'static str, String> {
+    match library { None => Ok("Notes"), Some("whiteboard") => Ok("Whiteboards"), _ => Err("Invalid document library".into()) }
+}
+
+fn note_directory(app: &tauri::AppHandle, library: Option<&str>) -> Result<PathBuf, String> {
+    let folder = library_folder(library)?;
+    let directory = app.path().document_dir().map_err(|e| e.to_string())?.join("P2Sharer").join(folder);
     fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
     Ok(directory)
 }
@@ -89,10 +94,10 @@ fn persist_note(directory: &Path, mut note: SavedNote, expected_updated_at: Opti
 }
 
 #[tauri::command]
-pub async fn list_saved_notes(app: tauri::AppHandle) -> Result<NoteLibrary, String> {
+pub async fn list_saved_notes(app: tauri::AppHandle, library: Option<String>) -> Result<NoteLibrary, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let _lock = NOTE_LOCK.lock().map_err(|e| e.to_string())?;
-        let directory = note_directory(&app)?;
+        let directory = note_directory(&app, library.as_deref())?;
         let mut notes = Vec::new();
         for entry in fs::read_dir(&directory).map_err(|e| e.to_string())? {
             let path = entry.map_err(|e| e.to_string())?.path();
@@ -110,30 +115,33 @@ pub async fn list_saved_notes(app: tauri::AppHandle) -> Result<NoteLibrary, Stri
 }
 
 #[tauri::command]
-pub async fn read_saved_note(app: tauri::AppHandle, id: String) -> Result<SavedNote, String> {
+pub async fn read_saved_note(app: tauri::AppHandle, id: String, library: Option<String>) -> Result<SavedNote, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let _lock = NOTE_LOCK.lock().map_err(|e| e.to_string())?;
-        let note = read_note(&note_path(&note_directory(&app)?, &id)?)?;
+        let note = read_note(&note_path(&note_directory(&app, library.as_deref())?, &id)?)?;
         if !note.id.eq_ignore_ascii_case(&id) { return Err("Invalid saved note".into()); }
         Ok(note)
     }).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub async fn save_library_note(app: tauri::AppHandle, id: String, name: String, content: String, expected_updated_at: Option<u64>) -> Result<SavedNote, String> {
+pub async fn save_library_note(app: tauri::AppHandle, id: String, name: String, content: String, expected_updated_at: Option<u64>, library: Option<String>) -> Result<SavedNote, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let _lock = NOTE_LOCK.lock().map_err(|e| e.to_string())?;
-        persist_note(&note_directory(&app)?, SavedNote { id, name, content, updated_at: 0 }, expected_updated_at)
+        persist_note(&note_directory(&app, library.as_deref())?, SavedNote { id, name, content, updated_at: 0 }, expected_updated_at)
     }).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub async fn open_note_file(language: Option<String>) -> Result<Option<(String, String)>, String> {
+pub async fn open_note_file(language: Option<String>, library: Option<String>) -> Result<Option<(String, String)>, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let copy = crate::localization::note_dialog_copy(language.as_deref());
+        let board = library.as_deref() == Some("whiteboard");
+        if library.is_some() && !board { return Err("Invalid document library".into()); }
+        let copy = if board { crate::localization::whiteboard_dialog_copy(language.as_deref()) }
+            else { crate::localization::note_dialog_copy(language.as_deref()) };
         let Some(path) = rfd::FileDialog::new()
             .set_title(copy.open_title)
-            .add_filter(copy.open_filter, &["html", "md", "txt"])
+            .add_filter(copy.open_filter, if board { &["p2board"][..] } else { &["html", "md", "txt"][..] })
             .pick_file() else { return Ok(None); };
         let format = path.extension().and_then(|value| value.to_str()).unwrap_or("txt").to_ascii_lowercase();
         read_bounded(&path, MAX_NOTE_BYTES).map(|content| Some((content, format)))
@@ -141,15 +149,18 @@ pub async fn open_note_file(language: Option<String>) -> Result<Option<(String, 
 }
 
 #[tauri::command]
-pub async fn save_note_file(content: String, format: String, language: Option<String>) -> Result<bool, String> {
+pub async fn save_note_file(content: String, format: String, language: Option<String>, library: Option<String>) -> Result<bool, String> {
     if content.len() > MAX_NOTE_BYTES { return Err("Note file is too large".into()); }
-    if !["html", "md", "txt"].contains(&format.as_str()) { return Err("Invalid export format".into()); }
+    if !(if library.as_deref() == Some("whiteboard") { &["p2board", "svg"][..] } else { &["html", "md", "txt"][..] }).contains(&format.as_str()) { return Err("Invalid export format".into()); }
     tauri::async_runtime::spawn_blocking(move || {
-        let copy = crate::localization::note_dialog_copy(language.as_deref());
+        let board = library.as_deref() == Some("whiteboard");
+        if library.is_some() && !board { return Err("Invalid document library".into()); }
+        let copy = if board { crate::localization::whiteboard_dialog_copy(language.as_deref()) }
+            else { crate::localization::note_dialog_copy(language.as_deref()) };
         let Some(path) = rfd::FileDialog::new()
             .set_title(copy.save_title)
             .add_filter(match format.as_str() { "md" => "Markdown", "txt" => if language.as_deref() == Some("pt-BR") { "Texto puro" } else { "Plain text" }, _ => copy.save_filter }, &[&format])
-            .set_file_name(format!("{}.{}", copy.file_name.trim_end_matches(".html"), format))
+            .set_file_name(format!("{}.{}", copy.file_name.trim_end_matches(".html").trim_end_matches(".p2board"), format))
             .save_file() else { return Ok(false); };
         std::fs::write(path, content).map(|_| true).map_err(|e| e.to_string())
     }).await.map_err(|e| e.to_string())?
@@ -172,6 +183,26 @@ mod tests {
     fn note() -> SavedNote {
         SavedNote { id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee".into(), name: "  Notes  ".into(),
             content: "<p>First &amp; second</p>".into(), updated_at: 0 }
+    }
+
+    #[test]
+    fn whiteboards_use_a_separate_library_and_preserve_editable_scene_content() {
+        assert_eq!(library_folder(None).unwrap(), "Notes");
+        assert_eq!(library_folder(Some("whiteboard")).unwrap(), "Whiteboards");
+        assert!(library_folder(Some("../outside")).is_err());
+        let fixture = Fixture::new();
+        let mut board = note();
+        board.content = r##"{"version":1,"shapes":[{"color":"#3b82f6","points":[{"x":-30,"y":40}]}]}"##.into();
+        let stored = persist_note(&fixture.0, board, None).unwrap();
+        let restored = read_note(&note_path(&fixture.0, &stored.id).unwrap()).unwrap();
+        assert_eq!(stored.content, restored.content);
+        assert!(persist_note(&fixture.0, restored, None).is_err());
+        for language in ["en", "pt-BR", "es", "fr", "de", "it", "zh-CN", "zh-TW", "ja", "ko", "hi", "fi", "ru"] {
+            let copy = crate::localization::whiteboard_dialog_copy(Some(language));
+            assert!(!copy.open_title.is_empty());
+            assert!(!copy.save_title.is_empty());
+            assert_eq!(copy.file_name, "whiteboard.p2board");
+        }
     }
 
     #[test]

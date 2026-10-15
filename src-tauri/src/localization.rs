@@ -31,6 +31,25 @@ pub fn note_dialog_copy(language: Option<&str>) -> NoteDialogCopy {
     }
 }
 
+
+pub fn whiteboard_dialog_copy(language: Option<&str>) -> NoteDialogCopy {
+    match language {
+        Some("pt-BR") => NoteDialogCopy { open_title: "Importar quadro", save_title: "Exportar quadro", open_filter: "Quadro branco", save_filter: "Quadro branco", file_name: "whiteboard.p2board" },
+        Some("es") => NoteDialogCopy { open_title: "Importar pizarra", save_title: "Exportar pizarra", open_filter: "Pizarra", save_filter: "Pizarra", file_name: "whiteboard.p2board" },
+        Some("fr") => NoteDialogCopy { open_title: "Importer un tableau", save_title: "Exporter le tableau", open_filter: "Tableau blanc", save_filter: "Tableau blanc", file_name: "whiteboard.p2board" },
+        Some("de") => NoteDialogCopy { open_title: "Whiteboard importieren", save_title: "Whiteboard exportieren", open_filter: "Whiteboard", save_filter: "Whiteboard", file_name: "whiteboard.p2board" },
+        Some("it") => NoteDialogCopy { open_title: "Importa lavagna", save_title: "Esporta lavagna", open_filter: "Lavagna", save_filter: "Lavagna", file_name: "whiteboard.p2board" },
+        Some("zh-CN") => NoteDialogCopy { open_title: "导入白板", save_title: "导出白板", open_filter: "白板", save_filter: "白板", file_name: "whiteboard.p2board" },
+        Some("zh-TW") => NoteDialogCopy { open_title: "匯入白板", save_title: "匯出白板", open_filter: "白板", save_filter: "白板", file_name: "whiteboard.p2board" },
+        Some("ja") => NoteDialogCopy { open_title: "ホワイトボードを読み込む", save_title: "ホワイトボードを出力", open_filter: "ホワイトボード", save_filter: "ホワイトボード", file_name: "whiteboard.p2board" },
+        Some("ko") => NoteDialogCopy { open_title: "화이트보드 가져오기", save_title: "화이트보드 내보내기", open_filter: "화이트보드", save_filter: "화이트보드", file_name: "whiteboard.p2board" },
+        Some("hi") => NoteDialogCopy { open_title: "व्हाइटबोर्ड आयात करें", save_title: "व्हाइटबोर्ड निर्यात करें", open_filter: "व्हाइटबोर्ड", save_filter: "व्हाइटबोर्ड", file_name: "whiteboard.p2board" },
+        Some("fi") => NoteDialogCopy { open_title: "Tuo valkotaulu", save_title: "Vie valkotaulu", open_filter: "Valkotaulu", save_filter: "Valkotaulu", file_name: "whiteboard.p2board" },
+        Some("ru") => NoteDialogCopy { open_title: "Импорт доски", save_title: "Экспорт доски", open_filter: "Доска", save_filter: "Доска", file_name: "whiteboard.p2board" },
+        _ => NoteDialogCopy { open_title: "Import whiteboard", save_title: "Export whiteboard", open_filter: "Whiteboard", save_filter: "Whiteboard", file_name: "whiteboard.p2board" },
+    }
+}
+
 pub struct BrowserDialogCopy {
     pub extension_title: &'static str,
     pub download_title: &'static str,

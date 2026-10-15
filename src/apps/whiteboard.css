@@ -1,0 +1,23 @@
+.apps-library-banner.whiteboard { background: linear-gradient(125deg, #258e86, #315f90 65%, #2d344f); }
+.whiteboard-app { display: flex; flex-direction: column; height: 100%; min-height: 0; width: 100%; overflow: hidden; }
+.whiteboard-toolbar { gap: 4px; }
+.whiteboard-toolbar .stream-drawing-size { border: 0; box-shadow: none; background: transparent; }
+.whiteboard-fill { width: 130px; max-width: 130px; }
+.whiteboard-workspace { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+.whiteboard-canvas { flex: 1; min-width: 0; position: relative; overflow: hidden; touch-action: none; user-select: none;
+  background-color: var(--room-app-content-bg); background-image: radial-gradient(var(--border-default) 1px, transparent 1px); background-size: 24px 24px; }
+.whiteboard-canvas.virtual-cursor { cursor: none; }
+.whiteboard-canvas:focus-visible { outline: 2px solid var(--accent-color); outline-offset: -2px; }
+.whiteboard-art, .whiteboard-cursors { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.whiteboard-navigation-hint { position: absolute; bottom: 8px; left: 10px; max-width: calc(100% - 20px); padding: 4px 7px;
+  border-radius: var(--radius-sm); background: var(--room-app-panel-bg); color: var(--text-muted); font-size: 10px; pointer-events: none; }
+.whiteboard-layers { flex: 0 0 220px; max-width: 42%; min-width: 120px; overflow-y: auto; padding: 10px;
+  background: var(--room-app-panel-bg); color: var(--text-primary); font-size: 12px; }
+.whiteboard-layers > strong { display: block; margin-bottom: 8px; }
+.whiteboard-layer { padding: 5px; border-radius: var(--radius-sm); margin-bottom: 4px; background: var(--bg-card); }
+.whiteboard-layer.selected { background: var(--bg-card-hover); box-shadow: inset 0 0 0 1px var(--accent-color); }
+.whiteboard-layer-name { display: flex; gap: 6px; width: 100%; justify-content: flex-start; }
+.whiteboard-layer .room-app-toolbar-actions { flex-wrap: wrap; }
+.stream-pointer-brush { display: block; box-sizing: border-box; border: 1.5px solid currentColor; border-radius: 50%;
+  position: absolute; transform: translate(-50%, -50%); box-shadow: 0 0 0 1px #fff8; }
+.whiteboard-cursors .stream-pointer-remote { z-index: 1; }

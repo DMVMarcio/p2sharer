@@ -30,14 +30,14 @@ export interface RoomAppModelContext {
 const MAX_NOTE = 500_000;
 const MAX_UPDATE = 700_000;
 
-function encodeUpdate(update: Uint8Array): string {
+export function encodeUpdate(update: Uint8Array): string {
   let binary = '';
   for (let offset = 0; offset < update.length; offset += 8192)
     binary += String.fromCharCode(...update.subarray(offset, offset + 8192));
   return btoa(binary);
 }
 
-function decodeUpdate(value: unknown): Uint8Array | null {
+export function decodeUpdate(value: unknown): Uint8Array | null {
   if (typeof value !== 'string' || value.length > MAX_UPDATE * 1.4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(value)) return null;
   try { return Uint8Array.from(atob(value), (char) => char.charCodeAt(0)); }
   catch { return null; }
