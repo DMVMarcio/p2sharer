@@ -36,11 +36,16 @@ mod proportional_resize {
         ratio: f64,
         frame: (i32, i32),
         min_width: f64,
-        height_driven: bool,
     ) {
         let width = (rect.right - rect.left - frame.0).max(1) as f64;
         let height = (rect.bottom - rect.top - frame.1).max(1) as f64;
-        let width = if edge == WMSZ_TOP || edge == WMSZ_BOTTOM || height_driven {
+        let corner = matches!(edge, WMSZ_TOPLEFT | WMSZ_TOPRIGHT | WMSZ_BOTTOMLEFT | WMSZ_BOTTOMRIGHT);
+        let width = if corner {
+            // Project the proposed client size onto the aspect-ratio line. Choosing
+            // an axis from deltas against the last constrained size feeds our own
+            // corrections back into the next message and makes diagonal drags oscillate.
+            (width + height / ratio) / (1.0 + 1.0 / (ratio * ratio))
+        } else if edge == WMSZ_TOP || edge == WMSZ_BOTTOM {
             height * ratio
         } else {
             width
@@ -83,24 +88,12 @@ mod proportional_resize {
                 );
                 let dpi = GetDpiForWindow(hwnd).max(96) as f64 / 96.0;
                 let requested = &mut *(lp.0 as *mut RECT);
-                // Corner resizing follows whichever dimension changed most, so a
-                // vertical-only corner drag still grows the proportional window.
-                let corner = matches!(
-                    wp.0 as u32,
-                    WMSZ_TOPLEFT | WMSZ_TOPRIGHT | WMSZ_BOTTOMLEFT | WMSZ_BOTTOMRIGHT
-                );
-                let height_driven = corner
-                    && ((requested.bottom - requested.top - frame.1 - client.bottom) as f64).abs()
-                        * ratio
-                        > ((requested.right - requested.left - frame.0 - client.right) as f64)
-                            .abs();
                 constrain(
                     requested,
                     wp.0 as u32,
                     ratio,
                     frame,
                     320.0 * dpi,
-                    height_driven,
                 );
                 return LRESULT(1);
             }
@@ -324,7 +317,7 @@ mod tests {
                     right: 1000,
                     bottom: 700,
                 };
-                proportional_resize::constrain(&mut rect, edge, ratio, (16, 16), 320.0, false);
+                proportional_resize::constrain(&mut rect, edge, ratio, (16, 16), 320.0);
                 let width = (rect.right - rect.left - 16) as f64;
                 let height = (rect.bottom - rect.top - 16) as f64;
                 assert!((height - width / ratio).abs() <= 1.0);
@@ -338,6 +331,34 @@ mod tests {
                     assert_eq!(rect.bottom, 700);
                 } else {
                     assert_eq!(rect.top, 100);
+                }
+            }
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn diagonal_resize_moves_continuously_in_both_axes() {
+        use windows::Win32::{Foundation::RECT, UI::WindowsAndMessaging::*};
+        for ratio in [16.0 / 9.0, 9.0 / 16.0, 32.0 / 9.0, 1.0] {
+            for edge in [WMSZ_TOPLEFT, WMSZ_TOPRIGHT, WMSZ_BOTTOMLEFT, WMSZ_BOTTOMRIGHT] {
+                for motion in [(1, 0), (0, 1), (1, 1)] {
+                    let mut previous: Option<(i32, i32)> = None;
+                    for step in 0..100 {
+                        let mut requested = RECT { left: 100, top: 100,
+                            right: 900 + step * motion.0, bottom: 700 + step * motion.1 };
+                        proportional_resize::constrain(&mut requested, edge, ratio, (16, 16), 320.0);
+                        let size = (requested.right - requested.left, requested.bottom - requested.top);
+                        if let Some(last) = previous {
+                            assert!((0..=2).contains(&(size.0 - last.0)));
+                            assert!((0..=2).contains(&(size.1 - last.1)));
+                        }
+                        previous = Some(size);
+                    }
+                    let last = previous.unwrap();
+                    let mut first = RECT { left: 100, top: 100, right: 900, bottom: 700 };
+                    proportional_resize::constrain(&mut first, edge, ratio, (16, 16), 320.0);
+                    assert!(last.0 > first.right - first.left || last.1 > first.bottom - first.top);
                 }
             }
         }
@@ -371,29 +392,38 @@ mod tests {
             .unwrap();
             for ratio in [16.0 / 9.0, 9.0 / 16.0] {
                 proportional_resize::install(hwnd, ratio).unwrap();
-                let mut outer = RECT::default();
-                let mut client = RECT::default();
-                GetWindowRect(hwnd, &mut outer).unwrap();
-                GetClientRect(hwnd, &mut client).unwrap();
-                let frame = (
-                    outer.right - outer.left - client.right,
-                    outer.bottom - outer.top - client.bottom,
-                );
-                let mut requested = RECT {
-                    left: 20,
-                    top: 20,
-                    right: 900,
-                    bottom: 500,
-                };
-                SendMessageW(
-                    hwnd,
-                    WM_SIZING,
-                    WPARAM(WMSZ_BOTTOMRIGHT as usize),
-                    LPARAM(&mut requested as *mut RECT as isize),
-                );
-                let width = (requested.right - requested.left - frame.0) as f64;
-                let height = (requested.bottom - requested.top - frame.1) as f64;
-                assert!((height - width / ratio).abs() <= 1.0);
+                let mut constrained = None;
+                for (window_width, window_height) in [(640, 480), (1280, 720)] {
+                    SetWindowPos(hwnd, None, 0, 0, window_width, window_height, SWP_NOZORDER | SWP_NOACTIVATE).unwrap();
+                    let mut outer = RECT::default();
+                    let mut client = RECT::default();
+                    GetWindowRect(hwnd, &mut outer).unwrap();
+                    GetClientRect(hwnd, &mut client).unwrap();
+                    let frame = (
+                        outer.right - outer.left - client.right,
+                        outer.bottom - outer.top - client.bottom,
+                    );
+                    let mut requested = RECT {
+                        left: 20,
+                        top: 20,
+                        right: 900,
+                        bottom: 500,
+                    };
+                    SendMessageW(
+                        hwnd,
+                        WM_SIZING,
+                        WPARAM(WMSZ_BOTTOMRIGHT as usize),
+                        LPARAM(&mut requested as *mut RECT as isize),
+                    );
+                    let width = (requested.right - requested.left - frame.0) as f64;
+                    let height = (requested.bottom - requested.top - frame.1) as f64;
+                    assert!((height - width / ratio).abs() <= 1.0);
+                    let dimensions = (requested.left, requested.top, requested.right, requested.bottom);
+                    if let Some(previous) = constrained {
+                        assert_eq!(dimensions, previous, "the previous window size must not change the correction");
+                    }
+                    constrained = Some(dimensions);
+                }
             }
             DestroyWindow(hwnd).unwrap();
         }
