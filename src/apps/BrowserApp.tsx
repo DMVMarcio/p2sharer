@@ -19,6 +19,7 @@ import { useMediaVolume } from '../hooks/useMediaVolume';
 import { ActivityToast } from '../components/common/ActivityToast';
 import { useBrowserCursor } from '../hooks/useBrowserCursor';
 import { BrowserTabs } from './BrowserTabs';
+import { BrowserContextMenu } from './BrowserContextMenu';
 import { browserHistoryButton, browserShortcut } from './browser_shortcuts';
 import { useSelectAllOnFocus } from '../hooks/useSelectAllOnFocus';
 import type { BrowserContentMode, BrowserVideoQuality } from './browser_quality';
@@ -301,7 +302,7 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
     <div className={`browser-surface${!minimized && model.running && model.hostOnline && cursor.pointer ? ' virtual-cursor' : ''}`} ref={surface} onPointerMove={e => pointer(e, 'mouseMoved')}
       onPointerLeave={leavePointer}
       onPointerDown={e => pointer(e, 'mousePressed')} onPointerUp={e => pointer(e, 'mouseReleased')}
-      onPointerCancel={() => send({ kind: 'release' })} onContextMenu={e => e.preventDefault()}
+      onPointerCancel={() => send({ kind: 'release' })} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); }}
       onWheel={e => {
         if (minimized || !model.canControl) return;
         const point = position(e); if (!point) return;
@@ -339,7 +340,7 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
       {model.running && volumeControl}
     </div>}
     {active?.loading && fullscreen && <div className="browser-loading fullscreen-loading" role="progressbar" aria-label={t('browser.loading')}><span /></div>}
-    {model.error && !minimized && <p className="browser-error" role="alert">{localizeError(model.error)}</p>}
+    {!minimized && <BrowserContextMenu model={model} surface={surface} />}
     {activity && !minimized && <ActivityToast key={activity.id} className="browser-activity-toast"
       person={{ id: activity.actor, name: participantName(activity.actor), color: 'var(--accent-color)' }} message={t(`browser.activity.${activity.action}`)} />}
     {settings && <BrowserSettings model={model} onClose={() => setSettings(false)} />}

@@ -17,6 +17,9 @@ mod dialogs;
 #[path = "browser_navigation.rs"]
 mod navigation;
 #[cfg(windows)]
+#[path = "browser_context_menu.rs"]
+mod context_menu;
+#[cfg(windows)]
 #[path = "browser_favicon.rs"]
 mod favicon;
 #[cfg(windows)]
@@ -443,6 +446,7 @@ async fn add_tab(
         navigation::install(&view, app.clone(), scope.to_string(), id).await?;
         extension_store::install_interceptor(&view, app.clone(), scope.to_string()).await?;
         dialogs::install(&view, app.clone(), scope.to_string(), id).await?;
+        context_menu::install(&view, app.clone(), scope.to_string(), id).await?;
     }
     if url != "about:blank" {
         view.navigate(tauri::Url::parse(url).map_err(|e| e.to_string())?)

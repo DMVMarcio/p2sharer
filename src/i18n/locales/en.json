@@ -1285,5 +1285,13 @@
   "browser.error.extensionPopup": "Extension popup unavailable",
   "browser.error.extensionStore": "Use a Chrome Web Store or Edge Add-ons link",
   "browser.error.extensionDownload": "Could not download extension",
-  "browser.extensionInstalled": "Extension installed"
+  "browser.extensionInstalled": "Extension installed",
+  "browser.context.open.link": "Open link in new tab",
+  "browser.context.open.source": "Open media in new tab",
+  "browser.context.copy.link": "Copy link address",
+  "browser.context.copy.source": "Copy media address",
+  "browser.context.copyText": "Copy selected text",
+  "browser.context.cut": "Cut",
+  "browser.context.paste": "Paste",
+  "browser.context.selectAll": "Select all"
 }

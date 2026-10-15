@@ -1285,5 +1285,13 @@
   "browser.error.extensionPopup": "Esta extensão não oferece uma interface compatível.",
   "browser.error.extensionStore": "Use um link da Chrome Web Store ou Edge Add-ons",
   "browser.error.extensionDownload": "Não foi possível baixar a extensão",
-  "browser.extensionInstalled": "Extensão instalada"
+  "browser.extensionInstalled": "Extensão instalada",
+  "browser.context.open.link": "Abrir link em nova aba",
+  "browser.context.open.source": "Abrir mídia em nova aba",
+  "browser.context.copy.link": "Copiar endereço do link",
+  "browser.context.copy.source": "Copiar endereço da mídia",
+  "browser.context.copyText": "Copiar texto selecionado",
+  "browser.context.cut": "Recortar",
+  "browser.context.paste": "Colar",
+  "browser.context.selectAll": "Selecionar tudo"
 }

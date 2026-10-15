@@ -1,6 +1,15 @@
 export const BROWSER_WIDTH = 1280;
 export const BROWSER_HEIGHT = 720;
 export interface BrowserTab { id: number; url: string; title: string; loading?: boolean; favicon?: string }
+export interface BrowserContext { tab: number; x: number; y: number; link: string; source: string; selection: string; editable: boolean }
+export function validBrowserContext(value: unknown): value is BrowserContext {
+  if (!value || typeof value !== 'object') return false;
+  const menu = value as BrowserContext;
+  return Number.isSafeInteger(menu.tab) && menu.tab > 0 && Number.isFinite(menu.x) && menu.x >= 0 && menu.x <= BROWSER_WIDTH
+    && Number.isFinite(menu.y) && menu.y >= 0 && menu.y <= BROWSER_HEIGHT
+    && [menu.link, menu.source].every(url => url === '' || typeof url === 'string' && browserUrl(url) === url)
+    && typeof menu.selection === 'string' && menu.selection.length <= 8192 && typeof menu.editable === 'boolean';
+}
 export function validBrowserFavicon(value: unknown): boolean {
   return value === undefined || value === '' || typeof value === 'string' && value.length <= 8192
     && /^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(value);

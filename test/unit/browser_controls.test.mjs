@@ -8,12 +8,13 @@ import React, { act, useState } from 'react';
 
 async function fixture() {
   const dom = new JSDOM('<div id="root"></div>', { pretendToBeVisual: true });
-  const keys = ['window', 'document', 'HTMLElement', 'Element', 'Node', 'IS_REACT_ACT_ENVIRONMENT'];
+  const keys = ['window', 'document', 'HTMLElement', 'Element', 'Node', 'MutationObserver', 'navigator', 'IS_REACT_ACT_ENVIRONMENT'];
   const previous = new Map(keys.map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
   for (const key of keys.slice(0, -1)) Object.defineProperty(globalThis, key, { configurable: true, value: dom.window[key] });
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  dom.window.matchMedia = () => ({ matches: false });
   const require = createRequire(import.meta.url);
-  const bundle = await build({ stdin: { contents: "export { useBrowserChrome } from './src/hooks/useBrowserChrome'; export { useMediaVolume } from './src/hooks/useMediaVolume'; export { MediaVolumeControl } from './src/components/common/MediaVolumeControl'; export { useSelectAllOnFocus } from './src/hooks/useSelectAllOnFocus'; export { BrowserTabs } from './src/apps/BrowserTabs';", resolveDir: process.cwd() },
+  const bundle = await build({ stdin: { contents: "export { useBrowserChrome } from './src/hooks/useBrowserChrome'; export { useMediaVolume } from './src/hooks/useMediaVolume'; export { MediaVolumeControl } from './src/components/common/MediaVolumeControl'; export { useSelectAllOnFocus } from './src/hooks/useSelectAllOnFocus'; export { BrowserTabs } from './src/apps/BrowserTabs'; export { BrowserContextMenu } from './src/apps/BrowserContextMenu'; export { ContextMenuProvider } from './src/components/common/ContextMenu'; export { t } from './src/i18n';", resolveDir: process.cwd() },
     bundle: true, write: false, format: 'esm', platform: 'node', loader: { '.css': 'empty' },
     plugins: [{ name: 'browser-controls-fixture', setup(builder) {
       builder.onResolve({ filter: /^[^./]/ }, args => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
@@ -87,9 +88,17 @@ test('tab dragging emits relative moves and closed tabs retire inertly without l
     f.dom.window.HTMLElement.prototype.releasePointerCapture = function() { captures.delete(this); };
     await render(tabs);
     const row = document.querySelector('[role=group]'); row.getBoundingClientRect = () => ({ left: 0, right: 360 });
-    [...row.querySelectorAll('[data-browser-tab]')].forEach((element, index) => { element.getBoundingClientRect = () => ({ left: index * 120, width: 120 }); });
+    [...row.querySelectorAll('[data-browser-tab]')].forEach((element, index) => { element.getBoundingClientRect = () => ({ left: index * 120, top: 0, width: 120, height: 28 }); });
     const first = row.querySelector('[data-browser-tab="1"] button');
-    await pointer(first, 'pointerdown', 40); await pointer(first, 'pointermove', 400); await pointer(first, 'pointerup', 400);
+    await pointer(first, 'pointerdown', 40); await pointer(first, 'pointermove', 400);
+    const preview = document.querySelector('.browser-tab-preview'); const placeholder = row.querySelector('.browser-tab-placeholder');
+    assert.equal(preview.textContent, 'Tab 1'); assert.equal(preview.getAttribute('aria-hidden'), 'true');
+    assert.equal(placeholder.nextElementSibling.querySelector('svg') !== null, true);
+    assert.equal(placeholder.style.width, preview.style.width);
+    await pointer(first, 'pointercancel', 400);
+    assert.equal(document.querySelector('.browser-tab-preview'), null); assert.equal(row.querySelector('.browser-tab-placeholder'), null);
+    assert.equal(commands.length, 0);
+    await pointer(first, 'pointerdown', 40); await pointer(first, 'pointermove', 100); await pointer(first, 'pointermove', 400); await pointer(first, 'pointerup', 400);
     await act(async () => first.click());
     assert.deepEqual(commands, [{ kind: 'move-tab', id: 1, before: null }]);
     await render([tabs[1], tabs[2], tabs[0]]);
@@ -133,5 +142,26 @@ test('the grouped volume control restores the last level and adjusting its slide
     await slide(0); await slide(65);
     assert.equal(current.volume, 0.65); assert.equal(current.muted, false);
     assert.equal(document.querySelector('input').getAttribute('aria-valuetext'), '65%');
+  } finally { await f.cleanup(); }
+});
+
+
+test('page context actions operate the shared page and use the requesting client clipboard', async () => {
+  const f = await fixture(); f.dom.window.matchMedia = () => ({ matches: true }); const commands = []; let clipboard = 'Local clipboard';
+  Object.defineProperty(navigator, 'clipboard', { value: { writeText: async text => { clipboard = text; }, readText: async () => clipboard } });
+  const surface = { current: null };
+  const model = { canControl: true, state: { active: 1 }, contextMenu: null, command: command => commands.push(command) };
+  const open = async key => {
+    model.contextMenu = { id: key, tab: 1, x: 50, y: 60, link: 'https://example.com/', source: '', selection: 'Page selection', editable: true };
+    await act(async () => f.root.render(React.createElement(f.ContextMenuProvider, null,
+      React.createElement('div', { ref: surface, tabIndex: 0 }), React.createElement(f.BrowserContextMenu, { model, surface }))));
+  };
+  const select = async label => act(async () => [...document.querySelectorAll('[role=menuitem]')].find(button => button.textContent === f.t(label)).click());
+  try {
+    await open(1); assert.equal(document.querySelectorAll('[role=menu]').length, 1);
+    await select('browser.context.open.link'); assert.deepEqual(commands.pop(), { kind: 'new-tab', url: 'https://example.com/' });
+    await open(2); await select('browser.context.copyText'); assert.equal(clipboard, 'Page selection');
+    clipboard = 'Local paste'; await open(3); await select('browser.context.paste'); assert.deepEqual(commands.pop(), { kind: 'text', text: 'Local paste' });
+    await open(4); model.state.active = 2; await select('browser.reload'); assert.equal(commands.length, 0);
   } finally { await f.cleanup(); }
 });

@@ -8,9 +8,11 @@
 .browser-tab-slot { position: relative; display: flex; flex-shrink: 0; max-width: 240px; overflow: hidden; }
 .browser-tab-slot.entering { animation: browserTabOpen var(--transition-fast) both; }
 .browser-tab-slot.exiting { overflow: hidden; animation: browserTabClose var(--content-exit-duration) ease-out both; }
-.browser-tab-slot.dragging { opacity: .55; }
-.browser-tab-slot.drop-before::before, .browser-tab-drop-end { content: ''; position: absolute; z-index: 2; left: 0; top: 2px; bottom: 2px; width: 2px; background: var(--accent-color); border-radius: var(--radius-full); }
-.browser-tab-drop-end { position: static; align-self: stretch; flex: 0 0 2px; }
+.browser-tab-slot.dragging { position: absolute; visibility: hidden; pointer-events: none; }
+.browser-tab-placeholder { flex-shrink: 0; border-radius: var(--radius-sm); background: var(--accent-subtle); outline: 1px dashed var(--accent-color); outline-offset: -1px; }
+.browser-tab-preview { position: fixed; z-index: 10000; pointer-events: none; box-shadow: var(--shadow-md); overflow: hidden; }
+.browser-tab-preview > .browser-tab-label { flex: 1; min-width: 0; justify-content: flex-start; }
+.browser-tab-preview-close { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); }
 .browser-tabs.reordering { user-select: none; }
 .browser-tab-label { touch-action: none; }
 @keyframes browserTabOpen { from { max-width: 0; opacity: 0; transform: translateY(3px); } to { max-width: 240px; opacity: 1; transform: translateY(0); } }
@@ -57,13 +59,11 @@
 @keyframes browserLoading { from { transform: translateX(-100%); } to { transform: translateX(390%); } }
 .room-app-browser.fullscreen .browser-chrome { position: absolute; inset: 0 0 auto; z-index: 10; background: var(--bg-card); opacity: 0; transform: translateY(-100%); pointer-events: none; transition: opacity var(--transition-normal), transform var(--transition-normal); }
 .room-app-browser.fullscreen .browser-chrome.visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
-.room-app-browser.fullscreen .browser-error { position: absolute; bottom: 0; left: 0; right: 0; z-index: 5; background: var(--bg-card); }
 @media (prefers-reduced-motion: reduce) { .browser-loading span { animation: none; width: 100%; opacity: .7; } .browser-chrome, .room-app-browser.fullscreen .browser-chrome { transition: none; } }
 .browser-temporary { display: flex; align-items: center; gap: 8px; font-size: 12px; }
 .browser-status { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 5px 9px; color: var(--text-secondary); font-size: 10px; }
 .browser-status > span:nth-child(2) { flex: 1; }
 .browser-status label { display: flex; gap: 4px; align-items: center; }
-.browser-error { color: var(--danger-text); margin: 4px 8px; font-size: 12px; overflow-wrap: anywhere; }
 .modal-card.browser-settings-dialog { width: 760px; max-width: calc(100vw - 40px); }
 .browser-settings { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
 .browser-settings-column { display: flex; flex-direction: column; min-width: 0; gap: 12px; }

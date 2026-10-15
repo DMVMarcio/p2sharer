@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { BrowserControlLease, browserUrl, browserPointerPosition, validBrowserCommand, validBrowserState, validBrowserDialog, type BrowserCommand } from '../../src/apps/browser_protocol.ts';
 import { BrowserModel, type BrowserNative } from '../../src/apps/browser_model.ts';
+import { toastManager } from '../../src/hooks/useToast.ts';
 
 const move = (x = 100): BrowserCommand => ({ kind: 'mouse', event: 'mouseMoved', x, y: 100, button: 'none', buttons: 0, delta_x: 0, delta_y: 0, modifiers: 0, clicks: 0 });
 const state = { tabs: [{ id: 1, title: 'Example', url: 'https://example.com/' }], active: 1, temporary: false };
@@ -65,6 +66,34 @@ function fixture(local = 'host', onCall?: (command: string, args: Record<string,
   model.state = structuredClone(state); model.running = true; sent.length = 0;
   return { model, calls, sent };
 }
+
+test('page context is accepted only from the live host session with safe bounded data', () => {
+  const { model } = fixture('alice');
+  const menu = { tab: 1, x: 50, y: 60, link: 'https://example.com/', source: '', selection: 'Selected', editable: false };
+  const packet = { type: 'context-menu', menu, session: '' };
+  try {
+    for (const [actor, snapshot, data] of [
+      ['bob', false, packet], ['host', true, packet], ['host', false, { ...packet, session: crypto.randomUUID() }],
+      ['host', false, { ...packet, menu: { ...menu, tab: 2 } }], ['host', false, { ...packet, menu: { ...menu, link: 'file:///private' } }],
+      ['host', false, { ...packet, menu: { ...menu, x: Infinity } }], ['host', false, { ...packet, menu: { ...menu, selection: 'x'.repeat(8193) } }],
+    ] as [string, boolean, unknown][]) { model.apply(data, actor, snapshot); assert.equal(model.contextMenu, null); }
+    model.apply(packet, 'host', false); assert.equal(model.contextMenu?.selection, 'Selected');
+    model.destroy(); assert.equal(model.contextMenu, null);
+  } finally { model.destroy(); }
+});
+
+test('browser failures use dismissible expiring notifications and coalesce repeated input failures', async context => {
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  let notifications: { id: string; type: string }[] = [];
+  const unsubscribe = toastManager.subscribe(items => { notifications = items; });
+  const { model } = fixture('host', async () => { throw new Error('Browser operation failed'); });
+  try {
+    model.command({ kind: 'reload' }); await settle();
+    assert.equal(notifications.length, 1); assert.equal(notifications[0].type, 'error');
+    model.command({ kind: 'reload' }); await settle(); assert.equal(notifications.length, 1);
+    context.mock.timers.tick(5001); assert.equal(notifications.length, 0);
+  } finally { notifications.forEach(item => toastManager.remove(item.id)); unsubscribe(); model.destroy(); context.mock.timers.reset(); }
+});
 
 test('host speaker volume stays local, bypasses shared controls and rejects viewer changes', async () => {
   const host = fixture(); const viewer = fixture('alice');
