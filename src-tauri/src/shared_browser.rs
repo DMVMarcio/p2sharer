@@ -20,6 +20,9 @@ mod navigation;
 #[path = "browser_context_menu.rs"]
 mod context_menu;
 #[cfg(windows)]
+#[path = "browser_cursor.rs"]
+mod cursor;
+#[cfg(windows)]
 #[path = "browser_favicon.rs"]
 mod favicon;
 #[cfg(windows)]
@@ -62,6 +65,7 @@ struct Session {
     saved: Option<SavedTabs>,
     language: Option<String>,
     capture_id: Option<String>,
+    cursor_shape: String,
     extension_ids: HashSet<String>,
 }
 #[derive(Default, Clone, PartialEq, Serialize, Deserialize)]
@@ -80,6 +84,10 @@ pub struct Tab {
     pub favicon: String,
     #[serde(default = "default_zoom")]
     pub zoom: f64,
+    #[serde(default, rename = "canBack")]
+    pub can_back: bool,
+    #[serde(default, rename = "canForward")]
+    pub can_forward: bool,
     #[serde(skip)]
     favicon_uri: String,
     #[serde(skip)]
@@ -309,6 +317,7 @@ pub async fn start_shared_browser(
                 saved: None,
                 language,
                 capture_id: None,
+                cursor_shape: "default".into(),
                 extension_ids: HashSet::new(),
             },
         );
@@ -460,6 +469,7 @@ async fn add_tab(
         extension_store::install_interceptor(&view, app.clone(), scope.to_string()).await?;
         dialogs::install(&view, app.clone(), scope.to_string(), id).await?;
         context_menu::install(&view, app.clone(), scope.to_string(), id).await?;
+        cursor::install(&view, app.clone(), scope.to_string(), id).await?;
     }
     if url != "about:blank" {
         view.navigate(tauri::Url::parse(url).map_err(|e| e.to_string())?)
@@ -526,6 +536,7 @@ async fn browser_state(
         for tab in &mut updated {
             if let Some(current) = session.tabs.iter().find(|t| t.id == tab.id) {
                 tab.loading = current.loading; tab.navigation_id = current.navigation_id;
+                tab.can_back = current.can_back; tab.can_forward = current.can_forward;
             }
         }
         session.tabs = updated.clone();
@@ -740,6 +751,9 @@ fn input_method(command: &BrowserCommand) -> Result<(&'static str, Value), Strin
             {
                 return Err("Invalid browser mouse input".into());
             }
+            let button = if event == "mouseMoved" {
+                if buttons & 1 != 0 { "left" } else if buttons & 2 != 0 { "right" } else if buttons & 4 != 0 { "middle" } else { "none" }
+            } else { button.as_str() };
             Ok((
                 "Input.dispatchMouseEvent",
                 json!({"type":event,"x":x,"y":y,"button":button,"buttons":buttons,
@@ -1282,6 +1296,14 @@ pub async fn browser_extensions(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn dragging_retains_the_pressed_button_for_native_text_selection() {
+        for (buttons, expected) in [(0, "none"), (1, "left"), (2, "right"), (4, "middle"), (3, "left")] {
+            let (_, params) = input_method(&BrowserCommand::Mouse { event: "mouseMoved".into(), x: 100.0, y: 100.0,
+                button: "none".into(), buttons, delta_x: 0.0, delta_y: 0.0, modifiers: 0, clicks: 0 }).unwrap();
+            assert_eq!(params["button"], expected); assert_eq!(params["buttons"], buttons);
+        }
+    }
     #[test]
     fn page_zoom_steps_are_bounded_and_reset_to_actual_size() {
         assert_eq!(next_zoom(1.0, 1).unwrap(), 1.1);

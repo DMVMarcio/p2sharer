@@ -5,7 +5,7 @@ import { BrowserControlLease, validBrowserCommand, validBrowserState, validBrows
 import { BrowserMedia } from './browser_media.ts';
 import { getLanguage } from '../i18n/index.ts';
 import { BrowserOwnership } from './browser_ownership.ts';
-import { validBrowserContext, type BrowserContext } from './browser_protocol.ts';
+import { validBrowserContext, validBrowserCursorShape, type BrowserCursorShape, type BrowserContext } from './browser_protocol.ts';
 import { showToast } from '../hooks/useToast.ts';
 import { localizeError } from '../i18n/index.ts';
 import { BrowserLocalRequests } from './browser_local_requests.ts';
@@ -23,7 +23,8 @@ export class BrowserModel implements RoomAppModel {
   get canStart(): boolean { return this.joined && (!this.host || this.isHost) && !this.running && !this.busy; }
   state: BrowserState = { tabs: [], active: 0, temporary: false };
   controller = '';
-  pointer: { x: number; y: number; actor: string } | null = null;
+  pointer: { x: number; y: number; actor: string; shape?: BrowserCursorShape } | null = null;
+  private cursorShape: BrowserCursorShape = 'default';
   activity: { id: number; actor: string; action: string } | null = null;
   extensionRequest: string | null = null;
   private activityId = 0;
@@ -207,12 +208,14 @@ export class BrowserModel implements RoomAppModel {
           });
           let removeLoading: () => void;
           try {
-            removeLoading = await listen<{ scope: string; tab: number; loading: boolean; serial: number }>('shared-browser-loading', ({ payload }) => {
+            removeLoading = await listen<{ scope: string; tab: number; loading: boolean; serial: number; canBack?: boolean; canForward?: boolean }>('shared-browser-loading', ({ payload }) => {
               if (!this.isHost || payload.scope !== this.scope || !this.joined || !this.running || !Number.isSafeInteger(payload.serial)
                 || payload.serial <= (this.state.serial ?? 0) || typeof payload.loading !== 'boolean') return;
               if (!this.state.tabs.some(tab => tab.id === payload.tab)) return;
               this.state = { ...this.state, serial: payload.serial,
-                tabs: this.state.tabs.map(tab => tab.id === payload.tab ? { ...tab, loading: payload.loading } : tab) };
+                tabs: this.state.tabs.map(tab => tab.id === payload.tab ? { ...tab, loading: payload.loading,
+                  canBack: typeof payload.canBack === 'boolean' ? payload.canBack : tab.canBack,
+                  canForward: typeof payload.canForward === 'boolean' ? payload.canForward : tab.canForward } : tab) };
               this.changed();
             });
           } catch (error) { removeDialog(); throw error; }
@@ -229,7 +232,12 @@ export class BrowserModel implements RoomAppModel {
             if (request.actor === this.context.localActor) { this.contextMenu = { ...payload.menu, id: ++this.contextId }; this.context.changed(); }
             else void this.context.send?.({ type: 'context-menu', menu: payload.menu, session: this.session }, request.actor).catch(() => {});
           }).catch(error => { removeDialog(); removeLoading(); removeExtension(); throw error; });
-          const remove = () => { removePopup(); removeDialog(); removeLoading(); removeExtension(); removeContext(); };
+          const removeCursor = await listen<{ scope: string; tab: number; shape: unknown }>('shared-browser-cursor', ({ payload }) => {
+            if (!this.isHost || !this.running || !this.joined || payload.scope !== this.scope || payload.tab !== this.state.active || !validBrowserCursorShape(payload.shape)) return;
+            this.cursorShape = payload.shape;
+            if (this.pointer) { this.pointer = { ...this.pointer, shape: payload.shape }; this.publishPointer(); this.context.changed(); }
+          }).catch(error => { removeDialog(); removeLoading(); removeExtension(); removeContext(); throw error; });
+          const remove = () => { removePopup(); removeDialog(); removeLoading(); removeExtension(); removeContext(); removeCursor(); };
           if (this.disposed) remove(); else this.unlisten = remove;
         } catch (error) { removePopup(); throw error; }
       })();
@@ -268,6 +276,8 @@ export class BrowserModel implements RoomAppModel {
   }
   command(command: BrowserCommand): void {
     if (!this.canControl || !validBrowserCommand(command)) return;
+    const active = this.state.tabs.find(tab => tab.id === this.state.active);
+    if (command.kind === 'back' && active?.canBack === false || command.kind === 'forward' && active?.canForward === false) return;
     if (this.localView) { this.context.emit({ type: 'browser-local', action: 'command', args: [command] }); return; }
     const packet = { type: 'command', command, sequence: ++this.sequence, tab: this.state.active, session: this.session };
     if (this.isHost) this.apply(packet, this.context.localActor, false);
@@ -283,9 +293,12 @@ export class BrowserModel implements RoomAppModel {
   private updatePointer(actor: string, command: Extract<BrowserCommand, { kind: 'mouse' }>, sequence: number): void {
     if (sequence <= (this.visualSequences.get(actor) ?? 0)) return;
     this.visualSequences.set(actor, sequence);
-    this.pointer = { x: command.x, y: command.y, actor };
-    for (const peer of this.members) if (peer !== this.host) void this.context.send?.({ type: 'cursor', ...this.pointer }, peer).catch(() => {});
+    this.pointer = { x: command.x, y: command.y, actor, shape: this.cursorShape };
+    this.publishPointer();
     this.context.changed();
+  }
+  private publishPointer(): void {
+    for (const peer of this.members) if (peer !== this.host) void this.context.send?.({ type: 'cursor', ...this.pointer, tab: this.state.active, session: this.session }, peer).catch(() => {});
   }
   apply(payload: unknown, actor: string, fromSnapshot: boolean): void {
     if (this.disposed || !payload || typeof payload !== 'object') return;
@@ -306,10 +319,11 @@ export class BrowserModel implements RoomAppModel {
       this.contextMenu = { ...data.menu, id: ++this.contextId }; this.context.changed(); return;
     }
     if (data.type === 'cursor' && actor === this.host && !this.isHost && !fromSnapshot && this.joined && this.hostOnline
+      && data.session === this.session && data.tab === this.state.active && validBrowserCursorShape(data.shape)
       && typeof data.x === 'number' && Number.isFinite(data.x) && data.x >= 0 && data.x <= 1280
       && typeof data.y === 'number' && Number.isFinite(data.y) && data.y >= 0 && data.y <= 720
       && typeof data.actor === 'string' && this.members.has(data.actor)) {
-      this.pointer = { x: data.x, y: data.y, actor: data.actor }; this.context.changed(); return;
+      this.pointer = { x: data.x, y: data.y, actor: data.actor, shape: data.shape }; this.context.changed(); return;
     }
     if (data.type === 'state') {
       if (this.isHost || actor !== this.host || data.hostTerm !== this.ownership.term || !validBrowserState(data.state) ||
@@ -500,6 +514,7 @@ export class BrowserModel implements RoomAppModel {
     this.pendingMoves.clear(); this.visualSequences.clear();
     this.leftSequences.clear(); this.activity = null; this.extensionRequest = null;
     this.contextActor = null; this.contextMenu = null;
+    this.cursorShape = 'default';
     this.presentation = 0;
     this.lease.clear(); this.controller = ''; this.running = false;
     this.dialog = null;

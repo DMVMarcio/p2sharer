@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-interface Point { x: number; y: number; actor: string }
+interface Point { x: number; y: number; actor: string; shape?: 'default' | 'text' | 'pointer' }
 /** Local visual feedback runs at display cadence, independently of host acknowledgements. */
 export function useBrowserCursor(authoritative: Point | null, canPredict: boolean, actor: string, tab: number) {
   const [local, setLocal] = useState<(Point & { tab: number }) | null>(null);
@@ -26,6 +26,6 @@ export function useBrowserCursor(authoritative: Point | null, canPredict: boolea
     clearTimeout(timer.current); timer.current = setTimeout(clear, 1000);
   };
   const predicted = canPredict && local?.tab === tab;
-  return { pointer: outside && authoritative?.actor === actor ? null : predicted ? local : authoritative, predicted, preview, clear,
+  return { pointer: outside && authoritative?.actor === actor ? null : predicted ? { ...local!, shape: authoritative?.actor === actor ? authoritative.shape : 'default' as const } : authoritative, predicted, preview, clear,
     leave() { clear(); setOutside(true); } };
 }

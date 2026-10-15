@@ -16,7 +16,9 @@ export function BrowserContextMenu({ model, surface }: { model: BrowserModel | u
     const bounds = element.getBoundingClientRect();
     const scale = Math.min(bounds.width / BROWSER_WIDTH, bounds.height / BROWSER_HEIGHT);
     const actions: ContextMenuAction[] = ['back', 'forward', 'reload'].map(kind => ({
-      id: kind, label: t(`browser.${kind}`), onSelect: () => send({ kind: kind as 'back' | 'forward' | 'reload' })
+      id: kind, label: t(`browser.${kind}`), disabled: kind === 'back' ? !model.state.tabs.find(tab => tab.id === model.state.active)?.canBack
+        : kind === 'forward' ? !model.state.tabs.find(tab => tab.id === model.state.active)?.canForward : false,
+      onSelect: () => send({ kind: kind as 'back' | 'forward' | 'reload' })
     }));
     for (const [kind, url] of [['link', menu.link], ['source', menu.source]]) {
       if (!url) continue;

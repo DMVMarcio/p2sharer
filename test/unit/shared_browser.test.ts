@@ -53,6 +53,29 @@ test('contained browser coordinates remain correct in full screen and letterboxe
   assert.equal(browserPointerPosition(0, 0, {left:0, top:0, width:0, height:0}), null);
 });
 
+test('history availability blocks impossible commands and validates shared native flags', async () => {
+  const { model, calls } = fixture();
+  try {
+    model.state.tabs[0] = { ...model.state.tabs[0], canBack: false, canForward: false };
+    model.command({ kind: 'back' }); model.command({ kind: 'forward' }); await settle(); assert.equal(calls.length, 0);
+    model.state.tabs[0].canBack = true; model.command({ kind: 'back' }); await settle();
+    assert.deepEqual(calls.at(-1)?.args.command, { kind: 'back' });
+    assert.equal(validBrowserState({ ...state, tabs: [{ ...state.tabs[0], canBack: 'yes' }] }), false);
+  } finally { model.destroy(); }
+});
+
+test('virtual cursor shapes are session-bound and shared only by the accepted browser host', () => {
+  const { model } = fixture('alice');
+  const packet = { type: 'cursor', actor: 'bob', x: 10, y: 20, shape: 'text', tab: 1, session: '' };
+  try {
+    model.apply(packet, 'bob', false); assert.equal(model.pointer, null);
+    model.apply({ ...packet, session: crypto.randomUUID() }, 'host', false); assert.equal(model.pointer, null);
+    model.apply({ ...packet, shape: 'arbitrary' }, 'host', false); assert.equal(model.pointer, null);
+    model.apply(packet, 'host', false); assert.equal(model.pointer?.shape, 'text');
+    model.apply({ ...packet, shape: 'pointer' }, 'host', false); assert.equal(model.pointer?.shape, 'pointer');
+  } finally { model.destroy(); }
+});
+
 function fixture(local = 'host', onCall?: (command: string, args: Record<string, unknown>) => Promise<unknown>) {
   const calls: { command: string; args: Record<string, unknown> }[] = [];
   const sent: { payload: unknown; target?: string }[] = [];

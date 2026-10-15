@@ -4775,6 +4775,7 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 }
 
 .loading-spinner { display: inline-block; flex-shrink: 0; width: 16px; height: 16px; border-color: currentColor; border-top-color: transparent; }
+.virtual-cursor-text { color: var(--accent-color); transform: translate(-50%, -50%); filter: drop-shadow(0 1px 1px var(--bg-card)); }
 .media-loading-overlay { position: absolute; inset: 0; z-index: 3; display: flex; align-items: center; justify-content: center; gap: 12px; color: var(--text-secondary); background: var(--bg-card); font-size: 12px; pointer-events: none; animation: mediaLoadingEnter var(--transition-fast) both; }
 .media-loading-overlay.closing { animation: mediaLoadingExit var(--dropdown-exit-duration) both; }
 @keyframes mediaLoadingEnter { from { opacity: 0; } to { opacity: 1; } }

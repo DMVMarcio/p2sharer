@@ -23,7 +23,7 @@ test('local cursor follows the latest display frame without changing authority a
   context.mock.timers.enable({ apis: ['setTimeout'] });
   const { createRoot } = await import('react-dom/client'); const root = createRoot(document.getElementById('root'));
   let cursor;
-  const authoritative = { x: 10, y: 10, actor: 'alice' };
+  const authoritative = { x: 10, y: 10, actor: 'alice', shape: 'default' };
   const Harness = ({ allowed = true, tab = 1 }) => {
     cursor = useBrowserCursor(authoritative, allowed, 'alice', tab);
     return React.createElement('span', null, cursor.pointer?.x);
@@ -36,6 +36,8 @@ test('local cursor follows the latest display frame without changing authority a
     await act(async () => frame());
     assert.equal(cursor.pointer.x, 30); assert.equal(authoritative.x, 10);
     await render({}); assert.equal(cursor.pointer.x, 30, 'an older acknowledgement cannot rewind the local visual');
+    authoritative.shape = 'text'; await render({});
+    assert.equal(cursor.pointer.shape, 'text'); assert.equal(cursor.pointer.x, 30, 'shape updates do not rewind predicted coordinates');
     await act(async () => cursor.leave());
     assert.equal(cursor.pointer, null, 'leaving immediately suppresses the last authoritative local pointer');
     await render({}); assert.equal(cursor.pointer, null);

@@ -150,7 +150,7 @@ test('page context actions operate the shared page and use the requesting client
   const f = await fixture(); f.dom.window.matchMedia = () => ({ matches: true }); const commands = []; let clipboard = 'Local clipboard';
   Object.defineProperty(navigator, 'clipboard', { value: { writeText: async text => { clipboard = text; }, readText: async () => clipboard } });
   const surface = { current: null };
-  const model = { canControl: true, state: { active: 1 }, contextMenu: null, consumeContextMenu() { this.contextMenu = null; }, command: command => commands.push(command) };
+  const model = { canControl: true, state: { active: 1, tabs: [{ id: 1, canBack: false, canForward: false }] }, contextMenu: null, consumeContextMenu() { this.contextMenu = null; }, command: command => commands.push(command) };
   const open = async key => {
     model.contextMenu = { id: key, tab: 1, x: 50, y: 60, link: 'https://example.com/', source: '', selection: 'Page selection', editable: true };
     await act(async () => f.root.render(React.createElement(f.ContextMenuProvider, null,

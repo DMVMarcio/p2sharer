@@ -1,6 +1,8 @@
 export const BROWSER_WIDTH = 1280;
 export const BROWSER_HEIGHT = 720;
-export interface BrowserTab { id: number; url: string; title: string; loading?: boolean; favicon?: string; zoom?: number }
+export type BrowserCursorShape = 'default' | 'text' | 'pointer';
+export const validBrowserCursorShape = (value: unknown): value is BrowserCursorShape => ['default', 'text', 'pointer'].includes(String(value));
+export interface BrowserTab { id: number; url: string; title: string; loading?: boolean; favicon?: string; zoom?: number; canBack?: boolean; canForward?: boolean }
 export interface BrowserContext { tab: number; x: number; y: number; link: string; source: string; selection: string; editable: boolean }
 export function validBrowserContext(value: unknown): value is BrowserContext {
   if (!value || typeof value !== 'object') return false;
@@ -78,6 +80,7 @@ export function validBrowserState(value: unknown): value is BrowserState {
     && s.tabs.every(t => t && integer(t.id, 1_000_000) && typeof t.url === 'string' && t.url.length <= 4096
       && typeof t.title === 'string' && t.title.length <= 400 && (t.loading === undefined || typeof t.loading === 'boolean') && validBrowserFavicon(t.favicon)
       && (t.zoom === undefined || typeof t.zoom === 'number' && Number.isFinite(t.zoom) && t.zoom >= 0.25 && t.zoom <= 5))
+    && s.tabs.every(t => (t.canBack === undefined || typeof t.canBack === 'boolean') && (t.canForward === undefined || typeof t.canForward === 'boolean'))
     && new Set(s.tabs.map(t => t.id)).size === s.tabs.length && (!s.tabs.length || s.tabs.some(t => t.id === s.active));
 }
 

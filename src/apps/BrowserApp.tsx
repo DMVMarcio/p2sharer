@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
-import { ArrowLeft, ArrowRight, RotateCw, Plus, X, Globe, Home, Settings, Maximize, Minimize, Lock, Unlock, Puzzle, Trash2, MousePointer2, FolderOpen, ChevronUp, ChevronDown } from 'lucide-react';
+import { ArrowLeft, ArrowRight, RotateCw, Plus, X, Globe, Home, Settings, Maximize, Minimize, Lock, Unlock, Puzzle, Trash2, FolderOpen, ChevronUp, ChevronDown } from 'lucide-react';
 import { roomAppsService } from './room_apps_service';
 import type { BrowserModel } from './browser_model';
 import { browserUrl, browserPointerPosition, BROWSER_HOME, BROWSER_HEIGHT, BROWSER_WIDTH, type BrowserCommand } from './browser_protocol';
@@ -25,6 +25,7 @@ import { useSelectAllOnFocus } from '../hooks/useSelectAllOnFocus';
 import type { BrowserContentMode, BrowserVideoQuality } from './browser_quality';
 import { useVideoPresentation } from '../hooks/useVideoPresentation';
 import { MediaLoadingOverlay } from '../components/common/MediaLoadingOverlay';
+import { VirtualCursorGlyph } from '../components/common/VirtualCursorGlyph';
 
 function BrowserSettings({ model, onClose }: { model: BrowserModel; onClose: () => void }) {
   const [mode, setMode] = useState('cache');
@@ -286,8 +287,8 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
         if (parsed) send({ kind: 'navigate', url: parsed }); else showToast(t('browser.invalidUrl'), 3500, 'error');
         keyboard.current?.focus();
       }}>
-        {icon('back', <ArrowLeft size={15} />, () => send({ kind: 'back' }), !model.canControl)}
-        {icon('forward', <ArrowRight size={15} />, () => send({ kind: 'forward' }), !model.canControl)}
+        {icon('back', <ArrowLeft size={15} />, () => send({ kind: 'back' }), !model.canControl || !active?.canBack)}
+        {icon('forward', <ArrowRight size={15} />, () => send({ kind: 'forward' }), !model.canControl || !active?.canForward)}
         {icon('reload', <RotateCw size={15} />, () => send({ kind: 'reload' }), !model.canControl)}
         {icon('home', <Home size={15} />, () => send({ kind: 'navigate', url: BROWSER_HOME }), !model.canControl)}
         <input ref={address} {...addressSelection} className="text-input-sm" autoComplete="off" value={url} maxLength={4096} aria-label={t('browser.address')}
@@ -320,7 +321,7 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
       {active?.loading && !fullscreen && <div className="browser-loading" role="progressbar" aria-label={t('browser.loading')}><span /></div>}
       {cursor.pointer && <div className="browser-cursor-layer"><div className={`browser-cursor${cursor.predicted ? ' predicted' : ''}`}
         style={{ left: `${cursor.pointer.x / BROWSER_WIDTH * 100}%`, top: `${cursor.pointer.y / BROWSER_HEIGHT * 100}%` }}>
-        <MousePointer2 size={20} fill="var(--accent-color)" /><span>{participantName(cursor.pointer.actor)}</span>
+        <VirtualCursorGlyph shape={cursor.pointer.shape} /><span>{participantName(cursor.pointer.actor)}</span>
       </div></div>}
       {!minimized && <textarea ref={keyboard} className="browser-keyboard" data-remote-keyboard autoComplete="off" aria-label={t('browser.keyboard')}
         disabled={!model.canControl} onKeyDown={e => key(e, 'keyDown')} onKeyUp={e => key(e, 'keyUp')}
