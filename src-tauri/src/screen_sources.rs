@@ -67,6 +67,7 @@ struct CaptureSession {
     source: String,
     active: Arc<AtomicBool>,
     sender: broadcast::Sender<Message>,
+    terminal_signal: Option<Message>,
     metrics: Arc<CaptureMetrics>,
     load: Arc<crate::video_load::CaptureLoad>,
     #[cfg(windows)]
@@ -74,6 +75,18 @@ struct CaptureSession {
 }
 static SESSIONS: std::sync::LazyLock<std::sync::Mutex<std::collections::HashMap<String, CaptureSession>>> =
     std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
+
+fn signal_capture_end(session_id: &str, active: &Arc<AtomicBool>, reason: &str) {
+    if let Ok(mut sessions) = SESSIONS.lock() {
+        if let Some(session) = sessions.get_mut(session_id) {
+            if Arc::ptr_eq(&session.active, active) && active.load(Ordering::Acquire) {
+                let message = Message::Text(format!("{{\"type\":\"fallback\",\"reason\":\"{reason}\"}}"));
+                session.terminal_signal = Some(message.clone());
+                let _ = session.sender.send(message);
+            }
+        }
+    }
+}
 
 pub struct EncodedCapture {
     pub frames: broadcast::Receiver<Message>,
@@ -653,6 +666,14 @@ fn start_wgc_capture(source: &str, capture_mouse: bool, flags: CaptureFlags) -> 
 }
 
 #[cfg(windows)]
+fn capture_window_state(source: &str) -> Option<bool> {
+    use windows::Win32::{Foundation::HWND, UI::WindowsAndMessaging::{IsIconic, IsWindow}};
+    let raw = source.strip_prefix("window:")?.parse::<usize>().ok()?;
+    let hwnd = HWND(raw as *mut std::ffi::c_void);
+    unsafe { IsWindow(hwnd).as_bool().then(|| IsIconic(hwnd).as_bool()) }
+}
+
+#[cfg(windows)]
 fn start_capture_supervisor(source: String, capture_mouse: bool, mut flags: CaptureFlags) {
     std::thread::spawn(move || {
         use crate::capture_recovery::{CaptureRecovery, RecoveryAction, input_desktop_available};
@@ -688,18 +709,13 @@ fn start_capture_supervisor(source: String, capture_mouse: bool, mut flags: Capt
                     || flags.lifecycle.closed.load(Ordering::Acquire)
             };
             let now = flags.start_instant.elapsed().as_millis() as u64;
-            match recovery.observe(flags.active_flag.load(Ordering::Acquire), desktop_available, source_exists, finished, now) {
+            let minimized = desktop_available && capture_window_state(&source) == Some(true);
+            match recovery.observe(flags.active_flag.load(Ordering::Acquire), desktop_available, source_exists, minimized, finished, now) {
                 RecoveryAction::Continue | RecoveryAction::Wait => continue,
                 RecoveryAction::Stop => break,
                 RecoveryAction::SourceGone | RecoveryAction::Failed => {
                     let reason = if source_exists { "capture_error" } else if source.starts_with("window:") { "window_closed" } else { "monitor_not_found" };
-                    if let Ok(sessions) = SESSIONS.lock() {
-                        if let Some(session) = sessions.get(&flags.session_id) {
-                            if Arc::ptr_eq(&session.active, &flags.active_flag) && session.active.load(Ordering::Acquire) {
-                                let _ = flags.sender.send(Message::Text(format!("{{\"type\":\"fallback\",\"reason\":\"{reason}\"}}")));
-                            }
-                        }
-                    }
+                    signal_capture_end(&flags.session_id, &flags.active_flag, reason);
                     break;
                 }
                 RecoveryAction::Restart => {}
@@ -903,10 +919,16 @@ pub fn ensure_ws_server_running() {
                             let _ = write.send(Message::Close(None)).await;
                             return;
                         }
+                        let mut rx = sender.unwrap().subscribe();
                         if write.send(Message::Text("auth-ok".into())).await.is_err() {
                             return;
                         }
-                        let mut rx = sender.unwrap().subscribe();
+                        // Closure can precede authentication when starting without frames.
+                        let terminal = SESSIONS.lock().ok().and_then(|sessions|
+                            sessions.get(session_id).and_then(|session| session.terminal_signal.clone()));
+                        if let Some(message) = terminal {
+                            if write.send(message).await.is_err() { return; }
+                        }
                         loop {
                             tokio::select! {
                                 msg = rx.recv() => {
@@ -1262,6 +1284,7 @@ pub fn start_capture_session(
         nvenc_enabled: nvenc_enabled.clone(), nvenc_keyframe: nvenc_keyframe.clone(), nvenc_bitrate: nvenc_bitrate.clone(),
         source: source_id.clone(),
         active: is_capturing.clone(), sender: sender.clone(),
+        terminal_signal: None,
         metrics: metrics.clone(),
         load: load.clone(),
         #[cfg(windows)]
@@ -1309,6 +1332,11 @@ pub fn start_capture_session(
                 }
                 start_capture_supervisor(source_id.clone(), should_draw_mouse, flags);
                 crate::logger::log_msg("INFO", "capture.start", &format!("session={session_id} backend=WGC startup_ms={} awaiting_first_frame=true", start_instant.elapsed().as_millis()));
+                return Ok(true);
+            }
+            Err(error) if capture_window_state(&source_id) == Some(true) => {
+                crate::logger::log_msg("INFO", "capture.start", &format!("session={session_id} WGC waiting for minimized window error={error}"));
+                start_capture_supervisor(source_id.clone(), should_draw_mouse, flags);
                 return Ok(true);
             }
             Err(error) => crate::logger::log_msg("WARN", "capture.start", &format!("session={session_id} WGC start failed; fallback=xcap error={error}")),
@@ -1396,13 +1424,24 @@ pub fn start_capture_session(
             }
 
             let captured_img = if is_window {
+                #[cfg(windows)]
+                match capture_window_state(&source_id) {
+                    None => {
+                        signal_capture_end(&session_id, &is_capturing_clone, "window_closed");
+                        break;
+                    }
+                    Some(true) => {
+                        consecutive_errors = 0;
+                        std::thread::sleep(std::time::Duration::from_millis(250));
+                        continue;
+                    }
+                    Some(false) => {}
+                }
                 if let Some(ref win) = cached_window {
                     if win.is_minimized().unwrap_or(false) {
-                        crate::logger::log_msg("WARN", "capture.source", &format!("session={session_id} source={source_id} backend=xcap reason=window_minimized"));
-                        let _ = sender.send(Message::Text(
-                            "{\"type\":\"fallback\",\"reason\":\"window_minimized\"}".to_string(),
-                        ));
-                        break;
+                        consecutive_errors = 0;
+                        std::thread::sleep(std::time::Duration::from_millis(250));
+                        continue;
                     }
                 }
 
@@ -1718,6 +1757,7 @@ mod tests {
                 metrics: Arc::new(CaptureMetrics::default()),
                 load: Arc::new(crate::video_load::CaptureLoad::new(60, 0, 0, None)),
                 source: "screen:0".into(), active: Arc::new(AtomicBool::new(true)), sender,
+                terminal_signal: None,
                 #[cfg(windows)]
                 control: None,
             });
@@ -1737,6 +1777,15 @@ mod tests {
         stop_capture_session("socket-test-a".into()).unwrap();
         b.send(Message::Binary(vec![33; 5])).unwrap();
         assert_eq!(tokio::time::timeout(std::time::Duration::from_secs(2), second.next()).await.unwrap().unwrap().unwrap().into_data(), vec![33; 5]);
+        let active = SESSIONS.lock().unwrap().get("socket-test-b").unwrap().active.clone();
+        signal_capture_end("socket-test-b", &Arc::new(AtomicBool::new(true)), "window_closed");
+        assert!(SESSIONS.lock().unwrap().get("socket-test-b").unwrap().terminal_signal.is_none());
+        signal_capture_end("socket-test-b", &active, "window_closed");
+        let (mut late, _) = tokio_tungstenite::connect_async(&url).await.unwrap();
+        late.send(Message::Text(format!("{}:socket-test-b", video_ws_token()))).await.unwrap();
+        assert_eq!(late.next().await.unwrap().unwrap().into_text().unwrap(), "auth-ok");
+        let closure = tokio::time::timeout(std::time::Duration::from_secs(2), late.next()).await.unwrap().unwrap().unwrap();
+        assert!(closure.into_text().unwrap().contains("window_closed"));
         stop_capture_session("socket-test-b".into()).unwrap();
     }
 

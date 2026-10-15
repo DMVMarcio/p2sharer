@@ -58,6 +58,21 @@ test('preview ownership transfers without stopping or reopening the published tr
   await prepared.bridge.stopCapture();
 });
 
+test('a window without preview frames remains publishable and keeps its capture alive', async () => {
+  await render({ source: 'window:waiting' });
+  const owned = preview.stream;
+  await act(async () => preview.reportPlaybackError());
+  assert.equal(preview.stream, owned);
+  assert.equal(owned.track.stopped, false);
+  assert.equal(preview.error, '');
+  let prepared;
+  await act(async () => { prepared = await preview.take(true); });
+  assert.equal(prepared.stream, owned);
+  await render({ source: 'window:waiting', disabled: true });
+  assert.equal(owned.track.stopped, false);
+  await prepared.bridge.stopCapture();
+});
+
 test('late capture completion after cancellation cannot retain a live session', async () => {
   let resolve;
   pending = new Promise((done) => { resolve = done; });

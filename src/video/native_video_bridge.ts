@@ -39,7 +39,17 @@ export class NativeVideoBridge implements VideoCaptureBridge {
   private isDecoding: boolean = false;
   private captureGeneration = 0;
   private encoderFeedbackToken: string | null = null;
-  public onFallbackNeeded: ((reason: string, stream?: MediaStream) => void) | null = null;
+  private fallbackHandler: ((reason: string, stream?: MediaStream) => void) | null = null;
+  private captureFailure: string | undefined;
+  public get onFallbackNeeded() { return this.fallbackHandler; }
+  public set onFallbackNeeded(handler: ((reason: string, stream?: MediaStream) => void) | null) {
+    this.fallbackHandler = handler;
+    const reason = this.captureFailure;
+    const generation = this.captureGeneration;
+    if (handler && reason) queueMicrotask(() => {
+      if (generation === this.captureGeneration && this.fallbackHandler === handler) handler(reason);
+    });
+  }
 
   public isCapturingDirectGpu(): boolean {
     return this.isCapturing && this.isDirectGpu;
@@ -59,6 +69,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     preferSurface?: 'monitor' | 'window'
   ): Promise<MediaStream> {
     await this.stopCapture();
+    this.captureFailure = undefined;
     this.isCapturing = true;
     this.isDirectGpu = true;
     this.currentFps = frameRate;
@@ -148,6 +159,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     quality: number
   ): Promise<MediaStream> {
     await this.stopCapture();
+    this.captureFailure = undefined;
     this.currentFps = fps;
     this.frameClock.reset();
     this.effectiveFps = Math.min(120, Math.max(15, fps));
@@ -172,6 +184,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     let feedbackPending = false;
     let nativeEncodingFailed = false;
     let receivedNativeEncoding = false;
+    let terminalReason: string | undefined;
 
     // 1. Initialize WebCodecs MediaStreamTrackGenerator if available for zero-copy GPU video pipeline
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -408,9 +421,13 @@ export class NativeVideoBridge implements VideoCaptureBridge {
             }
             console.warn('[NativeVideoBridge] Received capture signal from native backend:', { sessionId: this.sessionId, sourceId, reason,
               elapsedMs: Math.round(performance.now() - captureStarted) });
+            if (reason === 'window_minimized') return;
+            terminalReason = reason;
+            this.captureFailure = reason;
+            this.activeStream?.getTracks().forEach(track => track.stop());
             if (this.onFallbackNeeded) {
               this.onFallbackNeeded(reason);
-            }
+            } else void this.stopCapture();
             return;
           }
 
@@ -451,6 +468,8 @@ export class NativeVideoBridge implements VideoCaptureBridge {
               void encodedDecoder.decode(evt.data).then(frame => {
                 if (!frame) return;
                 if (generation !== this.captureGeneration || !this.isCapturing || nativeEncodingFailed) { frame.close(); return; }
+                const track = this.activeStream?.getVideoTracks()[0];
+                if (track) registerNativeSenderSource(track, { sessionId: this.sessionId, feedbackToken });
                 this.latestEncodedFrame?.close(); this.latestEncodedFrame = frame;
                 this.pendingBuffer = new Uint8Array([1, 0, 0, 0]).buffer;
                 void pumpNextFrame();
@@ -499,6 +518,13 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     }
 
     this.activeStream = stream;
+    if (terminalReason) {
+      await this.stopCapture();
+      throw new Error(terminalReason);
+    }
+    // A window can exist without a compositor surface while minimized. Publish its
+    // live track now; the same bridge consumes frames when the window renders again.
+    if (sourceId.startsWith('window:')) return stream;
     try {
       await new Promise<void>((resolve, reject) => {
         const started = performance.now();

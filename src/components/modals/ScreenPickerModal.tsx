@@ -7,7 +7,7 @@ import { useModal } from '../../hooks/useModal';
 import { useScreenPicker } from '../../hooks/useScreenPicker';
 import { getSkeletonCountForTab } from './screen_picker_utils';
 import { MediaPreview } from '../common/MediaPreview';
-import { Camera } from 'lucide-react';
+import { Camera, Monitor } from 'lucide-react';
 import { formatFrameRate } from '../../core/media_streams';
 import { useSkeletonPresence } from '../../hooks/useSkeletonPresence';
 
@@ -202,7 +202,7 @@ export const ScreenPickerModal: React.FC = () => {
                         {win.thumbnail ? (
                           <img src={win.thumbnail} alt={win.title} />
                         ) : (
-                          <div className="source-card-thumb-placeholder">{t("message.28014ef35252")}</div>
+                          <div className="source-card-thumb-placeholder source-card-thumb-skeleton-icon"><Monitor size={28} aria-hidden="true" /></div>
                         )}
                       </div>
                       <div className="source-card-info">
@@ -310,8 +310,9 @@ export const ScreenPickerModal: React.FC = () => {
             {t("message.bb9dbb406dcb")}</button>
           {(() => {
             const hasAvailableSources = currentTab === 'cameras' ? cameras.length > 0 : currentTab === 'screens' ? monitors.length > 0 : windows.length > 0;
-            const isConfirmDisabled = isLoading || isStarting || preview.busy || !selectedSourceId || !hasAvailableSources ||
-              !preview.stream || !!preview.error ||
+            const isWindow = selectedSourceId.startsWith('window:');
+            const isConfirmDisabled = isLoading || isStarting || !selectedSourceId || !hasAvailableSources ||
+              (!isWindow && (preview.busy || !preview.stream || !!preview.error)) ||
               (currentTab === 'cameras' && (!cameraModes.length || !cameraRates.length));
             return (
               <button

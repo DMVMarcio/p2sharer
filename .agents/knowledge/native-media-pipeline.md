@@ -70,7 +70,7 @@ When capture devices output 5.1, 7.1, or other multi-channel audio:
 - For ultra-low latency native capture, Rust binds a loopback WebSocket server on an ephemeral port.
 - Transmits compressed/raw frame buffers directly to the frontend's `NativeVideoBridge` without blocking Tauri's main IPC channel.
 - Direct GPU capture is the official application pipeline: in-app screen and window selection dispatches directly via `NativeVideoBridge` without triggering Chromium's browser dialog (`getDisplayMedia`).
-- Capture lifecycle signals (window minimized or closed) trigger native in-app toast alerts and clean teardown instead of spawning unexpected browser popups.
+- Window capture authentication can complete before the first image, so a live track can be published without a decoded preview. Preview timeouts retain window sessions. Minimization preserves a working WGC producer or defers a failed startup without consuming restart retries; restoring the window recreates its producer while preserving the transport and track. xcap waits while minimized. Actual source closure signals terminal teardown. Terminal signals are retained per session for bridges that authenticate after closure, and the frontend replays closure to a publication handler attached after capture startup.
 - On tested AMD hardware, wallpaper images appeared above board content in P2Sharer's local preview and transmitted frame while the actual Windows desktop remained correctly composed. Later validation confirmed that the normal WGC mode works after the capture and frame-queue changes, while the optional GDI compatibility mode flickers. Keep WGC as the normal capture path and do not expose the GDI mode.
 
 ---

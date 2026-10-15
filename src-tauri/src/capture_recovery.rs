@@ -23,6 +23,7 @@ impl CaptureRecovery {
         active: bool,
         desktop_available: bool,
         source_exists: bool,
+        source_minimized: bool,
         backend_finished: bool,
         now_ms: u64,
     ) -> RecoveryAction {
@@ -37,6 +38,14 @@ impl CaptureRecovery {
         }
         if !source_exists {
             return RecoveryAction::SourceGone;
+        }
+        if source_minimized {
+            // A live producer may still deliver frames for some minimized apps.
+            // Keep it, but rebuild on restore and never exhaust retries while iconic.
+            self.pending = true;
+            self.failures = 0;
+            self.retry_at_ms = now_ms;
+            return if backend_finished { RecoveryAction::Wait } else { RecoveryAction::Continue };
         }
         if self.failures >= 5 {
             return RecoveryAction::Failed;
@@ -110,35 +119,49 @@ pub fn input_desktop_available() -> bool {
 mod tests {
     use super::*;
     #[test]
+    fn minimized_windows_keep_live_frames_or_wait_without_exhausting_retries() {
+        for finished in [false, true] {
+            let mut recovery = CaptureRecovery::default();
+            for now in [0, 500, 30_000, 300_000] {
+                assert_eq!(recovery.observe(true, true, true, true, finished, now),
+                    if finished { RecoveryAction::Wait } else { RecoveryAction::Continue });
+            }
+            assert_eq!(recovery.observe(true, true, true, false, finished, 300_250), RecoveryAction::Restart);
+            recovery.restarted(true, 300_250);
+            assert_eq!(recovery.observe(true, true, true, false, false, 300_500), RecoveryAction::Continue);
+            assert_eq!(recovery.observe(true, true, false, true, true, 300_750), RecoveryAction::SourceGone);
+        }
+    }
+    #[test]
     fn secure_desktop_preserves_session_and_restarts_on_return() {
         let mut recovery = CaptureRecovery::default();
         for now in [0, 500, 30_000, 300_000] {
             // Source queries can also fail while the secure desktop is active.
             assert_eq!(
-                recovery.observe(true, false, false, true, now),
+                recovery.observe(true, false, false, false, true, now),
                 RecoveryAction::Wait
             );
         }
         assert_eq!(
-            recovery.observe(true, true, true, true, 300_250),
+            recovery.observe(true, true, true, false, true, 300_250),
             RecoveryAction::Restart
         );
         recovery.restarted(true, 300_250);
         assert_eq!(
-            recovery.observe(true, true, true, false, 300_500),
+            recovery.observe(true, true, true, false, false, 300_500),
             RecoveryAction::Continue
         );
     }
     #[test]
     fn cancellation_and_actual_source_loss_are_terminal() {
         let mut recovery = CaptureRecovery::default();
-        recovery.observe(true, false, false, true, 0);
+        recovery.observe(true, false, false, false, true, 0);
         assert_eq!(
-            recovery.observe(false, true, true, true, 500),
+            recovery.observe(false, true, true, false, true, 500),
             RecoveryAction::Stop
         );
         assert_eq!(
-            recovery.observe(true, true, false, true, 500),
+            recovery.observe(true, true, false, false, true, 500),
             RecoveryAction::SourceGone
         );
     }
@@ -148,19 +171,19 @@ mod tests {
         for attempt in 0..5 {
             let now = attempt * 500;
             assert_eq!(
-                recovery.observe(true, true, true, true, now),
+                recovery.observe(true, true, true, false, true, now),
                 RecoveryAction::Restart
             );
             recovery.restarted(false, now);
             if attempt < 4 {
                 assert_eq!(
-                    recovery.observe(true, true, true, true, now + 250),
+                    recovery.observe(true, true, true, false, true, now + 250),
                     RecoveryAction::Wait
                 );
             }
         }
         assert_eq!(
-            recovery.observe(true, true, true, true, 2_500),
+            recovery.observe(true, true, true, false, true, 2_500),
             RecoveryAction::Failed
         );
     }

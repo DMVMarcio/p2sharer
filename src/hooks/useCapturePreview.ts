@@ -147,23 +147,31 @@ export function useCapturePreview(sourceId: string, resolution: { width: number;
     return () => { cancelled = true; };
   }, [stream, sourceId, resolution.width, resolution.height, fps, dispose, recoverCamera]);
 
-  const take = useCallback(async () => {
+  const take = useCallback(async (allowUnavailable = false) => {
     await queue.current;
     const capture = active.current;
     const track = capture?.stream.getVideoTracks()[0];
     if (!capture || !track || track.readyState === 'ended') {
+      if (allowUnavailable) {
+        ++generation.current;
+        await dispose();
+        return undefined;
+      }
       throw new Error(t('capture.previewNoFrames'));
     }
     ++generation.current;
     active.current = null;
     setStream(null);
     return capture;
-  }, []);
+  }, [dispose]);
   const reportPlaybackError = useCallback(() => {
     const capture = active.current;
     const version = generation.current;
     const stale = () => generation.current !== version;
     if (!capture) return;
+    // Missing window frames are recoverable. Keep the producer and track alive;
+    // closing the actual window is signaled independently by the native supervisor.
+    if (capture.bridge && capture.sourceId.startsWith('window:')) return;
     logDiagnostic('ERROR', 'capture.preview', 'Preview player failed or received no decoded frame', {
       sourceId: capture.sourceId, sessionId: capture.bridge?.sessionId, settings: capture.stream.getVideoTracks()[0]?.getSettings(),
     });

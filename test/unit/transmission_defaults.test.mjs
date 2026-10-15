@@ -75,6 +75,17 @@ test('screen picker enumerates cameras passively until the camera tab is selecte
   assert.equal(picker.selectedSourceId, 'camera:fixture-camera');
 });
 
+test('a window can be confirmed while its preview is still pending', async () => {
+  await open();
+  globalThis.transmissionDefaultsFixture.previewBusy = true;
+  await act(async () => picker.setSelectedSourceId('window:minimized'));
+  const count = captures.length;
+  await act(async () => picker.confirmPicker());
+  assert.equal(captures.length, count + 1);
+  assert.equal(captures.at(-1)[0], 'window:minimized');
+  globalThis.transmissionDefaultsFixture.previewBusy = false;
+});
+
 test('first launch remembers settings only after successful confirmation, and they survive reload', async () => {
   localStorage.clear(); stateStore.loadFromStorage();
   assert.equal(new StateStore().rememberTransmissionSettings, true);

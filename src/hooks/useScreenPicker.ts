@@ -158,7 +158,7 @@ export function useScreenPicker(onClose?: () => void, isClosing = false) {
   }, [editingId]);
 
   const confirmPicker = useCallback(async () => {
-    if (isLoading || isStarting || preview.busy) return;
+    if (isLoading || isStarting || (preview.busy && !selectedSourceId.startsWith('window:'))) return;
     setIsStarting(true);
     try {
       const fallbackId = currentTab === 'windows'
@@ -167,7 +167,7 @@ export function useScreenPicker(onClose?: () => void, isClosing = false) {
       const chosen = selectedSourceId || fallbackId;
       const label = monitors.find((source) => source.id === chosen)?.name || windows.find((source) => source.id === chosen)?.title ||
         cameras.find((source) => `camera:${source.deviceId}` === chosen)?.label;
-      const prepared = await preview.take();
+      const prepared = await preview.take(chosen.startsWith('window:'));
       await roomService.startCapture(chosen, fps, { width: resConfig.width, height: resConfig.height }, showCursor, quality, label, prepared, bitrate);
       if (!chosen.startsWith('camera:')) stateStore.set((s) => {
         s.currentResolution = resConfig;
