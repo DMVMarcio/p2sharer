@@ -1256,7 +1256,7 @@
   "browser.controlAvailable": "Control available",
   "browser.mute": "Mute",
   "browser.activity.back": "went back",
-  "browser.activity.close-tab": "closed a tab",
+  "browser.activity.close-tab": "closed the tab “{title}”",
   "browser.activity.forward": "went forward",
   "browser.activity.home": "went to the home page",
   "browser.activity.navigate": "opened a page",

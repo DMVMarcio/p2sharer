@@ -1256,7 +1256,7 @@
   "browser.controlAvailable": "Controle disponível",
   "browser.mute": "Silenciar",
   "browser.activity.back": "voltou uma página",
-  "browser.activity.close-tab": "fechou uma aba",
+  "browser.activity.close-tab": "fechou a aba “{title}”",
   "browser.activity.forward": "avançou uma página",
   "browser.activity.home": "voltou para o início",
   "browser.activity.navigate": "acessou uma página",

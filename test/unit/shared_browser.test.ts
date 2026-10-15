@@ -22,7 +22,11 @@ test('control lease holds gestures, renews typing, grants host preemption and ex
   lease.update('alice', { kind: 'key', event: 'keyDown', key: 'Shift', code: 'ShiftLeft', modifiers: 8, virtual_key: 16 }, 400);
   assert.equal(lease.accepts('bob', 1400), false);
   assert.equal(lease.accepts('bob', 10400), true);
-  lease.clear(); assert.equal(lease.keys.size, 0); assert.equal(lease.owner, '');
+  lease.locked = true;
+  assert.equal(lease.expired(100_000), false);
+  assert.equal(lease.accepts('bob', 100_000), false);
+  assert.equal(lease.accepts('host', 100_000), true);
+  lease.clear(); assert.equal(lease.locked, false); assert.equal(lease.keys.size, 0); assert.equal(lease.owner, '');
 });
 
 test('browser input and snapshots reject unsafe URLs, oversized data and invalid coordinates', () => {
@@ -32,6 +36,8 @@ test('browser input and snapshots reject unsafe URLs, oversized data and invalid
   const credentials = new URL('https://example.com'); credentials.username = 'fixture-user'; credentials.password = 'fixture-password';
   assert.equal(browserUrl(credentials.href), null);
   assert.equal(validBrowserCommand(move()), true);
+  assert.equal(validBrowserCommand({ kind: 'relative-mouse', dx: -30, dy: 10 }), true);
+  for (const dx of [Infinity, NaN, 5001]) assert.equal(validBrowserCommand({ kind: 'relative-mouse', dx, dy: 0 }), false);
   assert.equal(validBrowserCommand({ ...move(), x: Infinity }), false);
   assert.equal(validBrowserCommand({ kind: 'text', text: 'x'.repeat(4097) }), false);
   assert.equal(validBrowserCommand({ kind: 'evaluate', script: 'test' }), false);
@@ -414,4 +420,41 @@ test('script dialog answers require live participation and unblock a paused nati
   await settle();
   assert.equal(calls.filter(c => c.command === 'resolve_browser_dialog').length, 1);
   assert.equal(model.dialog, null); assert.equal(model.controller, ''); model.destroy();
+});
+
+
+test('closing a tab shares its original title after native state removes it', async () => {
+  const host = fixture('host', async () => ({ tabs: [{ id: 2, title: 'Remaining', url: 'https://example.com/' }], active: 2, temporary: false }));
+  const peer = fixture('alice');
+  try {
+    host.model.command({ kind: 'close-tab', id: 1 }); await settle();
+    assert.equal(host.model.activity?.title, 'Example');
+    const packet = host.sent.find(item => (item.payload as { type?: string }).type === 'activity')!.payload;
+    peer.model.apply(packet, 'host', false);
+    assert.equal(peer.model.activity?.title, 'Example');
+  } finally { host.model.destroy(); peer.model.destroy(); }
+});
+
+test('game focus rejects spectator movement, retains its lease on viewport exit and allows host takeover', async () => {
+  const { model, calls } = fixture();
+  const input = (actor: string, sequence: number, command: BrowserCommand) => model.apply({ type: 'command', sequence, tab: 1, command }, actor, false);
+  try {
+    input('alice', 1, move()); await settle();
+    // Native lock telemetry binds focus to the actor whose accepted gesture requested it.
+    const lease = (model as unknown as { lease: BrowserControlLease }).lease;
+    lease.locked = true; model.gameOwner = 'alice';
+    input('alice', 2, { kind: 'cursor-leave' });
+    assert.equal(model.controller, 'alice');
+    const before = calls.length;
+    input('alice', 3, move(300)); await settle();
+    assert.equal(calls.length, before, 'late absolute motion cannot jump the game camera');
+    input('bob', 1, { kind: 'relative-mouse', dx: 20, dy: 0 }); await settle();
+    assert.equal(calls.some(call => (call.args.command as BrowserCommand)?.kind === 'relative-mouse'), false);
+    input('alice', 4, { kind: 'relative-mouse', dx: 10, dy: -2 });
+    input('alice', 5, { kind: 'relative-mouse', dx: 2, dy: -3 }); await settle();
+    assert.deepEqual(calls.at(-1)?.args.command, { kind: 'relative-mouse', dx: 12, dy: -5 });
+    input('host', 1, move(200)); await settle(); await settle();
+    assert.equal(model.gameOwner, ''); assert.equal(model.controller, 'host');
+    assert.ok(calls.some(call => (call.args.command as BrowserCommand)?.kind === 'release'));
+  } finally { model.destroy(); }
 });

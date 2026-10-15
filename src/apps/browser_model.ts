@@ -24,9 +24,11 @@ export class BrowserModel implements RoomAppModel {
   get canStart(): boolean { return this.joined && (!this.host || this.isHost) && !this.running && !this.busy; }
   state: BrowserState = { tabs: [], active: 0, temporary: false };
   controller = '';
+  gameOwner = '';
+  private gameRequest: { actor: string; tab: number; time: number } | null = null;
   pointer: { x: number; y: number; actor: string; shape?: BrowserCursorShape } | null = null;
   private cursorShape: BrowserCursorShape = 'default';
-  activity: { id: number; actor: string; action: string } | null = null;
+  activity: { id: number; actor: string; action: string; title?: string } | null = null;
   extensionRequest: string | null = null;
   private activityId = 0;
   private leftSequences = new Map<string, number>();
@@ -98,11 +100,11 @@ export class BrowserModel implements RoomAppModel {
       || !this.members.has(this.controller) || Date.now() - this.dialogOpenedAt >= 1000);
   }
   snapshot(): unknown {
-    return { type: 'state', ownership: this.ownership.snapshot(), hostTerm: this.ownership.term, state: this.state, revision: this.revision, running: this.running, controller: this.controller, paused: this.paused, dialog: this.dialog, session: this.session, presentation: this.presentation };
+    return { type: 'state', ownership: this.ownership.snapshot(), hostTerm: this.ownership.term, state: this.state, revision: this.revision, running: this.running, controller: this.controller, gameOwner: this.gameOwner, paused: this.paused, dialog: this.dialog, session: this.session, presentation: this.presentation };
   }
   localSnapshot() {
     return { state: this.state, host: this.host, running: this.running, busy: this.busy, paused: this.paused,
-      controller: this.controller, pointer: this.pointer, activity: this.activity, contextMenu: this.contextMenu,
+      controller: this.controller, gameOwner: this.gameOwner, pointer: this.pointer, activity: this.activity, contextMenu: this.contextMenu,
       extensions: this.extensions, extensionRequest: this.extensionRequest, dialog: this.dialog,
       quality: this.media?.quality.settings, hardwareAcceleration: this.hardwareAcceleration, session: this.session, presentation: this.presentation };
   }
@@ -112,6 +114,7 @@ export class BrowserModel implements RoomAppModel {
     if (!validBrowserState(data.state) || typeof data.host !== 'string') return;
     this.state = data.state; this.mirrorHost = data.host; this.running = data.running === true;
     this.busy = data.busy === true; this.paused = data.paused === true; this.controller = data.controller;
+    this.gameOwner = data.running && typeof data.gameOwner === 'string' && data.gameOwner === data.controller ? data.gameOwner : '';
     this.hardwareAcceleration = data.hardwareAcceleration !== false;
     this.pointer = data.pointer;
     if (this.activity?.id !== data.activity?.id) this.activity = data.activity;
@@ -268,7 +271,16 @@ export class BrowserModel implements RoomAppModel {
             this.cursorShape = payload.shape;
             if (this.pointer) { this.pointer = { ...this.pointer, shape: payload.shape }; this.publishPointer(); this.context.changed(); }
           }).catch(error => { removeDialog(); removeLoading(); removeExtension(); removeContext(); throw error; });
-          const remove = () => { removePopup(); removeDialog(); removeLoading(); removeExtension(); removeContext(); removeCursor(); };
+          const removeLock = await listen<{ scope: string; tab: number; locked: boolean }>('shared-browser-pointer-lock', ({ payload }) => {
+            if (!this.isHost || !this.running || payload.scope !== this.scope || payload.tab !== this.state.active) return;
+            const request = this.gameRequest;
+            if (payload.locked) this.gameRequest = null;
+            if (payload.locked && request && request.actor === this.lease.owner && request.tab === payload.tab
+              && Date.now() - request.time < 3000 && this.members.has(request.actor) && (!this.paused || request.actor === this.host)) {
+              this.lease.locked = true; this.gameOwner = request.actor; this.pointer = null; this.changed();
+            } else if (payload.locked || this.gameOwner) void this.queue(() => this.release()).catch(() => {});
+          }).catch(error => { removeDialog(); removeLoading(); removeExtension(); removeContext(); removeCursor(); throw error; });
+          const remove = () => { removeLock(); removePopup(); removeDialog(); removeLoading(); removeExtension(); removeContext(); removeCursor(); };
           if (this.disposed) remove(); else this.unlisten = remove;
         } catch (error) { removePopup(); throw error; }
       })();
@@ -298,7 +310,8 @@ export class BrowserModel implements RoomAppModel {
     } finally { this.busy = false; this.context.changed(); }
   }
   private async release(): Promise<void> {
-    const keys = [...this.lease.keys.values()]; this.lease.clear(); this.controller = '';
+    this.gameRequest = null;
+    const keys = [...this.lease.keys.values()]; this.lease.clear(); this.controller = ''; this.gameOwner = '';
     if (this.running) {
       for (const key of keys) await this.native.call('control_shared_browser', { scope: this.scope, command: { ...key, event: 'keyUp', modifiers: 0 } });
       await this.native.call('control_shared_browser', { scope: this.scope, command: { kind: 'release' } });
@@ -341,7 +354,7 @@ export class BrowserModel implements RoomAppModel {
     if (data.type === 'activity' && !this.isHost && actor === this.host && !fromSnapshot && this.joined && this.running
       && data.session === this.session && data.hostTerm === this.ownership.term && typeof data.actor === 'string' && this.members.has(data.actor)
       && typeof data.action === 'string' && ACTIVITY_ACTIONS.includes(data.action) && Number.isSafeInteger(data.id) && Number(data.id) > this.activityId) {
-      this.activityId = Number(data.id); this.activity = { id: this.activityId, actor: data.actor, action: data.action }; this.context.changed(); return;
+      this.activityId = Number(data.id); this.activity = { id: this.activityId, actor: data.actor, action: data.action, title: typeof data.title === 'string' ? data.title.slice(0, 400) : '' }; this.context.changed(); return;
     }
     if (fromSnapshot && data.ownership && typeof data.ownership === 'object')
       this.ownership.handle({ ...data.ownership, type: 'ownership' }, actor, true);
@@ -374,6 +387,7 @@ export class BrowserModel implements RoomAppModel {
       if (!this.running) { this.media?.stop(); this.pointer = null; }
       else if (!wasRunning && this.joined) void this.media?.start().catch(e => this.fail(e));
       this.controller = data.controller; this.paused = data.paused;
+      this.gameOwner = data.running && typeof data.gameOwner === 'string' && data.gameOwner === data.controller ? data.gameOwner : '';
       const dialog = data.dialog as BrowserPageDialog | null ?? null;
       if (dialog?.id !== this.dialog?.id) this.dialogOpenedAt = Date.now();
       this.dialog = dialog; this.context.changed(); return;
@@ -426,6 +440,7 @@ export class BrowserModel implements RoomAppModel {
     if (this.paused && actor !== this.host) return;
     const command = data.command;
     if (command.kind === 'cursor-leave') {
+      if (this.gameOwner === actor) return;
       this.leftSequences.set(actor, Number(data.sequence)); this.visualSequences.set(actor, Number(data.sequence)); this.pendingMoves.delete(actor);
       if (actor === this.host) this.hostPriorityUntil = 0;
       if (this.controller === actor) {
@@ -439,7 +454,16 @@ export class BrowserModel implements RoomAppModel {
     const memberEpoch = this.memberEpochs.get(actor) ?? 0;
     if (actor === this.host && command.kind !== 'release') this.hostPriorityUntil = Date.now() + 1000;
     let move: { packet: Record<string, unknown> } | undefined;
-    if (command.kind === 'mouse' && command.event === 'mouseMoved') {
+    if (command.kind === 'relative-mouse') {
+      const previous = this.pendingMoves.get(actor);
+      if (previous?.packet.command && (previous.packet.command as BrowserCommand).kind === 'relative-mouse') {
+        const old = previous.packet.command as Extract<BrowserCommand, { kind: 'relative-mouse' }>;
+        previous.packet = { ...data, command: { kind: 'relative-mouse', dx: Math.max(-5000, Math.min(5000, old.dx + command.dx)), dy: Math.max(-5000, Math.min(5000, old.dy + command.dy)) } }; return;
+      }
+      if (this.pending >= 95) return;
+      move = { packet: data }; this.pendingMoves.set(actor, move);
+    } else if (command.kind === 'mouse' && command.event === 'mouseMoved') {
+      if (this.gameOwner === actor) return;
       if (data.tab === this.state.active && this.controller === actor && this.lease.accepts(actor, Date.now())
         && (actor === this.host || Date.now() >= this.hostPriorityUntil)) {
         if (this.lease.owner === actor) this.lease.touched = Date.now();
@@ -464,22 +488,27 @@ export class BrowserModel implements RoomAppModel {
       if (packet.tab !== this.state.active) return;
       if (actor !== this.host && Date.now() < this.hostPriorityUntil) return;
       if (!this.lease.accepts(actor, Date.now())) return;
+      if (command.kind === 'relative-mouse' && this.gameOwner !== actor) return;
+      if (this.gameOwner === actor && command.kind === 'mouse' && command.event === 'mouseMoved') return;
       if (this.lease.owner && this.lease.owner !== actor) await this.release();
       if (['navigate', 'select-tab', 'close-tab', 'move-tab', 'new-tab', 'back', 'forward', 'reload'].includes(command.kind)
-        && (this.lease.buttons || this.lease.keys.size)) await this.release();
+        && (this.lease.buttons || this.lease.keys.size || this.lease.locked)) await this.release();
       const oldOwner = this.lease.owner;
       this.lease.update(actor, command, Date.now()); this.controller = actor;
+      if (command.kind === 'mouse' && command.event === 'mousePressed' || command.kind === 'key' && command.event === 'keyDown' && command.key !== 'Escape')
+        this.gameRequest = { actor, tab: this.state.active, time: Date.now() };
       if (command.kind === 'mouse') {
         if (command.event === 'mousePressed' && command.button === 'right') this.contextActor = { actor, tab: this.state.active, time: Date.now() };
         this.updatePointer(actor, command, Number(packet.sequence));
       }
       if (oldOwner !== actor) this.changed();
+      const title = command.kind === 'close-tab' ? this.state.tabs.find(tab => tab.id === command.id)?.title || '' : undefined;
       const state = await this.native.call<BrowserState | null>('control_shared_browser', { scope: this.scope, command });
       if (epoch === this.epoch) {
         this.acceptNativeState(state);
         if (ACTIVITY_ACTIONS.includes(command.kind)) {
           const action = command.kind === 'navigate' && command.url === 'https://www.google.com/' ? 'home' : command.kind;
-          this.activity = { id: ++this.activityId, actor, action };
+          this.activity = { id: ++this.activityId, actor, action, ...(title !== undefined ? { title } : {}) };
           for (const peer of this.members) if (peer !== this.host) void this.context.send?.({ type: 'activity', ...this.activity,
             session: this.session, hostTerm: this.ownership.term }, peer).catch(() => {});
           this.context.changed();
@@ -555,7 +584,7 @@ export class BrowserModel implements RoomAppModel {
     if (!this.joined) { this.stop(); return; }
     this.ensureMedia();
     if (!this.isHost) {
-      if (!this.hostOnline) { this.media?.stop(); this.controller = ''; this.running = false; this.dialog = null; this.pointer = null; this.context.changed(); }
+      if (!this.hostOnline) { this.media?.stop(); this.controller = ''; this.gameOwner = ''; this.running = false; this.dialog = null; this.pointer = null; this.context.changed(); }
       else if (!previous.has(this.context.localActor) || !previous.has(this.host)) {
         void this.media?.start().then(() => this.context.send?.({ type: 'media-request' }, this.host)).catch(e => this.fail(e));
       }
@@ -571,8 +600,9 @@ export class BrowserModel implements RoomAppModel {
     this.leftSequences.clear(); this.activity = null; this.extensionRequest = null;
     this.contextActor = null; this.contextMenu = null;
     this.cursorShape = 'default';
+    this.gameRequest = null;
     this.presentation = 0;
-    this.lease.clear(); this.controller = ''; this.running = false;
+    this.lease.clear(); this.controller = ''; this.gameOwner = ''; this.running = false;
     this.dialog = null;
     if (native && !this.localView && this.isHost && this.desktop) void this.native.call('stop_shared_browser', { scope: this.scope }).catch(() => {});
   }

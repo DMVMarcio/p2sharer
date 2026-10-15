@@ -72,6 +72,7 @@ struct Session {
     hardware_acceleration: bool,
     capture_id: Option<String>,
     cursor_shape: String,
+    pointer_context: Option<i64>,
     extension_ids: HashSet<String>,
 }
 #[derive(Default, Clone, PartialEq, Serialize, Deserialize)]
@@ -321,6 +322,7 @@ pub async fn start_shared_browser(
                 hardware_acceleration: hardware_acceleration.unwrap_or(true),
                 capture_id: None,
                 cursor_shape: "default".into(),
+                pointer_context: None,
                 extension_ids: HashSet::new(),
             },
         );
@@ -766,6 +768,7 @@ pub enum BrowserCommand {
         text: String,
     },
     Release,
+    RelativeMouse { dx: f64, dy: f64 },
 }
 fn move_tab(tabs: &mut Vec<Tab>, id: u32, before: Option<u32>) -> Result<(), String> {
     let index = tabs.iter().position(|tab| tab.id == id).ok_or("Unknown browser tab")?;
@@ -865,6 +868,7 @@ pub async fn control_shared_browser(
             | BrowserCommand::Key { .. }
             | BrowserCommand::Text { .. }
             | BrowserCommand::Release
+            | BrowserCommand::RelativeMouse { .. }
     );
     match command {
         BrowserCommand::Navigate { url } => {
@@ -964,6 +968,11 @@ pub async fn control_shared_browser(
             }
         }
         BrowserCommand::Release => {
+            let context = state.0.lock().unwrap().get_mut(&scope).and_then(|session| session.pointer_context.take());
+            #[cfg(windows)]
+            if let Some(context) = context {
+                let _ = cdp(&view, "Runtime.evaluate", json!({"expression":"document.exitPointerLock()","contextId":context,"timeout":50})).await;
+            }
             let (pointer, buttons) = {
                 let mut sessions = state.0.lock().unwrap();
                 let session = sessions.get_mut(&scope).ok_or("Browser closed")?;
@@ -973,6 +982,14 @@ pub async fn control_shared_browser(
             #[cfg(windows)]
             for (button, remaining) in release_buttons(buttons) {
                 cdp(&view, "Input.dispatchMouseEvent", json!({"type":"mouseReleased","x":pointer.0,"y":pointer.1,"button":button,"buttons":remaining})).await?;
+            }
+        }
+        BrowserCommand::RelativeMouse { dx, dy } => {
+            if !dx.is_finite() || !dy.is_finite() || dx.abs() > 5000.0 || dy.abs() > 5000.0 { return Err("Invalid browser input".into()); }
+            let context = state.0.lock().unwrap().get(&scope).and_then(|session| session.pointer_context);
+            #[cfg(windows)]
+            if let Some(context) = context {
+                cdp(&view, "Runtime.evaluate", json!({"expression":format!("globalThis.__p2sharerRelativeMouse?.({dx},{dy})"),"contextId":context,"timeout":50})).await?;
             }
         }
         input => {

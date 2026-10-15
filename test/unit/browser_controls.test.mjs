@@ -14,7 +14,7 @@ async function fixture() {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   dom.window.matchMedia = () => ({ matches: false });
   const require = createRequire(import.meta.url);
-  const bundle = await build({ stdin: { contents: "export { useBrowserChrome } from './src/hooks/useBrowserChrome'; export { useMediaVolume } from './src/hooks/useMediaVolume'; export { MediaVolumeControl } from './src/components/common/MediaVolumeControl'; export { useSelectAllOnFocus } from './src/hooks/useSelectAllOnFocus'; export { BrowserTabs } from './src/apps/BrowserTabs'; export { BrowserContextMenu } from './src/apps/BrowserContextMenu'; export { ContextMenuProvider } from './src/components/common/ContextMenu'; export { t } from './src/i18n'; export { useVideoPresentation } from './src/hooks/useVideoPresentation';", resolveDir: process.cwd() },
+  const bundle = await build({ stdin: { contents: "export { useBrowserPointerLock } from './src/hooks/useBrowserPointerLock'; export { useBrowserChrome } from './src/hooks/useBrowserChrome'; export { useMediaVolume } from './src/hooks/useMediaVolume'; export { MediaVolumeControl } from './src/components/common/MediaVolumeControl'; export { useSelectAllOnFocus } from './src/hooks/useSelectAllOnFocus'; export { BrowserTabs } from './src/apps/BrowserTabs'; export { BrowserContextMenu } from './src/apps/BrowserContextMenu'; export { ContextMenuProvider } from './src/components/common/ContextMenu'; export { t } from './src/i18n'; export { useVideoPresentation } from './src/hooks/useVideoPresentation';", resolveDir: process.cwd() },
     bundle: true, write: false, format: 'esm', platform: 'node', loader: { '.css': 'empty' },
     plugins: [{ name: 'browser-controls-fixture', setup(builder) {
       builder.onResolve({ filter: /^[^./]/ }, args => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
@@ -90,6 +90,10 @@ test('tab dragging emits relative moves and closed tabs retire inertly without l
     const row = document.querySelector('[role=group]'); row.getBoundingClientRect = () => ({ left: 0, right: 360 });
     [...row.querySelectorAll('[data-browser-tab]')].forEach((element, index) => { element.getBoundingClientRect = () => ({ left: index * 120, top: 0, width: 120, height: 28 }); });
     const first = row.querySelector('[data-browser-tab="1"] button');
+    await act(async () => first.dispatchEvent(new f.dom.window.MouseEvent('auxclick', { bubbles: true, button: 1, cancelable: true })));
+    assert.deepEqual(commands.pop(), { kind: 'close-tab', id: 1 });
+    await act(async () => first.dispatchEvent(new f.dom.window.MouseEvent('auxclick', { bubbles: true, button: 2, cancelable: true })));
+    assert.equal(commands.length, 0);
     await pointer(first, 'pointerdown', 40); await pointer(first, 'pointermove', 400);
     const preview = document.querySelector('.browser-tab-preview'); const placeholder = row.querySelector('.browser-tab-placeholder');
     assert.equal(preview.textContent, 'Tab 1'); assert.equal(preview.getAttribute('aria-hidden'), 'true');
@@ -186,5 +190,34 @@ test('tab presentation waits for the selected capture and visible video frames r
     await render(2, true); await present(); assert.equal(waiting(), 'true');
     await present(); assert.equal(waiting(), 'false');
     await render(3, true); assert.ok(cancelled > 0);
+  } finally { await f.cleanup(); }
+});
+
+
+test('local game capture forwards relative movement and releases on Escape, blur and ownership loss', async () => {
+  const f = await fixture(); const commands = [];
+  const surface = { current: null };
+  Object.defineProperty(document, 'pointerLockElement', { configurable: true, writable: true, value: null });
+  const change = () => document.dispatchEvent(new f.dom.window.Event('pointerlockchange'));
+  f.dom.window.HTMLElement.prototype.requestPointerLock = function () { document.pointerLockElement = this; change(); return Promise.resolve(); };
+  document.exitPointerLock = () => { document.pointerLockElement = null; change(); };
+  const Harness = ({ enabled }) => { f.useBrowserPointerLock(surface, enabled, command => commands.push(command)); return React.createElement('div', { ref: surface }); };
+  const render = enabled => act(async () => f.root.render(React.createElement(Harness, { enabled })));
+  try {
+    await render(true); assert.equal(document.pointerLockElement, surface.current);
+    await act(async () => {
+      const move = new f.dom.window.MouseEvent('mousemove', { bubbles: true });
+      Object.defineProperties(move, { movementX: { value: 40 }, movementY: { value: -12 } });
+      surface.current.dispatchEvent(move);
+      await new Promise(resolve => window.requestAnimationFrame(resolve));
+    });
+    assert.deepEqual(commands.pop(), { kind: 'relative-mouse', dx: 40, dy: -12 });
+    await act(async () => window.dispatchEvent(new f.dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })));
+    assert.equal(document.pointerLockElement, null); assert.equal(commands.at(-1).kind, 'release');
+    await render(false); await render(true);
+    await act(async () => window.dispatchEvent(new f.dom.window.Event('blur')));
+    assert.equal(document.pointerLockElement, null); assert.equal(commands.at(-1).kind, 'release');
+    await render(false); await render(true); await render(false);
+    assert.equal(document.pointerLockElement, null); assert.equal(commands.at(-1).kind, 'release');
   } finally { await f.cleanup(); }
 });

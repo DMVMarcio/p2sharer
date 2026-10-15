@@ -32,6 +32,7 @@ export type BrowserCommand =
   | { kind: 'reload'; ignore_cache?: boolean }
   | { kind: 'zoom'; direction: -1 | 0 | 1 }
   | { kind: 'back' | 'forward' | 'release' | 'cursor-leave' }
+  | { kind: 'relative-mouse'; dx: number; dy: number }
   | { kind: 'mouse'; event: 'mouseMoved' | 'mousePressed' | 'mouseReleased' | 'mouseWheel'; x: number; y: number;
       button: 'none' | 'left' | 'middle' | 'right'; buttons: number; delta_x: number; delta_y: number; modifiers: number; clicks: number }
   | { kind: 'key'; event: 'keyDown' | 'keyUp'; key: string; code: string; modifiers: number; virtual_key: number }
@@ -63,6 +64,7 @@ export function validBrowserCommand(value: unknown): value is BrowserCommand {
     case 'zoom': return [-1, 0, 1].includes(Number(v.direction)) && typeof v.direction === 'number';
     case 'back': case 'forward': case 'release': case 'cursor-leave': return true;
     case 'text': return typeof v.text === 'string' && v.text.length > 0 && v.text.length <= 4096;
+    case 'relative-mouse': return bounded(v.dx, 5000) && bounded(v.dy, 5000);
     case 'key': return ['keyDown', 'keyUp'].includes(String(v.event)) && typeof v.key === 'string' && v.key.length <= 80
       && typeof v.code === 'string' && v.code.length <= 80 && integer(v.modifiers, 15) && integer(v.virtual_key, 255);
     case 'mouse': return ['mouseMoved', 'mousePressed', 'mouseReleased', 'mouseWheel'].includes(String(v.event))
@@ -100,10 +102,11 @@ export class BrowserControlLease {
   owner = '';
   touched = 0;
   buttons = 0;
+  locked = false;
   keys = new Map<string, Extract<BrowserCommand, { kind: 'key' }>>();
   readonly host: string;
   constructor(host: string) { this.host = host; }
-  expired(now: number): boolean { return now - this.touched >= (this.buttons || this.keys.size ? 10_000 : 1000); }
+  expired(now: number): boolean { return !this.locked && now - this.touched >= (this.buttons || this.keys.size ? 10_000 : 1000); }
   accepts(actor: string, now: number): boolean { return !this.owner || actor === this.owner || actor === this.host || this.expired(now); }
   update(actor: string, command: BrowserCommand, now: number): void {
     this.owner = actor; this.touched = now;
@@ -113,6 +116,6 @@ export class BrowserControlLease {
       else this.keys.delete(command.code);
     }
   }
-  clear(): void { this.owner = ''; this.buttons = 0; this.keys.clear(); }
+  clear(): void { this.owner = ''; this.buttons = 0; this.locked = false; this.keys.clear(); }
 }
 export const BROWSER_HOME = 'https://www.google.com/';

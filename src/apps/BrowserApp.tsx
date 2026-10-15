@@ -26,6 +26,7 @@ import type { BrowserContentMode, BrowserVideoQuality } from './browser_quality'
 import { useVideoPresentation } from '../hooks/useVideoPresentation';
 import { MediaLoadingOverlay } from '../components/common/MediaLoadingOverlay';
 import { VirtualCursorGlyph } from '../components/common/VirtualCursorGlyph';
+import { useBrowserPointerLock } from '../hooks/useBrowserPointerLock';
 
 function BrowserSettings({ model, onClose }: { model: BrowserModel; onClose: () => void }) {
   const [mode, setMode] = useState('cache');
@@ -173,6 +174,8 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
   const active = model?.state.tabs.find(tab => tab.id === model.state.active);
   const presenting = useVideoPresentation(video, active?.id, model?.stream ?? null, Boolean(model?.running && model.hostOnline && !minimized), model?.presentation === active?.id);
   const localActor = roomAppsService.getLocalActor();
+  useBrowserPointerLock(surface, Boolean(model?.gameOwner === localActor && model?.canControl && !minimized && !settings && !model?.dialog),
+    command => model?.command(command));
   const cursor = useBrowserCursor(model?.pointer && model.controller === model.pointer.actor ? model.pointer : null,
     Boolean(!minimized && model?.canControl && (model.isHost || !model.controller || model.controller === localActor)), localActor, model?.state.active ?? 0);
   useEffect(() => { setUrl(active?.url === 'about:blank' ? '' : active?.url ?? ''); }, [active?.url, active?.id]);
@@ -216,17 +219,20 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
   const position = (e: { clientX: number; clientY: number }, clamp = false) =>
     browserPointerPosition(e.clientX, e.clientY, surface.current!.getBoundingClientRect(), clamp);
   const leavePointer = () => {
+    if (document.pointerLockElement === surface.current) return;
     cursor.leave();
     if (pointerInside.current) { pointerInside.current = false; send({ kind: 'cursor-leave' }); }
   };
   const pointer = (e: PointerEvent<HTMLDivElement>, event: 'mouseMoved' | 'mousePressed' | 'mouseReleased') => {
     if (minimized || !model.canControl || e.pointerType !== 'mouse' && e.pointerType !== 'pen') return;
-    const point = position(e); if (!point) {
+    const locked = document.pointerLockElement === surface.current;
+    if (locked && event === 'mouseMoved') return;
+    const point = locked ? { x: BROWSER_WIDTH / 2, y: BROWSER_HEIGHT / 2 } : position(e); if (!point) {
       if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
       leavePointer(); return;
     }
     pointerInside.current = true;
-    cursor.preview(point);
+    if (!locked) cursor.preview(point);
     if (event === 'mouseMoved' && performance.now() - lastMove.current < 16) return;
     lastMove.current = performance.now();
     e.preventDefault();
@@ -234,7 +240,8 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
       const last = lastClick.current;
       const count = performance.now() - last.time < 500 && Math.hypot(point.x - last.x, point.y - last.y) < 6 && last.button === e.button ? last.count % 3 + 1 : 1;
       lastClick.current = { time: performance.now(), ...point, button: e.button, count };
-      e.currentTarget.setPointerCapture(e.pointerId); keyboard.current?.focus({ preventScroll: true });
+      if (!locked) e.currentTarget.setPointerCapture(e.pointerId);
+      keyboard.current?.focus({ preventScroll: true });
     }
     const button = event === 'mouseMoved' ? 'none' : ['left', 'middle', 'right'][e.button] as 'left' | 'middle' | 'right';
     send({ kind: 'mouse', event, ...point, button: button ?? 'none', buttons: e.buttons & 7,
@@ -291,7 +298,7 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
       event.preventDefault(); event.stopPropagation(); send(history);
     }} onPointerUpCapture={event => { if (browserHistoryButton(event.button)) { event.preventDefault(); event.stopPropagation(); } }}
     onAuxClickCapture={event => { if (browserHistoryButton(event.button)) { event.preventDefault(); event.stopPropagation(); } }}
-    onPointerMove={() => { if (fullscreen) controls.reveal(); }} onClick={e => e.stopPropagation()}>
+    onPointerMove={() => { if (fullscreen && !model.gameOwner) controls.reveal(); }} onClick={e => e.stopPropagation()}>
     {!minimized && controls.collapsed && <TooltipButton className="btn btn-secondary btn-sm browser-chrome-expand"
       tooltip={t('browser.showToolbar')} aria-expanded={false} aria-controls={`browser-chrome-${instanceId}`}
       onClick={() => { controls.expand(); requestAnimationFrame(() => address.current?.focus()); }}><ChevronDown size={15} /></TooltipButton>}
@@ -338,7 +345,7 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
       <video ref={attachVideo} autoPlay playsInline muted aria-label={t('browser.title')} />
       <MediaLoadingOverlay visible={presenting} label={t('browser.loading')} />
       {active?.loading && !fullscreen && <div className="browser-loading" role="progressbar" aria-label={t('browser.loading')}><span /></div>}
-      {cursor.pointer && <div className="browser-cursor-layer"><div className={`browser-cursor${cursor.predicted ? ' predicted' : ''}`}
+      {cursor.pointer && !model.gameOwner && <div className="browser-cursor-layer"><div className={`browser-cursor${cursor.predicted ? ' predicted' : ''}`}
         style={{ left: `${cursor.pointer.x / BROWSER_WIDTH * 100}%`, top: `${cursor.pointer.y / BROWSER_HEIGHT * 100}%` }}>
         <VirtualCursorGlyph shape={cursor.pointer.shape} /><span>{participantName(cursor.pointer.actor)}</span>
       </div></div>}
@@ -368,7 +375,7 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
     {active?.loading && fullscreen && <div className="browser-loading fullscreen-loading" role="progressbar" aria-label={t('browser.loading')}><span /></div>}
     {!minimized && <BrowserContextMenu model={model} surface={surface} />}
     {activity && !minimized && <ActivityToast key={activity.id} className="browser-activity-toast"
-      person={{ id: activity.actor, name: participantName(activity.actor), color: 'var(--accent-color)' }} message={t(`browser.activity.${activity.action}`)} />}
+      person={{ id: activity.actor, name: participantName(activity.actor), color: 'var(--accent-color)' }} message={t(`browser.activity.${activity.action}`, { title: activity.title || t('browser.newTab') })} />}
     {settings && <BrowserSettings model={model} onClose={() => setSettings(false)} />}
     {!minimized && model.dialog && <BrowserPageDialog model={model} key={model.dialog.id} />}
     {!minimized && model.isHost && model.extensionRequest && <BrowserExtensionInstall model={model} initial={model.extensionRequest} onClose={() => model.dismissExtensionRequest()} />}

@@ -58,6 +58,8 @@ export function BrowserTabs({ tabs, active, canControl, running, command }: {
       className={`browser-tab-slot${entering ? ' entering' : ''}${exiting ? ' exiting' : ''}${drop?.id === tab.id ? ' dragging' : ''}`}>
       <div className={`browser-tab${tab.id === active ? ' selected' : ''}`}>
         <button aria-pressed={tab.id === active} className="btn btn-secondary btn-sm browser-tab-label" disabled={!canControl || exiting}
+          onAuxClick={event => { if (event.button === 1) { event.preventDefault(); event.stopPropagation(); if (canControl && !exiting) command({ kind: 'close-tab', id: tab.id }); } }}
+          onMouseDown={event => { if (event.button === 1) event.preventDefault(); }}
           onPointerDown={event => { if (event.button !== 0 || !canControl) return; suppressClick.current = false;
             const slot = event.currentTarget.closest<HTMLElement>('[data-browser-tab]')!; const bounds = slot.getBoundingClientRect();
             const rowBounds = row.current!.getBoundingClientRect();
