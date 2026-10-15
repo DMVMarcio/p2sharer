@@ -83,11 +83,13 @@ test('mounted notices, unread plurals and number formats change without translat
   await act(async () => root.render(React.createElement(React.Fragment, null,
     React.createElement(api.SystemNoticeText, { message }), React.createElement(api.UnreadChatBadge, { count: 1 }))));
   assert.match(document.body.textContent, /Sala iniciou Bloco de notas/);
+  assert.equal(api.t('browser.activity.close-tab', { title: 'Página de exemplo' }), 'fechou a aba “Página de exemplo”');
   const badge = document.querySelector('[role="status"]');
   assert.equal(badge.getAttribute('aria-label'), '1 mensagem não lida');
   assert.equal(api.formatFileSize(1536), '1,5 KB');
   await act(async () => api.setLanguage('en'));
   assert.match(document.body.textContent, /Sala started Notepad/);
+  assert.equal(api.t('browser.activity.close-tab', { title: 'Página de exemplo' }), 'closed the tab “Página de exemplo”');
   assert.equal(document.querySelector('strong').textContent, 'Sala');
   assert.equal(document.querySelector('[role="status"]'), badge);
   assert.equal(badge.getAttribute('aria-label'), '1 unread message');
