@@ -45,8 +45,8 @@
 .browser-surface video { width: 100%; height: 100%; object-fit: contain; display: block; pointer-events: none; }
 .browser-cursor-layer { position: absolute; width: min(100%, calc(100cqh * 16 / 9)); height: min(100%, calc(100cqw * 9 / 16)); aspect-ratio: 16 / 9; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; }
 .browser-surface { container-type: size; }
-.browser-surface.virtual-cursor, .browser-surface.virtual-cursor * { cursor: none; }
-.browser-cursor { position: absolute; display: flex; align-items: flex-start; gap: 3px; color: var(--text-primary); }
+.browser-cursor-layer.virtual-cursor { cursor: none; pointer-events: auto; }
+.browser-cursor { position: absolute; display: flex; align-items: flex-start; gap: 3px; color: var(--text-primary); pointer-events: none; }
 .browser-cursor:not(.predicted) { transition: left 16ms linear, top 16ms linear; }
 @media (prefers-reduced-motion: reduce) { .browser-cursor:not(.predicted) { transition: none; } }
 .browser-cursor span { margin-top: 15px; padding: 2px 5px; border-radius: var(--radius-sm); background: var(--bg-card); font-size: 10px; white-space: nowrap; }

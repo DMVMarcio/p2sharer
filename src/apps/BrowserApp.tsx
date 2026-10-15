@@ -331,7 +331,7 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
       </form>
       </div>
     </div>}
-    <div className={`browser-surface${!minimized && model.running && model.hostOnline && cursor.pointer ? ' virtual-cursor' : ''}`} ref={surface} onPointerMove={e => pointer(e, 'mouseMoved')}
+    <div className="browser-surface" ref={surface} onPointerMove={e => pointer(e, 'mouseMoved')}
       onPointerLeave={leavePointer}
       onPointerDown={e => pointer(e, 'mousePressed')} onPointerUp={e => pointer(e, 'mouseReleased')}
       onPointerCancel={() => send({ kind: 'release' })} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); }}
@@ -345,7 +345,7 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
       <video ref={attachVideo} autoPlay playsInline muted aria-label={t('browser.title')} />
       <MediaLoadingOverlay visible={presenting} label={t('browser.loading')} />
       {active?.loading && !fullscreen && <div className="browser-loading" role="progressbar" aria-label={t('browser.loading')}><span /></div>}
-      {cursor.pointer && !model.gameOwner && <div className="browser-cursor-layer"><div className={`browser-cursor${cursor.predicted ? ' predicted' : ''}`}
+      {cursor.pointer && !model.gameOwner && <div className={`browser-cursor-layer${!minimized && model.running && model.hostOnline ? ' virtual-cursor' : ''}`}><div className={`browser-cursor${cursor.predicted ? ' predicted' : ''}`}
         style={{ left: `${cursor.pointer.x / BROWSER_WIDTH * 100}%`, top: `${cursor.pointer.y / BROWSER_HEIGHT * 100}%` }}>
         <VirtualCursorGlyph shape={cursor.pointer.shape} /><span>{participantName(cursor.pointer.actor)}</span>
       </div></div>}

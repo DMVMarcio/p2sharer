@@ -120,6 +120,28 @@ test('tab dragging emits relative moves and closed tabs retire inertly without l
   } finally { await f.cleanup(); context.mock.timers.reset(); }
 });
 
+test('tab wheel scrolling maps vertical and horizontal input locally and preserves zoom gestures', async () => {
+  const f = await fixture(); const commands = [];
+  const tabs = [1, 2, 3].map(id => ({ id, url: `https://example.com/${id}`, title: `Tab ${id}` }));
+  try {
+    await act(async () => f.root.render(React.createElement(f.BrowserTabs, { tabs, active: 1, running: true, canControl: false, command: command => commands.push(command) })));
+    const row = document.querySelector('[role=group]');
+    Object.defineProperties(row, { scrollWidth: { configurable: true, value: 700 }, clientWidth: { value: 200 } });
+    const wheel = async options => {
+      const event = new f.dom.window.WheelEvent('wheel', { bubbles: true, cancelable: true, ...options });
+      await act(async () => row.querySelector('button').dispatchEvent(event)); return event;
+    };
+    assert.equal((await wheel({ deltaY: 60 })).defaultPrevented, true); assert.equal(row.scrollLeft, 60);
+    await wheel({ deltaY: -2, deltaMode: 1 }); assert.equal(row.scrollLeft, 28);
+    await wheel({ deltaX: 40, deltaY: 5 }); assert.equal(row.scrollLeft, 68);
+    await wheel({ deltaY: 1, deltaMode: 2 }); assert.equal(row.scrollLeft, 268);
+    assert.equal((await wheel({ deltaY: 20, ctrlKey: true })).defaultPrevented, false); assert.equal(row.scrollLeft, 268);
+    Object.defineProperty(row, 'scrollWidth', { value: 200 });
+    assert.equal((await wheel({ deltaY: 20 })).defaultPrevented, false); assert.equal(row.scrollLeft, 268);
+    assert.deepEqual(commands, [], 'scrolling the local tab strip never controls the shared page');
+  } finally { await f.cleanup(); }
+});
+
 test('the grouped volume control restores the last level and adjusting its slider unmutes', async () => {
   const f = await fixture(); let current;
   const Harness = () => {

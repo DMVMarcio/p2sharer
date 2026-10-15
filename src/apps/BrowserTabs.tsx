@@ -17,6 +17,19 @@ export function BrowserTabs({ tabs, active, canControl, running, command }: {
 }) {
   const entries = useListPresence(tabs);
   const row = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const element = row.current;
+    if (!element) return;
+    const wheel = (event: WheelEvent) => {
+      if (event.ctrlKey || element.scrollWidth <= element.clientWidth) return;
+      const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+      if (!delta) return;
+      event.preventDefault(); event.stopPropagation();
+      element.scrollLeft += delta * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? element.clientWidth : 1);
+    };
+    element.addEventListener('wheel', wheel, { passive: false });
+    return () => element.removeEventListener('wheel', wheel);
+  }, []);
   const drag = useRef<{ id: number; x: number; active: boolean; before: number | null; width: number; height: number;
     offsetX: number; offsetY: number; targets: { id: number; center: number }[] } | null>(null);
   const suppressClick = useRef(false);
