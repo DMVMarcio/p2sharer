@@ -1364,5 +1364,10 @@
   "whiteboard.documentChanged": "Avoin valkotaulu vaihtui. Sulje tämä ikkuna ja tallenna nykyinen valkotaulu uudelleen.",
   "whiteboard.exported": "Valkotaulu viety.",
   "whiteboard.tools": "Valkotaulun työkalut",
-  "whiteboard.smoothing": "Vakautus"
+  "whiteboard.smoothing": "Vakautus",
+  "whiteboard.eraser": "Pyyhekumi",
+  "whiteboard.layerName": "Taso {{index}}",
+  "whiteboard.addLayer": "Lisää taso",
+  "whiteboard.renameLayer": "Nimeä taso uudelleen",
+  "whiteboard.reorderLayer": "Järjestä taso vetämällä"
 }

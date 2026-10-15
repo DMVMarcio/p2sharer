@@ -1364,5 +1364,10 @@
   "whiteboard.documentChanged": "The open whiteboard changed. Close this dialog and save the current whiteboard again.",
   "whiteboard.exported": "Whiteboard exported.",
   "whiteboard.tools": "Whiteboard tools",
-  "whiteboard.smoothing": "Stabilization"
+  "whiteboard.smoothing": "Stabilization",
+  "whiteboard.eraser": "Eraser",
+  "whiteboard.layerName": "Layer {{index}}",
+  "whiteboard.addLayer": "Add layer",
+  "whiteboard.renameLayer": "Rename layer",
+  "whiteboard.reorderLayer": "Drag to reorder layer"
 }

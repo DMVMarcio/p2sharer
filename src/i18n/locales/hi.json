@@ -1364,5 +1364,10 @@
   "whiteboard.documentChanged": "खुला व्हाइटबोर्ड बदल गया है। यह संवाद बंद करके वर्तमान व्हाइटबोर्ड फिर सहेजें।",
   "whiteboard.exported": "व्हाइटबोर्ड निर्यात किया गया।",
   "whiteboard.tools": "व्हाइटबोर्ड उपकरण",
-  "whiteboard.smoothing": "स्थिरीकरण"
+  "whiteboard.smoothing": "स्थिरीकरण",
+  "whiteboard.eraser": "रबड़",
+  "whiteboard.layerName": "परत {{index}}",
+  "whiteboard.addLayer": "परत जोड़ें",
+  "whiteboard.renameLayer": "परत का नाम बदलें",
+  "whiteboard.reorderLayer": "परत का क्रम बदलने के लिए खींचें"
 }

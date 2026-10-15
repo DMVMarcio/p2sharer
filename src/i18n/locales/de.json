@@ -1364,5 +1364,10 @@
   "whiteboard.documentChanged": "Das geöffnete Whiteboard wurde gewechselt. Schließen Sie diesen Dialog und speichern Sie das aktuelle erneut.",
   "whiteboard.exported": "Whiteboard exportiert.",
   "whiteboard.tools": "Whiteboard-Werkzeuge",
-  "whiteboard.smoothing": "Stabilisierung"
+  "whiteboard.smoothing": "Stabilisierung",
+  "whiteboard.eraser": "Radierer",
+  "whiteboard.layerName": "Ebene {{index}}",
+  "whiteboard.addLayer": "Ebene hinzufügen",
+  "whiteboard.renameLayer": "Ebene umbenennen",
+  "whiteboard.reorderLayer": "Ziehen, um die Ebene anzuordnen"
 }

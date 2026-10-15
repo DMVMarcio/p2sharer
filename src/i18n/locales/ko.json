@@ -1364,5 +1364,10 @@
   "whiteboard.documentChanged": "열린 화이트보드가 바뀌었습니다. 이 대화상자를 닫고 현재 화이트보드를 다시 저장하세요.",
   "whiteboard.exported": "화이트보드를 내보냈습니다.",
   "whiteboard.tools": "화이트보드 도구",
-  "whiteboard.smoothing": "손떨림 보정"
+  "whiteboard.smoothing": "손떨림 보정",
+  "whiteboard.eraser": "지우개",
+  "whiteboard.layerName": "레이어 {{index}}",
+  "whiteboard.addLayer": "레이어 추가",
+  "whiteboard.renameLayer": "레이어 이름 바꾸기",
+  "whiteboard.reorderLayer": "드래그하여 레이어 순서 변경"
 }

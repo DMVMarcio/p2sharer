@@ -31,3 +31,14 @@
 .stream-pointer-brush { display: block; box-sizing: border-box; border: 1.5px solid currentColor; border-radius: 50%;
   position: absolute; transform: translate(-50%, -50%); box-shadow: 0 0 0 1px #fff8; }
 .whiteboard-cursors .stream-pointer-remote { z-index: 1; }
+
+.whiteboard-layer-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.whiteboard-layer-list { position: relative; display: flex; flex-direction: column; gap: 7px; }
+.whiteboard-layer { display: flex; align-items: stretch; gap: 4px; margin-bottom: 0; min-width: 0; }
+.whiteboard-layer-body { flex: 1; min-width: 0; }
+.whiteboard-layer-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.whiteboard-layer .whiteboard-layer-handle { width: 24px; height: auto; align-self: stretch; cursor: grab; touch-action: none; flex-shrink: 0; }
+.whiteboard-layer.is-dragging { background: var(--accent-subtle); outline: 1px dashed var(--accent-color); box-shadow: none; }
+.whiteboard-layer.is-dragging > * { opacity: 0; }
+.whiteboard-layer-drag { position: fixed; top: 0; left: 0; z-index: 10001; box-sizing: border-box; pointer-events: none;
+  align-items: center; color: var(--text-primary); background: var(--bg-control); box-shadow: var(--shadow-lg); opacity: .9; cursor: grabbing; }

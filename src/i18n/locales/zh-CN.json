@@ -1364,5 +1364,10 @@
   "whiteboard.documentChanged": "当前白板已更改。请关闭此对话框并重新保存当前白板。",
   "whiteboard.exported": "白板已导出。",
   "whiteboard.tools": "白板工具",
-  "whiteboard.smoothing": "防抖"
+  "whiteboard.smoothing": "防抖",
+  "whiteboard.eraser": "橡皮擦",
+  "whiteboard.layerName": "图层 {{index}}",
+  "whiteboard.addLayer": "添加图层",
+  "whiteboard.renameLayer": "重命名图层",
+  "whiteboard.reorderLayer": "拖动以调整图层顺序"
 }

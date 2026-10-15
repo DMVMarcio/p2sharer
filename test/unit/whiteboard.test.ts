@@ -3,7 +3,7 @@ import test from 'node:test';
 import * as Y from 'yjs';
 import { WhiteboardModel } from '../../src/apps/whiteboard_model.ts';
 import { encodeUpdate } from '../../src/apps/models.ts';
-import { boardSvg, brushPath, hitBoardShape, parseBoardFile, type BoardShape } from '../../src/apps/whiteboard_scene.ts';
+import { boardSvg, brushPath, hitBoardShape, hitBoardLayer, boardBrushWidth, DEFAULT_BOARD_LAYER, parseBoardFile, type BoardShape } from '../../src/apps/whiteboard_scene.ts';
 import { BOARD_WIDTH, BOARD_HEIGHT, BrushStabilizer, boardContains, clampBoardPoint, clampBoardViewport, containBoardShape } from '../../src/apps/whiteboard_interaction.ts';
 
 function shape(overrides: Partial<BoardShape> = {}): BoardShape {
@@ -122,4 +122,45 @@ test('configurable stabilization reduces jitter, zero follows the pointer and ex
   assert.equal(parseBoardFile(JSON.stringify({ version: 1, shapes: [stroke] })).shapes[0].smoothing, 80);
   assert.equal(hitBoardShape(stroke, { x: 100, y: 75 }, 3), true);
   assert.doesNotMatch(brushPath({ ...stroke, smoothing: 0 }), /Q/);
+});
+
+test('layers group paint, move as one, reorder, rename and preserve per-layer erasing through snapshots and files', () => {
+  const a = peer('a'), b = peer('b');
+  try {
+    a.model.put(shape()); a.model.put(shape({ order: 2 }));
+    assert.equal(a.model.layers.length, 1);
+    assert.equal(boardBrushWidth(1), 20);
+    const lower = a.model.layers[0];
+    a.model.updateLayer({ ...lower, name: 'Ink', x: 100, y: 50 });
+    assert.equal(a.model.shapes.length, 2);
+    assert.ok(a.model.shapes.every(s => s.x === 0));
+    const upper = a.model.addLayer('Details');
+    a.model.put(shape({ layerId: upper, filled: true }));
+    a.model.put(shape({ layerId: upper, tool: 'eraser', points: [{ x: 50, y: 50 }, { x: 50, y: 100 }], width: 40, order: 10 }));
+    const top = a.model.layers.find(l => l.id === upper)!;
+    assert.equal(hitBoardLayer(a.model.shapes, top, { x: 50, y: 70 }, 2), false);
+    assert.equal(hitBoardLayer(a.model.shapes, top, { x: 90, y: 70 }, 2), true);
+    const svg = boardSvg(a.model.shapes, a.model.layers);
+    assert.match(svg, /<mask /); assert.match(svg, /translate\(100 50\)/);
+    a.model.reorderLayers([upper, DEFAULT_BOARD_LAYER]);
+    b.model.apply(a.model.snapshot(), 'a', true);
+    assert.deepEqual(b.model.layers, a.model.layers);
+    assert.deepEqual(b.model.shapes, a.model.shapes);
+    const file = parseBoardFile(a.model.content);
+    assert.equal(file.version, 2);
+    b.model.replace(a.model.content, crypto.randomUUID(), 'Drawing');
+    assert.deepEqual(b.model.layers, a.model.layers);
+    a.model.removeLayer(upper);
+    assert.equal(a.model.layers.length, 1);
+    assert.equal(a.model.shapes.length, 2);
+    a.model.undo();
+    assert.equal(a.model.layers.length, 2);
+    assert.equal(a.model.shapes.length, 4);
+    const legacy = peer('legacy');
+    try {
+      legacy.model.replace(JSON.stringify({ version: 1, shapes: [shape()] }), crypto.randomUUID(), 'Legacy');
+      assert.equal(legacy.model.layers.length, 1);
+      assert.equal(parseBoardFile(legacy.model.content).version, 2);
+    } finally { legacy.model.destroy(); }
+  } finally { a.model.destroy(); b.model.destroy(); }
 });

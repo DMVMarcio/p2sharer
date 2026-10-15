@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent, type KeyboardEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent, type KeyboardEvent, type RefObject } from 'react';
 import { moveOrderedItem } from '../core/ordered_items.ts';
 
 interface Drag {
@@ -7,7 +7,7 @@ interface Drag {
 }
 
 // Pointer and keyboard sorting share one draft; only a completed gesture is persisted.
-export function useSortableGrid(ids: string[], onCommit: (ids: string[]) => boolean | void) {
+export function useSortableGrid(ids: string[], onCommit: (ids: string[]) => boolean | void, overlayRef?: RefObject<HTMLElement | null>) {
   const gridRef = useRef<HTMLDivElement>(null);
   const cardElements = useRef(new Map<string, HTMLElement>());
   const cardCallbacks = useRef(new Map<string, (element: HTMLElement | null) => void>());
@@ -27,6 +27,7 @@ export function useSortableGrid(ids: string[], onCommit: (ids: string[]) => bool
   const commitRef = useRef(onCommit);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const dragRef = useRef<Drag | null>(null);
+  const pendingLayout = useRef(false);
   const previousRects = useRef(new Map<string, DOMRect>());
   const animations = useRef(new Map<HTMLElement, Animation>());
   const idsKey = JSON.stringify(ids);
@@ -41,6 +42,7 @@ export function useSortableGrid(ids: string[], onCommit: (ids: string[]) => bool
     if (next === orderRef.current) return;
     measure();
     orderRef.current = next;
+    pendingLayout.current = true;
     setOrder(next);
   };
   const layoutRect = (node: HTMLElement) => {
@@ -54,6 +56,12 @@ export function useSortableGrid(ids: string[], onCommit: (ids: string[]) => bool
     const drag = dragRef.current;
     const node = cards().find((entry) => entry.dataset.sortableId === drag?.id);
     if (!drag || !node) return;
+    if (overlayRef?.current) {
+      const overlay = overlayRef.current;
+      overlay.style.width = `${node.offsetWidth}px`; overlay.style.height = `${node.offsetHeight}px`;
+      overlay.style.transform = `translate3d(${drag.x - drag.offsetX}px, ${drag.y - drag.offsetY}px, 0)`;
+      return;
+    }
     const rect = layoutRect(node);
     node.style.transform = `translate3d(${drag.x - drag.offsetX - rect.left}px, ${drag.y - drag.offsetY - rect.top}px, 0)`;
   };
@@ -77,6 +85,7 @@ export function useSortableGrid(ids: string[], onCommit: (ids: string[]) => bool
   }, [idsKey]);
 
   useLayoutEffect(() => {
+    pendingLayout.current = false;
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const transition = getComputedStyle(gridRef.current || document.documentElement).getPropertyValue('--transition-normal').trim();
     const duration = reducedMotion ? 0 : parseFloat(transition) * 1000;
@@ -123,7 +132,7 @@ export function useSortableGrid(ids: string[], onCommit: (ids: string[]) => bool
         }
         const nodes = cards();
         const active = nodes.find((node) => node.dataset.sortableId === drag.id);
-        if (active) {
+        if (active && !pendingLayout.current) {
           const x = drag.x - drag.offsetX + active.offsetWidth / 2;
           const y = drag.y - drag.offsetY + active.offsetHeight / 2;
           let closest = drag.id;

@@ -1364,5 +1364,10 @@
   "whiteboard.documentChanged": "Le tableau ouvert a changé. Fermez cette fenêtre et enregistrez le tableau actuel à nouveau.",
   "whiteboard.exported": "Tableau exporté.",
   "whiteboard.tools": "Outils du tableau",
-  "whiteboard.smoothing": "Stabilisation"
+  "whiteboard.smoothing": "Stabilisation",
+  "whiteboard.eraser": "Gomme",
+  "whiteboard.layerName": "Calque {{index}}",
+  "whiteboard.addLayer": "Ajouter un calque",
+  "whiteboard.renameLayer": "Renommer le calque",
+  "whiteboard.reorderLayer": "Glissez pour réordonner le calque"
 }

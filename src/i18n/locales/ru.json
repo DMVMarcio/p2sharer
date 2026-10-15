@@ -1364,5 +1364,10 @@
   "whiteboard.documentChanged": "Открытая доска изменилась. Закройте окно и сохраните текущую доску снова.",
   "whiteboard.exported": "Доска экспортирована.",
   "whiteboard.tools": "Инструменты доски",
-  "whiteboard.smoothing": "Стабилизация"
+  "whiteboard.smoothing": "Стабилизация",
+  "whiteboard.eraser": "Ластик",
+  "whiteboard.layerName": "Слой {{index}}",
+  "whiteboard.addLayer": "Добавить слой",
+  "whiteboard.renameLayer": "Переименовать слой",
+  "whiteboard.reorderLayer": "Перетащите для изменения порядка слоёв"
 }

@@ -1,4 +1,4 @@
-import { shapeBounds, type BoardPoint, type BoardShape } from './whiteboard_scene.ts';
+import { boardLayerBounds, shapeBounds, type BoardLayer, type BoardPoint, type BoardShape } from './whiteboard_scene.ts';
 
 export const BOARD_WIDTH = 16_000;
 export const BOARD_HEIGHT = 10_000;
@@ -22,6 +22,12 @@ export function containBoardShape(shape: BoardShape): BoardShape {
   const x = Math.max(0, Math.min(BOARD_WIDTH - bounds.width, bounds.x));
   const y = Math.max(0, Math.min(BOARD_HEIGHT - bounds.height, bounds.y));
   return { ...shape, x: shape.x + x - bounds.x, y: shape.y + y - bounds.y };
+}
+export function containBoardLayer(layer: BoardLayer, shapes: BoardShape[]): BoardLayer {
+  const bounds = boardLayerBounds(shapes, layer);
+  if (!bounds) return layer;
+  return { ...layer, x: layer.x + Math.max(0, Math.min(BOARD_WIDTH - bounds.width, bounds.x)) - bounds.x,
+    y: layer.y + Math.max(0, Math.min(BOARD_HEIGHT - bounds.height, bounds.y)) - bounds.y };
 }
 export class BrushStabilizer {
   private point: BoardPoint;

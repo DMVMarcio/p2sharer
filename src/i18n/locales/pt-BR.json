@@ -1364,5 +1364,10 @@
   "whiteboard.documentChanged": "O quadro aberto mudou. Feche esta janela e salve novamente o quadro atual.",
   "whiteboard.exported": "Quadro exportado.",
   "whiteboard.tools": "Ferramentas do quadro",
-  "whiteboard.smoothing": "Estabilização"
+  "whiteboard.smoothing": "Estabilização",
+  "whiteboard.eraser": "Borracha",
+  "whiteboard.layerName": "Camada {{index}}",
+  "whiteboard.addLayer": "Adicionar camada",
+  "whiteboard.renameLayer": "Renomear camada",
+  "whiteboard.reorderLayer": "Arraste para ordenar a camada"
 }

@@ -1364,5 +1364,10 @@
   "whiteboard.documentChanged": "現在のホワイトボードが変わりました。この画面を閉じて再度保存してください。",
   "whiteboard.exported": "ホワイトボードを出力しました。",
   "whiteboard.tools": "ホワイトボードツール",
-  "whiteboard.smoothing": "手ぶれ補正"
+  "whiteboard.smoothing": "手ぶれ補正",
+  "whiteboard.eraser": "消しゴム",
+  "whiteboard.layerName": "レイヤー {{index}}",
+  "whiteboard.addLayer": "レイヤーを追加",
+  "whiteboard.renameLayer": "レイヤー名を変更",
+  "whiteboard.reorderLayer": "ドラッグしてレイヤーを並べ替え"
 }

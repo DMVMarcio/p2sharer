@@ -1,6 +1,7 @@
-import { Brush, MousePointer2, Square, Circle, Minus, Undo2, Redo2 } from 'lucide-react';
+import { Brush, Eraser, MousePointer2, Square, Circle, Minus, Undo2, Redo2 } from 'lucide-react';
 import { TooltipButton } from '../components/common/TooltipButton';
 import { useContextMenu } from '../components/common/ContextMenu';
+import { IntegerSlider } from '../components/common/IntegerSlider';
 import { t } from '../i18n';
 import type { BoardTool } from './whiteboard_scene';
 
@@ -10,7 +11,7 @@ export function WhiteboardToolbar({ settings, onChange, canUndo, canRedo, onUndo
   onUndo(): void; onRedo(): void;
 }) {
   const menu = useContextMenu();
-  const tools = [['pointer', MousePointer2], ['brush', Brush], ['rectangle', Square], ['ellipse', Circle], ['line', Minus]] as const;
+  const tools = [['pointer', MousePointer2], ['brush', Brush], ['eraser', Eraser], ['rectangle', Square], ['ellipse', Circle], ['line', Minus]] as const;
   const colors = [['#a47754', 'color.brown'], ['#ef4444', 'message.6741b8b5e1c2'], ['#f97316', 'message.2b2b4ad00333'],
     ['#facc15', 'message.1875203bcdcc'], ['#22c55e', 'message.40598e1cb1d2'], ['#06b6d4', 'message.c954e4de2019'],
     ['#3b82f6', 'message.b0bf526b23af'], ['#a855f7', 'message.57a73ede5f6f'], ['#ec4899', 'message.75f9577a1637'],
@@ -22,9 +23,9 @@ export function WhiteboardToolbar({ settings, onChange, canUndo, canRedo, onUndo
         if (tool === 'rectangle' || tool === 'ellipse') menu(event, [false, true].map(filled => ({
           id: `${tool}-${filled}`, label: t(filled ? 'whiteboard.filled' : 'whiteboard.outline'), iconOnly: true,
           selected: settings.tool === tool && settings.filled === filled,
-          icon: <Icon size={30} fill={filled ? 'currentColor' : 'none'} strokeWidth={1.8} />,
+          icon: <Icon size={23} fill={filled ? 'currentColor' : 'none'} strokeWidth={1.8} />,
           onSelect: () => onChange({ ...settings, tool, filled }),
-        })), { toggle: true, layout: 'grid' });
+        })), { toggle: true, layout: 'grid', placement: 'top-center' });
         else onChange({ ...settings, tool });
       }}><Icon size={19} fill={settings.tool === tool && settings.filled && (tool === 'rectangle' || tool === 'ellipse') ? 'currentColor' : 'none'} /></TooltipButton>)}
     <TooltipButton tooltip={t('message.2237b88f398f')} className="room-app-notepad-tool" onClick={event => menu(event, colors.map(([color, label]) => ({
@@ -33,10 +34,8 @@ export function WhiteboardToolbar({ settings, onChange, canUndo, canRedo, onUndo
     })), { toggle: true })}><span className="stream-drawing-swatch" style={{ background: settings.color }} /></TooltipButton>
     </div>
     <div className="whiteboard-tool-properties">
-    <label className="stream-drawing-size">{t('whiteboard.width')}<input autoComplete="off" className="stream-volume-range" aria-label={t('whiteboard.width')}
-      type="range" min={1} max={100} value={settings.width} onChange={event => onChange({ ...settings, width: Number(event.target.value) })} /><output>{settings.width}</output></label>
-    <label className="stream-drawing-size">{t('whiteboard.smoothing')}<input autoComplete="off" className="stream-volume-range" aria-label={t('whiteboard.smoothing')}
-      type="range" min={0} max={100} value={settings.smoothing} onChange={event => onChange({ ...settings, smoothing: Number(event.target.value) })} /><output>{settings.smoothing}</output></label>
+    <IntegerSlider label={t('whiteboard.width')} min={1} max={100} value={settings.width} onChange={width => onChange({ ...settings, width })} />
+    <IntegerSlider label={t('whiteboard.smoothing')} min={0} max={100} value={settings.smoothing} onChange={smoothing => onChange({ ...settings, smoothing })} />
     <TooltipButton tooltip={t('message.786b48222848')} className="room-app-notepad-tool" disabled={!canUndo} onClick={onUndo}><Undo2 size={16} /></TooltipButton>
     <TooltipButton tooltip={t('message.7b659c9caa5e')} className="room-app-notepad-tool" disabled={!canRedo} onClick={onRedo}><Redo2 size={16} /></TooltipButton>
     </div>

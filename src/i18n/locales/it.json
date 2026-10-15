@@ -1364,5 +1364,10 @@
   "whiteboard.documentChanged": "La lavagna aperta è cambiata. Chiudi questa finestra e salva di nuovo quella attuale.",
   "whiteboard.exported": "Lavagna esportata.",
   "whiteboard.tools": "Strumenti della lavagna",
-  "whiteboard.smoothing": "Stabilizzazione"
+  "whiteboard.smoothing": "Stabilizzazione",
+  "whiteboard.eraser": "Gomma",
+  "whiteboard.layerName": "Livello {{index}}",
+  "whiteboard.addLayer": "Aggiungi livello",
+  "whiteboard.renameLayer": "Rinomina livello",
+  "whiteboard.reorderLayer": "Trascina per riordinare il livello"
 }

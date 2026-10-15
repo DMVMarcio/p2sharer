@@ -1,6 +1,6 @@
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
-import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { Copy } from 'lucide-react';
 import { useDropdownPresence } from '../../hooks/useDropdownPresence';
@@ -30,10 +30,11 @@ interface MenuState {
   source: HTMLElement;
   toggle?: boolean;
   layout?: 'grid';
+  placement?: 'top-center';
 }
 
 type MenuEvent = { preventDefault: () => void; stopPropagation: () => void; clientX: number; clientY: number; currentTarget: EventTarget | null };
-const MenuContext = createContext<(event: MenuEvent, actions: ContextMenuAction[], options?: { toggle?: boolean; layout?: 'grid' }) => void>(() => {});
+const MenuContext = createContext<(event: MenuEvent, actions: ContextMenuAction[], options?: { toggle?: boolean; layout?: 'grid'; placement?: 'top-center' }) => void>(() => {});
 export const useContextMenu = () => useContext(MenuContext);
 
 /** Feature menus defer editor targets to the central text editing menu. */
@@ -57,18 +58,18 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
   const actionsRef = useRef(getActions);
   currentRef.current = menu;
   actionsRef.current = getActions;
-  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [position, setPosition] = useState({ x: 0, y: 0, arrow: 0 });
   const close = useCallback((restoreFocus = false) => {
     if (restoreFocus && currentRef.current?.source.isConnected) currentRef.current.source.focus({ preventScroll: true });
     setMenu(null);
   }, []);
-  const open = useCallback((event: MenuEvent, actions: ContextMenuAction[], options?: { toggle?: boolean; layout?: 'grid' }) => {
+  const open = useCallback((event: MenuEvent, actions: ContextMenuAction[], options?: { toggle?: boolean; layout?: 'grid'; placement?: 'top-center' }) => {
     event.preventDefault();
     event.stopPropagation();
     const source = event.currentTarget instanceof HTMLElement ? event.currentTarget : document.body;
     if (options?.toggle && currentRef.current?.source === source) { close(true); return; }
     const bounds = source.getBoundingClientRect();
-    setMenu(actions.length ? { actions, source, toggle: options?.toggle, layout: options?.layout,
+    setMenu(actions.length ? { actions, source, toggle: options?.toggle, layout: options?.layout, placement: options?.placement,
       x: event.clientX || bounds.left + Math.min(bounds.width / 2, 24),
       y: event.clientY || bounds.top + Math.min(bounds.height / 2, 24) } : null);
   }, [close]);
@@ -123,8 +124,12 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
   useLayoutEffect(() => {
     if (!menu || !menuRef.current) return;
     const { offsetWidth, offsetHeight } = menuRef.current;
-    setPosition({ x: Math.max(8, Math.min(menu.x, window.innerWidth - offsetWidth - 8)),
-      y: Math.max(8, Math.min(menu.y, window.innerHeight - offsetHeight - 8)) });
+    const source = menu.source.getBoundingClientRect();
+    const x = menu.placement === 'top-center' ? source.left + source.width / 2 - offsetWidth / 2 : menu.x;
+    const y = menu.placement === 'top-center' ? source.top - offsetHeight - 12 : menu.y;
+    const left = Math.max(8, Math.min(x, window.innerWidth - offsetWidth - 8));
+    setPosition({ x: left, y: Math.max(8, Math.min(y, window.innerHeight - offsetHeight - 8)),
+      arrow: Math.max(10, Math.min(offsetWidth - 10, source.left + source.width / 2 - left)) });
     enabledButtons(menu.actions)[0]?.focus({ preventScroll: true });
   }, [menu]);
 
@@ -158,9 +163,9 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
   return <MenuContext.Provider value={open}>
     {children}
     {retained && createPortal(<div ref={menuRef} role="menu" aria-label={t("message.392b6906f80e")}
-      className={`context-menu ${retained.layout === 'grid' ? 'context-menu-visual-grid' : ''} ${presence.closing ? 'dropdown-closing' : ''}`}
+      className={`context-menu ${retained.layout === 'grid' ? 'context-menu-visual-grid' : ''} ${retained.placement === 'top-center' ? 'context-menu-anchored-above' : ''} ${presence.closing ? 'dropdown-closing' : ''}`}
       inert={presence.closing} aria-hidden={presence.closing}
-      style={{ left: position.x, top: position.y }}
+      style={{ left: position.x, top: position.y, '--context-menu-arrow-left': `${position.arrow}px` } as CSSProperties}
       onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); }}
       onClick={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()}>
       {retained.actions.map((action) => {

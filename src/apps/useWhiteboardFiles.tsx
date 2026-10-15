@@ -79,7 +79,7 @@ export function useWhiteboardFiles(model: WhiteboardModel | undefined, instanceI
       onSave={async name => { try { await persist(name, target.current); } catch (error) { throw new Error(boardError(error)); } }}
       onExport={async format => {
         if (!model) return;
-        if (await invoke<boolean>('save_note_file', { library: 'whiteboard', content: format === 'svg' ? boardSvg(model.shapes) : model.content, format, language: getLanguage() }))
+        if (await invoke<boolean>('save_note_file', { library: 'whiteboard', content: format === 'svg' ? boardSvg(model.shapes, model.layers) : model.content, format, language: getLanguage() }))
           showToast(t('whiteboard.exported'), 3500, 'success');
       }} onClose={() => setDialog(null)} />}
       {pending && !dialog && <ModalDialog title={t('whiteboard.replaceTitle')} onClose={() => {

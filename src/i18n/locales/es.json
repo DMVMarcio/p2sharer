@@ -1364,5 +1364,10 @@
   "whiteboard.documentChanged": "La pizarra abierta cambió. Cierra este diálogo y guarda de nuevo la actual.",
   "whiteboard.exported": "Pizarra exportada.",
   "whiteboard.tools": "Herramientas de pizarra",
-  "whiteboard.smoothing": "Estabilización"
+  "whiteboard.smoothing": "Estabilización",
+  "whiteboard.eraser": "Borrador",
+  "whiteboard.layerName": "Capa {{index}}",
+  "whiteboard.addLayer": "Añadir capa",
+  "whiteboard.renameLayer": "Renombrar capa",
+  "whiteboard.reorderLayer": "Arrastra para ordenar la capa"
 }

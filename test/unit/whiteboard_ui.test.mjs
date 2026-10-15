@@ -67,40 +67,48 @@ after(async () => { await act(async () => root.unmount()); fixture.model.destroy
 test('drawing, object movement, canvas panning, wheel navigation and brush cursors use the production scene', async () => {
   await act(async () => root.render(React.createElement(api.ContextMenuProvider, null, React.createElement(api.WhiteboardApp, { instanceId }))));
   await settle();
+  const initial = document.querySelector('.whiteboard-art > g').getAttribute('transform').match(/translate\(([-.\d]+) ([-.\d]+)\)/);
+  assert.equal(Number(initial[1]) + 8000, 400); assert.equal(Number(initial[2]) + 5000, 250);
   await click('Brush');
   await pointer('pointerdown', 100, 100); await pointer('pointermove', 140, 120);
   assert.equal(document.querySelector('rect[stroke-dasharray]'), null);
   await pointer('pointerup', 160, 140);
-  assert.ok(document.querySelector('rect[stroke-dasharray]'));
+  assert.equal(document.querySelector('rect[stroke-dasharray]'), null);
   assert.equal(fixture.model.shapes.length, 1);
   const original = fixture.model.shapes[0];
   assert.equal(original.tool, 'brush');
   assert.ok(document.querySelector('.stream-pointer-brush'));
   await click('Select and move');
-  await pointer('pointerdown', 100, 100); await pointer('pointermove', 120, 130); await pointer('pointerup', 120, 130);
-  assert.equal(fixture.model.shapes[0].x, 20);
-  assert.equal(fixture.model.shapes[0].y, 30);
+  await pointer('pointerdown', 100, 100); await pointer('pointermove', 120, 130);
+  assert.ok(document.querySelector('[data-cursor-shape="move"]'));
+  await pointer('pointerup', 120, 130);
+  assert.equal(fixture.model.layers[0].x, 20);
+  assert.equal(fixture.model.layers[0].y, 30);
   const beforePan = document.querySelector('.whiteboard-art > g').getAttribute('transform');
   await pointer('pointerdown', 400, 300); await pointer('pointermove', 450, 330); await pointer('pointerup', 450, 330);
   assert.notEqual(document.querySelector('.whiteboard-art > g').getAttribute('transform'), beforePan);
   const geometry = fixture.model.content;
+  const cursorBeforeZoom = document.querySelector('.stream-pointer-remote:not(.is-interpolated)');
+  const cursorPosition = [cursorBeforeZoom.style.left, cursorBeforeZoom.style.top];
   const beforeZoom = document.querySelector('.whiteboard-art > g').getAttribute('transform');
-  await act(async () => canvas().dispatchEvent(new window.WheelEvent('wheel', { deltaY: 100, bubbles: true, cancelable: true })));
+  await act(async () => canvas().dispatchEvent(new window.WheelEvent('wheel', { deltaY: 100, clientX: 450, clientY: 330, bubbles: true, cancelable: true })));
   await settle();
   assert.notEqual(document.querySelector('.whiteboard-art > g').getAttribute('transform'), beforeZoom);
+  const cursorAfterZoom = document.querySelector('.stream-pointer-remote:not(.is-interpolated)');
+  assert.deepEqual([cursorAfterZoom.style.left, cursorAfterZoom.style.top], cursorPosition);
   assert.equal(fixture.model.content, geometry);
   await act(async () => canvas().dispatchEvent(new window.WheelEvent('wheel', { deltaY: -200, ctrlKey: true, clientX: 100, clientY: 100, bubbles: true, cancelable: true })));
   await settle();
   assert.match(document.querySelector('.whiteboard-art > g').getAttribute('transform'), /scale\(1\./);
   await act(async () => canvas().dispatchEvent(new window.KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true })));
-  assert.equal(fixture.model.shapes[0].x, 0);
+  assert.equal(fixture.model.layers[0].x, 0);
 });
 
 test('layers toggle visibility and locking, and authenticated remote cursors retain brush size', async () => {
   assert.ok(document.querySelector('aside[aria-label="Layers"]'));
-  await click('Toggle layer visibility'); assert.equal(fixture.model.shapes[0].hidden, true);
-  await click('Toggle layer visibility'); assert.equal(fixture.model.shapes[0].hidden, false);
-  await click('Lock or unlock layer'); assert.equal(fixture.model.shapes[0].locked, true);
+  await click('Toggle layer visibility'); assert.equal(fixture.model.layers[0].hidden, true);
+  await click('Toggle layer visibility'); assert.equal(fixture.model.layers[0].hidden, false);
+  await click('Lock or unlock layer'); assert.equal(fixture.model.layers[0].locked, true);
   assert.equal(button('Delete layer').disabled, true);
   await click('Lock or unlock layer');
   await act(async () => {
@@ -112,12 +120,21 @@ test('layers toggle visibility and locking, and authenticated remote cursors ret
 });
 
 test('shape tools offer accessible visual fill choices and stabilization persists locally', async () => {
+  const widthDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth');
+  const heightDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight');
+  Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { configurable: true, get() { return this.classList.contains('context-menu') ? 120 : 0; } });
+  Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, get() { return this.classList.contains('context-menu') ? 64 : 0; } });
+  button('Rectangle').getBoundingClientRect = () => new window.DOMRect(300, 400, 36, 34);
   await click('Rectangle');
   const menu = document.querySelector('[role="menu"]');
   assert.ok(menu);
   assert.equal(menu.querySelectorAll('[role="menuitemradio"]').length, 2);
   assert.equal(menu.textContent, '');
+  assert.equal(Number.parseFloat(menu.style.left) + menu.offsetWidth / 2, 318);
+  assert.ok(Number.parseFloat(menu.style.top) + menu.offsetHeight < 400);
   await click('Filled', menu);
+  Object.defineProperty(HTMLElement.prototype, 'offsetWidth', widthDescriptor);
+  Object.defineProperty(HTMLElement.prototype, 'offsetHeight', heightDescriptor);
   assert.equal(button('Rectangle').getAttribute('aria-pressed'), 'true');
   await pointer('pointerdown', 180, 170); await pointer('pointermove', 230, 210);
   assert.equal(document.querySelector('rect[stroke-dasharray]'), null);
@@ -154,4 +171,58 @@ test('whiteboards save and reopen the same local file, export separately and con
   assert.equal(fixture.model.shapes.length, 1);
   assert.equal(fixture.model.identity.id, instanceId);
   assert.match(document.querySelector('[role="status"]').textContent, /Saved on this computer/);
+});
+
+
+test('manual numeric entry rejects non-digits and corrects out-of-range values', async () => {
+  const input = document.querySelector('input[inputmode="numeric"][aria-label="Thickness"]');
+  const set = async value => act(async () => {
+    input.focus(); Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(input, value);
+    input.dispatchEvent(new window.Event('input', { bubbles: true })); input.dispatchEvent(new window.Event('change', { bubbles: true }));
+  });
+  await set('9999'); await act(async () => input.blur()); assert.equal(input.value, '100');
+  await set('a.2'); assert.equal(input.value, '100');
+  await set(''); await act(async () => input.blur()); assert.equal(input.value, '1');
+});
+
+test('paint stays in the active layer, erasing is scoped, and named layers reorder with a drag placeholder', async () => {
+  await click('Add layer');
+  const layer = fixture.model.layers[fixture.model.layers.length - 1];
+  const row = () => document.querySelector(`[data-sortable-id="${layer.id}"]`);
+  await click('Rename layer', row());
+  const input = document.querySelector('input[aria-label="Rename layer"]');
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(input, 'Details');
+    input.dispatchEvent(new window.Event('input', { bubbles: true })); input.dispatchEvent(new window.Event('change', { bubbles: true }));
+  });
+  await act(async () => input.blur());
+  assert.equal(fixture.model.layers.find(l => l.id === layer.id).name, 'Details');
+  await click('Brush');
+  await pointer('pointerdown', 200, 150); await pointer('pointermove', 220, 170); await pointer('pointerup', 230, 180);
+  await pointer('pointerdown', 260, 220); await pointer('pointermove', 280, 240); await pointer('pointerup', 300, 250);
+  assert.equal(fixture.model.shapes.filter(s => s.layerId === layer.id).length, 2);
+  assert.equal(document.querySelector('rect[stroke-dasharray]'), null);
+  assert.equal(fixture.model.shapes[fixture.model.shapes.length - 1].width, 20);
+  await click('Eraser');
+  await pointer('pointerdown', 200, 150); await pointer('pointermove', 220, 150); await pointer('pointerup', 230, 150);
+  assert.ok(document.querySelector(`[data-board-layer="${layer.id}"] mask`));
+  const grid = document.querySelector('.whiteboard-layer-list');
+  grid.getBoundingClientRect = () => new window.DOMRect(600, 20, 200, 200);
+  for (const element of grid.children) {
+    Object.defineProperties(element, { offsetLeft: { configurable: true, get: () => 0 }, offsetTop: { configurable: true, get: () => [...grid.children].indexOf(element) * 80 },
+      offsetWidth: { configurable: true, get: () => 200 }, offsetHeight: { configurable: true, get: () => 72 } });
+    element.getBoundingClientRect = () => new window.DOMRect(600, 20 + [...grid.children].indexOf(element) * 80, 200, 72);
+  }
+  const dragEvent = (type, x, y) => { const event = new window.MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 });
+    Object.defineProperty(event, 'pointerId', { value: 9 }); return event; };
+  const before = fixture.model.layers.map(l => l.id);
+  await act(async () => button('Drag to reorder layer', row()).dispatchEvent(dragEvent('pointerdown', 780, 56)));
+  assert.ok(document.querySelector('.whiteboard-layer.is-dragging'));
+  assert.ok(document.querySelector('.whiteboard-layer-drag'));
+  await act(async () => window.dispatchEvent(dragEvent('pointermove', 780, 136))); await settle();
+  assert.deepEqual([...grid.children].map(node => node.dataset.sortableId), before, 'The placeholder follows the prospective drop position');
+  assert.deepEqual(fixture.model.layers.map(l => l.id), before);
+  await act(async () => window.dispatchEvent(dragEvent('pointerup', 780, 136))); await settle();
+  assert.deepEqual(fixture.model.layers.map(l => l.id), [...before].reverse());
+  assert.equal(document.querySelector('.whiteboard-layer-drag'), null);
 });
