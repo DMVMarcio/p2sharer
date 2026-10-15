@@ -51,17 +51,22 @@ export class RoomAppsService {
 
   // Trusted device-local bootstrap for detached windows, never for room packets.
   initializeLocalView(instance: RoomAppInstance): void { this.addInstance(instance, true); }
+  notifyLocalView(): void { this.notify(); }
 
   // A detached WebView mirrors the model; the main window remains the room transport owner.
   applyLocalView(id: string, snapshot: unknown, participants: string[], receivedAt?: number): void {
-    this.models.get(id)?.apply(snapshot, this.localActor, true, receivedAt);
+    const model = this.models.get(id);
+    if (model?.applyLocalSnapshot) { model.setParticipants?.(participants); model.applyLocalSnapshot(snapshot); }
+    else model?.apply(snapshot, this.localActor, true, receivedAt);
     this.participants.set(id, new Set(participants));
     this.notify();
   }
 
   publishLocalView(id: string, payload: unknown): void {
     if (!this.sender || !this.isJoined(id)) return;
-    this.models.get(id)?.apply(payload, this.localActor, false);
+    const model = this.models.get(id);
+    if (model?.applyLocalUpdate) { void model.applyLocalUpdate(payload).catch(console.warn); return; }
+    model?.apply(payload, this.localActor, false);
     this.sendInstanceEvent(id, { kind: 'data', id, payload });
     this.notify();
   }
@@ -158,6 +163,7 @@ export class RoomAppsService {
     const definition = getRoomApp(instance.kind);
     if (!definition) return false;
     const model = definition.createModel({
+      localView,
       instanceId: instance.id,
       createdBy: instance.createdBy,
       rtcConfiguration: this.rtcConfiguration,

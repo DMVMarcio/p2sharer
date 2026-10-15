@@ -1,6 +1,6 @@
 export const BROWSER_WIDTH = 1280;
 export const BROWSER_HEIGHT = 720;
-export interface BrowserTab { id: number; url: string; title: string; loading?: boolean; favicon?: string }
+export interface BrowserTab { id: number; url: string; title: string; loading?: boolean; favicon?: string; zoom?: number }
 export interface BrowserContext { tab: number; x: number; y: number; link: string; source: string; selection: string; editable: boolean }
 export function validBrowserContext(value: unknown): value is BrowserContext {
   if (!value || typeof value !== 'object') return false;
@@ -28,6 +28,7 @@ export type BrowserCommand =
   | { kind: 'select-tab' | 'close-tab'; id: number }
   | { kind: 'move-tab'; id: number; before: number | null }
   | { kind: 'reload'; ignore_cache?: boolean }
+  | { kind: 'zoom'; direction: -1 | 0 | 1 }
   | { kind: 'back' | 'forward' | 'release' | 'cursor-leave' }
   | { kind: 'mouse'; event: 'mouseMoved' | 'mousePressed' | 'mouseReleased' | 'mouseWheel'; x: number; y: number;
       button: 'none' | 'left' | 'middle' | 'right'; buttons: number; delta_x: number; delta_y: number; modifiers: number; clicks: number }
@@ -57,6 +58,7 @@ export function validBrowserCommand(value: unknown): value is BrowserCommand {
     case 'select-tab': case 'close-tab': return integer(v.id, 1_000_000);
     case 'move-tab': return integer(v.id, 1_000_000) && (v.before === null || integer(v.before, 1_000_000));
     case 'reload': return v.ignore_cache === undefined || typeof v.ignore_cache === 'boolean';
+    case 'zoom': return [-1, 0, 1].includes(Number(v.direction)) && typeof v.direction === 'number';
     case 'back': case 'forward': case 'release': case 'cursor-leave': return true;
     case 'text': return typeof v.text === 'string' && v.text.length > 0 && v.text.length <= 4096;
     case 'key': return ['keyDown', 'keyUp'].includes(String(v.event)) && typeof v.key === 'string' && v.key.length <= 80
@@ -74,7 +76,8 @@ export function validBrowserState(value: unknown): value is BrowserState {
   return typeof s.temporary === 'boolean' && (s.serial === undefined || integer(s.serial, Number.MAX_SAFE_INTEGER))
     && integer(s.active, 1_000_000) && Array.isArray(s.tabs) && s.tabs.length <= 16
     && s.tabs.every(t => t && integer(t.id, 1_000_000) && typeof t.url === 'string' && t.url.length <= 4096
-      && typeof t.title === 'string' && t.title.length <= 400 && (t.loading === undefined || typeof t.loading === 'boolean') && validBrowserFavicon(t.favicon))
+      && typeof t.title === 'string' && t.title.length <= 400 && (t.loading === undefined || typeof t.loading === 'boolean') && validBrowserFavicon(t.favicon)
+      && (t.zoom === undefined || typeof t.zoom === 'number' && Number.isFinite(t.zoom) && t.zoom >= 0.25 && t.zoom <= 5))
     && new Set(s.tabs.map(t => t.id)).size === s.tabs.length && (!s.tabs.length || s.tabs.some(t => t.id === s.active));
 }
 

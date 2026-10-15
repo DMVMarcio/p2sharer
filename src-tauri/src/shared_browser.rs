@@ -78,10 +78,22 @@ pub struct Tab {
     pub loading: bool,
     #[serde(default)]
     pub favicon: String,
+    #[serde(default = "default_zoom")]
+    pub zoom: f64,
     #[serde(skip)]
     favicon_uri: String,
     #[serde(skip)]
     navigation_id: u64,
+}
+fn default_zoom() -> f64 { 1.0 }
+fn next_zoom(current: f64, direction: i8) -> Result<f64, String> {
+    let levels = [0.25, 0.33, 0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0, 4.0, 5.0];
+    match direction {
+        0 => Ok(1.0),
+        1 => Ok(levels.into_iter().find(|level| *level > current + 0.001).unwrap_or(5.0)),
+        -1 => Ok(levels.into_iter().rev().find(|level| *level < current - 0.001).unwrap_or(0.25)),
+        _ => Err("Invalid browser zoom".into()),
+    }
 }
 
 fn trusted(window: &WebviewWindow, scope: &str) -> Result<(), String> {
@@ -405,6 +417,7 @@ async fn add_tab(
                 id,
                 url: url.into(),
                 title: String::new(),
+                zoom: 1.0,
                 ..Default::default()
             });
         } else {
@@ -665,6 +678,7 @@ pub enum BrowserCommand {
     Back,
     Forward,
     Reload { #[serde(default)] ignore_cache: bool },
+    Zoom { direction: i8 },
     Mouse {
         event: String,
         x: f64,
@@ -854,6 +868,19 @@ pub async fn control_shared_browser(
                     );
                 })
                 .await?;
+            }
+        }
+        BrowserCommand::Zoom { direction } => {
+            let current = state.0.lock().unwrap().get(&scope).and_then(|s| s.tabs.iter().find(|tab| tab.id == s.active)).map(|tab| tab.zoom).ok_or("Unknown browser tab")?;
+            let zoom = next_zoom(current, direction)?;
+            #[cfg(windows)]
+            {
+                let (tx, rx) = tokio::sync::oneshot::channel();
+                view.with_webview(move |webview| unsafe { let _ = tx.send(webview.controller().SetZoomFactor(zoom).map_err(|e| e.to_string())); }).map_err(|e| e.to_string())?;
+                rx.await.map_err(|e| e.to_string())??;
+            }
+            if let Some(session) = state.0.lock().unwrap().get_mut(&scope) {
+                if let Some(tab) = session.tabs.iter_mut().find(|tab| tab.id == session.active) { tab.zoom = zoom; }
             }
         }
         BrowserCommand::Reload { ignore_cache } => {
@@ -1255,6 +1282,16 @@ pub async fn browser_extensions(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn page_zoom_steps_are_bounded_and_reset_to_actual_size() {
+        assert_eq!(next_zoom(1.0, 1).unwrap(), 1.1);
+        assert_eq!(next_zoom(1.1, -1).unwrap(), 1.0);
+        assert_eq!(next_zoom(5.0, 1).unwrap(), 5.0);
+        assert_eq!(next_zoom(0.25, -1).unwrap(), 0.25);
+        assert_eq!(next_zoom(2.5, 0).unwrap(), 1.0);
+        assert!(next_zoom(1.0, 2).is_err());
+        assert!(serde_json::from_value::<BrowserCommand>(json!({"kind":"zoom","direction":1000})).is_err());
+    }
     use super::*;
     #[test]
     fn tab_moves_preserve_live_tab_data_and_reject_stale_targets_atomically() {

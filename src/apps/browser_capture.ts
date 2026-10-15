@@ -29,13 +29,13 @@ export class BrowserCapture {
   private previous: { images: number; processing_us: number } | null = null;
   private scope: string;
   private quality: BrowserQualityController;
-  private stream: (stream: MediaStream) => void;
+  private stream: (stream: MediaStream, tab: number) => void;
   private metadata: (state: BrowserState) => void;
   private changed: () => void;
   private failed: (error: unknown) => void;
   private native: BrowserCaptureDependencies;
   constructor(scope: string, quality: BrowserQualityController,
-    stream: (stream: MediaStream) => void, metadata: (state: BrowserState) => void,
+    stream: (stream: MediaStream, tab: number) => void, metadata: (state: BrowserState) => void,
     changed: () => void, failed: (error: unknown) => void,
     native = dependencies) {
     this.scope = scope; this.quality = quality; this.stream = stream; this.metadata = metadata;
@@ -68,7 +68,7 @@ export class BrowserCapture {
       if (frame.sourceId !== this.source) {
         const stream = await this.bridge.startCapture(frame.sourceId, quality.fps, quality, false, 90);
         if (this.stopped || generation !== this.generation) { await this.bridge.stopCapture(); return; }
-        this.source = frame.sourceId; this.previous = null; this.stream(stream);
+        this.source = frame.sourceId; this.previous = null; this.stream(stream, frame.state.active);
         this.profile = profile;
       } else if (profile !== this.profile) {
         await this.bridge.updateProfile(quality.fps, quality.width, quality.height);

@@ -114,6 +114,30 @@ test('host speaker volume stays local, bypasses shared controls and rejects view
   } finally { host.model.destroy(); viewer.model.destroy(); }
 });
 
+test('detached browser actions stay in the main model and closing the mirror cannot stop capture', async () => {
+  const main = fixture(); let nativeMirrorCalls = 0; let sentToRoom = 0;
+  const mirror = new BrowserModel({ localView: true, localActor: 'host', instanceId: crypto.randomUUID(), changed() {},
+    emit(payload) {
+      void main.model.applyLocalUpdate(payload).then(() => {
+        const request = payload as { id?: string }; if (request.id) mirror.acceptLocalResult(request.id);
+      });
+    }, send: async () => { sentToRoom++; } }, { call: async <T>() => { nativeMirrorCalls++; return null as T; } }, true);
+  try {
+    mirror.setParticipants(['host', 'alice']); mirror.applyLocalSnapshot(main.model.localSnapshot());
+    assert.equal(mirror.isHost, true); assert.equal(mirror.canControl, true);
+    mirror.command({ kind: 'zoom', direction: 1 }); await settle();
+    assert.deepEqual(main.calls.at(-1)?.args.command, { kind: 'zoom', direction: 1 });
+    await mirror.setLocalVolume(0.3, true);
+    assert.equal(main.calls.at(-1)?.command, 'set_shared_browser_volume');
+    assert.equal(main.calls.at(-1)?.args.volume, 0.3);
+    const before = main.calls.length;
+    main.model.apply({ type: 'browser-local', action: 'finish', args: [] }, 'alice', false);
+    assert.equal(main.calls.length, before); assert.equal(main.model.running, true);
+    mirror.destroy(); assert.equal(main.model.running, true);
+    assert.equal(nativeMirrorCalls, 0); assert.equal(sentToRoom, 0);
+  } finally { mirror.destroy(); main.model.destroy(); }
+});
+
 test('leaving the viewport immediately frees control and stale queued motion cannot reclaim it', async () => {
   let unblock = () => {}; let blocked = false;
   const { model, calls } = fixture('host', async (command, args) => {

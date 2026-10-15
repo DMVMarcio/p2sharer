@@ -14,7 +14,7 @@ async function fixture() {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   dom.window.matchMedia = () => ({ matches: false });
   const require = createRequire(import.meta.url);
-  const bundle = await build({ stdin: { contents: "export { useBrowserChrome } from './src/hooks/useBrowserChrome'; export { useMediaVolume } from './src/hooks/useMediaVolume'; export { MediaVolumeControl } from './src/components/common/MediaVolumeControl'; export { useSelectAllOnFocus } from './src/hooks/useSelectAllOnFocus'; export { BrowserTabs } from './src/apps/BrowserTabs'; export { BrowserContextMenu } from './src/apps/BrowserContextMenu'; export { ContextMenuProvider } from './src/components/common/ContextMenu'; export { t } from './src/i18n';", resolveDir: process.cwd() },
+  const bundle = await build({ stdin: { contents: "export { useBrowserChrome } from './src/hooks/useBrowserChrome'; export { useMediaVolume } from './src/hooks/useMediaVolume'; export { MediaVolumeControl } from './src/components/common/MediaVolumeControl'; export { useSelectAllOnFocus } from './src/hooks/useSelectAllOnFocus'; export { BrowserTabs } from './src/apps/BrowserTabs'; export { BrowserContextMenu } from './src/apps/BrowserContextMenu'; export { ContextMenuProvider } from './src/components/common/ContextMenu'; export { t } from './src/i18n'; export { useVideoPresentation } from './src/hooks/useVideoPresentation';", resolveDir: process.cwd() },
     bundle: true, write: false, format: 'esm', platform: 'node', loader: { '.css': 'empty' },
     plugins: [{ name: 'browser-controls-fixture', setup(builder) {
       builder.onResolve({ filter: /^[^./]/ }, args => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
@@ -150,7 +150,7 @@ test('page context actions operate the shared page and use the requesting client
   const f = await fixture(); f.dom.window.matchMedia = () => ({ matches: true }); const commands = []; let clipboard = 'Local clipboard';
   Object.defineProperty(navigator, 'clipboard', { value: { writeText: async text => { clipboard = text; }, readText: async () => clipboard } });
   const surface = { current: null };
-  const model = { canControl: true, state: { active: 1 }, contextMenu: null, command: command => commands.push(command) };
+  const model = { canControl: true, state: { active: 1 }, contextMenu: null, consumeContextMenu() { this.contextMenu = null; }, command: command => commands.push(command) };
   const open = async key => {
     model.contextMenu = { id: key, tab: 1, x: 50, y: 60, link: 'https://example.com/', source: '', selection: 'Page selection', editable: true };
     await act(async () => f.root.render(React.createElement(f.ContextMenuProvider, null,
@@ -163,5 +163,28 @@ test('page context actions operate the shared page and use the requesting client
     await open(2); await select('browser.context.copyText'); assert.equal(clipboard, 'Page selection');
     clipboard = 'Local paste'; await open(3); await select('browser.context.paste'); assert.deepEqual(commands.pop(), { kind: 'text', text: 'Local paste' });
     await open(4); model.state.active = 2; await select('browser.reload'); assert.equal(commands.length, 0);
+  } finally { await f.cleanup(); }
+});
+
+
+test('tab presentation waits for the selected capture and visible video frames rather than document loading', async () => {
+  const f = await fixture(); const video = { current: null }; const stream = {}; let frame; let bright = false; let cancelled = 0;
+  f.dom.window.HTMLCanvasElement.prototype.getContext = () => ({ drawImage() {}, getImageData: () => ({ data: new Uint8ClampedArray([bright ? 100 : 0, 0, 0, 255]) }) });
+  const Harness = ({ tab, sampling }) => React.createElement('div', { 'data-waiting': f.useVideoPresentation(video, tab, stream, true, sampling) },
+    React.createElement('video', { ref: video }));
+  const render = (tab, sampling) => act(async () => f.root.render(React.createElement(Harness, { tab, sampling })));
+  const waiting = () => document.querySelector('[data-waiting]').getAttribute('data-waiting');
+  const present = async () => act(async () => frame());
+  try {
+    await render(1, false);
+    Object.defineProperties(video.current, { readyState: { value: 2 }, videoWidth: { value: 1280 } });
+    video.current.requestVideoFrameCallback = callback => { frame = callback; return 7; };
+    video.current.cancelVideoFrameCallback = () => { cancelled++; };
+    await render(1, true); await present(); await present(); assert.equal(waiting(), 'true');
+    bright = true; await present(); assert.equal(waiting(), 'false');
+    await render(2, false); assert.equal(waiting(), 'true');
+    await render(2, true); await present(); assert.equal(waiting(), 'true');
+    await present(); assert.equal(waiting(), 'false');
+    await render(3, true); assert.ok(cancelled > 0);
   } finally { await f.cleanup(); }
 });

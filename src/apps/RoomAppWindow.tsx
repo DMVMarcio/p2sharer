@@ -11,6 +11,9 @@ import { getRoomApp, type RoomAppViewProps } from './registry';
 import { roomAppsService } from './room_apps_service';
 import { appWindowEvent, appWindowPeerId, sendAppWindow, type AppWindowMessage } from './app_window';
 import { stateStore } from '../core/state_store';
+import { BrowserModel } from './browser_model';
+import { BrowserMedia } from './browser_media';
+import { showToast } from '../hooks/useToast';
 
 export const RoomAppWindow: React.FC<{ instanceId: string }> = ({ instanceId }) => {
   const language = useLocale();
@@ -27,8 +30,12 @@ export const RoomAppWindow: React.FC<{ instanceId: string }> = ({ instanceId }) 
     let disposed = false;
     let remove: (() => void) | undefined;
     let initialized = false;
+    let browserMedia: BrowserMedia | undefined;
     void listen<AppWindowMessage>(appWindowEvent(instanceId), ({ payload: message }) => {
-      if (disposed || message.type !== 'state' || message.instance.id !== instanceId) return;
+      if (disposed) return;
+      if (message.type === 'browser-media') { void browserMedia?.receive('main', message.payload).catch(reason => showToast(localizeError(reason), 5000, 'error')); return; }
+      if (message.type === 'browser-result') { roomAppsService.getModel<BrowserModel>(instanceId)?.acceptLocalResult(message.id, message.error); return; }
+      if (message.type !== 'state' || message.instance.id !== instanceId) return;
       const definition = getRoomApp(message.instance.kind);
       if (!definition) return;
       if (!initialized) {
@@ -38,6 +45,14 @@ export const RoomAppWindow: React.FC<{ instanceId: string }> = ({ instanceId }) 
             void sendAppWindow(instanceId, 'main', { type: 'update', payload: event.payload }).catch(console.warn);
         }, message.actor);
         roomAppsService.initializeLocalView(message.instance);
+        const model = roomAppsService.getModel(instanceId);
+        if (model instanceof BrowserModel) {
+          browserMedia = new BrowserMedia(instanceId, false, async payload => {
+            if (!disposed) await sendAppWindow(instanceId, 'main', { type: 'browser-media', payload: payload as Record<string, unknown> });
+          }, () => roomAppsService.notifyLocalView(), () => {}, reason => showToast(localizeError(reason), 5000, 'error'), () => ({ iceServers: [] }));
+          model.media = browserMedia;
+          void browserMedia.start();
+        }
         stateStore.set((state) => { state.username = message.username; });
         setLabel(definition.label);
         setView(() => lazy(definition.loadView));
@@ -48,7 +63,7 @@ export const RoomAppWindow: React.FC<{ instanceId: string }> = ({ instanceId }) 
       remove = unlisten;
       void sendAppWindow(instanceId, 'main', { type: 'ready' }).catch((reason) => setError(localizeError(reason)));
     }).catch((reason) => setError(localizeError(reason)));
-    return () => { disposed = true; remove?.(); roomAppsService.reset(); };
+    return () => { disposed = true; remove?.(); browserMedia?.stop(); roomAppsService.reset(); };
   }, [instanceId]);
   const close = () => void sendAppWindow(instanceId, 'main', { type: 'restore' }).catch(console.warn);
   return <><div className="room-app-window">

@@ -87,6 +87,27 @@ test('browser quality detects playback, holds through short pauses and restores 
   assert.equal(validBrowserQuality({ mode: 'video', video: '4k120' }), false);
 });
 
+test('a local media relay preserves source quality hints and never takes ownership of capture tracks', async () => {
+  const previous = globalThis.RTCPeerConnection; let encodingChanges = 0;
+  class Connection {
+    senders: unknown[] = []; localDescription: { toJSON(): unknown } | null = null;
+    addTrack(track: unknown) { this.senders.push({ track, getParameters: () => ({ encodings: [{}] }), setParameters: async () => { encodingChanges++; } }); }
+    getSenders() { return this.senders; }
+    async createOffer() { return { type: 'offer', sdp: 'local-fixture' }; }
+    async setLocalDescription(value: unknown) { this.localDescription = { toJSON: () => value }; }
+    close() {}
+  }
+  globalThis.RTCPeerConnection = Connection as unknown as typeof RTCPeerConnection;
+  const track = new MockMediaStreamTrack('video'); const stream = new MockMediaStream([track]);
+  track.contentHint = 'motion';
+  const media = new BrowserMedia(crypto.randomUUID(), true, async () => {}, () => {}, () => {}, () => {}, () => ({ iceServers: [] }));
+  try {
+    media.relay(stream as unknown as MediaStream); assert.equal(media.stream, stream);
+    await media.offer('external'); assert.equal(track.contentHint, 'motion'); assert.equal(encodingChanges, 0);
+    media.stop(); assert.equal(track.readyState, 'live'); assert.equal(media.stream, null);
+  } finally { media.stop(); globalThis.RTCPeerConnection = previous; }
+});
+
 test('browser quality upgrades on sustained capture headroom, respects ceilings and backs off under load', () => {
   const quality = new BrowserQualityController({ mode: 'video', video: '1080p60' });
   for (let now = 0; now <= 8000; now += 100) quality.sample(5, now);

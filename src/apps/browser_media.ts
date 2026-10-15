@@ -10,9 +10,12 @@ import { BrowserCapture } from './browser_capture.ts';
 export class BrowserMedia {
   readonly quality = new BrowserQualityController(loadBrowserQuality());
   stream: MediaStream | null = null;
+  videoTab = 0;
   private audio?: AudioBridge;
   private capture?: BrowserCapture;
   private stopped = true;
+  private borrowed = false;
+  private relayTracks: MediaStreamTrack[] = [];
   private generation = 0;
   private peers = new Map<string, { pc: RTCPeerConnection; token: string; pending: RTCIceCandidateInit[];
     local: RTCIceCandidateInit[]; announced: boolean }>();
@@ -42,13 +45,30 @@ export class BrowserMedia {
     if (track) this.stream.addTrack(track);
     await this.audio.startListening(`shared-browser-audio-${this.scope}`);
     if (this.stopped || generation !== this.generation) return;
-    this.capture = new BrowserCapture(this.scope, this.quality, stream => this.installVideo(stream), this.metadata,
+    this.capture = new BrowserCapture(this.scope, this.quality, (stream, tab) => { this.videoTab = tab; this.installVideo(stream); }, this.metadata,
       () => { this.changed(); for (const { pc } of this.peers.values()) this.configureEncoding(pc); },
       error => { if (!this.stopped && generation === this.generation) this.failed(error); });
     await this.capture.start();
     if (!this.stopped && generation === this.generation) this.changed();
   }
   refreshCapture(): void { this.capture?.requestRefresh(); }
+  /** A device-local view borrows the live tracks without owning capture or room peers. */
+  relay(stream: MediaStream | null): void {
+    this.borrowed = true; this.stopped = false;
+    const tracks = stream?.getTracks() ?? [];
+    if (this.stream === stream && tracks.length === this.relayTracks.length && tracks.every((track, index) => track === this.relayTracks[index])) return;
+    this.relayTracks = tracks;
+    this.stream = stream;
+    for (const [peer, { pc }] of this.peers) {
+      for (const sender of pc.getSenders()) {
+        const kind = sender.track?.kind;
+        if (kind) void sender.replaceTrack(stream?.getTracks().find(track => track.kind === kind) ?? null).catch(this.failed);
+      }
+      if (stream && stream.getTracks().some(track => !pc.getSenders().some(sender => sender.track?.kind === track.kind))) {
+        this.lastOffers.delete(peer); void this.offer(peer).catch(this.failed);
+      }
+    }
+  }
   private installVideo(stream: MediaStream): void {
     const track = stream.getVideoTracks()[0]; if (!track || !this.stream || this.stopped) return;
     // Rebind the host video element even if its previous source ended between tabs.
@@ -70,6 +90,8 @@ export class BrowserMedia {
     this.changed();
   }
   private configureEncoding(pc: RTCPeerConnection): void {
+    // The local relay must preserve the borrowed track's hints and source frame rate.
+    if (this.borrowed) return;
     const quality = this.quality.quality;
     for (const track of this.stream?.getVideoTracks() ?? []) track.contentHint = quality.video ? 'motion' : 'detail';
     for (const sender of pc.getSenders()) if (sender.track?.kind === 'video') {
@@ -161,7 +183,8 @@ export class BrowserMedia {
   stop(): void {
     this.stopped = true; this.generation++; this.capture?.stop(); this.capture = undefined;
     for (const peer of this.peers.keys()) this.remove(peer);
-    this.stream?.getTracks().forEach(t => t.stop()); this.stream = null;
+    if (!this.borrowed) this.stream?.getTracks().forEach(t => t.stop()); this.stream = null;
+    this.relayTracks = [];
     this.audio?.stop(); this.audio = undefined;
   }
 }

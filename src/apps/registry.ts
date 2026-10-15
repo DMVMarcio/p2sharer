@@ -57,6 +57,6 @@ registerRoomApp({ kind: 'tunnels', protocolLabel: 'Tunnels', get label() { retur
   createModel: (context) => new TunnelModel(context),
   loadView: () => import('./TunnelApp').then((module) => ({ default: module.TunnelApp })) });
 registerRoomApp({ kind: 'browser', protocolLabel: 'Browser', get label() { return t('browser.title'); },
-  get description() { return t('browser.description'); }, icon: Globe, bannerClass: 'browser', detachable: false,
+  get description() { return t('browser.description'); }, icon: Globe, bannerClass: 'browser',
   createModel: context => new BrowserModel(context),
   loadView: () => import('./BrowserApp').then(module => ({ default: module.BrowserApp })) });

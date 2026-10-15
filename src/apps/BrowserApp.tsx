@@ -23,6 +23,8 @@ import { BrowserContextMenu } from './BrowserContextMenu';
 import { browserHistoryButton, browserShortcut } from './browser_shortcuts';
 import { useSelectAllOnFocus } from '../hooks/useSelectAllOnFocus';
 import type { BrowserContentMode, BrowserVideoQuality } from './browser_quality';
+import { useVideoPresentation } from '../hooks/useVideoPresentation';
+import { MediaLoadingOverlay } from '../components/common/MediaLoadingOverlay';
 
 function BrowserSettings({ model, onClose }: { model: BrowserModel; onClose: () => void }) {
   const [mode, setMode] = useState('cache');
@@ -37,10 +39,10 @@ function BrowserSettings({ model, onClose }: { model: BrowserModel; onClose: () 
       {model.state.temporary && <p>{t('browser.temporaryInfo')}</p>}
       {model.media && <>
         <label>{t('browser.contentMode')}<Select value={model.media.quality.settings.mode}
-          onValueChange={value => model.media?.configure({ ...model.media.quality.settings, mode: value as BrowserContentMode })}
+          onValueChange={value => model.configureQuality({ ...model.media!.quality.settings, mode: value as BrowserContentMode })}
           options={['auto', 'reading', 'video'].map(value => ({ value, label: t(`browser.mode.${value}`) }))} /></label>
         <label>{t('browser.videoQuality')}<Select value={model.media.quality.settings.video}
-          onValueChange={value => model.media?.configure({ ...model.media.quality.settings, video: value as BrowserVideoQuality })}
+          onValueChange={value => model.configureQuality({ ...model.media!.quality.settings, video: value as BrowserVideoQuality })}
           options={['720p30', '1080p30', '1080p60'].map(value => ({ value, label: t(`browser.quality.${value}`) }))} /></label>
       </>}
       <label>{t('browser.clearData')}<Select value={mode} disabled={model.busy} onValueChange={setMode}
@@ -155,6 +157,7 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
     return () => cancelAnimationFrame(frame);
   }, [fullscreen]);
   const active = model?.state.tabs.find(tab => tab.id === model.state.active);
+  const presenting = useVideoPresentation(video, active?.id, model?.stream ?? null, Boolean(model?.running && model.hostOnline && !minimized), model?.presentation === active?.id);
   const localActor = roomAppsService.getLocalActor();
   const cursor = useBrowserCursor(model?.pointer && model.controller === model.pointer.actor ? model.pointer : null,
     Boolean(!minimized && model?.canControl && (model.isHost || !model.controller || model.controller === localActor)), localActor, model?.state.active ?? 0);
@@ -289,6 +292,8 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
         {icon('home', <Home size={15} />, () => send({ kind: 'navigate', url: BROWSER_HOME }), !model.canControl)}
         <input ref={address} {...addressSelection} className="text-input-sm" autoComplete="off" value={url} maxLength={4096} aria-label={t('browser.address')}
           placeholder={t('browser.address')} disabled={!model.canControl} onChange={e => setUrl(e.target.value)} />
+        {active?.zoom !== undefined && Math.abs(active.zoom - 1) > 0.001 && <TooltipButton className="btn btn-secondary btn-sm browser-zoom"
+          tooltip={t('browser.resetZoom')} disabled={!model.canControl} onClick={() => send({ kind: 'zoom', direction: 0 })}>{Math.round(active.zoom * 100)}%</TooltipButton>}
         {model.isHost && icon(model.paused ? 'allowControl' : 'pauseControl', model.paused ? <Lock size={15} /> : <Unlock size={15} />, () => model.togglePause(), !model.running)}
         {model.isHost && icon('settings', <Settings size={15} />, () => setSettings(true), !model.running || model.busy)}
         {fullscreen && finishControl}
@@ -311,6 +316,7 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
           delta_y: Math.max(-5000, Math.min(5000, e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 720 : 1))), modifiers: modifiers(e), clicks: 0 });
       }}>
       <video ref={attachVideo} autoPlay playsInline muted aria-label={t('browser.title')} />
+      <MediaLoadingOverlay visible={presenting} label={t('browser.loading')} />
       {active?.loading && !fullscreen && <div className="browser-loading" role="progressbar" aria-label={t('browser.loading')}><span /></div>}
       {cursor.pointer && <div className="browser-cursor-layer"><div className={`browser-cursor${cursor.predicted ? ' predicted' : ''}`}
         style={{ left: `${cursor.pointer.x / BROWSER_WIDTH * 100}%`, top: `${cursor.pointer.y / BROWSER_HEIGHT * 100}%` }}>
@@ -328,7 +334,7 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
           <p>{t('browser.profileInfo')}</p>
           <label className="browser-temporary"><span className="modern-switch"><input type="checkbox" checked={temporary} disabled={model.busy}
             onChange={e => setTemporary(e.target.checked)} /><span className="switch-slider" /></span>{t('browser.temporary')}</label>
-          <button className="btn btn-primary" disabled={model.busy} onClick={() => void model.start(temporary)}>{t(model.busy ? 'browser.starting' : 'browser.start')}</button>
+          <button className="btn btn-primary" disabled={model.busy} onClick={() => void model.start(temporary).catch(error => showToast(localizeError(error), 4000, 'error'))}>{t(model.busy ? 'browser.starting' : 'browser.start')}</button>
         </> : <p>{t(model.hostOnline ? 'browser.waiting' : 'browser.hostOffline')}</p>}
       </div>}
     </div>

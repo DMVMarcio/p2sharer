@@ -2,6 +2,8 @@ import type { BrowserCommand } from './browser_protocol';
 
 interface Key { key: string; ctrlKey: boolean; shiftKey: boolean; altKey: boolean; metaKey: boolean }
 export function browserShortcut(event: Key): 'address' | BrowserCommand | null {
+  if ((event.ctrlKey || event.metaKey) && ['+', '=', '-', '_', '0'].includes(event.key))
+    return { kind: 'zoom', direction: event.key === '0' ? 0 : ['-', '_'].includes(event.key) ? -1 : 1 };
   if (event.key === 'F6' || (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'l') return 'address';
   if (event.key === 'F5' || (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'r')
     return { kind: 'reload', ignore_cache: event.key === 'F5' ? event.ctrlKey || event.shiftKey : event.shiftKey };

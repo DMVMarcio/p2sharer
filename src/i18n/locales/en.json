@@ -1293,5 +1293,6 @@
   "browser.context.copyText": "Copy selected text",
   "browser.context.cut": "Cut",
   "browser.context.paste": "Paste",
-  "browser.context.selectAll": "Select all"
+  "browser.context.selectAll": "Select all",
+  "browser.resetZoom": "Reset zoom"
 }

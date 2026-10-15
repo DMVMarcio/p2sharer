@@ -10,7 +10,7 @@ export function BrowserContextMenu({ model, surface }: { model: BrowserModel | u
   useEffect(() => {
     const element = surface.current;
     if (!menu || !model?.canControl || menu.tab !== model.state.active || !element) return;
-    model.contextMenu = null;
+    model.consumeContextMenu();
     const tab = menu.tab;
     const send: BrowserModel['command'] = command => { if (model.canControl && model.state.active === tab) model.command(command); };
     const bounds = element.getBoundingClientRect();

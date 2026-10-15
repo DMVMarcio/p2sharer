@@ -6,6 +6,9 @@ import type { YouTubeState } from './types.ts';
 import { preserveYouTubeTimeline, YOUTUBE_MAX_POSITION_SECONDS } from './youtube_timeline.ts';
 
 export interface RoomAppModel {
+  localSnapshot?(): unknown;
+  applyLocalSnapshot?(snapshot: unknown): void;
+  applyLocalUpdate?(payload: unknown): Promise<void>;
   prepareJoin?(): Promise<void>;
   snapshot(): unknown;
   apply(payload: unknown, actor: string, fromSnapshot: boolean, receivedAt?: number): void;
@@ -14,6 +17,7 @@ export interface RoomAppModel {
 }
 
 export interface RoomAppModelContext {
+  localView?: boolean;
   localActor: string;
   emit(payload: unknown): void;
   changed(): void;

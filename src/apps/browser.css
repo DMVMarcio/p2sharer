@@ -4,7 +4,7 @@
 .browser-chrome.collapsed { grid-template-rows: 0fr; }
 .browser-chrome-content { min-height: 0; overflow: hidden; }
 .browser-chrome-expand { position: absolute; top: 6px; right: 8px; z-index: 12; box-shadow: var(--shadow-sm); }
-.browser-tabs { display: flex; align-items: center; gap: 4px; padding: 5px 8px; overflow-x: auto; flex-shrink: 0; }
+.browser-tabs { display: flex; align-items: center; gap: 4px; padding: 5px 8px 2.5px; overflow-x: auto; flex-shrink: 0; }
 .browser-tab-slot { position: relative; display: flex; flex-shrink: 0; max-width: 240px; overflow: hidden; }
 .browser-tab-slot.entering { animation: browserTabOpen var(--transition-fast) both; }
 .browser-tab-slot.exiting { overflow: hidden; animation: browserTabClose var(--content-exit-duration) ease-out both; }
@@ -33,7 +33,9 @@
 .browser-tab.selected:hover { background: var(--accent-subtle); }
 .browser-tab span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .browser-favicon { width: 16px; height: 16px; object-fit: contain; flex-shrink: 0; }
-.browser-toolbar { display: flex; gap: 5px; padding: 5px 8px; align-items: center; flex-shrink: 0; }
+.browser-toolbar { display: flex; gap: 5px; padding: 2.5px 8px 5px; align-items: center; flex-shrink: 0; }
+.room-app-browser.fullscreen .browser-toolbar { padding-top: 5px; }
+.browser-zoom { color: var(--accent-color); font-variant-numeric: tabular-nums; }
 .browser-toolbar input { flex: 1; min-width: 40px; }
 .browser-toolbar > .btn { height: 28px; min-height: 28px; padding: 5px 8px; box-sizing: border-box; }
 .browser-toolbar > .text-input-sm { height: 28px; min-height: 28px; padding-block: 3px; box-sizing: border-box; }
