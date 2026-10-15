@@ -37,6 +37,9 @@ jobs:
           path: .release-workflow
           sparse-checkout: |
             /.github/actions/setup-build/
+            /tools/tauri.mjs
+            /tools/installer-names.mjs
+            /tools/native-build-env.mjs
             /tools/release.mjs
             /tools/test-installer-artifacts.ps1
             /src-tauri/tauri.windows.conf.json
@@ -51,6 +54,9 @@ jobs:
       - name: Apply Windows installer configuration
         shell: pwsh
         run: |
+          foreach ($buildTool in @('tauri.mjs', 'installer-names.mjs', 'native-build-env.mjs')) {
+            Copy-Item -LiteralPath (Join-Path '.release-workflow/tools' $buildTool) -Destination (Join-Path 'tools' $buildTool) -Force
+          }
           Copy-Item -LiteralPath '.release-workflow/src-tauri/tauri.windows.conf.json' -Destination 'src-tauri/tauri.windows.conf.json' -Force
           New-Item -ItemType Directory -Path 'src-tauri/windows' -Force | Out-Null
           Copy-Item -LiteralPath '.release-workflow/src-tauri/windows/installer-hooks.nsh' -Destination 'src-tauri/windows/installer-hooks.nsh' -Force
@@ -83,6 +89,7 @@ jobs:
       - name: Build signed installers and draft release
         uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
         env:
+          P2SHARER_TAURI_ACTION: '1'
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
@@ -98,11 +105,16 @@ jobs:
           uploadUpdaterJson: true
           updaterJsonPreferNsis: true
           uploadUpdaterSignatures: true
+      - name: Normalize local MSI filename
+        shell: pwsh
+        run: |
+          $installerVersion = (Get-Content 'src-tauri/tauri.conf.json' -Raw | ConvertFrom-Json).version
+          pnpm exec node tools/installer-names.mjs "src-tauri/target/release/bundle/msi/P2Sharer_${installerVersion}_x64_en-US.msi"
       - name: Validate compiled MSI upgrade and migration rules
         shell: pwsh
         run: |
           $installerVersion = (Get-Content 'src-tauri/tauri.conf.json' -Raw | ConvertFrom-Json).version
-          & .release-workflow/tools/test-installer-artifacts.ps1 -MsiPath "src-tauri/target/release/bundle/msi/P2Sharer_${installerVersion}_x64_en-US.msi"
+          & .release-workflow/tools/test-installer-artifacts.ps1 -MsiPath "src-tauri/target/release/bundle/msi/P2Sharer_${installerVersion}_x64-setup.msi"
       - name: Verify updater manifest and signing key
         run: node tools/release.mjs artifacts
       - name: Remove obsolete draft MSI asset names

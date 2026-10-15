@@ -7,7 +7,7 @@ Set-StrictMode -Version Latest
 # it, writing registry keys, or depending on this computer's installed applications.
 if (-not $MsiPath) {
     $taskConfig = Get-Content (Join-Path $PSScriptRoot '../src-tauri/tauri.conf.json') -Raw | ConvertFrom-Json
-    $MsiPath = Join-Path $PSScriptRoot "../src-tauri/target/release/bundle/msi/P2Sharer_$($taskConfig.version)_x64_en-US.msi"
+    $MsiPath = Join-Path $PSScriptRoot "../src-tauri/target/release/bundle/msi/P2Sharer_$($taskConfig.version)_x64-setup.msi"
 }
 $MsiPath = (Resolve-Path -LiteralPath $MsiPath).Path
 $taskInstaller = New-Object -ComObject WindowsInstaller.Installer
