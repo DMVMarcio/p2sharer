@@ -1,0 +1,10 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "stream-pointer",
+  "description": "Broadcaster pointer overlays receive native cursor and drawing updates.",
+  "windows": ["stream-pointer", "stream-pointer-*"],
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten"
+  ]
+}

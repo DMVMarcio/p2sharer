@@ -388,3 +388,24 @@ pub async fn update_stream_pointer_overlay(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn pointer_overlays_can_subscribe_to_native_visuals_without_window_or_update_permissions() {
+        // Exercise the resolved ACL embedded in the desktop build, not a copy of
+        // the capability-matching logic or a mocked successful event subscription.
+        let mut context: tauri::Context<tauri::Wry> = tauri::generate_context!();
+        let authority = context.runtime_authority_mut();
+        for label in ["stream-pointer", "stream-pointer-screen-1", "stream-pointer-window-2"] {
+            for command in ["plugin:event|listen", "plugin:event|unlisten"] {
+                assert!(authority.resolve_access(command, label, label, &tauri::ipc::Origin::Local).is_some(),
+                    "{label} must be able to call {command} before its readiness handshake");
+            }
+            for command in ["plugin:event|emit", "plugin:window|close", "plugin:updater|check"] {
+                assert!(authority.resolve_access(command, label, label, &tauri::ipc::Origin::Local).is_none(),
+                    "{label} must not gain unrelated permission for {command}");
+            }
+        }
+    }
+}

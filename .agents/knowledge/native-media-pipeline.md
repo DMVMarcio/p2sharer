@@ -178,7 +178,12 @@ Automatic capture uses capability-probed NVENC where supported and generic JPEG 
 `stream_pointer.rs` presents broadcaster annotations in a transparent DirectComposition
 WebView. Click-through styles, capture exclusion, and visibility are applied on the
 window's owning thread; the WebView readiness handshake cannot show an unprepared
-surface. Broadcaster cursors and drawings remain visible independently of capture
+surface. `capabilities/stream-pointer.json` grants event listen/unlisten to both
+the legacy overlay label and session-specific overlay labels. Event subscription
+must succeed before the readiness handshake; omitting that capability leaves the
+overlay hidden and prevents cursor/drawing updates. Its compiled ACL is covered by
+a native regression without granting window-control or updater permissions.
+Broadcaster cursors and drawings remain visible independently of capture
 exclusion support. Exclusion requires Windows 10 version 2004 (build 19041) or newer;
 earlier versions do not receive `WDA_MONITOR`, which cannot remove that surface from
 monitor capture. Unsupported or failed exclusion logs a warning once per overlay
