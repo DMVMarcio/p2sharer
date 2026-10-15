@@ -16,10 +16,10 @@ import { profileAction } from '../common/profile_actions';
 import { TooltipButton } from '../common/TooltipButton';
 import { useClipboardFeedback } from '../../hooks/useClipboardFeedback';
 
-export const AppHeader: React.FC<{ showUpdate?: boolean; homeScrolled?: boolean }> = ({ showUpdate = true, homeScrolled = false }) => {
+export const AppHeader: React.FC<{ showUpdate?: boolean; homeScrolled?: boolean; onLeaveRoom: () => void }> = ({ showUpdate = true, homeScrolled = false, onLeaveRoom }) => {
   useLocale();
   const openContextMenu = useContextMenu();
-  const { currentRoomCode, currentRoomInvite, currentRoomName, currentRoomPassword, username, isInRoom, leaveRoom } = useRoom();
+  const { currentRoomCode, currentRoomInvite, currentRoomName, currentRoomPassword, username, isInRoom } = useRoom();
   const { openModal } = useModal();
   const [savedRecord, setSavedRecord] = useState<SavedRoom | null>(null);
   const [savingRoom, setSavingRoom] = useState(false);
@@ -113,7 +113,7 @@ export const AppHeader: React.FC<{ showUpdate?: boolean; homeScrolled?: boolean 
         {isInRoom && (
           <TooltipButton tooltip={t("message.7b7b91d7fe87")}
             className="btn-icon-header header-leave-room" id="btn-leave-room"
-            onClick={leaveRoom} aria-label={t("message.7b7b91d7fe87")}>
+            onClick={onLeaveRoom} aria-label={t("message.7b7b91d7fe87")}>
             <LogOut size={18} aria-hidden="true" />
           </TooltipButton>
         )}

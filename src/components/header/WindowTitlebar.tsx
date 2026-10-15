@@ -11,7 +11,7 @@ import { useStore } from '../../hooks/useStore';
 import { roomService } from '../../services/room_service';
 
 /** Main-window chrome; detached media windows keep their existing controls. */
-export const WindowTitlebar: React.FC<{ onVisibilityChange: (visible: boolean) => void }> = ({ onVisibilityChange }) => {
+export const WindowTitlebar: React.FC<{ onVisibilityChange: (visible: boolean) => void; confirmClose?: () => Promise<boolean> }> = ({ onVisibilityChange, confirmClose }) => {
   useLocale();
   const nativeWindow = useMemo(() => isTauri() ? getCurrentWindow() : null, []);
   const title = useStore((state) => state.currentRoomCode && state.roomSlots.length > 0
@@ -59,13 +59,17 @@ export const WindowTitlebar: React.FC<{ onVisibilityChange: (visible: boolean) =
       event.preventDefault();
       if (closing) return;
       closing = true;
+      try {
+        if (confirmClose && !await confirmClose()) { closing = false; return; }
+      } catch (error) { closing = false; report(error); return; }
       try { await roomService.leaveRoom(); }
       catch (error) { console.warn('[Window] Room shutdown failed:', error); }
-      await nativeWindow.destroy();
+      try { await nativeWindow.destroy(); }
+      catch (error) { closing = false; report(error); }
     }));
     void refresh().catch(report);
     return () => { disposed = true; listeners.forEach((unlisten) => unlisten()); window.removeEventListener('p2sharer-native-fullscreen-changed', fullscreenChanged); };
-  }, [nativeWindow]);
+  }, [nativeWindow, confirmClose]);
 
   useEffect(() => { onVisibilityChange(Boolean(nativeWindow) && !fullscreen); }, [nativeWindow, fullscreen, onVisibilityChange]);
 

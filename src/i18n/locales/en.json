@@ -1,4 +1,9 @@
 {
+  "roomExit.title": "Unsaved room",
+  "roomExit.warning": "This room has not been saved. Would you like to save it before leaving?",
+  "roomExit.discard": "Leave without saving",
+  "roomExit.save": "Save and leave",
+
   "audio.captureChoice": "Audio to share",
   "audio.choice.exclude": "Mute some apps",
   "audio.choice.include": "Only chosen apps",

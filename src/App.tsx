@@ -1,3 +1,5 @@
+import { useRoomExit } from './hooks/useRoomExit';
+import { UnsavedRoomDialog } from './components/modals/UnsavedRoomDialog';
 import { ContentTransition } from './components/common/ContentTransition';
 import React, { useEffect, useState } from 'react';
 import { AppHeader } from './components/header/AppHeader';
@@ -46,6 +48,7 @@ export const App: React.FC = () => {
 };
 
 const MainApp: React.FC = () => {
+  const roomExit = useRoomExit();
   const [titlebarVisible, setTitlebarVisible] = useState(false);
   const [homeScrolled, setHomeScrolled] = useState(false);
   const { isInRoom, stopScreenSharing, leaveRoom, isSharingScreen, joinDialogRevision } = useRoom();
@@ -76,9 +79,9 @@ const MainApp: React.FC = () => {
 
   return (
     <>
-      <WindowTitlebar onVisibilityChange={setTitlebarVisible} />
+      <WindowTitlebar onVisibilityChange={setTitlebarVisible} confirmClose={roomExit.confirmExit} />
       <div className={`app-workspace${isInRoom ? '' : ' is-home'}`}>
-        <AppHeader showUpdate={!titlebarVisible} homeScrolled={homeScrolled} />
+        <AppHeader onLeaveRoom={async () => { if (await roomExit.confirmExit()) leaveRoom(); }} showUpdate={!titlebarVisible} homeScrolled={homeScrolled} />
         <main className="app-main" id="app-main">
           <ContentTransition value={isInRoom ? 'room' : 'home'} className="content-transition-fill">
             {view => view === 'room' ? <RoomView /> : <HomeView onScrollChange={setHomeScrolled} />}
@@ -100,6 +103,7 @@ const MainApp: React.FC = () => {
       {activeModal === 'apps' && <AppsModal />}
       <ConnectingOverlay />
       <AppUpdateDialog />
+      {roomExit.pending && <UnsavedRoomDialog busy={roomExit.busy} onDecision={roomExit.decide} />}
 
       {/* Global Notifications */}
       <ToastContainer />

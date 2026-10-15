@@ -13,6 +13,8 @@ const callbacks = new Map();
 const actions = [];
 const titles = [];
 let titlebarVisible;
+let allowClose = true;
+const confirmClose = async () => allowClose;
 const onVisibilityChange = value => { titlebarVisible = value; };
 let desktop = true, maximized = false, fullscreen = false, focused = true, unlistens = 0;
 const subscribe = async (key, callback) => {
@@ -52,7 +54,7 @@ const root = createRoot(document.getElementById('root'));
 after(async () => { await act(async () => root.unmount()); dom.window.close(); delete globalThis.windowChromeFixture; });
 
 test('caption buttons invoke native actions without becoming drag regions', async () => {
-  await act(async () => root.render(React.createElement(WindowTitlebar, { onVisibilityChange })));
+  await act(async () => root.render(React.createElement(WindowTitlebar, { onVisibilityChange, confirmClose })));
   assert.ok(document.querySelector('.window-titlebar-drag').hasAttribute('data-tauri-drag-region'));
   assert.ok([...document.querySelectorAll('button')].every(button => !button.hasAttribute('data-tauri-drag-region')));
   await act(async () => document.querySelector('[aria-label="Minimizar"]').click());
@@ -86,6 +88,11 @@ test('native and custom titles follow room join, rename, missing name and leave'
 });
 
 test('native close waits for room teardown before destroying the main window', async () => {
+  allowClose = false;
+  const previousActions = actions.length;
+  await callbacks.get('close')({ preventDefault() {} });
+  assert.equal(actions.length, previousActions, 'cancelled consent preserves the window and room');
+  allowClose = true;
   let finish;
   const teardown = new Promise(resolve => { finish = resolve; });
   windowChromeFixture.leaveRoom = () => teardown;
@@ -141,7 +148,7 @@ test('external window changes update chrome, fullscreen hides it, and teardown r
   assert.equal(callbacks.size, 0);
   assert.equal(unlistens, 3);
   desktop = false;
-  await act(async () => root.render(React.createElement(WindowTitlebar, { onVisibilityChange })));
+  await act(async () => root.render(React.createElement(WindowTitlebar, { onVisibilityChange, confirmClose })));
   assert.equal(document.querySelector('.window-titlebar'), null);
   assert.equal(titlebarVisible, false);
   assert.equal(callbacks.size, 0);

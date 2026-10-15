@@ -1,4 +1,9 @@
 {
+  "roomExit.title": "Sala não salva",
+  "roomExit.warning": "Esta sala não foi salva. Deseja salvá-la antes de sair?",
+  "roomExit.discard": "Sair sem salvar",
+  "roomExit.save": "Salvar e sair",
+
   "audio.captureChoice": "Áudio para transmitir",
   "audio.choice.exclude": "Silenciar alguns apps",
   "audio.choice.include": "Só apps escolhidos",
