@@ -1,6 +1,4 @@
 (() => {
-  const report = globalThis[__P2SHARER_CURSOR_BINDING__];
-  if (typeof report !== 'function') return;
   let point = null;
   let scheduled = false;
   const shapeAt = (x, y) => {
@@ -31,7 +29,13 @@
   const schedule = () => {
     if (scheduled || !point) return;
     scheduled = true;
-    requestAnimationFrame(() => { scheduled = false; if (point) report(shapeAt(point.x, point.y)); });
+    // Offscreen page rendering may pause animation frames; cursor feedback must not.
+    queueMicrotask(() => {
+      scheduled = false;
+      const report = globalThis[__P2SHARER_CURSOR_BINDING__];
+      if (!point || typeof report !== 'function') return;
+      report(shapeAt(point.x, point.y));
+    });
   };
   document.addEventListener('mousemove', event => {
     if (!event.isTrusted) return;
