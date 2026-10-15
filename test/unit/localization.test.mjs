@@ -6,7 +6,7 @@ import ts from 'typescript';
 import { spawnSync } from 'node:child_process';
 import { JSDOM } from 'jsdom';
 import React, { act, useState } from 'react';
-import { detectLanguage, normalizeLanguage, readLanguage } from '../../src/i18n/language.ts';
+import { APP_LANGUAGES, detectLanguage, normalizeLanguage, readLanguage } from '../../src/i18n/language.ts';
 
 const dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost', pretendToBeVisual: true });
 for (const key of ['window', 'document', 'HTMLElement', 'Element', 'Node', 'DOMParser', 'MutationObserver', 'localStorage']) globalThis[key] = dom.window[key];
@@ -38,12 +38,13 @@ const { createRoot } = await import('react-dom/client');
 const root = createRoot(document.getElementById('root'));
 after(async () => { await act(async () => root.unmount()); dom.window.close(); delete globalThis.readSystemLocaleFixture; });
 
-test('primary locale detection accepts English and Portuguese variants with English fallback', () => {
+test('primary locale detection supports every catalog, Chinese scripts and English fallback', () => {
   for (const language of ['pt-BR', 'pt-PT', 'PT_br', 'pt']) assert.equal(normalizeLanguage(language), 'pt-BR');
   for (const language of ['en-US', 'en-GB', 'EN', 'en_AU']) assert.equal(normalizeLanguage(language), 'en');
-  assert.equal(normalizeLanguage('fr-FR'), null);
+  for (const [input, expected] of Object.entries({ 'es-MX': 'es', 'fr-CA': 'fr', 'de-DE': 'de', 'it-IT': 'it', 'zh-CN': 'zh-CN', 'zh-SG': 'zh-CN', 'zh-TW': 'zh-TW', 'zh-HK': 'zh-TW', 'zh-MO': 'zh-TW', 'zh-Hans-TW': 'zh-CN', 'zh_Hant_CN': 'zh-TW', zh: 'zh-CN', 'ja-JP': 'ja', 'ko-KR': 'ko', 'hi-IN': 'hi', 'fi-FI': 'fi', 'ru-RU': 'ru' })) assert.equal(normalizeLanguage(input), expected, input);
+  assert.equal(normalizeLanguage('nl-NL'), null);
   assert.equal(normalizeLanguage(null), null);
-  assert.equal(detectLanguage(['fr-FR', 'pt-BR']), 'en');
+  assert.equal(detectLanguage(['nl-NL', 'pt-BR']), 'en');
   assert.equal(detectLanguage([]), 'en');
   localStorage.setItem('p2sharer_language', 'de-DE');
   assert.equal(readLanguage(), null);
@@ -128,13 +129,23 @@ test('virtual interface failures preserve the Windows error code in both languag
   } finally { api.setLanguage(previous); }
 });
 
-test('both catalogs cover every literal translation key and preserve interpolation variables', () => {
+test('all catalogs cover every literal translation key and preserve interpolation variables', () => {
   const en = JSON.parse(readFileSync('src/i18n/locales/en.json', 'utf8'));
-  const pt = JSON.parse(readFileSync('src/i18n/locales/pt-BR.json', 'utf8'));
-  assert.deepEqual(Object.keys(en).sort(), Object.keys(pt).sort());
-  for (const key of Object.keys(en)) {
-    assert.ok(en[key].trim(), key); assert.ok(pt[key].trim(), key);
-    assert.deepEqual(en[key].match(/\{\{[^}]+\}\}/g)?.sort(), pt[key].match(/\{\{[^}]+\}\}/g)?.sort(), key);
+  for (const language of APP_LANGUAGES) {
+    const catalog = JSON.parse(readFileSync(`src/i18n/locales/${language}.json`, 'utf8'));
+    assert.deepEqual(Object.keys(en).sort(), Object.keys(catalog).sort(), language);
+    for (const key of Object.keys(en)) {
+      assert.ok(catalog[key].trim(), `${language}: ${key}`);
+      assert.deepEqual(en[key].match(/\{\{[^}]+\}\}/g)?.sort(), catalog[key].match(/\{\{[^}]+\}\}/g)?.sort(), `${language}: ${key}`);
+      if (/^(?:wss?|https?|stun|turn):/.test(en[key])) {
+        assert.equal(catalog[key], en[key], `${language}: protocol example ${key}`);
+      }
+    }
+    for (const category of new Intl.PluralRules(language).resolvedOptions().pluralCategories) {
+      for (const base of ['tunnels.previewActive', 'tunnels.dropped', 'tunnels.connections', 'chat.unread', 'audio.detectedApps']) {
+        assert.ok(catalog[`${base}_${category}`], `${language}: ${base}_${category}`);
+      }
+    }
   }
   for (const file of readdirSync('src', { recursive: true }).filter(file => /\.tsx?$/.test(file))) {
     const source = ts.createSourceFile(file, readFileSync(`src/${file}`, 'utf8'), ts.ScriptTarget.Latest, true);
@@ -149,14 +160,14 @@ test('both catalogs cover every literal translation key and preserve interpolati
   }
 });
 
-test('every offline emoji has an accessible name in both languages', () => {
+test('every offline emoji has an accessible name in every supported language', () => {
   const catalog = JSON.parse(readFileSync('src/core/emoji_catalog.json', 'utf8'));
   const en = JSON.parse(readFileSync('src/i18n/locales/emoji-en.json', 'utf8'));
   const pt = JSON.parse(readFileSync('src/i18n/locales/emoji-pt-BR.json', 'utf8'));
-  assert.deepEqual(Object.keys(en).sort(), Object.keys(pt).sort());
-  for (const entry of catalog) {
-    assert.ok(en[`emoji.${entry.emoji}`]?.trim(), entry.name);
-    assert.ok(pt[`emoji.${entry.emoji}`]?.trim(), entry.name);
+  for (const language of APP_LANGUAGES) {
+    const labels = JSON.parse(readFileSync(`src/i18n/locales/emoji-${language}.json`, 'utf8'));
+    assert.deepEqual(Object.keys(en).sort(), Object.keys(labels).sort(), language);
+    for (const entry of catalog) assert.ok(labels[`emoji.${entry.emoji}`]?.trim(), `${language}: ${entry.name}`);
   }
   assert.equal(en['emoji.😀'], 'grinning face');
   assert.equal(pt['emoji.😀'], 'rosto risonho');
@@ -180,4 +191,33 @@ test('an open chat composer updates its placeholder and keeps the draft and edit
   assert.equal(composer.current.getMarkdown(), '😀');
   assert.equal(document.querySelector('.chat-composer-editor'), editor);
   assert.equal(editor.getAttribute('aria-label'), 'Mensagem');
+});
+
+test('all languages persist, synchronize detached windows and render localized app and emoji copy', async () => {
+  const previous = api.getLanguage();
+  const english = JSON.parse(readFileSync('src/i18n/locales/en.json', 'utf8'));
+  try {
+    for (const language of APP_LANGUAGES) {
+      await act(async () => api.setLanguage(language));
+      assert.equal(readLanguage(), language);
+      assert.equal(api.getLanguage(), language);
+      assert.equal(document.documentElement.lang, language);
+      const catalog = JSON.parse(readFileSync(`src/i18n/locales/${language}.json`, 'utf8'));
+      assert.equal(api.t('language.label'), catalog['language.label']);
+      if (language !== 'en') assert.notEqual(api.t('error.unknown'), english['error.unknown']);
+      for (const count of [0, 1, 2, 5, 21, 22, 101, 1.5, 1000000]) {
+        const category = new Intl.PluralRules(language).select(count);
+        assert.equal(api.t('chat.unread', { count }), catalog[`chat.unread_${category}`].replace('{{count}}', String(count)));
+      }
+      assert.equal(api.localizeText(catalog['roomExit.title']), catalog['roomExit.title']);
+      localStorage.setItem('p2sharer_language', language);
+      await act(async () => { window.dispatchEvent(new window.StorageEvent('storage', { key: 'p2sharer_language' })); });
+      assert.equal(api.getLanguage(), language);
+      const emojis = JSON.parse(readFileSync(`src/i18n/locales/emoji-${language}.json`, 'utf8'));
+      assert.equal(api.t('emoji.😀'), emojis['emoji.😀']);
+    }
+    await act(async () => api.setLanguage('en'));
+    const russian = JSON.parse(readFileSync('src/i18n/locales/ru.json', 'utf8'));
+    assert.equal(api.localizeText(russian['roomExit.title']), english['roomExit.title']);
+  } finally { await act(async () => api.setLanguage(previous)); }
 });

@@ -3,7 +3,6 @@
   "roomExit.warning": "This room has not been saved. Would you like to save it before leaving?",
   "roomExit.discard": "Leave without saving",
   "roomExit.save": "Save and leave",
-
   "audio.captureChoice": "Audio to share",
   "audio.choice.exclude": "Mute some apps",
   "audio.choice.include": "Only chosen apps",
@@ -417,7 +416,7 @@
   "message.91bd720166c7": "Disable all",
   "message.022956c958fc": "No servers configured.",
   "message.a3037dc71a43": "Remove",
-  "message.585f121d3f97": "wss://example.server",
+  "message.585f121d3f97": "wss://relay.example.com",
   "message.eadb377837ef": "Options",
   "message.786b48222848": "Undo",
   "message.7b659c9caa5e": "Redo",
@@ -1316,5 +1315,15 @@
   "browser.context.cut": "Cut",
   "browser.context.paste": "Paste",
   "browser.context.selectAll": "Select all",
-  "browser.resetZoom": "Reset zoom"
+  "browser.resetZoom": "Reset zoom",
+  "tunnels.previewActive_few": "{{count}} active tunnels",
+  "tunnels.previewActive_many": "{{count}} active tunnels",
+  "tunnels.dropped_few": "{{count}} dropped packets",
+  "tunnels.dropped_many": "{{count}} dropped packets",
+  "tunnels.connections_few": "{{count}} connections",
+  "tunnels.connections_many": "{{count}} connections",
+  "chat.unread_few": "{{count}} unread messages",
+  "chat.unread_many": "{{count}} unread messages",
+  "audio.detectedApps_few": "{{count}} apps detected",
+  "audio.detectedApps_many": "{{count}} apps detected"
 }

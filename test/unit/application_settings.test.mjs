@@ -1,3 +1,4 @@
+import { LANGUAGE_OPTIONS } from '../../src/i18n/language.ts';
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -181,7 +182,7 @@ test('the canonical language selector keeps its choice as an unsaved draft', asy
   const selector = document.getElementById('settings-language');
   assert.equal(selector.getAttribute('role'), 'combobox');
   await act(async () => selector.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Home', bubbles: true })));
-  assert.deepEqual([...document.querySelectorAll('[role="option"]')].map(option => option.textContent), ['English', 'Português Brasil']);
+  assert.deepEqual([...document.querySelectorAll('[role="option"]')].map(option => option.textContent), LANGUAGE_OPTIONS.map(option => option.label));
   await act(async () => selector.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
   assert.equal(document.querySelector('h3').textContent, 'Aplicação');
   assert.equal(getLanguage(), 'pt-BR');
@@ -193,6 +194,26 @@ test('the canonical language selector keeps its choice as an unsaved draft', asy
   assert.equal(document.documentElement.lang, 'en');
   assert.equal(document.getElementById('settings-beta-updates').checked, true);
   assert.equal(document.getElementById('settings-language'), selector);
+});
+
+test('new languages stay in the settings draft and save without falling back to English', async () => {
+  let saved = getLanguage();
+  for (const { value, label } of LANGUAGE_OPTIONS.slice(2)) {
+    const selector = document.getElementById('settings-language');
+    const key = name => selector.dispatchEvent(new window.KeyboardEvent('keydown', { key: name, bubbles: true }));
+    await act(async () => key('Home'));
+    for (let index = 0; index < LANGUAGE_OPTIONS.findIndex(option => option.value === value); index++) {
+      await act(async () => key('ArrowDown'));
+    }
+    await act(async () => key('Enter'));
+    assert.equal(getLanguage(), saved);
+    assert.equal(localStorage.getItem('p2sharer_language'), saved);
+    await act(async () => document.getElementById('save').click());
+    assert.equal(getLanguage(), value);
+    assert.equal(document.documentElement.lang, value);
+    assert.equal(selector.textContent, label);
+    saved = value;
+  }
 });
 
 test('the actual settings modal discards a closed language draft and applies it only on Save Settings', async () => {

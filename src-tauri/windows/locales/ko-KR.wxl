@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WixLocalization Culture="ko-kr" xmlns="http://schemas.microsoft.com/wix/2006/localization">
+  <String Id="TauriLanguage">1042</String>
+  <String Id="TauriCodepage">949</String>
+  <String Id="LaunchApp">P2Sharer 실행</String>
+  <String Id="DowngradeErrorMessage">최신 버전의 P2Sharer가 이미 설치되어 있습니다.</String>
+  <String Id="PathEnvVarFeature">P2Sharer 설치 폴더를 시스템 환경 변수 PATH에 추가하여 어디서나 프로그램을 실행할 수 있도록 합니다.</String>
+  <String Id="InstallAppFeature">P2Sharer를 설치합니다.</String>
+</WixLocalization>

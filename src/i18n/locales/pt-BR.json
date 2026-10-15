@@ -3,7 +3,6 @@
   "roomExit.warning": "Esta sala não foi salva. Deseja salvá-la antes de sair?",
   "roomExit.discard": "Sair sem salvar",
   "roomExit.save": "Salvar e sair",
-
   "audio.captureChoice": "Áudio para transmitir",
   "audio.choice.exclude": "Silenciar alguns apps",
   "audio.choice.include": "Só apps escolhidos",
@@ -417,7 +416,7 @@
   "message.91bd720166c7": "Desativar todos",
   "message.022956c958fc": "Nenhum servidor cadastrado.",
   "message.a3037dc71a43": "Remover",
-  "message.585f121d3f97": "wss://servidor.exemplo",
+  "message.585f121d3f97": "wss://relay.example.com",
   "message.eadb377837ef": "Opções",
   "message.786b48222848": "Desfazer",
   "message.7b659c9caa5e": "Refazer",
@@ -683,7 +682,7 @@
   "message.4f24b84b085c": "Servidor TURN",
   "message.1f0bc36a803d": "Permitir conexões por relay quando necessário",
   "message.87949ccf803a": "Endereços TURN (um por linha):",
-  "message.4bfa478047d1": "turn:turn.exemplo.com:3478?transport=udp turn:turn.exemplo.com:3478?transport=tcp",
+  "message.4bfa478047d1": "turn:turn.example.com:3478?transport=udp turn:turn.example.com:3478?transport=tcp",
   "message.e69e86de6c04": "Usuário (Username):",
   "message.3ff4bbfe65d6": "meu-usuario",
   "message.9c47a12d5703": "Senha (Credential):",
@@ -1316,5 +1315,15 @@
   "browser.context.cut": "Recortar",
   "browser.context.paste": "Colar",
   "browser.context.selectAll": "Selecionar tudo",
-  "browser.resetZoom": "Redefinir zoom"
+  "browser.resetZoom": "Redefinir zoom",
+  "tunnels.previewActive_few": "{{count}} túneis ativos",
+  "tunnels.previewActive_many": "{{count}} túneis ativos",
+  "tunnels.dropped_few": "{{count}} pacotes descartados",
+  "tunnels.dropped_many": "{{count}} pacotes descartados",
+  "tunnels.connections_few": "{{count}} conexões",
+  "tunnels.connections_many": "{{count}} conexões",
+  "chat.unread_few": "{{count}} mensagens não lidas",
+  "chat.unread_many": "{{count}} mensagens não lidas",
+  "audio.detectedApps_few": "{{count}} aplicativos detectados",
+  "audio.detectedApps_many": "{{count}} aplicativos detectados"
 }

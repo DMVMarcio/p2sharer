@@ -3,15 +3,75 @@
   "bundle": {
     "windows": {
       "wix": {
-        "language": "en-US",
-        "fragmentPaths": ["windows/nsis-migration.wxs"],
-        "componentRefs": ["MigrateNsisUser", "MigrateNsisMachine"]
+        "language": {
+          "en-US": {
+            "localePath": "windows/locales/en-US.wxl"
+          },
+          "pt-BR": {
+            "localePath": "windows/locales/pt-BR.wxl"
+          },
+          "es-ES": {
+            "localePath": "windows/locales/es-ES.wxl"
+          },
+          "fr-FR": {
+            "localePath": "windows/locales/fr-FR.wxl"
+          },
+          "de-DE": {
+            "localePath": "windows/locales/de-DE.wxl"
+          },
+          "it-IT": {
+            "localePath": "windows/locales/it-IT.wxl"
+          },
+          "zh-CN": {
+            "localePath": "windows/locales/zh-CN.wxl"
+          },
+          "zh-TW": {
+            "localePath": "windows/locales/zh-TW.wxl"
+          },
+          "ja-JP": {
+            "localePath": "windows/locales/ja-JP.wxl"
+          },
+          "ko-KR": {
+            "localePath": "windows/locales/ko-KR.wxl"
+          },
+          "fi-FI": {
+            "localePath": "windows/locales/fi-FI.wxl"
+          },
+          "ru-RU": {
+            "localePath": "windows/locales/ru-RU.wxl"
+          }
+        },
+        "fragmentPaths": [
+          "windows/nsis-migration.wxs"
+        ],
+        "componentRefs": [
+          "MigrateNsisUser",
+          "MigrateNsisMachine"
+        ]
       },
       "nsis": {
         "installMode": "currentUser",
-        "languages": ["English", "PortugueseBR"],
+        "languages": [
+          "English",
+          "PortugueseBR",
+          "Spanish",
+          "French",
+          "German",
+          "Italian",
+          "SimpChinese",
+          "TradChinese",
+          "Japanese",
+          "Korean",
+          "Hindi",
+          "Finnish",
+          "Russian"
+        ],
         "displayLanguageSelector": true,
-        "installerHooks": "windows/installer-hooks.nsh"
+        "installerHooks": "windows/installer-hooks.nsh",
+        "customLanguageFiles": {
+          "Hindi": "windows/locales/Hindi.nsh",
+          "Finnish": "windows/locales/Finnish.nsh"
+        }
       }
     }
   }

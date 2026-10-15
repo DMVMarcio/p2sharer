@@ -5,7 +5,7 @@ import { JSDOM } from 'jsdom';
 const revision = '5b159148f1390735049e296723f6b847229b23ef';
 const catalog = JSON.parse(readFileSync(new URL('../src/core/emoji_catalog.json', import.meta.url)));
 const normalize = (emoji) => emoji.replaceAll('\uFE0F', '');
-for (const [language, sourceLanguage] of [['en', 'en'], ['pt-BR', 'pt']]) {
+for (const [language, sourceLanguage] of [['en', 'en'], ['pt-BR', 'pt'], ['es', 'es'], ['fr', 'fr'], ['de', 'de'], ['it', 'it'], ['zh-CN', 'zh'], ['zh-TW', 'zh_Hant'], ['ja', 'ja'], ['ko', 'ko'], ['hi', 'hi'], ['fi', 'fi'], ['ru', 'ru']]) {
   const labels = new Map();
   for (const directory of ['annotations', 'annotationsDerived']) {
     const url = `https://raw.githubusercontent.com/unicode-org/cldr/${revision}/common/${directory}/${sourceLanguage}.xml`;

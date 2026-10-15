@@ -1,5 +1,5 @@
 import { t } from '../../i18n';
-import type { AppLanguage } from '../../i18n/language';
+import { LANGUAGE_OPTIONS, isAppLanguage, type AppLanguage } from '../../i18n/language';
 import { useLocale } from '../../hooks/useLocale';
 import { useAppUpdates } from '../../hooks/useAppUpdates';
 import { appUpdates } from '../../services/app_updates';
@@ -28,8 +28,8 @@ export function ApplicationSettings({ language, onLanguageChange, automatic, inc
     <div className="form-group">
       <label className="form-label" htmlFor="settings-language">{t('language.label')}</label>
       <Select id="settings-language" value={language} aria-label={t('language.label')}
-        options={[{ value: 'en', label: 'English' }, { value: 'pt-BR', label: 'Português Brasil' }]}
-        onValueChange={(value) => onLanguageChange(value === 'pt-BR' ? 'pt-BR' : 'en')} />
+        options={LANGUAGE_OPTIONS.map(option => ({ ...option }))}
+        onValueChange={(value) => { if (isAppLanguage(value)) onLanguageChange(value); }} />
     </div>
     <p className="field-info-text"><AppVersion /></p>
     <label className="settings-switch-row" htmlFor="settings-auto-updates">
