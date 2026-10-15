@@ -5043,6 +5043,9 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 .app-select:hover:not(:disabled) { background: color-mix(in srgb, var(--bg-input) 90%, var(--text-primary) 10%); }
 .app-select:focus-visible, .app-select.is-open { outline: none; border-color: var(--accent-color); box-shadow: 0 0 0 2px var(--accent-subtle); }
 .app-select:disabled { opacity: .45; cursor: default; }
+.app-select-label { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
+.app-select-icon { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.app-select-icon > img { display: block; border-radius: 2px; }
 .app-select-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .app-select-chevron { flex-shrink: 0; color: var(--text-secondary); transition: transform var(--dropdown-enter-duration) cubic-bezier(.16, 1, .3, 1); }
 .app-select.is-open .app-select-chevron { transform: rotate(180deg); }

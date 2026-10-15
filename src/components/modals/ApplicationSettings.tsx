@@ -28,7 +28,9 @@ export function ApplicationSettings({ language, onLanguageChange, automatic, inc
     <div className="form-group">
       <label className="form-label" htmlFor="settings-language">{t('language.label')}</label>
       <Select id="settings-language" value={language} aria-label={t('language.label')}
-        options={LANGUAGE_OPTIONS.map(option => ({ ...option }))}
+        options={LANGUAGE_OPTIONS.map(option => ({ ...option,
+          icon: <img src={`/flags/${option.flag}.svg`} alt="" width={20} height={15} draggable={false} />,
+        }))}
         onValueChange={(value) => { if (isAppLanguage(value)) onLanguageChange(value); }} />
     </div>
     <p className="field-info-text"><AppVersion /></p>

@@ -58,7 +58,12 @@ export function inspectEntry(path, content) {
   if (content.length > maxBytes) findings.push('file exceeds 5 MiB; review and use an appropriate distribution channel');
   if (!content.subarray(0, 8000).includes(0)) {
     const text = content.toString('utf8');
-    findings.push(...inspectNetworkIdentifiers(text));
+    // Compact SVG path decimals can resemble IPv4. Keep scanning every other
+    // attribute, metadata and text, and exclude only numeric path geometry.
+    const networkText = /\.svg$/i.test(path)
+      ? text.replace(/(<path\b[^>]*?\sd\s*=\s*)(["'])[Mm][MmZzLlHhVvCcSsQqTtAaEe\d+.,\s-]*\2/g, '$1$2$2')
+      : text;
+    findings.push(...inspectNetworkIdentifiers(networkText));
     if (/-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/.test(text) ||
         /\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{50,}|(?:AKIA|ASIA)[A-Z0-9]{16}|xox[baprs]-[A-Za-z0-9-]{20,})\b/.test(text)) {
       findings.push('potential credential; revoke real credentials and review history');

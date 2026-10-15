@@ -39,4 +39,14 @@ describe('Public repository hygiene', () => {
     assert.ok(inspectNetworkIdentifiers(privateHost).length);
     assert.deepEqual(inspectNetworkIdentifiers('wss://public:public@public.cloud.shiftr.io https://tauri.localhost'), []);
   });
+  it('distinguishes compact SVG path coordinates from network identifiers', () => {
+    const coordinates = [1, 4, 8, 7].join('.');
+    const geometry = `<path fill="#fff" d="M0 0c1 2 ${coordinates} 0"/>`;
+    assert.deepEqual(inspect('flag.svg', `<svg>${geometry}</svg>`), []);
+    assert.ok(inspect('note.md', geometry).length);
+    const address = [10, 12, 34, 56].join('.');
+    assert.ok(inspect('flag.svg', `<svg><metadata>${address}</metadata>${geometry}</svg>`).length);
+    assert.ok(inspect('flag.svg', `<svg><path data-source="http://${address}" d="M0 0c1 2 ${coordinates} 0"/></svg>`).length);
+    assert.ok(inspect('flag.svg', `<svg><path d="http://${address}"/></svg>`).length);
+  });
 });

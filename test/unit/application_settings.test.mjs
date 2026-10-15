@@ -181,8 +181,12 @@ test('application update controls keep drafts unsaved and check only the saved c
 test('the canonical language selector keeps its choice as an unsaved draft', async () => {
   const selector = document.getElementById('settings-language');
   assert.equal(selector.getAttribute('role'), 'combobox');
+  assert.equal(selector.querySelector('img').getAttribute('src'), '/flags/br.svg');
+  assert.equal(selector.querySelector('img').getAttribute('alt'), '');
+  assert.equal(selector.querySelector('img').parentElement.getAttribute('aria-hidden'), 'true');
   await act(async () => selector.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Home', bubbles: true })));
   assert.deepEqual([...document.querySelectorAll('[role="option"]')].map(option => option.textContent), LANGUAGE_OPTIONS.map(option => option.label));
+  assert.deepEqual([...document.querySelectorAll('[role="option"] img')].map(icon => icon.getAttribute('src')), LANGUAGE_OPTIONS.map(option => `/flags/${option.flag}.svg`));
   await act(async () => selector.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
   assert.equal(document.querySelector('h3').textContent, 'Aplicação');
   assert.equal(getLanguage(), 'pt-BR');
@@ -198,7 +202,7 @@ test('the canonical language selector keeps its choice as an unsaved draft', asy
 
 test('new languages stay in the settings draft and save without falling back to English', async () => {
   let saved = getLanguage();
-  for (const { value, label } of LANGUAGE_OPTIONS.slice(2)) {
+  for (const { value, label, flag } of LANGUAGE_OPTIONS.slice(2)) {
     const selector = document.getElementById('settings-language');
     const key = name => selector.dispatchEvent(new window.KeyboardEvent('keydown', { key: name, bubbles: true }));
     await act(async () => key('Home'));
@@ -206,6 +210,7 @@ test('new languages stay in the settings draft and save without falling back to 
       await act(async () => key('ArrowDown'));
     }
     await act(async () => key('Enter'));
+    assert.equal(selector.querySelector('img').getAttribute('src'), `/flags/${flag}.svg`);
     assert.equal(getLanguage(), saved);
     assert.equal(localStorage.getItem('p2sharer_language'), saved);
     await act(async () => document.getElementById('save').click());

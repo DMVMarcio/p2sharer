@@ -1,6 +1,6 @@
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type KeyboardEvent } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type KeyboardEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { autoUpdate, computePosition, flip, offset, shift, size } from '@floating-ui/dom';
 import { Check, ChevronDown } from 'lucide-react';
@@ -9,6 +9,8 @@ import { useDropdownPresence } from '../../hooks/useDropdownPresence';
 export interface SelectOption {
   value: string | number;
   label: string;
+  /** Decorative content shared by the option and selected value; labels stay plain text for typeahead. */
+  icon?: ReactNode;
   disabled?: boolean;
 }
 
@@ -144,7 +146,10 @@ export function Select({ value, options, onValueChange, placeholder = t("message
       aria-activedescendant={open && activeIndex >= 0 ? `${listId}-${activeIndex}` : undefined}
       onKeyDown={keyboard} onBlur={(event) => { close(); onBlur?.(event); }}
       onClick={(event) => { event.stopPropagation(); if (open) close(); else show(); }}>
-      <span className="app-select-value">{options[selectedIndex]?.label ?? placeholder}</span>
+      <span className="app-select-label">
+        {options[selectedIndex]?.icon && <span className="app-select-icon" aria-hidden="true">{options[selectedIndex].icon}</span>}
+        <span className="app-select-value">{options[selectedIndex]?.label ?? placeholder}</span>
+      </span>
       <ChevronDown className="app-select-chevron" size={14} aria-hidden="true" />
     </button>
     {presence.value && createPortal(<div ref={listRef} id={listId} role="listbox"
@@ -160,7 +165,10 @@ export function Select({ value, options, onValueChange, placeholder = t("message
         className={`app-select-option ${index === activeIndex ? 'is-active' : ''}`}
         onPointerMove={() => { if (!option.disabled) setActiveIndex(index); }}
         onClick={(event) => { event.stopPropagation(); choose(index); }}>
-        <span>{option.label}</span>{index === selectedIndex && <Check size={14} aria-hidden="true" />}
+        <span className="app-select-label">
+          {option.icon && <span className="app-select-icon" aria-hidden="true">{option.icon}</span>}
+          <span>{option.label}</span>
+        </span>{index === selectedIndex && <Check size={14} aria-hidden="true" />}
       </div>)}
     </div>, document.fullscreenElement ?? document.body)}
   </>;
