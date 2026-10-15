@@ -140,6 +140,7 @@ pub fn run() {
             }
             let handler: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool = tauri::generate_handler![
             shared_browser::start_shared_browser,
+            shared_browser::read_shared_browser_selection,
             shared_browser::stop_shared_browser,
             shared_browser::set_shared_browser_volume,
             shared_browser::control_shared_browser,

@@ -18,6 +18,7 @@ export class BrowserModel implements RoomAppModel {
   get host(): string { return this.context.localView ? this.mirrorHost : this.ownership.host; }
   private mirrorHost = '';
   private localRequests: BrowserLocalRequests;
+  private clipboardRequests: BrowserLocalRequests;
   get localView(): boolean { return Boolean(this.context.localView); }
   get isHost(): boolean { return this.host === this.context.localActor; }
   get canStart(): boolean { return this.joined && (!this.host || this.isHost) && !this.running && !this.busy; }
@@ -68,6 +69,12 @@ export class BrowserModel implements RoomAppModel {
   constructor(context: RoomAppModelContext, native: BrowserNative = { call: invoke }, desktop = isTauri()) {
     this.context = context; this.native = native; this.desktop = desktop;
     this.localRequests = new BrowserLocalRequests(payload => this.context.emit(payload));
+    this.clipboardRequests = new BrowserLocalRequests(payload => {
+      const { id } = payload as { id: string };
+      const packet = { type: 'copy-request', id, tab: this.state.active, session: this.session, sequence: ++this.sequence };
+      if (this.isHost) this.apply(packet, this.context.localActor, false);
+      else void this.context.send?.(packet, this.host).catch(() => this.clipboardRequests.result(id, 'Browser selection unavailable'));
+    }, 10_000);
     this.ownership = new BrowserOwnership(context.localActor, async (packet, peer) => { await context.send?.(packet, peer); }, (previous, next) => {
       const wasRunning = this.running;
       this.stop(false);
@@ -115,7 +122,12 @@ export class BrowserModel implements RoomAppModel {
     if (this.media && validBrowserQuality(data.quality) && JSON.stringify(this.media.quality.settings) !== JSON.stringify(data.quality)) this.media.quality.configure(data.quality);
     this.context.changed();
   }
-  acceptLocalResult(id: string, error?: string): void { this.localRequests.result(id, error); }
+  acceptLocalResult(id: string, error?: string, value?: unknown): void { this.localRequests.result(id, error, value); }
+  async copy(): Promise<string> {
+    if (!this.joined || !this.running || !this.hostOnline || this.disposed) return '';
+    const text = this.localView ? await this.localRequests.request<unknown>('copy') : await this.clipboardRequests.request<unknown>('copy');
+    return typeof text === 'string' && text.length <= 65536 ? text : '';
+  }
   async applyLocalUpdate(value: unknown): Promise<void> {
     if (this.localView || !this.joined || !value || typeof value !== 'object') return;
     const data = value as { type?: string; action?: string; args?: unknown[] };
@@ -129,6 +141,7 @@ export class BrowserModel implements RoomAppModel {
       case 'volume': if (typeof first === 'number' && typeof second === 'boolean') await this.setLocalVolume(first, second); break;
       case 'quality': if (validBrowserQuality(first)) this.configureQuality(first); break;
       case 'hardware': if (typeof first === 'boolean') this.configureHardwareAcceleration(first); break;
+      case 'restart': await this.restart(); break;
       case 'dismiss-extension': this.dismissExtensionRequest(); break;
       case 'dismiss-context': if (this.contextMenu?.id === first) { this.contextMenu = null; this.context.changed(); } break;
       case 'answer': if (typeof first === 'boolean' && typeof second === 'string') this.answerDialog(first, second); break;
@@ -197,7 +210,15 @@ export class BrowserModel implements RoomAppModel {
     try { if ((this.isHost || await this.ownership.request()) && this.joined && this.isHost) await this.startNative(temporary); }
     finally { this.busy = false; this.context.changed(); }
   }
-  private async startNative(temporary: boolean): Promise<void> {
+  async restart(): Promise<void> {
+    if (this.localView) return this.localRequests.request('restart');
+    if (!this.desktop || !this.isHost || !this.joined || !this.running || this.busy) return;
+    const temporary = this.state.temporary;
+    this.busy = true; this.stop(false);
+    this.state = { tabs: [], active: 0, temporary }; this.changed();
+    await this.startNative(temporary, true);
+  }
+  private async startNative(temporary: boolean, restart = false): Promise<void> {
     this.busy = true; this.context.changed();
     const epoch = this.epoch;
     try {
@@ -252,7 +273,7 @@ export class BrowserModel implements RoomAppModel {
         } catch (error) { removePopup(); throw error; }
       })();
       await this.listening;
-      const state = await this.native.call<BrowserState>('start_shared_browser', { scope: this.scope, temporary, language: getLanguage(), hardwareAcceleration: this.hardwareAcceleration });
+      const state = await this.native.call<BrowserState>('start_shared_browser', { scope: this.scope, temporary, language: getLanguage(), hardwareAcceleration: this.hardwareAcceleration, ...(restart ? { restart: true } : {}) });
       if (this.disposed || epoch !== this.epoch || !this.joined) {
         await this.native.call('stop_shared_browser', { scope: this.scope }); return;
       }
@@ -324,6 +345,11 @@ export class BrowserModel implements RoomAppModel {
     }
     if (fromSnapshot && data.ownership && typeof data.ownership === 'object')
       this.ownership.handle({ ...data.ownership, type: 'ownership' }, actor, true);
+    if (data.type === 'copy-result' && actor === this.host && !fromSnapshot && this.joined && this.running
+      && data.session === this.session && Number.isSafeInteger(data.tab) && Number(data.tab) > 0 && typeof data.id === 'string'
+      && typeof data.text === 'string' && data.text.length <= 65536 && (data.error === undefined || data.error === 'Browser selection unavailable')) {
+      this.clipboardRequests.result(data.id, data.error as string | undefined, data.text); return;
+    }
     if (data.type === 'context-menu' && !this.isHost && actor === this.host && !fromSnapshot && this.canControl
       && data.session === this.session && validBrowserContext(data.menu) && data.menu.tab === this.state.active) {
       this.contextMenu = { ...data.menu, id: ++this.contextId }; this.context.changed(); return;
@@ -353,6 +379,25 @@ export class BrowserModel implements RoomAppModel {
       this.dialog = dialog; this.context.changed(); return;
     }
     if (fromSnapshot || !this.joined || !this.members.has(actor)) return;
+    if (data.type === 'copy-request' && this.isHost && this.running && data.session === this.session && data.tab === this.state.active
+      && typeof data.id === 'string' && /^[a-f0-9-]{36}$/.test(data.id) && Number.isSafeInteger(data.sequence)
+      && Number(data.sequence) > (this.received.get(actor) ?? 0)) {
+      this.received.set(actor, Number(data.sequence));
+      const epoch = this.epoch; const membership = this.memberEpochs.get(actor); const tab = this.state.active;
+      const respond = (text: string, error?: string) => {
+        if (this.epoch !== epoch || !this.running || !this.members.has(actor) || this.memberEpochs.get(actor) !== membership) return;
+        const result = { type: 'copy-result', id: data.id, text, error, session: this.session, tab };
+        if (actor === this.host) this.apply(result, this.host, false);
+        else void this.context.send?.(result, actor).catch(() => {});
+      };
+      void this.queue(async () => {
+        if (this.epoch !== epoch || !this.running || this.memberEpochs.get(actor) !== membership) return;
+        if (this.state.active !== tab) { respond(''); return; }
+        const text = await this.native.call<unknown>('read_shared_browser_selection', { scope: this.scope, tab });
+        respond(typeof text === 'string' ? text.slice(0, 65536) : '');
+      }).catch(() => respond('', 'Browser selection unavailable'));
+      return;
+    }
     if (data.type === 'dialog-answer') {
       if (!this.isHost || !this.dialog || this.answering || data.id !== this.dialog.id || typeof data.accept !== 'boolean'
         || typeof data.text !== 'string' || data.text.length > 4096 || this.paused && actor !== this.host
@@ -519,6 +564,7 @@ export class BrowserModel implements RoomAppModel {
     }
   }
   private stop(native = true): void {
+    this.clipboardRequests.destroy();
     this.epoch++; clearInterval(this.timer); this.media?.stop(); this.media = null;
     this.session = '';
     this.pendingMoves.clear(); this.visualSequences.clear();

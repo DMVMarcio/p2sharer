@@ -6,6 +6,18 @@ pub fn arguments(inherited: &str, hardware_acceleration: bool) -> String {
     format!("{inherited} --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows --disable-direct-composition-video-overlays --disable-direct-composition-sw-video-overlays{software}")
 }
 
+#[cfg(windows)]
+pub async fn wait_for_exit(pid: u32) -> Result<(), String> {
+    // Passive wait: restarting never terminates the shell or kills a browser process.
+    tokio::task::spawn_blocking(move || unsafe {
+        use windows::Win32::{Foundation::{CloseHandle, WAIT_OBJECT_0}, System::Threading::{OpenProcess, WaitForSingleObject, PROCESS_SYNCHRONIZE}};
+        let Ok(handle) = OpenProcess(PROCESS_SYNCHRONIZE, false, pid) else { return Ok(()); };
+        let result = WaitForSingleObject(handle, 6000);
+        let _ = CloseHandle(handle);
+        if result == WAIT_OBJECT_0 { Ok(()) } else { Err("Browser restart timed out".into()) }
+    }).await.map_err(|e| e.to_string())?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

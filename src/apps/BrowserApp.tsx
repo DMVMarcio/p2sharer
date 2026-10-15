@@ -32,6 +32,7 @@ function BrowserSettings({ model, onClose }: { model: BrowserModel; onClose: () 
   const [confirm, setConfirm] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
   const [installLink, setInstallLink] = useState(false);
+  const [restart, setRestart] = useState(false);
   const run = (operation: Promise<void>) => void operation.catch(e => showToast(localizeError(e), 4000, 'error'));
   useEffect(() => { run(model.manageExtensions('list')); }, [model]);
   return <ModalDialog title={t('browser.settings')} icon={<Settings size={20} />} className="browser-settings-dialog" onClose={onClose} busy={model.busy}>
@@ -39,9 +40,8 @@ function BrowserSettings({ model, onClose }: { model: BrowserModel; onClose: () 
       <div className="browser-settings-column">
       {model.state.temporary && <p>{t('browser.temporaryInfo')}</p>}
       <label>{t('browser.hardwareAcceleration')}<Select value={model.hardwareAcceleration ? 'on' : 'off'} disabled={model.busy}
-        onValueChange={value => model.configureHardwareAcceleration(value === 'on')}
+        onValueChange={value => { if ((value === 'on') !== model.hardwareAcceleration) { model.configureHardwareAcceleration(value === 'on'); setRestart(true); } }}
         options={[{ value: 'on', label: t('browser.hardwareOn') }, { value: 'off', label: t('browser.hardwareOff') }]} /></label>
-      <p>{t('browser.hardwareRestart')}</p>
       {model.media && <>
         <label>{t('browser.contentMode')}<Select value={model.media.quality.settings.mode}
           onValueChange={value => model.configureQuality({ ...model.media!.quality.settings, mode: value as BrowserContentMode })}
@@ -75,6 +75,12 @@ function BrowserSettings({ model, onClose }: { model: BrowserModel; onClose: () 
       </div>)}
       </div>
     </div>
+    {restart && <ModalDialog title={t('browser.restartTitle')} onClose={() => setRestart(false)} busy={model.busy}
+      footer={<><button className="btn btn-secondary" disabled={model.busy} onClick={() => setRestart(false)}>{t('browser.restartLater')}</button>
+        <button className="btn btn-primary" disabled={model.busy || !model.isHost || !model.running}
+          onClick={() => run(model.restart().then(() => { setRestart(false); onClose(); }))}>{t('browser.restartNow')}</button></>}>
+      <p>{t(model.state.temporary ? 'browser.restartTemporaryInfo' : 'browser.restartInfo')}</p>
+    </ModalDialog>}
     {confirm && <ModalDialog title={t(`browser.clear.${mode}`)} onClose={() => setConfirm(false)} busy={model.busy}
       footer={close => <><button className="btn btn-secondary" disabled={model.busy} onClick={close}>{t('browser.cancel')}</button>
         <button className="btn btn-danger" disabled={model.busy} onClick={() => {
@@ -244,6 +250,12 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
   };
   const key = (e: KeyboardEvent<HTMLTextAreaElement>, event: 'keyDown' | 'keyUp') => {
     if (composing.current || e.nativeEvent.isComposing) return;
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'c') {
+      e.preventDefault();
+      if (event === 'keyDown' && !e.repeat) void model.copy().then(text => { if (text) return navigator.clipboard.writeText(text); })
+        .catch(error => showToast(localizeError(error), 4000, 'error'));
+      return;
+    }
     // Let the local textarea receive paste; never paste the host's personal clipboard.
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') return;
     if (e.key === 'Dead') return;

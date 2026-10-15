@@ -129,6 +129,49 @@ test('page context is accepted only from the live host session with safe bounded
   } finally { model.destroy(); }
 });
 
+test('copy reads the shared page only for the requesting actor and survives a later tab change', async () => {
+  const host = fixture('host', async command => command === 'read_shared_browser_selection' ? 'Selected page text' : null);
+  const viewer = fixture('alice');
+  try {
+    const copied = viewer.model.copy();
+    const request = viewer.sent.at(-1)!;
+    assert.equal(request.target, 'host');
+    host.model.apply(request.payload, 'alice', false); await settle();
+    assert.equal(host.calls.at(-1)?.command, 'read_shared_browser_selection');
+    assert.equal(host.sent.length, 1);
+    assert.equal(host.sent[0].target, 'alice');
+    const result = host.sent[0].payload as Record<string, unknown>;
+    let complete = false; void copied.then(() => { complete = true; });
+    viewer.model.apply(result, 'bob', false);
+    viewer.model.apply(result, 'host', true);
+    viewer.model.apply({ ...result, session: crypto.randomUUID() }, 'host', false);
+    await settle(); assert.equal(complete, false);
+    viewer.model.state = { tabs: [...viewer.model.state.tabs, { id: 2, title: 'Other tab', url: 'https://example.com/other' }], active: 2, temporary: false };
+    viewer.model.apply(result, 'host', false);
+    assert.equal(await copied, 'Selected page text');
+    host.model.apply(request.payload, 'alice', false); await settle();
+    assert.equal(host.calls.length, 1, 'replayed copy request cannot read the page again');
+    const ownCopy = host.model.copy();
+    assert.equal(await ownCopy, 'Selected page text');
+    assert.equal(host.sent.length, 1, 'host copies do not expose text to spectators');
+  } finally { host.model.destroy(); viewer.model.destroy(); }
+});
+
+test('detached copy returns text to the requesting window without native IPC in the mirror', async () => {
+  const main = fixture('host', async command => command === 'read_shared_browser_selection' ? 'Detached selection' : null);
+  let mirrorCalls = 0;
+  const mirror = new BrowserModel({ localView: true, localActor: 'host', instanceId: crypto.randomUUID(), changed() {},
+    emit(payload) {
+      const request = payload as { id: string };
+      void main.model.copy().then(text => mirror.acceptLocalResult(request.id, undefined, text));
+    } }, { call: async <T>() => { mirrorCalls++; return null as T; } }, true);
+  try {
+    mirror.setParticipants(['host', 'alice']); mirror.applyLocalSnapshot(main.model.localSnapshot());
+    assert.equal(await mirror.copy(), 'Detached selection');
+    assert.equal(mirrorCalls, 0);
+  } finally { mirror.destroy(); main.model.destroy(); }
+});
+
 test('browser failures use dismissible expiring notifications and coalesce repeated input failures', async context => {
   context.mock.timers.enable({ apis: ['setTimeout'] });
   let notifications: { id: string; type: string }[] = [];

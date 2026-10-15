@@ -34,7 +34,7 @@ export const RoomAppWindow: React.FC<{ instanceId: string }> = ({ instanceId }) 
     void listen<AppWindowMessage>(appWindowEvent(instanceId), ({ payload: message }) => {
       if (disposed) return;
       if (message.type === 'browser-media') { void browserMedia?.receive('main', message.payload).catch(reason => showToast(localizeError(reason), 5000, 'error')); return; }
-      if (message.type === 'browser-result') { roomAppsService.getModel<BrowserModel>(instanceId)?.acceptLocalResult(message.id, message.error); return; }
+      if (message.type === 'browser-result') { roomAppsService.getModel<BrowserModel>(instanceId)?.acceptLocalResult(message.id, message.error, message.value); return; }
       if (message.type !== 'state' || message.instance.id !== instanceId) return;
       const definition = getRoomApp(message.instance.kind);
       if (!definition) return;

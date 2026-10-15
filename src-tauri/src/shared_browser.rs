@@ -23,6 +23,9 @@ mod context_menu;
 #[path = "browser_cursor.rs"]
 mod cursor;
 #[cfg(windows)]
+#[path = "browser_selection.rs"]
+mod selection;
+#[cfg(windows)]
 #[path = "browser_favicon.rs"]
 mod favicon;
 #[cfg(windows)]
@@ -265,12 +268,15 @@ pub async fn start_shared_browser(
     temporary: bool,
     language: Option<String>,
     hardware_acceleration: Option<bool>,
+    restart: Option<bool>,
 ) -> Result<Value, String> {
     trusted(&window, &scope)?;
     let _operation = state.1.lock().await;
+    let restored = if restart.unwrap_or(false) { Some(prepare_restart(&app, &state, &scope).await?) } else { None };
+    let temporary = restored.as_ref().map_or(temporary, |(_, temporary, _)| *temporary);
     let base = root(&app)?;
     std::fs::create_dir_all(&base).map_err(|e| e.to_string())?;
-    let directory = if temporary {
+    let directory = if let Some((directory, _, _)) = &restored { directory.clone() } else if temporary {
         base.join(format!(
             "temporary-{scope}-{}",
             std::time::SystemTime::now()
@@ -319,7 +325,7 @@ pub async fn start_shared_browser(
             },
         );
     }
-    let saved = if temporary {
+    let saved = if let Some((_, _, saved)) = restored { saved } else if temporary {
         SavedTabs::default()
     } else {
         std::fs::read(base.join("tabs.json"))
@@ -543,10 +549,7 @@ async fn browser_state(
         session.serial
     };
     if !temporary {
-        let saved = SavedTabs {
-            urls: updated.iter().map(|t| t.url.clone()).collect(),
-            active_index: updated.iter().position(|t| t.id == active).unwrap_or(0),
-        };
+        let saved = saved_tabs(&updated, active);
         let changed = {
             state
                 .0
@@ -572,6 +575,40 @@ async fn browser_state(
     Ok(json!({"tabs": updated, "active": active, "temporary": temporary, "serial": serial}))
 }
 
+fn saved_tabs(tabs: &[Tab], active: u32) -> SavedTabs {
+    SavedTabs { urls: tabs.iter().map(|tab| tab.url.clone()).collect(), active_index: tabs.iter().position(|tab| tab.id == active).unwrap_or(0) }
+}
+
+async fn prepare_restart(app: &AppHandle, state: &BrowserState, scope: &str) -> Result<(PathBuf, bool, SavedTabs), String> {
+    let (directory, temporary, saved, labels, active) = {
+        let sessions = state.0.lock().unwrap();
+        let session = sessions.get(scope).ok_or("Browser closed")?;
+        (session.directory.clone(), session.temporary, saved_tabs(&session.tabs, session.active),
+            session.tabs.iter().map(|tab| label(scope, tab.id)).collect::<Vec<_>>(), session.active)
+    };
+    #[cfg(windows)]
+    let pid = {
+        let view = app.get_webview_window(&label(scope, active)).ok_or("Browser closed")?;
+        on_view(&view, |core, tx| unsafe {
+            let mut pid = 0;
+            let _ = tx.send(core.BrowserProcessId(&mut pid).map(|_| pid).map_err(|e| e.to_string()));
+        }).await?
+    };
+    #[cfg(not(windows))]
+    let _ = active;
+    // Reuse the temporary profile directory; InPrivate memory ends with its process.
+    if let Some(session) = state.0.lock().unwrap().get_mut(scope) { session.temporary = false; }
+    close_session(app, state, scope);
+    for _ in 0..200 {
+        if labels.iter().all(|label| app.get_webview_window(label).is_none()) { break; }
+        tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+    }
+    if labels.iter().any(|label| app.get_webview_window(label).is_some()) { return Err("Browser restart timed out".into()); }
+    #[cfg(windows)]
+    runtime::wait_for_exit(pid).await?;
+    Ok((directory, temporary, saved))
+}
+
 fn close_session(app: &AppHandle, state: &BrowserState, scope: &str) {
     let session = { state.0.lock().unwrap().remove(scope) };
     if let Some(session) = session {
@@ -592,6 +629,24 @@ fn close_session(app: &AppHandle, state: &BrowserState, scope: &str) {
             cleanup_directory(session.directory);
         }
     }
+}
+
+#[tauri::command]
+pub async fn read_shared_browser_selection(app: AppHandle, window: WebviewWindow,
+    state: tauri::State<'_, BrowserState>, scope: String, tab: u32) -> Result<String, String> {
+    trusted(&window, &scope)?;
+    let _operation = state.1.lock().await;
+    let generation = state.0.lock().unwrap().get(&scope).filter(|session| session.active == tab)
+        .map(|session| session.generation).ok_or("Browser selection unavailable")?;
+    let view = app.get_webview_window(&label(&scope, tab)).ok_or("Browser selection unavailable")?;
+    #[cfg(windows)]
+    let text = selection::read(&view).await?;
+    #[cfg(not(windows))]
+    let text = { let _ = view; String::new() };
+    if !state.0.lock().unwrap().get(&scope).is_some_and(|session| session.generation == generation && session.active == tab) {
+        return Err("Browser selection unavailable".into());
+    }
+    Ok(text)
 }
 fn cleanup_directory(directory: PathBuf) {
     // The caller supplies only app-generated profile directories, never a room path.

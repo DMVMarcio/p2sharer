@@ -59,9 +59,10 @@ export function useAppWindow(instance: RoomAppInstance) {
         } else if (message.type === 'update') {
           const model = roomAppsService.getModel(instance.id);
           if (model instanceof BrowserModel) {
-            const request = message.payload as { id?: unknown } | null;
-            void model.applyLocalUpdate(message.payload).then(() => {
-              if (typeof request?.id === 'string' && active.current) return sendAppWindow(instance.id, 'external', { type: 'browser-result', id: request.id });
+            const request = message.payload as { id?: unknown; type?: unknown; action?: unknown } | null;
+            const operation = request?.type === 'browser-local' && request.action === 'copy' ? model.copy() : model.applyLocalUpdate(message.payload);
+            void operation.then(value => {
+              if (typeof request?.id === 'string' && active.current) return sendAppWindow(instance.id, 'external', { type: 'browser-result', id: request.id, value });
             }).catch(error => {
               if (typeof request?.id === 'string' && active.current) void sendAppWindow(instance.id, 'external', { type: 'browser-result', id: request.id, error: localizeError(error) });
               else showToast(localizeError(error), 4000, 'error');

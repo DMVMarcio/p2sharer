@@ -8,7 +8,7 @@ export type AppWindowMessage =
   | { type: 'ready' }
   | { type: 'update'; payload: unknown }
   | { type: 'browser-media'; payload: Record<string, unknown> }
-  | { type: 'browser-result'; id: string; error?: string }
+  | { type: 'browser-result'; id: string; error?: string; value?: unknown }
   | { type: 'state'; instance: RoomAppInstance; actor: string; participants: string[];
       snapshot: unknown; username: string; receivedAt?: number }
   | { type: 'restore' };
