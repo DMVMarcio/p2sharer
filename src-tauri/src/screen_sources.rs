@@ -942,6 +942,29 @@ pub fn ensure_ws_server_running() {
     });
 }
 
+fn window_source_dimensions(win: &Window, minimized: bool) -> (u32, u32) {
+    #[cfg(windows)]
+    if minimized {
+        use windows::Win32::{Foundation::HWND, UI::WindowsAndMessaging::{GetWindowPlacement, WINDOWPLACEMENT}};
+        if let Ok(id) = win.id() {
+            let mut placement = WINDOWPLACEMENT {
+                length: std::mem::size_of::<WINDOWPLACEMENT>() as u32,
+                ..Default::default()
+            };
+            // Minimized frame bounds describe the taskbar icon, not the app's restored size.
+            if unsafe { GetWindowPlacement(HWND(id as usize as *mut std::ffi::c_void), &mut placement) }.is_ok() {
+                let rect = placement.rcNormalPosition;
+                return ((rect.right - rect.left).max(0) as u32, (rect.bottom - rect.top).max(0) as u32);
+            }
+        }
+    }
+    (win.width().unwrap_or(0), win.height().unwrap_or(0))
+}
+
+fn include_window_source(minimized: bool, width: u32, height: u32) -> bool {
+    minimized || (width >= 250 && height >= 200)
+}
+
 #[tauri::command]
 pub fn list_screen_sources() -> ScreenSourcesResponse {
     let mut monitors_out = Vec::new();
@@ -998,9 +1021,6 @@ pub fn list_screen_sources() -> ScreenSourcesResponse {
         let mut candidate_windows = Vec::new();
         for win in windows {
             let is_minimized = win.is_minimized().unwrap_or(false);
-            if is_minimized {
-                continue;
-            }
 
             let title = win.title().unwrap_or_default();
             let title_trim = title.trim().to_string();
@@ -1010,26 +1030,22 @@ pub fn list_screen_sources() -> ScreenSourcesResponse {
                 continue;
             }
 
-            let width = win.width().unwrap_or(0);
-            let height = win.height().unwrap_or(0);
+            let (width, height) = window_source_dimensions(&win, is_minimized);
 
-            if width < 250 || height < 200 {
+            if !include_window_source(is_minimized, width, height) {
                 continue;
             }
 
-            candidate_windows.push((win, title_trim, app_name, width, height));
-            if candidate_windows.len() >= 20 {
-                break;
-            }
+            candidate_windows.push((win, title_trim, app_name, width, height, is_minimized));
         }
 
-        for (idx, (win, title_trim, app_name, width, height)) in candidate_windows.into_iter().enumerate() {
+        for (idx, (win, title_trim, app_name, width, height, is_minimized)) in candidate_windows.into_iter().enumerate() {
             let pid = win.pid().unwrap_or(0);
             let win_id = win.id().map(|id| id.to_string()).unwrap_or_else(|_| pid.to_string());
 
             let mut thumb_b64 = None;
             // Only generate thumbnails for top 6 foreground windows to eliminate 2-5s IPC freeze
-            if idx < 6 {
+            if idx < 6 && !is_minimized {
                 if let Ok(rgba_img) = win.capture_image() {
                     let thumb = image::DynamicImage::ImageRgba8(rgba_img).thumbnail(320, 180);
                     let mut buf = Vec::new();
@@ -1641,6 +1657,14 @@ pub(crate) fn fit_capture_dimensions(width: u32, height: u32, max_width: u32, ma
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn minimized_sources_survive_icon_sized_or_unavailable_bounds() {
+        assert!(include_window_source(true, 160, 28));
+        assert!(include_window_source(true, 0, 0));
+        assert!(include_window_source(false, 1280, 720));
+        assert!(!include_window_source(false, 160, 28));
+    }
 
     #[test]
     fn retired_capture_producer_cannot_publish_into_preserved_transport() {

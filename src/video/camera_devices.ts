@@ -47,12 +47,12 @@ function applyCameraConstraints(track: MediaStreamTrack, options: MediaTrackCons
   });
 }
 
-/** Chromium hides device identities until a camera has been granted by the native host. */
-export async function listCameras(): Promise<MediaDeviceInfo[]> {
+/** Only an explicit camera selection may activate hardware to unlock device identities. */
+export async function listCameras(requestPermission = false): Promise<MediaDeviceInfo[]> {
   const media = navigator.mediaDevices;
   if (!media) return [];
   let devices = (await media.enumerateDevices()).filter((device) => device.kind === 'videoinput');
-  if (devices.length && devices.some((device) => !device.deviceId || !device.label)) {
+  if (requestPermission && devices.length && devices.some((device) => !device.deviceId || !device.label)) {
     const consent = await acquireCamera({ video: true, audio: false });
     try { devices = (await media.enumerateDevices()).filter((device) => device.kind === 'videoinput'); }
     finally { consent.getTracks().forEach((track) => track.stop()); }

@@ -14,6 +14,7 @@ const captures = [];
 let captureError = false;
 let finishCapture;
 globalThis.transmissionDefaultsFixture = {
+  cameraRequests: [],
   localCaptures: new Map(),
   startCapture: async (...args) => {
     captures.push(args);
@@ -29,7 +30,7 @@ const mocks = {
       globalThis.transmissionDefaultsFixture.receiveModes = modes; globalThis.transmissionDefaultsFixture.receiveRates = rates;
       return { busy: !!globalThis.transmissionDefaultsFixture.previewBusy, take, retry };
     };`,
-  cameras: 'export const listCameras = async () => [{ kind: "videoinput", deviceId: "fixture-camera", label: "Camera" }]; export const preferredCameraFrameRate = (rates, fps) => rates.includes(fps) ? fps : rates[0];',
+  cameras: 'export const listCameras = async (requestPermission = false) => { globalThis.transmissionDefaultsFixture.cameraRequests.push(requestPermission); return [{ kind: "videoinput", deviceId: "fixture-camera", label: "Camera" }]; }; export const preferredCameraFrameRate = (rates, fps) => rates.includes(fps) ? fps : rates[0];',
   tauri: 'export const invoke = async () => ({ monitors: [{ id: "screen:0", name: "Monitor" }], windows: [] });',
 };
 const bundle = await build({ stdin: { contents: `export { useScreenPicker } from './src/hooks/useScreenPicker.ts';
@@ -61,6 +62,18 @@ async function choose() {
 function saved() {
   return ['res', 'fps', 'bitrate', 'quality', 'cursor'].map(key => localStorage.getItem(`p2sharer_default_${key}`));
 }
+
+test('screen picker enumerates cameras passively until the camera tab is selected', async () => {
+  const requests = globalThis.transmissionDefaultsFixture.cameraRequests;
+  requests.length = 0;
+  await open();
+  assert.deepEqual(requests, [false]);
+  await act(async () => picker.setCurrentTab('windows'));
+  assert.deepEqual(requests, [false]);
+  await act(async () => picker.setCurrentTab('cameras'));
+  assert.deepEqual(requests, [false, true]);
+  assert.equal(picker.selectedSourceId, 'camera:fixture-camera');
+});
 
 test('first launch remembers settings only after successful confirmation, and they survive reload', async () => {
   localStorage.clear(); stateStore.loadFromStorage();

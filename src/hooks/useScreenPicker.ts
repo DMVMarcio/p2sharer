@@ -1,5 +1,5 @@
 import { localizeError, t } from '../i18n/index.ts';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { INITIAL_TRANSMISSION_DEFAULTS, stateStore } from '../core/state_store';
 import { MonitorSource, ScreenSourcesResponse, WindowSource } from '../core/types';
@@ -87,7 +87,7 @@ export function useScreenPicker(onClose?: () => void, isClosing = false) {
   const handleTabChange = useCallback((tab: 'screens' | 'windows' | 'cameras') => {
     setCurrentTab(tab);
     if (tab === 'cameras') {
-      setSelectedSourceId(cameras[0] ? `camera:${cameras[0].deviceId}` : '');
+      setSelectedSourceId(cameras[0]?.deviceId ? `camera:${cameras[0].deviceId}` : '');
       return;
     }
     if (tab === 'screens' && monitors.length > 0) {
@@ -100,6 +100,23 @@ export function useScreenPicker(onClose?: () => void, isClosing = false) {
       }
     }
   }, [monitors, windows, cameras, selectedSourceId]);
+
+  useEffect(() => {
+    if (currentTab !== 'cameras' || isClosing) return;
+    let cancelled = false;
+    void listCameras(true).then((devices) => {
+      if (cancelled) return;
+      setCameras(devices);
+      setSelectedSourceId((current) => devices.some((device) => `camera:${device.deviceId}` === current)
+        ? current : devices[0]?.deviceId ? `camera:${devices[0].deviceId}` : '');
+    }).catch((error) => {
+      if (!cancelled) {
+        logDiagnostic('WARN', 'capture.sources', 'Camera enumeration failed', { error });
+        setError(t('message.b7ee01f4e0b2'));
+      }
+    });
+    return () => { cancelled = true; };
+  }, [currentTab, isClosing]);
 
   const loadSources = useCallback(async () => {
     setIsLoading(true);

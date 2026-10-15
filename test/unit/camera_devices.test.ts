@@ -3,14 +3,16 @@ import assert from 'node:assert/strict';
 import { acquireCamera, listCameras, cameraResolutions, cameraFrameRates, configureCamera, preferredCameraFrameRate } from '../../src/video/camera_devices.ts';
 import { formatFrameRate } from '../../src/core/media_streams.ts';
 
-test('camera enumeration unlocks identities with one temporary device and always releases it', async () => {
+test('camera enumeration unlocks identities only on explicit request and releases the temporary device', async () => {
   let enumerations = 0, opened = 0, stopped = 0;
   Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { mediaDevices: {
-    enumerateDevices: async () => ++enumerations === 1 ? [{ kind: 'videoinput', deviceId: '', label: '' }] :
+    enumerateDevices: async () => ++enumerations <= 2 ? [{ kind: 'videoinput', deviceId: '', label: '' }] :
       [{ kind: 'videoinput', deviceId: 'usb', label: 'USB Camera' }, { kind: 'videoinput', deviceId: 'virtual', label: 'OBS' }],
     getUserMedia: async () => { opened++; return { getTracks: () => [{ stop: () => stopped++ }] }; },
   } } });
-  assert.equal((await listCameras()).length, 2);
+  assert.equal((await listCameras()).length, 1);
+  assert.equal(opened, 0); assert.equal(stopped, 0);
+  assert.equal((await listCameras(true)).length, 2);
   assert.equal(opened, 1); assert.equal(stopped, 1);
   await listCameras(); assert.equal(opened, 1);
 });
