@@ -1327,7 +1327,7 @@
   "audio.detectedApps_few": "{{count}} app rilevate",
   "audio.detectedApps_many": "{{count}} app rilevate",
   "whiteboard.title": "Lavagna",
-  "whiteboard.description": "Disegna, organizza i livelli e crea insieme su una tela infinita.",
+  "whiteboard.description": "Disegna, organizza i livelli e crea insieme su una tela ampia.",
   "whiteboard.pointer": "Seleziona e sposta",
   "whiteboard.brush": "Pennello",
   "whiteboard.rectangle": "Rettangolo",
@@ -1345,7 +1345,7 @@
   "whiteboard.lower": "Sposta livello in basso",
   "whiteboard.delete": "Elimina livello",
   "whiteboard.scene": "Tela della lavagna",
-  "whiteboard.navigation": "Trascina lo sfondo per muoverti · Rotella per spostarti · Ctrl + rotella per zoom",
+  "whiteboard.navigation": "Trascina lo sfondo o usa il pulsante centrale per spostarti · Rotella per zoom",
   "whiteboard.emptyScene": "I disegni appaiono qui come livelli.",
   "whiteboard.open": "Lavagne salvate",
   "whiteboard.search": "Cerca lavagne",
@@ -1363,5 +1363,6 @@
   "whiteboard.limit": "La lavagna ha raggiunto il limite. Salvala o esportala, poi creane una nuova.",
   "whiteboard.documentChanged": "La lavagna aperta è cambiata. Chiudi questa finestra e salva di nuovo quella attuale.",
   "whiteboard.exported": "Lavagna esportata.",
-  "whiteboard.tools": "Strumenti della lavagna"
+  "whiteboard.tools": "Strumenti della lavagna",
+  "whiteboard.smoothing": "Stabilizzazione"
 }

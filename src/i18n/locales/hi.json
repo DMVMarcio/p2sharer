@@ -1327,7 +1327,7 @@
   "audio.detectedApps_few": "{{count}} ऐप मिले",
   "audio.detectedApps_many": "{{count}} ऐप मिले",
   "whiteboard.title": "व्हाइटबोर्ड",
-  "whiteboard.description": "अनंत कैनवास पर साथ में चित्र बनाएँ और परतें व्यवस्थित करें।",
+  "whiteboard.description": "विशाल कैनवास पर साथ में चित्र बनाएँ और परतें व्यवस्थित करें।",
   "whiteboard.pointer": "चुनें और खिसकाएँ",
   "whiteboard.brush": "ब्रश",
   "whiteboard.rectangle": "आयत",
@@ -1345,7 +1345,7 @@
   "whiteboard.lower": "परत नीचे ले जाएँ",
   "whiteboard.delete": "परत हटाएँ",
   "whiteboard.scene": "व्हाइटबोर्ड कैनवास",
-  "whiteboard.navigation": "खाली जगह खींचकर या व्हील से खिसकाएँ · Ctrl + व्हील से ज़ूम करें",
+  "whiteboard.navigation": "खाली जगह खींचें या मध्य बटन से खिसकाएँ · व्हील से ज़ूम करें",
   "whiteboard.emptyScene": "चित्र यहाँ परतों के रूप में दिखाई देंगे।",
   "whiteboard.open": "सहेजे गए व्हाइटबोर्ड",
   "whiteboard.search": "व्हाइटबोर्ड खोजें",
@@ -1363,5 +1363,6 @@
   "whiteboard.limit": "यह व्हाइटबोर्ड आकार सीमा तक पहुँच गया है। इसे सहेजें या निर्यात करें, फिर नया व्हाइटबोर्ड शुरू करें।",
   "whiteboard.documentChanged": "खुला व्हाइटबोर्ड बदल गया है। यह संवाद बंद करके वर्तमान व्हाइटबोर्ड फिर सहेजें।",
   "whiteboard.exported": "व्हाइटबोर्ड निर्यात किया गया।",
-  "whiteboard.tools": "व्हाइटबोर्ड उपकरण"
+  "whiteboard.tools": "व्हाइटबोर्ड उपकरण",
+  "whiteboard.smoothing": "स्थिरीकरण"
 }

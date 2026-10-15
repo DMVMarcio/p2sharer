@@ -1327,7 +1327,7 @@
   "audio.detectedApps_few": "Обнаружено {{count}} приложения",
   "audio.detectedApps_many": "Обнаружено {{count}} приложений",
   "whiteboard.title": "Доска",
-  "whiteboard.description": "Рисуйте, управляйте слоями и творите вместе на бесконечном холсте.",
+  "whiteboard.description": "Рисуйте, управляйте слоями и творите вместе на просторном холсте.",
   "whiteboard.pointer": "Выбрать и переместить",
   "whiteboard.brush": "Кисть",
   "whiteboard.rectangle": "Прямоугольник",
@@ -1345,7 +1345,7 @@
   "whiteboard.lower": "Опустить слой",
   "whiteboard.delete": "Удалить слой",
   "whiteboard.scene": "Холст доски",
-  "whiteboard.navigation": "Перетаскивание фона или колесо — перемещение · Ctrl + колесо — масштаб",
+  "whiteboard.navigation": "Перетаскивайте фон или используйте среднюю кнопку для перемещения · Колесо — масштаб",
   "whiteboard.emptyScene": "Рисунки появятся здесь в виде слоёв.",
   "whiteboard.open": "Сохранённые доски",
   "whiteboard.search": "Поиск досок",
@@ -1363,5 +1363,6 @@
   "whiteboard.limit": "Достигнут предел размера доски. Сохраните или экспортируйте её и создайте новую.",
   "whiteboard.documentChanged": "Открытая доска изменилась. Закройте окно и сохраните текущую доску снова.",
   "whiteboard.exported": "Доска экспортирована.",
-  "whiteboard.tools": "Инструменты доски"
+  "whiteboard.tools": "Инструменты доски",
+  "whiteboard.smoothing": "Стабилизация"
 }

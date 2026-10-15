@@ -1327,7 +1327,7 @@
   "audio.detectedApps_few": "앱 {{count}}개 감지됨",
   "audio.detectedApps_many": "앱 {{count}}개 감지됨",
   "whiteboard.title": "화이트보드",
-  "whiteboard.description": "무한 캔버스에서 함께 그리고 레이어를 관리하세요.",
+  "whiteboard.description": "넓은 캔버스에서 함께 그리고 레이어를 관리하세요.",
   "whiteboard.pointer": "선택 및 이동",
   "whiteboard.brush": "브러시",
   "whiteboard.rectangle": "사각형",
@@ -1345,7 +1345,7 @@
   "whiteboard.lower": "레이어 아래로",
   "whiteboard.delete": "레이어 삭제",
   "whiteboard.scene": "화이트보드 캔버스",
-  "whiteboard.navigation": "빈 공간을 드래그하여 이동 · 휠로 이동 · Ctrl + 휠로 확대/축소",
+  "whiteboard.navigation": "빈 공간 드래그 또는 가운데 버튼으로 이동 · 휠로 확대/축소",
   "whiteboard.emptyScene": "그림이 여기에 레이어로 표시됩니다.",
   "whiteboard.open": "저장된 화이트보드",
   "whiteboard.search": "화이트보드 검색",
@@ -1363,5 +1363,6 @@
   "whiteboard.limit": "화이트보드 크기 제한에 도달했습니다. 저장하거나 내보낸 후 새 화이트보드를 시작하세요.",
   "whiteboard.documentChanged": "열린 화이트보드가 바뀌었습니다. 이 대화상자를 닫고 현재 화이트보드를 다시 저장하세요.",
   "whiteboard.exported": "화이트보드를 내보냈습니다.",
-  "whiteboard.tools": "화이트보드 도구"
+  "whiteboard.tools": "화이트보드 도구",
+  "whiteboard.smoothing": "손떨림 보정"
 }

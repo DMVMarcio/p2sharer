@@ -1327,7 +1327,7 @@
   "audio.detectedApps_few": "{{count}} applications détectées",
   "audio.detectedApps_many": "{{count}} applications détectées",
   "whiteboard.title": "Tableau blanc",
-  "whiteboard.description": "Dessinez, organisez les calques et créez ensemble sur une toile infinie.",
+  "whiteboard.description": "Dessinez, organisez les calques et créez ensemble sur une grande toile.",
   "whiteboard.pointer": "Sélectionner et déplacer",
   "whiteboard.brush": "Pinceau",
   "whiteboard.rectangle": "Rectangle",
@@ -1345,7 +1345,7 @@
   "whiteboard.lower": "Descendre le calque",
   "whiteboard.delete": "Supprimer le calque",
   "whiteboard.scene": "Toile du tableau blanc",
-  "whiteboard.navigation": "Glissez le fond pour naviguer · Molette pour déplacer · Ctrl + molette pour zoomer",
+  "whiteboard.navigation": "Glissez le fond ou utilisez le bouton central pour déplacer · Molette pour zoomer",
   "whiteboard.emptyScene": "Les dessins apparaissent ici sous forme de calques.",
   "whiteboard.open": "Tableaux enregistrés",
   "whiteboard.search": "Rechercher des tableaux",
@@ -1363,5 +1363,6 @@
   "whiteboard.limit": "Ce tableau a atteint sa limite. Enregistrez ou exportez-le, puis créez un nouveau tableau.",
   "whiteboard.documentChanged": "Le tableau ouvert a changé. Fermez cette fenêtre et enregistrez le tableau actuel à nouveau.",
   "whiteboard.exported": "Tableau exporté.",
-  "whiteboard.tools": "Outils du tableau"
+  "whiteboard.tools": "Outils du tableau",
+  "whiteboard.smoothing": "Stabilisation"
 }

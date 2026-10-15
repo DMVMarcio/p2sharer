@@ -13,6 +13,8 @@ export interface ContextMenuAction {
   id: string;
   label: string;
   icon?: ReactNode;
+  /** Visual choices retain their accessible label without displaying text. */
+  iconOnly?: boolean;
   disabled?: boolean;
   selected?: boolean;
   danger?: boolean;
@@ -27,10 +29,11 @@ interface MenuState {
   actions: ContextMenuAction[];
   source: HTMLElement;
   toggle?: boolean;
+  layout?: 'grid';
 }
 
 type MenuEvent = { preventDefault: () => void; stopPropagation: () => void; clientX: number; clientY: number; currentTarget: EventTarget | null };
-const MenuContext = createContext<(event: MenuEvent, actions: ContextMenuAction[], options?: { toggle?: boolean }) => void>(() => {});
+const MenuContext = createContext<(event: MenuEvent, actions: ContextMenuAction[], options?: { toggle?: boolean; layout?: 'grid' }) => void>(() => {});
 export const useContextMenu = () => useContext(MenuContext);
 
 /** Feature menus defer editor targets to the central text editing menu. */
@@ -59,13 +62,13 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
     if (restoreFocus && currentRef.current?.source.isConnected) currentRef.current.source.focus({ preventScroll: true });
     setMenu(null);
   }, []);
-  const open = useCallback((event: MenuEvent, actions: ContextMenuAction[], options?: { toggle?: boolean }) => {
+  const open = useCallback((event: MenuEvent, actions: ContextMenuAction[], options?: { toggle?: boolean; layout?: 'grid' }) => {
     event.preventDefault();
     event.stopPropagation();
     const source = event.currentTarget instanceof HTMLElement ? event.currentTarget : document.body;
     if (options?.toggle && currentRef.current?.source === source) { close(true); return; }
     const bounds = source.getBoundingClientRect();
-    setMenu(actions.length ? { actions, source, toggle: options?.toggle,
+    setMenu(actions.length ? { actions, source, toggle: options?.toggle, layout: options?.layout,
       x: event.clientX || bounds.left + Math.min(bounds.width / 2, 24),
       y: event.clientY || bounds.top + Math.min(bounds.height / 2, 24) } : null);
   }, [close]);
@@ -131,12 +134,12 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
       if (event.key === 'Escape' || event.key === 'Tab') {
         event.preventDefault(); event.stopPropagation(); close(true); return;
       }
-      if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+      if (!['ArrowDown', 'ArrowUp', 'Home', 'End', ...(menu.layout === 'grid' ? ['ArrowLeft', 'ArrowRight'] : [])].includes(event.key)) return;
       event.preventDefault();
       const buttons = enabledButtons(menu.actions);
       const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
       const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1
-        : (index + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length;
+        : (index + (event.key === 'ArrowDown' || event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length;
       buttons[next]?.focus();
     };
     document.addEventListener('keydown', key, true);
@@ -155,7 +158,7 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
   return <MenuContext.Provider value={open}>
     {children}
     {retained && createPortal(<div ref={menuRef} role="menu" aria-label={t("message.392b6906f80e")}
-      className={`context-menu ${presence.closing ? 'dropdown-closing' : ''}`}
+      className={`context-menu ${retained.layout === 'grid' ? 'context-menu-visual-grid' : ''} ${presence.closing ? 'dropdown-closing' : ''}`}
       inert={presence.closing} aria-hidden={presence.closing}
       style={{ left: position.x, top: position.y }}
       onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); }}
@@ -163,8 +166,9 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
       {retained.actions.map((action) => {
         const primary = <button key={action.id} type="button" role={action.selected === undefined ? 'menuitem' : 'menuitemradio'} aria-checked={action.selected}
         ref={element => { if (element) buttonRefs.current.set(action.id, element); else buttonRefs.current.delete(action.id); }}
-        disabled={action.disabled} className={`${action.danger ? 'context-menu-danger' : ''} ${action.separator ? 'context-menu-separated' : ''}`}
-        onClick={() => select(action)}>{action.icon && <span className="context-menu-icon">{action.icon}</span>}<span>{action.label}</span></button>;
+        aria-label={action.iconOnly ? action.label : undefined}
+        disabled={action.disabled} className={`${action.iconOnly ? 'context-menu-visual-choice' : ''} ${action.danger ? 'context-menu-danger' : ''} ${action.separator ? 'context-menu-separated' : ''}`}
+        onClick={() => select(action)}>{action.icon && <span className="context-menu-icon">{action.icon}</span>}{!action.iconOnly && <span>{action.label}</span>}</button>;
         const secondary = action.secondary;
         return secondary ? <div key={action.id} className="context-menu-row" role="none">{primary}
           <Tooltip content={secondary.label}><button type="button" role="menuitem" aria-label={secondary.label}

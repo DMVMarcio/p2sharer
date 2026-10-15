@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { StreamPointerGlyph } from '../components/room/StreamPointerGlyph';
 import { WhiteboardShape } from './WhiteboardShape';
@@ -6,9 +6,9 @@ import { BOARD_MAX_POINTS, boardCoordinate, hitBoardShape, shapeBounds, type Boa
 import type { BoardCursor, WhiteboardModel } from './whiteboard_model';
 import type { BoardSettings } from './WhiteboardToolbar';
 import { t } from '../i18n';
-
-export interface BoardViewport { x: number; y: number; zoom: number }
-type Gesture = { pointer: number; start: BoardPoint; mode: 'pan' | 'move' | 'draw'; original?: BoardShape; draft?: BoardShape; viewport: BoardViewport };
+import { BOARD_WIDTH, BOARD_HEIGHT, BOARD_MIN_ZOOM, boardContains, clampBoardPoint, containBoardShape, BrushStabilizer, type BoardViewport } from './whiteboard_interaction';
+import { useWhiteboardViewport } from './useWhiteboardViewport';
+type Gesture = { pointer: number; start: BoardPoint; mode: 'pan' | 'move' | 'draw'; original?: BoardShape; draft?: BoardShape; viewport: BoardViewport; stabilizer?: BrushStabilizer };
 export function WhiteboardCanvas({ model, settings, viewport, onViewport, selected, onSelect, compact, actor, name, participantName, onError, resetView }: {
   model: WhiteboardModel; settings: BoardSettings; viewport: BoardViewport; onViewport(viewport: BoardViewport): void;
   selected: string | null; onSelect(id: string | null): void; compact: boolean; actor: string; name: string;
@@ -16,6 +16,8 @@ export function WhiteboardCanvas({ model, settings, viewport, onViewport, select
   resetView: number;
 }) {
   const root = useRef<HTMLDivElement>(null);
+  const clipId = useId();
+  const navigation = useWhiteboardViewport(root, viewport, onViewport);
   const gesture = useRef<Gesture | null>(null);
   const framed = useRef(false);
   const [draft, setDraft] = useState<BoardShape | null>(null);
@@ -30,7 +32,7 @@ export function WhiteboardCanvas({ model, settings, viewport, onViewport, select
     latestCursor.current = value; setCursor(value);
     if (force || performance.now() - lastSent.current >= 40) { model.presence(value); lastSent.current = performance.now(); }
   };
-  const cancel = () => { gesture.current = null; setDraft(null); publish(null, true); };
+  const cancel = () => { navigation.stop(); gesture.current = null; setDraft(null); publish(null, true); };
   useEffect(() => {
     const heartbeat = setInterval(() => { if (latestCursor.current) model.presence(latestCursor.current); }, 800);
     const blur = () => cancel();
@@ -44,20 +46,20 @@ export function WhiteboardCanvas({ model, settings, viewport, onViewport, select
     const fit = () => {
       const shapes = model.shapes.filter(s => !s.hidden), element = root.current;
       if (!element) return;
-      if (!shapes.length) { onViewport({ x: 60, y: 60, zoom: 1 }); return; }
+      if (!shapes.length) { navigation.set({ x: 60, y: 60, zoom: 1 }); return; }
       const boxes = shapes.map(shapeBounds), padding = 60;
       const left = Math.min(...boxes.map(b => b.x)), top = Math.min(...boxes.map(b => b.y));
       const width = Math.max(...boxes.map(b => b.x + b.width)) - left;
       const height = Math.max(...boxes.map(b => b.y + b.height)) - top;
       const w = element.clientWidth || 800, h = element.clientHeight || 500;
-      const zoom = Math.max(.1, Math.min(1, (w - padding) / Math.max(1, width), (h - padding) / Math.max(1, height)));
-      onViewport({ x: (w - width * zoom) / 2 - left * zoom, y: (h - height * zoom) / 2 - top * zoom, zoom });
+      const zoom = Math.max(BOARD_MIN_ZOOM, Math.min(1, (w - padding) / Math.max(1, width), (h - padding) / Math.max(1, height)));
+      navigation.set({ x: (w - width * zoom) / 2 - left * zoom, y: (h - height * zoom) / 2 - top * zoom, zoom });
       framed.current = true;
     };
     fit();
     const update = () => { if (compact || !framed.current) fit(); };
     model.document.on('update', update);
-    const observer = new ResizeObserver(() => { if (compact) fit(); });
+    const observer = new ResizeObserver(() => { if (compact) fit(); else navigation.set(navigation.current.current); });
     if (root.current) observer.observe(root.current);
     return () => { observer.disconnect(); model.document.off('update', update); };
   }, [model, identity, resetView, compact, onViewport]);
@@ -71,20 +73,13 @@ export function WhiteboardCanvas({ model, settings, viewport, onViewport, select
     const wheel = (event: WheelEvent) => {
       if (current.current.compact || gesture.current) return;
       event.preventDefault(); event.stopPropagation();
-      const previous = current.current.viewport, bounds = element.getBoundingClientRect();
       const factor = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? element.clientHeight : 1;
-      let next: BoardViewport;
-      if (event.ctrlKey || event.metaKey) {
-        const zoom = Math.max(.1, Math.min(4, previous.zoom * Math.exp(-event.deltaY * factor * .002)));
-        const x = event.clientX - bounds.left, y = event.clientY - bounds.top;
-        next = { x: x - (x - previous.x) * zoom / previous.zoom, y: y - (y - previous.y) * zoom / previous.zoom, zoom };
-      } else next = { ...previous, x: previous.x - (event.shiftKey ? event.deltaY : event.deltaX) * factor, y: previous.y - (event.shiftKey ? 0 : event.deltaY) * factor };
-      onViewport(next); publish(null, true);
+      navigation.zoom(Math.max(-400, Math.min(400, event.deltaY * factor)), screenPoint(event));
     };
     element.addEventListener('wheel', wheel, { passive: false });
     return () => element.removeEventListener('wheel', wheel);
   }, [model, onViewport]);
-  const update = (event: ReactPointerEvent<HTMLDivElement>) => {
+  const update = (event: ReactPointerEvent<HTMLDivElement>, final = false) => {
     if (compact) return;
     const screen = screenPoint(event), g = gesture.current;
     let point = worldPoint(screen);
@@ -92,13 +87,16 @@ export function WhiteboardCanvas({ model, settings, viewport, onViewport, select
     if (g && g.pointer === event.pointerId) {
       if (g.mode === 'pan') {
         const next = { ...g.viewport, x: g.viewport.x + screen.x - g.start.x, y: g.viewport.y + screen.y - g.start.y };
-        onViewport(next); point = { x: (screen.x - next.x) / next.zoom, y: (screen.y - next.y) / next.zoom };
+        navigation.set(next); const view = navigation.current.current;
+        point = { x: (screen.x - view.x) / view.zoom, y: (screen.y - view.y) / view.zoom };
       }
       else if (g.draft && g.mode === 'move' && g.original) {
-        drawing = { ...g.original, x: g.original.x + point.x - g.start.x, y: g.original.y + point.y - g.start.y };
+        drawing = containBoardShape({ ...g.original, x: g.original.x + point.x - g.start.x, y: g.original.y + point.y - g.start.y });
         if (!boardCoordinate(drawing.x) || !boardCoordinate(drawing.y)) return;
         g.draft = drawing; setDraft(drawing);
       } else if (g.draft) {
+        point = clampBoardPoint(point);
+        if (g.stabilizer && !final) point = g.stabilizer.sample(point, event.timeStamp, settings.smoothing);
         if (!boardCoordinate(point.x) || !boardCoordinate(point.y)) return;
         let points = g.draft.points;
         if (g.draft.tool === 'brush') {
@@ -119,6 +117,8 @@ export function WhiteboardCanvas({ model, settings, viewport, onViewport, select
     framed.current = true;
     const screen = screenPoint(event), point = worldPoint(screen);
     if (!boardCoordinate(point.x) || !boardCoordinate(point.y)) return;
+    if (event.button === 0 && settings.tool !== 'pointer' && !boardContains(point)) return;
+    navigation.stop();
     root.current?.setPointerCapture(event.pointerId);
     const hit = settings.tool === 'pointer' && event.button === 0 ? [...model.shapes].reverse().find(shape => hitBoardShape(shape, point, 5 / viewport.zoom)) : undefined;
     if (event.button === 1 || settings.tool === 'pointer' && !hit) {
@@ -128,16 +128,17 @@ export function WhiteboardCanvas({ model, settings, viewport, onViewport, select
       onSelect(hit.id); gesture.current = { pointer: event.pointerId, mode: 'move', start: point, original: hit, draft: hit, viewport };
     } else if (settings.tool !== 'pointer') {
       const shape: BoardShape = { id: crypto.randomUUID(), tool: settings.tool, points: settings.tool === 'brush' ? [point] : [point, point],
-        color: settings.color, width: settings.width, filled: settings.filled, x: 0, y: 0,
+        color: settings.color, width: settings.width, filled: settings.filled, smoothing: settings.smoothing, x: 0, y: 0,
         order: (model.shapes[model.shapes.length - 1]?.order ?? 0) + 1, hidden: false, locked: false };
-      gesture.current = { pointer: event.pointerId, mode: 'draw', start: point, draft: shape, viewport }; setDraft(shape); onSelect(shape.id);
+      gesture.current = { pointer: event.pointerId, mode: 'draw', start: point, draft: shape, viewport,
+        stabilizer: settings.tool === 'brush' ? new BrushStabilizer(point, event.timeStamp) : undefined }; setDraft(shape); onSelect(shape.id);
     }
     update(event);
   };
   const up = (event: ReactPointerEvent<HTMLDivElement>) => {
     const g = gesture.current;
     if (!g || g.pointer !== event.pointerId) return;
-    update(event);
+    update(event, true);
     if (g.draft) {
       // A remote edit/deletion during a drag cancels this stale local move.
       const unchanged = !g.original || model.shapes.find(s => s.id === g.original!.id) === g.original;
@@ -154,16 +155,20 @@ export function WhiteboardCanvas({ model, settings, viewport, onViewport, select
     name={own ? '' : participantName(id)} color={c.color} interpolate={!own} shape={c.tool === 'hand' ? 'hand' : c.tool === 'pointer' ? 'pointer' : 'brush'}
     diameter={c.width * viewport.zoom} style={{ left: c.x * viewport.zoom + viewport.x, top: c.y * viewport.zoom + viewport.y }} />;
   return <div ref={root} className={`whiteboard-canvas ${compact ? 'compact' : 'virtual-cursor'}`} tabIndex={compact ? -1 : 0}
-    role="region" aria-label={t('whiteboard.scene')} onPointerDown={down} onPointerMove={update} onPointerUp={up}
+    role="region" aria-label={t('whiteboard.scene')} aria-description={t('whiteboard.navigation')} onPointerDown={down} onPointerMove={event => update(event)} onPointerUp={up}
     onPointerCancel={cancel} onLostPointerCapture={() => { if (gesture.current) cancel(); }}
     onPointerLeave={() => { if (!gesture.current) publish(null, true); }} onContextMenu={event => event.preventDefault()}>
     <svg className="whiteboard-art" aria-hidden="true">
+      <defs><clipPath id={clipId}><rect width={BOARD_WIDTH} height={BOARD_HEIGHT} /></clipPath></defs>
       <g transform={`translate(${viewport.x} ${viewport.y}) scale(${viewport.zoom})`}>
+        <rect className="whiteboard-paper" width={BOARD_WIDTH} height={BOARD_HEIGHT} fill="#ffffff" />
+        <g clipPath={`url(#${clipId})`}>
         {model.shapes.filter(shape => !shape.hidden && shape.id !== draft?.id).map(shape => <WhiteboardShape key={shape.id} shape={shape} />)}
         {draft && <WhiteboardShape shape={draft} />}
         {[...model.cursors].filter(([id, c]) => id !== actor && c.draft && !model.shapes.some(s => s.id === c.draft!.id)).map(([id, c]) => <g key={id} opacity={.65}><WhiteboardShape shape={c.draft!} /></g>)}
-        {!compact && bounds && <rect x={bounds.x - 5 / viewport.zoom} y={bounds.y - 5 / viewport.zoom}
+        {!compact && !draft && bounds && <rect x={bounds.x - 5 / viewport.zoom} y={bounds.y - 5 / viewport.zoom}
           width={bounds.width + 10 / viewport.zoom} height={bounds.height + 10 / viewport.zoom} fill="none" stroke="var(--accent-color)" strokeWidth={1 / viewport.zoom} strokeDasharray={`${4 / viewport.zoom} ${3 / viewport.zoom}`} />}
+        </g>
       </g>
     </svg>
     <div className="whiteboard-cursors" aria-hidden="true">

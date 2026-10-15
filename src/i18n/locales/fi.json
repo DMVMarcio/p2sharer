@@ -1327,7 +1327,7 @@
   "audio.detectedApps_few": "{{count}} sovellusta havaittu",
   "audio.detectedApps_many": "{{count}} sovellusta havaittu",
   "whiteboard.title": "Valkotaulu",
-  "whiteboard.description": "Piirrä, järjestä tasoja ja luo yhdessä rajattomalla kankaalla.",
+  "whiteboard.description": "Piirrä, järjestä tasoja ja luo yhdessä suurella kankaalla.",
   "whiteboard.pointer": "Valitse ja siirrä",
   "whiteboard.brush": "Sivellin",
   "whiteboard.rectangle": "Suorakulmio",
@@ -1345,7 +1345,7 @@
   "whiteboard.lower": "Siirrä tasoa alas",
   "whiteboard.delete": "Poista taso",
   "whiteboard.scene": "Valkotaulun kangas",
-  "whiteboard.navigation": "Siirrä vetämällä taustaa tai hiiren rullalla · Ctrl + rulla zoomaa",
+  "whiteboard.navigation": "Siirrä vetämällä taustaa tai hiiren keskipainikkeella · Rulla zoomaa",
   "whiteboard.emptyScene": "Piirrokset näkyvät tässä tasoina.",
   "whiteboard.open": "Tallennetut valkotaulut",
   "whiteboard.search": "Etsi valkotauluja",
@@ -1363,5 +1363,6 @@
   "whiteboard.limit": "Valkotaulun kokoraja täyttyi. Tallenna tai vie se ja aloita uusi valkotaulu.",
   "whiteboard.documentChanged": "Avoin valkotaulu vaihtui. Sulje tämä ikkuna ja tallenna nykyinen valkotaulu uudelleen.",
   "whiteboard.exported": "Valkotaulu viety.",
-  "whiteboard.tools": "Valkotaulun työkalut"
+  "whiteboard.tools": "Valkotaulun työkalut",
+  "whiteboard.smoothing": "Vakautus"
 }

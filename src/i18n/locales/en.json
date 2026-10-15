@@ -1327,7 +1327,7 @@
   "audio.detectedApps_few": "{{count}} apps detected",
   "audio.detectedApps_many": "{{count}} apps detected",
   "whiteboard.title": "Whiteboard",
-  "whiteboard.description": "Draw, organize layers and create together on an infinite canvas.",
+  "whiteboard.description": "Draw, organize layers and create together on a spacious canvas.",
   "whiteboard.pointer": "Select and move",
   "whiteboard.brush": "Brush",
   "whiteboard.rectangle": "Rectangle",
@@ -1345,7 +1345,7 @@
   "whiteboard.lower": "Move layer down",
   "whiteboard.delete": "Delete layer",
   "whiteboard.scene": "Whiteboard canvas",
-  "whiteboard.navigation": "Drag empty space to pan · Wheel to pan · Ctrl + wheel to zoom",
+  "whiteboard.navigation": "Drag empty space or use the middle button to pan · Wheel to zoom",
   "whiteboard.emptyScene": "Drawings appear as layers here.",
   "whiteboard.open": "Saved whiteboards",
   "whiteboard.search": "Search whiteboards",
@@ -1363,5 +1363,6 @@
   "whiteboard.limit": "This whiteboard reached its size limit. Save or export it, then start a new whiteboard.",
   "whiteboard.documentChanged": "The open whiteboard changed. Close this dialog and save the current whiteboard again.",
   "whiteboard.exported": "Whiteboard exported.",
-  "whiteboard.tools": "Whiteboard tools"
+  "whiteboard.tools": "Whiteboard tools",
+  "whiteboard.smoothing": "Stabilization"
 }

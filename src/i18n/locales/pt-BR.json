@@ -1327,7 +1327,7 @@
   "audio.detectedApps_few": "{{count}} aplicativos detectados",
   "audio.detectedApps_many": "{{count}} aplicativos detectados",
   "whiteboard.title": "Quadro branco",
-  "whiteboard.description": "Desenhe, organize camadas e crie em conjunto em um quadro infinito.",
+  "whiteboard.description": "Desenhe, organize camadas e crie em conjunto em um quadro amplo.",
   "whiteboard.pointer": "Selecionar e mover",
   "whiteboard.brush": "Pincel",
   "whiteboard.rectangle": "Retângulo",
@@ -1345,7 +1345,7 @@
   "whiteboard.lower": "Descer camada",
   "whiteboard.delete": "Excluir camada",
   "whiteboard.scene": "Área do quadro branco",
-  "whiteboard.navigation": "Arraste o fundo para navegar · Roda para mover · Ctrl + roda para zoom",
+  "whiteboard.navigation": "Arraste o fundo ou use o botão do meio para mover · Roda para zoom",
   "whiteboard.emptyScene": "Os desenhos aparecem aqui como camadas.",
   "whiteboard.open": "Quadros salvos",
   "whiteboard.search": "Buscar quadros",
@@ -1363,5 +1363,6 @@
   "whiteboard.limit": "Este quadro atingiu o limite de tamanho. Salve ou exporte e inicie um novo quadro.",
   "whiteboard.documentChanged": "O quadro aberto mudou. Feche esta janela e salve novamente o quadro atual.",
   "whiteboard.exported": "Quadro exportado.",
-  "whiteboard.tools": "Ferramentas do quadro"
+  "whiteboard.tools": "Ferramentas do quadro",
+  "whiteboard.smoothing": "Estabilização"
 }

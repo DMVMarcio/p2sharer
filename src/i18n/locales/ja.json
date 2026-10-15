@@ -1327,7 +1327,7 @@
   "audio.detectedApps_few": "{{count}} 個のアプリを検出",
   "audio.detectedApps_many": "{{count}} 個のアプリを検出",
   "whiteboard.title": "ホワイトボード",
-  "whiteboard.description": "無限のキャンバスで描画し、レイヤーを整理して共同制作。",
+  "whiteboard.description": "広いキャンバスで描画し、レイヤーを整理して共同制作。",
   "whiteboard.pointer": "選択と移動",
   "whiteboard.brush": "ブラシ",
   "whiteboard.rectangle": "長方形",
@@ -1345,7 +1345,7 @@
   "whiteboard.lower": "レイヤーを下へ",
   "whiteboard.delete": "レイヤーを削除",
   "whiteboard.scene": "ホワイトボードのキャンバス",
-  "whiteboard.navigation": "背景をドラッグで移動 · ホイールで移動 · Ctrl＋ホイールでズーム",
+  "whiteboard.navigation": "背景をドラッグまたは中ボタンで移動 · ホイールでズーム",
   "whiteboard.emptyScene": "描画はここにレイヤーとして表示されます。",
   "whiteboard.open": "保存したホワイトボード",
   "whiteboard.search": "ホワイトボードを検索",
@@ -1363,5 +1363,6 @@
   "whiteboard.limit": "サイズ制限に達しました。保存または出力して、新しいホワイトボードを作成してください。",
   "whiteboard.documentChanged": "現在のホワイトボードが変わりました。この画面を閉じて再度保存してください。",
   "whiteboard.exported": "ホワイトボードを出力しました。",
-  "whiteboard.tools": "ホワイトボードツール"
+  "whiteboard.tools": "ホワイトボードツール",
+  "whiteboard.smoothing": "手ぶれ補正"
 }

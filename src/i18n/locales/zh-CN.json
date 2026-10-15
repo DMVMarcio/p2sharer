@@ -1327,7 +1327,7 @@
   "audio.detectedApps_few": "检测到 {{count}} 个应用",
   "audio.detectedApps_many": "检测到 {{count}} 个应用",
   "whiteboard.title": "白板",
-  "whiteboard.description": "在无限画布上共同绘画、管理图层和创作。",
+  "whiteboard.description": "在宽阔画布上共同绘画、管理图层和创作。",
   "whiteboard.pointer": "选择并移动",
   "whiteboard.brush": "画笔",
   "whiteboard.rectangle": "矩形",
@@ -1345,7 +1345,7 @@
   "whiteboard.lower": "下移图层",
   "whiteboard.delete": "删除图层",
   "whiteboard.scene": "白板画布",
-  "whiteboard.navigation": "拖动空白处平移 · 滚轮平移 · Ctrl + 滚轮缩放",
+  "whiteboard.navigation": "拖动空白处或使用鼠标中键平移 · 滚轮缩放",
   "whiteboard.emptyScene": "绘图将在此显示为图层。",
   "whiteboard.open": "已保存的白板",
   "whiteboard.search": "搜索白板",
@@ -1363,5 +1363,6 @@
   "whiteboard.limit": "此白板已达到大小上限。请保存或导出，然后新建白板。",
   "whiteboard.documentChanged": "当前白板已更改。请关闭此对话框并重新保存当前白板。",
   "whiteboard.exported": "白板已导出。",
-  "whiteboard.tools": "白板工具"
+  "whiteboard.tools": "白板工具",
+  "whiteboard.smoothing": "防抖"
 }

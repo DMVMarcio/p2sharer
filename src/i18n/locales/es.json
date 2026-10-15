@@ -1327,7 +1327,7 @@
   "audio.detectedApps_few": "{{count}} aplicaciones detectadas",
   "audio.detectedApps_many": "{{count}} aplicaciones detectadas",
   "whiteboard.title": "Pizarra",
-  "whiteboard.description": "Dibuja, organiza capas y crea en equipo en un lienzo infinito.",
+  "whiteboard.description": "Dibuja, organiza capas y crea en equipo en un lienzo amplio.",
   "whiteboard.pointer": "Seleccionar y mover",
   "whiteboard.brush": "Pincel",
   "whiteboard.rectangle": "Rectángulo",
@@ -1345,7 +1345,7 @@
   "whiteboard.lower": "Bajar capa",
   "whiteboard.delete": "Eliminar capa",
   "whiteboard.scene": "Lienzo de pizarra",
-  "whiteboard.navigation": "Arrastra el fondo para desplazarte · Rueda para mover · Ctrl + rueda para zoom",
+  "whiteboard.navigation": "Arrastra el fondo o usa el botón central para desplazarte · Rueda para zoom",
   "whiteboard.emptyScene": "Los dibujos aparecen aquí como capas.",
   "whiteboard.open": "Pizarras guardadas",
   "whiteboard.search": "Buscar pizarras",
@@ -1363,5 +1363,6 @@
   "whiteboard.limit": "Esta pizarra alcanzó su límite de tamaño. Guarda o exporta y crea otra.",
   "whiteboard.documentChanged": "La pizarra abierta cambió. Cierra este diálogo y guarda de nuevo la actual.",
   "whiteboard.exported": "Pizarra exportada.",
-  "whiteboard.tools": "Herramientas de pizarra"
+  "whiteboard.tools": "Herramientas de pizarra",
+  "whiteboard.smoothing": "Estabilización"
 }

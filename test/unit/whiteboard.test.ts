@@ -3,7 +3,8 @@ import test from 'node:test';
 import * as Y from 'yjs';
 import { WhiteboardModel } from '../../src/apps/whiteboard_model.ts';
 import { encodeUpdate } from '../../src/apps/models.ts';
-import { boardSvg, hitBoardShape, parseBoardFile, type BoardShape } from '../../src/apps/whiteboard_scene.ts';
+import { boardSvg, brushPath, hitBoardShape, parseBoardFile, type BoardShape } from '../../src/apps/whiteboard_scene.ts';
+import { BOARD_WIDTH, BOARD_HEIGHT, BrushStabilizer, boardContains, clampBoardPoint, clampBoardViewport, containBoardShape } from '../../src/apps/whiteboard_interaction.ts';
 
 function shape(overrides: Partial<BoardShape> = {}): BoardShape {
   return { id: crypto.randomUUID(), tool: 'rectangle', points: [{ x: 10, y: 20 }, { x: 110, y: 120 }],
@@ -89,4 +90,36 @@ test('hit testing respects actual outlines, fills, locks, hidden objects and wor
   assert.equal(hitBoardShape(brush, { x: 0, y: 50 }, 2), true);
   assert.equal(hitBoardShape(brush, { x: 40, y: 10 }, 2), false);
   assert.throws(() => parseBoardFile(JSON.stringify({ version: 1, shapes: [rect, rect] })));
+});
+
+test('bounded navigation exposes a margin, centers a zoomed-out page and keeps objects inside the board', () => {
+  const left = clampBoardViewport({ x: 1e6, y: 1e6, zoom: 1 }, 800, 500);
+  assert.equal(left.x, 96); assert.equal(left.y, 96);
+  const right = clampBoardViewport({ x: -1e6, y: -1e6, zoom: 1 }, 800, 500);
+  assert.equal(right.x + BOARD_WIDTH, 800 - 96);
+  assert.equal(right.y + BOARD_HEIGHT, 500 - 96);
+  const overview = clampBoardViewport({ x: 1e6, y: -1e6, zoom: .025 }, 800, 500);
+  assert.equal(overview.x, (800 - BOARD_WIDTH * overview.zoom) / 2);
+  assert.equal(boardContains({ x: -1, y: 0 }), false);
+  assert.deepEqual(clampBoardPoint({ x: -100, y: BOARD_HEIGHT + 20 }), { x: 0, y: BOARD_HEIGHT });
+  const moved = containBoardShape(shape({ x: -1000, y: -1000 }));
+  assert.equal(moved.x + moved.points[0].x, 0);
+  assert.equal(moved.y + moved.points[0].y, 0);
+});
+
+test('configurable stabilization reduces jitter, zero follows the pointer and exported curves match the saved stroke', () => {
+  const filter = new BrushStabilizer({ x: 0, y: 0 }, 0), raw = new BrushStabilizer({ x: 0, y: 0 }, 0);
+  let energy = 0;
+  for (let i = 1; i <= 30; i++) {
+    const target = { x: i * 5, y: i % 2 ? 10 : -10 };
+    const point = filter.sample(target, i * 16, 80); energy += Math.abs(point.y);
+    assert.deepEqual(raw.sample(target, i * 16, 0), target);
+  }
+  assert.ok(energy < 100);
+  const stroke = shape({ tool: 'brush', smoothing: 80, points: [{ x: 0, y: 0 }, { x: 100, y: 100 }, { x: 200, y: 0 }] });
+  assert.match(brushPath(stroke), /Q/);
+  assert.ok(boardSvg([stroke]).includes(`d="${brushPath(stroke)}"`));
+  assert.equal(parseBoardFile(JSON.stringify({ version: 1, shapes: [stroke] })).shapes[0].smoothing, 80);
+  assert.equal(hitBoardShape(stroke, { x: 100, y: 75 }, 3), true);
+  assert.doesNotMatch(brushPath({ ...stroke, smoothing: 0 }), /Q/);
 });

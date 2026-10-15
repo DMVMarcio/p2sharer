@@ -40,6 +40,7 @@ const mocks = {
   useToast: 'export const showToast = value => globalThis.whiteboardFixture.errors.push(value);',
 };
 const bundle = await build({ stdin: { contents: `export { WhiteboardApp } from './src/apps/WhiteboardApp.tsx';
+  export { ContextMenuProvider } from './src/components/common/ContextMenu.tsx';
   export { WhiteboardModel } from './src/apps/whiteboard_model.ts'; export { setLanguage } from './src/i18n/index.ts';`, resolveDir: process.cwd() },
   bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic', plugins: [{ name: 'whiteboard-fixture', setup(builder) {
     builder.onResolve({ filter: /^@tauri-apps\/api\/core$/ }, () => ({ path: 'core', namespace: 'fixture' }));
@@ -64,10 +65,13 @@ const pointer = async (type, x, y) => act(async () => {
 after(async () => { await act(async () => root.unmount()); fixture.model.destroy(); dom.window.close(); delete globalThis.whiteboardFixture; });
 
 test('drawing, object movement, canvas panning, wheel navigation and brush cursors use the production scene', async () => {
-  await act(async () => root.render(React.createElement(api.WhiteboardApp, { instanceId })));
+  await act(async () => root.render(React.createElement(api.ContextMenuProvider, null, React.createElement(api.WhiteboardApp, { instanceId }))));
   await settle();
   await click('Brush');
-  await pointer('pointerdown', 100, 100); await pointer('pointermove', 140, 120); await pointer('pointerup', 160, 140);
+  await pointer('pointerdown', 100, 100); await pointer('pointermove', 140, 120);
+  assert.equal(document.querySelector('rect[stroke-dasharray]'), null);
+  await pointer('pointerup', 160, 140);
+  assert.ok(document.querySelector('rect[stroke-dasharray]'));
   assert.equal(fixture.model.shapes.length, 1);
   const original = fixture.model.shapes[0];
   assert.equal(original.tool, 'brush');
@@ -80,16 +84,20 @@ test('drawing, object movement, canvas panning, wheel navigation and brush curso
   await pointer('pointerdown', 400, 300); await pointer('pointermove', 450, 330); await pointer('pointerup', 450, 330);
   assert.notEqual(document.querySelector('.whiteboard-art > g').getAttribute('transform'), beforePan);
   const geometry = fixture.model.content;
+  const beforeZoom = document.querySelector('.whiteboard-art > g').getAttribute('transform');
   await act(async () => canvas().dispatchEvent(new window.WheelEvent('wheel', { deltaY: 100, bubbles: true, cancelable: true })));
+  await settle();
+  assert.notEqual(document.querySelector('.whiteboard-art > g').getAttribute('transform'), beforeZoom);
   assert.equal(fixture.model.content, geometry);
-  await act(async () => canvas().dispatchEvent(new window.WheelEvent('wheel', { deltaY: -100, ctrlKey: true, clientX: 100, clientY: 100, bubbles: true, cancelable: true })));
+  await act(async () => canvas().dispatchEvent(new window.WheelEvent('wheel', { deltaY: -200, ctrlKey: true, clientX: 100, clientY: 100, bubbles: true, cancelable: true })));
+  await settle();
   assert.match(document.querySelector('.whiteboard-art > g').getAttribute('transform'), /scale\(1\./);
   await act(async () => canvas().dispatchEvent(new window.KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true })));
   assert.equal(fixture.model.shapes[0].x, 0);
 });
 
 test('layers toggle visibility and locking, and authenticated remote cursors retain brush size', async () => {
-  await click('Layers');
+  assert.ok(document.querySelector('aside[aria-label="Layers"]'));
   await click('Toggle layer visibility'); assert.equal(fixture.model.shapes[0].hidden, true);
   await click('Toggle layer visibility'); assert.equal(fixture.model.shapes[0].hidden, false);
   await click('Lock or unlock layer'); assert.equal(fixture.model.shapes[0].locked, true);
@@ -101,6 +109,27 @@ test('layers toggle visibility and locking, and authenticated remote cursors ret
   });
   assert.match(document.querySelector('.whiteboard-cursors').textContent, /Remote/);
   assert.equal(fixture.model.cursors.get('remote').width, 30);
+});
+
+test('shape tools offer accessible visual fill choices and stabilization persists locally', async () => {
+  await click('Rectangle');
+  const menu = document.querySelector('[role="menu"]');
+  assert.ok(menu);
+  assert.equal(menu.querySelectorAll('[role="menuitemradio"]').length, 2);
+  assert.equal(menu.textContent, '');
+  await click('Filled', menu);
+  assert.equal(button('Rectangle').getAttribute('aria-pressed'), 'true');
+  await pointer('pointerdown', 180, 170); await pointer('pointermove', 230, 210);
+  assert.equal(document.querySelector('rect[stroke-dasharray]'), null);
+  await pointer('pointercancel', 230, 210);
+  const slider = document.querySelector('input[aria-label="Stabilization"]');
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(slider, '70');
+    slider.dispatchEvent(new window.Event('input', { bubbles: true })); slider.dispatchEvent(new window.Event('change', { bubbles: true }));
+  });
+  assert.equal(localStorage.getItem('p2sharer_whiteboard_smoothing'), '70');
+  await click('Select and move');
+  assert.equal(fixture.model.shapes.length, 1);
 });
 
 test('whiteboards save and reopen the same local file, export separately and confirm shared replacement', async () => {
