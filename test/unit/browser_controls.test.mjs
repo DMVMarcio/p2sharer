@@ -193,8 +193,11 @@ test('page context actions operate the shared page and use the requesting client
 });
 
 
-test('tab presentation waits for the selected capture and visible video frames rather than document loading', async () => {
-  const f = await fixture(); const video = { current: null }; const stream = {}; let frame; let bright = false; let cancelled = 0;
+test('tab presentation waits for its source and releases static or black decoded frames without repeated callbacks', async context => {
+  const f = await fixture(); const video = { current: null }; const stream = {}; let frame; let bright = false; let cancelled = 0; let now = 0;
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  context.mock.method(performance, 'now', () => now);
+  const tick = async elapsed => act(async () => { now += elapsed; context.mock.timers.tick(elapsed); });
   f.dom.window.HTMLCanvasElement.prototype.getContext = () => ({ drawImage() {}, getImageData: () => ({ data: new Uint8ClampedArray([bright ? 100 : 0, 0, 0, 255]) }) });
   const Harness = ({ tab, sampling }) => React.createElement('div', { 'data-waiting': f.useVideoPresentation(video, tab, stream, true, sampling) },
     React.createElement('video', { ref: video }));
@@ -203,7 +206,7 @@ test('tab presentation waits for the selected capture and visible video frames r
   const present = async () => act(async () => frame());
   try {
     await render(1, false);
-    Object.defineProperties(video.current, { readyState: { value: 2 }, videoWidth: { value: 1280 } });
+    Object.defineProperties(video.current, { readyState: { configurable: true, value: 2 }, videoWidth: { value: 1280 } });
     video.current.requestVideoFrameCallback = callback => { frame = callback; return 7; };
     video.current.cancelVideoFrameCallback = () => { cancelled++; };
     await render(1, true); await present(); await present(); assert.equal(waiting(), 'true');
@@ -211,8 +214,18 @@ test('tab presentation waits for the selected capture and visible video frames r
     await render(2, false); assert.equal(waiting(), 'true');
     await render(2, true); await present(); assert.equal(waiting(), 'true');
     await present(); assert.equal(waiting(), 'false');
-    await render(3, true); assert.ok(cancelled > 0);
-  } finally { await f.cleanup(); }
+    await render(3, true); await present(); assert.equal(waiting(), 'true');
+    await tick(200); assert.equal(waiting(), 'false', 'a single static remote frame must release the overlay');
+    bright = false;
+    await render(4, true); await present(); await tick(7800); assert.equal(waiting(), 'true');
+    await tick(200); assert.equal(waiting(), 'false', 'a genuinely black frame cannot leave loading stuck');
+    bright = true;
+    await render(5, false); await tick(10_000); assert.equal(waiting(), 'true', 'a frame from the previous tab cannot bypass source selection');
+    await render(5, true); await tick(200); assert.equal(waiting(), 'false', 'already decoded content does not require a fresh frame callback');
+    await render(6, true); assert.ok(cancelled > 0);
+    Object.defineProperty(video.current, 'readyState', { value: 0 });
+    await tick(10_000); assert.equal(waiting(), 'true', 'the timeout never treats a missing decoded image as ready');
+  } finally { await f.cleanup(); context.mock.restoreAll(); context.mock.timers.reset(); }
 });
 
 
