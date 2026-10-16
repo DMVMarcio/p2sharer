@@ -1376,5 +1376,10 @@
   "whiteboard.selectLayer": "Sélectionner le calque : {{name}}",
   "whiteboard.exportHint.p2board": "Tableau modifiable avec calques, dessins et gommage.",
   "whiteboard.exportHint.svg": "Image vectorielle des dessins visibles.",
-  "whiteboard.exportHint.png": "PNG du tableau entier sur fond blanc (4096 × 2560)."
+  "whiteboard.exportHint.png": "PNG du tableau entier sur fond blanc (4096 × 2560).",
+  "documents.rename": "Renommer",
+  "documents.overwriteTitle": "Ce nom existe déjà",
+  "documents.overwriteHint": "Un document nommé « {{name}} » existe déjà. Remplacer son contenu enregistré ?",
+  "documents.chooseName": "Choisir un autre nom",
+  "documents.nameExists": "Un document porte déjà ce nom. Choisissez un autre nom."
 }

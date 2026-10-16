@@ -1376,5 +1376,10 @@
   "whiteboard.selectLayer": "Valitse taso: {{name}}",
   "whiteboard.exportHint.p2board": "Muokattava valkotaulu tasoineen, piirroksineen ja pyyhintöineen.",
   "whiteboard.exportHint.svg": "Vektorikuva näkyvistä piirroksista.",
-  "whiteboard.exportHint.png": "PNG koko valkotaulusta valkoisella taustalla (4096 × 2560)."
+  "whiteboard.exportHint.png": "PNG koko valkotaulusta valkoisella taustalla (4096 × 2560).",
+  "documents.rename": "Nimeä uudelleen",
+  "documents.overwriteTitle": "Nimi on jo käytössä",
+  "documents.overwriteHint": "Asiakirja nimeltä ”{{name}}” on jo olemassa. Korvataanko tallennettu sisältö?",
+  "documents.chooseName": "Valitse toinen nimi",
+  "documents.nameExists": "Samanniminen asiakirja on jo olemassa. Valitse toinen nimi."
 }

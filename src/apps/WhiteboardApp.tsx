@@ -10,7 +10,8 @@ import { WhiteboardToolbar, type BoardSettings } from './WhiteboardToolbar';
 import { WhiteboardLayers } from './WhiteboardLayers';
 import { WhiteboardCanvas } from './WhiteboardCanvas';
 import { containBoardLayer, type BoardViewport } from './whiteboard_interaction';
-import { Scan } from 'lucide-react';
+import { useElementFullscreen } from '../hooks/useElementFullscreen';
+import { Maximize, Minimize } from 'lucide-react';
 import { TooltipButton } from '../components/common/TooltipButton';
 import { boardError, useWhiteboardFiles } from './useWhiteboardFiles';
 
@@ -25,7 +26,8 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
   const [activeLayer, setActiveLayer] = useState(DEFAULT_BOARD_LAYER);
   const [selected, setSelected] = useState<string | null>(null);
   const [viewport, setViewport] = useState<BoardViewport>({ x: 60, y: 60, zoom: 1 });
-  const [resetView, setResetView] = useState(0);
+  const { ref: fullscreenRef, fullscreen, toggleFullscreen } = useElementFullscreen<HTMLDivElement>();
+  compact = compact && !fullscreen;
   const files = useWhiteboardFiles(model, instanceId);
   useEffect(() => roomAppsService.subscribe(() => refresh(n => n + 1)), []);
   const error = (reason: unknown) => showToast(boardError(reason), 3500, 'error');
@@ -34,7 +36,7 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
   const remove = (id: string) => { try { model?.removeLayer(id); setSelected(null); } catch (reason) { error(reason); } };
   const currentLayer = model?.layers.some(l => l.id === activeLayer) ? activeLayer : model?.layers[0]?.id ?? DEFAULT_BOARD_LAYER;
   if (!model) return null;
-  return <div className="whiteboard-app" onClick={event => event.stopPropagation()} onPointerDown={event => event.stopPropagation()}
+  return <div ref={fullscreenRef} className="whiteboard-app" onClick={event => event.stopPropagation()} onPointerDown={event => event.stopPropagation()}
     onKeyDown={event => {
       if (compact || (event.target as HTMLElement).closest('input, textarea, [contenteditable], [role="dialog"], [role="menu"], [role="listbox"]')) return;
       const mod = event.ctrlKey || event.metaKey, key = event.key.toLowerCase();
@@ -52,7 +54,7 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
       }
     }}>
     {!compact && <><div className="whiteboard-file-actions">{files.actions}
-      <TooltipButton tooltip={t('whiteboard.resetView')} className="room-app-notepad-tool" onClick={() => setResetView(n => n + 1)}><Scan size={16} /></TooltipButton>
+      <TooltipButton tooltip={t(fullscreen ? 'browser.exitFullscreen' : 'browser.fullscreen')} aria-pressed={fullscreen} className="room-app-notepad-tool" onClick={() => void toggleFullscreen().catch(error)}>{fullscreen ? <Minimize size={16} /> : <Maximize size={16} />}</TooltipButton>
     </div>{files.status}</>}
     <div className="whiteboard-workspace">
       <div className="whiteboard-stage">
@@ -62,7 +64,7 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
     }} canUndo={model.history.canUndo()} canRedo={model.history.canRedo()} onUndo={() => model.undo()} onRedo={() => model.redo()}
       />}
       <WhiteboardCanvas model={model} activeLayer={currentLayer} settings={settings} viewport={viewport} onViewport={setViewport} selected={selected} onSelect={select}
-        compact={compact} actor={roomAppsService.getLocalActor()} name={username} onError={error} resetView={resetView}
+        compact={compact} actor={roomAppsService.getLocalActor()} name={username} onError={error}
         participantName={actor => peers.find(peer => peer.id === actor)?.username || t('browser.participant')} />
       </div>
       {!compact && <WhiteboardLayers layers={model.layers} shapes={model.shapes} active={currentLayer} onActivate={select} onChange={updateLayer} onDelete={remove}

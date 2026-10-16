@@ -11,6 +11,11 @@ export async function imageSrcToBase64(src: string): Promise<string> {
   }
   const response = await fetch(src);
   const blob = await response.blob();
+  return blobToDataUrl(blob);
+}
+
+/** Encode an existing blob without a CSP-restricted fetch round trip. */
+export function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => {

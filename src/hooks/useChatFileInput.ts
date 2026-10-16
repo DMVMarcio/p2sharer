@@ -1,3 +1,4 @@
+import { blobToDataUrl } from '../core/image_clipboard';
 import { t } from '../i18n/index.ts';
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { invoke, isTauri } from '@tauri-apps/api/core';
@@ -20,6 +21,7 @@ export function useChatFileInput(paneRef: RefObject<HTMLDivElement | null>) {
     if (busy.current || queue.current.length) return;
     busy.current = true;
     try {
+      if (args?.gifSource instanceof Promise) args = { ...args, gifSource: await args.gifSource };
       const result = await invoke<NativeChatFile[] | NativeChatFile | null>(command, args);
       const incoming = Array.isArray(result) ? result : result ? [result] : [];
       if (!mounted.current) { incoming.forEach(discard); return; }
@@ -58,18 +60,24 @@ export function useChatFileInput(paneRef: RefObject<HTMLDivElement | null>) {
       .catch((error) => console.warn('[Files] Could not listen for file drops:', error));
 
     const onPaste = (event: ClipboardEvent) => {
-      if (!inChat(event.target) || !event.clipboardData?.files.length) return;
+      if (!inChat(event.target) || !event.clipboardData) return;
+      const data = event.clipboardData;
+      const html = data.getData('text/html');
+      const source = html ? new DOMParser().parseFromString(html, 'text/html').querySelector('img')?.getAttribute('src') : null;
+      const gifSource = source && (/^data:image\/gif;base64,/i.test(source) || /^https?:\/\//i.test(source) && /\.gif(?:[?#]|$)/i.test(source)) ? source : null;
+      const gif = Array.from(data.files).find(file => file.type === 'image/gif');
+      if (!data.files.length && !gifSource) return;
       event.preventDefault();
       event.stopPropagation();
       clearTimeout(pasteTimer);
-      void prepare('paste_chat_files');
+      void prepare('paste_chat_files', gif || gifSource ? { gifSource: gif ? blobToDataUrl(gif) : gifSource } : undefined);
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat || !(event.ctrlKey || event.metaKey) || event.altKey || event.key.toLowerCase() !== 'v' || !inChat(event.target)) return;
       // Explorer file lists may not generate a DOM paste event in WebView2.
       // Let ordinary text paste run; image/file paste above cancels this fallback.
       clearTimeout(pasteTimer);
-      pasteTimer = setTimeout(() => { if (available()) void prepare('paste_chat_files'); }, 0);
+      pasteTimer = setTimeout(() => { if (available()) void prepare('paste_chat_files'); }, 50);
     };
     document.addEventListener('paste', onPaste, true);
     document.addEventListener('keydown', onKeyDown, true);

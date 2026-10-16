@@ -60,6 +60,7 @@ test('each file initializes image acceptance independently and still permits man
   for (const extension of ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp']) {
     await show(extension, `photo.${extension}`, true);
     assert.equal(document.querySelector('[aria-label="Aceitar solicitações"]').checked, true);
+    assert.equal(document.querySelector('.modal-overlay').parentElement, document.body);
   }
   await click(document.querySelector('[aria-label="Aceitar solicitações"]'));
   await click([...document.querySelectorAll('button')].find(button => button.textContent === 'Anexar'));
@@ -99,6 +100,11 @@ test('own sent images expose Save and Save As while own non-image files retain t
     transfers: [], preview: 'data:image/png;base64,AA==', speedUnit: 'MBps', onRequest: saveAs => requests.push(saveAs),
     onPreview: () => {}, onCancel: () => {}, onReveal: () => {} };
   await render(React.createElement(ChatFileAttachment, props));
+  await click(document.querySelector('.chat-file-image-button'));
+  assert.equal(document.querySelector('.chat-image-viewer').parentElement, document.body);
+  assert.ok(document.querySelector('.chat-image-viewer').contains(document.activeElement));
+  await act(async () => document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  assert.equal(document.querySelector('.chat-image-viewer'), null);
   await click(document.querySelector('[aria-label="Baixar"]'));
   await click([...document.querySelectorAll('.chat-file-download-menu button')].find(button => button.textContent === 'Salvar'));
   await settleExit();

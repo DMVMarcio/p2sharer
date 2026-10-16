@@ -11,10 +11,10 @@ import { useWhiteboardViewport } from './useWhiteboardViewport';
 
 type Cursor = Omit<BoardCursor, 'seenAt'>;
 type Gesture = { pointer: number; start: BoardPoint; mode: 'pan' | 'move' | 'draw'; original?: BoardLayer; layer?: BoardLayer; draft?: BoardShape; viewport: BoardViewport; stabilizer?: BrushStabilizer };
-export function WhiteboardCanvas({ model, activeLayer, settings, viewport, onViewport, selected, onSelect, compact, actor, name, participantName, onError, resetView }: {
+export function WhiteboardCanvas({ model, activeLayer, settings, viewport, onViewport, selected, onSelect, compact, actor, name, participantName, onError }: {
   model: WhiteboardModel; activeLayer: string; settings: BoardSettings; viewport: BoardViewport; onViewport(viewport: BoardViewport): void;
   selected: string | null; onSelect(id: string | null): void; compact: boolean; actor: string; name: string;
-  participantName(actor: string): string; onError(error: unknown): void; resetView: number;
+  participantName(actor: string): string; onError(error: unknown): void;
 }) {
   const root = useRef<HTMLDivElement>(null), clipId = useId();
   const navigation = useWhiteboardViewport(root, viewport, onViewport);
@@ -60,7 +60,7 @@ export function WhiteboardCanvas({ model, activeLayer, settings, viewport, onVie
     });
     if (root.current) observer.observe(root.current);
     return () => observer.disconnect();
-  }, [model, identity, resetView, compact, onViewport]);
+  }, [model, identity, compact, onViewport]);
   useEffect(() => {
     const screen = physicalScreen.current;
     if (screen && !gesture.current && !compact) publish({ ...worldPoint(screen), tool: settings.tool, width: boardBrushWidth(settings.width), color: settings.color }, screen);

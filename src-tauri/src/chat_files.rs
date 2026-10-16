@@ -223,9 +223,96 @@ pub async fn import_chat_files(state: State<'_, ChatFileState>, paths: Vec<Strin
     Ok(sources.into_iter().map(|(info, path)| { registered.insert(info.id.clone(), path); info }).collect())
 }
 
+const MAX_CLIPBOARD_GIF: usize = 16 * 1024 * 1024;
+
+fn clipboard_gif_bytes(bytes: Vec<u8>) -> Result<Vec<u8>, String> {
+    if bytes.len() > MAX_CLIPBOARD_GIF || !(bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a")) {
+        return Err("Invalid clipboard GIF".into());
+    }
+    let dimensions = image::ImageReader::with_format(std::io::Cursor::new(&bytes), image::ImageFormat::Gif)
+        .into_dimensions().map_err(|_| "Invalid clipboard GIF")?;
+    if dimensions.0 == 0 || dimensions.1 == 0 || dimensions.0 > 8192 || dimensions.1 > 8192 {
+        return Err("Clipboard image too large".into());
+    }
+    Ok(bytes)
+}
+
+#[cfg(windows)]
+fn native_clipboard_gif() -> Option<Vec<u8>> {
+    use windows::{core::w, Win32::{Foundation::HGLOBAL, System::{DataExchange::{OpenClipboard, CloseClipboard, RegisterClipboardFormatW, GetClipboardData}, Memory::{GlobalLock, GlobalUnlock, GlobalSize}}}};
+    unsafe {
+        OpenClipboard(None).ok()?;
+        struct ClipboardGuard;
+        impl Drop for ClipboardGuard { fn drop(&mut self) { unsafe { let _ = CloseClipboard(); } } }
+        let _guard = ClipboardGuard;
+        for format in [w!("GIF"), w!("image/gif")] {
+            let format = RegisterClipboardFormatW(format);
+            if format == 0 { continue; }
+            let Ok(handle) = GetClipboardData(format) else { continue; };
+            let handle = HGLOBAL(handle.0);
+            let size = GlobalSize(handle);
+            if size == 0 || size > MAX_CLIPBOARD_GIF { continue; }
+            let pointer = GlobalLock(handle);
+            if pointer.is_null() { continue; }
+            let bytes = std::slice::from_raw_parts(pointer as *const u8, size).to_vec();
+            let _ = GlobalUnlock(handle);
+            if let Ok(bytes) = clipboard_gif_bytes(bytes) { return Some(bytes); }
+        }
+        None
+    }
+}
+
+#[cfg(not(windows))]
+fn native_clipboard_gif() -> Option<Vec<u8>> { None }
+
+#[cfg(windows)]
+fn copy_clipboard_gif(bytes: &[u8]) -> Result<(), String> {
+    use windows::{core::w, Win32::{Foundation::{GlobalFree, HANDLE}, System::{DataExchange::{OpenClipboard, CloseClipboard, RegisterClipboardFormatW, SetClipboardData}, Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE}}}};
+    unsafe {
+        OpenClipboard(None).map_err(|e| e.to_string())?;
+        struct ClipboardGuard;
+        impl Drop for ClipboardGuard { fn drop(&mut self) { unsafe { let _ = CloseClipboard(); } } }
+        let _guard = ClipboardGuard;
+        let format = RegisterClipboardFormatW(w!("GIF"));
+        if format == 0 { return Err("Could not register clipboard GIF".into()); }
+        let handle = GlobalAlloc(GMEM_MOVEABLE, bytes.len()).map_err(|e| e.to_string())?;
+        let pointer = GlobalLock(handle);
+        if pointer.is_null() { let _ = GlobalFree(handle); return Err("Could not allocate clipboard GIF".into()); }
+        std::ptr::copy_nonoverlapping(bytes.as_ptr(), pointer as *mut u8, bytes.len());
+        let _ = GlobalUnlock(handle);
+        if let Err(error) = SetClipboardData(format, HANDLE(handle.0)) {
+            let _ = GlobalFree(handle); return Err(error.to_string());
+        }
+        // Windows owns the allocation after SetClipboardData succeeds.
+        Ok(())
+    }
+}
+
+async fn pasted_gif_source(source: &str) -> Result<Vec<u8>, String> {
+    if let Some(encoded) = source.strip_prefix("data:image/gif;base64,") {
+        if encoded.len() > MAX_CLIPBOARD_GIF * 4 / 3 + 4 { return Err("Clipboard image too large".into()); }
+        return clipboard_gif_bytes(STANDARD.decode(encoded).map_err(|_| "Invalid clipboard GIF")?);
+    }
+    let url = reqwest::Url::parse(source).map_err(|_| "Invalid clipboard GIF URL")?;
+    if !matches!(url.scheme(), "https" | "http") || !url.username().is_empty() || url.password().is_some() {
+        return Err("Invalid clipboard GIF URL".into());
+    }
+    let client = reqwest::Client::builder().timeout(std::time::Duration::from_secs(15))
+        .redirect(reqwest::redirect::Policy::limited(3)).build().map_err(|e| e.to_string())?;
+    let mut response = client.get(url).send().await.map_err(|e| e.to_string())?.error_for_status().map_err(|e| e.to_string())?;
+    if response.content_length().is_some_and(|length| length > MAX_CLIPBOARD_GIF as u64) { return Err("Clipboard image too large".into()); }
+    let mut bytes = Vec::new();
+    while let Some(chunk) = response.chunk().await.map_err(|e| e.to_string())? {
+        if bytes.len() + chunk.len() > MAX_CLIPBOARD_GIF { return Err("Clipboard image too large".into()); }
+        bytes.extend_from_slice(&chunk);
+    }
+    clipboard_gif_bytes(bytes)
+}
+
 #[tauri::command]
-pub async fn paste_chat_files(state: State<'_, ChatFileState>) -> Result<Vec<FileInfo>, String> {
-    let sources = tauri::async_runtime::spawn_blocking(|| -> Result<Vec<(PathBuf, bool)>, String> {
+pub async fn paste_chat_files(state: State<'_, ChatFileState>, gif_source: Option<String>) -> Result<Vec<FileInfo>, String> {
+    let gif = match gif_source { Some(source) => Some(pasted_gif_source(&source).await?), None => None };
+    let sources = tauri::async_runtime::spawn_blocking(move || -> Result<Vec<(PathBuf, bool)>, String> {
         let mut clipboard = arboard::Clipboard::new().map_err(|e| e.to_string())?;
         match clipboard.get().file_list() {
             Ok(paths) if !paths.is_empty() => {
@@ -234,6 +321,13 @@ pub async fn paste_chat_files(state: State<'_, ChatFileState>) -> Result<Vec<Fil
             }
             Err(arboard::Error::ContentNotAvailable) | Ok(_) => {}
             Err(error) => return Err(error.to_string()),
+        }
+        if let Some(bytes) = gif.or_else(native_clipboard_gif) {
+            let directory = dirs::data_local_dir().ok_or("Local data folder unavailable")?.join("P2Sharer").join("chat-clipboard");
+            fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
+            let path = directory.join(format!("clipboard-{}.gif", random_id()?));
+            if let Err(error) = fs::write(&path, bytes) { let _ = fs::remove_file(&path); return Err(error.to_string()); }
+            return Ok(vec![(path, true)]);
         }
         let pixels = match clipboard.get_image() {
             Ok(pixels) => pixels,
@@ -321,6 +415,11 @@ pub async fn copy_chat_image(data_base64: String) -> Result<(), String> {
         };
         let mut clipboard = arboard::Clipboard::new().map_err(|e| e.to_string())?;
         clipboard.set_image(image_data).map_err(|e| e.to_string())?;
+        #[cfg(windows)]
+        if let Some(encoded) = data_base64.strip_prefix("data:image/gif;base64,") {
+            let bytes = clipboard_gif_bytes(STANDARD.decode(encoded).map_err(|e| e.to_string())?)?;
+            copy_clipboard_gif(&bytes)?;
+        }
         Ok(())
     }).await.map_err(|e| e.to_string())?
 }
@@ -329,6 +428,14 @@ pub async fn copy_chat_image(data_base64: String) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn clipboard_gif_keeps_original_encoded_bytes_and_rejects_other_formats() {
+        let bytes = STANDARD.decode("R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==").unwrap();
+        assert_eq!(clipboard_gif_bytes(bytes.clone()).unwrap(), bytes);
+        assert!(clipboard_gif_bytes(b"not a GIF".to_vec()).is_err());
+        assert!(clipboard_gif_bytes(vec![0; MAX_CLIPBOARD_GIF + 1]).is_err());
+    }
 
     #[test]
     fn discarding_an_original_source_preserves_the_file() {

@@ -53,7 +53,7 @@ fn valid_stream_drawing(d: &StreamDrawing) -> bool {
         && d.color.starts_with('#')
         && d.color.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)
         && !d.points.is_empty()
-        && d.points.len() <= 192
+        && d.points.len() <= 384
         && d.points.iter().all(|p| {
             p.x.is_finite()
                 && p.y.is_finite()
@@ -391,6 +391,15 @@ pub async fn update_stream_pointer_overlay(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn drawing_point_capacity_matches_the_viewer_and_rejects_overflow() {
+        let mut drawing = super::StreamDrawing { tool: "brush".into(), color: "#ef4444".into(), size: 3,
+            points: (0..384).map(|_| super::DrawingPoint { x: 0.5, y: 0.5 }).collect(), text: None };
+        assert!(super::valid_stream_drawing(&drawing));
+        drawing.points.push(super::DrawingPoint { x: 0.5, y: 0.5 });
+        assert!(!super::valid_stream_drawing(&drawing));
+    }
+
     #[test]
     fn pointer_overlays_can_subscribe_to_native_visuals_without_window_or_update_permissions() {
         // Exercise the resolved ACL embedded in the desktop build, not a copy of

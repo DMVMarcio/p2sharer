@@ -1376,5 +1376,10 @@
   "whiteboard.selectLayer": "Выбрать слой: {{name}}",
   "whiteboard.exportHint.p2board": "Редактируемая доска со слоями, рисунками и стираниями.",
   "whiteboard.exportHint.svg": "Векторное изображение видимых рисунков.",
-  "whiteboard.exportHint.png": "PNG всей доски на белом фоне (4096 × 2560)."
+  "whiteboard.exportHint.png": "PNG всей доски на белом фоне (4096 × 2560).",
+  "documents.rename": "Переименовать",
+  "documents.overwriteTitle": "Имя уже существует",
+  "documents.overwriteHint": "Документ «{{name}}» уже существует. Перезаписать сохранённое содержимое?",
+  "documents.chooseName": "Выбрать другое имя",
+  "documents.nameExists": "Документ с таким именем уже существует. Выберите другое имя."
 }

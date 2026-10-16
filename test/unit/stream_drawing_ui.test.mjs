@@ -201,15 +201,15 @@ test('brush strokes stop at capacity and preserve every point until pointer rele
   await click('[aria-label="Pincel"]');
   const before = globalThis.__pointerTestSent.filter(p => p.kind === 'draw').length;
   await pointer('pointerdown', 0, 225);
-  for (let i = 0; i < 300; i++) await pointer('pointermove', 1 + i * 2, 225);
+  for (let i = 0; i < 500; i++) await pointer('pointermove', 1 + i, 225);
   assert.equal(globalThis.__pointerTestSent.filter(p => p.kind === 'draw').length, before);
   await pointer('pointerup', 799, 225);
   const packet = globalThis.__pointerTestSent.at(-1);
   assert.equal(packet.kind, 'draw');
-  assert.equal(packet.drawing.points.length, 192);
+  assert.equal(packet.drawing.points.length, 384);
   assert.deepEqual(packet.drawing.points, [
     { x: 0, y: .5 },
-    ...Array.from({ length: 191 }, (_, i) => ({ x: (1 + i * 2) / 800, y: .5 })),
+    ...Array.from({ length: 383 }, (_, i) => ({ x: (1 + i) / 800, y: .5 })),
   ]);
 });
 
@@ -247,4 +247,15 @@ test('pen and touch tablet inputs draw properly and container has touch-action c
   assert.equal(penDraws.length, initialDraws + 1);
   assert.equal(penDraws.at(-1).drawing.tool, 'brush');
   assert.deepEqual(penDraws.at(-1).drawing.points[0], { x: 0.2, y: 0.2 });
+});
+
+
+test('slow brush movement ignores redundant samples and reaches the release point', async () => {
+  await pointer('pointerdown', 80, 90);
+  for (let i = 0; i < 600; i++) await pointer('pointermove', 80 + i / 100, 90);
+  await pointer('pointerup', 100, 100);
+  const packet = globalThis.__pointerTestSent.at(-1);
+  assert.equal(packet.kind, 'draw');
+  assert.ok(packet.drawing.points.length < 30);
+  assert.deepEqual(packet.drawing.points.at(-1), { x: .125, y: 100 / 450 });
 });

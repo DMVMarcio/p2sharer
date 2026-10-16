@@ -1,5 +1,5 @@
 export const STREAM_DRAWING_MAX = 1024;
-export const STREAM_DRAWING_MAX_POINTS = 192;
+export const STREAM_DRAWING_MAX_POINTS = 384;
 export const STREAM_POINTER_MAX_VISUALS = STREAM_DRAWING_MAX + 256;
 export function streamDrawingLimit(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? Math.max(1, Math.min(STREAM_DRAWING_MAX, Math.round(value))) : STREAM_DRAWING_MAX;

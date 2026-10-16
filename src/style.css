@@ -2751,7 +2751,7 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 .chat-file-preview-request:hover { border-color: var(--accent-color); background: var(--bg-card-hover); }
 .chat-file-dialog { max-width: 480px; }
 .chat-file-dialog, .chat-file-dialog button, .chat-file-dialog input { font-family: var(--font-sans); }
-.chat-file-dialog-body { gap: 13px; }
+.chat-file-dialog-body { display: flex; flex-direction: column; gap: 13px; }
 .chat-file-switch { display: flex; justify-content: space-between; gap: 14px; align-items: center; font-size: 12px; font-weight: 600; color: var(--text-primary); }
 .chat-file-dialog .chat-file-observation { margin: -7px 0 0; font-size: 11px; line-height: 1.45; color: var(--text-muted); }
 .chat-file-observation strong { color: var(--text-secondary); }

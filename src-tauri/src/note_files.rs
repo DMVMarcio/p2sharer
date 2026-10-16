@@ -77,6 +77,15 @@ fn persist_note(directory: &Path, mut note: SavedNote, expected_updated_at: Opti
     if current.as_ref().map(|note| note.updated_at) != expected_updated_at {
         return Err("This note changed on disk. Reopen it before saving.".into());
     }
+    for entry in fs::read_dir(directory).map_err(|e| e.to_string())? {
+        let other_path = entry.map_err(|e| e.to_string())?.path();
+        if other_path == path || other_path.extension().and_then(|ext| ext.to_str()) != Some("json") { continue; }
+        if let Ok(other) = read_note(&other_path) {
+            if other.name.trim().to_lowercase() == note.name.to_lowercase() {
+                return Err("documents.nameExists".into());
+            }
+        }
+    }
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_err(|e| e.to_string())?.as_millis() as u64;
     note.updated_at = now.max(expected_updated_at.unwrap_or(0).saturating_add(1));
     let bytes = serde_json::to_vec(&note).map_err(|e| e.to_string())?;
@@ -131,6 +140,17 @@ pub async fn save_library_note(app: tauri::AppHandle, id: String, name: String, 
     tauri::async_runtime::spawn_blocking(move || {
         let _lock = NOTE_LOCK.lock().map_err(|e| e.to_string())?;
         persist_note(&note_directory(&app, library.as_deref())?, SavedNote { id, name, content, updated_at: 0 }, expected_updated_at)
+    }).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn rename_library_note(app: tauri::AppHandle, id: String, name: String, expected_updated_at: u64, library: Option<String>) -> Result<SavedNote, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let _lock = NOTE_LOCK.lock().map_err(|e| e.to_string())?;
+        let directory = note_directory(&app, library.as_deref())?;
+        let mut note = read_note(&note_path(&directory, &id)?)?;
+        note.name = name;
+        persist_note(&directory, note, Some(expected_updated_at))
     }).await.map_err(|e| e.to_string())?
 }
 
@@ -252,6 +272,26 @@ mod tests {
         assert!(persist_note(&fixture.0, restored, None).is_err());
         assert_eq!(read_note(&path).unwrap().content, second.content);
         assert_eq!(fs::read_dir(&fixture.0).unwrap().count(), 1);
+    }
+
+    #[test]
+    fn renaming_preserves_content_and_rejects_duplicate_names_and_stale_revisions() {
+        let fixture = Fixture::new();
+        let first = persist_note(&fixture.0, note(), None).unwrap();
+        let mut second = first.clone();
+        second.id = "11111111-2222-3333-4444-555555555555".into();
+        second.name = "Other".into();
+        let second = persist_note(&fixture.0, second, None).unwrap();
+        let mut renamed = first.clone();
+        renamed.name = "Updated name".into();
+        let renamed = persist_note(&fixture.0, renamed, Some(first.updated_at)).unwrap();
+        assert_eq!(renamed.content, first.content);
+        assert_eq!(renamed.id, first.id);
+        assert!(persist_note(&fixture.0, first.clone(), Some(first.updated_at)).is_err());
+        let mut duplicate = renamed.clone();
+        duplicate.name = " other ".into();
+        assert_eq!(persist_note(&fixture.0, duplicate, Some(renamed.updated_at)).err().unwrap(), "documents.nameExists");
+        assert_eq!(read_note(&note_path(&fixture.0, &second.id).unwrap()).unwrap().name, "Other");
     }
 
     #[test]

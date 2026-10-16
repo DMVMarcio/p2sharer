@@ -1376,5 +1376,10 @@
   "whiteboard.selectLayer": "Selecionar camada: {{name}}",
   "whiteboard.exportHint.p2board": "Quadro editável com camadas, desenhos e borracha.",
   "whiteboard.exportHint.svg": "Imagem vetorial dos desenhos visíveis.",
-  "whiteboard.exportHint.png": "PNG de todo o quadro com fundo branco (4096 × 2560)."
+  "whiteboard.exportHint.png": "PNG de todo o quadro com fundo branco (4096 × 2560).",
+  "documents.rename": "Renomear",
+  "documents.overwriteTitle": "Nome já existe",
+  "documents.overwriteHint": "Já existe um documento chamado “{{name}}”. Sobrescrever o conteúdo salvo?",
+  "documents.chooseName": "Escolher outro nome",
+  "documents.nameExists": "Já existe um documento com esse nome. Escolha outro nome."
 }

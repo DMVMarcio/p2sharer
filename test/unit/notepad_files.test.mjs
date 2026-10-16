@@ -21,6 +21,12 @@ fixture.invoke = async (command, args) => {
   fixture.calls.push({ command, args });
   if (command === 'list_saved_notes') return { directory: 'Notes', notes: [...fixture.notes.values()].map(note => ({ ...note, content: '' })) };
   if (command === 'read_saved_note') return { ...fixture.notes.get(args.id) };
+  if (command === 'rename_library_note') {
+    const current = fixture.notes.get(args.id);
+    assert.equal(args.expectedUpdatedAt, current.updatedAt);
+    const note = { ...current, name: args.name, updatedAt: current.updatedAt + 1 };
+    fixture.notes.set(note.id, note); return { ...note };
+  }
   if (command === 'save_library_note') {
     const current = fixture.notes.get(args.id);
     assert.equal(args.expectedUpdatedAt, current?.updatedAt ?? null);
@@ -158,4 +164,40 @@ test('a peer opening another note during the name dialog cannot redirect the pen
   assert.match(document.querySelector('[role="alert"]').textContent, /open note changed/);
   assert.equal(fixture.notes.size, 2);
   await click('Cancel', document.querySelector('[role="dialog"]'));
+});
+
+
+test('renaming the open note preserves unsaved content and advances its local revision', async () => {
+  const note = fixture.notes.get(instanceId);
+  await act(async () => { fixture.model.setNoteIdentity(note.id, note.name); fixture.editor.commands.setContent('<p>Unsaved changes</p>'); });
+  await click('Open', toolbar());
+  const row = [...document.querySelectorAll('.notepad-files-row')].find(row => row.textContent.includes(note.name));
+  await act(async () => row.querySelector('[aria-label="Rename"]').click()); await settle();
+  const child = [...document.querySelectorAll('[role="dialog"]')].at(-1);
+  const input = child.querySelector('input');
+  await act(async () => { Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(input, 'Renamed note'); input.dispatchEvent(new window.Event('input', { bubbles: true })); });
+  await click('Rename', child);
+  assert.equal(fixture.model.noteIdentity.name, 'Renamed note');
+  assert.equal(fixture.editor.getHTML(), '<p>Unsaved changes</p>');
+  assert.notEqual(fixture.notes.get(instanceId).content, '<p>Unsaved changes</p>');
+  await click('Cancel', document.querySelector('[role="dialog"]'));
+  await click('Save', toolbar());
+  assert.equal(fixture.notes.get(instanceId).content, '<p>Unsaved changes</p>');
+});
+
+test('saving by an existing name requires separate overwrite consent and adopts the saved identity', async () => {
+  const old = fixture.notes.get(instanceId);
+  await act(async () => { fixture.model.setNoteIdentity('99999999-aaaa-bbbb-cccc-dddddddddddd', old.name); fixture.editor.commands.setContent('<p>Replacement</p>'); });
+  await click('Save', toolbar());
+  await click('Save', document.querySelector('[role="dialog"]'));
+  assert.equal(document.querySelectorAll('[role="dialog"]').length, 2);
+  assert.notEqual(fixture.notes.get(instanceId).content, '<p>Replacement</p>');
+  await click('Choose another name', [...document.querySelectorAll('[role="dialog"]')].at(-1));
+  assert.equal(document.querySelectorAll('[role="dialog"]').length, 1);
+  await click('Save', document.querySelector('[role="dialog"]'));
+  await click('Overwrite', [...document.querySelectorAll('[role="dialog"]')].at(-1));
+  await settle();
+  assert.equal(document.querySelector('[role="dialog"]'), null);
+  assert.equal(fixture.notes.get(instanceId).content, '<p>Replacement</p>');
+  assert.equal(fixture.model.noteIdentity.id, instanceId);
 });

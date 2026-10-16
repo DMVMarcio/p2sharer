@@ -1376,5 +1376,10 @@
   "whiteboard.selectLayer": "选择图层：{{name}}",
   "whiteboard.exportHint.p2board": "包含图层、绘图和擦除记录的可编辑白板。",
   "whiteboard.exportHint.svg": "可见绘图的矢量图像。",
-  "whiteboard.exportHint.png": "整个白板的白底 PNG 图像（4096 × 2560）。"
+  "whiteboard.exportHint.png": "整个白板的白底 PNG 图像（4096 × 2560）。",
+  "documents.rename": "重命名",
+  "documents.overwriteTitle": "名称已存在",
+  "documents.overwriteHint": "已存在名为“{{name}}”的文档。是否覆盖已保存的内容？",
+  "documents.chooseName": "选择其他名称",
+  "documents.nameExists": "已存在同名文档。请选择其他名称。"
 }

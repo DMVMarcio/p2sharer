@@ -1376,5 +1376,10 @@
   "whiteboard.selectLayer": "Select layer: {{name}}",
   "whiteboard.exportHint.p2board": "Editable whiteboard with layers, paint and erasing.",
   "whiteboard.exportHint.svg": "Vector image of the visible artwork.",
-  "whiteboard.exportHint.png": "PNG of the entire whiteboard on white (4096 × 2560)."
+  "whiteboard.exportHint.png": "PNG of the entire whiteboard on white (4096 × 2560).",
+  "documents.rename": "Rename",
+  "documents.overwriteTitle": "Name already exists",
+  "documents.overwriteHint": "A document named “{{name}}” already exists. Overwrite its saved content?",
+  "documents.chooseName": "Choose another name",
+  "documents.nameExists": "A document with this name already exists. Choose another name."
 }

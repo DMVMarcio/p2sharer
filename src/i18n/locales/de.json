@@ -1376,5 +1376,10 @@
   "whiteboard.selectLayer": "Ebene auswählen: {{name}}",
   "whiteboard.exportHint.p2board": "Bearbeitbares Whiteboard mit Ebenen, Zeichnungen und Radierungen.",
   "whiteboard.exportHint.svg": "Vektorbild der sichtbaren Zeichnungen.",
-  "whiteboard.exportHint.png": "PNG des gesamten Whiteboards auf Weiß (4096 × 2560)."
+  "whiteboard.exportHint.png": "PNG des gesamten Whiteboards auf Weiß (4096 × 2560).",
+  "documents.rename": "Umbenennen",
+  "documents.overwriteTitle": "Name bereits vorhanden",
+  "documents.overwriteHint": "Ein Dokument namens „{{name}}“ ist bereits vorhanden. Gespeicherten Inhalt überschreiben?",
+  "documents.chooseName": "Anderen Namen wählen",
+  "documents.nameExists": "Ein Dokument mit diesem Namen ist bereits vorhanden. Wähle einen anderen Namen."
 }

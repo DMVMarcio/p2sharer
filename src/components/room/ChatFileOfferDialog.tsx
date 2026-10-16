@@ -1,4 +1,4 @@
-import { useModalDialogBehavior } from '../common/useModalDialogBehavior';
+import { ModalDialog } from '../common/ModalDialog';
 import { localizeText, t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { useState } from 'react';
@@ -14,19 +14,17 @@ export function ChatFileOfferDialog({ file, onClose, onOffer }: Props) {
   const [autoAccept, setAutoAccept] = useState(() => file.isImage);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const submit = async () => {
+  const submit = async (close: () => void) => {
     setBusy(true);
-    try { await onOffer(name.trim(), autoAccept); onClose(); }
+    try { await onOffer(name.trim(), autoAccept); close(); }
     catch { setError(t("message.fb1fa51a323d")); }
     finally { setBusy(false); }
   };
-  const dialogRef = useModalDialogBehavior(onClose, busy, false);
-  return <div className="modal-overlay">
-    <div ref={dialogRef} className="modal-card chat-file-dialog" role="dialog" aria-modal="true" aria-labelledby="chat-file-dialog-title">
-      <div className="modal-header"><div className="modal-header-icon"><Paperclip size={19} /></div><div><h2 id="chat-file-dialog-title">{t("message.0176661d7e81")}</h2>
-        <p className="modal-subtitle">{t("message.a9477d069b1b")}</p></div>
-        <button className="btn-close" aria-label={t("message.0f2bd88ef0ac")} disabled={busy} onClick={onClose}>&times;</button></div>
-      <div className="modal-body chat-file-dialog-body">
+  return <ModalDialog title={t("message.0176661d7e81")} subtitle={t("message.a9477d069b1b")}
+    icon={<Paperclip size={19} />} className="chat-file-dialog" busy={busy} onClose={onClose}
+    footer={close => <><button className="btn btn-secondary" disabled={busy} onClick={close}>{t("message.bb9dbb406dcb")}</button>
+      <button className="btn btn-primary" disabled={busy || !name.trim()} onClick={() => void submit(close)}>{t("message.3ee59a68ed11")}</button></>}>
+      <div className="chat-file-dialog-body">
         <div className="form-group"><label className="form-label" htmlFor="chat-file-name">{t("message.c586d2b42a35")}</label>
           <input autoComplete="off" className="text-input" id="chat-file-name" value={name} maxLength={180}
             onChange={(event) => setName(event.target.value)} /></div>
@@ -38,8 +36,5 @@ export function ChatFileOfferDialog({ file, onClose, onOffer }: Props) {
         <p className="chat-file-observation"><strong>{t("message.630f02eff4ae")}</strong>  {t("message.2aaef5696c80")}</p>
         {error && <p className="chat-file-error">{localizeText(error)}</p>}
       </div>
-      <div className="modal-footer"><button className="btn btn-secondary" disabled={busy} onClick={onClose}>{t("message.bb9dbb406dcb")}</button>
-        <button className="btn btn-primary" disabled={busy || !name.trim()} onClick={() => void submit()}>{t("message.3ee59a68ed11")}</button></div>
-    </div>
-  </div>;
+  </ModalDialog>;
 }

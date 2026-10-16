@@ -69,5 +69,5 @@ export function ModalDialog({ title, subtitle, icon, headerless = false, headerA
       <div className="modal-body">{children}</div>
       {footer && <div className="modal-footer">{typeof footer === 'function' ? footer(close) : footer}</div>}
     </div>
-  </div>, document.body);
+  </div>, document.fullscreenElement ?? document.body);
 }

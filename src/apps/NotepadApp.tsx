@@ -120,18 +120,18 @@ export const NotepadApp: React.FC<Props> = ({ instanceId, compact = false }) => 
     if (editor && !editor.isEmpty) setPending(note);
     else replace(note);
   };
-  const persist = async (name: string, expectedId: string) => {
+  const persist = async (name: string, expectedId: string, overwrite?: SavedNote) => {
     if (!editor || !model) return;
     const id = model.noteIdentity?.id ?? instanceId;
     if (id !== expectedId) throw new Error(t('notepad.documentChanged'));
     const content = editor.getHTML();
     const previous = saved.current.get(id);
     const library = previous ? null : await invoke<NoteLibrary>('list_saved_notes');
-    const existing = previous ?? library?.notes.find((note) => note.id === id);
-    const note = await invoke<SavedNote>('save_library_note', { id, name, content, expectedUpdatedAt: existing?.updatedAt ?? null });
-    saved.current.set(id, note);
+    const existing = overwrite ?? previous ?? library?.notes.find((note) => note.id === id);
+    const note = await invoke<SavedNote>('save_library_note', { id: overwrite?.id ?? id, name, content, expectedUpdatedAt: existing?.updatedAt ?? null });
+    saved.current.set(note.id, note);
     // Keep a delayed save from relabeling another document opened by a peer.
-    if ((model.noteIdentity?.id ?? instanceId) === id) model.setNoteIdentity(id, name);
+    if ((model.noteIdentity?.id ?? instanceId) === id) model.setNoteIdentity(note.id, note.name);
     setRevision((value) => value + 1);
     showToast(t('message.6896081fcc11'), 3500, 'success');
   };
@@ -195,7 +195,11 @@ export const NotepadApp: React.FC<Props> = ({ instanceId, compact = false }) => 
     </>}
     <EditorContent editor={editor} className="room-app-notepad-content" />
     {dialog && <NotepadFilesDialog mode={dialog} initialName={identity?.name ?? t('notepad.untitled')}
-      onOpen={requestReplace} onSave={(name) => persist(name, saveTarget.current)} onExport={exportNote} onClose={() => setDialog(null)} />}
+      onOpen={requestReplace} onSave={(name, overwrite) => persist(name, saveTarget.current, overwrite)}
+      onRename={note => { saved.current.set(note.id, note);
+        if ((model?.noteIdentity?.id ?? instanceId) === note.id) model?.setNoteIdentity(note.id, note.name);
+        setRevision(value => value + 1);
+      }} onExport={exportNote} onClose={() => setDialog(null)} />}
     {pending && !dialog && <ModalDialog title={t('notepad.replaceTitle')} onClose={() => {
       const note = approvedReplacement.current; approvedReplacement.current = null;
       if (note) replace(note); else setPending(null);

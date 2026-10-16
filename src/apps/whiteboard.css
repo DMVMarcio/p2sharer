@@ -79,3 +79,5 @@
 @media (prefers-reduced-motion: reduce) {
   .whiteboard-toolbar, .whiteboard-layers, .whiteboard-tool-choices, .whiteboard-toolbar-toggle svg, .whiteboard-layers-toggle svg:last-child { transition: none; }
 }
+
+.whiteboard-app:fullscreen { width: 100vw; height: 100vh; background: var(--bg-card); }

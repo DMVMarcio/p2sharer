@@ -1376,5 +1376,10 @@
   "whiteboard.selectLayer": "Seleccionar capa: {{name}}",
   "whiteboard.exportHint.p2board": "Pizarra editable con capas, dibujos y borrado.",
   "whiteboard.exportHint.svg": "Imagen vectorial de los dibujos visibles.",
-  "whiteboard.exportHint.png": "PNG de toda la pizarra sobre blanco (4096 × 2560)."
+  "whiteboard.exportHint.png": "PNG de toda la pizarra sobre blanco (4096 × 2560).",
+  "documents.rename": "Renombrar",
+  "documents.overwriteTitle": "El nombre ya existe",
+  "documents.overwriteHint": "Ya existe un documento llamado «{{name}}». ¿Sobrescribir su contenido guardado?",
+  "documents.chooseName": "Elegir otro nombre",
+  "documents.nameExists": "Ya existe un documento con este nombre. Elige otro nombre."
 }

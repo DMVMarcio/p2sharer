@@ -23,6 +23,12 @@ fixture.invoke = async (command, args) => {
   assert.equal(args.library, 'whiteboard');
   if (command === 'list_saved_notes') return { directory: 'Whiteboards', notes: [...fixture.notes.values()] };
   if (command === 'read_saved_note') return fixture.notes.get(args.id);
+  if (command === 'rename_library_note') {
+    const previous = fixture.notes.get(args.id);
+    assert.equal(args.expectedUpdatedAt, previous.updatedAt);
+    const note = { ...previous, name: args.name, updatedAt: previous.updatedAt + 1 };
+    fixture.notes.set(note.id, note); return note;
+  }
   if (command === 'save_library_note') {
     const previous = fixture.notes.get(args.id);
     assert.equal(args.expectedUpdatedAt, previous?.updatedAt ?? null);
@@ -34,7 +40,7 @@ fixture.invoke = async (command, args) => {
   throw new Error(command);
 };
 const mocks = {
-  core: 'export const invoke = (...args) => globalThis.whiteboardFixture.invoke(...args);',
+  core: 'export const isTauri = () => false; export const invoke = (...args) => globalThis.whiteboardFixture.invoke(...args);',
   room_apps_service: `export const roomAppsService = { getModel: () => globalThis.whiteboardFixture.model, getLocalActor: () => 'local',
     subscribe: fn => { globalThis.whiteboardFixture.listeners.add(fn); return () => globalThis.whiteboardFixture.listeners.delete(fn); } };`,
   useRoom: "export const useRoom = () => ({ username: 'Local', peers: [{ id: 'remote', username: 'Remote' }] });",
@@ -49,7 +55,7 @@ const bundle = await build({ stdin: { contents: `export { WhiteboardApp } from '
     builder.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: mocks[args.path] }));
     builder.onResolve({ filter: /^[^./]/ }, args => ({ path: import.meta.resolve(args.path), external: true }));
   } }] });
-const api = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
+const api = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text + '\n//# sourceURL=whiteboard-ui-test-bundle.js').toString('base64')}`);
 api.setLanguage('en');
 fixture.model = new api.WhiteboardModel({ localActor: 'local', emit: value => fixture.messages.push(value), changed: () => fixture.listeners.forEach(fn => fn()) });
 const { createRoot } = await import('react-dom/client');
@@ -270,7 +276,7 @@ test('PNG export renders the full white board and sends binary image data throug
   // The raster helper creates a browser Blob; the Node fixture's URL API needs a Node Blob.
   const createUrl = URL.createObjectURL;
   URL.createObjectURL = blob => {
-    if (blob instanceof window.Blob) return 'data:image/png;base64,iVBORw==';
+    if (blob instanceof window.Blob) throw new Error('PNG encoding must not fetch a blob URL');
     return createUrl(blob);
   };
   try {
@@ -292,4 +298,38 @@ test('PNG export renders the full white board and sends binary image data throug
     window.HTMLCanvasElement.prototype.toBlob = originalToBlob;
     delete globalThis.Image; delete globalThis.FileReader;
   }
+});
+
+
+test('fullscreen retains the canvas and keeps file dialogs inside the fullscreen surface', async () => {
+  const surface = document.querySelector('.whiteboard-app'), originalCanvas = canvas();
+  surface.requestFullscreen = async () => { Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: surface }); document.dispatchEvent(new window.Event('fullscreenchange')); };
+  document.exitFullscreen = async () => { Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: null }); document.dispatchEvent(new window.Event('fullscreenchange')); };
+  await click('Full screen');
+  assert.equal(document.fullscreenElement, surface);
+  assert.equal(canvas(), originalCanvas);
+  await click('Open');
+  assert.equal(document.querySelector('.modal-overlay').parentElement, surface);
+  await click('Cancel', document.querySelector('[role="dialog"]'));
+  await click('Exit full screen');
+  assert.equal(document.fullscreenElement, null);
+  assert.equal(canvas(), originalCanvas);
+});
+
+test('renaming an open board retains unsaved paint and subsequent saves use the new disk revision', async () => {
+  await click('Save');
+  const id = fixture.model.identity.id, oldContent = fixture.notes.get(id).content;
+  await act(async () => fixture.model.put({ id: crypto.randomUUID(), order: 100, hidden: false, locked: false, tool: 'line', color: '#ef4444', width: 3, filled: false, x: 0, y: 0, points: [{ x: 20, y: 30 }, { x: 80, y: 90 }] }));
+  const content = fixture.model.content;
+  await click('Open');
+  await click('Rename', document.querySelector('.notepad-files-row'));
+  const child = [...document.querySelectorAll('[role="dialog"]')].at(-1), input = child.querySelector('input');
+  await act(async () => { Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(input, 'Renamed board'); input.dispatchEvent(new window.Event('input', { bubbles: true })); });
+  await click('Rename', child);
+  assert.equal(fixture.model.identity.name, 'Renamed board');
+  assert.equal(fixture.model.content, content);
+  assert.equal(fixture.notes.get(id).content, oldContent);
+  await click('Cancel', document.querySelector('[role="dialog"]'));
+  await click('Save');
+  assert.equal(fixture.notes.get(id).content, content);
 });

@@ -10,7 +10,8 @@ import { boardSvg, parseBoardFile } from './whiteboard_scene';
 import { boardPng } from './whiteboard_export';
 
 export function boardError(error: unknown): string {
-  return error instanceof Error && error.message.startsWith('whiteboard.') ? t(error.message) : localizeError(error);
+  const message = error instanceof Error ? error.message : String(error);
+  return message.startsWith('whiteboard.') || message === 'documents.nameExists' ? t(message) : localizeError(error);
 }
 type Replacement = SavedNote | { content: string; format: string } | 'new';
 export function useWhiteboardFiles(model: WhiteboardModel | undefined, instanceId: string) {
@@ -32,15 +33,15 @@ export function useWhiteboardFiles(model: WhiteboardModel | undefined, instanceI
     }).catch(() => {});
     return () => { active = false; };
   }, [id]);
-  const persist = async (name: string, expectedId: string) => {
+  const persist = async (name: string, expectedId: string, overwrite?: SavedNote) => {
     if (!model) return;
     if ((model.identity?.id ?? instanceId) !== expectedId) throw new Error('whiteboard.documentChanged');
     const content = model.content;
-    const existing = saved.current.get(expectedId) ?? (await invoke<NoteLibrary>('list_saved_notes', { library: 'whiteboard' })).notes.find(note => note.id === expectedId);
-    const note = await invoke<SavedNote>('save_library_note', { id: expectedId, name, content,
+    const existing = overwrite ?? saved.current.get(expectedId) ?? (await invoke<NoteLibrary>('list_saved_notes', { library: 'whiteboard' })).notes.find(note => note.id === expectedId);
+    const note = await invoke<SavedNote>('save_library_note', { id: overwrite?.id ?? expectedId, name, content,
       expectedUpdatedAt: existing?.updatedAt ?? null, library: 'whiteboard' });
-    saved.current.set(expectedId, note);
-    if ((model.identity?.id ?? instanceId) === expectedId) model.setIdentity(expectedId, name);
+    saved.current.set(note.id, note);
+    if ((model.identity?.id ?? instanceId) === expectedId) model.setIdentity(note.id, note.name);
     refresh(n => n + 1); showToast(t('message.6896081fcc11'), 3500, 'success');
   };
   const save = async () => {
@@ -77,7 +78,11 @@ export function useWhiteboardFiles(model: WhiteboardModel | undefined, instanceI
     </div>,
     status: <div className="notepad-file-status" role="status"><strong>{name}</strong><span>{t(busy ? 'notepad.saving' : local?.content === model?.content ? 'notepad.saved' : local ? 'notepad.modified' : 'notepad.unsaved')}</span></div>,
     dialogs: <>{dialog && <DocumentFilesDialog mode={dialog} library="whiteboard" initialName={name} onOpen={requestReplace}
-      onSave={async name => { try { await persist(name, target.current); } catch (error) { throw new Error(boardError(error)); } }}
+      onSave={async (name, overwrite) => { try { await persist(name, target.current, overwrite); } catch (error) { throw new Error(boardError(error)); } }}
+      onRename={note => { saved.current.set(note.id, note);
+        if ((model?.identity?.id ?? instanceId) === note.id) model?.setIdentity(note.id, note.name);
+        refresh(n => n + 1);
+      }}
       onExport={async format => {
         if (!model) return;
         const content = format === 'png' ? await boardPng(model.shapes, model.layers) : format === 'svg' ? boardSvg(model.shapes, model.layers) : model.content;

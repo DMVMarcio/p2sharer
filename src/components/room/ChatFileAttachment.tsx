@@ -1,3 +1,5 @@
+import { createPortal } from 'react-dom';
+import { useModalDialogBehavior } from '../common/useModalDialogBehavior';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { useDropdownPresence } from '../../hooks/useDropdownPresence';
@@ -81,12 +83,7 @@ export function ChatFileAttachment({ message, transfers, preview, savedRequestId
       .then(() => showToast(t("message.e5d6c96e9104"), 3500, 'success'))
       .catch(() => showToast(t("message.e50839e7a83c"), 3500, 'error'));
   };
-  useEffect(() => {
-    if (!viewer) return;
-    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') setViewer(false); };
-    document.addEventListener('keydown', escape);
-    return () => document.removeEventListener('keydown', escape);
-  }, [viewer]);
+  const viewerRef = useModalDialogBehavior(() => setViewer(false), false, false, viewer);
   useEffect(() => {
     if (!viewer || !stageRef.current) return;
     const stage = stageRef.current;
@@ -140,7 +137,7 @@ export function ChatFileAttachment({ message, transfers, preview, savedRequestId
         </div>}
       </div>}
     </div>
-    {viewer && image && <div className="chat-image-viewer" role="dialog" aria-modal="true" aria-label={file.name}
+    {viewer && image && createPortal(<div ref={viewerRef} className="chat-image-viewer" role="dialog" aria-modal="true" aria-label={file.name}
       onContextMenu={handleViewerContextMenu}
       onClick={(event) => { if (event.target === event.currentTarget) setViewer(false); }}>
       <div className="chat-image-viewer-toolbar"><span>{file.name}</span>
@@ -158,6 +155,6 @@ export function ChatFileAttachment({ message, transfers, preview, savedRequestId
           setPan({ x: drag.current.panX + event.clientX - drag.current.x,
             y: drag.current.panY + event.clientY - drag.current.y }); }}
         onPointerUp={() => { drag.current = null; }} onPointerCancel={() => { drag.current = null; }} /></div>
-    </div>}
+    </div>, document.fullscreenElement ?? document.body)}
   </div>;
 }

@@ -1376,5 +1376,10 @@
   "whiteboard.selectLayer": "レイヤーを選択：{{name}}",
   "whiteboard.exportHint.p2board": "レイヤー、描画、消去を保持する編集可能なホワイトボードです。",
   "whiteboard.exportHint.svg": "表示中の描画のベクター画像です。",
-  "whiteboard.exportHint.png": "白い背景のホワイトボード全体のPNG画像（4096 × 2560）です。"
+  "whiteboard.exportHint.png": "白い背景のホワイトボード全体のPNG画像（4096 × 2560）です。",
+  "documents.rename": "名前を変更",
+  "documents.overwriteTitle": "名前が既に存在します",
+  "documents.overwriteHint": "「{{name}}」というドキュメントは既に存在します。保存済みの内容を上書きしますか？",
+  "documents.chooseName": "別の名前を選択",
+  "documents.nameExists": "同じ名前のドキュメントが既に存在します。別の名前を選択してください。"
 }
