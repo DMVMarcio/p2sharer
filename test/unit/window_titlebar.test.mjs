@@ -43,7 +43,7 @@ const bundle = await build({
       'export const roomService = { leaveRoom: () => globalThis.windowChromeFixture.leaveRoom() };' }));
     builder.onResolve({ filter: /^@tauri-apps\/api\/(core|window)$/ }, args => ({ path: args.path, namespace: 'fixture' }));
     builder.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: args.path.endsWith('core')
-      ? 'export const isTauri = () => globalThis.windowChromeFixture.isTauri(); export const invoke = async command => globalThis.windowChromeFixture.menuCommand = command;'
+      ? 'export const isTauri = () => globalThis.windowChromeFixture.isTauri(); export const invoke = async command => globalThis.windowChromeFixture.menuCommand = command; export class Channel {} export class Resource { constructor(rid) { this.rid = rid; } async close() {} }'
       : 'export const getCurrentWindow = () => globalThis.windowChromeFixture;' }));
     builder.onResolve({ filter: /^[^./]/ }, args => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
   } }],
