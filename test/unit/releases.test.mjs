@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { checkRelease, setVersion, validateVersion, validatePublicKey, normalizePublicKey, normalizeConfiguredPublicKey, verifyArtifacts } from '../../tools/release.mjs';
+import { createPortable, portableMarker } from '../../tools/portable-release.mjs';
 
 const config = JSON.parse(readFileSync(new URL('../../src-tauri/tauri.conf.json', import.meta.url), 'utf8'));
 test('release version updates all declarations without changing dependency versions', () => {
@@ -27,10 +28,22 @@ test('release version updates all declarations without changing dependency versi
     const manifest = { version: '1.1.0-beta.1', platforms: {
       'windows-x86_64-nsis': { signature, url: 'https://api.github.com/repos/DMVMarcio/p2sharer/releases/assets/1' },
       'windows-x86_64-msi': { signature, url: 'https://api.github.com/repos/DMVMarcio/p2sharer/releases/assets/2' },
+      'windows-x86_64-portable': { signature, url: 'https://api.github.com/repos/DMVMarcio/p2sharer/releases/assets/3' },
     } };
     const saveManifest = () => writeFileSync(join(root, 'latest.json'), JSON.stringify(manifest));
     saveManifest();
     assert.equal(verifyArtifacts(root), '1.1.0-beta.1');
+    mkdirSync(join(root, 'src-tauri/target/release'), { recursive: true });
+    const executable = Buffer.from('MZ synthetic executable');
+    writeFileSync(join(root, 'src-tauri/target/release/p2sharer.exe'), executable);
+    const portable = createPortable(root);
+    assert.equal(portable.endsWith('P2Sharer_1.1.0-beta.1_x64-portable.exe'), true);
+    assert.deepEqual(readFileSync(portable), Buffer.concat([executable, portableMarker]));
+    assert.deepEqual(readFileSync(join(root, 'src-tauri/target/release/p2sharer.exe')), executable);
+    delete manifest.platforms['windows-x86_64-portable'];
+    saveManifest();
+    assert.throws(() => verifyArtifacts(root), /portable/);
+    manifest.platforms['windows-x86_64-portable'] = { signature, url: 'https://api.github.com/repos/DMVMarcio/p2sharer/releases/assets/3' };
     manifest.platforms['windows-x86_64-msi'].signature = Buffer.from('wrong-key fixture').toString('base64');
     saveManifest();
     assert.throws(() => verifyArtifacts(root), /signing key/);

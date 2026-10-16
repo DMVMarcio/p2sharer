@@ -32,6 +32,7 @@ mod localization;
 mod app_data_migration;
 mod invitation_routing;
 mod app_updates;
+pub mod portable_update;
 pub mod lan_signaling;
 pub mod port_tunnel;
 pub mod virtual_network;
@@ -176,6 +177,9 @@ pub fn run() {
             lan_signaling::send_lan_signaling,
             lan_signaling::disconnect_lan_signaling,
             app_updates::check_app_update,
+            portable_update::download_portable_update,
+            portable_update::install_portable_update,
+            portable_update::restart_after_update,
             prepare_app_update,
             cancel_app_update,
             browser_shortcuts::disable_browser_shortcuts,

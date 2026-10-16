@@ -56,10 +56,20 @@ git push origin v1.0.0
 For later releases, first run `pnpm run release:version <new-version>`, validate and commit the changes, then create and push the matching tag.
 
 1. Inspect **Actions > Build release draft**. It installs pinned pnpm/Node dependencies and native prerequisites, checks versions and repository hygiene, runs frontend/native regressions, and builds using the default Cargo target directory.
-2. Open the draft under **Releases**. Its assets should include `.exe` and `.msi` installers, `.sig` signatures, and `latest.json` updater metadata. A failed job or incomplete assets must be resolved before publication.
+2. Open the draft under **Releases**. Its assets should include `.exe` and `.msi` installers, `P2Sharer_<version>_x64-portable.exe`, `.sig` signatures for all three, and `latest.json` updater metadata. A failed job or incomplete assets must be resolved before publication.
 3. Download and test the actual draft installer. Check startup, saved settings, room joining and live media. For later releases, test a real upgrade from the previous installed release.
 4. Review the generated release notes and add user-facing changes and known limitations.
 5. Select **Publish release** when ready. Publish stable releases as the latest release; keep beta tags marked as prereleases. The stable updater endpoint excludes prereleases. Both stable and beta channels query GitHub release metadata first to discover eligible newer versions before downloading `latest.json`, keeping release asset download counters accurate. Once confirmed by discovery, the official updater fetches and cryptographically verifies `latest.json`.
+
+### Portable Windows updates
+
+The release workflow copies the compiled application into `bundle/portable/P2Sharer_<version>_x64-portable.exe`, appends a portable runtime marker, then signs those exact bytes with the existing updater key. The marker survives executable renaming. Installed builds keep the installer update path; portable builds select the dedicated `windows-x86_64-portable` manifest entry. The workflow adds that entry to the installer manifest before validating all three signed targets. Retrying an older tag can produce a portable asset, but portable self-updates require application code containing this implementation.
+
+Portable downloads use the official updater's signature verification and the existing stable/beta discovery rules. Installation still requires explicit consent and native media teardown. A detached helper waits for the original process to exit, replaces the executable at its original path, and restarts it from that directory. The destination must be writable. Settings continue using the existing application data directory; portable here describes executable distribution, not a separate settings profile. WebView2 remains a runtime prerequisite.
+
+The replacement is staged in a uniquely named `.p2sharer-update-*` sibling directory on the same volume. A backup allows rollback if moving the new executable fails. Successful startup cleans up staging and the backup. If replacement or restart fails, retain the staging directory for recovery; `backup.exe` contains the previous executable when restoration could not complete, and replacement failures are recorded in `error.txt`. File lock retries are bounded. A helper that cannot acknowledge readiness or does not receive the installation commit cannot replace the original.
+
+Before publishing, the user should test an actual signed portable upgrade from an earlier release: rename the executable, place it in a writable directory containing spaces, download and confirm the update, and check the same executable path, version, settings and media after restart. Also test cancellation, an unwritable directory, and a locked executable. Automated checks do not establish a real published-release upgrade.
 
 ### Beta update channel
 
@@ -89,6 +99,8 @@ For the best reuse, wait for **Validate and warm build caches** to finish succes
 ## Local builds
 
 `pnpm run tauri:build` produces ordinary local installers without requiring signing credentials. These builds still include the updater and its public verification key.
+
+After that build, `pnpm exec node tools/portable-release.mjs` produces the portable executable under `src-tauri/target/release/bundle/portable/`. Official releases use the same tool with `--sign` after building, and upload its executable and signature alongside the installers.
 
 For a signed local release build, provide the existing private key and password through process environment variables:
 

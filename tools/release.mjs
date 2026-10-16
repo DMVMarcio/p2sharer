@@ -89,7 +89,7 @@ export function verifyArtifacts(directory = root) {
   const config = JSON.parse(readFileSync(resolve(directory, 'src-tauri/tauri.conf.json'), 'utf8'));
   const publicLines = Buffer.from(config.plugins.updater.pubkey, 'base64').toString('utf8').trim().split(/\r?\n/);
   const keyId = Buffer.from(publicLines[1], 'base64').subarray(2, 10);
-  for (const type of ['nsis', 'msi']) {
+  for (const type of ['nsis', 'msi', 'portable']) {
     const entry = manifest.platforms?.[`windows-x86_64-${type}`];
     if (!entry?.signature || !entry?.url) throw new Error(`Missing signed Windows ${type} updater entry.`);
     const url = new URL(entry.url);

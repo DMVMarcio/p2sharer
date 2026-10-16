@@ -74,6 +74,7 @@ fn stable_update_allowed(current: &Version, offered: &Version) -> bool {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateMetadata {
+    portable: bool,
     rid: tauri::ResourceId,
     current_version: String,
     version: String,
@@ -98,8 +99,10 @@ pub async fn check_app_update(
     let Some(updater) = updater else {
         return Ok(None);
     };
+    let portable = crate::portable_update::is_portable()?;
     let update = updater.check().await.map_err(|error| error.to_string())?;
     Ok(update.map(|update| UpdateMetadata {
+        portable,
         current_version: update.current_version.clone(),
         version: update.version.clone(),
         body: update.body.clone(),
@@ -140,8 +143,7 @@ async fn stable_updater(
     ))
     .map_err(|error| error.to_string())?;
 
-    let updater = webview
-        .updater_builder()
+    let updater = updater_builder(webview)?
         .endpoints(vec![endpoint])
         .map_err(|error| error.to_string())?
         .timeout(Duration::from_secs(15))
@@ -178,8 +180,7 @@ async fn preview_updater(
         "https://github.com/DMVMarcio/p2sharer/releases/download/{tag}/latest.json"
     ))
     .map_err(|error| error.to_string())?;
-    let updater = webview
-        .updater_builder()
+    let updater = updater_builder(webview)?
         .endpoints(vec![endpoint])
         .map_err(|error| error.to_string())?
         .timeout(Duration::from_secs(15))
@@ -189,6 +190,13 @@ async fn preview_updater(
         .build()
         .map_err(|error| error.to_string())?;
     Ok(Some(updater))
+}
+
+fn updater_builder(webview: &Webview) -> Result<tauri_plugin_updater::UpdaterBuilder, String> {
+    let builder = webview.updater_builder();
+    Ok(if crate::portable_update::is_portable()? {
+        builder.target("windows-x86_64-portable")
+    } else { builder })
 }
 
 #[cfg(test)]
