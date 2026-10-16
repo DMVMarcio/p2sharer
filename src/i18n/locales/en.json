@@ -1354,7 +1354,6 @@
   "whiteboard.empty": "Your saved whiteboards will appear here.",
   "whiteboard.name": "Whiteboard name",
   "whiteboard.localCopy": "Save a copy on this computer. Future saves update this same file, including during collaboration.",
-  "whiteboard.exportHint": "Export an editable P2Sharer whiteboard or an SVG image. Exporting keeps your local Save link.",
   "whiteboard.editable": "Editable whiteboard (.p2board)",
   "whiteboard.untitled": "Untitled whiteboard",
   "whiteboard.replaceTitle": "Replace the open whiteboard?",
@@ -1369,5 +1368,13 @@
   "whiteboard.layerName": "Layer {{index}}",
   "whiteboard.addLayer": "Add layer",
   "whiteboard.renameLayer": "Rename layer",
-  "whiteboard.reorderLayer": "Drag to reorder layer"
+  "whiteboard.reorderLayer": "Drag to reorder layer",
+  "whiteboard.hideTools": "Hide tools",
+  "whiteboard.showTools": "Show tools",
+  "whiteboard.hideLayers": "Hide layers",
+  "whiteboard.showLayers": "Show layers",
+  "whiteboard.selectLayer": "Select layer: {{name}}",
+  "whiteboard.exportHint.p2board": "Editable whiteboard with layers, paint and erasing.",
+  "whiteboard.exportHint.svg": "Vector image of the visible artwork.",
+  "whiteboard.exportHint.png": "PNG of the entire whiteboard on white (4096 × 2560)."
 }

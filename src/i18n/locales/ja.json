@@ -1354,7 +1354,6 @@
   "whiteboard.empty": "保存したホワイトボードがここに表示されます。",
   "whiteboard.name": "ホワイトボード名",
   "whiteboard.localCopy": "このコンピューターにコピーを保存します。共同作業中も以降の保存は同じファイルを更新します。",
-  "whiteboard.exportHint": "編集可能な P2Sharer ホワイトボードまたは SVG 画像を出力します。ローカル保存先との関連は保持されます。",
   "whiteboard.editable": "編集可能なホワイトボード (.p2board)",
   "whiteboard.untitled": "無題のホワイトボード",
   "whiteboard.replaceTitle": "現在のホワイトボードを置き換えますか？",
@@ -1369,5 +1368,13 @@
   "whiteboard.layerName": "レイヤー {{index}}",
   "whiteboard.addLayer": "レイヤーを追加",
   "whiteboard.renameLayer": "レイヤー名を変更",
-  "whiteboard.reorderLayer": "ドラッグしてレイヤーを並べ替え"
+  "whiteboard.reorderLayer": "ドラッグしてレイヤーを並べ替え",
+  "whiteboard.hideTools": "ツールを折りたたむ",
+  "whiteboard.showTools": "ツールを表示",
+  "whiteboard.hideLayers": "レイヤーを折りたたむ",
+  "whiteboard.showLayers": "レイヤーを表示",
+  "whiteboard.selectLayer": "レイヤーを選択：{{name}}",
+  "whiteboard.exportHint.p2board": "レイヤー、描画、消去を保持する編集可能なホワイトボードです。",
+  "whiteboard.exportHint.svg": "表示中の描画のベクター画像です。",
+  "whiteboard.exportHint.png": "白い背景のホワイトボード全体のPNG画像（4096 × 2560）です。"
 }

@@ -1354,7 +1354,6 @@
   "whiteboard.empty": "Le lavagne salvate appariranno qui.",
   "whiteboard.name": "Nome della lavagna",
   "whiteboard.localCopy": "Salva una copia su questo computer. I salvataggi successivi aggiornano lo stesso file, anche durante la collaborazione.",
-  "whiteboard.exportHint": "Esporta una lavagna P2Sharer modificabile o un’immagine SVG. Il collegamento al file locale rimane attivo.",
   "whiteboard.editable": "Lavagna modificabile (.p2board)",
   "whiteboard.untitled": "Lavagna senza titolo",
   "whiteboard.replaceTitle": "Sostituire la lavagna aperta?",
@@ -1369,5 +1368,13 @@
   "whiteboard.layerName": "Livello {{index}}",
   "whiteboard.addLayer": "Aggiungi livello",
   "whiteboard.renameLayer": "Rinomina livello",
-  "whiteboard.reorderLayer": "Trascina per riordinare il livello"
+  "whiteboard.reorderLayer": "Trascina per riordinare il livello",
+  "whiteboard.hideTools": "Nascondi strumenti",
+  "whiteboard.showTools": "Mostra strumenti",
+  "whiteboard.hideLayers": "Nascondi livelli",
+  "whiteboard.showLayers": "Mostra livelli",
+  "whiteboard.selectLayer": "Seleziona livello: {{name}}",
+  "whiteboard.exportHint.p2board": "Lavagna modificabile con livelli, disegni e cancellature.",
+  "whiteboard.exportHint.svg": "Immagine vettoriale dei disegni visibili.",
+  "whiteboard.exportHint.png": "PNG dell’intera lavagna su bianco (4096 × 2560)."
 }

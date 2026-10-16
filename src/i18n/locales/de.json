@@ -1354,7 +1354,6 @@
   "whiteboard.empty": "Gespeicherte Whiteboards erscheinen hier.",
   "whiteboard.name": "Whiteboard-Name",
   "whiteboard.localCopy": "Speichert eine Kopie auf diesem Computer. Weiteres Speichern aktualisiert dieselbe Datei, auch bei gemeinsamer Bearbeitung.",
-  "whiteboard.exportHint": "Exportiert ein bearbeitbares P2Sharer-Whiteboard oder ein SVG-Bild. Die Verknüpfung zur lokalen Datei bleibt erhalten.",
   "whiteboard.editable": "Bearbeitbares Whiteboard (.p2board)",
   "whiteboard.untitled": "Unbenanntes Whiteboard",
   "whiteboard.replaceTitle": "Geöffnetes Whiteboard ersetzen?",
@@ -1369,5 +1368,13 @@
   "whiteboard.layerName": "Ebene {{index}}",
   "whiteboard.addLayer": "Ebene hinzufügen",
   "whiteboard.renameLayer": "Ebene umbenennen",
-  "whiteboard.reorderLayer": "Ziehen, um die Ebene anzuordnen"
+  "whiteboard.reorderLayer": "Ziehen, um die Ebene anzuordnen",
+  "whiteboard.hideTools": "Werkzeuge ausblenden",
+  "whiteboard.showTools": "Werkzeuge anzeigen",
+  "whiteboard.hideLayers": "Ebenen ausblenden",
+  "whiteboard.showLayers": "Ebenen anzeigen",
+  "whiteboard.selectLayer": "Ebene auswählen: {{name}}",
+  "whiteboard.exportHint.p2board": "Bearbeitbares Whiteboard mit Ebenen, Zeichnungen und Radierungen.",
+  "whiteboard.exportHint.svg": "Vektorbild der sichtbaren Zeichnungen.",
+  "whiteboard.exportHint.png": "PNG des gesamten Whiteboards auf Weiß (4096 × 2560)."
 }

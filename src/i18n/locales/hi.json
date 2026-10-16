@@ -1354,7 +1354,6 @@
   "whiteboard.empty": "आपके सहेजे गए व्हाइटबोर्ड यहाँ दिखेंगे।",
   "whiteboard.name": "व्हाइटबोर्ड का नाम",
   "whiteboard.localCopy": "इस कंप्यूटर पर प्रति सहेजें। सहयोग के दौरान भी अगली बार सहेजने पर यही फ़ाइल अपडेट होगी।",
-  "whiteboard.exportHint": "संपादन योग्य P2Sharer व्हाइटबोर्ड या SVG चित्र निर्यात करें। स्थानीय फ़ाइल से सहेजने का संबंध बना रहेगा।",
   "whiteboard.editable": "संपादन योग्य व्हाइटबोर्ड (.p2board)",
   "whiteboard.untitled": "बिना शीर्षक का व्हाइटबोर्ड",
   "whiteboard.replaceTitle": "खुला व्हाइटबोर्ड बदलें?",
@@ -1369,5 +1368,13 @@
   "whiteboard.layerName": "परत {{index}}",
   "whiteboard.addLayer": "परत जोड़ें",
   "whiteboard.renameLayer": "परत का नाम बदलें",
-  "whiteboard.reorderLayer": "परत का क्रम बदलने के लिए खींचें"
+  "whiteboard.reorderLayer": "परत का क्रम बदलने के लिए खींचें",
+  "whiteboard.hideTools": "उपकरण समेटें",
+  "whiteboard.showTools": "उपकरण दिखाएँ",
+  "whiteboard.hideLayers": "परतें समेटें",
+  "whiteboard.showLayers": "परतें दिखाएँ",
+  "whiteboard.selectLayer": "परत चुनें: {{name}}",
+  "whiteboard.exportHint.p2board": "परतों, चित्रों और मिटाने के रिकॉर्ड वाला संपादन योग्य व्हाइटबोर्ड।",
+  "whiteboard.exportHint.svg": "दिखाई देने वाले चित्रों की वेक्टर छवि।",
+  "whiteboard.exportHint.png": "सफ़ेद पृष्ठभूमि पर पूरे व्हाइटबोर्ड की PNG छवि (4096 × 2560)।"
 }

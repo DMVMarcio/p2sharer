@@ -16,6 +16,7 @@ const captures = new Set();
 HTMLElement.prototype.setPointerCapture = id => captures.add(id);
 HTMLElement.prototype.releasePointerCapture = id => captures.delete(id);
 HTMLElement.prototype.hasPointerCapture = id => captures.has(id);
+HTMLElement.prototype.scrollIntoView = () => {};
 const fixture = globalThis.whiteboardFixture = { model: null, listeners: new Set(), notes: new Map(), calls: [], messages: [], errors: [] };
 fixture.invoke = async (command, args) => {
   fixture.calls.push({ command, args });
@@ -225,4 +226,70 @@ test('paint stays in the active layer, erasing is scoped, and named layers reord
   await act(async () => window.dispatchEvent(dragEvent('pointerup', 780, 136))); await settle();
   assert.deepEqual(fixture.model.layers.map(l => l.id), [...before].reverse());
   assert.equal(document.querySelector('.whiteboard-layer-drag'), null);
+});
+
+
+test('layer cards select grouped paint, names edit directly and panels collapse without changing content', async () => {
+  const layer = fixture.model.layers.find(l => l.name === 'Details');
+  const row = document.querySelector(`[data-sortable-id="${layer.id}"]`);
+  await act(async () => row.click());
+  assert.ok(document.querySelector('rect[stroke-dasharray]'));
+  assert.ok(row.querySelector('.whiteboard-layer-preview path'));
+  const content = fixture.model.content;
+  await click('Hide tools');
+  const tools = document.getElementById(button('Show tools').getAttribute('aria-controls'));
+  assert.equal(tools.getAttribute('aria-hidden'), 'true');
+  assert.ok(tools.hasAttribute('inert'));
+  await click('Show tools');
+  assert.equal(tools.hasAttribute('inert'), false);
+  await click('Hide layers');
+  const layers = document.getElementById(button('Show layers').getAttribute('aria-controls'));
+  assert.ok(layers.hasAttribute('inert'));
+  await click('Show layers');
+  assert.equal(layers.hasAttribute('inert'), false);
+  await click('Rename layer', row);
+  const input = row.querySelector('input');
+  await act(async () => input.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  assert.equal(fixture.model.content, content);
+});
+
+test('PNG export renders the full white board and sends binary image data through the native save flow', async () => {
+  globalThis.FileReader = window.FileReader;
+  const originalContext = window.HTMLCanvasElement.prototype.getContext;
+  const originalToBlob = window.HTMLCanvasElement.prototype.toBlob;
+  let renderedSvg = '', dimensions;
+  globalThis.Image = class {
+    naturalWidth = 4096; naturalHeight = 2560;
+    set src(url) { void fetch(url).then(r => r.text()).then(svg => { renderedSvg = svg; this.onload(); }); }
+  };
+  window.HTMLCanvasElement.prototype.getContext = () => ({ drawImage() {} });
+  window.HTMLCanvasElement.prototype.toBlob = function(callback) {
+    dimensions = [this.width, this.height];
+    callback(new window.Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' }));
+  };
+  // The raster helper creates a browser Blob; the Node fixture's URL API needs a Node Blob.
+  const createUrl = URL.createObjectURL;
+  URL.createObjectURL = blob => {
+    if (blob instanceof window.Blob) return 'data:image/png;base64,iVBORw==';
+    return createUrl(blob);
+  };
+  try {
+    await click('Export');
+    await click('Export format', document.querySelector('[role="dialog"]'));
+    const png = [...document.querySelectorAll('[role="option"]')].find(option => option.textContent.includes('PNG (.png)'));
+    assert.ok(png); await act(async () => png.click()); await settle();
+    assert.match(document.querySelector('.notepad-files-hint').textContent, /4096 × 2560/);
+    await click('Export', document.querySelector('[role="dialog"]')); await settle();
+    const exported = fixture.calls.filter(c => c.command === 'save_note_file').at(-1).args;
+    assert.equal(exported.format, 'png');
+    assert.match(exported.content, /^data:image\/png;base64,/);
+    assert.deepEqual(dimensions, [4096, 2560]);
+    assert.match(renderedSvg, /viewBox="0 0 16000 10000"/);
+    assert.match(renderedSvg, /fill="white"/);
+  } finally {
+    URL.createObjectURL = createUrl;
+    window.HTMLCanvasElement.prototype.getContext = originalContext;
+    window.HTMLCanvasElement.prototype.toBlob = originalToBlob;
+    delete globalThis.Image; delete globalThis.FileReader;
+  }
 });

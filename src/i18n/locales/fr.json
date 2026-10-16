@@ -1354,7 +1354,6 @@
   "whiteboard.empty": "Vos tableaux enregistrés apparaîtront ici.",
   "whiteboard.name": "Nom du tableau",
   "whiteboard.localCopy": "Enregistrez une copie sur cet ordinateur. Les sauvegardes suivantes mettent à jour ce même fichier, même en collaboration.",
-  "whiteboard.exportHint": "Exportez un tableau P2Sharer modifiable ou une image SVG. Le lien vers la copie locale est conservé.",
   "whiteboard.editable": "Tableau modifiable (.p2board)",
   "whiteboard.untitled": "Tableau sans titre",
   "whiteboard.replaceTitle": "Remplacer le tableau ouvert ?",
@@ -1369,5 +1368,13 @@
   "whiteboard.layerName": "Calque {{index}}",
   "whiteboard.addLayer": "Ajouter un calque",
   "whiteboard.renameLayer": "Renommer le calque",
-  "whiteboard.reorderLayer": "Glissez pour réordonner le calque"
+  "whiteboard.reorderLayer": "Glissez pour réordonner le calque",
+  "whiteboard.hideTools": "Masquer les outils",
+  "whiteboard.showTools": "Afficher les outils",
+  "whiteboard.hideLayers": "Masquer les calques",
+  "whiteboard.showLayers": "Afficher les calques",
+  "whiteboard.selectLayer": "Sélectionner le calque : {{name}}",
+  "whiteboard.exportHint.p2board": "Tableau modifiable avec calques, dessins et gommage.",
+  "whiteboard.exportHint.svg": "Image vectorielle des dessins visibles.",
+  "whiteboard.exportHint.png": "PNG du tableau entier sur fond blanc (4096 × 2560)."
 }

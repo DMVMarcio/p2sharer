@@ -26,7 +26,7 @@ export async function imageSrcToBase64(src: string): Promise<string> {
  * Converts an image blob to a PNG blob using an in-memory canvas.
  * Web browsers / Chromium require 'image/png' in ClipboardItem.
  */
-async function blobToPngBlob(blob: Blob): Promise<Blob> {
+export async function blobToPngBlob(blob: Blob): Promise<Blob> {
   if (blob.type === 'image/png') return blob;
   return new Promise<Blob>((resolve, reject) => {
     const url = URL.createObjectURL(blob);

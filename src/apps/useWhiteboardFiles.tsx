@@ -7,6 +7,7 @@ import { showToast } from '../hooks/useToast';
 import { getLanguage, localizeError, t } from '../i18n';
 import type { WhiteboardModel } from './whiteboard_model';
 import { boardSvg, parseBoardFile } from './whiteboard_scene';
+import { boardPng } from './whiteboard_export';
 
 export function boardError(error: unknown): string {
   return error instanceof Error && error.message.startsWith('whiteboard.') ? t(error.message) : localizeError(error);
@@ -79,7 +80,8 @@ export function useWhiteboardFiles(model: WhiteboardModel | undefined, instanceI
       onSave={async name => { try { await persist(name, target.current); } catch (error) { throw new Error(boardError(error)); } }}
       onExport={async format => {
         if (!model) return;
-        if (await invoke<boolean>('save_note_file', { library: 'whiteboard', content: format === 'svg' ? boardSvg(model.shapes, model.layers) : model.content, format, language: getLanguage() }))
+        const content = format === 'png' ? await boardPng(model.shapes, model.layers) : format === 'svg' ? boardSvg(model.shapes, model.layers) : model.content;
+        if (await invoke<boolean>('save_note_file', { library: 'whiteboard', content, format, language: getLanguage() }))
           showToast(t('whiteboard.exported'), 3500, 'success');
       }} onClose={() => setDialog(null)} />}
       {pending && !dialog && <ModalDialog title={t('whiteboard.replaceTitle')} onClose={() => {

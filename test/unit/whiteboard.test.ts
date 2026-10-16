@@ -3,7 +3,7 @@ import test from 'node:test';
 import * as Y from 'yjs';
 import { WhiteboardModel } from '../../src/apps/whiteboard_model.ts';
 import { encodeUpdate } from '../../src/apps/models.ts';
-import { boardSvg, brushPath, hitBoardShape, hitBoardLayer, boardBrushWidth, DEFAULT_BOARD_LAYER, parseBoardFile, type BoardShape } from '../../src/apps/whiteboard_scene.ts';
+import { boardSvg, brushPath, shapeBounds, hitBoardShape, hitBoardLayer, boardBrushWidth, DEFAULT_BOARD_LAYER, parseBoardFile, type BoardShape } from '../../src/apps/whiteboard_scene.ts';
 import { BOARD_WIDTH, BOARD_HEIGHT, BrushStabilizer, boardContains, clampBoardPoint, clampBoardViewport, containBoardShape } from '../../src/apps/whiteboard_interaction.ts';
 
 function shape(overrides: Partial<BoardShape> = {}): BoardShape {
@@ -103,8 +103,9 @@ test('bounded navigation exposes a margin, centers a zoomed-out page and keeps o
   assert.equal(boardContains({ x: -1, y: 0 }), false);
   assert.deepEqual(clampBoardPoint({ x: -100, y: BOARD_HEIGHT + 20 }), { x: 0, y: BOARD_HEIGHT });
   const moved = containBoardShape(shape({ x: -1000, y: -1000 }));
-  assert.equal(moved.x + moved.points[0].x, 0);
-  assert.equal(moved.y + moved.points[0].y, 0);
+  assert.equal(shapeBounds(moved).x, 0);
+  assert.equal(shapeBounds(moved).y, 0);
+  assert.deepEqual(shapeBounds(shape({ tool: 'brush', width: 100, x: 7, y: 9 })), { x: -33, y: -21, width: 200, height: 200 });
 });
 
 test('configurable stabilization reduces jitter, zero follows the pointer and exported curves match the saved stroke', () => {
@@ -130,6 +131,7 @@ test('layers group paint, move as one, reorder, rename and preserve per-layer er
     a.model.put(shape()); a.model.put(shape({ order: 2 }));
     assert.equal(a.model.layers.length, 1);
     assert.equal(boardBrushWidth(1), 20);
+    assert.equal(boardBrushWidth(100), 1400);
     const lower = a.model.layers[0];
     a.model.updateLayer({ ...lower, name: 'Ink', x: 100, y: 50 });
     assert.equal(a.model.shapes.length, 2);

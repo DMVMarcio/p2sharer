@@ -1,7 +1,7 @@
 import { t } from '../i18n/index.ts';
 import protocolLabels from '../i18n/protocol.json' with { type: 'json' };
 import type React from 'react';
-import { FileText, Network, Globe, PanelsTopLeft } from 'lucide-react';
+import { FileText, Network, Globe, Palette } from 'lucide-react';
 import { WhiteboardModel } from './whiteboard_model.ts';
 import { SiYoutube } from 'react-icons/si';
 import { NotepadModel, YouTubeModel, type RoomAppModel, type RoomAppModelContext } from './models.ts';
@@ -63,6 +63,6 @@ registerRoomApp({ kind: 'browser', protocolLabel: 'Browser', get label() { retur
   loadView: () => import('./BrowserApp').then(module => ({ default: module.BrowserApp })) });
 
 registerRoomApp({ kind: 'whiteboard', protocolLabel: 'Whiteboard', get label() { return t('whiteboard.title'); },
-  get description() { return t('whiteboard.description'); }, icon: PanelsTopLeft, bannerClass: 'whiteboard',
+  get description() { return t('whiteboard.description'); }, icon: Palette, bannerClass: 'whiteboard',
   createModel: context => new WhiteboardModel(context),
   loadView: () => import('./WhiteboardApp').then(module => ({ default: module.WhiteboardApp })) });

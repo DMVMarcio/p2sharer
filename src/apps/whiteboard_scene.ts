@@ -15,7 +15,7 @@ export const BOARD_MAX_SHAPES = 256;
 export const BOARD_MAX_POINTS = 256;
 export const boardId = (value: unknown): value is string => typeof value === 'string' && /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i.test(value);
 export const boardCoordinate = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= 1_000_000;
-export const boardBrushWidth = (value: number): number => value * 20;
+export const boardBrushWidth = (value: number): number => 20 + (value - 1) * 1380 / 99;
 export function validBoardLayer(value: unknown): value is BoardLayer {
   const l = value as BoardLayer;
   return Boolean(l && boardId(l.id) && typeof l.name === 'string' && l.name.length <= 80 &&
@@ -45,9 +45,13 @@ export function parseBoardFile(content: string): BoardFile {
     !file.shapes.every(s => file.layers!.some(l => l.id === (s.layerId ?? DEFAULT_BOARD_LAYER))))) throw new Error('whiteboard.invalidFile');
   return file.version === 1 ? { version: 1, shapes: file.shapes.map(s => ({ ...s, layerId: DEFAULT_BOARD_LAYER })) } : file;
 }
-export function shapeBounds(s: BoardShape) {
+function geometryBounds(s: BoardShape) {
   const xs = s.points.map(p => p.x + s.x), ys = s.points.map(p => p.y + s.y);
   return { x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) };
+}
+export function shapeBounds(s: BoardShape) {
+  const bounds = geometryBounds(s), radius = s.width / 2;
+  return { x: bounds.x - radius, y: bounds.y - radius, width: bounds.width + s.width, height: bounds.height + s.width };
 }
 function segmentDistance(p: BoardPoint, a: BoardPoint, b: BoardPoint): number {
   const dx = b.x - a.x, dy = b.y - a.y;
@@ -83,7 +87,7 @@ export function hitBoardShape(s: BoardShape, point: BoardPoint, tolerance: numbe
     return points.length === 1 ? segmentDistance(p, points[0], points[0]) <= margin
       : points.slice(1).some((b, i) => segmentDistance(p, points[i], b) <= margin);
   }
-  const b = shapeBounds(s), x = point.x - b.x, y = point.y - b.y;
+  const b = geometryBounds(s), x = point.x - b.x, y = point.y - b.y;
   if (s.tool === 'rectangle') return x >= -margin && y >= -margin && x <= b.width + margin && y <= b.height + margin &&
     (s.filled || Math.min(x, y, b.width - x, b.height - y) <= margin);
   const rx = b.width / 2, ry = b.height / 2;
@@ -113,7 +117,7 @@ export function shapeSvg(s: BoardShape): string {
   if (s.tool === 'rectangle') return `<rect ${common} x="${Math.min(a.x, b.x)}" y="${Math.min(a.y, b.y)}" width="${Math.abs(b.x - a.x)}" height="${Math.abs(b.y - a.y)}"/>`;
   return `<ellipse ${common} cx="${(a.x + b.x) / 2}" cy="${(a.y + b.y) / 2}" rx="${Math.abs(b.x - a.x) / 2}" ry="${Math.abs(b.y - a.y) / 2}"/>`;
 }
-export function boardSvg(shapes: BoardShape[], layers: BoardLayer[] = [defaultBoardLayer()]): string {
+export function boardSvg(shapes: BoardShape[], layers: BoardLayer[] = [defaultBoardLayer()], fullBoard = false): string {
   const visible = layers.filter(l => !l.hidden).flatMap(l => shapes.filter(s => !s.hidden && (s.layerId ?? DEFAULT_BOARD_LAYER) === l.id).map(s => ({ ...s, x: s.x + l.x, y: s.y + l.y }))), bounds = visible.map(shapeBounds);
   const pad = 60, x = Math.min(0, ...bounds.map(b => b.x)) - pad, y = Math.min(0, ...bounds.map(b => b.y)) - pad;
   const width = Math.max(100, ...bounds.map(b => b.x + b.width)) - x + pad;
@@ -126,5 +130,7 @@ export function boardSvg(shapes: BoardShape[], layers: BoardLayer[] = [defaultBo
     }
     return `<g transform="translate(${l.x} ${l.y})">${content}</g>`;
   }).join('');
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${x} ${y} ${width} ${height}">${art}</svg>`;
+  return fullBoard
+    ? `<svg xmlns="http://www.w3.org/2000/svg" width="4096" height="2560" viewBox="0 0 16000 10000"><rect width="16000" height="10000" fill="white"/>${art}</svg>`
+    : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${x} ${y} ${width} ${height}">${art}</svg>`;
 }

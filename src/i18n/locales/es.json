@@ -1354,7 +1354,6 @@
   "whiteboard.empty": "Tus pizarras guardadas aparecerán aquí.",
   "whiteboard.name": "Nombre de la pizarra",
   "whiteboard.localCopy": "Guarda una copia en este equipo. Los próximos guardados actualizan el mismo archivo, incluso al colaborar.",
-  "whiteboard.exportHint": "Exporta una pizarra editable de P2Sharer o una imagen SVG. La exportación conserva el vínculo al archivo local.",
   "whiteboard.editable": "Pizarra editable (.p2board)",
   "whiteboard.untitled": "Pizarra sin título",
   "whiteboard.replaceTitle": "¿Reemplazar la pizarra abierta?",
@@ -1369,5 +1368,13 @@
   "whiteboard.layerName": "Capa {{index}}",
   "whiteboard.addLayer": "Añadir capa",
   "whiteboard.renameLayer": "Renombrar capa",
-  "whiteboard.reorderLayer": "Arrastra para ordenar la capa"
+  "whiteboard.reorderLayer": "Arrastra para ordenar la capa",
+  "whiteboard.hideTools": "Ocultar herramientas",
+  "whiteboard.showTools": "Mostrar herramientas",
+  "whiteboard.hideLayers": "Ocultar capas",
+  "whiteboard.showLayers": "Mostrar capas",
+  "whiteboard.selectLayer": "Seleccionar capa: {{name}}",
+  "whiteboard.exportHint.p2board": "Pizarra editable con capas, dibujos y borrado.",
+  "whiteboard.exportHint.svg": "Imagen vectorial de los dibujos visibles.",
+  "whiteboard.exportHint.png": "PNG de toda la pizarra sobre blanco (4096 × 2560)."
 }

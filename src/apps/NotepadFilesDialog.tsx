@@ -88,8 +88,8 @@ export function DocumentFilesDialog({ mode, initialName, onOpen, onSave, onExpor
       <p className="notepad-files-hint">{copy('localCopy')}</p>
     </> : <>
       <Select aria-label={t('notepad.format')} value={format} onValueChange={(value) => setFormat(String(value))}
-        options={documentLibrary ? [{ value: 'p2board', label: t('whiteboard.editable') }, { value: 'svg', label: 'SVG (.svg)' }] : [{ value: 'md', label: 'Markdown (.md)' }, { value: 'txt', label: t('notepad.plainText') }, { value: 'html', label: t('notepad.richText') }]} />
-      <p className="notepad-files-hint">{copy('exportHint')}</p>
+        options={documentLibrary ? [{ value: 'p2board', label: t('whiteboard.editable') }, { value: 'svg', label: 'SVG (.svg)' }, { value: 'png', label: 'PNG (.png)' }] : [{ value: 'md', label: 'Markdown (.md)' }, { value: 'txt', label: t('notepad.plainText') }, { value: 'html', label: t('notepad.richText') }]} />
+      <p className="notepad-files-hint">{documentLibrary ? t(`whiteboard.exportHint.${format}`) : copy('exportHint')}</p>
     </>}
     {error && <p className="notepad-files-error" role="alert">{error}</p>}
   </ModalDialog>;

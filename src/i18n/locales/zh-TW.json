@@ -1354,7 +1354,6 @@
   "whiteboard.empty": "已儲存的白板將顯示在此處。",
   "whiteboard.name": "白板名稱",
   "whiteboard.localCopy": "在此電腦上儲存副本。後續儲存將更新同一檔案，包括協作期間。",
-  "whiteboard.exportHint": "匯出可編輯的 P2Sharer 白板或 SVG 圖片。匯出會保留與本機檔案的儲存關聯。",
   "whiteboard.editable": "可編輯白板 (.p2board)",
   "whiteboard.untitled": "未命名白板",
   "whiteboard.replaceTitle": "取代目前的白板？",
@@ -1369,5 +1368,13 @@
   "whiteboard.layerName": "圖層 {{index}}",
   "whiteboard.addLayer": "新增圖層",
   "whiteboard.renameLayer": "重新命名圖層",
-  "whiteboard.reorderLayer": "拖曳以調整圖層順序"
+  "whiteboard.reorderLayer": "拖曳以調整圖層順序",
+  "whiteboard.hideTools": "收合工具",
+  "whiteboard.showTools": "顯示工具",
+  "whiteboard.hideLayers": "收合圖層",
+  "whiteboard.showLayers": "顯示圖層",
+  "whiteboard.selectLayer": "選取圖層：{{name}}",
+  "whiteboard.exportHint.p2board": "包含圖層、繪圖和擦除記錄的可編輯白板。",
+  "whiteboard.exportHint.svg": "可見繪圖的向量圖像。",
+  "whiteboard.exportHint.png": "整個白板的白底 PNG 圖像（4096 × 2560）。"
 }

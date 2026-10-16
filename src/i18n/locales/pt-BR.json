@@ -1354,7 +1354,6 @@
   "whiteboard.empty": "Seus quadros salvos aparecerão aqui.",
   "whiteboard.name": "Nome do quadro",
   "whiteboard.localCopy": "Salve uma cópia neste computador. Os próximos salvamentos atualizam o mesmo arquivo, inclusive durante a colaboração.",
-  "whiteboard.exportHint": "Exporte um quadro editável do P2Sharer ou uma imagem SVG. A exportação mantém o vínculo com o arquivo salvo localmente.",
   "whiteboard.editable": "Quadro editável (.p2board)",
   "whiteboard.untitled": "Quadro sem título",
   "whiteboard.replaceTitle": "Substituir o quadro aberto?",
@@ -1369,5 +1368,13 @@
   "whiteboard.layerName": "Camada {{index}}",
   "whiteboard.addLayer": "Adicionar camada",
   "whiteboard.renameLayer": "Renomear camada",
-  "whiteboard.reorderLayer": "Arraste para ordenar a camada"
+  "whiteboard.reorderLayer": "Arraste para ordenar a camada",
+  "whiteboard.hideTools": "Recolher ferramentas",
+  "whiteboard.showTools": "Mostrar ferramentas",
+  "whiteboard.hideLayers": "Recolher camadas",
+  "whiteboard.showLayers": "Mostrar camadas",
+  "whiteboard.selectLayer": "Selecionar camada: {{name}}",
+  "whiteboard.exportHint.p2board": "Quadro editável com camadas, desenhos e borracha.",
+  "whiteboard.exportHint.svg": "Imagem vetorial dos desenhos visíveis.",
+  "whiteboard.exportHint.png": "PNG de todo o quadro com fundo branco (4096 × 2560)."
 }

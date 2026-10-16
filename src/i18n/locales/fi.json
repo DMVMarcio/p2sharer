@@ -1354,7 +1354,6 @@
   "whiteboard.empty": "Tallennetut valkotaulut näkyvät tässä.",
   "whiteboard.name": "Valkotaulun nimi",
   "whiteboard.localCopy": "Tallenna kopio tälle tietokoneelle. Myöhemmät tallennukset päivittävät saman tiedoston myös yhteistyössä.",
-  "whiteboard.exportHint": "Vie muokattava P2Sharer-valkotaulu tai SVG-kuva. Yhteys paikalliseen tallennukseen säilyy.",
   "whiteboard.editable": "Muokattava valkotaulu (.p2board)",
   "whiteboard.untitled": "Nimetön valkotaulu",
   "whiteboard.replaceTitle": "Korvataanko avoin valkotaulu?",
@@ -1369,5 +1368,13 @@
   "whiteboard.layerName": "Taso {{index}}",
   "whiteboard.addLayer": "Lisää taso",
   "whiteboard.renameLayer": "Nimeä taso uudelleen",
-  "whiteboard.reorderLayer": "Järjestä taso vetämällä"
+  "whiteboard.reorderLayer": "Järjestä taso vetämällä",
+  "whiteboard.hideTools": "Piilota työkalut",
+  "whiteboard.showTools": "Näytä työkalut",
+  "whiteboard.hideLayers": "Piilota tasot",
+  "whiteboard.showLayers": "Näytä tasot",
+  "whiteboard.selectLayer": "Valitse taso: {{name}}",
+  "whiteboard.exportHint.p2board": "Muokattava valkotaulu tasoineen, piirroksineen ja pyyhintöineen.",
+  "whiteboard.exportHint.svg": "Vektorikuva näkyvistä piirroksista.",
+  "whiteboard.exportHint.png": "PNG koko valkotaulusta valkoisella taustalla (4096 × 2560)."
 }

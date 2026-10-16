@@ -1354,7 +1354,6 @@
   "whiteboard.empty": "Здесь появятся сохранённые доски.",
   "whiteboard.name": "Название доски",
   "whiteboard.localCopy": "Сохраните копию на этом компьютере. Последующие сохранения обновят тот же файл, в том числе при совместной работе.",
-  "whiteboard.exportHint": "Экспортируйте редактируемую доску P2Sharer или изображение SVG. Связь с локальным файлом сохранится.",
   "whiteboard.editable": "Редактируемая доска (.p2board)",
   "whiteboard.untitled": "Доска без названия",
   "whiteboard.replaceTitle": "Заменить открытую доску?",
@@ -1369,5 +1368,13 @@
   "whiteboard.layerName": "Слой {{index}}",
   "whiteboard.addLayer": "Добавить слой",
   "whiteboard.renameLayer": "Переименовать слой",
-  "whiteboard.reorderLayer": "Перетащите для изменения порядка слоёв"
+  "whiteboard.reorderLayer": "Перетащите для изменения порядка слоёв",
+  "whiteboard.hideTools": "Скрыть инструменты",
+  "whiteboard.showTools": "Показать инструменты",
+  "whiteboard.hideLayers": "Скрыть слои",
+  "whiteboard.showLayers": "Показать слои",
+  "whiteboard.selectLayer": "Выбрать слой: {{name}}",
+  "whiteboard.exportHint.p2board": "Редактируемая доска со слоями, рисунками и стираниями.",
+  "whiteboard.exportHint.svg": "Векторное изображение видимых рисунков.",
+  "whiteboard.exportHint.png": "PNG всей доски на белом фоне (4096 × 2560)."
 }

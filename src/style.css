@@ -5449,3 +5449,8 @@ body:has(.fullscreen-dialog) .window-titlebar { display: none; }
 .modal-card.fullscreen-dialog { width: 100vw; max-width: none; height: 100vh; max-height: none; border-radius: 0; }
 .fullscreen-dialog > .modal-body { flex: 1; min-height: 0; padding: 0; gap: 0; overflow: hidden; }
 .fullscreen-dialog > .modal-footer, .fullscreen-dialog > .modal-overlay-actions { display: none; }
+
+.collapsible-region { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows var(--transition-normal), opacity var(--transition-normal); }
+.collapsible-region.is-open { grid-template-rows: 1fr; opacity: 1; }
+.collapsible-region-content { min-height: 0; overflow: hidden; }
+@media (prefers-reduced-motion: reduce) { .collapsible-region { transition: none; } }

@@ -65,7 +65,7 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
         compact={compact} actor={roomAppsService.getLocalActor()} name={username} onError={error} resetView={resetView}
         participantName={actor => peers.find(peer => peer.id === actor)?.username || t('browser.participant')} />
       </div>
-      {!compact && <WhiteboardLayers layers={model.layers} active={currentLayer} onActivate={id => { setActiveLayer(id); setSelected(null); }} onChange={updateLayer} onDelete={remove}
+      {!compact && <WhiteboardLayers layers={model.layers} shapes={model.shapes} active={currentLayer} onActivate={select} onChange={updateLayer} onDelete={remove}
         onAdd={() => { try { const id = model.addLayer(t('whiteboard.layerName', { index: model.layers.length + 1 })); setActiveLayer(id); setSelected(null); } catch (reason) { error(reason); } }}
         onReorder={ids => { try { model.reorderLayers(ids); } catch (reason) { error(reason); } }} />}
     </div>

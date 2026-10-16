@@ -1,4 +1,6 @@
 const MAX_NOTE_BYTES: usize = 2_000_000;
+const MAX_PNG_DATA_URL_BYTES: usize = 64_000_000;
+use base64::{engine::general_purpose::STANDARD, Engine};
 use serde::{Deserialize, Serialize};
 use std::{fs, io::{Read, Write}, path::{Path, PathBuf}, sync::Mutex};
 use tauri::Manager;
@@ -150,25 +152,54 @@ pub async fn open_note_file(language: Option<String>, library: Option<String>) -
 
 #[tauri::command]
 pub async fn save_note_file(content: String, format: String, language: Option<String>, library: Option<String>) -> Result<bool, String> {
-    if content.len() > MAX_NOTE_BYTES { return Err("Note file is too large".into()); }
-    if !(if library.as_deref() == Some("whiteboard") { &["p2board", "svg"][..] } else { &["html", "md", "txt"][..] }).contains(&format.as_str()) { return Err("Invalid export format".into()); }
+    let png = library.as_deref() == Some("whiteboard") && format == "png";
+    if content.len() > if png { MAX_PNG_DATA_URL_BYTES } else { MAX_NOTE_BYTES } { return Err("Note file is too large".into()); }
+    if !(if library.as_deref() == Some("whiteboard") { &["p2board", "svg", "png"][..] } else { &["html", "md", "txt"][..] }).contains(&format.as_str()) { return Err("Invalid export format".into()); }
     tauri::async_runtime::spawn_blocking(move || {
         let board = library.as_deref() == Some("whiteboard");
         if library.is_some() && !board { return Err("Invalid document library".into()); }
         let copy = if board { crate::localization::whiteboard_dialog_copy(language.as_deref()) }
             else { crate::localization::note_dialog_copy(language.as_deref()) };
+        let bytes = if png { decode_board_png(&content)? } else { content.into_bytes() };
         let Some(path) = rfd::FileDialog::new()
             .set_title(copy.save_title)
-            .add_filter(match format.as_str() { "md" => "Markdown", "txt" => if language.as_deref() == Some("pt-BR") { "Texto puro" } else { "Plain text" }, _ => copy.save_filter }, &[&format])
+            .add_filter(match format.as_str() { "png" => "PNG", "svg" => "SVG", "md" => "Markdown", "txt" => if language.as_deref() == Some("pt-BR") { "Texto puro" } else { "Plain text" }, _ => copy.save_filter }, &[&format])
             .set_file_name(format!("{}.{}", copy.file_name.trim_end_matches(".html").trim_end_matches(".p2board"), format))
             .save_file() else { return Ok(false); };
-        std::fs::write(path, content).map(|_| true).map_err(|e| e.to_string())
+        std::fs::write(path, bytes).map(|_| true).map_err(|e| e.to_string())
     }).await.map_err(|e| e.to_string())?
+}
+
+fn decode_board_png(content: &str) -> Result<Vec<u8>, String> {
+    if content.len() > MAX_PNG_DATA_URL_BYTES { return Err("PNG image is too large".into()); }
+    let encoded = content.strip_prefix("data:image/png;base64,").ok_or("Invalid PNG image")?;
+    let bytes = STANDARD.decode(encoded).map_err(|_| "Invalid PNG image")?;
+    let dimensions = image::ImageReader::with_format(std::io::Cursor::new(&bytes), image::ImageFormat::Png)
+        .into_dimensions().map_err(|_| "Invalid PNG image")?;
+    if dimensions.0 == 0 || dimensions.1 == 0 || dimensions.0 > 4096 || dimensions.1 > 4096 {
+        return Err("PNG dimensions are too large".into());
+    }
+    image::load_from_memory_with_format(&bytes, image::ImageFormat::Png).map_err(|_| "Invalid PNG image")?;
+    Ok(bytes)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn whiteboard_png_export_preserves_binary_bytes_and_rejects_invalid_payloads() {
+        let mut encoded = std::io::Cursor::new(Vec::new());
+        image::DynamicImage::new_rgb8(2, 3).write_to(&mut encoded, image::ImageFormat::Png).unwrap();
+        let bytes = encoded.into_inner();
+        let data = format!("data:image/png;base64,{}", STANDARD.encode(&bytes));
+        assert_eq!(decode_board_png(&data).unwrap(), bytes);
+        assert!(decode_board_png("data:image/png;base64,broken").is_err());
+        assert!(decode_board_png("data:image/svg+xml;base64,PHN2Zz4=").is_err());
+        let mut oversized = std::io::Cursor::new(Vec::new());
+        image::DynamicImage::new_rgb8(4097, 1).write_to(&mut oversized, image::ImageFormat::Png).unwrap();
+        assert!(decode_board_png(&format!("data:image/png;base64,{}", STANDARD.encode(oversized.into_inner()))).is_err());
+    }
 
     struct Fixture(PathBuf);
     impl Fixture {
