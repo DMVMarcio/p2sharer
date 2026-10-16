@@ -16,7 +16,7 @@ test('YouTube fullscreen control preserves the player and follows fullscreen exi
       builder.onResolve({ filter: /^@tauri-apps\/api\/(core|window)$/ }, args => ({ path: args.path, namespace: 'native' }));
       builder.onLoad({ filter: /.*/, namespace: 'native' }, args => ({ contents: args.path.endsWith('/window')
         ? 'export const getCurrentWindow = () => globalThis.youtubeFullscreenWindow;'
-        : 'export const isTauri = () => true;' }));
+        : 'export const isTauri = () => true; export const invoke = (command, args) => globalThis.youtubeFullscreenWindow.invoke(command, args);' }));
       builder.onResolve({ filter: /^[^./]/ }, args => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
     } }] });
   const { useElementFullscreen, YouTubeControls } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
@@ -32,6 +32,11 @@ test('YouTube fullscreen control preserves the player and follows fullscreen exi
   const initialBounds = { x: 80, y: 120, width: 640, height: 360 };
   let bounds = { ...initialBounds };
   globalThis.youtubeFullscreenWindow = {
+    invoke: async (command, args) => {
+      if (command === 'capture_window_placement') return { ...bounds, maximized: false };
+      if (command === 'restore_window_placement') { const { maximized, ...saved } = args.placement; bounds = saved; return; }
+      throw new Error(command);
+    },
     isFullscreen: async () => nativeFullscreen,
     setFullscreen: async value => { nativeFullscreen = value; },
     outerPosition: async () => ({ x: bounds.x, y: bounds.y }),
@@ -71,6 +76,10 @@ test('YouTube fullscreen control preserves the player and follows fullscreen exi
     assert.equal(nativeFullscreen, true);
     assert.equal(document.querySelector('iframe'), iframe);
     await act(async () => button().click());
+    assert.equal(active, null);
+    assert.equal(nativeFullscreen, false);
+    assert.deepEqual(bounds, initialBounds);
+    await act(async () => { button().click(); button().click(); });
     assert.equal(active, null);
     assert.equal(nativeFullscreen, false);
     assert.deepEqual(bounds, initialBounds);

@@ -13,6 +13,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from
 import { RoomSlotInfo } from '../../core/types';
 import { useRoom } from '../../hooks/useRoom';
 import { useStore } from '../../hooks/useStore';
+import { useElementFullscreen } from '../../hooks/useElementFullscreen';
 import { useStreamZoom } from '../../hooks/useStreamZoom';
 import { audioContextManager } from '../../audio/audio_context_manager';
 import { roomService } from '../../services/room_service';
@@ -60,7 +61,6 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   const [volume, setVolume] = useState<number>(100);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [lastVolume, setLastVolume] = useState<number>(100);
-  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const showLocalPreview = useStore((s) => s.localPreviewStreams[slot.peerId] ?? (slot.mediaKind === 'camera'));
   const setShowLocalPreview = (visible: boolean) => stateStore.set((s) => {
     s.localPreviewStreams = { ...s.localPreviewStreams, [slot.peerId]: visible };
@@ -73,7 +73,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     setActiveTooltips((prev) => Math.max(0, prev + (open ? 1 : -1)));
   }, []);
 
-  const cardRef = useRef<HTMLDivElement | null>(null);
+  const { ref: cardRef, fullscreen: isFullscreen, toggleFullscreen } = useElementFullscreen<HTMLDivElement>();
   const {
     zoom,
     pan,
@@ -86,28 +86,9 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     handleDoubleClick,
   } = useStreamZoom(cardRef, slot.stream, !inTray);
 
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(document.fullscreenElement === cardRef.current);
-    };
-
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-    };
-  }, []);
-
   const handleToggleFullscreen = (e?: React.MouseEvent) => {
     e?.stopPropagation();
-    if (document.fullscreenElement !== cardRef.current) {
-      if (cardRef.current?.requestFullscreen) {
-        cardRef.current.requestFullscreen().catch(() => {});
-      }
-    } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen().catch(() => {});
-      }
-    }
+    void toggleFullscreen().catch(error => console.warn('[Window] Fullscreen transition failed:', error));
   };
 
   const videoElementRef = useRef<HTMLVideoElement | null>(null);

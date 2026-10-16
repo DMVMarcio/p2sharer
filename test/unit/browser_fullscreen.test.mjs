@@ -58,7 +58,7 @@ test('fullscreen remains operable under StrictMode and uses the canonical dialog
       builder.onResolve({filter:/^@tauri-apps\/api\/(core|window)$/}, args => ({path:args.path, namespace:'fixture'}));
       builder.onLoad({filter:/.*/, namespace:'fixture'}, args => ({contents: args.path.endsWith('/window')
         ? 'export const getCurrentWindow = () => globalThis.nativeFullscreenFixture;'
-        : 'export const isTauri = () => true; export const invoke = async () => undefined;'}));
+        : 'export const isTauri = () => true; export const invoke = async command => command === \"capture_window_placement\" ? { x: 40, y: 60, width: 960, height: 540, maximized: false } : undefined;'}));
       builder.onResolve({filter:/^[^./]/}, args => ({path:pathToFileURL(require.resolve(args.path)).href, external:true}));
     } }] });
   const { useNativeFullscreen, FullscreenDialog } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);

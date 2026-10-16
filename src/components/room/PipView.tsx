@@ -10,6 +10,7 @@ import { invoke, isTauri } from '@tauri-apps/api/core';
 import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type { StreamWatcher } from '../../core/types';
 import { stateStore } from '../../core/state_store';
+import { useElementFullscreen } from '../../hooks/useElementFullscreen';
 import { useStreamZoom } from '../../hooks/useStreamZoom';
 import { ZoomControlBar } from './ZoomControlBar';
 import { StreamStatsOverlay } from './StreamStatsOverlay';
@@ -65,14 +66,13 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
   const [lastVolume, setLastVolume] = useState<number>(100);
   const [isHudPinned, setIsHudPinned] = useState<boolean>(false);
   const [isAlwaysOnTop, setIsAlwaysOnTop] = useState<boolean>(true);
-  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [activeTooltips, setActiveTooltips] = useState<number>(0);
 
   const handleTooltipOpenChange = useCallback((open: boolean) => {
     setActiveTooltips((previous) => Math.max(0, previous + (open ? 1 : -1)));
   }, []);
 
-  const containerRef = useRef<HTMLDivElement | null>(null);
+  const { ref: containerRef, fullscreen: isFullscreen, toggleFullscreen } = useElementFullscreen<HTMLDivElement>();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const lastVideoSizeRef = useRef('');
   const pointer = useStreamPointer(containerRef, videoRef, peerId, pointerEligible && !isLocal && !!stream && isVideoPlaying, stream, true, pointerEligible && !!stream && isVideoPlaying);
@@ -106,7 +106,6 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
   }, []);
   useEffect(() => {
     const fullscreenChanged = () => {
-      setIsFullscreen(Boolean(document.fullscreenElement));
       if (!document.fullscreenElement) { lastVideoSizeRef.current = ''; syncVideoSize(); }
     };
     document.addEventListener('fullscreenchange', fullscreenChanged);
@@ -439,13 +438,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
 
   const handleToggleFullscreen = (e?: React.MouseEvent) => {
     e?.stopPropagation();
-    if (document.fullscreenElement !== containerRef.current) {
-      containerRef.current?.requestFullscreen?.().catch(() => {});
-      setIsFullscreen(true);
-    } else {
-      document.exitFullscreen?.().catch(() => {});
-      setIsFullscreen(false);
-    }
+    void toggleFullscreen().catch(error => console.warn('[PiP] Fullscreen transition failed:', error));
   };
 
   return (

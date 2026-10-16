@@ -28,6 +28,8 @@ mod camera_permission;
 mod browser_shortcuts;
 pub mod shared_browser;
 mod window_chrome;
+#[cfg(windows)]
+mod window_placement;
 mod localization;
 mod app_data_migration;
 mod invitation_routing;
@@ -114,12 +116,18 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
+            let main = app.get_webview_window("main").ok_or("main webview missing")?;
+            #[cfg(windows)]
+            if let Err(error) = window_placement::install(&main) { eprintln!("[Window] Could not restore placement: {error}"); }
+            main.show()?;
             invitation_routing::install(app.handle())?;
             camera_permission::install(app)?;
             browser_shortcuts::disable_browser_shortcuts(app.get_webview_window("main").ok_or("main webview missing")?)?;
             Ok(())
         })
         .on_window_event(|window, event| {
+            #[cfg(windows)]
+            window_placement::on_event(window, event);
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 let label = window.label();
                 if label == "main" {
@@ -184,6 +192,8 @@ pub fn run() {
             cancel_app_update,
             browser_shortcuts::disable_browser_shortcuts,
             window_chrome::show_window_menu,
+            window_placement::capture_window_placement,
+            window_placement::restore_window_placement,
             localization::get_system_locale,
             native_rtc::create_native_video_offer,
             native_rtc::answer_native_video,

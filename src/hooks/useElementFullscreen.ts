@@ -21,7 +21,8 @@ export function useElementFullscreen<T extends HTMLElement>() {
       if (element && document.fullscreenElement === element) void document.exitFullscreen().catch(() => {});
     };
   }, []);
-  const toggleFullscreen = useCallback(async () => {
+  const operations = useRef<Promise<void>>(Promise.resolve());
+  const transition = useCallback(async () => {
     const element = ref.current;
     if (!element) return;
     if (document.fullscreenElement === element) {
@@ -45,5 +46,10 @@ export function useElementFullscreen<T extends HTMLElement>() {
       if (!element.isConnected && document.fullscreenElement === element) await document.exitFullscreen();
     }
   }, []);
+  const toggleFullscreen = useCallback(() => {
+    const next = operations.current.then(transition);
+    operations.current = next.catch(() => {});
+    return next;
+  }, [transition]);
   return { ref, fullscreen, toggleFullscreen };
 }

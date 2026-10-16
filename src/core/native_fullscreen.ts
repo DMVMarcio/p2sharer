@@ -26,8 +26,9 @@ export class NativeFullscreenSession {
       if (this.active) return true;
       this.previous = await this.native?.isFullscreen() ?? false;
       this.placement = this.previous ? undefined : await this.native?.capturePlacement?.();
-      if (this.disposed) return false;
-      await this.native?.setFullscreen(true);
+      if (this.disposed) { await this.restore(); return false; }
+      try { await this.native?.setFullscreen(true); }
+      catch (error) { await this.restore(); throw error; }
       if (this.disposed) { await this.restore(); return false; }
       this.active = true; return true;
     });
