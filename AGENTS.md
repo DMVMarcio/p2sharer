@@ -4,7 +4,7 @@
 
 Read `.agents/rules/agent-persistence.md` at the beginning of every task and follow it throughout the work. It is the central, always-on workspace rule. Its requirements cover language, Tauri validation, Git, persistent memory, canonical reuse, and agent management. Consult `.agents/knowledge.md` for the project context and recorded user preferences; apply relevant skills in addition to the central rule.
 
-P2Sharer is a Windows desktop application built with Tauri v2. The React/Vite frontend runs inside WebView2 and depends on native Rust commands, local media capture, and desktop packaging. Treat Vite browser mode as a frontend development aid, not as the product runtime.
+P2Sharer is a Windows desktop space for shared P2P experiences, built with Tauri v2. See [the product overview](docs/product-overview.md) for its purpose and current capabilities. The React/Vite frontend runs inside WebView2 and depends on native Rust commands, local media capture, and desktop packaging. Treat Vite browser mode as a frontend development aid, not as the product runtime.
 
 ## Package manager
 

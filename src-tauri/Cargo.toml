@@ -1,7 +1,7 @@
 [package]
 name = "p2sharer"
 version = "1.4.0"
-description = "P2Sharer - Serverless P2P Screen & Process Audio Sharing"
+description = "P2Sharer - A shared space to connect, create and explore through P2P"
 authors = ["P2Sharer Team"]
 edition = "2021"
 

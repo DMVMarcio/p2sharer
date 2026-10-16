@@ -66,7 +66,7 @@ test('caption buttons invoke native actions without becoming drag regions', asyn
 });
 
 test('native and custom titles follow room join, rename, missing name and leave', async () => {
-  const defaultTitle = 'P2Sharer - Compartilhamento de tela e áudio';
+  const defaultTitle = 'P2Sharer - Conecte, crie e explore com P2P';
   assert.equal(titles.at(-1), defaultTitle);
   assert.equal(document.querySelector('.window-titlebar-title').textContent, defaultTitle);
   await act(async () => stateStore.set(state => {
@@ -121,7 +121,7 @@ test('caption right click invokes Windows menu and suppresses the application fa
 test('language switches update native and custom captions while room names remain authored text', async () => {
   const button = document.querySelector('.window-titlebar button');
   await act(async () => setLanguage('en'));
-  assert.equal(titles.at(-1), 'P2Sharer - Screen and audio sharing');
+  assert.equal(titles.at(-1), 'P2Sharer - Connect, create and explore through P2P');
   assert.deepEqual([...document.querySelectorAll('button')].map(button => button.getAttribute('aria-label')), ['Minimize', 'Maximize', 'Close']);
   assert.equal(document.querySelector('.window-titlebar button'), button);
   await act(async () => stateStore.set(state => { state.currentRoomCode = 'example-code'; state.currentRoomName = 'Sala'; state.roomSlots = [{ peerId: 'local', isLocal: true }]; }));

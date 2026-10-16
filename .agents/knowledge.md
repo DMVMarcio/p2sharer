@@ -3,7 +3,9 @@
 This file indexes current architecture and explicit standing user rules. It is not a transcript, feature specification, backlog, or changelog. Subsystem references describe implementation; they do not establish user mandates. Apply the memory policy in [agent-persistence.md](rules/agent-persistence.md) before adding anything.
 
 ## 1. Project Overview & Architecture
-P2Sharer is a serverless, peer-to-peer screen and application audio sharing desktop application built on Tauri v2. It provides high-performance desktop/window streaming with hardware acceleration, native Windows WASAPI loopback audio capture with process-level filtering, and a resilient decentralized WebRTC mesh network with zero central media servers.
+P2Sharer is a Windows desktop space for connecting, creating and exploring together through peer-to-peer connections. Its purpose is to make the most of P2P across an expanding range of shared experiences and tools. See the [product overview](../docs/product-overview.md) for canonical positioning, current capabilities, implementation references and the distinction between available features and future plans.
+
+The Tauri v2 host combines native Windows integration with a React interface and a decentralized WebRTC mesh for shared media and app state. Public services support Internet peer discovery and external content; P2P does not mean that every feature works without external services.
 
 - **Ecosystem & Stack**:
   - **Host Framework**: Tauri v2 (`@tauri-apps/api: ^2`, `@tauri-apps/cli: ^2`, `tauri-plugin-opener: ^2`)
@@ -32,6 +34,7 @@ P2Sharer is a serverless, peer-to-peer screen and application audio sharing desk
 ---
 
 ## 3. Subsystem Architectural Deep Dives
+- [Product Purpose, Current Capabilities and Implementation References](../docs/product-overview.md)
 - [Release Versioning, Signing and GitHub Distribution](../docs/releases.md)
 - [Public Repository Safety and Historical Audits](knowledge/repository-publication.md)
 - [P2P Networking, Signaling Failover & WebRTC Mesh](knowledge/p2p-architecture.md)

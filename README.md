@@ -1,6 +1,8 @@
 # P2Sharer
 
-P2Sharer is a Windows desktop app for sharing screens, application audio and cameras with other people in a room. Watch multiple streams, exchange messages and files, take notes together, and watch YouTube with synchronized playback.
+P2Sharer is a shared space for connecting, creating and exploring together through peer-to-peer connections. Its goal is to make the most of P2P: bringing more of what people can do together into one Windows desktop app, with room to keep expanding.
+
+Share screens, application audio and cameras; chat and exchange files; browse the web together; draw on a whiteboard; write shared notes; watch synchronized YouTube videos; and connect local services through tunnels and a virtual network. Choose the tools that fit the moment, whether you are collaborating, sharing something or spending time together.
 
 **[Latest release](https://github.com/DMVMarcio/p2sharer/releases/latest)** · [All releases](https://github.com/DMVMarcio/p2sharer/releases)
 
@@ -8,20 +10,29 @@ Windows installers will be available on GitHub Releases as versions are publishe
 
 ## What you can do
 
-- Share a screen or individual window with audio, and add cameras as independent streams.
+- Create rooms, share invitations, save rooms for later and manage participant access.
+- Chat, share images and transfer files with recipient consent.
+- Browse together in a shared browser session with tabs, shared controls and audio.
+- Draw together on a whiteboard with layers, shapes and text, and save or export your work.
+- Write shared rich-text notes with live edits, local saving, import and export.
+- Watch YouTube together with synchronized playback, collaborative queues and saved playlists.
+- Share a screen or individual window with application audio, and add cameras as independent streams.
 - Choose which streams to watch, switch between grid and spotlight views, and keep video visible in picture-in-picture windows.
 - Control participant audio independently and select which applications contribute to shared audio.
-- Chat, share images and transfer files with recipient consent.
-- Use a collaborative notepad and synchronized YouTube queues, including saved playlists and player picture-in-picture.
 - Point and draw on shared streams to explain something together.
+- Share selected local TCP/UDP services through port tunnels or a virtual IPv4 network. The virtual network requires Windows administrator consent and uses Wintun.
+- Personalize your name, avatar, profile banner and interface appearance.
+- Open supported apps in separate windows or use them privately with the personal-app option.
 
 Rooms use WebRTC connections between participants. Internet (P2P) rooms use public services to discover peers; Local network / VPN rooms use local discovery. Streaming quality depends on each participant's connection, hardware and capture settings.
+
+See the [product overview](docs/product-overview.md) for the project's purpose, current capabilities and their implementation references. Voice calling is planned and is not currently available.
 
 ## Get started
 
 1. Install a published Windows release and open P2Sharer.
 2. Choose a display name, create a room and share its invitation, or join with an invitation you received. Enter the room password if required.
-3. Select a screen, window or camera to share. Choose other participants' streams to watch and open room apps when you want to collaborate.
+3. Chat and exchange files, open an app to browse, draw, write or watch together, or start a screen, window or camera stream. Join the apps and streams you want to follow.
 
 For the experimental LAN/VPN mode, choose **Local network / VPN** when creating a room and select your network adapter, such as Radmin VPN or Hamachi. Everyone must join the same network and use a version of P2Sharer that supports LAN invitations. Allow P2Sharer through the firewall on that network. Keep the creator's app open for new participants to join; media travels directly between participants. VPNs may use their own relays, and remote media compatibility still requires testing on your network.
 

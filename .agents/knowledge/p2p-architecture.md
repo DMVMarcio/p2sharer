@@ -1,7 +1,7 @@
 # Deep Dive: P2P Networking, Signaling Failover & WebRTC Mesh
 
 ## Overview
-P2Sharer operates as a serverless, peer-to-peer screen and audio streaming desktop application. It eliminates centralized media servers (SFUs) by establishing direct WebRTC mesh topologies between participants. Signaling uses public decentralized broker meshes with automatic multi-tier failover.
+P2Sharer uses a WebRTC mesh to connect participants for shared media, messages, file transfers and collaborative app state. This transport supports the broader [product purpose](../../docs/product-overview.md) of exploring what people can do together through P2P. It does not require centralized media servers (SFUs); Internet signaling uses public decentralized broker meshes with automatic multi-tier failover, and external content apps retain their own service dependencies.
 
 ---
 
