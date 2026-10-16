@@ -21,31 +21,34 @@ export function WhiteboardToolbar({ settings, onChange, canUndo, canRedo, onUndo
     ['#3b82f6', 'message.b0bf526b23af'], ['#a855f7', 'message.57a73ede5f6f'], ['#ec4899', 'message.75f9577a1637'],
     ['#ffffff', 'message.3683a74222dd'], ['#000000', 'message.4b652af43d8d']];
   return <div className={`whiteboard-toolbar ${open ? '' : 'is-collapsed'}`} role="toolbar" aria-label={t('whiteboard.tools')}>
-    <TooltipButton tooltip={t(open ? 'whiteboard.hideTools' : 'whiteboard.showTools')} className="room-app-notepad-tool whiteboard-toolbar-toggle"
-      aria-expanded={open} aria-controls={contentId} onClick={() => setOpen(value => !value)}><ChevronDown size={16} className={open ? '' : 'is-reversed'} /></TooltipButton>
+    <div className="whiteboard-toolbar-main-row">
+      <span className="whiteboard-toolbar-spacer" aria-hidden="true" />
+      <div className="whiteboard-tool-choices" inert={!open || undefined} aria-hidden={!open || undefined}>
+        {tools.map(([tool, Icon]) => <TooltipButton key={tool} tooltip={t(`whiteboard.${tool}`)} aria-pressed={settings.tool === tool}
+          className={`room-app-notepad-tool ${settings.tool === tool ? 'active' : ''}`} onClick={event => {
+            if (tool === 'rectangle' || tool === 'ellipse') menu(event, [false, true].map(filled => ({
+              id: `${tool}-${filled}`, label: t(filled ? 'whiteboard.filled' : 'whiteboard.outline'), iconOnly: true,
+              selected: settings.tool === tool && settings.filled === filled,
+              icon: <Icon size={23} fill={filled ? 'currentColor' : 'none'} strokeWidth={1.8} />,
+              onSelect: () => onChange({ ...settings, tool, filled }),
+            })), { toggle: true, layout: 'grid', placement: 'top-center' });
+            else onChange({ ...settings, tool });
+          }}><Icon size={19} fill={settings.tool === tool && settings.filled && (tool === 'rectangle' || tool === 'ellipse') ? 'currentColor' : 'none'} /></TooltipButton>)}
+        <TooltipButton tooltip={t('message.2237b88f398f')} className="room-app-notepad-tool" onClick={event => menu(event, colors.map(([color, label]) => ({
+          id: color, label: t(label), selected: color === settings.color, icon: <span className="stream-drawing-swatch" style={{ background: color }} />,
+          onSelect: () => onChange({ ...settings, color }),
+        })), { toggle: true })}><span className="stream-drawing-swatch" style={{ background: settings.color }} /></TooltipButton>
+      </div>
+      <TooltipButton tooltip={t(open ? 'whiteboard.hideTools' : 'whiteboard.showTools')} className="room-app-notepad-tool whiteboard-toolbar-toggle"
+        aria-expanded={open} aria-controls={contentId} onClick={() => setOpen(value => !value)}><ChevronDown size={16} className={open ? '' : 'is-reversed'} /></TooltipButton>
+    </div>
     <CollapsibleRegion open={open} id={contentId}>
-    <div className="whiteboard-tool-choices">
-    {tools.map(([tool, Icon]) => <TooltipButton key={tool} tooltip={t(`whiteboard.${tool}`)} aria-pressed={settings.tool === tool}
-      className={`room-app-notepad-tool ${settings.tool === tool ? 'active' : ''}`} onClick={event => {
-        if (tool === 'rectangle' || tool === 'ellipse') menu(event, [false, true].map(filled => ({
-          id: `${tool}-${filled}`, label: t(filled ? 'whiteboard.filled' : 'whiteboard.outline'), iconOnly: true,
-          selected: settings.tool === tool && settings.filled === filled,
-          icon: <Icon size={23} fill={filled ? 'currentColor' : 'none'} strokeWidth={1.8} />,
-          onSelect: () => onChange({ ...settings, tool, filled }),
-        })), { toggle: true, layout: 'grid', placement: 'top-center' });
-        else onChange({ ...settings, tool });
-      }}><Icon size={19} fill={settings.tool === tool && settings.filled && (tool === 'rectangle' || tool === 'ellipse') ? 'currentColor' : 'none'} /></TooltipButton>)}
-    <TooltipButton tooltip={t('message.2237b88f398f')} className="room-app-notepad-tool" onClick={event => menu(event, colors.map(([color, label]) => ({
-      id: color, label: t(label), selected: color === settings.color, icon: <span className="stream-drawing-swatch" style={{ background: color }} />,
-      onSelect: () => onChange({ ...settings, color }),
-    })), { toggle: true })}><span className="stream-drawing-swatch" style={{ background: settings.color }} /></TooltipButton>
-    </div>
-    <div className="whiteboard-tool-properties">
-    <IntegerSlider label={t('whiteboard.width')} min={1} max={100} value={settings.width} onChange={width => onChange({ ...settings, width })} />
-    <IntegerSlider label={t('whiteboard.smoothing')} min={0} max={100} value={settings.smoothing} onChange={smoothing => onChange({ ...settings, smoothing })} />
-    <TooltipButton tooltip={t('message.786b48222848')} className="room-app-notepad-tool" disabled={!canUndo} onClick={onUndo}><Undo2 size={16} /></TooltipButton>
-    <TooltipButton tooltip={t('message.7b659c9caa5e')} className="room-app-notepad-tool" disabled={!canRedo} onClick={onRedo}><Redo2 size={16} /></TooltipButton>
-    </div>
+      <div className="whiteboard-tool-properties">
+        <IntegerSlider label={t('whiteboard.width')} min={1} max={100} value={settings.width} onChange={width => onChange({ ...settings, width })} />
+        <IntegerSlider label={t('whiteboard.smoothing')} min={0} max={100} value={settings.smoothing} onChange={smoothing => onChange({ ...settings, smoothing })} />
+        <TooltipButton tooltip={t('message.786b48222848')} className="room-app-notepad-tool" disabled={!canUndo} onClick={onUndo}><Undo2 size={16} /></TooltipButton>
+        <TooltipButton tooltip={t('message.7b659c9caa5e')} className="room-app-notepad-tool" disabled={!canRedo} onClick={onRedo}><Redo2 size={16} /></TooltipButton>
+      </div>
     </CollapsibleRegion>
   </div>;
 }

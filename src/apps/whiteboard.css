@@ -5,15 +5,27 @@
 .whiteboard-workspace { display: flex; flex: 1; min-height: 0; overflow: hidden; }
 .whiteboard-stage { position: relative; display: flex; flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
 .whiteboard-toolbar { position: absolute; z-index: 3; bottom: 18px; left: 50%; transform: translateX(-50%);
-  display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 5px 8px 8px; width: 490px; max-width: calc(100% - 24px);
-  max-height: calc(100% - 36px); overflow-y: auto; box-sizing: border-box; border-radius: var(--radius-lg);
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 8px 6px; width: 490px; max-width: calc(100% - 24px);
+  max-height: calc(100% - 36px); overflow-y: auto; overflow-x: hidden; box-sizing: border-box; border-radius: var(--radius-lg);
   background: var(--bg-elevated); color: var(--text-primary); box-shadow: var(--shadow-lg); border: 1px solid var(--border-subtle);
-  transition: width var(--transition-normal); }
-.whiteboard-tool-choices, .whiteboard-tool-properties { display: flex; align-items: center; justify-content: center; gap: 4px; flex-wrap: wrap; }
-.whiteboard-tool-choices .room-app-notepad-tool { width: 36px; height: 34px; border-radius: var(--radius-md); transition: background var(--transition-fast), color var(--transition-fast); }
+  transition: width var(--transition-normal), padding var(--transition-normal); }
+.whiteboard-toolbar.is-collapsed { width: 44px; padding: 5px 0; overflow: hidden; }
+.whiteboard-toolbar-main-row { display: flex; align-items: center; justify-content: space-between; width: 100%; min-width: 0; }
+.whiteboard-toolbar-spacer { width: 36px; height: 34px; flex-shrink: 0; pointer-events: none; transition: width var(--transition-normal); }
+.whiteboard-toolbar.is-collapsed .whiteboard-toolbar-spacer { width: 0; }
+.whiteboard-tool-choices { display: flex; align-items: center; justify-content: center; gap: 4px; flex: 1; min-width: 0;
+  max-width: 420px; transition: max-width var(--transition-normal), opacity var(--transition-fast); }
+.whiteboard-toolbar.is-collapsed .whiteboard-tool-choices { max-width: 0; opacity: 0; overflow: hidden; pointer-events: none; gap: 0; }
+.whiteboard-tool-choices .room-app-notepad-tool, .whiteboard-toolbar-toggle { width: 36px; height: 34px; border-radius: var(--radius-md); flex-shrink: 0; transition: background var(--transition-fast), color var(--transition-fast); }
 .whiteboard-tool-choices .room-app-notepad-tool.active { background: var(--accent-subtle); color: var(--accent-color); }
-.whiteboard-toolbar .stream-drawing-size { border: 0; box-shadow: none; background: transparent; font-size: 10px; padding: 3px; }
-.whiteboard-toolbar .stream-drawing-size input { width: 60px; }
+.whiteboard-toolbar-toggle { margin-left: auto; }
+.whiteboard-toolbar.is-collapsed .whiteboard-toolbar-toggle { margin-left: 0; }
+.whiteboard-toolbar > .collapsible-region { width: 100%; }
+.whiteboard-tool-properties { display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: nowrap; padding-top: 2px; max-width: 100%; }
+.whiteboard-tool-properties .room-app-notepad-tool { width: 30px; height: 28px; border-radius: var(--radius-sm); flex-shrink: 0; }
+.whiteboard-toolbar .stream-drawing-size { border: 0; box-shadow: none; background: transparent; font-size: 11px; padding: 2px 4px; gap: 5px; flex-shrink: 0; }
+.whiteboard-toolbar .stream-drawing-size input[type="range"] { width: 50px; flex-shrink: 0; }
+.whiteboard-toolbar .stream-drawing-size .integer-slider-value { width: 28px; min-width: 28px; max-width: 28px; padding: 1px 2px; height: 22px; font-size: 11px; text-align: center; }
 .whiteboard-canvas { flex: 1; min-width: 0; position: relative; overflow: hidden; touch-action: none; user-select: none;
   background: var(--bg-app); }
 .whiteboard-paper { filter: drop-shadow(0 3px 12px #0003); stroke: #d1d5db; stroke-width: 1px; vector-effect: non-scaling-stroke; }
@@ -44,15 +56,11 @@
 .whiteboard-layer-drag { position: fixed; top: 0; left: 0; z-index: 10001; box-sizing: border-box; pointer-events: none;
   align-items: center; color: var(--text-primary); background: var(--bg-control); box-shadow: var(--shadow-lg); opacity: .9; cursor: grabbing; }
 
-.whiteboard-toolbar.is-collapsed { width: 44px; }
-.whiteboard-toolbar > .collapsible-region { width: 100%; }
-.whiteboard-toolbar-toggle { flex-shrink: 0; }
-.whiteboard-tool-choices { padding-top: 4px; }
-.whiteboard-tool-properties { padding-top: 5px; }
 .whiteboard-toolbar-toggle svg, .whiteboard-layers-toggle svg:last-child { transition: transform var(--transition-normal); }
 .whiteboard-toolbar-toggle .is-reversed, .whiteboard-layers-toggle .is-reversed { transform: rotate(180deg); }
-.whiteboard-layers.is-collapsed { width: 44px; padding-inline: 4px; }
-.whiteboard-layers-toggle { display: flex; width: 36px; margin-left: auto; margin-bottom: 6px; flex-shrink: 0; }
+.whiteboard-layers.is-collapsed { width: 44px; padding-inline: 0; overflow: hidden; }
+.whiteboard-layers-toggle { display: flex; align-items: center; justify-content: center; gap: 2px; width: 36px; height: 32px; margin: 0 auto 6px 0; border-radius: var(--radius-md); flex-shrink: 0; }
+.whiteboard-layers.is-collapsed .whiteboard-layers-toggle { margin-inline: auto; }
 .whiteboard-layers > .collapsible-region > .collapsible-region-content { min-width: 0; }
 .whiteboard-layer { cursor: pointer; }
 .whiteboard-layer-select { flex: 0 0 48px; width: 48px; height: 48px; align-self: center; padding: 0; border: 0;
@@ -67,5 +75,5 @@
 .whiteboard-layer-name:focus-visible, .whiteboard-layer-select:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 2px; }
 .whiteboard-layer .whiteboard-layer-name-input:focus { box-shadow: none; outline: none; }
 @media (prefers-reduced-motion: reduce) {
-  .whiteboard-toolbar, .whiteboard-layers, .whiteboard-toolbar-toggle svg, .whiteboard-layers-toggle svg:last-child { transition: none; }
+  .whiteboard-toolbar, .whiteboard-layers, .whiteboard-toolbar-spacer, .whiteboard-tool-choices, .whiteboard-toolbar-toggle svg, .whiteboard-layers-toggle svg:last-child { transition: none; }
 }
