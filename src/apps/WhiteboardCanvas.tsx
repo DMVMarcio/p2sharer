@@ -147,7 +147,8 @@ export function WhiteboardCanvas({ model, activeLayer, settings, viewport, onVie
   const bounds = selectedLayer ? boardLayerBounds(model.shapes, moving ?? selectedLayer) : null;
   const cursorGlyph = (id: string, c: Cursor, own = false) => <StreamPointerGlyph key={id} name={own ? '' : participantName(id)} color={c.color}
     interpolate={!own} shape={c.tool === 'hand' ? 'hand' : c.tool === 'move' ? 'move' : c.tool === 'pointer' ? 'pointer' : 'brush'} diameter={c.width * viewport.zoom}
-    style={{ left: own ? cursorScreen?.x : c.x * viewport.zoom + viewport.x, top: own ? cursorScreen?.y : c.y * viewport.zoom + viewport.y }} />;
+    style={{ left: own ? cursorScreen?.x : c.x, top: own ? cursorScreen?.y : c.y,
+      ...(!own ? { transform: `scale(${1 / viewport.zoom})`, transformOrigin: '0 0' } : {}) }} />;
   return <div ref={root} className={`whiteboard-canvas ${compact ? 'compact' : 'virtual-cursor'}`} tabIndex={compact ? -1 : 0}
     role="region" aria-label={t('whiteboard.scene')} aria-description={t('whiteboard.navigation')} onPointerDown={down} onPointerMove={event => update(event)} onPointerUp={up}
     onPointerCancel={cancel} onLostPointerCapture={() => { if (gesture.current) cancel(); }} onPointerLeave={() => { if (!gesture.current) leave(); }} onContextMenu={event => event.preventDefault()}>
@@ -168,7 +169,10 @@ export function WhiteboardCanvas({ model, activeLayer, settings, viewport, onVie
         </g>
       </g>
     </svg>
-    <div className="whiteboard-cursors" aria-hidden="true">{[...model.cursors].filter(([id]) => id !== actor).map(([id, c]) => cursorGlyph(id, c))}
+    <div className="whiteboard-cursors" aria-hidden="true">
+      <div className="whiteboard-remote-cursors" style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})` }}>
+        {[...model.cursors].filter(([id]) => id !== actor).map(([id, c]) => cursorGlyph(id, c))}
+      </div>
       {!compact && cursor && cursorGlyph(name, cursor, true)}</div>
     {!compact && <div className="whiteboard-navigation-hint">{Math.round(viewport.zoom * 100)}%</div>}
   </div>;

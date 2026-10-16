@@ -1381,5 +1381,7 @@
   "documents.overwriteTitle": "नाम पहले से मौजूद है",
   "documents.overwriteHint": "“{{name}}” नाम का दस्तावेज़ पहले से मौजूद है। सहेजी गई सामग्री को अधिलेखित करें?",
   "documents.chooseName": "दूसरा नाम चुनें",
-  "documents.nameExists": "इस नाम का दस्तावेज़ पहले से मौजूद है। दूसरा नाम चुनें।"
+  "documents.nameExists": "इस नाम का दस्तावेज़ पहले से मौजूद है। दूसरा नाम चुनें।",
+  "documents.delete": "हटाएँ",
+  "documents.deleteHint": "सहेजा गया दस्तावेज़ “{{name}}” हटाएँ? खुली सामग्री बनी रहेगी। दोबारा सहेजते समय नाम पूछा जाएगा।"
 }

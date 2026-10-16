@@ -16,11 +16,15 @@ window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventL
 window.Range.prototype.getClientRects = () => [];
 window.Range.prototype.getBoundingClientRect = () => new window.DOMRect();
 HTMLElement.prototype.scrollIntoView = () => {};
-const fixture = globalThis.notepadFixture = { model: null, editor: null, notes: new Map(), calls: [], imported: null };
+const fixture = globalThis.notepadFixture = { model: null, editor: null, notes: new Map(), calls: [], imported: null, subscriptions: new Set() };
 fixture.invoke = async (command, args) => {
   fixture.calls.push({ command, args });
   if (command === 'list_saved_notes') return { directory: 'Notes', notes: [...fixture.notes.values()].map(note => ({ ...note, content: '' })) };
   if (command === 'read_saved_note') return { ...fixture.notes.get(args.id) };
+  if (command === 'delete_library_note') {
+    assert.equal(args.expectedUpdatedAt, fixture.notes.get(args.id).updatedAt);
+    fixture.notes.delete(args.id); return;
+  }
   if (command === 'rename_library_note') {
     const current = fixture.notes.get(args.id);
     assert.equal(args.expectedUpdatedAt, current.updatedAt);
@@ -38,7 +42,8 @@ fixture.invoke = async (command, args) => {
   throw new Error(`Unexpected command: ${command}`);
 };
 const mocks = {
-  core: 'export const invoke = (...args) => globalThis.notepadFixture.invoke(...args);',
+  core: 'export const isTauri = () => globalThis.notepadFixture.native ?? false; export const invoke = (...args) => globalThis.notepadFixture.invoke(...args);',
+  event: `export const listen = async (_event, callback) => { const subscriptions = globalThis.notepadFixture.subscriptions; subscriptions.add(callback); return () => subscriptions.delete(callback); };`,
   room_apps_service: 'export const roomAppsService = { getModel: () => globalThis.notepadFixture.model, getLocalActor: () => "fixture" };',
   useRoom: 'export const useRoom = () => ({ username: "Fixture" });',
   useToast: 'export const showToast = () => {};',
@@ -47,9 +52,11 @@ const mocks = {
     globalThis.notepadFixture.editor = editor; return React.createElement('div', { 'data-toolbar': true }, fileActions); };`,
 };
 const bundle = await build({ stdin: { contents: `export { NotepadApp } from './src/apps/NotepadApp.tsx';
+  export { useDocumentLibraryDeletion } from './src/apps/useDocumentLibraryDeletion.ts';
   export { NotepadModel } from './src/apps/models.ts'; export { setLanguage } from './src/i18n/index.ts';`, resolveDir: process.cwd() },
   bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic',
   plugins: [{ name: 'notepad-native-fixture', setup(builder) {
+    builder.onResolve({ filter: /^@tauri-apps\/api\/event$/ }, () => ({ path: 'event', namespace: 'fixture' }));
     builder.onResolve({ filter: /^@tauri-apps\/api\/core$/ }, () => ({ path: 'core', namespace: 'fixture' }));
     builder.onResolve({ filter: /\/(room_apps_service|useRoom|useToast|useTextEditorContextMenu|NotepadToolbar)$/ }, args => ({
       path: args.path.split('/').at(-1), namespace: 'fixture',
@@ -200,4 +207,45 @@ test('saving by an existing name requires separate overwrite consent and adopts 
   assert.equal(document.querySelector('[role="dialog"]'), null);
   assert.equal(fixture.notes.get(instanceId).content, '<p>Replacement</p>');
   assert.equal(fixture.model.noteIdentity.id, instanceId);
+});
+
+
+test('deleting a saved open note requires consent, retains the draft, and asks for a name on the next save', async () => {
+  const note = fixture.notes.get(instanceId);
+  await act(async () => fixture.editor.commands.setContent('<p>Keep this unsaved content</p>'));
+  await click('Open', toolbar());
+  const row = () => [...document.querySelectorAll('.notepad-files-row')].find(row => row.textContent.includes(note.name));
+  await act(async () => row().querySelector('[aria-label="Delete"]').click()); await settle();
+  await click('Cancel', [...document.querySelectorAll('[role="dialog"]')].at(-1));
+  assert.ok(fixture.notes.has(instanceId));
+  await act(async () => row().querySelector('[aria-label="Delete"]').click()); await settle();
+  await click('Delete', [...document.querySelectorAll('[role="dialog"]')].at(-1));
+  assert.equal(fixture.notes.has(instanceId), false);
+  assert.equal(fixture.editor.getHTML(), '<p>Keep this unsaved content</p>');
+  assert.equal(fixture.model.noteIdentity.id, instanceId);
+  assert.ok(!row());
+  await click('Cancel', document.querySelector('[role="dialog"]'));
+  await click('Save', toolbar());
+  assert.equal(document.querySelector('[role="dialog"] input').value, note.name);
+  assert.equal(fixture.notes.has(instanceId), false);
+  await click('Save', document.querySelector('[role="dialog"]'));
+  assert.equal(fixture.notes.get(instanceId).content, '<p>Keep this unsaved content</p>');
+});
+
+
+test('device-local deletion events filter the document library, update callbacks, and release subscriptions', async () => {
+  fixture.native = true;
+  const host = document.createElement('div'); document.body.append(host);
+  const subscriptionRoot = createRoot(host), received = [];
+  function Subscriber({ label }) { api.useDocumentLibraryDeletion('notes', id => received.push([label, id])); return null; }
+  try {
+    await act(async () => subscriptionRoot.render(React.createElement(Subscriber, { label: 'first' })));
+    assert.equal(fixture.subscriptions.size, 1);
+    const notify = library => fixture.subscriptions.forEach(callback => callback({ payload: { library, id: instanceId } }));
+    notify('whiteboard'); assert.deepEqual(received, []);
+    notify('notes'); assert.deepEqual(received, [['first', instanceId]]);
+    await act(async () => subscriptionRoot.render(React.createElement(Subscriber, { label: 'latest' })));
+    notify('notes'); assert.deepEqual(received.at(-1), ['latest', instanceId]);
+  } finally { await act(async () => subscriptionRoot.unmount()); host.remove(); fixture.native = false; }
+  assert.equal(fixture.subscriptions.size, 0);
 });

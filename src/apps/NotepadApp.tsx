@@ -20,6 +20,7 @@ import { showToast } from '../hooks/useToast';
 import { useRoom } from '../hooks/useRoom';
 import { useTextEditorContextMenu } from '../hooks/useTextEditorContextMenu';
 import { ModalDialog } from '../components/common/ModalDialog';
+import { useDocumentLibraryDeletion } from './useDocumentLibraryDeletion';
 import { NotepadFilesDialog, type SavedNote, type NoteLibrary, type NoteExportFormat } from './NotepadFilesDialog';
 
 interface Props { instanceId: string; compact?: boolean }
@@ -41,6 +42,9 @@ export const NotepadApp: React.FC<Props> = ({ instanceId, compact = false }) => 
   const [pending, setPending] = useState<SavedNote | { content: string; format: string } | 'new' | null>(null);
   const [, setRevision] = useState(0);
   const saved = useRef(new Map<string, SavedNote>());
+  const deleted = useRef(new Set<string>());
+  const forgetSaved = (id: string) => { deleted.current.add(id); saved.current.delete(id); setRevision(value => value + 1); };
+  useDocumentLibraryDeletion('notes', forgetSaved);
   const saveTarget = useRef(instanceId);
   const approvedReplacement = useRef<NonNullable<typeof pending> | null>(null);
   const identity = model?.noteIdentity;
@@ -87,7 +91,7 @@ export const NotepadApp: React.FC<Props> = ({ instanceId, compact = false }) => 
         const library = await invoke<NoteLibrary>('list_saved_notes');
         if (!active || !library.notes.some((note) => note.id === id)) return;
         const note = await invoke<SavedNote>('read_saved_note', { id });
-        if (active && !saved.current.has(id)) {
+        if (active && !saved.current.has(id) && !deleted.current.has(id)) {
           saved.current.set(id, note);
           setRevision((value) => value + 1);
         }
@@ -129,7 +133,7 @@ export const NotepadApp: React.FC<Props> = ({ instanceId, compact = false }) => 
     const library = previous ? null : await invoke<NoteLibrary>('list_saved_notes');
     const existing = overwrite ?? previous ?? library?.notes.find((note) => note.id === id);
     const note = await invoke<SavedNote>('save_library_note', { id: overwrite?.id ?? id, name, content, expectedUpdatedAt: existing?.updatedAt ?? null });
-    saved.current.set(note.id, note);
+    deleted.current.delete(note.id); saved.current.set(note.id, note);
     // Keep a delayed save from relabeling another document opened by a peer.
     if ((model.noteIdentity?.id ?? instanceId) === id) model.setNoteIdentity(note.id, note.name);
     setRevision((value) => value + 1);
@@ -196,7 +200,8 @@ export const NotepadApp: React.FC<Props> = ({ instanceId, compact = false }) => 
     <EditorContent editor={editor} className="room-app-notepad-content" />
     {dialog && <NotepadFilesDialog mode={dialog} initialName={identity?.name ?? t('notepad.untitled')}
       onOpen={requestReplace} onSave={(name, overwrite) => persist(name, saveTarget.current, overwrite)}
-      onRename={note => { saved.current.set(note.id, note);
+      onDelete={forgetSaved}
+      onRename={note => { deleted.current.delete(note.id); saved.current.set(note.id, note);
         if ((model?.noteIdentity?.id ?? instanceId) === note.id) model?.setNoteIdentity(note.id, note.name);
         setRevision(value => value + 1);
       }} onExport={exportNote} onClose={() => setDialog(null)} />}

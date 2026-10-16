@@ -1381,5 +1381,7 @@
   "documents.overwriteTitle": "El nombre ya existe",
   "documents.overwriteHint": "Ya existe un documento llamado «{{name}}». ¿Sobrescribir su contenido guardado?",
   "documents.chooseName": "Elegir otro nombre",
-  "documents.nameExists": "Ya existe un documento con este nombre. Elige otro nombre."
+  "documents.nameExists": "Ya existe un documento con este nombre. Elige otro nombre.",
+  "documents.delete": "Eliminar",
+  "documents.deleteHint": "¿Eliminar el documento guardado «{{name}}»? El contenido abierto se conservará. Al volver a guardar se pedirá un nombre."
 }

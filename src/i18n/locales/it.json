@@ -1381,5 +1381,7 @@
   "documents.overwriteTitle": "Nome già esistente",
   "documents.overwriteHint": "Esiste già un documento chiamato «{{name}}». Sovrascrivere il contenuto salvato?",
   "documents.chooseName": "Scegli un altro nome",
-  "documents.nameExists": "Esiste già un documento con questo nome. Scegli un altro nome."
+  "documents.nameExists": "Esiste già un documento con questo nome. Scegli un altro nome.",
+  "documents.delete": "Elimina",
+  "documents.deleteHint": "Eliminare il documento salvato «{{name}}»? Il contenuto aperto verrà mantenuto. Al prossimo salvataggio verrà richiesto un nome."
 }

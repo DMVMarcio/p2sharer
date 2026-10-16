@@ -7,6 +7,7 @@ import { showToast } from '../hooks/useToast';
 import { getLanguage, localizeError, t } from '../i18n';
 import type { WhiteboardModel } from './whiteboard_model';
 import { boardSvg, parseBoardFile } from './whiteboard_scene';
+import { useDocumentLibraryDeletion } from './useDocumentLibraryDeletion';
 import { boardPng } from './whiteboard_export';
 
 export function boardError(error: unknown): string {
@@ -20,6 +21,9 @@ export function useWhiteboardFiles(model: WhiteboardModel | undefined, instanceI
   const [busy, setBusy] = useState(false);
   const [, refresh] = useState(0);
   const saved = useRef(new Map<string, SavedNote>());
+  const deleted = useRef(new Set<string>());
+  const forgetSaved = (id: string) => { deleted.current.add(id); saved.current.delete(id); refresh(n => n + 1); };
+  useDocumentLibraryDeletion('whiteboard', forgetSaved);
   const target = useRef(instanceId);
   const approved = useRef<Replacement | null>(null);
   const id = model?.identity?.id ?? instanceId;
@@ -29,7 +33,7 @@ export function useWhiteboardFiles(model: WhiteboardModel | undefined, instanceI
     if (!saved.current.has(id)) void invoke<NoteLibrary>('list_saved_notes', { library: 'whiteboard' }).then(async library => {
       if (!active || !library.notes.some(note => note.id === id)) return;
       const note = await invoke<SavedNote>('read_saved_note', { id, library: 'whiteboard' });
-      if (active && !saved.current.has(id)) { saved.current.set(id, note); refresh(n => n + 1); }
+      if (active && !saved.current.has(id) && !deleted.current.has(id)) { saved.current.set(id, note); refresh(n => n + 1); }
     }).catch(() => {});
     return () => { active = false; };
   }, [id]);
@@ -40,7 +44,7 @@ export function useWhiteboardFiles(model: WhiteboardModel | undefined, instanceI
     const existing = overwrite ?? saved.current.get(expectedId) ?? (await invoke<NoteLibrary>('list_saved_notes', { library: 'whiteboard' })).notes.find(note => note.id === expectedId);
     const note = await invoke<SavedNote>('save_library_note', { id: overwrite?.id ?? expectedId, name, content,
       expectedUpdatedAt: existing?.updatedAt ?? null, library: 'whiteboard' });
-    saved.current.set(note.id, note);
+    deleted.current.delete(note.id); saved.current.set(note.id, note);
     if ((model.identity?.id ?? instanceId) === expectedId) model.setIdentity(note.id, note.name);
     refresh(n => n + 1); showToast(t('message.6896081fcc11'), 3500, 'success');
   };
@@ -59,7 +63,7 @@ export function useWhiteboardFiles(model: WhiteboardModel | undefined, instanceI
     try {
       model?.replace(note === 'new' ? '{"version":1,"shapes":[]}' : note.content,
         note !== 'new' && 'id' in note ? note.id : crypto.randomUUID(), note !== 'new' && 'name' in note ? note.name : t('whiteboard.untitled'));
-      if (note !== 'new' && 'id' in note) saved.current.set(note.id, note);
+      if (note !== 'new' && 'id' in note) { deleted.current.delete(note.id); saved.current.set(note.id, note); }
     } catch (error) { showToast(boardError(error), 3500, 'error'); }
     setPending(null);
   };
@@ -79,7 +83,8 @@ export function useWhiteboardFiles(model: WhiteboardModel | undefined, instanceI
     status: <div className="notepad-file-status" role="status"><strong>{name}</strong><span>{t(busy ? 'notepad.saving' : local?.content === model?.content ? 'notepad.saved' : local ? 'notepad.modified' : 'notepad.unsaved')}</span></div>,
     dialogs: <>{dialog && <DocumentFilesDialog mode={dialog} library="whiteboard" initialName={name} onOpen={requestReplace}
       onSave={async (name, overwrite) => { try { await persist(name, target.current, overwrite); } catch (error) { throw new Error(boardError(error)); } }}
-      onRename={note => { saved.current.set(note.id, note);
+      onDelete={forgetSaved}
+      onRename={note => { deleted.current.delete(note.id); saved.current.set(note.id, note);
         if ((model?.identity?.id ?? instanceId) === note.id) model?.setIdentity(note.id, note.name);
         refresh(n => n + 1);
       }}

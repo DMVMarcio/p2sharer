@@ -1381,5 +1381,7 @@
   "documents.overwriteTitle": "이미 존재하는 이름",
   "documents.overwriteHint": "“{{name}}” 문서가 이미 있습니다. 저장된 내용을 덮어쓸까요?",
   "documents.chooseName": "다른 이름 선택",
-  "documents.nameExists": "같은 이름의 문서가 이미 있습니다. 다른 이름을 선택하세요."
+  "documents.nameExists": "같은 이름의 문서가 이미 있습니다. 다른 이름을 선택하세요.",
+  "documents.delete": "삭제",
+  "documents.deleteHint": "저장된 문서 “{{name}}”을 삭제할까요? 열려 있는 내용은 유지됩니다. 다시 저장할 때 이름을 입력해야 합니다."
 }

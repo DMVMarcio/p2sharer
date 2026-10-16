@@ -81,3 +81,6 @@
 }
 
 .whiteboard-app:fullscreen { width: 100vw; height: 100vh; background: var(--bg-card); }
+
+/* Camera movement is immediate; only remote world coordinates interpolate. */
+.whiteboard-remote-cursors { position: absolute; inset: 0; transform-origin: 0 0; pointer-events: none; }

@@ -23,6 +23,10 @@ fixture.invoke = async (command, args) => {
   assert.equal(args.library, 'whiteboard');
   if (command === 'list_saved_notes') return { directory: 'Whiteboards', notes: [...fixture.notes.values()] };
   if (command === 'read_saved_note') return fixture.notes.get(args.id);
+  if (command === 'delete_library_note') {
+    assert.equal(args.expectedUpdatedAt, fixture.notes.get(args.id).updatedAt);
+    fixture.notes.delete(args.id); return;
+  }
   if (command === 'rename_library_note') {
     const previous = fixture.notes.get(args.id);
     assert.equal(args.expectedUpdatedAt, previous.updatedAt);
@@ -332,4 +336,41 @@ test('renaming an open board retains unsaved paint and subsequent saves use the 
   await click('Cancel', document.querySelector('[role="dialog"]'));
   await click('Save');
   assert.equal(fixture.notes.get(id).content, content);
+});
+
+
+test('deleting the open saved board preserves paint and asks for a name before recreating its saved copy', async () => {
+  const id = fixture.model.identity.id, content = fixture.model.content, name = fixture.model.identity.name;
+  await click('Open');
+  const row = [...document.querySelectorAll('.notepad-files-row')].find(row => row.textContent.includes(name));
+  await click('Delete', row);
+  await click('Delete', [...document.querySelectorAll('[role="dialog"]')].at(-1));
+  assert.equal(fixture.notes.has(id), false);
+  assert.equal(fixture.model.content, content);
+  assert.equal(fixture.model.identity.id, id);
+  await click('Cancel', document.querySelector('[role="dialog"]'));
+  await click('Save');
+  assert.equal(document.querySelector('[role="dialog"] input').value, name);
+  await click('Save', document.querySelector('[role="dialog"]'));
+  assert.equal(fixture.notes.get(id).content, content);
+});
+
+test('remote cursors retain world coordinates while every zoom frame uses the same camera transform as the board', async () => {
+  await act(async () => { fixture.model.setParticipants(['local', 'remote']); fixture.model.apply({ cursor: {
+    x: 80, y: 90, tool: 'brush', width: 30, color: '#ef4444' } }, 'remote', false); });
+  const group = document.querySelector('.whiteboard-remote-cursors');
+  const glyph = group.querySelector('.stream-pointer-remote');
+  const initialCamera = group.style.transform;
+  await act(async () => canvas().dispatchEvent(new window.WheelEvent('wheel', {
+    deltaY: -200, ctrlKey: true, clientX: 300, clientY: 250, bubbles: true, cancelable: true })));
+  for (let frame = 0; frame < 4; frame++) {
+    await act(async () => new Promise(resolve => requestAnimationFrame(resolve)));
+    const camera = document.querySelector('.whiteboard-art > g').getAttribute('transform').match(/translate\(([^ ]+) ([^)]+)\) scale\(([^)]+)\)/);
+    const [x, y, zoom] = camera.slice(1).map(Number);
+    assert.equal(group.style.transform, `translate(${x}px, ${y}px) scale(${zoom})`);
+    assert.equal(glyph.style.left, '80px'); assert.equal(glyph.style.top, '90px');
+    assert.equal(glyph.style.transform, `scale(${1 / zoom})`);
+    assert.equal(Number.parseFloat(glyph.querySelector('i').style.width), 30 * zoom);
+  }
+  assert.notEqual(group.style.transform, initialCamera);
 });

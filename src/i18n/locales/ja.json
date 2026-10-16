@@ -1381,5 +1381,7 @@
   "documents.overwriteTitle": "名前が既に存在します",
   "documents.overwriteHint": "「{{name}}」というドキュメントは既に存在します。保存済みの内容を上書きしますか？",
   "documents.chooseName": "別の名前を選択",
-  "documents.nameExists": "同じ名前のドキュメントが既に存在します。別の名前を選択してください。"
+  "documents.nameExists": "同じ名前のドキュメントが既に存在します。別の名前を選択してください。",
+  "documents.delete": "削除",
+  "documents.deleteHint": "保存済みのドキュメント「{{name}}」を削除しますか？開いている内容は保持されます。再度保存するときに名前の入力を求められます。"
 }

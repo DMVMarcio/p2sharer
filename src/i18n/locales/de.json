@@ -1381,5 +1381,7 @@
   "documents.overwriteTitle": "Name bereits vorhanden",
   "documents.overwriteHint": "Ein Dokument namens „{{name}}“ ist bereits vorhanden. Gespeicherten Inhalt überschreiben?",
   "documents.chooseName": "Anderen Namen wählen",
-  "documents.nameExists": "Ein Dokument mit diesem Namen ist bereits vorhanden. Wähle einen anderen Namen."
+  "documents.nameExists": "Ein Dokument mit diesem Namen ist bereits vorhanden. Wähle einen anderen Namen.",
+  "documents.delete": "Löschen",
+  "documents.deleteHint": "Das gespeicherte Dokument „{{name}}“ löschen? Geöffneter Inhalt bleibt erhalten. Beim erneuten Speichern wird nach einem Namen gefragt."
 }

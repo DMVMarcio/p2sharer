@@ -3,7 +3,7 @@ const MAX_PNG_DATA_URL_BYTES: usize = 64_000_000;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use serde::{Deserialize, Serialize};
 use std::{fs, io::{Read, Write}, path::{Path, PathBuf}, sync::Mutex};
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 static NOTE_LOCK: Mutex<()> = Mutex::new(());
 
@@ -154,6 +154,30 @@ pub async fn rename_library_note(app: tauri::AppHandle, id: String, name: String
     }).await.map_err(|e| e.to_string())?
 }
 
+fn delete_note(directory: &Path, id: &str, expected_updated_at: u64) -> Result<(), String> {
+    let path = note_path(directory, id)?;
+    let note = read_note(&path)?;
+    if !note.id.eq_ignore_ascii_case(id) { return Err("Invalid saved note".into()); }
+    if note.updated_at != expected_updated_at {
+        return Err("This note changed on disk. Reopen it before saving.".into());
+    }
+    fs::remove_file(path).map_err(|e| e.to_string())
+}
+
+#[derive(Clone, Serialize)]
+struct DeletedDocument { id: String, library: String }
+
+#[tauri::command]
+pub async fn delete_library_note(app: tauri::AppHandle, id: String, expected_updated_at: u64, library: Option<String>) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let _lock = NOTE_LOCK.lock().map_err(|e| e.to_string())?;
+        delete_note(&note_directory(&app, library.as_deref())?, &id, expected_updated_at)?;
+        // Deletion is device-local: invalidate saved bindings in other app views without replacing shared content.
+        let _ = app.emit("document-library-deleted", DeletedDocument { id, library: library.unwrap_or_else(|| "notes".into()) });
+        Ok(())
+    }).await.map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 pub async fn open_note_file(language: Option<String>, library: Option<String>) -> Result<Option<(String, String)>, String> {
     tauri::async_runtime::spawn_blocking(move || {
@@ -272,6 +296,24 @@ mod tests {
         assert!(persist_note(&fixture.0, restored, None).is_err());
         assert_eq!(read_note(&path).unwrap().content, second.content);
         assert_eq!(fs::read_dir(&fixture.0).unwrap().count(), 1);
+    }
+
+    #[test]
+    fn deletion_checks_identity_and_revision_and_keeps_other_library_records() {
+        let fixture = Fixture::new();
+        let first = persist_note(&fixture.0, note(), None).unwrap();
+        let other_library = fixture.0.join("other-library");
+        fs::create_dir(&other_library).unwrap();
+        persist_note(&other_library, note(), None).unwrap();
+        assert!(delete_note(&fixture.0, "../outside", first.updated_at).is_err());
+        assert!(delete_note(&fixture.0, &first.id, first.updated_at + 1).is_err());
+        assert_eq!(read_note(&note_path(&fixture.0, &first.id).unwrap()).unwrap().content, first.content);
+        delete_note(&fixture.0, &first.id, first.updated_at).unwrap();
+        assert!(!note_path(&fixture.0, &first.id).unwrap().exists());
+        assert!(note_path(&other_library, &first.id).unwrap().exists());
+        assert!(delete_note(&fixture.0, &first.id, first.updated_at).is_err());
+        let recreated = persist_note(&fixture.0, first, None).unwrap();
+        assert_eq!(recreated.name, "Notes");
     }
 
     #[test]

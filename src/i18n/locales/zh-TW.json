@@ -1381,5 +1381,7 @@
   "documents.overwriteTitle": "名稱已存在",
   "documents.overwriteHint": "已存在名為「{{name}}」的文件。是否覆寫已儲存的內容？",
   "documents.chooseName": "選擇其他名稱",
-  "documents.nameExists": "已存在同名文件。請選擇其他名稱。"
+  "documents.nameExists": "已存在同名文件。請選擇其他名稱。",
+  "documents.delete": "刪除",
+  "documents.deleteHint": "刪除已儲存的文件「{{name}}」？開啟的內容將保留。再次儲存時將要求輸入名稱。"
 }

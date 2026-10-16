@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { FileText, Pencil } from 'lucide-react';
+import { FileText, Pencil, Trash2 } from 'lucide-react';
 import { ModalDialog } from '../components/common/ModalDialog';
 import { TooltipButton } from '../components/common/TooltipButton';
 import { Select } from '../components/common/Select';
@@ -16,6 +16,7 @@ interface NotepadFilesProps {
   onOpen: (note: SavedNote | { content: string; format: string }) => void;
   onSave: (name: string, overwrite?: SavedNote) => Promise<void>;
   onRename: (note: SavedNote) => void;
+  onDelete: (id: string) => void;
   onExport: (format: NoteExportFormat) => Promise<void>;
   onClose: () => void;
 }
@@ -23,11 +24,12 @@ export function NotepadFilesDialog(props: NotepadFilesProps) {
   return <DocumentFilesDialog {...props} onExport={format => props.onExport(format as NoteExportFormat)} />;
 }
 
-export function DocumentFilesDialog({ mode, initialName, onOpen, onSave, onRename, onExport, onClose, library: documentLibrary }: {
+export function DocumentFilesDialog({ mode, initialName, onOpen, onSave, onRename, onDelete, onExport, onClose, library: documentLibrary }: {
   mode: 'open' | 'save' | 'export'; initialName: string;
   onOpen: (note: SavedNote | { content: string; format: string }) => void;
   onSave: (name: string, overwrite?: SavedNote) => Promise<void>;
   onRename: (note: SavedNote) => void;
+  onDelete: (id: string) => void;
   onExport: (format: string) => Promise<void>;
   onClose: () => void; library?: 'whiteboard';
 }) {
@@ -40,7 +42,7 @@ export function DocumentFilesDialog({ mode, initialName, onOpen, onSave, onRenam
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(mode === 'open');
   const [error, setError] = useState('');
-  const [action, setAction] = useState<{ kind: 'rename' | 'overwrite'; note: SavedNote } | null>(null);
+  const [action, setAction] = useState<{ kind: 'rename' | 'overwrite' | 'delete'; note: SavedNote } | null>(null);
   const [rename, setRename] = useState('');
   const [childBusy, setChildBusy] = useState(false);
   const [childError, setChildError] = useState('');
@@ -78,6 +80,11 @@ export function DocumentFilesDialog({ mode, initialName, onOpen, onSave, onRenam
           expectedUpdatedAt: action.note.updatedAt, ...(documentLibrary ? { library: documentLibrary } : {}) });
         onRename(note);
         await refresh();
+      } else if (action.kind === 'delete') {
+        await invoke('delete_library_note', { id: action.note.id, expectedUpdatedAt: action.note.updatedAt,
+          ...(documentLibrary ? { library: documentLibrary } : {}) });
+        onDelete(action.note.id);
+        await refresh();
       } else await onSave(name.trim(), action.note);
       committed.current = true; close();
     } catch (reason) { setChildError(documentError(reason)); }
@@ -106,6 +113,8 @@ export function DocumentFilesDialog({ mode, initialName, onOpen, onSave, onRenam
             <div className="notepad-files-info"><strong>{note.name}</strong><span>{new Date(note.updatedAt).toLocaleString(getLanguage())}</span></div>
             <TooltipButton className="btn btn-sm btn-outline" tooltip={t('documents.rename')} disabled={busy}
               onClick={() => { setRename(note.name); setChildError(''); setAction({ kind: 'rename', note }); }}><Pencil size={14} /></TooltipButton>
+            <TooltipButton className="btn btn-sm btn-outline" tooltip={t('documents.delete')} disabled={busy}
+              onClick={() => { setChildError(''); setAction({ kind: 'delete', note }); }}><Trash2 size={14} /></TooltipButton>
             <button className="btn btn-sm btn-secondary" disabled={busy} onClick={() => void run(async () => {
               onOpen(await invoke<SavedNote>('read_saved_note', { id: note.id, ...(documentLibrary ? { library: documentLibrary } : {}) }));
             }, () => closeDialog.current())}>{t('message.a01a5fce396e')}</button>
@@ -125,18 +134,18 @@ export function DocumentFilesDialog({ mode, initialName, onOpen, onSave, onRenam
     </>}
     {error && <p className="notepad-files-error" role="alert">{error}</p>}
   </ModalDialog>
-    {action && <ModalDialog title={t(action.kind === 'rename' ? 'documents.rename' : 'documents.overwriteTitle')}
+    {action && <ModalDialog title={t(action.kind === 'rename' ? 'documents.rename' : action.kind === 'delete' ? 'documents.delete' : 'documents.overwriteTitle')}
       busy={childBusy} onClose={() => { const overwritten = action.kind === 'overwrite' && !childError && committed.current;
         committed.current = false; setAction(null); if (overwritten) closeDialog.current(); }}
       footer={close => <>
-        <button className="btn btn-secondary" data-autofocus={action.kind === 'overwrite' || undefined} disabled={childBusy} onClick={close}>
+        <button className="btn btn-secondary" data-autofocus={action.kind !== 'rename' || undefined} disabled={childBusy} onClick={close}>
           {t(action.kind === 'overwrite' ? 'documents.chooseName' : 'message.bb9dbb406dcb')}</button>
-        <button className="btn btn-primary" disabled={childBusy || (action.kind === 'rename' && !rename.trim())}
-          onClick={() => void commitAction(close)}>{t(action.kind === 'rename' ? 'documents.rename' : 'message.a5e42188d44b')}</button>
+        <button className={`btn ${action.kind === 'delete' ? 'btn-danger' : 'btn-primary'}`} disabled={childBusy || (action.kind === 'rename' && !rename.trim())}
+          onClick={() => void commitAction(close)}>{t(action.kind === 'rename' ? 'documents.rename' : action.kind === 'delete' ? 'documents.delete' : 'message.a5e42188d44b')}</button>
       </>}>
       {action.kind === 'rename' ? <><label className="form-label" htmlFor={`${nameId}-rename`}>{copy('name')}</label>
         <input id={`${nameId}-rename`} className="text-input" data-autofocus autoComplete="off" maxLength={80} value={rename}
-          onChange={event => setRename(event.target.value)} /></> : <p>{t('documents.overwriteHint', { name: action.note.name })}</p>}
+          onChange={event => setRename(event.target.value)} /></> : <p>{t(action.kind === 'delete' ? 'documents.deleteHint' : 'documents.overwriteHint', { name: action.note.name })}</p>}
       {childError && <p className="notepad-files-error" role="alert">{childError}</p>}
     </ModalDialog>}
   </>;

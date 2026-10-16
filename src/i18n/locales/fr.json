@@ -1381,5 +1381,7 @@
   "documents.overwriteTitle": "Ce nom existe déjà",
   "documents.overwriteHint": "Un document nommé « {{name}} » existe déjà. Remplacer son contenu enregistré ?",
   "documents.chooseName": "Choisir un autre nom",
-  "documents.nameExists": "Un document porte déjà ce nom. Choisissez un autre nom."
+  "documents.nameExists": "Un document porte déjà ce nom. Choisissez un autre nom.",
+  "documents.delete": "Supprimer",
+  "documents.deleteHint": "Supprimer le document enregistré « {{name}} » ? Le contenu ouvert sera conservé. Un nom sera demandé au prochain enregistrement."
 }
