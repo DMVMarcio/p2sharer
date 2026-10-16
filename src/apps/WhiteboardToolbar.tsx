@@ -22,7 +22,6 @@ export function WhiteboardToolbar({ settings, onChange, canUndo, canRedo, onUndo
     ['#ffffff', 'message.3683a74222dd'], ['#000000', 'message.4b652af43d8d']];
   return <div className={`whiteboard-toolbar ${open ? '' : 'is-collapsed'}`} role="toolbar" aria-label={t('whiteboard.tools')}>
     <div className="whiteboard-toolbar-main-row">
-      <span className="whiteboard-toolbar-spacer" aria-hidden="true" />
       <div className="whiteboard-tool-choices" inert={!open || undefined} aria-hidden={!open || undefined}>
         {tools.map(([tool, Icon]) => <TooltipButton key={tool} tooltip={t(`whiteboard.${tool}`)} aria-pressed={settings.tool === tool}
           className={`room-app-notepad-tool ${settings.tool === tool ? 'active' : ''}`} onClick={event => {
@@ -40,7 +39,7 @@ export function WhiteboardToolbar({ settings, onChange, canUndo, canRedo, onUndo
         })), { toggle: true })}><span className="stream-drawing-swatch" style={{ background: settings.color }} /></TooltipButton>
       </div>
       <TooltipButton tooltip={t(open ? 'whiteboard.hideTools' : 'whiteboard.showTools')} className="room-app-notepad-tool whiteboard-toolbar-toggle"
-        aria-expanded={open} aria-controls={contentId} onClick={() => setOpen(value => !value)}><ChevronDown size={16} className={open ? '' : 'is-reversed'} /></TooltipButton>
+        aria-expanded={open} aria-controls={contentId} onClick={() => setOpen(value => !value)}><ChevronDown size={20} strokeWidth={2.5} className={open ? '' : 'is-reversed'} /></TooltipButton>
     </div>
     <CollapsibleRegion open={open} id={contentId}>
       <div className="whiteboard-tool-properties">
