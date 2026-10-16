@@ -15,10 +15,10 @@ impl Placement {
         self.x.unsigned_abs() <= 1_000_000 && self.y.unsigned_abs() <= 1_000_000
             && (100..=65536).contains(&self.width) && (100..=65536).contains(&self.height)
     }
-    fn native(&self, maximized: bool) -> WINDOWPLACEMENT {
+    fn native(&self) -> WINDOWPLACEMENT {
         WINDOWPLACEMENT {
             length: std::mem::size_of::<WINDOWPLACEMENT>() as u32,
-            showCmd: if maximized { SW_SHOWMAXIMIZED.0 as u32 } else { SW_SHOWNORMAL.0 as u32 },
+            showCmd: if self.maximized { SW_SHOWMAXIMIZED.0 as u32 } else { SW_SHOWNORMAL.0 as u32 },
             rcNormalPosition: RECT { left: self.x, top: self.y, right: self.x + self.width, bottom: self.y + self.height },
             ..Default::default()
         }
@@ -46,10 +46,9 @@ fn capture(hwnd: HWND) -> Result<Placement, String> {
 fn restore(hwnd: HWND, placement: &Placement) -> Result<(), String> {
     if !placement.valid() { return Err("Invalid window placement".into()); }
     unsafe {
-        // A normal -> maximized transition makes Windows recompute the nonclient frame,
-        // rather than retaining a maximized frame sized for a fullscreen monitor.
-        SetWindowPlacement(hwnd, &placement.native(false)).map_err(|e| e.to_string())?;
-        if placement.maximized { SetWindowPlacement(hwnd, &placement.native(true)).map_err(|e| e.to_string())?; }
+        // Restore the saved show state directly, then recalculate the nonclient frame
+        // without exposing an intermediate normal-sized window.
+        SetWindowPlacement(hwnd, &placement.native()).map_err(|e| e.to_string())?;
         SetWindowPos(hwnd, None, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE)
             .map_err(|e| e.to_string())?;
     }
@@ -152,12 +151,13 @@ mod tests {
     #[test]
     fn placement_round_trips_workspace_coordinates_and_show_state_without_client_frame_conversion() {
         let saved = placement();
-        let native = saved.native(saved.maximized);
+        let native = saved.native();
         assert_eq!(native.length as usize, std::mem::size_of::<WINDOWPLACEMENT>());
         assert_eq!(native.rcNormalPosition.left, -1200);
         assert_eq!(native.rcNormalPosition.right - native.rcNormalPosition.left, 1100);
         assert_eq!(native.rcNormalPosition.bottom - native.rcNormalPosition.top, 700);
         assert_eq!(native.showCmd, SW_SHOWMAXIMIZED.0 as u32);
+        assert_eq!(Placement { maximized: false, ..saved }.native().showCmd, SW_SHOWNORMAL.0 as u32);
     }
     #[test]
     fn closing_during_fullscreen_remembers_the_windowed_snapshot() {
