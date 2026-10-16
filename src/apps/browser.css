@@ -71,6 +71,7 @@
 .browser-settings-column { display: flex; flex-direction: column; min-width: 0; gap: 12px; }
 .browser-settings p { margin: 0; font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
 .browser-settings-column > label { display: flex; flex-direction: column; gap: 7px; font-size: 12px; }
+.browser-settings-column > .browser-settings-switch { flex-direction: row; align-items: center; justify-content: space-between; }
 .browser-extension-heading, .browser-extension { display: flex; gap: 10px; align-items: center; }
 .browser-extension-heading h3, .browser-extension > span { flex: 1; margin: 0; font-size: 13px; overflow-wrap: anywhere; }
 .browser-page-message { white-space: pre-wrap; overflow-wrap: anywhere; }

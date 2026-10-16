@@ -40,9 +40,11 @@ function BrowserSettings({ model, onClose }: { model: BrowserModel; onClose: () 
     <div className="browser-settings">
       <div className="browser-settings-column">
       {model.state.temporary && <p>{t('browser.temporaryInfo')}</p>}
-      <label>{t('browser.hardwareAcceleration')}<Select value={model.hardwareAcceleration ? 'on' : 'off'} disabled={model.busy}
-        onValueChange={value => { if ((value === 'on') !== model.hardwareAcceleration) { model.configureHardwareAcceleration(value === 'on'); setRestart(true); } }}
-        options={[{ value: 'on', label: t('browser.hardwareOn') }, { value: 'off', label: t('browser.hardwareOff') }]} /></label>
+      <label className="browser-settings-switch">{t('browser.hardwareAcceleration')}<span className="modern-switch">
+        <input type="checkbox" autoComplete="off" checked={model.hardwareAcceleration} disabled={model.busy}
+          aria-label={t('browser.hardwareAcceleration')}
+          onChange={event => { model.configureHardwareAcceleration(event.target.checked); setRestart(true); }} />
+        <span className="switch-slider" /></span></label>
       {model.media && <>
         <label>{t('browser.contentMode')}<Select value={model.media.quality.settings.mode}
           onValueChange={value => model.configureQuality({ ...model.media!.quality.settings, mode: value as BrowserContentMode })}

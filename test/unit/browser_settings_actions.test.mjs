@@ -53,16 +53,17 @@ test('page copy writes the local clipboard and hardware changes restart only aft
     assert.equal(commands.some(command => command.kind === 'key' && command.code === 'KeyC'), false);
     const click = async element => { assert.ok(element); await act(async () => element.click()); };
     await click(document.querySelector(`[aria-label="${t('browser.settings')}"]`));
-    const change = async label => {
-      await click(document.querySelector('[role="combobox"]'));
-      await click([...document.querySelectorAll('[role="option"]')].find(option => option.textContent === label));
-    };
-    await change(t('browser.hardwareOff'));
+    const hardwareSwitch = () => document.querySelector(`input[type="checkbox"][aria-label="${t('browser.hardwareAcceleration')}"]`);
+    assert.equal(hardwareSwitch().checked, true);
+    await click(hardwareSwitch());
+    assert.equal(hardwareSwitch().checked, false);
     assert.equal(model.hardwareAcceleration, false); assert.equal(restarts, 0);
     await click([...document.querySelectorAll('button')].find(button => button.textContent === t('browser.restartLater')));
     assert.equal(restarts, 0);
     await act(async () => { await new Promise(resolve => setTimeout(resolve, 400)); });
-    await change(t('browser.hardwareOn'));
+    await click(hardwareSwitch());
+    assert.equal(hardwareSwitch().checked, true);
+    assert.equal(model.hardwareAcceleration, true);
     assert.equal(restarts, 0);
     await click([...document.querySelectorAll('button')].find(button => button.textContent === t('browser.restartNow')));
     assert.equal(restarts, 1);
