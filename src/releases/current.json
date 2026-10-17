@@ -1,96 +1,70 @@
 {
-  "version": "1.4.1",
+  "version": "1.4.2",
   "translations": {
     "en": [
-      "**Files in chat.** Fixes for attaching and pasting files and images into conversations.",
-      "**Your documents.** Improvements to opening, saving and deleting notes and whiteboards while keeping open content intact.",
-      "**Shared drawings.** Fixes for drawing on the whiteboard and annotating shared streams.",
-      "**Your window, remembered.** The app remembers window position, size and maximized state, with more consistent fullscreen behavior.",
-      "**Release notes at hand.** See what changed after updating and revisit the notes in **Settings → Application**."
+      "**Clearer stream controls.** Refreshed stream and picture-in-picture overlays with easier-to-read controls and colored statistics.",
+      "**Easier to stop sharing.** Stop a stream directly from its card or the main toolbar, choosing which one to end when sharing multiple sources.",
+      "**Steadier transfer details.** The statistics icon in chat uploads and downloads stays in place as transfer speeds change."
     ],
     "pt-BR": [
-      "**Arquivos no chat.** Correções ao anexar e colar arquivos e imagens nas conversas.",
-      "**Seus documentos.** Melhorias ao abrir, salvar e excluir notas e quadros brancos, preservando o conteúdo que está aberto.",
-      "**Desenhos compartilhados.** Correções ao desenhar no quadro branco e fazer anotações nas transmissões.",
-      "**Janela do seu jeito.** O app lembra a posição, o tamanho e o estado maximizado da janela, com comportamento mais consistente em tela cheia.",
-      "**Novidades à mão.** Confira as mudanças após atualizar e reabra as notas em **Configurações → Aplicação**."
+      "**Controles de transmissão mais claros.** Renovamos os overlays das transmissões e das janelas flutuantes, com controles mais legíveis e estatísticas coloridas.",
+      "**Mais fácil parar de transmitir.** Encerre uma transmissão pelo próprio card ou pela barra principal, escolhendo qual parar quando estiver compartilhando várias fontes.",
+      "**Detalhes das transferências no lugar.** O ícone de estatísticas dos envios e downloads do chat fica fixo mesmo quando a velocidade varia."
     ],
     "es": [
-      "**Archivos en el chat.** Correcciones al adjuntar y pegar archivos e imágenes en las conversaciones.",
-      "**Tus documentos.** Mejoras al abrir, guardar y eliminar notas y pizarras, conservando el contenido abierto.",
-      "**Dibujos compartidos.** Correcciones al dibujar en la pizarra y anotar en las transmisiones compartidas.",
-      "**Tu ventana, tal como la dejaste.** La aplicación recuerda la posición, el tamaño y el estado maximizado de la ventana, con un comportamiento de pantalla completa más uniforme.",
-      "**Novedades a mano.** Consulta los cambios después de actualizar y vuelve a abrir las notas en **Configuración → Aplicación**."
+      "**Controles de transmisión más claros.** Renovamos los controles superpuestos de las transmisiones y las ventanas flotantes, con opciones más legibles y estadísticas en color.",
+      "**Dejar de compartir es más fácil.** Detén una transmisión desde su tarjeta o la barra principal y elige cuál finalizar cuando compartas varias fuentes.",
+      "**Detalles de transferencia estables.** El icono de estadísticas de las subidas y descargas del chat permanece fijo aunque cambie la velocidad."
     ],
     "fr": [
-      "**Fichiers dans le chat.** Corrections lors de l’ajout et du collage de fichiers et d’images dans les conversations.",
-      "**Vos documents.** Améliorations de l’ouverture, de l’enregistrement et de la suppression des notes et tableaux blancs, en préservant le contenu ouvert.",
-      "**Dessins partagés.** Corrections du dessin sur le tableau blanc et des annotations sur les diffusions partagées.",
-      "**Votre fenêtre mémorisée.** L’application retient la position, la taille et l’état maximisé de la fenêtre, avec un comportement plein écran plus cohérent.",
-      "**Les nouveautés à portée de main.** Consultez les changements après une mise à jour et retrouvez les notes dans **Paramètres → Application**."
+      "**Des commandes de diffusion plus claires.** Les commandes superposées des diffusions et des fenêtres flottantes sont plus lisibles, avec des statistiques en couleur.",
+      "**Arrêter le partage plus facilement.** Arrêtez une diffusion depuis sa carte ou la barre principale, en choisissant laquelle terminer si vous partagez plusieurs sources.",
+      "**Des détails de transfert stables.** Dans les envois et téléchargements du chat, l’icône des statistiques reste en place lorsque la vitesse varie."
     ],
     "de": [
-      "**Dateien im Chat.** Fehler beim Anhängen und Einfügen von Dateien und Bildern in Unterhaltungen behoben.",
-      "**Deine Dokumente.** Verbesserungen beim Öffnen, Speichern und Löschen von Notizen und Whiteboards. Geöffnete Inhalte bleiben erhalten.",
-      "**Gemeinsame Zeichnungen.** Korrekturen beim Zeichnen auf dem Whiteboard und bei Anmerkungen in geteilten Übertragungen.",
-      "**Dein Fenster bleibt, wie du es möchtest.** Die App merkt sich Fensterposition, Größe und maximierten Zustand. Das Vollbildverhalten ist einheitlicher.",
-      "**Versionshinweise griffbereit.** Sieh dir die Änderungen nach einem Update an und öffne die Hinweise erneut unter **Einstellungen → Anwendung**."
+      "**Übersichtlichere Übertragungssteuerung.** Überarbeitete Einblendungen für Übertragungen und Bild-in-Bild-Fenster mit besser lesbaren Bedienelementen und farbigen Statistiken.",
+      "**Freigaben einfacher beenden.** Beende eine Übertragung direkt auf ihrer Karte oder über die Hauptleiste. Bei mehreren Quellen wählst du aus, welche beendet wird.",
+      "**Stabile Transferdetails.** Das Statistik-Symbol bei Chat-Uploads und -Downloads bleibt an seinem Platz, auch wenn sich die Geschwindigkeit ändert."
     ],
     "it": [
-      "**File nella chat.** Correzioni per l’aggiunta e l’incollaggio di file e immagini nelle conversazioni.",
-      "**I tuoi documenti.** Miglioramenti all’apertura, al salvataggio e all’eliminazione di note e lavagne, preservando il contenuto aperto.",
-      "**Disegni condivisi.** Correzioni al disegno sulla lavagna e alle annotazioni sulle trasmissioni condivise.",
-      "**La tua finestra, come l’hai lasciata.** L’app ricorda posizione, dimensioni e stato ingrandito della finestra, con un comportamento a schermo intero più coerente.",
-      "**Novità a portata di mano.** Scopri le modifiche dopo l’aggiornamento e riapri le note in **Impostazioni → Applicazione**."
+      "**Controlli delle trasmissioni più chiari.** Abbiamo rinnovato i controlli in sovrimpressione delle trasmissioni e delle finestre mobili, con comandi più leggibili e statistiche colorate.",
+      "**Interrompere la condivisione è più facile.** Ferma una trasmissione dalla sua scheda o dalla barra principale, scegliendo quale terminare quando condividi più sorgenti.",
+      "**Dettagli dei trasferimenti stabili.** L’icona delle statistiche degli invii e dei download nella chat resta ferma anche quando cambia la velocità."
     ],
     "zh-CN": [
-      "**聊天文件。** 修复在对话中添加和粘贴文件及图片的问题。",
-      "**你的文档。** 改进笔记和白板的打开、保存及删除流程，同时保留已打开的内容。",
-      "**共享绘图。** 修复在白板上绘图和在共享画面上添加批注的问题。",
-      "**记住你的窗口。** 应用会记住窗口位置、大小和最大化状态，全屏行为更加一致。",
-      "**随时查看更新。** 更新后查看新变化，也可在**设置 → 应用程序**中再次打开版本说明。"
+      "**更清晰的直播控件。** 更新了直播和画中画窗口的悬浮控件，按钮更易辨认，统计数据以不同颜色显示。",
+      "**更轻松地停止共享。** 可直接从直播卡片或主工具栏停止直播；同时共享多个来源时，可选择要停止的直播。",
+      "**传输详情位置更稳定。** 聊天上传和下载的统计图标不再随传输速度变化而移动。"
     ],
     "zh-TW": [
-      "**聊天檔案。** 修正對話中附加及貼上檔案和圖片的問題。",
-      "**你的文件。** 改善筆記和白板的開啟、儲存及刪除流程，同時保留已開啟的內容。",
-      "**共用繪圖。** 修正在白板上繪圖及在共用畫面上加入註記的問題。",
-      "**記住你的視窗。** 應用程式會記住視窗位置、大小及最大化狀態，全螢幕行為更加一致。",
-      "**隨時查看更新。** 更新後查看新變化，也可在**設定 → 應用程式**中再次開啟版本說明。"
+      "**更清楚的串流控制項。** 更新了串流及子母畫面視窗的浮動控制項，按鈕更容易辨識，統計資料以不同顏色顯示。",
+      "**更輕鬆地停止分享。** 可直接從串流卡片或主工具列停止串流；同時分享多個來源時，可選擇要停止的串流。",
+      "**傳輸詳細資訊位置更穩定。** 聊天上傳和下載的統計圖示不再隨傳輸速度變化而移動。"
     ],
     "ja": [
-      "**チャットのファイル。** 会話へのファイルや画像の添付・貼り付けに関する不具合を修正しました。",
-      "**ドキュメント。** 開いている内容を保持しながら、メモやホワイトボードを開く・保存する・削除する操作を改善しました。",
-      "**共有の描画。** ホワイトボードへの描画と共有配信への注釈に関する不具合を修正しました。",
-      "**ウィンドウをそのままに。** アプリがウィンドウの位置、サイズ、最大化状態を記憶し、全画面表示の動作も統一しました。",
-      "**更新内容をいつでも確認。** 更新後に変更点を確認でき、**設定 → アプリケーション**からリリースノートを再度開けます。"
+      "**配信操作がわかりやすく。** 配信とピクチャーインピクチャーのオーバーレイを刷新し、操作ボタンを見やすく、統計情報を色分けしました。",
+      "**共有の停止が簡単に。** 配信カードやメインツールバーから配信を停止できます。複数のソースを共有している場合は、停止する配信を選べます。",
+      "**転送の詳細を安定した位置に。** チャットのアップロードとダウンロードで、速度が変わっても統計アイコンが動かなくなりました。"
     ],
     "ko": [
-      "**채팅 파일.** 대화에서 파일 및 이미지를 첨부하고 붙여넣을 때 발생하는 문제를 수정했습니다.",
-      "**내 문서.** 열려 있는 내용을 유지하면서 메모와 화이트보드를 열고 저장하고 삭제하는 과정을 개선했습니다.",
-      "**공유 그리기.** 화이트보드에 그리거나 공유 스트림에 주석을 추가할 때 발생하는 문제를 수정했습니다.",
-      "**창 상태 기억.** 앱이 창 위치, 크기 및 최대화 상태를 기억하며 전체 화면 동작도 더 일관되게 작동합니다.",
-      "**언제든 확인하는 새 소식.** 업데이트 후 변경 사항을 확인하고 **설정 → 애플리케이션**에서 릴리스 노트를 다시 열 수 있습니다."
+      "**더 알아보기 쉬운 스트림 제어.** 스트림과 화면 속 화면 오버레이를 새롭게 다듬어 제어 버튼을 더 쉽게 알아볼 수 있고 통계도 색상으로 구분됩니다.",
+      "**더 간편한 공유 중지.** 스트림 카드나 기본 도구 모음에서 바로 스트림을 중지할 수 있습니다. 여러 소스를 공유할 때는 중지할 스트림을 선택할 수 있습니다.",
+      "**흔들리지 않는 전송 정보.** 채팅의 업로드와 다운로드에서 전송 속도가 바뀌어도 통계 아이콘이 움직이지 않습니다."
     ],
     "hi": [
-      "**चैट में फ़ाइलें।** बातचीत में फ़ाइलें और चित्र जोड़ने तथा पेस्ट करने की समस्याएँ ठीक की गई हैं।",
-      "**आपके दस्तावेज़।** खुले हुए कंटेंट को बनाए रखते हुए नोट और व्हाइटबोर्ड खोलने, सहेजने और हटाने में सुधार किए गए हैं।",
-      "**साझा ड्रॉइंग।** व्हाइटबोर्ड पर चित्र बनाने और साझा स्ट्रीम पर टिप्पणियाँ जोड़ने की समस्याएँ ठीक की गई हैं।",
-      "**आपकी विंडो याद रहती है।** ऐप विंडो की स्थिति, आकार और अधिकतम स्थिति याद रखता है, और फ़ुलस्क्रीन व्यवहार अधिक एकसमान है।",
-      "**नई जानकारी हमेशा उपलब्ध।** अपडेट के बाद बदलाव देखें और **सेटिंग्स → एप्लिकेशन** से रिलीज़ नोट फिर खोलें।"
+      "**स्ट्रीम के अधिक स्पष्ट नियंत्रण।** स्ट्रीम और पिक्चर-इन-पिक्चर के ओवरले को बेहतर बनाया है, ताकि नियंत्रण पढ़ना आसान हो और आँकड़े अलग-अलग रंगों में दिखें।",
+      "**साझा करना रोकना अब आसान है।** स्ट्रीम के कार्ड या मुख्य टूलबार से उसे सीधे रोकें। कई स्रोत साझा करते समय चुनें कि कौन-सी स्ट्रीम बंद करनी है।",
+      "**ट्रांसफ़र की जानकारी एक ही जगह।** चैट के अपलोड और डाउनलोड में गति बदलने पर भी आँकड़ों का आइकन अपनी जगह पर रहता है।"
     ],
     "fi": [
-      "**Tiedostot keskustelussa.** Korjauksia tiedostojen ja kuvien lisäämiseen ja liittämiseen leikepöydältä keskusteluihin.",
-      "**Omat asiakirjasi.** Parannuksia muistiinpanojen ja valkotaulujen avaamiseen, tallentamiseen ja poistamiseen. Avoin sisältö säilyy.",
-      "**Yhteiset piirrokset.** Korjauksia valkotaululle piirtämiseen ja jaettujen lähetysten merkintöihin.",
-      "**Ikkunasi muistetaan.** Sovellus muistaa ikkunan sijainnin, koon ja suurennetun tilan. Koko näytön toiminta on yhtenäisempää.",
-      "**Julkaisutiedot käden ulottuvilla.** Katso muutokset päivityksen jälkeen ja avaa julkaisutiedot uudelleen kohdasta **Asetukset → Sovellus**."
+      "**Selkeämmät lähetyksen säätimet.** Uudistetut lähetysten ja kuva kuvassa -ikkunoiden säätimet ovat helpommin luettavia, ja tilastot erottuvat väreillä.",
+      "**Jakamisen lopettaminen on helpompaa.** Lopeta lähetys suoraan sen kortista tai päätyökaluriviltä. Jos jaat useita lähteitä, voit valita lopetettavan lähetyksen.",
+      "**Siirtotiedot pysyvät paikallaan.** Chatin lähetysten ja latausten tilastokuvake ei enää liiku siirtonopeuden vaihtuessa."
     ],
     "ru": [
-      "**Файлы в чате.** Исправлены ошибки прикрепления и вставки файлов и изображений в беседах.",
-      "**Ваши документы.** Улучшены открытие, сохранение и удаление заметок и досок с сохранением открытого содержимого.",
-      "**Общие рисунки.** Исправлены ошибки рисования на доске и добавления аннотаций в общие трансляции.",
-      "**Ваше окно запоминается.** Приложение помнит положение, размер и развёрнутое состояние окна; полноэкранный режим работает более единообразно.",
-      "**Примечания к выпуску под рукой.** Узнавайте об изменениях после обновления и открывайте примечания повторно в разделе **Настройки → Приложение**."
+      "**Более понятное управление трансляциями.** Обновили панели поверх трансляций и окон «картинка в картинке»: элементы управления стали заметнее, а статистика выделена цветом.",
+      "**Остановить трансляцию стало проще.** Завершайте трансляцию прямо из её карточки или с главной панели. Если вы делитесь несколькими источниками, можно выбрать, какой из них остановить.",
+      "**Статистика передачи на месте.** Значок статистики отправок и загрузок в чате больше не смещается при изменении скорости."
     ]
   }
 }
