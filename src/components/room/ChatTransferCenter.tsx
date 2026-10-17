@@ -31,9 +31,9 @@ function timingText(transfer: FileProgress): string | null {
     t("message.b845b0cfe1b3", { v0: seconds(timings.verifyMs), v1: seconds(timings.writeMs), v2: seconds(timings.ackMs) });
 }
 
-function transportText(transfer: FileProgress, unit: TransferSpeedUnit): string | null {
+function transportLines(transfer: FileProgress, unit: TransferSpeedUnit): string[] {
   const details = transfer.transport;
-  if (!details) return null;
+  if (!details) return [];
   const parts: string[] = [];
   if (details.channelLabel === 'chat_file_bulk_v1') parts.push(t("message.928271cd163c"));
   if (details.protocol) parts.push(details.protocol.toUpperCase());
@@ -47,14 +47,14 @@ function transportText(transfer: FileProgress, unit: TransferSpeedUnit): string 
     parts.push(t("message.022150087935", { v0: formatFileSize(details.queuedBytes), v1: formatFileSize(details.queueLimitBytes) }));
   }
   if (details.packetsDiscardedOnSend) parts.push(t("message.56ef2c33fdc6", { v0: details.packetsDiscardedOnSend }));
-  return parts.length ? parts.join(' · ') : null;
+  return parts;
 }
 
 function TransferDetailsHint({ transfer, unit }: { transfer: FileProgress; unit: TransferSpeedUnit }) {
   const connection = [transfer.connectionType ? localizeText(transfer.connectionType) : null,
     transfer.rttMs !== null && transfer.rttMs !== undefined ? `${transfer.rttMs} ms` : null]
     .filter(Boolean).join(' · ');
-  const details = [connection, transportText(transfer, unit), timingText(transfer)].filter(Boolean);
+  const details = [connection, ...transportLines(transfer, unit), timingText(transfer)].filter(Boolean);
   if (!details.length) return null;
   return <Tooltip content={<div className="chat-transfer-details">
     {details.map((detail, index) => <div key={index}>{detail}</div>)}
