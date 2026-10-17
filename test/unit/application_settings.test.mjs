@@ -23,6 +23,7 @@ const bundle = await build({
   stdin: { contents: `export { ApplicationSettings } from './src/components/modals/ApplicationSettings.tsx';
     export { SettingsModal } from './src/components/modals/SettingsModal.tsx';
     export { ProfileModal } from './src/components/modals/ProfileModal.tsx';
+    export { ReleaseNotesDialog } from './src/components/modals/ReleaseNotesDialog.tsx';
     export { getLanguage, setLanguage } from './src/i18n/index.ts';
     export { stateStore } from './src/core/state_store.ts';
     export { profileImages, profileBanners } from './src/core/profile_image.ts';`, resolveDir: process.cwd() },
@@ -58,7 +59,7 @@ const controller = new AppUpdateController({
 });
 controller.setPreferences(false, false);
 globalThis.applicationSettingsController = controller;
-const { ApplicationSettings, SettingsModal, ProfileModal, getLanguage, setLanguage, profileImages, profileBanners, stateStore } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text + '\n//# sourceURL=application-settings-test.js').toString('base64')}`);
+const { ApplicationSettings, SettingsModal, ProfileModal, ReleaseNotesDialog, getLanguage, setLanguage, profileImages, profileBanners, stateStore } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text + '\n//# sourceURL=application-settings-test.js').toString('base64')}`);
 const { createRoot } = await import('react-dom/client');
 const root = createRoot(document.getElementById('root'));
 function Harness() {
@@ -76,6 +77,26 @@ after(async () => {
   delete globalThis.applicationSettingsController;
   delete globalThis.profileTarget;
   delete globalThis.profileDestination;
+});
+
+test('Application settings reopens installed release notes offline and restores focus after dismissal', async () => {
+  await act(async () => { root.render(null); setLanguage('pt-BR'); });
+  await act(async () => root.render(React.createElement(React.Fragment, null,
+    React.createElement(Harness), React.createElement(ReleaseNotesDialog))));
+  assert.equal(document.querySelector('[role="dialog"]'), null);
+  const button = [...document.querySelectorAll('button')].find(node => node.textContent === 'Ver notas da versão');
+  button.focus();
+  await act(async () => button.click());
+  assert.ok(document.querySelector('[role="dialog"][aria-modal="true"]'));
+  assert.match(document.querySelector('.release-notes-list').textContent, /arquivos e imagens/);
+  assert.equal(document.querySelector('.release-notes-list img'), null);
+  await act(async () => setLanguage('en'));
+  assert.match(document.querySelector('.release-notes-list').textContent, /files and images/);
+  await act(async () => document.querySelector('.modal-card').dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  await act(async () => new Promise(resolve => setTimeout(resolve, 260)));
+  assert.equal(document.querySelector('[role="dialog"]'), null);
+  assert.equal(document.activeElement, button);
+  await act(async () => { root.render(null); setLanguage('pt-BR'); });
 });
 
 test('profile editing opens settings only for the local profile', async () => {
@@ -163,7 +184,7 @@ test('application update controls keep drafts unsaved and check only the saved c
   await act(async () => root.render(React.createElement(Harness)));
   assert.equal(document.querySelector('h3').textContent, 'Aplicação');
   const preview = document.getElementById('settings-beta-updates');
-  const check = document.querySelector('#settings-pane-application .btn-secondary');
+  const check = [...document.querySelectorAll('#settings-pane-application button')].find(button => button.textContent === 'Procurar atualizações agora');
   assert.equal(preview.checked, false);
   assert.equal(check.disabled, false);
   await act(async () => preview.click());

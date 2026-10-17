@@ -1383,5 +1383,9 @@
   "documents.chooseName": "选择其他名称",
   "documents.nameExists": "已存在同名文档。请选择其他名称。",
   "documents.delete": "删除",
-  "documents.deleteHint": "删除已保存的文档“{{name}}”？打开的内容将保留。再次保存时将要求输入名称。"
+  "documents.deleteHint": "删除已保存的文档“{{name}}”？打开的内容将保留。再次保存时将要求输入名称。",
+  "releaseNotes.title": "版本新内容",
+  "releaseNotes.subtitle": "查看此版本的更新内容。",
+  "releaseNotes.done": "知道了",
+  "releaseNotes.view": "查看版本说明"
 }

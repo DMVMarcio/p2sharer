@@ -1383,5 +1383,9 @@
   "documents.chooseName": "選擇其他名稱",
   "documents.nameExists": "已存在同名文件。請選擇其他名稱。",
   "documents.delete": "刪除",
-  "documents.deleteHint": "刪除已儲存的文件「{{name}}」？開啟的內容將保留。再次儲存時將要求輸入名稱。"
+  "documents.deleteHint": "刪除已儲存的文件「{{name}}」？開啟的內容將保留。再次儲存時將要求輸入名稱。",
+  "releaseNotes.title": "版本新內容",
+  "releaseNotes.subtitle": "查看此版本的更新內容。",
+  "releaseNotes.done": "知道了",
+  "releaseNotes.view": "檢視版本說明"
 }

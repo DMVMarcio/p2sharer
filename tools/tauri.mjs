@@ -4,6 +4,8 @@ import { createRequire } from 'node:module';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { installerOutputLine, normalizeInstallerNames } from './installer-names.mjs';
+import { pruneInstallerArtifacts } from './installer-cleanup.mjs';
+import { checkRelease } from './release.mjs';
 
 configureNativeBuildEnvironment();
 
@@ -25,7 +27,12 @@ if (process.platform === 'win32' && ['build', 'bundle'].includes(args[0]) && pro
       child.once('error', reject);
       child.once('close', code => resolve(code ?? 1));
     });
-    if (code === 0) normalizeInstallerNames(artifacts, fileURLToPath(new URL('../src-tauri/target/', import.meta.url)));
+    if (code === 0) {
+      const target = fileURLToPath(new URL('../src-tauri/target/', import.meta.url));
+      normalizeInstallerNames(artifacts, target);
+      const removed = pruneInstallerArtifacts(target, checkRelease(), args.includes('--debug') ? 'debug' : 'release');
+      if (removed.length) console.log(`Removed ${removed.length} superseded local bundle files.`);
+    }
     process.exitCode = code;
   } catch (error) { console.error(error.message); process.exitCode = 1; }
 } else {

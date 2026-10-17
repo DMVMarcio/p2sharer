@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { checkRelease } from './release.mjs';
+import { pruneInstallerArtifacts } from './installer-cleanup.mjs';
 
 export const portableMarker = Buffer.from('\nP2SHARER_PORTABLE_V1\n');
 
@@ -26,6 +27,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
         { cwd: directory, stdio: 'inherit' });
       if (result.error || result.status !== 0) throw result.error ?? new Error('Portable signing failed');
     }
+    pruneInstallerArtifacts(resolve(directory, 'src-tauri/target'), checkRelease(directory));
     console.log(`Portable executable: ${destination}`);
   } catch (error) { console.error(error.message); process.exitCode = 1; }
 }

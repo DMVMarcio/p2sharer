@@ -98,6 +98,33 @@ For the best reuse, wait for **Validate and warm build caches** to finish succes
 
 ## Local builds
 
+Successful local `pnpm run tauri:build` builds normalize MSI names and remove superseded P2Sharer installers and their signatures from the selected profile's `bundle/msi` and `bundle/nsis` directories. Cleanup is restricted to recognized P2Sharer filenames inside the canonical Cargo target, and requires a current-version replacement of the same format and architecture. A failed build performs no cleanup. Other files, the application executable, Cargo dependencies and GitHub releases are unaffected. The portable tool applies the same rule after successfully creating/signing a replacement. A manually rebuilt older version becomes the retained build for its format/architecture.
+
+Run `pnpm run build:clean-installers` to apply the same cleanup to existing release outputs without rebuilding. Missing current-format replacements keep the previous files. Symbolic links and paths escaping the target directory are not deleted.
+
+## In-app release notes
+
+The application bundles [the current release notes](../src/releases/current.json), so viewing them requires no network request. Each language contains a plain list of user-facing changes. On startup after an update, the main window shows unread notes once; closing the dialog records that version locally. Settings > Application can always reopen the installed version's notes. Fresh profiles do not receive a post-update dialog. For migration from versions before 1.4.1, an existing saved username identifies a previous installation. History survives normal updates, manual installer upgrades and channel changes using the same app data; resetting app data resets it. An unread dialog remains pending across restarts. When local storage is unavailable, acknowledgement lasts for the session only.
+
+Prepare the next release:
+
+```powershell
+pnpm run release:version 1.4.2
+pnpm run release:notes
+# Complete src/releases/current.json in every supported language.
+pnpm run release:notes:check
+```
+
+The preparation command archives the previous file under `docs/release-notes/` before creating empty lists for the new version. It preserves existing notes when the version already matches and never overwrites an archived release. The build rejects stale versions, missing languages and empty lists. Keep each item concise and describe available behavior; exclude unpublished plans, development-only cleanup and implementation details. Notes are plain text, so HTML, scripts, images and links are never rendered or fetched.
+
+To delegate writing to an AI, provide a simple list of changes with this prompt (in any conversational language):
+
+> Prepare the release notes for the current P2Sharer version from the changes below. Check the implementation and diff, remove claims about unimplemented features, and write concise user-facing bullet points in src/releases/current.json. Translate every item into all 13 supported app languages, preserving the existing JSON schema. Run pnpm run release:notes:check. Changes: [my list].
+
+Review the Brazilian Portuguese list first, then approve the translations with the release. Editing notes does not reset acknowledgement for an already-read version; publish new changes under a new version. GitHub's release description and the updater's pre-install notes remain separate; copy the appropriate language's list into the draft release when publishing.
+
+## Local signing
+
 `pnpm run tauri:build` produces ordinary local installers without requiring signing credentials. These builds still include the updater and its public verification key.
 
 After that build, `pnpm exec node tools/portable-release.mjs` produces the portable executable under `src-tauri/target/release/bundle/portable/`. Official releases use the same tool with `--sign` after building, and upload its executable and signature alongside the installers.

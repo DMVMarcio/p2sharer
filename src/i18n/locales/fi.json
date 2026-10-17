@@ -1383,5 +1383,9 @@
   "documents.chooseName": "Valitse toinen nimi",
   "documents.nameExists": "Samanniminen asiakirja on jo olemassa. Valitse toinen nimi.",
   "documents.delete": "Poista",
-  "documents.deleteHint": "Poistetaanko tallennettu asiakirja ”{{name}}”? Avoin sisältö säilytetään. Seuraavalla tallennuskerralla kysytään nimeä."
+  "documents.deleteHint": "Poistetaanko tallennettu asiakirja ”{{name}}”? Avoin sisältö säilytetään. Seuraavalla tallennuskerralla kysytään nimeä.",
+  "releaseNotes.title": "Version uutuudet",
+  "releaseNotes.subtitle": "Katso tämän julkaisun muutokset.",
+  "releaseNotes.done": "Selvä",
+  "releaseNotes.view": "Näytä julkaisutiedot"
 }

@@ -1,7 +1,7 @@
 import { useRoomExit } from './hooks/useRoomExit';
 import { UnsavedRoomDialog } from './components/modals/UnsavedRoomDialog';
 import { ContentTransition } from './components/common/ContentTransition';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import { AppHeader } from './components/header/AppHeader';
 import { WindowTitlebar } from './components/header/WindowTitlebar';
 import { HomeView } from './components/home/HomeView';
@@ -27,8 +27,10 @@ import { PipView } from './components/room/PipView';
 import { YouTubePipView } from './apps/YouTubePipView';
 import { RoomAppWindow } from './apps/RoomAppWindow';
 import { AppUpdateDialog } from './components/modals/AppUpdateDialog';
+import { ReleaseNotesDialog } from './components/modals/ReleaseNotesDialog';
 import { startAutomaticUpdateChecks } from './services/app_updates';
 import { startRoomDeepLinks } from './services/room_deep_links';
+import { releaseNotes } from './services/release_notes';
 
 export const App: React.FC = () => {
   useAppTheme(); // Sets data-theme & data-accent
@@ -53,8 +55,11 @@ const MainApp: React.FC = () => {
   const [homeScrolled, setHomeScrolled] = useState(false);
   const { isInRoom, stopScreenSharing, leaveRoom, isSharingScreen, joinDialogRevision } = useRoom();
   const { openModal, activeModal, modalRevision } = useModal();
+  const notesState = useSyncExternalStore(releaseNotes.subscribe, releaseNotes.getSnapshot);
 
-  useEffect(startAutomaticUpdateChecks, []);
+  useEffect(() => {
+    if (!notesState.pending) return startAutomaticUpdateChecks();
+  }, [notesState.pending]);
   useEffect(startRoomDeepLinks, []);
   useEffect(() => setHomeScrolled(false), [isInRoom]);
 
@@ -103,6 +108,7 @@ const MainApp: React.FC = () => {
       {activeModal === 'apps' && <AppsModal />}
       <ConnectingOverlay />
       <AppUpdateDialog />
+      <ReleaseNotesDialog blocked={roomExit.pending} />
       {roomExit.pending && <UnsavedRoomDialog busy={roomExit.busy} onDecision={roomExit.decide} />}
 
       {/* Global Notifications */}

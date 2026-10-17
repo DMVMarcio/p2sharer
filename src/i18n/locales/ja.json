@@ -1383,5 +1383,9 @@
   "documents.chooseName": "別の名前を選択",
   "documents.nameExists": "同じ名前のドキュメントが既に存在します。別の名前を選択してください。",
   "documents.delete": "削除",
-  "documents.deleteHint": "保存済みのドキュメント「{{name}}」を削除しますか？開いている内容は保持されます。再度保存するときに名前の入力を求められます。"
+  "documents.deleteHint": "保存済みのドキュメント「{{name}}」を削除しますか？開いている内容は保持されます。再度保存するときに名前の入力を求められます。",
+  "releaseNotes.title": "このバージョンの新機能",
+  "releaseNotes.subtitle": "このリリースの変更点をご確認ください。",
+  "releaseNotes.done": "確認しました",
+  "releaseNotes.view": "リリースノートを見る"
 }

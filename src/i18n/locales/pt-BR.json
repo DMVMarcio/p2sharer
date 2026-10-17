@@ -1383,5 +1383,9 @@
   "documents.chooseName": "Escolher outro nome",
   "documents.nameExists": "Já existe um documento com esse nome. Escolha outro nome.",
   "documents.delete": "Excluir",
-  "documents.deleteHint": "Excluir o documento salvo “{{name}}”? O conteúdo aberto será mantido. Ao salvar novamente, será solicitado um nome."
+  "documents.deleteHint": "Excluir o documento salvo “{{name}}”? O conteúdo aberto será mantido. Ao salvar novamente, será solicitado um nome.",
+  "releaseNotes.title": "Novidades da versão",
+  "releaseNotes.subtitle": "Veja o que mudou nesta versão.",
+  "releaseNotes.done": "Entendi",
+  "releaseNotes.view": "Ver notas da versão"
 }

@@ -1383,5 +1383,9 @@
   "documents.chooseName": "दूसरा नाम चुनें",
   "documents.nameExists": "इस नाम का दस्तावेज़ पहले से मौजूद है। दूसरा नाम चुनें।",
   "documents.delete": "हटाएँ",
-  "documents.deleteHint": "सहेजा गया दस्तावेज़ “{{name}}” हटाएँ? खुली सामग्री बनी रहेगी। दोबारा सहेजते समय नाम पूछा जाएगा।"
+  "documents.deleteHint": "सहेजा गया दस्तावेज़ “{{name}}” हटाएँ? खुली सामग्री बनी रहेगी। दोबारा सहेजते समय नाम पूछा जाएगा।",
+  "releaseNotes.title": "इस संस्करण में नया",
+  "releaseNotes.subtitle": "इस रिलीज़ में हुए बदलाव देखें।",
+  "releaseNotes.done": "समझ गया",
+  "releaseNotes.view": "रिलीज़ नोट देखें"
 }

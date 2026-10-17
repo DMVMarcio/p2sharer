@@ -5,6 +5,7 @@ import { useAppUpdates } from '../../hooks/useAppUpdates';
 import { appUpdates } from '../../services/app_updates';
 import { Select } from '../common/Select';
 import { AppVersion } from '../common/AppVersion';
+import { releaseNotes } from '../../services/release_notes';
 
 interface Props {
   language: AppLanguage;
@@ -34,6 +35,8 @@ export function ApplicationSettings({ language, onLanguageChange, automatic, inc
         onValueChange={(value) => { if (isAppLanguage(value)) onLanguageChange(value); }} />
     </div>
     <p className="field-info-text"><AppVersion /></p>
+    <button type="button" className="btn btn-secondary btn-sm" onClick={releaseNotes.open}>
+      {t('releaseNotes.view')}</button>
     <label className="settings-switch-row" htmlFor="settings-auto-updates">
       <div className="settings-switch-label-group">
         <span className="settings-switch-title">{t("message.d8a908a0e8ab")}</span>

@@ -1383,5 +1383,9 @@
   "documents.chooseName": "Elegir otro nombre",
   "documents.nameExists": "Ya existe un documento con este nombre. Elige otro nombre.",
   "documents.delete": "Eliminar",
-  "documents.deleteHint": "¿Eliminar el documento guardado «{{name}}»? El contenido abierto se conservará. Al volver a guardar se pedirá un nombre."
+  "documents.deleteHint": "¿Eliminar el documento guardado «{{name}}»? El contenido abierto se conservará. Al volver a guardar se pedirá un nombre.",
+  "releaseNotes.title": "Novedades de la versión",
+  "releaseNotes.subtitle": "Descubre los cambios de esta versión.",
+  "releaseNotes.done": "Entendido",
+  "releaseNotes.view": "Ver notas de la versión"
 }

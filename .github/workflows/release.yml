@@ -39,6 +39,7 @@ jobs:
             /.github/actions/setup-build/
             /tools/tauri.mjs
             /tools/installer-names.mjs
+            /tools/installer-cleanup.mjs
             /tools/native-build-env.mjs
             /tools/release.mjs
             /tools/portable-release.mjs
@@ -55,7 +56,7 @@ jobs:
       - name: Apply Windows installer configuration
         shell: pwsh
         run: |
-          foreach ($buildTool in @('tauri.mjs', 'installer-names.mjs', 'native-build-env.mjs', 'release.mjs', 'portable-release.mjs')) {
+          foreach ($buildTool in @('tauri.mjs', 'installer-names.mjs', 'installer-cleanup.mjs', 'native-build-env.mjs', 'release.mjs', 'portable-release.mjs')) {
             Copy-Item -LiteralPath (Join-Path '.release-workflow/tools' $buildTool) -Destination (Join-Path 'tools' $buildTool) -Force
           }
           Copy-Item -LiteralPath '.release-workflow/src-tauri/tauri.windows.conf.json' -Destination 'src-tauri/tauri.windows.conf.json' -Force

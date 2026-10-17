@@ -1383,5 +1383,9 @@
   "documents.chooseName": "다른 이름 선택",
   "documents.nameExists": "같은 이름의 문서가 이미 있습니다. 다른 이름을 선택하세요.",
   "documents.delete": "삭제",
-  "documents.deleteHint": "저장된 문서 “{{name}}”을 삭제할까요? 열려 있는 내용은 유지됩니다. 다시 저장할 때 이름을 입력해야 합니다."
+  "documents.deleteHint": "저장된 문서 “{{name}}”을 삭제할까요? 열려 있는 내용은 유지됩니다. 다시 저장할 때 이름을 입력해야 합니다.",
+  "releaseNotes.title": "이번 버전의 새로운 기능",
+  "releaseNotes.subtitle": "이번 릴리스의 변경 사항을 확인하세요.",
+  "releaseNotes.done": "확인",
+  "releaseNotes.view": "릴리스 노트 보기"
 }

@@ -1383,5 +1383,9 @@
   "documents.chooseName": "Choose another name",
   "documents.nameExists": "A document with this name already exists. Choose another name.",
   "documents.delete": "Delete",
-  "documents.deleteHint": "Delete the saved document “{{name}}”? Open content will be kept. Saving it again will ask for a name."
+  "documents.deleteHint": "Delete the saved document “{{name}}”? Open content will be kept. Saving it again will ask for a name.",
+  "releaseNotes.title": "What's new",
+  "releaseNotes.subtitle": "See what changed in this release.",
+  "releaseNotes.done": "Got it",
+  "releaseNotes.view": "View release notes"
 }

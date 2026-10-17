@@ -1383,5 +1383,9 @@
   "documents.chooseName": "Choisir un autre nom",
   "documents.nameExists": "Un document porte déjà ce nom. Choisissez un autre nom.",
   "documents.delete": "Supprimer",
-  "documents.deleteHint": "Supprimer le document enregistré « {{name}} » ? Le contenu ouvert sera conservé. Un nom sera demandé au prochain enregistrement."
+  "documents.deleteHint": "Supprimer le document enregistré « {{name}} » ? Le contenu ouvert sera conservé. Un nom sera demandé au prochain enregistrement.",
+  "releaseNotes.title": "Nouveautés de la version",
+  "releaseNotes.subtitle": "Découvrez les changements de cette version.",
+  "releaseNotes.done": "Compris",
+  "releaseNotes.view": "Voir les notes de version"
 }
