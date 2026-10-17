@@ -2887,7 +2887,9 @@ html[data-theme="light"] :is(.stream-card, .pip-window-root) {
 .chat-transfer-item button { display: grid; flex: none; place-items: center; width: 25px; height: 25px; border: 0; border-radius: var(--radius-xs); background: transparent; color: var(--text-secondary); cursor: pointer; }
 .chat-transfer-item button:hover { background: var(--bg-card-hover); color: var(--text-primary); }
 .chat-transfer-speed { white-space: nowrap; }
-.chat-transfer-item .chat-transfer-details-trigger { display: inline-grid; width: 18px; height: 18px; padding: 0; margin-left: 4px; vertical-align: middle; }
+.chat-transfer-peer-row { display: flex; align-items: center; gap: 6px; min-height: 18px; }
+.chat-transfer-peer-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-transfer-item .chat-transfer-details-trigger { display: inline-grid; width: 18px; height: 18px; padding: 0; margin-left: auto; }
 .chat-transfer-details { display: flex; flex-direction: column; gap: 6px; font-size: 11px; line-height: 1.5; }
 
 .chat-image-viewer { position: fixed; z-index: 1500; inset: 0; display: flex; flex-direction: column; background: rgba(0,0,0,.88); }

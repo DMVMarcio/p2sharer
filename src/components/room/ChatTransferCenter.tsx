@@ -104,12 +104,14 @@ export function ChatTransferCenter() {
           </span>
           <div className="chat-transfer-item-copy">
             <strong>{transfer.fileName ?? t("message.ba8a452f2f83")}{transfer.previewOnly ? t("message.169a3563ed9b") : ''}</strong>
-            <span>{presence.value === 'send' ? t("message.237b14cbb480") : t("message.e2eca64bd73c")} {transfer.peerName ?? t("message.1e97ddf60a0f")}</span>
+            <div className="chat-transfer-peer-row">
+              <span className="chat-transfer-peer-name">{presence.value === 'send' ? t("message.237b14cbb480") : t("message.e2eca64bd73c")} {transfer.peerName ?? t("message.1e97ddf60a0f")}</span>
+              <TransferDetailsHint transfer={transfer} unit={speedUnit} />
+            </div>
             <small>{statusText(transfer)}
               {transfer.status === 'active' ? <> · <span className="chat-transfer-speed">
                 {formatTransferSpeed(transfer.bytesPerSecond ?? 0, speedUnit)}
-                <TransferDetailsHint transfer={transfer} unit={speedUnit} />
-              </span></> : <TransferDetailsHint transfer={transfer} unit={speedUnit} />}
+              </span></> : null}
             </small>
           </div>
           {transfer.status === 'complete' && transfer.direction === 'receive' && transfer.saved &&
