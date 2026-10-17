@@ -452,14 +452,6 @@ export const VideoCard: React.FC<VideoCardProps> = ({
         />
     )}
 
-      {/* User overlay at bottom-left */}
-      <div className="stream-card-overlay">
-        <ProfileAvatar peerId={slot.ownerPeerId ?? slot.peerId} name={slot.senderName}
-          isLocal={slot.isLocal} color={slot.color} className="stream-profile-avatar" />
-        <span className="stream-user-name"><Nickname name={slot.senderName} peerId={slot.ownerPeerId ?? slot.peerId} isLocal={slot.isLocal} />{slot.mediaLabel ? ` · ${slot.mediaLabel}` : ""}</span>
-        {slot.isLocal && <span className="badge-you">{t("message.a03099f135b1")}</span>}
-      </div>
-
       {/* Stream stop actions share the tray control recipe. */}
       {((!slot.isLocal && !isPipActive) || (slot.isLocal && slot.isStreaming)) && (
         <button
@@ -476,162 +468,172 @@ export const VideoCard: React.FC<VideoCardProps> = ({
         </button>
       )}
 
-      {/* Bottom-right stream controls: Volume (remote only) + PiP + Fullscreen */}
-      {!inTray && !isPipActive && (
-        <div
-          className="stream-controls-group"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {slot.isLocal && showLocalPreview && (
-            <button
-              type="button"
-              className="btn-toggle-local-preview active"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowLocalPreview(false);
-              }}
-              aria-label={t("message.317f00cc68bc")}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-                <line x1="1" y1="1" x2="23" y2="23"/>
-              </svg>
-              {t("message.c94490e9bdea")}</button>
-          )}
-          {!slot.isLocal && (
-            <div className="stream-volume-controller">
-              <Tooltip content={isMuted || volume === 0 ? t("message.5cfebda5d336") : t("message.70f507f2963f")}
-                onOpenChange={handleTooltipOpenChange}>
-                <button
-                  type="button"
-                  className="btn-stream-volume"
-                  onClick={handleToggleMute}
-                  aria-label={isMuted || volume === 0 ? t("message.5cfebda5d336") : t("message.70f507f2963f")}
-                >
-                  {isMuted || volume === 0 ? (
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-                      <line x1="23" x2="17" y1="9" y2="15"/>
-                      <line x1="17" x2="23" y1="9" y2="15"/>
-                    </svg>
-                  ) : volume < 50 ? (
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-                      <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
-                    </svg>
-                  ) : (
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-                      <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
-                      <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
-                    </svg>
-                  )}
-                </button>
-              </Tooltip>
-
-              <div className="stream-volume-slider-box">
-                <input autoComplete="off"
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={isMuted ? 0 : volume}
-                  className="stream-volume-range"
-                  aria-label={t('message.78ba36d6b04f')}
-                  aria-orientation="vertical"
-                  onChange={handleVolumeChange}
-                  onClick={(e) => e.stopPropagation()}
-                />
-                <span className="stream-volume-percent">{isMuted ? '0%' : `${volume}%`}</span>
-              </div>
-            </div>
-          )}
-
-          {!slot.isLocal && slot.pointerEligible !== false && <StreamPointerToggle enabled={pointer.enabled} onToggle={pointer.toggle} onTooltipOpenChange={handleTooltipOpenChange} />}
-
-          <Tooltip
-            content={
-              isHudPinned
-                ? t("message.b9125ff913f7")
-                : t("message.7dcee91def76")
-            }
-            onOpenChange={handleTooltipOpenChange}
-          >
-            <button
-              type="button"
-              className={`btn-stream-pin ${isHudPinned ? 'active' : ''}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsHudPinned((p) => !p);
-              }}
-              aria-label={
-                isHudPinned
-                  ? t("message.a66da920f259")
-                  : t("message.1efcef298a4c")
-              }
-              aria-pressed={isHudPinned}
-            >
-              <PanelsTopLeft size={14} aria-hidden="true" />
-            </button>
-          </Tooltip>
-
-          <Tooltip
-            content={t("message.365c67865e1c")}
-            onOpenChange={handleTooltipOpenChange}
-          >
-            <button
-              type="button"
-              className="btn-stream-pip"
-              id={`btn-stream-pip-${slot.peerId}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                pipService.openPip(slot.peerId, slot.senderName, slot.stream);
-              }}
-              aria-label={t("message.1f626fd80ce4")}
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-                <rect x="11" y="9" width="9" height="7" rx="1.5" fill="currentColor" fillOpacity="0.25" />
-              </svg>
-            </button>
-          </Tooltip>
-
-          <Tooltip content={isFullscreen ? t("message.1ea619b7211d") : t("message.1dfa15614e9a")}
-            onOpenChange={handleTooltipOpenChange}>
-            <button
-              type="button"
-              className="btn-stream-fullscreen"
-              id={`btn-stream-fullscreen-${slot.peerId}`}
-              onClick={handleToggleFullscreen}
-              aria-label={isFullscreen ? t("message.1ea619b7211d") : t("message.1dfa15614e9a")}
-            >
-              {isFullscreen ? (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="4 14 10 14 10 20"/>
-                  <polyline points="20 10 14 10 14 4"/>
-                  <line x1="14" x2="21" y1="10" y2="3"/>
-                  <line x1="3" x2="10" y1="21" y2="14"/>
-                </svg>
-              ) : (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="15 3 21 3 21 9"/>
-                  <polyline points="9 21 3 21 3 15"/>
-                  <line x1="21" x2="14" y1="3" y2="10"/>
-                  <line x1="3" x2="10" y1="21" y2="14"/>
-                </svg>
-              )}
-            </button>
-          </Tooltip>
+      <div className="stream-card-footer">
+        {/* User overlay at bottom-left */}
+        <div className="stream-card-overlay">
+          <ProfileAvatar peerId={slot.ownerPeerId ?? slot.peerId} name={slot.senderName}
+            isLocal={slot.isLocal} color={slot.color} className="stream-profile-avatar" />
+          <span className="stream-user-name"><Nickname name={slot.senderName} peerId={slot.ownerPeerId ?? slot.peerId} isLocal={slot.isLocal} />{slot.mediaLabel ? ` · ${slot.mediaLabel}` : ""}</span>
+          {slot.isLocal && <span className="badge-you">{t("message.a03099f135b1")}</span>}
         </div>
-      )}
+
+        {/* Bottom-right stream controls: Volume (remote only) + PiP + Fullscreen */}
+        {!inTray && !isPipActive && (
+          <div
+            className="stream-controls-group"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {slot.isLocal && showLocalPreview && (
+              <button
+                type="button"
+                className="btn-toggle-local-preview active"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowLocalPreview(false);
+                }}
+                aria-label={t("message.317f00cc68bc")}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                  <line x1="1" y1="1" x2="23" y2="23"/>
+                </svg>
+                {t("message.c94490e9bdea")}</button>
+            )}
+            {!slot.isLocal && (
+              <div className="stream-volume-controller">
+                <Tooltip content={isMuted || volume === 0 ? t("message.5cfebda5d336") : t("message.70f507f2963f")}
+                  onOpenChange={handleTooltipOpenChange}>
+                  <button
+                    type="button"
+                    className="btn-stream-volume"
+                    onClick={handleToggleMute}
+                    aria-label={isMuted || volume === 0 ? t("message.5cfebda5d336") : t("message.70f507f2963f")}
+                  >
+                    {isMuted || volume === 0 ? (
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                        <line x1="23" x2="17" y1="9" y2="15"/>
+                        <line x1="17" x2="23" y1="9" y2="15"/>
+                      </svg>
+                    ) : volume < 50 ? (
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                        <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                      </svg>
+                    ) : (
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                        <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+                      </svg>
+                    )}
+                  </button>
+                </Tooltip>
+
+                <div className="stream-volume-slider-box">
+                  <input autoComplete="off"
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={isMuted ? 0 : volume}
+                    className="stream-volume-range"
+                    aria-label={t('message.78ba36d6b04f')}
+                    aria-orientation="vertical"
+                    onChange={handleVolumeChange}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  <span className="stream-volume-percent">{isMuted ? '0%' : `${volume}%`}</span>
+                </div>
+              </div>
+            )}
+
+            {!slot.isLocal && slot.pointerEligible !== false && <StreamPointerToggle enabled={pointer.enabled} onToggle={pointer.toggle} onTooltipOpenChange={handleTooltipOpenChange} />}
+
+            <Tooltip
+              content={
+                isHudPinned
+                  ? t("message.b9125ff913f7")
+                  : t("message.7dcee91def76")
+              }
+              onOpenChange={handleTooltipOpenChange}
+            >
+              <button
+                type="button"
+                className={`btn-stream-pin ${isHudPinned ? 'active' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsHudPinned((p) => !p);
+                }}
+                aria-label={
+                  isHudPinned
+                    ? t("message.a66da920f259")
+                    : t("message.1efcef298a4c")
+                }
+                aria-pressed={isHudPinned}
+              >
+                <PanelsTopLeft size={14} aria-hidden="true" />
+              </button>
+            </Tooltip>
+
+            <Tooltip
+              content={t("message.365c67865e1c")}
+              onOpenChange={handleTooltipOpenChange}
+            >
+              <button
+                type="button"
+                className="btn-stream-pip"
+                id={`btn-stream-pip-${slot.peerId}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  pipService.openPip(slot.peerId, slot.senderName, slot.stream);
+                }}
+                aria-label={t("message.1f626fd80ce4")}
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                  <rect x="11" y="9" width="9" height="7" rx="1.5" fill="currentColor" fillOpacity="0.25" />
+                </svg>
+              </button>
+            </Tooltip>
+
+            <Tooltip content={isFullscreen ? t("message.1ea619b7211d") : t("message.1dfa15614e9a")}
+              onOpenChange={handleTooltipOpenChange}>
+              <button
+                type="button"
+                className="btn-stream-fullscreen"
+                id={`btn-stream-fullscreen-${slot.peerId}`}
+                onClick={handleToggleFullscreen}
+                aria-label={isFullscreen ? t("message.1ea619b7211d") : t("message.1dfa15614e9a")}
+              >
+                {isFullscreen ? (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="4 14 10 14 10 20"/>
+                    <polyline points="20 10 14 10 14 4"/>
+                    <line x1="14" x2="21" y1="10" y2="3"/>
+                    <line x1="3" x2="10" y1="21" y2="14"/>
+                  </svg>
+                ) : (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="15 3 21 3 21 9"/>
+                    <polyline points="9 21 3 21 3 15"/>
+                    <line x1="21" x2="14" y1="3" y2="10"/>
+                    <line x1="3" x2="10" y1="21" y2="14"/>
+                  </svg>
+                )}
+              </button>
+            </Tooltip>
+          </div>
+        )}
+      </div>
 
       {/* Precision Zoom Control Bar (visible when zoom > 1.0 and not in tray or PiP) */}
       {!inTray && !isPipActive && (

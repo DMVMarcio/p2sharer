@@ -1713,8 +1713,44 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 .pip-window-root {
   --stream-hud-bg: color-mix(in srgb, var(--bg-elevated) 97%, transparent);
   --stream-hud-hover: var(--bg-control-hover);
+  --stream-quality-color: #34d399;
+  --stream-bitrate-color: #a78bfa;
+  --stream-watchers-color: #38bdf8;
 }
-.stream-card:not(.in-tray) .stream-card-overlay { bottom: 60px; }
+html[data-theme="light"] :is(.stream-card, .pip-window-root) {
+  --stream-quality-color: #047857;
+  --stream-bitrate-color: #6d28d9;
+  --stream-watchers-color: #0369a1;
+}
+.stream-card-footer { display: contents; }
+.stream-card:not(.in-tray) .stream-card-footer {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  right: 10px;
+  z-index: 20;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  pointer-events: none;
+}
+.stream-card:not(.in-tray) .stream-card-footer .stream-card-overlay {
+  position: relative;
+  bottom: auto;
+  left: auto;
+  min-width: 0;
+  max-width: 100%;
+  flex: 0 1 auto;
+}
+.stream-card-footer .stream-profile-avatar { flex-shrink: 0; }
+.stream-card:not(.in-tray) .stream-card-footer .stream-controls-group {
+  position: relative;
+  bottom: auto;
+  right: auto;
+  margin-left: auto;
+  max-width: none;
+  flex-shrink: 0;
+}
 .stream-user-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .stream-card-overlay .badge-you { color: var(--text-primary); background: var(--bg-control); border: 0; flex-shrink: 0; }
 .stream-card:not(.in-tray) .btn-stop-watch-stream.is-local-stop {
@@ -1815,18 +1851,21 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   box-shadow: 0 0 6px #ef4444;
 }
 
+.stat-badge-quality { color: var(--stream-quality-color); }
+.stat-badge-quality .stat-badge-dot { background: currentColor; box-shadow: none; }
+
 .stat-badge-bitrate {
-  color: var(--text-primary);
+  color: var(--stream-bitrate-color);
   cursor: pointer;
 }
 
 .stat-badge-bitrate svg {
-  color: var(--text-primary);
+  color: inherit;
   flex-shrink: 0;
 }
 
 .stat-badge-watchers {
-  color: var(--text-primary);
+  color: var(--stream-watchers-color);
   cursor: pointer;
 }
 
@@ -2338,7 +2377,7 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 /* Stream Zoom Precision Controller */
 .stream-zoom-bar {
   position: absolute;
-  bottom: 100px;
+  bottom: 60px;
   right: 10px;
   z-index: 20;
   display: flex;
