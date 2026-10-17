@@ -34,7 +34,8 @@ export const StreamHeaderBar: React.FC = () => {
   const subscribedStreams = useStore((s) => s.subscribedStreams);
 
   const totalCount = roomSlots.length + appCounts.total;
-  const isBroadcasting = roomSlots.some((slot) => slot.isLocal && slot.isStreaming);
+  const localStreams = roomSlots.filter((slot) => slot.isLocal && slot.isStreaming && slot.mediaId);
+  const isBroadcasting = localStreams.length > 0;
   const streamingCount = roomSlots.filter((s) => s.isStreaming).length + appCounts.total;
   const watchingCount = roomSlots.filter(
     (s) => !s.isLocal && s.isStreaming && subscribedStreams.has(s.peerId)
@@ -46,21 +47,33 @@ export const StreamHeaderBar: React.FC = () => {
   };
   const handleToggleTransmission = (event: React.MouseEvent<HTMLButtonElement>) => {
     if (!isBroadcasting) { startTransmission(); return; }
-    const actions: ContextMenuAction[] = roomSlots
-      .filter((slot) => slot.isLocal && slot.isStreaming && slot.mediaId)
-      .map((slot) => {
-        const label = slot.mediaLabel || (slot.mediaKind === 'camera' ? t("message.dafb61aca12d") : t("message.2d31efc9c2ed"));
-        return { id: `edit-${slot.mediaId}`, label,
-          icon: slot.mediaKind === 'camera' ? <Camera size={15} /> : <Monitor size={15} />,
-          onSelect: () => { roomService.editTransmission(slot.mediaId!); openModal('screenPicker'); },
-          secondary: { get label() { return t("message.bc7431b85054", { v0: label }); }, icon: <Square size={14} />, danger: true,
-            onSelect: () => roomService.stopTransmission(slot.mediaId!) } };
-      });
+    const actions: ContextMenuAction[] = localStreams.map((slot) => {
+      const label = slot.mediaLabel || (slot.mediaKind === 'camera' ? t("message.dafb61aca12d") : t("message.2d31efc9c2ed"));
+      return { id: `edit-${slot.mediaId}`, label,
+        icon: slot.mediaKind === 'camera' ? <Camera size={15} /> : <Monitor size={15} />,
+        onSelect: () => { roomService.editTransmission(slot.mediaId!); openModal('screenPicker'); },
+        secondary: { get label() { return t("message.bc7431b85054", { v0: label }); }, icon: <Square size={14} />, danger: true,
+          onSelect: () => roomService.stopTransmission(slot.mediaId!) } };
+    });
     actions.push({ id: 'new-transmission', get label() { return t("message.632a0a6c5999"); }, icon: <Plus size={15} />,
       separator: true, onSelect: startTransmission });
     const bounds = event.currentTarget.getBoundingClientRect();
     openContextMenu({ currentTarget: event.currentTarget, clientX: bounds.left, clientY: bounds.bottom,
       preventDefault: () => event.preventDefault(), stopPropagation: () => event.stopPropagation() }, actions);
+  };
+
+  const handleStopTransmission = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (localStreams.length === 1) {
+      roomService.stopTransmission(localStreams[0].mediaId!);
+      return;
+    }
+    const bounds = event.currentTarget.getBoundingClientRect();
+    openContextMenu({ currentTarget: event.currentTarget, clientX: bounds.left, clientY: bounds.bottom,
+      preventDefault: () => event.preventDefault(), stopPropagation: () => event.stopPropagation() },
+    localStreams.map((slot) => ({ id: `stop-${slot.mediaId}`,
+      label: t("message.bc7431b85054", { v0: slot.mediaLabel || (slot.mediaKind === 'camera' ? t("message.dafb61aca12d") : t("message.2d31efc9c2ed")) }),
+      icon: slot.mediaKind === 'camera' ? <Camera size={15} /> : <Monitor size={15} />,
+      danger: true, onSelect: () => roomService.stopTransmission(slot.mediaId!) })));
   };
 
   return (
@@ -140,6 +153,14 @@ export const StreamHeaderBar: React.FC = () => {
             {isBroadcasting && <ChevronDown className="transmission-chevron" size={12} aria-hidden="true" />}
           </button>
         </Tooltip>
+
+        {isBroadcasting && <button type="button" className="btn btn-sm btn-danger btn-stop-transmission"
+          id="btn-stop-transmission" onClick={handleStopTransmission}
+          aria-haspopup={localStreams.length > 1 ? 'menu' : undefined}>
+          <Square size={14} aria-hidden="true" />
+          <span>{t("message.6ef17b51fd93")}</span>
+          {localStreams.length > 1 && <ChevronDown size={12} aria-hidden="true" />}
+        </button>}
 
         {/* Audio Filter Config */}
         <Tooltip content={t("message.44d9ce86bda1")}>

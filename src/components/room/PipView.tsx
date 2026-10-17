@@ -1,3 +1,4 @@
+import { Tooltip } from '../common/Tooltip';
 import { Nickname } from '../common/Nickname';
 import { normalizeNicknameStyle } from '../../core/nickname_style';
 import { localizeText, t } from '../../i18n';
@@ -510,30 +511,34 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
 
           <div className="pip-top-right">
             {/* Always on top / Pin toggle */}
-            <button
-              type="button"
-              className={`pip-header-btn ${isAlwaysOnTop ? 'active' : ''}`}
-              onClick={handleToggleAlwaysOnTop}
-              aria-label={isAlwaysOnTop ? t("message.9edf08040405") : t("message.8826562e878e")}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill={isAlwaysOnTop ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="17" x2="12" y2="22" />
-                <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
-              </svg>
-            </button>
+            <Tooltip content={isAlwaysOnTop ? t("message.9edf08040405") : t("message.8826562e878e")} onOpenChange={handleTooltipOpenChange}>
+              <button
+                type="button"
+                className={`pip-header-btn ${isAlwaysOnTop ? 'active' : ''}`}
+                onClick={handleToggleAlwaysOnTop}
+                aria-label={isAlwaysOnTop ? t("message.9edf08040405") : t("message.8826562e878e")}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill={isAlwaysOnTop ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="17" x2="12" y2="22" />
+                  <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
+                </svg>
+              </button>
+            </Tooltip>
 
             {/* Internal Close 'X' Button */}
-            <button
-              type="button"
-              className="pip-header-btn pip-close-btn"
-              onClick={handleClose}
-              aria-label={t("message.68392bf40d15")}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
+            <Tooltip content={t("message.68392bf40d15")} onOpenChange={handleTooltipOpenChange}>
+              <button
+                type="button"
+                className="pip-header-btn pip-close-btn"
+                onClick={handleClose}
+                aria-label={t("message.68392bf40d15")}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </Tooltip>
           </div>
         </div>
 
@@ -555,27 +560,29 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
           {/* Audio Volume Controller */}
           {!isLocal && (
             <div className={`stream-volume-controller ${isMuted ? 'muted' : ''}`}>
-              <button
-                type="button"
-                className="btn-stream-volume"
-                onClick={handleToggleMute}
-                aria-label={isMuted ? t("message.d99ff5fe7c0d") : t("message.712929976510")}
-              >
-                {isMuted || volume === 0 ? (
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="1" y1="1" x2="23" y2="23" />
-                    <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
-                    <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23" />
-                    <line x1="12" y1="19" x2="12" y2="23" />
-                    <line x1="8" y1="23" x2="16" y2="23" />
-                  </svg>
-                ) : (
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
-                  </svg>
-                )}
-              </button>
+              <Tooltip content={isMuted ? t("message.d99ff5fe7c0d") : t("message.712929976510")} onOpenChange={handleTooltipOpenChange}>
+                <button
+                  type="button"
+                  className="btn-stream-volume"
+                  onClick={handleToggleMute}
+                  aria-label={isMuted ? t("message.d99ff5fe7c0d") : t("message.712929976510")}
+                >
+                  {isMuted || volume === 0 ? (
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="1" y1="1" x2="23" y2="23" />
+                      <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
+                      <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23" />
+                      <line x1="12" y1="19" x2="12" y2="23" />
+                      <line x1="8" y1="23" x2="16" y2="23" />
+                    </svg>
+                  ) : (
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                      <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+                    </svg>
+                  )}
+                </button>
+              </Tooltip>
 
               <div className="stream-volume-slider-box">
                 <input autoComplete="off"
@@ -596,35 +603,40 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
           {!isLocal && pointerEligible && <StreamPointerToggle enabled={pointer.enabled} onToggle={pointer.toggle} />}
 
           {/* Pin HUD Button */}
-          <button
-            type="button"
-            className={`btn-stream-pin ${isHudPinned ? 'active' : ''}`}
-            onClick={(e) => {
-              e?.stopPropagation();
-              setIsHudPinned(!isHudPinned);
-            }}
-            aria-label={isHudPinned ? t("message.36e8a1a8461f") : t("message.e96d2fff8199")}
-          >
-            <PanelsTopLeft size={14} aria-hidden="true" />
-          </button>
+          <Tooltip content={isHudPinned ? t("message.36e8a1a8461f") : t("message.e96d2fff8199")} onOpenChange={handleTooltipOpenChange}>
+            <button
+              type="button"
+              className={`btn-stream-pin ${isHudPinned ? 'active' : ''}`}
+              onClick={(e) => {
+                e?.stopPropagation();
+                setIsHudPinned(!isHudPinned);
+              }}
+              aria-label={isHudPinned ? t("message.36e8a1a8461f") : t("message.e96d2fff8199")}
+              aria-pressed={isHudPinned}
+            >
+              <PanelsTopLeft size={14} aria-hidden="true" />
+            </button>
+          </Tooltip>
 
           {/* Fullscreen Button */}
-          <button
-            type="button"
-            className={`btn-stream-fullscreen ${isFullscreen ? 'active' : ''}`}
-            onClick={handleToggleFullscreen}
-            aria-label={isFullscreen ? t("message.1ea619b7211d") : t("message.1dfa15614e9a")}
-          >
-            {isFullscreen ? (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" />
-              </svg>
-            ) : (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
-              </svg>
-            )}
-          </button>
+          <Tooltip content={isFullscreen ? t("message.1ea619b7211d") : t("message.1dfa15614e9a")} onOpenChange={handleTooltipOpenChange}>
+            <button
+              type="button"
+              className={`btn-stream-fullscreen ${isFullscreen ? 'active' : ''}`}
+              onClick={handleToggleFullscreen}
+              aria-label={isFullscreen ? t("message.1ea619b7211d") : t("message.1dfa15614e9a")}
+            >
+              {isFullscreen ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" />
+                </svg>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+                </svg>
+              )}
+            </button>
+          </Tooltip>
         </div>
 
         {/* Focal Zoom Precision Control Bar (Appears when zoomed > 1.0x) */}

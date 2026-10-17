@@ -62,7 +62,7 @@ test('transmission menu edits sources, stops only the chosen source, and starts 
       root.render(React.createElement(ContextMenuProvider, null, React.createElement(StreamHeaderBar)));
     });
     assert.equal(document.querySelector('#label-share-screen').textContent, 'Transmissão');
-    assert.equal(document.querySelector('.transmission-stop-menu'), null);
+    assert.equal(document.querySelector('#btn-stop-transmission').getAttribute('aria-haspopup'), 'menu');
     await act(async () => document.querySelector('#btn-toggle-share-screen').click());
     const actions = [...document.querySelectorAll('[role="menuitem"]')];
     assert.equal(actions.length, 5);
@@ -77,6 +77,49 @@ test('transmission menu edits sources, stops only the chosen source, and starts 
     await act(async () => [...document.querySelectorAll('[role="menuitem"]')].find((button) => button.textContent === 'Iniciar nova transmissão').click());
     assert.equal(stateStore.editingStreamId, null);
     assert.deepEqual(stopped, ['camera']);
+  } finally { roomService.stopTransmission = original; }
+});
+
+test('header stop targets a single source directly and selects one of multiple sources', async () => {
+  const stopped = [];
+  const original = roomService.stopTransmission;
+  roomService.stopTransmission = id => stopped.push(id);
+  const header = async slots => act(async () => {
+    stateStore.set(state => { state.roomSlots = slots; });
+    root.render(React.createElement(ContextMenuProvider, null, React.createElement(StreamHeaderBar)));
+  });
+  try {
+    await header([{ ...screen, isLocal: true }, other]);
+    const direct = document.querySelector('#btn-stop-transmission');
+    assert.equal(direct.getAttribute('aria-haspopup'), null);
+    await act(async () => direct.click());
+    assert.deepEqual(stopped, ['screen']);
+    assert.ok(!document.querySelector('[role="menu"]:not([aria-hidden="true"])'));
+    await header([{ ...screen, isLocal: true }, { ...camera, isLocal: true }, other]);
+    await act(async () => document.querySelector('#btn-stop-transmission').click());
+    const actions = [...document.querySelectorAll('[role="menuitem"]')];
+    assert.equal(actions.length, 2);
+    await act(async () => actions.find(button => button.textContent.includes('camera')).click());
+    assert.deepEqual(stopped, ['screen', 'camera']);
+    await header([other]);
+    assert.equal(document.querySelector('#btn-stop-transmission'), null);
+  } finally { roomService.stopTransmission = original; }
+});
+
+test('local stop is available on the featured stream and does not change the selected stream', async () => {
+  const stopped = [];
+  const original = roomService.stopTransmission;
+  roomService.stopTransmission = id => stopped.push(id);
+  try {
+    stateStore.set(state => { state.roomSlots = [{ ...screen, isLocal: true }, other]; });
+    await render('spotlight', screen.peerId);
+    const featured = document.querySelector('.spotlight-featured-area .stream-card');
+    const stop = featured.querySelector('.btn-stop-watch-stream');
+    assert.ok(stop);
+    await act(async () => stop.click());
+    assert.deepEqual(stopped, ['screen']);
+    assert.equal(stateStore.pinnedPeerId, screen.peerId);
+    assert.equal(stateStore.layoutMode, 'spotlight');
   } finally { roomService.stopTransmission = original; }
 });
 

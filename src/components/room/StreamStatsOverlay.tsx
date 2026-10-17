@@ -98,14 +98,14 @@ export const StreamStatsOverlay: React.FC<StreamStatsOverlayProps> = ({
       </span>
 
       <Tooltip tooltipClassName="bitrate-tooltip" onOpenChange={onTooltipOpenChange} content={bitrateTooltip}>
-        <div className="stat-badge stat-badge-bitrate" onClick={(event) => event.stopPropagation()}>
+        <button type="button" className="stat-badge stat-badge-bitrate" onClick={(event) => event.stopPropagation()}>
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
           </svg>
           <span className="stat-bitrate-text">
             {liveBitrateKbps > 0 ? liveBitrateText : isLocal ? t("message.13028932018d", { v0: configuredBitrateValue }) : liveBitrateText}
           </span>
-        </div>
+        </button>
       </Tooltip>
 
       {!isLocal && pingText && pingClass && (

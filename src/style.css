@@ -1491,15 +1491,18 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   left: 10px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  background-color: rgba(0, 0, 0, 0.7);
+  gap: 8px;
+  background-color: var(--stream-hud-bg);
   backdrop-filter: blur(8px);
-  padding: 4px 10px;
-  border-radius: var(--radius-full);
-  font-size: 11px;
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  font-size: 12px;
   font-weight: 500;
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  border: 0;
+  box-shadow: var(--shadow-md);
+  max-width: calc(100% - 20px);
+  box-sizing: border-box;
   pointer-events: none;
   z-index: 5;
 }
@@ -1649,21 +1652,21 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   top: 10px;
   right: 10px;
   z-index: 15;
-  background-color: rgba(0, 0, 0, 0.65);
+  background-color: var(--stream-hud-bg);
   backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  color: #f4f4f5;
-  font-size: 11px;
-  font-weight: 500;
-  padding: 4px 10px;
-  border-radius: var(--radius-full);
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all var(--transition-fast);
 }
 
 .btn-stop-watch-stream:hover {
-  background-color: rgba(239, 68, 68, 0.75);
-  border-color: rgba(239, 68, 68, 0.9);
+  background-color: var(--danger-hover);
+  border-color: var(--danger-hover);
   color: #ffffff;
 }
 
@@ -1705,6 +1708,47 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
               visibility 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
+/* Shared themed surfaces stay readable over bright and dark media. */
+.stream-card,
+.pip-window-root {
+  --stream-hud-bg: color-mix(in srgb, var(--bg-elevated) 97%, transparent);
+  --stream-hud-hover: var(--bg-control-hover);
+}
+.stream-card:not(.in-tray) .stream-card-overlay { bottom: 60px; }
+.stream-user-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stream-card-overlay .badge-you { color: var(--text-primary); background: var(--bg-control); border: 0; flex-shrink: 0; }
+.stream-card:not(.in-tray) .btn-stop-watch-stream.is-local-stop {
+  opacity: 1;
+  pointer-events: auto;
+  background: color-mix(in srgb, var(--danger-bg) 20%, var(--bg-elevated));
+  color: var(--danger-text);
+  border-color: var(--danger-border);
+}
+.stream-card:not(.in-tray) .btn-stop-watch-stream.is-local-stop:hover {
+  background: var(--danger-hover);
+  color: white;
+}
+.stream-card:has(.is-local-stop) .stream-card-stats-hud { max-width: calc(100% - 190px); }
+.stream-controls-group .btn-toggle-local-preview.active {
+  background: var(--bg-control);
+  color: var(--text-primary);
+  border-color: transparent;
+  border-radius: var(--radius-sm);
+  margin: 0;
+  min-height: 32px;
+}
+.stream-controls-group .btn-toggle-local-preview.active:hover { background: var(--stream-hud-hover); }
+:is(.stream-controls-group, .stream-zoom-bar, .stream-card-stats-hud, .pip-top-bar) :is(button, input):focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 2px;
+}
+.btn-stop-transmission { flex-shrink: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .stream-card .stream-card-stats-hud, .stream-card .stream-card-overlay,
+  .stream-card .btn-stop-watch-stream, .stream-card .stream-controls-group,
+  .stream-card .stream-zoom-bar, .pip-overlay { transition: none !important; animation: none; }
+}
+
 /* Stream Card Stats HUD */
 .stream-card-stats-hud {
   position: absolute;
@@ -1723,23 +1767,23 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  background-color: rgba(10, 10, 15, 0.82);
+  background-color: var(--stream-hud-bg);
   backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  padding: 3px 7px;
-  border-radius: var(--radius-full);
+  border: 0;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 600;
-  color: #f4f4f5;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-md);
   transition: all var(--transition-fast);
   user-select: none;
 }
 
 .stat-badge:hover {
-  background-color: rgba(15, 15, 22, 0.94);
-  border-color: rgba(255, 255, 255, 0.3);
+  background-color: var(--stream-hud-hover);
+  border-color: var(--border-focus);
 }
 
 .stat-badge-dot {
@@ -1772,17 +1816,17 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 }
 
 .stat-badge-bitrate {
-  color: #a78bfa;
+  color: var(--text-primary);
   cursor: pointer;
 }
 
 .stat-badge-bitrate svg {
-  color: #a78bfa;
+  color: var(--text-primary);
   flex-shrink: 0;
 }
 
 .stat-badge-watchers {
-  color: #38bdf8;
+  color: var(--text-primary);
   cursor: pointer;
 }
 
@@ -1972,7 +2016,7 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   gap: 6px;
   font-size: 11px;
   font-weight: 600;
-  color: #a78bfa;
+  color: var(--text-primary);
   margin-bottom: 6px;
   padding-bottom: 4px;
   border-bottom: 1px solid var(--border-subtle);
@@ -1980,7 +2024,7 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 }
 
 .bitrate-tooltip-header svg {
-  color: #a78bfa;
+  color: var(--text-primary);
   flex-shrink: 0;
 }
 
@@ -2028,8 +2072,16 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   z-index: 20;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius-md);
+  background: var(--stream-hud-bg);
+  box-shadow: var(--shadow-md);
+  max-width: calc(100% - 20px);
+  box-sizing: border-box;
 }
+
+.stream-controls-group :is(.btn-stream-fullscreen, .btn-stream-pin, .btn-stream-pip):not(:hover):not(.active) { background: transparent; }
 
 .stream-controls-group .stream-volume-controller {
   position: relative;
@@ -2041,18 +2093,18 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 .btn-stream-fullscreen,
 .btn-stream-pin,
 .btn-stream-pip {
-  background-color: rgba(10, 10, 15, 0.82);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  color: #f4f4f5;
+  background-color: var(--stream-hud-bg, var(--bg-elevated));
+  backdrop-filter: none;
+  border: 0;
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   padding: 0;
-  border-radius: var(--radius-full);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  border-radius: var(--radius-sm);
+  box-shadow: none;
   cursor: pointer;
   flex-shrink: 0;
   transition: all var(--transition-fast);
@@ -2061,10 +2113,10 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 .btn-stream-fullscreen:hover:not(:disabled),
 .btn-stream-pin:hover:not(:disabled),
 .btn-stream-pip:hover:not(:disabled) {
-  background-color: rgba(15, 15, 22, 0.94);
+  background-color: var(--stream-hud-hover, var(--bg-control-hover));
   border-color: var(--accent-border);
   color: var(--accent-color);
-  transform: scale(1.08);
+  transform: none;
 }
 
 .btn-stream-fullscreen:disabled,
@@ -2075,18 +2127,18 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 }
 
 .btn-stream-pin.active {
-  background-color: rgba(10, 10, 15, 0.82);
+  background-color: var(--accent-subtle);
   border-color: var(--accent-color, #06b6d4);
   color: var(--accent-color, #06b6d4);
-  box-shadow: 0 0 8px rgba(6, 182, 212, 0.4), inset 0 0 0 1px rgba(6, 182, 212, 0.25);
+  box-shadow: inset 0 0 0 1px var(--accent-border);
 }
 
 .btn-stream-pin.active:hover {
-  background-color: rgba(15, 15, 22, 0.94);
+  background-color: var(--stream-hud-hover);
   border-color: var(--accent-color, #06b6d4);
   color: var(--accent-color, #06b6d4);
-  transform: scale(1.08);
-  box-shadow: 0 0 12px rgba(6, 182, 212, 0.5), inset 0 0 0 1px rgba(6, 182, 212, 0.35);
+  transform: none;
+  box-shadow: inset 0 0 0 1px var(--accent-border);
 }
 
 /* Stream Video Card Fullscreen Presentation */
@@ -2131,10 +2183,10 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   height: 28px;
   box-sizing: border-box;
   border-radius: var(--radius-full);
-  background-color: rgba(10, 10, 15, 0.82);
+  background-color: var(--stream-hud-bg);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow-md);
   pointer-events: none;
   z-index: -1;
   transition: height var(--transition-normal),
@@ -2146,14 +2198,14 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 .stream-volume-controller:has(:focus-visible)::before,
 .stream-volume-controller:has(.stream-volume-range:active)::before {
   height: 128px;
-  background-color: rgba(15, 15, 22, 0.94);
+  background-color: var(--stream-hud-hover);
   border-color: var(--accent-border);
 }
 
 .btn-stream-volume {
   background: none;
   border: none;
-  color: #f4f4f5;
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2277,7 +2329,7 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   font-size: 10px;
   font-weight: 600;
   font-family: var(--font-mono);
-  color: #d4d4d8;
+  color: var(--text-primary);
   min-width: 28px;
   user-select: none;
   flex-shrink: 0;
@@ -2286,18 +2338,18 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 /* Stream Zoom Precision Controller */
 .stream-zoom-bar {
   position: absolute;
-  bottom: 48px;
+  bottom: 100px;
   right: 10px;
   z-index: 20;
   display: flex;
   align-items: center;
   gap: 6px;
-  background-color: rgba(10, 10, 15, 0.88);
+  background-color: var(--stream-hud-bg);
   backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 0;
   padding: 4px 8px;
-  border-radius: var(--radius-full);
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.55);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
   animation: zoom-bar-fade-in 0.15s ease-out;
   user-select: none;
   pointer-events: auto;
@@ -2316,7 +2368,7 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 }
 
 .stream-zoom-bar:hover {
-  background-color: rgba(15, 15, 22, 0.96);
+  background-color: var(--stream-hud-hover);
   border-color: var(--accent-border);
 }
 
@@ -2331,7 +2383,7 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 .btn-zoom-step {
   background: none;
   border: none;
-  color: #f4f4f5;
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2363,7 +2415,7 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   width: 76px;
   height: 4px;
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.25);
+  background: var(--border-focus);
   outline: none;
   cursor: pointer;
 }
@@ -2389,7 +2441,7 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   font-size: 10.5px;
   font-weight: 600;
   font-family: var(--font-mono);
-  color: #f4f4f5;
+  color: var(--text-primary);
   min-width: 32px;
   text-align: center;
 }
@@ -2398,9 +2450,9 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   display: flex;
   align-items: center;
   gap: 3px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  color: #e4e4e7;
+  background: var(--bg-control);
+  border: 1px solid transparent;
+  color: var(--text-primary);
   font-size: 9.5px;
   font-weight: 600;
   font-family: var(--font-sans);
@@ -4717,7 +4769,7 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 }
 
 /* Use the available stream width, including space consumed by the sidebar. */
-@container stream-area (max-width: 800px) {
+@container stream-area (max-width: 1080px) {
   .stream-header-bar {
     height: auto;
     min-height: 48px;
@@ -4805,12 +4857,14 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 }
 
 .pip-window-root:hover .pip-overlay,
+.pip-window-root:focus-within .pip-overlay,
 .pip-overlay.is-hud-pinned {
   opacity: 1;
   pointer-events: none;
 }
 
 .pip-window-root:hover .pip-overlay > *,
+.pip-window-root:focus-within .pip-overlay > *,
 .pip-overlay.is-hud-pinned > * {
   pointer-events: auto;
 }
@@ -4822,7 +4876,8 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   left: 0;
   right: 0;
   height: 38px;
-  background: linear-gradient(180deg, rgba(8, 10, 15, 0.88) 0%, rgba(8, 10, 15, 0.45) 70%, transparent 100%);
+  background: var(--stream-hud-bg);
+  box-shadow: var(--shadow-md);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -4852,12 +4907,12 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 .pip-title {
   font-size: 12px;
   font-weight: 600;
-  color: #f4f4f5;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 240px;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  text-shadow: none;
 }
 
 .pip-top-right {
@@ -4870,7 +4925,7 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 .pip-header-btn {
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.75);
+  color: var(--text-primary);
   width: 26px;
   height: 26px;
   border-radius: var(--radius-sm);
@@ -4883,13 +4938,13 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 }
 
 .pip-header-btn:hover {
-  background-color: rgba(255, 255, 255, 0.12);
-  color: #fff;
+  background-color: var(--stream-hud-hover);
+  color: var(--text-primary);
 }
 
 .pip-header-btn.active {
   color: var(--accent-color, #06b6d4);
-  background-color: rgba(6, 182, 212, 0.2);
+  background-color: var(--accent-subtle);
 }
 
 .pip-header-btn.pip-close-btn:hover {
@@ -4917,7 +4972,7 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 /* Zoom control bar inside PiP */
 .pip-overlay .stream-zoom-bar {
   position: absolute;
-  bottom: 48px;
+  bottom: 60px;
   right: 10px;
   z-index: 20;
 }
