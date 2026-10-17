@@ -427,6 +427,16 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
 
 .app-update-content { display: grid; gap: 12px; }
 .release-notes-list { margin: 0; padding-inline-start: 20px; display: grid; gap: 12px; color: var(--text-secondary); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.release-notes-list p { margin: 0; line-height: inherit; }
+.release-notes-list strong, .release-notes-list h2, .release-notes-list h3 { color: var(--text-primary); }
+.release-notes-list h2, .release-notes-list h3 { margin: 0 0 8px; font-size: 15px; }
+.release-notes-list :is(p, ul, ol, pre, blockquote) + :is(p, ul, ol, pre, blockquote) { margin-block-start: 8px; }
+.release-notes-list :is(ul, ol) { padding-inline-start: 20px; }
+.release-notes-list :is(code, pre) { font-family: var(--font-mono); background: var(--bg-input); border-radius: var(--radius-xs); }
+.release-notes-list code { padding: 1px 4px; }
+.release-notes-list pre { padding: 10px; overflow: auto; }
+.release-notes-list pre code { padding: 0; }
+.release-notes-list blockquote { margin-inline: 0; padding-inline-start: 12px; border-inline-start: 2px solid var(--border-default); }
 .app-update-progress { width: 100%; accent-color: var(--accent-color); }
 .app-version { font-variant-numeric: tabular-nums; }
 .app-version-compact { font-size: 11px; color: var(--text-muted); }

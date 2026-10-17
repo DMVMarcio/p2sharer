@@ -29,7 +29,7 @@ test('unread notes wait for other dialogs, survive interrupted viewing and ackno
         builder.onResolve({ filter: /services\/release_notes$|services\/app_updates$|hooks\/useModal$/ }, args => ({ path: args.path.split('/').at(-1), namespace: 'fixture' }));
         builder.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: {
           release_notes: `export const releaseNotes = globalThis.releaseNotesFixture.notes;
-            export const installedReleaseNotes = () => ['<img src="https://example.invalid/image">'];`,
+            export const installedReleaseNotes = () => ['**Files** with *improvements* and ~~old behavior~~.\\n\\n## Highlights\\n\\n- Paste images\\n- Share files\\n\\n<img src="https://example.invalid/image">\\n\\n![Image](https://example.invalid/image) [Details](https://example.invalid/notes) <script>alert(1)</script>'];`,
           app_updates: 'export const appUpdates = globalThis.releaseNotesFixture.update;',
           useModal: 'export const useModal = () => ({ activeModal: globalThis.releaseNotesFixture.active });',
         }[args.path] }));
@@ -49,7 +49,14 @@ test('unread notes wait for other dialogs, survive interrupted viewing and ackno
     await act(async () => fixture.update.close());
     assert.ok(document.querySelector('[role="dialog"]'));
     assert.equal(document.querySelector('.release-notes-list img'), null);
-    assert.match(document.querySelector('.release-notes-list').textContent, /<img/);
+    assert.equal(document.querySelector('.release-notes-list strong').textContent, 'Files');
+    assert.equal(document.querySelector('.release-notes-list em').textContent, 'improvements');
+    assert.equal(document.querySelector('.release-notes-list del').textContent, 'old behavior');
+    assert.equal(document.querySelector('.release-notes-list h2').textContent, 'Highlights');
+    assert.equal(document.querySelectorAll('.release-notes-list ul li').length, 2);
+    assert.equal(document.querySelector('.release-notes-list a'), null);
+    assert.equal(document.querySelector('.release-notes-list script'), null);
+    assert.match(document.querySelector('.release-notes-list').textContent, /Details/);
     await act(async () => root.render(null));
     assert.equal(new ReleaseNotesController('1.4.1', localStorage).getSnapshot().pending, true);
     await act(async () => root.render(React.createElement(ReleaseNotesDialog)));
