@@ -324,7 +324,7 @@
   "capture.retryPreview": "Reintentar vista previa",
   "message.80e583478ab0": "Vista previa no disponible: {{v0}}",
   "message.f47f39a15741": "La cámara no admite este modo.",
-  "message.3ac7f82e95fe": "No se pudieron abrir archivos. Seleccione hasta 32 archivos, de hasta 2 GB cada uno.",
+  "message.3ac7f82e95fe": "No se pudieron abrir los archivos. Seleccione hasta 32 archivos.",
   "message.29014ff38240": "No se pudo completar la operación. Intentar otra vez.",
   "message.b7ee01f4e0b2": "No se pudieron enumerar las cámaras. Verifique los permisos de la cámara de Windows.",
   "message.f3ec8f258239": "No se pudieron enumerar las fuentes: {{v0}}",

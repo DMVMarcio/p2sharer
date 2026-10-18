@@ -324,7 +324,7 @@
   "capture.retryPreview": "重试预览",
   "message.80e583478ab0": "预览不可用：{{v0}}",
   "message.f47f39a15741": "相机不支持该模式。",
-  "message.3ac7f82e95fe": "无法打开文件。最多选择 32 个文件，每个文件最大 2 GB。",
+  "message.3ac7f82e95fe": "无法打开文件。最多选择 32 个文件。",
   "message.29014ff38240": "无法完成操作。再试一次。",
   "message.b7ee01f4e0b2": "无法列出摄像机。检查 Windows 相机权限。",
   "message.f3ec8f258239": "无法列出来源：{{v0}}",

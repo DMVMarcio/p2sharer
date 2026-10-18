@@ -324,7 +324,7 @@
   "capture.retryPreview": "Tentar prévia novamente",
   "message.80e583478ab0": "Prévia indisponível: {{v0}}",
   "message.f47f39a15741": "A câmera não oferece esse modo.",
-  "message.3ac7f82e95fe": "Não foi possível abrir os arquivos. Selecione até 32 arquivos, de até 2 GB cada.",
+  "message.3ac7f82e95fe": "Não foi possível abrir os arquivos. Selecione até 32 arquivos.",
   "message.29014ff38240": "Não foi possível concluir a operação. Tente novamente.",
   "message.b7ee01f4e0b2": "Não foi possível listar as câmeras. Verifique as permissões de câmera do Windows.",
   "message.f3ec8f258239": "Não foi possível listar as fontes: {{v0}}",

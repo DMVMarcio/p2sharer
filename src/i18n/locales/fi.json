@@ -324,7 +324,7 @@
   "capture.retryPreview": "Yritä esikatsella uudelleen",
   "message.80e583478ab0": "Esikatselu ei saatavilla: {{v0}}",
   "message.f47f39a15741": "Kamera ei tue tätä tilaa.",
-  "message.3ac7f82e95fe": "Tiedostoja ei voitu avata. Valitse enintään 32 tiedostoa, kukin enintään 2 Gt.",
+  "message.3ac7f82e95fe": "Tiedostoja ei voitu avata. Valitse enintään 32 tiedostoa.",
   "message.29014ff38240": "Toimintoa ei voitu suorittaa loppuun. Yritä uudelleen.",
   "message.b7ee01f4e0b2": "Kameroita ei voitu luetteloida. Tarkista Windowsin kameran käyttöoikeudet.",
   "message.f3ec8f258239": "Lähteitä ei voitu luetteloida: {{v0}}",

@@ -35,6 +35,51 @@ test('pipelined image chunks are assembled in offset order before acknowledgment
 
 const timings = () => ({ readMs: 0, prepareMs: 0, wireMs: 0, verifyMs: 0, writeMs: 0, ackMs: 0 });
 
+test('signed file blocks and native writes retain exact offsets beyond four GiB', async () => {
+  const dom = setupTestDOM();
+  try {
+    const base = 5 * 1024 ** 3;
+    const source = new Uint8Array(CHAT_FILE_CHUNK_BYTES + 7).fill(0x35);
+    const manager = new GroupRoomManager('Sender', 'large-file-test', '', false) as any;
+    manager.chatAuth = await PeerAuthenticator.create('large-file-test', 'sender');
+    manager.fileAction = {};
+    manager.peerTracker.isVerified = () => true;
+    const session = { messageId: 'message', peerId: 'receiver', sourceId: 'source',
+      direction: 'send', offset: base, sentOffset: base, total: base + source.length, timings: timings() };
+    manager.fileSessions.set('request', session);
+    let written = base;
+    (window as any).__TAURI_INTERNALS__ = { invoke: async (command: string, args: any, options: any) => {
+      if (command === 'read_chat_file_bytes') {
+        assert.equal(args.offset, base);
+        return source.buffer;
+      }
+      assert.equal(command, 'write_chat_download_bytes');
+      assert.equal(Number(options.headers['x-chat-offset']), written);
+      assert.deepEqual(args, source);
+      written += args.length;
+      return written;
+    } };
+    const pendingChunks = new Map<number, Uint8Array>();
+    manager.fileBulk = { send: async (_peer: string, packet: Uint8Array) => {
+      const decoded = decodeSignedFileChunk(packet)!;
+      assert.ok(await manager.chatAuth.verifyControl('chat-file-chunk-v2',
+        fileChunkSignatureData(decoded.header), decoded.header.signature, manager.chatAuth.publicKey));
+      pendingChunks.set(decoded.header.offset, decoded.bytes);
+    } };
+    await manager.sendNextFileChunks('request');
+    assert.equal(session.sentOffset, session.total);
+    assert.deepEqual([...pendingChunks.keys()], [base, base + CHAT_FILE_CHUNK_BYTES]);
+    const receiver = { ...session, direction: 'receive', pendingChunks };
+    manager.fileSessions.set('request', receiver);
+    manager.sendFilePacket = async (_peer: string, packet: any) => { assert.equal(packet.offset, written); };
+    manager.emitFileProgress = () => {};
+    manager.finishReceivedFile = async () => { manager.fileSessions.delete('request'); };
+    await manager.processReceivedFileChunks('request', receiver, { id: 'message' });
+    assert.equal(written, session.total);
+    assert.equal(receiver.offset, session.total);
+  } finally { dom.cleanup(); }
+});
+
 test('sender batches native reads while keeping signed wire chunks and the acknowledgment window bounded', async () => {
   const dom = setupTestDOM();
   try {

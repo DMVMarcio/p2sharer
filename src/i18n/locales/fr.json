@@ -324,7 +324,7 @@
   "capture.retryPreview": "Réessayer l'aperçu",
   "message.80e583478ab0": "Aperçu indisponible : {{v0}}",
   "message.f47f39a15741": "L'appareil photo ne prend pas en charge ce mode.",
-  "message.3ac7f82e95fe": "Impossible d'ouvrir les fichiers. Sélectionnez jusqu'à 32 fichiers, jusqu'à 2 Go chacun.",
+  "message.3ac7f82e95fe": "Impossible d’ouvrir les fichiers. Sélectionnez jusqu’à 32 fichiers.",
   "message.29014ff38240": "Impossible de terminer l'opération. Essayer à nouveau.",
   "message.b7ee01f4e0b2": "Impossible de répertorier les caméras. Vérifiez les autorisations de la caméra Windows.",
   "message.f3ec8f258239": "Impossible de répertorier les sources : {{v0}}",

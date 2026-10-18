@@ -5,7 +5,13 @@ use std::{collections::HashMap, fs::{self, File, OpenOptions}, io::{Read, Seek, 
 use tauri::State;
 
 const CHUNK: usize = 256 * 1024;
-const MAX_FILE: u64 = 2 * 1024 * 1024 * 1024;
+// File sizes and offsets cross JavaScript IPC as numbers; preserve exact integers.
+const MAX_SAFE_FILE_SIZE: u64 = (1 << 53) - 1;
+
+fn validate_file_size(size: u64) -> Result<(), String> {
+    if size > MAX_SAFE_FILE_SIZE { return Err("File size cannot be represented exactly".into()); }
+    Ok(())
+}
 
 #[derive(Default)]
 pub struct ChatFileState {
@@ -32,7 +38,7 @@ fn digest(path: &Path) -> Result<(u64, String), String> {
     let metadata = file.metadata().map_err(|e| e.to_string())?;
     if !metadata.is_file() { return Err("Only regular files can be shared".into()); }
     let size = metadata.len();
-    if size > MAX_FILE { return Err("File exceeds 2 GiB limit".into()); }
+    validate_file_size(size)?;
     let mut hasher = Sha256::new();
     let mut buffer = [0u8; 128 * 1024];
     loop {
@@ -136,9 +142,10 @@ async fn read_source_chunk(state: &ChatFileState, id: &str, offset: u64,
     tauri::async_runtime::spawn_blocking(move || {
         let mut file = File::open(path).map_err(|e| e.to_string())?;
         let size = file.metadata().map_err(|e| e.to_string())?.len();
-        if size > MAX_FILE || offset > size { return Err("Invalid source offset".into()); }
+        validate_file_size(size)?;
+        if offset > size { return Err("Invalid source offset".into()); }
         file.seek(SeekFrom::Start(offset)).map_err(|e| e.to_string())?;
-        let mut buffer = vec![0u8; length.min((size - offset) as usize)];
+        let mut buffer = vec![0u8; (length as u64).min(size - offset) as usize];
         file.read_exact(&mut buffer).map_err(|e| e.to_string())?;
         Ok(buffer)
     }).await.map_err(|e| e.to_string())?
@@ -148,7 +155,8 @@ pub(crate) fn open_direct_source(state: &ChatFileState, id: &str, size: u64) -> 
     let path = state.sources.lock().map_err(|e| e.to_string())?.get(id).cloned().ok_or("Source unavailable")?;
     let file = File::open(path).map_err(|e| e.to_string())?;
     let metadata = file.metadata().map_err(|e| e.to_string())?;
-    if !metadata.is_file() || size > MAX_FILE || metadata.len() != size { return Err("Source size changed".into()); }
+    validate_file_size(size)?;
+    if !metadata.is_file() || metadata.len() != size { return Err("Source size changed".into()); }
     Ok(file)
 }
 
@@ -163,7 +171,8 @@ pub(crate) fn validate_direct_download(state: &ChatFileState, id: &str, size: u6
 pub async fn choose_chat_download(state: State<'_, ChatFileState>, id: String, name: String, size: u64,
     hash: String, save_as: bool) -> Result<bool, String> {
     safe_name(&name)?;
-    if size > MAX_FILE || !hash.bytes().all(|b| b.is_ascii_hexdigit()) || hash.len() != 64 { return Err("Invalid file metadata".into()); }
+    validate_file_size(size)?;
+    if !hash.bytes().all(|b| b.is_ascii_hexdigit()) || hash.len() != 64 { return Err("Invalid file metadata".into()); }
     let destination = tauri::async_runtime::spawn_blocking(move || -> Result<Option<PathBuf>, String> {
         if save_as {
             return Ok(rfd::FileDialog::new().set_file_name(&name).save_file());
@@ -213,7 +222,9 @@ pub(crate) fn write_download_bytes(state: &ChatFileState, id: &str, offset: u64,
     if bytes.is_empty() || bytes.len() > CHUNK { return Err("Invalid chunk size".into()); }
     let mut downloads = state.downloads.lock().map_err(|e| e.to_string())?;
     let download = downloads.get_mut(id).ok_or("Download unavailable")?;
-    if offset != download.written || offset + bytes.len() as u64 > download.size { return Err("Invalid chunk offset".into()); }
+    if offset != download.written || offset.checked_add(bytes.len() as u64).is_none_or(|end| end > download.size) {
+        return Err("Invalid chunk offset".into());
+    }
     download.file.write_all(bytes).map_err(|e| e.to_string())?;
     download.written += bytes.len() as u64;
     Ok(download.written)
@@ -475,6 +486,15 @@ pub async fn copy_chat_image(data_base64: String) -> Result<(), String> {
 mod tests {
     use super::*;
 
+    #[test]
+    fn file_sizes_above_two_gib_preserve_javascript_integer_precision() {
+        for size in [0, 2 * 1024 * 1024 * 1024 + 1, 5 * 1024 * 1024 * 1024, MAX_SAFE_FILE_SIZE] {
+            assert!(validate_file_size(size).is_ok());
+        }
+        assert!(validate_file_size(MAX_SAFE_FILE_SIZE + 1).is_err());
+        assert!(validate_file_size(u64::MAX).is_err());
+    }
+
     #[tokio::test]
     async fn binary_source_reads_are_bounded_and_preserve_exact_bytes() {
         let state = ChatFileState::default();
@@ -519,6 +539,7 @@ mod tests {
         assert!(write_download_bytes(&state, "request", 0, &[]).is_err());
         assert!(write_download_bytes(&state, "request", 0, &vec![0; CHUNK + 1]).is_err());
         assert!(write_download_bytes(&state, "request", 1, &[1]).is_err());
+        assert!(write_download_bytes(&state, "request", u64::MAX, &[1]).is_err());
         assert_eq!(write_download_bytes(&state, "request", 0, &vec![0x42; CHUNK]).unwrap(), CHUNK as u64);
         assert!(write_download_bytes(&state, "request", CHUNK as u64, &[1, 2, 3, 4]).is_err());
         assert_eq!(write_download_bytes(&state, "request", CHUNK as u64, &[1, 2, 3]).unwrap(), (CHUNK + 3) as u64);

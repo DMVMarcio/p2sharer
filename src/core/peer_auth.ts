@@ -34,7 +34,7 @@ function hasSafeChatShape(value: unknown): value is SignedChatMessage {
       typeof message.file.name === 'string' &&
       message.file.name.length > 0 && message.file.name.length <= 180 &&
       !/[\\/:*?"<>|\x00-\x1f]/.test(message.file.name) &&
-      Number.isSafeInteger(message.file.size) && message.file.size >= 0 && message.file.size <= 2 * 1024 ** 3 &&
+      Number.isSafeInteger(message.file.size) && message.file.size >= 0 &&
       typeof message.file.sha256 === 'string' && /^[0-9a-f]{64}$/.test(message.file.sha256) &&
       typeof message.file.isImage === 'boolean' &&
       (!message.file.isImage || /\.(png|jpe?g|gif|webp|bmp)$/i.test(message.file.name)))) &&

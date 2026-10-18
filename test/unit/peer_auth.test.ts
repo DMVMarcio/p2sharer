@@ -66,6 +66,14 @@ test('file offers bind name, size, hash and image type to the author signature',
   assert.equal(await bob.verify({ ...message, file: { ...file, isImage: false } }, 'file-alice'), false);
   assert.equal(await bob.verify({ ...message, file: { ...file, name: '../escape.png' } }, 'file-alice'), false);
   assert.equal(await bob.verify({ ...message, file: null }, 'file-alice'), false);
+  for (const size of [2 * 1024 ** 3 + 1, 5 * 1024 ** 3, Number.MAX_SAFE_INTEGER]) {
+    const large = await alice.sign({ ...message, file: { ...file, size } });
+    assert.equal(await bob.verify(large, 'file-alice'), true);
+  }
+  for (const size of [-1, 0.5, Number.MAX_SAFE_INTEGER + 1, Infinity]) {
+    const invalid = await alice.sign({ ...message, file: { ...file, size } });
+    assert.equal(await bob.verify(invalid, 'file-alice'), false);
+  }
 });
 
 test('file control signatures bind requests to their transfer and message', async () => {

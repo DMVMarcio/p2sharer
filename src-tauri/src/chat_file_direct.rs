@@ -118,7 +118,7 @@ async fn receive(app: &tauri::AppHandle, id: &str, address: IpAddr, offer: Direc
     let mut buffer = vec![0u8; BUFFER];
     let mut last = Instant::now();
     while *bytes < size {
-        let limit = BUFFER.min((size - *bytes) as usize);
+        let limit = (BUFFER as u64).min(size - *bytes) as usize;
         let mut filled = 0;
         // TLS can yield individual records. Coalesce them before synchronous disk writes,
         // while retaining a stall timeout per read rather than a minimum transfer speed.
