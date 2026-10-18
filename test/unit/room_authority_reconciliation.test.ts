@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { PeerAuthenticator } from '../../src/core/peer_auth.ts';
+import { RoomAuthority } from '../../src/core/room_authority.ts';
 import { createAuthenticatedInvite, formatRoomInvite, parseRoomInvite,
   signRoomInvite } from '../../src/core/room_invite.ts';
 import { roomStateFingerprint } from '../../src/core/room_state_sync.ts';
@@ -80,6 +81,25 @@ test('admitted peers reconcile signed commands; unauthenticated peers cannot req
     (manager as any).localStream = null;
     await actions.get('room_admission')!.onMessage!(
       { kind: 'request', password: '' }, { peerId: 'member' });
+
+    const firstAdmission = sent.findLast(item => item.action === 'room_admission' &&
+      item.data.kind === 'command' && item.data.command.kind === 'admit')!.data.command;
+    const memberAuthority = new RoomAuthority(invite.roomId, invite.rootKey, member);
+    assert.equal(await memberAuthority.verifyCommand(firstAdmission), true);
+    room.onPeerLeave('member');
+    room.onPeerJoin('member');
+    const reconnectNonce = sent.findLast(item => item.action === 'peer_identity' &&
+      item.data.kind === 'challenge' && item.target === 'member')!.data.nonce;
+    await actions.get('peer_identity')!.onMessage!({ kind: 'proof', nonce: reconnectNonce,
+      key: member.publicKey, signature: await member.signControl('identity',
+        [invite.roomId, 'member', reconnectNonce]) }, { peerId: 'member' });
+    await actions.get('room_admission')!.onMessage!(
+      { kind: 'request', password: '' }, { peerId: 'member' });
+    const renewed = sent.findLast(item => item.action === 'room_admission' &&
+      item.data.kind === 'command' && item.data.command.kind === 'admit')!.data.command;
+    assert.ok(renewed.sequence > firstAdmission.sequence, 're-entry needs a fresh signed admission');
+    assert.equal(await memberAuthority.verifyCommand(firstAdmission), false, 'old commands remain replay protected');
+    assert.equal(await memberAuthority.verifyCommand(renewed), true);
 
     const emptyFingerprint = await roomStateFingerprint(0, []);
     await actions.get('room_admission')!.onMessage!(

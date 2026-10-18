@@ -151,6 +151,7 @@ export class GroupRoomManager {
   private previewAction: any = null;
   private previewNonce = crypto.randomUUID();
   private previewRequests = new Map<string, number>();
+  private admissionRequests = new Map<string, number>();
   private leavePromise: Promise<void> | null = null;
 
   public hasAdmission(): boolean { return this.localAdmitted && !this.previewOnly; }
@@ -879,8 +880,9 @@ export class GroupRoomManager {
     if (this.previewOnly) return;
     if (!this.authority?.isLocalHost() || !this.chatAuth) return;
     const key = this.chatAuth.getKnownKey(peerId);
-    if (!key || this.bannedKeys.has(key) || this.admissionHistory.some((item) =>
-      item.epoch === this.authority?.epoch && item.kind === 'admit' && item.targetPeerId === peerId && item.targetKey === key)) return;
+    if (!key || this.bannedKeys.has(key)) return;
+    // A returning client may already have consumed the previous command while
+    // restoring its saved history. Admission must renew its signed sequence.
     const command = await this.authority.makeCommand('admit', { targetPeerId: peerId, targetKey: key });
     this.admissionHistory.push(command);
     this.retainAdmissionHistory();
@@ -1250,6 +1252,10 @@ export class GroupRoomManager {
         const returningMember = Boolean(key && !this.bannedKeys.has(key) &&
           this.admissionHistory.some((command) => command.kind === 'admit' && command.targetKey === key));
         if (key && (data.password === this.password || returningMember)) {
+          const now = Date.now();
+          const previous = this.admissionRequests.get(meta.peerId);
+          if (previous !== undefined && now - previous < 1500) return;
+          this.admissionRequests.set(meta.peerId, now);
           if (this.authority.isLocalHost()) await this.issueAdmission(meta.peerId);
           else await this.issueAdminAdmission(meta.peerId);
         } else if (key) {
@@ -1815,6 +1821,7 @@ export class GroupRoomManager {
     // 9. Direct WebRTC Peer Lifecycle Listeners
     this.room.onPeerJoin = (peerId: string) => {
       if (this.room !== boundRoom) return;
+      this.admissionRequests.delete(peerId);
       console.log(`[P2P] Direct WebRTC peer connection active: ${peerId}`);
 
       // Verify and record direct WebRTC connection
@@ -2087,6 +2094,7 @@ export class GroupRoomManager {
   }
 
   private removePeer(peerId: string) {
+    this.admissionRequests.delete(peerId);
     profileStats.forget(peerId);
     this.profileTransfer?.forget(peerId);
     this.bannerTransfer?.forget(peerId);
@@ -3535,6 +3543,7 @@ export class GroupRoomManager {
     clearTimeout(this.profileStatsTimer); this.profileStatsTimer = undefined;
     if (!this.previewOnly) profileStats.clearPeers();
     this.previewRequests.clear();
+    this.admissionRequests.clear();
     this.profileTransfer?.close();
     this.profileTransfer = null;
     this.bannerTransfer?.close();
