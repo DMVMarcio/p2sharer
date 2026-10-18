@@ -5,7 +5,7 @@ import { profileAction } from '../common/profile_actions';
 import { modalManager } from '../../hooks/useModal';
 import { getLanguage, t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
-import React, { useState, useEffect, useRef, useSyncExternalStore } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useSyncExternalStore } from 'react';
 import { useDropdownPresence } from '../../hooks/useDropdownPresence';
 import { useRoom } from '../../hooks/useRoom';
 import { EmojiPicker } from '../common/EmojiPicker';
@@ -32,6 +32,9 @@ import { showToast } from '../../hooks/useToast';
 import { copyImageToClipboard } from '../../core/image_clipboard';
 import { ChatMentionSuggestions, type MentionCandidate } from './ChatMentionSuggestions';
 
+let lastChatScrollTop: number | null = null;
+let lastChatWasAtBottom = true;
+
 export const ChatPane: React.FC = () => {
   useLocale();
   const openContextMenu = useContextMenu();
@@ -54,7 +57,9 @@ export const ChatPane: React.FC = () => {
   const [mentionDismissed, setMentionDismissed] = useState(false);
   const emojiPack = useSyncExternalStore(subscribeEmojiPack, getEmojiPack);
   const transferSpeedUnit = useSyncExternalStore(subscribeTransferSpeedUnit, getTransferSpeedUnit);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const isInitialMount = useRef(true);
   const inputRef = useRef<EmojiComposerHandle>(null);
   const editRef = useRef<EmojiComposerHandle>(null);
   const editEmojiButtonRef = useRef<HTMLButtonElement>(null);
@@ -148,7 +153,27 @@ export const ChatPane: React.FC = () => {
   const latestMessageId = chatMessages[chatMessages.length - 1]?.id;
   const replyMessage = chatMessages.find((message) => message.id === replyToId && !message.deletedAt);
 
+  useLayoutEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    if (lastChatScrollTop !== null && !lastChatWasAtBottom) {
+      container.scrollTop = lastChatScrollTop;
+    } else {
+      container.scrollTop = container.scrollHeight;
+    }
+  }, []);
+
+  const handleMessagesScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    lastChatScrollTop = el.scrollTop;
+    lastChatWasAtBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) < 40;
+  };
+
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [latestMessageId]);
 
@@ -232,7 +257,12 @@ export const ChatPane: React.FC = () => {
   return (
     <div className="sidebar-tab-content active" id="tab-content-chat" ref={paneRef}>
       {dragging && <ChatFileDropOverlay />}
-      <div className="chat-messages-container" id="chat-messages-container">
+      <div
+        className="chat-messages-container"
+        id="chat-messages-container"
+        ref={messagesContainerRef}
+        onScroll={handleMessagesScroll}
+      >
         {visibleMessages.map((msg, index) => {
           const timeStr = new Date(msg.timestamp).toLocaleTimeString(getLanguage(), {
             hour: '2-digit',

@@ -1710,6 +1710,12 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
               visibility 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
+/* In grid mode, the broadcaster identity overlay is always visible on streaming cards */
+.layout-grid .stream-card .stream-card-overlay {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 /* Shared themed surfaces stay readable over bright and dark media. */
 .stream-card,
 .pip-window-root {

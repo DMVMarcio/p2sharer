@@ -54,8 +54,25 @@ export const RoomVideoContainer: React.FC = () => {
   const [cardSizes, setCardSizes] = useState<Record<string, number>>({});
   const [manualRows, setManualRows] = useState<string[][] | null>(null);
   const surfaceRef = useRef<HTMLDivElement | null>(null);
+  const trayRef = useRef<HTMLDivElement | null>(null);
   const currentRoomCode = useStore(s => s.currentRoomCode);
   useEffect(() => { setCardOrder([]); setCardSizes({}); setManualRows(null); }, [currentRoomCode]);
+
+  useEffect(() => {
+    if (layoutMode !== 'spotlight') return;
+    const el = trayRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || el.scrollWidth <= el.clientWidth) return;
+      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      if (!delta) return;
+      e.preventDefault();
+      e.stopPropagation();
+      el.scrollLeft += delta * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? el.clientWidth : 1);
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [layoutMode, isSpotlightTrayCollapsed]);
   useLayoutEffect(() => {
     const node = gridViewportRef.current;
     if (!node || layoutMode !== 'grid') return;
@@ -267,8 +284,24 @@ export const RoomVideoContainer: React.FC = () => {
                   <polyline points="6 9 12 15 18 9"/>
                 </svg>
               </button>
-              <div ref={layoutMode === 'spotlight' ? surfaceRef : undefined} className="spotlight-tray-strip" id="spotlight-tray-strip"
-                inert={isSpotlightTrayCollapsed} aria-hidden={isSpotlightTrayCollapsed}>
+              <div
+                ref={(node) => {
+                  if (layoutMode === 'spotlight') surfaceRef.current = node;
+                  trayRef.current = node;
+                }}
+                className="spotlight-tray-strip"
+                id="spotlight-tray-strip"
+                inert={isSpotlightTrayCollapsed}
+                aria-hidden={isSpotlightTrayCollapsed}
+                onWheel={(e) => {
+                  if (e.ctrlKey) return;
+                  const el = e.currentTarget;
+                  if (el.scrollWidth <= el.clientWidth) return;
+                  const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+                  if (!delta) return;
+                  el.scrollLeft += delta * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? el.clientWidth : 1);
+                }}
+              >
                 {entries.map(slot => renderMovableCard(slot, true))}
               </div>
             </div>
