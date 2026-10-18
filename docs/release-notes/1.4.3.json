@@ -1,0 +1,70 @@
+{
+  "version": "1.4.3",
+  "translations": {
+    "en": [
+      "**Clearer broadcast controls.** Active broadcasts are easier to recognize, with a visible edit pencil and a distinct stop button in the broadcast menu.",
+      "**Stereo audio.** Broadcasts and the shared browser preserve separate left and right channels when the source is stereo.",
+      "**Larger chat files.** Removed the 2 GiB limit per file. Sending and downloading still require consent."
+    ],
+    "pt-BR": [
+      "**Controles de transmissão mais claros.** As transmissões ativas ficam mais fáceis de identificar, com um lápis de edição visível e um botão de parar destacado no menu de transmissão.",
+      "**Áudio estéreo.** As transmissões e o navegador compartilhado preservam os canais esquerdo e direito separados quando a fonte é estéreo.",
+      "**Arquivos maiores no chat.** Removemos o limite de 2 GiB por arquivo. O envio e o download continuam dependendo de consentimento."
+    ],
+    "es": [
+      "**Controles de transmisión más claros.** Las transmisiones activas son más fáciles de identificar, con un lápiz de edición visible y un botón de detener destacado en el menú.",
+      "**Audio estéreo.** Las transmisiones y el navegador compartido conservan separados los canales izquierdo y derecho cuando la fuente es estéreo.",
+      "**Archivos más grandes en el chat.** Eliminamos el límite de 2 GiB por archivo. El envío y la descarga siguen requiriendo consentimiento."
+    ],
+    "fr": [
+      "**Des commandes de diffusion plus claires.** Les diffusions actives sont plus faciles à reconnaître, avec un crayon de modification visible et un bouton d’arrêt distinct dans le menu.",
+      "**Audio stéréo.** Les diffusions et le navigateur partagé conservent des canaux gauche et droit distincts lorsque la source est stéréo.",
+      "**Des fichiers plus volumineux dans le chat.** La limite de 2 Gio par fichier a été supprimée. L’envoi et le téléchargement nécessitent toujours un consentement."
+    ],
+    "de": [
+      "**Klarere Übertragungssteuerung.** Aktive Übertragungen sind leichter zu erkennen, mit einem sichtbaren Bearbeitungsstift und einer hervorgehobenen Stopptaste im Übertragungsmenü.",
+      "**Stereo-Audio.** Übertragungen und der gemeinsame Browser behalten getrennte linke und rechte Kanäle bei, wenn die Quelle Stereo liefert.",
+      "**Größere Dateien im Chat.** Die Begrenzung auf 2 GiB pro Datei wurde entfernt. Senden und Herunterladen erfordern weiterhin Zustimmung."
+    ],
+    "it": [
+      "**Controlli di trasmissione più chiari.** Le trasmissioni attive sono più facili da riconoscere, con una matita di modifica visibile e un pulsante di arresto ben distinto nel menu.",
+      "**Audio stereo.** Le trasmissioni e il browser condiviso mantengono separati i canali sinistro e destro quando la sorgente è stereo.",
+      "**File più grandi nella chat.** Rimosso il limite di 2 GiB per file. L’invio e il download richiedono ancora il consenso."
+    ],
+    "zh-CN": [
+      "**更清晰的直播控制。** 直播菜单通过醒目的编辑铅笔和独立的停止按钮，让正在进行的直播更易识别。",
+      "**立体声音频。** 当音源为立体声时，直播和共享浏览器会保留独立的左右声道。",
+      "**聊天支持更大的文件。** 已移除每个文件 2 GiB 的限制。发送和下载仍需获得同意。"
+    ],
+    "zh-TW": [
+      "**更清楚的直播控制。** 直播選單透過醒目的編輯鉛筆和獨立的停止按鈕，讓進行中的直播更容易識別。",
+      "**立體聲音訊。** 當音源為立體聲時，直播和共享瀏覽器會保留獨立的左右聲道。",
+      "**聊天支援更大的檔案。** 已移除每個檔案 2 GiB 的限制。傳送和下載仍需取得同意。"
+    ],
+    "ja": [
+      "**わかりやすい配信操作。** 配信メニューに編集用の鉛筆と目立つ停止ボタンを表示し、配信中の項目を見分けやすくしました。",
+      "**ステレオ音声。** 配信と共有ブラウザーで、音源がステレオの場合に左右のチャンネルを分離したまま再生できます。",
+      "**チャットでより大きなファイルを共有。** ファイルごとの 2 GiB 制限を撤廃しました。送信とダウンロードには引き続き同意が必要です。"
+    ],
+    "ko": [
+      "**더 명확한 방송 제어.** 방송 메뉴에 편집 연필과 눈에 띄는 중지 버튼을 표시하여 진행 중인 방송을 더 쉽게 구분할 수 있습니다.",
+      "**스테레오 오디오.** 방송과 공유 브라우저에서 소스가 스테레오인 경우 왼쪽과 오른쪽 채널을 분리하여 유지합니다.",
+      "**채팅에서 더 큰 파일 공유.** 파일당 2 GiB 제한을 제거했습니다. 전송과 다운로드에는 여전히 동의가 필요합니다."
+    ],
+    "hi": [
+      "**प्रसारण के अधिक स्पष्ट नियंत्रण।** प्रसारण मेनू में दिखाई देने वाली संपादन पेंसिल और अलग से उभरे रोकने के बटन से सक्रिय प्रसारण पहचानना आसान हो गया है।",
+      "**स्टीरियो ऑडियो।** स्रोत स्टीरियो होने पर प्रसारण और साझा ब्राउज़र बाएँ और दाएँ चैनलों को अलग रखते हैं।",
+      "**चैट में बड़ी फ़ाइलें।** प्रति फ़ाइल 2 GiB की सीमा हटा दी गई है। भेजने और डाउनलोड करने के लिए अब भी सहमति आवश्यक है।"
+    ],
+    "fi": [
+      "**Selkeämmät lähetysohjaimet.** Aktiiviset lähetykset on helpompi tunnistaa lähetysvalikossa näkyvän muokkauskynän ja erottuvan pysäytyspainikkeen avulla.",
+      "**Stereoääni.** Lähetykset ja jaettu selain säilyttävät vasemman ja oikean kanavan erillisinä, kun lähde on stereo.",
+      "**Suurempia tiedostoja keskustelussa.** Tiedostokohtainen 2 GiB:n raja on poistettu. Lähettäminen ja lataaminen edellyttävät edelleen suostumusta."
+    ],
+    "ru": [
+      "**Более понятное управление трансляциями.** Активные трансляции легче распознать благодаря видимому карандашу редактирования и выделенной кнопке остановки в меню.",
+      "**Стереозвук.** Трансляции и общий браузер сохраняют раздельные левый и правый каналы, если источник передаёт стереозвук.",
+      "**Большие файлы в чате.** Ограничение в 2 ГиБ на файл снято. Для отправки и скачивания по-прежнему требуется согласие."
+    ]
+  }
+}
