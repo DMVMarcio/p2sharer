@@ -107,7 +107,7 @@ function renderMentionsAndEmoji(content: string, pack: EmojiPack, emojiSize: num
 export const ChatMessageContent: React.FC<{ text: string; pack: EmojiPack }> = ({ text, pack }) => {
   const emojiCount = getEmojiOnlyCount(text);
   const isJumbo = emojiCount >= 1 && emojiCount <= 3;
-  const emojiSize = isJumbo ? 36 : 21;
+  const emojiSize = isJumbo ? 34 : 20;
 
   const withEmoji = (children: React.ReactNode) => React.Children.map(children, (child) =>
     typeof child === 'string' ? renderMentionsAndEmoji(child, pack, emojiSize) : child

@@ -1,6 +1,6 @@
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { usePanelSize } from '../../hooks/usePanelSize';
 import { PanelResizeHandle } from '../common/PanelResizeHandle';
 import { UnreadChatBadge } from './UnreadChatBadge';
@@ -14,7 +14,56 @@ export const RoomView: React.FC = () => {
   useLocale();
   const { isSidebarCollapsed, toggleSidebar, unreadChatMessages } = useRoom();
   const layoutRef = useRef<HTMLDivElement>(null);
+  const edgeRef = useRef<HTMLDivElement>(null);
   const sidebarSize = usePanelSize(layoutRef, 'width', 'p2sharer_sidebar_width', 320, 240, 240);
+
+  useEffect(() => {
+    const container = layoutRef.current;
+    if (!container) return;
+
+    let isNearby = false;
+    let rafId: number | null = null;
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (rafId !== null) return;
+      rafId = window.requestAnimationFrame(() => {
+        rafId = null;
+        const edge = edgeRef.current;
+        if (!edge) return;
+        const rect = edge.getBoundingClientRect();
+        const inZone = (
+          e.clientX >= rect.left &&
+          e.clientX <= rect.right &&
+          e.clientY >= rect.top &&
+          e.clientY <= rect.bottom
+        );
+        if (inZone !== isNearby) {
+          isNearby = inZone;
+          edge.classList.toggle('is-nearby', inZone);
+        }
+      });
+    };
+
+    const onPointerLeave = () => {
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+      if (isNearby) {
+        isNearby = false;
+        edgeRef.current?.classList.remove('is-nearby');
+      }
+    };
+
+    container.addEventListener('pointermove', onPointerMove, { passive: true });
+    container.addEventListener('pointerleave', onPointerLeave, { passive: true });
+    return () => {
+      if (rafId !== null) window.cancelAnimationFrame(rafId);
+      container.removeEventListener('pointermove', onPointerMove);
+      container.removeEventListener('pointerleave', onPointerLeave);
+      edgeRef.current?.classList.remove('is-nearby');
+    };
+  }, []);
 
   return (
     <section className="view active" id="view-group-room">
@@ -27,6 +76,7 @@ export const RoomView: React.FC = () => {
 
         {/* Hoverable lateral sidebar toggle arrow */}
         <div
+          ref={edgeRef}
           className={`sidebar-toggle-edge ${isSidebarCollapsed ? 'collapsed' : 'expanded'} ${unreadChatMessages > 0 ? 'has-unread' : ''}`}
         >
           <button
