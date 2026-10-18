@@ -4,67 +4,80 @@
     "en": [
       "**Clearer stream controls.** Refreshed stream and picture-in-picture overlays with easier-to-read controls and colored statistics.",
       "**Easier to stop sharing.** Stop a stream directly from its card or the main toolbar, choosing which one to end when sharing multiple sources.",
-      "**Steadier transfer details.** The statistics icon in chat uploads and downloads stays in place as transfer speeds change."
+      "**Steadier transfer details.** The statistics icon in chat uploads and downloads stays in place as transfer speeds change.",
+      "**Faster, steadier file transfers.** Removed repeated processing delays and fixed a problem that could stall chat uploads and downloads."
     ],
     "pt-BR": [
       "**Controles de transmissão mais claros.** Renovamos os overlays das transmissões e das janelas flutuantes, com controles mais legíveis e estatísticas coloridas.",
       "**Mais fácil parar de transmitir.** Encerre uma transmissão pelo próprio card ou pela barra principal, escolhendo qual parar quando estiver compartilhando várias fontes.",
-      "**Detalhes das transferências no lugar.** O ícone de estatísticas dos envios e downloads do chat fica fixo mesmo quando a velocidade varia."
+      "**Detalhes das transferências no lugar.** O ícone de estatísticas dos envios e downloads do chat fica fixo mesmo quando a velocidade varia.",
+      "**Transferências de arquivos mais rápidas e estáveis.** Reduzimos atrasos repetidos de processamento e corrigimos um problema que podia travar os envios e downloads do chat."
     ],
     "es": [
       "**Controles de transmisión más claros.** Renovamos los controles superpuestos de las transmisiones y las ventanas flotantes, con opciones más legibles y estadísticas en color.",
       "**Dejar de compartir es más fácil.** Detén una transmisión desde su tarjeta o la barra principal y elige cuál finalizar cuando compartas varias fuentes.",
-      "**Detalles de transferencia estables.** El icono de estadísticas de las subidas y descargas del chat permanece fijo aunque cambie la velocidad."
+      "**Detalles de transferencia estables.** El icono de estadísticas de las subidas y descargas del chat permanece fijo aunque cambie la velocidad.",
+      "**Transferencias de archivos más rápidas y estables.** Redujimos las demoras repetidas de procesamiento y corregimos un problema que podía bloquear las subidas y descargas del chat."
     ],
     "fr": [
       "**Des commandes de diffusion plus claires.** Les commandes superposées des diffusions et des fenêtres flottantes sont plus lisibles, avec des statistiques en couleur.",
       "**Arrêter le partage plus facilement.** Arrêtez une diffusion depuis sa carte ou la barre principale, en choisissant laquelle terminer si vous partagez plusieurs sources.",
-      "**Des détails de transfert stables.** Dans les envois et téléchargements du chat, l’icône des statistiques reste en place lorsque la vitesse varie."
+      "**Des détails de transfert stables.** Dans les envois et téléchargements du chat, l’icône des statistiques reste en place lorsque la vitesse varie.",
+      "**Des transferts de fichiers plus rapides et plus stables.** Réduction des délais de traitement répétés et correction d’un problème pouvant bloquer les envois et téléchargements du chat."
     ],
     "de": [
       "**Übersichtlichere Übertragungssteuerung.** Überarbeitete Einblendungen für Übertragungen und Bild-in-Bild-Fenster mit besser lesbaren Bedienelementen und farbigen Statistiken.",
       "**Freigaben einfacher beenden.** Beende eine Übertragung direkt auf ihrer Karte oder über die Hauptleiste. Bei mehreren Quellen wählst du aus, welche beendet wird.",
-      "**Stabile Transferdetails.** Das Statistik-Symbol bei Chat-Uploads und -Downloads bleibt an seinem Platz, auch wenn sich die Geschwindigkeit ändert."
+      "**Stabile Transferdetails.** Das Statistik-Symbol bei Chat-Uploads und -Downloads bleibt an seinem Platz, auch wenn sich die Geschwindigkeit ändert.",
+      "**Schnellere, stabilere Dateiübertragungen.** Wiederholte Verarbeitungsverzögerungen wurden reduziert und ein Problem behoben, das Uploads und Downloads im Chat zum Stillstand bringen konnte."
     ],
     "it": [
       "**Controlli delle trasmissioni più chiari.** Abbiamo rinnovato i controlli in sovrimpressione delle trasmissioni e delle finestre mobili, con comandi più leggibili e statistiche colorate.",
       "**Interrompere la condivisione è più facile.** Ferma una trasmissione dalla sua scheda o dalla barra principale, scegliendo quale terminare quando condividi più sorgenti.",
-      "**Dettagli dei trasferimenti stabili.** L’icona delle statistiche degli invii e dei download nella chat resta ferma anche quando cambia la velocità."
+      "**Dettagli dei trasferimenti stabili.** L’icona delle statistiche degli invii e dei download nella chat resta ferma anche quando cambia la velocità.",
+      "**Trasferimenti di file più rapidi e stabili.** Ridotti i ritardi ripetuti di elaborazione e risolto un problema che poteva bloccare gli invii e i download nella chat."
     ],
     "zh-CN": [
       "**更清晰的直播控件。** 更新了直播和画中画窗口的悬浮控件，按钮更易辨认，统计数据以不同颜色显示。",
       "**更轻松地停止共享。** 可直接从直播卡片或主工具栏停止直播；同时共享多个来源时，可选择要停止的直播。",
-      "**传输详情位置更稳定。** 聊天上传和下载的统计图标不再随传输速度变化而移动。"
+      "**传输详情位置更稳定。** 聊天上传和下载的统计图标不再随传输速度变化而移动。",
+      "**文件传输更快、更稳定。** 减少了重复的处理延迟，并修复了可能导致聊天上传和下载停滞的问题。"
     ],
     "zh-TW": [
       "**更清楚的串流控制項。** 更新了串流及子母畫面視窗的浮動控制項，按鈕更容易辨識，統計資料以不同顏色顯示。",
       "**更輕鬆地停止分享。** 可直接從串流卡片或主工具列停止串流；同時分享多個來源時，可選擇要停止的串流。",
-      "**傳輸詳細資訊位置更穩定。** 聊天上傳和下載的統計圖示不再隨傳輸速度變化而移動。"
+      "**傳輸詳細資訊位置更穩定。** 聊天上傳和下載的統計圖示不再隨傳輸速度變化而移動。",
+      "**檔案傳輸更快、更穩定。** 減少了重複的處理延遲，並修正了可能導致聊天上傳和下載停滯的問題。"
     ],
     "ja": [
       "**配信操作がわかりやすく。** 配信とピクチャーインピクチャーのオーバーレイを刷新し、操作ボタンを見やすく、統計情報を色分けしました。",
       "**共有の停止が簡単に。** 配信カードやメインツールバーから配信を停止できます。複数のソースを共有している場合は、停止する配信を選べます。",
-      "**転送の詳細を安定した位置に。** チャットのアップロードとダウンロードで、速度が変わっても統計アイコンが動かなくなりました。"
+      "**転送の詳細を安定した位置に。** チャットのアップロードとダウンロードで、速度が変わっても統計アイコンが動かなくなりました。",
+      "**ファイル転送がより速く、安定して。** 繰り返し発生する処理待ちを減らし、チャットのアップロードやダウンロードが停止することがある問題を修正しました。"
     ],
     "ko": [
       "**더 알아보기 쉬운 스트림 제어.** 스트림과 화면 속 화면 오버레이를 새롭게 다듬어 제어 버튼을 더 쉽게 알아볼 수 있고 통계도 색상으로 구분됩니다.",
       "**더 간편한 공유 중지.** 스트림 카드나 기본 도구 모음에서 바로 스트림을 중지할 수 있습니다. 여러 소스를 공유할 때는 중지할 스트림을 선택할 수 있습니다.",
-      "**흔들리지 않는 전송 정보.** 채팅의 업로드와 다운로드에서 전송 속도가 바뀌어도 통계 아이콘이 움직이지 않습니다."
+      "**흔들리지 않는 전송 정보.** 채팅의 업로드와 다운로드에서 전송 속도가 바뀌어도 통계 아이콘이 움직이지 않습니다.",
+      "**더 빠르고 안정적인 파일 전송.** 반복되는 처리 지연을 줄이고 채팅 업로드와 다운로드가 멈출 수 있는 문제를 수정했습니다."
     ],
     "hi": [
       "**स्ट्रीम के अधिक स्पष्ट नियंत्रण।** स्ट्रीम और पिक्चर-इन-पिक्चर के ओवरले को बेहतर बनाया है, ताकि नियंत्रण पढ़ना आसान हो और आँकड़े अलग-अलग रंगों में दिखें।",
       "**साझा करना रोकना अब आसान है।** स्ट्रीम के कार्ड या मुख्य टूलबार से उसे सीधे रोकें। कई स्रोत साझा करते समय चुनें कि कौन-सी स्ट्रीम बंद करनी है।",
-      "**ट्रांसफ़र की जानकारी एक ही जगह।** चैट के अपलोड और डाउनलोड में गति बदलने पर भी आँकड़ों का आइकन अपनी जगह पर रहता है।"
+      "**ट्रांसफ़र की जानकारी एक ही जगह।** चैट के अपलोड और डाउनलोड में गति बदलने पर भी आँकड़ों का आइकन अपनी जगह पर रहता है।",
+      "**फ़ाइल ट्रांसफ़र अब अधिक तेज़ और स्थिर।** बार-बार होने वाली प्रोसेसिंग देरी कम की और चैट में अपलोड व डाउनलोड अटकने की समस्या ठीक की।"
     ],
     "fi": [
       "**Selkeämmät lähetyksen säätimet.** Uudistetut lähetysten ja kuva kuvassa -ikkunoiden säätimet ovat helpommin luettavia, ja tilastot erottuvat väreillä.",
       "**Jakamisen lopettaminen on helpompaa.** Lopeta lähetys suoraan sen kortista tai päätyökaluriviltä. Jos jaat useita lähteitä, voit valita lopetettavan lähetyksen.",
-      "**Siirtotiedot pysyvät paikallaan.** Chatin lähetysten ja latausten tilastokuvake ei enää liiku siirtonopeuden vaihtuessa."
+      "**Siirtotiedot pysyvät paikallaan.** Chatin lähetysten ja latausten tilastokuvake ei enää liiku siirtonopeuden vaihtuessa.",
+      "**Nopeammat ja vakaammat tiedostosiirrot.** Vähensimme toistuvia käsittelyviiveitä ja korjasimme ongelman, joka saattoi pysäyttää chatin lähetykset ja lataukset."
     ],
     "ru": [
       "**Более понятное управление трансляциями.** Обновили панели поверх трансляций и окон «картинка в картинке»: элементы управления стали заметнее, а статистика выделена цветом.",
       "**Остановить трансляцию стало проще.** Завершайте трансляцию прямо из её карточки или с главной панели. Если вы делитесь несколькими источниками, можно выбрать, какой из них остановить.",
-      "**Статистика передачи на месте.** Значок статистики отправок и загрузок в чате больше не смещается при изменении скорости."
+      "**Статистика передачи на месте.** Значок статистики отправок и загрузок в чате больше не смещается при изменении скорости.",
+      "**Более быстрая и стабильная передача файлов.** Сократили повторяющиеся задержки обработки и исправили проблему, из-за которой отправка и загрузка файлов в чате могли зависать."
     ]
   }
 }

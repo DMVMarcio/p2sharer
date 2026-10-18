@@ -10,7 +10,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type { AppWireEvent } from '../apps/types.ts';
 import { getRoomApp } from '../apps/registry.ts';
 import { chatHistoryChanged, chatRevision, chatRevisionKey, mergeChatHistory, nextChatOrder } from '../core/chat_history.ts';
-import { CHAT_FILE_CHUNK_BYTES, CHAT_FILE_IN_FLIGHT_CHUNKS, MAX_IMAGE_PREVIEW_BYTES } from '../core/chat_file_limits.ts';
+import { CHAT_FILE_CHUNK_BYTES, CHAT_FILE_IO_BATCH_BYTES, CHAT_FILE_IN_FLIGHT_CHUNKS, MAX_IMAGE_PREVIEW_BYTES } from '../core/chat_file_limits.ts';
 import { decodeFileBase64, decodeSignedFileChunk, encodeFileBase64, encodeSignedFileChunk,
   fileChunkSignatureData, hashFileChunk } from '../core/chat_file_wire.ts';
 import { PeerAuthenticator } from '../core/peer_auth.ts';
@@ -124,7 +124,7 @@ export interface FileTimings { readMs: number; prepareMs: number; wireMs: number
 export interface FileTransportDiagnostics { protocol?: string; localCandidateType?: string; remoteCandidateType?: string; channelLabel?: string; queuedBytes?: number; queueLimitBytes?: number; pairBytesSent?: number; pairBytesReceived?: number; pairTimestamp?: number; pairBytesPerSecond?: number; availableOutgoingBitsPerSecond?: number; packetsDiscardedOnSend?: number }
 export interface FileProgress { requestId: string; messageId: string; direction: 'send' | 'receive'; bytes: number; total: number; status: 'pending' | 'active' | 'complete' | 'cancelled' | 'error'; error?: string; preview?: string; previewBytes?: Uint8Array; saved?: boolean; previewOnly?: boolean; peerId?: string; fileName?: string; peerName?: string; startedAt?: number; isImage?: boolean; bytesPerSecond?: number; connectionType?: string; rttMs?: number | null; timings?: FileTimings; transport?: FileTransportDiagnostics }
 type FilePacket = { kind: 'request' | 'accept' | 'ready' | 'deny' | 'ack' | 'cancel'; requestId: string; messageId: string; offset?: number; preview?: boolean; signature: string };
-type FileSession = { messageId: string; peerId: string; peerName?: string; sourceId?: string; offset: number; sentOffset?: number; sending?: boolean; receiving?: boolean; pendingChunks?: Map<number, Uint8Array>; total: number; direction: 'send' | 'receive'; preview?: boolean; chunks?: Uint8Array[]; timings: FileTimings };
+type FileSession = { messageId: string; peerId: string; peerName?: string; sourceId?: string; offset: number; sentOffset?: number; sending?: boolean; receiving?: boolean; writingUntil?: number; pendingChunks?: Map<number, Uint8Array>; total: number; direction: 'send' | 'receive'; preview?: boolean; chunks?: Uint8Array[]; timings: FileTimings };
 
 function newFileTimings(): FileTimings {
   return { readMs: 0, prepareMs: 0, wireMs: 0, verifyMs: 0, writeMs: 0, ackMs: 0 };
@@ -2900,20 +2900,17 @@ export class GroupRoomManager {
     await this.fileAction.send({ ...payload, signature }, { target: peerId });
   }
 
-  private async sendFileChunk(session: FileSession, requestId: string,
-    offset: number, encoded: string): Promise<void> {
+  private async prepareFileChunk(session: FileSession, requestId: string,
+    offset: number, bytes: Uint8Array): Promise<Uint8Array> {
     const peerId = session.peerId;
     if (!this.fileAction || !this.chatAuth || !this.peerTracker.isVerified(peerId) ||
         (this.authority && !this.isAdmittedPeer(peerId))) throw new Error('Peer unavailable');
     const prepareStart = performance.now();
-    const bytes = decodeFileBase64(encoded);
     const unsigned = { requestId, messageId: session.messageId, offset, hash: await hashFileChunk(bytes) };
     const signature = await this.chatAuth.signControl('chat-file-chunk-v2', fileChunkSignatureData(unsigned));
     const packet = encodeSignedFileChunk({ ...unsigned, signature }, bytes);
     session.timings.prepareMs += performance.now() - prepareStart;
-    const wireStart = performance.now();
-    await this.fileBulk.send(peerId, packet, () => this.fileSessions.get(requestId) === session);
-    session.timings.wireMs += performance.now() - wireStart;
+    return packet;
   }
 
   private async sendNextFileChunks(requestId: string): Promise<void> {
@@ -2924,13 +2921,30 @@ export class GroupRoomManager {
       while (this.fileSessions.get(requestId) === session && (session.sentOffset ?? 0) < session.total &&
           (session.sentOffset ?? 0) - session.offset < CHAT_FILE_IN_FLIGHT_CHUNKS * CHAT_FILE_CHUNK_BYTES) {
         const offset = session.sentOffset ?? 0;
+        const length = Math.min(CHAT_FILE_IO_BATCH_BYTES, session.total - offset,
+          CHAT_FILE_IN_FLIGHT_CHUNKS * CHAT_FILE_CHUNK_BYTES - (offset - session.offset));
         const readStart = performance.now();
         const data = await invoke<string>('read_chat_file_chunk', { id: session.sourceId, offset,
-          length: CHAT_FILE_CHUNK_BYTES });
+          length });
         session.timings.readMs += performance.now() - readStart;
         if (this.fileSessions.get(requestId) !== session) return;
-        session.sentOffset = offset + Math.min(CHAT_FILE_CHUNK_BYTES, session.total - offset);
-        await this.sendFileChunk(session, requestId, offset, data);
+        const bytes = decodeFileBase64(data);
+        if (bytes.length !== length) throw new Error('Source file changed or truncated');
+        // Prepare a bounded batch concurrently; never serialize a native round trip
+        // and two WebCrypto round trips for every small network message.
+        const preparing: Promise<Uint8Array>[] = [];
+        for (let index = 0; index < bytes.length; index += CHAT_FILE_CHUNK_BYTES) {
+          preparing.push(this.prepareFileChunk(session, requestId, offset + index,
+            bytes.subarray(index, index + CHAT_FILE_CHUNK_BYTES)));
+        }
+        const packets = await Promise.all(preparing);
+        for (let index = 0; index < packets.length; index++) {
+          if (this.fileSessions.get(requestId) !== session) return;
+          session.sentOffset = offset + Math.min((index + 1) * CHAT_FILE_CHUNK_BYTES, bytes.length);
+          const wireStart = performance.now();
+          await this.fileBulk.send(session.peerId, packets[index], () => this.fileSessions.get(requestId) === session);
+          session.timings.wireMs += performance.now() - wireStart;
+        }
       }
     } catch (error) {
       await this.cancelFileTransfer(requestId);
@@ -3044,7 +3058,7 @@ export class GroupRoomManager {
     const key = this.chatAuth?.getKnownKey(peerId);
     if (!session || !message?.file || !key || message.authorKey !== key ||
         session.direction !== 'receive' || session.peerId !== peerId || session.messageId !== header.messageId ||
-        header.offset < session.offset || header.offset >= session.total ||
+        header.offset < (session.writingUntil ?? session.offset) || header.offset >= session.total ||
         header.offset - session.offset > CHAT_FILE_IN_FLIGHT_CHUNKS * CHAT_FILE_CHUNK_BYTES ||
         header.offset + bytes.length > session.total ||
         session.pendingChunks?.has(header.offset) ||
@@ -3055,8 +3069,7 @@ export class GroupRoomManager {
         fileChunkSignatureData(header), header.signature, key);
     session.timings.verifyMs += performance.now() - verifyStart;
     if (!valid) return;
-    if (this.fileSessions.get(header.requestId) !== session || header.offset < session.offset ||
-        (session.receiving && header.offset === session.offset) ||
+    if (this.fileSessions.get(header.requestId) !== session || header.offset < (session.writingUntil ?? session.offset) ||
         session.pendingChunks?.has(header.offset) ||
         (session.pendingChunks?.size ?? 0) >= CHAT_FILE_IN_FLIGHT_CHUNKS + 1) return;
     session.pendingChunks ??= new Map();
@@ -3070,22 +3083,34 @@ export class GroupRoomManager {
     try {
       while (this.fileSessions.get(requestId) === session) {
         const offset = session.offset;
-        const bytes = session.pendingChunks?.get(offset);
-        if (!bytes) break;
-        session.pendingChunks!.delete(offset);
+        if (!session.pendingChunks?.has(offset)) break;
+        const batch: Uint8Array[] = [];
+        let length = 0;
+        while (session.pendingChunks.has(offset + length)) {
+          const bytes = session.pendingChunks.get(offset + length)!;
+          if (bytes.length === 0 || bytes.length > CHAT_FILE_CHUNK_BYTES || offset + length + bytes.length > session.total)
+            throw new Error('Invalid file chunk');
+          if (length + bytes.length > CHAT_FILE_IO_BATCH_BYTES) break;
+          session.pendingChunks.delete(offset + length);
+          batch.push(bytes);
+          length += bytes.length;
+        }
+        session.writingUntil = offset + length;
         const writeStart = performance.now();
         if (session.preview) {
-          if (bytes.length === 0 || bytes.length > CHAT_FILE_CHUNK_BYTES || offset + bytes.length > session.total) {
-            throw new Error('Invalid image chunk');
-          }
-          session.chunks!.push(bytes);
-          session.offset += bytes.length;
+          session.chunks!.push(...batch);
+          session.offset += length;
         } else {
+          const bytes = new Uint8Array(length);
+          let index = 0;
+          for (const chunk of batch) { bytes.set(chunk, index); index += chunk.length; }
           const written = await invoke<number>('write_chat_download_chunk',
             { id: requestId, offset, data: encodeFileBase64(bytes) });
           if (this.fileSessions.get(requestId) !== session) return;
+          if (written !== offset + length) throw new Error('Invalid download write offset');
           session.offset = written;
         }
+        session.writingUntil = undefined;
         session.timings.writeMs += performance.now() - writeStart;
         this.emitFileProgress(requestId, 'active');
         if (session.offset === session.total) await this.finishReceivedFile(requestId, session, message);
@@ -3102,6 +3127,7 @@ export class GroupRoomManager {
       }
     } finally {
       session.receiving = false;
+      session.writingUntil = undefined;
       if (this.fileSessions.get(requestId) === session && session.pendingChunks?.has(session.offset)) {
         void this.processReceivedFileChunks(requestId, session, message);
       }
