@@ -1,9 +1,42 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { BrowserMedia } from '../../src/apps/browser_media.ts';
+import { MediaCoordinator } from '../../src/p2p/media_coordinator.ts';
 import { MockMediaStream, MockMediaStreamTrack } from '../helpers/browser_mocks.ts';
 import { BrowserQualityController, validBrowserQuality, browserVideoBitrate } from '../../src/apps/browser_quality.ts';
 import { BrowserCapture, type BrowserCaptureDependencies } from '../../src/apps/browser_capture.ts';
+
+test('shared browser and detached relay negotiate stereo in both media offer and viewer answer', async () => {
+  const previous = globalThis.RTCPeerConnection;
+  const sdp = 'v=0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\na=rtpmap:111 opus/48000/2\r\na=fmtp:111 minptime=10;useinbandfec=1\r\n';
+  class Connection {
+    signalingState = 'stable';
+    localDescription: { toJSON(): unknown } | null = null;
+    async createOffer() { return { type: 'offer', sdp }; }
+    async createAnswer() { return { type: 'answer', sdp }; }
+    async setLocalDescription(value: unknown) { this.localDescription = { toJSON: () => value }; }
+    async setRemoteDescription() { this.signalingState = 'have-remote-offer'; }
+    addTrack() {}
+    close() {}
+  }
+  globalThis.RTCPeerConnection = Connection as unknown as typeof RTCPeerConnection;
+  MediaCoordinator.initGlobalWebRtcMunging();
+  const sent: any[] = [];
+  const create = (host: boolean) => new BrowserMedia(crypto.randomUUID(), host,
+    async payload => { sent.push(payload); }, () => {}, () => {}, error => { throw error; }, () => ({ iceServers: [] }));
+  const host = create(true); const viewer = create(false);
+  const track = new MockMediaStreamTrack('audio');
+  try {
+    host.relay(new MockMediaStream([track]) as unknown as MediaStream);
+    await host.offer('viewer');
+    await viewer.start();
+    await viewer.receive('host', sent[0]);
+    assert.equal(sent.length, 2);
+    assert.deepEqual(sent.map(value => value.description.type), ['offer', 'answer']);
+    for (const message of sent) assert.match(message.description.sdp,
+      /a=fmtp:111 minptime=10;useinbandfec=1;stereo=1;sprop-stereo=1\r\n/);
+  } finally { host.stop(); viewer.stop(); globalThis.RTCPeerConnection = previous; }
+});
 
 test('browser capture uses a scoped native stream, updates profiles in place and replaces only changed tabs', async () => {
   let source = 'window:1'; let starts = 0; let profiles = 0; let stops = 0; let deliveries = 0;

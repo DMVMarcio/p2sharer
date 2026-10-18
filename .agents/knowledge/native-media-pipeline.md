@@ -33,6 +33,7 @@ When capture devices output 5.1, 7.1, or other multi-channel audio:
 - The mixed-output soft clipper is continuous at its piecewise boundary so louder summed samples cannot create a waveform step.
 - The Web Audio bridge begins with a 50ms playout cushion, grows it up to 120ms after underruns, and slowly returns to the baseline. It discards new chunks when more than 200ms is already scheduled; it never resets the clock over queued audio.
 - WebRTC audio sender encodings use `maxBitrate = 192000` and high network priority. Video has medium priority and a low SDP bitrate floor so congestion control can preserve audio.
+- `MediaCoordinator` advertises Opus `stereo=1;sprop-stereo=1` in local offers and answers, including receive-only answers and parameterless Trystero negotiation. The global startup hook covers screen sharing, shared-browser media and detached relays. `opus/48000/2` alone defaults to a mono preference; the PCM bridge and playback gains already preserve independent channels.
 
 ### Selective Process-Level Audio Filtering
 - **Modes**:

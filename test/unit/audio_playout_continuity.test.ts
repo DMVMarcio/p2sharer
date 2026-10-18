@@ -14,6 +14,28 @@ function makeChunk(startFrame: number): string {
 }
 
 describe('audio playout continuity under ordered IPC jitter', () => {
+  it('preserves independent left and right PCM samples through the shared capture bridge', () => {
+    const dom = setupTestDOM();
+    const bridge = new AudioBridge();
+    try {
+      bridge.init();
+      const ctx = (bridge as any).audioCtx;
+      const sources: MockAudioBufferSourceNode[] = [];
+      const createSource = ctx.createBufferSource.bind(ctx);
+      ctx.createBufferSource = () => {
+        const source = createSource(); sources.push(source); return source;
+      };
+      const samples = new Float32Array([0.75, 0, 0, -0.5, 0.25, -0.75]);
+      (bridge as any).playPCMChunk({ pcm_base64: Buffer.from(samples.buffer).toString('base64'),
+        channels: 2, sample_rate: 48000, rms_level: 0.5 });
+      assert.equal(sources.length, 1);
+      assert.equal(sources[0]!.buffer!.numberOfChannels, 2);
+      assert.deepEqual([...sources[0]!.buffer!.getChannelData(0)], [0.75, 0, 0.25]);
+      assert.deepEqual([...sources[0]!.buffer!.getChannelData(1)], [0, -0.5, -0.75]);
+      assert.equal(sources[0]!.connectedTo, (bridge as any).destNode);
+    } finally { bridge.stop(); dom.cleanup(); }
+  });
+
   it('schedules a continuous 10-second signal without gaps or overlaps', () => {
     const dom = setupTestDOM();
     try {

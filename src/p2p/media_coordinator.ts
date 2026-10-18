@@ -118,7 +118,7 @@ export class MediaCoordinator {
   /**
    * Installs global monkey-patches on RTCPeerConnection.prototype to ensure
    * all SDP offers and answers (including parameterless setLocalDescription() used by Trystero)
-   * are munged with robust bitrate floor/ceiling (b=AS, b=TIAS, x-google-min-bitrate).
+   * advertise stereo Opus and robust video bitrate floor/ceiling.
    */
   public static initGlobalWebRtcMunging(): void {
     if (MediaCoordinator.globalMungingInitialized) return;
@@ -188,7 +188,7 @@ export class MediaCoordinator {
   }
 
   /**
-   * Munges SDP to enforce Google WebRTC bitrate floor and ceiling (x-google-min-bitrate, x-google-max-bitrate, b=AS, b=TIAS).
+   * Advertises stereo Opus and enforces Google WebRTC video bitrate floor and ceiling.
    * Confines video bitrate and fmtp parameters strictly inside the m=video section so they never bleed into m=audio or m=application.
    */
   public static mungeSdpBitrates(
@@ -206,6 +206,34 @@ export class MediaCoordinator {
       let end = start + 1;
       while (end < lines.length && !lines[end].startsWith('m=')) end++;
       const section = lines.slice(start, end);
+      if (section[0].startsWith('m=audio ') && section[0].split(/\s+/)[1] !== '0') {
+        const payloads = new Set(section[0].split(/\s+/).slice(3));
+        const opus = new Set(section.flatMap(line => {
+          const match = /^a=rtpmap:(\d+) opus\/48000\/2\s*$/i.exec(line);
+          return match && payloads.has(match[1]) ? [match[1]] : [];
+        }));
+        const configured = new Set<string>();
+        for (const line of section) {
+          const fmtp = /^a=fmtp:(\d+)\s+(.*)$/.exec(line);
+          if (!fmtp || !opus.has(fmtp[1])) {
+            result.push(line);
+            continue;
+          }
+          // opus/48000/2 alone still defaults to mono (RFC 7587). Both
+          // offers and answers must advertise the receiver's stereo preference.
+          const parameters = fmtp[2].split(';').map(value => value.trim()).filter(value =>
+            value && !/^(?:stereo|sprop-stereo)\s*=/i.test(value));
+          result.push(`a=fmtp:${fmtp[1]} ${[...parameters, 'stereo=1', 'sprop-stereo=1'].join(';')}`);
+          configured.add(fmtp[1]);
+        }
+        const missing = [...opus].filter(payload => !configured.has(payload));
+        // Insert before trailing empty lines, preserving the SDP terminator.
+        let insertAt = result.length;
+        while (insertAt > 0 && result[insertAt - 1] === '') insertAt--;
+        result.splice(insertAt, 0, ...missing.map(payload => `a=fmtp:${payload} stereo=1;sprop-stereo=1`));
+        start = end;
+        continue;
+      }
       if (!section[0].startsWith('m=video ')) {
         result.push(...section);
         start = end;

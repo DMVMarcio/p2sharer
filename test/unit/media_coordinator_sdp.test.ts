@@ -101,7 +101,7 @@ describe('MediaCoordinator SDP Munging and WebRTC Bandwidth Allocation', () => {
     );
   });
 
-  it('does not mutate audio or non-video lines and isolates fmtp strictly within m=video section', () => {
+  it('isolates video bitrate parameters from audio and application sections', () => {
     const multiSectionSdp = [
       'v=0',
       'm=application 9 UDP/DTLS/SCTP webrtc-datachannel',
@@ -127,6 +127,25 @@ describe('MediaCoordinator SDP Munging and WebRTC Bandwidth Allocation', () => {
     // a=fmtp:97 must occur BEFORE m=audio starts
     assert.ok(vp8FmtpIdx < audioIdx, 'Video fmtp line must precede m=audio section');
     assert.doesNotMatch(munged.slice(audioIdx), /a=fmtp:97/, 'm=audio must not contain video fmtp');
+    assert.match(munged.slice(audioIdx), /a=fmtp:111 stereo=1;sprop-stereo=1/);
+    assert.doesNotMatch(munged.slice(audioIdx), /x-google|b=AS|b=TIAS/);
+  });
+
+  it('negotiates stereo on each Opus payload without changing other codecs or rejected sections', () => {
+    const audio = [
+      'v=0', 'm=audio 9 UDP/TLS/RTP/SAVPF 109 0',
+      'a=rtpmap:109 opus/48000/2', 'a=fmtp:109 minptime=10; useinbandfec=1; stereo=0; sprop-stereo=0',
+      'a=rtpmap:0 PCMU/8000', 'a=fmtp:0 example=1',
+      'm=audio 9 UDP/TLS/RTP/SAVPF 111', 'a=rtpmap:111 OPUS/48000/2',
+      'm=audio 0 UDP/TLS/RTP/SAVPF 109', 'a=rtpmap:109 opus/48000/2', 'a=fmtp:109 stereo=0', '',
+    ].join('\r\n');
+    const munged = MediaCoordinator.mungeSdpBitrates(audio);
+    assert.match(munged, /a=fmtp:109 minptime=10;useinbandfec=1;stereo=1;sprop-stereo=1\r\n/);
+    assert.match(munged, /a=fmtp:111 stereo=1;sprop-stereo=1\r\n/);
+    assert.match(munged, /a=fmtp:0 example=1\r\n/);
+    assert.ok(munged.endsWith('a=fmtp:109 stereo=0\r\n'));
+    assert.equal(MediaCoordinator.mungeSdpBitrates(munged), munged);
+    assert.doesNotMatch(munged, /x-google|b=AS|b=TIAS/);
   });
 
   it('handles empty or non-string input safely without throwing', () => {
@@ -165,6 +184,17 @@ describe('MediaCoordinator SDP Munging and WebRTC Bandwidth Allocation', () => {
     assert.ok(setLocalCalledWith, 'setLocalDescription must receive the generated munged offer');
     assert.match(setLocalCalledWith.sdp, /b=AS:25000/);
     assert.match(setLocalCalledWith.sdp, /x-google-min-bitrate=500/);
+    assert.match(setLocalCalledWith.sdp, /a=fmtp:111 stereo=1;sprop-stereo=1/);
+
+    pc.signalingState = 'have-remote-offer';
+    await pc.setLocalDescription();
+    assert.equal(setLocalCalledWith.type, 'answer');
+    assert.match(setLocalCalledWith.sdp, /a=fmtp:111 stereo=1;sprop-stereo=1/);
+    for (const description of [await pc.createOffer(), await pc.createAnswer()]) {
+      assert.match(description.sdp, /a=fmtp:111 stereo=1;sprop-stereo=1/);
+      await pc.setLocalDescription(description);
+      assert.equal(setLocalCalledWith.sdp, description.sdp);
+    }
   });
 
   it('serializes overlapping sender updates and applies the latest FPS and bitrate', async () => {

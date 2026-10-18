@@ -2,42 +2,55 @@
   "version": "1.4.3",
   "translations": {
     "en": [
+      "**Stereo audio.** Broadcasts and the shared browser preserve separate left and right channels when the source is stereo.",
       "**Larger chat files.** Removed the 2 GiB limit per file. Sending and downloading still require consent."
     ],
     "pt-BR": [
+      "**Áudio estéreo.** As transmissões e o navegador compartilhado preservam os canais esquerdo e direito separados quando a fonte é estéreo.",
       "**Arquivos maiores no chat.** Removemos o limite de 2 GiB por arquivo. O envio e o download continuam dependendo de consentimento."
     ],
     "es": [
+      "**Audio estéreo.** Las transmisiones y el navegador compartido conservan separados los canales izquierdo y derecho cuando la fuente es estéreo.",
       "**Archivos más grandes en el chat.** Eliminamos el límite de 2 GiB por archivo. El envío y la descarga siguen requiriendo consentimiento."
     ],
     "fr": [
+      "**Audio stéréo.** Les diffusions et le navigateur partagé conservent des canaux gauche et droit distincts lorsque la source est stéréo.",
       "**Des fichiers plus volumineux dans le chat.** La limite de 2 Gio par fichier a été supprimée. L’envoi et le téléchargement nécessitent toujours un consentement."
     ],
     "de": [
+      "**Stereo-Audio.** Übertragungen und der gemeinsame Browser behalten getrennte linke und rechte Kanäle bei, wenn die Quelle Stereo liefert.",
       "**Größere Dateien im Chat.** Die Begrenzung auf 2 GiB pro Datei wurde entfernt. Senden und Herunterladen erfordern weiterhin Zustimmung."
     ],
     "it": [
+      "**Audio stereo.** Le trasmissioni e il browser condiviso mantengono separati i canali sinistro e destro quando la sorgente è stereo.",
       "**File più grandi nella chat.** Rimosso il limite di 2 GiB per file. L’invio e il download richiedono ancora il consenso."
     ],
     "zh-CN": [
+      "**立体声音频。** 当音源为立体声时，直播和共享浏览器会保留独立的左右声道。",
       "**聊天支持更大的文件。** 已移除每个文件 2 GiB 的限制。发送和下载仍需获得同意。"
     ],
     "zh-TW": [
+      "**立體聲音訊。** 當音源為立體聲時，直播和共享瀏覽器會保留獨立的左右聲道。",
       "**聊天支援更大的檔案。** 已移除每個檔案 2 GiB 的限制。傳送和下載仍需取得同意。"
     ],
     "ja": [
+      "**ステレオ音声。** 配信と共有ブラウザーで、音源がステレオの場合に左右のチャンネルを分離したまま再生できます。",
       "**チャットでより大きなファイルを共有。** ファイルごとの 2 GiB 制限を撤廃しました。送信とダウンロードには引き続き同意が必要です。"
     ],
     "ko": [
+      "**스테레오 오디오.** 방송과 공유 브라우저에서 소스가 스테레오인 경우 왼쪽과 오른쪽 채널을 분리하여 유지합니다.",
       "**채팅에서 더 큰 파일 공유.** 파일당 2 GiB 제한을 제거했습니다. 전송과 다운로드에는 여전히 동의가 필요합니다."
     ],
     "hi": [
+      "**स्टीरियो ऑडियो।** स्रोत स्टीरियो होने पर प्रसारण और साझा ब्राउज़र बाएँ और दाएँ चैनलों को अलग रखते हैं।",
       "**चैट में बड़ी फ़ाइलें।** प्रति फ़ाइल 2 GiB की सीमा हटा दी गई है। भेजने और डाउनलोड करने के लिए अब भी सहमति आवश्यक है।"
     ],
     "fi": [
+      "**Stereoääni.** Lähetykset ja jaettu selain säilyttävät vasemman ja oikean kanavan erillisinä, kun lähde on stereo.",
       "**Suurempia tiedostoja keskustelussa.** Tiedostokohtainen 2 GiB:n raja on poistettu. Lähettäminen ja lataaminen edellyttävät edelleen suostumusta."
     ],
     "ru": [
+      "**Стереозвук.** Трансляции и общий браузер сохраняют раздельные левый и правый каналы, если источник передаёт стереозвук.",
       "**Большие файлы в чате.** Ограничение в 2 ГиБ на файл снято. Для отправки и скачивания по-прежнему требуется согласие."
     ]
   }
