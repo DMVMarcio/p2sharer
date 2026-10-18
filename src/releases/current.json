@@ -5,79 +5,92 @@
       "**Clearer stream controls.** Refreshed stream and picture-in-picture overlays with easier-to-read controls and colored statistics.",
       "**Easier to stop sharing.** Stop a stream directly from its card or the main toolbar, choosing which one to end when sharing multiple sources.",
       "**Steadier transfer details.** The statistics icon in chat uploads and downloads stays in place as transfer speeds change.",
-      "**Faster, steadier file transfers.** Less waiting when sending and downloading large files, and a fix for transfers that could stall. Transfers on the same local network can now use a faster encrypted direct connection."
+      "**Faster, steadier file transfers.** Less waiting when sending and downloading large files, and a fix for transfers that could stall. Transfers on the same local network can now use a faster encrypted direct connection.",
+      "**More responsive tunnels and faster profiles.** Profile photos and banners transfer with less overhead. Tunnels use separate channels for reliable connections and game packets, reducing unnecessary waiting."
     ],
     "pt-BR": [
       "**Controles de transmissão mais claros.** Renovamos os overlays das transmissões e das janelas flutuantes, com controles mais legíveis e estatísticas coloridas.",
       "**Mais fácil parar de transmitir.** Encerre uma transmissão pelo próprio card ou pela barra principal, escolhendo qual parar quando estiver compartilhando várias fontes.",
       "**Detalhes das transferências no lugar.** O ícone de estatísticas dos envios e downloads do chat fica fixo mesmo quando a velocidade varia.",
-      "**Transferências de arquivos mais rápidas e estáveis.** Menos espera ao enviar e baixar arquivos grandes e correção de transferências que podiam travar. Transferências na mesma rede local agora podem usar uma conexão direta criptografada mais rápida."
+      "**Transferências de arquivos mais rápidas e estáveis.** Menos espera ao enviar e baixar arquivos grandes e correção de transferências que podiam travar. Transferências na mesma rede local agora podem usar uma conexão direta criptografada mais rápida.",
+      "**Túneis mais responsivos e perfis mais rápidos.** Fotos de perfil e banners são transferidos com menos processamento. Os túneis usam canais separados para conexões confiáveis e pacotes de jogos, reduzindo esperas desnecessárias."
     ],
     "es": [
       "**Controles de transmisión más claros.** Renovamos los controles superpuestos de las transmisiones y las ventanas flotantes, con opciones más legibles y estadísticas en color.",
       "**Dejar de compartir es más fácil.** Detén una transmisión desde su tarjeta o la barra principal y elige cuál finalizar cuando compartas varias fuentes.",
       "**Detalles de transferencia estables.** El icono de estadísticas de las subidas y descargas del chat permanece fijo aunque cambie la velocidad.",
-      "**Transferencias de archivos más rápidas y estables.** Menos esperas al enviar y descargar archivos grandes y corrección de transferencias que podían bloquearse. Las transferencias en la misma red local ahora pueden usar una conexión directa cifrada más rápida."
+      "**Transferencias de archivos más rápidas y estables.** Menos esperas al enviar y descargar archivos grandes y corrección de transferencias que podían bloquearse. Las transferencias en la misma red local ahora pueden usar una conexión directa cifrada más rápida.",
+      "**Túneles más ágiles y perfiles más rápidos.** Las fotos de perfil y los banners se transfieren con menos procesamiento. Los túneles usan canales separados para conexiones fiables y paquetes de juegos, reduciendo esperas innecesarias."
     ],
     "fr": [
       "**Des commandes de diffusion plus claires.** Les commandes superposées des diffusions et des fenêtres flottantes sont plus lisibles, avec des statistiques en couleur.",
       "**Arrêter le partage plus facilement.** Arrêtez une diffusion depuis sa carte ou la barre principale, en choisissant laquelle terminer si vous partagez plusieurs sources.",
       "**Des détails de transfert stables.** Dans les envois et téléchargements du chat, l’icône des statistiques reste en place lorsque la vitesse varie.",
-      "**Des transferts de fichiers plus rapides et plus stables.** Moins d’attente pour envoyer et télécharger de gros fichiers, et correction des transferts pouvant se bloquer. Les transferts sur le même réseau local peuvent désormais utiliser une connexion directe chiffrée plus rapide."
+      "**Des transferts de fichiers plus rapides et plus stables.** Moins d’attente pour envoyer et télécharger de gros fichiers, et correction des transferts pouvant se bloquer. Les transferts sur le même réseau local peuvent désormais utiliser une connexion directe chiffrée plus rapide.",
+      "**Des tunnels plus réactifs et des profils plus rapides.** Les photos de profil et les bannières nécessitent moins de traitement lors du transfert. Les tunnels séparent les connexions fiables et les paquets de jeu pour réduire les attentes inutiles."
     ],
     "de": [
       "**Übersichtlichere Übertragungssteuerung.** Überarbeitete Einblendungen für Übertragungen und Bild-in-Bild-Fenster mit besser lesbaren Bedienelementen und farbigen Statistiken.",
       "**Freigaben einfacher beenden.** Beende eine Übertragung direkt auf ihrer Karte oder über die Hauptleiste. Bei mehreren Quellen wählst du aus, welche beendet wird.",
       "**Stabile Transferdetails.** Das Statistik-Symbol bei Chat-Uploads und -Downloads bleibt an seinem Platz, auch wenn sich die Geschwindigkeit ändert.",
-      "**Schnellere, stabilere Dateiübertragungen.** Weniger Wartezeit beim Senden und Herunterladen großer Dateien sowie eine Korrektur für Übertragungen, die hängen bleiben konnten. Übertragungen im selben lokalen Netzwerk können jetzt eine schnellere verschlüsselte Direktverbindung nutzen."
+      "**Schnellere, stabilere Dateiübertragungen.** Weniger Wartezeit beim Senden und Herunterladen großer Dateien sowie eine Korrektur für Übertragungen, die hängen bleiben konnten. Übertragungen im selben lokalen Netzwerk können jetzt eine schnellere verschlüsselte Direktverbindung nutzen.",
+      "**Reaktionsschnellere Tunnel und schnellere Profile.** Profilbilder und Banner werden mit weniger Verarbeitungsaufwand übertragen. Getrennte Kanäle für zuverlässige Verbindungen und Spielpakete verringern unnötige Wartezeiten in Tunneln."
     ],
     "it": [
       "**Controlli delle trasmissioni più chiari.** Abbiamo rinnovato i controlli in sovrimpressione delle trasmissioni e delle finestre mobili, con comandi più leggibili e statistiche colorate.",
       "**Interrompere la condivisione è più facile.** Ferma una trasmissione dalla sua scheda o dalla barra principale, scegliendo quale terminare quando condividi più sorgenti.",
       "**Dettagli dei trasferimenti stabili.** L’icona delle statistiche degli invii e dei download nella chat resta ferma anche quando cambia la velocità.",
-      "**Trasferimenti di file più rapidi e stabili.** Meno attese durante l’invio e il download di file grandi e risolto un problema che poteva bloccare i trasferimenti. I trasferimenti sulla stessa rete locale possono ora usare una connessione diretta crittografata più veloce."
+      "**Trasferimenti di file più rapidi e stabili.** Meno attese durante l’invio e il download di file grandi e risolto un problema che poteva bloccare i trasferimenti. I trasferimenti sulla stessa rete locale possono ora usare una connessione diretta crittografata più veloce.",
+      "**Tunnel più reattivi e profili più veloci.** Foto del profilo e banner vengono trasferiti con meno elaborazione. I tunnel usano canali separati per connessioni affidabili e pacchetti di gioco, riducendo le attese inutili."
     ],
     "zh-CN": [
       "**更清晰的直播控件。** 更新了直播和画中画窗口的悬浮控件，按钮更易辨认，统计数据以不同颜色显示。",
       "**更轻松地停止共享。** 可直接从直播卡片或主工具栏停止直播；同时共享多个来源时，可选择要停止的直播。",
       "**传输详情位置更稳定。** 聊天上传和下载的统计图标不再随传输速度变化而移动。",
-      "**文件传输更快、更稳定。** 减少发送和下载大文件时的等待，并修复了传输可能停滞的问题。 同一局域网内的传输现在可使用更快的加密直连。"
+      "**文件传输更快、更稳定。** 减少发送和下载大文件时的等待，并修复了传输可能停滞的问题。 同一局域网内的传输现在可使用更快的加密直连。",
+      "**隧道响应更灵敏，个人资料传输更快。** 头像和横幅传输所需的处理更少。隧道为可靠连接和游戏数据包使用独立通道，减少不必要的等待。"
     ],
     "zh-TW": [
       "**更清楚的串流控制項。** 更新了串流及子母畫面視窗的浮動控制項，按鈕更容易辨識，統計資料以不同顏色顯示。",
       "**更輕鬆地停止分享。** 可直接從串流卡片或主工具列停止串流；同時分享多個來源時，可選擇要停止的串流。",
       "**傳輸詳細資訊位置更穩定。** 聊天上傳和下載的統計圖示不再隨傳輸速度變化而移動。",
-      "**檔案傳輸更快、更穩定。** 減少傳送和下載大型檔案時的等待，並修正了傳輸可能停滯的問題。 同一區域網路內的傳輸現在可使用更快的加密直連。"
+      "**檔案傳輸更快、更穩定。** 減少傳送和下載大型檔案時的等待，並修正了傳輸可能停滯的問題。 同一區域網路內的傳輸現在可使用更快的加密直連。",
+      "**通道回應更靈敏，個人資料傳輸更快。** 頭像和橫幅傳輸所需的處理更少。通道為可靠連線和遊戲封包使用獨立傳輸管道，減少不必要的等待。"
     ],
     "ja": [
       "**配信操作がわかりやすく。** 配信とピクチャーインピクチャーのオーバーレイを刷新し、操作ボタンを見やすく、統計情報を色分けしました。",
       "**共有の停止が簡単に。** 配信カードやメインツールバーから配信を停止できます。複数のソースを共有している場合は、停止する配信を選べます。",
       "**転送の詳細を安定した位置に。** チャットのアップロードとダウンロードで、速度が変わっても統計アイコンが動かなくなりました。",
-      "**ファイル転送がより速く、安定して。** 大きなファイルの送信やダウンロードの待ち時間を減らし、転送が停止することがある問題を修正しました。 同じローカルネットワーク内では、より高速な暗号化直接接続を利用できるようになりました。"
+      "**ファイル転送がより速く、安定して。** 大きなファイルの送信やダウンロードの待ち時間を減らし、転送が停止することがある問題を修正しました。 同じローカルネットワーク内では、より高速な暗号化直接接続を利用できるようになりました。",
+      "**トンネルの応答性とプロフィールの転送を改善。** プロフィール写真とバナーの転送処理を軽減しました。トンネルでは信頼性が必要な接続とゲームのパケットに別々のチャネルを使い、不要な待ち時間を減らします。"
     ],
     "ko": [
       "**더 알아보기 쉬운 스트림 제어.** 스트림과 화면 속 화면 오버레이를 새롭게 다듬어 제어 버튼을 더 쉽게 알아볼 수 있고 통계도 색상으로 구분됩니다.",
       "**더 간편한 공유 중지.** 스트림 카드나 기본 도구 모음에서 바로 스트림을 중지할 수 있습니다. 여러 소스를 공유할 때는 중지할 스트림을 선택할 수 있습니다.",
       "**흔들리지 않는 전송 정보.** 채팅의 업로드와 다운로드에서 전송 속도가 바뀌어도 통계 아이콘이 움직이지 않습니다.",
-      "**더 빠르고 안정적인 파일 전송.** 대용량 파일을 보내고 다운로드할 때의 대기 시간을 줄이고 전송이 멈출 수 있는 문제를 수정했습니다. 같은 로컬 네트워크에서는 더 빠른 암호화 직접 연결로 파일을 전송할 수 있습니다."
+      "**더 빠르고 안정적인 파일 전송.** 대용량 파일을 보내고 다운로드할 때의 대기 시간을 줄이고 전송이 멈출 수 있는 문제를 수정했습니다. 같은 로컬 네트워크에서는 더 빠른 암호화 직접 연결로 파일을 전송할 수 있습니다.",
+      "**더 빠르게 반응하는 터널과 프로필 전송.** 프로필 사진과 배너 전송에 필요한 처리를 줄였습니다. 터널은 신뢰성이 필요한 연결과 게임 패킷에 별도의 채널을 사용하여 불필요한 대기를 줄입니다."
     ],
     "hi": [
       "**स्ट्रीम के अधिक स्पष्ट नियंत्रण।** स्ट्रीम और पिक्चर-इन-पिक्चर के ओवरले को बेहतर बनाया है, ताकि नियंत्रण पढ़ना आसान हो और आँकड़े अलग-अलग रंगों में दिखें।",
       "**साझा करना रोकना अब आसान है।** स्ट्रीम के कार्ड या मुख्य टूलबार से उसे सीधे रोकें। कई स्रोत साझा करते समय चुनें कि कौन-सी स्ट्रीम बंद करनी है।",
       "**ट्रांसफ़र की जानकारी एक ही जगह।** चैट के अपलोड और डाउनलोड में गति बदलने पर भी आँकड़ों का आइकन अपनी जगह पर रहता है।",
-      "**फ़ाइल ट्रांसफ़र अब अधिक तेज़ और स्थिर।** बड़ी फ़ाइलें भेजने और डाउनलोड करने में कम प्रतीक्षा और ट्रांसफ़र अटकने की समस्या का समाधान। एक ही स्थानीय नेटवर्क पर फ़ाइल भेजने के लिए अब अधिक तेज़ एन्क्रिप्टेड सीधे कनेक्शन का उपयोग किया जा सकता है।"
+      "**फ़ाइल ट्रांसफ़र अब अधिक तेज़ और स्थिर।** बड़ी फ़ाइलें भेजने और डाउनलोड करने में कम प्रतीक्षा और ट्रांसफ़र अटकने की समस्या का समाधान। एक ही स्थानीय नेटवर्क पर फ़ाइल भेजने के लिए अब अधिक तेज़ एन्क्रिप्टेड सीधे कनेक्शन का उपयोग किया जा सकता है।",
+      "**अधिक तेज़ प्रतिक्रिया वाले टनल और प्रोफ़ाइल ट्रांसफ़र।** प्रोफ़ाइल फ़ोटो और बैनर कम प्रोसेसिंग के साथ भेजे जाते हैं। टनल भरोसेमंद कनेक्शन और गेम पैकेट के लिए अलग चैनल इस्तेमाल करते हैं, जिससे अनावश्यक इंतज़ार कम होता है।"
     ],
     "fi": [
       "**Selkeämmät lähetyksen säätimet.** Uudistetut lähetysten ja kuva kuvassa -ikkunoiden säätimet ovat helpommin luettavia, ja tilastot erottuvat väreillä.",
       "**Jakamisen lopettaminen on helpompaa.** Lopeta lähetys suoraan sen kortista tai päätyökaluriviltä. Jos jaat useita lähteitä, voit valita lopetettavan lähetyksen.",
       "**Siirtotiedot pysyvät paikallaan.** Chatin lähetysten ja latausten tilastokuvake ei enää liiku siirtonopeuden vaihtuessa.",
-      "**Nopeammat ja vakaammat tiedostosiirrot.** Vähemmän odottelua suurten tiedostojen lähetyksessä ja latauksessa sekä korjaus siirtojen pysähtymiseen. Saman lähiverkon siirrot voivat nyt käyttää nopeampaa salattua suoraa yhteyttä."
+      "**Nopeammat ja vakaammat tiedostosiirrot.** Vähemmän odottelua suurten tiedostojen lähetyksessä ja latauksessa sekä korjaus siirtojen pysähtymiseen. Saman lähiverkon siirrot voivat nyt käyttää nopeampaa salattua suoraa yhteyttä.",
+      "**Nopeammin reagoivat tunnelit ja profiilisiirrot.** Profiilikuvien ja kansikuvien siirto vaatii vähemmän käsittelyä. Tunnelit käyttävät erillisiä kanavia luotettaville yhteyksille ja pelipaketeille, mikä vähentää tarpeetonta odottamista."
     ],
     "ru": [
       "**Более понятное управление трансляциями.** Обновили панели поверх трансляций и окон «картинка в картинке»: элементы управления стали заметнее, а статистика выделена цветом.",
       "**Остановить трансляцию стало проще.** Завершайте трансляцию прямо из её карточки или с главной панели. Если вы делитесь несколькими источниками, можно выбрать, какой из них остановить.",
       "**Статистика передачи на месте.** Значок статистики отправок и загрузок в чате больше не смещается при изменении скорости.",
-      "**Более быстрая и стабильная передача файлов.** Меньше ожидания при отправке и загрузке больших файлов и исправление зависавших передач. При передаче в одной локальной сети теперь можно использовать более быстрое зашифрованное прямое соединение."
+      "**Более быстрая и стабильная передача файлов.** Меньше ожидания при отправке и загрузке больших файлов и исправление зависавших передач. При передаче в одной локальной сети теперь можно использовать более быстрое зашифрованное прямое соединение.",
+      "**Более отзывчивые туннели и быстрая передача профилей.** Передача фотографий профиля и баннеров требует меньше обработки. Туннели используют отдельные каналы для надёжных соединений и игровых пакетов, сокращая ненужное ожидание."
     ]
   }
 }

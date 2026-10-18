@@ -9,10 +9,11 @@ import { ReleaseNotesController } from '../../src/core/release_notes.ts';
 import { AppUpdateController } from '../../src/core/app_updates.ts';
 
 test('unread notes wait for other dialogs, survive interrupted viewing and acknowledge only on dismissal', async () => {
-  const dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost' });
-  const globals = ['window', 'document', 'HTMLElement', 'Element', 'Node', 'localStorage', 'IS_REACT_ACT_ENVIRONMENT'];
+  const dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost', pretendToBeVisual: true });
+  const globals = ['window', 'document', 'HTMLElement', 'Element', 'Node', 'localStorage', 'requestAnimationFrame', 'cancelAnimationFrame', 'IS_REACT_ACT_ENVIRONMENT'];
   const previous = new Map(globals.map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
-  for (const key of globals.slice(0, -1)) Object.defineProperty(globalThis, key, { configurable: true, value: dom.window[key] });
+  for (const key of globals.slice(0, -1)) Object.defineProperty(globalThis, key, { configurable: true,
+    value: key.endsWith('AnimationFrame') ? dom.window[key].bind(dom.window) : dom.window[key] });
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   localStorage.setItem('p2sharer_username', 'Existing profile');
   const fixture = globalThis.releaseNotesFixture = {

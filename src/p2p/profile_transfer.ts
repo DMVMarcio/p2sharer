@@ -2,7 +2,7 @@ import { profileImages, PROFILE_CHUNK, PROFILE_MAX_BYTES, validProfileColor, val
 
 type Send = (packet: unknown, peerId: string) => Promise<unknown> | unknown;
 interface Offer { hash: string; size: number; color: string; cardColor?: string; bannerEnabled?: boolean; bannerBlur?: boolean }
-interface Pending { offer: Offer; token: string; parts: string[]; length: number; until: number; validating: boolean }
+interface Pending { offer: Offer; token: string; parts: (string | Uint8Array)[]; length: number; until: number; validating: boolean }
 
 // Offers grant no permission to send image bytes. Only a matching, unexpired
 // request token permits a bounded sequence, and native validation gates display.
@@ -19,6 +19,7 @@ export class ProfileTransfer {
   private send: Send;
   private authorized: (peerId: string) => boolean;
   private images: typeof profileImages;
+  private binaryReady: (peerId: string) => boolean;
   private timer = setInterval(() => {
     for (const [peer, request] of this.pending) if (request.until < Date.now()) this.pending.delete(peer);
     for (const [peer, offer] of this.deferred) {
@@ -27,8 +28,10 @@ export class ProfileTransfer {
     }
     this.requestWaiting();
   }, 5000);
-  constructor(send: Send, authorized: (peerId: string) => boolean, images = profileImages) {
+  constructor(send: Send, authorized: (peerId: string) => boolean, images = profileImages,
+    binaryReady: (peerId: string) => boolean = () => false) {
     this.send = send; this.authorized = authorized; this.images = images;
+    this.binaryReady = binaryReady;
     // Node regression runners should not remain alive for browser housekeeping.
     (this.timer as unknown as { unref?: () => void }).unref?.();
   }
@@ -42,7 +45,8 @@ export class ProfileTransfer {
       this.attempts.set(peerId, { hash: offer.hash, count: attempts?.hash === offer.hash ? attempts.count + 1 : 1 });
       const token = crypto.randomUUID();
       this.pending.set(peerId, { offer, token, parts: [], length: 0, until: Date.now() + 60000, validating: false });
-      void Promise.resolve(this.send({ kind: 'request', hash: offer.hash, token }, peerId)).catch(() => {});
+      void Promise.resolve(this.send({ kind: 'request', hash: offer.hash, token,
+        ...(this.binaryReady(peerId) ? { binary: true } : {}) }, peerId)).catch(() => {});
     }
   }
   async announce(peerId: string) {
@@ -91,7 +95,7 @@ export class ProfileTransfer {
         for (let offset = 0; offset < data.length; offset += PROFILE_CHUNK) {
           if (this.closed || !this.authorized(peerId) || this.images.local.hash !== hash) break;
           await this.send({ kind: 'chunk', hash, token: p.token, index: offset / PROFILE_CHUNK,
-            data: data.slice(offset, offset + PROFILE_CHUNK) }, peerId);
+            data: data.slice(offset, offset + PROFILE_CHUNK), ...(p.binary === true ? { binary: true } : {}) }, peerId);
         }
       } finally {
         this.sending.delete(peerId);
@@ -100,14 +104,25 @@ export class ProfileTransfer {
       }
     } else if (p.kind === 'chunk') {
       const request = this.pending.get(peerId);
+      const binary = p.data instanceof Uint8Array;
+      const length = binary ? Math.ceil((p.data as Uint8Array).length / 3) * 4 : typeof p.data === 'string' ? p.data.length : 0;
       if (!request || request.validating || request.until < Date.now() || p.hash !== request.offer.hash || p.token !== request.token ||
-        p.index !== request.parts.length || typeof p.data !== 'string' || p.data.length === 0 ||
-        p.data.length !== Math.min(PROFILE_CHUNK, request.offer.size - request.length) ||
-        !/^[A-Za-z0-9+/]*={0,2}$/.test(p.data)) return;
-      request.parts.push(p.data); request.length += p.data.length;
+        p.index !== request.parts.length || !length ||
+        length !== Math.min(PROFILE_CHUNK, request.offer.size - request.length) ||
+        (request.parts.length > 0 && (request.parts[0] instanceof Uint8Array) !== binary) ||
+        (!binary && (typeof p.data !== 'string' || !/^[A-Za-z0-9+/]*={0,2}$/.test(p.data)))) return;
+      request.parts.push(p.data as string | Uint8Array); request.length += length;
       if (request.length === request.offer.size) {
         request.validating = true;
-        try { await this.images.accept(request.parts.join(''), request.offer.hash); }
+        try {
+          if (binary) {
+            const parts = request.parts as Uint8Array[];
+            const data = new Uint8Array(parts.reduce((total, part) => total + part.length, 0));
+            let offset = 0;
+            for (const part of parts) { data.set(part, offset); offset += part.length; }
+            await this.images.acceptBytes(data, request.offer.hash);
+          } else await this.images.accept(request.parts.join(''), request.offer.hash);
+        }
         catch { /* Invalid images never reach the rendered profile. */ }
         finally {
           if (this.pending.get(peerId) === request) this.pending.delete(peerId);

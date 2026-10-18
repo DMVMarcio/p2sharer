@@ -43,6 +43,9 @@ import {
 } from './ice_config.ts';
 import { createFileOptimizedPeerConnection, type FileOptimizedConnection } from './file_data_channel.ts';
 import { FileBulkChannelManager } from './file_bulk_channel.ts';
+import { PeerPayloadChannels } from './peer_payload_channels.ts';
+import { encodePeerPayload, decodePeerPayload } from '../core/peer_payload.ts';
+import { decodeFileBase64, encodeFileBase64 } from '../core/chat_file_wire.ts';
 import { NativeVideoTransport } from './native_video_transport.ts';
 import { MediaCoordinator } from './media_coordinator.ts';
 import { PeerTracker } from './peer_tracker.ts';
@@ -225,6 +228,47 @@ export class GroupRoomManager {
     (peerId) => this.room?.getPeers?.()?.[peerId] as RTCPeerConnection | undefined,
     (peerId, packet) => { void this.handleFileChunkWire(packet, peerId); },
   );
+  private binaryPeers = new Set<string>();
+  private payloadChannels = new PeerPayloadChannels(
+    peer => this.room?.getPeers?.()?.[peer] as RTCPeerConnection | undefined,
+    (peer, lane, frame) => {
+      if (!this.payloadPeerAllowed(peer)) return;
+      const decoded = decodePeerPayload(frame);
+      if (!decoded) return;
+      const { header, bytes } = decoded;
+      if (lane === 'profile' && ['avatar', 'banner'].includes(header.type) && header.packet?.kind === 'chunk') {
+        const transfer = header.type === 'banner' ? this.bannerTransfer : this.profileTransfer;
+        void transfer?.receive({ ...header.packet, data: bytes }, peer).catch(() => {});
+      } else if (lane !== 'profile' && header.kind === 'data' && typeof header.id === 'string') {
+        const payload = header.payload;
+        if (lane === 'datagram' && payload?.type === 'virtual-packet' && bytes.length <= 1280)
+          this.callbacks?.onAppEvent?.({ ...header, payload: { ...payload, data: bytes } }, peer);
+        else if ((lane === 'tunnel' || (lane === 'datagram' && payload?.packet?.kind === 'datagram')) && payload?.type === 'wire' && payload.packet && typeof payload.packet === 'object')
+          this.callbacks?.onAppEvent?.({ ...header, payload: { ...payload, packet: { ...payload.packet,
+            ...(['data', 'datagram'].includes(payload.packet.kind) ? { data: bytes } : {}) } } }, peer);
+      }
+    },
+  );
+  private payloadPeerAllowed(peer: string): boolean {
+    return Boolean(this.room && !this.previewOnly && this.peerTracker.isVerified(peer) &&
+      (!this.authority || (this.localAdmitted && this.isAdmittedPeer(peer))));
+  }
+  private async sendProfilePayload(packet: any, peer: string, banner = false): Promise<unknown> {
+    if (!this.payloadPeerAllowed(peer)) throw new Error('Profile peer unavailable');
+    if (packet.kind === 'offer') {
+      this.payloadChannels.ensure(peer);
+      packet = { ...packet, binary: true };
+    }
+    if (packet.kind === 'chunk' && packet.binary === true && this.binaryPeers.has(peer)) {
+      const { data, ...metadata } = packet;
+      const sent = await this.payloadChannels.send(peer, 'profile',
+        encodePeerPayload({ type: banner ? 'banner' : 'avatar', packet: metadata }, decodeFileBase64(data)),
+        () => this.payloadPeerAllowed(peer));
+      if (!sent) throw new Error('Profile binary channel unavailable');
+      return;
+    }
+    return (banner ? this.bannerAction : this.profileAction)?.send(packet, { target: peer });
+  }
   private seenChatRevisions: Set<string> = new Set();
   private chatAuth: PeerAuthenticator | null = null;
   private authority: RoomAuthority | null = null;
@@ -358,7 +402,29 @@ export class GroupRoomManager {
       const key = this.chatAuth?.getKnownKey(target);
       if (this.peerTracker.isVerified(target) &&
           (!this.authority || (key && this.admittedPeers.get(target) === key)))
+      {
+        if (event.kind === 'data') {
+          const payload = event.payload as any;
+          if (payload?.type === 'virtual-packet' || payload?.type === 'wire') {
+            this.payloadChannels.ensure(target);
+            const data = payload.type === 'wire' ? payload.packet?.data : payload.data;
+            const bytes = data instanceof Uint8Array ? data : typeof data === 'string' ? decodeFileBase64(data) : new Uint8Array();
+            const metadata = payload.type === 'wire'
+              ? { ...payload, packet: { ...payload.packet, data: undefined } } : { ...payload, data: undefined };
+            if (await this.payloadChannels.send(target, payload.type === 'virtual-packet' || payload.packet?.kind === 'datagram' ? 'datagram' : 'tunnel',
+              encodePeerPayload({ ...event, payload: metadata }, bytes), () => this.payloadPeerAllowed(target))) return;
+          }
+        }
+        // Compatibility with older peers retains their original room action.
+        if (event.kind === 'data') {
+          const payload = event.payload as any;
+          if (payload?.type === 'virtual-packet' && payload.data instanceof Uint8Array)
+            event = { ...event, payload: { ...payload, data: encodeFileBase64(payload.data) } };
+          else if (payload?.type === 'wire' && payload.packet?.data instanceof Uint8Array)
+            event = { ...event, payload: { ...payload, packet: { ...payload.packet, data: encodeFileBase64(payload.packet.data) } } };
+        }
         await this.appAction.send(event, { target });
+      }
       else throw new Error('Activity peer unavailable');
     } else {
       this.sendRoomAction(this.appAction, event);
@@ -1235,20 +1301,24 @@ export class GroupRoomManager {
     this.profileTransfer?.close();
     this.profileAction = this.room.makeAction('profile_image_v1');
     this.profileTransfer = new ProfileTransfer(
-      (packet, peerId) => this.profileAction?.send(packet, { target: peerId }),
+      (packet, peerId) => this.sendProfilePayload(packet, peerId),
       (peerId) => Boolean(this.room && this.peerTracker.isVerified(peerId) &&
         (!this.authority || (this.localAdmitted && this.isAdmittedPeer(peerId)))),
+      profileImages,
+      peer => this.binaryPeers.has(peer),
     );
-    this.profileAction.onMessage = (packet: unknown, meta: { peerId: string }) => {
+    this.profileAction.onMessage = (packet: any, meta: { peerId: string }) => {
+      if (packet?.kind === 'offer' && packet.binary === true) { this.payloadChannels.ensure(meta.peerId); this.binaryPeers.add(meta.peerId); }
       void this.profileTransfer?.receive(packet, meta.peerId).catch(() => {});
     };
     this.bannerTransfer?.close();
     this.bannerAction = this.room.makeAction('profile_banner_v1');
     this.bannerTransfer = new ProfileTransfer(
-      (packet, peerId) => this.bannerAction?.send(packet, { target: peerId }),
+      (packet, peerId) => this.sendProfilePayload(packet, peerId, true),
       (peerId) => Boolean(this.room && this.peerTracker.isVerified(peerId) &&
         (!this.authority || (this.localAdmitted && this.isAdmittedPeer(peerId)))),
       profileBanners,
+      peer => this.binaryPeers.has(peer),
     );
     this.bannerAction.onMessage = (packet: unknown, meta: { peerId: string }) => {
       void this.bannerTransfer?.receive(packet, meta.peerId).catch(() => {});
@@ -1718,6 +1788,7 @@ export class GroupRoomManager {
 
       // Verify and record direct WebRTC connection
       this.peerTracker.receivePeerExchange(peerId, true);
+      this.payloadChannels.ensure(peerId);
       this.rumorIntermediaries.delete(peerId);
       signalingManager.setPeerConnected(peerId);
 
@@ -1993,6 +2064,7 @@ export class GroupRoomManager {
     this.nativeVideo?.stop(undefined, peerId);
     this.pendingChallenges.delete(peerId);
     this.fileBulk.close(peerId);
+    this.payloadChannels.close(peerId); this.binaryPeers.delete(peerId);
     for (const [requestId, session] of this.fileSessions) {
       if (session.peerId !== peerId) continue;
       this.fileSessions.delete(requestId);
@@ -3467,6 +3539,7 @@ export class GroupRoomManager {
     this.nativeVideo?.close();
     this.nativeVideo = null;
     this.fileBulk.closeAll();
+    this.payloadChannels.closeAll(); this.binaryPeers.clear();
     const roomToLeave = this.room;
     this.room = null;
     if (roomToLeave) {

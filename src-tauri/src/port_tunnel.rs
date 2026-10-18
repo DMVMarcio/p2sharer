@@ -19,14 +19,15 @@ pub struct Export { pub id: String, pub name: String, pub port: u16, pub protoco
 pub enum Packet {
     Open { session: String, tunnel: String, generation: String, protocol: String },
     Ready { session: String },
-    Data { session: String, sequence: u32, data: String },
+    Data { session: String, sequence: u32, #[serde(with = "base64_bytes")] data: Vec<u8> },
+    Datagram { session: String, sequence: u32, #[serde(with = "base64_bytes")] data: Vec<u8> },
     Ack { session: String, sequence: u32 },
     End { session: String },
     Close { session: String },
 }
 impl Packet {
     fn session(&self) -> &str { match self { Self::Open { session, .. } | Self::Ready { session } |
-        Self::Data { session, .. } | Self::Ack { session, .. } | Self::End { session } | Self::Close { session } => session } }
+        Self::Data { session, .. } | Self::Datagram { session, .. } | Self::Ack { session, .. } | Self::End { session } | Self::Close { session } => session } }
 }
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -48,11 +49,22 @@ struct Scope { exports: HashMap<String, Export>, peers: HashSet<String>, session
     forwards: HashMap<String, Forward>, counters: HashMap<String, Counters> }
 #[derive(Clone, Default)]
 pub struct TunnelState { scopes: Arc<Mutex<HashMap<String, Scope>>> }
-enum Command { Ready, Ack(u32), Data(u32, Vec<u8>), LocalData(Vec<u8>), End }
+enum Command { Ready, Ack(u32), Data(u32, Vec<u8>, bool), LocalData(Vec<u8>), End }
 enum Socket { Tcp(TcpStream), Udp(Arc<UdpSocket>, Option<SocketAddr>) }
 
 fn valid_id(id: &str) -> bool { (id.len() == 32 || id.len() == 36) && id.bytes().all(|b| b.is_ascii_hexdigit() || b == b'-') }
 fn valid_peer(peer: &str) -> bool { !peer.is_empty() && peer.len() <= 100 }
+fn accept_datagram(window: &mut Option<(u32, u64)>, sequence: u32) -> bool {
+    let Some((highest, seen)) = window.as_mut() else { *window = Some((sequence, 1)); return true; };
+    if sequence > *highest {
+        let distance = sequence - *highest;
+        *seen = if distance >= 64 { 1 } else { (*seen << distance) | 1 };
+        *highest = sequence; return true;
+    }
+    let distance = *highest - sequence;
+    if distance >= 64 || (*seen & (1u64 << distance)) != 0 { return false; }
+    *seen |= 1u64 << distance; true
+}
 fn random_id() -> Result<String, String> {
     let mut bytes = [0u8; 16]; getrandom::getrandom(&mut bytes).map_err(|e| e.to_string())?;
     Ok(bytes.iter().map(|b| format!("{b:02x}")).collect())
@@ -60,12 +72,33 @@ fn random_id() -> Result<String, String> {
 fn main_only(window: &tauri::Window) -> Result<(), String> {
     if window.label() == "main" { Ok(()) } else { Err("Only the main window can operate tunnels".into()) }
 }
-fn sink(app: tauri::AppHandle) -> Sink { Arc::new(move |event| app.emit_to("main", "port-tunnel-event", event).map_err(|e| e.to_string())) }
+mod base64_bytes {
+    use super::*;
+    pub fn serialize<S: serde::Serializer>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error> { serializer.serialize_str(&STANDARD.encode(bytes)) }
+    pub fn deserialize<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Vec<u8>, D::Error> {
+        let data = String::deserialize(deserializer)?;
+        if data.len() > MAX_DATAGRAM.div_ceil(3) * 4 { return Err(serde::de::Error::custom("Tunnel packet is too large")); }
+        STANDARD.decode(data).map_err(serde::de::Error::custom)
+    }
+}
+fn sink(app: tauri::AppHandle) -> Sink { Arc::new(move |event| {
+    let (packet, bytes) = match &event.packet {
+        Packet::Data { session, sequence, data } => (serde_json::json!({"kind":"data","session":session,"sequence":sequence}), data.as_slice()),
+        Packet::Datagram { session, sequence, data } => (serde_json::json!({"kind":"datagram","session":session,"sequence":sequence}), data.as_slice()),
+        packet => (serde_json::to_value(packet).map_err(|e| e.to_string())?, &[][..]),
+    };
+    let header = serde_json::json!({"type":"wire","scope":event.scope,"peer":event.peer,"packet":packet});
+    if let Some(result) = crate::peer_payload::emit(&app, &event.scope, header, bytes) { return result; }
+    app.emit_to("main", "port-tunnel-event", event).map_err(|e| e.to_string())
+}) }
 fn emit(sink: &Sink, scope: &str, peer: &str, packet: Packet) -> Result<(), String> {
     sink(Event { scope: scope.into(), peer: peer.into(), packet })
 }
 
 impl TunnelState {
+    pub(crate) async fn receive_binary(&self, app: tauri::AppHandle, scope: String, peer: String, packet: Packet) -> Result<(), String> {
+        self.receive(scope, peer, packet, sink(app)).await
+    }
     fn configure(&self, scope: &str, exports: Vec<Export>, peers: Vec<String>) -> Result<(), String> {
         if !valid_id(scope) || exports.len() > 32 || peers.len() > 128 || peers.iter().any(|p| !valid_peer(p)) ||
             exports.iter().any(|e| !valid_id(&e.id) || !valid_id(&e.generation) || e.port == 0 ||
@@ -123,7 +156,7 @@ impl TunnelState {
         } else if !state.exports.get(tunnel).is_some_and(|e| e.generation == generation) {
             return Err("Tunnel is disabled".into());
         }
-        let (tx, rx) = mpsc::channel(4);
+        let (tx, rx) = mpsc::channel(128);
         let (cancel, cancelled) = watch::channel(false);
         state.sessions.insert((peer.into(), session.into()), Session { tunnel: tunnel.into(), generation: generation.into(), local, commands: tx, cancel });
         Ok((rx, cancelled))
@@ -144,11 +177,15 @@ impl TunnelState {
         let state = scopes.get(scope).ok_or("Tunnel is closed")?;
         if !state.peers.contains(peer) { return Err("Peer unavailable".into()); }
         let entry = state.sessions.get(&(peer.into(), session.into())).ok_or("Connection is closed")?;
-        entry.commands.try_send(command).map_err(|_| "Tunnel queue is full".into())
+        match entry.commands.try_send(command) {
+            Ok(()) | Err(mpsc::error::TrySendError::Full(Command::Data(_, _, true))) => Ok(()),
+            Err(_) => Err("Tunnel queue is full".into()),
+        }
     }
     async fn receive(&self, scope: String, peer: String, packet: Packet, output: Sink) -> Result<(), String> {
         if !valid_id(&scope) || !valid_peer(&peer) || !valid_id(packet.session()) { return Err("Invalid tunnel packet".into()); }
         let session = packet.session().to_owned();
+        let is_datagram = matches!(&packet, Packet::Datagram { .. });
         let result = match packet {
             Packet::Open { tunnel, generation, protocol, .. } => {
                 let export = { let scopes = self.scopes.lock().unwrap();
@@ -187,11 +224,10 @@ impl TunnelState {
             Packet::Ready { .. } => self.queue(&scope, &peer, &session, Command::Ready),
             Packet::Ack { sequence, .. } => self.queue(&scope, &peer, &session, Command::Ack(sequence)),
             Packet::End { .. } => self.queue(&scope, &peer, &session, Command::End),
-            Packet::Data { sequence, data, .. } => {
-                if data.len() > MAX_DATAGRAM.div_ceil(3) * 4 { return Err("Tunnel packet is too large".into()); }
-                let bytes = STANDARD.decode(data).map_err(|_| "Invalid tunnel data")?;
+            Packet::Data { sequence, data, .. } | Packet::Datagram { sequence, data, .. } => {
+                let bytes = data;
                 if bytes.len() > MAX_DATAGRAM { return Err("Tunnel packet is too large".into()); }
-                self.queue(&scope, &peer, &session, Command::Data(sequence, bytes))
+                self.queue(&scope, &peer, &session, Command::Data(sequence, bytes, is_datagram))
             }
             Packet::Close { .. } => { self.close_session(&scope, &peer, &session); Ok(()) }
         };
@@ -207,7 +243,10 @@ impl TunnelState {
         let mut buffer = vec![0u8; if udp { MAX_DATAGRAM + 1 } else { TCP_CHUNK }];
         let mut outgoing = 0u32;
         let mut incoming = 0u32;
-        let mut pending: Option<(u32, Instant)> = None;
+        let mut datagrams = None;
+        // Keep a bounded window moving instead of waiting one network RTT per read.
+        let mut pending = std::collections::VecDeque::<(u32, Instant)>::new();
+        let window = if udp { 32 } else { 16 };
         let mut first_datagram: Option<Vec<u8>> = None;
         let mut local_ended = false;
         let mut remote_ended = false;
@@ -215,26 +254,27 @@ impl TunnelState {
         let mut timer = tokio::time::interval(Duration::from_secs(2));
         loop {
             if *cancel.borrow() { break; }
-            if local_ended && remote_ended && pending.is_none() { break; }
+            if local_ended && remote_ended && pending.is_empty() { break; }
             let data = tokio::select! {
                 _ = cancel.changed() => break,
-                data = async { first_datagram.take().unwrap() }, if ready && pending.is_none() && first_datagram.is_some() => data,
+                data = async { first_datagram.take().unwrap() }, if ready && pending.len() < window && first_datagram.is_some() => data,
                 _ = timer.tick() => {
                     if (!ready && activity.elapsed() > Duration::from_secs(10)) ||
-                        pending.is_some_and(|(_, t)| t.elapsed() > Duration::from_secs(20)) ||
+                        pending.front().is_some_and(|(_, t)| t.elapsed() > Duration::from_secs(20)) ||
                         (udp && activity.elapsed() > Duration::from_secs(60)) { break; }
                     continue;
                 }
                 command = commands.recv() => {
                     match command {
                         Some(Command::Ready) if !ready => { ready = true; activity = Instant::now(); continue; }
-                        Some(Command::Ack(seq)) if pending.is_some_and(|(n, _)| n == seq) => { pending = None; continue; }
+                        Some(Command::Ack(seq)) if pending.front().is_some_and(|(n, _)| *n == seq) => { pending.pop_front(); continue; }
                         Some(Command::End) if ready && !udp && !remote_ended => {
                             let Socket::Tcp(stream) = &mut socket else { break; };
                             if stream.shutdown().await.is_err() { break; }
                             remote_ended = true; continue;
                         }
-                        Some(Command::Data(seq, data)) if ready && !remote_ended && seq == incoming => {
+                        Some(Command::Data(seq, data, datagram)) if ready && !remote_ended && datagram == udp && (udp || seq == incoming) => {
+                            if udp && !accept_datagram(&mut datagrams, seq) { continue; }
                             let written = tokio::time::timeout(Duration::from_secs(10), async {
                                 match &mut socket {
                                     Socket::Tcp(s) => s.write_all(&data).await.map(|_| data.len()),
@@ -245,11 +285,13 @@ impl TunnelState {
                             if !matches!(written, Ok(Ok(n)) if n == data.len()) { break; }
                             self.count(&scope, &tunnel, 0, data.len());
                             activity = Instant::now();
-                            let Some(next) = incoming.checked_add(1) else { break; }; incoming = next;
-                            if emit(&output, &scope, &peer, Packet::Ack { session: session.clone(), sequence: seq }).is_err() { break; }
+                            if !udp {
+                                let Some(next) = incoming.checked_add(1) else { break; }; incoming = next;
+                                if emit(&output, &scope, &peer, Packet::Ack { session: session.clone(), sequence: seq }).is_err() { break; }
+                            }
                             continue;
                         }
-                        Some(Command::LocalData(data)) if ready && pending.is_none() => data,
+                        Some(Command::LocalData(data)) if ready && pending.len() < window => data,
                         Some(Command::LocalData(data)) if !ready && udp && first_datagram.is_none() => { first_datagram = Some(data); continue; }
                         Some(Command::LocalData(_)) if udp => continue, // Bounded datagram queues drop under congestion.
                         _ => break,
@@ -261,7 +303,7 @@ impl TunnelState {
                         Socket::Udp(s, None) => s.recv(&mut buffer).await,
                         Socket::Udp(_, Some(_)) => std::future::pending().await,
                     }
-                }, if ready && pending.is_none() && !local_ended => {
+                }, if ready && pending.len() < window && !local_ended => {
                     match read {
                         Ok(0) if !udp => {
                             local_ended = true;
@@ -272,9 +314,12 @@ impl TunnelState {
                     }
                 }
             };
-            if emit(&output, &scope, &peer, Packet::Data { session: session.clone(), sequence: outgoing, data: STANDARD.encode(&data) }).is_err() { break; }
-            self.count(&scope, &tunnel, data.len(), 0);
-            pending = Some((outgoing, Instant::now()));
+            let length = data.len();
+            let packet = if udp { Packet::Datagram { session: session.clone(), sequence: outgoing, data } }
+                else { Packet::Data { session: session.clone(), sequence: outgoing, data } };
+            if emit(&output, &scope, &peer, packet).is_err() { break; }
+            self.count(&scope, &tunnel, length, 0);
+            if !udp { pending.push_back((outgoing, Instant::now())); }
             let Some(next) = outgoing.checked_add(1) else { break; }; outgoing = next;
             activity = Instant::now();
         }
@@ -368,6 +413,55 @@ pub async fn receive_port_tunnel(window: tauri::Window, state: State<'_, TunnelS
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn datagrams_allow_reordering_and_loss_without_replay_or_head_of_line_waits() {
+        let mut window = None;
+        assert!(accept_datagram(&mut window, 2));
+        assert!(accept_datagram(&mut window, 0));
+        assert!(accept_datagram(&mut window, 1));
+        assert!(!accept_datagram(&mut window, 2));
+        assert!(accept_datagram(&mut window, 100));
+        assert!(!accept_datagram(&mut window, 1));
+        assert!(accept_datagram(&mut window, 99));
+    }
+    #[tokio::test]
+    async fn congested_udp_drops_packets_without_destroying_the_session() {
+        let state = TunnelState::default(); let e = export(12345, "udp");
+        state.configure(SCOPE, vec![e.clone()], vec!["peer".into()]).unwrap();
+        let session = "44444444444444444444444444444444";
+        let (_commands, cancel) = state.register(SCOPE, "peer", session, &e.id, &e.generation, false).unwrap();
+        for sequence in 0..256 {
+            state.queue(SCOPE, "peer", session, Command::Data(sequence, vec![1], true)).unwrap();
+        }
+        assert!(!*cancel.borrow());
+        assert_eq!(state.status(SCOPE).counters[&e.id].sessions, 1);
+        state.stop(SCOPE);
+    }
+    #[tokio::test]
+    async fn tcp_pipeline_emits_multiple_reads_without_waiting_for_remote_acknowledgement() {
+        tokio::time::timeout(Duration::from_secs(5), async {
+            let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+            let mut client = TcpStream::connect(listener.local_addr().unwrap()).await.unwrap();
+            let (stream, _) = listener.accept().await.unwrap();
+            let state = TunnelState::default(); let e = export(12345, "tcp");
+            state.configure(SCOPE, vec![e.clone()], vec!["peer".into()]).unwrap();
+            let session = "44444444444444444444444444444444";
+            let (commands, cancel) = state.register(SCOPE, "peer", session, &e.id, &e.generation, false).unwrap();
+            let (send, mut receive) = mpsc::unbounded_channel();
+            let sink: Sink = Arc::new(move |event| send.send(event).map_err(|e| e.to_string()));
+            let pump = tokio::spawn({ let state = state.clone(); async move {
+                state.pump(SCOPE.into(), "peer".into(), session.into(), e.id, Socket::Tcp(stream), commands, cancel, sink, true).await;
+            } });
+            client.write_all(&vec![7; TCP_CHUNK * 3]).await.unwrap();
+            let mut total = 0;
+            while total < TCP_CHUNK * 3 {
+                match receive.recv().await.unwrap().packet {
+                    Packet::Data { data, .. } => total += data.len(), _ => panic!("Unexpected control packet"),
+                }
+            }
+            state.stop(SCOPE); pump.await.unwrap();
+        }).await.unwrap();
+    }
     const SCOPE: &str = "11111111-1111-4111-8111-111111111111";
     fn export(port: u16, protocol: &str) -> Export {
         Export { id: "22222222-2222-4222-8222-222222222222".into(), generation: "33333333-3333-4333-8333-333333333333".into(),

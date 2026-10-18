@@ -1,5 +1,6 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { listenTunnelPayloads, receiveTunnelPayload } from '../core/tunnel_payload_bridge.ts';
 import type { RoomAppModel, RoomAppModelContext } from './models.ts';
 import { createTunnelRules, isVirtualIp, validTunnelAdvertisements, validTunnelRule, type TunnelAdvertisement, type TunnelExport, type TunnelRule } from './tunnel_rules.ts';
 
@@ -14,11 +15,14 @@ export interface TunnelNative {
   call<T>(command: string, args: Record<string, unknown>): Promise<T>;
   listen(handler: (event: NativeEvent) => void): Promise<() => void>;
   listenVirtual?(handler: (event: NetworkEvent) => void): Promise<() => void>;
+  listenBinary?(scope: string, handler: (header: any, bytes: Uint8Array) => void): Promise<() => void>;
+  receiveBinary?(scope: string, peer: string, payload: unknown): Promise<void>;
 }
 const native: TunnelNative = {
   available: isTauri(), call: (command, args) => invoke(command, args),
   listen: async (handler) => listen<NativeEvent>('port-tunnel-event', ({ payload }) => handler(payload)),
   listenVirtual: async (handler) => listen<NetworkEvent>('virtual-network-event', ({ payload }) => handler(payload)),
+  listenBinary: listenTunnelPayloads, receiveBinary: receiveTunnelPayload,
 };
 
 /** Room state is owner-authored advertisements only; socket state stays on its device. */
@@ -44,6 +48,10 @@ export class TunnelModel implements RoomAppModel {
   private removeListener?: () => void;
   private removeStorageListener?: () => void;
   private removeNetworkListener?: () => void;
+  private removeBinaryListener?: () => void;
+  private binaryReady: Promise<void>;
+  private incomingWire = new Map<string, { pending: number; tail: Promise<unknown> }>();
+  private incomingDatagrams = 0;
   private networkReady: Promise<void>;
   private networkPending = 0;
   private timer?: ReturnType<typeof setInterval>;
@@ -59,6 +67,24 @@ export class TunnelModel implements RoomAppModel {
     this.context = context; this.bridge = bridge;
     this.scope = context.instanceId || crypto.randomUUID();
     this.available = bridge.available;
+    this.binaryReady = bridge.available && bridge.listenBinary ? bridge.listenBinary(this.scope, (header, bytes) => {
+      if (this.disposed) return;
+      const allowed = this.joined && this.members.has(header.peer);
+      if (header.type === 'wire' && allowed) {
+        void this.context.send?.({ type: 'wire', packet: { ...header.packet,
+          ...(['data', 'datagram'].includes(header.packet?.kind) ? { data: bytes } : {}) } }, header.peer).catch(() => {
+          void this.bridge.call('receive_port_tunnel', { scope: this.scope, peer: header.peer,
+            packet: { kind: 'close', session: header.packet?.session } }).catch(() => {});
+        });
+      } else if (header.type === 'virtual-packet' && Number.isSafeInteger(header.sequence)) {
+        let failed = !allowed || !this.context.send || this.networkPending >= 32;
+        if (failed) { void this.bridge.call('virtual_network_sent', { scope: this.scope, sequence: header.sequence, failed: true }).catch(() => {}); return; }
+        this.networkPending++;
+        void this.context.send!({ type: 'virtual-packet', data: bytes }, header.peer).catch(() => { failed = true; })
+          .finally(() => { this.networkPending--; return this.bridge.call('virtual_network_sent', { scope: this.scope, sequence: header.sequence, failed }).catch(() => {}); });
+      }
+    }).then(remove => { if (this.disposed) remove(); else this.removeBinaryListener = remove; }) : Promise.resolve();
+    void this.binaryReady.catch(error => { this.error = String(error); this.context.changed(); });
     this.store = storage ? createTunnelRules(storage) : null;
     try { this.rules = this.store?.list() ?? []; } catch (error) { this.error = String(error); }
     this.removeStorageListener = this.store?.subscribe(() => {
@@ -116,7 +142,7 @@ export class TunnelModel implements RoomAppModel {
     const next = this.serial.then(async () => {
       if (this.disposed) return;
       this.busy = true; this.error = ''; this.context.changed();
-      try { await this.listening; await operation(); }
+      try { await this.listening; await this.binaryReady; await operation(); }
       catch (error) { this.error = String(error); throw error; }
       finally { this.busy = false; this.context.changed(); }
     });
@@ -322,18 +348,43 @@ export class TunnelModel implements RoomAppModel {
         void this.command(async () => { await this.configure(); await this.reconcileRemoteProxies(); await this.refresh(); }).catch(() => {});
       this.context.changed();
     } else if (!fromSnapshot && data.type === 'virtual-packet' && this.available && this.bridge.listenVirtual) {
+      if (data.data instanceof Uint8Array && data.data.length <= 1280 && this.bridge.receiveBinary) {
+        this.receiveDatagram(actor, data); return;
+      }
       if (typeof data.data !== 'string' || data.data.length > 1708) return;
       void this.bridge.call('receive_virtual_network_packet', { scope: this.scope, peer: actor, data: data.data }).catch(() => {});
     } else if (!fromSnapshot && data.type === 'wire' && this.available && data.packet && typeof data.packet === 'object') {
       const packet = data.packet as { kind?: string; data?: unknown };
-      if (!['open', 'ready', 'data', 'ack', 'end', 'close'].includes(packet.kind || '') ||
-        (packet.kind === 'data' && (typeof packet.data !== 'string' || packet.data.length > 87_344))) return;
+      if (this.bridge.receiveBinary && ['open', 'ready', 'data', 'datagram', 'ack', 'end', 'close'].includes(packet.kind || '') &&
+        (!['data', 'datagram'].includes(packet.kind || '') || (packet.data instanceof Uint8Array && packet.data.length <= 65507))) {
+        if (packet.kind === 'datagram') {
+          this.receiveDatagram(actor, data);
+        } else {
+          const entry = this.incomingWire.get(actor) ?? { pending: 0, tail: Promise.resolve() };
+          if (entry.pending >= 1024) return;
+          this.incomingWire.set(actor, entry); entry.pending++;
+          const epoch = this.epoch;
+          entry.tail = entry.tail.then(async () => {
+            if (this.disposed || !this.joined || this.epoch !== epoch || !this.members.has(actor)) return;
+            await this.bridge.receiveBinary!(this.scope, actor, data);
+          }).catch(() => {}).finally(() => { if (--entry.pending === 0 && this.incomingWire.get(actor) === entry) this.incomingWire.delete(actor); });
+        }
+        return;
+      }
+      if (!['open', 'ready', 'data', 'datagram', 'ack', 'end', 'close'].includes(packet.kind || '') ||
+        (['data', 'datagram'].includes(packet.kind || '') && (typeof packet.data !== 'string' || packet.data.length > 87_344))) return;
       void this.bridge.call('receive_port_tunnel', { scope: this.scope, peer: actor, packet: data.packet }).catch(() => {});
     }
   }
   private remoteGenerations = new Map<string, string>();
+  private receiveDatagram(actor: string, payload: unknown): void {
+    if (!this.bridge.receiveBinary || this.incomingDatagrams >= 32) return;
+    this.incomingDatagrams++;
+    void this.bridge.receiveBinary(this.scope, actor, payload).catch(() => {})
+      .finally(() => { this.incomingDatagrams--; });
+  }
   destroy(): void {
-    this.disposed = true; this.joined = false; this.active.clear(); clearInterval(this.timer); this.removeListener?.(); this.removeStorageListener?.(); this.removeNetworkListener?.();
+    this.disposed = true; this.joined = false; this.active.clear(); clearInterval(this.timer); this.removeListener?.(); this.removeStorageListener?.(); this.removeNetworkListener?.(); this.removeBinaryListener?.();
     if (this.available && this.bridge.listenVirtual) void this.bridge.call('stop_virtual_network_scope', { scope: this.scope }).catch(() => {});
     // Finish any pending bind/configure before removing the scope, preventing late task resurrection.
     void this.serial.finally(async () => {

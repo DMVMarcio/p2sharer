@@ -53,12 +53,16 @@ Selected originals are released on cancellation, replacement or settings close.
 edges through the existing room action guard. Offers contain only hash, encoded
 size, fallback color and resolved card color. A cache miss creates a targeted
 request with a random,
-expiring token. Only matching, ordered 32 KiB Base64 chunks within the announced
-size are retained. At most four transfers are pending; other offers wait, and
+expiring token. Binary-capable peers send ordered binary chunks on the dedicated
+profile data channel, with bounded buffering independent of tunnel queues.
+The legacy room action retains Base64 chunks. Both paths enforce the announced
+size, request token and chunk index. At most four transfers are pending; other offers wait, and
 duplicate hashes share cached data. Rapid offers coalesce, failed requests have
 bounded retries, and disconnected peers lose pending transfers. The receiver
 checks SHA-256, square PNG/APNG dimensions and complete native decoding before
-display. The 64 MiB remote data URL cache has no disk persistence and dies with
+display. Binary images cross native validation through raw IPC and use Blob URLs;
+cache eviction revokes them and accounts for their actual image bytes.
+The 64 MiB remote image cache has no disk persistence and dies with
 the application process. Room departure clears associations and transfer state.
 
 Save broadcasts updated metadata to existing members; admission announces it to

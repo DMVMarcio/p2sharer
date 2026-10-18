@@ -543,6 +543,27 @@ pub async fn save_profile_image(
 }
 
 #[tauri::command]
+pub async fn validate_profile_image_bytes(window: tauri::Window, request: tauri::ipc::Request<'_>) -> Result<(), String> {
+    if window.label() != "main" { return Err("Only the main window can validate profile bytes".into()); }
+    let hash = request.headers().get("x-profile-hash").and_then(|v| v.to_str().ok())
+        .filter(|s| s.len() == 64 && s.bytes().all(|b| b.is_ascii_hexdigit())).ok_or("Invalid profile hash")?.to_owned();
+    let banner = match request.headers().get("x-profile-banner").and_then(|v| v.to_str().ok()) {
+        Some("true") => true, Some("false") => false, _ => return Err("Invalid profile kind".into()),
+    };
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else { return Err("Binary profile bytes required".into()); };
+    if bytes.len() > OUTPUT_LIMIT { return Err("Profile image is too large".into()); }
+    let bytes = bytes.clone();
+    tauri::async_runtime::spawn_blocking(move || validate_bytes(&bytes, &hash, banner)).await.map_err(|e| e.to_string())?
+}
+fn validate_bytes(bytes: &[u8], hash: &str, banner: bool) -> Result<(), String> {
+    if bytes.len() > OUTPUT_LIMIT || format!("{:x}", Sha256::digest(bytes)) != hash { return Err("Profile hash mismatch".into()); }
+    let (format, w, h) = inspect(bytes)?;
+    let valid_dimensions = if banner { w == h * 3 && w <= 960 } else { w == h && w <= 512 };
+    if format != ImageFormat::Png || !valid_dimensions { return Err("Invalid profile dimensions or format".into()); }
+    let _guard = IMAGE_WORK.lock().map_err(|e| e.to_string())?;
+    decode(bytes, None)?; Ok(())
+}
+#[tauri::command]
 pub async fn validate_profile_image(
     data: String,
     hash: String,
@@ -553,20 +574,7 @@ pub async fn validate_profile_image(
             return Err("Profile image is too large".into());
         }
         let bytes = STANDARD.decode(data).map_err(|e| e.to_string())?;
-        if bytes.len() > OUTPUT_LIMIT || format!("{:x}", Sha256::digest(&bytes)) != hash {
-            return Err("Profile hash mismatch".into());
-        }
-        let (format, w, h) = inspect(&bytes)?;
-        let valid_dimensions = if banner.unwrap_or(false) {
-            w == h * 3 && w <= 960
-        } else {
-            w == h && w <= 512
-        };
-        if format != ImageFormat::Png || !valid_dimensions {
-            return Err("Invalid profile dimensions or format".into());
-        }
-        let _guard = IMAGE_WORK.lock().map_err(|e| e.to_string())?;
-        decode(&bytes, None)?;
+        validate_bytes(&bytes, &hash, banner.unwrap_or(false))?;
         Ok(format!("data:image/png;base64,{}", STANDARD.encode(bytes)))
     })
     .await

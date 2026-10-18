@@ -244,11 +244,13 @@ impl VirtualNetworkState {
             getrandom::getrandom(&mut entropy).map_err(|e| e.to_string())?;
             let token: String = entropy.iter().map(|b| format!("{b:02x}")).collect();
             let launch_token = token.clone();
+            crate::logger::log_msg("INFO", "virtual_network", "Requesting Windows consent for the virtual adapter helper");
             let process = tokio::task::spawn_blocking(move || {
                 crate::virtual_network_driver::elevate(port, &launch_token)
             })
             .await
             .map_err(|e| e.to_string())??;
+            crate::logger::log_msg("INFO", "virtual_network", "Virtual adapter helper process launched; awaiting authenticated connection");
             {
                 let mut state = self.inner.lock().unwrap();
                 state.helpers.retain(|p| !p.exited());
@@ -403,6 +405,11 @@ impl VirtualNetworkState {
             .entry(route.rule)
             .or_default();
         c.sent += bytes.len() as u64;
+        if let Some(result) = crate::peer_payload::emit(app, &route.scope,
+            crate::peer_payload::virtual_header(&route.scope, &route.peer, sequence), bytes) {
+            if result.is_err() { state.credits.remove(&sequence); }
+            return;
+        }
         let event = PacketEvent {
             scope: route.scope,
             peer: route.peer,
@@ -688,6 +695,10 @@ pub fn receive_virtual_network_packet(
     let bytes = STANDARD
         .decode(data)
         .map_err(|_| "Invalid virtual packet")?;
+    receive_bytes(&state, scope, peer, bytes)
+}
+pub(crate) fn receive_bytes(state: &VirtualNetworkState, scope: String, peer: String, bytes: Vec<u8>) -> Result<(), String> {
+    if bytes.len() > MTU { return Err("Virtual packet is too large".into()); }
     let mut inner = state.inner.lock().unwrap();
     let identity = inner.identity.clone().ok_or("Virtual IP unavailable")?;
     let route = inner

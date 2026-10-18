@@ -38,6 +38,7 @@ mod app_updates;
 pub mod portable_update;
 pub mod lan_signaling;
 pub mod port_tunnel;
+mod peer_payload;
 pub mod virtual_network;
 mod virtual_network_policy;
 #[cfg(all(windows, target_arch = "x86_64"))]
@@ -113,6 +114,7 @@ pub fn run() {
         .manage(profile_image::ProfileImageState::default())
         .manage(lan_signaling::LanSignalingState::default())
         .manage(port_tunnel::TunnelState::default())
+        .manage(peer_payload::PayloadState::default())
         .manage(virtual_network::VirtualNetworkState::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -173,11 +175,15 @@ pub fn run() {
             port_tunnel::connect_port_tunnel,
             port_tunnel::disconnect_port_tunnel,
             port_tunnel::receive_port_tunnel,
+            peer_payload::subscribe_tunnel_payloads,
+            peer_payload::unsubscribe_tunnel_payloads,
+            peer_payload::receive_tunnel_payload,
             profile_image::pick_profile_image,
             profile_image::discard_profile_image,
             profile_image::save_profile_image,
             profile_image::load_profile_image,
             profile_image::validate_profile_image,
+            profile_image::validate_profile_image_bytes,
             media_diagnostics::media_diagnostics_enabled,
             media_diagnostics::write_media_diagnostics,
             lan_signaling::list_lan_interfaces,

@@ -30,6 +30,29 @@ function fixture() {
   return { model, native, calls, sent, storage, memory, settle: () => new Promise<void>((resolve) => setImmediate(resolve)) };
 }
 
+test('binary tunnel IPC bounds datagrams, preserves reliable order and rejects snapshots and strangers', async () => {
+  const f = fixture(), delivered: unknown[] = [], release: (() => void)[] = [];
+  f.native.receiveBinary = async (_scope, _peer, packet) => {
+    delivered.push(packet);
+    await new Promise<void>(resolve => release.push(resolve));
+  };
+  f.model.setParticipants(['alice', 'bob']); await f.settle();
+  const datagram = { type: 'wire', packet: { kind: 'datagram', session: rule.id, sequence: 0, data: new Uint8Array([1]) } };
+  try {
+    f.model.apply(datagram, 'bob', true); f.model.apply(datagram, 'stranger', false);
+    assert.equal(delivered.length, 0);
+    for (let i = 0; i < 100; i++) f.model.apply(datagram, 'bob', false);
+    assert.ok(delivered.length > 0 && delivered.length < 100, 'Congestion bounds native calls instead of accumulating stale game packets');
+    release.splice(0).forEach(resolve => resolve()); await f.settle(); delivered.length = 0;
+    const data = { type: 'wire', packet: { ...datagram.packet, kind: 'data' } };
+    const end = { type: 'wire', packet: { kind: 'end', session: rule.id } };
+    f.model.apply(data, 'bob', false); f.model.apply(end, 'bob', false); await f.settle();
+    assert.deepEqual(delivered, [data], 'Half-close cannot overtake a pending reliable write');
+    release.splice(0).forEach(resolve => resolve()); await f.settle();
+    assert.deepEqual(delivered, [data, end]);
+  } finally { release.splice(0).forEach(resolve => resolve()); f.model.destroy(); }
+});
+
 test('published proxies connect automatically on a free port and revoke on owner deactivation', async () => {
   const f = fixture(); f.model.setParticipants(['alice', 'bob']); await f.model.save(rule);
   const advertisement = { type: 'advertise', revision: 1, exports: [{ ...rule, generation, enabled: true }] };

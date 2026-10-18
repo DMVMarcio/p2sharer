@@ -19,6 +19,7 @@ class ProfileImages {
     color: automaticCardColor(hsvToHex({ h: Math.random() * 360, s: 0.65, v: 0.8 })) };
   peers = new Map<string, { hash: string; color: string; cardColor: string; bannerEnabled?: boolean; bannerBlur?: boolean }>();
   private cache = new Map<string, string>();
+  private cacheSizes = new Map<string, number>();
   private listeners = new Set<() => void>();
   private revision = 0;
   subscribe = (fn: () => void) => { this.listeners.add(fn); return () => { this.listeners.delete(fn); }; };
@@ -68,13 +69,26 @@ class ProfileImages {
     const url = await invoke<string>('validate_profile_image', { data, hash, ...(this.banner ? { banner: true } : {}) });
     this.cacheUrl(hash, url); this.notify();
   }
-  private cacheUrl(hash: string, url: string) {
+  async acceptBytes(data: Uint8Array, hash: string) {
+    await invoke('validate_profile_image_bytes', data, { headers: {
+      'x-profile-hash': hash, 'x-profile-banner': this.banner ? 'true' : 'false',
+    } });
+    const url = URL.createObjectURL(new Blob([data as BlobPart], { type: 'image/png' }));
+    this.cacheUrl(hash, url, data.length); this.notify();
+  }
+  private evict(hash: string) {
+    const url = this.cache.get(hash);
+    if (url?.startsWith('blob:')) URL.revokeObjectURL(url);
+    this.cache.delete(hash); this.cacheSizes.delete(hash);
+  }
+  private cacheUrl(hash: string, url: string, bytes = url.length) {
     // Bound the process cache (including data URL overhead) and retain recent hashes.
-    this.cache.delete(hash);
-    while (this.cache.size && [...this.cache.values()].reduce((n, url) => n + url.length, 0) + url.length > 64 * 1024 * 1024) {
-      this.cache.delete(this.cache.keys().next().value!);
+    this.evict(hash);
+    while (this.cache.size && [...this.cacheSizes.values()].reduce((n, size) => n + size, 0) + bytes > 64 * 1024 * 1024) {
+      this.evict(this.cache.keys().next().value!);
     }
     this.cache.set(hash, url);
+    this.cacheSizes.set(hash, bytes);
   }
   forget(peerId: string) { this.peers.delete(peerId); this.notify(); }
   clearPeers() { this.peers.clear(); this.notify(); }

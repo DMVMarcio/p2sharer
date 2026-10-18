@@ -24,7 +24,7 @@ use windows::{
             Threading::{CreateMutexW, ReleaseMutex, WaitForSingleObject},
         },
         UI::{
-            Shell::{ShellExecuteExW, SEE_MASK_NOCLOSEPROCESS, SHELLEXECUTEINFOW},
+            Shell::{ShellExecuteExW, SEE_MASK_NOCLOSEPROCESS, SEE_MASK_NOASYNC, SEE_MASK_FLAG_NO_UI, SHELLEXECUTEINFOW},
             WindowsAndMessaging::SW_HIDE,
         },
     },
@@ -176,6 +176,9 @@ impl Drop for HelperProcess {
     }
 }
 pub fn elevate(port: u16, token: &str) -> Result<HelperProcess, String> {
+    // Tokio worker threads have no Windows message loop. Complete shell activation
+    // synchronously and balance COM initialization before returning the worker.
+    let _apartment = ComApartment::new()?;
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     let path: Vec<u16> = exe.as_os_str().encode_wide().chain(Some(0)).collect();
     let parameters: Vec<u16> = format!("--p2sharer-vnet-helper {port} {token}")
@@ -184,7 +187,7 @@ pub fn elevate(port: u16, token: &str) -> Result<HelperProcess, String> {
         .collect();
     let mut info = SHELLEXECUTEINFOW {
         cbSize: std::mem::size_of::<SHELLEXECUTEINFOW>() as u32,
-        fMask: SEE_MASK_NOCLOSEPROCESS,
+        fMask: SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC | SEE_MASK_FLAG_NO_UI,
         lpVerb: w!("runas"),
         lpFile: PCWSTR(path.as_ptr()),
         lpParameters: PCWSTR(parameters.as_ptr()),

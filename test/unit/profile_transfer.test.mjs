@@ -13,12 +13,41 @@ const bundle = await build({
   bundle: true, write: false, format: 'esm', platform: 'node',
   plugins: [{ name: 'native', setup(builder) {
     builder.onResolve({ filter: /^@tauri-apps\/api\/core$/ }, () => ({ path: 'native', namespace: 'fixture' }));
-    builder.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({ contents: 'export const invoke = (command, args) => globalThis.__profileInvoke(command, args);' }));
+    builder.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({ contents: 'export const invoke = (command, args, options) => globalThis.__profileInvoke(command, args, options);' }));
   } }],
 });
 const { ProfileTransfer, profileImages, profileBanners } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
 const hash = 'a'.repeat(64);
 const offer = (hash = 'a'.repeat(64)) => ({ kind: 'offer', hash, color: '#123456', size: 4 });
+
+test('binary profile and banner chunks require consent and native validation before creating a cached image', async () => {
+  const previous = globalThis.__profileInvoke;
+  const calls = [];
+  globalThis.__profileInvoke = async (command, data, options) => {
+    assert.equal(command, 'validate_profile_image_bytes');
+    calls.push({ data, options });
+  };
+  try {
+    for (const [images, banner] of [[profileImages, false], [profileBanners, true]]) {
+      const sent = [], hash = (banner ? '7' : '8').repeat(64);
+      const transfer = new ProfileTransfer(packet => sent.push(packet), () => true, images, () => true);
+      try {
+        await transfer.receive({ ...offer(hash), ...(banner ? { bannerEnabled: true, bannerBlur: false } : {}) }, 'binary-peer');
+        const request = sent.find(packet => packet.kind === 'request');
+        assert.equal(request.binary, true);
+        const packet = { kind: 'chunk', hash, token: request.token, index: 0, data: new Uint8Array([1,2,3]) };
+        const before = calls.length;
+        await transfer.receive({ ...packet, token: 'wrong' }, 'binary-peer');
+        assert.equal(calls.length, before);
+        await transfer.receive(packet, 'binary-peer');
+        assert.equal(calls.length, before + 1);
+        assert.deepEqual(calls.at(-1).data, packet.data);
+        assert.deepEqual(calls.at(-1).options.headers, { 'x-profile-hash': hash, 'x-profile-banner': String(banner) });
+        assert.match(images.url('binary-peer'), /^blob:/);
+      } finally { transfer.close(); }
+    }
+  } finally { globalThis.__profileInvoke = previous; }
+});
 
 test('banners use independent consent and caches; display preferences update without transferring the image again', async () => {
   const sent = [];
