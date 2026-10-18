@@ -55,6 +55,8 @@ test('admitted peers reconcile signed commands; unauthenticated peers cannot req
     });
     room.onPeerJoin('unproved');
     assert.equal(manager.getConnectedPeers().some((peer) => peer.id === 'unproved'), false);
+    assert.equal(manager.getAllRoomSlots().some(slot => slot.peerId === 'unproved'), false,
+      'a discovery connection must not create a participant card');
     (manager as any).sendRoomAction(actions.get('presence'), { username: 'Host' });
     assert.equal(sent.some((item) => item.action === 'presence' && item.target === 'unproved'), false);
     (manager as any).localStream = { getTracks: () => [] };
@@ -75,6 +77,7 @@ test('admitted peers reconcile signed commands; unauthenticated peers cannot req
     await actions.get('peer_identity')!.onMessage!(
       { kind: 'proof', nonce, key: member.publicKey, signature }, { peerId: 'member' });
     assert.equal(manager.getConnectedPeers().some((peer) => peer.id === 'member'), false);
+    assert.equal(manager.getAllRoomSlots().some(slot => slot.peerId === 'member'), false);
     (manager as any).localStream = { getTracks: () => [] };
     manager.sendStreamToPeer('member');
     assert.equal(mediaSends, 0, 'a verified identity still requires room admission');
@@ -86,6 +89,10 @@ test('admitted peers reconcile signed commands; unauthenticated peers cannot req
       item.data.kind === 'command' && item.data.command.kind === 'admit')!.data.command;
     const memberAuthority = new RoomAuthority(invite.roomId, invite.rootKey, member);
     assert.equal(await memberAuthority.verifyCommand(firstAdmission), true);
+    assert.equal(manager.getAllRoomSlots().some(slot => slot.peerId === 'member'), false,
+      'admission alone must not publish a card before presence');
+    await actions.get('presence')!.onMessage!({ username: 'Member' }, { peerId: 'member' });
+    assert.equal(manager.getAllRoomSlots().find(slot => slot.peerId === 'member')?.senderName, 'Member');
     room.onPeerLeave('member');
     room.onPeerJoin('member');
     const reconnectNonce = sent.findLast(item => item.action === 'peer_identity' &&
@@ -93,6 +100,9 @@ test('admitted peers reconcile signed commands; unauthenticated peers cannot req
     await actions.get('peer_identity')!.onMessage!({ kind: 'proof', nonce: reconnectNonce,
       key: member.publicKey, signature: await member.signControl('identity',
         [invite.roomId, 'member', reconnectNonce]) }, { peerId: 'member' });
+    assert.equal(manager.getConnectedPeers().some(peer => peer.id === 'member'), false,
+      'a previous admission cannot make a returning preview visible');
+    assert.equal(manager.getAllRoomSlots().some(slot => slot.peerId === 'member'), false);
     await actions.get('room_admission')!.onMessage!(
       { kind: 'request', password: '' }, { peerId: 'member' });
     const renewed = sent.findLast(item => item.action === 'room_admission' &&
@@ -100,6 +110,9 @@ test('admitted peers reconcile signed commands; unauthenticated peers cannot req
     assert.ok(renewed.sequence > firstAdmission.sequence, 're-entry needs a fresh signed admission');
     assert.equal(await memberAuthority.verifyCommand(firstAdmission), false, 'old commands remain replay protected');
     assert.equal(await memberAuthority.verifyCommand(renewed), true);
+    await actions.get('presence')!.onMessage!({ username: 'Member' }, { peerId: 'member' });
+    assert.equal(manager.getConnectedPeers().some(peer => peer.id === 'member'), true);
+    assert.equal(manager.getAllRoomSlots().filter(slot => slot.peerId === 'member').length, 1);
 
     const emptyFingerprint = await roomStateFingerprint(0, []);
     await actions.get('room_admission')!.onMessage!(

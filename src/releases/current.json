@@ -6,91 +6,91 @@
       "**Stereo audio.** Broadcasts and the shared browser preserve separate left and right channels when the source is stereo.",
       "**Larger chat files.** Removed the 2 GiB limit per file. Sending and downloading still require consent.",
       "**Short invitations.** Share just the room code when someone is online, or use a full signed invitation. Saving the room keeps its verified details for future visits.",
-      "**Room re-entry.** Fixed joining getting stuck after leaving a room and returning with the same device."
+      "**Room entry.** Fixed joining getting stuck after leaving and returning with the same device. Previewing participants no longer creates a room card before joining."
     ],
     "pt-BR": [
       "**Controles de transmissão mais claros.** As transmissões ativas ficam mais fáceis de identificar, com um lápis de edição visível e um botão de parar destacado no menu de transmissão.",
       "**Áudio estéreo.** As transmissões e o navegador compartilhado preservam os canais esquerdo e direito separados quando a fonte é estéreo.",
       "**Arquivos maiores no chat.** Removemos o limite de 2 GiB por arquivo. O envio e o download continuam dependendo de consentimento.",
       "**Convites curtos.** Compartilhe apenas o código da sala quando houver alguém online ou use um convite assinado completo. Salvar a sala preserva os dados verificados para as próximas entradas.",
-      "**Voltar às salas.** Corrigimos o travamento na entrada após sair de uma sala e voltar com o mesmo dispositivo."
+      "**Entrada nas salas.** Corrigimos o travamento ao sair e voltar com o mesmo dispositivo. Consultar os participantes não cria mais um card na sala antes de entrar."
     ],
     "es": [
       "**Controles de transmisión más claros.** Las transmisiones activas son más fáciles de identificar, con un lápiz de edición visible y un botón de detener destacado en el menú.",
       "**Audio estéreo.** Las transmisiones y el navegador compartido conservan separados los canales izquierdo y derecho cuando la fuente es estéreo.",
       "**Archivos más grandes en el chat.** Eliminamos el límite de 2 GiB por archivo. El envío y la descarga siguen requiriendo consentimiento.",
       "**Invitaciones cortas.** Comparte solo el código de la sala cuando haya alguien en línea o usa una invitación firmada completa. Guardar la sala conserva sus datos verificados para futuras visitas.",
-      "**Volver a las salas.** Corregimos el bloqueo al entrar después de salir de una sala y volver con el mismo dispositivo."
+      "**Entrada a las salas.** Corregimos el bloqueo al salir y volver con el mismo dispositivo. Consultar los participantes ya no crea una tarjeta en la sala antes de entrar."
     ],
     "fr": [
       "**Des commandes de diffusion plus claires.** Les diffusions actives sont plus faciles à reconnaître, avec un crayon de modification visible et un bouton d’arrêt distinct dans le menu.",
       "**Audio stéréo.** Les diffusions et le navigateur partagé conservent des canaux gauche et droit distincts lorsque la source est stéréo.",
       "**Des fichiers plus volumineux dans le chat.** La limite de 2 Gio par fichier a été supprimée. L’envoi et le téléchargement nécessitent toujours un consentement.",
       "**Invitations courtes.** Partagez uniquement le code du salon lorsqu’une personne est en ligne, ou utilisez une invitation signée complète. Enregistrer le salon conserve ses informations vérifiées pour vos prochaines visites.",
-      "**Retour dans les salons.** Correction du blocage à l’entrée après avoir quitté un salon puis l’avoir rejoint avec le même appareil."
+      "**Entrée dans les salons.** Correction du blocage après avoir quitté puis rejoint un salon avec le même appareil. Consulter les participants ne crée plus de carte dans le salon avant d’y entrer."
     ],
     "de": [
       "**Klarere Übertragungssteuerung.** Aktive Übertragungen sind leichter zu erkennen, mit einem sichtbaren Bearbeitungsstift und einer hervorgehobenen Stopptaste im Übertragungsmenü.",
       "**Stereo-Audio.** Übertragungen und der gemeinsame Browser behalten getrennte linke und rechte Kanäle bei, wenn die Quelle Stereo liefert.",
       "**Größere Dateien im Chat.** Die Begrenzung auf 2 GiB pro Datei wurde entfernt. Senden und Herunterladen erfordern weiterhin Zustimmung.",
       "**Kurze Einladungen.** Teile nur den Raumcode, wenn jemand online ist, oder nutze eine vollständige signierte Einladung. Beim Speichern des Raums bleiben die geprüften Daten für spätere Besuche erhalten.",
-      "**Räumen erneut beitreten.** Ein Hängenbleiben beim erneuten Beitritt nach dem Verlassen eines Raums mit demselben Gerät wurde behoben."
+      "**Räumen beitreten.** Ein Hängenbleiben beim Verlassen und erneuten Beitritt mit demselben Gerät wurde behoben. Die Teilnehmervorschau erstellt vor dem Beitritt keine Teilnehmerkarte mehr im Raum."
     ],
     "it": [
       "**Controlli di trasmissione più chiari.** Le trasmissioni attive sono più facili da riconoscere, con una matita di modifica visibile e un pulsante di arresto ben distinto nel menu.",
       "**Audio stereo.** Le trasmissioni e il browser condiviso mantengono separati i canali sinistro e destro quando la sorgente è stereo.",
       "**File più grandi nella chat.** Rimosso il limite di 2 GiB per file. L’invio e il download richiedono ancora il consenso.",
       "**Inviti brevi.** Condividi solo il codice della stanza quando qualcuno è online oppure usa un invito firmato completo. Salvando la stanza conservi i dati verificati per gli accessi futuri.",
-      "**Rientrare nelle stanze.** Risolto il blocco durante l’ingresso dopo essere usciti da una stanza ed essere tornati con lo stesso dispositivo."
+      "**Ingresso nelle stanze.** Risolto il blocco dopo essere usciti e tornati con lo stesso dispositivo. Consultare i partecipanti non crea più una scheda nella stanza prima di entrare."
     ],
     "zh-CN": [
       "**更清晰的直播控制。** 直播菜单通过醒目的编辑铅笔和独立的停止按钮，让正在进行的直播更易识别。",
       "**立体声音频。** 当音源为立体声时，直播和共享浏览器会保留独立的左右声道。",
       "**聊天支持更大的文件。** 已移除每个文件 2 GiB 的限制。发送和下载仍需获得同意。",
       "**短邀请。** 有人在线时，只需分享房间代码，也可使用完整的签名邀请。保存房间会保留已验证的信息，供下次加入使用。",
-      "**重新加入房间。** 修复了使用同一设备离开房间后再次加入时卡住的问题。"
+      "**加入房间。** 修复了使用同一设备离开后再次加入时卡住的问题。查看参与者不再在正式加入前创建房间成员卡片。"
     ],
     "zh-TW": [
       "**更清楚的直播控制。** 直播選單透過醒目的編輯鉛筆和獨立的停止按鈕，讓進行中的直播更容易識別。",
       "**立體聲音訊。** 當音源為立體聲時，直播和共享瀏覽器會保留獨立的左右聲道。",
       "**聊天支援更大的檔案。** 已移除每個檔案 2 GiB 的限制。傳送和下載仍需取得同意。",
       "**短邀請。** 有人在線上時，只需分享房間代碼，也可使用完整的簽章邀請。儲存房間會保留已驗證的資訊，供下次加入使用。",
-      "**重新加入房間。** 修正使用同一裝置離開房間後再次加入時卡住的問題。"
+      "**加入房間。** 修正使用同一裝置離開後再次加入時卡住的問題。查看參與者不再於正式加入前建立房間成員卡片。"
     ],
     "ja": [
       "**わかりやすい配信操作。** 配信メニューに編集用の鉛筆と目立つ停止ボタンを表示し、配信中の項目を見分けやすくしました。",
       "**ステレオ音声。** 配信と共有ブラウザーで、音源がステレオの場合に左右のチャンネルを分離したまま再生できます。",
       "**チャットでより大きなファイルを共有。** ファイルごとの 2 GiB 制限を撤廃しました。送信とダウンロードには引き続き同意が必要です。",
       "**短い招待。** オンラインの参加者がいる場合はルームコードだけを共有でき、完全な署名付き招待も使用できます。ルームを保存すると、確認済みの情報を次回以降も使用できます。",
-      "**ルームへの再参加。** 同じデバイスでルームを退出してから再参加すると、参加処理が止まる問題を修正しました。"
+      "**ルームへの参加。** 同じデバイスで退出してから再参加すると処理が止まる問題を修正しました。参加者を確認するだけでは、入室前にルーム内のカードが表示されなくなりました。"
     ],
     "ko": [
       "**더 명확한 방송 제어.** 방송 메뉴에 편집 연필과 눈에 띄는 중지 버튼을 표시하여 진행 중인 방송을 더 쉽게 구분할 수 있습니다.",
       "**스테레오 오디오.** 방송과 공유 브라우저에서 소스가 스테레오인 경우 왼쪽과 오른쪽 채널을 분리하여 유지합니다.",
       "**채팅에서 더 큰 파일 공유.** 파일당 2 GiB 제한을 제거했습니다. 전송과 다운로드에는 여전히 동의가 필요합니다.",
       "**짧은 초대.** 온라인 참여자가 있으면 방 코드만 공유하거나 전체 서명된 초대를 사용할 수 있습니다. 방을 저장하면 확인된 정보가 다음 방문에도 유지됩니다.",
-      "**방에 다시 입장.** 같은 기기로 방에서 나간 뒤 다시 입장할 때 멈추는 문제를 수정했습니다."
+      "**방 입장.** 같은 기기로 나간 뒤 다시 입장할 때 멈추는 문제를 수정했습니다. 이제 참여자 목록을 확인하기만 하면 입장 전에 방에 참여자 카드가 표시되지 않습니다."
     ],
     "hi": [
       "**प्रसारण के अधिक स्पष्ट नियंत्रण।** प्रसारण मेनू में दिखाई देने वाली संपादन पेंसिल और अलग से उभरे रोकने के बटन से सक्रिय प्रसारण पहचानना आसान हो गया है।",
       "**स्टीरियो ऑडियो।** स्रोत स्टीरियो होने पर प्रसारण और साझा ब्राउज़र बाएँ और दाएँ चैनलों को अलग रखते हैं।",
       "**चैट में बड़ी फ़ाइलें।** प्रति फ़ाइल 2 GiB की सीमा हटा दी गई है। भेजने और डाउनलोड करने के लिए अब भी सहमति आवश्यक है।",
       "**छोटे आमंत्रण।** किसी के ऑनलाइन होने पर केवल रूम कोड साझा करें या पूरा हस्ताक्षरित आमंत्रण इस्तेमाल करें। रूम सहेजने पर सत्यापित जानकारी अगली बार के लिए बनी रहती है।",
-      "**रूम में दोबारा प्रवेश।** उसी डिवाइस से रूम छोड़ने के बाद दोबारा जुड़ने पर प्रक्रिया अटकने की समस्या ठीक की गई।"
+      "**रूम में प्रवेश।** उसी डिवाइस से बाहर निकलकर दोबारा जुड़ने पर प्रक्रिया अटकने की समस्या ठीक की गई। प्रतिभागियों की सूची देखने से अब प्रवेश करने से पहले रूम में कार्ड नहीं बनता।"
     ],
     "fi": [
       "**Selkeämmät lähetysohjaimet.** Aktiiviset lähetykset on helpompi tunnistaa lähetysvalikossa näkyvän muokkauskynän ja erottuvan pysäytyspainikkeen avulla.",
       "**Stereoääni.** Lähetykset ja jaettu selain säilyttävät vasemman ja oikean kanavan erillisinä, kun lähde on stereo.",
       "**Suurempia tiedostoja keskustelussa.** Tiedostokohtainen 2 GiB:n raja on poistettu. Lähettäminen ja lataaminen edellyttävät edelleen suostumusta.",
       "**Lyhyet kutsut.** Jaa pelkkä huonekoodi, kun joku on verkossa, tai käytä täydellistä allekirjoitettua kutsua. Huoneen tallentaminen säilyttää vahvistetut tiedot tulevia käyntejä varten.",
-      "**Huoneisiin palaaminen.** Korjattu liittymisen jumittuminen, kun huoneesta poistutaan ja siihen palataan samalla laitteella."
+      "**Huoneisiin liittyminen.** Korjattu liittymisen jumittuminen poistuttaessa ja palattaessa samalla laitteella. Osallistujien esikatselu ei enää luo huoneeseen osallistujakorttia ennen liittymistä."
     ],
     "ru": [
       "**Более понятное управление трансляциями.** Активные трансляции легче распознать благодаря видимому карандашу редактирования и выделенной кнопке остановки в меню.",
       "**Стереозвук.** Трансляции и общий браузер сохраняют раздельные левый и правый каналы, если источник передаёт стереозвук.",
       "**Большие файлы в чате.** Ограничение в 2 ГиБ на файл снято. Для отправки и скачивания по-прежнему требуется согласие.",
       "**Короткие приглашения.** Делитесь только кодом комнаты, когда кто-то онлайн, или используйте полное подписанное приглашение. При сохранении комнаты проверенные данные сохраняются для следующих посещений.",
-      "**Повторный вход в комнаты.** Исправлено зависание при входе после выхода из комнаты и возвращения с того же устройства."
+      "**Вход в комнаты.** Исправлено зависание при выходе и повторном входе с того же устройства. Просмотр участников больше не создаёт карточку в комнате до входа."
     ]
   }
 }

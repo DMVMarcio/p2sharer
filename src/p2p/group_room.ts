@@ -525,8 +525,7 @@ export class GroupRoomManager {
       },
     ];
 
-    const verifiedPeers = this.peerTracker.getVerifiedPeers().filter((peer) =>
-      !this.authority || this.isAdmittedPeer(peer.id));
+    const verifiedPeers = this.getConnectedPeers().filter(peer => this.peerTracker.isVerified(peer.id));
     verifiedPeers.forEach((p) => {
       list.push({
         peerId: p.id,
@@ -1822,6 +1821,7 @@ export class GroupRoomManager {
     this.room.onPeerJoin = (peerId: string) => {
       if (this.room !== boundRoom) return;
       this.admissionRequests.delete(peerId);
+      this.announcedPeerNames.delete(peerId);
       console.log(`[P2P] Direct WebRTC peer connection active: ${peerId}`);
 
       // Verify and record direct WebRTC connection
@@ -1840,6 +1840,7 @@ export class GroupRoomManager {
         this.authorityAction?.send({ kind: 'request' }, { target: peerId });
         this.admissionAction?.send({ kind: 'sync-request' }, { target: peerId });
         this.notifyPeersUpdate();
+        this.notifyStreamsUpdate();
         return;
       }
 
@@ -2497,9 +2498,8 @@ export class GroupRoomManager {
       watchers: this.getStreamWatchers('local'),
     });
 
-    // Keep indirect peers visible while their own WebRTC edge is negotiated.
-    // A rumor never receives media or watcher controls until directly verified.
-    this.peerTracker.getAllRoomPeers().forEach((peer) => {
+    // Cards use the same admitted, announced participants as the room roster.
+    this.getConnectedPeers().forEach((peer) => {
       const peerId = peer.id;
       const isDirect = peer.connectionState === 'connected';
       const uname = peer.username;
@@ -3421,7 +3421,7 @@ export class GroupRoomManager {
 
   public getConnectedPeers(): PeerInfo[] {
     return this.peerTracker.getAllRoomPeers().filter((peer) =>
-      !this.authority || this.isAdmittedPeer(peer.id))
+      !this.authority || (this.isAdmittedPeer(peer.id) && this.announcedPeerNames.has(peer.id)))
       .map((peer) => ({ ...peer, nicknameStyle: this.peerNicknameStyles.get(peer.id), isAdmin: this.isPeerAdmin(peer.id) }));
   }
 

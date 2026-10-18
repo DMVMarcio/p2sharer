@@ -89,6 +89,8 @@ When a remote track enters `ended` state, produces zero frames, or reports a str
 
 ## Room discovery before admission
 
+Room cards, participant rosters, and advertised peer lists share the `GroupRoomManager.getConnectedPeers()` projection. Authenticated rooms require both a valid admission and an announced presence on the current direct edge. A transport connection, identity handshake, cached admission, or host key alone does not establish visible participation. A new direct connection clears its old announced name; normal presence publishes the card after entry.
+
 Short invitations resolve a full room ID through the existing identity and signed-snapshot exchange before using the same preview and admission flow. They require an authenticated online member response, including for previously saved rooms. See [invitation trust](peer-security.md#authenticated-invitations) for first-use trust and persistence boundaries. Signed invitations retain the unanswered-discovery waiting behavior described below.
 
 `GroupRoomManager.join(callbacks, true)` opens a discovery connection on the same
