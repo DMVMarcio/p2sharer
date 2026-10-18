@@ -5272,8 +5272,8 @@ html[data-theme="light"] :is(.stream-card, .pip-window-root) {
 }
 .context-menu button:hover, .context-menu button:focus-visible { background: var(--dropdown-hover-bg); outline: none; }
 .context-menu button[aria-checked="true"] { background: var(--accent-subtle); }
-.context-menu.context-menu-visual-grid { display: grid; grid-template-columns: repeat(2, 56px); gap: 8px; min-width: 0; width: max-content; }
-.context-menu .context-menu-visual-choice { width: 56px; height: 56px; padding: 8px; justify-content: center; border-radius: var(--radius-sm); }
+.context-menu.context-menu-visual-grid { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; min-width: 0; width: max-content; max-width: calc(4 * 34px + 3 * 4px + 10px); }
+.context-menu .context-menu-visual-choice { width: 34px; height: 34px; min-height: 34px; padding: 4px; justify-content: center; border-radius: var(--radius-sm); flex: 0 0 34px; }
 .context-menu-visual-choice .context-menu-icon { width: auto; height: auto; }
 .context-menu.context-menu-anchored-above { overflow: visible; transform-origin: bottom center; }
 .context-menu-anchored-above::after { content: ''; position: absolute; width: 9px; height: 9px; left: var(--context-menu-arrow-left, 50%); bottom: -5px;

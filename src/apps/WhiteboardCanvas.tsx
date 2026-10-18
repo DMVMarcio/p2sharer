@@ -297,7 +297,7 @@ export function WhiteboardCanvas({ model, activeLayer, settings, viewport, onVie
             </g>;
           })}
           {!compact && !draft && bounds && <g className="whiteboard-selection-box">
-            <rect x={bounds.x - 5 / viewport.zoom} y={bounds.y - 5 / viewport.zoom} width={bounds.width + 10 / viewport.zoom} height={bounds.height + 10 / viewport.zoom}
+            <rect x={bounds.x} y={bounds.y} width={bounds.width} height={bounds.height}
               fill="none" stroke="var(--accent-color)" strokeWidth={1.25 / viewport.zoom} strokeDasharray={`${4 / viewport.zoom} ${3 / viewport.zoom}`} />
             {selectedLayer && !selectedLayer.locked && boardResizeHandles(bounds).map(item => (
               <rect key={item.handle} data-resize-handle={item.handle}

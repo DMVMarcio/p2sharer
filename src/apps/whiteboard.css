@@ -5,28 +5,33 @@
 .whiteboard-workspace { display: flex; flex: 1; min-height: 0; overflow: hidden; }
 .whiteboard-stage { position: relative; display: flex; flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
 .whiteboard-toolbar { position: absolute; z-index: 3; bottom: 18px; left: 50%; transform: translateX(-50%);
-  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 8px 6px; width: 620px; max-width: calc(100% - 24px);
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 10px 6px; width: 680px; max-width: calc(100% - 24px);
   max-height: calc(100% - 36px); overflow-y: auto; overflow-x: hidden; box-sizing: border-box; border-radius: var(--radius-lg);
   background: var(--bg-elevated); color: var(--text-primary); box-shadow: var(--shadow-lg); border: 1px solid var(--border-subtle);
   transition: width var(--transition-normal), height var(--transition-normal), padding var(--transition-normal); }
 .whiteboard-toolbar.is-collapsed { width: 44px; height: 44px; padding: 0; overflow: hidden; justify-content: center; }
-.whiteboard-toolbar-main-row { display: flex; align-items: center; justify-content: center; width: 100%; min-width: 0; }
-.whiteboard-toolbar.is-collapsed .whiteboard-toolbar-main-row { height: 100%; }
-.whiteboard-tool-choices { display: flex; align-items: center; justify-content: center; gap: 4px; flex: 1; min-width: 0;
-  max-width: 460px; padding-left: 36px;
+.whiteboard-toolbar-main-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; width: 100%; min-width: 0; gap: 8px; }
+.whiteboard-toolbar.is-collapsed .whiteboard-toolbar-main-row { display: flex; justify-content: center; height: 100%; gap: 0; }
+.whiteboard-toolbar-history { display: flex; align-items: center; gap: 4px; justify-self: start; min-width: 0;
+  transition: max-width var(--transition-normal), opacity var(--transition-fast); }
+.whiteboard-tool-choices { display: flex; align-items: center; justify-content: center; gap: 4px; justify-self: center; min-width: 0;
+  max-width: 480px;
   transition: max-width var(--transition-normal), opacity var(--transition-fast), padding var(--transition-normal); }
+.whiteboard-toolbar.is-collapsed .whiteboard-toolbar-history,
 .whiteboard-toolbar.is-collapsed .whiteboard-tool-choices { flex: 0 0 0px; width: 0; max-width: 0; opacity: 0; overflow: hidden; pointer-events: none; gap: 0; padding: 0; margin: 0; }
-.whiteboard-tool-choices .room-app-notepad-tool, .whiteboard-toolbar-toggle { width: 36px; height: 34px; border-radius: var(--radius-md); flex-shrink: 0; transition: background var(--transition-fast), color var(--transition-fast); }
+.whiteboard-toolbar-history .room-app-notepad-tool,
+.whiteboard-tool-choices .room-app-notepad-tool,
+.whiteboard-toolbar-toggle { width: 36px; height: 34px; border-radius: var(--radius-md); flex-shrink: 0; transition: background var(--transition-fast), color var(--transition-fast); }
 .whiteboard-tool-choices .room-app-notepad-tool.active { background: var(--accent-subtle); color: var(--accent-color); }
-.whiteboard-toolbar-toggle { display: flex; align-items: center; justify-content: center; margin-left: auto; }
+.whiteboard-toolbar-toggle { display: flex; align-items: center; justify-content: center; justify-self: end; margin-left: 0; }
 .whiteboard-toolbar.is-collapsed .whiteboard-toolbar-toggle { width: 100%; height: 100%; margin: 0 auto; border-radius: inherit; }
 .whiteboard-toolbar-toggle svg { display: block; transform-origin: 50% 50%; transition: transform var(--transition-normal); }
 .whiteboard-toolbar-toggle .is-reversed { transform: rotate(180deg); }
 .whiteboard-toolbar > .collapsible-region { width: 100%; }
-.whiteboard-tool-properties { display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; padding-top: 2px; max-width: 100%; }
+.whiteboard-tool-properties { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; padding-top: 2px; max-width: 100%; }
 .whiteboard-tool-properties .room-app-notepad-tool { width: 30px; height: 28px; border-radius: var(--radius-sm); flex-shrink: 0; }
-.whiteboard-toolbar .stream-drawing-size { border: 0; box-shadow: none; background: transparent; font-size: 11px; padding: 2px 4px; gap: 5px; flex-shrink: 0; }
-.whiteboard-toolbar .stream-drawing-size input[type="range"] { width: 46px; flex-shrink: 0; }
+.whiteboard-toolbar .stream-drawing-size { border: 0; box-shadow: none; background: transparent; font-size: 11px; padding: 2px 4px; gap: 6px; flex-shrink: 0; }
+.whiteboard-toolbar .stream-drawing-size input[type="range"] { width: 52px; flex-shrink: 0; }
 .whiteboard-toolbar .stream-drawing-size .integer-slider-value { width: 28px; min-width: 28px; max-width: 28px; padding: 1px 2px; height: 22px; font-size: 11px; text-align: center; }
 .whiteboard-canvas { flex: 1; min-width: 0; position: relative; overflow: hidden; touch-action: none; user-select: none;
   background: var(--bg-app); }
@@ -77,7 +82,7 @@
 .whiteboard-layer-name:focus-visible, .whiteboard-layer-select:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 2px; }
 .whiteboard-layer .whiteboard-layer-name-input:focus { box-shadow: none; outline: none; }
 @media (prefers-reduced-motion: reduce) {
-  .whiteboard-toolbar, .whiteboard-layers, .whiteboard-tool-choices, .whiteboard-toolbar-toggle svg, .whiteboard-layers-toggle svg:last-child { transition: none; }
+  .whiteboard-toolbar, .whiteboard-layers, .whiteboard-toolbar-history, .whiteboard-tool-choices, .whiteboard-toolbar-toggle svg, .whiteboard-layers-toggle svg:last-child { transition: none; }
 }
 
 .whiteboard-app:fullscreen { width: 100vw; height: 100vh; background: var(--bg-card); }

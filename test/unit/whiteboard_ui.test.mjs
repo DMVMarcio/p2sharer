@@ -156,6 +156,17 @@ test('shape tools offer accessible visual fill choices and stabilization persist
     slider.dispatchEvent(new window.Event('input', { bubbles: true })); slider.dispatchEvent(new window.Event('change', { bubbles: true }));
   });
   assert.equal(localStorage.getItem('p2sharer_whiteboard_smoothing'), '70');
+  assert.ok(document.querySelector('.whiteboard-toolbar-main-row .whiteboard-toolbar-history'));
+  assert.equal(document.querySelectorAll('.whiteboard-toolbar-main-row .whiteboard-toolbar-history button').length, 2);
+  assert.equal(document.querySelectorAll('.whiteboard-tool-properties button').length, 0);
+  await click('Brush');
+  const brushMenu = document.querySelector('[role="menu"]');
+  assert.ok(brushMenu);
+  assert.equal(brushMenu.querySelectorAll('[role="menuitemradio"]').length, 3);
+  await click('Pen', brushMenu);
+  assert.equal(button('Pen').getAttribute('aria-pressed'), 'true');
+  await click('Pen');
+  await click('Brush', document.querySelector('[role="menu"]'));
   await click('Select and move');
   assert.equal(fixture.model.shapes.length, 1);
 });

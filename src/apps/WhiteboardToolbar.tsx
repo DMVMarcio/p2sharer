@@ -44,19 +44,26 @@ export function WhiteboardToolbar({ settings, onChange, canUndo, canRedo, onUndo
     ['#ffffff', 'message.3683a74222dd'], ['#000000', 'message.4b652af43d8d']];
   return <div className={`whiteboard-toolbar ${open ? '' : 'is-collapsed'}`} role="toolbar" aria-label={t('whiteboard.tools')}>
     <div className="whiteboard-toolbar-main-row">
+      <div className="whiteboard-toolbar-history" inert={!open || undefined} aria-hidden={!open || undefined}>
+        <TooltipButton tooltip={t('message.786b48222848')} className="room-app-notepad-tool" disabled={!canUndo} onClick={onUndo}><Undo2 size={17} /></TooltipButton>
+        <TooltipButton tooltip={t('message.7b659c9caa5e')} className="room-app-notepad-tool" disabled={!canRedo} onClick={onRedo}><Redo2 size={17} /></TooltipButton>
+      </div>
       <div className="whiteboard-tool-choices" inert={!open || undefined} aria-hidden={!open || undefined}>
         {tools.map(([tool, Icon]) => <TooltipButton key={tool} tooltip={t(tool === 'brush' ? activeBrushLabel : `whiteboard.${tool}`)} aria-pressed={settings.tool === tool}
           className={`room-app-notepad-tool ${settings.tool === tool ? 'active' : ''}`} onClick={event => {
-            if (tool === 'brush') menu(event, brushVariants.map(([brushType, VariantIcon, labelKey]) => ({
-              id: `brush-${brushType}`, label: t(labelKey), iconOnly: true,
-              selected: settings.tool === 'brush' && settings.brushType === brushType,
-              icon: <VariantIcon size={21} strokeWidth={1.8} />,
-              onSelect: () => onChange({ ...settings, tool: 'brush', brushType }),
-            })), { toggle: true, layout: 'grid', placement: 'top-center' });
-            else if (tool === 'rectangle' || tool === 'ellipse') menu(event, [false, true].map(filled => ({
-              id: `${tool}-${filled}`, label: t(filled ? 'whiteboard.filled' : 'whiteboard.outline'), iconOnly: true,
+            if (tool === 'brush') {
+              if (settings.tool !== 'brush') onChange({ ...settings, tool: 'brush' });
+              menu(event, brushVariants.map(([brushType, VariantIcon, labelKey]) => ({
+                id: `brush-${brushType}`, label: t(labelKey), tooltip: t(labelKey), iconOnly: true,
+                selected: settings.brushType === brushType,
+                icon: <VariantIcon size={18} strokeWidth={1.8} />,
+                onSelect: () => onChange({ ...settings, tool: 'brush', brushType }),
+              })), { toggle: true, layout: 'grid', placement: 'top-center' });
+            } else if (tool === 'rectangle' || tool === 'ellipse') menu(event, [false, true].map(filled => ({
+              id: `${tool}-${filled}`, label: t(filled ? 'whiteboard.filled' : 'whiteboard.outline'),
+              tooltip: t(filled ? 'whiteboard.filled' : 'whiteboard.outline'), iconOnly: true,
               selected: settings.tool === tool && settings.filled === filled,
-              icon: <Icon size={23} fill={filled ? 'currentColor' : 'none'} strokeWidth={1.8} />,
+              icon: <Icon size={18} fill={filled ? 'currentColor' : 'none'} strokeWidth={1.8} />,
               onSelect: () => onChange({ ...settings, tool, filled }),
             })), { toggle: true, layout: 'grid', placement: 'top-center' });
             else onChange({ ...settings, tool });
@@ -75,8 +82,6 @@ export function WhiteboardToolbar({ settings, onChange, canUndo, canRedo, onUndo
         <IntegerSlider label={t('whiteboard.width')} min={1} max={100} value={settings.width} onChange={width => onChange({ ...settings, width })} />
         <IntegerSlider label={t('whiteboard.opacity')} min={1} max={100} value={settings.opacity} onChange={opacity => onChange({ ...settings, opacity })} />
         <IntegerSlider label={t('whiteboard.smoothing')} min={0} max={100} value={settings.smoothing} onChange={smoothing => onChange({ ...settings, smoothing })} />
-        <TooltipButton tooltip={t('message.786b48222848')} className="room-app-notepad-tool" disabled={!canUndo} onClick={onUndo}><Undo2 size={16} /></TooltipButton>
-        <TooltipButton tooltip={t('message.7b659c9caa5e')} className="room-app-notepad-tool" disabled={!canRedo} onClick={onRedo}><Redo2 size={16} /></TooltipButton>
       </div>
     </CollapsibleRegion>
   </div>;

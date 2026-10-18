@@ -689,7 +689,10 @@ fn validate_whiteboard_bytes(bytes: &[u8], hash: &str) -> Result<WhiteboardImage
 }
 
 #[tauri::command]
-pub async fn paste_whiteboard_image(data: Option<String>) -> Result<WhiteboardImage, String> {
+pub async fn paste_whiteboard_image(
+    data: Option<String>,
+    path: Option<String>,
+) -> Result<WhiteboardImage, String> {
     tauri::async_runtime::spawn_blocking(move || {
         if let Some(raw) = data {
             let encoded = raw
@@ -701,6 +704,19 @@ pub async fn paste_whiteboard_image(data: Option<String>) -> Result<WhiteboardIm
                 return Err("Image exceeds the 32 MB limit".into());
             }
             let bytes = STANDARD.decode(encoded).map_err(|_| "Invalid image")?;
+            return process_whiteboard_bytes(&bytes);
+        }
+        if let Some(file_path) = path {
+            let trimmed = file_path.trim();
+            if trimmed.is_empty() {
+                return Err("Invalid image".into());
+            }
+            let mut bytes = Vec::new();
+            std::fs::File::open(trimmed)
+                .map_err(|e| e.to_string())?
+                .take(INPUT_LIMIT as u64 + 1)
+                .read_to_end(&mut bytes)
+                .map_err(|e| e.to_string())?;
             return process_whiteboard_bytes(&bytes);
         }
         let mut clipboard = arboard::Clipboard::new().map_err(|e| e.to_string())?;
@@ -1188,7 +1204,7 @@ mod tests {
             "data:image/jpeg;base64,{}",
             STANDARD.encode(jpeg.into_inner())
         );
-        let prepared = paste_whiteboard_image(Some(data)).await.unwrap();
+        let prepared = paste_whiteboard_image(Some(data), None).await.unwrap();
         assert_eq!((prepared.width, prepared.height), (1920, 960));
         let validated = validate_whiteboard_image(prepared.data.clone(), prepared.hash.clone())
             .await

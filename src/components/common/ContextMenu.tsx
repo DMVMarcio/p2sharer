@@ -171,13 +171,16 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
       onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); }}
       onClick={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()}>
       {retained.actions.map((action) => {
+        const tooltipText = action.tooltip ?? (action.iconOnly ? action.label : undefined);
         const primary = <button key={action.id} type="button" role={action.selected === undefined ? 'menuitem' : 'menuitemradio'} aria-checked={action.selected}
         ref={element => { if (element) buttonRefs.current.set(action.id, element); else buttonRefs.current.delete(action.id); }}
-        aria-label={action.tooltip || (action.iconOnly ? action.label : undefined)}
+        aria-label={tooltipText}
         disabled={action.disabled} className={`${action.iconOnly ? 'context-menu-visual-choice' : ''} ${action.danger ? 'context-menu-danger' : ''} ${action.separator ? 'context-menu-separated' : ''}`}
         onClick={() => select(action)}>{action.icon && <span className="context-menu-icon" aria-hidden="true">{action.icon}</span>}{!action.iconOnly && <span className="context-menu-label">{action.label}</span>}
           {action.trailingIcon && <span className="context-menu-trailing-icon" aria-hidden="true">{action.trailingIcon}</span>}</button>;
-        const primaryAction = action.tooltip ? <Tooltip key={action.id} content={action.tooltip} disabled={presence.closing}>{primary}</Tooltip> : primary;
+        const primaryAction = tooltipText
+          ? <Tooltip key={action.id} content={tooltipText} placement={retained.placement === 'top-center' || action.iconOnly ? 'top' : 'auto'} disabled={presence.closing}>{primary}</Tooltip>
+          : primary;
         const secondary = action.secondary;
         return secondary ? <div key={action.id} className="context-menu-row" role="none">{primaryAction}
           <Tooltip content={secondary.label} disabled={presence.closing}><button type="button" role="menuitem" aria-label={secondary.label}

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { useLocale } from '../hooks/useLocale';
 import { useRoom } from '../hooks/useRoom';
 import { showToast } from '../hooks/useToast';
@@ -44,16 +45,25 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
   const select = (id: string | null) => { setSelected(id); if (id) setActiveLayer(id); };
   const remove = (id: string) => { try { model?.removeLayer(id); setSelected(null); } catch (reason) { error(reason); } };
   const currentLayer = model?.layers.some(l => l.id === activeLayer) ? activeLayer : model?.layers[0]?.id ?? DEFAULT_BOARD_LAYER;
-  const pasteImage = async (clipboardData?: DataTransfer | null) => {
+  const pasteImage = async (
+    clipboardData?: DataTransfer | null,
+    dropPoint?: { clientX: number; clientY: number },
+    filePath?: string,
+  ) => {
     if (!model || compact) return;
     try {
-      const dataUrl = await readClipboardImageDataUrl(clipboardData);
-      const image = await prepareWhiteboardImage(dataUrl);
+      const dataUrl = filePath ? undefined : await readClipboardImageDataUrl(clipboardData);
+      const image = await prepareWhiteboardImage(dataUrl, filePath);
       const canvasEl = fullscreenRef.current?.querySelector('.whiteboard-canvas') as HTMLElement | null;
+      const rect = canvasEl?.getBoundingClientRect();
       const viewW = (canvasEl?.clientWidth || 800) / viewport.zoom;
       const viewH = (canvasEl?.clientHeight || 500) / viewport.zoom;
-      const centerX = Math.max(0, Math.min(BOARD_WIDTH, (-viewport.x) / viewport.zoom + viewW / 2));
-      const centerY = Math.max(0, Math.min(BOARD_HEIGHT, (-viewport.y) / viewport.zoom + viewH / 2));
+      const centerX = dropPoint && rect
+        ? Math.max(0, Math.min(BOARD_WIDTH, (dropPoint.clientX - rect.left - viewport.x) / viewport.zoom))
+        : Math.max(0, Math.min(BOARD_WIDTH, (-viewport.x) / viewport.zoom + viewW / 2));
+      const centerY = dropPoint && rect
+        ? Math.max(0, Math.min(BOARD_HEIGHT, (dropPoint.clientY - rect.top - viewport.y) / viewport.zoom))
+        : Math.max(0, Math.min(BOARD_HEIGHT, (-viewport.y) / viewport.zoom + viewH / 2));
       const maxW = Math.min(BOARD_WIDTH * 0.8, Math.max(240, viewW * 0.65));
       const maxH = Math.min(BOARD_HEIGHT * 0.8, Math.max(240, viewH * 0.65));
       const scale = Math.min(1, maxW / image.width, maxH / image.height);
@@ -74,8 +84,54 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
       error(reason);
     }
   };
+  const pasteImageRef = useRef(pasteImage);
+  pasteImageRef.current = pasteImage;
+  useEffect(() => {
+    if (compact || typeof window === 'undefined' || !('__TAURI_INTERNALS__' in window)) return;
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    void getCurrentWebview().onDragDropEvent(event => {
+      if (disposed || event.payload.type !== 'drop' || !event.payload.paths.length) return;
+      const canvasEl = fullscreenRef.current?.querySelector('.whiteboard-canvas') as HTMLElement | null;
+      if (!canvasEl) return;
+      const rect = canvasEl.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      const logical = { clientX: event.payload.position.x / dpr, clientY: event.payload.position.y / dpr };
+      const raw = { clientX: event.payload.position.x, clientY: event.payload.position.y };
+      const inside = (pt: { clientX: number; clientY: number }) =>
+        pt.clientX >= rect.left && pt.clientX <= rect.right && pt.clientY >= rect.top && pt.clientY <= rect.bottom;
+      const dropPoint = inside(logical) ? logical : inside(raw) ? raw : null;
+      if (!dropPoint) return;
+      void pasteImageRef.current(null, dropPoint, event.payload.paths[0]);
+    }).then(fn => {
+      if (disposed) fn();
+      else unlisten = fn;
+    }).catch(() => {});
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [compact, fullscreenRef]);
   if (!model) return null;
   return <div ref={fullscreenRef} className="whiteboard-app" onClick={event => event.stopPropagation()} onPointerDown={event => event.stopPropagation()}
+    onDragOver={event => {
+      if (compact) return;
+      const hasFiles = Array.from(event.dataTransfer?.types ?? []).includes('Files') ||
+        Array.from(event.dataTransfer?.items ?? []).some(item => item.type.startsWith('image/'));
+      if (hasFiles) {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'copy';
+      }
+    }}
+    onDrop={event => {
+      if (compact) return;
+      const hasImage = Array.from(event.dataTransfer?.files ?? []).some(file => file.type.startsWith('image/')) ||
+        Array.from(event.dataTransfer?.items ?? []).some(item => item.type.startsWith('image/'));
+      if (!hasImage) return;
+      event.preventDefault();
+      event.stopPropagation();
+      void pasteImage(event.dataTransfer, { clientX: event.clientX, clientY: event.clientY });
+    }}
     onPaste={event => {
       if (compact || (event.target as HTMLElement).closest('input, textarea, [contenteditable], [role="dialog"], [role="menu"], [role="listbox"]')) return;
       event.preventDefault();

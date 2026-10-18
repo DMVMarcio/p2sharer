@@ -60,9 +60,9 @@ export async function verifyWhiteboardPng(data: string, expectedHash: string): P
   return { hash: expectedHash, data: encodeBase64(bytes), width, height };
 }
 
-export async function prepareWhiteboardImage(data?: string): Promise<WhiteboardImageRecord> {
+export async function prepareWhiteboardImage(data?: string, path?: string): Promise<WhiteboardImageRecord> {
   if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
-    return invoke<WhiteboardImageRecord>('paste_whiteboard_image', { data: data ?? null });
+    return invoke<WhiteboardImageRecord>('paste_whiteboard_image', { data: data ?? null, path: path ?? null });
   }
   if (!data) throw new Error('whiteboard.noClipboardImage');
   const clean = stripDataPrefix(data);
