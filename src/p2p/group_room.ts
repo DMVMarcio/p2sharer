@@ -11,9 +11,10 @@ import type { AppWireEvent } from '../apps/types.ts';
 import { getRoomApp } from '../apps/registry.ts';
 import { chatHistoryChanged, chatRevision, chatRevisionKey, mergeChatHistory, nextChatOrder } from '../core/chat_history.ts';
 import { CHAT_FILE_CHUNK_BYTES, CHAT_FILE_IO_BATCH_BYTES, CHAT_FILE_IN_FLIGHT_CHUNKS, MAX_IMAGE_PREVIEW_BYTES } from '../core/chat_file_limits.ts';
-import { decodeFileBase64, decodeSignedFileChunk, encodeFileBase64, encodeSignedFileChunk,
+import { decodeSignedFileChunk, encodeSignedFileChunk,
   fileChunkSignatureData, hashFileChunk } from '../core/chat_file_wire.ts';
 import { PeerAuthenticator } from '../core/peer_auth.ts';
+import { readChatFileBytes, writeChatDownloadBytes } from '../core/chat_file_io.ts';
 import { selectedIcePair, selectedIceRoute, type IceStat } from '../core/ice_route.ts';
 import { RoomAuthority, type AdminAdmission, type AuthorityTransfer, type HostCommand } from '../core/room_authority.ts';
 import { compareRoomInvites, formatRoomInvite, parseRoomInvite, signRoomInvite, validRoomName,
@@ -2924,11 +2925,9 @@ export class GroupRoomManager {
         const length = Math.min(CHAT_FILE_IO_BATCH_BYTES, session.total - offset,
           CHAT_FILE_IN_FLIGHT_CHUNKS * CHAT_FILE_CHUNK_BYTES - (offset - session.offset));
         const readStart = performance.now();
-        const data = await invoke<string>('read_chat_file_chunk', { id: session.sourceId, offset,
-          length });
+        const bytes = await readChatFileBytes(session.sourceId, offset, length);
         session.timings.readMs += performance.now() - readStart;
         if (this.fileSessions.get(requestId) !== session) return;
-        const bytes = decodeFileBase64(data);
         if (bytes.length !== length) throw new Error('Source file changed or truncated');
         // Prepare a bounded batch concurrently; never serialize a native round trip
         // and two WebCrypto round trips for every small network message.
@@ -3104,8 +3103,7 @@ export class GroupRoomManager {
           const bytes = new Uint8Array(length);
           let index = 0;
           for (const chunk of batch) { bytes.set(chunk, index); index += chunk.length; }
-          const written = await invoke<number>('write_chat_download_chunk',
-            { id: requestId, offset, data: encodeFileBase64(bytes) });
+          const written = await writeChatDownloadBytes(requestId, offset, bytes);
           if (this.fileSessions.get(requestId) !== session) return;
           if (written !== offset + length) throw new Error('Invalid download write offset');
           session.offset = written;

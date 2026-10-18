@@ -15,7 +15,7 @@ pub struct ChatFileState {
     clipboard_sources: Mutex<HashMap<String, PathBuf>>,
 }
 
-struct Download { temp: PathBuf, destination: PathBuf, size: u64, written: u64, hash: String }
+struct Download { temp: PathBuf, destination: PathBuf, file: File, size: u64, written: u64, hash: String }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -119,9 +119,20 @@ pub async fn inspect_chat_file(state: State<'_, ChatFileState>, id: String) -> R
 #[tauri::command]
 pub async fn read_chat_file_chunk(state: State<'_, ChatFileState>, id: String, offset: u64,
     length: Option<usize>) -> Result<String, String> {
+    read_source_chunk(&state, &id, offset, length).await.map(|bytes| STANDARD.encode(bytes))
+}
+
+#[tauri::command]
+pub async fn read_chat_file_bytes(state: State<'_, ChatFileState>, id: String, offset: u64,
+    length: Option<usize>) -> Result<tauri::ipc::Response, String> {
+    read_source_chunk(&state, &id, offset, length).await.map(tauri::ipc::Response::new)
+}
+
+async fn read_source_chunk(state: &ChatFileState, id: &str, offset: u64,
+    length: Option<usize>) -> Result<Vec<u8>, String> {
     let length = length.unwrap_or(CHUNK);
     if length == 0 || length > CHUNK { return Err("Invalid chunk size".into()); }
-    let path = state.sources.lock().map_err(|e| e.to_string())?.get(&id).cloned().ok_or("Source unavailable")?;
+    let path = state.sources.lock().map_err(|e| e.to_string())?.get(id).cloned().ok_or("Source unavailable")?;
     tauri::async_runtime::spawn_blocking(move || {
         let mut file = File::open(path).map_err(|e| e.to_string())?;
         let size = file.metadata().map_err(|e| e.to_string())?.len();
@@ -129,7 +140,7 @@ pub async fn read_chat_file_chunk(state: State<'_, ChatFileState>, id: String, o
         file.seek(SeekFrom::Start(offset)).map_err(|e| e.to_string())?;
         let mut buffer = vec![0u8; length.min((size - offset) as usize)];
         file.read_exact(&mut buffer).map_err(|e| e.to_string())?;
-        Ok(STANDARD.encode(buffer))
+        Ok(buffer)
     }).await.map_err(|e| e.to_string())?
 }
 
@@ -157,19 +168,38 @@ pub async fn choose_chat_download(state: State<'_, ChatFileState>, id: String, n
     }).await.map_err(|e| e.to_string())??;
     let Some(destination) = destination else { return Ok(false) };
     let temp = destination.with_extension(format!("p2sharer-{}.part", random_id()?));
-    OpenOptions::new().write(true).create_new(true).open(&temp).map_err(|e| e.to_string())?;
-    state.downloads.lock().map_err(|e| e.to_string())?.insert(id, Download { temp, destination, size, written: 0, hash });
+    let file = OpenOptions::new().write(true).create_new(true).open(&temp).map_err(|e| e.to_string())?;
+    state.downloads.lock().map_err(|e| e.to_string())?.insert(id, Download { temp, destination, file, size, written: 0, hash });
     Ok(true)
 }
 
 #[tauri::command]
 pub async fn write_chat_download_chunk(state: State<'_, ChatFileState>, id: String, offset: u64, data: String) -> Result<u64, String> {
     let bytes = STANDARD.decode(data).map_err(|e| e.to_string())?;
+    write_download_bytes(&state, &id, offset, &bytes)
+}
+
+fn download_headers(headers: &tauri::http::HeaderMap) -> Result<(&str, u64), String> {
+    let id = headers.get("x-chat-download-id").and_then(|value| value.to_str().ok()).ok_or("Missing download ID")?;
+    if id.is_empty() || id.len() > 80 { return Err("Invalid download ID".into()); }
+    let offset = headers.get("x-chat-offset").and_then(|value| value.to_str().ok()).ok_or("Missing download offset")?;
+    if offset.is_empty() || !offset.bytes().all(|byte| byte.is_ascii_digit()) { return Err("Invalid download offset".into()); }
+    Ok((id, offset.parse().map_err(|_| "Invalid download offset")?))
+}
+
+#[tauri::command]
+pub async fn write_chat_download_bytes(state: State<'_, ChatFileState>, request: tauri::ipc::Request<'_>) -> Result<u64, String> {
+    let (id, offset) = download_headers(request.headers())?;
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else { return Err("Expected binary file bytes".into()); };
+    write_download_bytes(&state, id, offset, bytes)
+}
+
+fn write_download_bytes(state: &ChatFileState, id: &str, offset: u64, bytes: &[u8]) -> Result<u64, String> {
     if bytes.is_empty() || bytes.len() > CHUNK { return Err("Invalid chunk size".into()); }
     let mut downloads = state.downloads.lock().map_err(|e| e.to_string())?;
-    let download = downloads.get_mut(&id).ok_or("Download unavailable")?;
+    let download = downloads.get_mut(id).ok_or("Download unavailable")?;
     if offset != download.written || offset + bytes.len() as u64 > download.size { return Err("Invalid chunk offset".into()); }
-    OpenOptions::new().append(true).open(&download.temp).and_then(|mut file| file.write_all(&bytes)).map_err(|e| e.to_string())?;
+    download.file.write_all(bytes).map_err(|e| e.to_string())?;
     download.written += bytes.len() as u64;
     Ok(download.written)
 }
@@ -177,6 +207,7 @@ pub async fn write_chat_download_chunk(state: State<'_, ChatFileState>, id: Stri
 #[tauri::command]
 pub async fn finish_chat_download(state: State<'_, ChatFileState>, id: String) -> Result<String, String> {
     let download = state.downloads.lock().map_err(|e| e.to_string())?.remove(&id).ok_or("Download unavailable")?;
+    drop(download.file);
     if download.written != download.size { let _ = fs::remove_file(&download.temp); return Err("Incomplete download".into()); }
     let (size, hash) = digest(&download.temp)?;
     if size != download.size || hash != download.hash { let _ = fs::remove_file(&download.temp); return Err("File signature mismatch".into()); }
@@ -189,7 +220,7 @@ pub async fn finish_chat_download(state: State<'_, ChatFileState>, id: String) -
 #[tauri::command]
 pub fn cancel_chat_download(state: State<'_, ChatFileState>, id: String) {
     if let Ok(mut downloads) = state.downloads.lock() {
-        if let Some(download) = downloads.remove(&id) { let _ = fs::remove_file(download.temp); }
+        if let Some(download) = downloads.remove(&id) { drop(download.file); let _ = fs::remove_file(download.temp); }
     }
 }
 
@@ -428,6 +459,60 @@ pub async fn copy_chat_image(data_base64: String) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn binary_source_reads_are_bounded_and_preserve_exact_bytes() {
+        let state = ChatFileState::default();
+        let path = std::env::temp_dir().join(format!("p2sharer-binary-{}", random_id().unwrap()));
+        let bytes: Vec<u8> = (0..CHUNK + 7).map(|index| (index % 251) as u8).collect();
+        fs::write(&path, &bytes).unwrap();
+        let info = register_source(&state, path.clone()).unwrap();
+        assert_eq!(read_source_chunk(&state, &info.id, 0, Some(CHUNK)).await.unwrap(), bytes[..CHUNK]);
+        assert_eq!(read_source_chunk(&state, &info.id, CHUNK as u64, Some(CHUNK)).await.unwrap(), bytes[CHUNK..]);
+        assert!(read_source_chunk(&state, &info.id, 0, Some(CHUNK + 1)).await.is_err());
+        assert!(read_source_chunk(&state, &info.id, 0, Some(0)).await.is_err());
+        assert!(read_source_chunk(&state, &info.id, bytes.len() as u64 + 1, Some(1)).await.is_err());
+        assert!(read_source_chunk(&state, "unknown", 0, Some(1)).await.is_err());
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn binary_download_headers_require_a_bounded_id_and_unsigned_offset() {
+        let mut headers = tauri::http::HeaderMap::new();
+        assert!(download_headers(&headers).is_err());
+        headers.insert("x-chat-download-id", "request".parse().unwrap());
+        for offset in ["", "-1", "+1", "1.5", "18446744073709551616"] {
+            headers.insert("x-chat-offset", offset.parse().unwrap());
+            assert!(download_headers(&headers).is_err());
+        }
+        headers.insert("x-chat-offset", "0".parse().unwrap());
+        assert_eq!(download_headers(&headers).unwrap(), ("request", 0));
+        headers.insert("x-chat-download-id", "a".repeat(81).parse().unwrap());
+        assert!(download_headers(&headers).is_err());
+    }
+
+    #[test]
+    fn binary_download_writes_share_one_handle_and_reject_invalid_ranges() {
+        let state = ChatFileState::default();
+        let path = std::env::temp_dir().join(format!("p2sharer-write-{}", random_id().unwrap()));
+        let file = OpenOptions::new().write(true).create_new(true).open(&path).unwrap();
+        state.downloads.lock().unwrap().insert("request".into(), Download {
+            temp: path.clone(), destination: path.with_extension("complete"), file,
+            size: (CHUNK + 3) as u64, written: 0, hash: String::new(),
+        });
+        assert!(write_download_bytes(&state, "unknown", 0, &[1]).is_err());
+        assert!(write_download_bytes(&state, "request", 0, &[]).is_err());
+        assert!(write_download_bytes(&state, "request", 0, &vec![0; CHUNK + 1]).is_err());
+        assert!(write_download_bytes(&state, "request", 1, &[1]).is_err());
+        assert_eq!(write_download_bytes(&state, "request", 0, &vec![0x42; CHUNK]).unwrap(), CHUNK as u64);
+        assert!(write_download_bytes(&state, "request", CHUNK as u64, &[1, 2, 3, 4]).is_err());
+        assert_eq!(write_download_bytes(&state, "request", CHUNK as u64, &[1, 2, 3]).unwrap(), (CHUNK + 3) as u64);
+        drop(state.downloads.lock().unwrap().remove("request").unwrap());
+        let bytes = fs::read(&path).unwrap();
+        assert_eq!(&bytes[..CHUNK], &vec![0x42; CHUNK]);
+        assert_eq!(&bytes[CHUNK..], &[1, 2, 3]);
+        fs::remove_file(path).unwrap();
+    }
 
     #[test]
     fn clipboard_gif_keeps_original_encoded_bytes_and_rejects_other_formats() {

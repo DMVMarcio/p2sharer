@@ -45,7 +45,7 @@ mod virtual_network_driver;
 use audio_loopback::{start_audio_capture, stop_audio_capture};
 use logger::{clear_log_file, get_log_file_path, open_latest_log, open_log_folder, write_frontend_log};
 use note_files::{open_note_file, save_note_file, list_saved_notes, read_saved_note, save_library_note, rename_library_note, delete_library_note};
-use chat_files::{ChatFileState, pick_chat_file, inspect_chat_file, read_chat_file_chunk, choose_chat_download, write_chat_download_chunk, finish_chat_download, cancel_chat_download, read_chat_image_preview, remember_chat_file_source, restore_chat_file_source, reveal_chat_download};
+use chat_files::{ChatFileState, pick_chat_file, inspect_chat_file, read_chat_file_chunk, read_chat_file_bytes, choose_chat_download, write_chat_download_chunk, write_chat_download_bytes, finish_chat_download, cancel_chat_download, read_chat_image_preview, remember_chat_file_source, restore_chat_file_source, reveal_chat_download};
 use pip_manager::{close_pip_window, open_pip_window, set_pip_always_on_top, set_pip_aspect_ratio};
 use process_manager::{
     list_audio_processes, setup_job_object_for_clean_child_teardown,
@@ -245,6 +245,8 @@ pub fn run() {
             discard_chat_file,
             inspect_chat_file,
             read_chat_file_chunk,
+            read_chat_file_bytes,
+            write_chat_download_bytes,
             choose_chat_download,
             write_chat_download_chunk,
             finish_chat_download,

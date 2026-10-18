@@ -51,9 +51,9 @@ test('sender batches native reads while keeping signed wire chunks and the ackno
     const reads: number[] = [];
     const packets: Uint8Array[] = [];
     (window as any).__TAURI_INTERNALS__ = { invoke: async (command: string, args: any) => {
-      assert.equal(command, 'read_chat_file_chunk');
+      assert.equal(command, 'read_chat_file_bytes');
       reads.push(args.length);
-      return source.subarray(args.offset, args.offset + args.length).toString('base64');
+      return Uint8Array.from(source.subarray(args.offset, args.offset + args.length)).buffer;
     } };
     manager.fileBulk = { send: async (_peer: string, packet: Uint8Array) => { packets.push(packet); } };
     await manager.sendNextFileChunks('request');
@@ -91,11 +91,12 @@ test('receiver coalesces contiguous verified chunks and acknowledges only comple
     const writes: Uint8Array[] = [];
     const acks: number[] = [];
     let written = 0;
-    (window as any).__TAURI_INTERNALS__ = { invoke: async (command: string, args: any) => {
-      assert.equal(command, 'write_chat_download_chunk');
-      assert.equal(args.offset, written);
+    (window as any).__TAURI_INTERNALS__ = { invoke: async (command: string, bytes: Uint8Array, options: any) => {
+      assert.equal(command, 'write_chat_download_bytes');
+      assert.equal(options.headers['x-chat-download-id'], 'request');
+      assert.equal(Number(options.headers['x-chat-offset']), written);
+      assert.ok(bytes instanceof Uint8Array);
       assert.equal(session.offset, written);
-      const bytes = Buffer.from(args.data, 'base64');
       assert.ok(bytes.length <= 256 * 1024);
       assert.equal(session.writingUntil, written + bytes.length);
       writes.push(bytes); written += bytes.length;
@@ -120,7 +121,7 @@ test('cancelling during a batched native read prevents preparation and transmiss
       direction: 'send', offset: 0, sentOffset: 0, total: CHAT_FILE_IO_BATCH_BYTES, timings: timings() });
     (window as any).__TAURI_INTERNALS__ = { invoke: async () => {
       manager.fileSessions.delete('request');
-      return Buffer.alloc(CHAT_FILE_IO_BATCH_BYTES).toString('base64');
+      return new ArrayBuffer(CHAT_FILE_IO_BATCH_BYTES);
     } };
     manager.prepareFileChunk = () => { assert.fail('Cancelled reads must not prepare packets'); };
     await manager.sendNextFileChunks('request');
