@@ -1,4 +1,9 @@
 {
+  "invite.short": "Kurze Einladung",
+  "invite.signed": "Signierte Einladung",
+  "invite.shortHint": "Jemand muss im Raum online sein.",
+  "invite.shortUnavailable": "Kein Teilnehmer hat geantwortet. Um mit einem kurzen Code beizutreten, muss jemand im Raum online und erreichbar sein. Versuche es erneut oder nutze eine signierte Einladung.",
+  "invite.shortLan": "Verwende für LAN-Räume die signierte Einladung.",
   "roomExit.title": "Nicht gespeicherter Raum",
   "roomExit.warning": "Dieser Raum wurde nicht gespeichert. Möchten Sie ihn vor dem Verlassen speichern?",
   "roomExit.discard": "Ohne Speichern verlassen",

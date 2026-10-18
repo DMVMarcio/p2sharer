@@ -1,4 +1,9 @@
 {
+  "invite.short": "短い招待",
+  "invite.signed": "署名付き招待",
+  "invite.shortHint": "ルームにオンラインの参加者が必要です。",
+  "invite.shortUnavailable": "参加者から応答がありません。短いコードで参加するには、ルーム内にオンラインで接続可能な参加者が必要です。再試行するか、署名付き招待を使用してください。",
+  "invite.shortLan": "LANルームでは署名付き招待を使用してください。",
   "roomExit.title": "未保存のルーム",
   "roomExit.warning": "このルームは保存されていません。退出する前に保存しますか？",
   "roomExit.discard": "保存せずに退出",

@@ -1,12 +1,85 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createAuthenticatedInvite, parseRoomInvite } from '../../src/core/room_invite.ts';
+import { createAuthenticatedInvite, isShortRoomCode, parseRoomInvite, signRoomInvite, formatRoomInvite } from '../../src/core/room_invite.ts';
 import { PeerAuthenticator } from '../../src/core/peer_auth.ts';
 import { RoomAuthority } from '../../src/core/room_authority.ts';
 import { savedRooms } from '../../src/core/saved_rooms.ts';
 import { validRoomPreview } from '../../src/core/room_preview.ts';
 import { GroupRoomManager } from '../../src/p2p/group_room.ts';
 import { signalingManager } from '../../src/p2p/signaling_manager.ts';
+
+test('short lookup requires a live authenticated member before promotion and retains its trust anchor', async () => {
+  const created = await createAuthenticatedInvite('Short lookup fixture');
+  const invite = parseRoomInvite(created.invite)!;
+  assert.ok(isShortRoomCode(invite.roomId));
+  assert.equal(isShortRoomCode(invite.roomId.slice(0, 8)), false);
+  const actions = new Map<string, any>();
+  const sent: Array<{ action: string; data: any }> = [];
+  const room = { makeAction(name: string) {
+    const action = { send: async (data: any) => { sent.push({ action: name, data }); } };
+    actions.set(name, action); return action;
+  }, getPeers: () => ({ host: {} }), onPeerJoin: (_id: string) => {}, onPeerLeave: (_id: string) => {} };
+  const original = { join: signalingManager.joinRoom, leave: signalingManager.leaveRoom, announce: signalingManager.reannounce };
+  let topic = '';
+  signalingManager.joinRoom = (_config, id) => { topic = id; return room; };
+  signalingManager.leaveRoom = async () => {};
+  signalingManager.reannounce = async () => {};
+  const manager = new GroupRoomManager('Guest', invite.roomId, '', false, undefined, true);
+  const previews: unknown[] = [];
+  const callbacks = { onStreamsUpdate: () => {}, onSlotsUpdate: () => {}, onChat: () => {},
+    onChatHistory: () => {}, onPeersUpdate: () => {}, onStatusChange: () => {},
+    onPreview: (preview: unknown) => previews.push(preview) };
+  try {
+    await manager.join(callbacks, true);
+    assert.equal(topic, `public-${invite.roomId}`);
+    await assert.rejects(manager.join(callbacks), /online room member/);
+    room.onPeerJoin('host');
+    assert.equal(sent.some(packet => ['presence', 'chat', 'history_sync'].includes(packet.action)), false);
+    await actions.get('room_invite_sync').onMessage({ invite: created.invite }, { peerId: 'host' });
+    assert.equal(manager.getInvite(), null, 'a snapshot needs a pinned direct identity');
+    const host = await PeerAuthenticator.create(invite.roomId, 'host', created.identity);
+    const nonce = sent.findLast(packet => packet.action === 'peer_identity' && packet.data.kind === 'challenge')!.data.nonce;
+    await actions.get('peer_identity').onMessage({ kind: 'proof', nonce, key: host.publicKey,
+      signature: await host.signControl('identity', [invite.roomId, 'host', nonce]) }, { peerId: 'host' });
+    await actions.get('room_invite_sync').onMessage({ invite: created.invite.slice(0, -3) }, { peerId: 'host' });
+    assert.equal(manager.getInvite(), null);
+    await actions.get('room_invite_sync').onMessage({ invite: created.invite }, { peerId: 'host' });
+    assert.equal(manager.getInvite(), created.invite);
+    assert.equal(await savedRooms.get(invite.roomId), undefined, 'lookup must not persist discovered keys');
+    await assert.rejects(manager.join(callbacks), /online room member/, 'a snapshot alone is not proof of a live member');
+    const preview = { name: 'Short lookup fixture', protected: false,
+      participants: [{ id: 'host', name: 'Host', color: '#06b6d4' }] };
+    const requestNonce = (manager as any).previewNonce;
+    const response = { kind: 'response', nonce: requestNonce, preview,
+      signature: await host.signControl('room-preview', [requestNonce, preview]) };
+    await actions.get('room_preview_v1').onMessage({ ...response, nonce: crypto.randomUUID() }, { peerId: 'host' });
+    assert.equal(previews.length, 0, 'a replayed response cannot unlock entry');
+    await actions.get('room_preview_v1').onMessage(response, { peerId: 'host' });
+    assert.deepEqual(previews, [preview]);
+    assert.equal(await savedRooms.get(invite.roomId), undefined);
+    await manager.join(callbacks);
+    const record = (await savedRooms.get(invite.roomId))!;
+    assert.equal(record.invite, created.invite);
+    assert.equal(record.saved, false);
+    await savedRooms.put({ ...record, saved: true });
+    assert.equal((await savedRooms.get(invite.roomId))?.invite, created.invite);
+    const impostor = await PeerAuthenticator.create(invite.roomId, 'impostor');
+    const replacement = { ...parseRoomInvite(created.invite)!, version: 4 as const,
+      rootKey: impostor.publicKey, name: 'Impostor', epoch: 0, revision: 2, adminKeys: [], authorityChain: [] };
+    const impostorInvite = formatRoomInvite(await signRoomInvite(replacement, impostor));
+    await actions.get('room_invite_sync').onMessage({ invite: impostorInvite }, { peerId: 'host' });
+    assert.equal(manager.getInvite(), created.invite, 'a learned creator key cannot be silently replaced');
+    room.onPeerLeave('host');
+    await assert.rejects(manager.join(callbacks), /online room member/, 'a departed member cannot authorize a later short-code entry');
+  } finally {
+    (manager as any).previewOnly = true;
+    await manager.leave();
+    signalingManager.joinRoom = original.join;
+    signalingManager.leaveRoom = original.leave;
+    signalingManager.reannounce = original.announce;
+    await savedRooms.remove(invite.roomId);
+  }
+});
 
 test('discovery authenticates identities without requesting admission or sending room content', async () => {
   const created = await createAuthenticatedInvite();

@@ -24,6 +24,11 @@ export interface NamedRoomInvite {
 
 export type RoomInvite = LegacyRoomInvite | NamedRoomInvite;
 
+/** The full random room identifier, never the abbreviated display label. */
+export function isShortRoomCode(value: string): boolean {
+  return /^[0-9a-f]{32}$/.test(value);
+}
+
 export interface RoomIdentity {
   publicKey: string;
   privateKey: string;

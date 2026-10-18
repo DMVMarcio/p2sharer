@@ -8,6 +8,8 @@ import { ModalDialog } from '../common/ModalDialog';
 import { ProfileAvatar } from '../common/ProfileAvatar';
 import { StatusNotice } from '../common/StatusNotice';
 import { verifyRoomInvite } from '../../core/room_invite_validation';
+import { isShortRoomCode } from '../../core/room_invite';
+import { savedRooms } from '../../core/saved_rooms';
 import { extractRoomInvite } from '../../core/room_deep_links';
 import type { RoomPreview } from '../../core/room_preview';
 import { GroupRoomManager } from '../../p2p/group_room';
@@ -36,9 +38,9 @@ export function JoinRoomModal() {
   const release = async () => {
     const current = session.current;
     if (!current) return;
+    session.current = null;
     current.release ??= roomService.stopRoomPreview(current.manager);
     await current.release;
-    if (session.current === current) session.current = null;
   };
   useEffect(() => {
     mounted.current = true;
@@ -60,11 +62,18 @@ export function JoinRoomModal() {
     }
   }, [phase, joinOutcome, joinError, closeModal]);
   useEffect(() => {
-    if (!canEnter || (phase !== 'searching' && phase !== 'preview')) return;
+    if (phase !== 'searching' && phase !== 'preview') return;
     const interval = setInterval(() => session.current?.manager.requestPreview(), 2500);
     const timeout = setTimeout(() => {
-      if (mounted.current) setPhase(current => current === 'searching' ? 'preview' : current);
-    }, 1500);
+      if (!mounted.current) return;
+      if (canEnter) setPhase(current => current === 'searching' ? 'preview' : current);
+      else {
+        void release().then(() => {
+          if (!mounted.current) return;
+          setError(t('invite.shortUnavailable')); setPhase('code');
+        });
+      }
+    }, canEnter ? 1500 : 20000);
     return () => { clearInterval(interval); clearTimeout(timeout); };
   }, [phase, canEnter]);
 
@@ -73,19 +82,29 @@ export function JoinRoomModal() {
     setError(''); setPhase('searching');
     try {
       const normalized = extractRoomInvite(code) ?? code.trim();
-      const invite = await verifyRoomInvite(normalized);
-      if (!invite) throw new Error(t('message.5348364ca0b6'));
+      const short = isShortRoomCode(normalized);
+      const known = short ? await savedRooms.get(normalized) : undefined;
+      const resolved = known?.invite ?? normalized;
+      const invite = await verifyRoomInvite(resolved);
+      if (!invite && !short) throw new Error(t('message.5348364ca0b6'));
       if (!mounted.current) return;
-      setRoomName(invite.version === 3 ? invite.roomId.slice(0, 8) : invite.name);
-      setCanEnter(true);
+      setRoomName(invite ? invite.version === 3 ? invite.roomId.slice(0, 8) : invite.name : '');
+      setCanEnter(!short);
       setCode(normalized);
       roomService.pendingJoinInvite = normalized;
-      const manager = new GroupRoomManager(stateStore.username, normalized, '', owner.current, stateStore.getTurnConfig());
+      const manager = new GroupRoomManager(stateStore.username, resolved, '', owner.current, stateStore.getTurnConfig(), short);
       const current = { manager, ready: Promise.resolve() };
       session.current = current;
       current.ready = roomService.startRoomPreview(manager, {
         onPreview: summary => {
           if (!mounted.current || joining.current || session.current !== current) return;
+          if (short) {
+            const verifiedInvite = manager.getInvite();
+            if (!verifiedInvite) return;
+            setCode(verifiedInvite);
+            roomService.pendingJoinInvite = verifiedInvite;
+            setCanEnter(true);
+          }
           setPreview(summary); setRequiresPassword(summary.protected); setPhase('preview');
         },
         onStreamsUpdate: () => {}, onSlotsUpdate: () => {}, onChat: () => {},
@@ -104,6 +123,7 @@ export function JoinRoomModal() {
   useEffect(() => { if (roomService.pendingJoinInvite && !retryError.current) void discover(); }, []);
 
   const enter = async () => {
+    if (!canEnter) return;
     if (joining.current && phase === 'joining') return;
     const waitForAdmission = Boolean(preview || error || retryError.current);
     roomService.joinOutcome = 'connecting';
@@ -135,7 +155,7 @@ export function JoinRoomModal() {
   return <ModalDialog title={preview?.name || roomName || t('message.3b24015dc709')} icon={<LogIn size={20} />}
     onCloseStart={cancelConnection} onClose={cancel} footer={close => <>
       <button type="button" className="btn btn-secondary" onClick={close}>{t('message.bb9dbb406dcb')}</button>
-      <button type="submit" form="join-room-form" className="btn btn-primary" disabled={busy}>
+      <button type="submit" form="join-room-form" className="btn btn-primary" disabled={busy || (phase !== 'code' && !canEnter)}>
         {t(phase === 'code' ? 'join.inspect' : 'message.ad207d12bdc1')}
       </button>
     </>}>

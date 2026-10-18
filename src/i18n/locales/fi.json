@@ -1,4 +1,9 @@
 {
+  "invite.short": "Lyhyt kutsu",
+  "invite.signed": "Allekirjoitettu kutsu",
+  "invite.shortHint": "Jonkun on oltava huoneessa verkossa.",
+  "invite.shortUnavailable": "Kukaan osallistuja ei vastannut. Lyhyellä koodilla liittyminen edellyttää, että joku on huoneessa verkossa ja tavoitettavissa. Yritä uudelleen tai käytä allekirjoitettua kutsua.",
+  "invite.shortLan": "Käytä LAN-huoneissa allekirjoitettua kutsua.",
   "roomExit.title": "Tallentamaton huone",
   "roomExit.warning": "Tätä huonetta ei ole tallennettu. Haluatko tallentaa sen ennen poistumista?",
   "roomExit.discard": "Poistu tallentamatta",

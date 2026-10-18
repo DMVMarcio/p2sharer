@@ -1,4 +1,9 @@
 {
+  "invite.short": "Short invitation",
+  "invite.signed": "Signed invitation",
+  "invite.shortHint": "Someone must be online in the room.",
+  "invite.shortUnavailable": "No room member responded. Someone must be online and reachable to join with a short code. Try again or use a signed invitation.",
+  "invite.shortLan": "Use the signed invitation for LAN rooms.",
   "roomExit.title": "Unsaved room",
   "roomExit.warning": "This room has not been saved. Would you like to save it before leaving?",
   "roomExit.discard": "Leave without saving",

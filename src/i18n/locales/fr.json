@@ -1,4 +1,9 @@
 {
+  "invite.short": "Invitation courte",
+  "invite.signed": "Invitation signée",
+  "invite.shortHint": "Une personne doit être en ligne dans le salon.",
+  "invite.shortUnavailable": "Aucun participant n’a répondu. Pour entrer avec un code court, une personne doit être en ligne et joignable dans le salon. Réessayez ou utilisez une invitation signée.",
+  "invite.shortLan": "Utilisez l’invitation signée pour les salons LAN.",
   "roomExit.title": "Salle non enregistrée",
   "roomExit.warning": "Cette salle n’a pas été enregistrée. Voulez-vous l’enregistrer avant de quitter ?",
   "roomExit.discard": "Quitter sans enregistrer",

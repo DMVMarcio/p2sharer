@@ -1,4 +1,9 @@
 {
+  "invite.short": "Invito breve",
+  "invite.signed": "Invito firmato",
+  "invite.shortHint": "Qualcuno deve essere online nella stanza.",
+  "invite.shortUnavailable": "Nessun partecipante ha risposto. Per entrare con un codice breve, qualcuno deve essere online e raggiungibile nella stanza. Riprova o usa un invito firmato.",
+  "invite.shortLan": "Usa l’invito firmato per le stanze LAN.",
   "roomExit.title": "Sala non salvata",
   "roomExit.warning": "Questa sala non è stata salvata. Vuoi salvarla prima di uscire?",
   "roomExit.discard": "Esci senza salvare",

@@ -1,4 +1,9 @@
 {
+  "invite.short": "Invitación corta",
+  "invite.signed": "Invitación firmada",
+  "invite.shortHint": "Debe haber alguien en línea en la sala.",
+  "invite.shortUnavailable": "Ningún participante respondió. Para entrar con un código corto, alguien debe estar en línea y accesible en la sala. Inténtalo de nuevo o usa una invitación firmada.",
+  "invite.shortLan": "Usa la invitación firmada para salas LAN.",
   "roomExit.title": "Sala no guardada",
   "roomExit.warning": "Esta sala no se ha guardado. ¿Quieres guardarla antes de salir?",
   "roomExit.discard": "Salir sin guardar",

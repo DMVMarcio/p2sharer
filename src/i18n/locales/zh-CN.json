@@ -1,4 +1,9 @@
 {
+  "invite.short": "短邀请",
+  "invite.signed": "签名邀请",
+  "invite.shortHint": "房间中必须有人在线。",
+  "invite.shortUnavailable": "没有参与者回应。使用短代码加入时，房间中必须有人在线且可连接。请重试或使用签名邀请。",
+  "invite.shortLan": "局域网房间请使用签名邀请。",
   "roomExit.title": "未保存的房间",
   "roomExit.warning": "此房间尚未保存。是否在离开前保存？",
   "roomExit.discard": "不保存并离开",

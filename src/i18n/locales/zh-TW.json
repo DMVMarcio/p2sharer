@@ -1,4 +1,9 @@
 {
+  "invite.short": "短邀請",
+  "invite.signed": "簽章邀請",
+  "invite.shortHint": "房間中必須有人在線上。",
+  "invite.shortUnavailable": "沒有參與者回應。使用短代碼加入時，房間中必須有人在線上且可連線。請重試或使用簽章邀請。",
+  "invite.shortLan": "區域網路房間請使用簽章邀請。",
   "roomExit.title": "未儲存的房間",
   "roomExit.warning": "此房間尚未儲存。是否在離開前儲存？",
   "roomExit.discard": "不儲存並離開",

@@ -89,6 +89,8 @@ When a remote track enters `ended` state, produces zero frames, or reports a str
 
 ## Room discovery before admission
 
+Short invitations resolve a full room ID through the existing identity and signed-snapshot exchange before using the same preview and admission flow. They require an authenticated online member response, including for previously saved rooms. See [invitation trust](peer-security.md#authenticated-invitations) for first-use trust and persistence boundaries. Signed invitations retain the unanswered-discovery waiting behavior described below.
+
 `GroupRoomManager.join(callbacks, true)` opens a discovery connection on the same
 signaling topic without requesting admission, announcing presence, receiving room
 content, or rewriting saved credentials. `room_preview_v1` returns nonce-bound,

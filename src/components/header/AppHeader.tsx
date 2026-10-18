@@ -6,7 +6,7 @@ import React, { useEffect, useState } from 'react';
 import { useRoom } from '../../hooks/useRoom';
 import { modalManager, useModal } from '../../hooks/useModal';
 import { showToast } from '../../hooks/useToast';
-import { BookmarkCheck, BookmarkPlus, Check, Copy, LockKeyhole, LogOut, Settings2 } from 'lucide-react';
+import { BookmarkCheck, BookmarkPlus, Check, ChevronDown, Copy, LockKeyhole, LogOut, Settings2 } from 'lucide-react';
 import { parseRoomInvite } from '../../core/room_invite';
 import { roomInviteLink } from '../../core/room_deep_links';
 import { savedRooms, type SavedRoom } from '../../core/saved_rooms';
@@ -24,6 +24,9 @@ export const AppHeader: React.FC<{ showUpdate?: boolean; homeScrolled?: boolean;
   const [savedRecord, setSavedRecord] = useState<SavedRoom | null>(null);
   const [savingRoom, setSavingRoom] = useState(false);
   const { copied, copy } = useClipboardFeedback(roomInviteLink(currentRoomInvite) || currentRoomCode);
+  const invitation = parseRoomInvite(currentRoomInvite);
+  const shortInvite = useClipboardFeedback(invitation?.roomId ?? '');
+  const inviteCopied = copied || shortInvite.copied;
 
   useEffect(() => {
     const roomId = parseRoomInvite(currentRoomInvite)?.roomId;
@@ -75,14 +78,22 @@ export const AppHeader: React.FC<{ showUpdate?: boolean; homeScrolled?: boolean;
                 </TooltipButton>
               )}
             </div>
-            <TooltipButton tooltip={copied ? t('header.copied') : t("message.70fad3f21d89", { v0: currentRoomName || currentRoomCode })}
-              className={`btn btn-secondary btn-sm header-room-action${copied ? ' is-copied' : ''}`}
-              id="header-room-code-pill" onClick={() => void copy()}
-              aria-label={copied ? t('header.copied') : t("message.159e49453544")}>
-              <span className="header-invite-icon" key={copied ? 'copied' : 'invite'}>
-                {copied ? <Check size={15} aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}
+            <TooltipButton tooltip={t(inviteCopied ? 'header.copied' : 'header.invite')}
+              className={`btn btn-secondary btn-sm header-room-action${inviteCopied ? ' is-copied' : ''}`}
+              id="header-room-code-pill" aria-haspopup="menu" onClick={event => openContextMenu(event, [
+                { id: 'short-invite', label: t('invite.short'), icon: <Copy size={15} />,
+                  disabled: !invitation || (invitation.version !== 3 && Boolean(invitation.connection)),
+                  tooltip: invitation && invitation.version !== 3 && invitation.connection ? t('invite.shortLan') : t('invite.shortHint'),
+                  onSelect: () => shortInvite.copy() },
+                { id: 'signed-invite', label: t('invite.signed'), icon: <LockKeyhole size={15} />,
+                  onSelect: () => copy() },
+              ], { toggle: true })}
+              aria-label={inviteCopied ? t('header.copied') : t('header.invite')}>
+              <span className="header-invite-icon" key={inviteCopied ? 'copied' : 'invite'}>
+                {inviteCopied ? <Check size={15} aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}
               </span>
-              <span className="header-invite-label" aria-live="polite">{t(copied ? 'header.copied' : 'header.invite')}</span>
+              <span className="header-invite-label" aria-live="polite">{t(inviteCopied ? 'header.copied' : 'header.invite')}</span>
+              <ChevronDown size={13} aria-hidden="true" />
             </TooltipButton>
           </>
         )}

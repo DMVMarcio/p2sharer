@@ -39,18 +39,20 @@ globalThis.previewUi = {
 const bundle = await build({ stdin: { contents: "export { JoinRoomModal } from './src/components/modals/JoinRoomModal.tsx';", resolveDir: process.cwd() },
   bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic',
   plugins: [{ name: 'preview-fixture', setup(builder) {
-    builder.onResolve({ filter: /useModal$|useRoom$|room_service$|state_store$|group_room$|room_invite_validation$/ }, args => ({ path: args.path, namespace: 'fixture' }));
+    builder.onResolve({ filter: /useModal$|useRoom$|room_service$|state_store$|group_room$|room_invite_validation$|saved_rooms$/ }, args => ({ path: args.path, namespace: 'fixture' }));
     builder.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents:
       args.path.endsWith('useModal') ? 'export const useModal = () => ({ closeModal: globalThis.previewUi.close });' :
       args.path.endsWith('useRoom') ? "import { useSyncExternalStore } from 'react'; export const useRoom = () => { useSyncExternalStore(globalThis.previewUi.subscribe, globalThis.previewUi.snapshot); return globalThis.previewUi.roomService; };" :
       args.path.endsWith('room_service') ? 'export const roomService = globalThis.previewUi.roomService;' :
       args.path.endsWith('state_store') ? 'export const stateStore = globalThis.previewUi.store;' :
-      args.path.endsWith('group_room') ? 'export class GroupRoomManager { join(callbacks) { return globalThis.previewUi.discover(callbacks); } requestPreview() {} async leave() { globalThis.previewUi.release(); } }' :
+      args.path.endsWith('group_room') ? 'export class GroupRoomManager { join(callbacks) { return globalThis.previewUi.discover(callbacks); } getInvite() { return globalThis.previewUi.resolvedInvite; } requestPreview() {} async leave() { globalThis.previewUi.release(); } }' :
+      args.path.endsWith('saved_rooms') ? 'export const savedRooms = { get: async () => undefined };' :
       "export const verifyRoomInvite = async () => ({ version: 4, roomId: 'fixture', name: 'Fixture room' });",
     }));
     builder.onResolve({ filter: /^[^./]/ }, args => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
   } }],
 });
+
 const { JoinRoomModal } = await import('data:text/javascript;base64,' + Buffer.from(bundle.outputFiles[0].text).toString('base64'));
 const { createRoot } = await import('react-dom/client');
 const root = createRoot(document.getElementById('root'));
@@ -159,5 +161,37 @@ test('closing during initialization cancels admission immediately and a fresh di
   await submit();
   assert.equal(joined.length, before + 1, 'a subsequent room entry must remain usable');
   await outcome('waiting');
+  await act(async () => root.render(null));
+});
+
+test('short invitation cannot enter without an online response and times out back to code entry', async context => {
+  context.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
+  Object.assign(previewUi.roomService, { pendingJoinInvite: 'a'.repeat(32), pendingJoinPassword: '',
+    pendingJoinAsOwner: false, pendingJoinError: '', joinOutcome: 'idle' });
+  const before = joined.length;
+  const released = left;
+  await act(async () => root.render(React.createElement(JoinRoomModal, { key: 'short-empty' })));
+  assert.equal(document.querySelector('button[type="submit"]').disabled, true);
+  await submit();
+  assert.equal(joined.length, before);
+  await act(async () => context.mock.timers.tick(20000));
+  assert.ok(document.getElementById('join-room-code'), 'an unanswered lookup must allow correction and retry');
+  assert.ok(document.querySelector('[role="alert"]'));
+  assert.equal(left, released + 1, 'timeout retires the discovery connection');
+  assert.equal(joined.length, before);
+  await act(async () => root.render(null));
+});
+
+test('short invitation promotes the resolved signed invitation only after a member response', async () => {
+  Object.assign(previewUi.roomService, { pendingJoinInvite: 'b'.repeat(32), pendingJoinPassword: '',
+    pendingJoinAsOwner: false, pendingJoinError: '', joinOutcome: 'idle' });
+  previewUi.resolvedInvite = 'resolved-signed-fixture';
+  const before = joined.length;
+  await act(async () => root.render(React.createElement(JoinRoomModal, { key: 'short-online' })));
+  await submit();
+  assert.equal(joined.length, before);
+  await act(async () => discovery.onPreview({ name: 'Online room', protected: false, participants: [] }));
+  await submit();
+  assert.deepEqual(joined.at(-1), ['resolved-signed-fixture', '', false, { waitForAdmission: true }]);
   await act(async () => root.render(null));
 });
