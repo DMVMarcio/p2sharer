@@ -1008,6 +1008,7 @@
   "notice.appStop": "{{actor}} closed {{app}}",
   "notice.password": "Password changed by {{actor}}",
   "notice.roomCreated": "Room created: {{room}}",
+  "chat.mentionSuggestions": "Mention suggestions",
   "chat.unread_one": "{{count}} unread message",
   "chat.unread_other": "{{count}} unread messages",
   "error.unknown": "The operation could not be completed. Please try again.",

@@ -3,55 +3,68 @@
   "translations": {
     "en": [
       "**Short invitations.** Share just the room code when someone is online, or use a full signed invitation. Saving the room keeps its verified details for future visits.",
-      "**Room entry.** Fixed joining getting stuck after leaving and returning with the same device. Previewing participants no longer creates a room card before joining."
+      "**Room entry.** Fixed joining getting stuck after leaving and returning with the same device. Previewing participants no longer creates a room card before joining.",
+      "**Chat improvements.** Larger text, emojis, and avatars for clearer reading, interactive @mentions with autocomplete, clickable names in notifications, and retained avatar cache when participants leave."
     ],
     "pt-BR": [
       "**Convites curtos.** Compartilhe apenas o código da sala quando houver alguém online ou use um convite assinado completo. Salvar a sala preserva os dados verificados para as próximas entradas.",
-      "**Entrada nas salas.** Corrigimos o travamento ao sair e voltar com o mesmo dispositivo. Consultar os participantes não cria mais um card na sala antes de entrar."
+      "**Entrada nas salas.** Corrigimos o travamento ao sair e voltar com o mesmo dispositivo. Consultar os participantes não cria mais um card na sala antes de entrar.",
+      "**Melhorias no chat.** Textos, emojis e avatares maiores para facilitar a leitura, menções interativas com @ e preenchimento automático, nomes clicáveis nas notificações e fotos mantidas em cache quando os participantes saem."
     ],
     "es": [
       "**Invitaciones cortas.** Comparte solo el código de la sala cuando haya alguien en línea o usa una invitación firmada completa. Guardar la sala conserva sus datos verificados para futuras visitas.",
-      "**Entrada a las salas.** Corregimos el bloqueo al salir y volver con el mismo dispositivo. Consultar los participantes ya no crea una tarjeta en la sala antes de entrar."
+      "**Entrada a las salas.** Corregimos el bloqueo al salir y volver con el mismo dispositivo. Consultar los participantes ya no crea una tarjeta en la sala antes de entrar.",
+      "**Mejoras en el chat.** Texto, emojis y avatares más grandes para facilitar la lectura, menciones interactivas con @ y autocompletado, nombres cliqueables en notificaciones y caché de avatares cuando los participantes salen."
     ],
     "fr": [
       "**Invitations courtes.** Partagez uniquement le code du salon lorsqu’une personne est en ligne, ou utilisez une invitation signée complète. Enregistrer le salon conserve ses informations vérifiées pour vos prochaines visites.",
-      "**Entrée dans les salons.** Correction du blocage après avoir quitté puis rejoint un salon avec le même appareil. Consulter les participants ne crée plus de carte dans le salon avant d’y entrer."
+      "**Entrée dans les salons.** Correction du blocage après avoir quitté puis rejoint un salon avec le même appareil. Consulter les participants ne crée plus de carte dans le salon avant d’y entrer.",
+      "**Améliorations du chat.** Textes, emojis et avatars plus grands pour une meilleure lisibilité, mentions @ interactives avec saisie semi-automatique, noms cliquables dans les notifications et conservation des avatars en cache lors du départ des participants."
     ],
     "de": [
       "**Kurze Einladungen.** Teile nur den Raumcode, wenn jemand online ist, oder nutze eine vollständige signierte Einladung. Beim Speichern des Raums bleiben die geprüften Daten für spätere Besuche erhalten.",
-      "**Räumen beitreten.** Ein Hängenbleiben beim Verlassen und erneuten Beitritt mit demselben Gerät wurde behoben. Die Teilnehmervorschau erstellt vor dem Beitritt keine Teilnehmerkarte mehr im Raum."
+      "**Räumen beitreten.** Ein Hängenbleiben beim Verlassen und erneuten Beitritt mit demselben Gerät wurde behoben. Die Teilnehmervorschau erstellt vor dem Beitritt keine Teilnehmerkarte mehr im Raum.",
+      "**Chat-Verbesserungen.** Größerer Text, Emojis und Avatare für bessere Lesbarkeit, interaktive @-Erwähnungen mit Autovervollständigung, anklickbare Namen in Benachrichtigungen und beibehaltene Avatar-Caches beim Verlassen von Teilnehmern."
     ],
     "it": [
       "**Inviti brevi.** Condividi solo il codice della stanza quando qualcuno è online oppure usa un invito firmato completo. Salvando la stanza conservi i dati verificati per gli accessi futuri.",
-      "**Ingresso nelle stanze.** Risolto il blocco dopo essere usciti e tornati con lo stesso dispositivo. Consultare i partecipanti non crea più una scheda nella stanza prima di entrare."
+      "**Ingresso nelle stanze.** Risolto il blocco dopo essere usciti e tornati con lo mesmo dispositivo. Consultare i partecipanti non crea più una scheda nella stanza prima di entrare.",
+      "**Miglioramenti alla chat.** Testo, emoji e avatar più grandi per una lettura più chiara, menzioni @ interattive con completamento automatico, nomi cliccabili nelle notifiche e cache degli avatar conservata quando i partecipanti escono."
     ],
     "zh-CN": [
       "**短邀请。** 有人在线时，只需分享房间代码，也可使用完整的签名邀请。保存房间会保留已验证的信息，供下次加入使用。",
-      "**加入房间。** 修复了使用同一设备离开后再次加入时卡住的问题。查看参与者不再在正式加入前创建房间成员卡片。"
+      "**加入房间。** 修复了使用同一设备离开后再次加入时卡住的问题。查看参与者不再在正式加入前创建房间成员卡片。",
+      "**聊天改进。** 更大的文字、表情和头像以提升可读性，带有自动补全的交互式 @提及，通知中可点击的成员名称，以及成员离开时保留的头像缓存。"
     ],
     "zh-TW": [
       "**短邀請。** 有人在線上時，只需分享房間代碼，也可使用完整的簽章邀請。儲存房間會保留已驗證的資訊，供下次加入使用。",
-      "**加入房間。** 修正使用同一裝置離開後再次加入時卡住的問題。查看參與者不再於正式加入前建立房間成員卡片。"
+      "**加入房間。** 修正使用同一裝置離開後再次加入時卡住的問題。查看參與者不再於正式加入前建立房間成員卡片。",
+      "**聊天改進。** 更大的文字、表情符號和頭像以提升可讀性，具備自動完成的互動式 @提及，通知中可點擊的成員名稱，以及成員離開時保留的頭像快取。"
     ],
     "ja": [
       "**短い招待。** オンラインの参加者がいる場合はルームコードだけを共有でき、完全な署名付き招待も使用できます。ルームを保存すると、確認済みの情報を次回以降も使用できます。",
-      "**ルームへの参加。** 同じデバイスで退出してから再参加すると処理が止まる問題を修正しました。参加者を確認するだけでは、入室前にルーム内のカードが表示されなくなりました。"
+      "**ルームへの参加。** 同じデバイスで退出してから再参加すると処理が止まる問題を修正しました。参加者を確認するだけでは、入室前にルーム内のカードが表示されなくなりました。",
+      "**チャットの改善。** 読みやすい大きなテキスト、絵文字、アバター、自動補完付きの対話型@メンション、通知内のクリック可能な参加者名、参加者が退室しても保持されるアバターのキャッシュを追加しました。"
     ],
     "ko": [
       "**짧은 초대.** 온라인 참여자가 있으면 방 코드만 공유하거나 전체 서명된 초대를 사용할 수 있습니다. 방을 저장하면 확인된 정보가 다음 방문에도 유지됩니다.",
-      "**방 입장.** 같은 기기로 나간 뒤 다시 입장할 때 멈추는 문제를 수정했습니다. 이제 참여자 목록을 확인하기만 하면 입장 전에 방에 참여자 카드가 표시되지 않습니다."
+      "**방 입장.** 같은 기기로 나간 뒤 다시 입장할 때 멈추는 문제를 수정했습니다. 이제 참여자 목록을 확인하기만 하면 입장 전에 방에 참여자 카드가 표시되지 않습니다.",
+      "**채팅 개선.** 더 읽기 쉬운 큰 텍스트, 이모지 및 아바타, 자동 완성을 지원하는 대화형 @멘션, 알림 내 클릭 가능한 참여자 이름, 참여자가 퇴장해도 유지되는 아바타 캐시가 추가되었습니다。"
     ],
     "hi": [
       "**छोटे आमंत्रण।** किसी के ऑनलाइन होने पर केवल रूम कोड साझा करें या पूरा हस्ताक्षरित आमंत्रण इस्तेमाल करें। रूम सहेजने पर सत्यापित जानकारी अगली बार के लिए बनी रहती है।",
-      "**रूम में प्रवेश।** उसी डिवाइस से बाहर निकलकर दोबारा जुड़ने पर प्रक्रिया अटकने की समस्या ठीक की गई। प्रतिभागियों की सूची देखने से अब प्रवेश करने से पहले रूम में कार्ड नहीं बनता।"
+      "**रूम में प्रवेश।** उसी डिवाइस से बाहर निकलकर दोबारा जुड़ने पर प्रक्रिया अटकने की समस्या ठीक की गई। प्रतिभागियों की सूची देखने से अब प्रवेश करने से पहले रूम में कार्ड नहीं बनता।",
+      "**चैट में सुधार।** बेहतर पठनीयता के लिए बड़े टेक्स्ट, इमोजी और अवतार, ऑटोकम्प्लीट के साथ इंटरैक्टिव @मेंशन, सूचनाओं में क्लिक करने योग्य प्रतिभागियों के नाम, और प्रतिभागियों के जाने पर भी अवतार कैश सुरक्षित रखने की सुविधा।"
     ],
     "fi": [
       "**Lyhyet kutsut.** Jaa pelkkä huonekoodi, kun joku on verkossa, tai käytä täydellistä allekirjoitettua kutsua. Huoneen tallentaminen säilyttää vahvistetut tiedot tulevia käyntejä varten.",
-      "**Huoneisiin liittyminen.** Korjattu liittymisen jumittuminen poistuttaessa ja palattaessa samalla laitteella. Osallistujien esikatselu ei enää luo huoneeseen osallistujakorttia ennen liittymistä."
+      "**Huoneisiin liittyminen.** Korjattu liittymisen jumittuminen poistuttaessa ja palattaessa samalla laitteella. Osallistujien esikatselu ei enää luo huoneeseen osallistujakorttia ennen liittymistä.",
+      "**Keskustelun parannukset.** Suurempi teksti, emojit ja profiilikuvat paremman luettavuuden takaamiseksi, vuorovaikutteiset @-maininnat automaattitäydennyksellä, klikattavat nimet ilmoituksissa ja säilytetty välimuisti poistuneiden osallistujien kuville."
     ],
     "ru": [
       "**Короткие приглашения.** Делитесь только кодом комнаты, когда кто-то онлайн, или используйте полное подписанное приглашение. При сохранении комнаты проверенные данные сохраняются для следующих посещений.",
-      "**Вход в комнаты.** Исправлено зависание при выходе и повторном входе с того же устройства. Просмотр участников больше не создаёт карточку в комнате до входа."
+      "**Вход в комнаты.** Исправлено зависание при выходе и повторном входе с того же устройства. Просмотр участников больше не создаёт карточку в комнате до входа.",
+      "**Улучшения чата.** Увеличенный текст, эмодзи и аватары для удобного чтения, интерактивные @упоминания с автодополнением, кликабельные имена в уведомлениях и сохранение аватаров в кэше при выходе участников."
     ]
   }
 }

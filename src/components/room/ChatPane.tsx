@@ -30,6 +30,7 @@ import { ChatTransferCenter } from './ChatTransferCenter';
 import { selfId } from '@trystero-p2p/core';
 import { showToast } from '../../hooks/useToast';
 import { copyImageToClipboard } from '../../core/image_clipboard';
+import { ChatMentionSuggestions, type MentionCandidate } from './ChatMentionSuggestions';
 
 export const ChatPane: React.FC = () => {
   useLocale();
@@ -37,7 +38,8 @@ export const ChatPane: React.FC = () => {
   useSyncExternalStore(profileImages.subscribe, profileImages.snapshot);
   const { roomSlots, chatMessages, sendChatMessage, editChatMessage, deleteChatMessage, offerFile,
     requestFile, requestFilePreview, cancelFileTransfer, fileProgress,
-    localFilePreviews, imagePreviews, savedDownloads, revealSavedFile } = useRoom();
+    localFilePreviews, imagePreviews, savedDownloads, revealSavedFile,
+    peers, username, isCreator, isRoomAdmin } = useRoom();
   const [inputText, setInputText] = useState('');
   const [pickerTarget, setPickerTarget] = useState<'compose' | 'edit' | null>(null);
   const composePicker = useDropdownPresence(pickerTarget === 'compose' ? true : null);
@@ -46,6 +48,10 @@ export const ChatPane: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionRange, setMentionRange] = useState<{ from: number; to: number } | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const [mentionDismissed, setMentionDismissed] = useState(false);
   const emojiPack = useSyncExternalStore(subscribeEmojiPack, getEmojiPack);
   const transferSpeedUnit = useSyncExternalStore(subscribeTransferSpeedUnit, getTransferSpeedUnit);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -57,6 +63,86 @@ export const ChatPane: React.FC = () => {
   const paneRef = useRef<HTMLDivElement>(null);
   const { selectedFile, dragging, close: closeFile, markOffered, pickFile } = useChatFileInput(paneRef);
   useEmojiSelectionHighlight(paneRef);
+
+  const mentionCandidates = React.useMemo(() => {
+    const list: MentionCandidate[] = [];
+    const seen = new Set<string>();
+    for (const p of (peers ?? [])) {
+      if (seen.has(p.id)) continue;
+      seen.add(p.id);
+      const slot = (roomSlots ?? []).find(s => s.peerId === p.id);
+      list.push({
+        peerId: p.id,
+        name: p.username,
+        color: slot?.color ?? profileImages.color(p.id),
+        isHost: p.isCreator,
+        isAdmin: p.isAdmin && !p.isCreator,
+        isLocal: false,
+      });
+    }
+    if (!seen.has(selfId)) {
+      list.push({
+        peerId: selfId,
+        name: username || '',
+        color: (roomSlots ?? []).find(s => s.isLocal)?.color ?? profileImages.color('local', true),
+        isHost: isCreator,
+        isAdmin: isRoomAdmin && !isCreator,
+        isLocal: true,
+      });
+    }
+    return list;
+  }, [peers, roomSlots, username, isCreator, isRoomAdmin]);
+
+  const filteredMentionCandidates = React.useMemo(() => {
+    if (mentionQuery === null || mentionDismissed) return [];
+    const q = mentionQuery.toLowerCase();
+    if (!q) return mentionCandidates;
+    return mentionCandidates
+      .filter(c => c.name.toLowerCase().includes(q))
+      .sort((a, b) => {
+        const aStarts = a.name.toLowerCase().startsWith(q);
+        const bStarts = b.name.toLowerCase().startsWith(q);
+        if (aStarts && !bStarts) return -1;
+        if (!aStarts && bStarts) return 1;
+        return a.name.localeCompare(b.name);
+      });
+  }, [mentionCandidates, mentionQuery, mentionDismissed]);
+
+  useEffect(() => {
+    setMentionIndex(0);
+  }, [mentionQuery]);
+
+  const handleMentionSelect = React.useCallback((candidate: MentionCandidate) => {
+    if (!mentionRange) return;
+    inputRef.current?.replaceRange(mentionRange, `@${candidate.name} `);
+    setMentionQuery(null);
+    setMentionRange(null);
+    setMentionDismissed(false);
+  }, [mentionRange]);
+
+  const handleMentionKeyDown = React.useCallback((key: 'ArrowUp' | 'ArrowDown' | 'Enter' | 'Tab' | 'Escape'): boolean => {
+    if (filteredMentionCandidates.length === 0) return false;
+    if (key === 'ArrowDown') {
+      setMentionIndex(i => (i + 1) % filteredMentionCandidates.length);
+      return true;
+    }
+    if (key === 'ArrowUp') {
+      setMentionIndex(i => (i - 1 + filteredMentionCandidates.length) % filteredMentionCandidates.length);
+      return true;
+    }
+    if (key === 'Enter' || key === 'Tab') {
+      const candidate = filteredMentionCandidates[mentionIndex];
+      if (candidate) {
+        handleMentionSelect(candidate);
+        return true;
+      }
+    }
+    if (key === 'Escape') {
+      setMentionDismissed(true);
+      return true;
+    }
+    return false;
+  }, [filteredMentionCandidates, mentionIndex, handleMentionSelect]);
 
   const visibleMessages = chatMessages.filter((message) => !message.deletedAt);
   const latestMessageId = chatMessages[chatMessages.length - 1]?.id;
@@ -75,14 +161,20 @@ export const ChatPane: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!pickerTarget) return;
     const onPointerDown = (event: PointerEvent) => {
+      if (!composerRef.current?.contains(event.target as Node)) {
+        setMentionDismissed(true);
+      }
+      if (!pickerTarget) return;
       if (!composerRef.current?.contains(event.target as Node) &&
           !(event.target as Element).closest('.emoji-picker-popover') &&
           !(event.target as Element).closest('.chat-msg-edit-emoji')) setPickerTarget(null);
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setPickerTarget(null);
+      if (event.key === 'Escape') {
+        setPickerTarget(null);
+        setMentionDismissed(true);
+      }
     };
     document.addEventListener('pointerdown', onPointerDown);
     document.addEventListener('keydown', onKeyDown);
@@ -103,6 +195,9 @@ export const ChatPane: React.FC = () => {
     setInputText('');
     setReplyToId(null);
     setPickerTarget(null);
+    setMentionQuery(null);
+    setMentionRange(null);
+    setMentionDismissed(false);
   };
 
   const saveEdit = async (id: string) => {
@@ -183,12 +278,12 @@ export const ChatPane: React.FC = () => {
                 if (!(event.target instanceof Element) || !event.target.closest('.profile-identity-button')) return;
                 event.stopPropagation();
                 openContextMenu(event, [profileAction({ peerId: msg.authorId ?? '', name: msg.sender,
-                  isLocal: msg.authorId === selfId, color: authorSlot?.color })]);
+                  isLocal: msg.authorId === selfId, color: authorSlot?.color ?? profileImages.color(msg.authorId ?? '', msg.authorId === selfId) })]);
               }}>
                 <button type="button" className="profile-identity-button" aria-label={t('profile.viewName', { name: msg.sender })}
-                  onClick={() => modalManager.openProfile({ peerId: msg.authorId ?? '', name: msg.sender, isLocal: msg.authorId === selfId, color: authorSlot?.color })}>
+                  onClick={() => modalManager.openProfile({ peerId: msg.authorId ?? '', name: msg.sender, isLocal: msg.authorId === selfId, color: authorSlot?.color ?? profileImages.color(msg.authorId ?? '', msg.authorId === selfId) })}>
                   <ProfileAvatar peerId={msg.authorId ?? ''} name={msg.sender} isLocal={msg.authorId === selfId}
-                    color={authorSlot?.color} className="chat-msg-avatar" />
+                    color={authorSlot?.color ?? profileImages.color(msg.authorId ?? '', msg.authorId === selfId)} className="chat-msg-avatar" />
                   <span className="chat-msg-sender"><Nickname name={msg.sender} peerId={msg.authorId} isLocal={msg.authorId === selfId} defaultColor={profileImages.background(msg.authorId ?? '', msg.authorId === selfId, authorSlot?.color)} /></span>
                 </button>
                 {msg.isHost && <span className="badge-host">{t("common.hostBadge")}</span>}
@@ -225,6 +320,13 @@ export const ChatPane: React.FC = () => {
       </div>
 
       <div className="chat-composer" ref={composerRef}>
+      {filteredMentionCandidates.length > 0 && !mentionDismissed && (
+        <ChatMentionSuggestions
+          candidates={filteredMentionCandidates}
+          selectedIndex={mentionIndex}
+          onSelect={handleMentionSelect}
+        />
+      )}
       {composePicker.value && <EmojiPicker pack={emojiPack} onSelect={insertEmoji} closing={composePicker.closing} />}
       {replyMessage && <div className="chat-composer-reply">
         <Reply size={15} />
@@ -238,6 +340,13 @@ export const ChatPane: React.FC = () => {
           pack={emojiPack}
           onChange={setInputText}
           onSend={sendMessage}
+          mentionActive={filteredMentionCandidates.length > 0 && !mentionDismissed}
+          onMentionQueryChange={(query, range) => {
+            setMentionQuery(query);
+            setMentionRange(range);
+            if (query !== null) setMentionDismissed(false);
+          }}
+          onMentionKeyDown={handleMentionKeyDown}
         />
         <div className="chat-input-actions">
           <div className="chat-input-actions-left">

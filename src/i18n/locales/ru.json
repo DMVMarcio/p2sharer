@@ -1008,6 +1008,7 @@
   "notice.appStop": "{{actor}} закрыт {{app}}",
   "notice.password": "Пароль изменен {{actor}}",
   "notice.roomCreated": "Комната создана: {{room}}",
+  "chat.mentionSuggestions": "Варианты упоминания",
   "chat.unread_one": "{{count}} непрочитанное сообщение",
   "chat.unread_other": "{{count}} непрочитанного сообщения",
   "error.unknown": "Операцию не удалось завершить. Пожалуйста, попробуйте еще раз.",

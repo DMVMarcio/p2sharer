@@ -3,6 +3,9 @@ import { useLocale } from '../../hooks/useLocale';
 import React from 'react';
 import type { ChatMessage } from '../../core/types.ts';
 import { getRoomApp } from '../../apps/registry';
+import { modalManager } from '../../hooks/useModal';
+import { stateStore } from '../../core/state_store';
+import { profileImages } from '../../core/profile_image';
 
 interface SystemNoticeTextProps {
   message: ChatMessage;
@@ -27,6 +30,19 @@ export const SystemNoticeText: React.FC<SystemNoticeTextProps> = ({ message }) =
     .sort((a, b) => b.length - a.length);
   if (!terms.length) return <>{displayText}</>;
 
+  let actorPeerId = message.authorId ?? '';
+  const isActorLocal = Boolean(message.systemActor) && (actorPeerId === 'local' || message.systemActor === stateStore.username);
+  if (message.systemActor && !actorPeerId) {
+    if (isActorLocal) {
+      actorPeerId = 'local';
+    } else {
+      const slot = stateStore.roomSlots.find((s) => s.senderName === message.systemActor);
+      actorPeerId = slot?.peerId ?? '';
+    }
+  }
+  const authorSlot = message.systemActor ? stateStore.roomSlots.find((s) => (s.ownerPeerId ?? s.peerId) === actorPeerId || (isActorLocal && s.isLocal)) : undefined;
+  const actorColor = message.systemActor ? (authorSlot?.color ?? profileImages.color(actorPeerId, isActorLocal)) : undefined;
+
   const parts: React.ReactNode[] = [];
   let cursor = 0;
   while (cursor < displayText.length) {
@@ -36,7 +52,30 @@ export const SystemNoticeText: React.FC<SystemNoticeTextProps> = ({ message }) =
     if (!matches.length) break;
     const { term, index } = matches[0];
     if (index > cursor) parts.push(displayText.slice(cursor, index));
-    parts.push(<strong className="chat-sys-highlight" key={`${index}-${term}`}>{term}</strong>);
+    if (term === message.systemActor) {
+      parts.push(
+        <strong className="chat-sys-highlight" key={`${index}-${term}`}>
+          <button
+            type="button"
+            className="chat-sys-actor-btn"
+            aria-label={t('profile.viewName', { name: term })}
+            onClick={(event) => {
+              event.stopPropagation();
+              modalManager.openProfile({
+                peerId: actorPeerId,
+                name: term,
+                isLocal: isActorLocal,
+                color: actorColor,
+              });
+            }}
+          >
+            {term}
+          </button>
+        </strong>
+      );
+    } else {
+      parts.push(<strong className="chat-sys-highlight" key={`${index}-${term}`}>{term}</strong>);
+    }
     cursor = index + term.length;
   }
   if (cursor < displayText.length) parts.push(displayText.slice(cursor));

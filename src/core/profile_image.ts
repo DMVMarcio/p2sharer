@@ -18,6 +18,7 @@ class ProfileImages {
   local: ProfileImage = { hash: '', data: '',
     color: automaticCardColor(hsvToHex({ h: Math.random() * 360, s: 0.65, v: 0.8 })) };
   peers = new Map<string, { hash: string; color: string; cardColor: string; bannerEnabled?: boolean; bannerBlur?: boolean }>();
+  private peerCache = new Map<string, { hash: string; color: string; cardColor: string; bannerEnabled?: boolean; bannerBlur?: boolean }>();
   private cache = new Map<string, string>();
   private cacheSizes = new Map<string, number>();
   private listeners = new Set<() => void>();
@@ -45,23 +46,30 @@ class ProfileImages {
   }
   url(peerId: string, local = false) {
     if (local || peerId === 'local') return this.local.data ? `data:image/png;base64,${this.local.data}` : undefined;
-    return this.cache.get(this.peers.get(peerId)?.hash ?? '');
+    const entry = this.peers.get(peerId) ?? this.peerCache.get(peerId);
+    return this.cache.get(entry?.hash ?? '');
   }
-  color(peerId: string, local = false) { return local || peerId === 'local' ? this.local.color : this.peers.get(peerId)?.color; }
+  color(peerId: string, local = false) {
+    return local || peerId === 'local' ? this.local.color : (this.peers.get(peerId) ?? this.peerCache.get(peerId))?.color;
+  }
   background(peerId: string, local = false, fallback?: string) {
+    const entry = this.peers.get(peerId) ?? this.peerCache.get(peerId);
     return local || peerId === 'local' ? this.local.cardColor ?? automaticCardColor(this.local.dominantColor ?? this.local.color)
-      : this.peers.get(peerId)?.cardColor ?? automaticCardColor(fallback ?? '#06b6d4');
+      : entry?.cardColor ?? automaticCardColor(fallback ?? '#06b6d4');
   }
   cardBanner(peerId: string, local = false) {
+    if (!local && peerId !== 'local' && !this.peers.has(peerId)) return undefined;
     const profile = local || peerId === 'local' ? this.local : this.peers.get(peerId);
     return profile?.bannerEnabled === false ? undefined : this.url(peerId, local);
   }
   blur(peerId: string, local = false) {
-    return (local || peerId === 'local' ? this.local : this.peers.get(peerId))?.bannerBlur !== false;
+    return (local || peerId === 'local' ? this.local : (this.peers.get(peerId) ?? this.peerCache.get(peerId)))?.bannerBlur !== false;
   }
   has(hash: string) { return this.cache.has(hash) || hash === this.local.hash; }
   announce(peerId: string, hash: string, color: string, cardColor = color, bannerEnabled = true, bannerBlur = true) {
-    this.peers.set(peerId, { hash, color, cardColor, ...(this.banner ? { bannerEnabled, bannerBlur } : {}) });
+    const entry = { hash, color, cardColor, ...(this.banner ? { bannerEnabled, bannerBlur } : {}) };
+    this.peers.set(peerId, entry);
+    this.peerCache.set(peerId, entry);
     if (hash && hash === this.local.hash) this.cacheUrl(hash, `data:image/png;base64,${this.local.data}`);
     this.notify();
   }
@@ -91,7 +99,7 @@ class ProfileImages {
     this.cacheSizes.set(hash, bytes);
   }
   forget(peerId: string) { this.peers.delete(peerId); this.notify(); }
-  clearPeers() { this.peers.clear(); this.notify(); }
+  clearPeers() { this.peers.clear(); this.peerCache.clear(); this.notify(); }
 }
 export const profileImages = new ProfileImages();
 export const profileBanners = new ProfileImages(true);

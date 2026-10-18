@@ -1008,6 +1008,7 @@
   "notice.appStop": "{{actor}} 关闭了 {{app}}",
   "notice.password": "密码已由 {{actor}} 更改",
   "notice.roomCreated": "已创建房间：{{room}}",
+  "chat.mentionSuggestions": "提及建议",
   "chat.unread_one": "{{count}} 条未读消息",
   "chat.unread_other": "{{count}} 条未读消息",
   "error.unknown": "操作无法完成。请再试一次。",

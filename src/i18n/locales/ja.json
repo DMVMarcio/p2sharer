@@ -1008,6 +1008,7 @@
   "notice.appStop": "{{actor}} が {{app}} を閉じました",
   "notice.password": "パスワードは {{actor}} によって変更されました",
   "notice.roomCreated": "ルームが作成されました: {{room}}",
+  "chat.mentionSuggestions": "メンション候補",
   "chat.unread_one": "未読メッセージ {{count}} 件",
   "chat.unread_other": "未読メッセージ {{count}} 件",
   "error.unknown": "操作を完了できませんでした。もう一度試してください。",

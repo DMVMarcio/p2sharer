@@ -1008,6 +1008,7 @@
   "notice.appStop": "{{actor}} hat {{app}} geschlossen",
   "notice.password": "Passwort geändert von {{actor}}",
   "notice.roomCreated": "Raum erstellt: {{room}}",
+  "chat.mentionSuggestions": "Erwähnungsvorschläge",
   "chat.unread_one": "{{count}} ungelesene Nachricht",
   "chat.unread_other": "{{count}} ungelesene Nachrichten",
   "error.unknown": "Der Vorgang konnte nicht abgeschlossen werden. Bitte versuchen Sie es erneut.",

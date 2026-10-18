@@ -1008,6 +1008,7 @@
   "notice.appStop": "{{actor}}님이 {{app}}을(를) 종료했습니다.",
   "notice.password": "{{actor}}님이 비밀번호를 변경했습니다.",
   "notice.roomCreated": "생성된 방: {{room}}",
+  "chat.mentionSuggestions": "멘션 추천",
   "chat.unread_one": "읽지 않은 메시지 {{count}}개",
   "chat.unread_other": "읽지 않은 메시지 {{count}}개",
   "error.unknown": "작업을 완료할 수 없습니다. 다시 시도해 주세요.",

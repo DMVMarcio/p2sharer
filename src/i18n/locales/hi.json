@@ -1008,6 +1008,7 @@
   "notice.appStop": "{{actor}} बंद {{app}}",
   "notice.password": "पासवर्ड {{actor}} द्वारा बदला गया",
   "notice.roomCreated": "कक्ष बनाया गया: {{room}}",
+  "chat.mentionSuggestions": "उल्लेख सुझाव",
   "chat.unread_one": "{{count}} अपठित संदेश",
   "chat.unread_other": "{{count}} अपठित संदेश",
   "error.unknown": "ऑपरेशन पूरा नहीं किया जा सकता है। कृपया पुन: प्रयास करें।",

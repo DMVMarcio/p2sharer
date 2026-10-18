@@ -18,6 +18,7 @@ export type EmojiComposerHandle = {
   focus: () => void;
   getMarkdown: () => string;
   hasText: () => boolean;
+  replaceRange: (range: { from: number; to: number }, text: string) => void;
 };
 
 type Props = {
@@ -26,6 +27,9 @@ type Props = {
   pack: EmojiPack;
   onChange: (value: string) => void;
   onSend: () => void;
+  onMentionQueryChange?: (query: string | null, range: { from: number; to: number } | null) => void;
+  onMentionKeyDown?: (key: 'ArrowUp' | 'ArrowDown' | 'Enter' | 'Tab' | 'Escape') => boolean;
+  mentionActive?: boolean;
 };
 
 function FormatButton({ label, active, onClick, children }: { label: string; active?: boolean; onClick: () => void; children: ReactNode }) {
@@ -42,11 +46,37 @@ function FormatButton({ label, active, onClick, children }: { label: string; act
   );
 }
 
-export const EmojiComposerInput = forwardRef<EmojiComposerHandle, Props>(function EmojiComposerInput({ id = 'chat-input-field', value, pack, onChange, onSend }, ref) {
+function checkMentionQuery(editorInstance: NonNullable<ReturnType<typeof useEditor>>): { query: string; range: { from: number; to: number } } | null {
+  const { from, empty } = editorInstance.state.selection;
+  if (!empty) return null;
+  const $from = editorInstance.state.selection.$from;
+  const textBefore = $from.parent.textBetween(0, $from.parentOffset, undefined, '\ufffc');
+  const match = /(?:^|\s)@([^\s@]*)$/.exec(textBefore);
+  if (!match) return null;
+  const query = match[1];
+  const matchStartOffset = match.index + (match[0].startsWith('@') ? 0 : 1);
+  const startPos = $from.start() + matchStartOffset;
+  const endPos = from;
+  return { query, range: { from: startPos, to: endPos } };
+}
+
+export const EmojiComposerInput = forwardRef<EmojiComposerHandle, Props>(function EmojiComposerInput({
+  id = 'chat-input-field',
+  value,
+  pack,
+  onChange,
+  onSend,
+  onMentionQueryChange,
+  onMentionKeyDown,
+  mentionActive = false,
+}, ref) {
   const language = useLocale();
   const packRef = useRef(pack);
   const onChangeRef = useRef(onChange);
   const onSendRef = useRef(onSend);
+  const onMentionQueryChangeRef = useRef(onMentionQueryChange);
+  const onMentionKeyDownRef = useRef(onMentionKeyDown);
+  const mentionActiveRef = useRef(mentionActive);
   const editingLinkRef = useRef(false);
   const linkInputRef = useRef<HTMLInputElement>(null);
   const [editingLink, setEditingLink] = useState(false);
@@ -55,6 +85,9 @@ export const EmojiComposerInput = forwardRef<EmojiComposerHandle, Props>(functio
   packRef.current = pack;
   onChangeRef.current = onChange;
   onSendRef.current = onSend;
+  onMentionQueryChangeRef.current = onMentionQueryChange;
+  onMentionKeyDownRef.current = onMentionKeyDown;
+  mentionActiveRef.current = mentionActive;
   editingLinkRef.current = editingLink;
 
   const editor = useEditor({
@@ -77,6 +110,15 @@ export const EmojiComposerInput = forwardRef<EmojiComposerHandle, Props>(functio
         'data-placeholder': t("message.886fe94fce87"),
       },
       handleKeyDown: (_view, event) => {
+        if (mentionActiveRef.current) {
+          if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Enter' || event.key === 'Tab' || event.key === 'Escape') {
+            const handled = onMentionKeyDownRef.current?.(event.key);
+            if (handled) {
+              event.preventDefault();
+              return true;
+            }
+          }
+        }
         if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
           event.preventDefault();
           onSendRef.current();
@@ -85,7 +127,19 @@ export const EmojiComposerInput = forwardRef<EmojiComposerHandle, Props>(functio
         return false;
       },
     },
-    onUpdate: ({ editor: current }) => onChangeRef.current(current.getMarkdown()),
+    onUpdate: ({ editor: current }) => {
+      onChangeRef.current(current.getMarkdown());
+      if (onMentionQueryChangeRef.current) {
+        const res = checkMentionQuery(current);
+        onMentionQueryChangeRef.current(res ? res.query : null, res ? res.range : null);
+      }
+    },
+    onSelectionUpdate: ({ editor: current }) => {
+      if (onMentionQueryChangeRef.current) {
+        const res = checkMentionQuery(current);
+        onMentionQueryChangeRef.current(res ? res.query : null, res ? res.range : null);
+      }
+    },
   }, []);
 
   useTextEditorContextMenu(editor);
@@ -113,6 +167,10 @@ export const EmojiComposerInput = forwardRef<EmojiComposerHandle, Props>(functio
     focus() { editor?.commands.focus(); },
     getMarkdown() { return editor?.getMarkdown() ?? ''; },
     hasText() { return Boolean(editor?.getText().trim()); },
+    replaceRange(range, text) {
+      if (!editor) return;
+      editor.chain().focus().deleteRange(range).insertContent(text).run();
+    },
   }), [editor]);
 
   const startLink = () => {

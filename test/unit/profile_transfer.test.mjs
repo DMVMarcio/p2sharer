@@ -108,6 +108,8 @@ test('image display requires an admitted offer, matching request and successful 
     assert.equal(profileImages.background('other'), '#ff8844');
     assert.equal(sent.length, 1);
     assert.equal(profileImages.url('other'), profileImages.url('peer'));
+    profileImages.forget('other');
+    assert.equal(profileImages.url('other'), profileImages.url('peer'), 'Cached image survives forget for disconnected peer messages');
     await transfer.receive({ kind: 'offer', hash: '', size: 0, color: '#654321' }, 'peer');
     assert.equal(profileImages.url('peer'), undefined);
     assert.equal(profileImages.color('peer'), '#654321');

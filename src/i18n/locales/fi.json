@@ -1008,6 +1008,7 @@
   "notice.appStop": "{{actor}} suljettu {{app}}",
   "notice.password": "{{actor}} vaihtoi salasanan",
   "notice.roomCreated": "Huone luotu: {{room}}",
+  "chat.mentionSuggestions": "Mainintaehdotukset",
   "chat.unread_one": "{{count}} lukematon viesti",
   "chat.unread_other": "{{count}} lukematonta viestiä",
   "error.unknown": "Toimintoa ei voitu suorittaa loppuun. Yritä uudelleen.",
