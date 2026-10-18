@@ -28,6 +28,7 @@ const { ContextMenuProvider, useContextMenu, getChatMessageActions, captureTextE
 const { createRoot } = await import('react-dom/client');
 const root = createRoot(document.getElementById('root'));
 let invoked = 0;
+const transmissionActions = [];
 function Surface() {
   const open = useContextMenu();
   return React.createElement('div', null,
@@ -36,6 +37,13 @@ function Surface() {
       { id: 'disabled', label: 'Disabled', disabled: true, onSelect: () => invoked += 100 },
       { id: 'last', label: 'Last', onSelect: () => invoked += 10 },
     ]) }, React.createElement('video', { id: 'video' })),
+    React.createElement('button', { id: 'transmissions', onClick: (event) => open(event, [{
+      id: 'edit-screen', label: 'Screen', tooltip: 'Edit Screen',
+      trailingIcon: React.createElement('svg', { 'data-edit-icon': true }),
+      onSelect: () => transmissionActions.push('edit'),
+      secondary: { label: 'Stop Screen', danger: true, icon: React.createElement('svg'),
+        onSelect: () => transmissionActions.push('stop') },
+    }]) }, 'Transmissions'),
     React.createElement('input', { id: 'editor' }),
     React.createElement('div', { className: 'modal-overlay', id: 'modal' }));
 }
@@ -190,4 +198,23 @@ test('rich editor edits use Tiptap history and preserve the captured selection',
     assert.equal(editor.state.selection.from, 0);
     assert.equal(editor.state.selection.to, editor.state.doc.content.size);
   } finally { unregister(); editor.destroy(); element.remove(); }
+});
+
+test('split transmission actions expose edit and stop separately and keep keyboard and icon activation independent', async () => {
+  await act(async () => document.getElementById('transmissions').click());
+  assert.equal(document.activeElement.getAttribute('aria-label'), 'Edit Screen');
+  const edit = document.activeElement;
+  const pencil = edit.querySelector('[data-edit-icon]');
+  assert.equal(pencil.parentElement.getAttribute('aria-hidden'), 'true');
+  await key('ArrowDown');
+  assert.equal(document.activeElement.getAttribute('aria-label'), 'Stop Screen');
+  await act(async () => document.activeElement.click());
+  assert.deepEqual(transmissionActions, ['stop']);
+  assert.equal(document.activeElement.id, 'transmissions');
+  assert.equal(document.querySelector('[role="menu"]').hasAttribute('inert'), true);
+  await act(async () => await new Promise(resolve => setTimeout(resolve, 280)));
+  await act(async () => document.getElementById('transmissions').click());
+  await act(async () => document.querySelector('[data-edit-icon]').dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
+  assert.deepEqual(transmissionActions, ['stop', 'edit']);
+  assert.equal(document.activeElement.id, 'transmissions');
 });

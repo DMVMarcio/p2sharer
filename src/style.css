@@ -820,6 +820,8 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 
 .btn.btn-transmission-menu { padding-right: 8px; }
 .btn-transmission-menu .transmission-chevron { flex-shrink: 0; width: 10px; margin-left: -5px; }
+.transmission-source-icon { position: relative; display: grid; place-items: center; padding: 7px; border-radius: var(--radius-sm); background: var(--accent-subtle); color: var(--accent-color); }
+.transmission-source-icon .stream-sharing-indicator { position: absolute; right: 1px; bottom: 1px; box-shadow: 0 0 0 2px var(--bg-elevated); }
 
 /* ==========================================================================
    VIEW 2: UNIFIED GROUP ROOM
@@ -5119,14 +5121,17 @@ html[data-theme="light"] :is(.stream-card, .pip-window-root) {
   transform: translateX(-50%) rotate(45deg); background: var(--bg-card); border-right: 1px solid var(--border-default); border-bottom: 1px solid var(--border-default); pointer-events: none; }
 .integer-slider .integer-slider-value { width: 36px; min-width: 0; padding: 2px; min-height: 22px; text-align: center; background: transparent; border-color: transparent; font: inherit; }
 .integer-slider .integer-slider-value:focus { background: var(--bg-input); border-color: var(--accent-color); }
-.context-menu-row { display: flex; align-items: center; border-radius: var(--radius-xs); }
-.context-menu-row:hover, .context-menu-row:focus-within { background: var(--dropdown-hover-bg); }
-.context-menu-row > button:first-child:hover, .context-menu-row > button:first-child:focus-visible { background: transparent; }
+.context-menu-row { display: flex; align-items: center; gap: 5px; padding: 3px; margin-bottom: 4px; background: var(--bg-elevated); border-radius: var(--radius-sm); }
 .context-menu-row > button:first-child { flex: 1; min-width: 0; }
-.context-menu-row > button:first-child > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.context-menu-row .context-menu-secondary { flex-shrink: 0; width: 32px; padding: 7px; justify-content: center; }
+.context-menu-row .context-menu-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.context-menu-trailing-icon { display: flex; flex-shrink: 0; margin-left: auto; padding-left: 12px; color: var(--text-secondary); }
+.context-menu-row > button:first-child:hover .context-menu-trailing-icon,
+.context-menu-row > button:first-child:focus-visible .context-menu-trailing-icon { color: var(--accent-color); }
+.context-menu-row .context-menu-secondary { flex-shrink: 0; width: 36px; height: 36px; padding: 9px; justify-content: center; border-radius: var(--radius-sm); }
+.context-menu-row .context-menu-secondary.context-menu-danger { background: var(--danger-bg); }
 .context-menu-row .context-menu-secondary.context-menu-danger:hover,
-.context-menu-row .context-menu-secondary.context-menu-danger:focus-visible { background: var(--danger-bg); }
+.context-menu-row .context-menu-secondary.context-menu-danger:focus-visible { background: var(--danger-hover); color: #fff; }
+.context-menu-row > button:focus-visible { outline: 2px solid var(--accent-color); outline-offset: -2px; }
 .context-menu button:disabled { opacity: .45; cursor: default; }
 .context-menu .context-menu-danger { color: var(--danger-text); }
 .context-menu .context-menu-separated { border-top: 1px solid var(--border-default); margin-top: 4px; border-radius: 0 0 4px 4px; }

@@ -8,7 +8,7 @@ import { useRoom } from '../../hooks/useRoom';
 import { useModal } from '../../hooks/useModal';
 import { useStore } from '../../hooks/useStore';
 import { Tooltip } from '../common/Tooltip';
-import { AppWindow, Square, ChevronDown, Camera, Monitor, Plus } from 'lucide-react';
+import { AppWindow, Square, ChevronDown, Camera, Monitor, Plus, Pencil } from 'lucide-react';
 import { useContextMenu, type ContextMenuAction } from '../common/ContextMenu';
 import { roomService } from '../../services/room_service';
 
@@ -50,9 +50,14 @@ export const StreamHeaderBar: React.FC = () => {
     const actions: ContextMenuAction[] = localStreams.map((slot) => {
       const label = slot.mediaLabel || (slot.mediaKind === 'camera' ? t("message.dafb61aca12d") : t("message.2d31efc9c2ed"));
       return { id: `edit-${slot.mediaId}`, label,
-        icon: slot.mediaKind === 'camera' ? <Camera size={15} /> : <Monitor size={15} />,
+        icon: <span className="transmission-source-icon">
+          {slot.mediaKind === 'camera' ? <Camera size={17} /> : <Monitor size={17} />}
+          <span className="stream-sharing-indicator active" />
+        </span>,
+        trailingIcon: <Pencil size={15} />,
+        tooltip: t("message.c0a6f99cb765", { v0: label }),
         onSelect: () => { roomService.editTransmission(slot.mediaId!); openModal('screenPicker'); },
-        secondary: { get label() { return t("message.bc7431b85054", { v0: label }); }, icon: <Square size={14} />, danger: true,
+        secondary: { get label() { return t("message.bc7431b85054", { v0: label }); }, icon: <Square size={14} fill="currentColor" aria-hidden="true" />, danger: true,
           onSelect: () => roomService.stopTransmission(slot.mediaId!) } };
     });
     actions.push({ id: 'new-transmission', get label() { return t("message.632a0a6c5999"); }, icon: <Plus size={15} />,

@@ -13,6 +13,8 @@ export interface ContextMenuAction {
   id: string;
   label: string;
   icon?: ReactNode;
+  trailingIcon?: ReactNode;
+  tooltip?: string;
   /** Visual choices retain their accessible label without displaying text. */
   iconOnly?: boolean;
   disabled?: boolean;
@@ -171,16 +173,18 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
       {retained.actions.map((action) => {
         const primary = <button key={action.id} type="button" role={action.selected === undefined ? 'menuitem' : 'menuitemradio'} aria-checked={action.selected}
         ref={element => { if (element) buttonRefs.current.set(action.id, element); else buttonRefs.current.delete(action.id); }}
-        aria-label={action.iconOnly ? action.label : undefined}
+        aria-label={action.tooltip || (action.iconOnly ? action.label : undefined)}
         disabled={action.disabled} className={`${action.iconOnly ? 'context-menu-visual-choice' : ''} ${action.danger ? 'context-menu-danger' : ''} ${action.separator ? 'context-menu-separated' : ''}`}
-        onClick={() => select(action)}>{action.icon && <span className="context-menu-icon">{action.icon}</span>}{!action.iconOnly && <span>{action.label}</span>}</button>;
+        onClick={() => select(action)}>{action.icon && <span className="context-menu-icon" aria-hidden="true">{action.icon}</span>}{!action.iconOnly && <span className="context-menu-label">{action.label}</span>}
+          {action.trailingIcon && <span className="context-menu-trailing-icon" aria-hidden="true">{action.trailingIcon}</span>}</button>;
+        const primaryAction = action.tooltip ? <Tooltip key={action.id} content={action.tooltip} disabled={presence.closing}>{primary}</Tooltip> : primary;
         const secondary = action.secondary;
-        return secondary ? <div key={action.id} className="context-menu-row" role="none">{primary}
-          <Tooltip content={secondary.label}><button type="button" role="menuitem" aria-label={secondary.label}
+        return secondary ? <div key={action.id} className="context-menu-row" role="none">{primaryAction}
+          <Tooltip content={secondary.label} disabled={presence.closing}><button type="button" role="menuitem" aria-label={secondary.label}
             ref={element => { const id = `${action.id}:secondary`; if (element) buttonRefs.current.set(id, element); else buttonRefs.current.delete(id); }}
             disabled={secondary.disabled} className={`context-menu-secondary ${secondary.danger ? 'context-menu-danger' : ''}`}
             onClick={() => select(secondary)}>{secondary.icon || secondary.label}</button></Tooltip>
-        </div> : primary;
+        </div> : primaryAction;
       })}
     </div>, document.fullscreenElement ?? document.body)}
   </MenuContext.Provider>;
