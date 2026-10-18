@@ -28,7 +28,8 @@ const bundle = await build({ stdin: { contents: `
   plugins: [{ name: 'localization-native-fixture', setup(builder) {
     builder.onResolve({ filter: /^@tauri-apps\/api\/core$/ }, () => ({ path: 'core', namespace: 'fixture' }));
     builder.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({ contents:
-      `export const isTauri = () => true; export const invoke = async command => {
+      `export class Channel { constructor() { throw new Error('Unexpected native channel'); } }
+      export const isTauri = () => true; export const invoke = async command => {
         if (command !== 'get_system_locale') throw new Error('Unexpected command');
         return globalThis.readSystemLocaleFixture(); };` }));
     builder.onResolve({ filter: /^[^./]/ }, args => ({ path: import.meta.resolve(args.path), external: true }));

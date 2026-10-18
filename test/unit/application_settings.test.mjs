@@ -29,6 +29,14 @@ const bundle = await build({
     export { profileImages, profileBanners } from './src/core/profile_image.ts';`, resolveDir: process.cwd() },
   bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic',
   plugins: [{ name: 'updater-fixture', setup(builder) {
+    // Exercise localized Markdown without depending on the upcoming release copy.
+    builder.onResolve({ filter: /\/releases\/current\.json$/ }, () => ({ path: 'notes', namespace: 'release-notes-fixture' }));
+    builder.onLoad({ filter: /.*/, namespace: 'release-notes-fixture' }, () => ({ loader: 'json', contents: JSON.stringify({
+      translations: {
+        'pt-BR': ['**arquivos e imagens** ![imagem](https://example.com/image.png)'],
+        en: ['**files and images** ![image](https://example.com/image.png)'],
+      },
+    }) }));
     builder.onResolve({ filter: /room_service|useRoom|useModal$|@tauri-apps\/api\/core/ }, args => ({
       path: args.path.includes('room_service') ? 'room' : args.path.includes('useRoom') ? 'room-hook' : args.path.includes('useModal') ? 'modal' : 'native', namespace: 'settings-fixture',
     }));
@@ -89,9 +97,11 @@ test('Application settings reopens installed release notes offline and restores 
   await act(async () => button.click());
   assert.ok(document.querySelector('[role="dialog"][aria-modal="true"]'));
   assert.match(document.querySelector('.release-notes-list').textContent, /arquivos e imagens/);
+  assert.equal(document.querySelector('.release-notes-list strong').textContent, 'arquivos e imagens');
   assert.equal(document.querySelector('.release-notes-list img'), null);
   await act(async () => setLanguage('en'));
   assert.match(document.querySelector('.release-notes-list').textContent, /files and images/);
+  assert.equal(document.querySelector('.release-notes-list img'), null);
   await act(async () => document.querySelector('.modal-card').dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
   await act(async () => new Promise(resolve => setTimeout(resolve, 260)));
   assert.equal(document.querySelector('[role="dialog"]'), null);
