@@ -88,7 +88,7 @@ fn interfaces() -> Vec<LanInterface> {
     result
 }
 
-fn usable_ip(ip: IpAddr) -> bool {
+pub(crate) fn usable_ip(ip: IpAddr) -> bool {
     !ip.is_loopback()
         && !ip.is_unspecified()
         && !ip.is_multicast()

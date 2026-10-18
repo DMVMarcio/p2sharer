@@ -10,6 +10,7 @@ export interface IceStat {
   remoteCandidateId?: string;
   currentRoundTripTime?: number;
   candidateType?: string;
+  address?: string;
   protocol?: string;
   bytesSent?: number;
   bytesReceived?: number;

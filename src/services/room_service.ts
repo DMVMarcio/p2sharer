@@ -814,8 +814,13 @@ export class RoomService {
         this.transferRates.set(progress.requestId, { at: now, bytes: progress.bytes, speed: bytesPerSecond });
       }
     } else if (progress.status !== 'pending') this.transferRates.delete(progress.requestId);
+    const nativeDirect = progress.nativeDirect ?? previous?.nativeDirect;
+    const transportChanged = nativeDirect !== previous?.nativeDirect;
+    if (transportChanged) this.transferRouteChecks.delete(progress.requestId);
     const entry: FileProgress = {
       ...previous, ...reported,
+      nativeDirect,
+      transport: transportChanged ? undefined : progress.transport ?? previous?.transport,
       fileName: progress.fileName ?? previous?.fileName ?? message?.file?.name ?? t("message.ba8a452f2f83"),
       peerName: progress.peerName ?? previous?.peerName ?? peer?.username ??
         (progress.direction === 'receive' ? message?.sender : undefined) ?? t("message.1e97ddf60a0f"),
@@ -824,7 +829,7 @@ export class RoomService {
       startedAt: previous?.startedAt ?? Date.now(),
       isImage: progress.isImage ?? previous?.isImage ?? message?.file?.isImage ?? false,
       bytesPerSecond,
-      timings: progress.timings ?? previous?.timings,
+      timings: nativeDirect ? undefined : progress.timings ?? previous?.timings,
     };
     this.fileProgress = { ...this.fileProgress, [entry.requestId]: entry };
     if (entry.status === 'complete' && previous?.status !== 'complete' && !this.localSaveIds.has(entry.requestId)) {
@@ -835,9 +840,10 @@ export class RoomService {
       const last = this.transferRouteChecks.get(entry.requestId);
       if (last === undefined || now - last >= 5000) {
         this.transferRouteChecks.set(entry.requestId, now);
-        void this.roomManager.getFileTransportDiagnostics(entry.peerId).then((stats) => {
+        void this.roomManager.getFileTransportDiagnostics(entry.peerId, entry.requestId).then((stats) => {
           const current = this.fileProgress[entry.requestId];
-          if (!stats || !current || current.status !== 'active' || current.peerId !== entry.peerId) return;
+          if (!stats || !current || current.status !== 'active' || current.peerId !== entry.peerId ||
+              current.nativeDirect !== entry.nativeDirect) return;
           const previous = current.transport;
           const transport = { ...stats.transport };
           const currentBytes = current.direction === 'send' ? transport.pairBytesSent : transport.pairBytesReceived;

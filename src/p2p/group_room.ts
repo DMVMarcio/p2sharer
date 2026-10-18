@@ -16,6 +16,7 @@ import { decodeSignedFileChunk, encodeSignedFileChunk,
 import { PeerAuthenticator } from '../core/peer_auth.ts';
 import { readChatFileBytes, writeChatDownloadBytes } from '../core/chat_file_io.ts';
 import { selectedIcePair, selectedIceRoute, type IceStat } from '../core/ice_route.ts';
+import { cancelDirectFile, directFileAddress, directFileSignature, receiveDirectFile, validDirectFileOffer, type DirectFileOffer } from '../core/chat_file_direct.ts';
 import { RoomAuthority, type AdminAdmission, type AuthorityTransfer, type HostCommand } from '../core/room_authority.ts';
 import { compareRoomInvites, formatRoomInvite, parseRoomInvite, signRoomInvite, validRoomName,
   type NamedRoomInvite } from '../core/room_invite.ts';
@@ -123,9 +124,9 @@ export interface NativeChatFile { id: string; name: string; path: string; size: 
 export interface FileRequest { requestId: string; messageId: string; peerId: string; peerName: string; path: string; name: string; preview: boolean }
 export interface FileTimings { readMs: number; prepareMs: number; wireMs: number; verifyMs: number; writeMs: number; ackMs: number }
 export interface FileTransportDiagnostics { protocol?: string; localCandidateType?: string; remoteCandidateType?: string; channelLabel?: string; queuedBytes?: number; queueLimitBytes?: number; pairBytesSent?: number; pairBytesReceived?: number; pairTimestamp?: number; pairBytesPerSecond?: number; availableOutgoingBitsPerSecond?: number; packetsDiscardedOnSend?: number }
-export interface FileProgress { requestId: string; messageId: string; direction: 'send' | 'receive'; bytes: number; total: number; status: 'pending' | 'active' | 'complete' | 'cancelled' | 'error'; error?: string; preview?: string; previewBytes?: Uint8Array; saved?: boolean; previewOnly?: boolean; peerId?: string; fileName?: string; peerName?: string; startedAt?: number; isImage?: boolean; bytesPerSecond?: number; connectionType?: string; rttMs?: number | null; timings?: FileTimings; transport?: FileTransportDiagnostics }
-type FilePacket = { kind: 'request' | 'accept' | 'ready' | 'deny' | 'ack' | 'cancel'; requestId: string; messageId: string; offset?: number; preview?: boolean; signature: string };
-type FileSession = { messageId: string; peerId: string; peerName?: string; sourceId?: string; offset: number; sentOffset?: number; sending?: boolean; receiving?: boolean; writingUntil?: number; pendingChunks?: Map<number, Uint8Array>; total: number; direction: 'send' | 'receive'; preview?: boolean; chunks?: Uint8Array[]; timings: FileTimings };
+export interface FileProgress { requestId: string; messageId: string; direction: 'send' | 'receive'; bytes: number; total: number; status: 'pending' | 'active' | 'complete' | 'cancelled' | 'error'; error?: string; preview?: string; previewBytes?: Uint8Array; saved?: boolean; nativeDirect?: boolean; previewOnly?: boolean; peerId?: string; fileName?: string; peerName?: string; startedAt?: number; isImage?: boolean; bytesPerSecond?: number; connectionType?: string; rttMs?: number | null; timings?: FileTimings; transport?: FileTransportDiagnostics }
+type FilePacket = { kind: 'request' | 'accept' | 'ready' | 'deny' | 'ack' | 'cancel'; requestId: string; messageId: string; offset?: number; preview?: boolean; direct?: DirectFileOffer; signature: string };
+type FileSession = { messageId: string; peerId: string; peerName?: string; sourceId?: string; offset: number; sentOffset?: number; direct?: boolean; startedTransfer?: boolean; sending?: boolean; receiving?: boolean; writingUntil?: number; pendingChunks?: Map<number, Uint8Array>; total: number; direction: 'send' | 'receive'; preview?: boolean; chunks?: Uint8Array[]; timings: FileTimings };
 
 function newFileTimings(): FileTimings {
   return { readMs: 0, prepareMs: 0, wireMs: 0, verifyMs: 0, writeMs: 0, ackMs: 0 };
@@ -192,6 +193,7 @@ export class GroupRoomManager {
   private reservedChatOrder = 0;
   private fileSources = new Map<string, { file: NativeChatFile; autoAcceptUntil: number }>();
   private fileSessions = new Map<string, FileSession>();
+  private fileDirectRetryAfter = new WeakMap<RTCPeerConnection, number>();
   private pendingFileRequests = new Map<string, FileRequest>();
   private requestedImagePreviews = new Set<string>();
   private revokedFileMessages = new Set<string>();
@@ -1994,6 +1996,7 @@ export class GroupRoomManager {
     for (const [requestId, session] of this.fileSessions) {
       if (session.peerId !== peerId) continue;
       this.fileSessions.delete(requestId);
+      void cancelDirectFile(requestId).catch(() => {});
       if (session.preview) this.requestedImagePreviews.delete(session.messageId);
       if (session.direction === 'receive' && !session.preview) void invoke('cancel_chat_download', { id: requestId });
       this.emitFileProgress(requestId, 'cancelled', session.offset, session.messageId, session.direction, session.total);
@@ -2683,7 +2686,7 @@ export class GroupRoomManager {
     return result;
   }
 
-  public async getFileTransportDiagnostics(peerId: string): Promise<{
+  public async getFileTransportDiagnostics(peerId: string, requestId?: string): Promise<{
     connectionType: string; rttMs: number | null; transport: FileTransportDiagnostics;
   } | null> {
     const pc = this.room?.getPeers?.()?.[peerId] as FileOptimizedConnection | undefined;
@@ -2692,6 +2695,11 @@ export class GroupRoomManager {
       const reports = Array.from((await pc.getStats()).values()) as IceStat[];
       const route = selectedIceRoute(reports);
       const selected = selectedIcePair(reports);
+      if (requestId ? this.fileSessions.get(requestId)?.direct :
+          [...this.fileSessions.values()].some(session => session.peerId === peerId && session.direct)) {
+        return { connectionType: route.connectionType, rttMs: route.pingMs,
+          transport: { protocol: 'TLS/TCP', channelLabel: 'chat_file_native_tls_v1' } };
+      }
       const channel = this.fileBulk.getChannel(peerId) ?? pc.roomDataChannel;
       return {
         connectionType: route.connectionType,
@@ -2852,18 +2860,33 @@ export class GroupRoomManager {
         throw new Error('Source file changed or moved');
       }
       if (this.revokedFileMessages.has(request.messageId)) throw new Error('File offer was revoked');
+      let direct: DirectFileOffer | undefined;
+      if (checked.size > 0 && !request.preview) {
+        try {
+          const pc = this.room?.getPeers?.()?.[request.peerId] as RTCPeerConnection | undefined;
+          const address = pc && (this.fileDirectRetryAfter.get(pc) ?? 0) <= Date.now()
+            ? await directFileAddress(pc, 'local', undefined, Boolean(this.snapshot?.connection)) : null;
+          if (address) direct = await invoke<DirectFileOffer>('offer_direct_chat_file', { id: requestId,
+            sourceId: source.file.id, address, size: checked.size });
+        } catch (error) { console.debug('[Files] Direct transport unavailable:', error); }
+      }
       if (checked.size > 0) this.fileBulk.ensure(request.peerId);
+      if (!this.peerTracker.isVerified(request.peerId) || this.revokedFileMessages.has(request.messageId)) {
+        await cancelDirectFile(requestId);
+        throw new Error('File request is no longer available');
+      }
       this.fileSessions.set(requestId, { messageId: request.messageId, peerId: request.peerId,
         peerName: request.peerName, sourceId: source.file.id, offset: 0, total: checked.size,
-        direction: 'send', preview: request.preview, sentOffset: 0, timings: newFileTimings() });
+        direction: 'send', preview: request.preview, direct: Boolean(direct), sentOffset: direct ? checked.size : 0, timings: newFileTimings() });
       this.emitFileProgress(requestId, 'active');
-      await this.sendFilePacket(request.peerId, { kind: 'accept', requestId, messageId: request.messageId });
+      await this.sendFilePacket(request.peerId, { kind: 'accept', requestId, messageId: request.messageId, ...(direct ? { direct } : {}) });
       if (checked.size === 0) {
         this.fileSessions.delete(requestId);
         this.emitFileProgress(requestId, 'complete', 0, request.messageId, 'send', 0);
       }
     } catch (error) {
       this.fileSessions.delete(requestId);
+      await cancelDirectFile(requestId).catch(() => {});
       await this.sendFilePacket(request.peerId, { kind: 'deny', requestId, messageId: request.messageId });
       this.callbacks?.onFileProgress?.({ requestId, messageId: request.messageId, direction: 'send',
         bytes: 0, total: message.file.size, status: 'error', error: String(error), peerId: request.peerId,
@@ -2875,6 +2898,7 @@ export class GroupRoomManager {
     const session = this.fileSessions.get(requestId);
     if (!session) return;
     this.fileSessions.delete(requestId);
+    await cancelDirectFile(requestId).catch(() => {});
     if (session.preview && session.direction === 'receive') this.requestedImagePreviews.delete(session.messageId);
     if (session.direction === 'receive' && !session.preview) await invoke('cancel_chat_download', { id: requestId });
     try { await this.sendFilePacket(session.peerId, { kind: 'cancel', requestId, messageId: session.messageId }); } catch {}
@@ -2890,14 +2914,15 @@ export class GroupRoomManager {
       direction: direction ?? session!.direction, bytes: bytes ?? session!.offset,
       total: total ?? session!.total, status, preview, previewBytes, saved,
       peerId: session?.peerId, peerName: session?.peerName, previewOnly: session?.preview,
-      timings: session ? { ...session.timings } : undefined });
+      nativeDirect: session ? Boolean(session.direct) : undefined,
+      timings: session && !session.direct ? { ...session.timings } : undefined });
   }
 
   private async sendFilePacket(peerId: string, payload: Omit<FilePacket, 'signature'>): Promise<void> {
     if (!this.fileAction || !this.chatAuth || !this.peerTracker.isVerified(peerId) ||
         (this.authority && !this.isAdmittedPeer(peerId))) throw new Error('Peer unavailable');
-    const signed = [payload.kind, payload.requestId, payload.messageId, payload.offset ?? null, Boolean(payload.preview)];
-    const signature = await this.chatAuth.signControl('chat-file-control-v2', signed);
+    const signed = [payload.kind, payload.requestId, payload.messageId, payload.offset ?? null, Boolean(payload.preview), directFileSignature(payload.direct)];
+    const signature = await this.chatAuth.signControl('chat-file-control-v3', signed);
     await this.fileAction.send({ ...payload, signature }, { target: peerId });
   }
 
@@ -2964,10 +2989,11 @@ export class GroupRoomManager {
         !['request', 'accept', 'ready', 'deny', 'ack', 'cancel'].includes(packet.kind) ||
         (packet.offset !== undefined && (!Number.isSafeInteger(packet.offset) || packet.offset < 0)) ||
         'data' in packet ||
-        (packet.preview !== undefined && typeof packet.preview !== 'boolean')) return;
+        (packet.preview !== undefined && typeof packet.preview !== 'boolean') ||
+        (packet.direct !== undefined && (packet.kind !== 'accept' || !validDirectFileOffer(packet.direct)))) return;
     const key = this.chatAuth?.getKnownKey(peerId);
-    if (!key || !await this.chatAuth!.verifyControl('chat-file-control-v2',
-      [packet.kind, packet.requestId, packet.messageId, packet.offset ?? null, Boolean(packet.preview)], packet.signature, key)) return;
+    if (!key || !await this.chatAuth!.verifyControl('chat-file-control-v3',
+      [packet.kind, packet.requestId, packet.messageId, packet.offset ?? null, Boolean(packet.preview), directFileSignature(packet.direct)], packet.signature, key)) return;
     const message = this.chatHistory.find((item) => item.id === packet.messageId);
     if (!message?.file) return;
     if (packet.kind === 'request') {
@@ -3005,6 +3031,7 @@ export class GroupRoomManager {
     if (!session || session.peerId !== peerId || session.messageId !== packet.messageId) return;
     if (packet.kind === 'cancel' || packet.kind === 'deny') {
       this.fileSessions.delete(packet.requestId);
+      await cancelDirectFile(packet.requestId).catch(() => {});
       if (session.preview && session.direction === 'receive') this.requestedImagePreviews.delete(session.messageId);
       if (session.direction === 'receive' && !session.preview) await invoke('cancel_chat_download', { id: packet.requestId });
       this.emitFileProgress(packet.requestId, 'cancelled', session.offset, session.messageId, session.direction, session.total);
@@ -3012,10 +3039,14 @@ export class GroupRoomManager {
     }
     if (session.direction === 'receive' && message.authorKey === this.chatAuth?.getKnownKey(peerId)) {
       if (packet.kind === 'accept') {
+        if (session.startedTransfer) return;
+        session.startedTransfer = true;
         if (session.total === 0) await this.finishReceivedFile(packet.requestId, session, message);
         else {
           this.emitFileProgress(packet.requestId, 'active');
           try {
+            if (packet.direct && !session.preview && await this.tryReceiveDirectFile(packet.requestId, session, message, packet.direct)) return;
+            if (this.fileSessions.get(packet.requestId) !== session) return;
             this.fileBulk.ensure(peerId);
             await this.fileBulk.ready(peerId);
             if (this.fileSessions.get(packet.requestId) === session) {
@@ -3030,6 +3061,13 @@ export class GroupRoomManager {
       }
     } else if (session.direction === 'send' && packet.kind === 'ready') {
       try {
+        if (session.direct) {
+          const pc = this.room?.getPeers?.()?.[peerId] as RTCPeerConnection | undefined;
+          if (pc) this.fileDirectRetryAfter.set(pc, Date.now() + 5 * 60_000);
+          await cancelDirectFile(packet.requestId);
+          session.direct = false;
+          session.sentOffset = 0;
+        }
         await this.fileBulk.ready(peerId);
         if (this.fileSessions.get(packet.requestId) === session) await this.sendNextFileChunks(packet.requestId);
       } catch (error) {
@@ -3043,7 +3081,39 @@ export class GroupRoomManager {
       if (session.offset === session.total) {
         this.fileSessions.delete(packet.requestId);
         this.emitFileProgress(packet.requestId, 'complete', session.offset, session.messageId, 'send', session.total);
-      } else await this.sendNextFileChunks(packet.requestId);
+      } else if (!session.direct) await this.sendNextFileChunks(packet.requestId);
+    }
+  }
+
+  private async tryReceiveDirectFile(requestId: string, session: FileSession, message: ChatMessage,
+    offer: DirectFileOffer): Promise<boolean> {
+    const address = await directFileAddress(this.room?.getPeers?.()?.[session.peerId] as RTCPeerConnection | undefined,
+      'remote', offer.address, Boolean(this.snapshot?.connection));
+    if (!address) return false;
+    session.direct = true;
+    try {
+      const result = await receiveDirectFile(requestId, address, offer, session.total, (bytes) => {
+        if (this.fileSessions.get(requestId) !== session || bytes < session.offset || bytes > session.total) return;
+        session.offset = bytes;
+        this.emitFileProgress(requestId, 'active');
+        // Completion is acknowledged only after the existing whole-file digest check.
+        if (bytes < session.total) void this.sendFilePacket(session.peerId,
+          { kind: 'ack', requestId, messageId: session.messageId, offset: bytes }).catch(() => {});
+      });
+      if (this.fileSessions.get(requestId) !== session) return true;
+      session.offset = result.bytes;
+      if (result.error) throw new Error(result.error);
+      if (result.bytes !== session.total) throw new Error('Incomplete direct file transfer');
+      await this.finishReceivedFile(requestId, session, message);
+      await this.sendFilePacket(session.peerId, { kind: 'ack', requestId,
+        messageId: session.messageId, offset: session.total });
+      return true;
+    } catch (error) {
+      if (this.fileSessions.get(requestId) !== session) return true;
+      if (session.offset !== 0) throw error;
+      console.debug('[Files] Direct connection failed; using WebRTC:', error);
+      session.direct = false;
+      return false;
     }
   }
 
@@ -3056,7 +3126,7 @@ export class GroupRoomManager {
     const message = this.chatHistory.find((item) => item.id === header.messageId);
     const key = this.chatAuth?.getKnownKey(peerId);
     if (!session || !message?.file || !key || message.authorKey !== key ||
-        session.direction !== 'receive' || session.peerId !== peerId || session.messageId !== header.messageId ||
+        session.direction !== 'receive' || session.direct || session.peerId !== peerId || session.messageId !== header.messageId ||
         header.offset < (session.writingUntil ?? session.offset) || header.offset >= session.total ||
         header.offset - session.offset > CHAT_FILE_IN_FLIGHT_CHUNKS * CHAT_FILE_CHUNK_BYTES ||
         header.offset + bytes.length > session.total ||
@@ -3429,6 +3499,7 @@ export class GroupRoomManager {
     this.chatHistory = [];
     this.reservedChatOrder = 0;
     this.fileSources.clear();
+    await Promise.allSettled([...this.fileSessions.keys()].map(id => cancelDirectFile(id)));
     await Promise.allSettled([...this.fileSessions].filter(([, session]) =>
       session.direction === 'receive' && !session.preview).map(([id]) =>
       invoke('cancel_chat_download', { id })));

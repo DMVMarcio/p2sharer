@@ -21,7 +21,7 @@ struct Download { temp: PathBuf, destination: PathBuf, file: File, size: u64, wr
 #[serde(rename_all = "camelCase")]
 pub struct FileInfo { id: String, name: String, path: String, size: u64, hash: String, is_image: bool }
 
-fn random_id() -> Result<String, String> {
+pub(crate) fn random_id() -> Result<String, String> {
     let mut bytes = [0u8; 16];
     getrandom::getrandom(&mut bytes).map_err(|e| e.to_string())?;
     Ok(bytes.iter().map(|b| format!("{b:02x}")).collect())
@@ -144,6 +144,21 @@ async fn read_source_chunk(state: &ChatFileState, id: &str, offset: u64,
     }).await.map_err(|e| e.to_string())?
 }
 
+pub(crate) fn open_direct_source(state: &ChatFileState, id: &str, size: u64) -> Result<File, String> {
+    let path = state.sources.lock().map_err(|e| e.to_string())?.get(id).cloned().ok_or("Source unavailable")?;
+    let file = File::open(path).map_err(|e| e.to_string())?;
+    let metadata = file.metadata().map_err(|e| e.to_string())?;
+    if !metadata.is_file() || size > MAX_FILE || metadata.len() != size { return Err("Source size changed".into()); }
+    Ok(file)
+}
+
+pub(crate) fn validate_direct_download(state: &ChatFileState, id: &str, size: u64) -> Result<(), String> {
+    let downloads = state.downloads.lock().map_err(|e| e.to_string())?;
+    let download = downloads.get(id).ok_or("Download unavailable")?;
+    if download.written != 0 || download.size != size { return Err("Invalid direct download".into()); }
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn choose_chat_download(state: State<'_, ChatFileState>, id: String, name: String, size: u64,
     hash: String, save_as: bool) -> Result<bool, String> {
@@ -194,7 +209,7 @@ pub async fn write_chat_download_bytes(state: State<'_, ChatFileState>, request:
     write_download_bytes(&state, id, offset, bytes)
 }
 
-fn write_download_bytes(state: &ChatFileState, id: &str, offset: u64, bytes: &[u8]) -> Result<u64, String> {
+pub(crate) fn write_download_bytes(state: &ChatFileState, id: &str, offset: u64, bytes: &[u8]) -> Result<u64, String> {
     if bytes.is_empty() || bytes.len() > CHUNK { return Err("Invalid chunk size".into()); }
     let mut downloads = state.downloads.lock().map_err(|e| e.to_string())?;
     let download = downloads.get_mut(id).ok_or("Download unavailable")?;

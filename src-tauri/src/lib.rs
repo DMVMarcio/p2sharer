@@ -8,6 +8,7 @@ mod media_diagnostics;
 pub mod note_files;
 pub mod youtube_playlist;
 pub mod chat_files;
+mod chat_file_direct;
 pub mod pip_manager;
 pub mod stream_pointer;
 pub mod process_manager;
@@ -107,6 +108,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_deep_link::init())
         .manage(ChatFileState::default())
+        .manage(chat_file_direct::DirectFileState::default())
         .manage(shared_browser::BrowserState::default())
         .manage(profile_image::ProfileImageState::default())
         .manage(lan_signaling::LanSignalingState::default())
@@ -246,6 +248,9 @@ pub fn run() {
             inspect_chat_file,
             read_chat_file_chunk,
             read_chat_file_bytes,
+            chat_file_direct::offer_direct_chat_file,
+            chat_file_direct::receive_direct_chat_file,
+            chat_file_direct::cancel_direct_chat_file,
             write_chat_download_bytes,
             choose_chat_download,
             write_chat_download_chunk,

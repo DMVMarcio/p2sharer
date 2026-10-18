@@ -6,6 +6,44 @@ import { GroupRoomManager } from '../../src/p2p/group_room.ts';
 import { CHAT_FILE_CHUNK_BYTES, MAX_IMAGE_PREVIEW_BYTES } from '../../src/core/chat_file_limits.ts';
 import { profileStats } from '../../src/core/profile_stats.ts';
 
+test('transport details follow each transfer and ignore a stale query after switching to native TLS', async () => {
+  const dom = setupTestDOM();
+  const service = RoomService.getInstance() as any;
+  const previous = { manager: service.roomManager, progress: service.fileProgress,
+    routes: service.transferRouteChecks, rates: service.transferRates };
+  try {
+    const pending: Array<(value: any) => void> = [];
+    const queries: string[] = [];
+    service.roomManager = { getFileTransportDiagnostics: async (_peer: string, request: string) => {
+      queries.push(request);
+      return new Promise(resolve => pending.push(resolve));
+    } };
+    service.fileProgress = {};
+    service.transferRouteChecks = new Map();
+    service.transferRates = new Map();
+    const progress = { requestId: 'transport-test', messageId: 'message', peerId: 'peer',
+      direction: 'receive', status: 'active', bytes: 0, total: 100 };
+    service.recordFileProgress({ ...progress, nativeDirect: false,
+      timings: { readMs: 0, prepareMs: 0, wireMs: 0, verifyMs: 10, writeMs: 20, ackMs: 30 } });
+    service.recordFileProgress({ ...progress, nativeDirect: true, bytes: 20 });
+    assert.deepEqual(queries, ['transport-test', 'transport-test']);
+    pending[1]({ transport: { protocol: 'TLS/TCP' }, rttMs: 5, connectionType: 'direct' });
+    await new Promise(resolve => setImmediate(resolve));
+    pending[0]({ transport: { protocol: 'udp' }, rttMs: 5, connectionType: 'direct' });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(service.fileProgress['transport-test'].transport.protocol, 'TLS/TCP');
+    assert.equal(service.fileProgress['transport-test'].timings, undefined);
+    service.recordFileProgress({ ...progress, nativeDirect: false, bytes: 30 });
+    pending[2]({ transport: { protocol: 'udp' }, rttMs: 5, connectionType: 'direct' });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(service.fileProgress['transport-test'].transport.protocol, 'udp');
+  } finally {
+    service.roomManager = previous.manager; service.fileProgress = previous.progress;
+    service.transferRouteChecks = previous.routes; service.transferRates = previous.rates;
+    dom.cleanup();
+  }
+});
+
 test('saving a verified image preview writes cached bytes without contacting its author', async () => {
   const dom = setupTestDOM();
   const service = RoomService.getInstance() as any;
