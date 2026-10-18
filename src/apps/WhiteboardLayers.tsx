@@ -8,9 +8,9 @@ import { t } from '../i18n';
 import type { BoardLayer, BoardShape } from './whiteboard_scene';
 import { WhiteboardLayerPreview } from './WhiteboardLayerPreview';
 
-export function WhiteboardLayers({ layers, shapes, active, onActivate, onChange, onDelete, onAdd, onReorder }: {
+export function WhiteboardLayers({ layers, shapes, active, onActivate, onChange, onDelete, onAdd, onReorder, imageHref }: {
   layers: BoardLayer[]; shapes: BoardShape[]; active: string; onActivate(id: string): void; onChange(layer: BoardLayer): void;
-  onDelete(id: string): void; onAdd(): void; onReorder(ids: string[]): void;
+  onDelete(id: string): void; onAdd(): void; onReorder(ids: string[]): void; imageHref?: (hash: string) => string | undefined;
 }) {
   const overlay = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(true);
@@ -38,7 +38,7 @@ export function WhiteboardLayers({ layers, shapes, active, onActivate, onChange,
         onClick={event => { if (!(event.target as HTMLElement).closest('button, input')) onActivate(id); }}
         className={`whiteboard-layer ${active === id ? 'selected' : ''} ${sorting.draggingId === id ? 'is-dragging' : ''}`}>
         <TooltipButton className="whiteboard-layer-select" tooltip={t('whiteboard.selectLayer', { name: layerName(layer) })}
-          aria-pressed={active === id} onClick={() => onActivate(id)}><WhiteboardLayerPreview shapes={shapes} layer={layer} /></TooltipButton>
+          aria-pressed={active === id} onClick={() => onActivate(id)}><WhiteboardLayerPreview shapes={shapes} layer={layer} imageHref={imageHref} /></TooltipButton>
         <div className="whiteboard-layer-body">
           {renaming === id ? <input autoComplete="off" autoFocus className="text-input-sm whiteboard-layer-name-input" aria-label={t('whiteboard.renameLayer')} value={name} maxLength={80}
             onChange={event => setName(event.target.value)} onBlur={() => commit(layer)} onKeyDown={event => {

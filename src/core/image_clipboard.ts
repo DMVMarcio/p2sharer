@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
-import { t } from '../i18n';
-import { showToast } from '../hooks/useToast';
+import { t } from '../i18n/index.ts';
+import { showToast } from '../hooks/useToast.ts';
 
 /**
  * Converts a data URL, blob URL, or remote URL into a base64 data string.

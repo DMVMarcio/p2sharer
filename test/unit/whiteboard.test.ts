@@ -3,8 +3,8 @@ import test from 'node:test';
 import * as Y from 'yjs';
 import { WhiteboardModel } from '../../src/apps/whiteboard_model.ts';
 import { encodeUpdate } from '../../src/apps/models.ts';
-import { boardSvg, brushPath, shapeBounds, hitBoardShape, hitBoardLayer, boardBrushWidth, DEFAULT_BOARD_LAYER, parseBoardFile, type BoardShape } from '../../src/apps/whiteboard_scene.ts';
-import { BOARD_WIDTH, BOARD_HEIGHT, BrushStabilizer, boardContains, clampBoardPoint, clampBoardViewport, containBoardShape } from '../../src/apps/whiteboard_interaction.ts';
+import { boardSvg, brushPath, shapeBounds, hitBoardShape, hitBoardLayer, boardBrushWidth, DEFAULT_BOARD_LAYER, parseBoardFile, hasVariablePressure, type BoardShape } from '../../src/apps/whiteboard_scene.ts';
+import { BOARD_WIDTH, BOARD_HEIGHT, BrushStabilizer, boardContains, clampBoardPoint, clampBoardViewport, containBoardShape, resizeBoardBounds } from '../../src/apps/whiteboard_interaction.ts';
 
 function shape(overrides: Partial<BoardShape> = {}): BoardShape {
   return { id: crypto.randomUUID(), tool: 'rectangle', points: [{ x: 10, y: 20 }, { x: 110, y: 120 }],
@@ -164,5 +164,63 @@ test('layers group paint, move as one, reorder, rename and preserve per-layer er
       assert.equal(legacy.model.layers.length, 1);
       assert.equal(parseBoardFile(legacy.model.content).version, 2);
     } finally { legacy.model.destroy(); }
+  } finally { a.model.destroy(); b.model.destroy(); }
+});
+
+test('unlimited stroke length splits seamlessly, preserves single-step undo, and supports brush types, opacity, and stylus pressure', () => {
+  const a = peer('a');
+  try {
+    const longPoints = Array.from({ length: 9000 }, (_, i) => ({
+      x: (i * 3) % BOARD_WIDTH,
+      y: Math.floor((i * 3) / BOARD_WIDTH) * 20 + 20,
+      p: 0.25 + ((i % 10) / 15),
+    }));
+    const stroke = shape({ tool: 'brush', brushType: 'pencil', opacity: 60, points: longPoints });
+    a.model.put(stroke);
+    assert.equal(a.model.shapes.length, 3);
+    const groupId = a.model.shapes[0].groupId;
+    assert.ok(groupId);
+    assert.ok(a.model.shapes.every(s => s.groupId === groupId && s.brushType === 'pencil' && s.opacity === 60));
+    assert.equal(hasVariablePressure(a.model.shapes[0]), true);
+    const outline = brushPath(a.model.shapes[0]);
+    assert.ok(outline.endsWith('Z'));
+    const svg = boardSvg(a.model.shapes, a.model.layers);
+    assert.match(svg, /<g opacity="0\.\d+">/);
+    a.model.undo();
+    assert.equal(a.model.shapes.length, 0);
+  } finally { a.model.destroy(); }
+});
+
+test('layers resize and stretch freely or proportionally with Shift, and validate P2P pasted images', async () => {
+  const a = peer('a'), b = peer('b');
+  try {
+    a.model.setParticipants(['b']);
+    b.model.setParticipants(['a']);
+    const box = { x: 100, y: 100, width: 200, height: 100 };
+    const stretched = resizeBoardBounds(box, 'se', { x: 400, y: 400 }, false);
+    assert.equal(stretched.width, 300);
+    assert.equal(stretched.height, 300);
+    const proportional = resizeBoardBounds(box, 'se', { x: 400, y: 400 }, true);
+    assert.equal(Math.round((proportional.width / proportional.height) * 100), 200);
+
+    // 1x1 valid transparent PNG
+    const pngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==';
+    const raw = Uint8Array.from(Buffer.from(pngBase64, 'base64'));
+    const digest = await crypto.subtle.digest('SHA-256', raw);
+    const sha256 = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+
+    const initialBox = { x: 500, y: 500, width: 100, height: 100 };
+    const layerId = a.model.pasteImage({ hash: sha256, data: pngBase64, width: 1, height: 1 }, initialBox, DEFAULT_BOARD_LAYER);
+    assert.equal(layerId, DEFAULT_BOARD_LAYER);
+    a.model.resizeLayer(layerId, initialBox, { x: 400, y: 400, width: 300, height: 150 });
+    assert.equal(a.model.shapes[0].scaleX, 3);
+    assert.equal(a.model.shapes[0].scaleY, 1.5);
+
+    for (const msg of a.messages) b.model.apply(msg, 'a', false);
+    assert.equal(b.model.shapes.length, 1);
+    for (const msg of b.messages) a.model.apply(msg, 'b', false);
+    for (const msg of a.messages.slice(-2)) b.model.apply(msg, 'a', false);
+    await new Promise(resolve => setTimeout(resolve, 30));
+    assert.equal(b.model.imageUrl(sha256), `data:image/png;base64,${pngBase64}`);
   } finally { a.model.destroy(); b.model.destroy(); }
 });

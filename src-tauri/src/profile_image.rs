@@ -616,6 +616,154 @@ pub async fn load_profile_image(
     Ok(Some(profile))
 }
 
+const WHITEBOARD_MAX_SIDE: u32 = 1920;
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct WhiteboardImage {
+    pub hash: String,
+    pub data: String,
+    pub width: u32,
+    pub height: u32,
+}
+
+fn normalize_whiteboard_frames(
+    mut frames: Vec<(RgbaImage, image::Delay)>,
+    plays: u32,
+) -> Result<WhiteboardImage, String> {
+    if frames.is_empty() {
+        return Err("Image has no frames".into());
+    }
+    let (w, h) = frames[0].0.dimensions();
+    if w == 0 || h == 0 {
+        return Err("Image dimensions exceed safety limits".into());
+    }
+    if w > WHITEBOARD_MAX_SIDE || h > WHITEBOARD_MAX_SIDE {
+        let scale = (f64::from(WHITEBOARD_MAX_SIDE) / f64::from(w.max(h))).min(1.0);
+        let nw = ((f64::from(w) * scale).round() as u32).clamp(1, WHITEBOARD_MAX_SIDE);
+        let nh = ((f64::from(h) * scale).round() as u32).clamp(1, WHITEBOARD_MAX_SIDE);
+        for (frame, _) in &mut frames {
+            *frame = image::imageops::resize(frame, nw, nh, image::imageops::FilterType::Lanczos3);
+        }
+    }
+    let (width, height) = frames[0].0.dimensions();
+    let bytes = encode(&frames, plays)?;
+    let hash = format!("{:x}", Sha256::digest(&bytes));
+    Ok(WhiteboardImage {
+        hash,
+        data: STANDARD.encode(bytes),
+        width,
+        height,
+    })
+}
+
+fn process_whiteboard_bytes(bytes: &[u8]) -> Result<WhiteboardImage, String> {
+    let _guard = IMAGE_WORK.lock().map_err(|e| e.to_string())?;
+    let (frames, plays) = decode(bytes, None)?;
+    normalize_whiteboard_frames(frames, plays)
+}
+
+fn validate_whiteboard_bytes(bytes: &[u8], hash: &str) -> Result<WhiteboardImage, String> {
+    if hash.len() != 64 || !hash.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err("Invalid image".into());
+    }
+    if bytes.len() > OUTPUT_LIMIT || format!("{:x}", Sha256::digest(bytes)) != hash {
+        return Err("Invalid image".into());
+    }
+    let (format, width, height) = inspect(bytes)?;
+    if format != ImageFormat::Png
+        || width == 0
+        || height == 0
+        || width > WHITEBOARD_MAX_SIDE
+        || height > WHITEBOARD_MAX_SIDE
+    {
+        return Err("Image dimensions exceed safety limits".into());
+    }
+    let _guard = IMAGE_WORK.lock().map_err(|e| e.to_string())?;
+    decode(bytes, None)?;
+    Ok(WhiteboardImage {
+        hash: hash.to_owned(),
+        data: STANDARD.encode(bytes),
+        width,
+        height,
+    })
+}
+
+#[tauri::command]
+pub async fn paste_whiteboard_image(data: Option<String>) -> Result<WhiteboardImage, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        if let Some(raw) = data {
+            let encoded = raw
+                .split_once(";base64,")
+                .map(|(_, body)| body)
+                .unwrap_or(raw.as_str())
+                .trim();
+            if encoded.is_empty() || encoded.len() > INPUT_LIMIT.div_ceil(3) * 4 {
+                return Err("Image exceeds the 32 MB limit".into());
+            }
+            let bytes = STANDARD.decode(encoded).map_err(|_| "Invalid image")?;
+            return process_whiteboard_bytes(&bytes);
+        }
+        let mut clipboard = arboard::Clipboard::new().map_err(|e| e.to_string())?;
+        if let Ok(paths) = clipboard.get().file_list() {
+            if let Some(path) = paths.into_iter().next() {
+                let mut bytes = Vec::new();
+                std::fs::File::open(path)
+                    .map_err(|e| e.to_string())?
+                    .take(INPUT_LIMIT as u64 + 1)
+                    .read_to_end(&mut bytes)
+                    .map_err(|e| e.to_string())?;
+                return process_whiteboard_bytes(&bytes);
+            }
+        }
+        let pixels = match clipboard.get_image() {
+            Ok(pixels) => pixels,
+            Err(arboard::Error::ContentNotAvailable) => {
+                return Err("whiteboard.noClipboardImage".into())
+            }
+            Err(error) => return Err(error.to_string()),
+        };
+        let width = u32::try_from(pixels.width).map_err(|_| "Image dimensions exceed safety limits")?;
+        let height = u32::try_from(pixels.height).map_err(|_| "Image dimensions exceed safety limits")?;
+        if width == 0
+            || height == 0
+            || width > 8192
+            || height > 8192
+            || u64::from(width) * u64::from(height) > 16 * 1024 * 1024
+        {
+            return Err("Image dimensions exceed safety limits".into());
+        }
+        let image = RgbaImage::from_raw(width, height, pixels.bytes.into_owned())
+            .ok_or("Invalid image")?;
+        let _guard = IMAGE_WORK.lock().map_err(|e| e.to_string())?;
+        normalize_whiteboard_frames(
+            vec![(image, image::Delay::from_numer_denom_ms(0, 1))],
+            1,
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn validate_whiteboard_image(
+    data: String,
+    hash: String,
+) -> Result<WhiteboardImage, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let encoded = data
+            .strip_prefix("data:image/png;base64,")
+            .unwrap_or(data.as_str())
+            .trim();
+        if encoded.is_empty() || encoded.len() > OUTPUT_LIMIT.div_ceil(3) * 4 {
+            return Err("Image exceeds the 32 MB limit".into());
+        }
+        let bytes = STANDARD.decode(encoded).map_err(|_| "Invalid image")?;
+        validate_whiteboard_bytes(&bytes, &hash)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1027,5 +1175,36 @@ mod tests {
         let mut broken = encode(&[frame(8, 8, [255, 0, 0, 255], 0)], 1).unwrap();
         broken.truncate(40);
         assert!(decode(&broken, None).is_err());
+    }
+
+    #[tokio::test]
+    async fn whiteboard_images_preserve_aspect_downscale_large_inputs_and_validate_hashes() {
+        let mut jpeg = Cursor::new(Vec::new());
+        image::DynamicImage::ImageRgba8(frame(2400, 1200, [30, 120, 220, 255], 0).0)
+            .to_rgb8()
+            .write_to(&mut jpeg, ImageFormat::Jpeg)
+            .unwrap();
+        let data = format!(
+            "data:image/jpeg;base64,{}",
+            STANDARD.encode(jpeg.into_inner())
+        );
+        let prepared = paste_whiteboard_image(Some(data)).await.unwrap();
+        assert_eq!((prepared.width, prepared.height), (1920, 960));
+        let validated = validate_whiteboard_image(prepared.data.clone(), prepared.hash.clone())
+            .await
+            .unwrap();
+        assert_eq!(validated, prepared);
+        assert!(
+            validate_whiteboard_image(prepared.data.clone(), "0".repeat(64))
+                .await
+                .is_err()
+        );
+        let oversized = encode(&[frame(1921, 10, [0, 0, 0, 255], 0)], 1).unwrap();
+        let oversized_hash = format!("{:x}", Sha256::digest(&oversized));
+        assert!(
+            validate_whiteboard_image(STANDARD.encode(oversized), oversized_hash)
+                .await
+                .is_err()
+        );
     }
 }

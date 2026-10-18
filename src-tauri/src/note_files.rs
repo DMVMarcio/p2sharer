@@ -1,4 +1,4 @@
-const MAX_NOTE_BYTES: usize = 2_000_000;
+const MAX_NOTE_BYTES: usize = 16_000_000;
 const MAX_PNG_DATA_URL_BYTES: usize = 64_000_000;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use serde::{Deserialize, Serialize};

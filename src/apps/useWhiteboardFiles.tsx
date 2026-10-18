@@ -90,7 +90,7 @@ export function useWhiteboardFiles(model: WhiteboardModel | undefined, instanceI
       }}
       onExport={async format => {
         if (!model) return;
-        const content = format === 'png' ? await boardPng(model.shapes, model.layers) : format === 'svg' ? boardSvg(model.shapes, model.layers) : model.content;
+        const content = format === 'png' ? await boardPng(model.shapes, model.layers, model.images) : format === 'svg' ? boardSvg(model.shapes, model.layers, false, model.images) : model.content;
         if (await invoke<boolean>('save_note_file', { library: 'whiteboard', content, format, language: getLanguage() }))
           showToast(t('whiteboard.exported'), 3500, 'success');
       }} onClose={() => setDialog(null)} />}

@@ -37,8 +37,8 @@ export function encodeUpdate(update: Uint8Array): string {
   return btoa(binary);
 }
 
-export function decodeUpdate(value: unknown): Uint8Array | null {
-  if (typeof value !== 'string' || value.length > MAX_UPDATE * 1.4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(value)) return null;
+export function decodeUpdate(value: unknown, maxBytes = MAX_UPDATE): Uint8Array | null {
+  if (typeof value !== 'string' || value.length > maxBytes * 1.4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(value)) return null;
   try { return Uint8Array.from(atob(value), (char) => char.charCodeAt(0)); }
   catch { return null; }
 }
