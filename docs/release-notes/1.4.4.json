@@ -1,0 +1,135 @@
+{
+  "version": "1.4.4",
+  "translations": {
+    "en": [
+      "**Short invitations.** Share just the room code when someone is online, or use a full signed invitation. Saving the room keeps its verified details for future visits.",
+      "**Room entry.** Fixed joining getting stuck after leaving and returning with the same device. Previewing participants no longer creates a room card before joining.",
+      "**Room and chat experience.** Opening the chat tab now preserves your scroll position instantly without top-down scrolling, stream cards in grid mode always display the broadcaster overlay, the spotlight bottom tray now supports horizontal mouse wheel scrolling, and chat text, emojis, avatars, and sidebar controls have been refined.",
+      "**Whiteboard.** Choose between Pencil, Pen, and Brush with adjustable opacity, stylus pressure sensitivity, unlimited stroke length, and full layer resizing and stretching (hold Shift to keep proportions). You can now also securely paste images onto the canvas and paint or erase directly over them.",
+      "**Notepad.** Insert images securely from local files, links, clipboard paste, or drag and drop, with interactive resizing and aspect-ratio locking. Right-click inside tables to insert rows above/below, insert columns before/after, or delete rows and columns.",
+      "**Window restoration.** Reopening the application while maximized now seamlessly fills the display without leaving a bottom border or gap.",
+      "**Text selection.** Opening an editor’s context menu now preserves selected text for copying, cutting, and editing.",
+      "**Audio filters.** Improved application detection to prevent freezes when choosing which apps to include or exclude from audio capture."
+    ],
+    "pt-BR": [
+      "**Convites curtos.** Compartilhe apenas o código da sala quando houver alguém online ou use um convite assinado completo. Salvar a sala preserva os dados verificados para as próximas entradas.",
+      "**Entrada nas salas.** Corrigimos o travamento ao sair e voltar com o mesmo dispositivo. Consultar os participantes não cria mais um card na sala antes de entrar.",
+      "**Experiência na sala e chat.** A troca para a aba de chat agora preserva a posição do scroll instantaneamente sem rolar do topo, cards de transmissão no modo grade exibem sempre o overlay do apresentador, a barra inferior do modo foco agora suporta scroll horizontal com a roda do mouse, e textos, emojis, avatares e botão lateral foram aprimorados.",
+      "**Quadro branco.** Escolha entre Lápis, Caneta e Pincel com controle de opacidade, suporte à pressão da caneta em mesas digitalizadoras, traços sem limite de comprimento e redimensionamento ou esticamento livre de camadas (segure Shift para manter a proporção). Agora também é possível colar imagens com segurança no quadro e desenhar ou apagar diretamente sobre elas.",
+      "**Bloco de Notas.** Insira imagens com segurança a partir de arquivos, links, Ctrl+V ou arrastar e soltar, com redimensionamento interativo e bloqueio de proporção. Clique com o botão direito em tabelas para adicionar linhas acima/abaixo, colunas antes/depois ou excluir linhas e colunas.",
+      "**Restauração da janela.** Reabrir o aplicativo maximizado agora preenche a tela perfeitamente sem deixar uma borda ou vão na parte inferior.",
+      "**Seleção de texto.** Abrir o menu de contexto de um editor agora preserva o texto selecionado para copiar, recortar e editar.",
+      "**Filtros de áudio.** Melhoramos a identificação de aplicativos para evitar travamentos ao escolher quais incluir ou excluir da captura de áudio."
+    ],
+    "es": [
+      "**Invitaciones cortas.** Comparte solo el código de la sala cuando haya alguien en línea o usa una invitación firmada completa. Guardar la sala conserva sus datos verificados para futuras visitas.",
+      "**Entrada a las salas.** Corregimos el bloqueo al salir e volver con el mismo dispositivo. Consultar los participantes ya no crea una tarjeta en la sala antes de entrar.",
+      "**Experiencia en la sala y chat.** Cambiar a la pestaña de chat ahora conserva la posición del scroll al instante sin desplazarse desde el inicio, las tarjetas de transmisión en modo cuadrícula siempre muestran el overlay del presentador, la bandeja inferior del modo foco admite desplazamiento horizontal con la rueda del ratón y se mejoraron textos, emojis, avatares y el botón lateral.",
+      "**Pizarra.** Elige entre Lápiz, Pluma y Pincel con opacidad ajustable, sensibilidad a la presión del lápiz óptico, trazos sin límite de longitud y cambio de tamaño o estiramiento de capas (mantén pulsado Shift para conservar la proporción). Ahora también puedes pegar imágenes de forma segura en el lienzo y dibujar o borrar sobre ellas.",
+      "**Bloc de notas.** Inserta imágenes de forma segura desde archivos, enlaces, Ctrl+V o arrastrar y soltar, con cambio de tamaño interactivo y bloqueo de proporciones. Haz clic derecho en las tablas para añadir filas arriba/abajo, columnas antes/después o eliminar filas y columnas.",
+      "**Restauración de la ventana.** Reabrir la aplicación maximizada ahora cubre toda la pantalla perfectamente sin dejar un borde o espacio en la parte inferior.",
+      "**Selección de texto.** Abrir el menú contextual de un editor ahora conserva el texto seleccionado para copiarlo, cortarlo y editarlo.",
+      "**Filtros de audio.** Mejoramos la detección de aplicaciones para evitar bloqueos al elegir cuáles incluir o excluir de la captura de audio."
+    ],
+    "fr": [
+      "**Invitations courtes.** Partagez uniquement le code du salon lorsqu’une personne est en ligne, ou utilisez une invitation signée complète. Enregistrer le salon conserve ses informations vérifiées pour vos prochaines visites.",
+      "**Entrée dans les salons.** Correction du blocage après avoir quitté puis rejoint un salon avec le même appareil. Consulter les participants ne crée plus de carte dans le salon avant d’y entrer.",
+      "**Expérience de salon et chat.** Passer à l’onglet de chat conserve instantanément votre position de défilement sans défiler depuis le haut, les cartes de diffusion en mode grille affichent toujours l’overlay du présentateur, la barre inférieure du mode projecteur prend désormais en charge le défilement horizontal avec la molette de la souris, et les textes, emojis, avatars et commandes latérales ont été affinés.",
+      "**Tableau blanc.** Choisissez entre Crayon, Stylo et Pinceau avec opacité réglable, prise en charge de la pression du stylet, longueur de trait illimitée et redimensionnement ou étirement des calques (maintenez Maj pour conserver les proportions). Vous pouvez aussi coller des images en toute sécurité sur la toile et dessiner ou gommer dessus.",
+      "**Bloc-notes.** Insérez des images en toute sécurité depuis des fichiers, des liens, Ctrl+V ou par glisser-déposer, avec redimensionnement interactif et verrouillage des proportions. Cliquez avec le bouton droit dans les tableaux pour ajouter des lignes au-dessus/en dessous, des colonnes avant/après ou supprimer des lignes et colonnes.",
+      "**Restauration de la fenêtre.** La réouverture de l’application en mode maximisé remplit désormais parfaitement l’écran sans laisser de bordure ou d’espace en bas.",
+      "**Sélection de texte.** L’ouverture du menu contextuel d’un éditeur conserve désormais le texte sélectionné pour le copier, le couper et le modifier.",
+      "**Filtres audio.** Détection des applications améliorée pour éviter les blocages lors du choix des applications à inclure ou à exclure de la capture audio."
+    ],
+    "de": [
+      "**Kurze Einladungen.** Teile nur den Raumcode, wenn jemand online ist, oder nutze eine vollständige signierte Einladung. Beim Speichern des Raums bleiben die geprüften Daten für spätere Besuche erhalten.",
+      "**Räumen beitreten.** Ein Hängenbleiben beim Verlassen und erneuten Beitritt mit demselben Gerät wurde behoben. Die Teilnehmervorschau erstellt vor dem Beitritt keine Teilnehmerkarte mehr im Raum.",
+      "**Raum- und Chat-Erlebnis.** Beim Wechsel zum Chat-Tab bleibt die Scroll-Position sofort ohne Scrollen von oben erhalten, Streaming-Karten im Rastermodus zeigen immer das Moderator-Overlay an, die untere Leiste im Fokusmodus unterstützt horizontales Scrollen mit dem Mausrad, und Texte, Emojis, Avataare und Seitenleisten-Steuerungen wurden verfeinert.",
+      "**Whiteboard.** Wähle zwischen Bleistift, Stift und Pinsel mit einstellbarer Deckkraft, Stiftdruckunterstützung, unbegrenzter Strichlänge sowie freiem Skalieren und Strecken von Ebenen (Umschalttaste hält das Seitenverhältnis). Bilder lassen sich jetzt außerdem sicher einfügen, übermalen und radieren.",
+      "**Notizblock.** Bilder lassen sich sicher aus Dateien, Links, per Zwischenablage oder Drag-and-Drop einfügen, mit interaktiver Skalierung und Seitenverhältnis-Sperre. Über das Kontextmenü in Tabellen können Zeilen oben/unten, Spalten davor/danach hinzugefügt sowie Zeilen und Spalten gelöscht werden.",
+      "**Fensterwiederherstellung.** Beim erneuten Öffnen der maximierten Anwendung füllt diese den Bildschirm wieder nahtlos aus, ohne einen unteren Rand oder Spalt zu hinterlassen.",
+      "**Textauswahl.** Beim Öffnen des Kontextmenüs eines Editors bleibt der ausgewählte Text zum Kopieren, Ausschneiden und Bearbeiten erhalten.",
+      "**Audiofilter.** Verbesserte Anwendungserkennung verhindert Hänger bei der Auswahl von Apps, die in die Audioaufnahme einbezogen oder davon ausgeschlossen werden."
+    ],
+    "it": [
+      "**Inviti brevi.** Condividi solo il codice della stanza quando qualcuno è online oppure usa un invito firmato completo. Salvando la stanza conservi i dati verificati per gli accessi futuri.",
+      "**Ingresso nelle stanze.** Risolto il blocco dopo essere usciti e tornati con lo stesso dispositivo. Consultare i partecipanti non crea più una scheda nella stanza prima di entrare.",
+      "**Esperienza in stanza e chat.** Il passaggio alla scheda chat conserva istantaneamente la posizione di scorrimento senza scorrere dall'alto, le schede di trasmissione in modalità griglia mostrano sempre l'overlay del relatore, la barra inferiore della modalità focus supporta lo scorrimento orizzontale con la rotellina del mouse, e testi, emoji, avatar e controlli laterali sono stati perfezionati.",
+      "**Lavagna.** Scegli tra Matita, Penna e Pennello con opacità regolabile, sensibilità alla pressione della penna, lunghezza del tratto illimitata e ridimensionamento o allungamento dei livelli (tieni premuto Maiusc per mantenere le proporzioni). Ora puoi anche incollare immagini in modo sicuro sulla tela e disegnarci o cancellarci sopra.",
+      "**Blocco note.** Inserisci immagini in modo sicuro da file, link, incolla o trascinamento, con ridimensionamento interattivo e blocco delle proporzioni. Fai clic destro nelle tabelle per inserire righe sopra/sotto, colonne prima/dopo o eliminare righe e colonne.",
+      "**Ripristino della finestra.** La riapertura dell'applicazione ingrandita ora riempie perfettamente lo schermo senza lasciare un bordo o spazio inferiore.",
+      "**Selezione del testo.** L’apertura del menu contestuale di un editor ora mantiene il testo selezionato per copiarlo, tagliarlo e modificarlo.",
+      "**Filtri audio.** Rilevamento delle applicazioni migliorato per evitare blocchi quando si scelgono le app da includere o escludere dalla cattura audio."
+    ],
+    "zh-CN": [
+      "**短邀请。** 有人在线时，只需分享房间代码，也可使用完整的签名邀请。保存房间会保留已验证的信息，供下次加入使用。",
+      "**加入房间。** 修复了使用同一设备离开后再次加入时卡住的问题。查看参与者不再在正式加入前创建房间成员卡片。",
+      "**房间与聊天体验。** 切换至聊天标签页时将立即保持之前的滚动位置而无需从顶部滚动，网格模式下的直播卡片始终显示主播信息覆盖层，焦点模式底栏现已支持鼠标滚轮横向滚动，并优化了文字、表情、头像和侧边栏控件。",
+      "**白板。** 支持在铅笔、钢笔和画笔之间切换，提供不透明度调节、压感笔支持、无限制笔画长度以及图层缩放与拉伸（按住 Shift 保持比例）。现在还可以安全地将图片粘贴到画布上并直接涂画或擦除。",
+      "**记事本。** 支持从本地文件、链接、剪贴板粘贴或拖放安全插入图片，并支持交互缩放与锁定比例。右键单击表格即可在上方/下方添加行、在前面/后面添加列或删除行与列。",
+      "**窗口恢复。** 最大化状态下重新打开应用程序时，窗口现在可以完美铺满屏幕，而不会在底部留下边框或间隙。",
+      "**文本选择。** 打开编辑器的右键菜单时，现在会保留已选文本，便于复制、剪切和编辑。",
+      "**音频筛选。** 改善了应用识别，避免在选择要包含或排除的音频采集应用时卡住。"
+    ],
+    "zh-TW": [
+      "**短邀請。** 有人在線上時，只需分享房間代碼，也可使用完整的簽章邀請。儲存房間會保留已驗證的資訊，供下次加入使用。",
+      "**加入房間。** 修正使用同一裝置離開後再次加入時卡住的問題。查看參與者不再於正式加入前建立房間成員卡片。",
+      "**房間與聊天體驗。** 切換至聊天分頁時將立即保留先前的捲動位置而無需從頂部捲動，網格模式下的直播卡片始終顯示實況主資訊覆蓋層，焦點模式底欄現已支援滑鼠滾輪橫向捲動，並最佳化了文字、表情符號、頭像和側邊欄控制項。",
+      "**白板。** 支援在鉛筆、鋼筆和畫筆之間切換，提供不透明度調整、感壓筆支援、無限制筆畫長度以及圖層縮放與拉伸（按住 Shift 保持比例）。現在也可以安全地將圖片貼到畫布上並直接塗畫或擦除。",
+      "**記事本。** 支援從本機檔案、連結、剪貼簿貼上或拖放安全插入圖片，並支援互動縮放與鎖定比例。右鍵點選表格即可在上方/下方新增行、在前面/後面新增列或刪除行與列。",
+      "**視窗還原。** 最大化狀態下重新開啟應用程式時，視窗現在可以完美填滿螢幕，而不會在底部留下邊框或間隙。",
+      "**文字選取。** 開啟編輯器的快顯功能表時，現在會保留已選文字，方便複製、剪下和編輯。",
+      "**音訊篩選。** 改善了應用程式識別，避免在選擇要包含或排除的音訊擷取應用程式時卡住。"
+    ],
+    "ja": [
+      "**短い招待。** オンラインの参加者がいる場合はルームコードだけを共有でき、完全な署名付き招待も使用できます。ルームを保存すると、確認済みの情報を次回以降も使用できます。",
+      "**ルームへの参加。** 同じデバイスで退出してから再参加すると処理が止まる問題を修正しました。参加者を確認するだけでは、入室前にルーム内のカードが表示されなくなりました。",
+      "**ルームとチャットの操作性。** チャットタブへの切り替え時に上からのスクロールなしで前回のスクロール位置が瞬時に復元され、グリッド表示の配信カードで配信者オーバーレイが常時表示されるようになり、スポットライト下部トレイのマウスホイールによる横スクロールに対応し、テキスト、絵文字、アバター、サイドバー操作を洗練しました。",
+      "**ホワイトボード。** 鉛筆・ペン・ブラシの切り替え、不透明度の調整、ペンタブレットの筆圧検知、長さ制限のないストローク、レイヤーの自由な拡大縮小・伸縮（Shiftキーで比率維持）に対応しました。クリップボードから画像を安全に貼り付け、その上から描画や消去も行えます。",
+      "**メモ帳。** ローカルファイル、リンク、貼り付け、ドラッグ＆ドロップから画像を安全に挿入し、サイズの変更や縦横比固定が行えます。表内を右クリックして上/下への行追加、前/後への列追加、行や列の削除を行えます。",
+      "**ウィンドウの復元。** 最大化の状態でアプリを再度開いたときに、下部に枠線や隙間を残さず画面全体にぴったり収まるようになりました。",
+      "**テキストの選択。** エディターのコンテキストメニューを開いても、コピー、切り取り、編集のために選択したテキストが保持されるようになりました。",
+      "**音声フィルター。** アプリの検出を改善し、音声キャプチャに含めるアプリや除外するアプリを選ぶ際に処理が停止する問題を防ぎます。"
+    ],
+    "ko": [
+      "**짧은 초대.** 온라인 참여자가 있으면 방 코드만 공유하거나 전체 서명된 초대를 사용할 수 있습니다. 방을 저장하면 확인된 정보가 다음 방문에도 유지됩니다.",
+      "**방 입장.** 같은 기기로 나간 뒤 다시 입장할 때 멈추는 문제를 수정했습니다. 이제 참여자 목록을 확인하기만 하면 입장 전에 방에 참여자 카드가 표시되지 않습니다.",
+      "**방 및 채팅 환경.** 채팅 탭으로 전환할 때 상단에서 스크롤되지 않고 이전 스크롤 위치가 즉시 유지되며, 그리드 모드의 방송 카드에 항상 발표자 오버레이가 표시되고, 포커스 모드 하단 트레이의 마우스 휠 가로 스크롤 지원 및 텍스트, 이모지, 아바타, 사이드바 컨트롤이 개선되었습니다。",
+      "**화이트보드.** 연필, 펜, 브러시 선택과 불투명도 조절, 펜 압력 감지, 길이 제한 없는 획 그리기, 레이어 크기 조절 및 늘리기(Shift 키로 비율 유지)를 지원합니다. 이제 이미지를 안전하게 붙여넣고 그 위에 바로 그리거나 지울 수도 있습니다.",
+      "**메모장.** 파일, 링크, 클립보드 붙여넣기, 드래그 앤 드롭을 통해 이미지를 안전하게 추가하고 비율 유지 크기 조절을 할 수 있습니다. 표 안에서 우클릭하여 위/아래 행 추가, 앞/뒤 열 추가, 행 및 열 삭제를 할 수 있습니다.",
+      "**창 복원.** 최대화된 상태에서 앱을 다시 열 때 하단에 테두리나 틈새를 남기지 않고 화면에 완벽하게 맞춰집니다.",
+      "**텍스트 선택.** 편집기의 컨텍스트 메뉴를 열어도 복사, 잘라내기 및 편집을 위해 선택한 텍스트가 유지됩니다.",
+      "**오디오 필터.** 오디오 캡처에 포함하거나 제외할 앱을 선택할 때 멈추지 않도록 앱 감지를 개선했습니다."
+    ],
+    "hi": [
+      "**छोटे आमंत्रण।** किसी के ऑनलाइन होने पर केवल रूम कोड साझा करें या पूरा हस्ताक्षरित आमंत्रण इस्तेमाल करें। रूम सहेजने पर सत्यापित जानकारी अगली बार के लिए बनी रहती है।",
+      "**रूम में प्रवेश।** उसी डिवाइस से बाहर निकलकर दोबारा जुड़ने पर प्रक्रिया अटकने की समस्या ठीक की गई। प्रतिभागियों की सूची देखने से अब प्रवेश करने से पहले रूम में कार्ड नहीं बनता।",
+      "**रूम और चैट का अनुभव।** चैट टैब पर स्विच करने पर अब ऊपर से स्क्रॉल हुए बिना अंतिम स्थिति तुरंत सुरक्षित रहती है, ग्रिड मोड में प्रसारण कार्ड पर हमेशा प्रस्तोता ओवरले दिखाई देता है, फ़ोकस मोड की निचली पट्टी अब माउस व्हील से क्षैतिज स्क्रॉल का समर्थन करती है, तथा टेक्स्ट, इमोजी, अवतार और साइडबार नियंत्रणों को परिष्कृत किया गया है।",
+      "**व्हाइटबोर्ड।** समायोज्य अपारदर्शिता के साथ पेंसिल, पेन और ब्रश के बीच चुनें, स्टाइलस दबाव संवेदनशीलता, असीमित स्ट्रोक लंबाई, और परत का आकार बदलने या खींचने (अनुपात बनाए रखने के लिए Shift दबाएँ) का समर्थन। अब आप कैनवास पर सुरक्षित रूप से छवियाँ चिपका सकते हैं और उनके ऊपर चित्र बना या मिटा सकते हैं।",
+      "**नोटपैड।** स्थानीय फ़ाइलों, लिंक, पेस्ट या ड्रैग-एंड-ड्रॉप से सुरक्षित रूप से छवियाँ जोड़ें, जिसमें इंटरैक्टिव आकार बदलना और अनुपात लॉक शामिल है। तालिकाओं में राइट-क्लिक करके ऊपर/नीचे पंक्ति जोड़ें, पहले/बाद में कॉलम जोड़ें, या पंक्तियाँ और कॉलम हटाएँ।",
+      "**विंडो पुनर्स्थापना।** अधिकतम (मैक्सिमाइज्ड) स्थिति में ऐप को फिर से खोलने पर अब नीचे कोई किनारा या अंतर छोड़े बिना स्क्रीन पूरी तरह से भर जाती है।",
+      "**टेक्स्ट चयन।** एडिटर का संदर्भ मेनू खोलने पर अब कॉपी, कट और संपादन के लिए चुना गया टेक्स्ट बरकरार रहता है।",
+      "**ऑडियो फ़िल्टर।** ऑडियो कैप्चर में शामिल या बाहर रखने वाले ऐप चुनते समय रुकावट से बचने के लिए ऐप की पहचान बेहतर की गई है।"
+    ],
+    "fi": [
+      "**Lyhyet kutsut.** Jaa pelkkä huonekoodi, kun joku on verkossa, tai käytä täydellistä allekirjoitettua kutsua. Huoneen tallentaminen säilyttää vahvistetut tiedot tulevia käyntejä varten.",
+      "**Huoneisiin liittyminen.** Korjattu liittymisen jumittuminen poistuttaessa ja palattaessa samalla laitteella. Osallistujien esikatselu ei enää luo huoneeseen osallistujakorttia ennen liittymistä.",
+      "**Huone- ja keskustelukokemus.** Keskusteluvälilehdelle siirtyminen säilyttää selaussijainnin välittömästi ilman ylhäältä alas vieritystä, ruudukkotilan lähetyskortit näyttävät aina esittäjän peittokuvan, kohdistustilan alipalkki tukee nyt vaakavieritystä hiiren rullalla, ja tekstit, emojit, kuvat sekä sivupalkin ohjaimet on hienosäädetty.",
+      "**Valkotaulu.** Valitse lyijykynä, kynä tai sivellin säädettävällä peittävyydellä, kynän paineentunnistuksella, rajoittamattomalla vedon pituudella sekä tasojen vapaalla koon muuttamisella ja venytyksellä (pidä Shift pohjassa säilyttääksesi mittasuhteet). Voit nyt myös liittää kuvia turvallisesti kankaalle sekä piirtää ja pyyhkiä niiden päällä.",
+      "**Muistio.** Lisää kuvia turvallisesti tiedostoista, linkeistä, liittämällä tai vetämällä ja pudottamalla, interaktiivisella koon muuttamisella ja mittasuhteiden lukituksella. Napsauta taulukkoa hiiren kakkospainikkeella lisätäksesi rivejä ylä-/alapuolelle, sarakkeita eteen/jälkeen tai poistaaksesi rivejä ja sarakkeita.",
+      "**Ikkunan palautus.** Suurennettuna uudelleen avattu sovellus täyttää nyt näytön saumattomasti jättämättä alareunaan kehystä tai rakoa.",
+      "**Tekstin valinta.** Editorin pikavalikon avaaminen säilyttää nyt valitun tekstin kopiointia, leikkaamista ja muokkaamista varten.",
+      "**Äänisuodattimet.** Sovellusten tunnistusta on parannettu, jotta äänen kaappaukseen sisällytettävien tai siitä pois jätettävien sovellusten valinta ei jumitu."
+    ],
+    "ru": [
+      "**Короткие приглашения.** Делитесь только кодом комнаты, когда кто-то онлайн, или используйте полное подписанное приглашение. При сохранении комнаты проверенные данные сохраняются для следующих посещений.",
+      "**Вход в комнаты.** Исправлено зависание при выходе и повторном входе с того же устройства. Просмотр участников больше не создаёт карточку в комнате до входа.",
+      "**Улучшения комнаты и чата.** При переключении на вкладку чата позиция прокрутки восстанавливается мгновенно без анимации сверху, карточки трансляций в режиме сетки всегда показывают оверлей ведущего, нижняя панель режима фокуса поддерживает горизонтальную прокрутку колесом мыши, а также улучшены тексты, эмодзи, аватары и боковые элементы управления.",
+      "**Доска.** Выбирайте между карандашом, ручкой и кистью с настраиваемой непрозрачностью, поддержкой нажима пера, неограниченной длиной штриха, а также свободным изменением размера и растяжением слоёв (удерживайте Shift для сохранения пропорций). Теперь на холст можно безопасно вставлять изображения и рисовать или стирать поверх них.",
+      "**Блокнот.** Безопасно вставляйте изображения из файлов, ссылок, буфера обмена или перетаскиванием с интерактивным изменением размера и фиксацией пропорций. Нажмите правой кнопкой мыши внутри таблицы, чтобы добавить строки выше/ниже, столбцы до/после или удалить строки и столбцы.",
+      "**Восстановление окна.** Повторное открытие приложения в развёрнутом виде теперь идеально заполняет экран без появления нижней границы или зазора.",
+      "**Выделение текста.** При открытии контекстного меню редактора выделенный текст теперь сохраняется для копирования, вырезания и редактирования.",
+      "**Аудиофильтры.** Улучшено обнаружение приложений, чтобы избежать зависаний при выборе приложений для включения в захват звука или исключения из него."
+    ]
+  }
+}
