@@ -48,6 +48,7 @@ import { encodePeerPayload, decodePeerPayload } from '../core/peer_payload.ts';
 import { decodeFileBase64, encodeFileBase64 } from '../core/chat_file_wire.ts';
 import { NativeVideoTransport } from './native_video_transport.ts';
 import { MediaCoordinator } from './media_coordinator.ts';
+import { withLocalInterfaceStun } from './interface_stun.ts';
 import { PeerTracker } from './peer_tracker.ts';
 import { signalingManager } from './signaling_manager.ts';
 import { t } from '../i18n/index.ts';
@@ -656,7 +657,7 @@ export class GroupRoomManager {
       console.log(`[P2P] Computed signaling topic: "${this.signalingTopic}"`);
 
       if (this.snapshot?.connection) {
-        // LAN rooms gather host candidates only; public STUN/TURN cannot select an internet route.
+        // LAN rooms exclude public STUN/TURN; same-host interface discovery stays local.
         this.turnConfig = null;
         this.rtcConfig = { iceServers: [], iceTransportPolicy: 'all', iceCandidatePoolSize: 0 };
         await signalingManager.prepareLan(this.snapshot.connection, this.roomId, this.isCreator, (connected) => {
@@ -664,6 +665,7 @@ export class GroupRoomManager {
           else if (this.room) this.callbacks?.onStatusChange(t('lan.signalingRestored'));
         });
       }
+      this.rtcConfig = await withLocalInterfaceStun(this.rtcConfig!);
       if (this.leavePromise) {
         if (this.snapshot?.connection) await signalingManager.leaveRoom();
         return;
@@ -730,6 +732,11 @@ export class GroupRoomManager {
 
   private async reconnectOnNewTransport(): Promise<void> {
     if (!this.callbacks || !this.signalingTopic) return;
+
+    this.rtcConfig = await withLocalInterfaceStun(this.snapshot?.connection
+      ? { iceServers: [], iceTransportPolicy: 'all', iceCandidatePoolSize: 0 }
+      : buildRtcConfiguration(this.turnConfig));
+    if (this.leavePromise) return;
 
     console.log('[P2P] Re-establishing room bindings on new transport...');
     // Replacing the Trystero room closes its old WebRTC channels. Old-room

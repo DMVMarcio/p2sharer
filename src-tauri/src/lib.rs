@@ -37,6 +37,7 @@ mod invitation_routing;
 mod app_updates;
 pub mod portable_update;
 pub mod lan_signaling;
+mod interface_stun;
 pub mod port_tunnel;
 mod peer_payload;
 pub mod virtual_network;
@@ -113,6 +114,7 @@ pub fn run() {
         .manage(shared_browser::BrowserState::default())
         .manage(profile_image::ProfileImageState::default())
         .manage(lan_signaling::LanSignalingState::default())
+        .manage(interface_stun::InterfaceStunState::default())
         .manage(port_tunnel::TunnelState::default())
         .manage(peer_payload::PayloadState::default())
         .manage(virtual_network::VirtualNetworkState::default())
@@ -197,6 +199,7 @@ pub fn run() {
             media_diagnostics::media_diagnostics_enabled,
             media_diagnostics::write_media_diagnostics,
             lan_signaling::list_lan_interfaces,
+            interface_stun::get_interface_stun_servers,
             lan_signaling::start_lan_signaling,
             lan_signaling::stop_lan_signaling,
             lan_signaling::connect_lan_signaling,

@@ -67,10 +67,10 @@ pub struct LanSignalingState {
 #[derive(Serialize)]
 pub struct LanInterface {
     name: String,
-    address: String,
+    pub(crate) address: String,
 }
 
-fn interfaces() -> Vec<LanInterface> {
+pub(crate) fn interfaces() -> Vec<LanInterface> {
     let networks = sysinfo::Networks::new_with_refreshed_list();
     let mut result = Vec::new();
     for (name, network) in &networks {

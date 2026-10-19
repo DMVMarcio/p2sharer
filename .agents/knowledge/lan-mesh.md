@@ -18,9 +18,15 @@ LAN uses signed `p2s5` snapshots containing `{ mode, endpoint, token }`. The tok
 
 `p2p/lan_signaling.ts` adapts native routing to the public `createTopicStrategy` API. `LanRelay` serializes writes, reconnects rendezvous independently, restores subscriptions and cleans up pending joins/listeners. LAN never falls back to public brokers. Signaling status reports LAN in the existing stream diagnostics tag.
 
-Rendezvous WebSocket is unencrypted on an ordinary physical LAN; its capability does not replace TLS. VPN encryption depends on the VPN. WebRTC media/data retains encrypted transport and existing admission/authorization. LAN gathers host candidates with empty STUN/TURN lists in WebView2 and the native RTP sender. ICE may select any reachable local interface, not exclusively the interface selected for rendezvous. A VPN may itself use a relay; a host candidate does not prove a direct physical internet path.
+Rendezvous WebSocket is unencrypted on an ordinary physical LAN; its capability does not replace TLS. VPN encryption depends on the VPN. WebRTC media/data retains encrypted transport and existing admission/authorization. LAN excludes public STUN/TURN servers. ICE may select any reachable local interface, not exclusively the interface selected for rendezvous. A VPN may itself use a relay; a host candidate does not prove a direct physical internet path.
 
 Virtual LANs may not forward mDNS. Startup disables Chromium's `WebRtcHideLocalIpsWithMdns` feature while preserving GPU and preexisting browser flags. Numeric local ICE addresses become visible to signaling peers in both connection modes; private keys remain private and transport encryption remains enabled. Browser flags are runtime-dependent and need real remote WebView2 validation.
+
+## Same-host IPv4 discovery
+
+WebView2 can omit non-default interfaces while microphone/camera permissions remain ungranted. `interface_stun.rs` reuses the assigned-interface inventory and maintains up to 16 ephemeral IPv4 STUN listeners. Each listener accepts binding requests only when the source address equals its own assigned address, validates message boundaries, and returns the observed socket endpoint using XOR-MAPPED-ADDRESS. It never forwards traffic or answers remote-source requests. Listener tasks are reused across joins, removed when their addresses disappear, and aborted when their owner is dropped.
+
+The main-window-only `get_interface_stun_servers` command supplies these same-host endpoints to `p2p/interface_stun.ts` before room negotiation, including previews and signaling transport reconnection. The browser routes its binding requests to each local interface and can advertise the resulting server-reflexive candidate without media permission or capture. Internet configurations retain public STUN/optional TURN; LAN configurations add only same-host discovery. Forced relay skips local discovery entirely. Endpoint discovery failure preserves the existing ICE configuration. This supplements IPv4 candidates; it does not grant media access, bypass VPN/firewall filtering, guarantee Internet NAT traversal, or replace TURN. Native RTP transport retains its existing separate ICE configuration.
 
 ## Validation and manual experiment
 
