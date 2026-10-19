@@ -179,6 +179,11 @@ test('rich editor edits use Tiptap history and preserve the captured selection',
   const unregister = registerTextEditor(editor);
   try {
     editor.commands.setTextSelection({ from: 8, to: 16 });
+    for (const target of [editor.view.dom, editor.view.dom.querySelector('p')]) {
+      assert.equal(captureTextEditing(target).selectedText, 'selected');
+      assert.equal(editor.state.selection.from, 8, 'capturing a menu target must not move the selection');
+      assert.equal(editor.state.selection.to, 16);
+    }
     const session = captureTextEditing(editor.view.dom);
     assert.equal(session.selectedText, 'selected');
     editor.commands.setTextSelection(1);

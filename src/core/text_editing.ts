@@ -34,15 +34,8 @@ export function captureTextEditing(target: EventTarget | null): TextEditingSessi
   if (!source) return null;
   const editor = editors.get(source);
   if (editor && !editor.isDestroyed) {
-    if (target instanceof Node && editor.view.dom.contains(target)) {
-      try {
-        const { from, to } = editor.state.selection;
-        const clickedPos = editor.view.posAtDOM(target, 0);
-        if (typeof clickedPos === 'number' && (from === to || clickedPos < from || clickedPos > to)) {
-          editor.commands.setTextSelection(clickedPos);
-        }
-      } catch {}
-    }
+    // Snapshot the editor's selection; a DOM target identifies an element, not
+    // the pointer's text offset. Mapping its start would collapse valid ranges.
     const initialDocument = editor.state.doc;
     const { from, to } = editor.state.selection;
     const restore = () => {
