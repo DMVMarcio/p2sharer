@@ -1,51 +1,41 @@
 html.web-landing, .web-landing body, .web-landing #root { height: auto; min-height: 100%; overflow: auto; }
 .web-landing body { user-select: text; }
-.site-shell { max-width: 1200px; margin: auto; padding: 0 40px; }
+.site-shell { max-width: 1600px; margin: auto; padding: 0 clamp(24px, 4vw, 64px); }
 .site-shell a { text-decoration: none; }
 .site-header, .site-header nav, .site-brand, .site-actions, .site-footer, .site-footer a { display: flex; align-items: center; gap: 18px; }
-.site-header { min-height: 100px; justify-content: space-between; }
-.site-brand { color: var(--text-primary); font-weight: 800; font-size: 22px; gap: 10px; }
-.site-brand img { width: 32px; height: 32px; object-fit: contain; }
+.site-header { min-height: 88px; justify-content: space-between; }
+.site-brand { color: var(--text-primary); font-weight: 800; font-size: 21px; gap: 10px; }
+.site-brand img { width: 34px; height: 34px; object-fit: contain; }
 .site-header nav { gap: 12px; }
-.site-header nav .custom-select { max-width: 180px; }
-.site-hero { display: grid; grid-template-columns: 1.2fr 1fr; align-items: center; min-height: 620px; gap: 44px; }
-.site-eyebrow { color: var(--accent-color); font-size: 12px; letter-spacing: .13em; text-transform: uppercase; font-weight: 700; margin-bottom: 22px; }
-.site-hero h1 { font-size: clamp(40px, 5vw, 68px); line-height: 1.1; letter-spacing: -.05em; max-width: 720px; margin: 0 0 26px; }
-.site-description { color: var(--text-secondary); font-size: 18px; line-height: 1.8; max-width: 560px; }
-.site-actions { flex-wrap: wrap; margin-top: 30px; }
-.site-note { color: var(--text-muted); font-size: 12px; margin-top: 18px; }
-.site-art { position: relative; display: grid; place-items: center; aspect-ratio: 1; background: radial-gradient(ellipse, var(--accent-subtle), transparent 68%); }
-.site-art > img { width: 66%; filter: drop-shadow(0 20px 45px var(--accent-subtle)); }
-.site-orbit { position: absolute; inset: 8%; border: 1px solid var(--border-subtle); border-radius: 50%; transform: rotate(-16deg); }
-.site-orbit svg { position: absolute; width: 50px; height: 50px; padding: 13px; color: var(--accent-color); background: var(--bg-elevated); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); transform: rotate(16deg); }
-.site-orbit svg:nth-child(1) { top: 4%; left: 8%; }
-.site-orbit svg:nth-child(2) { bottom: 0; left: 24%; }
-.site-orbit svg:nth-child(3) { right: -5%; top: 42%; }
-.site-features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; padding: 16px 0 80px; }
-.site-features article { background: var(--bg-card); border-radius: var(--radius-lg); padding: 30px; box-shadow: var(--shadow-sm); }
-.site-feature-icon { color: var(--accent-color); margin-bottom: 24px; }
-.site-features h2 { font-size: 18px; margin-bottom: 12px; }
-.site-features p, .site-platforms p { color: var(--text-secondary); line-height: 1.8; font-size: 14px; }
-.site-platforms { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; background: var(--bg-surface); border-radius: var(--radius-lg); padding: 44px; margin-bottom: 65px; }
-.site-platforms h2 { font-size: 30px; line-height: 1.3; letter-spacing: -.03em; }
-.site-platforms .site-eyebrow { color: var(--accent-color); }
-.site-platforms .btn { margin-top: 20px; }
+.site-header nav .app-select { max-width: 210px; }
+.site-hero { display: grid; grid-template-columns: 1.2fr 1fr; align-items: center; min-height: 560px; gap: 48px; padding: 40px 0; }
+.site-hero h1 { font-size: clamp(34px, 3.6vw, 56px); line-height: 1.18; letter-spacing: -.035em; max-width: 720px; margin: 0 0 22px; }
+.site-description { color: var(--text-secondary); font-size: 17px; line-height: 1.8; max-width: 650px; }
+.site-actions { flex-wrap: wrap; align-items: flex-start; margin-top: 26px; }
+.site-note { color: var(--text-muted); font-size: 12px; margin-top: 16px; }
+.site-art { display: grid; place-items: center; }
+.site-art > img { width: 75%; max-width: 450px; }
+.site-features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; padding: 32px 0 60px; }
+.site-features article { display: grid; grid-template-columns: 32px 1fr; align-content: start; column-gap: 14px; }
+.site-feature-icon { color: var(--accent-color); grid-row: span 2; }
+.site-features h2 { font-size: 16px; margin: 0 0 10px; }
+.site-features p { color: var(--text-secondary); line-height: 1.8; font-size: 14px; }
 .site-footer { justify-content: space-between; padding: 28px 0; color: var(--text-muted); font-size: 12px; }
 .site-footer a { color: var(--text-secondary); gap: 6px; }
 .site-skip { position: fixed; top: -100px; z-index: 9999; padding: 12px; color: var(--text-primary); background: var(--bg-elevated); }
 .site-skip:focus { top: 8px; }
+.site-download { display: grid; grid-template-columns: minmax(240px, .8fr) minmax(0, 1.6fr); align-items: start; gap: clamp(32px, 6vw, 100px); min-height: 70vh; padding: 70px 0; }
+.site-download-intro h1 { font-size: 32px; margin: 0 0 18px; letter-spacing: -.03em; }
+.site-download-intro p { color: var(--text-secondary); line-height: 1.8; max-width: 400px; margin-bottom: 24px; }
+.site-download > .download-panel { background: var(--bg-card); border-radius: var(--radius-lg); padding: clamp(22px, 3vw, 40px); box-shadow: var(--shadow-sm); }
 .web-app body { min-width: 0; }
 .web-app [hidden] { display: none !important; }
-@media (max-width: 760px) {
-  .site-shell { padding: 0 22px; }
+@media (max-width: 800px) {
   .site-header { flex-wrap: wrap; gap: 16px; padding: 20px 0; }
   .site-header nav { flex-wrap: wrap; }
-  .site-hero { grid-template-columns: 1fr; gap: 12px; padding-top: 55px; }
+  .site-hero, .site-download { grid-template-columns: 1fr; gap: 32px; }
+  .site-hero { min-height: 0; }
   .site-art { max-width: 340px; width: 100%; justify-self: center; }
-  .site-features, .site-platforms { grid-template-columns: 1fr; }
-  .site-platforms { gap: 12px; padding: 28px; }
-  .site-features { padding-bottom: 38px; }
+  .site-features { grid-template-columns: 1fr; gap: 24px; padding-bottom: 32px; }
+  .site-download { padding: 36px 0; }
 }
-
-.site-download { padding: 55px 0 90px; }
-.site-download h1 { font-size: 32px; margin-bottom: 24px; }

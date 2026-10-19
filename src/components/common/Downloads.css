@@ -1,0 +1,31 @@
+.download-dropdown { position: relative; width: max-content; min-width: 260px; max-width: 100%; }
+.download-dropdown > .btn { width: 100%; }
+.download-dropdown-panel { position: absolute; top: calc(100% + 8px); left: 0; width: 100%; box-sizing: border-box; z-index: 100; padding: 16px; overflow-y: auto; background: var(--bg-elevated); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); transform-origin: top center; animation: dropdownEnter var(--dropdown-enter-duration) cubic-bezier(.16, 1, .3, 1) both; }
+.download-dropdown-panel.dropdown-closing { pointer-events: none; animation: dropdownExit var(--dropdown-exit-duration) ease-in both; }
+.download-panel { min-width: 0; }
+.download-steps { display: flex; flex-wrap: wrap; gap: 8px 18px; color: var(--text-muted); font-size: 12px; margin-bottom: 24px; }
+.download-steps [aria-current] { color: var(--accent-color); }
+.download-step-heading { font-size: 18px; margin: 0 0 18px; outline: none; }
+.download-step-heading:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 4px; }
+.download-systems { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.download-systems .download-system { display: flex; flex-direction: column; gap: 12px; min-width: 0; padding: 28px 12px; white-space: normal; }
+.download-system small { color: var(--text-muted); font-size: 11px; font-weight: 400; overflow-wrap: anywhere; }
+.download-platform { display: flex; align-items: center; gap: 10px; font-weight: 600; margin: 14px 0; }
+.download-panel .choice-cards { grid-template-columns: 1fr; gap: 8px; }
+.download-panel .choice-card { display: grid; grid-template-columns: 22px 1fr; gap: 4px 12px; padding: 16px; }
+.download-panel .choice-card-icon { grid-row: span 2; }
+.download-panel .choice-card-description { grid-column: 2; }
+.download-panel .choice-card strong { font-size: 13px; }
+.download-action { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; margin-top: 22px; }
+.download-action small { color: var(--text-muted); font-size: 12px; }
+.download-panel-compact .download-steps { gap: 6px; margin-bottom: 16px; font-size: 10px; }
+.download-panel-compact .download-step-heading { font-size: 14px; margin-bottom: 12px; }
+.download-panel-compact .download-systems { gap: 5px; }
+.download-panel-compact .download-system { padding: 14px 3px; gap: 8px; font-size: 11px; }
+.download-panel-compact .download-system small { font-size: 9px; }
+.download-panel-compact .choice-card { padding: 12px; grid-template-columns: 1fr; }
+.download-panel-compact .choice-card-icon { display: none; }
+.download-panel-compact .choice-card-description { grid-column: 1; font-size: 11px; }
+.download-panel-compact .download-action { gap: 10px; }
+.download-panel-compact .download-action > .btn { width: 100%; }
+@media (prefers-reduced-motion: reduce) { .download-dropdown-panel, .download-dropdown-panel.dropdown-closing { animation: none; } }

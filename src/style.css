@@ -4,6 +4,7 @@
 
 @import './components/common/MediaVolumeControl.css';
 @import './components/common/ChoiceCards.css';
+@import './components/common/Downloads.css';
 
 :root {
   /* Fonts */
