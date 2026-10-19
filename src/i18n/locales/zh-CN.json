@@ -1441,7 +1441,7 @@
   "invite.webLink": "复制房间链接",
   "web.audioDesktop": "应用音频过滤需要桌面版。",
   "downloads.title": "下载 P2Sharer",
-  "downloads.intro": "选择操作系统和下载格式。Windows 下载适用于 64 位系统。",
+  "downloads.intro": "选择操作系统和下载格式。",
   "downloads.system": "操作系统",
   "downloads.format": "下载格式",
   "downloads.unavailable": "暂不可用",
@@ -1453,5 +1453,8 @@
   "downloads.portableText": "无需安装即可运行。请将程序放在具有写入权限的文件夹中。",
   "downloads.error": "无法加载下载列表，请稍后重试。",
   "downloads.retry": "重试",
-  "downloads.loading": "正在加载下载列表…"
+  "downloads.loading": "正在加载下载列表…",
+  "web.useWeb": "使用网页版",
+  "web.issues": "报告问题",
+  "web.sourceCode": "源代码"
 }

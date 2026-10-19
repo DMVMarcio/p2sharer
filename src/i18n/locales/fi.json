@@ -1441,7 +1441,7 @@
   "invite.webLink": "Kopioi huoneen linkki",
   "web.audioDesktop": "Sovellusten äänen suodatus vaatii työpöytäversion.",
   "downloads.title": "Lataa P2Sharer",
-  "downloads.intro": "Valitse käyttöjärjestelmä ja latausmuoto. Windows-lataukset ovat 64-bittisille järjestelmille.",
+  "downloads.intro": "Valitse käyttöjärjestelmä ja latausmuoto.",
   "downloads.system": "Käyttöjärjestelmä",
   "downloads.format": "Latausmuoto",
   "downloads.unavailable": "Ei saatavilla",
@@ -1453,5 +1453,8 @@
   "downloads.portableText": "Käytä ilman asennusta. Säilytä ohjelmatiedosto kansiossa, johon voi kirjoittaa.",
   "downloads.error": "Latauksia ei voitu hakea. Yritä hetken kuluttua uudelleen.",
   "downloads.retry": "Yritä uudelleen",
-  "downloads.loading": "Ladataan latausluetteloa…"
+  "downloads.loading": "Ladataan latausluetteloa…",
+  "web.useWeb": "Käytä verkkoversiota",
+  "web.issues": "Ilmoita ongelmasta",
+  "web.sourceCode": "Lähdekoodi"
 }

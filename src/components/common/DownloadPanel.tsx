@@ -1,20 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, AppWindow, Building2, FolderOpen, Download } from 'lucide-react';
-import { ChoiceCards } from './ChoiceCards';
+import { ArrowLeft } from 'lucide-react';
+import { DownloadFiles, type DownloadArtifact } from './DownloadFiles';
+import { TooltipButton } from './TooltipButton';
 import { SystemIcon } from './SystemIcon';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { useContentPresence } from '../../hooks/useContentPresence';
 
-interface DownloadCatalog { version: string | null; platforms: { id: string; artifacts: { id: string; url: string; size: number }[] }[] }
+interface DownloadCatalog { version: string | null; platforms: { id: string; artifacts: DownloadArtifact[] }[] }
 const systems = [{ id: 'windows', label: 'Windows' }, { id: 'macos', label: 'macOS' }, { id: 'linux', label: 'Linux' }];
-const formats = [{ id: 'installer', icon: AppWindow }, { id: 'msi', icon: Building2 }, { id: 'portable', icon: FolderOpen }];
 
-export function DownloadPanel({ compact = false }: { compact?: boolean }) {
+export function DownloadPanel() {
   useLocale();
   const [catalog, setCatalog] = useState<DownloadCatalog | null>(null);
   const [platform, setPlatform] = useState('windows');
-  const [format, setFormat] = useState('installer');
   const [step, setStep] = useState<'system' | 'format'>('system');
   const presence = useContentPresence(step);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -35,34 +34,28 @@ export function DownloadPanel({ compact = false }: { compact?: boolean }) {
     return () => controller.abort();
   }, [attempt]);
   const artifacts = catalog?.platforms.find(item => item.id === platform)?.artifacts ?? [];
-  const selected = artifacts.find(item => item.id === format);
-  return <section className={`download-panel${compact ? ' download-panel-compact' : ''}`} aria-label={t('downloads.title')}>
+  return <section className="download-panel" aria-label={t('downloads.title')}>
     <div className="download-steps" aria-label={t('downloads.title')}>
       <span aria-current={step === 'system' ? 'step' : undefined}>1 · {t('downloads.system')}</span>
       <span aria-current={step === 'format' ? 'step' : undefined}>2 · {t('downloads.format')}</span>
     </div>
     <div className={`content-transition${presence.closing ? ' content-exiting' : ''}`} inert={presence.closing}>
-      <h2 className="download-step-heading" ref={heading} tabIndex={-1}>{t(`downloads.${presence.value}`)}</h2>
+      <div className="download-step-header">
+        {presence.value === 'format' && <TooltipButton tooltip={t('downloads.system')} aria-label={t('downloads.system')}
+          className="btn-icon-header download-back" onClick={() => setStep('system')}><ArrowLeft size={19} aria-hidden="true" /></TooltipButton>}
+        <h2 className="download-step-heading" ref={heading} tabIndex={-1}>{t(`downloads.${presence.value}`)}</h2>
+      </div>
       {presence.value === 'system' ? <div className="download-systems">
-        {systems.map(system => <button key={system.id} type="button" className="btn btn-secondary download-system" onClick={() => {
+        {systems.map(system => <button key={system.id} type="button" className="btn btn-secondary download-system" disabled={!catalog?.platforms.find(item => item.id === system.id)?.artifacts.length} onClick={() => {
           setPlatform(system.id);
-          setFormat(catalog?.platforms.find(item => item.id === system.id)?.artifacts[0]?.id ?? 'installer');
           setStep('format');
         }}><SystemIcon system={system.id} /><strong>{system.label}</strong>
           {catalog && !catalog.platforms.find(item => item.id === system.id)?.artifacts.length && <small>{t('downloads.unavailable')}</small>}
         </button>)}
       </div> : <>
-        <button className="btn btn-ghost btn-sm download-back" onClick={() => setStep('system')}><ArrowLeft size={15} aria-hidden="true" />{t('downloads.system')}</button>
-        <p className="download-platform"><SystemIcon system={platform} />{systems.find(system => system.id === platform)?.label}{platform === 'windows' ? ' · x64' : ''}</p>
+        <p className="download-platform"><SystemIcon system={platform} />{systems.find(system => system.id === platform)?.label}{platform === 'windows' ? ' · x64' : ''}{catalog?.version && <span>v{catalog.version}</span>}</p>
         {catalog && <>
-          {artifacts.length ? <>
-            <ChoiceCards label={t('downloads.format')} value={format} onChange={setFormat} options={formats.map(({ id, icon: Icon }) => ({
-              value: id, label: `${t(`downloads.${id}`)} (${id === 'msi' ? '.msi' : '.exe'})`, icon: <Icon size={19} />,
-              description: `${t(`downloads.${id}Text`)}${!artifacts.some(item => item.id === id) ? ` ${t('downloads.unavailable')}` : ''}`, disabled: !artifacts.some(item => item.id === id),
-            }))} />
-            {selected && <div className="download-action"><a className="btn btn-primary" href={selected.url}><Download size={17} aria-hidden="true" />{t('common.download')}</a>
-              <small>v{catalog.version} · {Math.ceil(selected.size / 1024 / 1024)} MB</small></div>}
-          </> : <p role="status">{t('downloads.unavailable')}</p>}
+          {artifacts.length ? <DownloadFiles artifacts={artifacts} /> : <p role="status">{t('downloads.unavailable')}</p>}
         </>}
       </>}
     </div>

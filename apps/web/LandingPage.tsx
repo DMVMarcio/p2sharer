@@ -1,4 +1,5 @@
 import { DownloadButton } from '../../src/components/common/DownloadButton';
+import { SiteFooter } from './SiteFooter';
 import { DownloadPanel } from '../../src/components/common/DownloadPanel';
 import { ArrowUpRight, Monitor, Network, Pencil } from 'lucide-react';
 import { useAppTheme } from '../../src/hooks/useAppTheme';
@@ -25,11 +26,11 @@ export function LandingPage() {
       <nav aria-label={t('web.navigation')}>
         <Select aria-label={t('web.language')} value={getLanguage()} options={LANGUAGE_OPTIONS.map(option => ({ ...option, icon: <img src={`/flags/${option.flag}.svg`} alt="" width={20} height={15} draggable={false} /> }))}
           onValueChange={value => setLanguage(value as ReturnType<typeof getLanguage>)} />
-        <a className="btn btn-secondary" href="/app">{t('web.open')}<ArrowUpRight size={16} aria-hidden="true" /></a>
+        <a className="btn btn-secondary" href="/app">{t(location.pathname === '/download' ? 'web.useWeb' : 'web.open')}<ArrowUpRight size={16} aria-hidden="true" /></a>
       </nav>
     </header>
     <main id="content">
-      {location.pathname === '/download' ? <section className="site-download"><div className="site-download-intro"><h1>{t('downloads.title')}</h1><p>{t('downloads.intro')}</p><a className="btn btn-secondary" href="/app">{t('web.open')}<ArrowUpRight size={16} aria-hidden="true" /></a></div><DownloadPanel /></section> : <>
+      {location.pathname === '/download' ? <section className="site-download"><div className="site-download-intro"><h1>{t('downloads.title')}</h1><p>{t('downloads.intro')}</p><a className="btn btn-secondary" href="/app">{t(location.pathname === '/download' ? 'web.useWeb' : 'web.open')}<ArrowUpRight size={16} aria-hidden="true" /></a></div><DownloadPanel /></section> : <>
       <section className="site-hero">
         <div>
           <h1>{t('home.headline')}</h1>
@@ -53,6 +54,6 @@ export function LandingPage() {
 
       </>}
     </main>
-    <footer className="site-footer"><span>P2Sharer</span><a href="https://github.com/DMVMarcio/p2sharer" target="_blank" rel="noopener noreferrer">GitHub<ArrowUpRight size={14} aria-hidden="true" /></a></footer>
+    <SiteFooter />
   </div></ContextMenuProvider>;
 }

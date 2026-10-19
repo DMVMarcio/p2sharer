@@ -1441,7 +1441,7 @@
   "invite.webLink": "複製房間連結",
   "web.audioDesktop": "應用程式音訊篩選需要桌面版。",
   "downloads.title": "下載 P2Sharer",
-  "downloads.intro": "選擇作業系統與下載格式。Windows 下載適用於 64 位元系統。",
+  "downloads.intro": "選擇作業系統與下載格式。",
   "downloads.system": "作業系統",
   "downloads.format": "下載格式",
   "downloads.unavailable": "尚未提供",
@@ -1453,5 +1453,8 @@
   "downloads.portableText": "無須安裝即可執行。請將執行檔放在可寫入的資料夾中。",
   "downloads.error": "無法載入下載清單，請稍後再試。",
   "downloads.retry": "再試一次",
-  "downloads.loading": "正在載入下載清單…"
+  "downloads.loading": "正在載入下載清單…",
+  "web.useWeb": "使用網頁版",
+  "web.issues": "回報問題",
+  "web.sourceCode": "原始碼"
 }

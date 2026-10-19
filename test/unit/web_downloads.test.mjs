@@ -30,63 +30,58 @@ const root = createRoot(document.getElementById('root'));
 const render = () => act(async () => root.render(React.createElement(DownloadPanel)));
 after(async () => { await act(async () => root.unmount()); dom.window.close(); globalThis.fetch = previousFetch; });
 
-test('download formats link to actual assets and unavailable systems never offer a file', async () => {
+const systemButton = name => [...document.querySelectorAll('.download-system')].find(button => button.textContent.includes(name));
+const fileLink = id => document.querySelector(`a[aria-label="common.download · downloads.${id}"]`);
+
+test('only available systems advance to direct package downloads', async () => {
   await render();
-  assert.equal(document.querySelector('a.btn-primary'), null, 'system selection precedes download');
-  await act(async () => [...document.querySelectorAll('button')].find(button => button.textContent.includes('Windows')).click());
-  assert.equal(document.querySelector('a.btn-primary').href, 'https://example.com/installer.exe');
-  assert.equal(document.querySelector('input[value="portable"]').disabled, true);
-  await act(async () => document.querySelector('input[value="msi"]').click());
-  assert.equal(document.querySelector('a.btn-primary').href, 'https://example.com/installer.msi');
+  assert.equal(document.querySelector('.download-files'), null);
+  assert.equal(systemButton('Windows').disabled, false);
+  assert.equal(systemButton('macOS').disabled, true);
+  assert.equal(systemButton('Linux').disabled, true);
+  await act(async () => systemButton('macOS').click());
+  assert.equal(document.querySelector('.download-files'), null);
+  await act(async () => systemButton('Windows').click());
+  assert.equal(fileLink('installer').href, 'https://example.com/installer.exe');
+  assert.equal(fileLink('msi').href, 'https://example.com/installer.msi');
+  assert.equal(document.querySelector('.download-file.is-unavailable button').disabled, true);
+  assert.equal(fileLink('portable'), null);
+  assert.equal(document.activeElement, document.querySelector('.download-step-heading'));
   await act(async () => document.querySelector('.download-back').click());
-  await act(async () => [...document.querySelectorAll('button')].find(button => button.textContent.includes('macOS')).click());
-  assert.equal(document.querySelector('a.btn-primary'), null);
-  assert.equal(document.querySelector('[role="status"]').textContent, 'downloads.unavailable');
+  assert.ok(systemButton('Windows'));
+  assert.equal(document.querySelector('.download-files'), null);
 });
 
-test('failed release discovery offers a retry and restores valid downloads', async () => {
+test('failed release discovery offers a retry and restores available systems', async () => {
   await act(async () => root.render(null)); failed = true;
   await render(); assert.ok(document.querySelector('[role="alert"]'));
+  assert.equal(systemButton('Windows').disabled, true);
   failed = false;
   await act(async () => [...document.querySelectorAll('button')].find(button => button.textContent === 'downloads.retry').click());
   assert.equal(document.querySelector('[role="alert"]'), null);
-  await act(async () => [...document.querySelectorAll('button')].find(button => button.textContent.includes('Windows')).click());
-  assert.equal(document.querySelector('a.btn-primary').href, 'https://example.com/installer.exe');
+  assert.equal(systemButton('Windows').disabled, false);
+  await act(async () => systemButton('Windows').click());
+  assert.equal(fileLink('installer').href, 'https://example.com/installer.exe');
 });
 
-test('download disclosure supports keyboard entry, steps, Escape and outside dismissal', async () => {
-  await act(async () => root.render(React.createElement(DownloadButton)));
-  const trigger = document.querySelector('button[aria-expanded]');
-  await act(async () => trigger.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true })));
-  assert.equal(trigger.getAttribute('aria-expanded'), 'true');
-  assert.equal(document.querySelector('[role="dialog"]'), null);
-  assert.equal(document.activeElement.textContent, 'Windows');
-  await act(async () => document.activeElement.click());
-  assert.equal(document.activeElement, document.querySelector('.download-step-heading'));
-  assert.equal(trigger.getAttribute('aria-expanded'), 'true', 'step focus remains inside disclosure');
-  await act(async () => document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })));
-  assert.equal(trigger.getAttribute('aria-expanded'), 'false');
-  assert.equal(document.activeElement, trigger);
-  assert.equal(document.querySelector('.download-dropdown-panel'), null);
-  await act(async () => trigger.click());
-  await act(async () => document.body.dispatchEvent(new window.Event('pointerdown', { bubbles: true })));
-  assert.equal(trigger.getAttribute('aria-expanded'), 'false');
+test('download links open the dedicated page and preserve a web room in another tab', async () => {
+  await act(async () => root.render(React.createElement(DownloadButton, { compact: true, newTab: true })));
+  const link = document.querySelector('a');
+  assert.equal(link.href, 'https://example.com/download');
+  assert.equal(link.target, '_blank');
+  assert.match(link.rel, /noopener/);
+  assert.equal(document.querySelector('button'), null);
 });
 
-test('download steps and closing overlays retain inert outgoing content during motion', async () => {
+test('download steps retain inert outgoing content during motion', async () => {
   await act(async () => root.render(null));
   window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
-  await act(async () => root.render(React.createElement(DownloadButton)));
-  const trigger = document.querySelector('button[aria-expanded]');
-  await act(async () => trigger.click());
-  await act(async () => document.activeElement.click());
+  await render();
+  await act(async () => systemButton('Windows').click());
   assert.equal(document.querySelector('.content-transition').hasAttribute('inert'), true);
   await act(async () => new Promise(resolve => setTimeout(resolve, 180)));
   assert.equal(document.querySelector('.content-transition').hasAttribute('inert'), false);
   assert.equal(document.activeElement, document.querySelector('.download-step-heading'));
-  await act(async () => document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
-  assert.equal(document.querySelector('.download-dropdown-panel').hasAttribute('inert'), true);
-  await act(async () => new Promise(resolve => setTimeout(resolve, 300)));
-  assert.equal(document.querySelector('.download-dropdown-panel'), null);
+  assert.ok(fileLink('installer'));
   window.matchMedia = () => ({ matches: true, addEventListener() {}, removeEventListener() {} });
 });

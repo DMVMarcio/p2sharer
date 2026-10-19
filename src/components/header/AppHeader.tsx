@@ -1,3 +1,4 @@
+import { DownloadButton } from '../common/DownloadButton';
 import { Nickname } from '../common/Nickname';
 import { ProfileAvatar } from '../common/ProfileAvatar';
 import { t } from '../../i18n';
@@ -112,6 +113,7 @@ export const AppHeader: React.FC<{ showUpdate?: boolean; homeScrolled?: boolean;
       </div>
 
       <div className="header-user-info">
+        {!isTauri() && <DownloadButton compact newTab />}
         <button
           className="user-pill"
           id="user-pill"

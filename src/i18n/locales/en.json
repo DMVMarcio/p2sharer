@@ -1441,7 +1441,7 @@
   "invite.webLink": "Copy room link",
   "web.audioDesktop": "Application audio filtering requires the desktop version.",
   "downloads.title": "Download P2Sharer",
-  "downloads.intro": "Choose your operating system and a download format. Windows downloads are for 64-bit systems.",
+  "downloads.intro": "Choose your operating system and download format.",
   "downloads.system": "Operating system",
   "downloads.format": "Download format",
   "downloads.unavailable": "Not available",
@@ -1453,5 +1453,8 @@
   "downloads.portableText": "Run without installing. Keep the executable in a folder you can write to.",
   "downloads.error": "Downloads could not be loaded. Try again shortly.",
   "downloads.retry": "Try again",
-  "downloads.loading": "Loading downloads…"
+  "downloads.loading": "Loading downloads…",
+  "web.useWeb": "Use web version",
+  "web.issues": "Report an issue",
+  "web.sourceCode": "Source code"
 }
