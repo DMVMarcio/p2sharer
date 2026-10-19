@@ -72,13 +72,15 @@ fn saved_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
     Ok(directory.join("window-placement.json"))
 }
 
-pub fn install(window: &tauri::WebviewWindow) -> Result<(), String> {
-    if let Some(placement) = read_saved(&saved_path(window.app_handle())?) {
-        restore(HWND(window.hwnd().map_err(|e| e.to_string())?.0), &placement)?;
+pub fn install(window: &tauri::WebviewWindow) -> Result<bool, String> {
+    let saved = read_saved(&saved_path(window.app_handle())?);
+    let was_maximized = saved.as_ref().is_some_and(|placement| placement.maximized);
+    if let Some(ref placement) = saved {
+        restore(HWND(window.hwnd().map_err(|e| e.to_string())?.0), placement)?;
     }
     let placement = capture(HWND(window.hwnd().map_err(|e| e.to_string())?.0))?;
     STATE.lock().map_err(|e| e.to_string())?.normal = Some(placement);
-    Ok(())
+    Ok(was_maximized)
 }
 
 pub fn on_event(window: &tauri::Window, event: &tauri::WindowEvent) {
@@ -130,6 +132,7 @@ pub async fn restore_window_placement(window: tauri::Window, placement: Placemen
     authorize(&window)?;
     let hwnd = window.hwnd().map_err(|e| e.to_string())?.0 as usize;
     let label = window.label().to_owned();
+    let is_maximized = placement.maximized;
     let (send, receive) = tokio::sync::oneshot::channel();
     window.run_on_main_thread(move || {
         let result = restore(HWND(hwnd as *mut _), &placement).and_then(|_| {
@@ -140,7 +143,11 @@ pub async fn restore_window_placement(window: tauri::Window, placement: Placemen
         });
         let _ = send.send(result);
     }).map_err(|e| e.to_string())?;
-    receive.await.map_err(|e| e.to_string())?
+    receive.await.map_err(|e| e.to_string())??;
+    if is_maximized {
+        let _ = window.maximize();
+    }
+    Ok(())
 }
 
 

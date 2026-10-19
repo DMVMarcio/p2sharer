@@ -122,8 +122,15 @@ pub fn run() {
         .setup(|app| {
             let main = app.get_webview_window("main").ok_or("main webview missing")?;
             #[cfg(windows)]
-            if let Err(error) = window_placement::install(&main) { eprintln!("[Window] Could not restore placement: {error}"); }
+            let was_maximized = match window_placement::install(&main) {
+                Ok(maximized) => maximized,
+                Err(error) => { eprintln!("[Window] Could not restore placement: {error}"); false }
+            };
             main.show()?;
+            #[cfg(windows)]
+            if was_maximized {
+                let _ = main.maximize();
+            }
             invitation_routing::install(app.handle())?;
             camera_permission::install(app)?;
             browser_shortcuts::disable_browser_shortcuts(app.get_webview_window("main").ok_or("main webview missing")?)?;
