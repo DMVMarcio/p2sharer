@@ -23,6 +23,7 @@ export interface TextEditingSession {
   undo: () => void;
   redo: () => void;
   selectAll: () => void;
+  editor?: Editor;
 }
 
 const commandEnabled = (command: string) => document.queryCommandEnabled?.(command) ?? false;
@@ -33,6 +34,15 @@ export function captureTextEditing(target: EventTarget | null): TextEditingSessi
   if (!source) return null;
   const editor = editors.get(source);
   if (editor && !editor.isDestroyed) {
+    if (target instanceof Node && editor.view.dom.contains(target)) {
+      try {
+        const { from, to } = editor.state.selection;
+        const clickedPos = editor.view.posAtDOM(target, 0);
+        if (typeof clickedPos === 'number' && (from === to || clickedPos < from || clickedPos > to)) {
+          editor.commands.setTextSelection(clickedPos);
+        }
+      } catch {}
+    }
     const initialDocument = editor.state.doc;
     const { from, to } = editor.state.selection;
     const restore = () => {
@@ -49,6 +59,7 @@ export function captureTextEditing(target: EventTarget | null): TextEditingSessi
       undo: () => { restore(); if (editor.isEditable) editor.commands.undo(); },
       redo: () => { restore(); if (editor.isEditable) editor.commands.redo(); },
       selectAll: () => { restore(); editor.commands.selectAll(); },
+      editor,
     };
   }
 

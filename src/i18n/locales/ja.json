@@ -1401,5 +1401,11 @@
   "releaseNotes.view": "リリースノートを見る",
   "notepad.image": "画像",
   "notepad.imageUrl": "画像のURL",
-  "notepad.chooseImage": "ファイルを選択"
+  "notepad.chooseImage": "ファイルを選択",
+  "table.addAbove": "上に追加",
+  "table.addBelow": "下に追加",
+  "table.addBefore": "前に追加",
+  "table.addAfter": "後に追加",
+  "table.deleteRow": "行を削除",
+  "table.deleteColumn": "列を削除"
 }

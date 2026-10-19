@@ -1401,5 +1401,11 @@
   "releaseNotes.view": "Versionshinweise anzeigen",
   "notepad.image": "Bild",
   "notepad.imageUrl": "Bild-URL",
-  "notepad.chooseImage": "Datei auswählen"
+  "notepad.chooseImage": "Datei auswählen",
+  "table.addAbove": "Oben einfügen",
+  "table.addBelow": "Unten einfügen",
+  "table.addBefore": "Davor einfügen",
+  "table.addAfter": "Danach einfügen",
+  "table.deleteRow": "Zeile löschen",
+  "table.deleteColumn": "Spalte löschen"
 }

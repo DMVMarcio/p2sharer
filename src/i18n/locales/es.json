@@ -1401,5 +1401,11 @@
   "releaseNotes.view": "Ver notas de la versión",
   "notepad.image": "Imagen",
   "notepad.imageUrl": "URL de la imagen",
-  "notepad.chooseImage": "Elegir archivo"
+  "notepad.chooseImage": "Elegir archivo",
+  "table.addAbove": "Agregar arriba",
+  "table.addBelow": "Agregar abajo",
+  "table.addBefore": "Agregar antes",
+  "table.addAfter": "Agregar después",
+  "table.deleteRow": "Eliminar fila",
+  "table.deleteColumn": "Eliminar columna"
 }

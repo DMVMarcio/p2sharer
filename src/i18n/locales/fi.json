@@ -1401,5 +1401,11 @@
   "releaseNotes.view": "Näytä julkaisutiedot",
   "notepad.image": "Kuva",
   "notepad.imageUrl": "Kuvan URL-osoite",
-  "notepad.chooseImage": "Valitse tiedosto"
+  "notepad.chooseImage": "Valitse tiedosto",
+  "table.addAbove": "Lisää yläpuolelle",
+  "table.addBelow": "Lisää alapuolelle",
+  "table.addBefore": "Lisää eteen",
+  "table.addAfter": "Lisää jälkeen",
+  "table.deleteRow": "Poista rivi",
+  "table.deleteColumn": "Poista sarake"
 }

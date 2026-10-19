@@ -1401,5 +1401,11 @@
   "releaseNotes.view": "릴리스 노트 보기",
   "notepad.image": "이미지",
   "notepad.imageUrl": "이미지 URL",
-  "notepad.chooseImage": "파일 선택"
+  "notepad.chooseImage": "파일 선택",
+  "table.addAbove": "위에 추가",
+  "table.addBelow": "아래에 추가",
+  "table.addBefore": "앞에 추가",
+  "table.addAfter": "뒤에 추가",
+  "table.deleteRow": "행 삭제",
+  "table.deleteColumn": "열 삭제"
 }

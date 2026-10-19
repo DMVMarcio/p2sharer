@@ -2,7 +2,7 @@ import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
-import { Copy } from 'lucide-react';
+import { Copy, ChevronRight } from 'lucide-react';
 import { useDropdownPresence } from '../../hooks/useDropdownPresence';
 import { showToast } from '../../hooks/useToast';
 import { captureTextEditing, TEXT_EDITOR_SELECTOR } from '../../core/text_editing';
@@ -21,7 +21,8 @@ export interface ContextMenuAction {
   selected?: boolean;
   danger?: boolean;
   separator?: boolean;
-  onSelect: () => void | Promise<unknown>;
+  onSelect?: () => void | Promise<unknown>;
+  submenu?: ContextMenuAction[];
   secondary?: Pick<ContextMenuAction, 'label' | 'icon' | 'disabled' | 'danger' | 'onSelect'>;
 }
 
@@ -50,11 +51,15 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
 }) {
   useLocale();
   const [menu, setMenu] = useState<MenuState | null>(null);
+  const [activeSubmenu, setActiveSubmenu] = useState<{ id: string; actions: ContextMenuAction[]; parentRect: DOMRect } | null>(null);
+  const [submenuPosition, setSubmenuPosition] = useState({ x: 0, y: 0 });
   const presence = useDropdownPresence(menu);
   const menuRef = useRef<HTMLDivElement>(null);
+  const submenuRef = useRef<HTMLDivElement>(null);
   const buttonRefs = useRef(new Map<string, HTMLButtonElement>());
-  const enabledButtons = (actions: ContextMenuAction[]) => actions.flatMap(action =>
-    [buttonRefs.current.get(action.id), buttonRefs.current.get(`${action.id}:secondary`)]
+  const submenuButtonRefs = useRef(new Map<string, HTMLButtonElement>());
+  const enabledButtons = (actions: ContextMenuAction[], map = buttonRefs.current) => actions.flatMap(action =>
+    [map.get(action.id), map.get(`${action.id}:secondary`)]
   ).filter((button): button is HTMLButtonElement => Boolean(button && !button.disabled));
   const currentRef = useRef(menu);
   const actionsRef = useRef(getActions);
@@ -63,11 +68,13 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
   const [position, setPosition] = useState({ x: 0, y: 0, arrow: 0 });
   const close = useCallback((restoreFocus = false) => {
     if (restoreFocus && currentRef.current?.source.isConnected) currentRef.current.source.focus({ preventScroll: true });
+    setActiveSubmenu(null);
     setMenu(null);
   }, []);
   const open = useCallback((event: MenuEvent, actions: ContextMenuAction[], options?: { toggle?: boolean; layout?: 'grid'; placement?: 'top-center' }) => {
     event.preventDefault();
     event.stopPropagation();
+    setActiveSubmenu(null);
     const source = event.currentTarget instanceof HTMLElement ? event.currentTarget : document.body;
     if (options?.toggle && currentRef.current?.source === source) { close(true); return; }
     const bounds = source.getBoundingClientRect();
@@ -75,6 +82,16 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
       x: event.clientX || bounds.left + Math.min(bounds.width / 2, 24),
       y: event.clientY || bounds.top + Math.min(bounds.height / 2, 24) } : null);
   }, [close]);
+
+  const openActionSubmenu = useCallback((action: ContextMenuAction, element: HTMLElement) => {
+    if (!action.submenu?.length || action.disabled) return;
+    const parentRect = element.getBoundingClientRect();
+    let x = parentRect.right - 2;
+    if (x + 190 > window.innerWidth - 8) x = Math.max(8, parentRect.left - 190 + 2);
+    const y = Math.max(8, Math.min(parentRect.top - 4, window.innerHeight - 100));
+    setSubmenuPosition({ x, y });
+    setActiveSubmenu({ id: action.id, actions: action.submenu, parentRect });
+  }, []);
 
   useEffect(() => {
     const preserveSelection = (event: MouseEvent) => {
@@ -99,10 +116,10 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
     };
     const dismiss = (event: PointerEvent) => {
       if (currentRef.current?.toggle && currentRef.current.source.contains(event.target as Node)) return;
-      if (!menuRef.current?.contains(event.target as Node)) close();
+      if (!menuRef.current?.contains(event.target as Node) && !submenuRef.current?.contains(event.target as Node)) close();
     };
     const scroll = (event: Event) => {
-      if (!menuRef.current?.contains(event.target as Node)) close();
+      if (!menuRef.current?.contains(event.target as Node) && !submenuRef.current?.contains(event.target as Node)) close();
     };
     const blur = () => close();
     document.addEventListener('contextmenu', fallback);
@@ -135,14 +152,73 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
     enabledButtons(menu.actions)[0]?.focus({ preventScroll: true });
   }, [menu]);
 
+  useLayoutEffect(() => {
+    if (!activeSubmenu || !submenuRef.current) return;
+    const { offsetWidth, offsetHeight } = submenuRef.current;
+    const { parentRect } = activeSubmenu;
+    let x = parentRect.right - 2;
+    if (x + offsetWidth > window.innerWidth - 8) {
+      x = Math.max(8, parentRect.left - offsetWidth + 2);
+    }
+    let y = parentRect.top - 4;
+    if (y + offsetHeight > window.innerHeight - 8) {
+      y = Math.max(8, window.innerHeight - offsetHeight - 8);
+    }
+    setSubmenuPosition({ x, y });
+  }, [activeSubmenu]);
+
   useEffect(() => {
     if (!menu) return;
     const key = (event: KeyboardEvent) => {
       if (event.key === 'Escape' || event.key === 'Tab') {
-        event.preventDefault(); event.stopPropagation(); close(true); return;
+        event.preventDefault(); event.stopPropagation();
+        if (activeSubmenu) {
+          const parentBtn = buttonRefs.current.get(activeSubmenu.id);
+          setActiveSubmenu(null);
+          parentBtn?.focus();
+        } else {
+          close(true);
+        }
+        return;
       }
+
+      if (activeSubmenu && submenuRef.current?.contains(document.activeElement)) {
+        if (event.key === 'ArrowLeft') {
+          event.preventDefault(); event.stopPropagation();
+          const parentBtn = buttonRefs.current.get(activeSubmenu.id);
+          setActiveSubmenu(null);
+          parentBtn?.focus();
+          return;
+        }
+        if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+        event.preventDefault();
+        const buttons = enabledButtons(activeSubmenu.actions, submenuButtonRefs.current);
+        const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+        const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1
+          : (index + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length;
+        buttons[next]?.focus();
+        return;
+      }
+
+      if (event.key === 'ArrowRight') {
+        const currentAction = menu.actions.find(a => buttonRefs.current.get(a.id) === document.activeElement);
+        if (currentAction?.submenu?.length) {
+          event.preventDefault(); event.stopPropagation();
+          const btn = buttonRefs.current.get(currentAction.id);
+          if (btn) {
+            openActionSubmenu(currentAction, btn);
+            requestAnimationFrame(() => {
+              const subButtons = enabledButtons(currentAction.submenu!, submenuButtonRefs.current);
+              subButtons[0]?.focus();
+            });
+          }
+          return;
+        }
+      }
+
       if (!['ArrowDown', 'ArrowUp', 'Home', 'End', ...(menu.layout === 'grid' ? ['ArrowLeft', 'ArrowRight'] : [])].includes(event.key)) return;
       event.preventDefault();
+      setActiveSubmenu(null);
       const buttons = enabledButtons(menu.actions);
       const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
       const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1
@@ -154,10 +230,11 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
     const observer = new MutationObserver(() => { if (!menu.source.isConnected) close(); });
     observer.observe(document.body, { childList: true, subtree: true });
     return () => { document.removeEventListener('keydown', key, true); observer.disconnect(); };
-  }, [menu, close]);
+  }, [menu, activeSubmenu, close, openActionSubmenu]);
 
   const retained = presence.value;
   const select = (action: Pick<ContextMenuAction, 'onSelect'>) => {
+    if (!action.onSelect) return;
     close(true);
     try { Promise.resolve(action.onSelect()).catch(() => showToast(t("message.1776fea88e1f"), 3500, 'error')); }
     catch { showToast(t("message.1776fea88e1f"), 3500, 'error'); }
@@ -171,13 +248,32 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
       onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); }}
       onClick={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()}>
       {retained.actions.map((action) => {
+        const hasSubmenu = Boolean(action.submenu?.length);
+        const trailingIcon = action.trailingIcon || (hasSubmenu ? <ChevronRight size={13} /> : undefined);
         const tooltipText = action.tooltip ?? (action.iconOnly ? action.label : undefined);
-        const primary = <button key={action.id} type="button" role={action.selected === undefined ? 'menuitem' : 'menuitemradio'} aria-checked={action.selected}
-        ref={element => { if (element) buttonRefs.current.set(action.id, element); else buttonRefs.current.delete(action.id); }}
-        aria-label={tooltipText}
-        disabled={action.disabled} className={`${action.iconOnly ? 'context-menu-visual-choice' : ''} ${action.danger ? 'context-menu-danger' : ''} ${action.separator ? 'context-menu-separated' : ''}`}
-        onClick={() => select(action)}>{action.icon && <span className="context-menu-icon" aria-hidden="true">{action.icon}</span>}{!action.iconOnly && <span className="context-menu-label">{action.label}</span>}
-          {action.trailingIcon && <span className="context-menu-trailing-icon" aria-hidden="true">{action.trailingIcon}</span>}</button>;
+        const primary = <button key={action.id} type="button" role={action.selected === undefined ? 'menuitem' : 'menuitemradio'}
+          aria-checked={action.selected}
+          aria-haspopup={hasSubmenu ? 'menu' : undefined}
+          aria-expanded={hasSubmenu ? activeSubmenu?.id === action.id : undefined}
+          ref={element => { if (element) buttonRefs.current.set(action.id, element); else buttonRefs.current.delete(action.id); }}
+          aria-label={tooltipText}
+          disabled={action.disabled}
+          className={`${action.iconOnly ? 'context-menu-visual-choice' : ''} ${action.danger ? 'context-menu-danger' : ''} ${action.separator ? 'context-menu-separated' : ''}`}
+          onPointerEnter={(event) => {
+            if (hasSubmenu) openActionSubmenu(action, event.currentTarget);
+            else setActiveSubmenu(null);
+          }}
+          onClick={(event) => {
+            if (hasSubmenu) {
+              openActionSubmenu(action, event.currentTarget);
+              return;
+            }
+            if (action.onSelect) select(action as Pick<ContextMenuAction, 'onSelect'>);
+          }}>
+          {action.icon && <span className="context-menu-icon" aria-hidden="true">{action.icon}</span>}
+          {!action.iconOnly && <span className="context-menu-label">{action.label}</span>}
+          {trailingIcon && <span className="context-menu-trailing-icon" aria-hidden="true">{trailingIcon}</span>}
+        </button>;
         const primaryAction = tooltipText
           ? <Tooltip key={action.id} content={tooltipText} placement={retained.placement === 'top-center' || action.iconOnly ? 'top' : 'auto'} disabled={presence.closing}>{primary}</Tooltip>
           : primary;
@@ -190,5 +286,32 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
         </div> : primaryAction;
       })}
     </div>, document.fullscreenElement ?? document.body)}
+    {activeSubmenu && createPortal(
+      <div ref={submenuRef} role="menu" aria-label={t("message.392b6906f80e")}
+        className="context-menu context-submenu"
+        style={{ left: submenuPosition.x, top: submenuPosition.y } as CSSProperties}
+        onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); }}
+        onClick={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()}>
+        {activeSubmenu.actions.map((subAction) => {
+          const tooltipText = subAction.tooltip ?? (subAction.iconOnly ? subAction.label : undefined);
+          const primary = <button key={subAction.id} type="button"
+            role={subAction.selected === undefined ? 'menuitem' : 'menuitemradio'}
+            aria-checked={subAction.selected}
+            ref={element => { if (element) submenuButtonRefs.current.set(subAction.id, element); else submenuButtonRefs.current.delete(subAction.id); }}
+            aria-label={tooltipText}
+            disabled={subAction.disabled}
+            className={`${subAction.iconOnly ? 'context-menu-visual-choice' : ''} ${subAction.danger ? 'context-menu-danger' : ''} ${subAction.separator ? 'context-menu-separated' : ''}`}
+            onClick={() => { if (subAction.onSelect) select(subAction as Pick<ContextMenuAction, 'onSelect'>); }}>
+            {subAction.icon && <span className="context-menu-icon" aria-hidden="true">{subAction.icon}</span>}
+            {!subAction.iconOnly && <span className="context-menu-label">{subAction.label}</span>}
+            {subAction.trailingIcon && <span className="context-menu-trailing-icon" aria-hidden="true">{subAction.trailingIcon}</span>}
+          </button>;
+          return tooltipText
+            ? <Tooltip key={subAction.id} content={tooltipText} placement="auto">{primary}</Tooltip>
+            : primary;
+        })}
+      </div>,
+      document.fullscreenElement ?? document.body
+    )}
   </MenuContext.Provider>;
 }

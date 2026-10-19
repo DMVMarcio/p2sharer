@@ -5296,6 +5296,7 @@ html[data-theme="light"] :is(.stream-card, .pip-window-root) {
 .context-menu .context-menu-separated { border-top: 1px solid var(--border-default); margin-top: 4px; border-radius: 0 0 4px 4px; }
 .context-menu-icon { display: flex; flex-shrink: 0; color: var(--text-secondary); }
 .context-menu-danger .context-menu-icon { color: inherit; }
+.context-menu.context-submenu { z-index: 10001; }
 .context-menu.dropdown-closing { pointer-events: none; animation: dropdownExit var(--dropdown-exit-duration) cubic-bezier(0.4, 0, 0.2, 1) both; }
 @media (prefers-reduced-motion: reduce) { .context-menu, .context-menu.dropdown-closing { animation: none; } }
 

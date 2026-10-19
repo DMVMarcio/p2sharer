@@ -1401,5 +1401,11 @@
   "releaseNotes.view": "查看版本说明",
   "notepad.image": "图片",
   "notepad.imageUrl": "图片链接",
-  "notepad.chooseImage": "选择文件"
+  "notepad.chooseImage": "选择文件",
+  "table.addAbove": "在上方添加",
+  "table.addBelow": "在下方添加",
+  "table.addBefore": "在前面添加",
+  "table.addAfter": "在后面添加",
+  "table.deleteRow": "删除行",
+  "table.deleteColumn": "删除列"
 }

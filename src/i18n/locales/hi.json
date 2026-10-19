@@ -1401,5 +1401,11 @@
   "releaseNotes.view": "रिलीज़ नोट देखें",
   "notepad.image": "छवि",
   "notepad.imageUrl": "छवि URL",
-  "notepad.chooseImage": "फ़ाइल चुनें"
+  "notepad.chooseImage": "फ़ाइल चुनें",
+  "table.addAbove": "ऊपर जोड़ें",
+  "table.addBelow": "नीचे जोड़ें",
+  "table.addBefore": "पहले जोड़ें",
+  "table.addAfter": "बाद में जोड़ें",
+  "table.deleteRow": "पंक्ति हटाएँ",
+  "table.deleteColumn": "कॉलम हटाएँ"
 }

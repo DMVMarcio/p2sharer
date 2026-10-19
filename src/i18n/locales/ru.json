@@ -1401,5 +1401,11 @@
   "releaseNotes.view": "Примечания к выпуску",
   "notepad.image": "Изображение",
   "notepad.imageUrl": "URL изображения",
-  "notepad.chooseImage": "Выбрать файл"
+  "notepad.chooseImage": "Выбрать файл",
+  "table.addAbove": "Добавить выше",
+  "table.addBelow": "Добавить ниже",
+  "table.addBefore": "Добавить до",
+  "table.addAfter": "Добавить после",
+  "table.deleteRow": "Удалить строку",
+  "table.deleteColumn": "Удалить столбец"
 }
