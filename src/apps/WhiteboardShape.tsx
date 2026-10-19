@@ -15,23 +15,9 @@ export const WhiteboardShape = memo(function WhiteboardShape({ shape: s, imageHr
   if (s.tool === 'brush' || s.tool === 'eraser' || s.tool === 'line') {
     const d = brushPath(s);
     if (hasVariablePressure(s)) {
-      if (s.tool === 'brush' && s.brushType === 'brush') {
-        return <g opacity={opacity < 1 ? opacity : undefined}>
-          <path fill="none" stroke={s.color} strokeWidth={Math.round(s.width * 22) / 100} strokeOpacity={0.3} strokeLinecap="round" strokeLinejoin="round" transform={transform} d={d} />
-          <path fill={s.color} stroke="none" transform={transform} d={d} />
-        </g>;
-      }
-      return <path fill={s.color} stroke="none" opacity={opacity < 1 ? opacity : undefined} transform={transform} d={d} />;
+      return <path fill={s.color} fillRule="nonzero" stroke="none" opacity={opacity < 1 ? opacity : undefined} transform={transform} d={d} />;
     }
-    const width = s.tool === 'brush' && s.brushType === 'pencil' ? Math.max(1, Math.round(s.width * 72) / 100) : s.width;
-    const dash = s.tool === 'brush' && s.brushType === 'pencil' ? `${Math.round(Math.max(1, s.width * 0.2) * 100) / 100} ${Math.round(Math.max(0.5, s.width * 0.06) * 100) / 100}` : undefined;
-    if (s.tool === 'brush' && s.brushType === 'brush') {
-      return <g opacity={opacity < 1 ? opacity : undefined}>
-        <path stroke={s.color} strokeWidth={Math.round(s.width * 120) / 100} strokeOpacity={0.3} fill="none" strokeLinecap="round" strokeLinejoin="round" transform={transform} d={d} />
-        <path stroke={s.color} strokeWidth={Math.round(s.width * 88) / 100} fill="none" strokeLinecap="round" strokeLinejoin="round" transform={transform} d={d} />
-      </g>;
-    }
-    return <path stroke={s.color} strokeWidth={width} fill="none" opacity={opacity < 1 ? opacity : undefined} strokeDasharray={dash}
+    return <path stroke={s.color} strokeWidth={s.width} fill="none" opacity={opacity < 1 ? opacity : undefined}
       strokeLinecap="round" strokeLinejoin="round" transform={transform} d={d} />;
   }
   const props = { stroke: s.color, strokeWidth: s.width, fill: s.filled ? s.color : 'none',

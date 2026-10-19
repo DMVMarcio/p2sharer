@@ -80,7 +80,7 @@ test('drawing, object movement, canvas panning, wheel navigation and brush curso
   await settle();
   const initial = document.querySelector('.whiteboard-art > g').getAttribute('transform').match(/translate\(([-.\d]+) ([-.\d]+)\)/);
   assert.equal(Number(initial[1]) + 8000, 400); assert.equal(Number(initial[2]) + 5000, 250);
-  await click('Brush');
+  await click('Pencil');
   await pointer('pointerdown', 100, 100); await pointer('pointermove', 140, 120);
   assert.equal(document.querySelector('rect[stroke-dasharray]'), null);
   await pointer('pointerup', 160, 140);
@@ -88,6 +88,7 @@ test('drawing, object movement, canvas panning, wheel navigation and brush curso
   assert.equal(fixture.model.shapes.length, 1);
   const original = fixture.model.shapes[0];
   assert.equal(original.tool, 'brush');
+  assert.equal(original.brushType, 'pencil');
   assert.ok(document.querySelector('.stream-pointer-brush'));
   await click('Select and move');
   await pointer('pointerdown', 100, 100); await pointer('pointermove', 120, 130);
@@ -137,9 +138,11 @@ test('shape tools offer accessible visual fill choices and stabilization persist
   Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, get() { return this.classList.contains('context-menu') ? 64 : 0; } });
   button('Rectangle').getBoundingClientRect = () => new window.DOMRect(300, 400, 36, 34);
   await click('Rectangle');
+  assert.equal(button('Rectangle').getAttribute('aria-pressed'), 'true');
   const menu = document.querySelector('[role="menu"]');
   assert.ok(menu);
   assert.equal(menu.querySelectorAll('[role="menuitemradio"]').length, 2);
+  assert.equal(button('Outline', menu).getAttribute('aria-checked'), 'true');
   assert.equal(menu.textContent, '');
   assert.equal(Number.parseFloat(menu.style.left) + menu.offsetWidth / 2, 318);
   assert.ok(Number.parseFloat(menu.style.top) + menu.offsetHeight < 400);
@@ -159,10 +162,11 @@ test('shape tools offer accessible visual fill choices and stabilization persist
   assert.ok(document.querySelector('.whiteboard-toolbar-main-row .whiteboard-toolbar-history'));
   assert.equal(document.querySelectorAll('.whiteboard-toolbar-main-row .whiteboard-toolbar-history button').length, 2);
   assert.equal(document.querySelectorAll('.whiteboard-tool-properties button').length, 0);
-  await click('Brush');
+  await click('Pencil');
   const brushMenu = document.querySelector('[role="menu"]');
   assert.ok(brushMenu);
   assert.equal(brushMenu.querySelectorAll('[role="menuitemradio"]').length, 3);
+  assert.equal(button('Pencil', brushMenu).getAttribute('aria-checked'), 'true');
   await click('Pen', brushMenu);
   assert.equal(button('Pen').getAttribute('aria-pressed'), 'true');
   await click('Pen');

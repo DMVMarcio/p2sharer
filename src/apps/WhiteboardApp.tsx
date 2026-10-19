@@ -24,7 +24,7 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
   const [, refresh] = useState(0);
   const [settings, setSettings] = useState<BoardSettings>(() => ({
     tool: 'pointer',
-    brushType: 'brush',
+    brushType: 'pencil',
     color: '#3b82f6',
     width: 1,
     opacity: 100,

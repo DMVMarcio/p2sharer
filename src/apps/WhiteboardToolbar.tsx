@@ -22,14 +22,16 @@ export function WhiteboardToolbar({ settings, onChange, canUndo, canRedo, onUndo
 }) {
   const menu = useContextMenu();
   const [open, setOpen] = useState(true);
+  const [shapeFilled, setShapeFilled] = useState<{ rectangle: boolean; ellipse: boolean }>({ rectangle: false, ellipse: false });
   const contentId = useId();
   const brushVariants = [
     ['pencil', Pencil, 'whiteboard.pencil'],
     ['pen', Pen, 'whiteboard.pen'],
     ['brush', Brush, 'whiteboard.brush'],
   ] as const;
-  const ActiveBrushIcon = brushVariants.find(([kind]) => kind === settings.brushType)?.[1] ?? Brush;
-  const activeBrushLabel = brushVariants.find(([kind]) => kind === settings.brushType)?.[2] ?? 'whiteboard.brush';
+  const activeBrush = brushVariants.find(([kind]) => kind === settings.brushType) ?? brushVariants[0];
+  const ActiveBrushIcon = activeBrush[1];
+  const activeBrushLabel = activeBrush[2];
   const tools = [
     ['pointer', MousePointer2],
     ['brush', ActiveBrushIcon],
@@ -52,22 +54,29 @@ export function WhiteboardToolbar({ settings, onChange, canUndo, canRedo, onUndo
         {tools.map(([tool, Icon]) => <TooltipButton key={tool} tooltip={t(tool === 'brush' ? activeBrushLabel : `whiteboard.${tool}`)} aria-pressed={settings.tool === tool}
           className={`room-app-notepad-tool ${settings.tool === tool ? 'active' : ''}`} onClick={event => {
             if (tool === 'brush') {
-              if (settings.tool !== 'brush') onChange({ ...settings, tool: 'brush' });
+              const currentBrush = activeBrush[0];
+              onChange({ ...settings, tool: 'brush', brushType: currentBrush });
               menu(event, brushVariants.map(([brushType, VariantIcon, labelKey]) => ({
                 id: `brush-${brushType}`, label: t(labelKey), tooltip: t(labelKey), iconOnly: true,
-                selected: settings.brushType === brushType,
+                selected: currentBrush === brushType,
                 icon: <VariantIcon size={18} strokeWidth={1.8} />,
                 onSelect: () => onChange({ ...settings, tool: 'brush', brushType }),
               })), { toggle: true, layout: 'grid', placement: 'top-center' });
-            } else if (tool === 'rectangle' || tool === 'ellipse') menu(event, [false, true].map(filled => ({
-              id: `${tool}-${filled}`, label: t(filled ? 'whiteboard.filled' : 'whiteboard.outline'),
-              tooltip: t(filled ? 'whiteboard.filled' : 'whiteboard.outline'), iconOnly: true,
-              selected: settings.tool === tool && settings.filled === filled,
-              icon: <Icon size={18} fill={filled ? 'currentColor' : 'none'} strokeWidth={1.8} />,
-              onSelect: () => onChange({ ...settings, tool, filled }),
-            })), { toggle: true, layout: 'grid', placement: 'top-center' });
-            else onChange({ ...settings, tool });
-          }}><Icon size={19} fill={settings.tool === tool && settings.filled && (tool === 'rectangle' || tool === 'ellipse') ? 'currentColor' : 'none'} /></TooltipButton>)}
+            } else if (tool === 'rectangle' || tool === 'ellipse') {
+              const currentFilled = shapeFilled[tool];
+              onChange({ ...settings, tool, filled: currentFilled });
+              menu(event, [false, true].map(filled => ({
+                id: `${tool}-${filled}`, label: t(filled ? 'whiteboard.filled' : 'whiteboard.outline'),
+                tooltip: t(filled ? 'whiteboard.filled' : 'whiteboard.outline'), iconOnly: true,
+                selected: currentFilled === filled,
+                icon: <Icon size={18} fill={filled ? 'currentColor' : 'none'} strokeWidth={1.8} />,
+                onSelect: () => {
+                  setShapeFilled(prev => ({ ...prev, [tool]: filled }));
+                  onChange({ ...settings, tool, filled });
+                },
+              })), { toggle: true, layout: 'grid', placement: 'top-center' });
+            } else onChange({ ...settings, tool });
+          }}><Icon size={19} fill={(tool === 'rectangle' || tool === 'ellipse') && (settings.tool === tool ? settings.filled : shapeFilled[tool]) ? 'currentColor' : 'none'} /></TooltipButton>)}
         {onPasteImage && <TooltipButton tooltip={t('whiteboard.pasteImage')} className="room-app-notepad-tool" onClick={onPasteImage}><ImagePlus size={19} /></TooltipButton>}
         <TooltipButton tooltip={t('message.2237b88f398f')} className="room-app-notepad-tool" onClick={event => menu(event, colors.map(([color, label]) => ({
           id: color, label: t(label), selected: color === settings.color, icon: <span className="stream-drawing-swatch" style={{ background: color }} />,

@@ -31,9 +31,16 @@ type Gesture = {
 };
 type ResizePreview = { id: string; layer: BoardLayer; shapes: BoardShape[]; bounds: BoardBox };
 
-function pointerPressure(event: { pointerType?: string; pressure?: number }): number | undefined {
-  if (event.pointerType === 'pen' || (typeof event.pressure === 'number' && event.pressure > 0 && event.pressure !== 0.5)) {
-    return Math.round(Math.max(0.05, Math.min(1, event.pressure || 0.5)) * 1000) / 1000;
+function pointerPressure(event: { pointerType?: string; pressure?: number }, final = false): number | undefined {
+  if (event.pointerType === 'pen') {
+    if (final && (!event.pressure || event.pressure <= 0)) return 0.02;
+    if (typeof event.pressure === 'number' && event.pressure > 0) {
+      return Math.round(Math.max(0.02, Math.min(1, event.pressure)) * 1000) / 1000;
+    }
+    return final ? 0.02 : 0.15;
+  }
+  if (typeof event.pressure === 'number' && event.pressure > 0 && event.pressure !== 0.5) {
+    return Math.round(Math.max(0.02, Math.min(1, event.pressure)) * 1000) / 1000;
   }
   return undefined;
 }
@@ -131,7 +138,7 @@ export function WhiteboardCanvas({ model, activeLayer, settings, viewport, onVie
         let lastLocal: BoardPoint = points[points.length - 1];
         for (const sample of samples) {
           const sampleWorld = clampBoardPoint(worldPoint(screenPoint(sample)));
-          const p = pointerPressure(sample);
+          const p = pointerPressure(sample, final);
           let local: BoardPoint = {
             x: Math.round((sampleWorld.x - g.layer.x) * 100) / 100,
             y: Math.round((sampleWorld.y - g.layer.y) * 100) / 100,

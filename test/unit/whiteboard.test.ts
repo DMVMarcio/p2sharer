@@ -184,6 +184,24 @@ test('unlimited stroke length splits seamlessly, preserves single-step undo, and
     assert.equal(hasVariablePressure(a.model.shapes[0]), true);
     const outline = brushPath(a.model.shapes[0]);
     assert.ok(outline.endsWith('Z'));
+    assert.doesNotMatch(outline, /\bA\b/);
+    const tabletStroke = shape({
+      tool: 'brush',
+      brushType: 'pen',
+      width: 40,
+      points: [{ x: 100, y: 200, p: 0.4 }, { x: 200, y: 200, p: 0.8 }, { x: 300, y: 200, p: 0.4 }],
+    });
+    const coords = [...brushPath(tabletStroke).matchAll(/[-.\d]+/g)].map(m => Number(m[0]));
+    const xs = coords.filter((_, idx) => idx % 2 === 0);
+    assert.ok(Math.min(...xs) < 100, 'Start cap bulges outward before first point');
+    assert.ok(Math.max(...xs) > 300, 'End cap bulges outward after last point');
+    const scribble = shape({
+      tool: 'brush',
+      brushType: 'brush',
+      width: 30,
+      points: [{ x: 100, y: 100, p: 0.5 }, { x: 250, y: 100, p: 0.9 }, { x: 100, y: 102, p: 0.6 }],
+    });
+    assert.ok((brushPath(scribble).match(/Z/g) ?? []).length >= 2, 'Hairpin scribble splits into non-inverting subpaths');
     const svg = boardSvg(a.model.shapes, a.model.layers);
     assert.match(svg, /<g opacity="0\.\d+">/);
     a.model.undo();
