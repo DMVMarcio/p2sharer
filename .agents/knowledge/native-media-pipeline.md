@@ -47,6 +47,7 @@ When capture devices output 5.1, 7.1, or other multi-channel audio:
   - **48kHz Stereo WaveFormat Fallback**: If device mix format pointer is null or unqueryable, a 16-bit PCM 48kHz stereo `WAVEFORMATEX` is synthesized as a fallback.
 - **Multi-Process Include Mode Loopback (`MultiCaptureSource`)**:
   - When the user selects multiple applications to transmit in `include` mode, `resolve_target_process_roots` discovers the unique top-level root PID for each candidate.
+  - Audio process snapshots use `refresh_process_tree` with `ProcessRefreshKind::new()`: routing consumes names and parent PIDs only, without querying CPU, memory, disk or executable paths. Ancestor walks share a visited-PID iterator so stale/reused parent identifiers cannot create infinite loops. Portable regressions exercise cycle termination and the live process-root/exclusion entry points without requiring audio devices.
   - Rust activates an independent `IAudioClient` loopback interface for each target root PID, initializing them with shared stream flags and mix format.
   - In the capture loop, `WaitForMultipleObjects` waits concurrently across all client event handles with a 5ms timeout.
   - When packets arrive, each client's PCM frames are downmixed to stereo `f32` and digitally mixed with headroom and a continuous soft clipper.

@@ -566,6 +566,31 @@ pub(crate) mod win_audio {
         }
     }
 
+    /// Audio routing only needs names and parent PIDs, not CPU, disk or executable queries.
+    pub(crate) fn refresh_process_tree(sys: &mut sysinfo::System) {
+        sys.refresh_processes_specifics(
+            sysinfo::ProcessesToUpdate::All, true, sysinfo::ProcessRefreshKind::new(),
+        );
+    }
+
+    pub(super) fn process_ancestry(start: u32, mut parent: impl FnMut(u32) -> Option<u32>)
+        -> impl Iterator<Item = u32> {
+        let mut next = Some(start);
+        let mut visited = std::collections::HashSet::new();
+        std::iter::from_fn(move || {
+            let current = next?;
+            // Parent PIDs can be stale or reused; a snapshot is not necessarily a tree.
+            if !visited.insert(current) { next = None; return None; }
+            next = parent(current);
+            Some(current)
+        })
+    }
+
+    fn ancestors(pid: u32, sys: &sysinfo::System) -> impl Iterator<Item = u32> + '_ {
+        process_ancestry(pid, |pid| sys.process(sysinfo::Pid::from_u32(pid))
+            .and_then(|process| process.parent()).map(|parent| parent.as_u32()))
+    }
+
     pub(crate) fn resolve_self_and_child_pids(sys: &sysinfo::System) -> Vec<u32> {
         let self_pid = std::process::id();
         let mut self_pids = vec![self_pid];
@@ -600,23 +625,15 @@ pub(crate) mod win_audio {
     }
 
     pub(crate) fn resolve_single_process_root(pid: u32, sys: &sysinfo::System) -> u32 {
-        let mut curr = sysinfo::Pid::from_u32(pid);
-        let start_name = sys.process(curr).map(|p| p.name().to_string_lossy().to_lowercase());
-
-        while let Some(proc) = sys.process(curr) {
-            if let Some(parent_pid) = proc.parent() {
-                if let Some(parent_proc) = sys.process(parent_pid) {
-                    let parent_name = parent_proc.name().to_string_lossy().to_lowercase();
-                    if start_name.as_deref() == Some(&parent_name) {
-                        curr = parent_pid;
-                        continue;
-                    }
-                }
-            }
-            break;
+        let start_name = sys.process(sysinfo::Pid::from_u32(pid))
+            .map(|p| p.name().to_string_lossy().to_lowercase());
+        let mut root = pid;
+        for parent in ancestors(pid, sys).skip(1) {
+            let Some(process) = sys.process(sysinfo::Pid::from_u32(parent)) else { break; };
+            if start_name.as_deref() != Some(&process.name().to_string_lossy().to_lowercase()) { break; }
+            root = parent;
         }
-
-        curr.as_u32()
+        root
     }
 
     pub(crate) fn is_pid_or_ancestor_excluded(
@@ -626,12 +643,9 @@ pub(crate) mod win_audio {
         self_pids: &[u32],
         sys: &sysinfo::System,
     ) -> bool {
-        if self_pids.contains(&pid) || excluded_roots.contains(&pid) {
-            return true;
-        }
-
-        let mut curr = sysinfo::Pid::from_u32(pid);
-        while let Some(proc) = sys.process(curr) {
+        for current in ancestors(pid, sys) {
+            if self_pids.contains(&current) || excluded_roots.contains(&current) { return true; }
+            let Some(proc) = sys.process(sysinfo::Pid::from_u32(current)) else { break; };
             let p_name = proc.name().to_string_lossy().to_lowercase();
             if excluded_names.iter().any(|target| {
                 let target_clean = target.trim_end_matches(".exe");
@@ -641,15 +655,6 @@ pub(crate) mod win_audio {
                 return true;
             }
 
-            if let Some(parent_pid) = proc.parent() {
-                let p_u32 = parent_pid.as_u32();
-                if self_pids.contains(&p_u32) || excluded_roots.contains(&p_u32) {
-                    return true;
-                }
-                curr = parent_pid;
-            } else {
-                break;
-            }
         }
 
         false
@@ -661,7 +666,7 @@ pub(crate) mod win_audio {
         self_pids: &[u32],
         sys: &mut sysinfo::System,
     ) -> Vec<u32> {
-        sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+        refresh_process_tree(sys);
         let mut non_excluded: Vec<u32> = Vec::new();
 
         unsafe {
@@ -706,7 +711,7 @@ pub(crate) mod win_audio {
         target_pids: &[u32],
     ) -> Vec<u32> {
         let mut sys = sysinfo::System::new();
-        sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+        refresh_process_tree(&mut sys);
 
         let normalized_names: Vec<String> = target_names
             .iter()
@@ -742,20 +747,8 @@ pub(crate) mod win_audio {
         // A candidate PID is a top-level root candidate only if no other candidate PID is an ancestor of it.
         let mut top_level_candidates: Vec<u32> = Vec::new();
         for &pid in &candidate_pids {
-            let mut curr = sysinfo::Pid::from_u32(pid);
-            let mut has_candidate_ancestor = false;
-            while let Some(proc) = sys.process(curr) {
-                if let Some(parent_pid) = proc.parent() {
-                    let parent_u32 = parent_pid.as_u32();
-                    if candidate_pids.contains(&parent_u32) {
-                        has_candidate_ancestor = true;
-                        break;
-                    }
-                    curr = parent_pid;
-                } else {
-                    break;
-                }
-            }
+            let has_candidate_ancestor = ancestors(pid, &sys).skip(1)
+                .any(|parent| candidate_pids.contains(&parent));
             if !has_candidate_ancestor && !top_level_candidates.contains(&pid) {
                 top_level_candidates.push(pid);
             }
@@ -763,23 +756,7 @@ pub(crate) mod win_audio {
 
         let mut root_pids: Vec<u32> = Vec::new();
         for &start_pid in &top_level_candidates {
-            let mut curr = sysinfo::Pid::from_u32(start_pid);
-            let start_name = sys.process(curr).map(|p| p.name().to_string_lossy().to_lowercase());
-
-            while let Some(proc) = sys.process(curr) {
-                if let Some(parent_pid) = proc.parent() {
-                    if let Some(parent_proc) = sys.process(parent_pid) {
-                        let parent_name = parent_proc.name().to_string_lossy().to_lowercase();
-                        if start_name.as_deref() == Some(&parent_name) {
-                            curr = parent_pid;
-                            continue;
-                        }
-                    }
-                }
-                break;
-            }
-
-            let r_u32 = curr.as_u32();
+            let r_u32 = resolve_single_process_root(start_pid, &sys);
             if !root_pids.contains(&r_u32) {
                 root_pids.push(r_u32);
             }
@@ -979,8 +956,8 @@ pub(crate) mod win_audio {
 
             let buffer_duration = 10_000_000i64; // 1 second buffer in 100ns units
 
-            let mut sys = sysinfo::System::new_all();
-            sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+            let mut sys = sysinfo::System::new();
+            refresh_process_tree(&mut sys);
             let self_pids = resolve_self_and_child_pids(&sys);
 
             let normalized_names: Vec<String> = config
@@ -1124,7 +1101,7 @@ pub(crate) mod win_audio {
                 let worker_target_pids = config.target_pids.clone();
                 std::thread::spawn(move || {
                     let initialized = CoInitializeEx(None, COINIT_MULTITHREADED).is_ok();
-                    let mut worker_sys = sysinfo::System::new_all();
+                    let mut worker_sys = sysinfo::System::new();
                     while worker_stop.load(Ordering::Relaxed) {
                         let active = if is_multi_exclude {
                             discover_active_non_excluded_pids(
@@ -1133,7 +1110,7 @@ pub(crate) mod win_audio {
                         } else {
                             resolve_target_process_roots(&worker_targets, &worker_target_pids)
                         };
-                        worker_sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+                        refresh_process_tree(&mut worker_sys);
                         let live: Vec<u32> = worker_sys.processes().keys().map(|pid| pid.as_u32()).collect();
                         let _ = session_tx.try_send((active, live));
                         std::thread::sleep(std::time::Duration::from_millis(500));
@@ -1414,6 +1391,29 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
+    fn process_ancestry_terminates_for_cycles_missing_parents_and_deep_trees() {
+        use std::collections::HashMap;
+        for (parents, start, expected) in [
+            (vec![(7, 7)], 7, vec![7]),
+            (vec![(7, 8), (8, 9), (9, 7)], 7, vec![7, 8, 9]),
+            (vec![(7, 8), (8, 9)], 7, vec![7, 8, 9]),
+            (vec![], 7, vec![7]),
+        ] {
+            let parents: HashMap<_, _> = parents.into_iter().collect();
+            let mut reads = 0;
+            let actual = win_audio::process_ancestry(start, |pid| {
+                reads += 1;
+                assert!(reads <= parents.len() + 1, "An ancestry walk must not revisit a process");
+                parents.get(&pid).copied()
+            }).collect::<Vec<_>>();
+            assert_eq!(actual, expected);
+        }
+        // Legitimate process trees must not be truncated by an arbitrary depth cap.
+        assert_eq!(win_audio::process_ancestry(256, |pid| pid.checked_sub(1)).count(), 257);
+    }
+
+    #[cfg(windows)]
+    #[test]
     fn production_event_guard_closes_on_scope_exit_and_unwind() {
         use windows::core::PCWSTR;
         use windows::Win32::Foundation::GetHandleInformation;
@@ -1646,8 +1646,8 @@ mod tests {
         let roots = win_audio::resolve_target_process_roots(&["p2sharer".to_string()], &[my_pid]);
         assert!(!roots.is_empty(), "Should resolve roots for target");
 
-        let mut sys = sysinfo::System::new_all();
-        sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+        let mut sys = sysinfo::System::new();
+        win_audio::refresh_process_tree(&mut sys);
         let self_pids = win_audio::resolve_self_and_child_pids(&sys);
         assert!(self_pids.contains(&my_pid), "Self PIDs must contain current PID");
 
