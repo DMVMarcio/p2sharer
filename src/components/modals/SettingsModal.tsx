@@ -81,6 +81,8 @@ export const SettingsModal: React.FC = () => {
   const [sfxEnabled, setSfxEnabled] = useState(() => soundEffects.getEnabled());
   const [soundEvents, setSoundEvents] = useState(() => soundEffects.getEventPreferences());
   const [sfxVolume, setSfxVolume] = useState(() => Math.round(soundEffects.getVolume() * 100));
+  const [animationsEnabled, setAnimationsEnabled] = useState(() => stateStore.animationsEnabled);
+  const [visualEffectsEnabled, setVisualEffectsEnabled] = useState(() => stateStore.visualEffectsEnabled);
 
   const [defaultRes, setDefaultRes] = useState(
     () => localStorage.getItem('p2sharer_default_res') || INITIAL_TRANSMISSION_DEFAULTS.resolution
@@ -185,6 +187,8 @@ export const SettingsModal: React.FC = () => {
     localStorage.setItem(NICKNAME_STYLE_KEY, JSON.stringify(nicknameStyle));
     stateStore.set(s => { s.nicknameStyle = nicknameStyle; });
     roomService.roomManager?.refreshProfile();
+
+    stateStore.saveAppearancePreferences({ animations: animationsEnabled, visualEffects: visualEffectsEnabled });
 
     // Save SFX
     saveEmojiPack(emojiPack);
@@ -527,6 +531,43 @@ export const SettingsModal: React.FC = () => {
                   <label className="settings-label">{t("message.d0bc3fef4a6e")}</label>
                   <ColorPalette id="accent-colors-palette" label={t("message.d0bc3fef4a6e")} value={accentColor}
                     onChange={setAccentColor} presets={ACCENT_COLORS.map(item => ({ value: item.id, color: item.color, label: item.label }))} />
+                </div>
+
+                <div className="settings-row">
+                  <label className="settings-switch-row" htmlFor="settings-animations-enabled">
+                    <div className="settings-switch-label-group">
+                      <span className="settings-switch-title">{t('appearance.animations.title')}</span>
+                      <span className="settings-switch-subtitle">{t('appearance.animations.description')}</span>
+                    </div>
+                    <div className="modern-switch">
+                      <input
+                        autoComplete="off"
+                        type="checkbox"
+                        id="settings-animations-enabled"
+                        checked={animationsEnabled}
+                        disabled={saving || profileBusy}
+                        onChange={(event) => setAnimationsEnabled(event.target.checked)}
+                      />
+                      <span className="switch-slider" />
+                    </div>
+                  </label>
+                  <label className="settings-switch-row" htmlFor="settings-visual-effects-enabled">
+                    <div className="settings-switch-label-group">
+                      <span className="settings-switch-title">{t('appearance.visualEffects.title')}</span>
+                      <span className="settings-switch-subtitle">{t('appearance.visualEffects.description')}</span>
+                    </div>
+                    <div className="modern-switch">
+                      <input
+                        autoComplete="off"
+                        type="checkbox"
+                        id="settings-visual-effects-enabled"
+                        checked={visualEffectsEnabled}
+                        disabled={saving || profileBusy}
+                        onChange={(event) => setVisualEffectsEnabled(event.target.checked)}
+                      />
+                      <span className="switch-slider" />
+                    </div>
+                  </label>
                 </div>
               </div>
             )}

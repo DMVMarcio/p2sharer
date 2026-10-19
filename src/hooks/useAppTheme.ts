@@ -5,6 +5,7 @@ import { ThemeMode } from '../core/types';
 import { useStore } from './useStore';
 import { customAccentTokens } from '../core/accent_color';
 import { backgroundTokens, normalizeBackground } from '../core/background_color';
+import { applyAppearanceAttributes } from '../core/appearance_preferences';
 
 export const ACCENT_COLORS = [
   { id: 'cyan', get label() { return t("message.c954e4de2019"); }, color: '#06b6d4' },
@@ -31,6 +32,8 @@ export function useAppTheme() {
   const currentThemeMode = useStore((s) => s.currentThemeMode);
   const currentAccentColor = useStore((s) => s.currentAccentColor);
   const currentBackgroundColor = useStore((s) => s.currentBackgroundColor);
+  const animationsEnabled = useStore((s) => s.animationsEnabled);
+  const visualEffectsEnabled = useStore((s) => s.visualEffectsEnabled);
 
   const applyBackgroundColor = useCallback((color: string) => {
     const normalized = normalizeBackground(color);
@@ -79,6 +82,18 @@ export function useAppTheme() {
     }
   }, [currentAccentColor]);
 
+  useEffect(() => {
+    applyAppearanceAttributes(animationsEnabled, visualEffectsEnabled);
+  }, [animationsEnabled, visualEffectsEnabled]);
+
+  const applyAnimationsEnabled = useCallback((enabled: boolean) => {
+    stateStore.saveAppearancePreferences({ animations: enabled, visualEffects: stateStore.visualEffectsEnabled });
+  }, []);
+
+  const applyVisualEffectsEnabled = useCallback((enabled: boolean) => {
+    stateStore.saveAppearancePreferences({ animations: stateStore.animationsEnabled, visualEffects: enabled });
+  }, []);
+
   return {
     themeMode: currentThemeMode,
     accentColor: currentAccentColor,
@@ -86,5 +101,9 @@ export function useAppTheme() {
     setBackgroundColor: applyBackgroundColor,
     setThemeMode: applyThemeMode,
     setAccentColor: applyAccentColor,
+    animationsEnabled,
+    visualEffectsEnabled,
+    setAnimationsEnabled: applyAnimationsEnabled,
+    setVisualEffectsEnabled: applyVisualEffectsEnabled,
   };
 }

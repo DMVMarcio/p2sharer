@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent, type KeyboardEvent, type RefObject } from 'react';
 import { moveOrderedItem } from '../core/ordered_items.ts';
+import { isReducedMotion } from '../core/appearance_preferences.ts';
 
 interface Drag {
   id: string; pointerId: number; initial: string[]; x: number; y: number;
@@ -86,7 +87,7 @@ export function useSortableGrid(ids: string[], onCommit: (ids: string[]) => bool
 
   useLayoutEffect(() => {
     pendingLayout.current = false;
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reducedMotion = isReducedMotion();
     const transition = getComputedStyle(gridRef.current || document.documentElement).getPropertyValue('--transition-normal').trim();
     const duration = reducedMotion ? 0 : parseFloat(transition) * 1000;
     const easing = transition.slice(transition.indexOf(' ') + 1);

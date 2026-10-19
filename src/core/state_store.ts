@@ -4,6 +4,9 @@ import { normalizeBackground } from './background_color.ts';
 import { streamDrawingLimit, STREAM_DRAWING_MAX } from './stream_pointer.ts';
 import type { ResolutionConfig, RoomSlotInfo, StreamFilterMode, ThemeMode, TurnConfig } from './types.ts';
 import { parseTurnUrls } from '../p2p/ice_config.ts';
+import { isTauri } from '@tauri-apps/api/core';
+import { detectHardwareAcceleration } from './hardware_acceleration.ts';
+import { applyAppearanceAttributes } from './appearance_preferences.ts';
 
 export interface TransmissionDefaults {
   resolution: string;
@@ -47,6 +50,8 @@ export class StateStore {
   public currentThemeMode: ThemeMode = 'dark';
   public currentAccentColor: string = 'cyan';
   public currentBackgroundColor: string = 'graphite';
+  public animationsEnabled: boolean = true;
+  public visualEffectsEnabled: boolean = true;
 
   public currentFps: number = INITIAL_TRANSMISSION_DEFAULTS.fps;
   public currentBitrate: number = this.getDefaultBitrateForResolution(INITIAL_TRANSMISSION_DEFAULTS.resolution);
@@ -127,6 +132,35 @@ export class StateStore {
     this.currentAccentColor = localStorage.getItem('p2sharer_accent_color') || 'cyan';
     this.currentBackgroundColor = normalizeBackground(localStorage.getItem('p2sharer_background_color') || 'graphite');
 
+    const savedAnimations = localStorage.getItem('p2sharer_animations');
+    const savedVisualEffects = localStorage.getItem('p2sharer_visual_effects');
+
+    if (savedAnimations !== null) {
+      this.animationsEnabled = savedAnimations !== 'false';
+    } else {
+      if (!isTauri() && !detectHardwareAcceleration()) {
+        this.animationsEnabled = false;
+        localStorage.setItem('p2sharer_animations', 'false');
+      } else if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+        this.animationsEnabled = false;
+      } else {
+        this.animationsEnabled = true;
+      }
+    }
+
+    if (savedVisualEffects !== null) {
+      this.visualEffectsEnabled = savedVisualEffects !== 'false';
+    } else {
+      if (!isTauri() && !detectHardwareAcceleration()) {
+        this.visualEffectsEnabled = false;
+        localStorage.setItem('p2sharer_visual_effects', 'false');
+      } else {
+        this.visualEffectsEnabled = true;
+      }
+    }
+
+    applyAppearanceAttributes(this.animationsEnabled, this.visualEffectsEnabled);
+
     this.rememberTransmissionSettings = localStorage.getItem('p2sharer_remember_transmission_settings') !== 'false';
     const savedRes = localStorage.getItem('p2sharer_default_res') || INITIAL_TRANSMISSION_DEFAULTS.resolution;
     this.currentResolution = this.parseResolution(savedRes);
@@ -179,6 +213,18 @@ export class StateStore {
       state.currentBitrate = settings.bitrate;
       state.currentQuality = settings.quality;
     });
+  }
+
+  public saveAppearancePreferences(prefs: { animations: boolean; visualEffects: boolean }): void {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('p2sharer_animations', String(prefs.animations));
+      localStorage.setItem('p2sharer_visual_effects', String(prefs.visualEffects));
+    }
+    this.set((state) => {
+      state.animationsEnabled = prefs.animations;
+      state.visualEffectsEnabled = prefs.visualEffects;
+    });
+    applyAppearanceAttributes(prefs.animations, prefs.visualEffects);
   }
 
   public getDefaultBitrateForResolution(resLabel: string): number {

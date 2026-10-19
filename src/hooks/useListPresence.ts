@@ -1,4 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { isReducedMotion } from '../core/appearance_preferences.ts';
+import { stateStore } from '../core/state_store.ts';
 
 // Matches --content-exit-duration, shared with content transitions.
 const EXIT_DURATION_MS = 150;
@@ -11,7 +13,7 @@ export function useListPresence<T extends Item>(items: readonly T[]) {
   const timers = useRef(new Map<Item['id'], ReturnType<typeof setTimeout>>());
   useLayoutEffect(() => {
     const live = new Set(items.map(item => item.id));
-    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const reduced = isReducedMotion();
     for (const [id, timer] of timers.current) if (live.has(id) || reduced) { clearTimeout(timer); timers.current.delete(id); }
     setEntries(previous => {
       const result = items.map(item => { const old = previous.find(entry => entry.item.id === item.id);
@@ -33,12 +35,18 @@ export function useListPresence<T extends Item>(items: readonly T[]) {
   useEffect(() => {
     const motion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
     const remove = () => {
-      if (!motion?.matches) return;
+      if (!isReducedMotion()) return;
       for (const timer of timers.current.values()) clearTimeout(timer); timers.current.clear();
       setEntries(latest.current.map(item => ({ item, entering: false, exiting: false })));
     };
+    const unsubscribe = stateStore.subscribe(remove);
     motion?.addEventListener?.('change', remove);
-    return () => { motion?.removeEventListener?.('change', remove); for (const timer of timers.current.values()) clearTimeout(timer); timers.current.clear(); };
+    return () => {
+      motion?.removeEventListener?.('change', remove);
+      unsubscribe();
+      for (const timer of timers.current.values()) clearTimeout(timer);
+      timers.current.clear();
+    };
   }, []);
   return entries;
 }

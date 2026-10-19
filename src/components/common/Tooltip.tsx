@@ -8,6 +8,7 @@ import React, {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { calculateTooltipPosition } from './tooltip_utils';
+import { isReducedMotion } from '../../core/appearance_preferences';
 
 export interface TooltipProps {
   /** The content to show inside the tooltip. If null or undefined, tooltip will not appear. */
@@ -69,7 +70,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
   const isCompact = compact ?? (typeof content === 'string' && !tooltipClassName);
 
   const getExitDuration = useCallback(() => {
-    if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+    if (isReducedMotion()) {
       return 0;
     }
     return exitDuration ?? (hideDelay < 20 ? 0 : 140);

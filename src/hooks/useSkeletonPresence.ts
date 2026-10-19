@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { isReducedMotion } from '../core/appearance_preferences.ts';
 
 // Keep in sync with --source-loading-duration in style.css.
 const FADE_DURATION_MS = 400;
@@ -9,7 +10,7 @@ export function useSkeletonPresence(loading: boolean) {
   useEffect(() => {
     if (loading) { setRetained(true); return; }
     if (!retained) return;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { setRetained(false); return; }
+    if (isReducedMotion()) { setRetained(false); return; }
     const timer = window.setTimeout(() => setRetained(false), FADE_DURATION_MS);
     return () => window.clearTimeout(timer);
   }, [loading, retained]);

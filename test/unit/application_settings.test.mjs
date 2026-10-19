@@ -203,6 +203,28 @@ test('appearance applies and persists custom colors and restores preset tokens',
   assert.equal(localStorage.getItem('p2sharer_accent_color'), 'brown');
   assert.equal(document.documentElement.getAttribute('data-accent'), 'brown');
   assert.equal(document.documentElement.style.getPropertyValue('--custom-accent-color'), '');
+
+  const animSwitch = document.querySelector('#settings-animations-enabled');
+  const fxSwitch = document.querySelector('#settings-visual-effects-enabled');
+  assert.ok(animSwitch, 'Animations switch is present');
+  assert.ok(fxSwitch, 'Visual effects switch is present');
+  assert.equal(animSwitch.checked, false, 'Animations disabled by default when prefers-reduced-motion matches');
+  assert.equal(fxSwitch.checked, true, 'Visual effects enabled by default');
+
+  await act(async () => {
+    animSwitch.click();
+    fxSwitch.click();
+  });
+  assert.equal(animSwitch.checked, true);
+  assert.equal(fxSwitch.checked, false);
+
+  await act(async () => document.querySelector('#btn-save-settings').click());
+  assert.equal(localStorage.getItem('p2sharer_animations'), 'true');
+  assert.equal(localStorage.getItem('p2sharer_visual_effects'), 'false');
+  assert.equal(stateStore.animationsEnabled, true);
+  assert.equal(stateStore.visualEffectsEnabled, false);
+  assert.equal(document.documentElement.getAttribute('data-reduced-motion'), null);
+  assert.equal(document.documentElement.getAttribute('data-reduced-effects'), 'true');
 });
 
 test('application update controls keep drafts unsaved and check only the saved channel', async () => {

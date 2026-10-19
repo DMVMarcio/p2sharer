@@ -5735,3 +5735,122 @@ body:has(.fullscreen-dialog, .chat-image-viewer) .window-titlebar { display: non
 .desktop-feature-message { display: flex; flex-direction: column; gap: 8px; max-width: 270px; }
 .desktop-feature-message a { color: var(--accent-color); text-decoration: underline; }
 .header-web-home img { width: 28px; height: 28px; object-fit: contain; }
+
+/* ==========================================================================
+   PERFORMANCE & ACCESSIBILITY OVERRIDES (Reduced Motion & Reduced Visual Effects)
+   ========================================================================== */
+
+:root[data-reduced-motion="true"] {
+  --transition-fast: 0s !important;
+  --transition-normal: 0s !important;
+  --content-exit-duration: 0ms !important;
+  --dropdown-enter-duration: 0ms !important;
+  --dropdown-exit-duration: 0ms !important;
+  --source-loading-duration: 0ms !important;
+}
+
+:root[data-reduced-motion="true"] .header-invite-icon,
+:root[data-reduced-motion="true"] .badge-live-dot,
+:root[data-reduced-motion="true"] .stream-zoom-bar,
+:root[data-reduced-motion="true"] .modal-overlay,
+:root[data-reduced-motion="true"] .modal-overlay .modal-card,
+:root[data-reduced-motion="true"] .modal-overlay.closing,
+:root[data-reduced-motion="true"] .modal-overlay.closing .modal-card,
+:root[data-reduced-motion="true"] .toast,
+:root[data-reduced-motion="true"] .toast.is-exiting,
+:root[data-reduced-motion="true"] .media-loading-overlay,
+:root[data-reduced-motion="true"] .media-loading-overlay.closing,
+:root[data-reduced-motion="true"] .loading-spinner,
+:root[data-reduced-motion="true"] .context-menu,
+:root[data-reduced-motion="true"] .context-menu.dropdown-closing,
+:root[data-reduced-motion="true"] .app-select-list,
+:root[data-reduced-motion="true"] .app-select-list.dropdown-closing,
+:root[data-reduced-motion="true"] .audio-refresh-spinning {
+  animation: none !important;
+}
+
+:root[data-reduced-motion="true"] .app-workspace.is-home .app-header,
+:root[data-reduced-motion="true"] .participant-card,
+:root[data-reduced-motion="true"] .btn-watch-stream,
+:root[data-reduced-motion="true"] .btn-stop-watch-stream,
+:root[data-reduced-motion="true"] .stat-badge,
+:root[data-reduced-motion="true"] .stream-volume-controller::before,
+:root[data-reduced-motion="true"] .sidebar-edge-toggle-btn,
+:root[data-reduced-motion="true"] .user-card,
+:root[data-reduced-motion="true"] .app-select,
+:root[data-reduced-motion="true"] .app-select-chevron,
+:root[data-reduced-motion="true"] .app-select-option,
+:root[data-reduced-motion="true"] .context-menu button,
+:root[data-reduced-motion="true"] .context-menu-row,
+:root[data-reduced-motion="true"] .chat-file-download-menu button,
+:root[data-reduced-motion="true"] .profile-upload-overlay,
+:root[data-reduced-motion="true"] .collapsible-region {
+  transition: none !important;
+}
+
+:root[data-reduced-effects="true"] *,
+:root[data-reduced-effects="true"] *::before,
+:root[data-reduced-effects="true"] *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+:root[data-reduced-effects="true"] .profile-card-banner.is-blurred img {
+  filter: none !important;
+}
+
+:root[data-reduced-effects="true"] .app-workspace.is-home {
+  background: var(--bg-app) !important;
+}
+
+:root[data-reduced-effects="true"] .app-workspace.is-home .app-header.is-home-scrolled {
+  background-color: var(--bg-app) !important;
+  backdrop-filter: none !important;
+}
+
+:root[data-reduced-effects="true"] .modal-overlay,
+:root[data-reduced-effects="true"] .connecting-overlay {
+  background-color: var(--bg-overlay) !important;
+  backdrop-filter: none !important;
+}
+
+:root[data-reduced-effects="true"] .participant-card {
+  background: var(--card-color, var(--user-color, var(--bg-card))) !important;
+}
+
+:root[data-reduced-effects="true"] .participant-avatar-badge {
+  background-color: rgba(255, 255, 255, 0.28) !important;
+  backdrop-filter: none !important;
+}
+
+:root[data-reduced-effects="true"] .stream-card-overlay,
+:root[data-reduced-effects="true"] .btn-stop-watch-stream,
+:root[data-reduced-effects="true"] .stat-badge,
+:root[data-reduced-effects="true"] .stream-zoom-bar,
+:root[data-reduced-effects="true"] .sidebar-edge-toggle-btn,
+:root[data-reduced-effects="true"] .stream-volume-controller::before,
+:root[data-reduced-effects="true"] .badge-live-stream,
+:root[data-reduced-effects="true"] .badge-live-watchers,
+:root[data-reduced-effects="true"] .badge-you {
+  background-color: var(--bg-elevated) !important;
+  backdrop-filter: none !important;
+}
+
+:root[data-reduced-effects="true"] .context-menu {
+  background: var(--bg-card) !important;
+  box-shadow: var(--shadow-md) !important;
+  backdrop-filter: none !important;
+}
+
+:root[data-reduced-effects="true"] .app-select-list {
+  background: var(--bg-input) !important;
+  box-shadow: var(--shadow-md) !important;
+  backdrop-filter: none !important;
+}
+
+:root[data-reduced-effects="true"] .nickname-effect-gradient,
+:root[data-reduced-effects="true"] .nickname-effect-rainbow,
+:root[data-reduced-effects="true"] .nickname-effect-shine {
+  background-image: none !important;
+  color: var(--nickname-color, inherit) !important;
+}

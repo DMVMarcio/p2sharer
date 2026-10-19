@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ToastItem } from '../core/toast_manager';
+import { useReducedMotion } from '../core/appearance_preferences';
 
 interface PresentedToast extends ToastItem { exiting: boolean; }
 
@@ -10,20 +11,12 @@ const MOVE_MS = 220;
 /** Retain inert exits and animate stack movement independently of each toast's entrance. */
 export function useToastStack(toasts: ToastItem[]) {
   const [items, setItems] = useState<PresentedToast[]>(() => toasts.map(item => ({ ...item, exiting: false })));
-  const [reducedMotion, setReducedMotion] = useState(() => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
+  const reducedMotion = useReducedMotion();
   const nodes = useRef(new Map<string, HTMLDivElement>());
   const callbacks = useRef(new Map<string, (node: HTMLDivElement | null) => void>());
   const positions = useRef(new Map<string, number>());
   const animations = useRef(new Map<string, Animation>());
   const exits = useRef(new Map<string, number>());
-
-  useEffect(() => {
-    const motion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
-    const change = () => setReducedMotion(motion?.matches ?? false);
-    change();
-    motion?.addEventListener?.('change', change);
-    return () => motion?.removeEventListener?.('change', change);
-  }, []);
 
   useLayoutEffect(() => {
     setItems(previous => {
