@@ -2,15 +2,16 @@ import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { resolve, extname, sep, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { latestDownloads, releasesUrl } from './downloads.mjs';
 
 const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../web/dist');
 const contentTypes = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.png': 'image/png',
   '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.ico': 'image/x-icon' };
-const releases = 'https://github.com/DMVMarcio/p2sharer/releases/latest';
+const releases = releasesUrl;
 
 /** Same-origin API and production asset host. Room content stays on the P2P mesh. */
-export function createWebServer({ root = webRoot } = {}) {
+export function createWebServer({ root = webRoot, downloads = latestDownloads } = {}) {
   return createServer(async (request, response) => {
     response.setHeader('X-Content-Type-Options', 'nosniff');
     response.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -34,12 +35,16 @@ export function createWebServer({ root = webRoot } = {}) {
       }
       if (path === '/api/health') return send(200, JSON.stringify({ status: 'ok' }));
       if (path === '/api/config') return send(200, JSON.stringify({ runtime: 'web', downloadsUrl: releases }));
+      if (path === '/api/downloads') {
+        try { return send(200, JSON.stringify(await downloads())); }
+        catch { return send(503, JSON.stringify({ error: 'Downloads temporarily unavailable' })); }
+      }
       if (path === '/api/download') {
         response.writeHead(302, { Location: releases });
         return response.end();
       }
       if (path.startsWith('/api/')) return send(404, JSON.stringify({ error: 'Not found' }));
-      const route = path === '/' || path === '/app' || path === '/app/';
+      const route = path === '/' || path === '/download' || path === '/app' || path === '/app/' || /^\/app\/[0-9a-f]{32}\/?$/.test(path);
       const file = resolve(root, route ? 'index.html' : `.${path}`);
       if (!file.startsWith(resolve(root) + sep)) return send(400, JSON.stringify({ error: 'Invalid path' }));
       if (!(await stat(file)).isFile()) return send(404, JSON.stringify({ error: 'Not found' }));

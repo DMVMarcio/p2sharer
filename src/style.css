@@ -3,6 +3,7 @@
    ========================================================================== */
 
 @import './components/common/MediaVolumeControl.css';
+@import './components/common/ChoiceCards.css';
 
 :root {
   /* Fonts */
@@ -5728,3 +5729,8 @@ body:has(.fullscreen-dialog, .chat-image-viewer) .window-titlebar { display: non
 .collapsible-region.is-open { grid-template-rows: 1fr; opacity: 1; }
 .collapsible-region-content { min-height: 0; overflow: hidden; }
 @media (prefers-reduced-motion: reduce) { .collapsible-region { transition: none; } }
+
+.desktop-feature-trigger { display: inline-flex; }
+.desktop-feature-message { display: flex; flex-direction: column; gap: 8px; max-width: 270px; }
+.desktop-feature-message a { color: var(--accent-color); text-decoration: underline; }
+.header-web-home img { width: 28px; height: 28px; object-fit: contain; }

@@ -1,4 +1,6 @@
-import { ArrowUpRight, Download, FileText, Monitor, Network, Pencil, Play } from 'lucide-react';
+import { DownloadButton } from '../../src/components/common/DownloadButton';
+import { DownloadPanel } from '../../src/components/common/DownloadPanel';
+import { ArrowUpRight, FileText, Monitor, Network, Pencil, Play } from 'lucide-react';
 import { useAppTheme } from '../../src/hooks/useAppTheme';
 import { useLocale } from '../../src/hooks/useLocale';
 import { t, getLanguage, setLanguage } from '../../src/i18n';
@@ -26,6 +28,7 @@ export function LandingPage() {
       </nav>
     </header>
     <main id="content">
+      {location.pathname === '/download' ? <div className="site-download"><h1>{t('downloads.title')}</h1><DownloadPanel /></div> : <>
       <section className="site-hero">
         <div>
           <p className="site-eyebrow">{t('web.eyebrow')}</p>
@@ -33,7 +36,7 @@ export function LandingPage() {
           <p className="site-description">{t('home.description')}</p>
           <div className="site-actions">
             <a className="btn btn-primary" href="/app">{t('web.open')}<ArrowUpRight size={18} aria-hidden="true" /></a>
-            <a className="btn btn-secondary" href="/api/download"><Download size={18} aria-hidden="true" />{t('web.download')}</a>
+            <DownloadButton />
           </div>
           <p className="site-note">{t('web.noAccount')}</p>
         </div>
@@ -52,6 +55,7 @@ export function LandingPage() {
         <div><p className="site-eyebrow">{t('web.platformTitle')}</p><h2>{t('web.platformHeading')}</h2></div>
         <div><p>{t('web.platformText')}</p><a className="btn btn-primary" href="/app">{t('web.open')}<ArrowUpRight size={17} aria-hidden="true" /></a></div>
       </section>
+      </>}
     </main>
     <footer className="site-footer"><span>P2Sharer</span><a href="https://github.com/DMVMarcio/p2sharer" target="_blank" rel="noopener noreferrer">GitHub<ArrowUpRight size={14} aria-hidden="true" /></a></footer>
   </div></ContextMenuProvider>;

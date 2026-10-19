@@ -223,7 +223,10 @@ export const Tooltip: React.FC<TooltipProps> = ({
     };
     const escape = (event: KeyboardEvent) => {
       pointerActivationRef.current = false;
-      if (event.key === 'Escape') dismiss();
+      if (event.key === 'Escape') {
+        if (interactive && tooltipRef.current?.contains(document.activeElement)) triggerRef.current?.focus({ preventScroll: true });
+        dismiss();
+      }
     };
     window.addEventListener('blur', dismiss);
     window.addEventListener('resize', dismiss);
@@ -325,7 +328,8 @@ export const Tooltip: React.FC<TooltipProps> = ({
       children.props.onFocus?.(e);
     },
     onBlur: (e: React.FocusEvent) => {
-      handleHide();
+      if (interactive && tooltipRef.current?.contains(e.relatedTarget as Node | null)) clearTimers();
+      else handleHide();
       children.props.onBlur?.(e);
     },
     onPointerDown: (e: React.PointerEvent) => {
@@ -336,6 +340,10 @@ export const Tooltip: React.FC<TooltipProps> = ({
     onKeyDown: (e: React.KeyboardEvent) => {
       pointerActivationRef.current = false;
       if (e.key === 'Escape') dismiss();
+      if (interactive && isOpen && e.key === 'Tab' && !e.shiftKey) {
+        const first = tooltipRef.current?.querySelector<HTMLElement>('a[href], button:not(:disabled), [tabindex="0"]');
+        if (first) { e.preventDefault(); first.focus(); }
+      }
       children.props.onKeyDown?.(e);
     },
     'aria-describedby': isOpen ? tooltipId : undefined,
@@ -363,6 +371,11 @@ export const Tooltip: React.FC<TooltipProps> = ({
             }}
             onMouseEnter={interactive ? clearTimers : undefined}
             onMouseLeave={interactive ? handleHide : undefined}
+            onFocusCapture={interactive ? clearTimers : undefined}
+            onBlur={interactive ? event => {
+              const target = event.relatedTarget as Node | null;
+              if (!tooltipRef.current?.contains(target) && !triggerRef.current?.contains(target)) handleHide();
+            } : undefined}
           >
             {content}
           </div>,

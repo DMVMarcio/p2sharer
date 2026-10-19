@@ -46,7 +46,7 @@ const bundle = await build({
       modal: `export const useModal = () => ({ isClosing: false, closeModal: () => globalThis.settingsClosed++ });
         export const modalManager = { getProfileTarget: () => globalThis.profileTarget,
           open: destination => { globalThis.profileDestination = destination; } };`,
-      native: `export const isTauri = () => true; export const invoke = async (command, args) => {
+      native: `export const isTauri = () => globalThis.settingsRuntimeDesktop !== false; export const invoke = async (command, args) => {
         if (globalThis.profileBackend && command.includes('profile_image')) return globalThis.profileBackend(command, args);
         if (command === 'save_profile_image') return { hash: '', data: '', color: args.color };
         return command === 'get_log_file_path' ? 'fixture.log' : { driver_api_available: false };
@@ -85,6 +85,21 @@ after(async () => {
   delete globalThis.applicationSettingsController;
   delete globalThis.profileTarget;
   delete globalThis.profileDestination;
+});
+
+test('web settings describe the application version and omit native transmission controls', async () => {
+  globalThis.settingsRuntimeDesktop = false;
+  try {
+    await act(async () => { root.render(null); setLanguage('en'); });
+    await act(async () => root.render(React.createElement(Harness)));
+    assert.match(document.querySelector('.app-version').textContent, /Application version:/);
+    assert.equal(document.querySelector('#settings-auto-updates'), null);
+    await act(async () => root.render(React.createElement(SettingsModal)));
+    await act(async () => [...document.querySelectorAll('.settings-nav-sidebar button')].find(button => button.textContent.trim() === 'Stream').click());
+    await act(async () => new Promise(resolve => setTimeout(resolve, 260)));
+    for (const id of ['settings-default-resolution', 'settings-default-fps', 'settings-default-bitrate']) assert.ok(document.getElementById(id), id);
+    for (const id of ['settings-default-quality', 'settings-remember-transmission', 'settings-video-encoder', 'settings-check-cursor', 'stream-options-pointing']) assert.equal(document.getElementById(id), null, id);
+  } finally { delete globalThis.settingsRuntimeDesktop; await act(async () => { root.render(null); setLanguage('pt-BR'); }); }
 });
 
 test('Application settings reopens installed release notes offline and restores focus after dismissal', async () => {

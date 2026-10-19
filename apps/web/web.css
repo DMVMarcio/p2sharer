@@ -46,3 +46,6 @@ html.web-landing, .web-landing body, .web-landing #root { height: auto; min-heig
   .site-platforms { gap: 12px; padding: 28px; }
   .site-features { padding-bottom: 38px; }
 }
+
+.site-download { padding: 55px 0 90px; }
+.site-download h1 { font-size: 32px; margin-bottom: 24px; }

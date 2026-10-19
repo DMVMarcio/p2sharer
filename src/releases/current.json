@@ -10,7 +10,8 @@
       "**Window restoration.** Reopening the application while maximized now seamlessly fills the display without leaving a bottom border or gap.",
       "**Text selection.** Opening an editor’s context menu now preserves selected text for copying, cutting, and editing.",
       "**Audio filters.** Improved application detection to prevent freezes when choosing which apps to include or exclude from audio capture.",
-      "**Web access.** Open P2Sharer in your browser to join rooms, chat, share media and use collaborative apps, with local room and document storage."
+      "**Web access.** Open P2Sharer in your browser to join rooms, chat, share media and use collaborative apps, with local room and document storage.",
+      "**Web experience.** Share room links, return home from the room header, choose capture sources with cards, and download the right Windows package. Browser settings now show only supported transmission options."
     ],
     "pt-BR": [
       "**Convites curtos.** Compartilhe apenas o código da sala quando houver alguém online ou use um convite assinado completo. Salvar a sala preserva os dados verificados para as próximas entradas.",
@@ -21,7 +22,8 @@
       "**Restauração da janela.** Reabrir o aplicativo maximizado agora preenche a tela perfeitamente sem deixar uma borda ou vão na parte inferior.",
       "**Seleção de texto.** Abrir o menu de contexto de um editor agora preserva o texto selecionado para copiar, recortar e editar.",
       "**Filtros de áudio.** Melhoramos a identificação de aplicativos para evitar travamentos ao escolher quais incluir ou excluir da captura de áudio.",
-      "**Acesso pela web.** Abra o P2Sharer no navegador para entrar em salas, conversar, compartilhar mídia e usar apps colaborativos, com salas e documentos salvos localmente."
+      "**Acesso pela web.** Abra o P2Sharer no navegador para entrar em salas, conversar, compartilhar mídia e usar apps colaborativos, com salas e documentos salvos localmente.",
+      "**Experiência web.** Compartilhe links de salas, volte ao início pelo cabeçalho, escolha a captura por cards e baixe o pacote certo para Windows. As configurações do navegador agora mostram apenas as opções de transmissão compatíveis."
     ],
     "es": [
       "**Invitaciones cortas.** Comparte solo el código de la sala cuando haya alguien en línea o usa una invitación firmada completa. Guardar la sala conserva sus datos verificados para futuras visitas.",
@@ -32,7 +34,8 @@
       "**Restauración de la ventana.** Reabrir la aplicación maximizada ahora cubre toda la pantalla perfectamente sin dejar un borde o espacio en la parte inferior.",
       "**Selección de texto.** Abrir el menú contextual de un editor ahora conserva el texto seleccionado para copiarlo, cortarlo y editarlo.",
       "**Filtros de audio.** Mejoramos la detección de aplicaciones para evitar bloqueos al elegir cuáles incluir o excluir de la captura de audio.",
-      "**Acceso web.** Abre P2Sharer en el navegador para entrar en salas, chatear, compartir contenido y usar apps colaborativas, con salas y documentos guardados localmente."
+      "**Acceso web.** Abre P2Sharer en el navegador para entrar en salas, chatear, compartir contenido y usar apps colaborativas, con salas y documentos guardados localmente.",
+      "**Experiencia web.** Comparte enlaces de salas, vuelve al inicio desde la cabecera, elige la captura con tarjetas y descarga el paquete adecuado para Windows. El navegador muestra solo las opciones de transmisión compatibles."
     ],
     "fr": [
       "**Invitations courtes.** Partagez uniquement le code du salon lorsqu’une personne est en ligne, ou utilisez une invitation signée complète. Enregistrer le salon conserve ses informations vérifiées pour vos prochaines visites.",
@@ -43,7 +46,8 @@
       "**Restauration de la fenêtre.** La réouverture de l’application en mode maximisé remplit désormais parfaitement l’écran sans laisser de bordure ou d’espace en bas.",
       "**Sélection de texte.** L’ouverture du menu contextuel d’un éditeur conserve désormais le texte sélectionné pour le copier, le couper et le modifier.",
       "**Filtres audio.** Détection des applications améliorée pour éviter les blocages lors du choix des applications à inclure ou à exclure de la capture audio.",
-      "**Accès web.** Ouvrez P2Sharer dans le navigateur pour rejoindre des salons, discuter, partager des médias et utiliser des apps collaboratives, avec sauvegarde locale des salons et documents."
+      "**Accès web.** Ouvrez P2Sharer dans le navigateur pour rejoindre des salons, discuter, partager des médias et utiliser des apps collaboratives, avec sauvegarde locale des salons et documents.",
+      "**Expérience web.** Partagez des liens de salon, revenez à l’accueil depuis l’en-tête, choisissez la capture par cartes et téléchargez le bon paquet Windows. Le navigateur affiche uniquement les réglages de diffusion compatibles."
     ],
     "de": [
       "**Kurze Einladungen.** Teile nur den Raumcode, wenn jemand online ist, oder nutze eine vollständige signierte Einladung. Beim Speichern des Raums bleiben die geprüften Daten für spätere Besuche erhalten.",
@@ -54,7 +58,8 @@
       "**Fensterwiederherstellung.** Beim erneuten Öffnen der maximierten Anwendung füllt diese den Bildschirm wieder nahtlos aus, ohne einen unteren Rand oder Spalt zu hinterlassen.",
       "**Textauswahl.** Beim Öffnen des Kontextmenüs eines Editors bleibt der ausgewählte Text zum Kopieren, Ausschneiden und Bearbeiten erhalten.",
       "**Audiofilter.** Verbesserte Anwendungserkennung verhindert Hänger bei der Auswahl von Apps, die in die Audioaufnahme einbezogen oder davon ausgeschlossen werden.",
-      "**Webzugang.** Öffne P2Sharer im Browser, um Räumen beizutreten, zu chatten, Medien zu teilen und gemeinsame Apps zu nutzen. Räume und Dokumente werden lokal gespeichert."
+      "**Webzugang.** Öffne P2Sharer im Browser, um Räumen beizutreten, zu chatten, Medien zu teilen und gemeinsame Apps zu nutzen. Räume und Dokumente werden lokal gespeichert.",
+      "**Weberlebnis.** Teile Raumlinks, kehre über den Raumkopf zur Startseite zurück, wähle Aufnahmequellen über Karten und lade das passende Windows-Paket herunter. Im Browser erscheinen nur unterstützte Übertragungsoptionen."
     ],
     "it": [
       "**Inviti brevi.** Condividi solo il codice della stanza quando qualcuno è online oppure usa un invito firmato completo. Salvando la stanza conservi i dati verificati per gli accessi futuri.",
@@ -65,7 +70,8 @@
       "**Ripristino della finestra.** La riapertura dell'applicazione ingrandita ora riempie perfettamente lo schermo senza lasciare un bordo o spazio inferiore.",
       "**Selezione del testo.** L’apertura del menu contestuale di un editor ora mantiene il testo selezionato per copiarlo, tagliarlo e modificarlo.",
       "**Filtri audio.** Rilevamento delle applicazioni migliorato per evitare blocchi quando si scelgono le app da includere o escludere dalla cattura audio.",
-      "**Accesso web.** Apri P2Sharer nel browser per entrare nelle stanze, chattare, condividere contenuti e usare app collaborative, con stanze e documenti salvati localmente."
+      "**Accesso web.** Apri P2Sharer nel browser per entrare nelle stanze, chattare, condividere contenuti e usare app collaborative, con stanze e documenti salvati localmente.",
+      "**Esperienza web.** Condividi link delle stanze, torna alla pagina iniziale dall’intestazione, scegli la cattura con schede e scarica il pacchetto Windows adatto. Il browser mostra solo le opzioni di trasmissione supportate."
     ],
     "zh-CN": [
       "**短邀请。** 有人在线时，只需分享房间代码，也可使用完整的签名邀请。保存房间会保留已验证的信息，供下次加入使用。",
@@ -76,7 +82,8 @@
       "**窗口恢复。** 最大化状态下重新打开应用程序时，窗口现在可以完美铺满屏幕，而不会在底部留下边框或间隙。",
       "**文本选择。** 打开编辑器的右键菜单时，现在会保留已选文本，便于复制、剪切和编辑。",
       "**音频筛选。** 改善了应用识别，避免在选择要包含或排除的音频采集应用时卡住。",
-      "**网页访问。** 在浏览器中打开 P2Sharer，即可加入房间、聊天、共享媒体并使用协作应用，房间和文档保存在本地。"
+      "**网页访问。** 在浏览器中打开 P2Sharer，即可加入房间、聊天、共享媒体并使用协作应用，房间和文档保存在本地。",
+      "**网页体验。** 分享房间链接、从房间标题栏返回首页、通过卡片选择捕获来源，并下载合适的 Windows 安装包。浏览器设置现仅显示支持的传输选项。"
     ],
     "zh-TW": [
       "**短邀請。** 有人在線上時，只需分享房間代碼，也可使用完整的簽章邀請。儲存房間會保留已驗證的資訊，供下次加入使用。",
@@ -87,7 +94,8 @@
       "**視窗還原。** 最大化狀態下重新開啟應用程式時，視窗現在可以完美填滿螢幕，而不會在底部留下邊框或間隙。",
       "**文字選取。** 開啟編輯器的快顯功能表時，現在會保留已選文字，方便複製、剪下和編輯。",
       "**音訊篩選。** 改善了應用程式識別，避免在選擇要包含或排除的音訊擷取應用程式時卡住。",
-      "**網頁存取。** 在瀏覽器中開啟 P2Sharer，即可加入房間、聊天、分享媒體並使用協作應用程式，房間與文件儲存在本機。"
+      "**網頁存取。** 在瀏覽器中開啟 P2Sharer，即可加入房間、聊天、分享媒體並使用協作應用程式，房間與文件儲存在本機。",
+      "**網頁體驗。** 分享房間連結、從房間標題列返回首頁、透過卡片選擇擷取來源，並下載合適的 Windows 安裝套件。瀏覽器設定現在僅顯示支援的傳輸選項。"
     ],
     "ja": [
       "**短い招待。** オンラインの参加者がいる場合はルームコードだけを共有でき、完全な署名付き招待も使用できます。ルームを保存すると、確認済みの情報を次回以降も使用できます。",
@@ -98,7 +106,8 @@
       "**ウィンドウの復元。** 最大化の状態でアプリを再度開いたときに、下部に枠線や隙間を残さず画面全体にぴったり収まるようになりました。",
       "**テキストの選択。** エディターのコンテキストメニューを開いても、コピー、切り取り、編集のために選択したテキストが保持されるようになりました。",
       "**音声フィルター。** アプリの検出を改善し、音声キャプチャに含めるアプリや除外するアプリを選ぶ際に処理が停止する問題を防ぎます。",
-      "**ウェブアクセス。** ブラウザーで P2Sharer を開いて、ルームへの参加、チャット、メディア共有、共同アプリの利用ができます。ルームや文書は端末に保存されます。"
+      "**ウェブアクセス。** ブラウザーで P2Sharer を開いて、ルームへの参加、チャット、メディア共有、共同アプリの利用ができます。ルームや文書は端末に保存されます。",
+      "**ウェブ体験。** ルームのリンク共有、ヘッダーからホームへの移動、カードによるキャプチャ元の選択、適切な Windows パッケージのダウンロードができます。ブラウザーには対応する配信設定だけが表示されます。"
     ],
     "ko": [
       "**짧은 초대.** 온라인 참여자가 있으면 방 코드만 공유하거나 전체 서명된 초대를 사용할 수 있습니다. 방을 저장하면 확인된 정보가 다음 방문에도 유지됩니다.",
@@ -109,7 +118,8 @@
       "**창 복원.** 최대화된 상태에서 앱을 다시 열 때 하단에 테두리나 틈새를 남기지 않고 화면에 완벽하게 맞춰집니다.",
       "**텍스트 선택.** 편집기의 컨텍스트 메뉴를 열어도 복사, 잘라내기 및 편집을 위해 선택한 텍스트가 유지됩니다.",
       "**오디오 필터.** 오디오 캡처에 포함하거나 제외할 앱을 선택할 때 멈추지 않도록 앱 감지를 개선했습니다.",
-      "**웹 접속.** 브라우저에서 P2Sharer를 열어 방에 참여하고, 채팅하고, 미디어를 공유하고, 협업 앱을 사용하세요. 방과 문서는 기기에 저장됩니다."
+      "**웹 접속.** 브라우저에서 P2Sharer를 열어 방에 참여하고, 채팅하고, 미디어를 공유하고, 협업 앱을 사용하세요. 방과 문서는 기기에 저장됩니다.",
+      "**웹 사용 환경.** 방 링크를 공유하고, 헤더에서 홈으로 돌아가고, 카드로 캡처 소스를 선택하고, 알맞은 Windows 패키지를 다운로드하세요. 브라우저에는 지원되는 전송 설정만 표시됩니다."
     ],
     "hi": [
       "**छोटे आमंत्रण।** किसी के ऑनलाइन होने पर केवल रूम कोड साझा करें या पूरा हस्ताक्षरित आमंत्रण इस्तेमाल करें। रूम सहेजने पर सत्यापित जानकारी अगली बार के लिए बनी रहती है।",
@@ -120,7 +130,8 @@
       "**विंडो पुनर्स्थापना।** अधिकतम (मैक्सिमाइज्ड) स्थिति में ऐप को फिर से खोलने पर अब नीचे कोई किनारा या अंतर छोड़े बिना स्क्रीन पूरी तरह से भर जाती है।",
       "**टेक्स्ट चयन।** एडिटर का संदर्भ मेनू खोलने पर अब कॉपी, कट और संपादन के लिए चुना गया टेक्स्ट बरकरार रहता है।",
       "**ऑडियो फ़िल्टर।** ऑडियो कैप्चर में शामिल या बाहर रखने वाले ऐप चुनते समय रुकावट से बचने के लिए ऐप की पहचान बेहतर की गई है।",
-      "**वेब से पहुँच।** ब्राउज़र में P2Sharer खोलकर कमरों से जुड़ें, चैट करें, मीडिया साझा करें और सहयोगी ऐप इस्तेमाल करें। कमरे और दस्तावेज़ स्थानीय रूप से सहेजे जाते हैं।"
+      "**वेब से पहुँच।** ब्राउज़र में P2Sharer खोलकर कमरों से जुड़ें, चैट करें, मीडिया साझा करें और सहयोगी ऐप इस्तेमाल करें। कमरे और दस्तावेज़ स्थानीय रूप से सहेजे जाते हैं।",
+      "**वेब अनुभव।** कमरे के लिंक साझा करें, हेडर से होम पर लौटें, कार्ड से कैप्चर स्रोत चुनें और सही Windows पैकेज डाउनलोड करें। ब्राउज़र में अब केवल समर्थित प्रसारण विकल्प दिखते हैं।"
     ],
     "fi": [
       "**Lyhyet kutsut.** Jaa pelkkä huonekoodi, kun joku on verkossa, tai käytä täydellistä allekirjoitettua kutsua. Huoneen tallentaminen säilyttää vahvistetut tiedot tulevia käyntejä varten.",
@@ -131,7 +142,8 @@
       "**Ikkunan palautus.** Suurennettuna uudelleen avattu sovellus täyttää nyt näytön saumattomasti jättämättä alareunaan kehystä tai rakoa.",
       "**Tekstin valinta.** Editorin pikavalikon avaaminen säilyttää nyt valitun tekstin kopiointia, leikkaamista ja muokkaamista varten.",
       "**Äänisuodattimet.** Sovellusten tunnistusta on parannettu, jotta äänen kaappaukseen sisällytettävien tai siitä pois jätettävien sovellusten valinta ei jumitu.",
-      "**Verkkokäyttö.** Avaa P2Sharer selaimessa liittyäksesi huoneisiin, keskustellaksesi, jakaaksesi mediaa ja käyttääksesi yhteisiä sovelluksia. Huoneet ja asiakirjat tallennetaan paikallisesti."
+      "**Verkkokäyttö.** Avaa P2Sharer selaimessa liittyäksesi huoneisiin, keskustellaksesi, jakaaksesi mediaa ja käyttääksesi yhteisiä sovelluksia. Huoneet ja asiakirjat tallennetaan paikallisesti.",
+      "**Verkkokokemus.** Jaa huonelinkkejä, palaa etusivulle huoneen otsakkeesta, valitse kaappauslähde korteilla ja lataa sopiva Windows-paketti. Selain näyttää vain tuetut lähetysasetukset."
     ],
     "ru": [
       "**Короткие приглашения.** Делитесь только кодом комнаты, когда кто-то онлайн, или используйте полное подписанное приглашение. При сохранении комнаты проверенные данные сохраняются для следующих посещений.",
@@ -142,7 +154,8 @@
       "**Восстановление окна.** Повторное открытие приложения в развёрнутом виде теперь идеально заполняет экран без появления нижней границы или зазора.",
       "**Выделение текста.** При открытии контекстного меню редактора выделенный текст теперь сохраняется для копирования, вырезания и редактирования.",
       "**Аудиофильтры.** Улучшено обнаружение приложений, чтобы избежать зависаний при выборе приложений для включения в захват звука или исключения из него.",
-      "**Веб-доступ.** Откройте P2Sharer в браузере, чтобы входить в комнаты, общаться, делиться медиа и использовать совместные приложения. Комнаты и документы сохраняются локально."
+      "**Веб-доступ.** Откройте P2Sharer в браузере, чтобы входить в комнаты, общаться, делиться медиа и использовать совместные приложения. Комнаты и документы сохраняются локально.",
+      "**Веб-версия.** Делитесь ссылками на комнаты, возвращайтесь на главную из заголовка, выбирайте источник захвата карточками и скачивайте подходящий пакет Windows. В браузере отображаются только поддерживаемые настройки трансляции."
     ]
   }
 }

@@ -31,6 +31,8 @@ pnpm run web:start
 
 The Node server serves `apps/web/dist` at `http://localhost:3000`. Configure `HOST` and `PORT` in the process environment when needed. Use HTTPS through a reverse proxy for remote users: camera, display capture, clipboard and Web Crypto depend on secure contexts and browser permissions. The server binds to loopback by default. Deployment credentials, certificates and generated distribution files do not belong in Git. This task does not configure a hosting provider or publish the site.
 
+Production desktop links use `https://p2sharer.com`. Override the public origin with `VITE_PUBLIC_SITE_URL` when packaging another environment; development defaults to `http://localhost:1422`. Browser room links use the browser's current origin. The sanitized `.env.example` documents the setting. Room URLs use `/app/<short-code>` with the complete random room identifier, never a password or signed invitation. Opening a link waits for profile setup and opens the normal room preview; it does not bypass admission. Returning home keeps the existing unsaved-room confirmation.
+
 ## Backend contract
 
 | Endpoint | Result |
@@ -38,6 +40,9 @@ The Node server serves `apps/web/dist` at `http://localhost:3000`. Configure `HO
 | `GET /api/health` | Health response |
 | `GET /api/config` | Public runtime metadata and official release-page URL |
 | `GET /api/download` | Redirect to official Windows releases |
+| `GET /api/downloads` | Latest stable release's available installer, MSI and portable downloads |
+
+The download selector and `/download` page use `/api/downloads`. The backend coalesces GitHub requests, caches successful results for five minutes and only advertises official, published assets that actually exist. macOS and Linux remain unavailable until packaging support is added. Temporary GitHub failures return an error with a retry option rather than fabricated download URLs.
 
 The API does not accept room messages, profile data, invitations or file uploads. Room admission, signatures, public multi-transport discovery and WebRTC media/data channels remain shared with the desktop application. No new centralized signaling or account service is introduced. Existing TURN configuration remains available in settings for networks that require a relay; hosting this HTTP backend alone does not provide TURN. Custom discovery services and content sources must permit browser requests and comply with HTTPS/CORS rules.
 
@@ -51,6 +56,7 @@ The production host restricts methods, rejects traversal and hidden-file request
 - The browser can view/control a shared browser hosted by a Windows participant. Starting its own native browser host, process audio filtering, native encoders, LAN discovery, tunnels and virtual networking require the desktop runtime. Unsupported OS commands fail explicitly; the web API never proxies native commands.
 - Native detached app windows and native PiP controls remain desktop integrations. Web video uses browser picture-in-picture when available. Mobile layouts of the shared desktop-oriented workspace may still need further adaptation.
 - Changing a shared screen source in the browser requires stopping that transmission and starting another capture. This keeps source audio tied to the browser permission prompt; desktop live source editing remains available. Browser-selected profile animations are saved as a static PNG.
+- Browser transmission settings expose resolution, frame rate and sending bitrate. Resolution/frame rate are capture preferences constrained by browser and device support, not guarantees. Native quality, encoder, cursor-overlay and automatic picker-persistence controls are omitted. Capture cards hint at screen versus window/tab selection; the browser retains the final permission picker. Camera names are shown only when the browser exposes actual device identities.
 
 Web builds and automated checks are not interactive interoperability verification. User-operated checks should cover two independent browser sessions, browser-to-desktop rooms, permissions/cancellation, audio support, reconnects and actual transfers on the intended browsers and networks.
 

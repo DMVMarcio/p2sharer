@@ -6,7 +6,11 @@ import React, { useEffect, useState } from 'react';
 import { useRoom } from '../../hooks/useRoom';
 import { modalManager, useModal } from '../../hooks/useModal';
 import { showToast } from '../../hooks/useToast';
-import { BookmarkCheck, BookmarkPlus, Check, ChevronDown, Copy, LockKeyhole, LogOut, Settings2 } from 'lucide-react';
+import { BookmarkCheck, BookmarkPlus, Check, ChevronDown, Copy, Link, LockKeyhole, LogOut, Settings2 } from 'lucide-react';
+import { isTauri } from '@tauri-apps/api/core';
+import { websiteUrl } from '../../platform/website';
+import { webRoomPath } from '../../core/web_room_links';
+import logo from '../../assets/logo_right_bottom.png';
 import { parseRoomInvite } from '../../core/room_invite';
 import { roomInviteLink } from '../../core/room_deep_links';
 import { savedRooms, type SavedRoom } from '../../core/saved_rooms';
@@ -26,7 +30,8 @@ export const AppHeader: React.FC<{ showUpdate?: boolean; homeScrolled?: boolean;
   const { copied, copy } = useClipboardFeedback(roomInviteLink(currentRoomInvite) || currentRoomCode);
   const invitation = parseRoomInvite(currentRoomInvite);
   const shortInvite = useClipboardFeedback(invitation?.roomId ?? '');
-  const inviteCopied = copied || shortInvite.copied;
+  const webInvite = useClipboardFeedback(websiteUrl(webRoomPath(invitation?.roomId)));
+  const inviteCopied = copied || shortInvite.copied || webInvite.copied;
 
   useEffect(() => {
     const roomId = parseRoomInvite(currentRoomInvite)?.roomId;
@@ -65,6 +70,8 @@ export const AppHeader: React.FC<{ showUpdate?: boolean; homeScrolled?: boolean;
       <div className="header-room-info">
         {isInRoom && (
           <>
+            {!isTauri() && <TooltipButton tooltip={t('web.home')} aria-label={t('web.home')}
+              className="btn-icon-header header-web-home" onClick={onLeaveRoom}><img src={logo} alt="" /></TooltipButton>}
             <div className="header-room-name">
               <strong id="display-room-code">{currentRoomName || currentRoomCode}</strong>
               {currentRoomPassword && <LockKeyhole size={14} className="room-lock-icon" aria-hidden="true" />}
@@ -87,6 +94,9 @@ export const AppHeader: React.FC<{ showUpdate?: boolean; homeScrolled?: boolean;
                   onSelect: () => shortInvite.copy() },
                 { id: 'signed-invite', label: t('invite.signed'), icon: <LockKeyhole size={15} />,
                   onSelect: () => copy() },
+                { id: 'web-invite', label: t('invite.webLink'), icon: <Link size={15} />,
+                  disabled: !invitation || (invitation.version !== 3 && Boolean(invitation.connection)),
+                  tooltip: t('invite.shortHint'), onSelect: () => webInvite.copy() },
               ], { toggle: true })}
               aria-label={inviteCopied ? t('header.copied') : t('header.invite')}>
               <span className="header-invite-icon" key={inviteCopied ? 'copied' : 'invite'}>

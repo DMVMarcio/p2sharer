@@ -57,6 +57,16 @@ beforeEach(async () => {
 });
 after(async () => { await act(async () => root.unmount()); browser.window.close(); });
 
+test('interactive tooltip links retain keyboard focus until focus leaves the panel', async () => {
+  await render({ interactive: true, content: React.createElement('a', { href: '/download' }, 'Download') });
+  await hover();
+  await act(async () => trigger().dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })));
+  assert.equal(document.activeElement, tooltip().querySelector('a'));
+  await wait(); assert.ok(tooltip()?.classList.contains('visible'));
+  await act(async () => document.getElementById('outside').focus());
+  await wait(); assert.equal(tooltip(), null);
+});
+
 test('click dismisses without reopening on mouse focus, and pending hover is canceled', async () => {
   await hover();
   await dispatch(trigger(), 'pointerdown');

@@ -11,6 +11,7 @@ import { verifyRoomInvite } from '../../core/room_invite_validation';
 import { isShortRoomCode } from '../../core/room_invite';
 import { savedRooms } from '../../core/saved_rooms';
 import { extractRoomInvite } from '../../core/room_deep_links';
+import { extractWebRoomCode } from '../../core/web_room_links';
 import type { RoomPreview } from '../../core/room_preview';
 import { GroupRoomManager } from '../../p2p/group_room';
 import { stateStore } from '../../core/state_store';
@@ -81,7 +82,7 @@ export function JoinRoomModal() {
     if (phase !== 'code') return;
     setError(''); setPhase('searching');
     try {
-      const normalized = extractRoomInvite(code) ?? code.trim();
+      const normalized = extractRoomInvite(code) ?? extractWebRoomCode(code) ?? code.trim();
       const short = isShortRoomCode(normalized);
       const known = short ? await savedRooms.get(normalized) : undefined;
       const resolved = known?.invite ?? normalized;

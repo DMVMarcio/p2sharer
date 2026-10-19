@@ -1,3 +1,4 @@
+import { websiteUrl } from '../../platform/website';
 import { isTauri } from '@tauri-apps/api/core';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
@@ -169,7 +170,10 @@ export const StreamHeaderBar: React.FC = () => {
         </button>}
 
         {/* Audio Filter Config */}
-        <Tooltip content={t("message.44d9ce86bda1")}>
+        <Tooltip interactive={!isTauri()} content={isTauri() ? t("message.44d9ce86bda1") : <span className="desktop-feature-message">
+          <span>{t('web.audioDesktop')}</span><a href={websiteUrl('/download')} target="_blank" rel="noopener noreferrer">{t('downloads.title')}</a>
+        </span>}>
+          <span className="desktop-feature-trigger" tabIndex={!isTauri() ? 0 : undefined} role="group" aria-label={t("message.44d9ce86bda1")}>
           <button
             className="btn btn-sm btn-outline btn-compact"
             id="btn-open-audio-filter"
@@ -189,7 +193,7 @@ export const StreamHeaderBar: React.FC = () => {
               <line x1="17" x2="23" y1="16" y2="16" />
             </svg>
             <span className="btn-text">{t("message.195c60bb2325")}</span>
-          </button>
+          </button></span>
         </Tooltip>
 
         {/* Room settings */}

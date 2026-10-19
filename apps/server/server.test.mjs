@@ -5,20 +5,22 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { request } from 'node:http';
 import { createWebServer } from './server.mjs';
+import { releaseDownloads } from './downloads.mjs';
 
 test('production host serves landing/app, public API and immutable assets without exposing files', async () => {
   const root = await mkdtemp(join(tmpdir(), 'p2sharer-web-'));
   await mkdir(join(root, 'assets'));
   await writeFile(join(root, 'index.html'), '<div id="root"></div>');
   await writeFile(join(root, 'assets', 'fixture.js'), 'export const ready = true;');
-  const server = createWebServer({ root });
+  const catalog = releaseDownloads(null);
+  const server = createWebServer({ root, downloads: async () => catalog });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
   const raw = path => new Promise((resolve, reject) => {
     request(base + path, response => { response.resume(); response.on('end', () => resolve(response.statusCode)); }).on('error', reject).end();
   });
   try {
-    for (const path of ['/', '/app', '/app/']) {
+    for (const path of ['/', '/app', '/app/', '/download', '/app/' + 'a'.repeat(32)]) {
       const response = await fetch(base + path);
       assert.equal(response.status, 200); assert.match(await response.text(), /id="root"/);
       assert.match(response.headers.get('content-security-policy'), /object-src 'none'/);
@@ -28,6 +30,7 @@ test('production host serves landing/app, public API and immutable assets withou
     assert.deepEqual(await (await fetch(base + '/api/health')).json(), { status: 'ok' });
     const config = await (await fetch(base + '/api/config')).json();
     assert.equal(config.runtime, 'web'); assert.match(config.downloadsUrl, /^https:\/\/github.com\//);
+    assert.deepEqual(await (await fetch(base + '/api/downloads')).json(), catalog);
     const redirect = await fetch(base + '/api/download', { redirect: 'manual' });
     assert.equal(redirect.status, 302); assert.equal(redirect.headers.get('location'), config.downloadsUrl);
     const asset = await fetch(base + '/assets/fixture.js');
@@ -41,4 +44,19 @@ test('production host serves landing/app, public API and immutable assets withou
     await new Promise(resolve => server.close(resolve));
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test('download catalog advertises only existing stable assets from the official repository', () => {
+  const names = ['P2Sharer_1.4.4_x64-setup.exe', 'P2Sharer_1.4.4_x64-setup.msi', 'P2Sharer_1.4.4_x64-portable.exe'];
+  const release = { tag_name: 'v1.4.4', draft: false, prerelease: false, assets: names.map(name => ({
+    name, size: 1024, state: 'uploaded', browser_download_url: `https://github.com/DMVMarcio/p2sharer/releases/download/v1.4.4/${name}`,
+  })) };
+  assert.deepEqual(releaseDownloads(release).platforms[0].artifacts.map(item => item.id), ['installer', 'msi', 'portable']);
+  assert.equal(releaseDownloads({ ...release, draft: true }).platforms[0].artifacts.length, 0);
+  assert.equal(releaseDownloads({ ...release, prerelease: true }).platforms[0].artifacts.length, 0);
+  release.assets[0].browser_download_url = 'https://example.com/untrusted.exe';
+  release.assets[1].size = 0;
+  assert.deepEqual(releaseDownloads(release).platforms[0].artifacts.map(item => item.id), ['portable']);
+  assert.equal(releaseDownloads(release).platforms[1].artifacts.length, 0);
+  assert.equal(releaseDownloads(null).version, null);
 });

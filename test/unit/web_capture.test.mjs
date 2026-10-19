@@ -11,12 +11,13 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
 Object.defineProperty(window, 'isSecureContext', { configurable: true, value: true });
 const fixture = globalThis.webCaptureFixture = {
-  state: { editingStreamId: null, currentBitrate: 6000 }, captures: new Map(),
-  requests: 0, published: [], closed: 0, stopped: 0, gesture: false, failPicker: false, failPublish: false,
+  state: { editingStreamId: null, currentBitrate: 6000, currentFps: 60, currentResolution: { width: 1920, height: 1080 } }, captures: new Map(),
+  requests: 0, published: [], closed: 0, stopped: 0, gesture: false, failPicker: false, failPublish: false, cameras: [], cameraRequests: [], displayRequests: [],
 };
 const track = { getSettings: () => ({ width: 1280, height: 720, frameRate: 30 }), stop: () => fixture.stopped++ };
 const stream = { getVideoTracks: () => [track], getTracks: () => [track] };
-const media = { getDisplayMedia() {
+const media = { getUserMedia(options) { fixture.cameraRequests.push(options); return Promise.resolve(stream); }, getDisplayMedia(options) {
+  fixture.displayRequests.push(options);
   assert.equal(fixture.gesture, true, 'screen permission must start within the click');
   fixture.requests++;
   return fixture.failPicker ? Promise.reject(new DOMException('Permission denied', 'NotAllowedError')) : Promise.resolve(stream);
@@ -31,7 +32,7 @@ const bundle = await build({ stdin: { contents: "export { BrowserCaptureModal } 
       } };`,
       state_store: 'export const stateStore = globalThis.webCaptureFixture.state;',
       useModal: 'export const useModal = () => ({ closeModal: () => globalThis.webCaptureFixture.closed++ });',
-      camera_devices: 'export const listCameras = async () => [];',
+      camera_devices: 'export const listCameras = async () => globalThis.webCaptureFixture.cameras;',
       i18n: 'export const t = key => key; export const localizeError = error => error.message;',
       useLocale: 'export const useLocale = () => "en";',
     }[path] }));
@@ -50,6 +51,9 @@ test('screen permissions require a click and successful capture enters the share
   await render(); assert.equal(fixture.requests, 0); assert.equal(fixture.published.length, 0);
   await click();
   assert.equal(fixture.requests, 1); assert.equal(fixture.closed, 1);
+  assert.equal(fixture.displayRequests[0].video.displaySurface, 'monitor');
+  assert.equal(fixture.displayRequests[0].video.width.ideal, 1920);
+  assert.equal(fixture.displayRequests[0].video.frameRate.ideal, 60);
   assert.equal(fixture.published[0][0], 'screen:browser');
   assert.equal(fixture.published[0][6].stream, stream);
   assert.equal(fixture.stopped, 0);
@@ -78,4 +82,22 @@ test('browser capture blocks insecure origins and native screen editing before p
   await render(); assert.equal(share().disabled, true); await click();
   assert.equal(fixture.requests, previous);
   assert.equal(document.querySelector('[role="status"]').textContent, 'web.desktopOnly');
+});
+
+
+test('capture cards distinguish browser surfaces and expose only named camera devices', async () => {
+  fixture.state.editingStreamId = null;
+  fixture.cameras = [{ deviceId: 'real-camera', label: 'Desk camera' }, { deviceId: 'real-camera', label: 'Desk camera' }, { deviceId: '', label: '' }];
+  await render();
+  const radios = [...document.querySelectorAll('input[type="radio"]')];
+  assert.deepEqual(radios.map(input => input.value), ['screen', 'window', 'camera']);
+  await act(async () => radios.find(input => input.value === 'window').click());
+  await click(); assert.equal(fixture.displayRequests.at(-1).video.displaySurface, 'window');
+  await render();
+  await act(async () => document.querySelector('input[value="camera"]').click());
+  assert.equal(document.querySelector('[role="combobox"]').textContent, 'Desk camera');
+  assert.equal(fixture.cameraRequests.length, 0, 'enumeration does not activate cameras');
+  await click();
+  assert.equal(fixture.cameraRequests.at(-1).video.deviceId.exact, 'real-camera');
+  assert.equal(fixture.cameraRequests.at(-1).video.frameRate.ideal, 60);
 });

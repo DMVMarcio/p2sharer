@@ -33,6 +33,7 @@ import { startRoomDeepLinks } from './services/room_deep_links';
 import { releaseNotes } from './services/release_notes';
 import { isTauri } from '@tauri-apps/api/core';
 import { BrowserCaptureModal } from './components/modals/BrowserCaptureModal';
+import { startWebRoomNavigation } from './services/web_room_navigation';
 
 export const App: React.FC = () => {
   useAppTheme(); // Sets data-theme & data-accent
@@ -63,6 +64,7 @@ const MainApp: React.FC = () => {
     if (!notesState.pending) return startAutomaticUpdateChecks();
   }, [notesState.pending]);
   useEffect(startRoomDeepLinks, []);
+  useEffect(() => startWebRoomNavigation(roomExit.confirmExit), [roomExit.confirmExit]);
   useEffect(() => setHomeScrolled(false), [isInRoom]);
 
   useEffect(() => {

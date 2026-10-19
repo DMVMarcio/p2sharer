@@ -1,5 +1,6 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { t } from '../i18n/index.ts';
 import { listenTunnelPayloads, receiveTunnelPayload } from '../core/tunnel_payload_bridge.ts';
 import type { RoomAppModel, RoomAppModelContext } from './models.ts';
 import { createTunnelRules, isVirtualIp, validTunnelAdvertisements, validTunnelRule, type TunnelAdvertisement, type TunnelExport, type TunnelRule } from './tunnel_rules.ts';
@@ -151,7 +152,7 @@ export class TunnelModel implements RoomAppModel {
   }
   prepareJoin(): Promise<void> {
     return this.command(async () => {
-      if (!this.available) throw new Error('Virtual networking requires Windows x64');
+      if (!this.available) throw new Error(t('web.unsupported'));
       await this.networkReady;
       await this.bridge.call('prepare_virtual_network_app', { scope: this.scope });
       if (this.disposed) await this.bridge.call('stop_virtual_network_scope', { scope: this.scope });

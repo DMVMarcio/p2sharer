@@ -1,0 +1,9 @@
+.choice-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr)); gap: 12px; border: 0; padding: 0; margin: 18px 0; min-width: 0; }
+.choice-cards .choice-card { position: relative; display: flex; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 12px; white-space: normal; text-align: left; padding: 20px; color: var(--text-primary); background: var(--bg-card); border: 1px solid transparent; border-radius: var(--radius-md); box-shadow: var(--shadow-sm); }
+.choice-cards .choice-card:hover { background: var(--bg-card-hover); }
+.choice-card.is-selected { background: var(--accent-subtle); border-color: var(--accent-color); }
+.choice-card-icon { display: flex; color: var(--accent-color); }
+.choice-card-description { color: var(--text-secondary); font-size: 12px; font-weight: 400; line-height: 1.6; }
+.choice-card input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.choice-card:has(input:focus-visible) { outline: 2px solid var(--accent-color); outline-offset: 3px; }
+.choice-card.is-disabled, .choice-cards:disabled .choice-card { opacity: .5; cursor: not-allowed; }

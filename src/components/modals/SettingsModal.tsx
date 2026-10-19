@@ -618,7 +618,7 @@ export const SettingsModal: React.FC = () => {
                   <p className="settings-pane-desc">{t("message.b1d138672f98")}</p>
                 </div>
 
-                <label className="settings-switch-row" htmlFor="settings-remember-transmission">
+                {isTauri() && <label className="settings-switch-row" htmlFor="settings-remember-transmission">
                   <div className="settings-switch-label-group">
                     <span className="settings-switch-title">{t("message.fc0ae2308590")}</span>
                     <span className="settings-switch-subtitle">{t("message.90555aabe768")}</span>
@@ -629,7 +629,7 @@ export const SettingsModal: React.FC = () => {
                       onChange={(event) => setRememberTransmissionSettings(event.target.checked)} />
                     <span className="switch-slider" />
                   </div>
-                </label>
+                </label>}
 
                 <div className="settings-row-grid">
                   <div className="settings-col">
@@ -695,7 +695,7 @@ export const SettingsModal: React.FC = () => {
                     />
                   </div>
 
-                  <div className="settings-col">
+                  {isTauri() && <div className="settings-col">
                     <label className="settings-label" htmlFor="settings-default-quality">
                       {t("message.c3d090c6e04f")}</label>
                     <Select
@@ -710,10 +710,10 @@ export const SettingsModal: React.FC = () => {
                         { value: '75', get label() { return t("message.9df00552db6a"); } },
                       ]}
                     />
-                  </div>
+                  </div>}
                 </div>
 
-                <div className="settings-row">
+                {isTauri() && <div className="settings-row">
                   <div className="sidebar-tabs settings-subtabs" role="tablist" aria-label={t("message.f45b43b042cf")}>
                     {(['advanced', 'pointing'] as const).map(tab => <button key={tab} type="button"
                       ref={element => { if (element) streamOptionRefs.current[tab] = element; else delete streamOptionRefs.current[tab]; }}
@@ -785,7 +785,7 @@ export const SettingsModal: React.FC = () => {
                     </div>
                   </label>
                   </div>}
-                </div>
+                </div>}
               </div>
             )}
 
