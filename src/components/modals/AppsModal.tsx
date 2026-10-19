@@ -1,3 +1,4 @@
+import { isTauri } from '@tauri-apps/api/core';
 import { localizeError, t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useEffect, useState } from 'react';
@@ -40,7 +41,7 @@ export const AppsModal: React.FC = () => {
         onClick={() => start(close)}><Play size={15} strokeWidth={2} aria-hidden="true" />  {t("message.99bae897c2a6")}</button>
     </div>}>
     <div className="apps-library-grid">
-      {listRoomApps().map((app) => <button type="button"
+      {listRoomApps().filter(app => isTauri() || !['tunnels', 'browser'].includes(app.kind)).map((app) => <button type="button"
         className={`apps-library-card ${selectedKind === app.kind ? 'selected' : ''}`} key={app.kind}
         aria-pressed={selectedKind === app.kind} onClick={() => setSelectedKind(app.kind)}>
         <div className={`apps-library-banner ${app.bannerClass || ''} ${app.bannerImage ? 'has-image' : ''}`}

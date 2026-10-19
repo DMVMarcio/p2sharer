@@ -5,7 +5,8 @@ import { generateUserColor } from '../p2p/group_room.ts';
 import { validStreamPointer, validStreamPointerState, type StreamPointerState, type StreamPointerPacket } from '../core/stream_pointer.ts';
 import { emitTo, listen } from '@tauri-apps/api/event';
 import { streamPointerView } from './stream_pointer_view.ts';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '../platform/commands.ts';
+import { isTauri } from '@tauri-apps/api/core';
 import { roomAppsService } from '../apps/room_apps_service.ts';
 import { AudioBridge } from '../audio/audio_bridge.ts';
 import { audioContextManager } from '../audio/audio_context_manager.ts';
@@ -214,9 +215,10 @@ export class RoomService {
     roomAppsService.reset();
     const parsed = await verifyRoomInvite(code);
     if (signal?.aborted) return;
-    if (!parsed && typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+    if (!parsed) {
       throw new Error(t("message.a07036fbd08c"));
     }
+    if (!isTauri() && 'connection' in parsed && parsed.connection) throw new Error(t('web.desktopOnly'));
     stateStore.set((s) => {
       s.currentRoomCode = parsed ? parsed.roomId.slice(0, 8) : code;
       s.currentRoomInvite = parsed ? code : '';
@@ -513,7 +515,7 @@ export class RoomService {
         if (slot) this.publishPointerView(slot.peerId, state);
       }, async (visuals, drawingsIncluded) => {
         const sessionId = this.localCaptures.get(mediaId)?.bridge?.sessionId;
-        if (sessionId) await invoke('update_stream_pointer_overlay', { visuals, sessionId, drawingsIncluded });
+        if (isTauri() && sessionId) await invoke('update_stream_pointer_overlay', { visuals, sessionId, drawingsIncluded });
       });
       this.pointerReceivers.set(mediaId, receiver);
     }
@@ -574,7 +576,7 @@ export class RoomService {
         return;
       }
       const id = editingId || crypto.randomUUID();
-      const bridge = prepared?.bridge || (kind === 'screen' ? new NativeVideoBridge(crypto.randomUUID()) : undefined);
+      const bridge = prepared?.bridge || (isTauri() && kind === 'screen' ? new NativeVideoBridge(crypto.randomUUID()) : undefined);
       let stream: MediaStream | undefined;
       try {
         if (!this.localCaptures.size) await MediaCoordinator.prepareCodecPreferences(res.width, res.height, fps, bitrate * 1000);
@@ -600,7 +602,7 @@ export class RoomService {
           const slot = stateStore.roomSlots.find((slot) => slot.isLocal && slot.mediaId === id);
           if (slot) pipService.updateStream(slot.peerId, stream);
         } else {
-          if (kind === 'screen' && !Array.from(this.localCaptures.values()).some((entry) => entry.kind === 'screen')) {
+          if (isTauri() && kind === 'screen' && !Array.from(this.localCaptures.values()).some((entry) => entry.kind === 'screen')) {
             const audio = await this.audioBridge.startCapture(stateStore.isAudioFilterFullAudio ? 'full' : stateStore.selectedFilterMode,
               stateStore.isAudioFilterFullAudio ? [] : stateStore.getActiveFilterPids(),
               stateStore.isAudioFilterFullAudio ? [] : stateStore.getActiveFilterNames());
@@ -639,7 +641,7 @@ export class RoomService {
   private syncCaptureState() {
     stateStore.set((state) => { state.isSharingScreen = Array.from(this.localCaptures.values()).some((entry) => entry.kind === 'screen'); });
     const screen = Array.from(this.localCaptures.values()).find((entry) => entry.kind === 'screen');
-    void invoke('select_pointer_capture', { sessionId: screen?.bridge?.sessionId || null }).catch(console.warn);
+    if (isTauri()) void invoke('select_pointer_capture', { sessionId: screen?.bridge?.sessionId || null }).catch(console.warn);
     this.notify();
   }
 

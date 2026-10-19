@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { ImagePlus, Upload, X } from 'lucide-react';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '../../platform/commands.ts';
 import { t } from '../../i18n';
 import { BANNER_ASPECT, profileBanners, type ProfileDraft } from '../../core/profile_image';
 import { CropPreview, ProfileCropDialog } from './ProfileCropDialog';

@@ -1,3 +1,5 @@
+packages:
+  - 'apps/*'
 patchedDependencies:
   '@trystero-p2p/core@0.25.3': patches/@trystero-p2p__core@0.25.3.patch
 allowBuilds:

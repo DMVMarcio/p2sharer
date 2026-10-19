@@ -67,7 +67,7 @@ const bundle = await build({ stdin: { contents: `export { NotepadApp } from './s
   bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic',
   plugins: [{ name: 'notepad-native-fixture', setup(builder) {
     builder.onResolve({ filter: /^@tauri-apps\/api\/event$/ }, () => ({ path: 'event', namespace: 'fixture' }));
-    builder.onResolve({ filter: /^@tauri-apps\/api\/core$/ }, () => ({ path: 'core', namespace: 'fixture' }));
+    builder.onResolve({ filter: /^(?:@tauri-apps\/api\/core|.*\/platform\/commands\.ts)$/ }, () => ({ path: 'core', namespace: 'fixture' }));
     builder.onResolve({ filter: /^@tauri-apps\/api\/webview$/ }, () => ({ path: 'webview', namespace: 'fixture' }));
     builder.onResolve({ filter: /\/(room_apps_service|useRoom|useToast|useTextEditorContextMenu|NotepadToolbar)$/ }, args => ({
       path: args.path.split('/').at(-1), namespace: 'fixture',

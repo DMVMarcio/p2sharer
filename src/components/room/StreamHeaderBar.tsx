@@ -1,3 +1,4 @@
+import { isTauri } from '@tauri-apps/api/core';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { Settings2 } from 'lucide-react';
@@ -172,6 +173,7 @@ export const StreamHeaderBar: React.FC = () => {
           <button
             className="btn btn-sm btn-outline btn-compact"
             id="btn-open-audio-filter"
+            disabled={!isTauri()}
             onClick={() => openModal('audioFilter')}
             aria-label={t("message.44d9ce86bda1")}
           >

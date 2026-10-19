@@ -1,3 +1,4 @@
+import { isTauri } from '@tauri-apps/api/core';
 import { useContentPresence } from '../../hooks/useContentPresence';
 import { useModalDialogBehavior } from '../common/useModalDialogBehavior';
 import { profileStats } from '../../core/profile_stats';
@@ -12,7 +13,7 @@ import { streamDrawingLimit, STREAM_DRAWING_MAX } from '../../core/stream_pointe
 import { formatFrameRate } from '../../core/media_streams';
 import { Select } from '../common/Select';
 import React, { useState, useEffect, useRef } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '../../platform/commands.ts';
 import { useModal } from '../../hooks/useModal';
 import { useAppTheme, ACCENT_COLORS } from '../../hooks/useAppTheme';
 import { ColorPalette } from '../common/ColorPalette';
@@ -121,12 +122,14 @@ export const SettingsModal: React.FC = () => {
   const [logPath, setLogPath] = useState(t("message.fc228b3fc51f"));
 
   useEffect(() => {
+    if (!isTauri()) return;
     invoke<string>('get_log_file_path')
       .then((path) => setLogPath(path))
       .catch(() => setLogPath(t("message.847ad4c50b0d")));
   }, []);
 
   useEffect(() => {
+    if (!isTauri()) { setEncoderProbeDone(true); return; }
     let mounted = true;
     invoke<NativeEncoderSupport>('get_native_encoder_support').then(support => {
       if (!mounted) return;
@@ -363,6 +366,7 @@ export const SettingsModal: React.FC = () => {
               disabled={profileBusy || saving}
               className={`settings-nav-item ${activeTab === 'diagnostics' ? 'active' : ''}`}
               onClick={() => setActiveTab('diagnostics')}
+              hidden={!isTauri()}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -756,7 +760,7 @@ export const SettingsModal: React.FC = () => {
                   <div className="settings-row">
                     <label className="settings-label" htmlFor="settings-video-encoder">{t("message.e13520183b92")}</label>
                     <Select id="settings-video-encoder" className="select-input-sm" value={encoder}
-                      disabled={!encoderProbeDone} onValueChange={value => setEncoder(value as EncoderPreference)}
+                      disabled={!isTauri() || !encoderProbeDone} onValueChange={value => setEncoder(value as EncoderPreference)}
                       options={[
                         { value: 'auto', get label() { return t("message.2e0fd9488d50"); } },
                         { value: 'generic', get label() { return t("message.f574fa78f3a3"); } },

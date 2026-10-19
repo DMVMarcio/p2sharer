@@ -32,5 +32,9 @@ jobs:
         run: pnpm test
       - name: Check frontend compilation
         run: pnpm run build
+      - name: Check browser compilation
+        run: pnpm run web:build
+      - name: Run web backend regressions
+        run: pnpm run test:web
       - name: Run portable native regressions
         run: pnpm run test:native --release --locked

@@ -6,7 +6,7 @@ import { profileStats } from '../core/profile_stats.ts';
 import { validStreamDescriptors, streamSlotKey, streamOwner, type StreamDescriptor } from "../core/media_streams.ts";
 import { validStreamPointer, validStreamPointerState, type StreamPointerState, type StreamPointerPacket } from '../core/stream_pointer.ts';
 import { selfId } from '@trystero-p2p/core';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '../platform/commands.ts';
 import type { AppWireEvent } from '../apps/types.ts';
 import { getRoomApp } from '../apps/registry.ts';
 import { chatHistoryChanged, chatRevision, chatRevisionKey, mergeChatHistory, nextChatOrder } from '../core/chat_history.ts';
@@ -2984,7 +2984,7 @@ export class GroupRoomManager {
           const pc = this.room?.getPeers?.()?.[request.peerId] as RTCPeerConnection | undefined;
           const address = pc && (this.fileDirectRetryAfter.get(pc) ?? 0) <= Date.now()
             ? await directFileAddress(pc, 'local', undefined, Boolean(this.snapshot?.connection)) : null;
-          if (address) direct = await invoke<DirectFileOffer>('offer_direct_chat_file', { id: requestId,
+          if (address && typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) direct = await invoke<DirectFileOffer>('offer_direct_chat_file', { id: requestId,
             sourceId: source.file.id, address, size: checked.size });
         } catch (error) { console.debug('[Files] Direct transport unavailable:', error); }
       }

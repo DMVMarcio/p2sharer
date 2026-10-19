@@ -19,7 +19,12 @@
     "tauri:dev": "node tools/tauri.mjs dev",
     "tauri:build": "node tools/tauri.mjs build",
     "test": "node tools/test.mjs",
-    "test:native": "node tools/test.mjs --native"
+    "test:native": "node tools/test.mjs --native",
+    "web:dev": "pnpm --filter @p2sharer/web dev",
+    "web:build": "pnpm --filter @p2sharer/web build",
+    "web:start": "pnpm --filter @p2sharer/server start",
+    "server:dev": "pnpm --filter @p2sharer/server dev",
+    "test:web": "pnpm --filter @p2sharer/server test"
   },
   "dependencies": {
     "@floating-ui/dom": "^1.8.0",
@@ -72,6 +77,7 @@
     "@tauri-apps/cli": "^2.12.1",
     "@types/pako": "^2.0.4",
     "esbuild": "0.25.12",
+    "fake-indexeddb": "6.2.4",
     "jsdom": "^27.4.0",
     "typescript": "~5.6.2",
     "vite": "^6.0.3"

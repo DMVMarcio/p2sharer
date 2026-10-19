@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '../platform/commands.ts';
 import { automaticCardColor } from './profile_card_color.ts';
 import { hsvToHex } from './hsv_color.ts';
 
@@ -28,7 +28,7 @@ class ProfileImages {
   private notify() { this.revision++; this.listeners.forEach(fn => fn()); }
   readonly ready: Promise<void>;
   private async load() {
-    if (typeof window === 'undefined' || !('__TAURI_INTERNALS__' in window)) return;
+    if (typeof window === 'undefined' || (!('__TAURI_INTERNALS__' in window) && typeof indexedDB === 'undefined')) return;
     try {
       const local = await invoke<ProfileImage | null>('load_profile_image', this.banner ? { banner: true } : undefined);
       this.local = local ?? (this.banner ? this.local : await invoke<ProfileImage>('save_profile_image', {

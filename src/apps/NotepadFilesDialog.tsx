@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '../platform/commands.ts';
 import { FileText, Pencil, Trash2 } from 'lucide-react';
 import { ModalDialog } from '../components/common/ModalDialog';
 import { TooltipButton } from '../components/common/TooltipButton';

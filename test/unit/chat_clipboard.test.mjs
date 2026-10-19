@@ -10,6 +10,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const fixture = globalThis.clipboardFixture = { calls: [] };
 const bundle = await build({ stdin: { contents: "export { useChatFileInput } from './src/hooks/useChatFileInput.ts';", resolveDir: process.cwd() },
   bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic', plugins: [{ name: 'clipboard-native-fixture', setup(builder) {
+    builder.onResolve({ filter: /\/platform\/commands\.ts$/ }, () => ({ path: 'core', namespace: 'fixture' }));
     builder.onResolve({ filter: /^@tauri-apps\/api\/(core|webview)$/ }, args => ({ path: args.path.split('/').at(-1), namespace: 'fixture' }));
     builder.onResolve({ filter: /useToast$/ }, () => ({ path: 'toast', namespace: 'fixture' }));
     builder.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: args.path === 'core' ? `

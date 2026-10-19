@@ -21,7 +21,7 @@ export class BrowserModel implements RoomAppModel {
   private clipboardRequests: BrowserLocalRequests;
   get localView(): boolean { return Boolean(this.context.localView); }
   get isHost(): boolean { return this.host === this.context.localActor; }
-  get canStart(): boolean { return this.joined && (!this.host || this.isHost) && !this.running && !this.busy; }
+  get canStart(): boolean { return (this.desktop || this.localView) && this.joined && (!this.host || this.isHost) && !this.running && !this.busy; }
   state: BrowserState = { tabs: [], active: 0, temporary: false };
   controller = '';
   gameOwner = '';
@@ -197,7 +197,7 @@ export class BrowserModel implements RoomAppModel {
     return next;
   }
   private ensureMedia(): void {
-    if (!this.desktop || !this.joined || this.media) return;
+    if ((!this.desktop && this.isHost) || !this.joined || this.media) return;
     this.media = new BrowserMedia(this.scope, this.isHost, async (payload, target) => {
       if (!this.joined || !this.members.has(target) || this.disposed) throw new Error('Browser participant unavailable');
       await this.context.send?.(payload, target);

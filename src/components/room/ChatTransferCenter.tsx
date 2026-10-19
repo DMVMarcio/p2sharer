@@ -3,6 +3,7 @@ import { useLocale } from '../../hooks/useLocale';
 import { useDropdownPresence } from '../../hooks/useDropdownPresence';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Download, File, FolderSearch, Image as ImageIcon, Info, Square, Upload, X } from 'lucide-react';
+import { isTauri } from '@tauri-apps/api/core';
 import { useRoom } from '../../hooks/useRoom';
 import { showToast } from '../../hooks/useToast';
 import { Tooltip } from '../common/Tooltip';
@@ -114,7 +115,7 @@ export function ChatTransferCenter() {
               </span></> : null}
             </small>
           </div>
-          {transfer.status === 'complete' && transfer.direction === 'receive' && transfer.saved &&
+          {isTauri() && transfer.status === 'complete' && transfer.direction === 'receive' && transfer.saved &&
             <TooltipButton tooltip={t("message.effbe5e6d9fb")} aria-label={t("message.9392dee15ee6")}
               onClick={() => void revealSavedFile(transfer.messageId, transfer.requestId)
                 .catch(() => showToast(t("message.bf86d73f16f0")))}><FolderSearch size={15} /></TooltipButton>}

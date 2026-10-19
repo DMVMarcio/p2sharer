@@ -25,6 +25,7 @@ export function directFileSignature(offer?: DirectFileOffer): unknown {
 /** Numeric peer endpoints are bound to the signed certificate; never resolve URLs or NAT mappings. */
 export async function directFileAddress(pc: RTCPeerConnection | undefined, side: 'local' | 'remote',
   announced?: string, lan = false): Promise<string | null> {
+  if (typeof window !== 'undefined' && !('__TAURI_INTERNALS__' in window)) return null;
   if (!pc || pc.connectionState !== 'connected') return null;
   const pair = selectedIcePair(Array.from((await pc.getStats()).values()) as IceStat[]);
   if (pair?.local?.candidateType !== 'host' || !['host', 'prflx'].includes(pair.remote?.candidateType ?? '')) return null;
@@ -51,5 +52,6 @@ export function receiveDirectFile(id: string, address: string, offer: DirectFile
 }
 
 export function cancelDirectFile(id: string): Promise<void> {
+  if (typeof window !== 'undefined' && !('__TAURI_INTERNALS__' in window)) return Promise.resolve();
   return invoke('cancel_direct_chat_file', { id });
 }

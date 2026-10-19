@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '../platform/commands.ts';
 import { compareRoomInvites, parseRoomInvite, type RoomIdentity } from './room_invite.ts';
 import { verifyRoomInvite } from './room_invite_validation.ts';
 import type { AuthorityTransfer, HostCommand } from './room_authority.ts';
@@ -29,7 +29,7 @@ export function savedRoomCustomName(record: SavedRoom): string | undefined {
 const memory = new Map<string, SavedRoom>();
 const listeners = new Set<() => void>();
 const pendingMutations = new Map<string, Promise<void>>();
-const native = (): boolean => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+const native = (): boolean => typeof window !== 'undefined' && ('__TAURI_INTERNALS__' in window || typeof indexedDB !== 'undefined');
 
 async function serializeMutation(roomId: string, task: () => Promise<void>): Promise<void> {
   const previous = pendingMutations.get(roomId) ?? Promise.resolve();

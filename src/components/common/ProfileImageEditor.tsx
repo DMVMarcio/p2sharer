@@ -3,7 +3,7 @@ import { ProfileBannerEditor, type BannerDraft } from './ProfileBannerEditor';
 import type { NicknameStyle } from '../../core/nickname_style';
 import { useState, useSyncExternalStore } from 'react';
 import { Upload, X } from 'lucide-react';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '../../platform/commands.ts';
 import { t } from '../../i18n';
 import { profileImages, profileBanners, type ProfileDraft } from '../../core/profile_image';
 import { contrastingTextColor } from '../../core/accent_color';

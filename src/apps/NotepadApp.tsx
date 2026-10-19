@@ -1,7 +1,7 @@
 import { localizeError, getLanguage, t } from '../i18n';
 import { useLocale } from '../hooks/useLocale';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '../platform/commands.ts';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { Download, FilePlus2, FolderOpen, Save } from 'lucide-react';
 import { EditorContent, useEditor } from '@tiptap/react';

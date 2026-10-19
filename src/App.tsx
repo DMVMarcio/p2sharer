@@ -31,6 +31,8 @@ import { ReleaseNotesDialog } from './components/modals/ReleaseNotesDialog';
 import { startAutomaticUpdateChecks } from './services/app_updates';
 import { startRoomDeepLinks } from './services/room_deep_links';
 import { releaseNotes } from './services/release_notes';
+import { isTauri } from '@tauri-apps/api/core';
+import { BrowserCaptureModal } from './components/modals/BrowserCaptureModal';
 
 export const App: React.FC = () => {
   useAppTheme(); // Sets data-theme & data-accent
@@ -97,7 +99,7 @@ const MainApp: React.FC = () => {
       {/* Modals & Overlays */}
       {activeModal === 'profile' && <ProfileModal key={modalRevision} />}
       {activeModal === 'settings' && <SettingsModal />}
-      {activeModal === 'screenPicker' && <ScreenPickerModal />}
+      {activeModal === 'screenPicker' && (isTauri() ? <ScreenPickerModal /> : <BrowserCaptureModal />)}
       {activeModal === 'username' && <UsernameModal />}
       {activeModal === 'audioFilter' && <AudioFilterModal />}
       {activeModal === 'createRoom' && <CreateRoomModal />}

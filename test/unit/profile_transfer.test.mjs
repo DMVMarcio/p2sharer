@@ -12,7 +12,7 @@ const bundle = await build({
   stdin: { contents: `export { ProfileTransfer } from './src/p2p/profile_transfer.ts'; export { profileImages, profileBanners } from './src/core/profile_image.ts'; export { contrastingTextColor } from './src/core/accent_color.ts';`, resolveDir: process.cwd() },
   bundle: true, write: false, format: 'esm', platform: 'node',
   plugins: [{ name: 'native', setup(builder) {
-    builder.onResolve({ filter: /^@tauri-apps\/api\/core$/ }, () => ({ path: 'native', namespace: 'fixture' }));
+    builder.onResolve({ filter: /^(?:@tauri-apps\/api\/core|.*\/platform\/commands\.ts)$/ }, () => ({ path: 'native', namespace: 'fixture' }));
     builder.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({ contents: 'export const invoke = (command, args, options) => globalThis.__profileInvoke(command, args, options);' }));
   } }],
 });

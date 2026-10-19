@@ -2,6 +2,7 @@ import { createPortal } from 'react-dom';
 import { useModalDialogBehavior } from '../common/useModalDialogBehavior';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
+import { isTauri } from '@tauri-apps/api/core';
 import { useDropdownPresence } from '../../hooks/useDropdownPresence';
 import { useEffect, useRef, useState } from 'react';
 import { Copy, Download, File, FolderSearch, Image as ImageIcon, X, ZoomIn, ZoomOut } from 'lucide-react';
@@ -122,7 +123,7 @@ export function ChatFileAttachment({ message, transfers, preview, savedRequestId
           {' '}{formatTransferSpeed(transfer.bytesPerSecond ?? 0, speedUnit)}</small>)}
         {!receiving && savedRequestId && <small>{t("message.0d0123be2282")}</small>}</div>
       {(!own || file.isImage) && <div className="chat-file-download-wrap" ref={downloadWrap}>
-        {savedRequestId && <Tooltip content={t("message.effbe5e6d9fb")}><button type="button" className="chat-file-reveal-button"
+        {isTauri() && savedRequestId && <Tooltip content={t("message.effbe5e6d9fb")}><button type="button" className="chat-file-reveal-button"
           aria-label={t("message.9392dee15ee6")} onClick={() => onReveal(savedRequestId)}><FolderSearch size={16} /></button></Tooltip>}
         {receiving ? <FileProgressRing pending={receiving.status === 'pending'}
           progress={receiving.total ? receiving.bytes / receiving.total : 0}

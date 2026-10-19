@@ -23,6 +23,9 @@ import { Tooltip } from '../common/Tooltip';
 import { StreamStatsOverlay } from './StreamStatsOverlay';
 import { Grid2X2, Focus, Eye, EyeOff, Maximize, PanelsTopLeft, PictureInPicture2, RotateCcw, Volume2, VolumeX, Square, MonitorUp } from 'lucide-react';
 import { useContextMenu, type ContextMenuAction } from '../common/ContextMenu';
+import { isTauri } from '@tauri-apps/api/core';
+import { openBrowserPictureInPicture } from '../../platform/picture_in_picture';
+import { showToast } from '../../hooks/useToast';
 
 interface VideoCardProps {
   children?: React.ReactNode;
@@ -92,6 +95,11 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   };
 
   const videoElementRef = useRef<HTMLVideoElement | null>(null);
+  const openPictureInPicture = () => {
+    const request = isTauri() ? pipService.openPip(slot.peerId, slot.senderName, slot.stream)
+      : openBrowserPictureInPicture(videoElementRef.current);
+    void request.catch(() => showToast(t('error.unknown'), 3500, 'error'));
+  };
   const currentStreamRef = useRef(slot.stream);
   currentStreamRef.current = slot.stream;
 
@@ -274,7 +282,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
         actions.push({ id: 'fullscreen', get label() { return isFullscreen ? t("message.cbe5019d4a64") : t("message.cdd35dea1ee3"); }, icon: <Maximize size={15} />, onSelect: () => handleToggleFullscreen() });
       }
       actions.push({ id: 'pip', get label() { return t("message.850d2cf3aafa"); }, icon: <PictureInPicture2 size={15} />,
-        disabled: !slot.stream, onSelect: () => pipService.openPip(slot.peerId, slot.senderName, slot.stream) });
+        disabled: !slot.stream || (!isTauri() && !document.pictureInPictureEnabled), onSelect: openPictureInPicture });
     }
     actions.push({ id: 'stop', get label() { return slot.isLocal ? t("message.6ef17b51fd93") : t("message.470b862fbd07"); }, icon: <Square size={15} />, separator: true,
       onSelect: slot.isLocal ? () => { if (slot.mediaId) roomService.stopTransmission(slot.mediaId); } : () => stopWatchingStream(slot.peerId) });
@@ -583,9 +591,10 @@ export const VideoCard: React.FC<VideoCardProps> = ({
                 type="button"
                 className="btn-stream-pip"
                 id={`btn-stream-pip-${slot.peerId}`}
+                disabled={!isTauri() && !document.pictureInPictureEnabled}
                 onClick={(e) => {
                   e.stopPropagation();
-                  pipService.openPip(slot.peerId, slot.senderName, slot.stream);
+                  openPictureInPicture();
                 }}
                 aria-label={t("message.1f626fd80ce4")}
               >

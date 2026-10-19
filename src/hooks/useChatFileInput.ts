@@ -1,10 +1,12 @@
 import { blobToDataUrl } from '../core/image_clipboard';
 import { t } from '../i18n/index.ts';
 import { useEffect, useRef, useState, type RefObject } from 'react';
-import { invoke, isTauri } from '@tauri-apps/api/core';
+import { isTauri } from '@tauri-apps/api/core';
+import { invoke } from '../platform/commands.ts';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import type { NativeChatFile } from '../p2p/group_room';
 import { showToast } from './useToast';
+import { registerBrowserFile } from '../platform/web_files';
 
 export function useChatFileInput(paneRef: RefObject<HTMLDivElement | null>) {
   const [files, setFiles] = useState<NativeChatFile[]>([]);
@@ -35,7 +37,39 @@ export function useChatFileInput(paneRef: RefObject<HTMLDivElement | null>) {
 
   useEffect(() => {
     mounted.current = true;
-    if (!isTauri()) return () => { mounted.current = false; };
+    if (!isTauri()) {
+      const pane = paneRef.current;
+      const receive = async (incoming: File[]) => {
+        if (busy.current || queue.current.length || !incoming.length) return;
+        busy.current = true;
+        const prepared: NativeChatFile[] = [];
+        try {
+          for (const file of incoming) prepared.push(await registerBrowserFile(file, file.name));
+          if (!mounted.current) { prepared.forEach(discard); return; }
+          queue.current = prepared; setFiles(prepared);
+        } catch {
+          prepared.forEach(discard);
+          if (mounted.current) showToast(t('web.fileLimit'), 3500, 'error');
+        } finally { busy.current = false; }
+      };
+      const over = (event: DragEvent) => { if (event.dataTransfer?.types.includes('Files')) { event.preventDefault(); setDragging(true); } };
+      const leave = () => setDragging(false);
+      const drop = (event: DragEvent) => {
+        event.preventDefault(); setDragging(false);
+        if (event.dataTransfer) void receive(Array.from(event.dataTransfer.files));
+      };
+      const paste = (event: ClipboardEvent) => {
+        if (!event.clipboardData?.files.length) return;
+        event.preventDefault(); void receive(Array.from(event.clipboardData.files));
+      };
+      pane?.addEventListener('dragover', over); pane?.addEventListener('dragleave', leave);
+      pane?.addEventListener('drop', drop); pane?.addEventListener('paste', paste);
+      return () => {
+        mounted.current = false; queue.current.forEach(discard); queue.current = [];
+        pane?.removeEventListener('dragover', over); pane?.removeEventListener('dragleave', leave);
+        pane?.removeEventListener('drop', drop); pane?.removeEventListener('paste', paste);
+      };
+    }
     let disposed = false;
     let unlisten: (() => void) | undefined;
     let pasteTimer: ReturnType<typeof setTimeout> | undefined;

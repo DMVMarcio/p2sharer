@@ -8,6 +8,7 @@ import { useRoom } from '../../hooks/useRoom';
 import { SavedRoomsSection } from './SavedRoomsSection';
 import { AppVersion } from '../common/AppVersion';
 import { roomService } from '../../services/room_service';
+import { isTauri } from '@tauri-apps/api/core';
 
 export const HomeView: React.FC<{ onScrollChange?: (scrolled: boolean) => void }> = ({ onScrollChange }) => {
   useLocale();
@@ -59,6 +60,7 @@ export const HomeView: React.FC<{ onScrollChange?: (scrolled: boolean) => void }
             <img src={logo} alt="" className="hero-logo" />
           </div>
         </div>
+        {!isTauri() && <p className="hero-note">{t('web.platformText')}</p>}
         <SavedRoomsSection />
       </div>
       <footer className="home-version"><AppVersion compact /></footer>

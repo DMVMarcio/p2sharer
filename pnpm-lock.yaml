@@ -158,6 +158,9 @@ importers:
       esbuild:
         specifier: 0.25.12
         version: 0.25.12
+      fake-indexeddb:
+        specifier: 6.2.4
+        version: 6.2.4
       jsdom:
         specifier: ^27.4.0
         version: 27.4.0
@@ -167,6 +170,10 @@ importers:
       vite:
         specifier: ^6.0.3
         version: 6.4.3(@types/node@26.2.0)
+
+  apps/server: {}
+
+  apps/web: {}
 
 packages:
 
@@ -1175,6 +1182,10 @@ packages:
 
   extend@3.0.2:
     resolution: {integrity: sha512-fjquC59cD7CyW6urNXK0FBufkZcoiGG80wTuPujX590cB5Ttln20E2UB4S/WARVqhXffZl2LNgS+gQdPIIim/g==}
+
+  fake-indexeddb@6.2.4:
+    resolution: {integrity: sha512-INKeIKEtSViN4yVtEWEUqbsqmaIy7Ls+MfU0yxQVXg67pOJ/sH1ZxcVrP8XrKULUFohcPD9gnmym+qBfEybACw==}
+    engines: {node: '>=18'}
 
   fast-equals@5.4.3:
     resolution: {integrity: sha512-8unmvA0qrfpFWBYUate9BTGtQdKHWBYt+KdAIkag7Vvxe7wz8Q2nJg7fLMC0bJqe0bjP31kca7Ckaawrs4Istg==}
@@ -2763,6 +2774,8 @@ snapshots:
   events@3.3.0: {}
 
   extend@3.0.2: {}
+
+  fake-indexeddb@6.2.4: {}
 
   fast-equals@5.4.3: {}
 

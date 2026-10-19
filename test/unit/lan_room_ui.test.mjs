@@ -36,7 +36,7 @@ const bundle = await build({
       args.path.includes('useRoom') ? 'export const useRoom = () => ({ joinRoom: (...args) => globalThis.lanUiJoin(...args) });' :
       args.path.includes('useToast') ? 'export const showToast = () => {};' :
       args.path.includes('saved_rooms') ? 'export const savedRooms = { put: async record => globalThis.lanUiSave(record) };' :
-      'export const invoke = command => globalThis.lanUiInvoke(command);',
+      'export const isTauri = () => true; export const invoke = command => globalThis.lanUiInvoke(command);',
     }));
     builder.onResolve({ filter: /^[^./]/ }, args => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
   } }],

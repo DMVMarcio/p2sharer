@@ -54,7 +54,7 @@ const bundle = await build({ stdin: { contents: `export { WhiteboardApp } from '
   export { ContextMenuProvider } from './src/components/common/ContextMenu.tsx';
   export { WhiteboardModel } from './src/apps/whiteboard_model.ts'; export { setLanguage } from './src/i18n/index.ts';`, resolveDir: process.cwd() },
   bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic', plugins: [{ name: 'whiteboard-fixture', setup(builder) {
-    builder.onResolve({ filter: /^@tauri-apps\/api\/core$/ }, () => ({ path: 'core', namespace: 'fixture' }));
+    builder.onResolve({ filter: /^(?:@tauri-apps\/api\/core|.*\/platform\/commands\.ts)$/ }, () => ({ path: 'core', namespace: 'fixture' }));
     builder.onResolve({ filter: /\/(room_apps_service|useRoom|useToast)$/ }, args => ({ path: args.path.split('/').at(-1), namespace: 'fixture' }));
     builder.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: mocks[args.path] }));
     builder.onResolve({ filter: /^[^./]/ }, args => ({ path: import.meta.resolve(args.path), external: true }));

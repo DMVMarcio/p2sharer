@@ -38,6 +38,8 @@ For the experimental LAN/VPN mode, choose **Local network / VPN** when creating 
 
 ## Development
 
+The repository also includes a React website and browser application, backed by a Node.js HTTP server. See [web workspace instructions](docs/web.md) for local startup, production hosting, shared code and browser capability limits.
+
 P2Sharer uses Tauri v2 and Rust for the Windows host, with React, TypeScript and Vite for the interface. Development requires:
 
 - Node.js 22.14 or newer and pnpm 10.30.1, pinned in `package.json`.

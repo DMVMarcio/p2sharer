@@ -37,7 +37,7 @@ const bundle = await build({
         en: ['**files and images** ![image](https://example.com/image.png)'],
       },
     }) }));
-    builder.onResolve({ filter: /room_service|useRoom|useModal$|@tauri-apps\/api\/core/ }, args => ({
+    builder.onResolve({ filter: /room_service|useRoom|useModal$|platform\/commands\.ts$|@tauri-apps\/api\/core/ }, args => ({
       path: args.path.includes('room_service') ? 'room' : args.path.includes('useRoom') ? 'room-hook' : args.path.includes('useModal') ? 'modal' : 'native', namespace: 'settings-fixture',
     }));
     builder.onLoad({ filter: /.*/, namespace: 'settings-fixture' }, args => ({ contents: {
@@ -46,7 +46,7 @@ const bundle = await build({
       modal: `export const useModal = () => ({ isClosing: false, closeModal: () => globalThis.settingsClosed++ });
         export const modalManager = { getProfileTarget: () => globalThis.profileTarget,
           open: destination => { globalThis.profileDestination = destination; } };`,
-      native: `export const invoke = async (command, args) => {
+      native: `export const isTauri = () => true; export const invoke = async (command, args) => {
         if (globalThis.profileBackend && command.includes('profile_image')) return globalThis.profileBackend(command, args);
         if (command === 'save_profile_image') return { hash: '', data: '', color: args.color };
         return command === 'get_log_file_path' ? 'fixture.log' : { driver_api_available: false };

@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '../platform/commands.ts';
 import { blobToDataUrl } from '../core/image_clipboard.ts';
 import { PROFILE_CHUNK, PROFILE_MAX_BYTES, validProfileHash } from '../core/profile_image.ts';
 

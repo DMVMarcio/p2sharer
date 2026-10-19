@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '../platform/commands.ts';
 import { FilePlus2, FolderOpen, Save, Download } from 'lucide-react';
 import { DocumentFilesDialog, type NoteLibrary, type SavedNote } from './NotepadFilesDialog';
 import { ModalDialog } from '../components/common/ModalDialog';

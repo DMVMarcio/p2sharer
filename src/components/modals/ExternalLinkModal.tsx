@@ -1,3 +1,4 @@
+import { isTauri } from '@tauri-apps/api/core';
 import { useModalDialogBehavior } from '../common/useModalDialogBehavior';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
@@ -20,6 +21,7 @@ export const ExternalLinkModal: React.FC = () => {
   const proceed = () => {
     if (!destination) return;
     closeModal();
+    if (!isTauri()) { window.open(destination, '_blank', 'noopener,noreferrer'); return; }
     void openUrl(destination).catch(() => showToast(t("message.3c3c85fd6b50"), 3500, 'error'));
   };
 

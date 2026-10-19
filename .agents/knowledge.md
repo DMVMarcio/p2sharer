@@ -35,6 +35,7 @@ The Tauri v2 host combines native Windows integration with a React interface and
 
 ## 3. Subsystem Architectural Deep Dives
 - [Product Purpose, Current Capabilities and Implementation References](../docs/product-overview.md)
+- [Web Workspace, Browser Runtime and HTTP Backend](../docs/web.md)
 - [Release Versioning, Signing and GitHub Distribution](../docs/releases.md)
 - [Public Repository Safety and Historical Audits](knowledge/repository-publication.md)
 - [P2P Networking, Signaling Failover & WebRTC Mesh](knowledge/p2p-architecture.md)

@@ -2,7 +2,7 @@ import { useModalDialogBehavior } from '../common/useModalDialogBehavior';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useEffect, useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, isTauri } from '@tauri-apps/api/core';
 import { Select } from '../common/Select';
 import { createLanConnection, type LanInterface } from '../../core/lan_room';
 import { useFormSubmit } from '../../hooks/useFormSubmit';
@@ -94,7 +94,7 @@ export const CreateRoomModal: React.FC = () => {
             <Select id="create-room-connection" value={mode} disabled={pending}
               onValueChange={setMode} options={[
                 { value: 'p2p', label: t('lan.internetP2p') },
-                { value: 'lan', label: t('lan.localVpn') },
+                { value: 'lan', label: t('lan.localVpn'), disabled: !isTauri() },
               ]} />
           </div>
           {mode === 'lan' && <div className="form-group">

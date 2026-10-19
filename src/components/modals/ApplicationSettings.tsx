@@ -1,3 +1,4 @@
+import { isTauri } from '@tauri-apps/api/core';
 import { t } from '../../i18n';
 import { LANGUAGE_OPTIONS, isAppLanguage, type AppLanguage } from '../../i18n/language';
 import { useLocale } from '../../hooks/useLocale';
@@ -37,7 +38,7 @@ export function ApplicationSettings({ language, onLanguageChange, automatic, inc
     <p className="field-info-text"><AppVersion /></p>
     <button type="button" className="btn btn-secondary btn-sm" onClick={releaseNotes.open}>
       {t('releaseNotes.view')}</button>
-    <label className="settings-switch-row" htmlFor="settings-auto-updates">
+    {isTauri() && <><label className="settings-switch-row" htmlFor="settings-auto-updates">
       <div className="settings-switch-label-group">
         <span className="settings-switch-title">{t("message.d8a908a0e8ab")}</span>
       </div>
@@ -62,6 +63,6 @@ export function ApplicationSettings({ language, onLanguageChange, automatic, inc
     {channelChanged && <p className="field-info-text">{t("message.013d77e5aa5d")}</p>}
     <button type="button" className="btn btn-secondary btn-sm"
       disabled={busy || channelChanged || update.status === 'checking'} onClick={() => void appUpdates.check(true)}>
-      {t("message.5f59554ade76")}</button>
+      {t("message.5f59554ade76")}</button></>}
   </div>;
 }
