@@ -4,21 +4,21 @@ import { Select } from '../components/common/Select';
 import React from 'react';
 import type { Editor } from '@tiptap/react';
 import { useEditorState } from '@tiptap/react';
-import { AlignCenter, AlignLeft, AlignRight, Bold, Code, Highlighter, Italic, Link2,
+import { AlignCenter, AlignLeft, AlignRight, Bold, Code, Highlighter, ImagePlus, Italic, Link2,
   List, ListOrdered, Minus, Quote, Redo2, Strikethrough, Table2, TableColumnsSplit,
   TableRowsSplit, Trash2, Underline as UnderlineIcon, Undo2 } from 'lucide-react';
 import { TooltipButton } from '../components/common/TooltipButton';
 
-interface Props { editor: Editor; onLink(): void; fileActions?: React.ReactNode }
+interface Props { editor: Editor; onLink(): void; onImage?(): void; imageActive?: boolean; fileActions?: React.ReactNode }
 
-export const NotepadToolbar: React.FC<Props> = ({ editor, onLink, fileActions }) => {
+export const NotepadToolbar: React.FC<Props> = ({ editor, onLink, onImage, imageActive, fileActions }) => {
   useLocale();
   const active = useEditorState({ editor, selector: ({ editor: current }) => ({
     bold: current.isActive('bold'), italic: current.isActive('italic'), underline: current.isActive('underline'),
     strike: current.isActive('strike'), highlight: current.isActive('highlight'),
     bullet: current.isActive('bulletList'), ordered: current.isActive('orderedList'),
     quote: current.isActive('blockquote'), code: current.isActive('codeBlock'),
-    link: current.isActive('link'), table: current.isActive('table'),
+    link: current.isActive('link'), image: current.isActive('image'), table: current.isActive('table'),
     heading: current.getAttributes('heading').level || 0,
     alignment: current.getAttributes('paragraph').textAlign || current.getAttributes('heading').textAlign || 'left',
   }) });
@@ -52,6 +52,7 @@ export const NotepadToolbar: React.FC<Props> = ({ editor, onLink, fileActions })
     {tool(t("message.45b49b8b0365"), <Code size={15} />, active.code, () => editor.chain().focus().toggleCodeBlock().run())}
     {tool(t("message.3eebdaf6f213"), <Minus size={15} />, false, () => editor.chain().focus().setHorizontalRule().run())}
     {tool('Link', <Link2 size={15} />, active.link, onLink)}
+    {onImage && tool(t('notepad.image'), <ImagePlus size={15} />, Boolean(active.image || imageActive), onImage)}
     <span className="room-app-notepad-tools-divider" />
     {tool(t("message.ac3914c8261a"), <Table2 size={15} />, active.table, () => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run())}
     {active.table && <>

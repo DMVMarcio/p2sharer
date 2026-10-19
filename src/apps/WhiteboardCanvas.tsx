@@ -184,7 +184,7 @@ export function WhiteboardCanvas({ model, activeLayer, settings, spaceHeld = fal
     const activeWidth = boardBrushWidth(settings.width) * (p !== undefined ? 0.25 + 0.75 * p : 1);
     publish({
       ...point,
-      tool: spaceHeld ? 'pointer' : g?.mode === 'pan' ? 'hand' : g?.mode === 'move' || g?.mode === 'resize' ? 'move' : settings.tool,
+      tool: g?.mode === 'pan' ? 'hand' : g?.mode === 'move' || g?.mode === 'resize' ? 'move' : spaceHeld ? 'pointer' : settings.tool,
       width: activeWidth,
       color: settings.color,
       ...(drawing ? { draft: drawing } : {}),

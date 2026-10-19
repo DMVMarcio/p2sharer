@@ -688,11 +688,123 @@ fn validate_whiteboard_bytes(bytes: &[u8], hash: &str) -> Result<WhiteboardImage
     })
 }
 
+fn valid_remote_image_url(url: &tauri::Url) -> bool {
+    if !matches!(url.scheme(), "https" | "http")
+        || !url.username().is_empty()
+        || url.password().is_some()
+    {
+        return false;
+    }
+    let Some(raw_host) = url.host_str() else {
+        return false;
+    };
+    let bare = raw_host
+        .strip_prefix('[')
+        .and_then(|s| s.strip_suffix(']'))
+        .unwrap_or(raw_host);
+    if let Ok(ip) = bare.parse::<std::net::Ipv4Addr>() {
+        return !ip.is_private()
+            && !ip.is_loopback()
+            && !ip.is_link_local()
+            && !ip.is_broadcast()
+            && !ip.is_multicast()
+            && !ip.is_unspecified();
+    }
+    if let Ok(ip) = bare.parse::<std::net::Ipv6Addr>() {
+        return !ip.is_loopback()
+            && !ip.is_unique_local()
+            && !ip.is_unicast_link_local()
+            && !ip.is_multicast()
+            && !ip.is_unspecified();
+    }
+    let host = bare.trim_end_matches('.').to_ascii_lowercase();
+    host.contains('.')
+        && host != "localhost"
+        && !host.ends_with(".local")
+        && !host.ends_with(".internal")
+        && !host.ends_with(".lan")
+        && !host.ends_with(".home")
+}
+
+async fn fetch_remote_image_bytes(raw: &str) -> Result<Vec<u8>, String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() || trimmed.len() > 2048 {
+        return Err("Invalid image".into());
+    }
+    let parsed = tauri::Url::parse(trimmed).map_err(|_| "Invalid image")?;
+    if !valid_remote_image_url(&parsed) {
+        return Err("Invalid image".into());
+    }
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .redirect(reqwest::redirect::Policy::custom(|attempt| {
+            if attempt.previous().len() < 5 && valid_remote_image_url(attempt.url()) {
+                attempt.follow()
+            } else {
+                attempt.stop()
+            }
+        }))
+        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36")
+        .build()
+        .map_err(|_| "Invalid image")?;
+    let mut response = client
+        .get(parsed)
+        .send()
+        .await
+        .map_err(|_| "Invalid image")?
+        .error_for_status()
+        .map_err(|_| "Invalid image")?;
+    if !valid_remote_image_url(response.url())
+        || response.status().is_redirection()
+        || response
+            .content_length()
+            .is_some_and(|len| len > INPUT_LIMIT as u64)
+    {
+        return Err("Image exceeds the 32 MB limit".into());
+    }
+    let mut bytes = Vec::new();
+    while let Some(chunk) = response.chunk().await.map_err(|_| "Invalid image")? {
+        if bytes.len() + chunk.len() > INPUT_LIMIT {
+            return Err("Image exceeds the 32 MB limit".into());
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+    Ok(bytes)
+}
+
+#[tauri::command]
+pub async fn pick_whiteboard_image() -> Result<Option<WhiteboardImage>, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        let Some(path) = rfd::FileDialog::new()
+            .add_filter("Images", &["png", "apng", "jpg", "jpeg", "webp", "gif"])
+            .pick_file()
+        else {
+            return Ok(None);
+        };
+        let mut bytes = Vec::new();
+        std::fs::File::open(path)
+            .map_err(|e| e.to_string())?
+            .take(INPUT_LIMIT as u64 + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|e| e.to_string())?;
+        process_whiteboard_bytes(&bytes).map(Some)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 pub async fn paste_whiteboard_image(
     data: Option<String>,
     path: Option<String>,
+    url: Option<String>,
 ) -> Result<WhiteboardImage, String> {
+    if let Some(remote_url) = url {
+        let bytes = fetch_remote_image_bytes(&remote_url).await?;
+        return tauri::async_runtime::spawn_blocking(move || process_whiteboard_bytes(&bytes))
+            .await
+            .map_err(|e| e.to_string())?;
+    }
     tauri::async_runtime::spawn_blocking(move || {
         if let Some(raw) = data {
             let encoded = raw
@@ -1204,7 +1316,7 @@ mod tests {
             "data:image/jpeg;base64,{}",
             STANDARD.encode(jpeg.into_inner())
         );
-        let prepared = paste_whiteboard_image(Some(data), None).await.unwrap();
+        let prepared = paste_whiteboard_image(Some(data), None, None).await.unwrap();
         assert_eq!((prepared.width, prepared.height), (1920, 960));
         let validated = validate_whiteboard_image(prepared.data.clone(), prepared.hash.clone())
             .await
@@ -1222,5 +1334,12 @@ mod tests {
                 .await
                 .is_err()
         );
+        let mut with_auth = tauri::Url::parse("https://example.com/banner.png").unwrap();
+        let _ = with_auth.set_username("user");
+        assert!(valid_remote_image_url(&tauri::Url::parse("https://example.com/banner.png").unwrap()));
+        assert!(!valid_remote_image_url(&tauri::Url::parse("http://localhost/banner.png").unwrap()));
+        assert!(!valid_remote_image_url(&tauri::Url::parse("http://127.0.0.1/banner.png").unwrap()));
+        assert!(!valid_remote_image_url(&with_auth));
+        assert!(!valid_remote_image_url(&tauri::Url::parse("file:///banner.png").unwrap()));
     }
 }

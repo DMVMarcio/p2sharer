@@ -1398,5 +1398,8 @@
   "releaseNotes.title": "このバージョンの新機能",
   "releaseNotes.subtitle": "このリリースの変更点をご確認ください。",
   "releaseNotes.done": "確認しました",
-  "releaseNotes.view": "リリースノートを見る"
+  "releaseNotes.view": "リリースノートを見る",
+  "notepad.image": "画像",
+  "notepad.imageUrl": "画像のURL",
+  "notepad.chooseImage": "ファイルを選択"
 }

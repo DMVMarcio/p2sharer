@@ -234,8 +234,10 @@ test('manual numeric entry rejects non-digits and corrects out-of-range values',
   assert.ok(document.querySelector('[data-cursor-shape="pointer"]'));
   const beforeSpacePan = document.querySelector('.whiteboard-art > g').getAttribute('transform');
   await pointer('pointerdown', 250, 250);
+  assert.ok(document.querySelector('[data-cursor-shape="hand"]'));
   await pointer('pointermove', 300, 280);
   await settle();
+  assert.ok(document.querySelector('[data-cursor-shape="hand"]'));
   const afterSpacePan = document.querySelector('.whiteboard-art > g').getAttribute('transform');
   assert.notEqual(afterSpacePan, beforeSpacePan);
   await act(async () => window.dispatchEvent(new window.KeyboardEvent('keyup', { key: ' ', code: 'Space', bubbles: true })));

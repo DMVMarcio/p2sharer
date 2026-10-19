@@ -1398,5 +1398,8 @@
   "releaseNotes.title": "Novità della versione",
   "releaseNotes.subtitle": "Scopri cosa è cambiato in questa versione.",
   "releaseNotes.done": "Ho capito",
-  "releaseNotes.view": "Visualizza le note di versione"
+  "releaseNotes.view": "Visualizza le note di versione",
+  "notepad.image": "Immagine",
+  "notepad.imageUrl": "URL immagine",
+  "notepad.chooseImage": "Scegli file"
 }

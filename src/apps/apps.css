@@ -167,6 +167,25 @@
   font-weight: 700; line-height: 1.2; white-space: nowrap; }
 .room-app-notepad.compact .room-app-notepad-content { pointer-events: none; }
 .room-app-notepad.compact .room-app-notepad-editor { padding: 7px 10px; font-size: 10px; }
+.notepad-image-node { display: inline-block; vertical-align: bottom; max-width: 100%; margin: 4px 2px; line-height: 0; }
+.notepad-image-wrapper { position: relative; display: inline-block; max-width: 100%; line-height: 0; user-select: none; cursor: grab; }
+.notepad-image-wrapper:active { cursor: grabbing; }
+.notepad-image-element { display: block; max-width: 100%; border-radius: var(--radius-sm); object-fit: fill; }
+.notepad-image-loading { display: inline-block; width: 160px; height: 110px; border: 1px dashed var(--border-default);
+  border-radius: var(--radius-sm); background: var(--room-app-panel-bg); }
+.notepad-image-selection { position: absolute; inset: 0; border: 1.5px dashed #3b82f6; border-radius: var(--radius-sm);
+  box-sizing: border-box; pointer-events: none; }
+.notepad-image-handle { position: absolute; width: 9px; height: 9px; border: 1.5px solid #3b82f6; border-radius: 2px;
+  background: #fff; box-sizing: border-box; pointer-events: auto; }
+.notepad-image-handle.handle-nw { top: -5px; left: -5px; cursor: nwse-resize; }
+.notepad-image-handle.handle-n { top: -5px; left: calc(50% - 4.5px); cursor: ns-resize; }
+.notepad-image-handle.handle-ne { top: -5px; right: -5px; cursor: nesw-resize; }
+.notepad-image-handle.handle-e { top: calc(50% - 4.5px); right: -5px; cursor: ew-resize; }
+.notepad-image-handle.handle-se { right: -5px; bottom: -5px; cursor: nwse-resize; }
+.notepad-image-handle.handle-s { bottom: -5px; left: calc(50% - 4.5px); cursor: ns-resize; }
+.notepad-image-handle.handle-sw { bottom: -5px; left: -5px; cursor: nesw-resize; }
+.notepad-image-handle.handle-w { top: calc(50% - 4.5px); left: -5px; cursor: ew-resize; }
+.room-app-notepad.compact .notepad-image-element { max-height: 90px; width: auto !important; height: auto !important; }
 
 /* Shared video app. All surfaces remain clipped by the transmission card. */
 .room-app-youtube { --yt-ink: var(--text-primary); --yt-muted: var(--text-secondary); --yt-line: var(--border-subtle); --yt-surface: var(--room-app-panel-bg);

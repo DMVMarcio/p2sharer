@@ -184,6 +184,7 @@ pub fn run() {
             profile_image::load_profile_image,
             profile_image::validate_profile_image,
             profile_image::validate_profile_image_bytes,
+            profile_image::pick_whiteboard_image,
             profile_image::paste_whiteboard_image,
             profile_image::validate_whiteboard_image,
             media_diagnostics::media_diagnostics_enabled,

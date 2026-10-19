@@ -4,6 +4,10 @@ import { Awareness, applyAwarenessUpdate, encodeAwarenessUpdate } from 'y-protoc
 import * as decoding from 'lib0/decoding';
 import type { YouTubeState } from './types.ts';
 import { preserveYouTubeTimeline, YOUTUBE_MAX_POSITION_SECONDS } from './youtube_timeline.ts';
+import { validProfileHash } from '../core/profile_image.ts';
+import {
+  decodeBase64, inspectPngBytes, PeerImageStore, stripDataPrefix, type WhiteboardImageRecord,
+} from './whiteboard_image.ts';
 
 export interface RoomAppModel {
   localSnapshot?(): unknown;
@@ -43,18 +47,77 @@ export function decodeUpdate(value: unknown, maxBytes = MAX_UPDATE): Uint8Array 
   catch { return null; }
 }
 
+function collectXmlImageHashes(fragment: Y.XmlFragment | Y.XmlElement, out: Set<string>): void {
+  for (const child of fragment.toArray()) {
+    if (child instanceof Y.XmlElement) {
+      if (child.nodeName === 'image') {
+        const src = child.getAttribute('src');
+        if (typeof src === 'string' && src.startsWith('p2image:')) {
+          const hash = src.slice(8);
+          if (validProfileHash(hash)) out.add(hash);
+        }
+      }
+      collectXmlImageHashes(child, out);
+    }
+  }
+}
+
 export class NotepadModel implements RoomAppModel {
   private doc = new Y.Doc();
   private awarenessValue: Awareness | null = null;
   private awarenessClients = new Map<string, number>();
   private context: RoomAppModelContext;
+  private imageStore: PeerImageStore;
+  private listeners = new Set<() => void>();
+
   constructor(context: RoomAppModelContext) {
     this.context = context;
+    this.imageStore = new PeerImageStore(
+      {
+        localView: context.localView,
+        localActor: context.localActor,
+        emit: payload => context.emit(payload),
+        send: context.send ? (payload, target) => context.send!(payload, target) : undefined,
+        changed: () => this.notifyChanged(),
+      },
+      () => {
+        const hashes = new Set<string>();
+        collectXmlImageHashes(this.richContent, hashes);
+        return hashes;
+      },
+    );
     this.doc.on('update', (update: Uint8Array, origin: unknown) => {
-      this.context.changed();
+      this.notifyChanged();
       if (origin !== 'remote' && update.byteLength <= MAX_UPDATE)
         this.context.emit({ update: encodeUpdate(update) });
     });
+  }
+  private notifyChanged(): void {
+    this.context.changed();
+    this.listeners.forEach(fn => fn());
+  }
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+  get images(): Map<string, string> { return this.imageStore.images; }
+  imageUrl(hash: string): string | undefined { return this.imageStore.imageUrl(hash); }
+  cacheImage(hash: string, data: string): void {
+    this.imageStore.cacheImage(hash, data);
+    this.notifyChanged();
+  }
+  registerImage(image: WhiteboardImageRecord): void {
+    const clean = stripDataPrefix(image.data);
+    if (!validProfileHash(image.hash) || !clean) throw new Error('Invalid image');
+    inspectPngBytes(decodeBase64(clean));
+    this.imageStore.cacheImage(image.hash, clean);
+    if (this.context.localView) {
+      this.context.emit({ localImage: { hash: image.hash, data: clean } });
+    }
+    this.notifyChanged();
+  }
+  setParticipants(participants: string[]): void {
+    this.imageStore.setParticipants(participants);
   }
   get awareness(): Awareness {
     if (this.awarenessValue) return this.awarenessValue;
@@ -94,9 +157,39 @@ export class NotepadModel implements RoomAppModel {
     this.doc.transact(() => { text.delete(0, text.length); text.insert(0, content); });
   }
   snapshot(): unknown { return { update: encodeUpdate(Y.encodeStateAsUpdate(this.doc)) }; }
+  localSnapshot(): unknown { return { ...(this.snapshot() as object), images: [...this.images] }; }
+  applyLocalSnapshot(value: unknown): void {
+    const images = (value as { images?: [string, string][] })?.images;
+    if (Array.isArray(images)) {
+      for (const [hash, data] of images) if (validProfileHash(hash) && typeof data === 'string') this.imageStore.cacheImage(hash, data);
+    }
+    this.apply(value, this.context.localActor, true);
+  }
   apply(payload: unknown, actor: string, fromSnapshot: boolean): void {
     if (!payload || typeof payload !== 'object') return;
-    const data = payload as { update?: unknown; awareness?: unknown };
+    const data = payload as {
+      update?: unknown;
+      awareness?: unknown;
+      imageRequest?: unknown;
+      imageChunk?: unknown;
+      localImage?: { hash?: unknown; data?: unknown };
+    };
+    if (!fromSnapshot && data.localImage && actor === this.context.localActor) {
+      const { hash, data: raw } = data.localImage;
+      if (validProfileHash(hash) && typeof raw === 'string') {
+        this.imageStore.cacheImage(hash, raw);
+        this.notifyChanged();
+      }
+      return;
+    }
+    if (!fromSnapshot && 'imageRequest' in data) {
+      this.imageStore.handleImageRequest(data.imageRequest, actor);
+      return;
+    }
+    if (!fromSnapshot && 'imageChunk' in data) {
+      this.imageStore.handleImageChunk(data.imageChunk, actor);
+      return;
+    }
     if (!fromSnapshot && data.awareness !== undefined) {
       const update = decodeUpdate(data.awareness);
       if (!update || update.byteLength > 4096) return;
@@ -115,9 +208,17 @@ export class NotepadModel implements RoomAppModel {
     }
     const update = decodeUpdate(data.update);
     if (!update || this.text.length > MAX_NOTE) return;
-    try { Y.applyUpdate(this.doc, update, 'remote'); } catch { /* Reject malformed updates. */ }
+    try {
+      Y.applyUpdate(this.doc, update, 'remote');
+      this.imageStore.requestWaitingImages(actor);
+    } catch { /* Reject malformed updates. */ }
   }
-  destroy(): void { this.awarenessValue?.destroy(); this.doc.destroy(); }
+  destroy(): void {
+    this.listeners.clear();
+    this.imageStore.destroy();
+    this.awarenessValue?.destroy();
+    this.doc.destroy();
+  }
 }
 
 export function validYouTubeState(value: unknown): value is YouTubeState {

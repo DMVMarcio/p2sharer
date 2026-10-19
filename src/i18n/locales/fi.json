@@ -1398,5 +1398,8 @@
   "releaseNotes.title": "Version uutuudet",
   "releaseNotes.subtitle": "Katso tämän julkaisun muutokset.",
   "releaseNotes.done": "Selvä",
-  "releaseNotes.view": "Näytä julkaisutiedot"
+  "releaseNotes.view": "Näytä julkaisutiedot",
+  "notepad.image": "Kuva",
+  "notepad.imageUrl": "Kuvan URL-osoite",
+  "notepad.chooseImage": "Valitse tiedosto"
 }

@@ -39,25 +39,36 @@ fixture.invoke = async (command, args) => {
   }
   if (command === 'open_note_file') return fixture.imported;
   if (command === 'save_note_file') return true;
+  if (command === 'pick_whiteboard_image') return fixture.pickedImage ?? null;
+  if (command === 'paste_whiteboard_image') return fixture.pastedImage;
   throw new Error(`Unexpected command: ${command}`);
 };
 const mocks = {
   core: 'export const isTauri = () => globalThis.notepadFixture.native ?? false; export const invoke = (...args) => globalThis.notepadFixture.invoke(...args);',
   event: `export const listen = async (_event, callback) => { const subscriptions = globalThis.notepadFixture.subscriptions; subscriptions.add(callback); return () => subscriptions.delete(callback); };`,
+  webview: 'export const getCurrentWebview = () => ({ onDragDropEvent: async () => () => {} });',
   room_apps_service: 'export const roomAppsService = { getModel: () => globalThis.notepadFixture.model, getLocalActor: () => "fixture" };',
   useRoom: 'export const useRoom = () => ({ username: "Fixture" });',
   useToast: 'export const showToast = () => {};',
   useTextEditorContextMenu: 'export const useTextEditorContextMenu = () => {};',
-  NotepadToolbar: `import React from 'react'; export const NotepadToolbar = ({ editor, fileActions }) => {
-    globalThis.notepadFixture.editor = editor; return React.createElement('div', { 'data-toolbar': true }, fileActions); };`,
+  NotepadToolbar: `import React from 'react'; export const NotepadToolbar = ({ editor, onImage, fileActions }) => {
+    globalThis.notepadFixture.editor = editor;
+    return React.createElement('div', { 'data-toolbar': true },
+      onImage ? React.createElement('button', { type: 'button', onClick: onImage }, 'Image') : null,
+      fileActions,
+    );
+  };`,
 };
 const bundle = await build({ stdin: { contents: `export { NotepadApp } from './src/apps/NotepadApp.tsx';
+  export { resizedNoteImageDimensions } from './src/apps/NotepadImageExtension.tsx';
+  export { sha256Hex, decodeBase64 } from './src/apps/whiteboard_image.ts';
   export { useDocumentLibraryDeletion } from './src/apps/useDocumentLibraryDeletion.ts';
   export { NotepadModel } from './src/apps/models.ts'; export { setLanguage } from './src/i18n/index.ts';`, resolveDir: process.cwd() },
   bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic',
   plugins: [{ name: 'notepad-native-fixture', setup(builder) {
     builder.onResolve({ filter: /^@tauri-apps\/api\/event$/ }, () => ({ path: 'event', namespace: 'fixture' }));
     builder.onResolve({ filter: /^@tauri-apps\/api\/core$/ }, () => ({ path: 'core', namespace: 'fixture' }));
+    builder.onResolve({ filter: /^@tauri-apps\/api\/webview$/ }, () => ({ path: 'webview', namespace: 'fixture' }));
     builder.onResolve({ filter: /\/(room_apps_service|useRoom|useToast|useTextEditorContextMenu|NotepadToolbar)$/ }, args => ({
       path: args.path.split('/').at(-1), namespace: 'fixture',
     }));
@@ -248,4 +259,100 @@ test('device-local deletion events filter the document library, update callbacks
     notify('notes'); assert.deepEqual(received.at(-1), ['latest', instanceId]);
   } finally { await act(async () => subscriptionRoot.unmount()); host.remove(); fixture.native = false; }
   assert.equal(fixture.subscriptions.size, 0);
+});
+
+test('notepad inserts sanitized images by file, link, paste, and drag-and-drop, resizes with Shift aspect lock, and syncs chunks over P2P', async () => {
+  const samplePngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAADklEQVR4nGP4z8DAwMAAAggB/1p6pJcAAAAASUVORK5CYII=';
+  const sampleBytes = api.decodeBase64(samplePngBase64);
+  const sampleHash = await api.sha256Hex(sampleBytes);
+  const sampleRecord = { hash: sampleHash, data: samplePngBase64, width: 120, height: 80 };
+
+  await act(async () => fixture.editor.commands.clearContent());
+
+  // 1. Insert by file picker
+  fixture.pickedImage = sampleRecord;
+  await click('Image', toolbar());
+  await click('Choose file');
+  assert.equal(fixture.calls.at(-1).command, 'pick_whiteboard_image');
+  assert.match(fixture.editor.getHTML(), new RegExp(`data-image-hash="${sampleHash}"`));
+
+  // 2. Insert by URL link
+  await act(async () => fixture.editor.commands.clearContent());
+  fixture.pastedImage = sampleRecord;
+  await click('Image', toolbar());
+  const urlInput = document.querySelector('input[aria-label="Image URL"]');
+  assert.ok(urlInput);
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(urlInput, 'https://example.com/photo.png');
+    urlInput.dispatchEvent(new window.Event('input', { bubbles: true }));
+  });
+  await click('Apply');
+  assert.equal(fixture.calls.at(-1).command, 'paste_whiteboard_image');
+  assert.equal(fixture.calls.at(-1).args.url, 'https://example.com/photo.png');
+  assert.match(fixture.editor.getHTML(), new RegExp(`data-image-hash="${sampleHash}"`));
+
+  // 3. Insert by Ctrl+V paste and 4. Drag and drop
+  globalThis.FileReader = window.FileReader;
+  try {
+    await act(async () => fixture.editor.commands.clearContent());
+    const rootEl = document.querySelector('.room-app-notepad');
+    const fakeFile = new window.Blob([sampleBytes], { type: 'image/png' });
+    const pasteEvent = new window.Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(pasteEvent, 'clipboardData', {
+      value: { items: [{ type: 'image/png', getAsFile: () => fakeFile }], files: [fakeFile], getData: () => '' },
+    });
+    await act(async () => { rootEl.dispatchEvent(pasteEvent); });
+    await settle();
+    assert.match(fixture.editor.getHTML(), new RegExp(`data-image-hash="${sampleHash}"`));
+
+    await act(async () => fixture.editor.commands.clearContent());
+    const dropEvent = new window.MouseEvent('drop', { bubbles: true, cancelable: true, clientX: 40, clientY: 40 });
+    Object.defineProperty(dropEvent, 'dataTransfer', {
+      value: { files: [fakeFile], items: [{ type: 'image/png' }], types: ['Files'] },
+    });
+    await act(async () => { rootEl.dispatchEvent(dropEvent); });
+    await settle();
+    assert.match(fixture.editor.getHTML(), new RegExp(`data-image-hash="${sampleHash}"`));
+  } finally {
+    delete globalThis.FileReader;
+  }
+
+  // 5. Resize dimensions (free stretch vs Shift aspect-ratio lock)
+  assert.deepEqual(api.resizedNoteImageDimensions(120, 80, 'se', 60, 10, false), { width: 180, height: 90 });
+  assert.deepEqual(api.resizedNoteImageDimensions(120, 80, 'se', 60, 10, true), { width: 180, height: 120 });
+
+  // 6. P2P chunked transfer between two NotepadModel peers
+  const peerEvents = [];
+  const hostEvents = [];
+  const hostModel = new api.NotepadModel({
+    localActor: 'host',
+    emit: payload => hostEvents.push(payload),
+    send: async (payload) => { peerEvents.push(payload); },
+    changed() {},
+  });
+  const peerModel = new api.NotepadModel({
+    localActor: 'peer',
+    emit: payload => peerEvents.push(payload),
+    send: async (payload) => { hostEvents.push(payload); },
+    changed() {},
+  });
+  try {
+    hostModel.setParticipants(['host', 'peer']);
+    peerModel.setParticipants(['host', 'peer']);
+    hostModel.registerImage(sampleRecord);
+    hostModel.apply(fixture.model.snapshot(), 'fixture', true);
+    peerModel.apply(hostModel.snapshot(), 'host', false);
+    const req = hostEvents.find(e => e.imageRequest);
+    assert.ok(req, 'Peer should request missing image hash from host');
+    hostModel.apply(req, 'peer', false);
+    await settle();
+    const chunks = peerEvents.filter(e => e.imageChunk);
+    assert.ok(chunks.length > 0, 'Host should send image chunks to peer');
+    for (const chunk of chunks) peerModel.apply(chunk, 'host', false);
+    await settle();
+    assert.equal(peerModel.imageUrl(sampleHash), `data:image/png;base64,${samplePngBase64}`);
+  } finally {
+    hostModel.destroy();
+    peerModel.destroy();
+  }
 });

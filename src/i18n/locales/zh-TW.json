@@ -1398,5 +1398,8 @@
   "releaseNotes.title": "版本新內容",
   "releaseNotes.subtitle": "查看此版本的更新內容。",
   "releaseNotes.done": "知道了",
-  "releaseNotes.view": "檢視版本說明"
+  "releaseNotes.view": "檢視版本說明",
+  "notepad.image": "圖片",
+  "notepad.imageUrl": "圖片連結",
+  "notepad.chooseImage": "選擇檔案"
 }
