@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { resolve, extname, sep, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { attachSignalingBroker } from './signaling.mjs';
 import { latestDownloads, releasesUrl } from './downloads.mjs';
 
 const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../web/dist');
@@ -11,13 +12,13 @@ const contentTypes = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascr
 const releases = releasesUrl;
 
 /** Same-origin API and production asset host. Room content stays on the P2P mesh. */
-export function createWebServer({ root = webRoot, downloads = latestDownloads } = {}) {
-  return createServer(async (request, response) => {
+export async function createWebServer({ root = webRoot, downloads = latestDownloads, signaling = {} } = {}) {
+  const server = createServer(async (request, response) => {
     response.setHeader('X-Content-Type-Options', 'nosniff');
     response.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     response.setHeader('X-Frame-Options', 'DENY');
     response.setHeader('Permissions-Policy', 'camera=(self), microphone=(self), display-capture=(self)');
-    response.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' https://www.youtube.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self'; connect-src 'self' https: wss:; media-src 'self' blob:; worker-src 'self' blob:; frame-src https://www.youtube.com https://www.youtube-nocookie.com; object-src 'none'; base-uri 'none'; form-action 'self'");
+    response.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' https://www.youtube.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self'; connect-src 'self' https: wss: ws://localhost:* ws://127.0.0.1:*; media-src 'self' blob:; worker-src 'self' blob:; frame-src https://www.youtube.com https://www.youtube-nocookie.com; object-src 'none'; base-uri 'none'; form-action 'self'");
     response.setHeader('Cache-Control', 'no-store');
     const send = (status, body, type = 'application/json; charset=utf-8') => {
       response.writeHead(status, { 'Content-Type': type });
@@ -55,12 +56,22 @@ export function createWebServer({ root = webRoot, downloads = latestDownloads } 
       return send(status, JSON.stringify({ error: status === 500 ? 'Server error' : 'Not found' }));
     }
   });
+  const closeBroker = await attachSignalingBroker(server, signaling);
+  const closeHttp = server.close.bind(server);
+  let closing;
+  server.close = callback => {
+    closing ??= closeBroker().then(() => new Promise((resolve, reject) => closeHttp(error => error ? reject(error) : resolve())));
+    closing.then(() => callback?.(), error => callback?.(error));
+    return server;
+  };
+  return server;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const port = Number(process.env.PORT ?? 3000);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Invalid PORT');
-  const server = createWebServer();
+  const server = await createWebServer({ signaling: { trustProxy: process.env.BROKER_TRUST_PROXY === '1',
+    ...(process.env.BROKER_ALLOWED_ORIGINS ? { allowedOrigins: process.env.BROKER_ALLOWED_ORIGINS.split(',').map(value => value.trim()) } : {}) } });
   server.listen(port, process.env.HOST ?? '127.0.0.1', () => console.info(`P2Sharer web server ready on port ${port}`));
   for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => server.close());
 }

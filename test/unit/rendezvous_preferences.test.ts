@@ -1,3 +1,5 @@
+import { defaultRelayUrls as nostrDefaults } from '@trystero-p2p/nostr';
+import { defaultRelayUrls as torrentDefaults } from '@trystero-p2p/torrent';
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -70,4 +72,27 @@ describe('Rendezvous server preferences', () => {
       globalThis.localStorage = prior;
     }
   });
+});
+
+it('uses first-party signaling in the web browser and removes retired saved endpoints without losing custom choices', () => {
+  const oldWindow = globalThis.window, oldStorage = globalThis.localStorage;
+  const values = new Map<string, string>();
+  globalThis.window = { location: { origin: 'https://example.com' } } as Window & typeof globalThis;
+  globalThis.localStorage = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); } } as Storage;
+  try {
+    const factory = defaultRendezvousPreferences();
+    assert.deepEqual(enabledRendezvousUrls(factory, 'mqtt'), ['wss://example.com/mqtt']);
+    assert.deepEqual(enabledRendezvousUrls(factory, 'nostr'), []);
+    assert.deepEqual(enabledRendezvousUrls(factory, 'torrent'), []);
+    const legacy = { mqtt: ['wss://public:public@public.cloud.shiftr.io', 'wss://broker.emqx.io:8084/mqtt', 'wss://broker-cn.emqx.io:8084/mqtt', 'wss://test.mosquitto.org:8081/mqtt'].map(url => ({ url, enabled: true })),
+      nostr: nostrDefaults.map(url => ({ url, enabled: true })), torrent: torrentDefaults.map(url => ({ url, enabled: true })) };
+    values.set('p2sharer_rendezvous_servers_v1', JSON.stringify(legacy));
+    assert.deepEqual(loadRendezvousPreferences(), factory);
+    legacy.mqtt.push({ url: 'wss://custom.example/mqtt', enabled: false });
+    legacy.nostr.push({ url: 'wss://rapi.acrop.net', enabled: true });
+    values.set('p2sharer_rendezvous_servers_v1', JSON.stringify(legacy));
+    const migrated = loadRendezvousPreferences();
+    assert.ok(migrated.mqtt.some(entry => entry.url === 'wss://custom.example/mqtt' && !entry.enabled));
+    assert.ok(!Object.values(migrated).flat().some(entry => ['broker-cn.emqx.io', 'rapi.acrop.net'].includes(new URL(entry.url).hostname)));
+  } finally { globalThis.window = oldWindow; globalThis.localStorage = oldStorage; }
 });

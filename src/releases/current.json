@@ -12,7 +12,8 @@
       "**Audio filters.** Improved application detection to prevent freezes when choosing which apps to include or exclude from audio capture.",
       "**Web access.** Open P2Sharer in your browser to join rooms, chat, share media and use collaborative apps, with local room and document storage.",
       "**Web experience.** Share room links, return home from the room header, choose capture sources with cards, and download the right Windows package. Browser settings now show only supported transmission options.",
-      "**Website and downloads.** Open the downloads page from the website or the web app header, then choose a system and download a file directly from the package list. Unavailable systems are disabled, and the wider page includes a new footer with useful links."
+      "**Website and downloads.** Open the downloads page from the website or the web app header, then choose a system and download a file directly from the package list. Unavailable systems are disabled, and the wider page includes a new footer with useful links.",
+      "**Room discovery.** Web rooms use the P2Sharer server by default. The desktop app includes it alongside the remaining public fallbacks, and retired endpoints are removed from saved settings."
     ],
     "pt-BR": [
       "**Convites curtos.** Compartilhe apenas o código da sala quando houver alguém online ou use um convite assinado completo. Salvar a sala preserva os dados verificados para as próximas entradas.",
@@ -25,7 +26,8 @@
       "**Filtros de áudio.** Melhoramos a identificação de aplicativos para evitar travamentos ao escolher quais incluir ou excluir da captura de áudio.",
       "**Acesso pela web.** Abra o P2Sharer no navegador para entrar em salas, conversar, compartilhar mídia e usar apps colaborativos, com salas e documentos salvos localmente.",
       "**Experiência web.** Compartilhe links de salas, volte ao início pelo cabeçalho, escolha a captura por cards e baixe o pacote certo para Windows. As configurações do navegador agora mostram apenas as opções de transmissão compatíveis.",
-      "**Site e downloads.** Acesse os downloads pelo site ou pelo header do app web, escolha o sistema e baixe diretamente pela lista de arquivos. Sistemas indisponíveis ficam desativados, e a página mais ampla ganhou um rodapé com links úteis."
+      "**Site e downloads.** Acesse os downloads pelo site ou pelo header do app web, escolha o sistema e baixe diretamente pela lista de arquivos. Sistemas indisponíveis ficam desativados, e a página mais ampla ganhou um rodapé com links úteis.",
+      "**Encontro de salas.** A versão web usa o servidor do P2Sharer por padrão. O desktop passa a incluí-lo junto às alternativas públicas restantes, e os endpoints removidos saem das configurações salvas."
     ],
     "es": [
       "**Invitaciones cortas.** Comparte solo el código de la sala cuando haya alguien en línea o usa una invitación firmada completa. Guardar la sala conserva sus datos verificados para futuras visitas.",
@@ -38,7 +40,8 @@
       "**Filtros de audio.** Mejoramos la detección de aplicaciones para evitar bloqueos al elegir cuáles incluir o excluir de la captura de audio.",
       "**Acceso web.** Abre P2Sharer en el navegador para entrar en salas, chatear, compartir contenido y usar apps colaborativas, con salas y documentos guardados localmente.",
       "**Experiencia web.** Comparte enlaces de salas, vuelve al inicio desde la cabecera, elige la captura con tarjetas y descarga el paquete adecuado para Windows. El navegador muestra solo las opciones de transmisión compatibles.",
-      "**Sitio y descargas.** Abre las descargas desde el sitio o la cabecera de la app web, elige el sistema y descarga desde la lista de archivos. Los sistemas no disponibles están desactivados y la página más amplia incluye un pie con enlaces útiles."
+      "**Sitio y descargas.** Abre las descargas desde el sitio o la cabecera de la app web, elige el sistema y descarga desde la lista de archivos. Los sistemas no disponibles están desactivados y la página más amplia incluye un pie con enlaces útiles.",
+      "**Descubrimiento de salas.** La versión web usa el servidor de P2Sharer por defecto. La app de escritorio lo incluye junto con las alternativas públicas restantes y elimina los servidores retirados de la configuración guardada."
     ],
     "fr": [
       "**Invitations courtes.** Partagez uniquement le code du salon lorsqu’une personne est en ligne, ou utilisez une invitation signée complète. Enregistrer le salon conserve ses informations vérifiées pour vos prochaines visites.",
@@ -51,7 +54,8 @@
       "**Filtres audio.** Détection des applications améliorée pour éviter les blocages lors du choix des applications à inclure ou à exclure de la capture audio.",
       "**Accès web.** Ouvrez P2Sharer dans le navigateur pour rejoindre des salons, discuter, partager des médias et utiliser des apps collaboratives, avec sauvegarde locale des salons et documents.",
       "**Expérience web.** Partagez des liens de salon, revenez à l’accueil depuis l’en-tête, choisissez la capture par cartes et téléchargez le bon paquet Windows. Le navigateur affiche uniquement les réglages de diffusion compatibles.",
-      "**Site et téléchargements.** Accédez aux téléchargements depuis le site ou l’en-tête de l’app web, choisissez le système et téléchargez depuis la liste des fichiers. Les systèmes indisponibles sont désactivés et la page élargie propose un pied de page avec des liens utiles."
+      "**Site et téléchargements.** Accédez aux téléchargements depuis le site ou l’en-tête de l’app web, choisissez le système et téléchargez depuis la liste des fichiers. Les systèmes indisponibles sont désactivés et la page élargie propose un pied de page avec des liens utiles.",
+      "**Découverte des salons.** La version web utilise le serveur P2Sharer par défaut. L’app de bureau l’ajoute aux autres solutions publiques et retire les serveurs abandonnés des paramètres enregistrés."
     ],
     "de": [
       "**Kurze Einladungen.** Teile nur den Raumcode, wenn jemand online ist, oder nutze eine vollständige signierte Einladung. Beim Speichern des Raums bleiben die geprüften Daten für spätere Besuche erhalten.",
@@ -64,7 +68,8 @@
       "**Audiofilter.** Verbesserte Anwendungserkennung verhindert Hänger bei der Auswahl von Apps, die in die Audioaufnahme einbezogen oder davon ausgeschlossen werden.",
       "**Webzugang.** Öffne P2Sharer im Browser, um Räumen beizutreten, zu chatten, Medien zu teilen und gemeinsame Apps zu nutzen. Räume und Dokumente werden lokal gespeichert.",
       "**Weberlebnis.** Teile Raumlinks, kehre über den Raumkopf zur Startseite zurück, wähle Aufnahmequellen über Karten und lade das passende Windows-Paket herunter. Im Browser erscheinen nur unterstützte Übertragungsoptionen.",
-      "**Website und Downloads.** Öffne Downloads über die Website oder den Kopfbereich der Web-App, wähle das System und lade Dateien direkt aus der Paketliste herunter. Nicht verfügbare Systeme sind deaktiviert; die breitere Seite bietet einen Footer mit hilfreichen Links."
+      "**Website und Downloads.** Öffne Downloads über die Website oder den Kopfbereich der Web-App, wähle das System und lade Dateien direkt aus der Paketliste herunter. Nicht verfügbare Systeme sind deaktiviert; die breitere Seite bietet einen Footer mit hilfreichen Links.",
+      "**Raumsuche.** Die Webversion verwendet standardmäßig den P2Sharer-Server. Die Desktop-App ergänzt ihn um die verbleibenden öffentlichen Alternativen und entfernt ausgemusterte Server aus gespeicherten Einstellungen."
     ],
     "it": [
       "**Inviti brevi.** Condividi solo il codice della stanza quando qualcuno è online oppure usa un invito firmato completo. Salvando la stanza conservi i dati verificati per gli accessi futuri.",
@@ -77,7 +82,8 @@
       "**Filtri audio.** Rilevamento delle applicazioni migliorato per evitare blocchi quando si scelgono le app da includere o escludere dalla cattura audio.",
       "**Accesso web.** Apri P2Sharer nel browser per entrare nelle stanze, chattare, condividere contenuti e usare app collaborative, con stanze e documenti salvati localmente.",
       "**Esperienza web.** Condividi link delle stanze, torna alla pagina iniziale dall’intestazione, scegli la cattura con schede e scarica il pacchetto Windows adatto. Il browser mostra solo le opzioni di trasmissione supportate.",
-      "**Sito e download.** Apri i download dal sito o dall’intestazione dell’app web, scegli il sistema e scarica dalla lista dei file. I sistemi non disponibili sono disattivati e la pagina più ampia include un piè di pagina con link utili."
+      "**Sito e download.** Apri i download dal sito o dall’intestazione dell’app web, scegli il sistema e scarica dalla lista dei file. I sistemi non disponibili sono disattivati e la pagina più ampia include un piè di pagina con link utili.",
+      "**Ricerca delle stanze.** La versione web usa il server P2Sharer per impostazione predefinita. L’app desktop lo affianca alle alternative pubbliche rimanenti e rimuove i server ritirati dalle impostazioni salvate."
     ],
     "zh-CN": [
       "**短邀请。** 有人在线时，只需分享房间代码，也可使用完整的签名邀请。保存房间会保留已验证的信息，供下次加入使用。",
@@ -90,7 +96,8 @@
       "**音频筛选。** 改善了应用识别，避免在选择要包含或排除的音频采集应用时卡住。",
       "**网页访问。** 在浏览器中打开 P2Sharer，即可加入房间、聊天、共享媒体并使用协作应用，房间和文档保存在本地。",
       "**网页体验。** 分享房间链接、从房间标题栏返回首页、通过卡片选择捕获来源，并下载合适的 Windows 安装包。浏览器设置现仅显示支持的传输选项。",
-      "**网站与下载。** 从网站或网页应用顶部进入下载页，选择系统后直接从文件列表下载。不可用的系统已禁用，更宽的页面还新增了实用链接页脚。"
+      "**网站与下载。** 从网站或网页应用顶部进入下载页，选择系统后直接从文件列表下载。不可用的系统已禁用，更宽的页面还新增了实用链接页脚。",
+      "**房间发现。** 网页版默认使用 P2Sharer 服务器。桌面版在保留其余公共备用服务的同时加入该服务器，并从已保存的设置中移除停用的服务地址。"
     ],
     "zh-TW": [
       "**短邀請。** 有人在線上時，只需分享房間代碼，也可使用完整的簽章邀請。儲存房間會保留已驗證的資訊，供下次加入使用。",
@@ -103,7 +110,8 @@
       "**音訊篩選。** 改善了應用程式識別，避免在選擇要包含或排除的音訊擷取應用程式時卡住。",
       "**網頁存取。** 在瀏覽器中開啟 P2Sharer，即可加入房間、聊天、分享媒體並使用協作應用程式，房間與文件儲存在本機。",
       "**網頁體驗。** 分享房間連結、從房間標題列返回首頁、透過卡片選擇擷取來源，並下載合適的 Windows 安裝套件。瀏覽器設定現在僅顯示支援的傳輸選項。",
-      "**網站與下載。** 從網站或網頁應用程式頂端進入下載頁，選擇系統後直接從檔案清單下載。無法使用的系統已停用，更寬的頁面還新增了實用連結頁尾。"
+      "**網站與下載。** 從網站或網頁應用程式頂端進入下載頁，選擇系統後直接從檔案清單下載。無法使用的系統已停用，更寬的頁面還新增了實用連結頁尾。",
+      "**房間探索。** 網頁版預設使用 P2Sharer 伺服器。桌面版在保留其餘公共備援服務的同時加入該伺服器，並從已儲存的設定移除停用的服務位址。"
     ],
     "ja": [
       "**短い招待。** オンラインの参加者がいる場合はルームコードだけを共有でき、完全な署名付き招待も使用できます。ルームを保存すると、確認済みの情報を次回以降も使用できます。",
@@ -116,7 +124,8 @@
       "**音声フィルター。** アプリの検出を改善し、音声キャプチャに含めるアプリや除外するアプリを選ぶ際に処理が停止する問題を防ぎます。",
       "**ウェブアクセス。** ブラウザーで P2Sharer を開いて、ルームへの参加、チャット、メディア共有、共同アプリの利用ができます。ルームや文書は端末に保存されます。",
       "**ウェブ体験。** ルームのリンク共有、ヘッダーからホームへの移動、カードによるキャプチャ元の選択、適切な Windows パッケージのダウンロードができます。ブラウザーには対応する配信設定だけが表示されます。",
-      "**ウェブサイトとダウンロード。** サイトやウェブアプリ上部からダウンロードページを開き、OS を選んでファイル一覧から直接ダウンロードできます。未対応の OS は無効になり、広いページに便利なリンクのフッターを追加しました。"
+      "**ウェブサイトとダウンロード。** サイトやウェブアプリ上部からダウンロードページを開き、OS を選んでファイル一覧から直接ダウンロードできます。未対応の OS は無効になり、広いページに便利なリンクのフッターを追加しました。",
+      "**ルームの検出。** ウェブ版は既定で P2Sharer サーバーを使います。デスクトップ版では他の公開サーバーも引き続き利用でき、廃止した接続先は保存済み設定から削除されます。"
     ],
     "ko": [
       "**짧은 초대.** 온라인 참여자가 있으면 방 코드만 공유하거나 전체 서명된 초대를 사용할 수 있습니다. 방을 저장하면 확인된 정보가 다음 방문에도 유지됩니다.",
@@ -129,7 +138,8 @@
       "**오디오 필터.** 오디오 캡처에 포함하거나 제외할 앱을 선택할 때 멈추지 않도록 앱 감지를 개선했습니다.",
       "**웹 접속.** 브라우저에서 P2Sharer를 열어 방에 참여하고, 채팅하고, 미디어를 공유하고, 협업 앱을 사용하세요. 방과 문서는 기기에 저장됩니다.",
       "**웹 사용 환경.** 방 링크를 공유하고, 헤더에서 홈으로 돌아가고, 카드로 캡처 소스를 선택하고, 알맞은 Windows 패키지를 다운로드하세요. 브라우저에는 지원되는 전송 설정만 표시됩니다.",
-      "**웹사이트와 다운로드.** 사이트나 웹 앱 상단에서 다운로드 페이지를 열고 운영체제를 선택한 뒤 파일 목록에서 바로 다운로드하세요. 지원하지 않는 운영체제는 비활성화되며 넓어진 페이지에 유용한 링크가 있는 푸터를 추가했습니다."
+      "**웹사이트와 다운로드.** 사이트나 웹 앱 상단에서 다운로드 페이지를 열고 운영체제를 선택한 뒤 파일 목록에서 바로 다운로드하세요. 지원하지 않는 운영체제는 비활성화되며 넓어진 페이지에 유용한 링크가 있는 푸터를 추가했습니다.",
+      "**방 검색.** 웹 버전은 기본적으로 P2Sharer 서버를 사용합니다. 데스크톱 앱은 남아 있는 공개 대체 서버와 함께 이를 사용하며 저장된 설정에서 제외된 서버 주소를 제거합니다."
     ],
     "hi": [
       "**छोटे आमंत्रण।** किसी के ऑनलाइन होने पर केवल रूम कोड साझा करें या पूरा हस्ताक्षरित आमंत्रण इस्तेमाल करें। रूम सहेजने पर सत्यापित जानकारी अगली बार के लिए बनी रहती है।",
@@ -142,7 +152,8 @@
       "**ऑडियो फ़िल्टर।** ऑडियो कैप्चर में शामिल या बाहर रखने वाले ऐप चुनते समय रुकावट से बचने के लिए ऐप की पहचान बेहतर की गई है।",
       "**वेब से पहुँच।** ब्राउज़र में P2Sharer खोलकर कमरों से जुड़ें, चैट करें, मीडिया साझा करें और सहयोगी ऐप इस्तेमाल करें। कमरे और दस्तावेज़ स्थानीय रूप से सहेजे जाते हैं।",
       "**वेब अनुभव।** कमरे के लिंक साझा करें, हेडर से होम पर लौटें, कार्ड से कैप्चर स्रोत चुनें और सही Windows पैकेज डाउनलोड करें। ब्राउज़र में अब केवल समर्थित प्रसारण विकल्प दिखते हैं।",
-      "**वेबसाइट और डाउनलोड।** साइट या वेब ऐप के हेडर से डाउनलोड पेज खोलें, सिस्टम चुनें और फ़ाइल सूची से सीधे डाउनलोड करें। अनुपलब्ध सिस्टम निष्क्रिय हैं और चौड़े पेज में उपयोगी लिंक वाला फ़ुटर जोड़ा गया है।"
+      "**वेबसाइट और डाउनलोड।** साइट या वेब ऐप के हेडर से डाउनलोड पेज खोलें, सिस्टम चुनें और फ़ाइल सूची से सीधे डाउनलोड करें। अनुपलब्ध सिस्टम निष्क्रिय हैं और चौड़े पेज में उपयोगी लिंक वाला फ़ुटर जोड़ा गया है।",
+      "**कमरे खोजना।** वेब संस्करण डिफ़ॉल्ट रूप से P2Sharer सर्वर इस्तेमाल करता है। डेस्कटॉप ऐप में यह बाकी सार्वजनिक विकल्पों के साथ शामिल है और हटाए गए सर्वर सहेजी गई सेटिंग से भी निकल जाते हैं।"
     ],
     "fi": [
       "**Lyhyet kutsut.** Jaa pelkkä huonekoodi, kun joku on verkossa, tai käytä täydellistä allekirjoitettua kutsua. Huoneen tallentaminen säilyttää vahvistetut tiedot tulevia käyntejä varten.",
@@ -155,7 +166,8 @@
       "**Äänisuodattimet.** Sovellusten tunnistusta on parannettu, jotta äänen kaappaukseen sisällytettävien tai siitä pois jätettävien sovellusten valinta ei jumitu.",
       "**Verkkokäyttö.** Avaa P2Sharer selaimessa liittyäksesi huoneisiin, keskustellaksesi, jakaaksesi mediaa ja käyttääksesi yhteisiä sovelluksia. Huoneet ja asiakirjat tallennetaan paikallisesti.",
       "**Verkkokokemus.** Jaa huonelinkkejä, palaa etusivulle huoneen otsakkeesta, valitse kaappauslähde korteilla ja lataa sopiva Windows-paketti. Selain näyttää vain tuetut lähetysasetukset.",
-      "**Sivusto ja lataukset.** Avaa lataussivu sivustolta tai verkkosovelluksen yläpalkista, valitse järjestelmä ja lataa tiedosto suoraan pakettiluettelosta. Puuttuvat järjestelmät on poistettu käytöstä, ja leveämmällä sivulla on alatunniste hyödyllisine linkkeineen."
+      "**Sivusto ja lataukset.** Avaa lataussivu sivustolta tai verkkosovelluksen yläpalkista, valitse järjestelmä ja lataa tiedosto suoraan pakettiluettelosta. Puuttuvat järjestelmät on poistettu käytöstä, ja leveämmällä sivulla on alatunniste hyödyllisine linkkeineen.",
+      "**Huoneiden löytäminen.** Verkkoversio käyttää oletuksena P2Sharerin palvelinta. Työpöytäsovellus käyttää sen lisäksi jäljellä olevia julkisia varapalvelimia ja poistaa käytöstä poistetut osoitteet tallennetuista asetuksista."
     ],
     "ru": [
       "**Короткие приглашения.** Делитесь только кодом комнаты, когда кто-то онлайн, или используйте полное подписанное приглашение. При сохранении комнаты проверенные данные сохраняются для следующих посещений.",
@@ -168,7 +180,8 @@
       "**Аудиофильтры.** Улучшено обнаружение приложений, чтобы избежать зависаний при выборе приложений для включения в захват звука или исключения из него.",
       "**Веб-доступ.** Откройте P2Sharer в браузере, чтобы входить в комнаты, общаться, делиться медиа и использовать совместные приложения. Комнаты и документы сохраняются локально.",
       "**Веб-версия.** Делитесь ссылками на комнаты, возвращайтесь на главную из заголовка, выбирайте источник захвата карточками и скачивайте подходящий пакет Windows. В браузере отображаются только поддерживаемые настройки трансляции.",
-      "**Сайт и загрузки.** Откройте загрузки с сайта или из шапки веб-приложения, выберите систему и скачайте файл прямо из списка пакетов. Недоступные системы отключены; на более широкой странице появился футер с полезными ссылками."
+      "**Сайт и загрузки.** Откройте загрузки с сайта или из шапки веб-приложения, выберите систему и скачайте файл прямо из списка пакетов. Недоступные системы отключены; на более широкой странице появился футер с полезными ссылками.",
+      "**Поиск комнат.** Веб-версия по умолчанию использует сервер P2Sharer. Настольное приложение добавляет его к оставшимся публичным резервным серверам и удаляет исключённые адреса из сохранённых настроек."
     ]
   }
 }

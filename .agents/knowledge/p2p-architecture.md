@@ -1,7 +1,7 @@
 # Deep Dive: P2P Networking, Signaling Failover & WebRTC Mesh
 
 ## Overview
-P2Sharer uses a WebRTC mesh to connect participants for shared media, messages, file transfers and collaborative app state. This transport supports the broader [product purpose](../../docs/product-overview.md) of exploring what people can do together through P2P. It does not require centralized media servers (SFUs); Internet signaling uses public decentralized broker meshes with automatic multi-tier failover, and external content apps retain their own service dependencies.
+P2Sharer uses a WebRTC mesh to connect participants for shared media, messages, file transfers and collaborative app state. This transport supports the broader [product purpose](../../docs/product-overview.md) of exploring what people can do together through P2P. It does not require centralized media servers (SFUs); Internet signaling uses a first-party MQTT broker and optional public transports with automatic multi-tier failover, and external content apps retain their own service dependencies.
 
 ---
 
@@ -12,7 +12,7 @@ P2Sharer uses a WebRTC mesh to connect participants for shared media, messages, 
 `src/p2p/relay_preferences.ts` stores separate MQTT, Nostr, and WebTorrent server lists in local storage. Each entry has a secure WebSocket URL and an enabled flag. The network settings editor can add, remove, and toggle entries. At room join, `SignalingManager` loads the saved lists, passes only enabled URLs to Trystero's `relayConfig`, and starts MQTT probe clients only for enabled brokers. Transports with no enabled servers are omitted from the failover chain. At least one enabled server across all transports is required. Changes made while a room is active apply on the next join to preserve existing peer channels.
 
 WebRTC signaling is handled through Trystero multi-transport adapters in strict prioritized order:
-1. **MQTT (`@trystero-p2p/mqtt`)**: Primary transport (~50–150ms connection latency). Uses prioritized high-availability public brokers: `wss://public.cloud.shiftr.io`, `wss://broker.emqx.io:8084/mqtt`, `wss://broker-cn.emqx.io:8084/mqtt`, and `wss://test.mosquitto.org:8081/mqtt` (unresponsive endpoints like `broker.hivemq.com:8884` are strictly excluded).
+1. **MQTT (`@trystero-p2p/mqtt`)**: Primary transport (~50–150ms connection latency). Uses the first-party `/mqtt` broker, with public Shiftr, EMQX and Mosquitto fallbacks on desktop. Browser defaults use only the current-origin broker; custom lists remain supported. See [broker deployment and limits](../../docs/web.md#first-party-rendezvous-broker).
 2. **Nostr (`@trystero-p2p/nostr`)**: Secondary transport (~200–500ms connection latency). Relies on decentralized Nostr relay servers (`wss://relay.damus.io`, etc.).
 3. **WebTorrent (`@trystero-p2p/torrent`)**: Tertiary fallback (~1–3s latency). Employs public BitTorrent trackers (`wss://tracker.openwebtorrent.com`, etc.).
 

@@ -9,7 +9,7 @@ export default defineConfig({
     port: 1422,
     strictPort: true,
     fs: { allow: [searchForWorkspaceRoot('.')] },
-    proxy: { '/api': 'http://127.0.0.1:3000' },
+    proxy: { '/api': 'http://127.0.0.1:3000', '/mqtt': { target: 'ws://127.0.0.1:3000', ws: true } },
   },
   build: { outDir: 'dist' },
 });

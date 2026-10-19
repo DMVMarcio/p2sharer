@@ -5,7 +5,16 @@
   "scripts": {
     "dev": "node --watch server.mjs",
     "start": "node server.mjs",
-    "test": "node --test server.test.mjs"
+    "test": "node --test server.test.mjs signaling.test.mjs"
   },
-  "engines": { "node": ">=22.14.0" }
+  "engines": {
+    "node": ">=22.14.0"
+  },
+  "dependencies": {
+    "aedes": "^1.2.0",
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "mqtt": "5.15.2"
+  }
 }

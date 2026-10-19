@@ -13,7 +13,7 @@ test('production host serves landing/app, public API and immutable assets withou
   await writeFile(join(root, 'index.html'), '<div id="root"></div>');
   await writeFile(join(root, 'assets', 'fixture.js'), 'export const ready = true;');
   const catalog = releaseDownloads(null);
-  const server = createWebServer({ root, downloads: async () => catalog });
+  const server = await createWebServer({ root, downloads: async () => catalog });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
   const raw = path => new Promise((resolve, reject) => {

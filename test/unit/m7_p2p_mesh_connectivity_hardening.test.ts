@@ -30,8 +30,8 @@ describe('M7: P2P Mesh Connectivity, Indirect Bridging & Signaling Stability Har
       assert.ok(DEFAULT_MQTT_RELAY_URLS.some((u) => u.includes('shiftr.io')));
       assert.ok(DEFAULT_MQTT_RELAY_URLS.some((u) => u.includes('emqx.io')));
       assert.ok(DEFAULT_MQTT_RELAY_URLS.some((u) => u.includes('mosquitto.org')));
-      // Shiftr should be first for lowest latency and highest responsiveness
-      assert.ok(DEFAULT_MQTT_RELAY_URLS[0]!.includes('shiftr.io'));
+      // The first-party broker comes before the remaining desktop fallbacks.
+      assert.equal(new URL(DEFAULT_MQTT_RELAY_URLS[0]!).pathname, '/mqtt');
     });
 
     it('1.2: activeRoom alone does not fabricate healthy MQTT sockets', () => {

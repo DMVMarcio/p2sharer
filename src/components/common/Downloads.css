@@ -6,7 +6,7 @@
 .download-step-heading { font-size: 18px; margin: 0; outline: none; }
 .download-step-heading:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 4px; }
 .download-systems { display: grid; grid-template-columns: repeat(3, minmax(0, 160px)); gap: 16px; }
-.download-systems .download-system { display: flex; flex-direction: column; gap: 10px; aspect-ratio: 1; width: 100%; min-width: 0; padding: 12px; white-space: normal; }
+.download-systems .download-system { display: flex; flex-direction: column; gap: 10px; aspect-ratio: 1; width: 100%; min-width: 0; min-height: 0; overflow: hidden; padding: 10px; white-space: normal; }
 .download-system small { color: var(--text-muted); font-size: 11px; font-weight: 400; overflow-wrap: anywhere; }
 .download-platform { display: flex; align-items: center; gap: 10px; color: var(--text-secondary); font-size: 13px; margin: 14px 0 24px; }
 .download-files { list-style: none; padding: 0; margin: 0; }

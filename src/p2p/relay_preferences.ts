@@ -1,3 +1,4 @@
+import { isBrowserRuntime, websiteUrl } from '../platform/website.ts';
 import { defaultRelayUrls as defaultNostrUrls } from '@trystero-p2p/nostr';
 import { defaultRelayUrls as defaultTorrentUrls } from '@trystero-p2p/torrent';
 import type { RendezvousTransport, SignalingTransport } from '../core/types.ts';
@@ -11,31 +12,34 @@ export type RendezvousPreferences = Record<RendezvousTransport, RendezvousServer
 
 const STORAGE_KEY = 'p2sharer_rendezvous_servers_v1';
 
-export const DEFAULT_MQTT_RELAY_URLS = [
+const ownedBrokerUrl = () => websiteUrl('/mqtt').replace(/^http/, 'ws');
+const retiredHosts = new Set(['broker-cn.emqx.io', 'rapi.acrop.net']);
+function retired(url: string): boolean {
+  try { return retiredHosts.has(new URL(url).hostname); } catch { return true; }
+}
+const publicMqttUrls = [
   'wss://public:public@public.cloud.shiftr.io',
   'wss://broker.emqx.io:8084/mqtt',
-  'wss://broker-cn.emqx.io:8084/mqtt',
   'wss://test.mosquitto.org:8081/mqtt',
 ];
 
-const defaults: Record<RendezvousTransport, string[]> = {
-  mqtt: DEFAULT_MQTT_RELAY_URLS,
-  nostr: defaultNostrUrls,
-  torrent: defaultTorrentUrls,
-};
+export const DEFAULT_MQTT_RELAY_URLS = [ownedBrokerUrl(), ...publicMqttUrls];
+const legacyMqttUrls = [...publicMqttUrls, 'wss://broker-cn.emqx.io:8084/mqtt'];
 
 export function defaultRendezvousPreferences(): RendezvousPreferences {
+  const web = isBrowserRuntime();
   return {
-    mqtt: defaults.mqtt.map((url) => ({ url, enabled: true })),
-    nostr: defaults.nostr.map((url) => ({ url, enabled: true })),
-    torrent: defaults.torrent.map((url) => ({ url, enabled: true })),
+    mqtt: [ownedBrokerUrl(), ...(web ? [] : publicMqttUrls)].map(url => ({ url, enabled: true })),
+    nostr: web ? [] : defaultNostrUrls.filter(url => !retired(url)).map(url => ({ url, enabled: true })),
+    torrent: web ? [] : defaultTorrentUrls.filter(url => !retired(url)).map(url => ({ url, enabled: true })),
   };
 }
 
 export function normalizeRendezvousUrl(value: string): string | null {
   try {
     const url = new URL(value.trim());
-    if (url.protocol !== 'wss:' || !url.hostname || url.hash) return null;
+    const localWebSocket = url.protocol === 'ws:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+    if ((url.protocol !== 'wss:' && !localWebSocket) || !url.hostname || url.hash) return null;
     return url.href.replace(/\/$/, value.trim().endsWith('/') ? '/' : '');
   } catch {
     return null;
@@ -48,7 +52,7 @@ export function validateRendezvousPreferences(value: RendezvousPreferences): str
     const seen = new Set<string>();
     for (const server of value[transport]) {
       const url = normalizeRendezvousUrl(server.url);
-      if (!url) return `URL inválida em ${transport.toUpperCase()}. Use wss://.`;
+      if (!url || retired(server.url)) return `URL inválida em ${transport.toUpperCase()}. Use wss://.`;
       if (seen.has(url)) return `Servidor duplicado em ${transport.toUpperCase()}.`;
       seen.add(url);
       if (server.enabled) enabled++;
@@ -72,6 +76,9 @@ export function loadRendezvousPreferences(): RendezvousPreferences {
         normalizeRendezvousUrl(entry.url) !== null
       );
     }
+    const sameDefaults = (entries: RendezvousServer[], urls: string[]) => entries.length === urls.length && entries.every(entry => entry.enabled && urls.includes(entry.url));
+    if (sameDefaults(result.mqtt, legacyMqttUrls) && sameDefaults(result.nostr, defaultNostrUrls) && sameDefaults(result.torrent, defaultTorrentUrls)) return defaultRendezvousPreferences();
+    for (const transport of ['mqtt', 'nostr', 'torrent'] as const) result[transport] = result[transport].filter(entry => !retired(entry.url));
     return validateRendezvousPreferences(result) ? defaultRendezvousPreferences() : result;
   } catch {
     return defaultRendezvousPreferences();
