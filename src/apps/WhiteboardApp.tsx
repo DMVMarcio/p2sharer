@@ -6,7 +6,7 @@ import { showToast } from '../hooks/useToast';
 import { t } from '../i18n';
 import { roomAppsService } from './room_apps_service';
 import type { WhiteboardModel } from './whiteboard_model';
-import { DEFAULT_BOARD_LAYER, type BoardLayer } from './whiteboard_scene';
+import { DEFAULT_BOARD_LAYER, type BoardLayer, type BoardTool } from './whiteboard_scene';
 import { WhiteboardToolbar, type BoardSettings } from './WhiteboardToolbar';
 import { WhiteboardLayers } from './WhiteboardLayers';
 import { WhiteboardCanvas } from './WhiteboardCanvas';
@@ -17,22 +17,68 @@ import { Maximize, Minimize } from 'lucide-react';
 import { TooltipButton } from '../components/common/TooltipButton';
 import { boardError, useWhiteboardFiles } from './useWhiteboardFiles';
 
+type WidthTool = 'brush' | 'eraser' | 'rectangle' | 'ellipse' | 'line';
+const isWidthTool = (tool: BoardTool): tool is WidthTool =>
+  tool === 'brush' || tool === 'eraser' || tool === 'rectangle' || tool === 'ellipse' || tool === 'line';
+
+function loadToolWidths(): Record<WidthTool, number> {
+  const defaults: Record<WidthTool, number> = { brush: 1, eraser: 1, rectangle: 1, ellipse: 1, line: 1 };
+  try {
+    const raw = localStorage.getItem('p2sharer_whiteboard_widths');
+    if (!raw) return defaults;
+    const parsed = JSON.parse(raw) as Partial<Record<WidthTool, unknown>>;
+    for (const key of Object.keys(defaults) as WidthTool[]) {
+      const val = Number(parsed?.[key]);
+      if (Number.isFinite(val)) defaults[key] = Math.max(1, Math.min(100, Math.round(val)));
+    }
+  } catch { /* ignore */ }
+  return defaults;
+}
+
+const isBlockedShortcutTarget = (target: EventTarget | null) =>
+  target instanceof Element && Boolean(target.closest('input, textarea, select, [contenteditable], .ProseMirror, [role="textbox"], [role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]'));
+
 export function WhiteboardApp({ instanceId, compact = false }: { instanceId: string; compact?: boolean }) {
   useLocale();
   const { username, peers } = useRoom();
   const model = roomAppsService.getModel<WhiteboardModel>(instanceId);
   const [, refresh] = useState(0);
+  const toolWidthsRef = useRef<Record<WidthTool, number>>(loadToolWidths());
+  const lastWidthToolRef = useRef<WidthTool>('brush');
+  const [spaceHeld, setSpaceHeld] = useState(false);
   const [settings, setSettings] = useState<BoardSettings>(() => ({
     tool: 'pointer',
     brushType: 'pencil',
     color: '#3b82f6',
-    width: 1,
+    width: toolWidthsRef.current.brush,
     opacity: 100,
     filled: false,
+    shapeFilled: { rectangle: false, ellipse: false },
     smoothing: (() => {
       try { const value = Number(localStorage.getItem('p2sharer_whiteboard_smoothing') ?? 35); return Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 35; } catch { return 35; }
     })(),
   }));
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+  const applySettings = (next: BoardSettings) => {
+    setSettings(prev => {
+      let width = next.width;
+      const widthChanged = next.width !== prev.width;
+      const toolChanged = next.tool !== prev.tool;
+      if (toolChanged && isWidthTool(next.tool) && !widthChanged) {
+        lastWidthToolRef.current = next.tool;
+        width = toolWidthsRef.current[next.tool] ?? 1;
+      } else if (widthChanged) {
+        const targetTool = isWidthTool(next.tool) ? next.tool : lastWidthToolRef.current;
+        toolWidthsRef.current = { ...toolWidthsRef.current, [targetTool]: next.width };
+        try { localStorage.setItem('p2sharer_whiteboard_widths', JSON.stringify(toolWidthsRef.current)); } catch { /* ignore */ }
+      } else if (isWidthTool(next.tool)) {
+        lastWidthToolRef.current = next.tool;
+      }
+      try { localStorage.setItem('p2sharer_whiteboard_smoothing', String(next.smoothing)); } catch { /* Keep the current session preference. */ }
+      return { ...next, width };
+    });
+  };
   const [activeLayer, setActiveLayer] = useState(DEFAULT_BOARD_LAYER);
   const [selected, setSelected] = useState<string | null>(null);
   const [viewport, setViewport] = useState<BoardViewport>({ x: 60, y: 60, zoom: 1 });
@@ -40,6 +86,40 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
   compact = compact && !fullscreen;
   const files = useWhiteboardFiles(model, instanceId);
   useEffect(() => roomAppsService.subscribe(() => refresh(n => n + 1)), []);
+  useEffect(() => {
+    if (compact) { setSpaceHeld(false); return; }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || isBlockedShortcutTarget(event.target)) return;
+      if (document.activeElement !== document.body && !fullscreenRef.current?.contains(document.activeElement)) return;
+      if (fullscreenRef.current?.contains(event.target as Node)) return;
+      const mod = event.ctrlKey || event.metaKey, key = event.key.toLowerCase();
+      if (!mod && !event.altKey) {
+        if (event.code === 'Space' || event.key === ' ') {
+          event.preventDefault();
+          if (!event.repeat) setSpaceHeld(true);
+        } else if (!event.repeat) {
+          if (key === 'b') { event.preventDefault(); applySettings({ ...settingsRef.current, tool: 'brush' }); }
+          else if (key === 'e') { event.preventDefault(); applySettings({ ...settingsRef.current, tool: 'eraser' }); }
+          else if (key === 'v') { event.preventDefault(); applySettings({ ...settingsRef.current, tool: 'pointer' }); }
+          else if (key === 'r') { event.preventDefault(); applySettings({ ...settingsRef.current, tool: 'rectangle', filled: settingsRef.current.shapeFilled?.rectangle ?? false }); }
+          else if (key === 'o' || key === 'c') { event.preventDefault(); applySettings({ ...settingsRef.current, tool: 'ellipse', filled: settingsRef.current.shapeFilled?.ellipse ?? false }); }
+          else if (key === 'l') { event.preventDefault(); applySettings({ ...settingsRef.current, tool: 'line' }); }
+        }
+      }
+    };
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.code === 'Space' || event.key === ' ') setSpaceHeld(false);
+    };
+    const onBlur = () => setSpaceHeld(false);
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp, true);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp, true);
+      window.removeEventListener('blur', onBlur);
+    };
+  }, [compact, fullscreenRef]);
   const error = (reason: unknown) => showToast(boardError(reason), 3500, 'error');
   const updateLayer = (layer: BoardLayer) => { try { model?.updateLayer(layer); } catch (reason) { error(reason); } };
   const select = (id: string | null) => { setSelected(id); if (id) setActiveLayer(id); };
@@ -133,17 +213,44 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
       void pasteImage(event.dataTransfer, { clientX: event.clientX, clientY: event.clientY });
     }}
     onPaste={event => {
-      if (compact || (event.target as HTMLElement).closest('input, textarea, [contenteditable], [role="dialog"], [role="menu"], [role="listbox"]')) return;
+      if (compact || isBlockedShortcutTarget(event.target)) return;
       event.preventDefault();
       void pasteImage(event.clipboardData);
     }}
+    onKeyUp={event => {
+      if (event.code === 'Space' || event.key === ' ') {
+        if (!isBlockedShortcutTarget(event.target)) event.preventDefault();
+        setSpaceHeld(false);
+      }
+    }}
     onKeyDown={event => {
-      if (compact || (event.target as HTMLElement).closest('input, textarea, [contenteditable], [role="dialog"], [role="menu"], [role="listbox"]')) return;
+      if (compact || isBlockedShortcutTarget(event.target)) return;
       const mod = event.ctrlKey || event.metaKey, key = event.key.toLowerCase();
+      if (!mod && !event.altKey && (event.code === 'Space' || event.key === ' ')) {
+        event.preventDefault();
+        if (!event.repeat) setSpaceHeld(true);
+        return;
+      }
       if (mod && key === 's') { event.preventDefault(); void files.save(); }
       else if (mod && key === 'v') { event.preventDefault(); void pasteImage(); }
       else if (mod && (key === 'z' || key === 'y')) { event.preventDefault(); if (key === 'y' || event.shiftKey) model.redo(); else model.undo(); }
-      else if (event.target instanceof HTMLElement && event.target.classList.contains('whiteboard-canvas')) {
+      else if (!mod && !event.altKey && !event.repeat) {
+        if (key === 'b') { event.preventDefault(); applySettings({ ...settingsRef.current, tool: 'brush' }); return; }
+        if (key === 'e') { event.preventDefault(); applySettings({ ...settingsRef.current, tool: 'eraser' }); return; }
+        if (key === 'v') { event.preventDefault(); applySettings({ ...settingsRef.current, tool: 'pointer' }); return; }
+        if (key === 'r') {
+          event.preventDefault();
+          applySettings({ ...settingsRef.current, tool: 'rectangle', filled: settingsRef.current.shapeFilled?.rectangle ?? false });
+          return;
+        }
+        if (key === 'o' || key === 'c') {
+          event.preventDefault();
+          applySettings({ ...settingsRef.current, tool: 'ellipse', filled: settingsRef.current.shapeFilled?.ellipse ?? false });
+          return;
+        }
+        if (key === 'l') { event.preventDefault(); applySettings({ ...settingsRef.current, tool: 'line' }); return; }
+      }
+      if (event.target instanceof HTMLElement && event.target.classList.contains('whiteboard-canvas')) {
         if (key === 'delete' || key === 'backspace') { event.preventDefault(); if (selected) remove(selected); }
         if (key === 'escape') setSelected(null);
         const layer = model.layers.find(l => l.id === selected);
@@ -159,12 +266,10 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
     </div>{files.status}</>}
     <div className="whiteboard-workspace">
       <div className="whiteboard-stage">
-    {!compact && <WhiteboardToolbar settings={settings} onChange={next => {
-      setSettings(next);
-      try { localStorage.setItem('p2sharer_whiteboard_smoothing', String(next.smoothing)); } catch { /* Keep the current session preference. */ }
-    }} canUndo={model.history.canUndo()} canRedo={model.history.canRedo()} onUndo={() => model.undo()} onRedo={() => model.redo()} onPasteImage={() => void pasteImage()}
+    {!compact && <WhiteboardToolbar settings={settings} onChange={applySettings}
+      canUndo={model.history.canUndo()} canRedo={model.history.canRedo()} onUndo={() => model.undo()} onRedo={() => model.redo()} onPasteImage={() => void pasteImage()}
       />}
-      <WhiteboardCanvas model={model} activeLayer={currentLayer} settings={settings} viewport={viewport} onViewport={setViewport} selected={selected} onSelect={select}
+      <WhiteboardCanvas model={model} activeLayer={currentLayer} settings={settings} spaceHeld={spaceHeld} viewport={viewport} onViewport={setViewport} selected={selected} onSelect={select}
         compact={compact} actor={roomAppsService.getLocalActor()} name={username} onError={error} onPasteImage={() => void pasteImage()}
         participantName={actor => peers.find(peer => peer.id === actor)?.username || t('browser.participant')} />
       </div>

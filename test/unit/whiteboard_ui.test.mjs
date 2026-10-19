@@ -209,6 +209,45 @@ test('manual numeric entry rejects non-digits and corrects out-of-range values',
   await set('9999'); await act(async () => input.blur()); assert.equal(input.value, '100');
   await set('a.2'); assert.equal(input.value, '100');
   await set(''); await act(async () => input.blur()); assert.equal(input.value, '1');
+  // Per-tool thickness memory & shortcuts (B, E, V, R, O)
+  await act(async () => canvas().dispatchEvent(new window.KeyboardEvent('keydown', { key: 'b', bubbles: true })));
+  assert.equal(button('Brush').getAttribute('aria-pressed'), 'true');
+  await set('25'); await act(async () => input.blur());
+  assert.equal(input.value, '25');
+  await act(async () => canvas().dispatchEvent(new window.KeyboardEvent('keydown', { key: 'r', bubbles: true })));
+  assert.equal(button('Rectangle').getAttribute('aria-pressed'), 'true');
+  assert.equal(input.value, '1');
+  await set('12'); await act(async () => input.blur());
+  await act(async () => canvas().dispatchEvent(new window.KeyboardEvent('keydown', { key: 'o', bubbles: true })));
+  assert.equal(button('Ellipse').getAttribute('aria-pressed'), 'true');
+  assert.equal(input.value, '1');
+  await set('8'); await act(async () => input.blur());
+  await act(async () => canvas().dispatchEvent(new window.KeyboardEvent('keydown', { key: 'e', bubbles: true })));
+  assert.equal(button('Eraser').getAttribute('aria-pressed'), 'true');
+  assert.equal(input.value, '1');
+  await act(async () => canvas().dispatchEvent(new window.KeyboardEvent('keydown', { key: 'b', bubbles: true })));
+  assert.equal(button('Brush').getAttribute('aria-pressed'), 'true');
+  assert.equal(input.value, '25');
+  // Space key temporarily turns cursor into pointer, pans board, and cancels drag on release
+  await pointer('pointermove', 250, 250);
+  await act(async () => canvas().dispatchEvent(new window.KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true })));
+  assert.ok(document.querySelector('[data-cursor-shape="pointer"]'));
+  const beforeSpacePan = document.querySelector('.whiteboard-art > g').getAttribute('transform');
+  await pointer('pointerdown', 250, 250);
+  await pointer('pointermove', 300, 280);
+  await settle();
+  const afterSpacePan = document.querySelector('.whiteboard-art > g').getAttribute('transform');
+  assert.notEqual(afterSpacePan, beforeSpacePan);
+  await act(async () => window.dispatchEvent(new window.KeyboardEvent('keyup', { key: ' ', code: 'Space', bubbles: true })));
+  assert.ok(document.querySelector('.stream-pointer-brush'));
+  await pointer('pointermove', 350, 320);
+  await settle();
+  assert.equal(document.querySelector('.whiteboard-art > g').getAttribute('transform'), afterSpacePan);
+  await pointer('pointerup', 350, 320);
+  // Restore brush thickness to 1 and tool to pointer for subsequent tests
+  await set('1'); await act(async () => input.blur());
+  await act(async () => canvas().dispatchEvent(new window.KeyboardEvent('keydown', { key: 'v', bubbles: true })));
+  assert.equal(button('Select and move').getAttribute('aria-pressed'), 'true');
 });
 
 test('paint stays in the active layer, erasing is scoped, and named layers reorder with a drag placeholder', async () => {

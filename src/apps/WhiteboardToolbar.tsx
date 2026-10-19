@@ -14,6 +14,7 @@ export interface BoardSettings {
   width: number;
   opacity: number;
   filled: boolean;
+  shapeFilled?: { rectangle: boolean; ellipse: boolean };
   smoothing: number;
 }
 export function WhiteboardToolbar({ settings, onChange, canUndo, canRedo, onUndo, onRedo, onPasteImage }: {
@@ -22,7 +23,7 @@ export function WhiteboardToolbar({ settings, onChange, canUndo, canRedo, onUndo
 }) {
   const menu = useContextMenu();
   const [open, setOpen] = useState(true);
-  const [shapeFilled, setShapeFilled] = useState<{ rectangle: boolean; ellipse: boolean }>({ rectangle: false, ellipse: false });
+  const shapeFilled = settings.shapeFilled ?? { rectangle: false, ellipse: false };
   const contentId = useId();
   const brushVariants = [
     ['pencil', Pencil, 'whiteboard.pencil'],
@@ -33,12 +34,12 @@ export function WhiteboardToolbar({ settings, onChange, canUndo, canRedo, onUndo
   const ActiveBrushIcon = activeBrush[1];
   const activeBrushLabel = activeBrush[2];
   const tools = [
-    ['pointer', MousePointer2],
-    ['brush', ActiveBrushIcon],
-    ['eraser', Eraser],
-    ['rectangle', Square],
-    ['ellipse', Circle],
-    ['line', Minus],
+    ['pointer', MousePointer2, 'V'],
+    ['brush', ActiveBrushIcon, 'B'],
+    ['eraser', Eraser, 'E'],
+    ['rectangle', Square, 'R'],
+    ['ellipse', Circle, 'O'],
+    ['line', Minus, 'L'],
   ] as const;
   const colors = [['#a47754', 'color.brown'], ['#ef4444', 'message.6741b8b5e1c2'], ['#f97316', 'message.2b2b4ad00333'],
     ['#facc15', 'message.1875203bcdcc'], ['#22c55e', 'message.40598e1cb1d2'], ['#06b6d4', 'message.c954e4de2019'],
@@ -47,36 +48,39 @@ export function WhiteboardToolbar({ settings, onChange, canUndo, canRedo, onUndo
   return <div className={`whiteboard-toolbar ${open ? '' : 'is-collapsed'}`} role="toolbar" aria-label={t('whiteboard.tools')}>
     <div className="whiteboard-toolbar-main-row">
       <div className="whiteboard-toolbar-history" inert={!open || undefined} aria-hidden={!open || undefined}>
-        <TooltipButton tooltip={t('message.786b48222848')} className="room-app-notepad-tool" disabled={!canUndo} onClick={onUndo}><Undo2 size={17} /></TooltipButton>
-        <TooltipButton tooltip={t('message.7b659c9caa5e')} className="room-app-notepad-tool" disabled={!canRedo} onClick={onRedo}><Redo2 size={17} /></TooltipButton>
+        <TooltipButton aria-label={t('message.786b48222848')} aria-keyshortcuts="Control+Z" tooltip={`${t('message.786b48222848')} (Ctrl+Z)`} className="room-app-notepad-tool" disabled={!canUndo} onClick={onUndo}><Undo2 size={17} /></TooltipButton>
+        <TooltipButton aria-label={t('message.7b659c9caa5e')} aria-keyshortcuts="Control+Y" tooltip={`${t('message.7b659c9caa5e')} (Ctrl+Y)`} className="room-app-notepad-tool" disabled={!canRedo} onClick={onRedo}><Redo2 size={17} /></TooltipButton>
       </div>
       <div className="whiteboard-tool-choices" inert={!open || undefined} aria-hidden={!open || undefined}>
-        {tools.map(([tool, Icon]) => <TooltipButton key={tool} tooltip={t(tool === 'brush' ? activeBrushLabel : `whiteboard.${tool}`)} aria-pressed={settings.tool === tool}
-          className={`room-app-notepad-tool ${settings.tool === tool ? 'active' : ''}`} onClick={event => {
-            if (tool === 'brush') {
-              const currentBrush = activeBrush[0];
-              onChange({ ...settings, tool: 'brush', brushType: currentBrush });
-              menu(event, brushVariants.map(([brushType, VariantIcon, labelKey]) => ({
-                id: `brush-${brushType}`, label: t(labelKey), tooltip: t(labelKey), iconOnly: true,
-                selected: currentBrush === brushType,
-                icon: <VariantIcon size={18} strokeWidth={1.8} />,
-                onSelect: () => onChange({ ...settings, tool: 'brush', brushType }),
-              })), { toggle: true, layout: 'grid', placement: 'top-center' });
-            } else if (tool === 'rectangle' || tool === 'ellipse') {
-              const currentFilled = shapeFilled[tool];
-              onChange({ ...settings, tool, filled: currentFilled });
-              menu(event, [false, true].map(filled => ({
-                id: `${tool}-${filled}`, label: t(filled ? 'whiteboard.filled' : 'whiteboard.outline'),
-                tooltip: t(filled ? 'whiteboard.filled' : 'whiteboard.outline'), iconOnly: true,
-                selected: currentFilled === filled,
-                icon: <Icon size={18} fill={filled ? 'currentColor' : 'none'} strokeWidth={1.8} />,
-                onSelect: () => {
-                  setShapeFilled(prev => ({ ...prev, [tool]: filled }));
-                  onChange({ ...settings, tool, filled });
-                },
-              })), { toggle: true, layout: 'grid', placement: 'top-center' });
-            } else onChange({ ...settings, tool });
-          }}><Icon size={19} fill={(tool === 'rectangle' || tool === 'ellipse') && (settings.tool === tool ? settings.filled : shapeFilled[tool]) ? 'currentColor' : 'none'} /></TooltipButton>)}
+        {tools.map(([tool, Icon, shortcut]) => {
+          const baseLabel = t(tool === 'brush' ? activeBrushLabel : `whiteboard.${tool}`);
+          return <TooltipButton key={tool} aria-label={baseLabel} aria-keyshortcuts={shortcut} tooltip={`${baseLabel} (${shortcut})`} aria-pressed={settings.tool === tool}
+            className={`room-app-notepad-tool ${settings.tool === tool ? 'active' : ''}`} onClick={event => {
+              if (tool === 'brush') {
+                const currentBrush = activeBrush[0];
+                onChange({ ...settings, tool: 'brush', brushType: currentBrush });
+                menu(event, brushVariants.map(([brushType, VariantIcon, labelKey]) => ({
+                  id: `brush-${brushType}`, label: t(labelKey), tooltip: t(labelKey), iconOnly: true,
+                  selected: currentBrush === brushType,
+                  icon: <VariantIcon size={18} strokeWidth={1.8} />,
+                  onSelect: () => onChange({ ...settings, tool: 'brush', brushType }),
+                })), { toggle: true, layout: 'grid', placement: 'top-center' });
+              } else if (tool === 'rectangle' || tool === 'ellipse') {
+                const currentFilled = shapeFilled[tool];
+                onChange({ ...settings, tool, filled: currentFilled });
+                menu(event, [false, true].map(filled => ({
+                  id: `${tool}-${filled}`, label: t(filled ? 'whiteboard.filled' : 'whiteboard.outline'),
+                  tooltip: t(filled ? 'whiteboard.filled' : 'whiteboard.outline'), iconOnly: true,
+                  selected: currentFilled === filled,
+                  icon: <Icon size={18} fill={filled ? 'currentColor' : 'none'} strokeWidth={1.8} />,
+                  onSelect: () => {
+                    const nextShapeFilled = { ...shapeFilled, [tool]: filled };
+                    onChange({ ...settings, tool, filled, shapeFilled: nextShapeFilled });
+                  },
+                })), { toggle: true, layout: 'grid', placement: 'top-center' });
+              } else onChange({ ...settings, tool });
+            }}><Icon size={19} fill={(tool === 'rectangle' || tool === 'ellipse') && (settings.tool === tool ? settings.filled : shapeFilled[tool]) ? 'currentColor' : 'none'} /></TooltipButton>;
+        })}
         {onPasteImage && <TooltipButton tooltip={t('whiteboard.pasteImage')} className="room-app-notepad-tool" onClick={onPasteImage}><ImagePlus size={19} /></TooltipButton>}
         <TooltipButton tooltip={t('message.2237b88f398f')} className="room-app-notepad-tool" onClick={event => menu(event, colors.map(([color, label]) => ({
           id: color, label: t(label), selected: color === settings.color, icon: <span className="stream-drawing-swatch" style={{ background: color }} />,

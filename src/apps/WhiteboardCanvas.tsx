@@ -20,6 +20,7 @@ type Gesture = {
   pointer: number;
   start: BoardPoint;
   mode: 'pan' | 'move' | 'resize' | 'draw';
+  spacePan?: boolean;
   handle?: BoardResizeHandle;
   initialBounds?: BoardBox;
   targetBounds?: BoardBox;
@@ -45,8 +46,8 @@ function pointerPressure(event: { pointerType?: string; pressure?: number }, fin
   return undefined;
 }
 
-export function WhiteboardCanvas({ model, activeLayer, settings, viewport, onViewport, selected, onSelect, compact, actor, name, participantName, onError, onPasteImage }: {
-  model: WhiteboardModel; activeLayer: string; settings: BoardSettings; viewport: BoardViewport; onViewport(viewport: BoardViewport): void;
+export function WhiteboardCanvas({ model, activeLayer, settings, spaceHeld = false, viewport, onViewport, selected, onSelect, compact, actor, name, participantName, onError, onPasteImage }: {
+  model: WhiteboardModel; activeLayer: string; settings: BoardSettings; spaceHeld?: boolean; viewport: BoardViewport; onViewport(viewport: BoardViewport): void;
   selected: string | null; onSelect(id: string | null): void; compact: boolean; actor: string; name: string;
   participantName(actor: string): string; onError(error: unknown): void; onPasteImage?(): void;
 }) {
@@ -60,7 +61,7 @@ export function WhiteboardCanvas({ model, activeLayer, settings, viewport, onVie
   const [cursor, setCursor] = useState<Cursor | null>(null);
   const [cursorScreen, setCursorScreen] = useState<BoardPoint | null>(null);
   const physicalScreen = useRef<BoardPoint | null>(null);
-  const current = useRef({ settings, compact }); current.current = { settings, compact };
+  const current = useRef({ settings, compact, spaceHeld }); current.current = { settings, compact, spaceHeld };
   const lastSent = useRef(0), latestCursor = useRef<Cursor | null>(null);
   const screenPoint = (event: { clientX: number; clientY: number }): BoardPoint => {
     const bounds = root.current!.getBoundingClientRect(); return { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
@@ -101,9 +102,19 @@ export function WhiteboardCanvas({ model, activeLayer, settings, viewport, onVie
     return () => observer.disconnect();
   }, [model, identity, compact, onViewport]);
   useEffect(() => {
+    if (!spaceHeld && gesture.current?.spacePan) {
+      const pointerId = gesture.current.pointer;
+      navigation.stop();
+      gesture.current = null;
+      if (root.current?.hasPointerCapture(pointerId)) {
+        try { root.current.releasePointerCapture(pointerId); } catch { /* ignore */ }
+      }
+    }
     const screen = physicalScreen.current;
-    if (screen && !gesture.current && !compact) publish({ ...worldPoint(screen), tool: settings.tool, width: boardBrushWidth(settings.width), color: settings.color }, screen);
-  }, [viewport.x, viewport.y, viewport.zoom, settings.tool, settings.width, settings.color, compact]);
+    if (screen && !gesture.current && !compact) {
+      publish({ ...worldPoint(screen), tool: spaceHeld ? 'pointer' : settings.tool, width: boardBrushWidth(settings.width), color: settings.color }, screen);
+    }
+  }, [spaceHeld, viewport.x, viewport.y, viewport.zoom, settings.tool, settings.width, settings.color, compact]);
   useEffect(() => {
     const element = root.current; if (!element) return;
     const wheel = (event: WheelEvent) => {
@@ -173,7 +184,7 @@ export function WhiteboardCanvas({ model, activeLayer, settings, viewport, onVie
     const activeWidth = boardBrushWidth(settings.width) * (p !== undefined ? 0.25 + 0.75 * p : 1);
     publish({
       ...point,
-      tool: g?.mode === 'pan' ? 'hand' : g?.mode === 'move' || g?.mode === 'resize' ? 'move' : settings.tool,
+      tool: spaceHeld ? 'pointer' : g?.mode === 'pan' ? 'hand' : g?.mode === 'move' || g?.mode === 'resize' ? 'move' : settings.tool,
       width: activeWidth,
       color: settings.color,
       ...(drawing ? { draft: drawing } : {}),
@@ -183,6 +194,12 @@ export function WhiteboardCanvas({ model, activeLayer, settings, viewport, onVie
     if (compact || gesture.current || ![0, 1].includes(event.button)) return;
     event.preventDefault(); event.stopPropagation(); root.current?.focus();
     const screen = screenPoint(event), point = worldPoint(screen);
+    if (spaceHeld) {
+      navigation.stop(); root.current?.setPointerCapture(event.pointerId);
+      gesture.current = { pointer: event.pointerId, mode: 'pan', spacePan: true, start: screen, viewport: navigation.current.current };
+      update(event);
+      return;
+    }
     const layer = model.layers.find(l => l.id === activeLayer);
     if (event.button === 0 && settings.tool !== 'pointer' && (!boardContains(point) || !layer || layer.locked || layer.hidden)) return;
     navigation.stop(); root.current?.setPointerCapture(event.pointerId);
@@ -269,7 +286,7 @@ export function WhiteboardCanvas({ model, activeLayer, settings, viewport, onVie
     } catch (error) { onError(error); }
     gesture.current = null; setDraft(null); setMoving(null); setResizing(null);
     if (root.current?.hasPointerCapture(event.pointerId)) root.current.releasePointerCapture(event.pointerId);
-    publish({ ...worldPoint(screenPoint(event)), tool: settings.tool, width: boardBrushWidth(settings.width), color: settings.color }, screenPoint(event), true);
+    publish({ ...worldPoint(screenPoint(event)), tool: spaceHeld ? 'pointer' : settings.tool, width: boardBrushWidth(settings.width), color: settings.color }, screenPoint(event), true);
   };
   const selectedLayer = model.layers.find(l => l.id === selected && !l.hidden);
   const bounds = resizing && selectedLayer && resizing.id === selectedLayer.id
