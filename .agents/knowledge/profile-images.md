@@ -94,6 +94,22 @@ scrim for readable foreground text. Settings owns banner upload, removal and
 display-option drafts. `ProfileModal` displays the full banner regardless of its
 card visibility/blur settings and uses the shared nickname and avatar components.
 
+## Browser GIF processing
+
+The browser command adapter retains the original validated GIF bytes for selection
+and crop previews. `platform/web_profile_gif.ts` bounds dimensions, frame count and
+cumulative pixels before decompression, composites GIF patches with transparent,
+restore-background and restore-previous disposal, then applies the canonical crop
+to every displayed frame. Work is serialized and yields between frame batches.
+`core/png_animation.ts` streams full RGBA frames into metadata-free PNG/APNG chunks
+using the shared pako compressor, preserving frame delays and the desktop decoder's
+loop-count convention. Output caps match the native avatar/banner dimensions and
+8 MiB encoded limit, without upscaling. The saved hash, IndexedDB record and existing
+PNG-based profile transfer contract remain unchanged. Other browser raster formats
+continue through the existing static canvas normalization. Software-canvas tests
+exercise selection, saving, reloading, crop geometry, disposal and independent
+APNG decoding without requiring interactive browser automation or physical devices.
+
 ## Profile statistics and viewing
 
 `core/profile_stats.ts` stores versioned aggregate totals in the main WebView local

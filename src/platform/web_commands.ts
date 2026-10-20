@@ -6,6 +6,7 @@ import { browserFileCommand, downloadBlob, pickBrowserFile } from './web_files.t
 import type { ProfileImage } from '../core/profile_image.ts';
 import type { SavedNote } from '../apps/NotepadFilesDialog.ts';
 import { cropDimensions } from '../core/profile_crop.ts';
+import { isGif, inspectProfileGif, cropProfileGif, PROFILE_INPUT_LIMIT } from './web_profile_gif.ts';
 
 const drafts = new Map<string, Blob>();
 
@@ -89,17 +90,37 @@ export async function invokeBrowser(command: string, input?: unknown, options?: 
     case 'pick_profile_image': {
       const file = await pickBrowserFile('image/png,image/jpeg,image/webp,image/gif');
       if (!file) return null;
-      const normalized = await normalizeImage(file);
-      const blob = new Blob([decodeBase64(normalized.data) as BlobPart], { type: 'image/png' });
+      if (file.size > PROFILE_INPUT_LIMIT || drafts.size >= 4) throw new Error('Image exceeds safety limits');
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      // GIF previews must retain the original bytes rather than a canvas snapshot.
+      const gif = isGif(bytes);
+      let blob: Blob;
+      let dimensions: { width: number; height: number };
+      if (gif) {
+        dimensions = inspectProfileGif(bytes);
+        blob = new Blob([bytes as BlobPart], { type: 'image/gif' });
+      } else {
+        const normalized = await normalizeImage(file);
+        dimensions = normalized;
+        blob = new Blob([decodeBase64(normalized.data) as BlobPart], { type: 'image/png' });
+      }
       const token = crypto.randomUUID(); drafts.set(token, blob);
-      return { token, preview: `data:image/png;base64,${normalized.data}`, width: normalized.width, height: normalized.height };
+      return { token, preview: await blobToDataUrl(blob), width: dimensions.width, height: dimensions.height };
     }
     case 'discard_profile_image': drafts.delete(args.token); return;
     case 'save_profile_image': {
       const key = args.banner ? 'banner' : 'profile';
       const image = args.token ? drafts.get(args.token) : undefined;
       if (args.token && !image) throw new Error('Image draft unavailable');
-      const normalized = image && !args.remove ? await normalizeImage(image, args.banner, args.crop ?? { x: 0.5, y: 0.5, size: 1 }) : undefined;
+      let normalized: Awaited<ReturnType<typeof normalizeImage>> | undefined;
+      if (image && !args.remove) {
+        const crop = args.crop ?? { x: 0.5, y: 0.5, size: 1 };
+        if (image.type === 'image/gif') {
+          const result = await cropProfileGif(new Uint8Array(await image.arrayBuffer()), crop, args.banner);
+          const data = (await blobToDataUrl(new Blob([result.bytes as BlobPart], { type: 'image/png' }))).split(',')[1];
+          normalized = { data, hash: await sha256Hex(result.bytes), width: result.width, height: result.height };
+        } else normalized = await normalizeImage(image, args.banner, crop);
+      }
       return browserRecord<ProfileImage>(key, previous => ({
         hash: args.remove ? '' : normalized?.hash ?? previous?.hash ?? '',
         data: args.remove ? '' : normalized?.data ?? previous?.data ?? '',

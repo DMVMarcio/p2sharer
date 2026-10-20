@@ -2,67 +2,67 @@
   "version": "1.5.0",
   "translations": {
     "en": [
-      "**Web access.** Use P2Sharer directly in your browser to join rooms, chat, share media, and collaborate without installing anything, with easy link sharing and direct downloads for the desktop app. Smooth transitions and clear loading feedback make navigation between the website and web app more predictable, without full page reloads.",
+      "**Web access.** Use P2Sharer directly in your browser to join rooms, chat, share media, and collaborate without installing anything, with easy link sharing and direct downloads for the desktop app. Smooth transitions and clear loading feedback make navigation between the website and web app more predictable, without full page reloads. GIF avatars and banners retain their animation in browser previews and after saving.",
       "**Room discovery.** Faster and more reliable room connections using the official P2Sharer server by default, with public fallbacks kept for redundancy.",
       "**Visual performance controls.** Reduce motion or disable heavy background blur and gradients to keep the app responsive on devices without hardware acceleration."
     ],
     "pt-BR": [
-      "**Acesso pela web.** Use o P2Sharer diretamente pelo navegador para entrar em salas, conversar, compartilhar mídia e colaborar sem instalar nada, com compartilhamento simples de links e download direto da versão desktop. Transições suaves e indicação de carregamento deixam a navegação entre o site e o app mais clara, sem recarregar a página inteira.",
+      "**Acesso pela web.** Use o P2Sharer diretamente pelo navegador para entrar em salas, conversar, compartilhar mídia e colaborar sem instalar nada, com compartilhamento simples de links e download direto da versão desktop. Transições suaves e indicação de carregamento deixam a navegação entre o site e o app mais clara, sem recarregar a página inteira. Avatares e banners em GIF mantêm a animação na prévia do navegador e depois de salvar.",
       "**Encontro de salas.** Conexões e entrada em salas mais rápidas e estáveis com o servidor oficial do P2Sharer como padrão, mantendo alternativas públicas para contingência.",
       "**Controles de desempenho visual.** Reduza o movimento ou desative desfoques de fundo e gradientes pesados para manter o app rápido em dispositivos sem aceleração por hardware."
     ],
     "es": [
-      "**Acceso web.** Usa P2Sharer directamente en el navegador para entrar a salas, chatear, compartir contenido y colaborar sin instalar nada, con enlaces directos para compartir y descarga de la app de escritorio. Las transiciones suaves y los indicadores de carga facilitan la navegación entre el sitio y la aplicación web sin recargar toda la página.",
+      "**Acceso web.** Usa P2Sharer directamente en el navegador para entrar a salas, chatear, compartir contenido y colaborar sin instalar nada, con enlaces directos para compartir y descarga de la app de escritorio. Las transiciones suaves y los indicadores de carga facilitan la navegación entre el sitio y la aplicación web sin recargar toda la página. Los avatares y banners GIF mantienen la animación en la vista previa del navegador y después de guardarlos.",
       "**Descubrimiento de salas.** Conexiones a salas más rápidas y estables con el servidor oficial de P2Sharer por defecto, manteniendo alternativas públicas de respaldo.",
       "**Controles de rendimiento visual.** Reduce el movimiento o desactiva el desenfoque de fondo y los degradados pesados para mantener la aplicación fluida en dispositivos sin aceleración por hardware."
     ],
     "fr": [
-      "**Accès web.** Utilisez P2Sharer directement dans votre navigateur pour rejoindre des salons, discuter, partager des médias et collaborer sans rien installer, avec un partage facile de liens et le téléchargement direct de l'application de bureau. Des transitions fluides et des indicateurs de chargement clairs facilitent la navigation entre le site et l’application web sans recharger toute la page.",
+      "**Accès web.** Utilisez P2Sharer directement dans votre navigateur pour rejoindre des salons, discuter, partager des médias et collaborer sans rien installer, avec un partage facile de liens et le téléchargement direct de l'application de bureau. Des transitions fluides et des indicateurs de chargement clairs facilitent la navigation entre le site et l’application web sans recharger toute la page. Les avatars et bannières GIF conservent leur animation dans l’aperçu du navigateur et après l’enregistrement.",
       "**Découverte des salons.** Des connexions aux salons plus rapides et plus fiables grâce au serveur officiel P2Sharer par défaut, tout en conservant des solutions publiques de secours.",
       "**Contrôles de performances visuelles.** Réduisez les mouvements ou désactivez le flou d'arrière-plan et les dégradés lourds pour maintenir l'application fluide sur les appareils sans accélération matérielle."
     ],
     "de": [
-      "**Webzugang.** Nutze P2Sharer direkt im Browser, um Räumen beizutreten, zu chatten, Medien zu teilen und ohne Installation zusammenzuarbeiten, inklusive einfachem Teilen von Links und direktem Download der Desktop-App. Sanfte Übergänge und klare Ladeanzeigen erleichtern die Navigation zwischen Website und Web-App, ohne die gesamte Seite neu zu laden.",
+      "**Webzugang.** Nutze P2Sharer direkt im Browser, um Räumen beizutreten, zu chatten, Medien zu teilen und ohne Installation zusammenzuarbeiten, inklusive einfachem Teilen von Links und direktem Download der Desktop-App. Sanfte Übergänge und klare Ladeanzeigen erleichtern die Navigation zwischen Website und Web-App, ohne die gesamte Seite neu zu laden. GIF-Avatare und -Banner behalten ihre Animation in der Browser-Vorschau und nach dem Speichern.",
       "**Raumsuche.** Schnellere und zuverlässigere Raumverbindungen über den offiziellen P2Sharer-Server als Standard, mit öffentlichen Ausweichservern als Absicherung.",
       "**Steuerung der visuellen Leistung.** Reduzieren Sie Bewegungen oder deaktivieren Sie Hintergrundunschärfe und aufwendige Verläufe, damit die App auch ohne Hardwarebeschleunigung flüssig läuft."
     ],
     "it": [
-      "**Accesso web.** Usa P2Sharer direttamente nel browser per entrare nelle stanze, chattare, condividere contenuti e collaborare senza installare nulla, con facile condivisione di link e download diretto dell'app desktop. Transizioni fluide e indicatori di caricamento chiari facilitano la navigazione tra il sito e l’app web senza ricaricare l’intera pagina.",
+      "**Accesso web.** Usa P2Sharer direttamente nel browser per entrare nelle stanze, chattare, condividere contenuti e collaborare senza installare nulla, con facile condivisione di link e download diretto dell'app desktop. Transizioni fluide e indicatori di caricamento chiari facilitano la navigazione tra il sito e l’app web senza ricaricare l’intera pagina. Gli avatar e i banner GIF mantengono l’animazione nell’anteprima del browser e dopo il salvataggio.",
       "**Ricerca delle stanze.** Connessioni alle stanze più veloci e affidabili grazie al server ufficiale P2Sharer predefinito, mantenendo alternative pubbliche di riserva.",
       "**Controlli delle prestazioni visive.** Riduci il movimento o disattiva sfocature dello sfondo e gradienti pesanti per mantenere l'app reattiva sui dispositivi senza accelerazione hardware."
     ],
     "zh-CN": [
-      "**网页访问。** 直接在浏览器中使用 P2Sharer 加入房间、聊天、共享媒体并进行协作而无需安装任何软件，支持便捷的房间链接分享和桌面端直接下载。 流畅的过渡效果和清晰的加载提示，让网站与网页应用之间的切换更加直观，无需重新加载整个页面。",
+      "**网页访问。** 直接在浏览器中使用 P2Sharer 加入房间、聊天、共享媒体并进行协作而无需安装任何软件，支持便捷的房间链接分享和桌面端直接下载。 流畅的过渡效果和清晰的加载提示，让网站与网页应用之间的切换更加直观，无需重新加载整个页面。 GIF 头像和横幅在浏览器预览和保存后均保留动画效果。",
       "**房间发现。** 默认采用官方 P2Sharer 服务器提供更快、更稳定的房间连接，同时保留公共备用服务以防万一。",
       "**视觉性能控制。** 支持减少动态效果或禁用复杂的背景模糊与渐变，确保应用在未开启硬件加速的设备上依然保持流畅。"
     ],
     "zh-TW": [
-      "**網頁存取。** 直接在瀏覽器中使用 P2Sharer 加入房間、聊天、分享媒體並進行協作而無需安裝任何軟體，支援便捷的房間連結分享與桌面端直接下載。 流暢的過場效果與清楚的載入提示，讓網站與網頁應用程式之間的切換更加直覺，無需重新載入整個頁面。",
+      "**網頁存取。** 直接在瀏覽器中使用 P2Sharer 加入房間、聊天、分享媒體並進行協作而無需安裝任何軟體，支援便捷的房間連結分享與桌面端直接下載。 流暢的過場效果與清楚的載入提示，讓網站與網頁應用程式之間的切換更加直覺，無需重新載入整個頁面。 GIF 頭像與橫幅在瀏覽器預覽及儲存後皆保留動畫效果。",
       "**房間探索。** 預設採用官方 P2Sharer 伺服器提供更快速、更穩定的房間連線，同時保留公共備援服務以防萬一。",
       "**視覺效能控制。** 支援減少動態效果或停用複雜的背景模糊與漸變，確保應用程式在未開啟硬體加速的裝置上依然保持順暢。"
     ],
     "ja": [
-      "**ウェブアクセス。** インストール不要でブラウザーから直接 P2Sharer を開き、ルームへの参加、チャット、メディア共有、共同作業が可能になり、簡単なリンク共有やデスクトップ版の直接ダウンロードにも対応しました。 スムーズな画面切り替えとわかりやすい読み込み表示により、ページ全体を再読み込みせずにサイトとウェブアプリを快適に移動できます。",
+      "**ウェブアクセス。** インストール不要でブラウザーから直接 P2Sharer を開き、ルームへの参加、チャット、メディア共有、共同作業が可能になり、簡単なリンク共有やデスクトップ版の直接ダウンロードにも対応しました。 スムーズな画面切り替えとわかりやすい読み込み表示により、ページ全体を再読み込みせずにサイトとウェブアプリを快適に移動できます。 GIF のアバターとバナーは、ブラウザーのプレビューでも保存後でもアニメーションを維持します。",
       "**ルームの検出。** 公式の P2Sharer サーバーを標準で使用することで、より高速かつ安定したルーム接続を提供し、予備として公開サーバーも引き続き利用できます。",
       "**視覚パフォーマンス設定。** 視覚効果を抑えるか、背景のぼかしや負荷の高いグラデーションを無効にすることで、ハードウェア アクセラレーションのない環境でも快適に動作します。"
     ],
     "ko": [
-      "**웹 접속.** 별도 설치 없이 브라우저에서 바로 P2Sharer를 사용하여 방에 참여하고, 채팅하고, 미디어를 공유하며 협업할 수 있으며, 간편한 링크 공유 및 데스크톱 앱 다운로드를 지원합니다。 부드러운 화면 전환과 명확한 로딩 표시로 페이지 전체를 다시 불러오지 않고 사이트와 웹 앱 사이를 편리하게 이동할 수 있습니다.",
+      "**웹 접속.** 별도 설치 없이 브라우저에서 바로 P2Sharer를 사용하여 방에 참여하고, 채팅하고, 미디어를 공유하며 협업할 수 있으며, 간편한 링크 공유 및 데스크톱 앱 다운로드를 지원합니다。 부드러운 화면 전환과 명확한 로딩 표시로 페이지 전체를 다시 불러오지 않고 사이트와 웹 앱 사이를 편리하게 이동할 수 있습니다. GIF 아바타와 배너는 브라우저 미리보기와 저장 후에도 애니메이션을 유지합니다.",
       "**방 검색.** 공식 P2Sharer 서버를 기본으로 사용하여 더 빠르고 안정적으로 방에 연결되며, 공개 대체 서버도 계속 백업으로 유지됩니다。",
       "**시각 성능 설정.** 모션을 줄이거나 배경 흐림 및 복잡한 그라데이션을 비활성화하여 하드웨어 가속이 없는 기기에서도 부드럽게 앱을 사용할 수 있습니다。"
     ],
     "hi": [
-      "**वेब से पहुँच।** बिना कुछ इंस्टॉल किए ब्राउज़र में सीधे P2Sharer का इस्तेमाल करके कमरों से जुड़ें, चैट करें, मीडिया साझा करें और सहयोग करें, जिसमें आसान लिंक शेयरिंग और डेस्कटॉप ऐप का सीधा डाउनलोड शामिल है। सहज बदलावों और स्पष्ट लोडिंग संकेतों के साथ पूरा पेज दोबारा लोड किए बिना वेबसाइट और वेब ऐप के बीच आसानी से जाएँ।",
+      "**वेब से पहुँच।** बिना कुछ इंस्टॉल किए ब्राउज़र में सीधे P2Sharer का इस्तेमाल करके कमरों से जुड़ें, चैट करें, मीडिया साझा करें और सहयोग करें, जिसमें आसान लिंक शेयरिंग और डेस्कटॉप ऐप का सीधा डाउनलोड शामिल है। सहज बदलावों और स्पष्ट लोडिंग संकेतों के साथ पूरा पेज दोबारा लोड किए बिना वेबसाइट और वेब ऐप के बीच आसानी से जाएँ। GIF अवतार और बैनर ब्राउज़र पूर्वावलोकन और सहेजने के बाद भी अपना एनीमेशन बनाए रखते हैं।",
       "**कमरे खोजना।** आधिकारिक P2Sharer सर्वर को डिफ़ॉल्ट बनाकर कमरों से तेज़ और अधिक विश्वसनीय कनेक्शन, जिसमें बैकअप के रूप में सार्वजनिक विकल्प भी बने रहेंगे।",
       "**दृश्य प्रदर्शन नियंत्रण।** हार्डवेयर त्वरण के बिना उपकरणों पर ऐप को तेज़ रखने के लिए मोशन कम करें या भारी पृष्ठभूमि धुंधलापन और ग्रेडिएंट बंद करें।"
     ],
     "fi": [
-      "**Verkkokäyttö.** Käytä P2Shareria suoraan selaimessa liittyäksesi huoneisiin, keskustellaksesi, jakaaksesi mediaa ja tehdäksesi yhteistyötä ilman asennusta, helpolla linkkien jakamisella ja työpöytäsovelluksen suoralla latauksella. Pehmeät siirtymät ja selkeät latausilmaisimet helpottavat siirtymistä sivuston ja verkkosovelluksen välillä lataamatta koko sivua uudelleen.",
+      "**Verkkokäyttö.** Käytä P2Shareria suoraan selaimessa liittyäksesi huoneisiin, keskustellaksesi, jakaaksesi mediaa ja tehdäksesi yhteistyötä ilman asennusta, helpolla linkkien jakamisella ja työpöytäsovelluksen suoralla latauksella. Pehmeät siirtymät ja selkeät latausilmaisimet helpottavat siirtymistä sivuston ja verkkosovelluksen välillä lataamatta koko sivua uudelleen. GIF-avatarit ja -bannerit säilyttävät animaationsa selaimen esikatselussa ja tallennuksen jälkeen.",
       "**Huoneiden löytäminen.** Nopeammat ja luotettavammat huoneyhteydet virallisen P2Sharer-palvelimen toimiessa oletuksena, säilyttäen julkiset varapalvelimet varmistuksena.",
       "**Visuaalisen suorituskyvyn asetukset.** Vähennä liikettä tai poista taustan sumennus ja raskaat liukuvärit käytöstä pitääksesi sovelluksen sulavana laitteilla, joissa ei ole laitteistokiihdytystä."
     ],
     "ru": [
-      "**Веб-доступ.** Используйте P2Sharer прямо в браузере, чтобы подключаться к комнатам, общаться, делиться медиа и работать совместно без установки, с простым обменом ссылками и прямой загрузкой версии для ПК. Плавные переходы и понятная индикация загрузки делают навигацию между сайтом и веб-приложением удобнее без полной перезагрузки страницы.",
+      "**Веб-доступ.** Используйте P2Sharer прямо в браузере, чтобы подключаться к комнатам, общаться, делиться медиа и работать совместно без установки, с простым обменом ссылками и прямой загрузкой версии для ПК. Плавные переходы и понятная индикация загрузки делают навигацию между сайтом и веб-приложением удобнее без полной перезагрузки страницы. GIF-аватары и баннеры сохраняют анимацию в предпросмотре браузера и после сохранения.",
       "**Поиск комнат.** Более быстрое и надёжное подключение к комнатам благодаря официальному серверу P2Sharer по умолчанию с сохранением публичных серверов в качестве резерва.",
       "**Настройки визуальной производительности.** Уменьшайте движение или отключайте размытие фона и тяжелые градиенты для плавной работы приложения на устройствах без аппаратного ускорения."
     ]
