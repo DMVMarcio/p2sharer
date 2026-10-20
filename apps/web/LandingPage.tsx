@@ -2,16 +2,16 @@ import { Outlet, useLocation } from 'react-router';
 import { WebsiteLink } from '../../src/components/common/WebsiteLink';
 import { DownloadButton } from '../../src/components/common/DownloadButton';
 import { SiteFooter } from './SiteFooter';
-import { DownloadPanel } from '../../src/components/common/DownloadPanel';
 import { ArrowUpRight, Monitor, Network, Pencil } from 'lucide-react';
 import { useAppTheme } from '../../src/hooks/useAppTheme';
 import { useLocale } from '../../src/hooks/useLocale';
 import { t, getLanguage, setLanguage } from '../../src/i18n';
 import { LANGUAGE_OPTIONS } from '../../src/i18n/language';
 import { Select } from '../../src/components/common/Select';
-import { ContextMenuProvider } from '../../src/components/common/ContextMenu';
 import artwork from '../../src/assets/logo_right_bottom.webp';
 import logo from '../../src/assets/logo.png';
+
+export { DownloadsPage } from './DownloadsPage';
 
 const features = [
   { icon: Monitor, title: 'web.mediaTitle', description: 'web.mediaText' },
@@ -22,7 +22,7 @@ const features = [
 export function SiteLayout() {
   const location = useLocation();
   useAppTheme(); useLocale();
-  return <ContextMenuProvider><div className="site-shell">
+  return <div className="site-shell">
     <WebsiteLink className="site-skip" href="#content">{t('web.skip')}</WebsiteLink>
     <header className="site-header">
       <WebsiteLink className="site-brand" href="/" aria-label="P2Sharer"><img src={logo} alt="" />P2Sharer</WebsiteLink>
@@ -36,12 +36,7 @@ export function SiteLayout() {
       <Outlet />
     </main>
     <SiteFooter />
-  </div></ContextMenuProvider>;
-}
-
-export function DownloadsPage() {
-  useLocale();
-  return <section className="site-download"><div className="site-download-intro"><h1>{t('downloads.title')}</h1><p>{t('downloads.intro')}</p><WebsiteLink className="btn btn-secondary" href="/app">{t('web.useWeb')}<ArrowUpRight size={16} aria-hidden="true" /></WebsiteLink></div><DownloadPanel /></section>;
+  </div>;
 }
 
 export function LandingPage() {
@@ -67,6 +62,5 @@ export function LandingPage() {
           <h2>{t(title)}</h2><p>{t(description)}</p>
         </article>)}
       </section>
-
       </>;
 }

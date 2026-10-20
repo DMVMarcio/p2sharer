@@ -15,6 +15,20 @@ export default defineConfig(({ mode }) => {
     fs: { allow: [workspaceRoot] },
     proxy: { '/api': { target: settings.apiUrl, changeOrigin: true }, '/mqtt': { target: new URL(settings.brokerUrl).origin, changeOrigin: true, ws: true, rewrite: () => new URL(settings.brokerUrl).pathname } },
   },
-  build: { outDir: 'dist' },
+  build: {
+    outDir: 'dist',
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/') || id.includes('node_modules/react-router/')) {
+            return 'vendor-react';
+          }
+          if (id.includes('node_modules/@floating-ui/')) {
+            return 'vendor-floating-ui';
+          }
+        },
+      },
+    },
+  },
 };
 });

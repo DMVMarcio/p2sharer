@@ -6,7 +6,6 @@ import { NavigationFeedback } from './NavigationFeedback';
 import { webRoutes } from './router';
 import { initializeLanguage } from '../../src/i18n';
 import '@fontsource-variable/plus-jakarta-sans/wght.css';
-import '@fontsource-variable/jetbrains-mono/wght.css';
 import '../../src/style.css';
 import './web.css';
 

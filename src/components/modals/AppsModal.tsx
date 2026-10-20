@@ -59,16 +59,17 @@ export const AppsModal: React.FC = () => {
               aria-hidden="true">
               <span className="apps-library-banner-glow" />
               <RoomAppIcon kind={app.kind} size={34} strokeWidth={1.7} />
-            </div>
-            <div className="apps-library-card-content">
-              <h3>{app.label}</h3>
-              <p>{app.description || t("message.3ede798ddd3d")}</p>
               {isDesktopOnly && (
                 <div className="apps-library-card-notice" role="status">
                   <Monitor size={12} strokeWidth={2} aria-hidden="true" />
                   <span>{t('apps.desktopOnlyNotice')}</span>
                 </div>
               )}
+            </div>
+            <div className="apps-library-card-content">
+              <h3>{app.label}</h3>
+              <p>{app.description || t("message.3ede798ddd3d")}</p>
+
             </div>
           </button>
         );

@@ -1,7 +1,7 @@
 import { waitForNavigationPaint } from '../../src/platform/rendering';
 import { useLayoutEffect, useRef } from 'react';
 import { Navigate, Outlet, useLocation, useRouteError, type RouteObject } from 'react-router';
-import { SiteLayout, LandingPage, DownloadsPage } from './LandingPage';
+import { SiteLayout, LandingPage } from './LandingPage';
 import { useAppTheme } from '../../src/hooks/useAppTheme';
 import { useLocale } from '../../src/hooks/useLocale';
 import { t } from '../../src/i18n';
@@ -31,11 +31,14 @@ function WebLayout() {
   return <Outlet />;
 }
 
-export function webRoutes(loadApp = () => import('./AppPage')): RouteObject[] {
+export function webRoutes(
+  loadApp = () => import('./AppPage'),
+  loadDownloads = () => import('./DownloadsPage'),
+): RouteObject[] {
   return [{ Component: WebLayout, HydrateFallback: () => null, ErrorBoundary: RouteError, children: [
     { Component: SiteLayout, children: [
       { index: true, Component: LandingPage },
-      { path: 'download', Component: DownloadsPage },
+      { path: 'download', lazy: async () => { const m = await loadDownloads(); return { Component: m.DownloadsPage }; } },
       { path: 'downloads', element: <Navigate to="/download" replace /> },
     ] },
     { path: 'app/*', lazy: async () => { await waitForNavigationPaint(); return loadApp(); } },
