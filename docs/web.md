@@ -102,3 +102,9 @@ The broker accepts clean sessions, QoS 0 and the exact alphanumeric topic format
 `BROKER_ALLOWED_ORIGINS` replaces the derived origin allowlist; same-host requests and originless MQTT clients remain supported. The defaults include configured site/API origins, Tauri origins and local development origins when appropriate. `BROKER_TRUST_PROXY=1` enables per-IP limits using `X-Forwarded-For`; enable it only behind a trusted reverse proxy that overwrites that header and prevents direct access to the Node listener. Otherwise limits use the socket peer address.
 
 The broker replaces public rendezvous endpoints, not STUN/TURN or external content services. No deployment or antivirus reputation guarantee follows from using a first-party hostname.
+
+### Client routing
+
+The web entry owns one React root and a React Router data router. The site layout retains its header and footer between the landing and download routes; `/downloads` aliases `/download`. The application route loads its runtime and styles on demand with navigation feedback. `WebsiteLink` uses client navigation for same-origin links inside this router and preserves ordinary links in desktop windows, downloads, hash anchors and explicit new tabs.
+
+`AppPage` adapts room URL synchronization to the router instead of overwriting its history state. Active-room navigation is blocked until the existing room-exit dialog approves; room teardown completes before the destination mounts. Room-code changes within `/app` retain the app instance and use the canonical invitation preview. The server serves the SPA entry for supported direct routes. Favicons live at stable public URLs and use the existing desktop application icon.

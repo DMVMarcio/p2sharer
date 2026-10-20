@@ -6,7 +6,13 @@ import { modalManager } from '../hooks/useModal.ts';
 import { roomService } from './room_service.ts';
 
 /** URLs carry only public short codes. Joining still requires the canonical preview and admission flow. */
-export function startWebRoomNavigation(confirmExit: () => Promise<boolean>): () => void {
+export interface WebRoomNavigation {
+  replace: (path: string) => void;
+  subscribe: (listener: () => void) => () => void;
+  registerExit: (confirmExit: () => Promise<boolean>) => () => void;
+}
+
+export function startWebRoomNavigation(confirmExit: () => Promise<boolean>, router?: WebRoomNavigation): () => void {
   if (isTauri()) return () => {};
   let pending = roomCodeFromPath(window.location.pathname);
   if (pending && modalManager.getActive() === 'joinRoom' && (roomService.pendingJoinInvite === pending ||
@@ -17,7 +23,10 @@ export function startWebRoomNavigation(confirmExit: () => Promise<boolean>): () 
   const current = () => stateStore.roomSlots.length ? parseRoomInvite(stateStore.currentRoomInvite)?.roomId ?? null : null;
   const replace = (code: string | null) => {
     const path = webRoomPath(code);
-    if (window.location.pathname !== path || window.location.search || window.location.hash) history.replaceState(null, '', path);
+    if (window.location.pathname !== path || window.location.search || window.location.hash) {
+      if (router) router.replace(path);
+      else history.replaceState(history.state, '', path);
+    }
   };
   const sync = () => {
     if (disposed || navigating) return;
@@ -51,7 +60,11 @@ export function startWebRoomNavigation(confirmExit: () => Promise<boolean>): () 
   };
   const onPop = () => { void pop().catch(() => { if (!disposed) replace(current()); }); };
   const subscriptions = [stateStore.subscribe(sync), modalManager.subscribe(sync), roomService.subscribe(sync)];
-  window.addEventListener('popstate', onPop);
+  const stopNavigation = router ? router.subscribe(onPop) : (() => {
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  })();
+  const stopExit = router?.registerExit(confirmExit);
   sync();
-  return () => { disposed = true; window.removeEventListener('popstate', onPop); subscriptions.forEach(stop => stop()); };
+  return () => { disposed = true; stopNavigation(); stopExit?.(); subscriptions.forEach(stop => stop()); };
 }

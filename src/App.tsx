@@ -33,9 +33,9 @@ import { startRoomDeepLinks } from './services/room_deep_links';
 import { releaseNotes } from './services/release_notes';
 import { isTauri } from '@tauri-apps/api/core';
 import { BrowserCaptureModal } from './components/modals/BrowserCaptureModal';
-import { startWebRoomNavigation } from './services/web_room_navigation';
+import { startWebRoomNavigation, type WebRoomNavigation } from './services/web_room_navigation';
 
-export const App: React.FC = () => {
+export const App: React.FC<{ webNavigation?: WebRoomNavigation }> = ({ webNavigation }) => {
   useAppTheme(); // Sets data-theme & data-accent
 
   const pipPeerId = typeof window !== 'undefined'
@@ -49,10 +49,10 @@ export const App: React.FC = () => {
     return <PipView peerId={pipPeerId} />;
   }
 
-  return <MainApp />;
+  return <MainApp webNavigation={webNavigation} />;
 };
 
-const MainApp: React.FC = () => {
+const MainApp: React.FC<{ webNavigation?: WebRoomNavigation }> = ({ webNavigation }) => {
   const roomExit = useRoomExit();
   const [titlebarVisible, setTitlebarVisible] = useState(false);
   const [homeScrolled, setHomeScrolled] = useState(false);
@@ -64,7 +64,7 @@ const MainApp: React.FC = () => {
     if (!notesState.pending) return startAutomaticUpdateChecks();
   }, [notesState.pending]);
   useEffect(startRoomDeepLinks, []);
-  useEffect(() => startWebRoomNavigation(roomExit.confirmExit), [roomExit.confirmExit]);
+  useEffect(() => startWebRoomNavigation(roomExit.confirmExit, webNavigation), [roomExit.confirmExit, webNavigation]);
   useEffect(() => setHomeScrolled(false), [isInRoom]);
 
   useEffect(() => {

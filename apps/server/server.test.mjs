@@ -12,6 +12,7 @@ test('production host serves landing/app, public API and immutable assets withou
   await mkdir(join(root, 'assets'));
   await writeFile(join(root, 'index.html'), '<div id="root"></div>');
   await writeFile(join(root, 'assets', 'fixture.js'), 'export const ready = true;');
+  await writeFile(join(root, 'favicon.ico'), Buffer.from([0, 0, 1, 0]));
   const catalog = releaseDownloads(null);
   const server = await createWebServer({ root, downloads: async () => catalog });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -20,13 +21,17 @@ test('production host serves landing/app, public API and immutable assets withou
     request(base + path, response => { response.resume(); response.on('end', () => resolve(response.statusCode)); }).on('error', reject).end();
   });
   try {
-    for (const path of ['/', '/app', '/app/', '/download', '/app/' + 'a'.repeat(32)]) {
+    for (const path of ['/', '/app', '/app/', '/download', '/downloads', '/app/' + 'a'.repeat(32)]) {
       const response = await fetch(base + path);
       assert.equal(response.status, 200); assert.match(await response.text(), /id="root"/);
       assert.match(response.headers.get('content-security-policy'), /object-src 'none'/);
       assert.equal(response.headers.get('referrer-policy'), 'strict-origin-when-cross-origin');
       assert.equal(response.headers.get('cache-control'), 'no-store');
     }
+    const favicon = await fetch(base + '/favicon.ico');
+    assert.equal(favicon.status, 200);
+    assert.match(favicon.headers.get('content-type'), /image\/x-icon/);
+    assert.deepEqual(Buffer.from(await favicon.arrayBuffer()), Buffer.from([0, 0, 1, 0]));
     assert.deepEqual(await (await fetch(base + '/api/health')).json(), { status: 'ok' });
     const config = await (await fetch(base + '/api/config')).json();
     assert.equal(config.runtime, 'web'); assert.match(config.downloadsUrl, /^https:\/\/github.com\//);

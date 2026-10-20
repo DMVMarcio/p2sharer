@@ -53,3 +53,6 @@ html.web-landing, .web-landing body, .web-landing #root { height: auto; min-heig
   .site-footer-main { grid-template-columns: 1fr 1fr; }
   .site-footer-identity { grid-column: 1 / -1; }
 }
+
+.site-route-loading { position: fixed; inset: auto 24px 24px auto; z-index: 10000; display: flex; align-items: center; gap: 12px; padding: 16px 20px; background: var(--bg-elevated); color: var(--text-primary); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); }
+.site-route-error { display: grid; justify-items: center; gap: 16px; padding: 48px 24px; color: var(--text-primary); }

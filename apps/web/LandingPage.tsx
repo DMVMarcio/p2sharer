@@ -1,3 +1,5 @@
+import { Outlet, useLocation } from 'react-router';
+import { WebsiteLink } from '../../src/components/common/WebsiteLink';
 import { DownloadButton } from '../../src/components/common/DownloadButton';
 import { SiteFooter } from './SiteFooter';
 import { DownloadPanel } from '../../src/components/common/DownloadPanel';
@@ -17,26 +19,40 @@ const features = [
   { icon: Network, title: 'web.p2pTitle', description: 'web.p2pText' },
 ];
 
-export function LandingPage() {
+export function SiteLayout() {
+  const location = useLocation();
   useAppTheme(); useLocale();
   return <ContextMenuProvider><div className="site-shell">
-    <a className="site-skip" href="#content">{t('web.skip')}</a>
+    <WebsiteLink className="site-skip" href="#content">{t('web.skip')}</WebsiteLink>
     <header className="site-header">
-      <a className="site-brand" href="/" aria-label="P2Sharer"><img src={logo} alt="" />P2Sharer</a>
+      <WebsiteLink className="site-brand" href="/" aria-label="P2Sharer"><img src={logo} alt="" />P2Sharer</WebsiteLink>
       <nav aria-label={t('web.navigation')}>
         <Select aria-label={t('web.language')} value={getLanguage()} options={LANGUAGE_OPTIONS.map(option => ({ ...option, icon: <img src={`/flags/${option.flag}.svg`} alt="" width={20} height={15} draggable={false} /> }))}
           onValueChange={value => setLanguage(value as ReturnType<typeof getLanguage>)} />
-        <a className="btn btn-secondary" href="/app">{t(location.pathname === '/download' ? 'web.useWeb' : 'web.open')}<ArrowUpRight size={16} aria-hidden="true" /></a>
+        <WebsiteLink className="btn btn-secondary" href="/app">{t(location.pathname === '/download' ? 'web.useWeb' : 'web.open')}<ArrowUpRight size={16} aria-hidden="true" /></WebsiteLink>
       </nav>
     </header>
-    <main id="content">
-      {location.pathname === '/download' ? <section className="site-download"><div className="site-download-intro"><h1>{t('downloads.title')}</h1><p>{t('downloads.intro')}</p><a className="btn btn-secondary" href="/app">{t(location.pathname === '/download' ? 'web.useWeb' : 'web.open')}<ArrowUpRight size={16} aria-hidden="true" /></a></div><DownloadPanel /></section> : <>
+    <main id="content" tabIndex={-1}>
+      <Outlet />
+    </main>
+    <SiteFooter />
+  </div></ContextMenuProvider>;
+}
+
+export function DownloadsPage() {
+  useLocale();
+  return <section className="site-download"><div className="site-download-intro"><h1>{t('downloads.title')}</h1><p>{t('downloads.intro')}</p><WebsiteLink className="btn btn-secondary" href="/app">{t('web.useWeb')}<ArrowUpRight size={16} aria-hidden="true" /></WebsiteLink></div><DownloadPanel /></section>;
+}
+
+export function LandingPage() {
+  useLocale();
+  return <>
       <section className="site-hero">
         <div>
           <h1>{t('home.headline')}</h1>
           <p className="site-description">{t('home.description')}</p>
           <div className="site-actions">
-            <a className="btn btn-primary" href="/app">{t('web.open')}<ArrowUpRight size={18} aria-hidden="true" /></a>
+            <WebsiteLink className="btn btn-primary" href="/app">{t('web.open')}<ArrowUpRight size={18} aria-hidden="true" /></WebsiteLink>
             <DownloadButton />
           </div>
           <p className="site-note">{t('web.noAccount')}</p>
@@ -52,8 +68,5 @@ export function LandingPage() {
         </article>)}
       </section>
 
-      </>}
-    </main>
-    <SiteFooter />
-  </div></ContextMenuProvider>;
+      </>;
 }

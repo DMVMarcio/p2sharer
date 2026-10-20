@@ -59,7 +59,7 @@ export async function createWebServer({ root = webRoot, downloads = latestDownlo
         return response.end();
       }
       if (path.startsWith('/api/')) return send(404, JSON.stringify({ error: 'Not found' }));
-      const route = path === '/' || path === '/download' || path === '/app' || path === '/app/' || /^\/app\/[0-9a-f]{32}\/?$/.test(path);
+      const route = path === '/' || path === '/download' || path === '/downloads' || path === '/app' || path === '/app/' || /^\/app\/[0-9a-f]{32}\/?$/.test(path);
       const file = resolve(root, route ? 'index.html' : `.${path}`);
       if (!file.startsWith(resolve(root) + sep)) return send(400, JSON.stringify({ error: 'Invalid path' }));
       if (!(await stat(file)).isFile()) return send(404, JSON.stringify({ error: 'Not found' }));

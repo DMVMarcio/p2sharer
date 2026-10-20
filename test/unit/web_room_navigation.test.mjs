@@ -56,5 +56,24 @@ test('room URLs defer preview for profile setup, survive remounts and preserve e
     allow = true; history.pushState(null, '', '/app'); window.dispatchEvent(new window.PopStateEvent('popstate')); await settle();
     assert.equal(window.location.pathname, '/app'); assert.equal(fixture.state.roomSlots.length, 0);
     assert.equal(opened.length, 1);
+
+    stop();
+    const replacements = [];
+    let routeChanged; let exitGuard;
+    history.replaceState({ idx: 7 }, '', '/app');
+    stop = startWebRoomNavigation(async () => allow, {
+      replace: path => { replacements.push(path); history.replaceState(history.state, '', path); },
+      subscribe: listener => { routeChanged = listener; return () => { routeChanged = null; }; },
+      registerExit: callback => { exitGuard = callback; return () => { exitGuard = null; }; },
+    });
+    assert.equal(await exitGuard(), true);
+    fixture.state.currentRoomInvite = invite; fixture.state.roomSlots = [{}]; notify();
+    assert.deepEqual(replacements, [`/app/${id}`]);
+    assert.equal(history.state.idx, 7, 'room updates must preserve the router history index');
+    fixture.state.roomSlots = []; notify();
+    assert.equal(window.location.pathname, '/app');
+    history.pushState({ idx: 8 }, '', `/app/${id}`); routeChanged(); await settle();
+    assert.equal(opened.length, 2, 'router notifications use the canonical room preview');
+    stop(); assert.equal(routeChanged, null); assert.equal(exitGuard, null);
   } finally { stop(); assert.equal(listeners.size, 0); dom.window.close(); Object.assign(globalThis, old); delete globalThis.webNavigationFixture; }
 });
