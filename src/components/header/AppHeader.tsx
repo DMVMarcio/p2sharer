@@ -11,7 +11,7 @@ import { BookmarkCheck, BookmarkPlus, Check, ChevronDown, Copy, Link, LockKeyhol
 import { isTauri } from '@tauri-apps/api/core';
 import { websiteUrl } from '../../platform/website';
 import { webRoomPath } from '../../core/web_room_links';
-import logo from '../../../src-tauri/icons/128x128@2x.png';
+import logo from '../../assets/logo.svg';
 import { parseRoomInvite } from '../../core/room_invite';
 import { roomInviteLink } from '../../core/room_deep_links';
 import { savedRooms, type SavedRoom } from '../../core/saved_rooms';

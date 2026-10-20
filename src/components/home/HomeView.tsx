@@ -2,7 +2,7 @@ import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React from 'react';
 import { ArrowUpRight, LogIn, Plus } from 'lucide-react';
-import logo from '../../assets/logo_right_bottom.png';
+import logo from '../../assets/logo_right_bottom.webp';
 import { useModal } from '../../hooks/useModal';
 import { useRoom } from '../../hooks/useRoom';
 import { SavedRoomsSection } from './SavedRoomsSection';

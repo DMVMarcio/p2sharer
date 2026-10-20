@@ -10,8 +10,8 @@ import { t, getLanguage, setLanguage } from '../../src/i18n';
 import { LANGUAGE_OPTIONS } from '../../src/i18n/language';
 import { Select } from '../../src/components/common/Select';
 import { ContextMenuProvider } from '../../src/components/common/ContextMenu';
-import artwork from '../../src/assets/logo_right_bottom.png';
-import logo from '../../src-tauri/icons/128x128@2x.png';
+import artwork from '../../src/assets/logo_right_bottom.webp';
+import logo from '../../src/assets/logo.svg';
 
 const features = [
   { icon: Monitor, title: 'web.mediaTitle', description: 'web.mediaText' },

@@ -34,7 +34,7 @@ const mocks = {
     }`,
 };
 const bundle = await build({ stdin: { contents: `export { webRoutes } from './apps/web/router.tsx'; export { NavigationFeedback } from './apps/web/NavigationFeedback.tsx'; export { Component as WebApp } from './apps/web/AppPage.tsx';`, resolveDir: process.cwd() },
-  bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic', loader: { '.css': 'empty', '.png': 'dataurl' },
+  bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic', loader: { '.css': 'empty', '.png': 'dataurl', '.webp': 'dataurl', '.svg': 'dataurl' },
   plugins: [{ name: 'web-fixtures', setup(builder) {
     builder.onResolve({ filter: /\/(appearance_preferences|useAppTheme|useLocale|i18n|language|Select|ContextMenu|DownloadPanel|AppContextMenu|app_runtime|state_store|room_invite|room_service|App)$/ }, args => ({ namespace: 'fixture', path: args.path.split('/').at(-1) }));
     builder.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: mocks[args.path], loader: 'js' }));

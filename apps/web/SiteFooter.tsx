@@ -2,7 +2,7 @@ import { WebsiteLink } from '../../src/components/common/WebsiteLink';
 import { ArrowUpRight } from 'lucide-react';
 import { t } from '../../src/i18n';
 import { useLocale } from '../../src/hooks/useLocale';
-import logo from '../../src-tauri/icons/128x128@2x.png';
+import logo from '../../src/assets/logo.svg';
 
 const repository = 'https://github.com/DMVMarcio/p2sharer';
 

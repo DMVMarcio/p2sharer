@@ -27,7 +27,7 @@ test('the real header badge opens the update dialog and installation remains an 
     const require = createRequire(import.meta.url);
     const bundle = await build({ stdin: { contents: `export { AppHeader } from './src/components/header/AppHeader';
       export { AppUpdateDialog } from './src/components/modals/AppUpdateDialog';`, resolveDir: fileURLToPath(new URL('../../', import.meta.url)) },
-      write: false, bundle: true, format: 'esm', platform: 'node', jsx: 'automatic', loader: { '.png': 'dataurl' },
+      write: false, bundle: true, format: 'esm', platform: 'node', jsx: 'automatic', loader: { '.png': 'dataurl', '.svg': 'dataurl' },
       plugins: [{ name: 'native-boundaries', setup(builder) {
         const mocks = {
           app_updates: 'export const appUpdates = globalThis.appUpdateUiFixture;',
