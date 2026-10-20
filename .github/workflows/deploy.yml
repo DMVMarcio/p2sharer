@@ -26,7 +26,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           port: ${{ secrets.SSH_PORT || '22' }}
-          key: ${{ secrets.SSH_SECRET_KEY }}
+          key: ${{ secrets.SSH_SECRET }}
           envs: DEPLOY_PATH
           command_timeout: 20m
           script: |
