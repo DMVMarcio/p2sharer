@@ -11,27 +11,54 @@ The pnpm workspace contains three execution targets without duplicating the Reac
 
 The desktop paths remain stable for Tauri, signing, release tools and native build caches. pnpm handles the small workspace directly; a separate task orchestrator is not required. Dependencies and shared source remain at the root rather than copying components into another application. Extract independent packages when they have independent consumers or release boundaries.
 
+## Environment configuration
+
+Copy `.env.example` to `.env` at the repository root. Backend scripts and both Vite configurations automatically read that root regardless of their working directory. Actual environment files are ignored by Git; templates are tracked. Use literal values rather than shell interpolation.
+
+Files load in this order: `.env`, `.env.local`, `.env.<mode>`, `.env.<mode>.local`. Later files override earlier ones; variables supplied by the shell or service manager override every file. Development commands use development mode; builds and `web:start` use production mode. Restart development processes after editing environment files. Public `VITE_*` values are embedded at build time: rebuild clients when changing deployment addresses; restarting the backend alone does not update distributed clients.
+
+| Variable | Purpose / automatic default |
+| --- | --- |
+| `BACKEND_HOST` | Node listening interface; `127.0.0.1` |
+| `BACKEND_PORT` | HTTP and MQTT/WebSocket port; `3000`; `PORT` is accepted when unset |
+| `WEB_DEV_PORT` | Web Vite port; `1422` |
+| `VITE_PUBLIC_SITE_URL` | Desktop website/invitation origin; local web dev URL or `https://p2sharer.com` |
+| `VITE_PUBLIC_API_URL` | Backend HTTP origin, without `/api`; local backend port or `https://api.p2sharer.com` |
+| `VITE_PUBLIC_BROKER_URL` | Full broker WebSocket URL; derived from the API origin with `/mqtt` unless provided |
+| `API_ALLOWED_ORIGINS` | Optional replacement HTTP origin allowlist; defaults include configured site/API and Tauri origins |
+| `BROKER_ALLOWED_ORIGINS` | Optional replacement WebSocket origin allowlist; defaults include configured site/API and Tauri origins |
+| `BROKER_TRUST_PROXY` | `0` by default; use `1` only behind a trusted proxy that overwrites `X-Forwarded-For` |
+
+Blank public URLs select automatic development/production defaults. Changing only `BACKEND_PORT` changes the local API, broker and Vite proxy destinations together. An explicit public URL overrides automatic derivation. Allowlists are comma-separated. `VITE_*` values are public; server-only credentials must not use that prefix. Custom server lists saved through app settings still override factory defaults.
+
 ## Run locally
 
 Use Node.js 22.14+ and pnpm 10.30.1:
 
 ```powershell
+Copy-Item .env.example .env
 pnpm install --frozen-lockfile
 pnpm run server:dev
 ```
 
-In a second terminal run `pnpm run web:dev`. Open `http://localhost:1422/` for the landing page or `http://localhost:1422/app` for the application. Vite proxies `/api` to the backend on port 3000. The existing `pnpm run tauri:dev` remains the Windows development command.
+Do not overwrite an existing `.env`. In a second terminal run `pnpm run web:dev`. The default site is `http://localhost:1422/`, the app is `/app`, and the backend is `http://127.0.0.1:3000`. The browser uses the configured API origin with CORS and the configured broker directly. Vite also proxies `/api` and `/mqtt` for same-origin consumers. `pnpm run tauri:dev` uses that same backend.
 
-For the production web build:
+For example, `BACKEND_PORT=4317` moves the local backend, API requests and broker to port 4317. Leave public URLs blank for automatic local configuration. To use a remote development backend, fill in its public API/broker URLs and allow the local site origin on that server.
+
+## Deploy on a VPS
+
+Copy `.env.production.example` to `.env.production` on the build machine and VPS. It separates `https://p2sharer.com` from `https://api.p2sharer.com`, with `wss://api.p2sharer.com/mqtt` for signaling. Customize the addresses and listening port, then run:
 
 ```powershell
 pnpm run web:build
 pnpm run web:start
 ```
 
-The Node server serves `apps/web/dist` at `http://localhost:3000`. Configure `HOST` and `PORT` in the process environment when needed. Use HTTPS through a reverse proxy for remote users: camera, display capture, clipboard and Web Crypto depend on secure contexts and browser permissions. The server binds to loopback by default. Deployment credentials, certificates and generated distribution files do not belong in Git. This task does not configure a hosting provider or publish the site.
+Run `pnpm run tauri:build` with the same production public URLs when packaging desktop clients. `web:start` loads production environment files automatically. The Node service serves `apps/web/dist`, HTTP API and broker on the configured backend port. A reverse proxy can route both hostnames to that listener, or host the static distribution separately. The API hostname must forward `/api/*` and WebSocket Upgrade requests for `/mqtt`. Default allowlists derive the configured site/API origins and retain desktop origins.
 
-Production desktop links use `https://p2sharer.com`. Override the public origin with `VITE_PUBLIC_SITE_URL` when packaging another environment; development defaults to `http://localhost:1422`. Browser room links use the browser's current origin. The sanitized `.env.example` documents the setting. Room URLs use `/app/<short-code>` with the complete random room identifier, never a password or signed invitation. Opening a link waits for profile setup and opens the normal room preview; it does not bypass admission. Returning home keeps the existing unsaved-room confirmation.
+Use HTTPS for both public hostnames. The Node listener stays HTTP behind the proxy and binds to loopback by default. Forward the original Host header, use an idle timeout longer than MQTT keepalive, and overwrite `X-Forwarded-For` before enabling proxy trust. Deployment credentials, certificates and generated files do not belong in Git. Building does not publish the site, provision DNS or configure a VPS.
+
+Room URLs use `/app/<short-code>` with the complete random identifier, never a password or signed invitation. Browser room links use the current site origin. Opening a link waits for profile setup and opens the normal room preview without bypassing admission; returning home preserves the unsaved-room confirmation.
 
 ## Backend contract
 
@@ -66,12 +93,12 @@ Web builds and automated checks are not interactive interoperability verificatio
 
 ## First-party rendezvous broker
 
-The Node process also accepts MQTT 3.1.1 over WebSocket at `/mqtt`. Production desktop defaults use `wss://p2sharer.com/mqtt` (derived from `VITE_PUBLIC_SITE_URL`); web defaults use their current origin with only this broker enabled. Desktop defaults retain the other supported public MQTT, Nostr and WebTorrent fallbacks. Users can still configure custom servers. Untouched legacy factory lists upgrade automatically; customized lists retain user choices while retired hosts are removed. WebSocket URLs without TLS are accepted only for loopback development. Vite proxies `/mqtt` to the backend alongside `/api`.
+The Node process also accepts MQTT 3.1.1 over WebSocket at `/mqtt`. Production clients use `wss://api.p2sharer.com/mqtt` unless public API/broker settings override it. Browser defaults enable only that broker. Desktop defaults retain the supported public MQTT, Nostr and WebTorrent fallbacks. Custom lists remain supported. Untouched legacy factory lists upgrade automatically; customized lists retain user choices while retired hosts are removed. WebSocket URLs without TLS are accepted only for loopback development.
 
 Deploy this as a long-running Node service behind HTTPS with WebSocket Upgrade forwarding on `/mqtt`, and a proxy idle timeout greater than the MQTT keepalive. A static host or request-only serverless function cannot host it. Building the app does not deploy or activate `p2sharer.com`. Publish the backend before distributing clients that depend on that endpoint. A single instance keeps all rendezvous in memory; multiple replicas require a shared MQTT backend or routing all `/mqtt` traffic to one broker, not independent in-memory instances.
 
 The broker accepts clean sessions, QoS 0 and the exact alphanumeric topic format used by Trystero. It rejects wildcard subscriptions, retained publications, wills and persistent sessions. It limits total connections (512), connections per source IP (64), subscriptions per client (32), MQTT/WS packets (128 KiB), inbound packet/byte rates and slow receiver buffers. It does not persist or log topic contents, SDP, client identifiers or source addresses. Public hashed topics provide discovery, not room authorization: the existing signed invitation, preview and admission policies remain mandatory. The service still observes live network metadata and signaling payloads, as a public broker would.
 
-`BROKER_ALLOWED_ORIGINS` can replace the default comma-separated browser-origin allowlist; same-host browser requests and originless MQTT clients remain supported. The default list includes the public site, Tauri WebView origins and local Vite development origins. `BROKER_TRUST_PROXY=1` enables per-IP limits using `X-Forwarded-For`; use it only behind a trusted reverse proxy that overwrites that header and prevents direct access to the Node listener. Otherwise limits use the socket peer address. These process settings contain no credentials and are optional.
+`BROKER_ALLOWED_ORIGINS` replaces the derived origin allowlist; same-host requests and originless MQTT clients remain supported. The defaults include configured site/API origins, Tauri origins and local development origins when appropriate. `BROKER_TRUST_PROXY=1` enables per-IP limits using `X-Forwarded-For`; enable it only behind a trusted reverse proxy that overwrites that header and prevents direct access to the Node listener. Otherwise limits use the socket peer address.
 
 The broker replaces public rendezvous endpoints, not STUN/TURN or external content services. No deployment or antivirus reputation guarantee follows from using a first-party hostname.

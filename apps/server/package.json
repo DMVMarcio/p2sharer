@@ -3,8 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --watch server.mjs",
-    "start": "node server.mjs",
+    "dev": "node --watch server.mjs --mode development",
+    "start": "node server.mjs --mode production",
     "test": "node --test server.test.mjs signaling.test.mjs"
   },
   "engines": {

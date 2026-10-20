@@ -84,6 +84,8 @@ it('uses first-party signaling in the web browser and removes retired saved endp
     assert.deepEqual(enabledRendezvousUrls(factory, 'mqtt'), ['wss://example.com/mqtt']);
     assert.deepEqual(enabledRendezvousUrls(factory, 'nostr'), []);
     assert.deepEqual(enabledRendezvousUrls(factory, 'torrent'), []);
+    values.set('p2sharer_rendezvous_servers_v1', JSON.stringify({ mqtt: [{ url: 'wss://p2sharer.com/mqtt', enabled: true }], nostr: [], torrent: [] }));
+    assert.deepEqual(loadRendezvousPreferences(), factory);
     const legacy = { mqtt: ['wss://public:public@public.cloud.shiftr.io', 'wss://broker.emqx.io:8084/mqtt', 'wss://broker-cn.emqx.io:8084/mqtt', 'wss://test.mosquitto.org:8081/mqtt'].map(url => ({ url, enabled: true })),
       nostr: nostrDefaults.map(url => ({ url, enabled: true })), torrent: torrentDefaults.map(url => ({ url, enabled: true })) };
     values.set('p2sharer_rendezvous_servers_v1', JSON.stringify(legacy));

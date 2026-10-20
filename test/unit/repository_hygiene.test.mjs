@@ -11,7 +11,7 @@ describe('Public repository hygiene', () => {
     }
   });
   it('preserves environment templates, source licenses, lockfiles and icons', () => {
-    for (const path of ['fixtures/.env.example', 'public/fonts/LICENSE.txt', 'pnpm-lock.yaml', 'src-tauri/icons/icon.icns']) {
+    for (const path of ['fixtures/.env.example', '.env.production.example', 'public/fonts/LICENSE.txt', 'pnpm-lock.yaml', 'src-tauri/icons/icon.icns']) {
       assert.deepEqual(inspect(path), [], path);
     }
   });
@@ -26,6 +26,7 @@ describe('Public repository hygiene', () => {
     assert.ok(inspectEntry('asset.bin', Buffer.alloc(5 * 1024 * 1024 + 1)).length);
     const header = ['-----BEGIN', 'PRIVATE KEY-----'].join(' ');
     assert.ok(inspect('credential.txt', header).length);
+    assert.ok(inspect('.env.production.example', header).length);
   });
   it('flags infrastructure addresses while preserving loopback, examples and browser versions', () => {
     assert.ok(inspectNetworkIdentifiers([10, 12, 34, 56].join('.')).length);

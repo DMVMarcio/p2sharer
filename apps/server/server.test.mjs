@@ -60,3 +60,20 @@ test('download catalog advertises only existing stable assets from the official 
   assert.equal(releaseDownloads(release).platforms[1].artifacts.length, 0);
   assert.equal(releaseDownloads(null).version, null);
 });
+
+test('API supports the configured website origin, preflight and origin isolation', async () => {
+  const server = await createWebServer({ apiAllowedOrigins: ['https://site.example'] });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const url = `http://127.0.0.1:${server.address().port}/api/health`;
+  try {
+    const allowed = await fetch(url, { headers: { Origin: 'https://site.example' } });
+    assert.equal(allowed.status, 200);
+    assert.equal(allowed.headers.get('access-control-allow-origin'), 'https://site.example');
+    assert.equal(allowed.headers.get('vary'), 'Origin');
+    const preflight = await fetch(url, { method: 'OPTIONS', headers: { Origin: 'https://site.example', 'Access-Control-Request-Method': 'GET' } });
+    assert.equal(preflight.status, 204);
+    assert.match(preflight.headers.get('access-control-allow-methods'), /GET/);
+    const denied = await fetch(url, { headers: { Origin: 'https://untrusted.example' } });
+    assert.equal(denied.status, 403); assert.equal(denied.headers.get('access-control-allow-origin'), null);
+  } finally { await new Promise(resolve => server.close(resolve)); }
+});

@@ -50,7 +50,8 @@ export function inspectEntry(path, content) {
   if (segments.some(segment => ['node_modules', 'target', 'dist', '.pnpm-store', 'coverage', 'relatorios'].includes(segment))) {
     findings.push('generated or local directory');
   }
-  if ((/^\.env(?:\.|$)/.test(name) && !/^\.env\.(example|sample|template)$/.test(name)) ||
+  const environmentTemplate = /^\.env\.(example|sample|template)$/.test(name) || name === '.env.production.example';
+  if ((/^\.env(?:\.|$)/.test(name) && !environmentTemplate) ||
       /\.(log|dmp|stackdump|pid|tmp|bak|orig|pem|key|p12|pfx|keystore|sqlite3?|exe|msi|pdb)$/i.test(name) ||
       /^logs?\.txt$/i.test(name) || /^DEBUG_PERFORMANCE_/i.test(name)) {
     findings.push('private, diagnostic, or generated file');

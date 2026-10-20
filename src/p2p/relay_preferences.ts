@@ -1,4 +1,4 @@
-import { isBrowserRuntime, websiteUrl } from '../platform/website.ts';
+import { isBrowserRuntime, signalingBrokerUrl, websiteUrl } from '../platform/website.ts';
 import { defaultRelayUrls as defaultNostrUrls } from '@trystero-p2p/nostr';
 import { defaultRelayUrls as defaultTorrentUrls } from '@trystero-p2p/torrent';
 import type { RendezvousTransport, SignalingTransport } from '../core/types.ts';
@@ -12,7 +12,7 @@ export type RendezvousPreferences = Record<RendezvousTransport, RendezvousServer
 
 const STORAGE_KEY = 'p2sharer_rendezvous_servers_v1';
 
-const ownedBrokerUrl = () => websiteUrl('/mqtt').replace(/^http/, 'ws');
+const ownedBrokerUrl = signalingBrokerUrl;
 const retiredHosts = new Set(['broker-cn.emqx.io', 'rapi.acrop.net']);
 function retired(url: string): boolean {
   try { return retiredHosts.has(new URL(url).hostname); } catch { return true; }
@@ -77,7 +77,10 @@ export function loadRendezvousPreferences(): RendezvousPreferences {
       );
     }
     const sameDefaults = (entries: RendezvousServer[], urls: string[]) => entries.length === urls.length && entries.every(entry => entry.enabled && urls.includes(entry.url));
-    if (sameDefaults(result.mqtt, legacyMqttUrls) && sameDefaults(result.nostr, defaultNostrUrls) && sameDefaults(result.torrent, defaultTorrentUrls)) return defaultRendezvousPreferences();
+    const previousOwned = [websiteUrl('/mqtt').replace(/^http/, 'ws'), 'wss://p2sharer.com/mqtt'];
+    const factoryFallbacks = sameDefaults(result.nostr, defaultNostrUrls) && sameDefaults(result.torrent, defaultTorrentUrls);
+    if (factoryFallbacks && (sameDefaults(result.mqtt, legacyMqttUrls) || previousOwned.some(url => sameDefaults(result.mqtt, [url, ...publicMqttUrls])))) return defaultRendezvousPreferences();
+    if (isBrowserRuntime() && !result.nostr.length && !result.torrent.length && previousOwned.some(url => sameDefaults(result.mqtt, [url]))) return defaultRendezvousPreferences();
     for (const transport of ['mqtt', 'nostr', 'torrent'] as const) result[transport] = result[transport].filter(entry => !retired(entry.url));
     return validateRendezvousPreferences(result) ? defaultRendezvousPreferences() : result;
   } catch {

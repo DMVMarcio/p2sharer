@@ -1,3 +1,4 @@
+import { loadWorkspaceEnvironment, deploymentSettings } from '../../tools/environment.mjs';
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { resolve, extname, sep, dirname } from 'node:path';
@@ -12,7 +13,7 @@ const contentTypes = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascr
 const releases = releasesUrl;
 
 /** Same-origin API and production asset host. Room content stays on the P2P mesh. */
-export async function createWebServer({ root = webRoot, downloads = latestDownloads, signaling = {} } = {}) {
+export async function createWebServer({ root = webRoot, downloads = latestDownloads, signaling = {}, apiAllowedOrigins = ['https://p2sharer.com'] } = {}) {
   const server = createServer(async (request, response) => {
     response.setHeader('X-Content-Type-Options', 'nosniff');
     response.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -24,6 +25,19 @@ export async function createWebServer({ root = webRoot, downloads = latestDownlo
       response.writeHead(status, { 'Content-Type': type });
       response.end(request.method === 'HEAD' ? undefined : body);
     };
+    const isApi = (request.url ?? '').split('?')[0].startsWith('/api/');
+    if (isApi) {
+      response.setHeader('Vary', 'Origin');
+      const origin = request.headers.origin;
+      if (origin && !apiAllowedOrigins.includes(origin)) return send(403, JSON.stringify({ error: 'Origin not allowed' }));
+      if (origin) response.setHeader('Access-Control-Allow-Origin', origin);
+      if (request.method === 'OPTIONS') {
+        if (!origin) return send(403, JSON.stringify({ error: 'Origin required' }));
+        response.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+        response.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+        return send(204, '');
+      }
+    }
     if (!['GET', 'HEAD'].includes(request.method)) {
       response.setHeader('Allow', 'GET, HEAD');
       return send(405, JSON.stringify({ error: 'Method not allowed' }));
@@ -68,10 +82,11 @@ export async function createWebServer({ root = webRoot, downloads = latestDownlo
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const port = Number(process.env.PORT ?? 3000);
-  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Invalid PORT');
-  const server = await createWebServer({ signaling: { trustProxy: process.env.BROKER_TRUST_PROXY === '1',
-    ...(process.env.BROKER_ALLOWED_ORIGINS ? { allowedOrigins: process.env.BROKER_ALLOWED_ORIGINS.split(',').map(value => value.trim()) } : {}) } });
-  server.listen(port, process.env.HOST ?? '127.0.0.1', () => console.info(`P2Sharer web server ready on port ${port}`));
+  const modeIndex = process.argv.indexOf('--mode');
+  const mode = modeIndex >= 0 ? process.argv[modeIndex + 1] : process.env.NODE_ENV || 'production';
+  const settings = deploymentSettings(loadWorkspaceEnvironment(mode), mode);
+  const server = await createWebServer({ apiAllowedOrigins: settings.apiAllowedOrigins,
+    signaling: { trustProxy: settings.trustProxy, allowedOrigins: settings.brokerAllowedOrigins } });
+  server.listen(settings.backendPort, settings.host, () => console.info(`P2Sharer web server ready on port ${settings.backendPort}`));
   for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => server.close());
 }

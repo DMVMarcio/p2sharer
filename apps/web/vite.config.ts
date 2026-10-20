@@ -1,15 +1,20 @@
 import { defineConfig, searchForWorkspaceRoot } from 'vite';
 import react from '@vitejs/plugin-react';
+import { loadWorkspaceEnvironment, deploymentSettings, publicEnvironment, workspaceRoot } from '../../tools/environment.mjs';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const settings = deploymentSettings(loadWorkspaceEnvironment(mode), mode);
+  return {
   plugins: [react()],
   publicDir: '../../public',
-  envDir: '../..',
+  envDir: workspaceRoot,
+  define: publicEnvironment(settings),
   server: {
-    port: 1422,
+    port: settings.webPort,
     strictPort: true,
     fs: { allow: [searchForWorkspaceRoot('.')] },
-    proxy: { '/api': 'http://127.0.0.1:3000', '/mqtt': { target: 'ws://127.0.0.1:3000', ws: true } },
+    proxy: { '/api': { target: settings.apiUrl, changeOrigin: true }, '/mqtt': { target: new URL(settings.brokerUrl).origin, changeOrigin: true, ws: true, rewrite: () => new URL(settings.brokerUrl).pathname } },
   },
   build: { outDir: 'dist' },
+};
 });

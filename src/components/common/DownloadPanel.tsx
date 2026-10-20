@@ -1,3 +1,4 @@
+import { apiUrl } from '../../platform/website';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { DownloadFiles, type DownloadArtifact } from './DownloadFiles';
@@ -26,7 +27,7 @@ export function DownloadPanel() {
   }, [presence.value]);
   useEffect(() => {
     const controller = new AbortController(); setError(false); setCatalog(null);
-    void fetch('/api/downloads', { signal: controller.signal }).then(async response => {
+    void fetch(apiUrl('/api/downloads'), { signal: controller.signal }).then(async response => {
       if (!response.ok) throw new Error('Downloads unavailable');
       const value = await response.json() as DownloadCatalog;
       if (!controller.signal.aborted) setCatalog(value);
