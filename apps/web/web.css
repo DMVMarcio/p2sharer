@@ -54,5 +54,25 @@ html.web-landing, .web-landing body, .web-landing #root { height: auto; min-heig
   .site-footer-identity { grid-column: 1 / -1; }
 }
 
-.site-route-loading { position: fixed; inset: auto 24px 24px auto; z-index: 10000; display: flex; align-items: center; gap: 12px; padding: 16px 20px; background: var(--bg-elevated); color: var(--text-primary); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); }
+/* Navigation feedback stays outside the route snapshot and never intercepts input. */
+.site-route-loading { position: fixed; inset: 0; z-index: 10000; pointer-events: none; view-transition-name: site-navigation-feedback; }
+.site-route-progress { position: absolute; inset: 0 0 auto; height: 3px; overflow: hidden; background: var(--bg-selected); }
+.site-route-progress::after { content: ''; display: block; width: 35%; height: 100%; background: var(--accent-color); animation: siteRouteProgress calc(var(--source-loading-duration) * 3) ease-in-out infinite; }
+.site-route-loading-label { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; justify-content: center; gap: 12px; max-width: calc(100% - 32px); padding: 14px 20px; background: var(--bg-elevated); color: var(--text-primary); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); }
+.site-route-loading.closing { animation: mediaLoadingExit var(--dropdown-exit-duration) both; }
+@keyframes siteRouteProgress { from { transform: translateX(-110%); } to { transform: translateX(390%); } }
+::view-transition-old(root) { animation: contentExit var(--content-exit-duration) ease-in both; }
+::view-transition-new(root) { animation: tabContentEnter var(--transition-normal) both; }
+::view-transition-old(site-navigation-feedback), ::view-transition-new(site-navigation-feedback) { animation: none; }
+:root[data-reduced-motion="true"]::view-transition-group(*),
+:root[data-reduced-motion="true"]::view-transition-old(*),
+:root[data-reduced-motion="true"]::view-transition-new(*) { animation: none !important; }
+:root[data-reduced-motion="true"] .site-route-loading,
+:root[data-reduced-motion="true"] .site-route-loading-label,
+:root[data-reduced-motion="true"] .site-route-progress::after { animation: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+  .site-route-loading, .site-route-loading-label, .site-route-progress::after { animation: none !important; }
+}
+
 .site-route-error { display: grid; justify-items: center; gap: 16px; padding: 48px 24px; color: var(--text-primary); }
