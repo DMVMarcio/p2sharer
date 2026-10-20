@@ -60,6 +60,73 @@ Use HTTPS for both public hostnames. The Node listener stays HTTP behind the pro
 
 Room URLs use `/app/<short-code>` with the complete random identifier, never a password or signed invitation. Browser room links use the current site origin. Opening a link waits for profile setup and opens the normal room preview without bypassing admission; returning home preserves the unsaved-room confirmation.
 
+### Automatic deployment from main
+
+`.github/workflows/deploy.yml` deploys the web service on every push to `main`,
+independently of desktop validation and the release workflow. It can also be run
+manually from `main`. Only one deployment runs at a time; an active deployment is
+not canceled by a newer push. Each run checks out its triggering commit rather
+than pulling an unspecified newer revision.
+
+Configure these repository Actions secrets under **Settings > Secrets and
+variables > Actions**:
+
+| Secret | Value |
+| --- | --- |
+| `SSH_HOST` | VPS hostname or address, without a URL scheme |
+| `SSH_USER` | Linux user owning the checkout and PM2 process |
+| `SSH_PORT` | SSH port; defaults to `22` when omitted |
+| `SSH_SECRET_KEY` | Complete private key, including its opening and closing lines |
+| `SSH_FINGERPRINT` | Optional SSH host SHA256 fingerprint; obtain it on the VPS with `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub -E sha256` |
+
+The repository variable `SSH_DEPLOY_PATH` overrides the remote checkout directory;
+the default is `/root/apps/p2sharer/p2sharer`. This must be a dedicated deployment
+checkout: tracked edits are discarded when selecting the deployment commit.
+Ignored environment files are preserved; no `git clean` is performed.
+
+Prepare the VPS once:
+
+1. Install Node.js 22.14+ (Node 22 LTS), pnpm 10.30.1, Git, curl and PM2. Make
+   their executables available to noninteractive SSH sessions, not just an
+   interactive shell or an unloaded version manager.
+2. Clone the repository at the deployment path and ensure `git fetch origin main`
+   works noninteractively as `SSH_USER`. Private repositories require separate
+   read access from the VPS to GitHub; the Actions-to-VPS key does not grant that.
+3. Create `.env.production` from the sanitized root template and configure the
+   public URLs, backend port and proxy settings. Bind the backend to loopback
+   (or an interface that includes loopback); the post-deploy health check uses
+   `127.0.0.1` and the configured backend port.
+4. Configure Nginx and TLS as described above. Run `pm2 startup` as the deployment
+   user and execute the system setup command it prints to enable boot recovery.
+
+The workflow installs all build dependencies with the frozen lockfile, runs the
+backend regressions, builds the browser application and restarts `P2Sharer`.
+The first deployment creates that PM2 process using `apps/server/server.mjs`
+with `--mode production`; subsequent deployments restart the existing process. If a
+process named `P2Sharer` already exists, ensure it starts this production backend
+from the same checkout. A successful health check is followed by `pm2 save`.
+The Node process stays running during installation and compilation; this is an
+in-place deployment, so it does not provide atomic asset replacement or rollback.
+Restarting the single broker disconnects signaling clients, which must reconnect.
+Desktop installers and GitHub releases are not generated or published here.
+
+To generate a dedicated Actions login key **on the VPS**, log in as `SSH_USER`
+and run the following once. Use a new filename if this key already exists.
+
+```sh
+mkdir -p ~/.ssh
+chmod 700 ~/.ssh
+ssh-keygen -t ed25519 -C "p2sharer-github-actions" -f ~/.ssh/p2sharer_actions -N ""
+cat ~/.ssh/p2sharer_actions.pub >> ~/.ssh/authorized_keys
+chmod 600 ~/.ssh/authorized_keys ~/.ssh/p2sharer_actions
+cat ~/.ssh/p2sharer_actions
+```
+
+Copy the last command's complete output into `SSH_SECRET_KEY`, never into Git or
+workflow logs. The `.pub` key remains authorized on the VPS. This key has no
+passphrase so the workflow can use it noninteractively. The host fingerprint is
+a different value from the login key fingerprint.
+
 ## Backend contract
 
 | Endpoint | Result |
