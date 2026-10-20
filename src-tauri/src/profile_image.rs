@@ -500,7 +500,7 @@ pub async fn save_profile_image(
         profile.card_color = card_color;
         if banner {
             profile.banner_enabled = Some(banner_enabled.unwrap_or(true));
-            profile.banner_blur = Some(banner_blur.unwrap_or(true));
+            profile.banner_blur = Some(banner_blur.unwrap_or(false));
         }
         if remove {
             profile.hash.clear();

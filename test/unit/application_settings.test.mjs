@@ -391,14 +391,16 @@ test('banner crop and card preferences remain drafts until Save and never replac
     await act(async () => root.render(React.createElement(SettingsModal)));
     await choose();
     assert.equal(document.getElementById('profile-card-automatic'), null);
+    assert.equal(document.getElementById('profile-banner-blur').checked, false, 'Banner blur defaults to unchecked');
     await act(async () => document.getElementById('profile-banner-blur').click());
+    assert.equal(document.getElementById('profile-banner-blur').checked, true);
     await act(async () => document.getElementById('btn-cancel-settings').click());
     assert.equal(saves.length, 0);
     assert.equal(profileBanners.local.data, '');
     await act(async () => root.render(null));
     await act(async () => root.render(React.createElement(SettingsModal)));
     await choose();
-    await act(async () => document.getElementById('profile-banner-blur').click());
+    assert.equal(document.getElementById('profile-banner-blur').checked, false, 'New banner draft keeps blur unchecked by default');
     await act(async () => document.getElementById('profile-banner-enabled').click());
     assert.equal(document.getElementById('profile-banner-blur'), null);
     assert.ok(document.getElementById('profile-card-automatic'));

@@ -37,7 +37,7 @@ class ProfileImages {
       this.notify();
     } catch (error) { console.warn('[Profile] Saved image could not be loaded:', error); }
   }
-  async save(draft: ProfileDraft | null, color: string, remove: boolean, cardColor: string | null = null, bannerEnabled = true, bannerBlur = true) {
+  async save(draft: ProfileDraft | null, color: string, remove: boolean, cardColor: string | null = null, bannerEnabled = true, bannerBlur = false) {
     await this.ready;
     this.local = await invoke<ProfileImage>('save_profile_image', { token: draft?.token ?? null, crop: draft?.crop ?? null, color, cardColor, remove,
       ...(this.banner ? { banner: true, bannerEnabled, bannerBlur } : {}) });
@@ -63,10 +63,10 @@ class ProfileImages {
     return profile?.bannerEnabled === false ? undefined : this.url(peerId, local);
   }
   blur(peerId: string, local = false) {
-    return (local || peerId === 'local' ? this.local : (this.peers.get(peerId) ?? this.peerCache.get(peerId)))?.bannerBlur !== false;
+    return (local || peerId === 'local' ? this.local : (this.peers.get(peerId) ?? this.peerCache.get(peerId)))?.bannerBlur === true;
   }
   has(hash: string) { return this.cache.has(hash) || hash === this.local.hash; }
-  announce(peerId: string, hash: string, color: string, cardColor = color, bannerEnabled = true, bannerBlur = true) {
+  announce(peerId: string, hash: string, color: string, cardColor = color, bannerEnabled = true, bannerBlur = false) {
     const entry = { hash, color, cardColor, ...(this.banner ? { bannerEnabled, bannerBlur } : {}) };
     this.peers.set(peerId, entry);
     this.peerCache.set(peerId, entry);

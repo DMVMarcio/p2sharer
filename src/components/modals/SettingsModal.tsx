@@ -60,7 +60,7 @@ export const SettingsModal: React.FC = () => {
   useEffect(() => () => { void invoke('discard_profile_image').catch(() => {}); }, []);
   const [profileDraft, setProfileDraft] = useState<ProfileDraft | null>(null);
   const [bannerDraft, setBannerDraft] = useState<BannerDraft>(() => ({ image: null, remove: false,
-    enabled: profileBanners.local.bannerEnabled !== false, blur: profileBanners.local.bannerBlur !== false }));
+    enabled: profileBanners.local.bannerEnabled !== false, blur: profileBanners.local.bannerBlur === true }));
   const [profileColor, setProfileColor] = useState(profileImages.local.color);
   const [profileCardColor, setProfileCardColor] = useState<string | null>(profileImages.local.cardColor ?? null);
   const [profileRemove, setProfileRemove] = useState(false);
@@ -69,7 +69,7 @@ export const SettingsModal: React.FC = () => {
   const [saving, setSaving] = useState(false);
   useEffect(() => { void profileImages.ready.then(() => { setProfileColor(profileImages.local.color); setProfileCardColor(profileImages.local.cardColor ?? null); }); }, []);
   useEffect(() => { void profileBanners.ready.then(() => setBannerDraft(current => ({ ...current,
-    enabled: profileBanners.local.bannerEnabled !== false, blur: profileBanners.local.bannerBlur !== false }))); }, []);
+    enabled: profileBanners.local.bannerEnabled !== false, blur: profileBanners.local.bannerBlur === true }))); }, []);
   const [nick, setNick] = useState(() => stateStore.username);
   const [language, setLanguageDraft] = useState(getLanguage);
   const [autoUpdates, setAutoUpdates] = useState(automaticUpdateChecks);
@@ -169,7 +169,7 @@ export const SettingsModal: React.FC = () => {
     setSaving(true);
     try {
       if (bannerDraft.image || bannerDraft.remove || bannerDraft.enabled !== (profileBanners.local.bannerEnabled !== false) ||
-        bannerDraft.blur !== (profileBanners.local.bannerBlur !== false)) {
+        bannerDraft.blur !== (profileBanners.local.bannerBlur === true)) {
         await profileBanners.save(bannerDraft.image, profileBanners.local.color, bannerDraft.remove, null, bannerDraft.enabled, bannerDraft.blur);
       }
       await profileImages.save(profileDraft, profileColor, profileRemove, profileCardColor);

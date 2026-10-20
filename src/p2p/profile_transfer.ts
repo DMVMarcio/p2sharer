@@ -54,7 +54,7 @@ export class ProfileTransfer {
     if (this.closed || !this.authorized(peerId)) return;
     const { hash, data, color, bannerEnabled, bannerBlur } = this.images.local;
     await this.send({ kind: 'offer', hash, size: data.length, color, cardColor: this.images.background('local'),
-      ...(this.images.banner ? { bannerEnabled: bannerEnabled !== false, bannerBlur: bannerBlur !== false } : {}) }, peerId);
+      ...(this.images.banner ? { bannerEnabled: bannerEnabled !== false, bannerBlur: bannerBlur === true } : {}) }, peerId);
   }
   async receive(packet: unknown, peerId: string) {
     if (this.closed || !this.authorized(peerId) || !packet || typeof packet !== 'object') return;
