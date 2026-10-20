@@ -1,5 +1,5 @@
 import { waitForNavigationPaint } from '../../src/platform/rendering';
-import { useLayoutEffect } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { Navigate, Outlet, useLocation, useRouteError, type RouteObject } from 'react-router';
 import { SiteLayout, LandingPage, DownloadsPage } from './LandingPage';
 import { useAppTheme } from '../../src/hooks/useAppTheme';
@@ -16,13 +16,16 @@ function RouteError() {
 function WebLayout() {
   useAppTheme();
   const location = useLocation();
+  const previousPath = useRef(location.pathname);
   const app = location.pathname === '/app' || location.pathname.startsWith('/app/');
   useLayoutEffect(() => {
+    const changedPage = previousPath.current !== location.pathname;
+    previousPath.current = location.pathname;
     document.documentElement.classList.toggle('web-app', app);
     document.documentElement.classList.toggle('web-landing', !app);
     if (!app && !location.hash) {
       window.scrollTo(0, 0);
-      document.getElementById('content')?.focus({ preventScroll: true });
+      if (changedPage) document.getElementById('content')?.focus({ preventScroll: true });
     }
   }, [app, location.pathname, location.hash]);
   return <Outlet />;

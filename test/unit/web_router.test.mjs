@@ -76,6 +76,7 @@ test('web routing reuses the site layout, loads the app on demand and protects a
   const click = element => act(async () => { element.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })); });
   try {
     await act(async () => root.render(React.createElement(React.Fragment, null, React.createElement(NavigationFeedback, { router }), React.createElement(RouterProvider, { router }))));
+    assert.equal(document.activeElement, document.body, 'initial entry must not move focus to the page container');
     const header = document.querySelector('.site-header');
     const footer = document.querySelector('.site-footer');
     await click(document.querySelector('.site-actions .download-link'));
