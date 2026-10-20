@@ -18,6 +18,6 @@ export function SiteFooter() {
         <WebsiteLink href={`${repository}/issues`} target="_blank" rel="noopener noreferrer">{t('web.issues')}<ArrowUpRight size={13} aria-hidden="true" /></WebsiteLink>
       </nav>
     </div>
-    <div className="site-footer-bottom"><span>© {new Date().getFullYear()} P2Sharer</span><span>Windows · Web</span></div>
+    <div className="site-footer-bottom"><span>© {new Date().getFullYear()} P2Sharer</span></div>
   </footer>;
 }

@@ -48,7 +48,7 @@ export function LandingPage() {
   useLocale();
   return <>
       <section className="site-hero">
-        <div>
+        <div className="site-hero-content">
           <h1>{t('home.headline')}</h1>
           <p className="site-description">{t('home.description')}</p>
           <div className="site-actions">
@@ -58,7 +58,7 @@ export function LandingPage() {
           <p className="site-note">{t('web.noAccount')}</p>
         </div>
         <div className="site-art" aria-hidden="true">
-          <img src={artwork} alt="" />
+          <img src={artwork} alt="" className="site-art-logo" />
         </div>
       </section>
       <section className="site-features" aria-label={t('web.features')}>
