@@ -1460,5 +1460,6 @@
   "downloads.loading": "Chargement des téléchargements…",
   "web.useWeb": "Utiliser la version web",
   "web.issues": "Signaler un problème",
-  "web.sourceCode": "Code source"
+  "web.sourceCode": "Code source",
+  "apps.desktopOnlyNotice": "Ne peut être lancé que sur l’application de bureau"
 }

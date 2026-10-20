@@ -29,6 +29,39 @@
 .apps-library-card::after { content: ""; position: absolute; inset: 0; z-index: 2; border-radius: inherit; box-shadow: inset 0 0 0 1px var(--accent-color); opacity: 0; pointer-events: none; transition: opacity var(--transition-fast); }
 .apps-library-card.selected::after { opacity: 1; }
 .apps-library-card:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 3px; }
+.apps-library-card.is-disabled,
+.apps-library-card:disabled {
+  opacity: 0.52;
+  cursor: not-allowed;
+  transform: none !important;
+}
+.apps-library-card.is-disabled:hover,
+.apps-library-card:disabled:hover {
+  background: var(--bg-card);
+  transform: none !important;
+}
+.apps-library-card.is-disabled .apps-library-banner,
+.apps-library-card:disabled .apps-library-banner {
+  filter: grayscale(0.2);
+}
+.apps-library-card-notice {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 4px 8px;
+  border-radius: var(--radius-xs);
+  background: color-mix(in srgb, var(--text-muted) 16%, transparent);
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+.apps-library-card-notice svg {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
 .apps-library-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; flex-wrap: wrap; }
 .apps-library-personal { display: flex; align-items: center; gap: 10px; cursor: pointer; }
 .apps-library-personal > span:last-child { display: flex; flex-direction: column; gap: 3px; }

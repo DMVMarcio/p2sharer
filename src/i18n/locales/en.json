@@ -1460,5 +1460,6 @@
   "downloads.loading": "Loading downloads…",
   "web.useWeb": "Use web version",
   "web.issues": "Report an issue",
-  "web.sourceCode": "Source code"
+  "web.sourceCode": "Source code",
+  "apps.desktopOnlyNotice": "Can only be started in the desktop app"
 }

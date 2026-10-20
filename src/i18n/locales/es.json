@@ -1460,5 +1460,6 @@
   "downloads.loading": "Cargando descargas…",
   "web.useWeb": "Usar versión web",
   "web.issues": "Informar de un problema",
-  "web.sourceCode": "Código fuente"
+  "web.sourceCode": "Código fuente",
+  "apps.desktopOnlyNotice": "Solo se puede iniciar en la aplicación de escritorio"
 }

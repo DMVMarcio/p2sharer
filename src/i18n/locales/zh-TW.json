@@ -1460,5 +1460,6 @@
   "downloads.loading": "正在載入下載清單…",
   "web.useWeb": "使用網頁版",
   "web.issues": "回報問題",
-  "web.sourceCode": "原始碼"
+  "web.sourceCode": "原始碼",
+  "apps.desktopOnlyNotice": "只能在桌面應用程式中啟動"
 }

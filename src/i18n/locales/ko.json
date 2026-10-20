@@ -1460,5 +1460,6 @@
   "downloads.loading": "다운로드 목록 불러오는 중…",
   "web.useWeb": "웹 버전 사용하기",
   "web.issues": "문제 신고",
-  "web.sourceCode": "소스 코드"
+  "web.sourceCode": "소스 코드",
+  "apps.desktopOnlyNotice": "데스크톱 앱에서만 시작할 수 있습니다"
 }

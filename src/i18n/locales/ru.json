@@ -1460,5 +1460,6 @@
   "downloads.loading": "Загрузка списка файлов…",
   "web.useWeb": "Открыть веб-версию",
   "web.issues": "Сообщить о проблеме",
-  "web.sourceCode": "Исходный код"
+  "web.sourceCode": "Исходный код",
+  "apps.desktopOnlyNotice": "Можно запустить только в приложении для ПК"
 }

@@ -1460,5 +1460,6 @@
   "downloads.loading": "正在加载下载列表…",
   "web.useWeb": "使用网页版",
   "web.issues": "报告问题",
-  "web.sourceCode": "源代码"
+  "web.sourceCode": "源代码",
+  "apps.desktopOnlyNotice": "只能在桌面应用中启动"
 }

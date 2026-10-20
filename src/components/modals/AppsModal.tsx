@@ -2,8 +2,8 @@ import { isTauri } from '@tauri-apps/api/core';
 import { localizeError, t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useEffect, useState } from 'react';
-import { AppWindow, Play } from 'lucide-react';
-import { listRoomApps, onRoomAppRegistryChange } from '../../apps/registry';
+import { AppWindow, Play, Monitor } from 'lucide-react';
+import { getRoomApp, listRoomApps, onRoomAppRegistryChange } from '../../apps/registry';
 import { RoomAppIcon } from '../../apps/RoomAppIcon';
 import { roomAppsService } from '../../apps/room_apps_service';
 import { ModalDialog } from '../common/ModalDialog';
@@ -20,6 +20,8 @@ export const AppsModal: React.FC = () => {
   useEffect(() => onRoomAppRegistryChange(() => setRegistryTick((tick) => tick + 1)), []);
 
   const start = (close: () => void) => {
+    const app = getRoomApp(selectedKind);
+    if (!isTauri() && (app?.desktopOnly || ['tunnels', 'browser'].includes(selectedKind))) return;
     try { roomAppsService.start(selectedKind, personal); close(); }
     catch (error) { showToast(localizeError(error), 3500, 'error'); }
   };
@@ -37,24 +39,40 @@ export const AppsModal: React.FC = () => {
           <span id="apps-personal-description">{t("message.fbd796b44845")}</span>
         </span>
       </label>
-      <button type="button" className="btn btn-primary apps-library-start" disabled={!selectedKind}
+      <button type="button" className="btn btn-primary apps-library-start" disabled={!selectedKind || (!isTauri() && Boolean(getRoomApp(selectedKind)?.desktopOnly || ['tunnels', 'browser'].includes(selectedKind)))}
         onClick={() => start(close)}><Play size={15} strokeWidth={2} aria-hidden="true" />  {t("message.99bae897c2a6")}</button>
     </div>}>
     <div className="apps-library-grid">
-      {listRoomApps().filter(app => isTauri() || !['tunnels', 'browser'].includes(app.kind)).map((app) => <button type="button"
-        className={`apps-library-card ${selectedKind === app.kind ? 'selected' : ''}`} key={app.kind}
-        aria-pressed={selectedKind === app.kind} onClick={() => setSelectedKind(app.kind)}>
-        <div className={`apps-library-banner ${app.bannerClass || ''} ${app.bannerImage ? 'has-image' : ''}`}
-          style={app.bannerImage ? { backgroundImage: `url("${app.bannerImage}")` } : undefined}
-          aria-hidden="true">
-          <span className="apps-library-banner-glow" />
-          <RoomAppIcon kind={app.kind} size={34} strokeWidth={1.7} />
-        </div>
-        <div className="apps-library-card-content">
-          <h3>{app.label}</h3>
-          <p>{app.description || t("message.3ede798ddd3d")}</p>
-        </div>
-      </button>)}
+      {listRoomApps().map((app) => {
+        const isDesktopOnly = !isTauri() && Boolean(app.desktopOnly || ['tunnels', 'browser'].includes(app.kind));
+        return (
+          <button type="button"
+            className={`apps-library-card ${selectedKind === app.kind ? 'selected' : ''} ${isDesktopOnly ? 'is-disabled' : ''}`}
+            key={app.kind}
+            disabled={isDesktopOnly}
+            aria-disabled={isDesktopOnly}
+            aria-pressed={selectedKind === app.kind}
+            onClick={() => { if (!isDesktopOnly) setSelectedKind(app.kind); }}
+            title={isDesktopOnly ? t('apps.desktopOnlyNotice') : undefined}>
+            <div className={`apps-library-banner ${app.bannerClass || ''} ${app.bannerImage ? 'has-image' : ''}`}
+              style={app.bannerImage ? { backgroundImage: `url("${app.bannerImage}")` } : undefined}
+              aria-hidden="true">
+              <span className="apps-library-banner-glow" />
+              <RoomAppIcon kind={app.kind} size={34} strokeWidth={1.7} />
+            </div>
+            <div className="apps-library-card-content">
+              <h3>{app.label}</h3>
+              <p>{app.description || t("message.3ede798ddd3d")}</p>
+              {isDesktopOnly && (
+                <div className="apps-library-card-notice" role="status">
+                  <Monitor size={12} strokeWidth={2} aria-hidden="true" />
+                  <span>{t('apps.desktopOnlyNotice')}</span>
+                </div>
+              )}
+            </div>
+          </button>
+        );
+      })}
     </div>
   </ModalDialog>;
 };

@@ -20,6 +20,7 @@ export interface RoomAppDefinition {
   bannerClass?: string;
   bannerImage?: string;
   detachable?: boolean;
+  desktopOnly?: boolean;
   createModel(context: RoomAppModelContext): RoomAppModel;
   loadView(): Promise<{ default: React.ComponentType<RoomAppViewProps> }>;
 }
@@ -54,11 +55,11 @@ registerRoomApp({ kind: 'youtube', label: 'YouTube',
   icon: SiYoutube, iconStyle: 'filled', bannerClass: 'youtube', createModel: (context) => new YouTubeModel(context),
   loadView: () => import('./YouTubeApp').then((module) => ({ default: module.YouTubeApp })) });
 registerRoomApp({ kind: 'tunnels', protocolLabel: 'Tunnels', get label() { return t('tunnels.title'); },
-  get description() { return t('tunnels.description'); }, icon: Network, bannerClass: 'tunnels', detachable: false,
+  get description() { return t('tunnels.description'); }, icon: Network, bannerClass: 'tunnels', detachable: false, desktopOnly: true,
   createModel: (context) => new TunnelModel(context),
   loadView: () => import('./TunnelApp').then((module) => ({ default: module.TunnelApp })) });
 registerRoomApp({ kind: 'browser', protocolLabel: 'Browser', get label() { return t('browser.title'); },
-  get description() { return t('browser.description'); }, icon: Globe, bannerClass: 'browser',
+  get description() { return t('browser.description'); }, icon: Globe, bannerClass: 'browser', desktopOnly: true,
   createModel: context => new BrowserModel(context),
   loadView: () => import('./BrowserApp').then(module => ({ default: module.BrowserApp })) });
 

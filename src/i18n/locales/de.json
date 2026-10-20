@@ -1460,5 +1460,6 @@
   "downloads.loading": "Downloads werden geladen…",
   "web.useWeb": "Webversion nutzen",
   "web.issues": "Problem melden",
-  "web.sourceCode": "Quellcode"
+  "web.sourceCode": "Quellcode",
+  "apps.desktopOnlyNotice": "Kann nur in der Desktop-App gestartet werden"
 }

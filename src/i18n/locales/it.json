@@ -1460,5 +1460,6 @@
   "downloads.loading": "Caricamento dei download…",
   "web.useWeb": "Usa la versione web",
   "web.issues": "Segnala un problema",
-  "web.sourceCode": "Codice sorgente"
+  "web.sourceCode": "Codice sorgente",
+  "apps.desktopOnlyNotice": "Può essere avviato solo nell'app desktop"
 }

@@ -1460,5 +1460,6 @@
   "downloads.loading": "ダウンロード一覧を読み込み中…",
   "web.useWeb": "ウェブ版を使う",
   "web.issues": "問題を報告",
-  "web.sourceCode": "ソースコード"
+  "web.sourceCode": "ソースコード",
+  "apps.desktopOnlyNotice": "デスクトップ アプリでのみ開始できます"
 }

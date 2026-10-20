@@ -1460,5 +1460,6 @@
   "downloads.loading": "Ladataan latausluetteloa…",
   "web.useWeb": "Käytä verkkoversiota",
   "web.issues": "Ilmoita ongelmasta",
-  "web.sourceCode": "Lähdekoodi"
+  "web.sourceCode": "Lähdekoodi",
+  "apps.desktopOnlyNotice": "Voidaan käynnistää vain työpöytäsovelluksessa"
 }

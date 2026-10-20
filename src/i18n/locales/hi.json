@@ -1460,5 +1460,6 @@
   "downloads.loading": "डाउनलोड सूची लोड हो रही है…",
   "web.useWeb": "वेब संस्करण इस्तेमाल करें",
   "web.issues": "समस्या की रिपोर्ट करें",
-  "web.sourceCode": "स्रोत कोड"
+  "web.sourceCode": "स्रोत कोड",
+  "apps.desktopOnlyNotice": "केवल डेस्कटॉप ऐप में शुरू किया जा सकता है"
 }
