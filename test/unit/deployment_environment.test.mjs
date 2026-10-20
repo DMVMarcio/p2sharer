@@ -1,10 +1,46 @@
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import { test } from 'node:test';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { loadWorkspaceEnvironment, deploymentSettings, publicEnvironment } from '../../tools/environment.mjs';
+import { dirname, join } from 'node:path';
+import { createServer, normalizePath } from 'vite';
+import { loadWorkspaceEnvironment, deploymentSettings, publicEnvironment, workspaceRoot } from '../../tools/environment.mjs';
+
+test('web dev serves shared workspace fonts and rejects files outside the workspace', async () => {
+  const require = createRequire(import.meta.url);
+  const previousDirectory = process.cwd();
+  const outsideDirectory = await mkdtemp(join(tmpdir(), 'p2sharer-vite-'));
+  let server;
+  try {
+    // Match pnpm's package working directory when evaluating the real Vite config.
+    process.chdir(join(workspaceRoot, 'apps/web'));
+    server = await createServer({
+      configFile: join(workspaceRoot, 'apps/web/vite.config.ts'),
+      logLevel: 'silent',
+      server: { host: '127.0.0.1', port: 0, strictPort: false, hmr: false, watch: null },
+      optimizeDeps: { noDiscovery: true, include: [] },
+    });
+    process.chdir(previousDirectory);
+    await server.listen();
+    const origin = `http://127.0.0.1:${server.httpServer.address().port}`;
+    for (const font of ['plus-jakarta-sans', 'jetbrains-mono']) {
+      const fontPath = join(dirname(require.resolve(`@fontsource-variable/${font}/wght.css`)), 'files', `${font}-latin-wght-normal.woff2`);
+      const response = await fetch(`${origin}/@fs/${normalizePath(fontPath)}`);
+      assert.equal(response.status, 200, `${font} must be served from the workspace dependency directory`);
+      assert.deepEqual(Buffer.from(await response.arrayBuffer()), await readFile(fontPath));
+    }
+    const outsideFile = join(outsideDirectory, 'private.txt');
+    await writeFile(outsideFile, 'outside workspace fixture');
+    const denied = await fetch(`${origin}/@fs/${normalizePath(outsideFile)}`);
+    assert.equal(denied.status, 403);
+  } finally {
+    process.chdir(previousDirectory);
+    await server?.close();
+    await rm(outsideDirectory, { recursive: true, force: true });
+  }
+});
 
 test('environment files use shared root, mode/local precedence and external overrides', async () => {
   const root = await mkdtemp(join(tmpdir(), 'p2sharer-env-'));
