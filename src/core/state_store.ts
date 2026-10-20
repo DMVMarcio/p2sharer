@@ -4,7 +4,13 @@ import { normalizeBackground } from './background_color.ts';
 import { streamDrawingLimit, STREAM_DRAWING_MAX } from './stream_pointer.ts';
 import type { ResolutionConfig, RoomSlotInfo, StreamFilterMode, ThemeMode, TurnConfig } from './types.ts';
 import { parseTurnUrls } from '../p2p/ice_config.ts';
-import { isTauri } from '@tauri-apps/api/core';
+function isWebRuntime(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (typeof process !== 'undefined' && process?.versions?.node) return false;
+  const g = globalThis as unknown as { isTauri?: () => boolean | boolean };
+  const isTauriGlobal = typeof g.isTauri === 'function' ? g.isTauri() : Boolean(g.isTauri);
+  return !('__TAURI_INTERNALS__' in window || '__TAURI__' in window || isTauriGlobal);
+}
 import { detectHardwareAcceleration } from './hardware_acceleration.ts';
 import { applyAppearanceAttributes } from './appearance_preferences.ts';
 
@@ -138,7 +144,7 @@ export class StateStore {
     if (savedAnimations !== null) {
       this.animationsEnabled = savedAnimations !== 'false';
     } else {
-      if (!isTauri() && !detectHardwareAcceleration()) {
+      if (isWebRuntime() && !detectHardwareAcceleration()) {
         this.animationsEnabled = false;
         localStorage.setItem('p2sharer_animations', 'false');
       } else if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
@@ -151,7 +157,7 @@ export class StateStore {
     if (savedVisualEffects !== null) {
       this.visualEffectsEnabled = savedVisualEffects !== 'false';
     } else {
-      if (!isTauri() && !detectHardwareAcceleration()) {
+      if (isWebRuntime() && !detectHardwareAcceleration()) {
         this.visualEffectsEnabled = false;
         localStorage.setItem('p2sharer_visual_effects', 'false');
       } else {

@@ -305,13 +305,14 @@ html,
 body {
   height: 100%;
   width: 100%;
+  background-color: var(--bg-app);
 }
 
 body {
   font-family: var(--font-sans);
   background-color: var(--bg-app);
   color: var(--text-primary);
-  height: 100vh;
+  height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;

@@ -76,10 +76,11 @@ pub fn install(window: &tauri::WebviewWindow) -> Result<bool, String> {
     let saved = read_saved(&saved_path(window.app_handle())?);
     let was_maximized = saved.as_ref().is_some_and(|placement| placement.maximized);
     if let Some(ref placement) = saved {
-        restore(HWND(window.hwnd().map_err(|e| e.to_string())?.0), placement)?;
+        let normal = Placement { maximized: false, ..placement.clone() };
+        restore(HWND(window.hwnd().map_err(|e| e.to_string())?.0), &normal)?;
     }
     let placement = capture(HWND(window.hwnd().map_err(|e| e.to_string())?.0))?;
-    STATE.lock().map_err(|e| e.to_string())?.normal = Some(placement);
+    STATE.lock().map_err(|e| e.to_string())?.normal = Some(Placement { maximized: was_maximized, ..placement });
     Ok(was_maximized)
 }
 
@@ -135,7 +136,8 @@ pub async fn restore_window_placement(window: tauri::Window, placement: Placemen
     let is_maximized = placement.maximized;
     let (send, receive) = tokio::sync::oneshot::channel();
     window.run_on_main_thread(move || {
-        let result = restore(HWND(hwnd as *mut _), &placement).and_then(|_| {
+        let normal = Placement { maximized: false, ..placement.clone() };
+        let result = restore(HWND(hwnd as *mut _), if is_maximized { &normal } else { &placement }).and_then(|_| {
             let mut state = STATE.lock().map_err(|e| e.to_string())?;
             if label == "main" { state.normal = Some(placement); }
             state.fullscreen.remove(&label);

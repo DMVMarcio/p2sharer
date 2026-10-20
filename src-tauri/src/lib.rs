@@ -128,11 +128,21 @@ pub fn run() {
                 Ok(maximized) => maximized,
                 Err(error) => { eprintln!("[Window] Could not restore placement: {error}"); false }
             };
-            main.show()?;
             #[cfg(windows)]
             if was_maximized {
+                use windows::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_SHOWMAXIMIZED};
+                use windows::Win32::Foundation::HWND;
+                if let Ok(hwnd) = main.hwnd() {
+                    unsafe {
+                        let _ = ShowWindow(HWND(hwnd.0), SW_SHOWMAXIMIZED);
+                    }
+                }
                 let _ = main.maximize();
+            } else {
+                main.show()?;
             }
+            #[cfg(not(windows))]
+            main.show()?;
             invitation_routing::install(app.handle())?;
             camera_permission::install(app)?;
             browser_shortcuts::disable_browser_shortcuts(app.get_webview_window("main").ok_or("main webview missing")?)?;
