@@ -43,7 +43,7 @@ html.web-landing, .web-landing body, .web-landing #root { height: auto; min-heig
   pointer-events: none;
   background: radial-gradient(ellipse 100% 100% at 100% 100%, #00225c 0%, #00225c 32%, transparent 90%);
 }
-.site-hero-content { position: relative; z-index: 1; min-width: 0; max-width: 680px; }
+.site-hero-content { position: relative; z-index: 2; min-width: 0; max-width: 680px; }
 .site-hero h1 { font-size: clamp(32px, 3.6vw, 56px); line-height: 1.15; letter-spacing: -.04em; color: var(--text-primary); margin: 0 0 22px; text-wrap: balance; }
 .site-description { color: var(--text-secondary); font-size: clamp(15px, 1.2vw, 17px); line-height: 1.8; max-width: 600px; }
 .site-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 28px; }
@@ -59,6 +59,7 @@ html.web-landing, .web-landing body, .web-landing #root { height: auto; min-heig
   display: flex;
   align-items: flex-end;
   justify-content: flex-end;
+  z-index: 1;
 }
 .site-art > img,
 .site-art-logo {
