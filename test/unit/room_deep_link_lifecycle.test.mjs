@@ -65,13 +65,21 @@ test('the production listener handles startup, live delivery, profile setup and 
     await settle();
     assert.equal(fixture.service.pendingJoinInvite, second);
     assert.equal(opened.length, 2);
+    fixture.modal.active = null; notify();
+    const short = 'a'.repeat(32);
+    handler([roomInviteLink(short)]);
+    await settle();
+    assert.equal(fixture.service.pendingJoinInvite, short, 'short deep links open the canonical discovery preview');
+    assert.equal(opened.length, 3);
+    handler([roomInviteLink(short)]);
+    await settle(); assert.equal(opened.length, 3);
     stop();
     assert.equal(stopCount, 1);
     assert.equal(listeners.size, 0);
     fixture.modal.active = null;
     handler([roomInviteLink(first)]);
     await settle();
-    assert.equal(opened.length, 2, 'a disposed subscription cannot open dialogs');
+    assert.equal(opened.length, 3, 'a disposed subscription cannot open dialogs');
 
     // A live event received while reading the startup URL supersedes that snapshot.
     fixture.onRead = () => handler([roomInviteLink(second)]);

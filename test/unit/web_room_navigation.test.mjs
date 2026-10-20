@@ -4,6 +4,7 @@ import { build } from 'esbuild';
 import { JSDOM } from 'jsdom';
 import { createAuthenticatedInvite, parseRoomInvite } from '../../src/core/room_invite.ts';
 import { extractWebRoomCode, roomCodeFromPath, webRoomPath } from '../../src/core/web_room_links.ts';
+import { tryDesktopRoomInvite } from '../../src/platform/desktop_room_invite.ts';
 
 test('web room URLs accept complete short codes and omit secrets or unsupported routes', () => {
   const id = 'a'.repeat(32);
@@ -49,6 +50,7 @@ test('room URLs defer preview for profile setup, survive remounts and preserve e
     assert.deepEqual(opened, ['joinRoom']); assert.equal(fixture.service.pendingJoinInvite, id);
     stop(); stop = startWebRoomNavigation(async () => allow);
     fixture.modal.active = null; notify(); assert.equal(opened.length, 1, 'remount must not reopen a canceled preview');
+    assert.equal(window.location.pathname, '/app', 'canceling a link preview removes its room code');
     fixture.state.currentRoomInvite = invite; fixture.state.roomSlots = [{}]; notify();
     assert.equal(window.location.pathname, `/app/${id}`);
     history.pushState(null, '', '/app'); window.dispatchEvent(new window.PopStateEvent('popstate')); await settle();
@@ -74,6 +76,47 @@ test('room URLs defer preview for profile setup, survive remounts and preserve e
     assert.equal(window.location.pathname, '/app');
     history.pushState({ idx: 8 }, '', `/app/${id}`); routeChanged(); await settle();
     assert.equal(opened.length, 2, 'router notifications use the canonical room preview');
+    fixture.service.connectingOverlay.visible = true;
+    fixture.modal.active = null; notify();
+    assert.equal(window.location.pathname, `/app/${id}`, 'a pending connection retains its invite URL');
+    fixture.service.connectingOverlay.visible = false; notify();
+    assert.equal(window.location.pathname, '/app', 'a canceled connection clears the URL when teardown completes');
+    history.pushState({ idx: 9 }, '', `/app/${id}`); routeChanged(); await settle();
+    fixture.state.currentRoomInvite = invite; fixture.state.roomSlots = [{}]; notify();
+    fixture.modal.active = null; notify();
+    assert.equal(window.location.pathname, `/app/${id}`, 'closing an admitted preview preserves the active room URL');
     stop(); assert.equal(routeChanged, null); assert.equal(exitGuard, null);
   } finally { stop(); assert.equal(listeners.size, 0); dom.window.close(); Object.assign(globalThis, old); delete globalThis.webNavigationFixture; }
+});
+
+test('desktop handoff is deferred, deduplicated and never replaces the web document', context => {
+  const id = 'a'.repeat(32);
+  const dom = new JSDOM('', { url: `https://example.com/app/${id}` });
+  const old = { window: globalThis.window, document: globalThis.document };
+  globalThis.window = dom.window; globalThis.document = dom.window.document;
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    tryDesktopRoomInvite('/'); tryDesktopRoomInvite('/app');
+    context.mock.timers.tick(0);
+    assert.equal(document.querySelector('iframe'), null);
+    const cancelled = tryDesktopRoomInvite(window.location.pathname); cancelled();
+    context.mock.timers.tick(0);
+    assert.equal(document.querySelector('iframe'), null);
+    const stop = tryDesktopRoomInvite(window.location.pathname);
+    context.mock.timers.tick(0);
+    assert.equal(document.querySelector('iframe').src, `p2sharer://invite/${id}`);
+    assert.equal(document.querySelector('iframe').hidden, true);
+    assert.equal(window.location.pathname, `/app/${id}`);
+    tryDesktopRoomInvite(window.location.pathname); context.mock.timers.tick(0);
+    assert.equal(document.querySelectorAll('iframe').length, 1);
+    context.mock.timers.tick(30_000);
+    assert.equal(document.querySelector('iframe'), null); stop();
+    window.history.replaceState(null, '', '/app/' + 'b'.repeat(32));
+    const append = document.body.append;
+    document.body.append = () => { throw new Error('Protocol handler unavailable'); };
+    tryDesktopRoomInvite(window.location.pathname);
+    assert.doesNotThrow(() => context.mock.timers.tick(0));
+    assert.equal(window.location.pathname, '/app/' + 'b'.repeat(32));
+    document.body.append = append;
+  } finally { dom.window.close(); Object.assign(globalThis, old); }
 });

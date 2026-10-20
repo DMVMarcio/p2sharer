@@ -311,6 +311,7 @@ mod tests {
     fn routing_accepts_only_bounded_invitation_protocol_payloads() {
         assert!(invitation(b"p2sharer://invite/fixture-credential").is_some());
         assert!(invitation(b"p2sharer://convite/fixture-credential").is_some());
+        assert!(invitation(b"p2sharer://invite/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa").is_some());
         for value in [
             "",
             "https://example.com",

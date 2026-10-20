@@ -25,6 +25,7 @@ test('production host serves landing/app, public API and immutable assets withou
       const response = await fetch(base + path);
       assert.equal(response.status, 200); assert.match(await response.text(), /id="root"/);
       assert.match(response.headers.get('content-security-policy'), /object-src 'none'/);
+      assert.match(response.headers.get('content-security-policy'), /frame-src p2sharer:/);
       assert.equal(response.headers.get('referrer-policy'), 'strict-origin-when-cross-origin');
       assert.equal(response.headers.get('cache-control'), 'no-store');
     }

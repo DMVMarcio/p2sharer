@@ -18,6 +18,13 @@ test('application invitation links preserve signed credentials and reject ambigu
     assert.equal(extractRoomInvite(value), null);
   }
   assert.equal(roomInviteLink('invalid'), '');
+  const short = 'a'.repeat(32);
+  assert.equal(extractRoomInvite(roomInviteLink(short)), short);
+  assert.equal(extractRoomInvite(`p2sharer://convite/${short}`), short);
+  for (const value of [`p2sharer://invite/${short}?password=fixture`, `p2sharer://invite/${short}#fragment`,
+    `p2sharer://invite/${short}/`, `p2sharer://invite/${'a'.repeat(31)}`, `p2sharer://invite/${short.toUpperCase()}`]) {
+    assert.equal(extractRoomInvite(value), null);
+  }
 });
 
 test('external invitations wait for readiness and retain only the latest pending room', async () => {

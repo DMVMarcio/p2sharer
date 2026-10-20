@@ -108,3 +108,17 @@ The broker replaces public rendezvous endpoints, not STUN/TURN or external conte
 The web entry owns one React root and a React Router data router. The site layout retains its header and footer between the landing and download routes; `/downloads` aliases `/download`. The application route loads its runtime and styles on demand. `NavigationFeedback` subscribes directly to router state outside `RouterProvider`, keeping its top progress bar and localized status independent of deferred route rendering. Lazy application loading yields a paint before evaluating the module; a timer fallback handles suspended animation frames in hidden tabs. Same-origin links request native View Transitions through the DOM RouterProvider, using shared content entrance/exit recipes and both system and application reduced-motion preferences. `WebsiteLink` uses client navigation for same-origin links inside this router and preserves ordinary links in desktop windows, downloads, hash anchors and explicit new tabs.
 
 `AppPage` adapts room URL synchronization to the router instead of overwriting its history state. Active-room navigation is blocked until the existing room-exit dialog approves; room teardown completes before the destination mounts. Room-code changes within `/app` retain the app instance and use the canonical invitation preview. The server serves the SPA entry for supported direct routes. Favicons live at stable public URLs and use the existing desktop application icon.
+
+
+Room-invitation cancellation replaces the URL with `/app` only after the preview
+closes and connection teardown settles; admitted rooms keep their public code.
+Invitation routes schedule one desktop-protocol attempt per room and document in
+a hidden frame, using `p2sharer://invite/<short-code>`. Plain `/app`, the
+landing page and room URL changes after joining do not launch the desktop.
+Cleanup removes pending timers and protocol frames. The CSP permits only the
+P2Sharer custom scheme alongside the existing video frame origins. Browser policy
+may require confirmation or block automatic protocol launches; the web preview
+remains usable without installation detection, success assumptions or redirects.
+The desktop accepts both signed invitations and public short codes. Short codes
+open canonical room discovery and preview; admission and signature verification
+continue through the existing join flow.

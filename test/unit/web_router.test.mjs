@@ -105,6 +105,8 @@ test('web routing reuses the site layout, loads the app on demand and protects a
     await click(document.querySelector('button'));
     assert.equal(router.state.location.pathname, '/app/' + 'a'.repeat(32));
     assert.equal(fixture.mounts, 1, 'room URL changes must preserve the mounted app');
+    await act(settle);
+    assert.equal(document.querySelector('iframe'), null, 'joining in the web app must not trigger a desktop handoff');
     await act(async () => { void router.navigate(-1); await settle(); });
     assert.equal(router.state.location.pathname, '/app/' + 'a'.repeat(32));
     assert.equal(fixture.exits, 1); assert.equal(fixture.leaves, 0);
@@ -116,6 +118,12 @@ test('web routing reuses the site layout, loads the app on demand and protects a
     assert.ok(document.querySelector('.site-download'));
     assert.equal(document, originalDocument);
     assert.equal(unloads, 0, 'client navigation must not unload the document');
+    const other = 'b'.repeat(32);
+    await act(async () => { await router.navigate(`/app/${other}`); await settle(); });
+    await act(settle);
+    assert.equal(document.querySelector('iframe').src, `p2sharer://invite/${other}`);
+    await act(async () => { await router.navigate('/app'); await settle(); });
+    assert.equal(document.querySelector('iframe'), null, 'leaving an invitation cleans up its protocol frame');
   } finally {
     await act(async () => root.unmount()); router.dispose(); dom.window.close(); Object.assign(globalThis, old); delete globalThis.webRouterFixture;
   }

@@ -2,6 +2,7 @@ import { isTauri } from '@tauri-apps/api/core';
 import { getCurrent, onOpenUrl } from '@tauri-apps/plugin-deep-link';
 import { extractRoomInvite, RoomDeepLinkInbox } from '../core/room_deep_links.ts';
 import { verifyRoomInvite } from '../core/room_invite_validation.ts';
+import { isShortRoomCode, parseRoomInvite } from '../core/room_invite.ts';
 import { stateStore } from '../core/state_store.ts';
 import { modalManager } from '../hooks/useModal.ts';
 import { showToast } from '../hooks/useToast.ts';
@@ -19,10 +20,12 @@ export function startRoomDeepLinks(): () => void {
   const inbox = new RoomDeepLinkInbox(invite => {
     checking = true;
     inspectingInvite = invite;
-    void verifyRoomInvite(invite).then(parsed => {
+    const short = isShortRoomCode(invite);
+    void (short ? Promise.resolve(null) : verifyRoomInvite(invite)).then(parsed => {
       if (disposed) return;
-      if (!parsed) { showToast(t('message.5348364ca0b6'), 3500, 'error'); return; }
-      if (invite === stateStore.currentRoomInvite && stateStore.roomSlots.length) return;
+      if (!short && !parsed) { showToast(t('message.5348364ca0b6'), 3500, 'error'); return; }
+      if (stateStore.roomSlots.length && (invite === stateStore.currentRoomInvite ||
+          short && parseRoomInvite(stateStore.currentRoomInvite)?.roomId === invite)) return;
       // Recheck after asynchronous signature verification; never replace an active dialog.
       if (modalManager.getActive() || !stateStore.username || roomService.connectingOverlay.visible) {
         inbox.receive([`p2sharer://invite/${invite}`]);

@@ -15,8 +15,9 @@ export interface WebRoomNavigation {
 export function startWebRoomNavigation(confirmExit: () => Promise<boolean>, router?: WebRoomNavigation): () => void {
   if (isTauri()) return () => {};
   let pending = roomCodeFromPath(window.location.pathname);
+  let preview: string | null = null;
   if (pending && modalManager.getActive() === 'joinRoom' && (roomService.pendingJoinInvite === pending ||
-      parseRoomInvite(roomService.pendingJoinInvite)?.roomId === pending)) pending = null;
+      parseRoomInvite(roomService.pendingJoinInvite)?.roomId === pending)) { preview = pending; pending = null; }
   let previous: string | null = null;
   let disposed = false;
   let navigating = false;
@@ -31,6 +32,10 @@ export function startWebRoomNavigation(confirmExit: () => Promise<boolean>, rout
   const sync = () => {
     if (disposed || navigating) return;
     const active = current();
+    if (preview && modalManager.getActive() !== 'joinRoom' && (active || !roomService.connectingOverlay.visible)) {
+      preview = null;
+      if (!active && !pending && !roomService.connectingOverlay.visible) replace(null);
+    }
     if (active !== previous) {
       if (active) { pending = null; replace(active); }
       else if (previous) replace(pending);
@@ -38,6 +43,7 @@ export function startWebRoomNavigation(confirmExit: () => Promise<boolean>, rout
     }
     if (pending && !active && stateStore.username && !modalManager.getActive() && !roomService.connectingOverlay.visible) {
       const code = pending; pending = null;
+      preview = code;
       roomService.pendingJoinInvite = code;
       roomService.pendingJoinPassword = '';
       roomService.pendingJoinAsOwner = false;

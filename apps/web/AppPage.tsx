@@ -8,6 +8,7 @@ import { roomCodeFromPath } from '../../src/core/web_room_links';
 import { parseRoomInvite } from '../../src/core/room_invite';
 import { roomService } from '../../src/services/room_service';
 import type { WebRoomNavigation } from '../../src/services/web_room_navigation';
+import { tryDesktopRoomInvite } from '../../src/platform/desktop_room_invite';
 import '../../src/components/room/stream_pointer.css';
 import '../../src/apps/apps.css';
 
@@ -30,6 +31,10 @@ export function Component() {
     subscribe: listener => { listeners.current.add(listener); return () => { listeners.current.delete(listener); }; },
     registerExit: callback => { confirm.current = callback; return () => { confirm.current = null; }; },
   }), [navigate]);
+
+  useEffect(() => {
+    if (!stateStore.roomSlots.length) return tryDesktopRoomInvite(location.pathname);
+  }, [location.pathname]);
 
   useEffect(() => {
     leaving.current = false;

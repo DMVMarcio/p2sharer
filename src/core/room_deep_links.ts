@@ -1,12 +1,14 @@
+import { isShortRoomCode } from './room_invite.ts';
+
 const INVITE_CODE = /^p2s[345]\.[A-Za-z0-9_-]{200,30000}$/;
-const INVITE_LINK = /^p2sharer:\/\/(?:invite|convite)\/(p2s[345]\.[A-Za-z0-9_-]{200,30000})$/i;
+const INVITE_LINK = /^p2sharer:\/\/(?:invite|convite)\/(p2s[345]\.[A-Za-z0-9_-]{200,30000}|[0-9a-f]{32})$/i;
 
 /** Keep the case-sensitive invitation in the path, never in the URL host. */
 export function extractRoomInvite(value: string): string | null {
   const text = value.trim();
-  if (INVITE_CODE.test(text)) return text;
+  if (INVITE_CODE.test(text) || isShortRoomCode(text)) return text;
   const code = INVITE_LINK.exec(text)?.[1];
-  return code && INVITE_CODE.test(code) ? code : null;
+  return code && (INVITE_CODE.test(code) || isShortRoomCode(code)) ? code : null;
 }
 
 export function roomInviteLink(code: string): string {
