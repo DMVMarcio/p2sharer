@@ -4,14 +4,15 @@ import { test } from 'node:test';
 import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { createServer, normalizePath } from 'vite';
 import { loadWorkspaceEnvironment, deploymentSettings, publicEnvironment, workspaceRoot } from '../../tools/environment.mjs';
 
 test('web dev serves shared workspace fonts and rejects files outside the workspace', async () => {
   const require = createRequire(import.meta.url);
   const previousDirectory = process.cwd();
-  const outsideDirectory = await mkdtemp(join(tmpdir(), 'p2sharer-vite-'));
+  const outsideBase = dirname(resolve(workspaceRoot));
+  const outsideDirectory = await mkdtemp(join(outsideBase, 'p2sharer-vite-'));
   let server;
   try {
     // Match pnpm's package working directory when evaluating the real Vite config.
