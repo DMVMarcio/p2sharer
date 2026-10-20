@@ -11,7 +11,7 @@ import { LANGUAGE_OPTIONS } from '../../src/i18n/language';
 import { Select } from '../../src/components/common/Select';
 import { ContextMenuProvider } from '../../src/components/common/ContextMenu';
 import artwork from '../../src/assets/logo_right_bottom.webp';
-import logo from '../../src/assets/logo.svg';
+import logo from '../../src/assets/logo.png';
 
 const features = [
   { icon: Monitor, title: 'web.mediaTitle', description: 'web.mediaText' },
