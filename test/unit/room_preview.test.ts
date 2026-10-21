@@ -107,6 +107,10 @@ test('discovery authenticates identities without requesting admission or sending
       onChatHistory: () => {}, onPeersUpdate: () => {}, onStatusChange: () => {},
       onPreview: preview => previews.push(preview) }, true);
     assert.equal(manager.hasAdmission(), false);
+    let previewReannounced = 0;
+    signalingManager.reannounce = async () => { previewReannounced++; };
+    manager.requestPreview();
+    assert.equal(previewReannounced, 1, 'requestPreview reannounces to rendezvous broker when searching for peers');
     room.onPeerJoin('member');
     const member = await PeerAuthenticator.create(invite.roomId, 'member');
     const nonce = sent.findLast(packet => packet.action === 'peer_identity' && packet.data.kind === 'challenge')!.data.nonce;

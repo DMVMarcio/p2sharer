@@ -165,6 +165,9 @@ export class GroupRoomManager {
 
   public requestPreview(): void {
     if (!this.previewOnly) return;
+    if (this.peerTracker.directConnectedPeers.size === 0 && this.signalingTopic) {
+      void signalingManager.reannounce(this.signalingTopic);
+    }
     for (const peerId of this.peerTracker.directConnectedPeers) {
       if (this.chatAuth?.getKnownKey(peerId)) void this.previewAction?.send(
         { kind: 'request', nonce: this.previewNonce }, { target: peerId });

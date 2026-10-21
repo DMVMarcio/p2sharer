@@ -235,9 +235,13 @@ export class SignalingManager {
         if (Object.keys(raw).length > 0) {
           return raw;
         }
-        // Probe clients can publish rendezvous beacons, but their connection does not
-        // prove that Trystero's own subscriptions are connected to the broker.
-        return {};
+        const connectedProbes: Record<string, { readyState: number; connected: boolean }> = {};
+        for (const [url, status] of this.mqttSocketStatuses.entries()) {
+          if (status.connected || status.readyState === 1) {
+            connectedProbes[url] = { readyState: 1, connected: true };
+          }
+        }
+        return connectedProbes;
       }
       if (transport === 'nostr') {
         return getNostrRelaySockets() || {};
@@ -601,8 +605,8 @@ export class SignalingManager {
     // MQTT.js can hide Trystero's internal WebSocket. A connected MQTT probe
     // means the broker is reachable, so let Trystero reconnect instead of
     // moving only this client to another signaling network.
-    if (this.activeTransport === 'mqtt' && relay.connected === 0 &&
-        [...this.mqttSocketStatuses.values()].some((status) => status.connected)) {
+    if (this.activeTransport === 'mqtt' && (relay.connected > 0 ||
+        [...this.mqttSocketStatuses.values()].some((status) => status.connected))) {
       this.consecutiveStalls = 0;
       return;
     }

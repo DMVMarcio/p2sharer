@@ -3,79 +3,79 @@
   "translations": {
     "en": [
       "**Web access.** Join rooms, chat, share media and collaborate from your browser, with smooth navigation, animated profiles and easy desktop downloads. Room links can open the desktop app while keeping the web version available.",
-      "**Room discovery.** Faster and more reliable room connections using the official P2Sharer server by default, with public fallbacks kept for redundancy.",
+      "**Cross-platform room discovery.** Seamless connections between web and desktop users regardless of who hosts, with reliable rendezvous signaling across official and public brokers.",
       "**Visual performance controls.** Reduce motion or disable heavy background blur and gradients to keep the app responsive on devices without hardware acceleration.",
       "**Web load performance and app library layout.** Faster initial page loading in the browser by loading languages and fonts on demand, along with consistent card alignment in the room app library."
     ],
     "pt-BR": [
       "**Acesso pela web.** Entre em salas, converse, compartilhe mídia e colabore pelo navegador, com navegação fluida, perfis animados e download fácil da versão desktop. Links de sala podem abrir o aplicativo instalado, mantendo a versão web disponível.",
-      "**Encontro de salas.** Conexões e entrada em salas mais rápidas e estáveis com o servidor oficial do P2Sharer como padrão, mantendo alternativas públicas para contingência.",
+      "**Encontro de salas entre plataformas.** Conexões diretas e estáveis entre usuários da web e do desktop independentemente de quem cria a sala, com sinalização confiável pelo servidor oficial e servidores públicos.",
       "**Controles de desempenho visual.** Reduza o movimento ou desative desfoques de fundo e gradientes pesados para manter o app rápido em dispositivos sem aceleração por hardware.",
       "**Carregamento mais rápido na web e alinhamento da biblioteca de apps.** Inicialização no navegador mais rápida ao baixar idiomas e fontes sob demanda, além de alinhamento uniforme dos cards na biblioteca de apps da sala."
     ],
     "es": [
       "**Acceso web.** Entra a salas, chatea, comparte contenido y colabora desde el navegador, con navegación fluida, perfiles animados y descarga fácil de la aplicación de escritorio. Los enlaces de sala pueden abrir la aplicación instalada manteniendo disponible la versión web.",
-      "**Descubrimiento de salas.** Conexiones a salas más rápidas y estables con el servidor oficial de P2Sharer por defecto, manteniendo alternativas públicas de respaldo.",
+      "**Descubrimiento entre plataformas.** Conexiones fluidas entre usuarios web y de escritorio sin importar quién cree la sala, con señalización confiable a través del servidor oficial y alternativas públicas.",
       "**Controles de rendimiento visual.** Reduce el movimiento o desactiva el desenfoque de fondo y los degradados pesados para mantener la aplicación fluida en dispositivos sin aceleración por hardware.",
       "**Carga web más rápida y alineación en la biblioteca de apps.** Carga inicial en el navegador más rápida al descargar idiomas y fuentes bajo demanda, junto con una alineación uniforme de las tarjetas en la biblioteca de apps de la sala."
     ],
     "fr": [
       "**Accès web.** Rejoignez des salons, discutez, partagez des médias et collaborez depuis votre navigateur, avec une navigation fluide, des profils animés et un téléchargement facile de l’application de bureau. Les liens de salon peuvent ouvrir l’application installée tout en gardant la version web disponible.",
-      "**Découverte des salons.** Des connexions aux salons plus rapides et plus fiables grâce au serveur officiel P2Sharer par défaut, tout en conservant des solutions publiques de secours.",
+      "**Découverte de salons multiplateforme.** Connexions fluides entre utilisateurs web et bureau quel que soit l'hôte du salon, avec une signalisation fiable via le serveur officiel et des relais publics.",
       "**Contrôles de performances visuelles.** Réduisez les mouvements ou désactivez le flou d'arrière-plan et les dégradés lourds pour maintenir l'application fluide sur les appareils sans accélération matérielle.",
       "**Chargement web plus rapide et alignement de la bibliothèque d’apps.** Démarrage plus rapide dans le navigateur grâce au chargement à la demande des langues et polices, avec un alignement uniforme des cartes dans la bibliothèque d'apps du salon."
     ],
     "de": [
       "**Webzugang.** Tritt Räumen bei, chatte, teile Medien und arbeite im Browser zusammen – mit flüssiger Navigation, animierten Profilen und einfachem Desktop-Download. Raumlinks können die installierte App öffnen, während die Webversion verfügbar bleibt.",
-      "**Raumsuche.** Schnellere und zuverlässigere Raumverbindungen über den offiziellen P2Sharer-Server als Standard, mit öffentlichen Ausweichservern als Absicherung.",
+      "**Plattformübergreifende Raumsuche.** Nahtlose Verbindungen zwischen Web- und Desktop-Nutzern unabhängig davon, wer den Raum erstellt, mit zuverlässiger Signalübertragung über den offiziellen Server und öffentliche Ausweichserver.",
       "**Steuerung der visuellen Leistung.** Reduzieren Sie Bewegungen oder deaktivieren Sie Hintergrundunschärfe und aufwendige Verläufe, damit die App auch ohne Hardwarebeschleunigung flüssig läuft.",
       "**Schnelleres Laden im Web und einheitliche App-Übersicht.** Deutlich schnellerer Start im Browser durch das bedarfsgesteuerte Laden von Sprachen und Schriftarten sowie eine saubere Ausrichtung der Karten in der Raum-App-Bibliothek."
     ],
     "it": [
       "**Accesso web.** Entra nelle stanze, chatta, condividi contenuti e collabora dal browser, con navigazione fluida, profili animati e download semplice dell’app desktop. I link delle stanze possono aprire l’app installata mantenendo disponibile la versione web.",
-      "**Ricerca delle stanze.** Connessioni alle stanze più veloci e affidabili grazie al server ufficiale P2Sharer predefinito, mantenendo alternative pubbliche di riserva.",
+      "**Ricerca stanze multipiattaforma.** Connessioni fluide tra utenti web e desktop indipendentemente da chi ospita la stanza, con segnalazione affidabile tramite il server ufficiale e alternative pubbliche.",
       "**Controlli delle prestazioni visive.** Riduci il movimento o disattiva sfocature dello sfondo e gradienti pesanti per mantenere l'app reattiva sui dispositivi senza accelerazione hardware.",
       "**Caricamento web più veloce e allineamento della libreria di app.** Avvio nel browser più rapido grazie al caricamento su richiesta di lingue e caratteri, con un allineamento coerente delle schede nella libreria di app della stanza."
     ],
     "zh-CN": [
       "**网页访问。** 在浏览器中加入房间、聊天、共享媒体并协作，享受流畅导航、动态个人资料和便捷的桌面端下载。房间链接可尝试打开已安装的应用，同时保留网页版供使用。",
-      "**房间发现。** 默认采用官方 P2Sharer 服务器提供更快、更稳定的房间连接，同时保留公共备用服务以防万一。",
+      "**跨平台房间发现。** 无论网页端或桌面端谁主持房间，均可在两者之间无缝直连，依托官方及公共中继提供更可靠的会合信令。",
       "**视觉性能控制。** 支持减少动态效果或禁用复杂的背景模糊与渐变，确保应用在未开启硬件加速的设备上依然保持流畅。",
       "**网页端加载性能与应用库排版优化。** 通过按需加载语言和字体显著加快浏览器首次载入速度，并优化房间应用库中的卡片对齐效果。"
     ],
     "zh-TW": [
       "**網頁存取。** 在瀏覽器中加入房間、聊天、分享媒體並協作，享受流暢導覽、動態個人檔案與便捷的桌面版下載。房間連結可嘗試開啟已安裝的應用程式，同時保留網頁版供使用。",
-      "**房間探索。** 預設採用官方 P2Sharer 伺服器提供更快速、更穩定的房間連線，同時保留公共備援服務以防萬一。",
+      "**跨平台房間探索。** 無論網頁端或桌面端誰主持房間，皆可在兩者之間順暢直連，透過官方及公共中繼提供更可靠的交會訊號。",
       "**視覺效能控制。** 支援減少動態效果或停用複雜的背景模糊與漸變，確保應用程式在未開啟硬體加速的裝置上依然保持順暢。",
       "**網頁版載入效能與應用程式庫排版最佳化。** 透過依需求載入語言與字型大幅加快瀏覽器初次載入速度，並改善房間應用程式庫中的卡片對齊效果。"
     ],
     "ja": [
       "**ウェブアクセス。** ブラウザーからルームに参加し、チャット、メディア共有、共同作業ができます。スムーズな画面移動、アニメーション付きプロフィール、簡単なデスクトップ版のダウンロードに対応しました。ルームリンクからインストール済みアプリを開く際も、ウェブ版を引き続き利用できます。",
-      "**ルームの検出。** 公式の P2Sharer サーバーを標準で使用することで、より高速かつ安定したルーム接続を提供し、予備として公開サーバーも引き続き利用できます。",
+      "**クロスプラットフォームのルーム検出。** ウェブ版とデスクトップ版のどちらがホストになっても確実に相互接続でき、公式および公開ブローカーによる安定したシグナリングを提供します。",
       "**視覚パフォーマンス設定。** 視覚効果を抑えるか、背景のぼかしや負荷の高いグラデーションを無効にすることで、ハードウェア アクセラレーションのない環境でも快適に動作します。",
       "**ウェブ版の読み込み高速化とアプリライブラリの整列。** 言語とフォントをオンデマンドで取得することでブラウザーの初期表示を高速化し、ルーム内のアプリ一覧カードの配置を美しく整えました。"
     ],
     "ko": [
       "**웹 접속.** 브라우저에서 방에 참여하고 채팅, 미디어 공유, 협업을 할 수 있으며 부드러운 화면 전환, 움직이는 프로필, 간편한 데스크톱 앱 다운로드를 지원합니다. 방 링크로 설치된 앱을 열 때도 웹 버전을 계속 사용할 수 있습니다.",
-      "**방 검색.** 공식 P2Sharer 서버를 기본으로 사용하여 더 빠르고 안정적으로 방에 연결되며, 공개 대체 서버도 계속 백업으로 유지됩니다。",
-      "**시각 성능 설정.** 모션을 줄이거나 배경 흐림 및 복잡한 그라데이션을 비활성화하여 하드웨어 가속이 없는 기기에서도 부드럽게 앱을 사용할 수 있습니다。",
+      "**크로스 플랫폼 방 검색.** 웹과 데스크톱 사용자 중 누가 호스트가 되어도 원활하게 상호 연결되며, 공식 서버와 공개 브로커를 통한 안정적인 시그널링을 제공합니다.",
+      "**시각 성능 설정.** 모션을 줄이거나 배경 흐림 및 복잡한 그라데이션을 비활성화하여 하드웨어 가속이 없는 기기에서도 부드럽게 앱을 사용할 수 있습니다.",
       "**웹 로딩 성능 및 앱 보관함 정렬 개선.** 언어와 글꼴을 필요할 때만 불러와 브라우저 초기 로딩 속도를 높이고, 방 앱 보관함의 카드 정렬을 깔끔하게 맞췄습니다。"
     ],
     "hi": [
       "**वेब से पहुँच।** सहज नेविगेशन, एनिमेटed प्रोफ़ाइल और आसान डेस्कटॉप डाउनलोड के साथ ब्राउज़र से कमरों में शामिल हों, चैट करें, मीडिया साझा करें और सहयोग करें। कमरे के लिंक इंस्टॉल किया गया ऐप खोल सकते हैं, जबकि वेब संस्करण भी उपलब्ध रहता है।",
-      "**कमरे खोजना।** आधिकारिक P2Sharer सर्वर को डिफ़ॉल्ट बनाकर कमरों से तेज़ और अधिक विश्वसनीय कनेक्शन, जिसमें बैकअप के रूप में सार्वजनिक विकल्प भी बने रहेंगे।",
+      "**क्रॉस-प्लेटफ़ॉर्म कमरा खोज।** वेब और डेस्कटॉप उपयोगकर्ताओं के बीच सहज कनेक्शन, चाहे होस्ट कोई भी हो, आधिकारिक और सार्वजनिक ब्रोकरों के माध्यम से विश्वसनीय सिग्नलिंग के साथ।",
       "**दृश्य प्रदर्शन नियंत्रण।** हार्डवेयर त्वरण के बिना उपकरणों पर ऐप को तेज़ रखने के लिए मोशन कम करें या भारी पृष्ठभूमि धुंधलापन और ग्रेडिएंट बंद करें।",
       "**तेज़ वेब लोडिंग और ऐप लाइब्रेरी का बेहतर लेआउट।** भाषाओं और फ़ॉन्ट को आवश्यकतानुसार लोड करके ब्राउज़र में तेज़ी से पेज शुरू होना, साथ ही कमरे की ऐप लाइब्रेरी में कार्ड का एक समान अलाइनमेंट।"
     ],
     "fi": [
       "**Verkkokäyttö.** Liity huoneisiin, keskustele, jaa mediaa ja tee yhteistyötä selaimessa sujuvan navigoinnin, animoitujen profiilien ja helpon työpöytäsovelluksen latauksen avulla. Huonelinkit voivat avata asennetun sovelluksen verkkoversion pysyessä käytettävissä.",
-      "**Huoneiden löytäminen.** Nopeammat ja luotettavammat huoneyhteydet virallisen P2Sharer-palvelimen toimiessa oletuksena, säilyttäen julkiset varapalvelimet varmistuksena.",
+      "**Alustojen välinen huoneiden löytäminen.** Saumattomat yhteydet verkko- ja työpöytäkäyttäjien välillä riippumatta siitä, kumpi luo huoneen, luotettavan virallisen ja julkisen signaalinvälityksen avulla.",
       "**Visuaalisen suorituskyvyn asetukset.** Vähennä liikettä tai poista taustan sumennus ja raskaat liukuvärit käytöstä pitääksesi sovelluksen sulavana laitteilla, joissa ei ole laitteistokiihdytystä.",
       "**Nopeampi verkkolataus ja sovelluskirjaston tasaus.** Selaimen aloitussivut latautuvat nopeammin lataamalla kielet ja fontit tarpeen mukaan, ja huonesovellusten kortit asettuvat siististi samalle tasolle."
     ],
     "ru": [
       "**Веб-доступ.** Подключайтесь к комнатам, общайтесь, делитесь медиа и работайте совместно в браузере с плавной навигацией, анимированными профилями и удобной загрузкой версии для ПК. Ссылки комнат могут открывать установленное приложение, сохраняя доступ к веб-версии.",
-      "**Поиск комнат.** Более быстрое и надёжное подключение к комнатам благодаря официальному серверу P2Sharer по умолчанию с сохранением публичных серверов в качестве резерва.",
+      "**Кроссплатформенный поиск комнат.** Надёжное подключение между пользователями веб-версии и версии для ПК независимо от того, кто создал комнату, со стабильной передачей сигналов через официальный и публичные серверы.",
       "**Настройки визуальной производительности.** Уменьшайте движение или отключайте размытие фона и тяжелые градиенты для плавной работы приложения на устройствах без аппаратного ускорения.",
       "**Ускоренная загрузка в веб-версии и выравнивание библиотеки приложений.** Значительное ускорение начальной загрузки в браузере за счёт подгрузки языков и шрифтов по требованию, а также аккуратное выравнивание карточек в библиотеке приложений комнаты."
     ]

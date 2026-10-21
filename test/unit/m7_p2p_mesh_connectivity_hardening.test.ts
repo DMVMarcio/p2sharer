@@ -24,10 +24,10 @@ describe('M7: P2P Mesh Connectivity, Indirect Bridging & Signaling Stability Har
   // Area 1: High-Availability MQTT Broker Configuration & Relay Sockets
   // =========================================================================
   describe('Area 1: High-Availability MQTT Broker Configuration', () => {
-    it('1.1: DEFAULT_MQTT_RELAY_URLS includes fast verified brokers (Shiftr, EMQX, Mosquitto)', () => {
+    it('1.1: DEFAULT_MQTT_RELAY_URLS includes fast verified brokers (HiveMQ, EMQX, Mosquitto)', () => {
       assert.ok(Array.isArray(DEFAULT_MQTT_RELAY_URLS));
       assert.ok(DEFAULT_MQTT_RELAY_URLS.length >= 4);
-      assert.ok(DEFAULT_MQTT_RELAY_URLS.some((u) => u.includes('shiftr.io')));
+      assert.ok(DEFAULT_MQTT_RELAY_URLS.some((u) => u.includes('hivemq.com')));
       assert.ok(DEFAULT_MQTT_RELAY_URLS.some((u) => u.includes('emqx.io')));
       assert.ok(DEFAULT_MQTT_RELAY_URLS.some((u) => u.includes('mosquitto.org')));
       // The first-party broker comes before the remaining desktop fallbacks.

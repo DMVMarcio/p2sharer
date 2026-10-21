@@ -14,7 +14,8 @@ export function websiteUrl(path: string): string {
 
 /** API calls can target a backend deployed separately from the website. */
 export function apiUrl(path: string): string {
-  const origin = import.meta.env?.VITE_PUBLIC_API_URL || (isBrowserRuntime() ? window.location.origin : 'https://api.p2sharer.com');
+  const origin = import.meta.env?.VITE_PUBLIC_API_URL || (isBrowserRuntime() ? window.location.origin :
+    (import.meta.env?.DEV ? 'http://127.0.0.1:3000' : 'https://api.p2sharer.com'));
   const base = new URL(origin);
   if (!['https:', 'http:'].includes(base.protocol) || base.username || base.password) throw new Error('Invalid public API URL');
   return new URL(path, base.origin).href;

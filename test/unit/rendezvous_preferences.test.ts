@@ -40,6 +40,9 @@ describe('Rendezvous server preferences', () => {
     preferences.mqtt.push({ url: 'ws://insecure.example', enabled: true });
     assert.match(validateRendezvousPreferences(preferences) ?? '', /wss:\/\//);
     preferences.mqtt.pop();
+    preferences.mqtt.push({ url: ['wss://', 'test-user', ':', 'test-pass', '@broker.example/mqtt'].join(''), enabled: true });
+    assert.match(validateRendezvousPreferences(preferences) ?? '', /wss:\/\//);
+    preferences.mqtt.pop();
     preferences.mqtt.push({ ...preferences.mqtt[0]! });
     assert.match(validateRendezvousPreferences(preferences) ?? '', /duplicado/);
     preferences.mqtt.pop();
@@ -95,6 +98,6 @@ it('uses first-party signaling in the web browser and removes retired saved endp
     values.set('p2sharer_rendezvous_servers_v1', JSON.stringify(legacy));
     const migrated = loadRendezvousPreferences();
     assert.ok(migrated.mqtt.some(entry => entry.url === 'wss://custom.example/mqtt' && !entry.enabled));
-    assert.ok(!Object.values(migrated).flat().some(entry => ['broker-cn.emqx.io', 'rapi.acrop.net'].includes(new URL(entry.url).hostname)));
+    assert.ok(!Object.values(migrated).flat().some(entry => ['broker-cn.emqx.io', 'rapi.acrop.net', 'public.cloud.shiftr.io'].includes(new URL(entry.url).hostname)));
   } finally { globalThis.window = oldWindow; globalThis.localStorage = oldStorage; }
 });
