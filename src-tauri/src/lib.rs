@@ -79,6 +79,14 @@ fn cancel_app_update(window: tauri::Window) -> Result<(), String> {
     process_manager::set_update_installer_breakaway(false)
 }
 
+#[tauri::command]
+fn exit_application(app: tauri::AppHandle) -> Result<(), String> {
+    let _ = stop_native_screen_capture();
+    let _ = stop_audio_capture();
+    app.exit(0);
+    std::process::exit(0);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     if invitation_routing::forward_startup_invitation() { return; }
@@ -162,6 +170,8 @@ pub fn run() {
                 }
             }
             if matches!(event, tauri::WindowEvent::Destroyed) && window.label() == "main" {
+                let _ = stop_native_screen_capture();
+                let _ = stop_audio_capture();
                 std::process::exit(0);
             }
         })
@@ -221,6 +231,7 @@ pub fn run() {
             portable_update::restart_after_update,
             prepare_app_update,
             cancel_app_update,
+            exit_application,
             browser_shortcuts::disable_browser_shortcuts,
             window_chrome::show_window_menu,
             window_placement::capture_window_placement,
@@ -293,6 +304,13 @@ pub fn run() {
             ];
             handler(invoke)
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app_handle, event| {
+            if let tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit = event {
+                let _ = stop_native_screen_capture();
+                let _ = stop_audio_capture();
+                std::process::exit(0);
+            }
+        });
 }

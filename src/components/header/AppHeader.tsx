@@ -9,6 +9,7 @@ import { modalManager, useModal } from '../../hooks/useModal';
 import { showToast } from '../../hooks/useToast';
 import { BookmarkCheck, BookmarkPlus, Check, ChevronDown, Copy, Link, LockKeyhole, LogOut, Settings2 } from 'lucide-react';
 import { isTauri } from '@tauri-apps/api/core';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { websiteUrl } from '../../platform/website';
 import { webRoomPath } from '../../core/web_room_links';
 import logo from '../../assets/logo.png';
@@ -66,8 +67,19 @@ export const AppHeader: React.FC<{ showUpdate?: boolean; homeScrolled?: boolean;
     }
   };
 
+  const handleHeaderDoubleClick = (event: React.MouseEvent) => {
+    const target = event.target as HTMLElement | null;
+    if (!target) return;
+    if (target.closest('button, input, select, textarea, a, [role="button"], [role="menuitem"]')) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (isTauri()) {
+      void getCurrentWindow().toggleMaximize().catch((error) => console.warn('[Window] Could not toggle maximize:', error));
+    }
+  };
+
   return (
-    <header className={`app-header${isInRoom ? ' is-in-room' : homeScrolled ? ' is-home-scrolled' : ''}`} data-tauri-drag-region>
+    <header className={`app-header${isInRoom ? ' is-in-room' : homeScrolled ? ' is-home-scrolled' : ''}`} data-tauri-drag-region onDoubleClick={handleHeaderDoubleClick}>
       <div className="header-room-info">
         {isInRoom && (
           <>

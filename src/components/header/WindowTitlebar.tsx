@@ -62,10 +62,16 @@ export const WindowTitlebar: React.FC<{ onVisibilityChange: (visible: boolean) =
       try {
         if (confirmClose && !await confirmClose()) { closing = false; return; }
       } catch (error) { closing = false; report(error); return; }
-      try { await roomService.leaveRoom(); }
-      catch (error) { console.warn('[Window] Room shutdown failed:', error); }
+      try {
+        await Promise.race([
+          roomService.leaveRoom(),
+          new Promise((resolve) => setTimeout(resolve, 1500)),
+        ]);
+      } catch (error) { console.warn('[Window] Room shutdown failed:', error); }
       try { await nativeWindow.destroy(); }
-      catch (error) { closing = false; report(error); }
+      catch (error) { report(error); }
+      try { await invoke('exit_application'); }
+      catch {}
     }));
     void refresh().catch(report);
     return () => { disposed = true; listeners.forEach((unlisten) => unlisten()); window.removeEventListener('p2sharer-native-fullscreen-changed', fullscreenChanged); };
@@ -78,15 +84,21 @@ export const WindowTitlebar: React.FC<{ onVisibilityChange: (visible: boolean) =
     void nativeWindow[action]().catch((error) => console.warn('[Window] Window action failed:', error));
   };
 
+  const handleToggleMaximize = (event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    run('toggleMaximize');
+  };
+
   return (
     <div className={`window-titlebar ${focused ? '' : 'is-inactive'}`} onContextMenu={(event) => {
       event.preventDefault();
       event.stopPropagation();
       void invoke('show_window_menu').catch((error) => console.warn('[Window] Could not open system menu:', error));
     }}>
-      <div className="window-titlebar-drag" data-tauri-drag-region>
-        <img src={logoImg} width="16" height="16" alt="" draggable={false} data-tauri-drag-region />
-        <span className="window-titlebar-title" data-tauri-drag-region>{title}</span>
+      <div className="window-titlebar-drag" data-tauri-drag-region onDoubleClick={handleToggleMaximize}>
+        <img src={logoImg} width="16" height="16" alt="" draggable={false} onDoubleClick={handleToggleMaximize} />
+        <span className="window-titlebar-title" data-tauri-drag-region onDoubleClick={handleToggleMaximize}>{title}</span>
       </div>
       <div className="window-titlebar-actions"><AppUpdateButton /></div>
       <div className="window-caption-controls" role="group" aria-label={t("message.a64ca0dc164b")}>
