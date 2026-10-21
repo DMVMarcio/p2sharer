@@ -64,6 +64,19 @@ When capture devices output 5.1, 7.1, or other multi-channel audio:
 - Captures monitors or individual top-level windows without requiring invasive display hooks.
 - Enumerates available monitors (with resolution, primary flag, thumbnail) and open windows (filtered for system artifacts like Program Manager).
 
+### Windows Capture Feature Compatibility
+
+`start_wgc_capture` probes optional cursor and border properties before selecting
+settings for either windows or monitors, including supervisor restarts. Windows 10
+desktop build 19045 supports WGC but lacks `IsBorderRequired` (introduced in build
+20348). Requesting `WithoutBorder` on that system aborts WGC initialization and
+unnecessarily selects xcap/JPEG, losing GPU scaling and native encoding. Unsupported
+properties retain OS defaults; older systems may therefore show the system capture
+border or retain the default cursor behavior. Generic mode still uses WGC capture
+and available GPU scaling with JPEG, without requiring NVIDIA or NVENC. Real overload
+adaptation remains enabled; fixing feature selection does not guarantee a specific
+GPU's capture or browser encoder throughput.
+
 ### Multimedia Timer RAII Guard (`MultimediaTimerGuard`)
 - Automatically calls `timeBeginPeriod(1)` upon capture initialization and `timeEndPeriod(1)` on drop.
 - Forces Windows OS scheduler timer resolution to 1ms, ensuring steady 60â€“120 FPS capture timing without jitter.

@@ -638,7 +638,12 @@ type ActiveCaptureControl =
 
 #[cfg(windows)]
 fn start_wgc_capture(source: &str, capture_mouse: bool, flags: CaptureFlags) -> Result<ActiveCaptureControl, String> {
-    let cursor = if capture_mouse { CursorCaptureSettings::WithCursor } else { CursorCaptureSettings::WithoutCursor };
+    use windows_capture::graphics_capture_api::GraphicsCaptureApi;
+    let cursor_supported = GraphicsCaptureApi::is_cursor_settings_supported().unwrap_or(false);
+    let border_supported = GraphicsCaptureApi::is_border_settings_supported().unwrap_or(false);
+    let (cursor, border) = capture_visual_settings(capture_mouse, cursor_supported, border_supported);
+    crate::logger::log_msg("INFO", "capture.compatibility", &format!(
+        "session={} cursor_configurable={cursor_supported} border_configurable={border_supported} cursor={cursor:?} border={border:?}", flags.session_id));
     let (kind, raw) = source.split_once(':').ok_or("Invalid capture source")?;
     if kind == "window" {
         let hwnd = raw.parse::<usize>().map_err(|e| e.to_string())?;
@@ -652,17 +657,31 @@ fn start_wgc_capture(source: &str, capture_mouse: bool, flags: CaptureFlags) -> 
         };
         if !window.is_valid() && !browser_source { return Err("Capture window no longer exists".into()); }
         NativeWgcHandler::start_free_threaded(Settings::new(window, cursor,
-            DrawBorderSettings::WithoutBorder, SecondaryWindowSettings::Default,
+            border, SecondaryWindowSettings::Default,
             capture_update_interval(), DirtyRegionSettings::Default, ColorFormat::Rgba8, flags))
             .map_err(|e| e.to_string())
     } else {
         let index = raw.parse::<usize>().map_err(|e| e.to_string())?;
         let monitor = WgcMonitor::from_index(index + 1).map_err(|e| e.to_string())?;
         NativeWgcHandler::start_free_threaded(Settings::new(monitor, cursor,
-            DrawBorderSettings::WithoutBorder, SecondaryWindowSettings::Default,
+            border, SecondaryWindowSettings::Default,
             capture_update_interval(), DirtyRegionSettings::Default, ColorFormat::Rgba8, flags))
             .map_err(|e| e.to_string())
     }
+}
+
+#[cfg(windows)]
+fn capture_visual_settings(capture_mouse: bool, cursor_supported: bool, border_supported: bool)
+    -> (CursorCaptureSettings, DrawBorderSettings) {
+    // WGC itself works on Windows 10, but changing its border requires build 20348.
+    // Unsupported optional settings must retain OS defaults instead of losing the
+    // GPU capture/scaling path (including generic JPEG capture on AMD and Intel).
+    let cursor = if !cursor_supported { CursorCaptureSettings::Default }
+        else if capture_mouse { CursorCaptureSettings::WithCursor }
+        else { CursorCaptureSettings::WithoutCursor };
+    let border = if border_supported { DrawBorderSettings::WithoutBorder }
+        else { DrawBorderSettings::Default };
+    (cursor, border)
 }
 
 #[cfg(windows)]
@@ -1696,6 +1715,61 @@ pub(crate) fn fit_capture_dimensions(width: u32, height: u32, max_width: u32, ma
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn optional_wgc_settings_preserve_capture_on_older_windows() {
+        for capture_mouse in [false, true] {
+            for cursor_supported in [false, true] {
+                for border_supported in [false, true] {
+                    let (cursor, border) = capture_visual_settings(capture_mouse, cursor_supported, border_supported);
+                    assert_eq!(border, if border_supported { DrawBorderSettings::WithoutBorder } else { DrawBorderSettings::Default });
+                    assert_eq!(cursor, if !cursor_supported { CursorCaptureSettings::Default }
+                        else if capture_mouse { CursorCaptureSettings::WithCursor } else { CursorCaptureSettings::WithoutCursor });
+                }
+            }
+        }
+    }
+
+    #[test]
+    #[ignore = "requires an interactive Windows desktop and capture permission; captures pixels in memory only"]
+    fn live_generic_wgc_retains_requested_profile_without_nvenc() {
+        let monitor = list_screen_sources().monitors.into_iter().find(|monitor| monitor.is_primary)
+            .expect("live capture requires a primary monitor");
+        let expected = fit_capture_dimensions(monitor.width, monitor.height, 1920, 1080);
+        let session_id = "generic-wgc-compatibility-test";
+        start_capture_session(session_id.into(), monitor.id, Some(60), Some(1920), Some(1080),
+            Some(true), Some(90), None, Some("generic".into())).unwrap();
+        // Always release capture resources, including when an assertion fails.
+        struct Cleanup;
+        impl Drop for Cleanup { fn drop(&mut self) { let _ = stop_capture_session("generic-wgc-compatibility-test".into()); } }
+        let _cleanup = Cleanup;
+        let (metrics, load, mut receiver) = {
+            let sessions = SESSIONS.lock().unwrap();
+            let session = sessions.get(session_id).unwrap();
+            assert!(session.control.is_some(), "generic capture must start WGC, not fall back to xcap");
+            assert!(!session.nvenc_enabled.load(Ordering::Relaxed));
+            (session.metrics.clone(), session.load.clone(), session.sender.subscribe())
+        };
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(12);
+        let mut decoded = 0;
+        while std::time::Instant::now() < deadline {
+            if let Ok(Message::Binary(bytes)) = receiver.try_recv() {
+                if bytes.len() > 4 {
+                    let image = image::load_from_memory(&bytes).expect("generic output must be decodable JPEG");
+                    assert_eq!((image.width(), image.height()), expected);
+                    decoded += 1;
+                }
+            } else { std::thread::sleep(std::time::Duration::from_millis(2)); }
+        }
+        let images = metrics.images.load(Ordering::Relaxed);
+        assert!(decoded > 0 && images > 0, "WGC must deliver real images, not only repeat ticks");
+        assert_eq!(metrics.nvenc_images.load(Ordering::Relaxed), 0);
+        assert_eq!(load.snapshot().resolution_scale_percent, 100);
+        assert_eq!(load.fps(), 60);
+        eprintln!("generic WGC: images={images} decoded={decoded} mean_processing_us={} readback_errors={} profile={}x{}@{}",
+            metrics.processing_us.load(Ordering::Relaxed) / images,
+            metrics.readback_errors.load(Ordering::Relaxed), expected.0, expected.1, load.fps());
+    }
 
     #[test]
     fn minimized_sources_survive_icon_sized_or_unavailable_bounds() {

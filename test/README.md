@@ -23,6 +23,15 @@ pnpm run test:native --release hardware_encodes_recreates_portrait_and_forces_re
 pnpm run test:native --release live_capture_produces_images_and_stops_idempotently -- --ignored --test-threads=1
 ```
 
+`live_generic_wgc_retains_requested_profile_without_nvenc` explicitly checks live
+WGC startup and decodable JPEG output at the selected monitor's aspect ratio within
+1080p/60, with NVENC disabled. It samples capture for twelve seconds, asserts that
+native load adaptation preserves the requested profile, and reports processing cost.
+It retains pixels only in memory and does not measure browser encoding, receiver
+playback, Internet throughput or motion FPS on a static desktop. Run it by name with
+`pnpm run test:native --release live_generic_wgc_retains_requested_profile_without_nvenc '--' --ignored --nocapture --test-threads=1`.
+Quoting the separator preserves it when PowerShell resolves pnpm to a `.ps1` shim.
+
 The Cargo `--` separates the test executable's flags from Cargo's flags. Do not run all ignored tests indiscriminately: some capture the desktop or play audio. The live tone fixture specifically requires a 32-bit floating-point default output mix; that requirement is local to this explicit manual check, not to the automatic suite. Hardware tests fail when explicitly requested on unsupported hardware, rather than returning early and reporting a false pass.
 
 The preserved scripts in `test/bench/` and Rust examples are manual diagnostics. See `test/bench/README.md` for setup and limitations. FPS, wall-clock speed and CPU/GPU scheduling vary across contributors; do not make personal benchmark measurements universal acceptance thresholds.

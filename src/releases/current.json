@@ -2,66 +2,79 @@
   "version": "1.5.1",
   "translations": {
     "en": [
+      "**Smoother screen sharing on Windows 10.** Fixed an unnecessary capture fallback that could cause high CPU usage, stuttering and repeated quality reductions, including in generic mode without NVENC.",
       "**Cross-platform room discovery.** Seamless connections between web and desktop users regardless of who hosts, with reliable rendezvous signaling across official and public brokers.",
       "**Window stability and clean shutdown.** Double-clicking the title bar or room header reliably toggles window maximization without unexpected window closures, and closing the app cleanly terminates all background processes.",
       "**Uncapped web file transfers.** Send and receive files of any size in the browser version without cumulative batch limits, featuring direct disk streaming and support for sending multiple files."
     ],
     "pt-BR": [
+      "**Transmissão mais fluida no Windows 10.** Corrigida uma troca desnecessária do método de captura que podia causar alto uso de CPU, travamentos e reduções repetidas de qualidade, inclusive no modo genérico sem NVENC.",
       "**Encontro de salas entre plataformas.** Conexões diretas e estáveis entre usuários da web e do desktop independentemente de quem cria a sala, com sinalização confiável pelo servidor oficial e servidores públicos.",
       "**Estabilidade da janela e encerramento limpo.** O clique duplo na barra de título ou no cabeçalho da sala agora alterna a maximização com total estabilidade sem fechar a janela, e ao sair do aplicativo todos os processos em segundo plano são finalizados com segurança.",
       "**Envio de arquivos sem limite no navegador.** Envio e recebimento de arquivos de qualquer tamanho na versão web sem restrições de lote acumulado, com streaming direto para o disco e suporte ao envio de múltiplos arquivos."
     ],
     "es": [
+      "**Pantalla compartida más fluida en Windows 10.** Corregido un cambio innecesario del método de captura que podía causar alto uso de CPU, tirones y reducciones repetidas de calidad, también en el modo genérico sin NVENC.",
       "**Descubrimiento entre plataformas.** Conexiones fluidas entre usuarios web y de escritorio sin importar quién cree la sala, con señalización confiable a través del servidor oficial y alternativas públicas.",
       "**Estabilidad de la ventana y cierre limpio.** Hacer doble clic en la barra de título o en el encabezado de la sala alterna la maximización de forma confiable sin cierres inesperados, y al salir de la aplicación se finalizan por completo los procesos en segundo plano.",
       "**Transferencia de archivos sin límites en la web.** Envía y recibe archivos de cualquier tamaño en la versión web sin restricciones de lote acumulado, con transmisión directa al disco y compatibilidad para enviar múltiples archivos."
     ],
     "fr": [
+      "**Partage d’écran plus fluide sous Windows 10.** Correction d’un basculement inutile de la capture qui pouvait provoquer une forte utilisation du processeur, des saccades et des baisses répétées de qualité, y compris en mode générique sans NVENC.",
       "**Découverte de salons multiplateforme.** Connexions fluides entre utilisateurs web et bureau quel que soit l'hôte du salon, avec une signalisation fiable via le serveur officiel et des relais publics.",
       "**Stabilité de la fenêtre et fermeture propre.** Double-cliquer sur la barre de titre ou l'en-tête du salon bascule l'agrandissement de manière fiable sans fermeture inattendue, et quitter l'application termine proprement tous les processus en arrière-plan.",
       "**Transferts de fichiers sans limite sur le Web.** Envoyez et recevez des fichiers de n'importe quelle taille dans la version navigateur sans limite de lot cumulé, avec écriture directe sur disque en streaming et prise en charge de l'envoi de fichiers multiples."
     ],
     "de": [
+      "**Flüssigere Bildschirmübertragung unter Windows 10.** Ein unnötiger Wechsel des Aufnahmeverfahrens wurde behoben, der hohe CPU-Auslastung, Ruckeln und wiederholte Qualitätsverluste verursachen konnte, auch im generischen Modus ohne NVENC.",
       "**Plattformübergreifende Raumsuche.** Nahtlose Verbindungen zwischen Web- und Desktop-Nutzern unabhängig davon, wer den Raum erstellt, mit zuverlässiger Signalübertragung über den offiziellen Server und öffentliche Ausweichserver.",
       "**Fensterstabilität und sauberer Beendigungsvorgang.** Durch Doppelklick auf die Titelleiste oder den Raum-Header wird die Fenstermaximierung zuverlässig umgeschaltet, ohne dass sich das Fenster schließt, und beim Beenden der Anwendung werden alle Hintergrundprozesse sauber beendet.",
       "**Unbegrenzte Dateiübertragungen im Browser.** Senden und empfangen Sie Dateien beliebiger Größe in der Webversion ohne kumulative Stapelbegrenzungen, mit direktem Festplatten-Streaming und Unterstützung für das Senden mehrerer Dateien."
     ],
     "it": [
+      "**Condivisione dello schermo più fluida su Windows 10.** Corretto un cambio non necessario del metodo di acquisizione che poteva causare un elevato uso della CPU, scatti e ripetute riduzioni della qualità, anche in modalità generica senza NVENC.",
       "**Ricerca stanze multipiattaforma.** Connessioni fluide tra utenti web e desktop indipendentemente da chi ospita la stanza, com segnalazione affidabile tramite il server ufficiale e alternative pubbliche.",
       "**Stabilità della finestra e chiusura pulita.** Facendo doppio clic sulla barra del titolo o sull'intestazione della stanza si attiva o disattiva l'ingrandimento in modo affidabile senza chiusure impreviste, e all'uscita dall'applicazione tutti i processi in background vengono terminati correttamente.",
       "**Trasferimento file senza limiti sul Web.** Invia e ricevi file di qualsiasi dimensione nella versione browser senza limiti di batch cumulativi, con streaming diretto su disco e supporto all'invio di più file contemporaneamente."
     ],
     "zh-CN": [
+      "**Windows 10 屏幕共享更流畅。** 修复了不必要的捕获方式切换，该问题可能导致 CPU 占用过高、卡顿和画质反复下降，也影响不使用 NVENC 的通用模式。",
       "**跨平台房间发现。** 无论网页端或桌面端谁主持房间，均可在两者之间无缝直连，依托官方及公共中继提供更可靠的会合信令。",
       "**窗口稳定性与彻底退出。** 双击标题栏或房间顶部可稳定切换窗口最大化而不会意外关闭窗口，退出应用程序时将彻底终止所有后台进程。",
       "**网页端无限制文件传输。** 在网页版中无限制发送与接收任意大小的文件，摆脱累计批次容量限制，支持直读流式写入磁盘及同时发送多个文件。"
     ],
     "zh-TW": [
+      "**Windows 10 螢幕分享更流暢。** 修正不必要的擷取方式切換，此問題可能導致 CPU 使用率過高、卡頓及畫質反覆下降，也影響不使用 NVENC 的通用模式。",
       "**跨平台房間探索。** 無論網頁端或桌面端誰主持房間，皆可在兩者之間順暢直連，透過官方及公共中繼提供更可靠的交會訊號。",
       "**視窗穩定度與徹底結束。** 雙擊標題列或房間頂部可穩定切換視窗最大化而不會意外關閉視窗，結束應用程式時將徹底終止所有背景處理程序。",
       "**網頁版無限制檔案傳輸。** 在網頁版中無限制傳送與接收任意大小的檔案，擺脫累計批次容量限制，支援直寫串流至磁碟及同時傳送多個檔案。"
     ],
     "ja": [
+      "**Windows 10 でより滑らかな画面共有。** 不要なキャプチャ方式の切り替えにより、CPU 使用率の上昇、カクつき、繰り返しの画質低下が発生する問題を修正しました。NVENC を使わない汎用モードも対象です。",
       "**クロスプラットフォームのルーム検出。** ウェブ版とデスクトップ版のどちらがホストになっても確実に相互接続でき、公式および公開ブローカーによる安定したシグナリングを提供します。",
       "**ウィンドウの安定性とクリーンな終了。** タイトルバーやルームヘッダーをダブルクリックした際の最大化切り替えが安定し、予期せずウィンドウが閉じる問題を解消しました。また、アプリ終了時に関連するすべてのバックグラウンドプロセスを完全に停止します。",
       "**ウェブ版での無制限ファイル転送。** 累積バッチ制限なしで、ウェブ版でも任意のサイズのファイルを送受信可能になりました。ディスクへの直接ストリーミング保存と複数ファイルの一括送信に対応しています。"
     ],
     "ko": [
+      "**Windows 10에서 더 부드러운 화면 공유.** 불필요한 캡처 방식 전환으로 CPU 사용량이 높아지고 끊김과 반복적인 화질 저하가 발생할 수 있는 문제를 수정했습니다. NVENC 없는 일반 모드에도 적용됩니다.",
       "**크로스 플랫폼 방 검색.** 웹과 데스크톱 사용자 중 누가 호스트가 되어도 원활하게 상호 연결되며, 공식 서버와 공개 브로커를 통한 안정적인 시그널링을 제공합니다。",
       "**창 안정성 및 백그라운드 정상 종료.** 제목 표시줄이나 방 헤더를 두 번 클릭할 때 창이 예기치 않게 닫히지 않고 안정적으로 최대화 상태가 전환되며, 앱 종료 시 모든 백그라운드 프로세스가 완전히 정리됩니다.",
       "**웹 버전 무제한 파일 전송.** 누적 묶음 용량 제한 없이 웹 버전에서도 모든 크기의 파일을 주고받을 수 있으며, 디스크 직접 스트리밍 저장 및 여러 파일 동시 전송을 지원합니다."
     ],
     "hi": [
+      "**Windows 10 पर अधिक सहज स्क्रीन शेयरिंग।** कैप्चर विधि में अनावश्यक बदलाव को ठीक किया गया, जिससे CPU का अधिक उपयोग, रुकावट और गुणवत्ता में बार-बार गिरावट हो सकती थी। यह सुधार NVENC के बिना सामान्य मोड पर भी लागू होता है।",
       "**क्रॉस-प्लेटफ़ॉर्म कमरा खोज।** वेब और डेस्कटॉप उपयोगकर्ताओं के बीच सहज कनेक्शन, चाहे होस्ट कोई भी हो, आधिकारिक और सार्वजनिक ब्रोकरों के माध्यम से विश्वसनीय सिग्नलिंग के साथ।",
       "**विंडो स्थिरता और सुरक्षित समापन।** शीर्षक पट्टी या कमरे के हेडर पर डबल-क्लिक करने से विंडो अनपेक्षित रूप से बंद हुए बिना विश्वसनीयता से अधिकतम होती है, और ऐप बंद करने पर सभी पृष्ठभूमि प्रक्रियाएं पूरी तरह से समाप्त हो जाती हैं।",
       "**वेब पर असीमित फ़ाइल स्थानांतरण।** बिना किसी संचयी बैच सीमा के वेब संस्करण में किसी भी आकार की फ़ाइलें भेजें और प्राप्त करें, जिसमें डिस्क पर सीधा स्ट्रीमिंग लेखन और एकाधिक फ़ाइलें भेजने का समर्थन शामिल है।"
     ],
     "fi": [
+      "**Sujuvampi näytön jakaminen Windows 10:ssä.** Korjattu tarpeeton kaappaustavan vaihto, joka saattoi aiheuttaa suurta suorittimen käyttöä, nykimistä ja toistuvaa laadun heikkenemistä myös yleisessä tilassa ilman NVENC-koodausta.",
       "**Alustojen välinen huoneiden löytäminen.** Saumattomat yhteydet verkko- ja työpöytäkäyttäjien välillä riippumatta siitä, kumpi luo huoneen, luotettavan virallisen ja julkisen signaalinvälityksen avulla.",
       "**Ikkunan vakaus ja siisti sulkeutuminen.** Otsikkopalkin tai huoneen yläpalkin kaksoisnapsauttaminen vaihtaa ikkunan koon luotettavasti sulkematta ikkunaa odottamatta, ja sovelluksen sulkeminen sammuttaa kaikki taustaprosessit puhtaasti.",
       "**Rajoittamaton tiedostonsiirto selaimessa.** Lähetä ja vastaanota minkä tahansa kokoisia tiedostoja verkkoversiossa ilman kumulatiivisia erärajoituksia, hyödyntäen suoraa levystriimausta ja useiden tiedostojen samanaikaista lähetystä."
     ],
     "ru": [
+      "**Более плавная трансляция экрана в Windows 10.** Исправлено ненужное переключение способа захвата, которое могло вызывать высокую нагрузку на процессор, рывки и повторное снижение качества, в том числе в универсальном режиме без NVENC.",
       "**Кроссплатформенный поиск комнат.** Надёжное подключение между пользователями веб-версии и версии для ПК независимо от того, кто создал комнату, со стабильной передачей сигналов через официальный и публичные серверы.",
       "**Стабильность окна и чистое завершение работы.** Двойной клик по строке заголовка или шапке комнаты надёжно переключает полноэкранный режим без непредвиденного закрытия окна, а при выходе из приложения все фоновые процессы завершаются полностью.",
       "**Передача файлов без ограничений в веб-версии.** Отправка и получение файлов любого размера в браузере без совокупных пакетных лимитов, с прямой потоковой записью на диск и поддержкой отправки нескольких файлов."
