@@ -1461,5 +1461,7 @@
   "web.useWeb": "Webversion nutzen",
   "web.issues": "Problem melden",
   "web.sourceCode": "Quellcode",
-  "apps.desktopOnlyNotice": "Kann nur in der Desktop-App gestartet werden"
+  "apps.desktopOnlyNotice": "Kann nur in der Desktop-App gestartet werden",
+  "chat.filePreparing": "Datei wird vorbereitet...",
+  "chat.fileIndexing": "Hash wird berechnet..."
 }

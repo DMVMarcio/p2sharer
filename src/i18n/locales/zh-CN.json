@@ -1461,5 +1461,7 @@
   "web.useWeb": "使用网页版",
   "web.issues": "报告问题",
   "web.sourceCode": "源代码",
-  "apps.desktopOnlyNotice": "只能在桌面应用中启动"
+  "apps.desktopOnlyNotice": "只能在桌面应用中启动",
+  "chat.filePreparing": "正在准备文件...",
+  "chat.fileIndexing": "正在计算哈希..."
 }

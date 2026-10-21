@@ -1461,5 +1461,7 @@
   "web.useWeb": "Utiliser la version web",
   "web.issues": "Signaler un problème",
   "web.sourceCode": "Code source",
-  "apps.desktopOnlyNotice": "Ne peut être lancé que sur l’application de bureau"
+  "apps.desktopOnlyNotice": "Ne peut être lancé que sur l’application de bureau",
+  "chat.filePreparing": "Préparation du fichier...",
+  "chat.fileIndexing": "Calcul du hachage..."
 }

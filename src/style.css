@@ -2926,6 +2926,10 @@ html[data-theme="light"] :is(.stream-card, .pip-window-root) {
 .chat-file-observation strong { color: var(--text-secondary); }
 .chat-file-detail { display: flex; flex-direction: column; gap: 4px; padding: 8px 0; border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); overflow-wrap: anywhere; font-size: 11px; color: var(--text-secondary); }
 .chat-file-detail span:last-child { font-family: var(--font-mono); font-size: 10px; }
+.chat-file-loading-state { display: inline-flex; align-items: center; gap: 7px; color: var(--accent-color); font-family: var(--font-sans); font-size: 11px; }
+.chat-file-spinner { width: 12px; height: 12px; border: 2px solid var(--border-default); border-top-color: var(--accent-color); border-radius: 50%; animation: chat-file-spin .75s linear infinite; display: inline-block; flex-shrink: 0; }
+@keyframes chat-file-spin { to { transform: rotate(360deg); } }
+:root[data-reduced-motion="true"] .chat-file-spinner { animation: none; }
 .chat-file-error { color: #ef4444; }
 .chat-file-toasts { position: fixed; z-index: 1200; right: 340px; top: 118px; display: flex; flex-direction: column; gap: 10px; width: min(300px, calc(100vw - 40px)); }
 .chat-file-toast { display: flex; flex-direction: column; gap: 8px; padding: 16px; border: 0; border-radius: var(--radius-lg); background: var(--bg-input); box-shadow: var(--shadow-lg); overflow-wrap: anywhere; }

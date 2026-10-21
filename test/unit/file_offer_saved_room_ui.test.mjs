@@ -161,4 +161,39 @@ test('transfer menus keep diagnostics in a keyboard-accessible hint beside the s
   }
 });
 
+test('chat file offer dialog renders loading state immediately and is cancelable during indexing', async () => {
+  let closed = false;
+  let offered = false;
+  await render(React.createElement(ChatFileOfferDialog, {
+    file: { id: 'test-1', name: 'large-video.mp4', size: 1024 * 1024 * 500, hash: '', isImage: false, loading: true },
+    onClose: () => { closed = true; },
+    onOffer: async () => { offered = true; },
+  }));
+  assert.ok(document.querySelector('.chat-file-spinner'));
+  const buttons = Array.from(document.querySelectorAll('.chat-file-dialog button'));
+  const cancelButton = buttons.find(b => b.textContent === 'Cancelar');
+  const submitButton = buttons.find(b => b.classList.contains('btn-primary'));
+  assert.ok(cancelButton);
+  assert.ok(submitButton);
+  assert.equal(submitButton.disabled, true);
+  assert.equal(cancelButton.disabled, false);
+
+  await click(cancelButton);
+  await settleExit();
+  assert.equal(closed, true);
+  assert.equal(offered, false);
+
+  await render(React.createElement(ChatFileOfferDialog, {
+    file: { id: 'test-1', name: 'large-video.mp4', size: 1024 * 1024 * 500, hash: 'abc12345', isImage: false, loading: false },
+    onClose: () => {},
+    onOffer: async () => { offered = true; },
+  }));
+  const readySubmit = Array.from(document.querySelectorAll('.chat-file-dialog button')).find(b => b.classList.contains('btn-primary'));
+  assert.ok(readySubmit);
+  assert.equal(readySubmit.disabled, false);
+  await click(readySubmit);
+  assert.equal(offered, true);
+  await render(null);
+});
+
 after(async () => { await act(async () => root.unmount()); dom.window.close(); delete globalThis.fileOfferSavedRoomFixture; });

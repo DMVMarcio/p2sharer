@@ -1461,5 +1461,7 @@
   "web.useWeb": "ウェブ版を使う",
   "web.issues": "問題を報告",
   "web.sourceCode": "ソースコード",
-  "apps.desktopOnlyNotice": "デスクトップ アプリでのみ開始できます"
+  "apps.desktopOnlyNotice": "デスクトップ アプリでのみ開始できます",
+  "chat.filePreparing": "ファイルを準備しています...",
+  "chat.fileIndexing": "ハッシュを計算しています..."
 }

@@ -1461,5 +1461,7 @@
   "web.useWeb": "Usar versión web",
   "web.issues": "Informar de un problema",
   "web.sourceCode": "Código fuente",
-  "apps.desktopOnlyNotice": "Solo se puede iniciar en la aplicación de escritorio"
+  "apps.desktopOnlyNotice": "Solo se puede iniciar en la aplicación de escritorio",
+  "chat.filePreparing": "Preparando archivo...",
+  "chat.fileIndexing": "Calculando hash..."
 }

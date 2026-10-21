@@ -1461,5 +1461,7 @@
   "web.useWeb": "Открыть веб-версию",
   "web.issues": "Сообщить о проблеме",
   "web.sourceCode": "Исходный код",
-  "apps.desktopOnlyNotice": "Можно запустить только в приложении для ПК"
+  "apps.desktopOnlyNotice": "Можно запустить только в приложении для ПК",
+  "chat.filePreparing": "Подготовка файла...",
+  "chat.fileIndexing": "Вычисление хеша..."
 }

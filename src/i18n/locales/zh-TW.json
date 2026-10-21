@@ -1461,5 +1461,7 @@
   "web.useWeb": "使用網頁版",
   "web.issues": "回報問題",
   "web.sourceCode": "原始碼",
-  "apps.desktopOnlyNotice": "只能在桌面應用程式中啟動"
+  "apps.desktopOnlyNotice": "只能在桌面應用程式中啟動",
+  "chat.filePreparing": "正在準備檔案...",
+  "chat.fileIndexing": "正在計算雜湊..."
 }

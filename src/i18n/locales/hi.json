@@ -1461,5 +1461,7 @@
   "web.useWeb": "वेब संस्करण इस्तेमाल करें",
   "web.issues": "समस्या की रिपोर्ट करें",
   "web.sourceCode": "स्रोत कोड",
-  "apps.desktopOnlyNotice": "केवल डेस्कटॉप ऐप में शुरू किया जा सकता है"
+  "apps.desktopOnlyNotice": "केवल डेस्कटॉप ऐप में शुरू किया जा सकता है",
+  "chat.filePreparing": "फ़ाइल तैयार हो रही है...",
+  "chat.fileIndexing": "हैश की गणना की जा रही है..."
 }

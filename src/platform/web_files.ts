@@ -123,9 +123,15 @@ export function createSha256() {
   };
 }
 
-export async function computeBlobSha256(blob: Blob, onProgress?: (bytes: number) => void): Promise<string> {
+export async function computeBlobSha256(
+  blob: Blob,
+  signal?: AbortSignal,
+  onProgress?: (bytes: number) => void
+): Promise<string> {
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
   if (blob.size <= 32 * 1024 * 1024) {
     const buffer = await blob.arrayBuffer();
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
     const digest = await crypto.subtle.digest('SHA-256', buffer);
     return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
   }
@@ -133,6 +139,7 @@ export async function computeBlobSha256(blob: Blob, onProgress?: (bytes: number)
   const chunkSize = 4 * 1024 * 1024;
   let offset = 0;
   while (offset < blob.size) {
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
     const slice = blob.slice(offset, Math.min(blob.size, offset + chunkSize));
     const buf = new Uint8Array(await slice.arrayBuffer());
     hasher.update(buf);
@@ -189,11 +196,11 @@ export function downloadBlob(blob: Blob, name: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
-export async function registerBrowserFile(blob: Blob, name: string): Promise<NativeChatFile> {
+export async function registerBrowserFile(blob: Blob, name: string, signal?: AbortSignal): Promise<NativeChatFile> {
   if (!blob || !(blob instanceof Blob)) throw new Error('Invalid file');
   if (sources.size >= 128) throw new Error('web.fileLimit');
   const id = crypto.randomUUID();
-  const hash = await computeBlobSha256(blob);
+  const hash = await computeBlobSha256(blob, signal);
   const file: NativeChatFile = {
     id,
     path: id,

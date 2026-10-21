@@ -1461,5 +1461,7 @@
   "web.useWeb": "Käytä verkkoversiota",
   "web.issues": "Ilmoita ongelmasta",
   "web.sourceCode": "Lähdekoodi",
-  "apps.desktopOnlyNotice": "Voidaan käynnistää vain työpöytäsovelluksessa"
+  "apps.desktopOnlyNotice": "Voidaan käynnistää vain työpöytäsovelluksessa",
+  "chat.filePreparing": "Valmistellaan tiedostoa...",
+  "chat.fileIndexing": "Lasketaan tiivistettä..."
 }
