@@ -444,7 +444,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
 
           if (evt.data instanceof ArrayBuffer) {
             if (evt.data.byteLength > 4) {
-              const encoder = isNativeEncodedPacket(evt.data) ? 'NVENC/H264' : 'libjpeg-turbo/JPEG';
+              const encoder = isNativeEncodedPacket(evt.data) ? 'native/H264' : 'libjpeg-turbo/JPEG';
               if (wireEncoder !== encoder) {
                 logDiagnostic('INFO', 'capture.encoder', 'Observed native video payload', {
                   sessionId: this.sessionId, encoder, previousEncoder: wireEncoder,

@@ -57,8 +57,8 @@ export async function runNvencLifecycle(requestedSource?: string) {
   } finally {await first.stopCapture();await second.stopCapture();await tiny.stopCapture();await decoderUnavailable.stopCapture();cancelAnimationFrame(animation);canvas.remove();}
 }
 
-/** Check RGBA channel order and quadrant orientation through actual encode/decode. */
-export async function runNvencVisualCheck(requestedSource?: string) {
+/** Check either native hardware backend and its JPEG fallback through actual encode/decode. */
+export async function runHardwareVisualCheck(requestedSource?: string) {
   const sourceId = await resolveCaptureSource(requestedSource);
   const window=getCurrentWindow(),wasMaximized=await window.isMaximized(),wasAlwaysOnTop=await window.isAlwaysOnTop();
   await window.setAlwaysOnTop(true);
@@ -87,12 +87,14 @@ export async function runNvencVisualCheck(requestedSource?: string) {
   try {
     await bridge.startCapture(sourceId,30,{width:1280,height:720},false,90);await wait();
     const before=await invoke<Record<string,number>>('get_capture_metrics',{sessionId:bridge.sessionId});
-    if(!before.nvenc_images)throw new Error('NVENC required for color validation');
-    const nvenc=sample();await bridge.disableNativeEncoding();await wait();const jpeg=sample();
-    return {expected:colors,nvenc,jpeg};
+    if(!before.nvenc_images)throw new Error('Native hardware H264 required for color validation');
+    const nativeH264=sample();await bridge.disableNativeEncoding();await wait();const jpeg=sample();
+    return {expected:colors,nativeH264,jpeg};
   } finally {
     await bridge.stopCapture();cancelAnimationFrame(animation);canvas.remove();
     await window.setAlwaysOnTop(wasAlwaysOnTop);
     if(!wasMaximized&&await window.isMaximized())await invoke('plugin:window|internal_toggle_maximize',{label:window.label});
   }
 }
+
+export const runNvencVisualCheck = runHardwareVisualCheck;

@@ -142,7 +142,7 @@ fn log_selected_encoder(metrics: &CaptureMetrics, session: &str, encoder: u8, wi
     if metrics.encoder_kind.swap(encoder, Ordering::Relaxed) != encoder {
         crate::logger::log_msg("INFO", "capture.encoder", &format!(
             "session={session} encoder={} output={width}x{height} fps={fps} elapsed_ms={elapsed_ms} first_successful_frame=true",
-            if encoder == 1 { "NVENC/H264" } else { "libjpeg-turbo/JPEG" }));
+            match encoder { 1 => "NVENC/H264", 3 => "MediaFoundation/H264", _ => "libjpeg-turbo/JPEG" }));
     }
 }
 
@@ -239,7 +239,7 @@ pub async fn get_native_encoder_support() -> Result<serde_json::Value, String> {
     }).await.map_err(|error| error.to_string())
 }
 
-// Explicit generic always wins; the old diagnostic flag only overrides automatic mode.
+// Generic skips the vendor SDK, but can use the Windows hardware encoder.
 fn nvenc_requested(preference: Option<&str>, diagnostic: Option<&str>) -> bool {
     match preference {
         Some("generic") => false,
@@ -248,6 +248,8 @@ fn nvenc_requested(preference: Option<&str>, diagnostic: Option<&str>) -> bool {
     }
 }
 
+fn mf_requested(diagnostic: Option<&str>) -> bool { diagnostic != Some("0") }
+
 #[tauri::command]
 pub fn control_capture_encoder(session_id: String, feedback_token: String, disable: bool) -> Result<(), String> {
     let sessions = SESSIONS.lock().map_err(|_| "Capture session lock poisoned")?;
@@ -255,7 +257,7 @@ pub fn control_capture_encoder(session_id: String, feedback_token: String, disab
     session.load.validate_token(&feedback_token)?;
     if disable {
         if session.nvenc_enabled.swap(false, Ordering::Relaxed) {
-            crate::logger::log_msg("WARN", "capture.encoder", &format!("session={session_id} NVENC disabled by frontend decoder/transport; fallback=libjpeg-turbo/JPEG"));
+            crate::logger::log_msg("WARN", "capture.encoder", &format!("session={session_id} native H264 disabled by frontend decoder/transport; fallback=libjpeg-turbo/JPEG"));
             session.metrics.nvenc_fallbacks.fetch_add(1, Ordering::Relaxed);
         }
     }
@@ -335,6 +337,8 @@ fn start_frame_delivery(delivery: FrameDelivery, active: Arc<AtomicBool>, load: 
 pub struct CaptureFlags {
     lifecycle: Arc<WgcLifecycle>,
     nvenc_sequence: Arc<std::sync::atomic::AtomicU32>,
+    try_nvenc: bool,
+    try_mf: bool,
     pub session_id: String,
     pub nvenc_enabled: Arc<AtomicBool>,
     pub nvenc_keyframe: Arc<AtomicBool>,
@@ -364,7 +368,7 @@ impl WgcLifecycle {
 pub struct NativeWgcHandler {
     lifecycle: Arc<WgcLifecycle>,
     session_id: String,
-    nvenc: crate::video_nvenc::GpuEncoder,
+    nvenc: Option<crate::video_hardware::GpuEncoder>,
     nvenc_enabled: Arc<AtomicBool>,
     nvenc_keyframe: Arc<AtomicBool>,
     nvenc_bitrate: Arc<std::sync::atomic::AtomicU32>,
@@ -402,7 +406,7 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
         Ok(Self {
             lifecycle: ctx.flags.lifecycle,
             session_id: ctx.flags.session_id,
-            nvenc: crate::video_nvenc::GpuEncoder::with_sequence(ctx.flags.nvenc_sequence),
+            nvenc: Some(crate::video_hardware::GpuEncoder::new(ctx.flags.try_nvenc, ctx.flags.try_mf, ctx.flags.nvenc_sequence)),
             nvenc_enabled: ctx.flags.nvenc_enabled,
             nvenc_keyframe: ctx.flags.nvenc_keyframe,
             nvenc_bitrate: ctx.flags.nvenc_bitrate,
@@ -481,13 +485,13 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
                 return Ok(());
             }
             let encoder_started = std::time::Instant::now();
-            let result = self.nvenc.encode(frame.device(), scaled.as_ref().unwrap_or(frame.as_raw_texture()),
+            let result = self.nvenc.as_mut().ok_or_else(|| "Native encoder was retired".to_string()).and_then(|encoder| encoder.encode(frame.device(), scaled.as_ref().unwrap_or(frame.as_raw_texture()),
                 src_width, src_height, self.load.fps(), self.nvenc_bitrate.load(Ordering::Relaxed), self.start_instant.elapsed().as_micros() as u64,
-                self.nvenc_keyframe.swap(false, Ordering::Relaxed));
+                self.nvenc_keyframe.swap(false, Ordering::Relaxed)));
             self.metrics.nvenc_us.fetch_add(encoder_started.elapsed().as_micros() as u64, Ordering::Relaxed);
             match result {
                 Ok(bytes) => {
-                    log_selected_encoder(&self.metrics, &self.session_id, 1, src_width, src_height, self.load.fps(), self.start_instant.elapsed().as_millis());
+                    log_selected_encoder(&self.metrics, &self.session_id, self.nvenc.as_ref().unwrap().backend(), src_width, src_height, self.load.fps(), self.start_instant.elapsed().as_millis());
                     self.next_frame_time += self.frame_interval;
                     if arrival_time.saturating_duration_since(self.next_frame_time) >= self.frame_interval {
                         self.next_frame_time = arrival_time + self.frame_interval;
@@ -508,18 +512,18 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
                 Err(error) => {
                     self.nvenc_enabled.store(false, Ordering::Relaxed);
                     self.metrics.nvenc_fallbacks.fetch_add(1, Ordering::Relaxed);
-                    self.nvenc = crate::video_nvenc::GpuEncoder::default();
-                    crate::logger::log_msg("WARN", "capture.nvenc", &format!("session={} NVENC encode/init failed output={src_width}x{src_height} fps={} attempt_ms={} elapsed_ms={} fallback=libjpeg-turbo/JPEG error={error}",
+                    self.nvenc = None;
+                    crate::logger::log_msg("WARN", "capture.hardware", &format!("session={} hardware encode/init failed output={src_width}x{src_height} fps={} attempt_ms={} elapsed_ms={} fallback=libjpeg-turbo/JPEG error={error}",
                         self.session_id, self.load.fps(), encoder_started.elapsed().as_millis(), self.start_instant.elapsed().as_millis()));
                 }
             }
         } else {
             if self.nvenc_enabled.swap(false, Ordering::Relaxed) {
-                crate::logger::log_msg("WARN", "capture.nvenc", &format!("session={} NVENC disabled: GPU scaling unavailable for source bounds; fallback=libjpeg-turbo/JPEG", self.session_id));
+                crate::logger::log_msg("WARN", "capture.hardware", &format!("session={} native H264 disabled: GPU scaling unavailable for source bounds; fallback=libjpeg-turbo/JPEG", self.session_id));
                 self.metrics.nvenc_fallbacks.fetch_add(1, Ordering::Relaxed);
             }
             // A decoder rejection releases the driver session on its owner thread.
-            self.nvenc = crate::video_nvenc::GpuEncoder::default();
+            self.nvenc = None;
         }
         let mut frame_buffer = match if self.legacy_readback {
             frame.buffer().map(crate::video_readback::CapturePixels::Legacy).map_err(|error| -> Self::Error { error.into() })
@@ -552,9 +556,7 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
         let should_resize = self.target_width > 0
             && self.target_height > 0
             && (src_width > self.target_width || src_height > self.target_height);
-        let row_bytes = src_width as usize * 4;
-        let pixel_data = frame_buffer.packed(&mut self.raw_buffer, src_width, src_height);
-        let pixel_pitch = row_bytes;
+        let (pixel_data, pixel_pitch) = frame_buffer.strided(&mut self.raw_buffer, src_width, src_height, should_resize);
         self.metrics.readback_us.fetch_add(arrival_time.elapsed().as_micros() as u64, Ordering::Relaxed);
         let resize_start = std::time::Instant::now();
         let (final_pixels, final_w, final_h, final_pitch) = if should_resize {
@@ -1294,9 +1296,11 @@ pub fn start_capture_session(
     let sender = if session_id == "default" { get_frame_sender().clone() } else { broadcast::channel(32).0 };
     let metrics = Arc::new(CaptureMetrics::default());
     let load = Arc::new(crate::video_load::CaptureLoad::new(fps, width, height, feedback_token));
-    let nvenc_enabled = Arc::new(AtomicBool::new(nvenc_requested(encoder_preference.as_deref(), std::env::var("P2SHARER_NATIVE_NVENC").ok().as_deref())));
-    crate::logger::log_msg("INFO", "capture.start", &format!("session={session_id} source={source_id} requested={width}x{height}@{fps} cursor={should_draw_mouse} jpeg_quality={jpeg_quality} preference={} nvenc_requested={}",
-        encoder_preference.as_deref().unwrap_or("auto"), nvenc_enabled.load(Ordering::Relaxed)));
+    let try_nvenc = nvenc_requested(encoder_preference.as_deref(), std::env::var("P2SHARER_NATIVE_NVENC").ok().as_deref());
+    let try_mf = mf_requested(std::env::var("P2SHARER_NATIVE_MF").ok().as_deref());
+    let nvenc_enabled = Arc::new(AtomicBool::new(try_nvenc || try_mf));
+    crate::logger::log_msg("INFO", "capture.start", &format!("session={session_id} source={source_id} requested={width}x{height}@{fps} cursor={should_draw_mouse} jpeg_quality={jpeg_quality} preference={} nvenc_requested={try_nvenc} mf_requested={try_mf}",
+        encoder_preference.as_deref().unwrap_or("auto")));
     let nvenc_keyframe = Arc::new(AtomicBool::new(true));
     let nvenc_bitrate = Arc::new(std::sync::atomic::AtomicU32::new(15_000_000));
     SESSIONS.lock().map_err(|_| "Capture session lock poisoned")?.insert(session_id.clone(), CaptureSession {
@@ -1319,6 +1323,7 @@ pub fn start_capture_session(
         let flags = CaptureFlags {
             lifecycle: Arc::new(WgcLifecycle::new()),
             nvenc_sequence: Arc::new(std::sync::atomic::AtomicU32::new(0)),
+            try_nvenc, try_mf,
             session_id: session_id.clone(),
             nvenc_enabled: nvenc_enabled.clone(), nvenc_keyframe: nvenc_keyframe.clone(), nvenc_bitrate: nvenc_bitrate.clone(),
             delivery: delivery.clone(),
@@ -1733,6 +1738,7 @@ mod tests {
     #[test]
     #[ignore = "requires an interactive Windows desktop and capture permission; captures pixels in memory only"]
     fn live_generic_wgc_retains_requested_profile_without_nvenc() {
+        assert_eq!(std::env::var("P2SHARER_NATIVE_MF").as_deref(), Ok("0"), "set P2SHARER_NATIVE_MF=0 to exercise the JPEG fallback explicitly");
         let monitor = list_screen_sources().monitors.into_iter().find(|monitor| monitor.is_primary)
             .expect("live capture requires a primary monitor");
         let expected = fit_capture_dimensions(monitor.width, monitor.height, 1920, 1080);
@@ -1806,6 +1812,8 @@ mod tests {
         }
         assert!(!nvenc_requested(Some("generic"), Some("1")));
         assert!(nvenc_requested(Some("nvenc"), Some("0")));
+        assert!(mf_requested(None));
+        assert!(!mf_requested(Some("0")));
     }
 
     #[test]

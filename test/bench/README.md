@@ -17,7 +17,8 @@ const { runVideoLoopback } = await import('/test/bench/video_loopback.ts');
 await runVideoLoopback({ pipeline: 'native', peers: 2, probe: true });
 // A browser canvas source isolates encoding from native capture.
 await runVideoLoopback({ pipeline: 'canvas', peers: 2 });
-// Select Generic in settings first to isolate the vendor-neutral JPEG path.
+// Generic uses Windows hardware H264 when supported. To isolate JPEG, also launch
+// the diagnostic instance with P2SHARER_NATIVE_MF=0.
 await runVideoLoopback({ pipeline: 'native', peers: 1, probe: true, quality: 95 });
 
 const { runMultipleMediaLoopback, runPointerIsolation } =
@@ -45,3 +46,12 @@ Native builds require the documented MSVC/CMake/NASM prerequisites. Always keep 
 NVENC quality and motion fixtures are ignored native tests. Run an individual named test with `pnpm run test:native --release <test-name> -- --ignored --test-threads=1`. Optional `P2SHARER_NVENC_QUALITY_DIR` exports packets and reference pixels; choose an ignored directory under `src-tauri/target/`. `nvenc_quality.ts` exposes `measureNvencDetail(base64, validate, motion1080)` to decode those fixtures, check dimensions, keys, sequence continuity and detail across bitrate changes. Static synthetic detail is not a game-fidelity benchmark.
 
 Compare fresh sender/receiver counter deltas and frame intervals; cached heartbeats are not newly captured frames. Local peers share the same machine and cannot prove another participant's decoder or network performance. Close the desktop application before the required `pnpm run tauri:build` packaging validation. Never commit captures, packet exports, logs, credentials or personal hardware reports.
+
+For Windows Media Foundation, select Generic and leave `P2SHARER_NATIVE_MF` unset.
+The same `runNativeRtpLoopback` exercises native publication and viewer recovery;
+`runHardwareVisualCheck` in `nvenc_lifecycle.ts` verifies color/orientation and JPEG
+fallback for either hardware backend. `capture.encoder` in the native log identifies
+MediaFoundation/H264 versus NVENC/H264; the shared wire format alone does not.
+Record the selected budget, content and fallback counts: passing a simple scene
+does not establish support for detailed 1080p recovery at very low bitrates. Hardware
+MFT burst overshoot can trigger the existing compatibility fallback there.

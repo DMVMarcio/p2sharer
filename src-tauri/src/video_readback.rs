@@ -2,7 +2,7 @@ use windows_capture::frame::{Frame, FrameBuffer};
 use windows_capture_api::core::{Error, Result};
 use windows_capture_api::Win32::Foundation::E_POINTER;
 use windows_capture_api::Win32::Graphics::Direct3D11::{
-    D3D11_CPU_ACCESS_READ, D3D11_CPU_ACCESS_WRITE, D3D11_MAP_READ_WRITE, D3D11_MAPPED_SUBRESOURCE,
+    D3D11_CPU_ACCESS_READ, D3D11_MAP_READ, D3D11_MAPPED_SUBRESOURCE,
     D3D11_TEXTURE2D_DESC, D3D11_USAGE_STAGING, ID3D11Device,
     ID3D11DeviceContext, ID3D11Texture2D,
 };
@@ -35,7 +35,7 @@ impl ReusableReadback {
         if recreate {
             let staging_desc = D3D11_TEXTURE2D_DESC {
                 Usage: D3D11_USAGE_STAGING, BindFlags: 0,
-                CPUAccessFlags: (D3D11_CPU_ACCESS_READ.0 | D3D11_CPU_ACCESS_WRITE.0) as u32, MiscFlags: 0,
+                CPUAccessFlags: D3D11_CPU_ACCESS_READ.0 as u32, MiscFlags: 0,
                 ..desc
             };
             let mut texture = None;
@@ -47,7 +47,7 @@ impl ReusableReadback {
         let mut mapped = D3D11_MAPPED_SUBRESOURCE::default();
         unsafe {
             context.CopyResource(texture, source);
-            context.Map(texture, 0, D3D11_MAP_READ_WRITE, 0, Some(&mut mapped))?;
+            context.Map(texture, 0, D3D11_MAP_READ, 0, Some(&mut mapped))?;
         }
         Ok(MappedReadback { context: context.clone(), texture, mapped, height: desc.Height })
     }
@@ -69,11 +69,6 @@ impl MappedReadback<'_> {
         unsafe { std::slice::from_raw_parts(self.mapped.pData.cast(), self.row_pitch() * self.height as usize) }
     }
 
-    fn pixels_mut(&mut self) -> &mut [u8] {
-        let len = self.row_pitch() * self.height as usize;
-        // The guard has exclusive access to the mapped read/write texture.
-        unsafe { std::slice::from_raw_parts_mut(self.mapped.pData.cast(), len) }
-    }
 }
 
 impl Drop for MappedReadback<'_> {
@@ -89,20 +84,18 @@ pub enum CapturePixels<'a> {
 }
 
 impl CapturePixels<'_> {
-    pub fn packed<'a>(&'a mut self, destination: &'a mut Vec<u8>, width: u32, height: u32) -> &'a [u8] {
+    pub fn strided<'a>(&'a mut self, destination: &'a mut Vec<u8>, width: u32, height: u32, pack: bool) -> (&'a [u8], usize) {
         match self {
-            Self::Legacy(buffer) => buffer.as_nopadding_buffer(destination),
-            Self::Reused(buffer) => {
+            Self::Legacy(buffer) => (buffer.as_nopadding_buffer(destination), width as usize * 4),
+            Self::Reused(buffer) if pack && buffer.row_pitch() != width as usize * 4 => {
                 let row_bytes = width as usize * 4;
-                if buffer.row_pitch() == row_bytes { return buffer.pixels(); }
-                // Preserve the library's parallel packing and no-copy behavior.
-                let pitch = buffer.row_pitch() as u32;
-                let depth = buffer.mapped.DepthPitch;
-                let view = FrameBuffer::new(buffer.pixels_mut(), width, height, pitch, depth,
-                    windows_capture::settings::ColorFormat::Rgba8);
-                let _ = view.as_nopadding_buffer(destination);
-                destination
+                destination.resize(row_bytes * height as usize, 0);
+                for (source, target) in buffer.pixels().chunks_exact(buffer.row_pitch()).zip(destination.chunks_exact_mut(row_bytes)) {
+                    target.copy_from_slice(&source[..row_bytes]);
+                }
+                (destination, row_bytes)
             }
+            Self::Reused(buffer) => (buffer.pixels(), buffer.row_pitch()),
         }
     }
 }
@@ -134,7 +127,10 @@ mod tests {
             }
             let mut captured = CapturePixels::Reused(mapped);
             let mut packed = Vec::new();
-            assert_eq!(captured.packed(&mut packed, width, height), pixels.as_slice());
+            let (strided, pitch) = captured.strided(&mut packed, width, height, false);
+            for row in strided.chunks_exact(pitch) { assert_eq!(&row[..width as usize * 4], &pixels[..width as usize * 4]); }
+            assert!(packed.is_empty(), "JPEG can read mapped rows without an intermediate CPU copy");
+            assert_eq!(captured.strided(&mut packed, width, height, true).0, pixels.as_slice());
             drop(captured);
             assert_eq!(readback.allocations(), expected_allocations);
         }

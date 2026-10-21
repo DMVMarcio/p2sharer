@@ -71,14 +71,18 @@ impl GpuEncoder {
         }
         if bytes.is_null() || len == 0 || len > 16 * 1024 * 1024 { return Err("NVENC output size invalid".into()); }
         let sequence = self.next_sequence();
-        let mut packet = Vec::with_capacity(28 + len);
-        packet.extend_from_slice(b"P2NV"); packet.push(1); packet.push(u8::from(key != 0)); packet.extend_from_slice(&[0, 0]);
-        packet.extend_from_slice(&width.to_le_bytes()); packet.extend_from_slice(&height.to_le_bytes());
-        packet.extend_from_slice(&sequence.to_le_bytes()); packet.extend_from_slice(&timestamp.to_le_bytes());
         // Driver bytes remain owned by this encoder until its next synchronous call.
-        packet.extend_from_slice(unsafe { std::slice::from_raw_parts(bytes, len) });
-        Ok(packet)
+        Ok(packet(unsafe { std::slice::from_raw_parts(bytes, len) }, width, height, sequence, timestamp, key != 0))
     }
+}
+
+pub(crate) fn packet(bytes: &[u8], width: u32, height: u32, sequence: u32, timestamp: u64, key: bool) -> Vec<u8> {
+    let mut packet = Vec::with_capacity(28 + bytes.len());
+    packet.extend_from_slice(b"P2NV"); packet.push(1); packet.push(u8::from(key)); packet.extend_from_slice(&[0, 0]);
+    packet.extend_from_slice(&width.to_le_bytes()); packet.extend_from_slice(&height.to_le_bytes());
+    packet.extend_from_slice(&sequence.to_le_bytes()); packet.extend_from_slice(&timestamp.to_le_bytes());
+    packet.extend_from_slice(bytes);
+    packet
 }
 
 #[cfg(test)]

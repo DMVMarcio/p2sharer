@@ -73,7 +73,8 @@ desktop build 19045 supports WGC but lacks `IsBorderRequired` (introduced in bui
 unnecessarily selects xcap/JPEG, losing GPU scaling and native encoding. Unsupported
 properties retain OS defaults; older systems may therefore show the system capture
 border or retain the default cursor behavior. Generic mode still uses WGC capture
-and available GPU scaling with JPEG, without requiring NVIDIA or NVENC. Real overload
+and available GPU scaling without requiring NVIDIA or NVENC. It tries the Windows
+hardware H264 encoder before the JPEG fallback. Real overload
 adaptation remains enabled; fixing feature selection does not guarantee a specific
 GPU's capture or browser encoder throughput.
 
@@ -190,7 +191,7 @@ Building the vendored native library requires CMake and the existing MSVC C/C++ 
 
 ## Capture scaling, load, and pacing
 
-`video_gpu_scale.rs` owns per-session GPU scaling and reusable staging resources; mapped guards release GPU resources. Aspect-fit bounds preserve portrait sources without upscaling. JPEG uses the shared `RealtimeJpegEncoder`; strided diagnostic encoding is not a reason to bypass the production pixel-packing path.
+`video_gpu_scale.rs` owns per-session GPU scaling and reusable staging resources; mapped guards release GPU resources. Aspect-fit bounds preserve portrait sources without upscaling. JPEG uses the shared `RealtimeJpegEncoder` directly on read-only mapped rows and their actual pitch. CPU row packing is needed only for legacy capture or the CPU resize fallback.
 
 `video_load.rs` owns per-session runtime limits. Native processing and `bridge_load_meter.ts` feedback measure actual work and pending JPEG replacement; idle ticks do not indicate overload. Sustained pressure reduces scale before FPS, healthy windows restore one step, and generation tokens reject stale feedback. These runtime limits do not rewrite saved capture preferences or replace WebRTC congestion control.
 
@@ -200,7 +201,7 @@ Building the vendored native library requires CMake and the existing MSVC C/C++ 
 
 ## Native encoded publication
 
-Automatic capture uses capability-probed NVENC where supported and generic JPEG otherwise. Native H264 is published through webrtc-rs RTP/DTLS-SRTP; WebCodecs supplies only the local preview. See [native-nvenc.md](native-nvenc.md) for selection, generation ownership, packet pacing, rate control, keyframe recovery, audio association, and fallback.
+Automatic capture tries NVENC, then hardware-only Media Foundation, then JPEG. Generic skips the NVENC SDK but can use Media Foundation on compatible Intel, AMD, NVIDIA and integrated GPUs. JPEG retains browser WebRTC encoding. Native H264 is published through webrtc-rs RTP/DTLS-SRTP; WebCodecs supplies only the local preview. See [native-nvenc.md](native-nvenc.md) for selection, generation ownership, packet pacing, rate control, keyframe recovery, audio association, and fallback.
 
 ## Validation boundaries
 

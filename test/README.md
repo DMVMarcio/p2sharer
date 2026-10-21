@@ -25,7 +25,8 @@ pnpm run test:native --release live_capture_produces_images_and_stops_idempotent
 
 `live_generic_wgc_retains_requested_profile_without_nvenc` explicitly checks live
 WGC startup and decodable JPEG output at the selected monitor's aspect ratio within
-1080p/60, with NVENC disabled. It samples capture for twelve seconds, asserts that
+1080p/60, with NVENC disabled. Set `$env:P2SHARER_NATIVE_MF='0'` for this JPEG-only fixture.
+It samples capture for twelve seconds, asserts that
 native load adaptation preserves the requested profile, and reports processing cost.
 It retains pixels only in memory and does not measure browser encoding, receiver
 playback, Internet throughput or motion FPS on a static desktop. Run it by name with
@@ -47,3 +48,11 @@ The retired tier-based `test/e2e/` harness mostly validated handwritten DSP, sig
 The retired capture-cadence script extracted Rust source with regular expressions and no longer compiled against the current handler; the production frame-pacer regressions remain in the native suite. Removed native diagnostics measured `Instant`, `Vec`, polling thread timings or duplicated resource guards. Production resampler, downmix, continuity, clipping, serialization, transport authentication, JPEG/readback and event-guard lifetime checks remain. The encoder preference regression is now included in the standard frontend command. Retain regressions because they protect behavior, even when their filenames originated in an earlier milestone.
 
 Keep generated results, packet fixtures, screenshots and logs under ignored output directories or outside the repository. Do not commit private room credentials, machine profiles, deployment addresses, personal paths or media captured during testing.
+
+The ignored `hardware_mf_encodes_recreates_and_forces_recovery_keys` fixture validates
+Windows hardware MFT encoding on the actual D3D11 adapter, including portrait and
+1080p, capture timestamps, shared packet sequence, bitrate edits and recovery IDRs.
+Run it with `pnpm run test:native --release hardware_mf_encodes_recreates_and_forces_recovery_keys '--' --ignored --nocapture --test-threads=1`.
+It requires a hardware H264 MFT; unsupported hardware fails explicitly. Validate
+Intel, AMD and integrated GPUs separately rather than inferring compatibility from
+one vendor's result. No proprietary encoder runtime is bundled.

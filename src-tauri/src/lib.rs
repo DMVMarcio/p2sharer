@@ -25,6 +25,8 @@ mod video_readback;
 mod video_gpu_scale;
 #[cfg(windows)]
 mod video_nvenc;
+#[cfg(windows)]
+mod video_hardware;
 mod camera_permission;
 mod browser_shortcuts;
 pub mod shared_browser;

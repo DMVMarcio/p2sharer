@@ -1,4 +1,4 @@
-# Native NVENC encoding
+# Native hardware H264 encoding
 
 ## Current scope
 
@@ -7,17 +7,22 @@ settings offer Automatic, Generic, and NVIDIA NVENC only after a real D3D11 enco
 session/preset/resource probe succeeds. The short probe runs off the command thread
 and releases its hardware session immediately. Each actual capture still validates
 its own device, dimensions and driver resources and falls back to generic on failure.
-AMD encoding is not implemented or advertised yet.
+Automatic tries NVENC first, then the Windows Media Foundation hardware encoder.
+Generic skips the NVENC SDK and tries Media Foundation before falling back to JPEG.
+`video_hardware.rs` centralizes backend ownership and the shared P2NV packet contract.
+The existing `nvenc_*` capture counters and enable/keyframe/budget atomics retain their
+legacy names for IPC compatibility, but also cover Media Foundation H264.
 
 `p2sharer_video_encoder` persists the preference. Unknown values or unavailable
 explicit NVENC selections recover to Automatic (and generic when native encoding
 cannot run). Settings Save applies to future screen/window captures, including source
 restarts, without an application restart; existing captures remain intact. Cameras
 keep their established path. `P2SHARER_NATIVE_NVENC=0` is a diagnostic override for
-Automatic; `=1` remains accepted. Explicit Generic overrides that flag, and explicit
-NVENC overrides the automatic diagnostic disable.
+Automatic; `=1` remains accepted. Explicit Generic skips NVENC regardless of that flag,
+and explicit NVENC overrides the automatic diagnostic disable. `P2SHARER_NATIVE_MF=0`
+disables Windows hardware encoding for diagnostics; combine it with Generic to isolate JPEG.
 
-The published path is WGC -> GPU area scaler -> NVENC -> native H264 RTP
+The published path is WGC -> GPU area scaler -> hardware encoder -> native H264 RTP
 packetization/pacing -> DTLS-SRTP -> the viewer's ordinary WebRTC video track.
 `src-tauri/src/native_rtc.rs` uses pinned webrtc-rs 0.17.2. Native video uses one
 standard RTP peer connection per capture/viewer. Targeted SDP/trickle ICE signaling
@@ -28,7 +33,7 @@ Compatibility with every public NAT/TURN route has not been established.
 **The published native video is not decoded and re-encoded by the browser.** The
 existing authenticated H264/WebCodecs bridge still supplies the local preview and
 local UI track. A WeakMap registers only live local capture tracks and their capture
-generation tokens. Cameras, unsupported capture devices and generic captures retain
+generation tokens. Cameras, unsupported capture devices and JPEG fallback captures retain
 the established browser WebRTC path. Native negotiation/encoding/transport rejection
 also selects that path for the affected viewer without opening a browser picker.
 Automatic enables native RTP on supported captures; failed native negotiation retains
@@ -99,6 +104,41 @@ failed connection events retain recovery. Native byte counters feed the existing
 per-transmission bitrate/FPS UI (transmitted frames, not preview repeats); receivers retain ordinary browser RTP statistics.
 
 ## Driver boundary and fallback
+
+### Windows hardware backend
+
+`native/mf/encoder.cpp` enumerates only hardware H264 MFTs, filtering by the actual
+capture adapter LUID through dynamically resolved `MFTEnum2` when available. The
+older enumeration fallback still binds and validates the capture D3D11 device.
+It does not instantiate the Windows software H264 encoder. Intel, AMD and integrated
+GPU support depends on the adapter's installed hardware MFT, D3D11 video conversion,
+baseline H264 and low-latency controls; actual devices need explicit validation.
+Separate vendor SDK implementations are not required for a functioning hardware MFT.
+
+The GPU video processor converts full-range desktop RGBA into limited-range BT.709
+NV12. A bounded Media Foundation sample pool retains each texture until the MFT
+releases it. Event callbacks signal Win32 semaphores with a shared failure event;
+no polling or CPU raw pixel readback is used. Each submission requires low-delay output within a bounded
+150 ms wait; an unsupported/buffering driver selects JPEG for that generation.
+Output retains capture timestamps, Annex B framing, recovery keys and SPS/PPS.
+The H264 HRD size is configured in bytes before output type negotiation, with an
+80 ms reservoir and the same transport overhead reservation as NVENC. Live bitrate
+edits do not intentionally recreate the encoder. Hardware MFTs can still overshoot
+the requested burst budget on complex recovery pictures at very low bitrates. The
+existing native RTP send deadline then selects browser compatibility fallback;
+native continuity at a higher bitrate does not establish continuity at those limits.
+Geometry/FPS changes release the previous session before creating another. COM/MF resources and
+callbacks retire on the capture thread. Delay-loaded runtime libraries with an
+explicit availability check preserve fallback on Windows editions missing media APIs.
+Win32 heap allocation and waits avoid an MSVCP dependency; the shim retains the
+existing VCRUNTIME140 baseline rather than requiring VCRUNTIME140_1.
+
+Native publication, preview rejection and viewer fallback reuse the existing token
+and lifecycle contracts. Preview software decoding remains deliberate because the
+hardware preview decoder previously introduced delivery stalls; native publication
+does not pass through that decoder or a browser encoder.
+
+### NVIDIA backend
 
 `native/nvenc/encoder.cpp` uses the pinned, MIT-licensed NVIDIA SDK 12.1 header. It
 loads the driver DLL from Windows System32, checks API compatibility, opens a session

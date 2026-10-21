@@ -41,7 +41,7 @@ The Tauri v2 host combines native Windows integration with a React interface and
 - [P2P Networking, Signaling Failover & WebRTC Mesh](knowledge/p2p-architecture.md)
 - [LAN and Virtual LAN WebRTC Mesh](knowledge/lan-mesh.md)
 - [Native Media Pipeline: Audio Loopback, Video Capture & Web Bridges](knowledge/native-media-pipeline.md)
-- [Native NVENC Encoding, Settings, Validation and Transport Limits](knowledge/native-nvenc.md)
+- [Native Hardware H264 Encoding, Settings, Validation and Transport Limits](knowledge/native-nvenc.md)
 - [Opt-in Sender/Receiver Media Diagnostics](../docs/media-diagnostics.md)
 - [Frontend Architecture, React Media Rendering & State Management](knowledge/frontend-ui-state.md)
 - [Multiple Screen/Camera Sessions and Viewer Compositions](knowledge/multiple-media-streams.md)
