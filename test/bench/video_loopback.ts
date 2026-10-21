@@ -14,6 +14,7 @@ export async function runVideoLoopback(options: {
   hideReceivers?: boolean;
   resolution?: { width: number; height: number };
   fps?: number;
+  quality?: number;
   loadScenario?: boolean | 'sustained';
   warmupMs?: number;
 } = {}) {
@@ -63,7 +64,7 @@ export async function runVideoLoopback(options: {
   try {
     stream = options.pipeline === 'canvas'
       ? canvas.captureStream(fps)
-      : await bridge.startCapture(sourceId, fps, options.resolution ?? { width: 1920, height: 1080 }, false, 90);
+      : await bridge.startCapture(sourceId, fps, options.resolution ?? { width: 1920, height: 1080 }, false, options.quality ?? 90);
     const track = stream.getVideoTracks()[0];
     const socket = (bridge as unknown as { ws: WebSocket | null }).ws;
     const trackWriter = (bridge as unknown as { trackWriter: WritableStreamDefaultWriter<VideoFrame> | null }).trackWriter;
@@ -141,9 +142,10 @@ export async function runVideoLoopback(options: {
           const metrics = await invoke<{ load: { resolution_scale_percent: number; effective_fps: number; adjustments: number } }>(
             'get_capture_metrics', { sessionId: bridge.sessionId });
           const secondary = await invoke<{ load: { adjustments: number } }>('get_capture_metrics', { sessionId: secondaryBridge.sessionId });
-          const bitmap = (bridge as unknown as { latestBitmap: ImageBitmap | null }).latestBitmap;
+          const bitmap = (bridge as unknown as { latestJpegFrame: ImageBitmap | VideoFrame | null }).latestJpegFrame;
           phases.push({ seconds: (index + 1) * 2, injectedSlowWrite: index < overloadSamples, metrics, secondary,
-            bitmap: bitmap ? { width: bitmap.width, height: bitmap.height } : undefined, rtp: await sample() });
+            bitmap: bitmap ? { width: 'displayWidth' in bitmap ? bitmap.displayWidth : bitmap.width,
+              height: 'displayHeight' in bitmap ? bitmap.displayHeight : bitmap.height } : undefined, rtp: await sample() });
         }
         const loads = phases.map(phase => phase.metrics.load);
         if (!loads.some(load => load.resolution_scale_percent < 100)) throw new Error('Sustained bridge load was not adapted');
@@ -160,13 +162,19 @@ export async function runVideoLoopback(options: {
         writer.write = originalWrite;
       }
     }
+    const playbackSample = () => videos.map(video => {
+      const quality = video.getVideoPlaybackQuality();
+      return { totalFrames: quality.totalVideoFrames, droppedFrames: quality.droppedVideoFrames, timestamp: performance.now() };
+    });
     const before = await sample();
+    const playbackBefore = playbackSample();
     const nativeBefore = options.pipeline === 'canvas' ? undefined : await invoke('get_capture_metrics', { sessionId: bridge.sessionId });
     const captureBefore = { imageMessages, heartbeatMessages, jpegBytes, timestamp: performance.now() };
     imageTimes.length = writerTimes.length = 0;
     receiverTimes.forEach(timing => { timing.media.length = timing.display.length = 0; });
     await new Promise((resolve) => setTimeout(resolve, 4000));
     const after = await sample();
+    const playbackAfter = playbackSample();
     const intervals = (times: number[]) => {
       const gaps = times.slice(1).map((value, index) => value - times[index]).sort((a, b) => a - b);
       const percentile = (fraction: number) => gaps[Math.min(gaps.length - 1, Math.floor(gaps.length * fraction))];
@@ -176,8 +184,8 @@ export async function runVideoLoopback(options: {
     const cadence = { websocketImages: intervals(imageTimes), trackWrites: intervals(writerTimes),
       receivers: receiverTimes.map(timing => ({ media: intervals(timing.media), display: intervals(timing.display) })) };
     const nativeAfter = options.pipeline === 'canvas' ? undefined : await invoke('get_capture_metrics', { sessionId: bridge.sessionId });
-    const sourceState = bridge as unknown as { latestBitmap: ImageBitmap | null; latestEncodedFrame: VideoFrame | null };
-    const sourceBitmap = sourceState.latestEncodedFrame || sourceState.latestBitmap;
+    const sourceState = bridge as unknown as { latestJpegFrame: ImageBitmap | VideoFrame | null; latestEncodedFrame: VideoFrame | null };
+    const sourceBitmap = sourceState.latestEncodedFrame || sourceState.latestJpegFrame;
     const pixelRange = (source: CanvasImageSource) => {
       const sample = document.createElement('canvas'); sample.width = 64; sample.height = 36;
       const ctx = sample.getContext('2d', { willReadFrequently: true })!;
@@ -198,7 +206,8 @@ export async function runVideoLoopback(options: {
     snapshot.width = 480;
     snapshot.height = 270;
     if (sourceBitmap) snapshot.getContext('2d')!.drawImage(sourceBitmap, 0, 0, 480, 270);
-    return { nativeBefore, nativeAfter, loadScenario, cadence, visualChecks, sourceSnapshot: sourceBitmap ? snapshot.toDataURL() : undefined, options, animationFrames: frame, source: track.getSettings(), before, after,
+    return { nativeBefore, nativeAfter, loadScenario, cadence, visualChecks, playbackBefore, playbackAfter,
+      sourceSnapshot: sourceBitmap ? snapshot.toDataURL() : undefined, options, animationFrames: frame, source: track.getSettings(), before, after,
       captureBefore, captureAfter: { imageMessages, heartbeatMessages, jpegBytes, timestamp: performance.now() } };
   } finally {
     connections.forEach((pc) => pc.close());

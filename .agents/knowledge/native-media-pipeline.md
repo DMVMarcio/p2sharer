@@ -172,6 +172,20 @@ Apply codec preferences immediately before offer/answer generation, including Tr
 
 WGC and automatic xcap capture share `video_jpeg::RealtimeJpegEncoder`, backed by statically linked libjpeg-turbo through the `turbojpeg` crate. It preserves requested quality and 4:2:0 subsampling, keeps a compressor and output buffer across frames, and disables optimized entropy coding for real-time work. A decoder round-trip test checks RGBA color order and reuse across changing image sizes. Raw RGBA WebSocket transport was tested and rejected because the large local packets reduced measured FPS in this WebView2.
 
+`NativeJpegDecoder` prefers WebCodecs `ImageDecoder` output directly as a
+`VideoFrame`, preserving decoded video planes for the track writer instead of
+converting JPEG through an RGB `ImageBitmap` and back to video. Missing or rejected
+image decoding falls back to `createImageBitmap` for that capture generation.
+Stopping closes pending decoders and discards late output; the bridge owns and
+closes cached frames. JPEG preview frames do not register as native H264 senders.
+Before track writes, decoded JPEG video planes are copied into reusable storage
+and used to construct a frame with the live media timestamp. Cloning a still-image
+frame with a new JS timestamp can leave Chromium's underlying media timestamp at
+zero, causing irregular RTP/playout despite normal encoded FPS. Rebuild timed
+frames for cached repeats too; preserve layout, crop, display size and color space.
+Validate the complete capture/bridge/WebRTC path when changing this boundary;
+native capture FPS alone does not measure JPEG decoding or browser encoding cost.
+
 Building the vendored native library requires CMake and the existing MSVC C/C++ toolchain. NASM is required for x86 SIMD by the selected `require-simd` feature; do not silently package the slower scalar encoder. `.cargo/config.toml` selects a CMake toolchain setting `WITH_CRT_DLL=ON`, matching Rust's default MSVC runtime while keeping the JPEG library static. No separately installed JPEG DLL is required at runtime. Benchmark the full native path after encoder changes; a faster synthetic source alone is insufficient.
 
 ## Capture scaling, load, and pacing

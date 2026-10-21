@@ -48,7 +48,13 @@ export function summarizeVideoLoopback(result) {
       encoder: report.encoderImplementation, decoder: report.decoderImplementation,
     };
   }));
-  return { options: result.options, seconds, native, cadence: result.cadence, visualChecks: result.visualChecks,
+  const playback = result.playbackAfter?.map((after, index) => {
+    const before = result.playbackBefore[index];
+    const droppedFrames = delta(before, after, 'droppedFrames');
+    return { droppedFrames, displayedFps: (delta(before, after, 'totalFrames') - droppedFrames) * 1000 /
+      delta(before, after, 'timestamp') };
+  });
+  return { options: result.options, seconds, native, cadence: result.cadence, visualChecks: result.visualChecks, playback,
     websocketImageFps: delta(result.captureBefore, result.captureAfter, 'imageMessages') / seconds,
     jpegBytesPerFrame: delta(result.captureBefore, result.captureAfter, 'jpegBytes') === undefined ? undefined
       : delta(result.captureBefore, result.captureAfter, 'jpegBytes') / delta(result.captureBefore, result.captureAfter, 'imageMessages'),

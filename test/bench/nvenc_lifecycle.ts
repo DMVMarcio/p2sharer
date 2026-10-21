@@ -74,8 +74,8 @@ export async function runNvencVisualCheck(requestedSource?: string) {
   const animate=()=>{ctx.fillStyle=counter++%2?'#000':'#fff';ctx.fillRect(0,0,4,4);animation=requestAnimationFrame(animate);};animate();
   const wait=()=>new Promise(resolve=>setTimeout(resolve,250));
   const sample=()=>{
-    const source=bridge as unknown as {latestEncodedFrame:VideoFrame|null;latestBitmap:ImageBitmap|null};
-    const image=source.latestEncodedFrame||source.latestBitmap;if(!image)throw new Error('No captured image');
+    const source=bridge as unknown as {latestEncodedFrame:VideoFrame|null;latestJpegFrame:ImageBitmap|VideoFrame|null};
+    const image=source.latestEncodedFrame||source.latestJpegFrame;if(!image)throw new Error('No captured image');
     const sampleCanvas=document.createElement('canvas');sampleCanvas.width=64;sampleCanvas.height=64;
     const sampleContext=sampleCanvas.getContext('2d',{willReadFrequently:true})!;sampleContext.drawImage(image,0,0,64,64);
     return colors.map((expected,index)=>{

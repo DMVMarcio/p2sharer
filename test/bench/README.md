@@ -17,6 +17,8 @@ const { runVideoLoopback } = await import('/test/bench/video_loopback.ts');
 await runVideoLoopback({ pipeline: 'native', peers: 2, probe: true });
 // A browser canvas source isolates encoding from native capture.
 await runVideoLoopback({ pipeline: 'canvas', peers: 2 });
+// Select Generic in settings first to isolate the vendor-neutral JPEG path.
+await runVideoLoopback({ pipeline: 'native', peers: 1, probe: true, quality: 95 });
 
 const { runMultipleMediaLoopback, runPointerIsolation } =
   await import('/test/bench/multiple_media_loopback.ts');
