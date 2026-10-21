@@ -6,7 +6,7 @@ import 'fake-indexeddb/auto';
 const bundle = await build({ stdin: { contents: `
   export { invokeBrowser } from './src/platform/web_commands.ts';
   export { browserRecord } from './src/platform/web_storage.ts';
-  export { registerBrowserFile } from './src/platform/web_files.ts';
+  export { registerBrowserFile, computeBlobSha256 } from './src/platform/web_files.ts';
 `, resolveDir: process.cwd() }, bundle: true, write: false, platform: 'node', format: 'esm',
   plugins: [{ name: 'web-platform-translator', setup(builder) {
     builder.onResolve({ filter: /(?:^|\/)i18n(?:\/index\.ts)?$/ }, () => ({ path: 'i18n', namespace: 'fixture' }));
@@ -60,7 +60,34 @@ test('browser files use signed chunk offsets and verify full hashes before expor
     assert.deepEqual(exports, ['fixture.txt']);
     context.mock.timers.tick(60_000);
   } finally { globalThis.document = previousDocument; context.mock.timers.reset(); }
-  await assert.rejects(invoke('choose_chat_download', { id, size: 257 * 1024 * 1024 }), /web.fileLimit/);
+  assert.equal(await invoke('choose_chat_download', { id: crypto.randomUUID(), name: 'large.iso', size: 5 * 1024 * 1024 * 1024, hash: '0'.repeat(64) }), true);
+  await assert.rejects(invoke('choose_chat_download', { id: crypto.randomUUID(), name: 'invalid', size: -1, hash: '0'.repeat(64) }), /Invalid download size/);
+  await assert.rejects(invoke('choose_chat_download', { id: crypto.randomUUID(), name: 'invalid', size: Number.MAX_SAFE_INTEGER + 1, hash: '0'.repeat(64) }), /Invalid download size/);
+
+  const diskWrites = [];
+  let closed = false;
+  const previousPicker = globalThis.showSaveFilePicker;
+  globalThis.showSaveFilePicker = async () => ({
+    createWritable: async () => ({
+      write: async param => { diskWrites.push(param); },
+      close: async () => { closed = true; },
+      abort: async () => {},
+    }),
+  });
+  const streamId = crypto.randomUUID();
+  try {
+    assert.equal(await invoke('choose_chat_download', { id: streamId, name: 'streamed.bin', size: 11, hash: source.hash }), true);
+    const writeStream = (offset, text) => invoke('write_chat_download_bytes', new TextEncoder().encode(text),
+      { headers: { 'x-chat-download-id': streamId, 'x-chat-offset': String(offset) } });
+    assert.equal(await writeStream(0, 'hello world'), 11);
+    assert.equal(await invoke('finish_chat_download', { id: streamId }), 'streamed.bin');
+    assert.equal(closed, true);
+    assert.equal(diskWrites.length, 1);
+    assert.equal(new TextDecoder().decode(diskWrites[0].data), 'hello world');
+  } finally {
+    globalThis.showSaveFilePicker = previousPicker;
+  }
+
   await invoke('discard_chat_file', { id: source.id });
   await assert.rejects(invoke('read_chat_file_bytes', { id: source.id, offset: 0, length: 1 }), /Invalid read/);
 });
@@ -83,4 +110,24 @@ test('browser profile validation preserves native geometry and verifies content 
     await assert.rejects(api.invokeBrowser('validate_profile_image_bytes', bytes, { headers: { 'x-profile-hash': hash, 'x-profile-banner': 'true' } }), /Invalid image/);
     assert.equal(decodes, 1, 'untrusted bytes never reach the image decoder before geometry and hash checks');
   } finally { globalThis.createImageBitmap = previousDecoder; globalThis.FileReader = previousReader; }
+});
+
+test('browser file streaming computes hashes without aggregate lote limits across multiple sources', async () => {
+  const invoke = api.invokeBrowser;
+  const file1 = await api.registerBrowserFile(new Blob(['first file content']), 'file1.txt');
+  const file2 = await api.registerBrowserFile(new Blob(['second file content']), 'file2.txt');
+  const file3 = await api.registerBrowserFile(new Blob(['third file content']), 'file3.txt');
+  assert.equal((await invoke('inspect_chat_file', { id: file1.id })).name, 'file1.txt');
+  assert.equal((await invoke('inspect_chat_file', { id: file2.id })).name, 'file2.txt');
+  assert.equal((await invoke('inspect_chat_file', { id: file3.id })).name, 'file3.txt');
+
+  const data = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]);
+  const expectedHash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', data)),
+    b => b.toString(16).padStart(2, '0')).join('');
+  const computedHash = await api.computeBlobSha256(new Blob([data]));
+  assert.equal(computedHash, expectedHash);
+
+  await invoke('discard_chat_file', { id: file1.id });
+  await invoke('discard_chat_file', { id: file2.id });
+  await invoke('discard_chat_file', { id: file3.id });
 });
