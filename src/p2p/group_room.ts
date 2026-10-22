@@ -587,19 +587,19 @@ export class GroupRoomManager {
     }
   }
 
-  private handleRelayedAction(actionName: string | undefined, payload: unknown, originPeerId: string, intermediaryPeerId: string): void {
+  private handleRelayedAction(actionName: string | undefined, payload: unknown, originPeerId: string, _intermediaryPeerId: string): void {
     if (!actionName || typeof actionName !== 'string' || !originPeerId) return;
     this.peerTracker.touchPeer(originPeerId);
     if (actionName === 'chat' && this.chatAction?.onMessage) {
-      void this.chatAction.onMessage(payload as ChatMessage, { peerId: intermediaryPeerId });
+      void this.chatAction.onMessage(payload as ChatMessage, { peerId: originPeerId });
     } else if (actionName === 'presence' && this.presenceAction?.onMessage) {
-      void this.presenceAction.onMessage(payload, { peerId: intermediaryPeerId });
+      void this.presenceAction.onMessage(payload, { peerId: originPeerId });
     } else if (actionName === 'app' && this.appAction?.onMessage) {
-      void this.appAction.onMessage(payload, { peerId: intermediaryPeerId });
+      void this.appAction.onMessage(payload, { peerId: originPeerId });
     } else if (actionName === 'peer_ping' && this.pingAction?.onMessage) {
-      void this.pingAction.onMessage(payload as { t: number }, { peerId: intermediaryPeerId });
+      void this.pingAction.onMessage(payload as { t: number }, { peerId: originPeerId });
     } else if (actionName === 'peer_pong' && this.pongAction?.onMessage) {
-      void this.pongAction.onMessage(payload as { t: number }, { peerId: intermediaryPeerId });
+      void this.pongAction.onMessage(payload as { t: number }, { peerId: originPeerId });
     }
   }
 

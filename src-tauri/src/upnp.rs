@@ -91,16 +91,12 @@ async fn discover_gateway() -> Result<(String, String, Ipv4Addr), String> {
     let socket = UdpSocket::bind("0.0.0.0:0").await.map_err(|e| e.to_string())?;
     socket.set_broadcast(true).map_err(|e| e.to_string())?;
 
-    let search_msg = concat!(
-        "M-SEARCH * HTTP/1.1\r\n",
-        "HOST: 239.255.255.250:1900\r\n",
-        "ST: urn:schemas-upnp-org:device:InternetGatewayDevice:1\r\n",
-        "MAN: \"ssdp:discover\"\r\n",
-        "MX: 2\r\n",
-        "\r\n"
+    let ssdp_ip = Ipv4Addr::new(239, 255, 255, 250);
+    let multicast_addr = SocketAddr::new(IpAddr::V4(ssdp_ip), 1900);
+    let search_msg = format!(
+        "M-SEARCH * HTTP/1.1\r\nHOST: {}:1900\r\nST: urn:schemas-upnp-org:device:InternetGatewayDevice:1\r\nMAN: \"ssdp:discover\"\r\nMX: 2\r\n\r\n",
+        ssdp_ip
     );
-
-    let multicast_addr: SocketAddr = "239.255.255.250:1900".parse().unwrap();
     socket.send_to(search_msg.as_bytes(), multicast_addr).await.map_err(|e| e.to_string())?;
 
     let mut buf = [0u8; 2048];
