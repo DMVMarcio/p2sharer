@@ -138,7 +138,7 @@ pub fn run() {
         .setup(|app| {
             let main = app.get_webview_window("main").ok_or("main webview missing")?;
             let upnp_state = app.state::<upnp::UpnpState>().inner().clone();
-            tokio::spawn(async move { upnp_state.init_discovery().await; });
+            tauri::async_runtime::spawn(async move { upnp_state.init_discovery().await; });
             #[cfg(windows)]
             let was_maximized = match window_placement::install(&main) {
                 Ok(maximized) => maximized,
