@@ -24,6 +24,8 @@ mod video_readback;
 #[cfg(windows)]
 mod video_gpu_scale;
 #[cfg(windows)]
+mod video_dxgi;
+#[cfg(windows)]
 mod video_nvenc;
 #[cfg(windows)]
 mod video_hardware;

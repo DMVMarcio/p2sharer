@@ -1,6 +1,6 @@
 [package]
 name = "p2sharer"
-version = "1.5.1"
+version = "1.5.2"
 description = "P2Sharer - A shared space to connect, create and explore through P2P"
 authors = ["P2Sharer Team"]
 edition = "2021"
@@ -55,7 +55,7 @@ semver = "1"
 
 
 [target.'cfg(windows)'.dependencies]
-windows-capture-api = { package = "windows", version = "0.62.2", features = ["Win32_Graphics_Direct3D11", "Win32_Graphics_Direct3D_Fxc", "Win32_Graphics_Dxgi_Common"] }
+windows-capture-api = { package = "windows", version = "0.62.2", features = ["Win32_Graphics_Direct3D11", "Win32_Graphics_Direct3D_Fxc", "Win32_Graphics_Dxgi_Common", "Win32_Graphics_Dxgi"] }
 webview2-com = "0.39.1"
 windows = { version = "0.58", features = [
     "implement",

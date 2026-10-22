@@ -25,7 +25,8 @@ pnpm run test:native --release live_capture_produces_images_and_stops_idempotent
 
 `live_generic_wgc_retains_requested_profile_without_nvenc` explicitly checks live
 WGC startup and decodable JPEG output at the selected monitor's aspect ratio within
-1080p/60, with NVENC disabled. Set `$env:P2SHARER_NATIVE_MF='0'` for this JPEG-only fixture.
+1080p/60, with NVENC disabled. Set `$env:P2SHARER_NATIVE_MF='0'` and
+`$env:P2SHARER_CAPTURE_BACKEND='wgc'` for this WGC/JPEG-only fixture.
 It samples capture for twelve seconds, asserts that
 native load adaptation preserves the requested profile, and reports processing cost.
 It retains pixels only in memory and does not measure browser encoding, receiver
@@ -56,3 +57,10 @@ Run it with `pnpm run test:native --release hardware_mf_encodes_recreates_and_fo
 It requires a hardware H264 MFT; unsupported hardware fails explicitly. Validate
 Intel, AMD and integrated GPUs separately rather than inferring compatibility from
 one vendor's result. No proprietary encoder runtime is bundled.
+
+`live_dxgi_recreates_producer_with_preserved_session_and_recovery_key` retires a
+real monitor producer and verifies that the supervisor recreates DXGI while
+preserving the session, packet sequence, dimensions and a recovery keyframe.
+Select `P2SHARER_CAPTURE_BACKEND=dxgi`, leave Media Foundation enabled and run this
+fixture explicitly with `--ignored --test-threads=1`. It requires a visible desktop
+and hardware H264; it does not lock Windows or claim a physical display-mode test.

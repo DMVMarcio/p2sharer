@@ -71,12 +71,25 @@ settings for either windows or monitors, including supervisor restarts. Windows 
 desktop build 19045 supports WGC but lacks `IsBorderRequired` (introduced in build
 20348). Requesting `WithoutBorder` on that system aborts WGC initialization and
 unnecessarily selects xcap/JPEG, losing GPU scaling and native encoding. Unsupported
-properties retain OS defaults; older systems may therefore show the system capture
-border or retain the default cursor behavior. Generic mode still uses WGC capture
-and available GPU scaling without requiring NVIDIA or NVENC. It tries the Windows
+properties retain OS defaults. `start_gpu_capture` prefers DXGI Desktop Duplication
+for monitor sharing on systems without the optional border property. It matches
+the selected HMONITOR to its DXGI output and creates the device on that output's
+adapter. `video_dxgi.rs` converts BGRA to RGBA, restores display rotation and draws
+color, masked-color and monochrome cursors on the GPU. Only pointer bitmaps cross
+the CPU. The shared texture processor retains scaling, native encoders, pacing,
+load feedback and JPEG fallback. Windows, hidden-cursor sessions and unsupported
+duplication use WGC; those Windows 10 sessions may still show the OS capture border.
+`P2SHARER_CAPTURE_BACKEND=wgc|dxgi` selects a diagnostic preference, without bypassing
+compatibility fallback. Access loss uses the existing desktop recovery supervisor;
+other duplication failures retire the producer and retry through WGC. Generic mode
+uses GPU capture and available scaling without requiring NVIDIA or NVENC. It tries the Windows
 hardware H264 encoder before the JPEG fallback. Real overload
 adaptation remains enabled; fixing feature selection does not guarantee a specific
 GPU's capture or browser encoder throughput.
+
+Capture metrics identify the actual producer with `capture_backend`: 0 during
+initialization, 1 for WGC, 2 for DXGI and 3 for xcap. Encoder counters remain shared
+across GPU capture backends and supervisor generations.
 
 ### Multimedia Timer RAII Guard (`MultimediaTimerGuard`)
 - Automatically calls `timeBeginPeriod(1)` upon capture initialization and `timeEndPeriod(1)` on drop.

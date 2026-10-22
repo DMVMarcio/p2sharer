@@ -58,7 +58,7 @@ export async function runNvencLifecycle(requestedSource?: string) {
 }
 
 /** Check either native hardware backend and its JPEG fallback through actual encode/decode. */
-export async function runHardwareVisualCheck(requestedSource?: string) {
+export async function runHardwareVisualCheck(requestedSource?: string, captureMouse = false) {
   const sourceId = await resolveCaptureSource(requestedSource);
   const window=getCurrentWindow(),wasMaximized=await window.isMaximized(),wasAlwaysOnTop=await window.isAlwaysOnTop();
   await window.setAlwaysOnTop(true);
@@ -85,7 +85,7 @@ export async function runHardwareVisualCheck(requestedSource?: string) {
     });
   };
   try {
-    await bridge.startCapture(sourceId,30,{width:1280,height:720},false,90);await wait();
+    await bridge.startCapture(sourceId,30,{width:1280,height:720},captureMouse,90);await wait();
     const before=await invoke<Record<string,number>>('get_capture_metrics',{sessionId:bridge.sessionId});
     if(!before.nvenc_images)throw new Error('Native hardware H264 required for color validation');
     const nativeH264=sample();await bridge.disableNativeEncoding();await wait();const jpeg=sample();

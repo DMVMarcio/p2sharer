@@ -106,6 +106,7 @@ pub fn encoded_capture(id: &str, token: &str) -> Result<EncodedCapture, String> 
 
 #[derive(Default)]
 pub struct CaptureMetrics {
+    capture_backend: std::sync::atomic::AtomicU8,
     encoder_kind: std::sync::atomic::AtomicU8,
     jpeg_errors: std::sync::atomic::AtomicU64,
     #[cfg(feature = "media-diagnostics")]
@@ -148,6 +149,7 @@ fn log_selected_encoder(metrics: &CaptureMetrics, session: &str, encoder: u8, wi
 
 #[derive(Serialize)]
 pub struct CaptureMetricsSnapshot {
+    capture_backend: u8,
     nvenc_images: u64, nvenc_us: u64, nvenc_fallbacks: u64,
     callbacks: u64, gated: u64, images: u64, readback_us: u64, jpeg_us: u64, processing_us: u64,
     staging_allocations: u64, readback_errors: u64, resize_us: u64,
@@ -167,6 +169,7 @@ pub fn get_capture_metrics(session_id: String) -> Result<CaptureMetricsSnapshot,
 fn metrics_snapshot(session: &CaptureSession) -> CaptureMetricsSnapshot {
     let metrics = &session.metrics;
     CaptureMetricsSnapshot {
+        capture_backend: metrics.capture_backend.load(Ordering::Relaxed),
         nvenc_images: metrics.nvenc_images.load(Ordering::Relaxed),
         nvenc_us: metrics.nvenc_us.load(Ordering::Relaxed),
         nvenc_fallbacks: metrics.nvenc_fallbacks.load(Ordering::Relaxed),
@@ -335,7 +338,8 @@ fn start_frame_delivery(delivery: FrameDelivery, active: Arc<AtomicBool>, load: 
 
 #[derive(Clone)]
 pub struct CaptureFlags {
-    lifecycle: Arc<WgcLifecycle>,
+    lifecycle: Arc<CaptureLifecycle>,
+    prefer_dxgi: Arc<AtomicBool>,
     nvenc_sequence: Arc<std::sync::atomic::AtomicU32>,
     try_nvenc: bool,
     try_mf: bool,
@@ -356,17 +360,17 @@ pub struct CaptureFlags {
     pub metrics: Arc<CaptureMetrics>,
 }
 
-struct WgcLifecycle {
+struct CaptureLifecycle {
     active: AtomicBool,
     closed: AtomicBool,
 }
-impl WgcLifecycle {
+impl CaptureLifecycle {
     fn new() -> Self { Self { active: AtomicBool::new(true), closed: AtomicBool::new(false) } }
 }
 
 #[cfg(windows)]
 pub struct NativeWgcHandler {
-    lifecycle: Arc<WgcLifecycle>,
+    lifecycle: Arc<CaptureLifecycle>,
     session_id: String,
     nvenc: Option<crate::video_hardware::GpuEncoder>,
     nvenc_enabled: Arc<AtomicBool>,
@@ -401,37 +405,8 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
     type Error = Box<dyn std::error::Error + Send + Sync>;
 
     fn new(ctx: Context<Self::Flags>) -> Result<Self, Self::Error> {
-        let fps = ctx.flags.target_fps.clamp(15, 120);
-        let frame_interval = std::time::Duration::from_nanos(1_000_000_000 / fps as u64);
-        Ok(Self {
-            lifecycle: ctx.flags.lifecycle,
-            session_id: ctx.flags.session_id,
-            nvenc: Some(crate::video_hardware::GpuEncoder::new(ctx.flags.try_nvenc, ctx.flags.try_mf, ctx.flags.nvenc_sequence)),
-            nvenc_enabled: ctx.flags.nvenc_enabled,
-            nvenc_keyframe: ctx.flags.nvenc_keyframe,
-            nvenc_bitrate: ctx.flags.nvenc_bitrate,
-            delivery: ctx.flags.delivery,
-            legacy_pacing: ctx.flags.legacy_pacing,
-            load: ctx.flags.load,
-            load_controller: crate::video_load::LoadController::default(),
-            sender: ctx.flags.sender,
-            target_width: ctx.flags.target_width,
-            target_height: ctx.flags.target_height,
-            active_flag: ctx.flags.active_flag,
-            raw_buffer: Vec::new(),
-            readback: crate::video_readback::ReusableReadback::default(),
-            legacy_readback: std::env::var("P2SHARER_LEGACY_VIDEO_READBACK").as_deref() == Ok("1"),
-            consecutive_readback_errors: 0,
-            gpu_scaler: crate::video_gpu_scale::GpuScaler::default(),
-            gpu_scaling_disabled: false,
-            resized_image: None,
-            resizer: fast_image_resize::Resizer::new(),
-            jpeg_encoder: RealtimeJpegEncoder::new(ctx.flags.quality)?,
-            next_frame_time: std::time::Instant::now(),
-            frame_interval,
-            start_instant: ctx.flags.start_instant,
-            metrics: ctx.flags.metrics,
-        })
+        ctx.flags.metrics.capture_backend.store(1, Ordering::Relaxed);
+        Self::from_flags(ctx.flags)
     }
 
     fn on_frame_arrived(
@@ -444,6 +419,67 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
             return Ok(());
         }
 
+        let device = frame.device().clone();
+        let context = frame.device_context().clone();
+        let texture = frame.as_raw_texture().clone();
+        self.process_texture(&device, &context, &texture, frame.width(), frame.height(), Some(frame))
+    }
+
+    fn on_closed(&mut self) -> Result<(), Self::Error> {
+        crate::logger::log_msg("WARN", "capture.source", &format!("session={} WGC source closed elapsed_ms={}", self.session_id, self.start_instant.elapsed().as_millis()));
+        // A monitor's WGC item can close during a secure desktop transition.
+        // The supervisor confirms source loss or recreates capture after returning.
+        self.lifecycle.closed.store(true, Ordering::Release);
+        Ok(())
+    }
+}
+
+#[cfg(windows)]
+type CaptureError = Box<dyn std::error::Error + Send + Sync>;
+
+#[cfg(windows)]
+impl NativeWgcHandler {
+    fn from_flags(flags: CaptureFlags) -> Result<Self, CaptureError> {
+        let fps = flags.target_fps.clamp(15, 120);
+        let frame_interval = std::time::Duration::from_nanos(1_000_000_000 / fps as u64);
+        Ok(Self {
+            lifecycle: flags.lifecycle,
+            session_id: flags.session_id,
+            nvenc: Some(crate::video_hardware::GpuEncoder::new(flags.try_nvenc, flags.try_mf, flags.nvenc_sequence)),
+            nvenc_enabled: flags.nvenc_enabled,
+            nvenc_keyframe: flags.nvenc_keyframe,
+            nvenc_bitrate: flags.nvenc_bitrate,
+            delivery: flags.delivery,
+            legacy_pacing: flags.legacy_pacing,
+            load: flags.load,
+            load_controller: crate::video_load::LoadController::default(),
+            sender: flags.sender,
+            target_width: flags.target_width,
+            target_height: flags.target_height,
+            active_flag: flags.active_flag,
+            raw_buffer: Vec::new(),
+            readback: crate::video_readback::ReusableReadback::default(),
+            legacy_readback: std::env::var("P2SHARER_LEGACY_VIDEO_READBACK").as_deref() == Ok("1"),
+            consecutive_readback_errors: 0,
+            gpu_scaler: crate::video_gpu_scale::GpuScaler::default(),
+            gpu_scaling_disabled: false,
+            resized_image: None,
+            resizer: fast_image_resize::Resizer::new(),
+            jpeg_encoder: RealtimeJpegEncoder::new(flags.quality)?,
+            next_frame_time: std::time::Instant::now(),
+            frame_interval,
+            start_instant: flags.start_instant,
+            metrics: flags.metrics,
+        })
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn process_texture(&mut self, device: &windows_capture_api::Win32::Graphics::Direct3D11::ID3D11Device,
+        context: &windows_capture_api::Win32::Graphics::Direct3D11::ID3D11DeviceContext,
+        texture: &windows_capture_api::Win32::Graphics::Direct3D11::ID3D11Texture2D,
+        width: u32, height: u32, legacy: Option<&mut Frame<'_>>) -> Result<(), CaptureError> {
+        let legacy_unavailable = legacy.is_none();
+        if legacy_unavailable { self.legacy_readback = false; }
         // Keep the target cadence across callback jitter and non-matching refresh rates.
         // Resetting the gate after each frame can halve 60 FPS capture on a 75 Hz display.
         let arrival_time = std::time::Instant::now();
@@ -456,8 +492,8 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
             return Ok(());
         }
 
-        let mut src_width = frame.width();
-        let mut src_height = frame.height();
+        let mut src_width = width;
+        let mut src_height = height;
         if src_width == 0 || src_height == 0 {
             return Ok(());
         }
@@ -468,7 +504,7 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
             && self.target_width > 0 && self.target_height > 0
             && (src_width > self.target_width || src_height > self.target_height) {
             let (width, height) = fit_capture_dimensions(src_width, src_height, self.target_width, self.target_height);
-            match self.gpu_scaler.resize(frame.device(), frame.device_context(), frame.as_raw_texture(), width, height) {
+            match self.gpu_scaler.resize(device, context, texture, width, height) {
                 Ok(texture) => { src_width = width; src_height = height; Some(texture) },
                 Err(error) => {
                     self.gpu_scaling_disabled = true;
@@ -485,7 +521,7 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
                 return Ok(());
             }
             let encoder_started = std::time::Instant::now();
-            let result = self.nvenc.as_mut().ok_or_else(|| "Native encoder was retired".to_string()).and_then(|encoder| encoder.encode(frame.device(), scaled.as_ref().unwrap_or(frame.as_raw_texture()),
+            let result = self.nvenc.as_mut().ok_or_else(|| "Native encoder was retired".to_string()).and_then(|encoder| encoder.encode(device, scaled.as_ref().unwrap_or(texture),
                 src_width, src_height, self.load.fps(), self.nvenc_bitrate.load(Ordering::Relaxed), self.start_instant.elapsed().as_micros() as u64,
                 self.nvenc_keyframe.swap(false, Ordering::Relaxed)));
             self.metrics.nvenc_us.fetch_add(encoder_started.elapsed().as_micros() as u64, Ordering::Relaxed);
@@ -525,13 +561,11 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
             // A decoder rejection releases the driver session on its owner thread.
             self.nvenc = None;
         }
-        let mut frame_buffer = match if self.legacy_readback {
-            frame.buffer().map(crate::video_readback::CapturePixels::Legacy).map_err(|error| -> Self::Error { error.into() })
-        } else if let Some(texture) = scaled.as_ref() {
-            self.readback.read_texture(frame.device(), frame.device_context(), texture)
-                .map(crate::video_readback::CapturePixels::Reused).map_err(|error| -> Self::Error { error.into() })
+        let mut frame_buffer = match if self.legacy_readback && legacy.is_some() {
+            legacy.unwrap().buffer().map(crate::video_readback::CapturePixels::Legacy).map_err(|error| -> CaptureError { error.into() })
         } else {
-            self.readback.read(frame).map(crate::video_readback::CapturePixels::Reused).map_err(|error| -> Self::Error { error.into() })
+            self.readback.read_texture(device, context, scaled.as_ref().unwrap_or(texture))
+                .map(crate::video_readback::CapturePixels::Reused).map_err(|error| -> CaptureError { error.into() })
         } {
             Ok(buf) => buf,
             Err(_e) => {
@@ -544,6 +578,7 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
                     self.legacy_readback = true;
                     crate::logger::log_msg("WARN", "capture.readback", &format!("session={} reusable GPU readback failed three times; fallback=legacy readback error={_e:?}", self.session_id));
                 }
+                if legacy_unavailable && self.consecutive_readback_errors >= 3 { return Err(_e); }
                 // Transient DXGI surface lock or swapchain mode switch (e.g. game launched / resized)
                 // Returning Ok(()) ensures windows-capture does NOT abort the capture loop!
                 return Ok(());
@@ -625,21 +660,93 @@ impl GraphicsCaptureApiHandler for NativeWgcHandler {
         Ok(())
     }
 
-    fn on_closed(&mut self) -> Result<(), Self::Error> {
-        crate::logger::log_msg("WARN", "capture.source", &format!("session={} WGC source closed elapsed_ms={}", self.session_id, self.start_instant.elapsed().as_millis()));
-        // A monitor's WGC item can close during a secure desktop transition.
-        // The supervisor confirms source loss or recreates capture after returning.
-        self.lifecycle.closed.store(true, Ordering::Release);
-        Ok(())
+}
+
+#[cfg(windows)]
+type WgcControl = CaptureControl<NativeWgcHandler, CaptureError>;
+
+#[cfg(windows)]
+enum ActiveCaptureControl {
+    Wgc(WgcControl),
+    Dxgi { halt: Arc<AtomicBool>, thread: std::thread::JoinHandle<()> },
+}
+#[cfg(windows)]
+impl ActiveCaptureControl {
+    fn is_finished(&self) -> bool { match self {
+        Self::Wgc(control) => control.is_finished(), Self::Dxgi { thread, .. } => thread.is_finished(),
+    } }
+}
+
+#[cfg(windows)]
+fn start_gpu_capture(source: &str, capture_mouse: bool, mut flags: CaptureFlags) -> Result<(ActiveCaptureControl, Arc<CaptureLifecycle>), String> {
+    if capture_mouse && source.starts_with("screen:") && flags.prefer_dxgi.load(Ordering::Acquire) {
+        match start_dxgi_capture(source, capture_mouse, flags.clone()) {
+            Ok(control) => return Ok((control, flags.lifecycle.clone())),
+            Err(error) => {
+                flags.prefer_dxgi.store(false, Ordering::Release);
+                if !flags.lifecycle.active.load(Ordering::Acquire) { flags.lifecycle = Arc::new(CaptureLifecycle::new()); }
+                flags.lifecycle.closed.store(false, Ordering::Release);
+                crate::logger::log_msg("WARN", "capture.dxgi", &format!("session={} initialization failed; fallback=WGC error={error}", flags.session_id));
+            }
+        }
+    }
+    let lifecycle = flags.lifecycle.clone();
+    start_wgc_capture(source, capture_mouse, flags).map(|control| (ActiveCaptureControl::Wgc(control), lifecycle))
+}
+
+#[cfg(windows)]
+fn start_dxgi_capture(source: &str, capture_mouse: bool, flags: CaptureFlags) -> Result<ActiveCaptureControl, String> {
+    let index = source.strip_prefix("screen:").ok_or("DXGI requires a monitor")?.parse::<usize>().map_err(|e| e.to_string())?;
+    let monitor = WgcMonitor::from_index(index + 1).map_err(|e| e.to_string())?.as_raw_hmonitor() as usize;
+    let halt = Arc::new(AtomicBool::new(false));
+    let stopped = halt.clone();
+    let (ready, started) = std::sync::mpsc::sync_channel(1);
+    let lifecycle = flags.lifecycle.clone();
+    let thread = std::thread::spawn(move || {
+        let _timer = MultimediaTimerGuard::new();
+        let result = (|| -> Result<(), CaptureError> {
+            let mut capture = crate::video_dxgi::DesktopCapture::new(monitor, capture_mouse)?;
+            let mut processor = NativeWgcHandler::from_flags(flags.clone())?;
+            flags.metrics.capture_backend.store(2, Ordering::Relaxed);
+            if ready.send(Ok(())).is_err() { return Ok(()); }
+            crate::logger::log_msg("INFO", "capture.start", &format!("session={} backend=DXGI awaiting_first_frame=true", flags.session_id));
+            while !stopped.load(Ordering::Acquire) && flags.active_flag.load(Ordering::Acquire) && flags.lifecycle.active.load(Ordering::Acquire) {
+                if let Some(texture) = capture.next_frame()? {
+                    let (width, height) = capture.dimensions();
+                    processor.process_texture(capture.device(), capture.context(), &texture, width, height, None)?;
+                }
+            }
+            Ok(())
+        })();
+        if let Err(error) = result {
+            // A lost duplication can follow a mode/desktop switch. Recreate it through
+            // the existing recovery supervisor; other failures retain WGC compatibility.
+            let lost = error.downcast_ref::<windows_capture_api::core::Error>()
+                .is_some_and(|error| error.code() == windows_capture_api::Win32::Graphics::Dxgi::DXGI_ERROR_ACCESS_LOST);
+            if !lost { flags.prefer_dxgi.store(false, Ordering::Release); }
+            let message = error.to_string();
+            let _ = ready.try_send(Err(message.clone()));
+            crate::logger::log_msg("WARN", "capture.dxgi", &format!("session={} capture stopped access_lost={lost} error={message}", flags.session_id));
+        }
+        flags.lifecycle.closed.store(true, Ordering::Release);
+    });
+    match started.recv_timeout(std::time::Duration::from_secs(3)) {
+        Ok(Ok(())) => Ok(ActiveCaptureControl::Dxgi { halt, thread }),
+        Ok(Err(error)) => {
+            let _ = thread.join();
+            Err(error)
+        }
+        _ => {
+            halt.store(true, Ordering::Release);
+            // A slow driver must never retain permission to publish into the WGC replacement.
+            lifecycle.active.store(false, Ordering::Release);
+            Err("DXGI startup timed out".into())
+        }
     }
 }
 
 #[cfg(windows)]
-type ActiveCaptureControl =
-    CaptureControl<NativeWgcHandler, Box<dyn std::error::Error + Send + Sync>>;
-
-#[cfg(windows)]
-fn start_wgc_capture(source: &str, capture_mouse: bool, flags: CaptureFlags) -> Result<ActiveCaptureControl, String> {
+fn start_wgc_capture(source: &str, capture_mouse: bool, flags: CaptureFlags) -> Result<WgcControl, String> {
     use windows_capture::graphics_capture_api::GraphicsCaptureApi;
     let cursor_supported = GraphicsCaptureApi::is_cursor_settings_supported().unwrap_or(false);
     let border_supported = GraphicsCaptureApi::is_border_settings_supported().unwrap_or(false);
@@ -750,12 +857,13 @@ fn start_capture_supervisor(source: String, capture_mouse: bool, mut flags: Capt
             };
             // Allow the retired handler to release its GPU/encoder before rebuilding.
             // Cleanup is bounded and runs off the UI thread.
-            if let Some(control) = previous { let _ = safely_stop_wgc_control(control).join(); }
+            if let Some(control) = previous { let _ = safely_stop_capture_control(control).join(); }
             if !flags.active_flag.load(Ordering::Acquire) { break; }
-            flags.lifecycle = Arc::new(WgcLifecycle::new());
+            flags.lifecycle = Arc::new(CaptureLifecycle::new());
             flags.nvenc_keyframe.store(true, Ordering::Release);
-            match start_wgc_capture(&source, capture_mouse, flags.clone()) {
-                Ok(control) => {
+            match start_gpu_capture(&source, capture_mouse, flags.clone()) {
+                Ok((control, lifecycle)) => {
+                    flags.lifecycle = lifecycle;
                     let mut control = Some(control);
                     if let Ok(mut sessions) = SESSIONS.lock() {
                         if let Some(session) = sessions.get_mut(&flags.session_id) {
@@ -766,12 +874,12 @@ fn start_capture_supervisor(source: String, capture_mouse: bool, mut flags: Capt
                     }
                     if let Some(control) = control {
                         flags.lifecycle.active.store(false, Ordering::Release);
-                        safely_stop_wgc_control(control);
+                        safely_stop_capture_control(control);
                         break;
                     }
                     recovery.restarted(true, now);
                     paused = false;
-                    crate::logger::log_msg("INFO", "capture.recovery", &format!("session={} WGC capture resumed", flags.session_id));
+                    crate::logger::log_msg("INFO", "capture.recovery", &format!("session={} GPU capture resumed", flags.session_id));
                 }
                 Err(error) => {
                     recovery.restarted(false, now);
@@ -1320,8 +1428,12 @@ pub fn start_capture_session(
 
     #[cfg(windows)]
     {
-        let flags = CaptureFlags {
-            lifecycle: Arc::new(WgcLifecycle::new()),
+        let mut flags = CaptureFlags {
+            lifecycle: Arc::new(CaptureLifecycle::new()),
+            prefer_dxgi: Arc::new(AtomicBool::new(match std::env::var("P2SHARER_CAPTURE_BACKEND").as_deref() {
+                Ok("wgc") => false, Ok("dxgi") => true,
+                _ => !windows_capture::graphics_capture_api::GraphicsCaptureApi::is_border_settings_supported().unwrap_or(false),
+            })),
             nvenc_sequence: Arc::new(std::sync::atomic::AtomicU32::new(0)),
             try_nvenc, try_mf,
             session_id: session_id.clone(),
@@ -1339,8 +1451,9 @@ pub fn start_capture_session(
             start_instant,
         };
 
-        match start_wgc_capture(&source_id, should_draw_mouse, flags.clone()) {
-            Ok(control) => {
+        match start_gpu_capture(&source_id, should_draw_mouse, flags.clone()) {
+            Ok((control, lifecycle)) => {
+                flags.lifecycle = lifecycle;
                 let mut control = Some(control);
                 if let Ok(mut sessions) = SESSIONS.lock() {
                     if let Some(session) = sessions.get_mut(&session_id) {
@@ -1351,11 +1464,11 @@ pub fn start_capture_session(
                 }
                 if let Some(control) = control {
                     flags.lifecycle.active.store(false, Ordering::Release);
-                    safely_stop_wgc_control(control);
+                    safely_stop_capture_control(control);
                     return Ok(false);
                 }
                 start_capture_supervisor(source_id.clone(), should_draw_mouse, flags);
-                crate::logger::log_msg("INFO", "capture.start", &format!("session={session_id} backend=WGC startup_ms={} awaiting_first_frame=true", start_instant.elapsed().as_millis()));
+                crate::logger::log_msg("INFO", "capture.start", &format!("session={session_id} backend=GPU startup_ms={} awaiting_first_frame=true", start_instant.elapsed().as_millis()));
                 return Ok(true);
             }
             Err(error) if capture_window_state(&source_id) == Some(true) => {
@@ -1368,6 +1481,7 @@ pub fn start_capture_session(
     }
 
     // Fallback capture thread (xcap) if WGC is unsupported or failed
+    metrics.capture_backend.store(3, Ordering::Relaxed);
     crate::logger::log_msg("WARN", "capture.start", &format!("session={session_id} backend=xcap encoder=libjpeg-turbo/JPEG reason=WGC_unavailable_or_start_failed"));
     std::thread::spawn(move || {
         let _timer_guard = MultimediaTimerGuard::new();
@@ -1629,12 +1743,19 @@ pub fn start_capture_session(
 }
 
 #[cfg(windows)]
-fn safely_stop_wgc_control(control: ActiveCaptureControl) -> std::thread::JoinHandle<()> {
+fn safely_stop_capture_control(control: ActiveCaptureControl) -> std::thread::JoinHandle<()> {
     use std::os::windows::prelude::AsRawHandle;
     use windows::Win32::Foundation::{HANDLE, LPARAM, WPARAM};
     use windows::Win32::System::Threading::GetThreadId;
     use windows::Win32::UI::WindowsAndMessaging::{PostThreadMessageW, WM_QUIT};
 
+    let control = match control {
+        ActiveCaptureControl::Wgc(control) => control,
+        ActiveCaptureControl::Dxgi { halt, thread } => {
+            halt.store(true, Ordering::Release);
+            return std::thread::spawn(move || { finish_capture_thread(thread); });
+        }
+    };
     // 1. Signal halt flag immediately so on_frame_arrived halts without spinning
     control.halt_handle().store(true, Ordering::SeqCst);
 
@@ -1659,16 +1780,17 @@ fn safely_stop_wgc_control(control: ActiveCaptureControl) -> std::thread::JoinHa
             }
         }
 
-        // 4. Polite bounded poll (max 600ms total, 20ms sleeps = 0% CPU)
-        let start = std::time::Instant::now();
-        while !thread_handle.is_finished() && start.elapsed().as_millis() < 600 {
-            std::thread::sleep(std::time::Duration::from_millis(20));
-        }
-
-        if thread_handle.is_finished() {
-            let _ = thread_handle.join();
-        }
+        finish_capture_thread(thread_handle);
     })
+}
+
+#[cfg(windows)]
+fn finish_capture_thread<T>(thread: std::thread::JoinHandle<T>) {
+    let started = std::time::Instant::now();
+    while !thread.is_finished() && started.elapsed().as_millis() < 600 {
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    if thread.is_finished() { let _ = thread.join(); }
 }
 
 #[tauri::command]
@@ -1687,7 +1809,7 @@ pub fn stop_capture_session(session_id: String) -> Result<bool, String> {
             session.metrics.nvenc_fallbacks.load(Ordering::Relaxed), session.metrics.readback_errors.load(Ordering::Relaxed), session.metrics.jpeg_errors.load(Ordering::Relaxed)));
         session.active.store(false, Ordering::SeqCst);
         #[cfg(windows)]
-        if let Some(control) = session.control { safely_stop_wgc_control(control); }
+        if let Some(control) = session.control { safely_stop_capture_control(control); }
     }
     let empty = SESSIONS.lock().map_err(|_| "Capture session lock poisoned")?.is_empty();
     CAPTURING_VIDEO.store(!empty, Ordering::SeqCst);
@@ -1739,6 +1861,7 @@ mod tests {
     #[ignore = "requires an interactive Windows desktop and capture permission; captures pixels in memory only"]
     fn live_generic_wgc_retains_requested_profile_without_nvenc() {
         assert_eq!(std::env::var("P2SHARER_NATIVE_MF").as_deref(), Ok("0"), "set P2SHARER_NATIVE_MF=0 to exercise the JPEG fallback explicitly");
+        assert_eq!(std::env::var("P2SHARER_CAPTURE_BACKEND").as_deref(), Ok("wgc"), "set P2SHARER_CAPTURE_BACKEND=wgc to exercise WGC explicitly");
         let monitor = list_screen_sources().monitors.into_iter().find(|monitor| monitor.is_primary)
             .expect("live capture requires a primary monitor");
         let expected = fit_capture_dimensions(monitor.width, monitor.height, 1920, 1080);
@@ -1752,7 +1875,7 @@ mod tests {
         let (metrics, load, mut receiver) = {
             let sessions = SESSIONS.lock().unwrap();
             let session = sessions.get(session_id).unwrap();
-            assert!(session.control.is_some(), "generic capture must start WGC, not fall back to xcap");
+            assert!(session.control.is_some(), "generic capture must retain GPU capture");
             assert!(!session.nvenc_enabled.load(Ordering::Relaxed));
             (session.metrics.clone(), session.load.clone(), session.sender.subscribe())
         };
@@ -1768,6 +1891,7 @@ mod tests {
             } else { std::thread::sleep(std::time::Duration::from_millis(2)); }
         }
         let images = metrics.images.load(Ordering::Relaxed);
+        assert_eq!(metrics.capture_backend.load(Ordering::Relaxed), 1, "WGC must be the actual capture backend");
         assert!(decoded > 0 && images > 0, "WGC must deliver real images, not only repeat ticks");
         assert_eq!(metrics.nvenc_images.load(Ordering::Relaxed), 0);
         assert_eq!(load.snapshot().resolution_scale_percent, 100);
@@ -1775,6 +1899,59 @@ mod tests {
         eprintln!("generic WGC: images={images} decoded={decoded} mean_processing_us={} readback_errors={} profile={}x{}@{}",
             metrics.processing_us.load(Ordering::Relaxed) / images,
             metrics.readback_errors.load(Ordering::Relaxed), expected.0, expected.1, load.fps());
+    }
+
+    #[test]
+    #[ignore = "requires an interactive Windows desktop, DXGI monitor capture and a hardware H264 encoder"]
+    fn live_dxgi_recreates_producer_with_preserved_session_and_recovery_key() {
+        let monitor = list_screen_sources().monitors.into_iter().find(|monitor| monitor.is_primary)
+            .expect("live capture requires a primary monitor");
+        let id = "dxgi-producer-recovery-test";
+        start_capture_session(id.into(), monitor.id, Some(60), Some(1920), Some(1080),
+            Some(true), Some(90), None, Some("generic".into())).unwrap();
+        struct Cleanup;
+        impl Drop for Cleanup { fn drop(&mut self) { let _ = stop_capture_session("dxgi-producer-recovery-test".into()); } }
+        let _cleanup = Cleanup;
+        let (active, halt, mut receiver) = {
+            let sessions = SESSIONS.lock().unwrap(); let session = &sessions[id];
+            assert_eq!(session.metrics.capture_backend.load(Ordering::Relaxed), 2);
+            let Some(ActiveCaptureControl::Dxgi { halt, .. }) = &session.control else { panic!("DXGI required"); };
+            (session.active.clone(), halt.clone(), session.sender.subscribe())
+        };
+        fn packet(receiver: &mut broadcast::Receiver<Message>) -> Vec<u8> {
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+            while std::time::Instant::now() < deadline {
+                if let Ok(Message::Binary(bytes)) = receiver.try_recv() {
+                    if bytes.starts_with(b"P2NV") { return bytes; }
+                }
+                std::thread::sleep(std::time::Duration::from_millis(5));
+            }
+            panic!("Native H264 frame required");
+        }
+        let before = packet(&mut receiver);
+        halt.store(true, Ordering::Release);
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        loop {
+            assert!(std::time::Instant::now() < deadline, "DXGI producer did not restart");
+            let replaced = {
+                let sessions = SESSIONS.lock().unwrap(); let session = &sessions[id];
+                assert!(Arc::ptr_eq(&active, &session.active) && active.load(Ordering::Acquire));
+                matches!(&session.control, Some(ActiveCaptureControl::Dxgi { halt: current, .. }) if !Arc::ptr_eq(&halt, current))
+            };
+            if replaced { break; }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        // Old queued dependent frames can precede the replacement's recovery IDR.
+        loop {
+            assert!(std::time::Instant::now() < deadline, "Recovery key missing");
+            let after = packet(&mut receiver);
+            let previous = u32::from_le_bytes(before[16..20].try_into().unwrap());
+            let current = u32::from_le_bytes(after[16..20].try_into().unwrap());
+            if current > previous && after[5] != 0 {
+                assert_eq!(&before[8..16], &after[8..16]);
+                break;
+            }
+        }
     }
 
     #[test]

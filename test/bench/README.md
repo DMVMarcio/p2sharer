@@ -55,3 +55,13 @@ MediaFoundation/H264 versus NVENC/H264; the shared wire format alone does not.
 Record the selected budget, content and fallback counts: passing a simple scene
 does not establish support for detailed 1080p recovery at very low bitrates. Hardware
 MFT burst overshoot can trigger the existing compatibility fallback there.
+
+For DXGI monitor validation, pass `captureMouse: true` to `runNativeRtpLoopback`,
+and `true` as the second argument to `runHardwareVisualCheck(sourceId, true)`.
+Hidden-cursor sessions intentionally retain WGC because duplication cannot remove
+a cursor already embedded by the display driver. Compare the same scene/profile
+using `P2SHARER_CAPTURE_BACKEND=dxgi` and `wgc` on separate diagnostic launches.
+Confirm `backend=DXGI` in the native capture log; a successful encoder alone does
+not establish which capture backend ran. DXGI is monitor-only; window capture and
+unsupported driver configurations preserve WGC compatibility. Rotation and pointer
+composition regressions use WARP without requiring a physical display or GPU.

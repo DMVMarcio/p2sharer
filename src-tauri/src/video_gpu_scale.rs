@@ -29,9 +29,9 @@ float4 ps(Vertex v) : SV_TARGET {
 }
 "#;
 
-fn compile(entry: PCSTR, profile: PCSTR) -> Result<ID3DBlob> {
+pub(crate) fn compile_shader(source: &str, entry: PCSTR, profile: PCSTR) -> Result<ID3DBlob> {
     let mut code = None;
-    unsafe { D3DCompile(SHADER.as_ptr().cast(), SHADER.len(), PCSTR::null(), None,
+    unsafe { D3DCompile(source.as_ptr().cast(), source.len(), PCSTR::null(), None,
         None, entry, profile, 0, 0, &mut code, None)?; }
     code.ok_or_else(|| Error::from_hresult(E_POINTER))
 }
@@ -57,8 +57,8 @@ impl GpuScaler {
             return Err(Error::from_hresult(E_INVALIDARG));
         }
         if self.shaders.as_ref().map_or(true, |shaders| shaders.device != *device) {
-            let vs = compile(s!("vs"), s!("vs_4_0"))?;
-            let ps = compile(s!("ps"), s!("ps_4_0"))?;
+            let vs = compile_shader(SHADER, s!("vs"), s!("vs_4_0"))?;
+            let ps = compile_shader(SHADER, s!("ps"), s!("ps_4_0"))?;
             let mut vertex = None; let mut pixel = None;
             unsafe {
                 device.CreateVertexShader(std::slice::from_raw_parts(vs.GetBufferPointer().cast(), vs.GetBufferSize()), None, Some(&mut vertex))?;

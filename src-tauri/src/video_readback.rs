@@ -1,4 +1,4 @@
-use windows_capture::frame::{Frame, FrameBuffer};
+use windows_capture::frame::FrameBuffer;
 use windows_capture_api::core::{Error, Result};
 use windows_capture_api::Win32::Foundation::E_POINTER;
 use windows_capture_api::Win32::Graphics::Direct3D11::{
@@ -16,10 +16,6 @@ pub struct ReusableReadback {
 
 impl ReusableReadback {
     pub fn allocations(&self) -> u64 { self.allocations }
-
-    pub fn read<'a>(&'a mut self, frame: &Frame<'_>) -> Result<MappedReadback<'a>> {
-        self.read_texture(frame.device(), frame.device_context(), frame.as_raw_texture())
-    }
 
     pub fn read_texture<'a>(
         &'a mut self, device: &ID3D11Device, context: &ID3D11DeviceContext,
