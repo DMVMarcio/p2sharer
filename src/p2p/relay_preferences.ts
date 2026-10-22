@@ -19,11 +19,23 @@ function retired(url: string): boolean {
 }
 const publicMqttUrls = [
   'wss://broker.hivemq.com:8884/mqtt',
-  'wss://broker.emqx.io:8084/mqtt',
-  'wss://test.mosquitto.org:8081/mqtt',
+];
+
+export const DEFAULT_NOSTR_RELAY_URLS = [
+  'wss://relay.damus.io',
+  'wss://nos.today',
+];
+
+export const DEFAULT_TORRENT_TRACKER_URLS = [
+  'wss://tracker.openwebtorrent.com',
+  'wss://tracker.webtorrent.dev',
 ];
 
 export const DEFAULT_MQTT_RELAY_URLS = [ownedBrokerUrl(), ...publicMqttUrls];
+const legacyPublicMqttSets = [
+  ['wss://broker.hivemq.com:8884/mqtt', 'wss://broker.emqx.io:8084/mqtt', 'wss://test.mosquitto.org:8081/mqtt'],
+  ['wss://public:public@public.cloud.shiftr.io', 'wss://broker.emqx.io:8084/mqtt', 'wss://test.mosquitto.org:8081/mqtt'],
+];
 const legacyMqttUrls = [
   'wss://public:public@public.cloud.shiftr.io',
   'wss://broker.emqx.io:8084/mqtt',
@@ -35,8 +47,8 @@ export function defaultRendezvousPreferences(): RendezvousPreferences {
   const web = isBrowserRuntime();
   return {
     mqtt: [ownedBrokerUrl(), ...(web ? [] : publicMqttUrls)].map(url => ({ url, enabled: true })),
-    nostr: web ? [] : defaultNostrUrls.filter(url => !retired(url)).map(url => ({ url, enabled: true })),
-    torrent: web ? [] : defaultTorrentUrls.filter(url => !retired(url)).map(url => ({ url, enabled: true })),
+    nostr: web ? [] : DEFAULT_NOSTR_RELAY_URLS.map(url => ({ url, enabled: true })),
+    torrent: web ? [] : DEFAULT_TORRENT_TRACKER_URLS.map(url => ({ url, enabled: true })),
   };
 }
 
@@ -84,9 +96,10 @@ export function loadRendezvousPreferences(): RendezvousPreferences {
     const previousOwned = [websiteUrl('/mqtt').replace(/^http/, 'ws'), 'wss://p2sharer.com/mqtt'];
     const previousPublicSets = [
       publicMqttUrls,
-      ['wss://public:public@public.cloud.shiftr.io', 'wss://broker.emqx.io:8084/mqtt', 'wss://test.mosquitto.org:8081/mqtt'],
+      ...legacyPublicMqttSets,
     ];
-    const factoryFallbacks = sameDefaults(result.nostr, defaultNostrUrls) && sameDefaults(result.torrent, defaultTorrentUrls);
+    const factoryFallbacks = (sameDefaults(result.nostr, defaultNostrUrls) || sameDefaults(result.nostr, DEFAULT_NOSTR_RELAY_URLS)) &&
+      (sameDefaults(result.torrent, defaultTorrentUrls) || sameDefaults(result.torrent, DEFAULT_TORRENT_TRACKER_URLS));
     const matchesPreviousMqtt = sameDefaults(result.mqtt, legacyMqttUrls) ||
       previousOwned.some(url => previousPublicSets.some(set => sameDefaults(result.mqtt, [url, ...set])));
     if (factoryFallbacks && matchesPreviousMqtt) return defaultRendezvousPreferences();

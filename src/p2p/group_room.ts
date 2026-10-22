@@ -564,6 +564,43 @@ export class GroupRoomManager {
       return;
     }
     for (const peerId of this.admittedTargets()) void action.send(data, { target: peerId });
+    this.relayActionToIndirectPeers(action, data);
+  }
+
+  private relayActionToIndirectPeers(action: unknown, data: unknown): void {
+    if (!this.meshRelayAction) return;
+    let actionName: string | undefined;
+    if (action === this.chatAction) actionName = 'chat';
+    else if (action === this.presenceAction) actionName = 'presence';
+    else if (action === this.appAction) actionName = 'app';
+    if (!actionName) return;
+
+    for (const [indirectPeerId, intermediaryPeerId] of this.rumorIntermediaries) {
+      if (this.peerTracker.isRelayed(indirectPeerId) && this.peerTracker.directConnectedPeers.has(intermediaryPeerId)) {
+        try {
+          this.meshRelayAction.send(
+            { target: indirectPeerId, origin: selfId, kind: 'action_relay', action: actionName, payload: data },
+            { target: intermediaryPeerId }
+          );
+        } catch {}
+      }
+    }
+  }
+
+  private handleRelayedAction(actionName: string | undefined, payload: unknown, originPeerId: string, intermediaryPeerId: string): void {
+    if (!actionName || typeof actionName !== 'string' || !originPeerId) return;
+    this.peerTracker.touchPeer(originPeerId);
+    if (actionName === 'chat' && this.chatAction?.onMessage) {
+      void this.chatAction.onMessage(payload as ChatMessage, { peerId: intermediaryPeerId });
+    } else if (actionName === 'presence' && this.presenceAction?.onMessage) {
+      void this.presenceAction.onMessage(payload, { peerId: intermediaryPeerId });
+    } else if (actionName === 'app' && this.appAction?.onMessage) {
+      void this.appAction.onMessage(payload, { peerId: intermediaryPeerId });
+    } else if (actionName === 'peer_ping' && this.pingAction?.onMessage) {
+      void this.pingAction.onMessage(payload as { t: number }, { peerId: intermediaryPeerId });
+    } else if (actionName === 'peer_pong' && this.pongAction?.onMessage) {
+      void this.pongAction.onMessage(payload as { t: number }, { peerId: intermediaryPeerId });
+    }
   }
 
   private async persistJoinedIdentity(saved?: SavedRoom): Promise<void> {
@@ -1688,7 +1725,7 @@ export class GroupRoomManager {
     this.meshRelayAction = this.room.makeAction('mesh_relay');
     this.meshRelayAction.onMessage = (
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      data: { target: string; origin: string; kind: string; payload: any },
+      data: { target: string; origin: string; kind: string; payload: any; action?: string },
       meta: { peerId: string }
     ) => {
       if (!data || typeof data.origin !== 'string' || !data.origin || data.origin.length > 80 ||
@@ -1703,6 +1740,12 @@ export class GroupRoomManager {
           this.rumorIntermediaries.set(data.origin, meta.peerId);
           this.peerTracker.receivePeerExchange(data.origin, false, typeof p.username === 'string' ? p.username.slice(0, 80) : undefined);
 
+          if (typeof p.publicKey === 'string' && /^[0-9a-f]{66}$/i.test(p.publicKey)) {
+            this.chatAuth?.pinDirect(data.origin, p.publicKey);
+          }
+          this.peerTracker.setPeerRelayed(data.origin, true);
+          this.notifyPeersUpdate();
+
           // Reply with mesh_ack back through the intermediary
           if (this.meshRelayAction) {
             try {
@@ -1716,6 +1759,7 @@ export class GroupRoomManager {
                     isCreator: this.isCreator,
                     joinedAt: this.myJoinedAt,
                     isStreaming: Boolean(this.localStream),
+                    publicKey: this.chatAuth?.publicKey,
                   },
                 },
                 { target: meta.peerId }
@@ -1732,11 +1776,18 @@ export class GroupRoomManager {
           const p = data.payload || {};
           this.rumorIntermediaries.set(data.origin, meta.peerId);
           this.peerTracker.receivePeerExchange(data.origin, false, typeof p.username === 'string' ? p.username.slice(0, 80) : undefined);
+          if (typeof p.publicKey === 'string' && /^[0-9a-f]{66}$/i.test(p.publicKey)) {
+            this.chatAuth?.pinDirect(data.origin, p.publicKey);
+          }
+          this.peerTracker.setPeerRelayed(data.origin, true);
+          this.notifyPeersUpdate();
 
           // Force signaling re-announcement on the broker
           if (this.signalingTopic) {
             signalingManager.reannounce(this.signalingTopic, data.origin);
           }
+        } else if (data.kind === 'action_relay') {
+          this.handleRelayedAction(data.action, data.payload, data.origin, meta.peerId);
         } else if (data.kind === 'stream_req' && data.origin === meta.peerId && this.localStream) {
           this.sendStreamToPeer(data.origin);
         }
@@ -2242,6 +2293,7 @@ export class GroupRoomManager {
               isCreator: this.isCreator,
               joinedAt: this.myJoinedAt,
               isStreaming: Boolean(this.localStream),
+              publicKey: this.chatAuth?.publicKey,
               targetUsername,
             },
           },

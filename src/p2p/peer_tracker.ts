@@ -20,6 +20,7 @@ export class PeerTracker {
   private streamWatchers = new Map<string, Set<string>>(); // broadcasterId -> Set<watcherPeerId>
   private watcherNames = new Map<string, string>(); // peerId -> username
   private streamingPeers = new Set<string>(); // verified peerId set who is broadcasting
+  private relayedPeers = new Set<string>();
 
   /**
    * Processes a peer arrival from direct WebRTC connection or PEX gossip.
@@ -110,6 +111,7 @@ export class PeerTracker {
     this.peerPings.delete(peerId);
     this.watcherNames.delete(peerId);
     this.streamingPeers.delete(peerId);
+    this.relayedPeers.delete(peerId);
 
     // Remove as watcher from all active stream slots
     this.streamWatchers.forEach((watchers) => {
@@ -229,6 +231,15 @@ export class PeerTracker {
    * Returns list of all known room peers, including direct verified peers
    * and active in-flight / bridged PEX rumors with 'connecting' state.
    */
+  public setPeerRelayed(peerId: string, relayed: boolean): void {
+    if (relayed) this.relayedPeers.add(peerId);
+    else this.relayedPeers.delete(peerId);
+  }
+
+  public isRelayed(peerId: string): boolean {
+    return this.relayedPeers.has(peerId);
+  }
+
   public getAllRoomPeers(): PeerInfo[] {
     const list: PeerInfo[] = [];
     const addedIds = new Set<string>();
@@ -252,7 +263,7 @@ export class PeerTracker {
         list.push({
           id: rId,
           username: uname,
-          connectionState: 'connecting',
+          connectionState: (this.relayedPeers && this.relayedPeers.has(rId)) ? 'connected' : 'connecting',
           joinedAt: this.peerJoinedAt.get(rId) || Date.now(),
         });
       }
@@ -339,5 +350,6 @@ export class PeerTracker {
     this.streamWatchers.clear();
     this.watcherNames.clear();
     this.streamingPeers.clear();
+    this.relayedPeers.clear();
   }
 }

@@ -24,12 +24,10 @@ describe('M7: P2P Mesh Connectivity, Indirect Bridging & Signaling Stability Har
   // Area 1: High-Availability MQTT Broker Configuration & Relay Sockets
   // =========================================================================
   describe('Area 1: High-Availability MQTT Broker Configuration', () => {
-    it('1.1: DEFAULT_MQTT_RELAY_URLS includes fast verified brokers (HiveMQ, EMQX, Mosquitto)', () => {
+    it('1.1: DEFAULT_MQTT_RELAY_URLS includes first-party broker and verified fallback (HiveMQ)', () => {
       assert.ok(Array.isArray(DEFAULT_MQTT_RELAY_URLS));
-      assert.ok(DEFAULT_MQTT_RELAY_URLS.length >= 4);
+      assert.ok(DEFAULT_MQTT_RELAY_URLS.length >= 2);
       assert.ok(DEFAULT_MQTT_RELAY_URLS.some((u) => u.includes('hivemq.com')));
-      assert.ok(DEFAULT_MQTT_RELAY_URLS.some((u) => u.includes('emqx.io')));
-      assert.ok(DEFAULT_MQTT_RELAY_URLS.some((u) => u.includes('mosquitto.org')));
       // The first-party broker comes before the remaining desktop fallbacks.
       assert.equal(new URL(DEFAULT_MQTT_RELAY_URLS[0]!).pathname, '/mqtt');
     });
@@ -264,6 +262,39 @@ describe('M7: P2P Mesh Connectivity, Indirect Bridging & Signaling Stability Har
       (roomManager as any).peerTracker.addPeer('peer-verified', 'VerifiedPeer');
       (roomManager as any).bridgeIndirectPeer('peer-verified', 'peer-bob');
       assert.equal(sentRelayMessages.length, 0);
+    });
+
+    it('4.3: meshRelayAction forwards relayed actions and marks indirect peer connected', async () => {
+      const roomManager = new GroupRoomManager('Alice', 'room-alpha', '', true);
+      const sentRelayMessages: any[] = [];
+      (roomManager as any).meshRelayAction = {
+        send: (data: any, opts: any) => sentRelayMessages.push({ data, opts }),
+      };
+
+      // Set up intermediary bob and indirect charlie
+      (roomManager as any).peerTracker.addPeer('peer-bob', 'Bob');
+      (roomManager as any).rumorIntermediaries.set('peer-charlie', 'peer-bob');
+      (roomManager as any).peerTracker.receivePeerExchange('peer-charlie', false, 'Charlie');
+
+      // Before mesh_ack, charlie is connecting
+      let peers = (roomManager as any).peerTracker.getAllRoomPeers();
+      const charlieBefore = peers.find((p: any) => p.id === 'peer-charlie');
+      assert.equal(charlieBefore?.connectionState, 'connecting');
+
+      // Trigger relayed status via peerTracker
+      (roomManager as any).peerTracker.setPeerRelayed('peer-charlie', true);
+      peers = (roomManager as any).peerTracker.getAllRoomPeers();
+      const charlieAfter = peers.find((p: any) => p.id === 'peer-charlie');
+      assert.equal(charlieAfter?.connectionState, 'connected');
+
+      // Test relayActionToIndirectPeers sends to bob for charlie
+      (roomManager as any).relayActionToIndirectPeers((roomManager as any).chatAction, { id: 'm1', text: 'Hello' });
+      assert.ok(sentRelayMessages.length >= 1);
+      const last = sentRelayMessages[sentRelayMessages.length - 1];
+      assert.equal(last.opts.target, 'peer-bob');
+      assert.equal(last.data.target, 'peer-charlie');
+      assert.equal(last.data.kind, 'action_relay');
+      assert.equal(last.data.action, 'chat');
     });
   });
 });

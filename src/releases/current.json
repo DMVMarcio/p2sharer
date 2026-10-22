@@ -2,43 +2,56 @@
   "version": "1.5.2",
   "translations": {
     "en": [
-      "**Smoother screen sharing with less CPU work.** Improved Windows 10 capture and added GPU encoding in generic mode on compatible hardware, including Intel, AMD and integrated graphics, with automatic compatibility fallback."
+      "**Smoother screen sharing with less CPU work.** Improved Windows 10 capture and added GPU encoding in generic mode on compatible hardware, including Intel, AMD and integrated graphics, with automatic compatibility fallback.",
+      "**More reliable connections between participants.** Streamlined discovery servers to prevent network splits, added automatic room relaying so participants connect even through restrictive home networks, and enabled automatic router port mapping on desktop."
     ],
     "pt-BR": [
-      "**Compartilhamento de tela mais fluido e com menos trabalho para a CPU.** Melhoramos a captura no Windows 10 e adicionamos codificação pela GPU no modo genérico em hardware compatível, incluindo Intel, AMD e gráficos integrados, com alternativa automática para manter a compatibilidade."
+      "**Compartilhamento de tela mais fluido e com menos trabalho para a CPU.** Melhoramos a captura no Windows 10 e adicionamos codificação pela GPU no modo genérico em hardware compatível, incluindo Intel, AMD e gráficos integrados, com alternativa automática para manter a compatibilidade.",
+      "**Conexões mais confiáveis entre os participantes da sala.** Simplificamos os servidores de encontro para evitar divisões de rede, adicionamos retransmissão automática na sala para conectar participantes mesmo sob redes restritivas e ativamos mapeamento automático de portas no roteador pelo desktop."
     ],
     "es": [
-      "**Pantalla compartida más fluida y con menos trabajo para la CPU.** Mejoramos la captura en Windows 10 y añadimos codificación por GPU en el modo genérico con hardware compatible, incluidos Intel, AMD y gráficos integrados, con una alternativa automática para mantener la compatibilidad."
+      "**Pantalla compartida más fluida y con menos trabajo para la CPU.** Mejoramos la captura en Windows 10 y añadimos codificación por GPU en el modo genérico con hardware compatible, incluidos Intel, AMD y gráficos integrados, con una alternativa automática para mantener la compatibilidad.",
+      "**Conexiones más confiables entre los participantes de la sala.** Simplificamos los servidores de encuentro para evitar divisiones de red, añadimos retransmisión automática en la sala para conectar participantes incluso en redes restrictivas y activamos el mapeo automático de puertos en el enrutador en el escritorio."
     ],
     "fr": [
-      "**Partage d’écran plus fluide et processeur moins sollicité.** Capture améliorée sous Windows 10 et encodage GPU en mode générique sur le matériel compatible, notamment Intel, AMD et les circuits graphiques intégrés, avec repli automatique pour préserver la compatibilité."
+      "**Partage d’écran plus fluide et processeur moins sollicité.** Capture améliorée sous Windows 10 et encodage GPU en mode générique sur le matériel compatible, notamment Intel, AMD et les circuits graphiques intégrés, avec repli automatique pour préserver la compatibilité.",
+      "**Connexions plus fiables entre les participants du salon.** Simplification des serveurs de rencontre pour éviter la fragmentation réseau, ajout du relais automatique dans le salon pour connecter les participants même derrière des réseaux restrictifs et activation du mappage automatique de ports sur le bureau."
     ],
     "de": [
-      "**Flüssigere Bildschirmübertragung mit weniger CPU-Arbeit.** Verbesserte Aufnahme unter Windows 10 und GPU-Kodierung im generischen Modus auf kompatibler Hardware, einschließlich Intel, AMD und integrierter Grafik, mit automatischer Ausweichlösung für die Kompatibilität."
+      "**Flüssigere Bildschirmübertragung mit weniger CPU-Arbeit.** Verbesserte Aufnahme unter Windows 10 und GPU-Kodierung im generischen Modus auf kompatibler Hardware, einschließlich Intel, AMD und integrierter Grafik, mit automatischer Ausweichlösung für die Kompatibilität.",
+      "**Zuverlässigere Verbindungen zwischen den Teilnehmern im Raum.** Bereinigte Verbindungsserver zur Vermeidung von Netzwerkspaltungen, automatische Weiterleitung im Raum für Verbindungen selbst über restriktive Heimnetzwerke und automatische Router-Portzuweisung auf dem Desktop."
     ],
     "it": [
-      "**Condivisione dello schermo più fluida con meno lavoro per la CPU.** Acquisizione migliorata su Windows 10 e codifica GPU in modalità generica su hardware compatibile, inclusi Intel, AMD e grafica integrata, con alternativa automatica per mantenere la compatibilità."
+      "**Condivisione dello schermo più fluida con menos lavoro per la CPU.** Acquisizione migliorata su Windows 10 e codifica GPU in modalità generica su hardware compatibile, inclusi Intel, AMD e grafica integrata, con alternativa automatica per mantenere la compatibilità.",
+      "**Connessioni più affidabili tra i partecipanti nella stanza.** Semplificati i server di incontro per evitare frammentazioni di rete, aggiunto l'inoltro automatico nella stanza per connettere i partecipanti anche su reti restrittive e attivata la mappatura automatica delle porte del router su desktop."
     ],
     "zh-CN": [
-      "**屏幕共享更流畅，减少 CPU 负担。** 改进了 Windows 10 屏幕捕获，并为兼容硬件的通用模式添加 GPU 编码，涵盖 Intel、AMD 和集成显卡，支持自动回退以保持兼容性。"
+      "**屏幕共享更流畅，减少 CPU 负担。** 改进了 Windows 10 屏幕捕获，并为兼容硬件的通用模式添加 GPU 编码，涵盖 Intel、AMD 和集成显卡，支持自动回退以保持兼容性。",
+      "**房间参与者之间的连接更可靠。** 精简了会合服务器以防止网络分割，加入房间内自动中继使参与者即使在受限网络下也能顺利连接，并在桌面端启用了路由器端口自动映射。"
     ],
     "zh-TW": [
-      "**螢幕分享更流暢，減少 CPU 負擔。** 改善 Windows 10 螢幕擷取，並為相容硬體的通用模式加入 GPU 編碼，涵蓋 Intel、AMD 與整合式顯示晶片，支援自動切換備用方式以維持相容性。"
+      "**螢幕分享更流暢，減少 CPU 負擔。** 改善 Windows 10 螢幕擷取，並為相容硬體的通用模式加入 GPU 編碼，涵蓋 Intel、AMD 與整合式顯示晶片，支援自動切換備用方式以維持相容性。",
+      "**房間參與者之間的連線更可靠。** 精簡了會合伺服器以防止網路分割，加入房間內自動中繼使參與者即使在受限網路下也能順利連線，並在桌面端啟用了路由器連接埠自動對應。"
     ],
     "ja": [
-      "**CPU の負担を抑えた、より滑らかな画面共有。** Windows 10 のキャプチャを改善し、Intel、AMD、内蔵グラフィックスなどの対応ハードウェアで汎用モードの GPU エンコードを追加しました。互換性を維持するため、自動フォールバックにも対応します。"
+      "**CPU の負担を抑えた、より滑らかな画面共有。** Windows 10 のキャプチャを改善し、Intel、AMD、内蔵グラフィックスなどの対応ハードウェアで汎用モードの GPU エンコードを追加しました。互換性を維持するため、自動フォールバックにも対応します。",
+      "**ルーム参加者間の接続がより安定しました。** ネットワークの分断を防ぐためランデブーサーバーを整理し、制限のあるネットワークでも参加者同士がつながる自動リレーを追加するとともに、デスクトップ版でルーターのポート自動マッピングに対応しました。"
     ],
     "ko": [
-      "**CPU 부담을 줄인 더 부드러운 화면 공유.** Windows 10 캡처를 개선하고 Intel, AMD 및 내장 그래픽 등 호환 하드웨어의 일반 모드에 GPU 인코딩을 추가했습니다. 호환성을 유지하기 위해 자동 대체 방식도 지원합니다."
+      "**CPU 부담을 줄인 더 부드러운 화면 공유.** Windows 10 캡처를 개선하고 Intel, AMD 및 내장 그래픽 등 호환 하드웨어의 일반 모드에 GPU 인코딩을 추가했습니다. 호환성을 유지하기 위해 자동 대체 방식도 지원합니다.",
+      "**방 참여자 간의 연결 안정성이 향상되었습니다.** 네트워크 분할을 줄이기 위해 만남 서버를 간소화하고, 제한된 네트워크 환경에서도 참여자가 연결될 수 있도록 자동 릴레이를 추가했으며, 데스크톱에서 라우터 포트 자동 매핑을 지원합니다."
     ],
     "hi": [
-      "**CPU पर कम भार के साथ अधिक सहज स्क्रीन शेयरिंग।** Windows 10 कैप्चर में सुधार किया गया है और संगत हार्डवेयर पर सामान्य मोड में GPU एन्कोडिंग जोड़ी गई है, जिसमें Intel, AMD और एकीकृत ग्राफ़िक्स शामिल हैं। संगतता बनाए रखने के लिए वैकल्पिक तरीके पर अपने आप स्विच होता है।"
+      "**CPU पर कम भार के साथ अधिक सहज स्क्रीन शेयरिंग।** Windows 10 कैप्चर में सुधार किया गया है और संगत हार्डवेयर पर सामान्य mode में GPU एन्कोडिंग जोड़ी गई है, जिसमें Intel, AMD और एकीकृत ग्राफ़िक्स शामिल हैं। संगतता बनाए रखने के लिए वैकल्पिक तरीके पर अपने आप स्विच होता है।",
+      "**रूम के प्रतिभागियों के बीच अधिक विश्वसनीय कनेक्शन।** नेटवर्क विभाजन को रोकने के लिए सिग्नलिंग सर्वर को सुव्यवस्थित किया गया, सख्त नेटवर्क में भी प्रतिभागियों को जोड़ने के लिए स्वचालित रूम रिले जोड़ा गया और डेस्कटॉप पर राउटर पोर्ट की स्वचालित मैपिंग सक्षम की गई।"
     ],
     "fi": [
-      "**Sujuvampi näytönjako ja vähemmän työtä suorittimelle.** Parannettu Windows 10:n kaappausta ja lisätty yleiseen tilaan GPU-enkoodaus yhteensopivilla laitteilla, myös Intelin, AMD:n ja integroiduilla grafiikkapiireillä. Automaattinen varamenetelmä säilyttää yhteensopivuuden."
+      "**Sujuvampi näytönjako ja vähemmän työtä suorittimelle.** Parannettu Windows 10:n kaappausta ja lisätty yleiseen tilaan GPU-enkoodaus yhteensopivilla laitteilla, myös Intelin, AMD:n ja integroiduilla grafiikkapiireillä. Automaattinen varamenetelmä säilyttää yhteensopivuuden.",
+      "**Luotettavammat yhteydet huoneen osallistujien välillä.** Kohtaamispalvelimia selkeytettiin verkon jakautumisen estämiseksi, lisättiin automaattinen verkon sisäinen välitys yhdistämään osallistujat myös rajoittavissa verkoissa ja otettiin käyttöön reitittimen automaattinen portinohjaus työpöydällä."
     ],
     "ru": [
-      "**Более плавная демонстрация экрана с меньшей нагрузкой на процессор.** Улучшен захват в Windows 10 и добавлено кодирование на GPU в универсальном режиме на совместимом оборудовании, включая Intel, AMD и встроенную графику, с автоматическим переходом на запасной вариант для сохранения совместимости."
+      "**Более плавная демонстрация экрана с меньшей нагрузкой на процессор.** Улучшен захват в Windows 10 и добавлено кодирование на GPU в универсальном режиме на совместимом оборудовании, включая Intel, AMD и встроенную графику, с автоматическим переходом на запасной вариант для сохранения совместимости.",
+      "**Более надёжные соединения между участниками комнаты.** Оптимизированы серверы встречи для предотвращения разделения сети, добавлена автоматическая ретрансляция для соединения участников даже в сетях со строгим NAT и включено автоматическое сопоставление портов роутера на десктопе."
     ]
   }
 }

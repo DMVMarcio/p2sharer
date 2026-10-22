@@ -45,6 +45,7 @@ mod interface_stun;
 pub mod port_tunnel;
 mod peer_payload;
 pub mod virtual_network;
+pub mod upnp;
 mod virtual_network_policy;
 #[cfg(all(windows, target_arch = "x86_64"))]
 mod virtual_network_driver;
@@ -130,11 +131,14 @@ pub fn run() {
         .manage(port_tunnel::TunnelState::default())
         .manage(peer_payload::PayloadState::default())
         .manage(virtual_network::VirtualNetworkState::default())
+        .manage(upnp::UpnpState::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
             let main = app.get_webview_window("main").ok_or("main webview missing")?;
+            let upnp_state = app.state::<upnp::UpnpState>().inner().clone();
+            tokio::spawn(async move { upnp_state.init_discovery().await; });
             #[cfg(windows)]
             let was_maximized = match window_placement::install(&main) {
                 Ok(maximized) => maximized,
@@ -223,6 +227,8 @@ pub fn run() {
             portable_update::download_portable_update,
             portable_update::install_portable_update,
             portable_update::restart_after_update,
+            upnp::get_upnp_status,
+            upnp::request_upnp_port,
             prepare_app_update,
             cancel_app_update,
             exit_application,
