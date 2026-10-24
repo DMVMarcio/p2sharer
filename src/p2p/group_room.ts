@@ -1880,6 +1880,7 @@ export class GroupRoomManager {
           if (this.previewOnly || !this.localAdmitted || !this.chatAuth?.getKnownKey(peerId) ||
               this.admittedPeers.get(peerId) !== this.chatAuth.getKnownKey(peerId)) return;
         }
+        this.peerTracker.touchPeer(args[1].peerId);
         return handler(...args);
       };
     });
@@ -2063,10 +2064,21 @@ export class GroupRoomManager {
 
   private startHeartbeatLoop(): void {
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+    const intervalMs = 2000;
+    const staleTimeoutMs = 25000;
+    let lastHeartbeatAt = Date.now();
+    let recoveryGraceUntil = 0;
 
     // Continuous presence heartbeat, PEX sync & Ghost Peer Pruner (every 2.0s)
     this.heartbeatTimer = setInterval(() => {
       if (!this.room) return;
+      const now = Date.now();
+      // CPU starvation, suspension and clock corrections delay local timers as
+      // well as queued messages. Give the transport a chance to drain them.
+      if (now - lastHeartbeatAt > intervalMs * 4 || now < lastHeartbeatAt) {
+        recoveryGraceUntil = now + staleTimeoutMs;
+      }
+      lastHeartbeatAt = now;
 
       // A peer may connect before the other side finishes binding its action
       // handlers. Retry the challenge until its key is pinned.
@@ -2119,7 +2131,6 @@ export class GroupRoomManager {
       // Continuous presence re-announcement on broker until direct peers connect or if rumors exist
       const hasNoDirectPeers = this.peerTracker.directConnectedPeers.size === 0;
       const rumors = this.peerTracker.getPendingRumors();
-      const now = Date.now();
       const pendingAdmission = Boolean(this.authority && !this.previewOnly && !this.localAdmitted && !this.admissionDenied);
       if (pendingAdmission && now - this.lastAdmissionRetry >= 4000) {
         this.lastAdmissionRetry = now;
@@ -2151,25 +2162,27 @@ export class GroupRoomManager {
         });
       }
 
-      // Prune ghost peers that missed heartbeats, but ONLY if their WebRTC connection is not active
+      // Trystero's active room map owns transport liveness. A quiet, recovering
+      // edge must not lose its verified identity and start rejecting presence.
       const activePeers = this.room?.getPeers?.() || {};
-      const staleCandidateIds = this.peerTracker.getStalePeerIds(25000);
+      const staleCandidateIds = now >= recoveryGraceUntil ? this.peerTracker.getStalePeerIds(staleTimeoutMs) : [];
       if (staleCandidateIds.length > 0) {
         staleCandidateIds.forEach((p) => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const peerObj: any = activePeers[p];
           const pc: RTCPeerConnection = peerObj?.connection || peerObj?.pc || peerObj;
-          if (pc && (pc.connectionState === 'connected' || pc.iceConnectionState === 'connected')) {
-            // WebRTC channel is physically alive - refresh touch so it isn't dropped falsely
+          if (pc && ![pc.connectionState, pc.iceConnectionState].some(state => state === 'failed' || state === 'closed')) {
+            // Includes ICE completed/checking and temporary disconnected states;
+            // definitive close/leave still comes through the room lifecycle.
             this.peerTracker.touchPeer(p);
             return;
           }
 
-          console.log(`[P2P] Pruning ghost peer due to timeout and disconnected WebRTC channel: ${p}`);
+          console.log(`[P2P] Pruning silent peer with no active room transport: ${p}`);
           this.removePeer(p);
         });
       }
-    }, 2000);
+    }, intervalMs);
 
     // Initial broadcast and request history from room
     setTimeout(() => {

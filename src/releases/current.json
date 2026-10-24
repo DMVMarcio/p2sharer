@@ -4,79 +4,79 @@
     "en": [
       "Whiteboard PNG exports can now remove empty margins, keeping 10 px around your drawing.",
       "PiP windows can now be minimized, maximized and restored. Detached apps resize freely, while streams retain their proportions when resized.",
-      "Room entry is smoother: participant previews keep their order, late participants continue to be discovered, and avatar/banner loading causes less disruption to ongoing streams.",
+      "Room entry and presence are more stable: participant previews keep their order, late participants remain discoverable, and temporary connection recovery or a busy computer no longer causes premature participant removal. Avatar and banner loading also causes less disruption to streams.",
       "Code blocks in chat and Notepad now support language selection and syntax highlighting. Notepad also supports indentation and familiar code editing shortcuts."
     ],
     "pt-BR": [
       "Agora é possível exportar o Whiteboard em PNG sem margens vazias, mantendo 10 px ao redor do desenho.",
       "As janelas PiP agora podem ser minimizadas, maximizadas e restauradas. Apps destacados podem ser redimensionados livremente, enquanto transmissões mantêm suas proporções ao redimensionar.",
-      "A entrada em salas fica mais fluida: a prévia mantém a ordem dos participantes, a busca continua por quem ainda não respondeu e o carregamento de avatares e banners interrompe menos as transmissões.",
+      "A entrada e a presença nas salas ficam mais estáveis: a prévia mantém a ordem, a busca continua por participantes atrasados e a recuperação temporária da conexão ou um computador sobrecarregado não remove participantes antes da hora. Avatares e banners também interrompem menos as transmissões.",
       "Blocos de código no chat e no Bloco de notas agora permitem escolher a linguagem e têm realce de sintaxe. O Bloco de notas também oferece indentação e atalhos comuns de edição de código."
     ],
     "es": [
       "Ahora puedes exportar el Whiteboard en PNG sin márgenes vacíos, dejando 10 px alrededor del dibujo.",
       "Las ventanas PiP ahora se pueden minimizar, maximizar y restaurar. Las apps separadas se redimensionan libremente, mientras que las transmisiones conservan sus proporciones al redimensionarse.",
-      "Entrar en salas es más fluido: la vista previa mantiene el orden de los participantes, se sigue buscando a quienes aún no respondieron y la carga de avatares y banners interrumpe menos las transmisiones.",
+      "La entrada y la presencia en las salas son más estables: la vista previa conserva el orden, se sigue buscando a los participantes que tardan en responder y la recuperación temporal de la conexión o un equipo sobrecargado ya no elimina participantes antes de tiempo. Los avatares y banners también interrumpen menos las transmisiones.",
       "Los bloques de código del chat y del Bloc de notas ahora permiten elegir el lenguaje y resaltan la sintaxis. El Bloc de notas también ofrece sangría y atajos habituales de edición de código."
     ],
     "fr": [
       "Les exports PNG du Whiteboard peuvent désormais supprimer les marges vides et garder 10 px autour du dessin.",
       "Les fenêtres PiP peuvent désormais être réduites, agrandies et restaurées. Les apps détachées se redimensionnent librement, tandis que les diffusions conservent leurs proportions au redimensionnement.",
-      "L’entrée dans les salons est plus fluide : l’ordre des participants reste stable dans l’aperçu, la recherche continue pour ceux qui n’ont pas encore répondu et le chargement des avatars et bannières perturbe moins les diffusions.",
+      "L’entrée et la présence dans les salons sont plus stables : l’aperçu conserve son ordre, la recherche des participants tardifs continue et une reprise temporaire de connexion ou un ordinateur surchargé ne supprime plus prématurément les participants. Les avatars et bannières perturbent aussi moins les diffusions.",
       "Les blocs de code du chat et du Bloc-notes permettent désormais de choisir le langage et bénéficient de la coloration syntaxique. Le Bloc-notes propose aussi l’indentation et des raccourcis courants d’édition de code."
     ],
     "de": [
       "PNG-Exporte des Whiteboards können jetzt leere Ränder entfernen und 10 px um die Zeichnung beibehalten.",
       "PiP-Fenster lassen sich jetzt minimieren, maximieren und wiederherstellen. Ausgelagerte Apps sind frei skalierbar, während Übertragungen beim Ändern der Größe ihre Proportionen beibehalten.",
-      "Der Raumbeitritt läuft flüssiger: Die Teilnehmervorschau behält ihre Reihenfolge, noch nicht antwortende Teilnehmer werden weiter gesucht und das Laden von Avataren und Bannern stört laufende Übertragungen weniger.",
+      "Raumbeitritt und Anwesenheit sind stabiler: Die Vorschau behält ihre Reihenfolge, spät antwortende Teilnehmer werden weiter gesucht und eine vorübergehende Verbindungswiederherstellung oder ein ausgelasteter Computer entfernt Teilnehmer nicht mehr vorzeitig. Avatare und Banner stören Übertragungen ebenfalls weniger.",
       "Codeblöcke im Chat und Notizblock bieten jetzt Sprachauswahl und Syntaxhervorhebung. Der Notizblock unterstützt außerdem Einrückung und gängige Tastenkürzel zur Codebearbeitung."
     ],
     "it": [
       "Le esportazioni PNG del Whiteboard ora possono rimuovere i margini vuoti, mantenendo 10 px intorno al disegno.",
       "Le finestre PiP ora possono essere ridotte a icona, ingrandite e ripristinate. Le app separate si ridimensionano liberamente, mentre le trasmissioni mantengono le proporzioni durante il ridimensionamento.",
-      "L’ingresso nelle stanze è più fluido: l’anteprima mantiene l’ordine dei partecipanti, la ricerca continua per chi non ha ancora risposto e il caricamento di avatar e banner interrompe meno le trasmissioni.",
+      "L’ingresso e la presenza nelle stanze sono più stabili: l’anteprima mantiene l’ordine, la ricerca dei partecipanti in ritardo continua e il recupero temporaneo della connessione o un computer sovraccarico non rimuove più i partecipanti prima del tempo. Avatar e banner interrompono meno le trasmissioni.",
       "I blocchi di codice nella chat e nel Blocco note ora supportano la scelta del linguaggio e l’evidenziazione della sintassi. Il Blocco note offre anche rientri e scorciatoie comuni per modificare il codice."
     ],
     "zh-CN": [
       "白板导出 PNG 时现在可以移除空白边距，在绘图周围保留 10 像素。",
       "PiP 窗口现在支持最小化、最大化和还原。独立应用窗口可自由调整大小，直播窗口在调整大小时保持宽高比。",
-      "加入房间更加流畅：参与者预览保持固定顺序，继续查找尚未响应的参与者，加载头像和横幅时对正在进行的直播干扰更少。",
+      "房间加入和在线状态更加稳定：预览保持顺序，继续查找延迟响应的参与者，连接暂时恢复中或电脑繁忙时不会再过早移除参与者。头像和横幅加载对直播的干扰也更少。",
       "聊天和记事本中的代码块现在支持选择编程语言和语法高亮。记事本还支持缩进和常用的代码编辑快捷键。"
     ],
     "zh-TW": [
       "白板匯出 PNG 時現在可以移除空白邊距，在繪圖周圍保留 10 像素。",
       "PiP 視窗現在支援最小化、最大化和還原。獨立應用程式視窗可自由調整大小，串流視窗在調整大小時保持長寬比。",
-      "加入房間更加流暢：參與者預覽保持固定順序，繼續尋找尚未回應的參與者，載入頭像和橫幅時對正在進行的串流干擾更少。",
+      "房間加入和在線狀態更加穩定：預覽保持順序，持續尋找延遲回應的參與者，連線暫時恢復中或電腦忙碌時不再過早移除參與者。頭像和橫幅載入對串流的干擾也更少。",
       "聊天和記事本中的程式碼區塊現在支援選擇程式語言和語法醒目提示。記事本也支援縮排和常用的程式碼編輯快捷鍵。"
     ],
     "ja": [
       "ホワイトボードの PNG 書き出しで、描画の周囲に 10 px を残して空白の余白を削除できるようになりました。",
       "PiP ウィンドウを最小化、最大化、元のサイズに戻せるようになりました。別ウィンドウのアプリは自由にサイズを変更でき、配信はサイズ変更時に縦横比を維持します。",
-      "ルーム参加がよりスムーズになりました。プレビューの参加者の順序が安定し、まだ応答していない参加者の検索が続き、アバターやバナーの読み込みによる配信への影響も減りました。",
+      "ルーム参加と参加者表示がより安定しました。プレビューの順序を保ち、応答の遅い参加者の検索を続け、一時的な接続復旧やパソコンの高負荷で参加者が早まって削除される問題を修正しました。アバターやバナーの読み込みによる配信への影響も減りました。",
       "チャットとメモ帳のコードブロックで、言語の選択とシンタックスハイライトに対応しました。メモ帳ではインデントや一般的なコード編集ショートカットも使えます。"
     ],
     "ko": [
       "이제 화이트보드를 PNG로 내보낼 때 빈 여백을 제거하고 그림 주위에 10px만 남길 수 있습니다.",
       "이제 PiP 창을 최소화, 최대화하고 원래 크기로 복원할 수 있습니다. 분리된 앱은 자유롭게 크기를 조절할 수 있으며, 방송 창은 크기 조절 시 비율을 유지합니다.",
-      "방 입장이 더 원활해졌습니다. 참여자 미리보기 순서가 유지되고, 아직 응답하지 않은 참여자를 계속 검색하며, 아바타와 배너 로딩으로 인한 방송 중단이 줄었습니다.",
+      "방 입장과 참여자 표시가 더 안정적입니다. 미리보기 순서를 유지하고 응답이 늦은 참여자를 계속 검색하며, 일시적인 연결 복구나 컴퓨터 과부하로 참여자가 너무 일찍 제거되는 문제를 수정했습니다. 아바타와 배너 로딩으로 인한 방송 중단도 줄었습니다.",
       "채팅과 메모장의 코드 블록에서 언어 선택과 구문 강조를 지원합니다. 메모장은 들여쓰기와 자주 쓰는 코드 편집 단축키도 지원합니다."
     ],
     "hi": [
       "अब व्हाइटबोर्ड को PNG में निर्यात करते समय खाली हाशिए हटाकर चित्र के चारों ओर 10 px रख सकते हैं।",
       "अब PiP विंडो को छोटा, अधिकतम और पूर्व आकार में बहाल कर सकते हैं। अलग की गई ऐप्स का आकार स्वतंत्र रूप से बदलता है, जबकि स्ट्रीम का आकार बदलते समय अनुपात बना रहता है।",
-      "कमरों में प्रवेश अधिक सहज है: पूर्वावलोकन में प्रतिभागियों का क्रम स्थिर रहता है, अभी तक जवाब न देने वाले प्रतिभागियों की खोज जारी रहती है और अवतार व बैनर लोड होने से चल रही स्ट्रीम में कम व्यवधान होता है।",
+      "कमरों में प्रवेश और प्रतिभागियों की उपस्थिति अधिक स्थिर है: पूर्वावलोकन का क्रम बना रहता है, देर से जवाब देने वालों की खोज जारी रहती है और अस्थायी कनेक्शन रिकवरी या व्यस्त कंप्यूटर के कारण प्रतिभागी समय से पहले नहीं हटते। अवतार और बैनर लोड होने से भी स्ट्रीम में कम व्यवधान होता है।",
       "चैट और नोटपैड के कोड ब्लॉक में अब प्रोग्रामिंग भाषा चुनने और सिंटैक्स हाइलाइटिंग की सुविधा है। नोटपैड में इंडेंटेशन और आम कोड संपादन शॉर्टकट भी उपलब्ध हैं।"
     ],
     "fi": [
       "Valkotaulun PNG-viennistä voi nyt poistaa tyhjät marginaalit ja jättää piirroksen ympärille 10 px.",
       "PiP-ikkunat voi nyt pienentää, suurentaa ja palauttaa. Irrotettujen sovellusten kokoa voi muuttaa vapaasti, kun taas lähetykset säilyttävät kuvasuhteensa kokoa muutettaessa.",
-      "Huoneisiin liittyminen on sujuvampaa: osallistujien esikatselujärjestys säilyy, vielä vastaamattomien osallistujien etsintä jatkuu ja avatarien sekä bannerien lataaminen häiritsee lähetyksiä vähemmän.",
+      "Huoneisiin liittyminen ja osallistujien näkyminen ovat vakaampia: esikatselujärjestys säilyy, hitaasti vastaavien etsintä jatkuu eikä yhteyden tilapäinen palautuminen tai tietokoneen kuormitus enää poista osallistujia liian aikaisin. Avatarien ja bannerien lataaminen häiritsee myös lähetyksiä vähemmän.",
       "Chatin ja Muistion koodilohkot tukevat nyt kielen valintaa ja syntaksin korostusta. Muistio tukee myös sisennystä ja tuttuja koodinmuokkauksen pikanäppäimiä."
     ],
     "ru": [
       "При экспорте доски в PNG теперь можно убрать пустые поля, оставив 10 пикселей вокруг рисунка.",
       "Окна PiP теперь можно сворачивать, разворачивать и восстанавливать. Размер отдельных окон приложений меняется свободно, а окна трансляций сохраняют пропорции при изменении размера.",
-      "Вход в комнаты стал плавнее: порядок участников в предпросмотре сохраняется, поиск ещё не ответивших участников продолжается, а загрузка аватаров и баннеров меньше мешает текущим трансляциям.",
+      "Вход в комнаты и отображение участников стали стабильнее: порядок в предпросмотре сохраняется, поиск поздно ответивших продолжается, а временное восстановление соединения или высокая нагрузка на компьютер больше не удаляют участников раньше времени. Аватары и баннеры также меньше мешают трансляциям.",
       "Блоки кода в чате и Блокноте теперь поддерживают выбор языка и подсветку синтаксиса. В Блокноте также доступны отступы и привычные сочетания клавиш для редактирования кода."
     ]
   }

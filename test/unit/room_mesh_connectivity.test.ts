@@ -69,6 +69,80 @@ test('a direct handshake does not erase the known creator role', () => {
   assert.equal(tracker.isPeerCreator('creator-peer'), true);
 });
 
+test('silent room connections survive ICE recovery and continue accepting presence', async context => {
+  context.mock.timers.enable({ apis: ['setInterval', 'Date'], now: 10000 });
+  const original = { join: signalingManager.joinRoom, leave: signalingManager.leaveRoom, announce: signalingManager.reannounce };
+  const mock = mockRoom();
+  const connections: Record<string, any> = {
+    recovering: { connectionState: 'disconnected', iceConnectionState: 'disconnected' },
+    completed: { connectionState: 'connecting', iceConnectionState: 'completed' },
+    failed: { connectionState: 'failed', iceConnectionState: 'failed' },
+  };
+  mock.room.getPeers = () => connections;
+  signalingManager.joinRoom = () => mock.room;
+  signalingManager.leaveRoom = async () => {};
+  signalingManager.reannounce = async () => {};
+  const left: string[] = [];
+  const manager = new GroupRoomManager('Viewer', 'heartbeat-recovery-fixture', '', true);
+  try {
+    await manager.join({ ...callbacks(), onPeerLeft: id => left.push(id) });
+    const presence = mock.actions.get('presence')!.onMessage!;
+    for (const id of Object.keys(connections)) {
+      mock.room.onPeerJoin(id);
+      presence({ username: id }, { peerId: id });
+    }
+    for (let tick = 0; tick < 13; tick++) context.mock.timers.tick(2000);
+    assert.deepEqual(manager.getConnectedPeers().map(peer => peer.id).sort(), ['completed', 'recovering']);
+    assert.deepEqual(left, ['failed'], 'terminal connections still retire normally');
+    connections.recovering.connectionState = 'connected';
+    connections.recovering.iceConnectionState = 'connected';
+    presence({ username: 'Recovered participant' }, { peerId: 'recovering' });
+    assert.equal(manager.getConnectedPeers().find(peer => peer.id === 'recovering')?.username, 'Recovered participant',
+      'same-edge presence must remain authorized after a heartbeat gap');
+    delete connections.recovering;
+    mock.room.onPeerLeave('recovering');
+    assert.deepEqual(left, ['failed', 'recovering'], 'transport-confirmed departures remain immediate');
+  } finally {
+    await manager.leave();
+    signalingManager.joinRoom = original.join; signalingManager.leaveRoom = original.leave;
+    signalingManager.reannounce = original.announce;
+  }
+});
+
+test('a stalled local event loop gets time to drain presence before pruning absent peers', async context => {
+  context.mock.timers.enable({ apis: ['setInterval', 'Date'], now: 10000 });
+  const original = { join: signalingManager.joinRoom, leave: signalingManager.leaveRoom, announce: signalingManager.reannounce };
+  const mock = mockRoom();
+  signalingManager.joinRoom = () => mock.room;
+  signalingManager.leaveRoom = async () => {};
+  signalingManager.reannounce = async () => {};
+  const manager = new GroupRoomManager('Viewer', 'heartbeat-stall-fixture', '', true);
+  const left: string[] = [];
+  try {
+    await manager.join({ ...callbacks(), onPeerLeft: id => left.push(id) });
+    const presence = mock.actions.get('presence')!.onMessage!;
+    for (const id of ['recovering', 'gone']) {
+      mock.room.onPeerJoin(id);
+      presence({ username: id }, { peerId: id });
+    }
+    // Advance the clock without running queued intervals, as during CPU starvation/suspend.
+    context.mock.timers.setTime(130000);
+    context.mock.timers.tick(2000);
+    assert.equal(manager.getConnectedPeers().length, 2, 'local scheduler delay is not remote departure evidence');
+    presence({ username: 'Recovered' }, { peerId: 'recovering' });
+    for (let tick = 0; tick < 12; tick++) context.mock.timers.tick(2000);
+    assert.deepEqual(left, [], 'queued authenticated traffic can restore liveness during the grace period');
+    mock.actions.get('peer_ping')!.onMessage!({ t: Date.now() }, { peerId: 'recovering' });
+    context.mock.timers.tick(2000);
+    assert.deepEqual(left, ['gone'], 'a genuinely absent peer still expires after recovery grace');
+    assert.equal(manager.getConnectedPeers()[0]?.id, 'recovering');
+  } finally {
+    await manager.leave();
+    signalingManager.joinRoom = original.join; signalingManager.leaveRoom = original.leave;
+    signalingManager.reannounce = original.announce;
+  }
+});
+
 test('join and leave notices wait for the direct presence username', async () => {
   const originalJoin = signalingManager.joinRoom;
   const originalLeave = signalingManager.leaveRoom;
