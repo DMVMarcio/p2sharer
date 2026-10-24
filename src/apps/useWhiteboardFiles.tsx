@@ -88,9 +88,9 @@ export function useWhiteboardFiles(model: WhiteboardModel | undefined, instanceI
         if ((model?.identity?.id ?? instanceId) === note.id) model?.setIdentity(note.id, note.name);
         refresh(n => n + 1);
       }}
-      onExport={async format => {
+      onExport={async (format, { removeMargins }) => {
         if (!model) return;
-        const content = format === 'png' ? await boardPng(model.shapes, model.layers, model.images) : format === 'svg' ? boardSvg(model.shapes, model.layers, false, model.images) : model.content;
+        const content = format === 'png' ? await boardPng(model.shapes, model.layers, model.images, removeMargins) : format === 'svg' ? boardSvg(model.shapes, model.layers, false, model.images) : model.content;
         if (await invoke<boolean>('save_note_file', { library: 'whiteboard', content, format, language: getLanguage() }))
           showToast(t('whiteboard.exported'), 3500, 'success');
       }} onClose={() => setDialog(null)} />}

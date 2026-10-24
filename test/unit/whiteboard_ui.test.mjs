@@ -3,6 +3,7 @@ import { after, test } from 'node:test';
 import { build } from 'esbuild';
 import { JSDOM } from 'jsdom';
 import React, { act } from 'react';
+import { createCanvas } from '@napi-rs/canvas';
 
 const dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost', pretendToBeVisual: true });
 for (const key of ['window', 'document', 'HTMLElement', 'Element', 'Node', 'MutationObserver', 'localStorage', 'Event', 'CustomEvent']) globalThis[key] = dom.window[key];
@@ -51,6 +52,7 @@ const mocks = {
   useToast: 'export const showToast = value => globalThis.whiteboardFixture.errors.push(value);',
 };
 const bundle = await build({ stdin: { contents: `export { WhiteboardApp } from './src/apps/WhiteboardApp.tsx';
+  export { trimWhiteCanvasMargins } from './src/core/image_clipboard.ts';
   export { ContextMenuProvider } from './src/components/common/ContextMenu.tsx';
   export { WhiteboardModel } from './src/apps/whiteboard_model.ts'; export { setLanguage } from './src/i18n/index.ts';`, resolveDir: process.cwd() },
   bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic', plugins: [{ name: 'whiteboard-fixture', setup(builder) {
@@ -319,7 +321,28 @@ test('layer cards select grouped paint, names edit directly and panels collapse 
   assert.equal(fixture.model.content, content);
 });
 
-test('PNG export renders the full white board and sends binary image data through the native save flow', async () => {
+test('white margin cropping preserves rendered pixels, edge padding and empty boards', () => {
+  const originalCreate = document.createElement;
+  document.createElement = tag => { assert.equal(tag, 'canvas'); return createCanvas(1, 1); };
+  try {
+    const source = createCanvas(100, 80), ctx = source.getContext('2d');
+    ctx.fillStyle = 'white'; ctx.fillRect(0, 0, 100, 80);
+    assert.equal(api.trimWhiteCanvasMargins(source, 10), source);
+    ctx.fillStyle = '#fefefe'; ctx.fillRect(0, 0, 3, 2);
+    ctx.fillStyle = 'red'; ctx.fillRect(10, 20, 5, 4);
+    // Simulate a fully erased area far away from the surviving paint.
+    ctx.fillRect(90, 70, 4, 4); ctx.fillStyle = 'white'; ctx.fillRect(90, 70, 4, 4);
+    const result = api.trimWhiteCanvasMargins(source, 10);
+    assert.deepEqual([result.width, result.height], [35, 44]);
+    const pixel = (x, y) => [...result.getContext('2d').getImageData(x, y, 1, 1).data];
+    assert.deepEqual(pixel(9, 10), [255, 255, 255, 255]);
+    assert.deepEqual(pixel(10, 10), [254, 254, 254, 255]);
+    assert.deepEqual(pixel(20, 30), [255, 0, 0, 255]);
+    assert.deepEqual(pixel(25, 34), [255, 255, 255, 255]);
+  } finally { document.createElement = originalCreate; }
+});
+
+test('PNG export defaults to cropped margins, supports full board export and resets on reopen', async () => {
   globalThis.FileReader = window.FileReader;
   const originalContext = window.HTMLCanvasElement.prototype.getContext;
   const originalToBlob = window.HTMLCanvasElement.prototype.toBlob;
@@ -328,7 +351,10 @@ test('PNG export renders the full white board and sends binary image data throug
     naturalWidth = 4096; naturalHeight = 2560;
     set src(url) { void fetch(url).then(r => r.text()).then(svg => { renderedSvg = svg; this.onload(); }); }
   };
-  window.HTMLCanvasElement.prototype.getContext = () => ({ drawImage() {} });
+  const pixels = new Uint8ClampedArray(4096 * 2560 * 4).fill(255);
+  pixels[(200 * 4096 + 100) * 4] = 0;
+  pixels[(220 * 4096 + 120) * 4] = 0;
+  window.HTMLCanvasElement.prototype.getContext = () => ({ drawImage() {}, fillRect() {}, getImageData: () => ({ data: pixels }) });
   window.HTMLCanvasElement.prototype.toBlob = function(callback) {
     dimensions = [this.width, this.height];
     callback(new window.Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' }));
@@ -341,17 +367,35 @@ test('PNG export renders the full white board and sends binary image data throug
   };
   try {
     await click('Export');
+    assert.equal(document.querySelector('[role="dialog"] input[type="checkbox"]'), null);
     await click('Export format', document.querySelector('[role="dialog"]'));
     const png = [...document.querySelectorAll('[role="option"]')].find(option => option.textContent.includes('PNG (.png)'));
     assert.ok(png); await act(async () => png.click()); await settle();
-    assert.match(document.querySelector('.notepad-files-hint').textContent, /4096 × 2560/);
+    const toggle = document.querySelector('[role="dialog"] input[type="checkbox"]');
+    assert.equal(toggle.checked, true);
+    assert.match(toggle.closest('label').textContent, /Remove margins/);
     await click('Export', document.querySelector('[role="dialog"]')); await settle();
     const exported = fixture.calls.filter(c => c.command === 'save_note_file').at(-1).args;
     assert.equal(exported.format, 'png');
     assert.match(exported.content, /^data:image\/png;base64,/);
-    assert.deepEqual(dimensions, [4096, 2560]);
+    assert.deepEqual(dimensions, [41, 41]);
     assert.match(renderedSvg, /viewBox="0 0 16000 10000"/);
     assert.match(renderedSvg, /fill="white"/);
+    const selectPng = async () => {
+      await click('Export format', document.querySelector('[role="dialog"]'));
+      await act(async () => [...document.querySelectorAll('[role="option"]')].find(option => option.textContent.includes('PNG (.png)')).click());
+      await settle();
+    };
+    await click('Export'); await selectPng();
+    await act(async () => document.querySelector('[role="dialog"] input[type="checkbox"]').click());
+    await click('Export', document.querySelector('[role="dialog"]')); await settle();
+    assert.deepEqual(dimensions, [4096, 2560]);
+    await click('Export'); await selectPng();
+    assert.equal(document.querySelector('[role="dialog"] input[type="checkbox"]').checked, true);
+    await click('Export format', document.querySelector('[role="dialog"]'));
+    await act(async () => [...document.querySelectorAll('[role="option"]')].find(option => option.textContent.includes('SVG (.svg)')).click()); await settle();
+    assert.equal(document.querySelector('[role="dialog"] input[type="checkbox"]'), null);
+    await click('Cancel', document.querySelector('[role="dialog"]'));
   } finally {
     URL.createObjectURL = createUrl;
     window.HTMLCanvasElement.prototype.getContext = originalContext;

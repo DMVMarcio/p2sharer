@@ -31,8 +31,8 @@ export function blobToDataUrl(blob: Blob): Promise<string> {
  * Converts an image blob to a PNG blob using an in-memory canvas.
  * Web browsers / Chromium require 'image/png' in ClipboardItem.
  */
-export async function blobToPngBlob(blob: Blob): Promise<Blob> {
-  if (blob.type === 'image/png') return blob;
+export async function blobToPngBlob(blob: Blob, whiteMarginPadding?: number): Promise<Blob> {
+  if (blob.type === 'image/png' && whiteMarginPadding === undefined) return blob;
   return new Promise<Blob>((resolve, reject) => {
     const url = URL.createObjectURL(blob);
     const img = new Image();
@@ -46,11 +46,14 @@ export async function blobToPngBlob(blob: Blob): Promise<Blob> {
         reject(new Error('Canvas context unavailable'));
         return;
       }
-      ctx.drawImage(img, 0, 0);
-      canvas.toBlob((pngBlob) => {
-        if (pngBlob) resolve(pngBlob);
-        else reject(new Error('Failed to render PNG blob'));
-      }, 'image/png');
+      try {
+        ctx.drawImage(img, 0, 0);
+        const output = whiteMarginPadding === undefined ? canvas : trimWhiteCanvasMargins(canvas, whiteMarginPadding);
+        output.toBlob((pngBlob) => {
+          if (pngBlob) resolve(pngBlob);
+          else reject(new Error('Failed to render PNG blob'));
+        }, 'image/png');
+      } catch (error) { reject(error); }
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
@@ -58,6 +61,35 @@ export async function blobToPngBlob(blob: Blob): Promise<Blob> {
     };
     img.src = url;
   });
+}
+
+/** Crop rendered content against a white background, preserving padding in output pixels. */
+export function trimWhiteCanvasMargins(canvas: HTMLCanvasElement, padding: number): HTMLCanvasElement {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas context unavailable');
+  const { width, height } = canvas;
+  const { data } = ctx.getImageData(0, 0, width, height);
+  let left = width, top = height, right = -1, bottom = -1;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      if (data[i + 3] === 0 || (data[i] === 255 && data[i + 1] === 255 && data[i + 2] === 255)) continue;
+      left = Math.min(left, x); top = Math.min(top, y);
+      right = Math.max(right, x); bottom = Math.max(bottom, y);
+    }
+  }
+  // An empty or completely erased board keeps its original dimensions.
+  if (right < left) return canvas;
+  const inset = Math.max(0, Math.ceil(padding));
+  const output = document.createElement('canvas');
+  output.width = right - left + 1 + inset * 2;
+  output.height = bottom - top + 1 + inset * 2;
+  const target = output.getContext('2d');
+  if (!target) throw new Error('Canvas context unavailable');
+  target.fillStyle = '#ffffff';
+  target.fillRect(0, 0, output.width, output.height);
+  target.drawImage(canvas, left, top, right - left + 1, bottom - top + 1, inset, inset, right - left + 1, bottom - top + 1);
+  return output;
 }
 
 /**

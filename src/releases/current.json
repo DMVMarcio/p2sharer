@@ -1,18 +1,44 @@
 {
   "version": "1.5.4",
   "translations": {
-    "en": [],
-    "pt-BR": [],
-    "es": [],
-    "fr": [],
-    "de": [],
-    "it": [],
-    "zh-CN": [],
-    "zh-TW": [],
-    "ja": [],
-    "ko": [],
-    "hi": [],
-    "fi": [],
-    "ru": []
+    "en": [
+      "Whiteboard PNG exports can now remove empty margins, keeping 10 px around your drawing."
+    ],
+    "pt-BR": [
+      "Agora é possível exportar o Whiteboard em PNG sem margens vazias, mantendo 10 px ao redor do desenho."
+    ],
+    "es": [
+      "Ahora puedes exportar el Whiteboard en PNG sin márgenes vacíos, dejando 10 px alrededor del dibujo."
+    ],
+    "fr": [
+      "Les exports PNG du Whiteboard peuvent désormais supprimer les marges vides et garder 10 px autour du dessin."
+    ],
+    "de": [
+      "PNG-Exporte des Whiteboards können jetzt leere Ränder entfernen und 10 px um die Zeichnung beibehalten."
+    ],
+    "it": [
+      "Le esportazioni PNG del Whiteboard ora possono rimuovere i margini vuoti, mantenendo 10 px intorno al disegno."
+    ],
+    "zh-CN": [
+      "白板导出 PNG 时现在可以移除空白边距，在绘图周围保留 10 像素。"
+    ],
+    "zh-TW": [
+      "白板匯出 PNG 時現在可以移除空白邊距，在繪圖周圍保留 10 像素。"
+    ],
+    "ja": [
+      "ホワイトボードの PNG 書き出しで、描画の周囲に 10 px を残して空白の余白を削除できるようになりました。"
+    ],
+    "ko": [
+      "이제 화이트보드를 PNG로 내보낼 때 빈 여백을 제거하고 그림 주위에 10px만 남길 수 있습니다."
+    ],
+    "hi": [
+      "अब व्हाइटबोर्ड को PNG में निर्यात करते समय खाली हाशिए हटाकर चित्र के चारों ओर 10 px रख सकते हैं।"
+    ],
+    "fi": [
+      "Valkotaulun PNG-viennistä voi nyt poistaa tyhjät marginaalit ja jättää piirroksen ympärille 10 px."
+    ],
+    "ru": [
+      "При экспорте доски в PNG теперь можно убрать пустые поля, оставив 10 пикселей вокруг рисунка."
+    ]
   }
 }

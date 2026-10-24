@@ -30,7 +30,7 @@ export function DocumentFilesDialog({ mode, initialName, onOpen, onSave, onRenam
   onSave: (name: string, overwrite?: SavedNote) => Promise<void>;
   onRename: (note: SavedNote) => void;
   onDelete: (id: string) => void;
-  onExport: (format: string) => Promise<void>;
+  onExport: (format: string, options: { removeMargins: boolean }) => Promise<void>;
   onClose: () => void; library?: 'whiteboard';
 }) {
   useLocale();
@@ -39,6 +39,7 @@ export function DocumentFilesDialog({ mode, initialName, onOpen, onSave, onRenam
   const [query, setQuery] = useState('');
   const [name, setName] = useState(initialName);
   const [format, setFormat] = useState(documentLibrary ? 'p2board' : 'md');
+  const [removeMargins, setRemoveMargins] = useState(true);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(mode === 'open');
   const [error, setError] = useState('');
@@ -101,7 +102,7 @@ export function DocumentFilesDialog({ mode, initialName, onOpen, onSave, onRenam
       </>}
       <button className="btn btn-secondary" disabled={busy || loading} onClick={close}>{t('message.bb9dbb406dcb')}</button>
       {mode !== 'open' && <button className="btn btn-primary" disabled={busy || (mode === 'save' && !name.trim())}
-        onClick={() => void (mode === 'save' ? save(close) : run(() => onExport(format), close))}>{copy(mode)}</button>}
+        onClick={() => void (mode === 'save' ? save(close) : run(() => onExport(format, { removeMargins }), close))}>{copy(mode)}</button>}
     </>; }}>
     {mode === 'open' ? <>
       <input className="text-input" autoComplete="off" data-autofocus aria-label={copy('search')} placeholder={copy('search')}
@@ -131,6 +132,14 @@ export function DocumentFilesDialog({ mode, initialName, onOpen, onSave, onRenam
       <Select aria-label={t('notepad.format')} value={format} onValueChange={(value) => setFormat(String(value))}
         options={documentLibrary ? [{ value: 'p2board', label: t('whiteboard.editable') }, { value: 'svg', label: 'SVG (.svg)' }, { value: 'png', label: 'PNG (.png)' }] : [{ value: 'md', label: 'Markdown (.md)' }, { value: 'txt', label: t('notepad.plainText') }, { value: 'html', label: t('notepad.richText') }]} />
       <p className="notepad-files-hint">{documentLibrary ? t(`whiteboard.exportHint.${format}`) : copy('exportHint')}</p>
+      {documentLibrary === 'whiteboard' && format === 'png' && <label className="settings-switch-row">
+        <span className="settings-switch-title">{t('whiteboard.removeMargins')}</span>
+        <span className="modern-switch">
+          <input autoComplete="off" type="checkbox" disabled={busy} checked={removeMargins}
+            onChange={event => setRemoveMargins(event.target.checked)} />
+          <span className="switch-slider" />
+        </span>
+      </label>}
     </>}
     {error && <p className="notepad-files-error" role="alert">{error}</p>}
   </ModalDialog>
