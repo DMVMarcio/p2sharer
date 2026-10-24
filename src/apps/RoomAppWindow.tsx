@@ -6,6 +6,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { listen } from '@tauri-apps/api/event';
 import { ExternalLink, Pin, X } from 'lucide-react';
 import { TooltipButton } from '../components/common/TooltipButton';
+import { PipWindowControls } from '../components/common/PipWindowControls';
 import { ToastContainer } from '../components/common/ToastContainer';
 import { getRoomApp, type RoomAppViewProps } from './registry';
 import { roomAppsService } from './room_apps_service';
@@ -71,6 +72,7 @@ export const RoomAppWindow: React.FC<{ instanceId: string }> = ({ instanceId }) 
       <div className="pip-top-left" data-tauri-drag-region><ExternalLink size={16} />
         <span className="pip-title" data-tauri-drag-region>{localizeText(label)}</span></div>
       <div className="pip-top-right">
+        <PipWindowControls />
         <TooltipButton tooltip={t("message.5a2e134fd61f")} aria-label={t("message.5a2e134fd61f")} aria-pressed={alwaysOnTop}
           className={`pip-header-btn ${alwaysOnTop ? 'active' : ''}`} onClick={async () => {
             try { await invoke('set_pip_always_on_top', { peerId: appWindowPeerId(instanceId), alwaysOnTop: !alwaysOnTop });

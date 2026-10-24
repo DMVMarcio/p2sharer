@@ -7,6 +7,7 @@ import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { Pin, X, PictureInPicture2, Play, Pause, Volume2, VolumeX, Captions } from 'lucide-react';
 import { useContextMenu } from '../components/common/ContextMenu';
 import { TooltipButton } from '../components/common/TooltipButton';
+import { PipWindowControls } from '../components/common/PipWindowControls';
 import { initFrontendLogger } from '../core/logger';
 import { YouTubeControls } from './YouTubeControls';
 import { canAdvanceYouTubeQueue } from './youtube_queue';
@@ -226,6 +227,7 @@ export const YouTubePipView: React.FC<{ instanceId: string }> = ({ instanceId })
           <span className="pip-title" data-tauri-drag-region={!fullscreen || undefined}>{current?.title || t("message.74e9d4b5b312")}</span>
         </div>
         <div className="pip-top-right">
+          <PipWindowControls fullscreen={fullscreen} />
           <TooltipButton tooltip={alwaysOnTop ? t("message.9edf08040405") : t("message.5c73f9df033a")}
             className={`pip-header-btn ${alwaysOnTop ? 'active' : ''}`} onClick={() => void toggleTop()}>
             <Pin size={15} /></TooltipButton>

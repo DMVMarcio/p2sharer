@@ -9,6 +9,14 @@ fn video_ratio(width: Option<u32>, height: Option<u32>) -> f64 {
     }
 }
 
+fn pip_video_ratio(peer_id: &str, width: Option<u32>, height: Option<u32>) -> Option<f64> {
+    if peer_id.starts_with("app-") || peer_id.starts_with("youtube-") {
+        None
+    } else {
+        Some(video_ratio(width, height))
+    }
+}
+
 fn fit_video_size(ratio: f64, max_width: f64, max_height: f64) -> (f64, f64) {
     let width = max_width.min(max_height * ratio).max(1.0);
     (width, (width / ratio).max(1.0))
@@ -146,6 +154,13 @@ async fn apply_video_ratio(window: WebviewWindow, ratio: f64) -> Result<(), Stri
                 target
                     .set_min_size(Some(LogicalSize::new(320.0, 320.0 / ratio)))
                     .map_err(|e| e.to_string())?;
+                // Metadata updates must not resize a maximized, minimized or fullscreen window.
+                if target.is_maximized().map_err(|e| e.to_string())?
+                    || target.is_minimized().map_err(|e| e.to_string())?
+                    || target.is_fullscreen().map_err(|e| e.to_string())?
+                {
+                    return Ok(());
+                }
                 target
                     .set_size(LogicalSize::new(width, height))
                     .map_err(|e| e.to_string())?;
@@ -164,6 +179,7 @@ pub async fn set_pip_aspect_ratio(
     video_height: u32,
 ) -> Result<(), String> {
     if !window.label().starts_with("pip-")
+        || pip_video_ratio(window.label().trim_start_matches("pip-"), None, None).is_none()
         || video_width == 0
         || video_height == 0
         || video_width > 65536
@@ -213,6 +229,7 @@ pub async fn open_pip_window(
 
     // If window already exists, bring it to front
     if let Some(existing_window) = app.get_webview_window(&label) {
+        let _ = existing_window.unminimize();
         let _ = existing_window.show();
         let _ = existing_window.set_focus();
         return Ok(());
@@ -227,20 +244,23 @@ pub async fn open_pip_window(
         format!("P2Sharer - {}", title.trim())
     };
 
-    let ratio = video_ratio(video_width, video_height);
-    let (width, height) = fit_video_size(ratio, 800.0, 600.0);
+    let ratio = pip_video_ratio(&peer_id, video_width, video_height);
+    let (width, height) = ratio.map_or((800.0, 600.0), |ratio| fit_video_size(ratio, 800.0, 600.0));
     let builder = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App(url_str.into()))
         .title(&win_title)
         .inner_size(width, height)
-        .min_inner_size(320.0, 320.0 / ratio)
-        .maximizable(false)
+        .min_inner_size(320.0, ratio.map_or(240.0, |ratio| 320.0 / ratio))
+        .maximizable(true)
+        .minimizable(true)
         .resizable(true)
         .decorations(false)
         .always_on_top(true)
         .shadow(true);
 
     let window = builder.build().map_err(|e| e.to_string())?;
-    apply_video_ratio(window, ratio).await?;
+    if let Some(ratio) = ratio {
+        apply_video_ratio(window, ratio).await?;
+    }
 
     Ok(())
 }
@@ -303,6 +323,10 @@ mod tests {
             assert!((width / height - ratio).abs() < 0.000001);
         }
         assert_eq!(video_ratio(Some(0), Some(1080)), 16.0 / 9.0);
+        assert_eq!(pip_video_ratio("app-fixture", None, None), None);
+        assert_eq!(pip_video_ratio("youtube-fixture", Some(1920), Some(1080)), None);
+        assert_eq!(pip_video_ratio("local", Some(1080), Some(1920)), Some(9.0 / 16.0));
+        assert_eq!(pip_video_ratio("remote@screen", None, None), Some(16.0 / 9.0));
     }
 
     #[cfg(windows)]

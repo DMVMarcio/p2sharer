@@ -21,6 +21,7 @@ import { Maximize, PanelsTopLeft, Pin, PictureInPicture2, RotateCcw, VolumeX, Vo
 import { useContextMenu, type ContextMenuAction } from '../common/ContextMenu';
 import { validPipAudioSettings } from '../../services/pip_audio';
 import { usePipWindowDrag } from '../../hooks/usePipWindowDrag';
+import { PipWindowControls } from '../common/PipWindowControls';
 
 interface PipViewProps {
   peerId: string;
@@ -510,6 +511,7 @@ export const PipView: React.FC<PipViewProps> = ({ peerId }) => {
           </div>
 
           <div className="pip-top-right">
+            <PipWindowControls fullscreen={isFullscreen} onTooltipOpenChange={handleTooltipOpenChange} />
             {/* Always on top / Pin toggle */}
             <Tooltip content={isAlwaysOnTop ? t("message.9edf08040405") : t("message.8826562e878e")} onOpenChange={handleTooltipOpenChange}>
               <button
