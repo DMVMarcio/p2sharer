@@ -1,44 +1,18 @@
 {
-  "version": "1.5.3",
+  "version": "1.5.4",
   "translations": {
-    "en": [
-      "**More reliable connections between participants.** Streamlined discovery servers to prevent network splits, added automatic room relaying so participants connect even through restrictive home networks, and enabled automatic router port mapping on desktop."
-    ],
-    "pt-BR": [
-      "**Conexões mais confiáveis entre os participantes da sala.** Simplificamos os servidores de encontro para evitar divisões de rede, adicionamos retransmissão automática na sala para conectar participantes mesmo sob redes restritivas e ativamos mapeamento automático de portas no roteador pelo desktop."
-    ],
-    "es": [
-      "**Conexiones más confiables entre los participantes de la sala.** Simplificamos los servidores de encuentro para evitar divisiones de red, añadimos retransmisión automática en la sala para conectar participantes incluso en redes restrictivas y activamos el mapeo automático de puertos en el enrutador en el escritorio."
-    ],
-    "fr": [
-      "**Connexions plus fiables entre les participants du salon.** Simplification des serveurs de rencontre pour éviter la fragmentation réseau, ajout du relais automatique dans le salon pour connecter les participants même derrière des réseaux restrictifs et activation du mappage automatique de ports sur le bureau."
-    ],
-    "de": [
-      "**Zuverlässigere Verbindungen zwischen den Teilnehmern im Raum.** Bereinigte Verbindungsserver zur Vermeidung von Netzwerkspaltungen, automatische Weiterleitung im Raum für Verbindungen selbst über restriktive Heimnetzwerke und automatische Router-Portzuweisung auf dem Desktop."
-    ],
-    "it": [
-      "**Connessioni più affidabili tra i partecipanti nella stanza.** Semplificati i server di incontro per evitare frammentazioni di rete, aggiunto l'inoltro automatico nella stanza per connettere i partecipanti anche su reti restrittive e attivata la mappatura automatica delle porte del router su desktop."
-    ],
-    "zh-CN": [
-      "**房间参与者之间的连接更可靠。** 精简了会合服务器以防止网络分割，加入房间内自动中继使参与者即使在受限网络下也能顺利连接，并在桌面端启用了路由器端口自动映射。"
-    ],
-    "zh-TW": [
-      "**房間參與者之間的連線更可靠。** 精簡了會合伺服器以防止網路分割，加入房間內自動中繼使參與者即使在受限網路下也能順利連線，並在桌面端啟用了路由器連接埠自動對應。"
-    ],
-    "ja": [
-      "**ルーム参加者間の接続がより安定しました。** ネットワークの分断を防ぐためランデブーサーバーを整理し、制限のあるネットワークでも参加者同士がつながる自動リレーを追加するとともに、デスクトップ版でルーターのポート自動マッピングに対応しました。"
-    ],
-    "ko": [
-      "**방 참여자 간의 연결 안정성이 향상되었습니다.** 네트워크 분할을 줄이기 위해 만남 서버를 간소화하고, 제한된 네트워크 환경에서도 참여자가 연결될 수 있도록 자동 릴레이를 추가했으며, 데스크톱에서 라우터 포트 자동 매핑을 지원합니다."
-    ],
-    "hi": [
-      "**रूम के प्रतिभागियों के बीच अधिक विश्वसनीय कनेक्शन।** नेटवर्क विभाजन को रोकने के लिए सिग्नलिंग सर्वर को सुव्यवस्थित किया गया, सख्त नेटवर्क में भी प्रतिभागियों को जोड़ने के लिए स्वचालित रूम रिले जोड़ा गया और डेस्कटॉप पर राउटर पोर्ट की स्वचालित मैपिंग सक्षम की गई।"
-    ],
-    "fi": [
-      "**Luotettavammat yhteydet huoneen osallistujien välillä.** Kohtaamispalvelimia selkeytettiin verkon jakautumisen estämiseksi, lisättiin automaattinen verkon sisäinen välitys yhdistämään osallistujat myös rajoittavissa verkoissa ja otettiin käyttöön reitittimen automaattinen portinohjaus työpöydällä."
-    ],
-    "ru": [
-      "**Более надёжные соединения между участниками комнаты.** Оптимизированы серверы встречи для предотвращения разделения сети, добавлена автоматическая ретрансляция для соединения участников даже в сетях со строгим NAT и включено автоматическое сопоставление портов роутера на десктопе."
-    ]
+    "en": [],
+    "pt-BR": [],
+    "es": [],
+    "fr": [],
+    "de": [],
+    "it": [],
+    "zh-CN": [],
+    "zh-TW": [],
+    "ja": [],
+    "ko": [],
+    "hi": [],
+    "fi": [],
+    "ru": []
   }
 }
