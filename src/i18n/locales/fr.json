@@ -1464,5 +1464,7 @@
   "web.sourceCode": "Code source",
   "apps.desktopOnlyNotice": "Ne peut être lancé que sur l’application de bureau",
   "chat.filePreparing": "Préparation du fichier...",
-  "chat.fileIndexing": "Calcul du hachage..."
+  "chat.fileIndexing": "Calcul du hachage...",
+  "code.language": "Langage de programmation",
+  "code.plainText": "Texte brut"
 }

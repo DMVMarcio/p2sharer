@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
+import { HighlightedCodeBlock } from './HighlightedCodeBlock';
 import remarkGfm from 'remark-gfm';
 import { safeChatUrl } from '../../core/chat_links';
 import { EmojiPack } from '../../core/emoji_preferences';
@@ -129,7 +130,13 @@ export const ChatMessageContent: React.FC<{ text: string; pack: EmojiPack }> = (
           h1: ({ children }) => <h1>{withEmoji(children)}</h1>,
           h2: ({ children }) => <h2>{withEmoji(children)}</h2>,
           h3: ({ children }) => <h3>{withEmoji(children)}</h3>,
-          code: ({ children, className }) => <code className={className}>{withEmoji(children)}</code>,
+          pre: ({ children }) => {
+            const code = React.Children.toArray(children).find(React.isValidElement) as React.ReactElement<{ children: string; className?: string }> | undefined;
+            if (!code) return <pre>{children}</pre>;
+            return <HighlightedCodeBlock text={String(code.props.children).replace(/\n$/, '')}
+              language={code.props.className?.replace(/^language-/, '') ?? 'plaintext'} />;
+          },
+          code: ({ children, className }) => <code className={className}>{children}</code>,
           a: ({ href, children }) => href ? (
             <a
               href={href}

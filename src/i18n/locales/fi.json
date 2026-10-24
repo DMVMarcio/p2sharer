@@ -1464,5 +1464,7 @@
   "web.sourceCode": "Lähdekoodi",
   "apps.desktopOnlyNotice": "Voidaan käynnistää vain työpöytäsovelluksessa",
   "chat.filePreparing": "Valmistellaan tiedostoa...",
-  "chat.fileIndexing": "Lasketaan tiivistettä..."
+  "chat.fileIndexing": "Lasketaan tiivistettä...",
+  "code.language": "Ohjelmointikieli",
+  "code.plainText": "Pelkkä teksti"
 }

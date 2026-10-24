@@ -1464,5 +1464,7 @@
   "web.sourceCode": "Исходный код",
   "apps.desktopOnlyNotice": "Можно запустить только в приложении для ПК",
   "chat.filePreparing": "Подготовка файла...",
-  "chat.fileIndexing": "Вычисление хеша..."
+  "chat.fileIndexing": "Вычисление хеша...",
+  "code.language": "Язык программирования",
+  "code.plainText": "Обычный текст"
 }

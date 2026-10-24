@@ -356,3 +356,21 @@ test('notepad inserts sanitized images by file, link, paste, and drag-and-drop, 
     peerModel.destroy();
   }
 });
+
+test('code languages and keyboard edits persist in the collaborative note snapshot', async () => {
+  await act(async () => fixture.editor.commands.setContent('```python\nprint("hello")\n```', { contentType: 'markdown' }));
+  await act(async () => fixture.editor.commands.setTextSelection(1));
+  await act(async () => document.querySelector('.room-app-notepad-editor').dispatchEvent(new window.KeyboardEvent('keydown', {
+    key: 'Tab', bubbles: true, cancelable: true,
+  })));
+  assert.match(fixture.editor.getMarkdown(), /```python\n  print/);
+  assert.ok(document.querySelector('.room-app-notepad-editor .hljs-built_in'));
+  const remote = new api.NotepadModel({ localActor: 'peer', emit() {}, changed() {} });
+  try {
+    remote.apply(fixture.model.snapshot(), 'fixture', true);
+    const code = remote.richContent.toArray().find(node => node.nodeName === 'codeBlock');
+    assert.ok(code);
+    assert.equal(code.getAttribute('language'), 'python');
+    assert.match(code.toString(), /  print/);
+  } finally { remote.destroy(); }
+});

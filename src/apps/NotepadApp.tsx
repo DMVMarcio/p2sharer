@@ -6,6 +6,8 @@ import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { Download, FilePlus2, FolderOpen, Save } from 'lucide-react';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import { CodeBlockExtension } from '../components/common/CodeBlockExtension';
+import { CodeEditing } from '../components/common/CodeEditing';
 import { Markdown } from '@tiptap/markdown';
 import Placeholder from '@tiptap/extension-placeholder';
 import Collaboration from '@tiptap/extension-collaboration';
@@ -76,7 +78,9 @@ export const NotepadApp: React.FC<Props> = ({ instanceId, compact = false }) => 
     immediatelyRender: false,
     editable: !compact,
     extensions: [
-      StarterKit.configure({ undoRedo: false, underline: false, link: { openOnClick: false, autolink: true, linkOnPaste: true } }),
+      StarterKit.configure({ codeBlock: false, undoRedo: false, underline: false, link: { openOnClick: false, autolink: true, linkOnPaste: true } }),
+      CodeBlockExtension,
+      CodeEditing.configure({ plainTextTab: true }),
       Markdown,
       Placeholder.configure({ placeholder: () => t("message.ddf4b9ab9b48") }),
       Underline,

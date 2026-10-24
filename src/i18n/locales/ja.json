@@ -1464,5 +1464,7 @@
   "web.sourceCode": "ソースコード",
   "apps.desktopOnlyNotice": "デスクトップ アプリでのみ開始できます",
   "chat.filePreparing": "ファイルを準備しています...",
-  "chat.fileIndexing": "ハッシュを計算しています..."
+  "chat.fileIndexing": "ハッシュを計算しています...",
+  "code.language": "プログラミング言語",
+  "code.plainText": "プレーンテキスト"
 }

@@ -1464,5 +1464,7 @@
   "web.sourceCode": "Código-fonte",
   "apps.desktopOnlyNotice": "Só pode ser iniciado no app desktop",
   "chat.filePreparing": "Preparando arquivo...",
-  "chat.fileIndexing": "Calculando hash..."
+  "chat.fileIndexing": "Calculando hash...",
+  "code.language": "Linguagem de programação",
+  "code.plainText": "Texto simples"
 }

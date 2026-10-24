@@ -1464,5 +1464,7 @@
   "web.sourceCode": "源代码",
   "apps.desktopOnlyNotice": "只能在桌面应用中启动",
   "chat.filePreparing": "正在准备文件...",
-  "chat.fileIndexing": "正在计算哈希..."
+  "chat.fileIndexing": "正在计算哈希...",
+  "code.language": "编程语言",
+  "code.plainText": "纯文本"
 }

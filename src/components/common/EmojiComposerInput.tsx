@@ -11,6 +11,8 @@ import { Bold, Italic, Strikethrough, Code, Code2, Link2, Quote, List, ListOrder
 import type { EmojiPack } from '../../core/emoji_preferences';
 import { safeChatUrl } from '../../core/chat_links';
 import { ChatEmojiDecorations } from './ChatEmojiDecorations';
+import { CodeBlockExtension } from './CodeBlockExtension';
+import { CodeEditing } from './CodeEditing';
 import { useTextEditorContextMenu } from '../../hooks/useTextEditorContextMenu';
 
 export type EmojiComposerHandle = {
@@ -50,6 +52,7 @@ function checkMentionQuery(editorInstance: NonNullable<ReturnType<typeof useEdit
   const { from, empty } = editorInstance.state.selection;
   if (!empty) return null;
   const $from = editorInstance.state.selection.$from;
+  if ($from.parent.type.spec.code) return null;
   const textBefore = $from.parent.textBetween(0, $from.parentOffset, undefined, '\ufffc');
   const match = /(?:^|\s)@([^\s@]*)$/.exec(textBefore);
   if (!match) return null;
@@ -95,7 +98,9 @@ export const EmojiComposerInput = forwardRef<EmojiComposerHandle, Props>(functio
     content: value,
     contentType: 'markdown',
     extensions: [
-      StarterKit.configure({ link: { openOnClick: false, autolink: true, linkOnPaste: true } }),
+      StarterKit.configure({ codeBlock: false, link: { openOnClick: false, autolink: true, linkOnPaste: true } }),
+      CodeBlockExtension,
+      CodeEditing,
       Markdown,
       CharacterCount.configure({ limit: 2000 }),
       Placeholder.configure({ placeholder: () => t("message.886fe94fce87") }),
@@ -119,7 +124,8 @@ export const EmojiComposerInput = forwardRef<EmojiComposerHandle, Props>(functio
             }
           }
         }
-        if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+        if (event.key === 'Enter' && !event.shiftKey && !event.isComposing &&
+            (!_view.state.selection.$from.parent.type.spec.code || event.ctrlKey || event.metaKey)) {
           event.preventDefault();
           onSendRef.current();
           return true;

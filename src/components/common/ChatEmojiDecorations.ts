@@ -22,6 +22,7 @@ export const ChatEmojiDecorations = Extension.create<{ getPack: () => EmojiPack 
           const pack = getPack();
           const decorations: Decoration[] = [];
           state.doc.descendants((node, position) => {
+            if (node.type.spec.code) return false;
             if (!node.isText || !node.text) return;
             for (const { segment, index } of segmenter.segment(node.text)) {
               if (getEmojiIndex(segment) === undefined) continue;

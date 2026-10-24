@@ -1464,5 +1464,7 @@
   "web.sourceCode": "स्रोत कोड",
   "apps.desktopOnlyNotice": "केवल डेस्कटॉप ऐप में शुरू किया जा सकता है",
   "chat.filePreparing": "फ़ाइल तैयार हो रही है...",
-  "chat.fileIndexing": "हैश की गणना की जा रही है..."
+  "chat.fileIndexing": "हैश की गणना की जा रही है...",
+  "code.language": "प्रोग्रामिंग भाषा",
+  "code.plainText": "सादा पाठ"
 }

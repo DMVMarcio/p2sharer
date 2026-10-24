@@ -134,6 +134,21 @@ Persistent settings are automatically synchronized to and restored from `localSt
 
 `components/common/Select.tsx` replaces all native selects. Pass controlled `value`, `options` (value, plain-text label, optional decorative icon and disabled), and `onValueChange` (string value), with an associated label or `aria-label`. It uses the shared dropdown presence and duration tokens, retaining inert exit content, and Floating UI for fixed portal positioning, boundary flipping, resize/scroll tracking, and available-height sizing. Keyboard navigation, Home/End, typeahead, Enter/Space, Escape, and Tab work through a select-only combobox with active-descendant semantics. Decorative option icons appear in both the list and selected value, hidden from assistive technology; plain-text labels remain the basis for typeahead. Focus stays on its trigger so modal traps and rich-editor selection remain stable. `ModalDialog` delegates Escape to an expanded combobox before closing the dialog. Application UI must not introduce native `<select>` controls.
 
+## Shared Code Editing
+
+Chat drafts and collaborative notes replace StarterKit's code block with
+`components/common/CodeBlockExtension.tsx`. Its language attribute survives HTML,
+Markdown and the note's Yjs fragment; the React node view keeps its canonical
+`CodeLanguageSelect` outside editable content and serialized exports. Sent chat
+blocks use `HighlightedCodeBlock`, whose language override is local to the reader.
+`core/code_highlighting.ts` owns the Lowlight grammar registry, aliases and bounded
+highlighting, with plain-text fallback for unknown languages and large snippets.
+Tokens render as React text/spans, never injected HTML, using shared theme colors.
+Code bypasses emoji decorations and mention rendering. `CodeEditing` applies
+selection-aware line edits as editor transactions, preserving collaborative undo;
+its optional note Tab handling retains list indentation and table navigation.
+Chat Enter inserts lines inside code; Ctrl/Command+Enter sends from that context.
+
 ## Canonical UI Control Catalog
 
 The application-wide rule covers reusable React components and shared CSS recipes. Styled native buttons, text inputs, checkboxes, and ranges retain their semantic behavior; browser select menus, context menus, and `title` tooltips are replaced by the application's shared implementations.

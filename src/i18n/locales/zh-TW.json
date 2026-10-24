@@ -1464,5 +1464,7 @@
   "web.sourceCode": "原始碼",
   "apps.desktopOnlyNotice": "只能在桌面應用程式中啟動",
   "chat.filePreparing": "正在準備檔案...",
-  "chat.fileIndexing": "正在計算雜湊..."
+  "chat.fileIndexing": "正在計算雜湊...",
+  "code.language": "程式語言",
+  "code.plainText": "純文字"
 }
