@@ -6,6 +6,7 @@ export class AudioContextManager {
   private peerSinks: Map<string, PeerAudioSinkState> = new Map();
   private peerAudioTracks = new Map<string, MediaStreamTrack[]>();
   private peerPullElements = new Map<string, HTMLAudioElement>();
+  private unlockListenerAttached = false;
 
   public static getInstance(): AudioContextManager {
     if (!AudioContextManager.instance) {
@@ -19,10 +20,51 @@ export class AudioContextManager {
       const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       this.audioCtx = new AudioContextClass();
     }
-    if (this.audioCtx.state === 'suspended') {
-      this.audioCtx.resume().catch(() => {});
-    }
+    this.safeResumeAudioContext();
     return this.audioCtx;
+  }
+
+  private safeResumeAudioContext(): void {
+    if (this.audioCtx && this.audioCtx.state === 'suspended') {
+      this.audioCtx.resume().catch((err) => {
+        if (err?.name === 'NotAllowedError') {
+          this.ensureUserInteractionUnlock();
+        }
+      });
+    }
+  }
+
+  private safePlayPullElement(element: HTMLAudioElement): void {
+    const promise = element.play();
+    if (promise !== undefined) {
+      promise.catch((err) => {
+        if (err?.name === 'NotAllowedError') {
+          this.ensureUserInteractionUnlock();
+        }
+      });
+    }
+  }
+
+  private ensureUserInteractionUnlock(): void {
+    if (this.unlockListenerAttached || typeof window === 'undefined') return;
+    this.unlockListenerAttached = true;
+    const unlock = () => {
+      this.unlockListenerAttached = false;
+      window.removeEventListener('pointerdown', unlock, true);
+      window.removeEventListener('keydown', unlock, true);
+      window.removeEventListener('touchstart', unlock, true);
+      if (this.audioCtx && this.audioCtx.state === 'suspended') {
+        this.audioCtx.resume().catch(() => {});
+      }
+      this.peerPullElements.forEach((el) => {
+        if (el.paused) {
+          el.play().catch(() => {});
+        }
+      });
+    };
+    window.addEventListener('pointerdown', unlock, { capture: true, once: true });
+    window.addEventListener('keydown', unlock, { capture: true, once: true });
+    window.addEventListener('touchstart', unlock, { capture: true, once: true });
   }
 
   public attachPeerAudio(peerId: string, stream: MediaStream): PeerAudioSinkState {
@@ -49,6 +91,7 @@ export class AudioContextManager {
       return state;
     }
 
+    let pullElement = this.peerPullElements.get(peerId);
     const previous = this.peerAudioTracks.get(peerId);
     if (!state.source || !previous || tracks.length !== previous.length || tracks.some(track => !previous.includes(track))) {
       if (state.source) {
@@ -65,22 +108,25 @@ export class AudioContextManager {
         // Chromium remote WebRTC audio needs an active media-element sink to
         // keep pulling samples into Web Audio after the visible video enters PiP.
         // Zero element volume avoids a second audible path; gain owns the volume.
-        let element = this.peerPullElements.get(peerId);
-        if (!element) {
-          element = document.createElement('audio');
-          element.autoplay = true;
-          element.volume = 0;
-          element.hidden = true;
-          document.body.appendChild(element);
-          this.peerPullElements.set(peerId, element);
+        if (!pullElement) {
+          pullElement = document.createElement('audio');
+          pullElement.autoplay = true;
+          pullElement.setAttribute('playsinline', 'true');
+          pullElement.volume = 0;
+          pullElement.hidden = true;
+          document.body.appendChild(pullElement);
+          this.peerPullElements.set(peerId, pullElement);
         }
-        element.srcObject = audioStream;
-        void element.play().catch(() => {});
+        pullElement.srcObject = audioStream;
+        this.safePlayPullElement(pullElement);
       } catch (err) {
         console.warn('Failed to connect media stream source for peer:', peerId, err);
       }
+    } else if (pullElement && pullElement.paused) {
+      this.safePlayPullElement(pullElement);
     }
 
+    this.safeResumeAudioContext();
     state.gainNode.gain.value = state.isMuted ? 0 : state.volume / 100;
     return state;
   }
@@ -117,7 +163,11 @@ export class AudioContextManager {
       }
       state.gainNode.gain.value = state.isMuted ? 0 : state.volume / 100;
       if (this.audioCtx && this.audioCtx.state === 'suspended' && !state.isMuted && state.volume > 0) {
-        this.audioCtx.resume().catch(() => {});
+        this.safeResumeAudioContext();
+      }
+      const pullElement = this.peerPullElements.get(peerId);
+      if (pullElement && pullElement.paused && !state.isMuted && state.volume > 0) {
+        this.safePlayPullElement(pullElement);
       }
     }
   }

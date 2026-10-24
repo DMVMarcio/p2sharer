@@ -194,6 +194,7 @@ export class GroupRoomManager {
   private remoteMedia = new Map<string, Map<string, MediaStream>>();
   private observedRemoteStreams = new WeakSet<MediaStream>();
   private remoteDescriptors = new Map<string, StreamDescriptor[]>();
+  private remoteDescriptorFirstSeen = new Map<string, number>();
   private remoteMediaRevisions = new Map<string, number>();
   private mediaRevision = 0;
   private mediaDispatches = new Map<string, { room: unknown; connection: RTCPeerConnection | undefined;
@@ -1564,7 +1565,15 @@ export class GroupRoomManager {
         this.remoteMediaRevisions.set(peerId, data.revision!);
         const previousDescriptors = this.remoteDescriptors.get(peerId) || [];
         this.remoteDescriptors.set(peerId, data.streams);
+        const now = Date.now();
+        for (const entry of data.streams) {
+          const key = streamSlotKey(peerId, entry.id);
+          if (!this.remoteDescriptorFirstSeen.has(key)) {
+            this.remoteDescriptorFirstSeen.set(key, now);
+          }
+        }
         for (const entry of previousDescriptors) if (!data.streams.some((next) => next.id === entry.id)) {
+          this.remoteDescriptorFirstSeen.delete(streamSlotKey(peerId, entry.id));
           this.cleanupStreamWatchers(streamSlotKey(peerId, entry.id), senderName);
         }
         const previous = this.remoteMedia.get(peerId);
@@ -1577,8 +1586,18 @@ export class GroupRoomManager {
           this.callbacks?.onStreamStopped?.(peerId, senderName, false);
           this.cleanupStreamWatchers(peerId, senderName);
         }
-        if (data.streams.length && data.streams.some((entry) => !media?.get(entry.id)?.getVideoTracks().some((track) => track.readyState === 'live'))) {
-          const now = Date.now();
+        const needsRecovery = data.streams.some((entry) => {
+          const key = streamSlotKey(peerId, entry.id);
+          const firstSeen = this.remoteDescriptorFirstSeen.get(key) || now;
+          if (now - firstSeen < 2500) return false;
+          const stream = media?.get(entry.id);
+          const hasLiveVideo = Boolean(stream?.getVideoTracks().some((track) => track.readyState === 'live'));
+          if (!hasLiveVideo) return true;
+          const hasLiveAudio = Boolean(stream?.getAudioTracks().some((track) => track.readyState === 'live'));
+          if (entry.kind === 'screen' && !hasLiveAudio) return true;
+          return false;
+        });
+        if (data.streams.length && needsRecovery) {
           if (now - (this.lastStreamRecoveryRequests.get(peerId) || 0) > 8000) {
             this.lastStreamRecoveryRequests.set(peerId, now);
             this.requestStreamFromPeer(peerId);
@@ -1851,7 +1870,7 @@ export class GroupRoomManager {
       receive: (peerId, stream, descriptor) => this.receivePeerStream(stream, peerId, descriptor),
       fallback: (peerId, mediaId) => {
         const entry = this.localMedia.get(mediaId);
-        if (entry && this.room === boundRoom) this.dispatchMediaToPeer(peerId);
+        if (entry && this.room === boundRoom) this.dispatchMediaToPeer(peerId, true);
       },
     });
     this.nativeVideoAction.onMessage = (data: unknown, meta: { peerId: string }) => {
@@ -2242,6 +2261,9 @@ export class GroupRoomManager {
     this.remoteMedia.delete(peerId);
     this.remoteDescriptors.delete(peerId);
     this.remoteMediaRevisions.delete(peerId);
+    for (const key of this.remoteDescriptorFirstSeen.keys()) {
+      if (key.startsWith(`${peerId}/`)) this.remoteDescriptorFirstSeen.delete(key);
+    }
     this.lastBroadcasterStreamIds.delete(peerId);
     this.lastStreamRecoveryRequests.delete(peerId);
     this.lastBridgeAttempts.delete(peerId);
@@ -2430,7 +2452,7 @@ export class GroupRoomManager {
       }
 
       // Targeted addStream dispatch passing `{ target: peerId }` object option
-      this.dispatchMediaToPeer(peerId);
+      this.dispatchMediaToPeer(peerId, recovery);
 
       [0, 30, 80, 150, 300, 600, 1200, 2000].forEach((delay) => {
         dispatch.timers.push(setTimeout(() => {
@@ -2444,7 +2466,7 @@ export class GroupRoomManager {
       this.clearMediaDispatch(peerId);
       console.warn('[P2P] Error sending stream to peer, fallback:', err);
       try {
-        this.dispatchMediaToPeer(peerId);
+        this.dispatchMediaToPeer(peerId, recovery);
       } catch {}
     }
   }
@@ -2457,13 +2479,26 @@ export class GroupRoomManager {
     }
   }
 
-  private dispatchMediaToPeer(peerId: string) {
+  private dispatchMediaToPeer(peerId: string, recovery = false) {
     const room = this.room;
     if (!room) return;
+    const peers = room.getPeers?.() || {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const peerObj: any = peers[peerId];
+    const pc: RTCPeerConnection = peerObj?.connection || peerObj?.pc || peerObj;
+
     for (const entry of this.localMedia.values()) {
       if (this.nativeVideo?.dispatch(peerId, entry.stream, entry.descriptor)) {
         for (const video of entry.stream.getVideoTracks()) room.removeTrack(video, { target: peerId });
         for (const audio of entry.stream.getAudioTracks()) {
+          if (recovery && pc && typeof pc.getSenders === 'function') {
+            const sender = pc.getSenders().find((s) => s.track === audio);
+            if (sender) {
+              try {
+                pc.removeTrack(sender);
+              } catch {}
+            }
+          }
           for (const operation of room.addTrack(audio, entry.stream, { target: peerId, metadata: entry.descriptor }) || []) {
             void Promise.resolve(operation).catch(error => console.warn('[Media] Audio dispatch failed:', error));
           }
@@ -3724,6 +3759,7 @@ export class GroupRoomManager {
     this.remoteStreams.clear();
     this.remoteMedia.clear();
     this.remoteDescriptors.clear();
+    this.remoteDescriptorFirstSeen.clear();
     this.remoteMediaRevisions.clear();
     this.mediaStatsSamples.clear();
     this.localMedia.clear();
