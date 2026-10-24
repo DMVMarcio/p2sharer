@@ -39,6 +39,27 @@ function callbacks() {
   };
 }
 
+test('a banner offer negotiates binary transfer before any avatar offer arrives', async () => {
+  const mock = mockRoom();
+  const manager = new GroupRoomManager('Viewer', 'profile-capability-fixture', '', false);
+  const internal = manager as any;
+  internal.room = mock.room;
+  internal.bindRoomActions();
+  internal.peerTracker.receivePeerExchange('peer', true);
+  const requests: any[] = [];
+  mock.actions.get('profile_banner_v1')!.send = async packet => { requests.push(packet); };
+  try {
+    await mock.actions.get('profile_banner_v1')!.onMessage!({ kind: 'offer', binary: true,
+      hash: '5'.repeat(64), size: 4, color: '#123456', bannerEnabled: true, bannerBlur: false }, { peerId: 'peer' });
+    const request = requests.find(packet => packet.kind === 'request');
+    assert.ok(request);
+    assert.equal(request.binary, true);
+  } finally {
+    internal.profileTransfer.close(); internal.bannerTransfer.close();
+    internal.nativeVideo.close(); internal.room = null;
+  }
+});
+
 test('a direct handshake does not erase the known creator role', () => {
   const tracker = new PeerTracker();
   tracker.receivePeerExchange('creator-peer', false, 'Creator', true, 1);

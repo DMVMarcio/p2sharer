@@ -65,11 +65,12 @@ export class ProfileTransfer {
         !Number.isInteger(p.size) || (p.size as number) < 0 || (p.size as number) > Math.ceil(PROFILE_MAX_BYTES / 3) * 4 ||
         (p.hash === '') !== (p.size === 0)) return;
       const old = this.offers.get(peerId);
-      if (old?.hash === p.hash && old.color === p.color && old.cardColor === (p.cardColor ?? p.color) &&
+      const sameImage = old !== undefined && old.hash === p.hash && old.size === p.size;
+      if (old && sameImage && old.color === p.color && old.cardColor === (p.cardColor ?? p.color) &&
         old.bannerEnabled === p.bannerEnabled && old.bannerBlur === p.bannerBlur) {
         this.deferred.delete(peerId); this.requestWaiting(); return;
       }
-      if (p.hash !== '' && Date.now() - (this.lastOffer.get(peerId) ?? 0) < 1000) {
+      if (!sameImage && p.hash !== '' && Date.now() - (this.lastOffer.get(peerId) ?? 0) < 1000) {
         this.deferred.set(peerId, { hash: p.hash, size: p.size as number, color: p.color, cardColor: (p.cardColor ?? p.color) as string,
           ...(this.images.banner ? { bannerEnabled: p.bannerEnabled as boolean, bannerBlur: p.bannerBlur as boolean } : {}) }); return;
       }
@@ -78,7 +79,9 @@ export class ProfileTransfer {
       const offer = { hash: p.hash, size: p.size as number, color: p.color, cardColor: (p.cardColor ?? p.color) as string,
         ...(this.images.banner ? { bannerEnabled: p.bannerEnabled as boolean, bannerBlur: p.bannerBlur as boolean } : {}) };
       this.offers.set(peerId, offer);
-      if (!this.pending.get(peerId)?.validating) this.pending.delete(peerId);
+      const request = this.pending.get(peerId);
+      if (request && !request.validating &&
+          (request.offer.hash !== offer.hash || request.offer.size !== offer.size)) this.pending.delete(peerId);
       this.images.announce(peerId, offer.hash, offer.color, offer.cardColor, offer.bannerEnabled, offer.bannerBlur);
       // The first offer also confirms the remote receiver is admitted and ready.
       // An earlier admission-time announcement may have arrived before its gate opened.

@@ -53,7 +53,10 @@ Selected originals are released on cancellation, replacement or settings close.
 edges through the existing room action guard. Offers contain only hash, encoded
 size, fallback color and resolved card color. A cache miss creates a targeted
 request with a random,
-expiring token. Binary-capable peers send ordered binary chunks on the dedicated
+expiring token. Either an avatar or banner offer negotiates binary capability,
+independently of arrival order. Appearance-only updates preserve the active
+request token and partial bytes when image hash and size are unchanged.
+Binary-capable peers send ordered binary chunks on the dedicated
 profile data channel, with bounded buffering independent of tunnel queues.
 The legacy room action retains Base64 chunks. Both paths enforce the announced
 size, request token and chunk index. At most four transfers are pending; other offers wait, and

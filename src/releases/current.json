@@ -4,67 +4,67 @@
     "en": [
       "Whiteboard PNG exports can now remove empty margins, keeping 10 px around your drawing.",
       "PiP windows can now be minimized, maximized and restored. Detached apps resize freely, while streams retain their proportions when resized.",
-      "Joining rooms is smoother, with controlled synchronization and less disruption to ongoing streams."
+      "Joining rooms and loading avatars and banners is smoother, with controlled synchronization and less disruption to ongoing streams."
     ],
     "pt-BR": [
       "Agora é possível exportar o Whiteboard em PNG sem margens vazias, mantendo 10 px ao redor do desenho.",
       "As janelas PiP agora podem ser minimizadas, maximizadas e restauradas. Apps destacados podem ser redimensionados livremente, enquanto transmissões mantêm suas proporções ao redimensionar.",
-      "A entrada em salas fica mais fluida, com sincronização controlada e menos interrupções nas transmissões em andamento."
+      "A entrada em salas e o carregamento de avatares e banners ficam mais fluidos, com sincronização controlada e menos interrupções nas transmissões em andamento."
     ],
     "es": [
       "Ahora puedes exportar el Whiteboard en PNG sin márgenes vacíos, dejando 10 px alrededor del dibujo.",
       "Las ventanas PiP ahora se pueden minimizar, maximizar y restaurar. Las apps separadas se redimensionan libremente, mientras que las transmisiones conservan sus proporciones al redimensionarse.",
-      "Entrar en salas es más fluido, con sincronización controlada y menos interrupciones en las transmisiones en curso."
+      "Entrar en salas y cargar avatares y banners es más fluido, con sincronización controlada y menos interrupciones en las transmisiones en curso."
     ],
     "fr": [
       "Les exports PNG du Whiteboard peuvent désormais supprimer les marges vides et garder 10 px autour du dessin.",
       "Les fenêtres PiP peuvent désormais être réduites, agrandies et restaurées. Les apps détachées se redimensionnent librement, tandis que les diffusions conservent leurs proportions au redimensionnement.",
-      "L’entrée dans les salons est plus fluide, avec une synchronisation maîtrisée et moins d’interruptions des diffusions en cours."
+      "L’entrée dans les salons et le chargement des avatars et bannières sont plus fluides, avec une synchronisation maîtrisée et moins d’interruptions des diffusions en cours."
     ],
     "de": [
       "PNG-Exporte des Whiteboards können jetzt leere Ränder entfernen und 10 px um die Zeichnung beibehalten.",
       "PiP-Fenster lassen sich jetzt minimieren, maximieren und wiederherstellen. Ausgelagerte Apps sind frei skalierbar, während Übertragungen beim Ändern der Größe ihre Proportionen beibehalten.",
-      "Der Raumbeitritt läuft flüssiger, mit kontrollierter Synchronisierung und weniger Unterbrechungen laufender Übertragungen."
+      "Raumbeitritt und Laden von Avataren und Bannern laufen flüssiger, mit kontrollierter Synchronisierung und weniger Unterbrechungen laufender Übertragungen."
     ],
     "it": [
       "Le esportazioni PNG del Whiteboard ora possono rimuovere i margini vuoti, mantenendo 10 px intorno al disegno.",
       "Le finestre PiP ora possono essere ridotte a icona, ingrandite e ripristinate. Le app separate si ridimensionano liberamente, mentre le trasmissioni mantengono le proporzioni durante il ridimensionamento.",
-      "L’ingresso nelle stanze è più fluido, con sincronizzazione controllata e meno interruzioni delle trasmissioni in corso."
+      "L’ingresso nelle stanze e il caricamento di avatar e banner sono più fluidi, con sincronizzazione controllata e meno interruzioni delle trasmissioni in corso."
     ],
     "zh-CN": [
       "白板导出 PNG 时现在可以移除空白边距，在绘图周围保留 10 像素。",
       "PiP 窗口现在支持最小化、最大化和还原。独立应用窗口可自由调整大小，直播窗口在调整大小时保持宽高比。",
-      "加入房间更加流畅，同步过程更有序，减少对正在进行的直播的干扰。"
+      "加入房间以及加载头像和横幅更加流畅，同步过程更有序，减少对正在进行的直播的干扰。"
     ],
     "zh-TW": [
       "白板匯出 PNG 時現在可以移除空白邊距，在繪圖周圍保留 10 像素。",
       "PiP 視窗現在支援最小化、最大化和還原。獨立應用程式視窗可自由調整大小，串流視窗在調整大小時保持長寬比。",
-      "加入房間更加流暢，同步過程更有序，減少對正在進行的串流的干擾。"
+      "加入房間以及載入頭像和橫幅更加流暢，同步過程更有序，減少對正在進行的串流的干擾。"
     ],
     "ja": [
       "ホワイトボードの PNG 書き出しで、描画の周囲に 10 px を残して空白の余白を削除できるようになりました。",
       "PiP ウィンドウを最小化、最大化、元のサイズに戻せるようになりました。別ウィンドウのアプリは自由にサイズを変更でき、配信はサイズ変更時に縦横比を維持します。",
-      "ルーム参加時の同期を制御し、進行中の配信への影響を減らすことで、よりスムーズに参加できるようになりました。"
+      "ルーム参加時やアバター・バナー読み込み時の同期を制御し、進行中の配信への影響を減らして、よりスムーズに利用できるようになりました。"
     ],
     "ko": [
       "이제 화이트보드를 PNG로 내보낼 때 빈 여백을 제거하고 그림 주위에 10px만 남길 수 있습니다.",
       "이제 PiP 창을 최소화, 최대화하고 원래 크기로 복원할 수 있습니다. 분리된 앱은 자유롭게 크기를 조절할 수 있으며, 방송 창은 크기 조절 시 비율을 유지합니다.",
-      "동기화를 제어하고 진행 중인 방송의 중단을 줄여 방에 더 원활하게 입장할 수 있습니다."
+      "동기화를 제어하고 진행 중인 방송의 중단을 줄여 방 입장과 아바타 및 배너 로딩이 더 원활해졌습니다."
     ],
     "hi": [
       "अब व्हाइटबोर्ड को PNG में निर्यात करते समय खाली हाशिए हटाकर चित्र के चारों ओर 10 px रख सकते हैं।",
       "अब PiP विंडो को छोटा, अधिकतम और पूर्व आकार में बहाल कर सकते हैं। अलग की गई ऐप्स का आकार स्वतंत्र रूप से बदलता है, जबकि स्ट्रीम का आकार बदलते समय अनुपात बना रहता है।",
-      "नियंत्रित समन्वयन और चल रही स्ट्रीम में कम व्यवधान के साथ कमरों में प्रवेश अब अधिक सहज है।"
+      "नियंत्रित समन्वयन और चल रही स्ट्रीम में कम व्यवधान के साथ कमरों में प्रवेश तथा अवतार और बैनर लोड करना अब अधिक सहज है।"
     ],
     "fi": [
       "Valkotaulun PNG-viennistä voi nyt poistaa tyhjät marginaalit ja jättää piirroksen ympärille 10 px.",
       "PiP-ikkunat voi nyt pienentää, suurentaa ja palauttaa. Irrotettujen sovellusten kokoa voi muuttaa vapaasti, kun taas lähetykset säilyttävät kuvasuhteensa kokoa muutettaessa.",
-      "Huoneisiin liittyminen on sujuvampaa hallitun synkronoinnin ja käynnissä olevien lähetysten vähäisempien häiriöiden ansiosta."
+      "Huoneisiin liittyminen sekä avatarien ja bannerien lataaminen on sujuvampaa hallitun synkronoinnin ja käynnissä olevien lähetysten vähäisempien häiriöiden ansiosta."
     ],
     "ru": [
       "При экспорте доски в PNG теперь можно убрать пустые поля, оставив 10 пикселей вокруг рисунка.",
       "Окна PiP теперь можно сворачивать, разворачивать и восстанавливать. Размер отдельных окон приложений меняется свободно, а окна трансляций сохраняют пропорции при изменении размера.",
-      "Вход в комнаты стал плавнее благодаря контролируемой синхронизации и меньшему количеству прерываний текущих трансляций."
+      "Вход в комнаты и загрузка аватаров и баннеров стали плавнее благодаря контролируемой синхронизации и меньшему количеству прерываний текущих трансляций."
     ]
   }
 }

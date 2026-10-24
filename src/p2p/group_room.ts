@@ -279,6 +279,15 @@ export class GroupRoomManager {
     }
     return (banner ? this.bannerAction : this.profileAction)?.send(packet, { target: peer });
   }
+
+  private receiveProfilePayload(packet: any, peer: string, banner = false): void {
+    if (packet?.kind === 'offer' && packet.binary === true) {
+      this.payloadChannels.ensure(peer);
+      this.binaryPeers.add(peer);
+    }
+    const transfer = banner ? this.bannerTransfer : this.profileTransfer;
+    void transfer?.receive(packet, peer).catch(() => {});
+  }
   private seenChatRevisions: Set<string> = new Set();
   private chatAuth: PeerAuthenticator | null = null;
   private authority: RoomAuthority | null = null;
@@ -1392,8 +1401,7 @@ export class GroupRoomManager {
       peer => this.binaryPeers.has(peer),
     );
     this.profileAction.onMessage = (packet: any, meta: { peerId: string }) => {
-      if (packet?.kind === 'offer' && packet.binary === true) { this.payloadChannels.ensure(meta.peerId); this.binaryPeers.add(meta.peerId); }
-      void this.profileTransfer?.receive(packet, meta.peerId).catch(() => {});
+      this.receiveProfilePayload(packet, meta.peerId);
     };
     this.bannerTransfer?.close();
     this.bannerAction = this.room.makeAction('profile_banner_v1');
@@ -1405,7 +1413,7 @@ export class GroupRoomManager {
       peer => this.binaryPeers.has(peer),
     );
     this.bannerAction.onMessage = (packet: unknown, meta: { peerId: string }) => {
-      void this.bannerTransfer?.receive(packet, meta.peerId).catch(() => {});
+      this.receiveProfilePayload(packet, meta.peerId, true);
     };
     this.fileAction = this.room.makeAction('chat_file_v2');
     this.profileStatsAction = this.room.makeAction('profile_stats_v1');

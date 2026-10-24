@@ -20,6 +20,28 @@ const { ProfileTransfer, profileImages, profileBanners } = await import(`data:te
 const hash = 'a'.repeat(64);
 const offer = (hash = 'a'.repeat(64)) => ({ kind: 'offer', hash, color: '#123456', size: 4 });
 
+test('appearance-only banner updates retain the active request token and downloaded chunks', async context => {
+  context.mock.timers.enable({ apis: ['Date'], now: 10000 });
+  const requests = [], accepted = [];
+  const data = 'YWFh'.repeat(8193);
+  const hash = '6'.repeat(64);
+  const images = { banner: true, ready: Promise.resolve(), local: { hash: '', data: '', color: '#123456' },
+    background: () => '#123456', has: () => false, announce() {}, clearPeers() {},
+    accept: async (data, hash) => accepted.push({ data, hash }) };
+  const transfer = new ProfileTransfer(packet => { if (packet.kind === 'request') requests.push(packet); }, () => true, images);
+  const initial = { ...offer(hash), size: data.length, bannerEnabled: true, bannerBlur: false };
+  try {
+    await transfer.receive(initial, 'peer');
+    const token = requests[0].token;
+    await transfer.receive({ kind: 'chunk', hash, token, index: 0, data: data.slice(0, 32768) }, 'peer');
+    context.mock.timers.tick(1500);
+    await transfer.receive({ ...initial, color: '#654321', bannerBlur: true }, 'peer');
+    assert.equal(requests.length, 1, 'unchanged image bytes must not restart the transfer');
+    await transfer.receive({ kind: 'chunk', hash, token, index: 1, data: data.slice(32768) }, 'peer');
+    assert.deepEqual(accepted, [{ data, hash }]);
+  } finally { transfer.close(); }
+});
+
 test('binary profile and banner chunks require consent and native validation before creating a cached image', async () => {
   const previous = globalThis.__profileInvoke;
   const calls = [];
