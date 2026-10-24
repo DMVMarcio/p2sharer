@@ -6,6 +6,25 @@ import { registerRoomApp } from '../../src/apps/registry.ts';
 import type { AppWireEvent } from '../../src/apps/types.ts';
 import * as Y from 'yjs';
 
+test('joining sync requests and responses stay targeted to the new direct peer', () => {
+  const sent: Array<{ event: AppWireEvent; target?: string }> = [];
+  const service = new RoomAppsService();
+  service.attach((event, target) => sent.push({ event, target }), 'existing');
+  try {
+    service.start('notepad');
+    sent.length = 0;
+    service.sendSync('newcomer');
+    service.requestSync('newcomer');
+    assert.ok(sent.some(({ event }) => event.kind === 'sync'));
+    assert.ok(sent.some(({ event }) => event.kind === 'sync-request'));
+    assert.ok(sent.every(({ target }) => target === 'newcomer'));
+    sent.length = 0;
+    service.receive({ kind: 'sync-request' }, 'newcomer');
+    assert.ok(sent.length > 0);
+    assert.ok(sent.every(({ target }) => target === 'newcomer'));
+  } finally { service.reset(); }
+});
+
 test('only app owners and current room moderators can stop shared apps, including through sync', () => {
   const sent: AppWireEvent[] = [];
   const moderators = new Set(['admin', 'host']);

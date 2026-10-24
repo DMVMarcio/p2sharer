@@ -45,6 +45,52 @@ test('native publication targets only its peer, suppresses browser video and pre
   internal.nativeVideo = null; internal.room = null; manager.stopStream();
 });
 
+test('presence reuses published media and newcomer warmup touches only its connection', context => {
+  context.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 10_000 });
+  const manager = new GroupRoomManager('Owner', 'test', '', true);
+  const internal = manager as any;
+  const stream = fakeStream('screen');
+  const connection = () => ({ getSenders: () => [], setLocalDescription: async () => {} });
+  const existing = connection(), newcomer = connection();
+  const peers: Record<string, unknown> = { existing, newcomer };
+  const sent: string[] = [], tuned: unknown[] = [];
+  internal.localStream = stream;
+  internal.localMedia.set('screen', { stream, descriptor: descriptor('screen') });
+  internal.room = { getPeers: () => peers,
+    addStream: (_stream: unknown, options: { target: string }) => { sent.push(options.target); return []; },
+    removeStream() {}, removeTrack() {},
+  };
+  internal.peerTracker.receivePeerExchange('existing', true);
+  internal.peerTracker.receivePeerExchange('newcomer', true);
+  internal.applyMediaParameters = (pc: unknown) => tuned.push(pc);
+  try {
+    manager.sendStreamToPeer('existing');
+    context.mock.timers.tick(2100);
+    tuned.length = 0;
+    for (let repeat = 0; repeat < 40; repeat++) {
+      manager.sendStreamToPeer('newcomer');
+      manager.sendStreamToPeer('existing');
+    }
+    assert.deepEqual(sent, ['existing', 'newcomer']);
+    context.mock.timers.tick(2100);
+    assert.ok(tuned.length > 0);
+    assert.ok(tuned.every(pc => pc === newcomer));
+    manager.sendStreamToPeer('newcomer', true);
+    manager.sendStreamToPeer('newcomer', true);
+    assert.deepEqual(sent, ['existing', 'newcomer', 'newcomer'], 'recovery resends metadata once, without parallel bursts');
+    peers.newcomer = connection();
+    manager.sendStreamToPeer('newcomer');
+    assert.equal(sent.length, 4, 'a replacement connection receives the active tracks');
+    internal.mediaRevision++;
+    manager.sendStreamToPeer('newcomer');
+    assert.equal(sent.length, 5, 'a changed publication is sent even during recovery cooldown');
+    manager.stopStream();
+    tuned.length = 0;
+    context.mock.timers.tick(2100);
+    assert.equal(tuned.length, 0, 'stopping media retires scheduled sender work');
+  } finally { internal.room = null; manager.stopStream(); }
+});
+
 test('native sender HUD measures transmitted frames rather than preview repeats or requested FPS', async (context) => {
   context.mock.timers.enable({ apis: ['Date'], now: 10_000 });
   const manager = new GroupRoomManager('Owner', 'test', '', true);

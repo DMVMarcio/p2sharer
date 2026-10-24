@@ -194,6 +194,8 @@ export class GroupRoomManager {
   private remoteDescriptors = new Map<string, StreamDescriptor[]>();
   private remoteMediaRevisions = new Map<string, number>();
   private mediaRevision = 0;
+  private mediaDispatches = new Map<string, { room: unknown; connection: RTCPeerConnection | undefined;
+    revision: number; at: number; timers: ReturnType<typeof setTimeout>[] }>();
   private mediaStatsSamples = new Map<string, { bytes: number; at: number; nativeFrames?: number }>();
   private localStream: MediaStream | null = null;
 
@@ -352,7 +354,6 @@ export class GroupRoomManager {
   private existingAtJoinIds: Set<string> = new Set();
   private pendingJoinNotices: Map<string, PeerInfo> = new Map();
   private lastRumorReannounceTime: number = 0;
-  private currentTargetBitrate: number = 25000000;
   private currentTargetFps: number = 60;
   private signalingTopic: string = '';
   private rtcConfig: RTCConfiguration | null = null;
@@ -1660,7 +1661,7 @@ export class GroupRoomManager {
 
       console.log(`[P2P] Received stream request from peer ${requesterId}`);
       if (this.localStream) {
-        this.sendStreamToPeer(requesterId);
+        this.sendStreamToPeer(requesterId, true);
       }
     };
 
@@ -1789,7 +1790,7 @@ export class GroupRoomManager {
         } else if (data.kind === 'action_relay') {
           this.handleRelayedAction(data.action, data.payload, data.origin, meta.peerId);
         } else if (data.kind === 'stream_req' && data.origin === meta.peerId && this.localStream) {
-          this.sendStreamToPeer(data.origin);
+          this.sendStreamToPeer(data.origin, true);
         }
       } else if (data.target && this.peerTracker.hasPeer(data.target)) {
         try {
@@ -1881,6 +1882,7 @@ export class GroupRoomManager {
     // 9. Direct WebRTC Peer Lifecycle Listeners
     this.room.onPeerJoin = (peerId: string) => {
       if (this.room !== boundRoom) return;
+      this.clearMediaDispatch(peerId);
       this.admissionRequests.delete(peerId);
       this.announcedPeerNames.delete(peerId);
       console.log(`[P2P] Direct WebRTC peer connection active: ${peerId}`);
@@ -2156,6 +2158,7 @@ export class GroupRoomManager {
   }
 
   private removePeer(peerId: string) {
+    this.clearMediaDispatch(peerId);
     this.admissionRequests.delete(peerId);
     profileStats.forget(peerId);
     this.profileTransfer?.forget(peerId);
@@ -2348,15 +2351,22 @@ export class GroupRoomManager {
   /**
    * Targeted Stream Dispatch strictly passing `{ target: peerId }` to eliminate transceiver leaks.
    */
-  public sendStreamToPeer(peerId: string) {
+  public sendStreamToPeer(peerId: string, recovery = false) {
     if (!this.localStream || !this.room || !this.peerTracker.isVerified(peerId)) return;
     if (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(peerId))) return;
-    this.publishMediaManifest(peerId);
     try {
       const peers = this.room.getPeers?.() || {};
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const peerObj: any = peers[peerId];
       const pc: RTCPeerConnection = peerObj?.connection || peerObj?.pc || peerObj;
+      const previous = this.mediaDispatches.get(peerId);
+      if (previous && previous.room === this.room && previous.connection === pc && previous.revision === this.mediaRevision &&
+          (!recovery || Date.now() - previous.at < 1000)) return;
+      this.clearMediaDispatch(peerId);
+      const dispatch = { room: this.room, connection: pc, revision: this.mediaRevision,
+        at: Date.now(), timers: [] as ReturnType<typeof setTimeout>[] };
+      this.mediaDispatches.set(peerId, dispatch);
+      this.publishMediaManifest(peerId);
 
       if (pc) {
         MediaCoordinator.patchPeerConnectionSdp(pc);
@@ -2378,13 +2388,27 @@ export class GroupRoomManager {
       this.dispatchMediaToPeer(peerId);
 
       [0, 30, 80, 150, 300, 600, 1200, 2000].forEach((delay) => {
-        setTimeout(() => this.boostSenders(this.currentTargetBitrate, this.currentTargetFps), delay);
+        dispatch.timers.push(setTimeout(() => {
+          if (this.mediaDispatches.get(peerId) !== dispatch || this.room !== dispatch.room ||
+              this.mediaRevision !== dispatch.revision || !this.peerTracker.isVerified(peerId) || !pc) return;
+          this.applyMediaParameters(pc);
+          void MediaCoordinator.requestKeyFrame(pc);
+        }, delay));
       });
     } catch (err) {
+      this.clearMediaDispatch(peerId);
       console.warn('[P2P] Error sending stream to peer, fallback:', err);
       try {
         this.dispatchMediaToPeer(peerId);
       } catch {}
+    }
+  }
+
+  private clearMediaDispatch(peerId?: string): void {
+    for (const [id, dispatch] of this.mediaDispatches) {
+      if (peerId !== undefined && id !== peerId) continue;
+      dispatch.timers.forEach(clearTimeout);
+      this.mediaDispatches.delete(id);
     }
   }
 
@@ -2428,7 +2452,6 @@ export class GroupRoomManager {
     this.localMedia.set(entry.id, { descriptor: entry, stream });
     this.mediaRevision++;
     this.localStream = Array.from(this.localMedia.values()).find((item) => item.descriptor.kind === 'screen')?.stream || stream;
-    this.currentTargetBitrate = targetBitrateBps;
     this.currentTargetFps = targetFps;
     this.publishMediaManifest();
     for (const peerId of this.peerTracker.directConnectedPeers) this.sendStreamToPeer(peerId);
@@ -2502,6 +2525,7 @@ export class GroupRoomManager {
   }
 
   public stopStream(id?: string) {
+    this.clearMediaDispatch();
     const wasStreaming = this.localMedia.size > 0;
     this.mediaRevision++;
     const entries = id ? [this.localMedia.get(id)].filter(Boolean) : [...this.localMedia.values()];

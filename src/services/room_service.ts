@@ -389,7 +389,7 @@ export class RoomService {
       onPeerJoined: (peer, isInitial) => {
         if (this.roomManager !== manager) return;
         roomAppsService.sendSync(peer.id);
-        roomAppsService.requestSync();
+        roomAppsService.requestSync(peer.id);
         const name = peer.username.trim();
         if (!isInitial && name) {
           soundEffects.playUserJoin();

@@ -205,7 +205,7 @@ export class RoomAppsService {
     this.notify();
   }
 
-  requestSync(): void { this.dispatch({ kind: 'sync-request' }); }
+  requestSync(target?: string): void { this.dispatch({ kind: 'sync-request' }, target); }
   sendSync(target: string): void {
     if (!this.sender) return;
     this.dispatch({ kind: 'sync', instances: this.getInstances().filter((instance) => !instance.personal), snapshots: {},

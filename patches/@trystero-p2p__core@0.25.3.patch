@@ -1,5 +1,23 @@
+diff --git a/dist/action-wire.mjs b/dist/action-wire.mjs
+index 992caaaef5e9f1e0bcfb5e348bc9138667f8242b..cdeb35a56997bf285673885e94bb8265bac09c53 100644
+--- a/dist/action-wire.mjs
++++ b/dist/action-wire.mjs
+@@ -116,10 +116,11 @@ const createActionWireManager = ({ getPeer, getPeerIds, canReceiveFromPeer, thro
+ 						throwIfAborted(signal);
+ 						const chunk = chunks[chunkN];
+ 						if (!chunk) break;
+-						if (channel && channel.bufferedAmount > channel.bufferedAmountLowThreshold) {
++						// Concurrent actions share this budget; another sender may fill it after a drain.
++						while (channel && channel.bufferedAmount > channel.bufferedAmountLowThreshold) {
+ 							const didDrain = await waitForBufferedAmountLow(channel);
+ 							throwIfAborted(signal);
+-							if (!didDrain) break;
++							if (!didDrain) return;
+ 						}
+ 						const currentPeer = getPeer(id, normalizedOptions.sendToPending);
+ 						if (!currentPeer || currentPeer !== peer) break;
 diff --git a/dist/media.mjs b/dist/media.mjs
-index 2fd4906e80aefbef3f6b9f523a77ebf58562c3af..3968364812260fdc364199dec4ad34f451e01143 100644
+index 2fd4906e80aefbef3f6b9f523a77ebf58562c3af..53258a2eb704aad191112933fee39d0f06928f15 100644
 --- a/dist/media.mjs
 +++ b/dist/media.mjs
 @@ -53,6 +53,8 @@ const createMediaIdentityCache = () => {
@@ -81,7 +99,7 @@ index 2fd4906e80aefbef3f6b9f523a77ebf58562c3af..3968364812260fdc364199dec4ad34f4
  		get onPeerStream() {
  			return listeners.onPeerStream;
 diff --git a/dist/offer-pool.mjs b/dist/offer-pool.mjs
-index 7340a4f4bd7192c2c9f064d40311433436effc0f..387a39da8d4f2824f69b298e2b6993242744204a 100644
+index 7340a4f4bd7192c2c9f064d40311433436effc0f..76076fb6d1649100358ca3c7d12b51bb1210b180 100644
 --- a/dist/offer-pool.mjs
 +++ b/dist/offer-pool.mjs
 @@ -2,7 +2,7 @@ import { all, alloc, noOp, resetTimer } from "./utils.mjs";
@@ -94,7 +112,7 @@ index 7340a4f4bd7192c2c9f064d40311433436effc0f..387a39da8d4f2824f69b298e2b699324
  	makeOffer;
  	pool = [];
 diff --git a/dist/peer.mjs b/dist/peer.mjs
-index 8003df9196a808650bc233f9243be5eae14b4a1d..908d87fe821d94e971cded6e67035012b964d63d 100644
+index 8003df9196a808650bc233f9243be5eae14b4a1d..44579d8fbe661690578c96572f343f9e3197a1a8 100644
 --- a/dist/peer.mjs
 +++ b/dist/peer.mjs
 @@ -8,6 +8,12 @@ const offerType = "offer";
