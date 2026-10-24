@@ -184,7 +184,8 @@ test('preview bounds reject remote URLs, oversized avatars, and duplicate partic
   }
 });
 
-test('promoting a guest preserves the authenticated edge and still requires signed admission', async () => {
+test('promoting a guest keeps discovery and admission retries alive until signed admission', async context => {
+  context.mock.timers.enable({ apis: ['setInterval', 'Date'], now: 10000 });
   const created = await createAuthenticatedInvite();
   const invite = parseRoomInvite(created.invite)!;
   const actions = new Map<string, any>();
@@ -195,14 +196,19 @@ test('promoting a guest preserves the authenticated edge and still requires sign
   }, getPeers: () => ({ host: {} }), onPeerJoin: (_id: string) => {}, onPeerLeave: (_id: string) => {} };
   const original = { join: signalingManager.joinRoom, leave: signalingManager.leaveRoom, announce: signalingManager.reannounce };
   let connections = 0;
+  let reannouncements = 0;
   signalingManager.joinRoom = () => { connections++; return room; };
   signalingManager.leaveRoom = async () => {};
-  signalingManager.reannounce = async () => {};
+  signalingManager.reannounce = async () => { reannouncements++; };
   const manager = new GroupRoomManager('Guest', created.invite, '', false);
   const callbacks = { onStreamsUpdate: () => {}, onSlotsUpdate: () => {}, onChat: () => {},
     onChatHistory: () => {}, onPeersUpdate: () => {}, onStatusChange: () => {} };
   try {
     await manager.join(callbacks, true);
+    await manager.join(callbacks, false, 'fixture-password');
+    context.mock.timers.tick(4000);
+    assert.ok(reannouncements > 0, 'entering before any preview response continues rendezvous');
+    assert.equal(manager.hasAdmission(), false);
     room.onPeerJoin('host');
     const host = await PeerAuthenticator.create(invite.roomId, 'host', created.identity);
     const nonce = sent.findLast(packet => packet.action === 'peer_identity' && packet.data.kind === 'challenge')!.data.nonce;
@@ -217,7 +223,28 @@ test('promoting a guest preserves the authenticated edge and still requires sign
     assert.ok(sent.some(packet => packet.action === 'room_admission' && packet.data.kind === 'request' &&
       packet.data.password === 'fixture-password'));
     assert.equal(sent.some(packet => packet.action === 'presence'), false);
+    sent.length = 0;
+    const announcedBeforeRetry = reannouncements;
+    context.mock.timers.tick(4000);
+    assert.ok(reannouncements > announcedBeforeRetry, 'a direct edge cannot stop rendezvous before admission');
+    assert.ok(sent.some(packet => packet.action === 'room_preview_v1' && packet.data.kind === 'request'),
+      'discovery continues after early entry, even with an existing direct connection');
+    assert.ok(sent.some(packet => packet.action === 'room_admission' && packet.data.kind === 'request'),
+      'a lost admission request is retried without replacing the connection');
+    const preview = { name: 'Late preview fixture', protected: false,
+      participants: [{ id: 'host', name: 'Host', color: '#06b6d4' },
+        { id: 'late-member', name: 'Member', color: '#abcdef' }] };
+    const previewNonce = (manager as any).previewNonce;
+    await actions.get('room_preview_v1').onMessage({ kind: 'response', nonce: previewNonce, preview,
+      signature: await host.signControl('room-preview', [previewNonce, preview]) }, { peerId: 'host' });
+    assert.ok((manager as any).peerTracker.getPendingRumors().includes('late-member'));
+    assert.equal((manager as any).peerTracker.isVerified('late-member'), false);
+    assert.equal(manager.hasAdmission(), false, 'a late preview never grants room admission');
     await actions.get('room_admission').onMessage({ kind: 'denied' }, { peerId: 'host' });
+    sent.length = 0;
+    context.mock.timers.tick(8000);
+    assert.equal(sent.some(packet => packet.action === 'room_admission' && packet.data.kind === 'request'), false,
+      'an explicit password rejection pauses automatic admission retries');
     await manager.join(callbacks, false, 'corrected-fixture');
     assert.equal(connections, 1, 'password retries must preserve the same transport too');
     assert.equal(manager.hasAdmission(), false);
@@ -225,6 +252,10 @@ test('promoting a guest preserves the authenticated edge and still requires sign
     const command = await authority.makeCommand('admit', { targetPeerId: manager.getLocalPeerId(), targetKey: identity });
     await actions.get('room_admission').onMessage({ kind: 'command', command }, { peerId: 'host' });
     assert.equal(manager.hasAdmission(), true);
+    sent.length = 0;
+    context.mock.timers.tick(8000);
+    assert.equal(sent.some(packet => ['room_preview_v1', 'room_admission'].includes(packet.action) && packet.data.kind === 'request'), false,
+      'successful admission retires entry retries');
   } finally {
     await manager.leave();
     signalingManager.joinRoom = original.join;

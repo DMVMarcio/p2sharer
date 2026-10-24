@@ -3,6 +3,14 @@ import { validProfileColor } from './profile_image.ts';
 export interface RoomPreviewParticipant { id: string; name: string; color: string; avatar?: string }
 export interface RoomPreview { name: string; protected: boolean; participants: RoomPreviewParticipant[] }
 
+/** Different respondents list themselves first; retain the displayed identity order. */
+export function stabilizeRoomPreview(previous: RoomPreview | null, next: RoomPreview): RoomPreview {
+  if (!previous) return next;
+  const order = new Map(previous.participants.map((person, index) => [person.id, index]));
+  return { ...next, participants: [...next.participants].sort((left, right) =>
+    (order.get(left.id) ?? order.size) - (order.get(right.id) ?? order.size) || left.id.localeCompare(right.id)) };
+}
+
 function validPreviewAvatar(value: unknown): boolean {
   if (typeof value !== 'string' || value.length > 8192 ||
       !/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(value)) return false;

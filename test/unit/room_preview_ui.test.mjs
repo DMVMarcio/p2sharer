@@ -77,6 +77,15 @@ test('a saved room previews people and keeps connection and password errors in t
   await act(async () => discovery.onPreview({ name: 'Online room', protected: true,
     participants: [{ id: 'host', name: 'Host', color: '#06b6d4' }] }));
   assert.ok(document.querySelector('li').textContent.includes('Host'));
+  const host = { id: 'host', name: 'Host', color: '#06b6d4' };
+  const guest = { id: 'guest', name: 'Guest', color: '#ff8844' };
+  await act(async () => discovery.onPreview({ name: 'Online room', protected: true, participants: [host, guest] }));
+  const originalRows = [...document.querySelectorAll('.join-room-participants li')];
+  await act(async () => discovery.onPreview({ name: 'Online room', protected: true,
+    participants: [{ ...guest, color: '#123456' }, host] }));
+  const updatedRows = [...document.querySelectorAll('.join-room-participants li')];
+  assert.ok(updatedRows.length === originalRows.length && updatedRows.every((row, index) => row === originalRows[index]),
+    'responses from different members must update identities without moving existing rows');
   assert.equal(document.getElementById('join-room-password').value, 'remembered-fixture');
   const releasedBefore = left;
   await submit();

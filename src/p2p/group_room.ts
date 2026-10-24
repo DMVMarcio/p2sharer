@@ -153,6 +153,8 @@ export class GroupRoomManager {
   private previewNonce = crypto.randomUUID();
   private previewRequests = new Map<string, number>();
   private admissionRequests = new Map<string, number>();
+  private admissionDenied = false;
+  private lastAdmissionRetry = 0;
   private leavePromise: Promise<void> | null = null;
 
   public hasAdmission(): boolean { return this.localAdmitted && !this.previewOnly; }
@@ -164,7 +166,7 @@ export class GroupRoomManager {
   }
 
   public requestPreview(): void {
-    if (!this.previewOnly) return;
+    if (this.leavePromise || (!this.previewOnly && (this.localAdmitted || this.admissionDenied))) return;
     if (this.peerTracker.directConnectedPeers.size === 0 && this.signalingTopic) {
       void signalingManager.reannounce(this.signalingTopic);
     }
@@ -625,6 +627,7 @@ export class GroupRoomManager {
 
   public async join(callbacks: RoomCallbacks, previewOnly = false, password = this.password) {
     if (this.leavePromise) return;
+    if (!previewOnly) { this.admissionDenied = false; this.lastAdmissionRetry = 0; }
     if (this.shortLookup && !previewOnly && (!this.shortLookupReady ||
         ![...this.peerTracker.directConnectedPeers].some(peer => this.isAdmittedPeer(peer)))) {
       throw new Error('Short invitation requires an online room member');
@@ -1193,7 +1196,7 @@ export class GroupRoomManager {
         if (this.room === boundRoom) await this.previewAction.send(
           { kind: 'response', nonce: data.nonce, preview, signature, membership,
             adminMembership: this.adminAdmissions.get(selfId) }, { target: meta.peerId });
-      } else if (data.kind === 'response' && this.previewOnly && data.nonce === this.previewNonce &&
+      } else if (data.kind === 'response' && (this.previewOnly || !this.localAdmitted && !this.admissionDenied) && data.nonce === this.previewNonce &&
                  validRoomPreview(data.preview) && typeof data.signature === 'string' &&
                  await this.chatAuth.verifyControl('room-preview', [data.nonce, data.preview], data.signature, key)) {
         let member = this.authority?.isPeerHost(meta.peerId) || this.isPeerAdmin(meta.peerId) || this.isAdmittedPeer(meta.peerId);
@@ -1205,6 +1208,16 @@ export class GroupRoomManager {
           this.admittedPeers.set(meta.peerId, key);
           this.shortLookupReady = true;
           this.callbacks?.onPreview?.(data.preview, meta.peerId);
+          if (!this.previewOnly && !this.localAdmitted) {
+            // Signed preview rosters aid rendezvous only; every edge still needs identity and admission.
+            for (const person of data.preview.participants) {
+              if (person.id === selfId || !person.id || person.id.length > 80 ||
+                  this.peerTracker.isVerified(person.id) || this.peerTracker.getPendingRumors().includes(person.id) ||
+                  !this.canTrackRumor(person.id)) continue;
+              this.peerTracker.receivePeerExchange(person.id, false, person.name);
+              if (this.signalingTopic) void signalingManager.reannounce(this.signalingTopic, person.id).catch(() => {});
+            }
+          }
         }
       }
     };
@@ -1347,6 +1360,7 @@ export class GroupRoomManager {
         }
       } else if (data.kind === 'denied' &&
                  (this.authority.isPeerHost(meta.peerId) || this.isPeerAdmin(meta.peerId))) {
+        this.admissionDenied = true;
         this.callbacks?.onStatusChange('Senha incorreta para esta sala');
       }
     };
@@ -2106,13 +2120,23 @@ export class GroupRoomManager {
       const hasNoDirectPeers = this.peerTracker.directConnectedPeers.size === 0;
       const rumors = this.peerTracker.getPendingRumors();
       const now = Date.now();
+      const pendingAdmission = Boolean(this.authority && !this.previewOnly && !this.localAdmitted && !this.admissionDenied);
+      if (pendingAdmission && now - this.lastAdmissionRetry >= 4000) {
+        this.lastAdmissionRetry = now;
+        this.requestPreview();
+        for (const peerId of this.peerTracker.directConnectedPeers) {
+          if (this.chatAuth?.getKnownKey(peerId) && (this.authority?.isPeerHost(peerId) || this.isPeerAdmin(peerId))) {
+            void this.requestAdmission(peerId).catch(error => console.warn('[Rooms] Admission retry failed:', error));
+          }
+        }
+      }
       if (this.authority && now - this.lastAuthoritySummary >= 20_000) {
         this.lastAuthoritySummary = now;
         void this.sendAuthoritySummary().catch((error) =>
           console.warn('[Rooms] Authority reconciliation failed:', error));
       }
       if (
-        (hasNoDirectPeers || rumors.length > 0) &&
+        (hasNoDirectPeers || pendingAdmission || rumors.length > 0) &&
         this.signalingTopic &&
         now - this.lastRumorReannounceTime > 2500
       ) {

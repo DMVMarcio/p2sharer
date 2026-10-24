@@ -12,7 +12,7 @@ import { isShortRoomCode } from '../../core/room_invite';
 import { savedRooms } from '../../core/saved_rooms';
 import { extractRoomInvite } from '../../core/room_deep_links';
 import { extractWebRoomCode } from '../../core/web_room_links';
-import type { RoomPreview } from '../../core/room_preview';
+import { stabilizeRoomPreview, type RoomPreview } from '../../core/room_preview';
 import { GroupRoomManager } from '../../p2p/group_room';
 import { stateStore } from '../../core/state_store';
 import { roomService } from '../../services/room_service';
@@ -106,7 +106,8 @@ export function JoinRoomModal() {
             roomService.pendingJoinInvite = verifiedInvite;
             setCanEnter(true);
           }
-          setPreview(summary); setRequiresPassword(summary.protected); setPhase('preview');
+          setPreview(previous => stabilizeRoomPreview(previous, summary));
+          setRequiresPassword(summary.protected); setPhase('preview');
         },
         onStreamsUpdate: () => {}, onSlotsUpdate: () => {}, onChat: () => {},
         onChatHistory: () => {}, onPeersUpdate: () => {},

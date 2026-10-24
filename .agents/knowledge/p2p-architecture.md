@@ -114,6 +114,14 @@ timeout. This is distinct from signed admission: room content remains gated,
 and a later password rejection resumes the join dialog. A confirmed occupied
 room or a password retry still waits for admission before dismissing the dialog.
 
+While admission is pending, the manager repeats preview and host/admin admission
+requests every four seconds and continues broker re-announcement even when a
+direct edge already exists. Late signed previews may seed bounded unverified
+rendezvous hints; they never authorize room content. Explicit password denial
+pauses entry retries until another join attempt. Successful admission retires them.
+The preview dialog retains existing participant ID order across respondents while
+applying current names, thumbnails, arrivals and removals.
+
 Preview rosters exclude the requester and require admitted direct peers with
 announced names and live transport edges. A failed handshake with an individual
 peer remains a diagnostic while the admission attempt and signaling retries
