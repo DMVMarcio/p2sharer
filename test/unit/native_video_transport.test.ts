@@ -36,6 +36,28 @@ test('stopping a local source never closes a remote source with the same media I
   native.stop('screen','peer');assert.equal(internal.incoming.size,0);assert.equal(closedRemote,1);native.close();
 });
 
+test('failed native sender route blocks redispatch until explicitly cleared, even across stops', () => {
+  const native = new NativeVideoTransport({ rtc: () => ({}), send: () => {}, permitted: () => true, receive: () => {}, fallback: () => {} });
+  const internal = native as any;
+  const track = { id: 'track', readyState: 'live', kind: 'video' } as MediaStreamTrack;
+  registerNativeSenderSource(track, { sessionId: 'capture', feedbackToken: 'token' });
+  const stream = { getVideoTracks: () => [track] } as unknown as MediaStream;
+  const descriptor = { id: 'screen', kind: 'screen' as const, label: 'Screen', videoTrackId: 'track', fps: 60, bitrate: 15000 };
+  const route = { id: 'route', peer: 'peer', descriptor, source: { sessionId: 'capture', feedbackToken: 'token' }, offered: false, timer: setTimeout(() => {}, 1000) };
+  internal.outgoing.set('peer/screen', route);
+  internal.fail(route);
+  assert.equal(native.isBlocked('peer', 'screen'), true);
+  assert.equal(native.dispatch('peer', stream, descriptor), false);
+
+  native.stop('screen', 'peer');
+  assert.equal(native.isBlocked('peer', 'screen'), true, 'Stopping a route must not wipe the failure block');
+  assert.equal(native.dispatch('peer', stream, descriptor), false);
+
+  native.clearBlocked('screen', 'peer');
+  assert.equal(native.isBlocked('peer', 'screen'), false);
+  native.close();
+});
+
 function receiverFixture(context: any) {
   let now = 0;
   context.mock.method(performance, 'now', () => now);

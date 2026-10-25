@@ -137,6 +137,10 @@ export class NativeVideoTransport {
     }
     if (signal.kind === 'offer') {
       if (!signal.descriptor || !this.config.permitted(peer, signal.descriptor) || this.incoming.size >= 128) return;
+      if (this.blocked.has(key)) {
+        this.send(peer, { id: signal.id, mediaId: signal.mediaId, kind: 'reject', reason: 'already_blocked' });
+        return;
+      }
       const old = this.incoming.get(key);
       if (old?.id === signal.id) {
         const answer = old.pc.localDescription;
@@ -235,6 +239,7 @@ export class NativeVideoTransport {
   }
   private reject(r: Incoming, reason = 'receiver_failed', error?: unknown): void {
     if (this.incoming.get(this.key(r.peer,r.descriptor.id)) !== r) return;
+    this.blocked.add(this.key(r.peer, r.descriptor.id));
     logDiagnostic('WARN', 'transmission.native', 'Rejecting native video; requesting browser WebRTC fallback', {
       routeId: r.id, mediaId: r.descriptor.id, reason, error, connectionState: r.pc.connectionState,
       iceState: r.pc.iceConnectionState, videoStats: r.videoStats, elapsedMs: Math.round(performance.now() - r.started) });
@@ -273,6 +278,14 @@ export class NativeVideoTransport {
   }
   public sending(peer: string, mediaId: string): boolean { return this.outgoing.get(this.key(peer, mediaId))?.ready === true; }
   public receiving(peer: string, mediaId: string): boolean { return this.incoming.get(this.key(peer, mediaId))?.verifiedFrames === true; }
+  public isBlocked(peer: string, mediaId: string): boolean { return this.blocked.has(this.key(peer, mediaId)); }
+  public clearBlocked(mediaId?: string, peer?: string): void {
+    for (const key of this.blocked) {
+      if ((!peer || key.startsWith(`${peer}/`)) && (!mediaId || key.endsWith(`/${mediaId}`))) {
+        this.blocked.delete(key);
+      }
+    }
+  }
   public update(mediaId: string, bitrate: number): void {
     for (const r of this.outgoing.values()) if (r.descriptor.id === mediaId) {
       r.descriptor = {...r.descriptor, bitrate};
@@ -282,9 +295,8 @@ export class NativeVideoTransport {
   public stop(mediaId?: string, peer?: string): void {
     for (const r of this.outgoing.values()) if ((!mediaId || r.descriptor.id === mediaId) && (!peer || r.peer === peer)) this.closeOutgoing(r, true);
     for (const r of this.incoming.values()) if (!(!peer && mediaId) && (!mediaId || r.descriptor.id === mediaId) && (!peer || r.peer === peer)) this.closeIncoming(r);
-    for (const key of this.blocked) if ((!peer || key.startsWith(`${peer}/`)) && (!mediaId || key.endsWith(`/${mediaId}`))) this.blocked.delete(key);
   }
-  public close(): void { this.stop(); this.closed=true; this.unlisten?.(); }
+  public close(): void { this.stop(); this.blocked.clear(); this.closed=true; this.unlisten?.(); }
   public receiver(peer: string, mediaId: string): RTCPeerConnection | undefined {
     const route = this.incoming.get(this.key(peer, mediaId));
     return route?.verifiedFrames ? route.pc : undefined;

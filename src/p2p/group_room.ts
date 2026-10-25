@@ -1876,7 +1876,7 @@ export class GroupRoomManager {
         const entry = this.localMedia.get(mediaId);
         if (entry && this.room === boundRoom) {
           logDiagnostic('INFO', 'transmission.fallback', 'Publishing browser video after native route failure', { mediaId });
-          this.dispatchMediaToPeer(peerId, true, mediaId);
+          this.dispatchBrowserMediaToPeer(peerId, entry);
         }
       },
     });
@@ -2267,6 +2267,7 @@ export class GroupRoomManager {
     this.cleanupStreamWatchers(peerId, '');
     this.remoteWatchRevisions.delete(peerId);
     this.nativeVideo?.stop(undefined, peerId);
+    this.nativeVideo?.clearBlocked(undefined, peerId);
     this.pendingChallenges.delete(peerId);
     this.fileBulk.close(peerId);
     this.payloadChannels.close(peerId); this.binaryPeers.delete(peerId);
@@ -2516,6 +2517,37 @@ export class GroupRoomManager {
     }
   }
 
+  private dispatchBrowserMediaToPeer(peerId: string, entry: { descriptor: StreamDescriptor; stream: MediaStream }): void {
+    const room = this.room;
+    if (!room) return;
+    const peers = room.getPeers?.() || {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const peerObj: any = peers[peerId];
+    const pc: RTCPeerConnection = peerObj?.connection || peerObj?.pc || peerObj;
+
+    if (typeof room.addTrack === 'function') {
+      for (const track of entry.stream.getTracks()) {
+        for (const operation of room.addTrack(track, entry.stream, { target: peerId, metadata: entry.descriptor }) || []) {
+          void Promise.resolve(operation).catch(error => console.warn('[Media] Track dispatch failed:', error));
+        }
+      }
+    }
+    if (typeof room.addStream === 'function') {
+      for (const operation of room.addStream(entry.stream, { target: peerId, metadata: entry.descriptor }) || []) {
+        void Promise.resolve(operation).then(() => {
+          if (this.room !== room || this.localMedia.get(entry.descriptor.id) !== entry) {
+            room.removeStream?.(entry.stream, { target: peerId });
+          }
+        }).catch(error => console.warn('[Media] Stream dispatch failed:', error));
+      }
+    }
+    if (pc) {
+      this.applyMediaParameters(pc);
+      void MediaCoordinator.requestKeyFrame(pc);
+    }
+    this.publishMediaManifest(peerId);
+  }
+
   private dispatchMediaToPeer(peerId: string, recovery = false, mediaId?: string) {
     const room = this.room;
     if (!room) return;
@@ -2527,36 +2559,28 @@ export class GroupRoomManager {
     for (const entry of this.localMedia.values()) {
       if (mediaId !== undefined && entry.descriptor.id !== mediaId) continue;
       if (recovery && pc) void MediaCoordinator.requestKeyFrame(pc);
-      if (recovery) {
-        this.nativeVideo?.stop(entry.descriptor.id, peerId);
-        for (const track of entry.stream.getTracks()) {
-          try { room.removeTrack(track, { target: peerId }); } catch {}
-          const sender = pc?.getSenders?.().find(s => s.track === track);
-          if (sender) {
-            try { pc.removeTrack(sender); } catch {}
-          }
-        }
+      if (this.nativeVideo?.isBlocked?.(peerId, entry.descriptor.id)) {
+        this.dispatchBrowserMediaToPeer(peerId, entry);
+        continue;
       }
       if (this.nativeVideo?.dispatch(peerId, entry.stream, entry.descriptor)) {
         const nativeReady = this.nativeVideo.sending(peerId, entry.descriptor.id);
-        if (nativeReady) for (const video of entry.stream.getVideoTracks()) room.removeTrack(video, { target: peerId });
+        if (nativeReady && typeof room.removeTrack === 'function') {
+          for (const video of entry.stream.getVideoTracks()) room.removeTrack(video, { target: peerId });
+        }
         // Start on the established room connection while native ICE negotiates.
         // Per-track ownership lets the ready acknowledgement retire only video.
         const tracks = nativeReady ? entry.stream.getAudioTracks() : entry.stream.getTracks();
-        for (const track of tracks) {
-          for (const operation of room.addTrack(track, entry.stream, { target: peerId, metadata: entry.descriptor }) || []) {
-            void Promise.resolve(operation).catch(error => console.warn('[Media] Track dispatch failed:', error));
+        if (typeof room.addTrack === 'function') {
+          for (const track of tracks) {
+            for (const operation of room.addTrack(track, entry.stream, { target: peerId, metadata: entry.descriptor }) || []) {
+              void Promise.resolve(operation).catch(error => console.warn('[Media] Track dispatch failed:', error));
+            }
           }
         }
         continue;
       }
-      for (const operation of room.addStream(entry.stream, { target: peerId, metadata: entry.descriptor }) || []) {
-        void Promise.resolve(operation).then(() => {
-          if (this.room !== room || this.localMedia.get(entry.descriptor.id) !== entry) {
-            room.removeStream(entry.stream, { target: peerId });
-          }
-        }).catch(error => console.warn('[Media] Stream dispatch failed:', error));
-      }
+      this.dispatchBrowserMediaToPeer(peerId, entry);
     }
   }
 
