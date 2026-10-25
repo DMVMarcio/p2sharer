@@ -132,6 +132,7 @@ test('sub-process accordion toggling supports granular and parent all-or-nothing
         pid: 100,
         name: 'Discord.exe',
         window_title: 'Discord - #general',
+        is_likely_chat_or_voice: true,
         sub_processes: [
           { pid: 100, window_title: 'Discord - #general', has_audio: false },
           { pid: 101, window_title: null, has_audio: true },
@@ -190,6 +191,22 @@ test('sub-process accordion toggling supports granular and parent all-or-nothing
     assert.equal(filter.getProcessSelectionState(discord), 'all');
     assert.equal(filter.selectedNames.has('discord'), true);
     assert.deepEqual([...filter.selectedPids].sort((a, b) => a - b), [100, 101, 102, 200]);
+
+    // Partial to all via master switch logic: uncheck 101 then click master switch
+    await act(async () => filter.toggleSubProcess(discord, 101, false));
+    assert.equal(filter.getProcessSelectionState(discord), 'partial');
+    const masterSwitchNext = filter.getProcessSelectionState(discord) === 'partial' ? true : false;
+    await act(async () => filter.toggleProcess(discord, masterSwitchNext));
+    assert.equal(filter.getProcessSelectionState(discord), 'all');
+    assert.deepEqual([...filter.selectedPids].sort((a, b) => a - b), [100, 101, 102, 200]);
+
+    // Single process selection includes all subprocess pids
+    await act(async () => filter.selectSingleProcess(discord));
+    assert.deepEqual([...filter.selectedPids].sort((a, b) => a - b), [100, 101, 102]);
+
+    // Voice apps selection includes all subprocess pids
+    await act(async () => filter.selectVoiceApps());
+    assert.deepEqual([...filter.selectedPids].sort((a, b) => a - b), [100, 101, 102]);
 
     // Search by subprocess PID
     await act(async () => filter.setSearchText('101'));

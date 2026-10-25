@@ -87,7 +87,13 @@ export const AudioFilterModal = () => {
                 return <div key={`${process.pid}_${process.name}`} className="audio-filter-app-group">
                   <div
                     className={`settings-switch-row audio-filter-app ${selectionState !== 'none' ? 'selected' : ''}`}
-                    onClick={() => { if (hasMultiple) toggleExpand(appKey); }}
+                    onClick={() => {
+                      if (hasMultiple) {
+                        toggleExpand(appKey);
+                      } else {
+                        filter.toggleProcess(process, selectionState !== 'all');
+                      }
+                    }}
                     role={hasMultiple ? 'button' : undefined}
                     tabIndex={hasMultiple ? 0 : undefined}
                     aria-expanded={hasMultiple ? isExpanded : undefined}
@@ -132,7 +138,7 @@ export const AudioFilterModal = () => {
                         <span className="audio-filter-app-executable">{labels.executable}</span>
                       </div>
                     </div>
-                    <span className="modern-switch" onClick={(e) => e.stopPropagation()}>
+                    <label className="modern-switch" onClick={(e) => e.stopPropagation()}>
                       <input
                         ref={(el) => {
                           if (el) el.indeterminate = selectionState === 'partial';
@@ -143,11 +149,12 @@ export const AudioFilterModal = () => {
                         checked={selectionState === 'all'}
                         aria-label={t(choice === 'exclude' ? 'audio.muteApp' : 'audio.allowApp', { app: process.name })}
                         onChange={(event) => {
-                          filter.toggleProcess(process, event.target.checked);
+                          const nextChecked = selectionState === 'partial' ? true : event.target.checked;
+                          filter.toggleProcess(process, nextChecked);
                         }}
                       />
                       <span className="switch-slider" />
-                    </span>
+                    </label>
                   </div>
 
                   {isExpanded && (

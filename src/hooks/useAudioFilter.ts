@@ -269,15 +269,25 @@ export function useAudioFilter() {
   const selectSingleProcess = useCallback(
     (item: ProcessItem) => {
       const nameLower = audioProcessKey(item.name);
+      const targetPids = new Set<number>();
+      processes.forEach((p) => {
+        if (audioProcessKey(p.name) === nameLower) {
+          getPidsForProcess(p).forEach(pid => targetPids.add(pid));
+        }
+      });
+      if (targetPids.size === 0) {
+        getPidsForProcess(item).forEach(pid => targetPids.add(pid));
+      }
+
       if (selectedFilterMode === 'exclude') {
         setDraftExcludeNames(new Set([nameLower]));
-        setDraftExcludePids(new Set([item.pid]));
+        setDraftExcludePids(targetPids);
       } else {
         setDraftIncludeNames(new Set([nameLower]));
-        setDraftIncludePids(new Set([item.pid]));
+        setDraftIncludePids(targetPids);
       }
     },
-    [selectedFilterMode]
+    [selectedFilterMode, processes]
   );
 
   const clearSelection = useCallback(() => {
@@ -297,7 +307,7 @@ export function useAudioFilter() {
     processes.forEach((p) => {
       if (p.is_likely_chat_or_voice) {
         nextNames.add(audioProcessKey(p.name));
-        nextPids.add(p.pid);
+        getPidsForProcess(p).forEach(pid => nextPids.add(pid));
       }
     });
 
