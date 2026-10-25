@@ -413,6 +413,21 @@ export const VideoCard: React.FC<VideoCardProps> = ({
               autoPlay
               playsInline
               muted
+              onLoadedData={() => {
+                if (!slot.isLocal && videoElementRef.current && videoElementRef.current.readyState >= 2 && videoElementRef.current.videoWidth > 0) {
+                  setIsVideoReady(true);
+                }
+              }}
+              onPlaying={() => {
+                if (!slot.isLocal && videoElementRef.current && videoElementRef.current.videoWidth > 0) {
+                  setIsVideoReady(true);
+                }
+              }}
+              onTimeUpdate={() => {
+                if (!slot.isLocal && videoElementRef.current && videoElementRef.current.currentTime > 0 && videoElementRef.current.videoWidth > 0) {
+                  setIsVideoReady(true);
+                }
+              }}
               style={{
                 width: '100%',
                 height: '100%',

@@ -42,6 +42,15 @@ RTP statistics prove that frames decode; only the receiver's `ready` acknowledge
 retires the browser video sender. Failed native setup therefore cannot hold startup
 behind an ICE timeout. The temporary probe is released at handoff or teardown.
 
+`transmission.native.ice` records sender ICE/connection transitions, a bounded
+connected snapshot and a snapshot before native teardown destroys the checklist.
+Snapshots allowlist candidate type/network/family and pair nomination, STUN
+request/response counters, bytes and RTT, without addresses, ports, candidate IDs,
+server URLs or credentials. Collection has a 750 ms deadline, runs outside the
+route registry lock and never polls the frame loop. Receiver logs reuse the shared
+ICE/SDP summarizers and cache the existing startup stats sample, including its age,
+for route retirement. Route IDs correlate sender and receiver across clock skew.
+
 Audio retains the original Trystero connection and its filters. Its per-track
 metadata callback and native video callback merge tracks into the same advertised
 media slot. Stopping the audio-bearing screen transfers audio to the surviving

@@ -2,67 +2,67 @@
   "version": "1.6.0",
   "translations": {
     "en": [
-      "**Screen sharing starts without waiting for native video negotiation** and reconnects more reliably after leaving and rejoining a room. Recovery repairs missing video senders and protects new sessions from delayed cleanup.",
+      "**Screen sharing starts without waiting for native video negotiation** and reconnects more reliably after leaving and rejoining a room. Recovery repairs missing video senders and protects new sessions from delayed cleanup. Connection logs provide clearer evidence when screen sharing fails to connect or display video.",
       "**Tunnels show live upload and download speeds** with compact units and precise decimals. Hosts can inspect totals and traffic per participant, alongside the existing P2P connection latency.",
       "Screen sharing avoids invalid network adapter addresses and keeps transmission statistics stable during startup and shutdown. Audio can recover from suspended playback on the sender and viewer without restarting the app."
     ],
     "pt-BR": [
-      "A **transmissão de tela começa sem esperar a negociação do vídeo nativo** e se reconecta com mais confiabilidade após sair e reentrar na sala. A recuperação restaura envios de vídeo ausentes e protege novas sessões contra limpezas atrasadas.",
+      "A **transmissão de tela começa sem esperar a negociação do vídeo nativo** e se reconecta com mais confiabilidade após sair e reentrar na sala. A recuperação restaura envios de vídeo ausentes e protege novas sessões contra limpezas atrasadas. Os logs de conexão oferecem informações mais claras quando a transmissão não conecta ou não exibe vídeo.",
       "Os **túneis mostram as velocidades atuais de upload e download**, com unidades compactas e casas decimais. Quem hospeda pode consultar os totais e o tráfego por participante, além da latência da conexão P2P já existente.",
       "A transmissão de tela evita endereços inválidos de adaptadores de rede e mantém as estatísticas estáveis ao iniciar e encerrar transmissões. O áudio pode se recuperar de bloqueios de reprodução no transmissor e no espectador sem reiniciar o app."
     ],
     "es": [
-      "La **transmisión de pantalla comienza sin esperar la negociación del vídeo nativo** y se reconecta con más fiabilidad al salir y volver a una sala. La recuperación restablece el envío de vídeo y protege las sesiones nuevas frente a limpiezas tardías.",
+      "La **transmisión de pantalla comienza sin esperar la negociación del vídeo nativo** y se reconecta con más fiabilidad al salir y volver a una sala. La recuperación restablece el envío de vídeo y protege las sesiones nuevas frente a limpiezas tardías. Los registros de conexión ofrecen información más clara cuando la transmisión no conecta o no muestra vídeo.",
       "Los **túneles muestran velocidades actuales de subida y descarga**, con unidades compactas y decimales precisos. El anfitrión puede consultar los totales y el tráfico por participante, junto con la latencia de la conexión P2P existente.",
       "La transmisión de pantalla evita direcciones inválidas de adaptadores de red y mantiene las estadísticas estables al iniciar y finalizar las transmisiones. El audio puede recuperarse de bloqueos de reproducción en el emisor y el espectador sin reiniciar la app."
     ],
     "fr": [
-      "Le **partage d’écran démarre sans attendre la négociation de la vidéo native** et se reconnecte plus sûrement après avoir quitté puis rejoint une salle. La récupération rétablit les envois vidéo manquants et protège les nouvelles sessions des nettoyages tardifs.",
+      "Le **partage d’écran démarre sans attendre la négociation de la vidéo native** et se reconnecte plus sûrement après avoir quitté puis rejoint une salle. La récupération rétablit les envois vidéo manquants et protège les nouvelles sessions des nettoyages tardifs. Les journaux de connexion donnent des indications plus claires lorsque le partage d’écran ne se connecte pas ou n’affiche pas de vidéo.",
       "Les **tunnels affichent les débits actuels d’envoi et de réception**, avec des unités compactes et des décimales précises. L’hôte peut consulter les totaux et le trafic par participant, ainsi que la latence de la connexion P2P existante.",
       "Le partage d’écran évite les adresses réseau invalides et stabilise les statistiques au démarrage et à l’arrêt des diffusions. Le son peut reprendre après un blocage de lecture chez l’émetteur comme chez le spectateur, sans redémarrer l’app."
     ],
     "de": [
-      "Die **Bildschirmübertragung startet ohne auf die Aushandlung des nativen Videos zu warten** und verbindet sich nach erneutem Betreten eines Raums zuverlässiger. Die Wiederherstellung setzt fehlende Videoübertragungen fort und schützt neue Sitzungen vor verspäteten Aufräumvorgängen.",
+      "Die **Bildschirmübertragung startet ohne auf die Aushandlung des nativen Videos zu warten** und verbindet sich nach erneutem Betreten eines Raums zuverlässiger. Die Wiederherstellung setzt fehlende Videoübertragungen fort und schützt neue Sitzungen vor verspäteten Aufräumvorgängen. Verbindungsprotokolle liefern klarere Hinweise, wenn die Bildschirmübertragung keine Verbindung aufbaut oder kein Bild zeigt.",
       "**Tunnel zeigen aktuelle Upload- und Downloadraten** mit kompakten Einheiten und präzisen Dezimalstellen. Hosts können Summen und Datenverkehr pro Teilnehmer sowie die Latenz der bestehenden P2P-Verbindung einsehen.",
       "Die **Bildschirmübertragung wurde stabilisiert**. Ungültige Netzwerkadapter-Adressen werden vermieden und Statistiken bleiben beim Starten und Beenden stabil. Der Ton kann sich beim Sender und Zuschauer von Wiedergabesperren erholen, ohne die App neu zu starten."
     ],
     "it": [
-      "La **condivisione schermo inizia senza attendere la negoziazione del video nativo** e si riconnette in modo più affidabile quando si rientra in una stanza. Il recupero ripristina gli invii video mancanti e protegge le nuove sessioni dalle pulizie ritardate.",
+      "La **condivisione schermo inizia senza attendere la negoziazione del video nativo** e si riconnette in modo più affidabile quando si rientra in una stanza. Il recupero ripristina gli invii video mancanti e protegge le nuove sessioni dalle pulizie ritardate. I registri di connessione forniscono informazioni più chiare quando la condivisione schermo non si connette o non mostra il video.",
       "I **tunnel mostrano le velocità attuali di invio e download**, con unità compatte e decimali precisi. Chi ospita può consultare totali e traffico per partecipante, insieme alla latenza della connessione P2P esistente.",
       "La condivisione schermo evita indirizzi non validi delle schede di rete e mantiene stabili le statistiche all’avvio e alla chiusura delle trasmissioni. L’audio può riprendersi dai blocchi di riproduzione sul trasmettitore e sullo spettatore senza riavviare l’app."
     ],
     "zh-CN": [
-      "**屏幕共享无需等待原生视频协商即可开始**，退出并重新加入房间后能更可靠地重新连接。恢复机制会重新建立缺失的视频发送，并防止延迟清理影响新会话。",
+      "**屏幕共享无需等待原生视频协商即可开始**，退出并重新加入房间后能更可靠地重新连接。恢复机制会重新建立缺失的视频发送，并防止延迟清理影响新会话。 连接日志可在屏幕共享无法连接或显示视频时提供更清晰的诊断信息。",
       "**隧道显示实时上传和下载速度**，使用紧凑单位并保留小数精度。主机可查看总量和每位参与者的流量，以及现有 P2P 连接的延迟。",
       "屏幕共享避开无效的网络适配器地址，并在开始和结束直播时保持统计信息稳定。发送端和观看端的音频可从播放暂停中恢复，无需重启应用。"
     ],
     "zh-TW": [
-      "**螢幕共享無需等待原生視訊協商即可開始**，離開並重新加入房間後能更可靠地重新連線。復原機制會重新建立缺失的視訊傳送，並防止延遲清理影響新工作階段。",
+      "**螢幕共享無需等待原生視訊協商即可開始**，離開並重新加入房間後能更可靠地重新連線。復原機制會重新建立缺失的視訊傳送，並防止延遲清理影響新工作階段。 連線紀錄可在螢幕共享無法連線或顯示視訊時提供更清楚的診斷資訊。",
       "**通道顯示即時上傳和下載速度**，使用精簡單位並保留小數精度。主機可查看總量和每位參與者的流量，以及現有 P2P 連線的延遲。",
       "螢幕共享避開無效的網路介面卡位址，並在開始和結束串流時保持統計資訊穩定。傳送端和觀看端的音訊可從播放暫停中恢復，無需重新啟動應用程式。"
     ],
     "ja": [
-      "**ネイティブ映像の接続交渉を待たずに画面共有を開始**し、ルームへの再参加後も安定して再接続します。復旧処理は停止した映像送信を再開し、遅れて実行される後処理から新しいセッションを保護します。",
+      "**ネイティブ映像の接続交渉を待たずに画面共有を開始**し、ルームへの再参加後も安定して再接続します。復旧処理は停止した映像送信を再開し、遅れて実行される後処理から新しいセッションを保護します。 画面共有が接続できない場合や映像が表示されない場合に、接続ログからより詳しい情報を確認できます。",
       "**トンネルに現在のアップロードとダウンロード速度を表示**し、見やすい単位と小数で精度を保ちます。ホストは合計と参加者ごとの通信量、および既存のP2P接続の遅延を確認できます。",
       "**画面共有が安定しました**。無効なネットワークアダプターのアドレスを避け、配信開始・終了時の統計表示も安定します。送信側と視聴側の音声再生が停止しても、アプリを再起動せずに復旧できるようになりました。"
     ],
     "ko": [
-      "**네이티브 비디오 협상을 기다리지 않고 화면 공유를 시작**하며 방에 다시 들어온 뒤 더 안정적으로 재연결합니다. 복구 과정은 누락된 비디오 송신을 복원하고 지연된 정리 작업으로부터 새 세션을 보호합니다.",
+      "**네이티브 비디오 협상을 기다리지 않고 화면 공유를 시작**하며 방에 다시 들어온 뒤 더 안정적으로 재연결합니다. 복구 과정은 누락된 비디오 송신을 복원하고 지연된 정리 작업으로부터 새 세션을 보호합니다. 화면 공유가 연결되지 않거나 비디오가 표시되지 않을 때 연결 기록에서 더 명확한 진단 정보를 확인할 수 있습니다.",
       "**터널에 실시간 업로드 및 다운로드 속도가 표시**되며 간결한 단위와 소수점으로 정밀도를 유지합니다. 호스트는 총 전송량과 참여자별 트래픽, 기존 P2P 연결의 지연 시간을 확인할 수 있습니다.",
       "**화면 공유가 더 안정적으로 작동**합니다. 잘못된 네트워크 어댑터 주소를 피하고 방송 시작 및 종료 시 통계를 안정적으로 유지합니다. 송신자와 시청자 모두 앱을 다시 시작하지 않고 오디오 재생 차단에서 복구할 수 있습니다."
     ],
     "hi": [
-      "**मूल वीडियो की कनेक्शन वार्ता की प्रतीक्षा किए बिना स्क्रीन शेयरिंग शुरू होती है** और कमरे में दोबारा जुड़ने पर अधिक भरोसेमंद ढंग से कनेक्ट होती है। बहाली रुका हुआ वीडियो भेजना फिर शुरू करती है और नए सत्रों को देर से होने वाली सफ़ाई से बचाती है।",
+      "**मूल वीडियो की कनेक्शन वार्ता की प्रतीक्षा किए बिना स्क्रीन शेयरिंग शुरू होती है** और कमरे में दोबारा जुड़ने पर अधिक भरोसेमंद ढंग से कनेक्ट होती है। बहाली रुका हुआ वीडियो भेजना फिर शुरू करती है और नए सत्रों को देर से होने वाली सफ़ाई से बचाती है। स्क्रीन शेयरिंग कनेक्ट न होने या वीडियो न दिखने पर कनेक्शन लॉग अधिक स्पष्ट जानकारी देते हैं।",
       "**टनल अब वर्तमान अपलोड और डाउनलोड गति दिखाती हैं**, संक्षिप्त इकाइयों और सटीक दशमलव के साथ। होस्ट कुल और प्रत्येक प्रतिभागी का ट्रैफ़िक तथा मौजूदा P2P कनेक्शन का विलंब देख सकते हैं।",
       "**स्क्रीन शेयरिंग अब अधिक स्थिर है**, अमान्य नेटवर्क एडाप्टर पतों से बचती है और प्रसारण शुरू व बंद करते समय आँकड़े स्थिर रखती है। ऐप को पुनः शुरू किए बिना प्रेषक और दर्शक दोनों पर रुका हुआ ऑडियो फिर से चल सकता है।"
     ],
     "fi": [
-      "**Näytönjako käynnistyy odottamatta natiivivideon yhteysneuvottelua** ja yhdistyy luotettavammin huoneeseen palaamisen jälkeen. Palautus käynnistää puuttuvat videolähetykset ja suojaa uusia istuntoja viivästyneeltä siivoukselta.",
+      "**Näytönjako käynnistyy odottamatta natiivivideon yhteysneuvottelua** ja yhdistyy luotettavammin huoneeseen palaamisen jälkeen. Palautus käynnistää puuttuvat videolähetykset ja suojaa uusia istuntoja viivästyneeltä siivoukselta. Yhteyslokit antavat selkeämpiä tietoja, jos näytönjako ei yhdisty tai näytä videota.",
       "**Tunnelit näyttävät nykyiset lähetys- ja latausnopeudet** tiiviillä yksiköillä ja tarkoilla desimaaleilla. Isäntä voi tarkastella kokonaismääriä ja osallistujakohtaista liikennettä sekä nykyisen P2P-yhteyden viivettä.",
       "Näytönjako välttää virheellisiä verkkosovittimien osoitteita ja pitää tilastot vakaina lähetyksen alkaessa ja päättyessä. Ääni voi palautua lähettäjän ja katsojan toistoestoista ilman sovelluksen uudelleenkäynnistystä."
     ],
     "ru": [
-      "**Демонстрация экрана запускается без ожидания согласования нативного видео** и надёжнее подключается после повторного входа в комнату. Восстановление возобновляет отсутствующую отправку видео и защищает новые сеансы от запоздалой очистки.",
+      "**Демонстрация экрана запускается без ожидания согласования нативного видео** и надёжнее подключается после повторного входа в комнату. Восстановление возобновляет отсутствующую отправку видео и защищает новые сеансы от запоздалой очистки. Журналы соединения дают более понятную информацию, когда демонстрация экрана не подключается или не показывает видео.",
       "**Туннели показывают текущую скорость отправки и загрузки** с компактными единицами и точными десятичными значениями. Хост может просматривать общие объёмы и трафик каждого участника, а также задержку существующего P2P-соединения.",
       "Демонстрация экрана избегает недействительных адресов сетевых адаптеров и сохраняет стабильность статистики при запуске и остановке трансляций. Звук может восстанавливаться после блокировки воспроизведения у отправителя и зрителя без перезапуска приложения."
     ]

@@ -47,16 +47,15 @@ export function observeRemoteVideoStartup(element: HTMLVideoElement, options: {
   }, 1500);
   if (typeof element.requestVideoFrameCallback === 'function') {
     frame = element.requestVideoFrameCallback(ready);
-  } else {
-    element.addEventListener('loadeddata', check);
-    element.addEventListener('timeupdate', check);
-    check();
   }
+  element.addEventListener('loadeddata', check);
+  element.addEventListener('timeupdate', check);
+  check();
   play();
   return () => {
     disposed = true;
     clearInterval(timer);
-    if (frame !== undefined) element.cancelVideoFrameCallback(frame);
+    if (frame !== undefined && typeof element.cancelVideoFrameCallback === 'function') element.cancelVideoFrameCallback(frame);
     element.removeEventListener('loadeddata', check);
     element.removeEventListener('timeupdate', check);
   };

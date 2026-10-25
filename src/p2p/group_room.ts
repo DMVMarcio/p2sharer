@@ -1876,7 +1876,7 @@ export class GroupRoomManager {
         const entry = this.localMedia.get(mediaId);
         if (entry && this.room === boundRoom) {
           logDiagnostic('INFO', 'transmission.fallback', 'Publishing browser video after native route failure', { mediaId });
-          this.dispatchMediaToPeer(peerId, false, mediaId);
+          this.dispatchMediaToPeer(peerId, true, mediaId);
         }
       },
     });
@@ -2056,8 +2056,12 @@ export class GroupRoomManager {
         const media = this.remoteMedia.get(peerId) || new Map<string, MediaStream>();
         const existing = media.get(metadata.id);
         if (existing) {
-          const video = stream.getVideoTracks().length ? stream.getVideoTracks() : existing.getVideoTracks();
-          const audio = stream.getAudioTracks().length ? stream.getAudioTracks() : existing.getAudioTracks();
+          const liveVideo = stream.getVideoTracks().filter(t => t.readyState === 'live');
+          const liveAudio = stream.getAudioTracks().filter(t => t.readyState === 'live');
+          const existingLiveVideo = existing.getVideoTracks().filter(t => t.readyState === 'live');
+          const existingLiveAudio = existing.getAudioTracks().filter(t => t.readyState === 'live');
+          const video = liveVideo.length ? liveVideo : existingLiveVideo;
+          const audio = liveAudio.length ? liveAudio : existingLiveAudio;
           const incoming = stream;
           const tracks = [...video, ...audio];
           const current = existing.getTracks();
@@ -2523,6 +2527,16 @@ export class GroupRoomManager {
     for (const entry of this.localMedia.values()) {
       if (mediaId !== undefined && entry.descriptor.id !== mediaId) continue;
       if (recovery && pc) void MediaCoordinator.requestKeyFrame(pc);
+      if (recovery) {
+        this.nativeVideo?.stop(entry.descriptor.id, peerId);
+        for (const track of entry.stream.getTracks()) {
+          try { room.removeTrack(track, { target: peerId }); } catch {}
+          const sender = pc?.getSenders?.().find(s => s.track === track);
+          if (sender) {
+            try { pc.removeTrack(sender); } catch {}
+          }
+        }
+      }
       if (this.nativeVideo?.dispatch(peerId, entry.stream, entry.descriptor)) {
         const nativeReady = this.nativeVideo.sending(peerId, entry.descriptor.id);
         if (nativeReady) for (const video of entry.stream.getVideoTracks()) room.removeTrack(video, { target: peerId });
@@ -3786,6 +3800,7 @@ export class GroupRoomManager {
 
     this.peerTracker.clear();
     this.localWatching.clear();
+    this.observedRemoteStreams = new WeakSet<MediaStream>();
     this.remoteWatchRevisions.clear();
     this.remoteStreams.clear();
     this.remoteMedia.clear();

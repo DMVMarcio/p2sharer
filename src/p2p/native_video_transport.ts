@@ -4,6 +4,7 @@ import { validStreamDescriptors, type StreamDescriptor } from '../core/media_str
 import { nativeSenderSource, type NativeSenderSource } from '../video/native_sender_source.ts';
 import { MediaCoordinator } from './media_coordinator.ts';
 import { logDiagnostic } from '../core/logger.ts';
+import { summarizeIceDescription, summarizeIceStats } from './ice_config.ts';
 
 const SETUP_TIMEOUT_MS = 15_000;
 const FIRST_VIDEO_TIMEOUT_MS = 3_500;
@@ -18,6 +19,7 @@ interface Incoming { id: string; peer: string; descriptor: StreamDescriptor; pc:
   timer: ReturnType<typeof setInterval>; remoteReady: boolean; candidates: RTCIceCandidateInit[]; started: number; connectedAt?: number;
   verifiedFrames?: boolean;
   stream?: MediaStream; probe?: HTMLVideoElement;
+  iceSummary?: ReturnType<typeof summarizeIceStats>; sampledAt?: number;
   videoStats?: { bytesReceived: number; framesReceived: number; framesDecoded: number; keyFramesDecoded: number } }
 interface TransportConfig {
   rtc: () => RTCConfiguration;
@@ -72,12 +74,18 @@ export class NativeVideoTransport {
     await this.ensureListener();
     if (!this.current(route)) return;
     const rtc = this.config.rtc();
+    logDiagnostic('INFO', 'transmission.native.ice', 'Creating native sender offer', {
+      routeId: route.id, mediaId: route.descriptor.id, relayOnly: rtc.iceTransportPolicy === 'relay',
+      serverCount: rtc.iceServers?.length ?? 0, elapsedMs: Math.round(performance.now() - route.started) });
     const sdp = await invoke<string>('create_native_video_offer', { id: route.id, ...route.source,
       streamId: route.descriptor.id, trackId: route.track.id, bitrate: Math.round(route.descriptor.bitrate * 1000),
       iceServers: (rtc.iceServers ?? []).map(s => ({ urls: Array.isArray(s.urls) ? s.urls : [s.urls],
         username: s.username ?? '', credential: s.credential ?? '' })), relayOnly: rtc.iceTransportPolicy === 'relay' });
     if (!this.current(route)) { await this.closeNative(route); return; }
     route.offer = { id: route.id, mediaId: route.descriptor.id, kind: 'offer', descriptor: route.descriptor, sdp };
+    logDiagnostic('INFO', 'transmission.native.ice', 'Native sender offer created', {
+      routeId: route.id, elapsedMs: Math.round(performance.now() - route.started),
+      description: summarizeIceDescription({ type: 'offer', sdp } as RTCSessionDescription) });
     this.sendOffer(route);
   }
   private sendOffer(route: Outgoing): void {
@@ -172,6 +180,9 @@ export class NativeVideoTransport {
         incoming.remoteReady = true;
         for (const candidate of incoming.candidates.splice(0)) await pc.addIceCandidate(candidate);
         const answer = await pc.createAnswer(); await pc.setLocalDescription(answer);
+        logDiagnostic('INFO', 'transmission.native.ice', 'Native receiver answer created', {
+          routeId: incoming.id, mediaId: signal.mediaId, elapsedMs: Math.round(performance.now() - incoming.started),
+          remote: summarizeIceDescription(pc.remoteDescription), local: summarizeIceDescription(pc.localDescription) });
         if (this.incoming.get(key) === incoming) this.send(peer,{ id: incoming.id, mediaId: signal.mediaId, kind:'answer',sdp:answer.sdp });
       } catch (error) { this.reject(incoming, 'receiver_setup_failed', error); }
       return;
@@ -198,6 +209,10 @@ export class NativeVideoTransport {
     if (r.pc.connectionState === 'connected') r.connectedAt ??= performance.now();
     const stats = await r.pc.getStats().catch(() => undefined);
     if (this.incoming.get(this.key(r.peer,r.descriptor.id)) !== r || r.verifiedFrames) return;
+    if (stats) {
+      r.iceSummary = summarizeIceStats(stats);
+      r.sampledAt = performance.now();
+    }
     const video = stats && [...stats.values()].find(s => s.type === 'inbound-rtp' && s.kind === 'video');
     if (video) r.videoStats = { bytesReceived: video.bytesReceived ?? 0, framesReceived: video.framesReceived ?? 0,
       framesDecoded: video.framesDecoded ?? 0, keyFramesDecoded: video.keyFramesDecoded ?? 0 };
@@ -243,6 +258,13 @@ export class NativeVideoTransport {
     void this.closeNative(r);
   }
   private closeIncoming(r: Incoming): void {
+    logDiagnostic('INFO', 'transmission.native.ice', 'Native receiver route retired', {
+      routeId: r.id, mediaId: r.descriptor.id, elapsedMs: Math.round(performance.now() - r.started),
+      connection: r.pc.connectionState, ice: r.pc.iceConnectionState, gathering: r.pc.iceGatheringState,
+      decoded: r.verifiedFrames === true, video: r.videoStats,
+      sampleAgeMs: r.sampledAt === undefined ? null : Math.round(performance.now() - r.sampledAt),
+      routes: r.iceSummary ?? { status: 'not_sampled' },
+    });
     this.incoming.delete(this.key(r.peer,r.descriptor.id)); clearInterval(r.timer); this.releaseProbe(r); r.pc.close();
   }
   private releaseProbe(r: Incoming): void {
@@ -258,9 +280,9 @@ export class NativeVideoTransport {
     }
   }
   public stop(mediaId?: string, peer?: string): void {
-    for (const r of this.outgoing.values()) if (!(mediaId && peer) && (!mediaId || r.descriptor.id===mediaId) && (!peer || r.peer===peer)) this.closeOutgoing(r,true);
-    for (const r of this.incoming.values()) if (!(mediaId && !peer) && (!mediaId || r.descriptor.id===mediaId) && (!peer || r.peer===peer)) this.closeIncoming(r);
-    for (const key of this.blocked) if (!(mediaId && peer) && (!peer || key.startsWith(`${peer}/`)) && (!mediaId || key.endsWith(`/${mediaId}`))) this.blocked.delete(key);
+    for (const r of this.outgoing.values()) if ((!mediaId || r.descriptor.id === mediaId) && (!peer || r.peer === peer)) this.closeOutgoing(r, true);
+    for (const r of this.incoming.values()) if (!(!peer && mediaId) && (!mediaId || r.descriptor.id === mediaId) && (!peer || r.peer === peer)) this.closeIncoming(r);
+    for (const key of this.blocked) if ((!peer || key.startsWith(`${peer}/`)) && (!mediaId || key.endsWith(`/${mediaId}`))) this.blocked.delete(key);
   }
   public close(): void { this.stop(); this.closed=true; this.unlisten?.(); }
   public receiver(peer: string, mediaId: string): RTCPeerConnection | undefined {

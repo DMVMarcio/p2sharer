@@ -17,7 +17,7 @@ index 992caaaef5e9f1e0bcfb5e348bc9138667f8242b..43f142909ad420f48144ba974553834a
  						const currentPeer = getPeer(id, normalizedOptions.sendToPending);
  						if (!currentPeer || currentPeer !== peer) break;
 diff --git a/dist/media.mjs b/dist/media.mjs
-index 2fd4906e80aefbef3f6b9f523a77ebf58562c3af..5fb7cfdc78ddb29f09c3ec33013d6991c29054fc 100644
+index 2fd4906e80aefbef3f6b9f523a77ebf58562c3af..499cc2df7ad0fb6b0817e8bd80b39d45fae789a4 100644
 --- a/dist/media.mjs
 +++ b/dist/media.mjs
 @@ -53,6 +53,10 @@ const createMediaIdentityCache = () => {
@@ -54,14 +54,20 @@ index 2fd4906e80aefbef3f6b9f523a77ebf58562c3af..5fb7cfdc78ddb29f09c3ec33013d6991
  		});
  	};
  	return {
-@@ -97,38 +103,64 @@ const createMediaManager = ({ iterate, isActive, getSharedMediaPeer }) => {
+@@ -96,39 +102,73 @@ const createMediaManager = ({ iterate, isActive, getSharedMediaPeer }) => {
+ 			if (!isActive(id)) return;
  			const parsed = toPendingMediaMeta(meta);
  			if (!parsed) return;
- 			const cached = getSharedMediaPeer(id)?.__trysteroMedia?.getRemoteStream(parsed.key, parsed.streamId);
+-			const cached = getSharedMediaPeer(id)?.__trysteroMedia?.getRemoteStream(parsed.key, parsed.streamId);
 -			if (cached) {
++			const peerObj = getSharedMediaPeer(id);
++			const cached = peerObj?.__trysteroMedia?.getRemoteStream(parsed.key, parsed.streamId);
 +			pendingStreamMetas[id] = (pendingStreamMetas[id] ?? []).filter(meta => meta.key !== parsed.key);
 +			pendingStreamMetas[id].push(parsed);
-+			if (cached && cached.getTracks().some(track => track.readyState !== "ended")) {
++			const liveReceivers = peerObj?.connection?.getReceivers?.();
++			const cachedTracks = cached?.getTracks() ?? [];
++			const isStreamLive = !liveReceivers || cachedTracks.some(track => track.readyState !== "ended" && liveReceivers.some(r => r.track === track));
++			if (cached && isStreamLive && cachedTracks.some(track => track.readyState !== "ended")) {
  				emitStream(id, parsed.key, cached, parsed.metadata);
  				return;
  			}
@@ -76,11 +82,15 @@ index 2fd4906e80aefbef3f6b9f523a77ebf58562c3af..5fb7cfdc78ddb29f09c3ec33013d6991
  			if (!isActive(id)) return;
  			const parsed = toPendingMediaMeta(meta);
  			if (!parsed) return;
- 			const cached = getSharedMediaPeer(id)?.__trysteroMedia?.getRemoteTrack(parsed.key, parsed.trackId);
+-			const cached = getSharedMediaPeer(id)?.__trysteroMedia?.getRemoteTrack(parsed.key, parsed.trackId);
 -			if (cached) {
++			const peerObj = getSharedMediaPeer(id);
++			const cached = peerObj?.__trysteroMedia?.getRemoteTrack(parsed.key, parsed.trackId);
 +			pendingTrackMetas[id] = (pendingTrackMetas[id] ?? []).filter(meta => meta.key !== parsed.key);
 +			pendingTrackMetas[id].push(parsed);
-+			if (cached && cached.track.readyState !== "ended" && cached.stream.getTracks().includes(cached.track)) {
++			const liveReceivers = peerObj?.connection?.getReceivers?.();
++			const isReceiverLive = !liveReceivers || liveReceivers.some(r => r.track === cached?.track);
++			if (cached && isReceiverLive && cached.track.readyState !== "ended" && cached.stream.getTracks().includes(cached.track)) {
  				emitTrack(id, parsed.key, cached.track, cached.stream, parsed.metadata);
  				return;
  			}
@@ -122,6 +132,7 @@ index 2fd4906e80aefbef3f6b9f523a77ebf58562c3af..5fb7cfdc78ddb29f09c3ec33013d6991
  			delete pendingTrackMetas[id];
 +			delete receivedStreams[id];
 +			delete receivedTracks[id];
++			getSharedMediaPeer(id)?.__trysteroMedia?.clearRemote();
  		},
  		get onPeerStream() {
  			return listeners.onPeerStream;
@@ -181,7 +192,7 @@ index 8003df9196a808650bc233f9243be5eae14b4a1d..44579d8fbe661690578c96572f343f9e
  			const sender = pc.getSenders().find((s) => s.track === track);
  			if (sender) pc.removeTrack(sender);
 diff --git a/dist/shared-peer.mjs b/dist/shared-peer.mjs
-index 5fca48a89e823ad3a5665d121f390b505ecf9345..3a7d0f5fa5f467cadfc553600bb3b453bba14f77 100644
+index 5fca48a89e823ad3a5665d121f390b505ecf9345..589ba90970ac72b5d18e37bb451f0394f76e597e 100644
 --- a/dist/shared-peer.mjs
 +++ b/dist/shared-peer.mjs
 @@ -162,7 +162,7 @@ var SharedPeerManager = class {

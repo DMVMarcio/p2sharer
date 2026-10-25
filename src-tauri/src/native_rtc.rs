@@ -50,8 +50,74 @@ struct Route {
     bytes: AtomicU64,
     keys: AtomicU64,
     gaps: AtomicU64,
+    started: Instant,
+    local_candidates: Arc<AtomicU64>,
+    remote_candidates: AtomicU64,
+    remote_ice_errors: AtomicU64,
     #[cfg(feature = "media-diagnostics")]
     diagnostics: RouteDiagnostics,
+}
+
+/// Allowlisted statistics only: never serialize native reports, candidate IDs,
+/// addresses, ports, URLs, certificates or SDP into the session log.
+fn summarize_native_ice(stats: &webrtc::stats::StatsReport) -> serde_json::Value {
+    use webrtc::stats::StatsReportType;
+    let mut candidates = HashMap::new();
+    let (mut local, mut remote) = (0, 0);
+    for (id, report) in &stats.reports {
+        let (side, candidate) = match report {
+            StatsReportType::LocalCandidate(c) => { local += 1; ("local", c) },
+            StatsReportType::RemoteCandidate(c) => { remote += 1; ("remote", c) },
+            _ => continue,
+        };
+        let family = match candidate.ip.parse::<std::net::IpAddr>() {
+            Ok(std::net::IpAddr::V4(_)) => "ipv4",
+            Ok(std::net::IpAddr::V6(_)) => "ipv6",
+            Err(_) => "unknown",
+        };
+        candidates.insert(id, serde_json::json!({ "side": side, "type": candidate.candidate_type.to_string(),
+            "network": candidate.network_type.to_string(), "family": family }));
+    }
+    let mut pairs: Vec<_> = stats.reports.values().filter_map(|report| match report {
+        StatsReportType::CandidatePair(pair) => Some(pair), _ => None,
+    }).collect();
+    pairs.sort_by_key(|pair| (std::cmp::Reverse(pair.nominated), std::cmp::Reverse(pair.responses_received)));
+    serde_json::json!({ "schema": 1, "localCandidates": local, "remoteCandidates": remote,
+        "candidateInventory": candidates.values().take(64).collect::<Vec<_>>(),
+        "omittedCandidates": candidates.len().saturating_sub(64),
+        "pairCount": pairs.len(), "omittedPairs": pairs.len().saturating_sub(24),
+        "requestsSent": pairs.iter().map(|p| p.requests_sent).sum::<u64>(),
+        "responsesReceived": pairs.iter().map(|p| p.responses_received).sum::<u64>(),
+        "requestsReceived": pairs.iter().map(|p| p.requests_received).sum::<u64>(),
+        "responsesSent": pairs.iter().map(|p| p.responses_sent).sum::<u64>(),
+        "pairs": pairs.iter().take(24).map(|p| serde_json::json!({
+            "state": p.state.to_string(), "nominated": p.nominated,
+            "local": candidates.get(&p.local_candidate_id), "remote": candidates.get(&p.remote_candidate_id),
+            "requestsSent": p.requests_sent, "responsesReceived": p.responses_received,
+            "requestsReceived": p.requests_received, "responsesSent": p.responses_sent,
+            "bytesSent": p.bytes_sent, "bytesReceived": p.bytes_received,
+            "rttSeconds": p.current_round_trip_time,
+        })).collect::<Vec<_>>() })
+}
+
+async fn log_native_route(id: &str, route: &Route, phase: &str) {
+    let connection = route.pc.connection_state().to_string();
+    let ice = route.pc.ice_connection_state().to_string();
+    let dtls = route.pc.sctp().transport().state().to_string();
+    let stats = match tokio::time::timeout(Duration::from_millis(750), route.pc.get_stats()).await {
+        Ok(stats) => summarize_native_ice(&stats),
+        Err(_) => serde_json::json!({ "status": "timeout" }),
+    };
+    crate::logger::log_msg("INFO", "transmission.native.ice", &serde_json::json!({
+        "routeId": id, "phase": phase, "elapsedMs": route.started.elapsed().as_millis(),
+        "connection": connection, "ice": ice, "dtls": dtls,
+        "gathering": route.pc.ice_gathering_state().to_string(),
+        "generatedCandidates": route.local_candidates.load(Ordering::Relaxed),
+        "appliedCandidates": route.remote_candidates.load(Ordering::Relaxed),
+        "candidateErrors": route.remote_ice_errors.load(Ordering::Relaxed),
+        "frames": route.frames.load(Ordering::Relaxed), "bytes": route.bytes.load(Ordering::Relaxed),
+        "routes": stats,
+    }).to_string());
 }
 
 #[cfg(feature = "media-diagnostics")]
@@ -225,6 +291,7 @@ pub async fn create_native_video_offer(
         .map_err(|e| e.to_string())?,
     );
     let live = Arc::new(AtomicBool::new(true));
+    let local_candidates = Arc::new(AtomicU64::new(0));
     let geometry = capture.load.snapshot();
     let value = Arc::new(Route {
         pc: pc.clone(),
@@ -238,6 +305,8 @@ pub async fn create_native_video_offer(
         bytes: AtomicU64::new(0),
         keys: AtomicU64::new(0),
         gaps: AtomicU64::new(0),
+        started: Instant::now(), local_candidates: local_candidates.clone(),
+        remote_candidates: AtomicU64::new(0), remote_ice_errors: AtomicU64::new(0),
         #[cfg(feature = "media-diagnostics")]
         diagnostics: RouteDiagnostics { track: crate::media_diagnostics::opaque_id(&track_id),
             loss: AtomicU32::new(0), rtt_us: AtomicU64::new(0), baseline_rtt_us: AtomicU64::new(0),
@@ -259,8 +328,10 @@ pub async fn create_native_video_offer(
     pc.on_ice_candidate(Box::new(move |candidate| {
         let app = ice_app.clone();
         let id = ice_id.clone();
+        let generated = local_candidates.clone();
         Box::pin(async move {
             if let Some(candidate) = candidate {
+                generated.fetch_add(1, Ordering::Relaxed);
                 if let Ok(mut candidate) = candidate.to_json() {
                     candidate.sdp_mid = Some("0".into());
                     let _ = app.emit(
@@ -277,15 +348,39 @@ pub async fn create_native_video_offer(
         })
     }));
     let state_app = app.clone();
+    let ice_state_id = id.clone();
+    let ice_state_route = Arc::downgrade(&value);
+    pc.on_ice_connection_state_change(Box::new(move |state| {
+        let id = ice_state_id.clone();
+        let route = ice_state_route.upgrade();
+        Box::pin(async move {
+            if let Some(route) = route {
+                crate::logger::log_msg("INFO", "transmission.native.ice", &serde_json::json!({
+                    "routeId": id, "phase": "ice_state", "ice": state.to_string(),
+                    "elapsedMs": route.started.elapsed().as_millis(),
+                    "generatedCandidates": route.local_candidates.load(Ordering::Relaxed),
+                    "appliedCandidates": route.remote_candidates.load(Ordering::Relaxed),
+                }).to_string());
+            }
+        })
+    }));
     let state_id = id.clone();
     let state_key = capture.keyframe.clone();
+    let diagnostic_route = Arc::downgrade(&value);
     pc.on_peer_connection_state_change(Box::new(move |state| {
         let app = state_app.clone();
         let id = state_id.clone();
         let key = state_key.clone();
+        let diagnostic_route = diagnostic_route.clone();
         Box::pin(async move {
+            crate::logger::log_msg("INFO", "transmission.native.ice",
+                &format!("Native sender state routeId={id} connection={state}"));
             if state == RTCPeerConnectionState::Connected {
                 key.store(true, Ordering::Relaxed);
+                if let Some(route) = diagnostic_route.upgrade() {
+                    let id = id.clone();
+                    tokio::spawn(async move { log_native_route(&id, &route, "connected").await; });
+                }
             }
             if matches!(
                 state,
@@ -552,12 +647,11 @@ pub async fn add_native_video_ice(
     if candidate.candidate.len() > 4096 {
         return Err("Candidate too large".into());
     }
-    route(&id, &feedback_token)
-        .await?
-        .pc
-        .add_ice_candidate(candidate)
-        .await
-        .map_err(|e| e.to_string())
+    let r = route(&id, &feedback_token).await?;
+    let result = r.pc.add_ice_candidate(candidate).await;
+    if result.is_ok() { r.remote_candidates.fetch_add(1, Ordering::Relaxed); }
+    else { r.remote_ice_errors.fetch_add(1, Ordering::Relaxed); }
+    result.map_err(|e| e.to_string())
 }
 #[tauri::command]
 pub async fn set_native_video_bitrate(
@@ -586,6 +680,8 @@ pub async fn close_native_video(id: String, feedback_token: String) -> Result<()
     let r = routes.remove(&id).unwrap();
     drop(routes);
     r.active.store(false, Ordering::Relaxed);
+    // Sample before close destroys the ICE checklist. No per-frame polling.
+    log_native_route(&id, &r, "before_close").await;
     r.bitrate
         .store(r.budget.load(Ordering::Relaxed), Ordering::Relaxed);
     let result = r.pc.close().await.map_err(|e| e.to_string());
@@ -740,6 +836,30 @@ impl FrameGate {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn native_ice_diagnostics_allowlist_excludes_addresses_credentials_and_identifiers() {
+        use webrtc::stats::{ICECandidateStats, RTCStatsType, StatsReport, StatsReportType};
+        let candidate = ICECandidateStats {
+            timestamp: tokio::time::Instant::now(), stats_type: RTCStatsType::LocalCandidate,
+            id: "private-candidate-identifier".into(),
+            candidate_type: webrtc::ice::candidate::CandidateType::Host,
+            deleted: false, ip: "192.0.2.25".into(),
+            network_type: webrtc::ice::network_type::NetworkType::Udp4,
+            port: 23456, priority: 1, relay_protocol: "udp".into(),
+            url: "fixture-url-not-for-logging".into(),
+        };
+        let stats = StatsReport { reports: HashMap::from([("private-report-identifier".into(), StatsReportType::LocalCandidate(candidate))]) };
+        let summary = summarize_native_ice(&stats);
+        assert_eq!(summary["localCandidates"], 1);
+        assert_eq!(summary["remoteCandidates"], 0);
+        assert_eq!(summary["pairCount"], 0);
+        assert_eq!(summary["candidateInventory"][0]["family"], "ipv4");
+        assert_eq!(summary["candidateInventory"][0]["type"], "host");
+        let serialized = summary.to_string();
+        for excluded in ["192.0.2.25", "23456", "private-candidate-identifier", "private-report-identifier", "fixture-url-not-for-logging"] {
+            assert!(!serialized.contains(excluded));
+        }
+    }
     #[test]
     fn native_candidates_require_a_bindable_unicast_address() {
         use std::net::{IpAddr, Ipv4Addr};
