@@ -34,7 +34,8 @@ impl Packet {
 pub struct Event { scope: String, peer: String, packet: Packet }
 #[derive(Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Counters { pub sent: u64, pub received: u64, pub sessions: usize }
+pub struct Counters { pub sent: u64, pub received: u64, pub sessions: usize,
+    pub peers: HashMap<String, crate::traffic_counters::TrafficTotals> }
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ForwardInfo { pub id: String, pub peer: String, pub tunnel: String, pub port: u16, pub protocol: String }
@@ -161,10 +162,11 @@ impl TunnelState {
         state.sessions.insert((peer.into(), session.into()), Session { tunnel: tunnel.into(), generation: generation.into(), local, commands: tx, cancel });
         Ok((rx, cancelled))
     }
-    fn count(&self, scope: &str, tunnel: &str, sent: usize, received: usize) {
+    fn count(&self, scope: &str, tunnel: &str, peer: &str, sent: usize, received: usize) {
         if let Some(state) = self.scopes.lock().unwrap().get_mut(scope) {
             let c = state.counters.entry(tunnel.into()).or_default();
             c.sent = c.sent.saturating_add(sent as u64); c.received = c.received.saturating_add(received as u64);
+            crate::traffic_counters::record_peer_traffic(&mut c.peers, peer, sent, received);
         }
     }
     fn close_session(&self, scope: &str, peer: &str, session: &str) {
@@ -283,7 +285,7 @@ impl TunnelState {
                                 }
                             }).await;
                             if !matches!(written, Ok(Ok(n)) if n == data.len()) { break; }
-                            self.count(&scope, &tunnel, 0, data.len());
+                            self.count(&scope, &tunnel, &peer, 0, data.len());
                             activity = Instant::now();
                             if !udp {
                                 let Some(next) = incoming.checked_add(1) else { break; }; incoming = next;
@@ -318,7 +320,7 @@ impl TunnelState {
             let packet = if udp { Packet::Datagram { session: session.clone(), sequence: outgoing, data } }
                 else { Packet::Data { session: session.clone(), sequence: outgoing, data } };
             if emit(&output, &scope, &peer, packet).is_err() { break; }
-            self.count(&scope, &tunnel, length, 0);
+            self.count(&scope, &tunnel, &peer, length, 0);
             if !udp { pending.push_back((outgoing, Instant::now())); }
             let Some(next) = outgoing.checked_add(1) else { break; }; outgoing = next;
             activity = Instant::now();
@@ -424,6 +426,23 @@ mod tests {
         assert!(!accept_datagram(&mut window, 1));
         assert!(accept_datagram(&mut window, 99));
     }
+    #[test]
+    fn traffic_totals_keep_participants_and_directions_independent() {
+        let state = TunnelState::default(); let e = export(12345, "tcp");
+        state.configure(SCOPE, vec![e.clone()], vec!["first".into(), "second".into()]).unwrap();
+        state.count(SCOPE, &e.id, "first", 100, 25);
+        state.count(SCOPE, &e.id, "second", 40, 80);
+        state.count(SCOPE, &e.id, "first", 5, 10);
+        let status = state.status(SCOPE);
+        let totals = &status.counters[&e.id];
+        assert_eq!((totals.sent, totals.received), (145, 115));
+        assert_eq!((totals.peers["first"].sent, totals.peers["first"].received), (105, 35));
+        assert_eq!((totals.peers["second"].sent, totals.peers["second"].received), (40, 80));
+        let wire = serde_json::to_value(status).unwrap();
+        assert_eq!(wire["counters"][&e.id]["peers"]["first"]["sent"], 105);
+        state.stop(SCOPE);
+        assert!(state.status(SCOPE).counters.is_empty());
+    }
     #[tokio::test]
     async fn congested_udp_drops_packets_without_destroying_the_session() {
         let state = TunnelState::default(); let e = export(12345, "udp");
@@ -503,6 +522,9 @@ mod tests {
             let mut received = Vec::new(); client.read_to_end(&mut received).await.unwrap();
             assert_eq!(received, bytes);
             assert_eq!(right.status(SCOPE).counters.values().map(|c| c.received).sum::<u64>(), bytes.len() as u64);
+            let status = right.status(SCOPE);
+            let totals = status.counters.values().next().unwrap();
+            assert_eq!(totals.peers["left"].received, bytes.len() as u64);
             left.stop(SCOPE); right.stop(SCOPE); router.abort(); echo.await.unwrap();
         }).await.unwrap();
     }

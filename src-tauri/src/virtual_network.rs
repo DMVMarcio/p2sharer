@@ -41,6 +41,7 @@ pub struct Counters {
     sent: u64,
     received: u64,
     dropped: u64,
+    peers: HashMap<String, crate::traffic_counters::TrafficTotals>,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -405,6 +406,7 @@ impl VirtualNetworkState {
             .entry(route.rule)
             .or_default();
         c.sent += bytes.len() as u64;
+        crate::traffic_counters::record_peer_traffic(&mut c.peers, &route.peer, bytes.len(), 0);
         if let Some(result) = crate::peer_payload::emit(app, &route.scope,
             crate::peer_payload::virtual_header(&route.scope, &route.peer, sequence), bytes) {
             if result.is_err() { state.credits.remove(&sequence); }
@@ -719,13 +721,14 @@ pub(crate) fn receive_bytes(state: &VirtualNetworkState, scope: String, peer: St
             .dropped += 1;
         return Ok(());
     }
-    inner
+    let counter = inner
         .counters
         .entry(scope)
         .or_default()
         .entry(route.rule)
-        .or_default()
-        .received += bytes.len() as u64;
+        .or_default();
+    counter.received += bytes.len() as u64;
+    crate::traffic_counters::record_peer_traffic(&mut counter.peers, &peer, 0, bytes.len());
     Ok(())
 }
 
@@ -926,6 +929,54 @@ fn finish_helper_error(stream: &mut std::net::TcpStream) {
 mod startup_tests {
     use super::*;
     use std::io::{Read, Write};
+
+    #[test]
+    fn admitted_traffic_is_counted_per_participant_without_counting_rejected_packets() {
+        use crate::virtual_network_policy::Peer;
+        let state = VirtualNetworkState::default();
+        let scope = "11111111-1111-4111-8111-111111111111";
+        let rule = "22222222-2222-4222-8222-222222222222";
+        let local = Ipv4Addr::new(10, 160, 1, 1);
+        let first = Ipv4Addr::new(10, 160, 1, 2);
+        let second = Ipv4Addr::new(10, 160, 1, 3);
+        let (sender, mut receiver) = mpsc::channel(8);
+        let (cancel, _) = watch::channel(false);
+        {
+            let mut inner = state.inner.lock().unwrap();
+            inner.identity = Some(Identity { ip: local });
+            inner.connection = Some(Connection { sender, cancel, generation: 1 });
+            inner.policy.configure(scope, Scope {
+                own: vec![Grant { id: rule.into(), port: 12345, protocol: "udp".into(),
+                    generation: "33333333-3333-4333-8333-333333333333".into() }],
+                peers: vec![Peer { id: "first".into(), ip: first, grants: vec![] },
+                    Peer { id: "second".into(), ip: second, grants: vec![] }],
+            }, local).unwrap();
+        }
+        let packet = |source: Ipv4Addr| {
+            let mut bytes = vec![0u8; 28];
+            bytes[0] = 0x45; bytes[2..4].copy_from_slice(&28u16.to_be_bytes());
+            bytes[8] = 64; bytes[9] = 17;
+            bytes[12..16].copy_from_slice(&source.octets());
+            bytes[16..20].copy_from_slice(&local.octets());
+            bytes[20..22].copy_from_slice(&40000u16.to_be_bytes());
+            bytes[22..24].copy_from_slice(&12345u16.to_be_bytes());
+            let mut sum: u32 = bytes[..20].chunks_exact(2)
+                .map(|pair| u16::from_be_bytes([pair[0], pair[1]]) as u32).sum();
+            while sum > 0xffff { sum = (sum & 0xffff) + (sum >> 16); }
+            bytes[10..12].copy_from_slice(&(!(sum as u16)).to_be_bytes());
+            bytes
+        };
+        receive_bytes(&state, scope.into(), "first".into(), packet(first)).unwrap();
+        receive_bytes(&state, scope.into(), "first".into(), packet(first)).unwrap();
+        receive_bytes(&state, scope.into(), "second".into(), packet(second)).unwrap();
+        assert!(receive_bytes(&state, scope.into(), "first".into(), packet(second)).is_err());
+        assert_eq!(receiver.try_recv().unwrap().1, packet(first));
+        let inner = state.inner.lock().unwrap();
+        let totals = &inner.counters[scope][rule];
+        assert_eq!((totals.sent, totals.received), (0, 84));
+        assert_eq!(totals.peers["first"].received, 56);
+        assert_eq!(totals.peers["second"].received, 28);
+    }
 
     #[test]
     fn app_leases_keep_an_idle_session_until_the_last_app_leaves() {

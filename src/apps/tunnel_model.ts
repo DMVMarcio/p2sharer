@@ -1,16 +1,17 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { TrafficRateSampler, type TrafficSnapshot } from '../core/traffic_rate.ts';
 import { t } from '../i18n/index.ts';
 import { listenTunnelPayloads, receiveTunnelPayload } from '../core/tunnel_payload_bridge.ts';
 import type { RoomAppModel, RoomAppModelContext } from './models.ts';
 import { createTunnelRules, isVirtualIp, validTunnelAdvertisements, validTunnelRule, type TunnelAdvertisement, type TunnelExport, type TunnelRule } from './tunnel_rules.ts';
 
-export interface TunnelCounters { sent: number; received: number; sessions: number }
+export interface TunnelCounters extends TrafficSnapshot { sessions: number }
 export interface TunnelForward { id: string; peer: string; tunnel: string; port: number; protocol: string }
 interface Status { counters: Record<string, TunnelCounters>; forwards: TunnelForward[] }
 interface NativeEvent { scope: string; peer: string; packet: { kind: string; session: string } }
 interface NetworkEvent { scope?: string; peer?: string; data?: string; sequence?: number; ip?: string; error?: string }
-export interface NetworkCounters { sent: number; received: number; dropped: number }
+export interface NetworkCounters extends TrafficSnapshot { dropped: number }
 export interface TunnelNative {
   available: boolean;
   call<T>(command: string, args: Record<string, unknown>): Promise<T>;
@@ -40,6 +41,10 @@ export class TunnelModel implements RoomAppModel {
   networkConnections = new Map<string, { peer: string; rule: TunnelAdvertisement }>();
   networkCounters: Record<string, NetworkCounters> = {};
   networkRunning = false;
+  rates: Record<string, TrafficSnapshot> = {};
+  networkRates: Record<string, TrafficSnapshot> = {};
+  private rateSampler = new TrafficRateSampler();
+  private networkRateSampler = new TrafficRateSampler();
   private members = new Set<string>();
   private revision = 0;
   private revisions = new Map<string, number>();
@@ -232,6 +237,7 @@ export class TunnelModel implements RoomAppModel {
       this.active.clear(); this.revision++; this.remote.clear(); this.revisions.clear();
       this.remoteIPs.clear(); this.networkConnections.clear(); this.networkCounters = {};
       this.status = { counters: {}, forwards: [] };
+      this.rateSampler.clear(); this.networkRateSampler.clear(); this.rates = {}; this.networkRates = {};
       clearInterval(this.timer); this.timer = undefined;
     }
     void this.command(async () => {
@@ -303,6 +309,7 @@ export class TunnelModel implements RoomAppModel {
   disconnect(id: string): Promise<void> {
     return this.command(async () => { await this.bridge.call('disconnect_port_tunnel', { scope: this.scope, id }); this.remoteGenerations.delete(id); await this.refresh(); });
   }
+  get participantIds(): string[] { return [...this.members].filter(id => id !== this.context.localActor); }
   networkKey(peer: string, id: string): string { return `${peer}:${id}`; }
   regenerateIP(): Promise<void> {
     return this.command(async () => {
@@ -316,11 +323,12 @@ export class TunnelModel implements RoomAppModel {
     if (this.disposed || !this.available || !this.joined) return;
     const result = await this.bridge.call<Status>('get_port_tunnel_status', { scope: this.scope });
     if (this.disposed || !this.joined) return;
-    this.status = result; this.context.changed();
+    this.status = result; this.rates = this.rateSampler.update(result.counters); this.context.changed();
     if (this.bridge.listenVirtual) {
       const network = await this.bridge.call<{ ip: string; running: boolean; active: boolean; counters: Record<string, NetworkCounters> }>('get_virtual_network_status', { scope: this.scope });
       if (this.disposed || !this.joined) return;
       this.networkRunning = network.running; this.networkCounters = network.counters;
+      this.networkRates = this.networkRateSampler.update(network.counters);
       if (!network.active && (this.networkConnections.size || [...this.active.values()].some((r) => r.mode === 'virtual'))) {
         this.networkConnections.clear();
         for (const [id, rule] of this.active) if (rule.mode === 'virtual') this.active.delete(id);

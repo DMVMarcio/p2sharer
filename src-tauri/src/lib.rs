@@ -44,6 +44,7 @@ pub mod lan_signaling;
 mod interface_stun;
 pub mod port_tunnel;
 mod peer_payload;
+mod traffic_counters;
 pub mod virtual_network;
 pub mod upnp;
 mod virtual_network_policy;

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Network, Plus, Pencil, Trash2, Copy, RefreshCw } from 'lucide-react';
+import { Network, Plus, Pencil, Trash2, Copy, RefreshCw, CircleAlert } from 'lucide-react';
 import { t, localizeError } from '../i18n';
 import { useLocale } from '../hooks/useLocale';
 import { useRoom } from '../hooks/useRoom';
@@ -11,15 +11,66 @@ import { TooltipButton } from '../components/common/TooltipButton';
 import { ProfileAvatar } from '../components/common/ProfileAvatar';
 import { roomAppsService } from './room_apps_service';
 import { TunnelModel, type TunnelCounters, type NetworkCounters } from './tunnel_model';
+import { formatFileSize } from '../core/file_size';
+import type { TrafficCount, TrafficSnapshot } from '../core/traffic_rate';
 import { validTunnelRule, type TunnelRule } from './tunnel_rules';
 
-function TunnelStats({ counters }: { counters?: TunnelCounters | NetworkCounters }) {
-  if (!counters) return null;
-  const amount = (bytes: number) => (bytes / 1024).toLocaleString(undefined, { maximumFractionDigits: 1 });
+const trafficAmount = (bytes: number) => formatFileSize(bytes, { binary: true, fractionDigits: 2 });
+
+function TrafficRates({ rate }: { rate?: TrafficCount }) {
+  const upload = `${trafficAmount(rate?.sent ?? 0)}/s`;
+  const download = `${trafficAmount(rate?.received ?? 0)}/s`;
+  return <>
+    <span className="tunnel-upload" aria-label={t('tunnels.upload', { amount: upload })}>↑ {upload}</span>
+    <span className="tunnel-download" aria-label={t('tunnels.download', { amount: download })}>↓ {download}</span>
+  </>;
+}
+
+function TrafficDetails({ counters, rate }: { counters?: TrafficCount; rate?: TrafficCount }) {
+  return <div className="tunnel-stats-summary">
+    <div className="tunnel-traffic"><TrafficRates rate={rate} /></div>
+    <span>{t('tunnels.totalUpload', { amount: trafficAmount(counters?.sent ?? 0) })}</span>
+    <span>{t('tunnels.totalDownload', { amount: trafficAmount(counters?.received ?? 0) })}</span>
+  </div>;
+}
+
+type TunnelParticipant = { id: string; name: string; ping?: number | null };
+
+function TunnelPing({ ping }: { ping?: number | null }) {
+  const value = ping == null || !Number.isFinite(ping) ? '—' : Math.round(ping).toLocaleString();
+  return <span className="tunnel-ping" aria-label={t('tunnels.latency', { amount: value })}>{value} ms</span>;
+}
+
+function TunnelStatsHint({ counters, rate, participants }: {
+  counters?: TunnelCounters | NetworkCounters; rate?: TrafficSnapshot;
+  participants?: TunnelParticipant[]; ping?: number | null;
+}) {
+  return <div className="tunnel-stats-hint">
+    <span>{t('tunnels.rateWindow')}</span>
+    <TrafficDetails counters={counters} rate={rate} />
+    {counters && <span>{'dropped' in counters ? t('tunnels.dropped', { count: counters.dropped }) : t('tunnels.connections', { count: counters.sessions })}</span>}
+    <span className="tunnel-hint">{t('tunnels.latencyHelp')}</span>
+    {participants?.map(participant => <div key={participant.id} className="tunnel-stats-participant">
+      <div className="tunnel-stats-participant-heading"><strong>{participant.name}</strong><TunnelPing ping={participant.ping} /></div>
+      <TrafficDetails counters={counters?.peers?.[participant.id]} rate={rate?.peers?.[participant.id]} />
+    </div>)}
+  </div>;
+}
+
+function TunnelStats({ counters, rate, participants, ping }: {
+  counters?: TunnelCounters | NetworkCounters; rate?: TrafficSnapshot;
+  participants?: TunnelParticipant[]; ping?: number | null;
+}) {
   return <div className="tunnel-stats">
-    <div className="tunnel-traffic"><span className="tunnel-upload" aria-label={t('tunnels.upload', { amount: amount(counters.sent) })}>↑ {amount(counters.sent)} KiB</span>
-      <span className="tunnel-download" aria-label={t('tunnels.download', { amount: amount(counters.received) })}>↓ {amount(counters.received)} KiB</span></div>
-    <span>{'dropped' in counters ? t('tunnels.dropped', { count: counters.dropped }) : t('tunnels.connections', { count: counters.sessions })}</span>
+    <div className="tunnel-traffic">
+      <TrafficRates rate={rate} />
+      {!participants && <TunnelPing ping={ping} />}
+      <Tooltip placement="bottom" interactive content={<TunnelStatsHint counters={counters} rate={rate} participants={participants} />}>
+        <button type="button" className="btn btn-sm btn-secondary tunnel-stats-info" aria-label={t('file.transferDetails')}>
+          <CircleAlert size={14} aria-hidden="true" />
+        </button>
+      </Tooltip>
+    </div>
   </div>;
 }
 
@@ -70,7 +121,7 @@ function TunnelRuleDialog({ rule, model, onClose }: { rule: TunnelRule; model: T
 
 export function TunnelApp({ instanceId, compact = false }: { instanceId: string; compact?: boolean }) {
   useLocale();
-  const { peers } = useRoom();
+  const { peers, getPeerPing } = useRoom();
   const [, update] = useState(0);
   useEffect(() => roomAppsService.subscribe(() => update((n) => n + 1)), []);
   const model = roomAppsService.getModel<TunnelModel>(instanceId);
@@ -80,6 +131,13 @@ export function TunnelApp({ instanceId, compact = false }: { instanceId: string;
   if (!model) return null;
   const run = (operation: Promise<void>) => void operation.catch((reason) => showToast(localizeError(reason), 4000, 'error'));
   const remoteRows = [...model.remote].flatMap(([peer, rules]) => rules.filter((rule) => rule.enabled).map((rule) => ({ peer, rule })));
+  const participantIds = new Set(model.participantIds);
+  const peerNames = new Map(peers.map(peer => [peer.id, peer.username]));
+  const participants = (counters?: TrafficSnapshot): TunnelParticipant[] =>
+    [...new Set([...participantIds, ...Object.keys(counters?.peers ?? {})])].map(id => ({
+      id, name: peerNames.get(id) || `${t('tunnels.participant')} ${id.slice(0, 6)}`,
+      ping: participantIds.has(id) ? getPeerPing(id) : null,
+    }));
   const avatar = (peer: string, name: string) => <Tooltip content={name}>
     <ProfileAvatar className="room-app-participant" name={name} peerId={peer} tabIndex={0} />
   </Tooltip>;
@@ -110,7 +168,7 @@ export function TunnelApp({ instanceId, compact = false }: { instanceId: string;
           <div className="tunnel-details"><strong>{rule.name}</strong>
             <span>{rule.protocol === 'any' ? t('virtualNetwork.allPorts') : `${rule.protocol.toUpperCase()} · ${rule.port}`}
               {rule.mode === 'virtual' && model.ip ? ` · ${model.ip}` : ''}</span>
-            <TunnelStats counters={rule.mode === 'virtual' ? model.networkCounters[rule.id] : model.status.counters[rule.id]} /></div>
+            <TunnelStats participants={participants(rule.mode === 'virtual' ? model.networkCounters[rule.id] : model.status.counters[rule.id])} rate={rule.mode === 'virtual' ? model.networkRates[rule.id] : model.rates[rule.id]} counters={rule.mode === 'virtual' ? model.networkCounters[rule.id] : model.status.counters[rule.id]} /></div>
           {!compact && <div className="tunnel-actions">
             <TooltipButton tooltip={t('tunnels.edit')} aria-label={t('tunnels.edit')} className="btn btn-sm btn-secondary"
               disabled={model.busy} onClick={() => setEditing(rule)}><Pencil size={15} /></TooltipButton>
@@ -137,7 +195,7 @@ export function TunnelApp({ instanceId, compact = false }: { instanceId: string;
             <div className="tunnel-details"><div className="tunnel-title">{avatar(peer, name)}<strong>{rule.name}</strong></div>
               <span>{rule.protocol === 'any' ? t('virtualNetwork.allPorts') : `${rule.protocol.toUpperCase()} · ${rule.port}`}</span>
               {(forward || virtual && ip) && <code>{address}</code>}
-              <TunnelStats counters={virtual ? model.networkCounters[rule.id] : forward ? model.status.counters[forward.id] : undefined} />
+              <TunnelStats ping={getPeerPing(peer)} rate={virtual ? model.networkRates[rule.id] : forward ? model.rates[forward.id] : undefined} counters={virtual ? model.networkCounters[rule.id] : forward ? model.status.counters[forward.id] : undefined} />
             </div>
             {!compact && <div className="tunnel-actions">
               {address && <TooltipButton tooltip={t('tunnels.copy')} aria-label={t('tunnels.copy')} className="btn btn-sm btn-secondary"
