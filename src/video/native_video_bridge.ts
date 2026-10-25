@@ -43,6 +43,9 @@ export class NativeVideoBridge implements VideoCaptureBridge {
   private encoderFeedbackToken: string | null = null;
   private fallbackHandler: ((reason: string, stream?: MediaStream) => void) | null = null;
   private captureFailure: string | undefined;
+  private consumers = new Set<string>();
+  private managedConsumers = false;
+  private hasFirstFrame = false;
   public get onFallbackNeeded() { return this.fallbackHandler; }
   public set onFallbackNeeded(handler: ((reason: string, stream?: MediaStream) => void) | null) {
     this.fallbackHandler = handler;
@@ -51,6 +54,37 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     if (handler && reason) queueMicrotask(() => {
       if (generation === this.captureGeneration && this.fallbackHandler === handler) handler(reason);
     });
+  }
+
+  public setConsumerActive(consumerId: string, active: boolean): void {
+    this.managedConsumers = true;
+    if (active) {
+      const wasEmpty = this.consumers.size === 0;
+      this.consumers.add(consumerId);
+      if (wasEmpty && this.isCapturingNative() && this.encoderFeedbackToken) {
+        void invoke('control_capture_encoder', {
+          sessionId: this.sessionId,
+          feedbackToken: this.encoderFeedbackToken,
+          disable: false,
+        }).catch(() => {});
+      }
+    } else {
+      this.consumers.delete(consumerId);
+      if (this.consumers.size === 0) {
+        this.latestEncodedFrame?.close();
+        this.latestEncodedFrame = null;
+        if (this.latestJpegFrame) {
+          try { this.latestJpegFrame.close(); } catch {}
+          this.latestJpegFrame = null;
+        }
+        this.pendingBuffer = null;
+      }
+    }
+  }
+
+  public hasActiveConsumers(): boolean {
+    if (!this.managedConsumers) return true;
+    return this.consumers.size > 0;
   }
 
   public isCapturingDirectGpu(): boolean {
@@ -115,6 +149,9 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     } catch (err) {
       this.isCapturing = false;
       this.isDirectGpu = false;
+    this.hasFirstFrame = false;
+    this.managedConsumers = false;
+    this.consumers.clear();
       throw err;
     }
   }
@@ -236,6 +273,9 @@ export class NativeVideoBridge implements VideoCaptureBridge {
 
     this.isCapturing = true;
     this.isDirectGpu = false;
+    this.hasFirstFrame = false;
+    this.managedConsumers = false;
+    this.consumers.clear();
 
     // 2. Start native Rust capture thread
     try {
@@ -271,6 +311,9 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     } catch (err) {
       this.isCapturing = false;
       this.isDirectGpu = false;
+    this.hasFirstFrame = false;
+    this.managedConsumers = false;
+    this.consumers.clear();
       const reason = err instanceof Error ? err.message : String(err);
       console.error('[NativeVideoBridge] Native capture failed to start:', { sessionId: this.sessionId, sourceId,
         elapsedMs: Math.round(performance.now() - captureStarted), error: err, reason });
@@ -324,6 +367,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
 
         if (!bitmap || !this.isCapturing) {
           this.isDecoding = false;
+
           return;
         }
 
@@ -340,6 +384,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
               // Keep only the newest pending JPEG while the encoder consumes this frame.
               // Unawaited writes build an unbounded queue on slower GPU encoders.
               const writer = this.trackWriter;
+              if (writer.desiredSize !== null && writer.desiredSize <= 0) return;
               await writer.ready;
               if (this.isCapturing && generation === this.captureGeneration) {
                 await writer.write(videoFrame);
@@ -349,6 +394,11 @@ export class NativeVideoBridge implements VideoCaptureBridge {
             }
           } catch (writeErr) {
             console.warn('[NativeVideoBridge] VideoFrame write failed:', writeErr);
+          } finally {
+            if (bitmap === this.latestEncodedFrame && this.hasFirstFrame) {
+              this.latestEncodedFrame?.close();
+              this.latestEncodedFrame = null;
+            }
           }
         } else {
           // Canvas fallback
@@ -368,6 +418,10 @@ export class NativeVideoBridge implements VideoCaptureBridge {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (track as any).requestFrame();
           }
+          if (bitmap === this.latestEncodedFrame && this.hasFirstFrame) {
+            this.latestEncodedFrame?.close();
+            this.latestEncodedFrame = null;
+          }
         }
       } catch {
         // Ignore frame decode failure
@@ -379,6 +433,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
             this.processingCost = this.processingCost ? this.processingCost * 0.9 + cost * 0.1 : cost;
           }
           this.isDecoding = false;
+
           if (this.pendingBuffer) pumpNextFrame();
         }
       }
@@ -443,6 +498,9 @@ export class NativeVideoBridge implements VideoCaptureBridge {
           }
 
           if (evt.data instanceof ArrayBuffer) {
+            if (this.hasFirstFrame && this.managedConsumers && this.consumers.size === 0) {
+              return;
+            }
             if (evt.data.byteLength > 4) {
               const encoder = isNativeEncodedPacket(evt.data) ? 'native/H264' : 'libjpeg-turbo/JPEG';
               if (wireEncoder !== encoder) {
@@ -481,6 +539,9 @@ export class NativeVideoBridge implements VideoCaptureBridge {
                 if (generation !== this.captureGeneration || !this.isCapturing || nativeEncodingFailed) { frame.close(); return; }
                 const track = this.activeStream?.getVideoTracks()[0];
                 if (track) registerNativeSenderSource(track, { sessionId: this.sessionId, feedbackToken });
+                if (!this.hasFirstFrame) {
+                  this.hasFirstFrame = true;
+                }
                 this.latestEncodedFrame?.close(); this.latestEncodedFrame = frame;
                 this.pendingBuffer = new Uint8Array([1, 0, 0, 0]).buffer;
                 void pumpNextFrame();
@@ -501,6 +562,9 @@ export class NativeVideoBridge implements VideoCaptureBridge {
             // Never allow a 1-byte pacer tick to overwrite an awaiting real video frame!
             if (evt.data.byteLength <= 4 && this.pendingBuffer && this.pendingBuffer.byteLength > 4) {
               return;
+            }
+            if (!this.hasFirstFrame && evt.data.byteLength > 4) {
+              this.hasFirstFrame = true;
             }
             this.pendingBuffer = evt.data;
             pumpNextFrame();
@@ -542,6 +606,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
         const check = () => {
           const frame = this.latestEncodedFrame || this.latestJpegFrame;
           if (frame) {
+            this.hasFirstFrame = true;
             logDiagnostic('INFO', 'capture.preview', 'First native preview frame decoded', {
               sessionId: this.sessionId, sourceId, encoder: wireEncoder,
               width: 'displayWidth' in frame ? frame.displayWidth : frame.width,
@@ -637,6 +702,9 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     this.loadMeter = null;
     this.isCapturing = false;
     this.isDirectGpu = false;
+    this.hasFirstFrame = false;
+    this.managedConsumers = false;
+    this.consumers.clear();
     this.pendingBuffer = null;
     this.isDecoding = false;
 

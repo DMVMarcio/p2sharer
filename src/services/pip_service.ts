@@ -80,6 +80,9 @@ export class PipService {
         (roomService as unknown as { nativeVideoBridge?: { activeStream?: MediaStream | null } })?.nativeVideoBridge?.activeStream ||
         null;
     }
+    if (streamOwner(peerId) === 'local' && activeStream) {
+      roomService.setCaptureConsumer(activeStream, 'pip', true);
+    }
     if (streamOwner(peerId) !== 'local' && activeStream?.getAudioTracks().length) {
       audioContextManager.attachPeerAudio(peerId, activeStream);
     }
@@ -330,6 +333,14 @@ export class PipService {
       audioContextManager.attachPeerAudio(peerId, stream);
     }
     if (session.stream === stream && videoSender?.track === newVideoTrack) return;
+    if (streamOwner(peerId) === 'local') {
+      if (session.stream && session.stream !== stream) {
+        roomService.setCaptureConsumer(session.stream, 'pip', false);
+      }
+      if (stream) {
+        roomService.setCaptureConsumer(stream, 'pip', true);
+      }
+    }
     session.stream = stream;
     try {
       if (videoSender && newVideoTrack) {
@@ -360,6 +371,9 @@ export class PipService {
   public async restoreFromPip(peerId: string): Promise<void> {
     const session = this.sessions.get(peerId);
     if (session) {
+      if (streamOwner(peerId) === 'local' && session.stream) {
+        roomService.setCaptureConsumer(session.stream, 'pip', false);
+      }
       if (session.statsInterval) {
         clearInterval(session.statsInterval);
       }
@@ -390,6 +404,9 @@ export class PipService {
   private handlePipWindowClosed(peerId: string): void {
     const session = this.sessions.get(peerId);
     if (session) {
+      if (streamOwner(peerId) === 'local' && session.stream) {
+        roomService.setCaptureConsumer(session.stream, 'pip', false);
+      }
       if (session.statsInterval) {
         clearInterval(session.statsInterval);
       }

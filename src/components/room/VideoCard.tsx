@@ -160,6 +160,15 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   }, [slot.stream, slot.isLocal, cleanupVideoElement]);
 
   useEffect(() => {
+    if (!slot.isLocal || !slot.stream) return;
+    const stream = slot.stream;
+    roomService.setCaptureConsumer(stream, 'local-preview', showLocalPreview);
+    return () => {
+      roomService.setCaptureConsumer(stream, 'local-preview', false);
+    };
+  }, [slot.isLocal, slot.stream, showLocalPreview]);
+
+  useEffect(() => {
     const element = videoElementRef.current;
     if (slot.isLocal || !slot.stream || !element) return;
     return observeRemoteVideoStartup(element, {

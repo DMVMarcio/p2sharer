@@ -322,6 +322,9 @@ export class RoomService {
         this.recordFileProgress(progress);
         if (progress.status === 'error') showToast(t("message.fd2175809652"), 3500, 'error');
       },
+      onSenderConsumerChange: (mediaId: string, consumerId: string, active: boolean) => {
+        if (this.roomManager === manager) this.setCaptureConsumer(mediaId, consumerId, active);
+      },
       onStreamPointerState: (snapshot, broadcasterId) => {
         const slot = stateStore.roomSlots.find((slot) => (slot.ownerPeerId || slot.peerId) === broadcasterId && slot.pointerEligible !== false && (!snapshot.mediaId || slot.mediaId === snapshot.mediaId));
         if (this.roomManager === manager && slot && stateStore.subscribedStreams.has(slot.peerId)) this.publishPointerView(slot.peerId, snapshot);
@@ -577,6 +580,7 @@ export class RoomService {
       }
       const id = editingId || crypto.randomUUID();
       const bridge = prepared?.bridge || (isTauri() && kind === 'screen' ? new NativeVideoBridge(crypto.randomUUID()) : undefined);
+      if (prepared?.bridge) prepared.bridge.setConsumerActive('modal-preview', false);
       let stream: MediaStream | undefined;
       try {
         if (!this.localCaptures.size) await MediaCoordinator.prepareCodecPreferences(res.width, res.height, fps, bitrate * 1000);
@@ -612,6 +616,8 @@ export class RoomService {
         }
         const capture = { sourceId, kind, stream, bridge, fps, resolution: res, mouse, quality, bitrate };
         this.localCaptures.set(id, capture);
+        const initialPreview = Boolean(stateStore.localPreviewStreams[id] ?? stateStore.localPreviewStreams['local'] ?? (kind === 'camera'));
+        bridge?.setConsumerActive('local-preview', initialPreview);
         track.onended = () => { if (this.localCaptures.get(id) === capture) this.stopTransmission(id); };
         if (bridge) bridge.onFallbackNeeded = () => {
           if (this.localCaptures.get(id) === capture) { showToast(t("message.e018f7492e19")); this.stopTransmission(id); }
@@ -671,6 +677,14 @@ export class RoomService {
 
   public editTransmission(id: string) {
     stateStore.set((state) => { state.editingStreamId = id; });
+  }
+
+  public setCaptureConsumer(key: string | MediaStream, consumerId: string, active: boolean): void {
+    for (const [id, entry] of this.localCaptures) {
+      if (key === 'local' || id === key || entry.stream === key || entry.sourceId === key) {
+        entry.bridge?.setConsumerActive(consumerId, active);
+      }
+    }
   }
 
   public overlayStream(key: string) {

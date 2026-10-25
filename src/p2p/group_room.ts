@@ -123,6 +123,7 @@ export interface RoomCallbacks {
   onStreamStopped?: (peerId: string, username: string, isLocal: boolean) => void;
   onWatchStarted?: (watcherPeerId: string, watcherName: string, broadcasterPeerId: string) => void;
   onWatchStopped?: (watcherPeerId: string, watcherName: string, broadcasterPeerId: string) => void;
+  onSenderConsumerChange?: (mediaId: string, consumerId: string, active: boolean) => void;
 }
 
 export interface NativeChatFile { id: string; name: string; path: string; size: number; hash: string; isImage: boolean }
@@ -1876,7 +1877,9 @@ export class GroupRoomManager {
         const entry = this.localMedia.get(mediaId);
         if (entry && this.room === boundRoom) {
           logDiagnostic('INFO', 'transmission.fallback', 'Publishing browser video after native route failure', { mediaId });
-          this.dispatchBrowserMediaToPeer(peerId, entry);
+
+          this.callbacks?.onSenderConsumerChange?.(entry.descriptor.id, `webrtc-${peerId}`, true);
+      this.dispatchBrowserMediaToPeer(peerId, entry);
         }
       },
     });
@@ -2267,6 +2270,9 @@ export class GroupRoomManager {
     this.cleanupStreamWatchers(peerId, '');
     this.remoteWatchRevisions.delete(peerId);
     this.nativeVideo?.stop(undefined, peerId);
+    for (const entry of this.localMedia.values()) {
+      this.callbacks?.onSenderConsumerChange?.(entry.descriptor.id, `webrtc-${peerId}`, false);
+    }
     this.pendingChallenges.delete(peerId);
     this.fileBulk.close(peerId);
     this.payloadChannels.close(peerId); this.binaryPeers.delete(peerId);
@@ -2559,11 +2565,14 @@ export class GroupRoomManager {
       if (mediaId !== undefined && entry.descriptor.id !== mediaId) continue;
       if (recovery && pc) void MediaCoordinator.requestKeyFrame(pc);
       if (this.nativeVideo?.isBlocked?.(peerId, entry.descriptor.id)) {
-        this.dispatchBrowserMediaToPeer(peerId, entry);
+        this.callbacks?.onSenderConsumerChange?.(entry.descriptor.id, `webrtc-${peerId}`, true);
+        this.callbacks?.onSenderConsumerChange?.(entry.descriptor.id, `webrtc-${peerId}`, true);
+      this.dispatchBrowserMediaToPeer(peerId, entry);
         continue;
       }
       if (this.nativeVideo?.dispatch(peerId, entry.stream, entry.descriptor)) {
         const nativeReady = this.nativeVideo.sending(peerId, entry.descriptor.id);
+        this.callbacks?.onSenderConsumerChange?.(entry.descriptor.id, `webrtc-${peerId}`, !nativeReady);
         if (nativeReady && typeof room.removeTrack === 'function') {
           for (const video of entry.stream.getVideoTracks()) room.removeTrack(video, { target: peerId });
         }
@@ -2579,6 +2588,7 @@ export class GroupRoomManager {
         }
         continue;
       }
+      this.callbacks?.onSenderConsumerChange?.(entry.descriptor.id, `webrtc-${peerId}`, true);
       this.dispatchBrowserMediaToPeer(peerId, entry);
     }
   }
@@ -2695,6 +2705,9 @@ export class GroupRoomManager {
         }
       }
       this.nativeVideo?.stop(entry.descriptor.id);
+      for (const peerId of this.peerTracker.directConnectedPeers) {
+        this.callbacks?.onSenderConsumerChange?.(entry.descriptor.id, `webrtc-${peerId}`, false);
+      }
       this.room?.removeStream(entry.stream);
       for (const track of entry.stream.getTracks()) track.stop();
       this.cleanupStreamWatchers(streamSlotKey(selfId, entry.descriptor.id), this.username);

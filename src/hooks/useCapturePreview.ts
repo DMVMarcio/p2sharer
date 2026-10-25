@@ -25,6 +25,7 @@ export function useCapturePreview(sourceId: string, resolution: { width: number;
   const dispose = useCallback(async () => {
     const capture = active.current;
     active.current = null;
+    capture?.bridge?.setConsumerActive('modal-preview', false);
     if (capture?.bridge) await capture.bridge.stopCapture();
     else capture?.stream.getTracks().forEach((track) => track.stop());
   }, []);
@@ -64,6 +65,7 @@ export function useCapturePreview(sourceId: string, resolution: { width: number;
       if (disabled || !sourceId || cancelled()) return;
       const options = requested.current;
       const bridge = sourceId.startsWith('camera:') ? undefined : new NativeVideoBridge(`preview-${crypto.randomUUID()}`);
+      bridge?.setConsumerActive('modal-preview', true);
       try {
         const preview = bridge ? await bridge.startCapture(sourceId, options.fps, options.resolution, options.mouse, options.quality)
           : await acquireCamera({ audio: false, video: {
@@ -161,6 +163,7 @@ export function useCapturePreview(sourceId: string, resolution: { width: number;
     }
     ++generation.current;
     active.current = null;
+    capture.bridge?.setConsumerActive('modal-preview', false);
     setStream(null);
     return capture;
   }, [dispose]);
