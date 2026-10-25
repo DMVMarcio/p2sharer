@@ -133,3 +133,48 @@ test('native statistics skip pending creation and ignore samples retired during 
   await assert.rejects(invalid, error => error === 'Native route token mismatch');
   internal.outgoing.clear(); native.close();
 });
+
+test('pending native offer replays its route and ICE history until answered, then stops', async context => {
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  const previousWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  let answers = 0;
+  let acknowledge!: () => void;
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: { __TAURI_INTERNALS__: {
+    invoke: (command: string) => {
+      if (command === 'answer_native_video') { answers++; return new Promise<void>(resolve => { acknowledge = resolve; }); }
+      return Promise.resolve();
+    },
+  } } });
+  context.after(() => { if (previousWindow) Object.defineProperty(globalThis, 'window', previousWindow); else delete (globalThis as any).window; });
+  const messages: any[] = [];
+  const native = new NativeVideoTransport({ rtc: () => ({}), send: (_peer, signal) => messages.push(signal),
+    permitted: () => true, receive: () => {}, fallback: () => {} });
+  const internal = native as any;
+  const route = { id: 'route', peer: 'peer', descriptor: { id: 'screen' }, source: { feedbackToken: 'token' },
+    started: performance.now(), offered: false, answered: false, candidates: [], localCandidates: [{ candidate: 'candidate:fixture' }],
+    offer: { id: 'route', mediaId: 'screen', kind: 'offer', sdp: 'v=0' }, timer: setTimeout(() => {}, 15000) };
+  internal.outgoing.set('peer/screen', route);
+  context.after(() => native.close());
+  internal.sendOffer(route);
+  context.mock.timers.tick(1500);
+  assert.deepEqual(messages.map(message => message.kind), ['offer', 'ice', 'offer', 'ice']);
+  assert.ok(messages.every(message => message.id === 'route'));
+  const answer = { id: 'route', mediaId: 'screen', kind: 'answer', sdp: 'v=0' };
+  const answering = native.signal('peer', answer);
+  await native.signal('peer', answer);
+  assert.equal(answers, 1, 'Retransmitted answers must not enter native negotiation twice');
+  acknowledge();
+  await answering;
+  context.mock.timers.tick(20_000);
+  assert.equal(messages.length, 4);
+});
+
+test('duplicate native offer resends the existing answer without replacing the receiver', async context => {
+  const f = receiverFixture(context);
+  Object.assign(f.pc, { localDescription: { type: 'answer', sdp: 'v=0' } });
+  await f.native.signal('peer', { id: 'remote-route', mediaId: 'screen', kind: 'offer', sdp: 'v=0',
+    descriptor: { id: 'screen', kind: 'screen', label: 'Screen', videoTrackId: 'track', fps: 60, bitrate: 8000 } });
+  assert.equal(f.messages[0]?.kind, 'answer');
+  assert.equal(f.internal.incoming.get('peer/screen'), f.route);
+  assert.equal(f.pc.connectionState, 'connecting');
+});

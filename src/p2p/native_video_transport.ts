@@ -12,6 +12,7 @@ type Signal = { id: string; kind: 'offer' | 'answer' | 'ice' | 'reject' | 'stop'
   sdp?: string; candidate?: RTCIceCandidateInit; descriptor?: StreamDescriptor; reason?: string };
 interface Outgoing { id: string; peer: string; descriptor: StreamDescriptor; source: NativeSenderSource; track: MediaStreamTrack;
   started: number;
+  offer?: Signal; retryTimer?: ReturnType<typeof setTimeout>; answering?: boolean;
   timer: ReturnType<typeof setTimeout>; offered: boolean; answered: boolean; candidates: RTCIceCandidateInit[]; localCandidates: RTCIceCandidateInit[] }
 interface Incoming { id: string; peer: string; descriptor: StreamDescriptor; pc: RTCPeerConnection;
   timer: ReturnType<typeof setInterval>; remoteReady: boolean; candidates: RTCIceCandidateInit[]; started: number; connectedAt?: number;
@@ -44,8 +45,8 @@ export class NativeVideoTransport {
       if (!route || this.closed) return;
       if (payload.kind === 'failed') { this.fail(route, 'native_sender_failure', payload.reason); return; }
       if (payload.kind === 'ice' && payload.candidate) {
-        if (!route.offered) route.localCandidates.push(payload.candidate);
-        else this.send(route.peer, { id: route.id, mediaId: route.descriptor.id, kind: 'ice', candidate: payload.candidate });
+        if (route.localCandidates.length < 64) route.localCandidates.push(payload.candidate);
+        if (route.offered) this.send(route.peer, { id: route.id, mediaId: route.descriptor.id, kind: 'ice', candidate: payload.candidate });
       }
     }).then(unlisten => { if (this.closed) unlisten(); else this.unlisten = unlisten; });
   }
@@ -74,9 +75,18 @@ export class NativeVideoTransport {
       iceServers: (rtc.iceServers ?? []).map(s => ({ urls: Array.isArray(s.urls) ? s.urls : [s.urls],
         username: s.username ?? '', credential: s.credential ?? '' })), relayOnly: rtc.iceTransportPolicy === 'relay' });
     if (!this.current(route)) { await this.closeNative(route); return; }
-    this.send(route.peer, { id: route.id, mediaId: route.descriptor.id, kind: 'offer', descriptor: route.descriptor, sdp });
+    route.offer = { id: route.id, mediaId: route.descriptor.id, kind: 'offer', descriptor: route.descriptor, sdp };
+    this.sendOffer(route);
+  }
+  private sendOffer(route: Outgoing): void {
+    if (!this.current(route) || route.answered || !route.offer) return;
+    this.send(route.peer, route.offer);
     route.offered = true;
-    for (const candidate of route.localCandidates.splice(0)) this.send(route.peer, { id: route.id, mediaId: route.descriptor.id, kind: 'ice', candidate });
+    for (const candidate of route.localCandidates) this.send(route.peer, { id: route.id, mediaId: route.descriptor.id, kind: 'ice', candidate });
+    // Admission/manifest handlers can still be binding on reentry. Retry the
+    // same route and ICE history until acknowledged, within the setup deadline.
+    clearTimeout(route.retryTimer);
+    route.retryTimer = setTimeout(() => this.sendOffer(route), 1500);
   }
   private current(route: Outgoing): boolean { return !this.closed && this.outgoing.get(this.key(route.peer,route.descriptor.id)) === route; }
   private send(peer: string, signal: Signal): void {
@@ -89,10 +99,12 @@ export class NativeVideoTransport {
     if (outgoing?.id === signal.id) {
       try {
         if (signal.kind === 'reject') { this.fail(outgoing, 'receiver_rejected', signal.reason); return; }
-        if (signal.kind === 'answer' && !outgoing.answered) {
+        if (signal.kind === 'answer' && !outgoing.answered && !outgoing.answering) {
+          outgoing.answering = true;
           await invoke('answer_native_video', { id: outgoing.id, feedbackToken: outgoing.source.feedbackToken, sdp: signal.sdp });
           if (!this.current(outgoing)) return;
           outgoing.answered = true;
+          clearTimeout(outgoing.retryTimer);
           logDiagnostic('INFO', 'transmission.native', 'Native H264 offer answered; awaiting transport frames', {
             routeId: outgoing.id, mediaId: outgoing.descriptor.id, sessionId: outgoing.source.sessionId,
             elapsedMs: Math.round(performance.now() - outgoing.started) });
@@ -109,7 +121,11 @@ export class NativeVideoTransport {
     if (signal.kind === 'offer') {
       if (!signal.descriptor || !this.config.permitted(peer, signal.descriptor) || this.incoming.size >= 128) return;
       const old = this.incoming.get(key);
-      if (old?.id === signal.id) return;
+      if (old?.id === signal.id) {
+        const answer = old.pc.localDescription;
+        if (answer?.type === 'answer') this.send(peer, { id: old.id, mediaId: signal.mediaId, kind: 'answer', sdp: answer.sdp });
+        return;
+      }
       if (old) this.closeIncoming(old);
       const pc = new RTCPeerConnection(this.config.rtc());
       const incoming: Incoming = { id: signal.id, peer, descriptor: signal.descriptor, pc, candidates: [], remoteReady: false,
@@ -199,7 +215,7 @@ export class NativeVideoTransport {
     if (this.config.permitted(r.peer)) this.config.fallback(r.peer,r.descriptor.id);
   }
   private closeOutgoing(r: Outgoing, notify: boolean): void {
-    this.outgoing.delete(this.key(r.peer,r.descriptor.id)); clearTimeout(r.timer);
+    this.outgoing.delete(this.key(r.peer,r.descriptor.id)); clearTimeout(r.timer); clearTimeout(r.retryTimer);
     if (notify && r.offered) this.send(r.peer,{id:r.id,mediaId:r.descriptor.id,kind:'stop'});
     void this.closeNative(r);
   }

@@ -2019,6 +2019,12 @@ export class GroupRoomManager {
       if (!this.peerTracker.isVerified(peerId)) return;
       if (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(peerId))) return;
       if (metadata !== undefined && !validStreamDescriptors([metadata])) return;
+      // Shared connections can replay a container emptied by SDP removal during
+      // room detach. It must never replace a playable native/browser stream.
+      if (!stream.getTracks().some(track => track.readyState === 'live')) {
+        logDiagnostic('WARN', 'transmission.receive', 'Ignoring retired or empty remote stream', { mediaId: metadata?.id, streamId: stream.id });
+        return;
+      }
       console.log(`[P2P] Received stream from peer: ${peerId}`);
       this.peerTracker.touchPeer(peerId);
       this.peerTracker.setStreaming(peerId, true);

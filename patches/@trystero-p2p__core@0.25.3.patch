@@ -1,5 +1,5 @@
 diff --git a/dist/action-wire.mjs b/dist/action-wire.mjs
-index 992caaaef5e9f1e0bcfb5e348bc9138667f8242b..cdeb35a56997bf285673885e94bb8265bac09c53 100644
+index 992caaaef5e9f1e0bcfb5e348bc9138667f8242b..43f142909ad420f48144ba974553834a0bbf4f3e 100644
 --- a/dist/action-wire.mjs
 +++ b/dist/action-wire.mjs
 @@ -116,10 +116,11 @@ const createActionWireManager = ({ getPeer, getPeerIds, canReceiveFromPeer, thro
@@ -17,19 +17,35 @@ index 992caaaef5e9f1e0bcfb5e348bc9138667f8242b..cdeb35a56997bf285673885e94bb8265
  						const currentPeer = getPeer(id, normalizedOptions.sendToPending);
  						if (!currentPeer || currentPeer !== peer) break;
 diff --git a/dist/media.mjs b/dist/media.mjs
-index 2fd4906e80aefbef3f6b9f523a77ebf58562c3af..53258a2eb704aad191112933fee39d0f06928f15 100644
+index 2fd4906e80aefbef3f6b9f523a77ebf58562c3af..62bf55e8bc80a175d51c2922ee4abeb88d54e0ba 100644
 --- a/dist/media.mjs
 +++ b/dist/media.mjs
-@@ -53,6 +53,8 @@ const createMediaIdentityCache = () => {
+@@ -53,6 +53,10 @@ const createMediaIdentityCache = () => {
  const createMediaManager = ({ iterate, isActive, getSharedMediaPeer }) => {
  	const pendingStreamMetas = {};
  	const pendingTrackMetas = {};
 +	const receivedStreams = {};
 +	const receivedTracks = {};
++	const emittedStreamTracks = {};
++	const emittedTracks = {};
  	const localMedia = createMediaIdentityCache();
  	const listeners = {
  		onPeerStream: null,
-@@ -76,7 +78,7 @@ const createMediaManager = ({ iterate, isActive, getSharedMediaPeer }) => {
+@@ -60,11 +64,13 @@ const createMediaManager = ({ iterate, isActive, getSharedMediaPeer }) => {
+ 	};
+ 	const emitStream = (id, key, stream, metadata) => {
+ 		if (!isActive(id)) return;
++		(emittedStreamTracks[id] ??= new WeakMap()).set(stream, stream.getTracks());
+ 		getSharedMediaPeer(id)?.__trysteroMedia?.rememberRemoteStream(key, stream, typeof stream.id === "string" ? stream.id : void 0);
+ 		listeners.onPeerStream?.(stream, id, metadata);
+ 	};
+ 	const emitTrack = (id, key, track, stream, metadata) => {
+ 		if (!isActive(id)) return;
++		(emittedTracks[id] ??= new WeakMap()).set(track, stream);
+ 		getSharedMediaPeer(id)?.__trysteroMedia?.rememberRemoteTrack(key, track, stream, typeof track.id === "string" ? track.id : void 0, typeof stream.id === "string" ? stream.id : void 0);
+ 		listeners.onPeerTrack?.(track, stream, id, metadata);
+ 	};
+@@ -76,7 +82,7 @@ const createMediaManager = ({ iterate, isActive, getSharedMediaPeer }) => {
  		};
  		return iterate(targets, async (id, peer) => {
  			await sendMeta(payload, id);
@@ -38,32 +54,39 @@ index 2fd4906e80aefbef3f6b9f523a77ebf58562c3af..53258a2eb704aad191112933fee39d0f
  		});
  	};
  	return {
-@@ -101,7 +103,14 @@ const createMediaManager = ({ iterate, isActive, getSharedMediaPeer }) => {
+@@ -97,38 +103,64 @@ const createMediaManager = ({ iterate, isActive, getSharedMediaPeer }) => {
+ 			const parsed = toPendingMediaMeta(meta);
+ 			if (!parsed) return;
+ 			const cached = getSharedMediaPeer(id)?.__trysteroMedia?.getRemoteStream(parsed.key, parsed.streamId);
+-			if (cached) {
++			pendingStreamMetas[id] = (pendingStreamMetas[id] ?? []).filter(meta => meta.key !== parsed.key);
++			pendingStreamMetas[id].push(parsed);
++			if (cached && cached.getTracks().some(track => track.readyState !== "ended")) {
  				emitStream(id, parsed.key, cached, parsed.metadata);
  				return;
  			}
 -			(pendingStreamMetas[id] ??= []).push(parsed);
-+			pendingStreamMetas[id] = (pendingStreamMetas[id] ?? []).filter(meta => meta.key !== parsed.key);
-+			pendingStreamMetas[id].push(parsed);
 +			const received = receivedStreams[id]?.get(parsed.streamId);
 +			if (received) {
-+				pendingStreamMetas[id].pop();
 +				receivedStreams[id].delete(parsed.streamId);
 +				emitStream(id, parsed.key, received, parsed.metadata);
 +			}
  		},
  		receiveTrackMeta: (meta, id) => {
  			if (!isActive(id)) return;
-@@ -112,23 +121,40 @@ const createMediaManager = ({ iterate, isActive, getSharedMediaPeer }) => {
+ 			const parsed = toPendingMediaMeta(meta);
+ 			if (!parsed) return;
+ 			const cached = getSharedMediaPeer(id)?.__trysteroMedia?.getRemoteTrack(parsed.key, parsed.trackId);
+-			if (cached) {
++			pendingTrackMetas[id] = (pendingTrackMetas[id] ?? []).filter(meta => meta.key !== parsed.key);
++			pendingTrackMetas[id].push(parsed);
++			if (cached && cached.track.readyState !== "ended" && cached.stream.getTracks().includes(cached.track)) {
  				emitTrack(id, parsed.key, cached.track, cached.stream, parsed.metadata);
  				return;
  			}
 -			(pendingTrackMetas[id] ??= []).push(parsed);
-+			pendingTrackMetas[id] = (pendingTrackMetas[id] ?? []).filter(meta => meta.key !== parsed.key);
-+			pendingTrackMetas[id].push(parsed);
 +			const received = receivedTracks[id]?.get(parsed.trackId);
 +			if (received) {
-+				pendingTrackMetas[id].pop();
 +				receivedTracks[id].delete(parsed.trackId);
 +				emitTrack(id, parsed.key, received.track, received.stream, parsed.metadata);
 +			}
@@ -71,10 +94,12 @@ index 2fd4906e80aefbef3f6b9f523a77ebf58562c3af..53258a2eb704aad191112933fee39d0f
  		receiveRemoteStream: (id, stream) => {
  			if (!isActive(id)) return;
 -			const next = pendingStreamMetas[id]?.shift();
-+			if (getSharedMediaPeer(id)?.__trysteroMedia?.getRemoteStream("", stream.id)) return;
++			const previousTracks = emittedStreamTracks[id]?.get(stream);
++			const tracks = stream.getTracks();
++			if (previousTracks && previousTracks.length === tracks.length && tracks.every(track => previousTracks.includes(track))) return;
 +			(receivedStreams[id] ??= new Map()).set(stream.id, stream);
 +			const index = pendingStreamMetas[id]?.findIndex(meta => meta.streamId === stream.id) ?? -1;
-+			const next = index >= 0 ? pendingStreamMetas[id].splice(index, 1)[0] : null;
++			const next = index >= 0 ? pendingStreamMetas[id][index] : null;
  			if (!next) return;
 +			receivedStreams[id].delete(stream.id);
  			emitStream(id, next.key, stream, next.metadata);
@@ -82,15 +107,17 @@ index 2fd4906e80aefbef3f6b9f523a77ebf58562c3af..53258a2eb704aad191112933fee39d0f
  		receiveRemoteTrack: (id, track, stream) => {
  			if (!isActive(id)) return;
 -			const next = pendingTrackMetas[id]?.shift();
-+			if (getSharedMediaPeer(id)?.__trysteroMedia?.getRemoteTrack("", track.id)) return;
++			if (emittedTracks[id]?.get(track) === stream) return;
 +			(receivedTracks[id] ??= new Map()).set(track.id, { track, stream });
 +			const index = pendingTrackMetas[id]?.findIndex(meta => meta.trackId === track.id) ?? -1;
-+			const next = index >= 0 ? pendingTrackMetas[id].splice(index, 1)[0] : null;
++			const next = index >= 0 ? pendingTrackMetas[id][index] : null;
  			if (!next) return;
 +			receivedTracks[id].delete(track.id);
  			emitTrack(id, next.key, track, stream, next.metadata);
  		},
  		clearPeer: (id) => {
++			delete emittedStreamTracks[id];
++			delete emittedTracks[id];
  			delete pendingStreamMetas[id];
  			delete pendingTrackMetas[id];
 +			delete receivedStreams[id];

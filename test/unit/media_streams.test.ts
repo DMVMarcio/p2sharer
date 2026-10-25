@@ -175,6 +175,9 @@ test('native video and ordinary audio merge into the same advertised slot withou
     browserStream.addTrack(lateVideo);
     assert.deepEqual(media.get('screen').getTracks(), [lateVideo, audio],
       'Browser fallback must observe late video even when only audio had track metadata');
+    const playing = media.get('screen');
+    internal.receivePeerStream(new TestStream([]), 'owner', descriptor('screen'));
+    assert.equal(media.get('screen'), playing, 'An empty cached stream must not replace playable video');
     internal.room = null;
   } finally { Object.assign(globalThis,{MediaStream:original}); }
 });
