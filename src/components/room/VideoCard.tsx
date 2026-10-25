@@ -26,6 +26,7 @@ import { useContextMenu, type ContextMenuAction } from '../common/ContextMenu';
 import { isTauri } from '@tauri-apps/api/core';
 import { openBrowserPictureInPicture } from '../../platform/picture_in_picture';
 import { showToast } from '../../hooks/useToast';
+import { observeRemoteVideoStartup } from '../../video/remote_video_startup';
 
 interface VideoCardProps {
   children?: React.ReactNode;
@@ -157,6 +158,16 @@ export const VideoCard: React.FC<VideoCardProps> = ({
       if (!slot.isLocal) setIsVideoReady(false);
     }
   }, [slot.stream, slot.isLocal, cleanupVideoElement]);
+
+  useEffect(() => {
+    const element = videoElementRef.current;
+    if (slot.isLocal || !slot.stream || !element) return;
+    return observeRemoteVideoStartup(element, {
+      mediaId: slot.peerId,
+      ready: () => setIsVideoReady(true),
+      recover: () => roomService.roomManager?.requestStream(slot.peerId),
+    });
+  }, [slot.stream, slot.isLocal, slot.peerId, inTray, isPipActive]);
 
   useEffect(() => {
     return () => {
@@ -402,9 +413,6 @@ export const VideoCard: React.FC<VideoCardProps> = ({
               autoPlay
               playsInline
               muted
-              onLoadedData={() => setIsVideoReady(true)}
-              onPlaying={() => setIsVideoReady(true)}
-              onTimeUpdate={() => { if (!isVideoReady) setIsVideoReady(true); }}
               style={{
                 width: '100%',
                 height: '100%',

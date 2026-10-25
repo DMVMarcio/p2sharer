@@ -45,6 +45,24 @@ test('native publication targets only its peer, suppresses browser video and pre
   internal.nativeVideo = null; internal.room = null; manager.stopStream();
 });
 
+test('browser fallback dispatches only the failed media without renegotiating another source', () => {
+  const manager = new GroupRoomManager('Owner', 'test', '', true);
+  const internal = manager as any;
+  const screen = fakeStream('screen'), camera = fakeStream('camera');
+  internal.localMedia.set('screen', { stream: screen, descriptor: descriptor('screen') });
+  internal.localMedia.set('camera', { stream: camera, descriptor: descriptor('camera', 'camera') });
+  const dispatched: unknown[] = [];
+  internal.nativeVideo = { dispatch: (_peer: string, stream: unknown) => {
+    assert.equal(stream, screen); return false;
+  } };
+  internal.room = { getPeers: () => ({}), addStream: (stream: unknown, options: any) => {
+    assert.equal(options.target, 'watcher'); dispatched.push(stream); return [];
+  } };
+  internal.dispatchMediaToPeer('watcher', false, 'screen');
+  assert.deepEqual(dispatched, [screen]);
+  internal.nativeVideo = null; internal.room = null; manager.stopStream();
+});
+
 test('presence reuses published media and newcomer warmup touches only its connection', context => {
   context.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 10_000 });
   const manager = new GroupRoomManager('Owner', 'test', '', true);
@@ -149,6 +167,15 @@ test('native video and ordinary audio merge into the same advertised slot withou
     cameraStream.addTrack({ id: 'late-audio', kind: 'audio', readyState: 'live' });
     assert.equal(media.get('camera'), cameraStream, 'Late tracks must preserve the observed container');
     assert.equal(media.get('camera').getAudioTracks().length, 1);
+    internal.room = { getPeers: () => ({}) };
+    internal.bindRoomListeners();
+    const browserStream = new TestStream([audio]);
+    internal.room.onPeerTrack(audio, browserStream, 'owner', descriptor('screen'));
+    const lateVideo = { id: 'late-browser-video', kind: 'video', readyState: 'live' };
+    browserStream.addTrack(lateVideo);
+    assert.deepEqual(media.get('screen').getTracks(), [lateVideo, audio],
+      'Browser fallback must observe late video even when only audio had track metadata');
+    internal.room = null;
   } finally { Object.assign(globalThis,{MediaStream:original}); }
 });
 

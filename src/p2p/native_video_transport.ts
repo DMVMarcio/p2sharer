@@ -9,12 +9,14 @@ const SETUP_TIMEOUT_MS = 15_000;
 const FIRST_VIDEO_TIMEOUT_MS = 3_500;
 
 type Signal = { id: string; kind: 'offer' | 'answer' | 'ice' | 'reject' | 'stop'; mediaId: string;
-  sdp?: string; candidate?: RTCIceCandidateInit; descriptor?: StreamDescriptor };
+  sdp?: string; candidate?: RTCIceCandidateInit; descriptor?: StreamDescriptor; reason?: string };
 interface Outgoing { id: string; peer: string; descriptor: StreamDescriptor; source: NativeSenderSource; track: MediaStreamTrack;
   started: number;
   timer: ReturnType<typeof setTimeout>; offered: boolean; answered: boolean; candidates: RTCIceCandidateInit[]; localCandidates: RTCIceCandidateInit[] }
 interface Incoming { id: string; peer: string; descriptor: StreamDescriptor; pc: RTCPeerConnection;
-  timer: ReturnType<typeof setInterval>; remoteReady: boolean; candidates: RTCIceCandidateInit[]; started: number; connectedAt?: number }
+  timer: ReturnType<typeof setInterval>; remoteReady: boolean; candidates: RTCIceCandidateInit[]; started: number; connectedAt?: number;
+  verifiedFrames?: boolean;
+  videoStats?: { bytesReceived: number; framesReceived: number; framesDecoded: number; keyFramesDecoded: number } }
 interface TransportConfig {
   rtc: () => RTCConfiguration;
   send: (peer: string, signal: Signal) => void;
@@ -37,10 +39,10 @@ export class NativeVideoTransport {
   constructor(config: TransportConfig) { this.config = config; }
   private key(peer: string, mediaId: string): string { return `${peer}/${mediaId}`; }
   private ensureListener(): Promise<void> {
-    return this.listening ??= listen<{ id: string; kind: string; candidate?: RTCIceCandidateInit }>('native-video-signal', ({ payload }) => {
+    return this.listening ??= listen<{ id: string; kind: string; candidate?: RTCIceCandidateInit; reason?: string }>('native-video-signal', ({ payload }) => {
       const route = [...this.outgoing.values()].find(r => r.id === payload.id);
       if (!route || this.closed) return;
-      if (payload.kind === 'failed') { this.fail(route, 'native_sender_failure'); return; }
+      if (payload.kind === 'failed') { this.fail(route, 'native_sender_failure', payload.reason); return; }
       if (payload.kind === 'ice' && payload.candidate) {
         if (!route.offered) route.localCandidates.push(payload.candidate);
         else this.send(route.peer, { id: route.id, mediaId: route.descriptor.id, kind: 'ice', candidate: payload.candidate });
@@ -86,7 +88,7 @@ export class NativeVideoTransport {
     const outgoing = this.outgoing.get(key);
     if (outgoing?.id === signal.id) {
       try {
-        if (signal.kind === 'reject') { this.fail(outgoing, 'receiver_rejected'); return; }
+        if (signal.kind === 'reject') { this.fail(outgoing, 'receiver_rejected', signal.reason); return; }
         if (signal.kind === 'answer' && !outgoing.answered) {
           await invoke('answer_native_video', { id: outgoing.id, feedbackToken: outgoing.source.feedbackToken, sdp: signal.sdp });
           if (!this.current(outgoing)) return;
@@ -114,6 +116,9 @@ export class NativeVideoTransport {
         started: performance.now(), timer: setInterval(() => { void this.checkReceiver(incoming); }, 500) };
       this.incoming.set(key, incoming);
       pc.onconnectionstatechange = () => {
+        logDiagnostic('INFO', 'transmission.native', 'Native receiver connection state changed', {
+          routeId: incoming.id, mediaId: incoming.descriptor.id, connectionState: pc.connectionState,
+          iceState: pc.iceConnectionState, elapsedMs: Math.round(performance.now() - incoming.started) });
         if (pc.connectionState === 'connected') incoming.connectedAt ??= performance.now();
         if (pc.connectionState === 'failed') this.reject(incoming, 'connection_failed');
       };
@@ -147,6 +152,7 @@ export class NativeVideoTransport {
   }
   private async checkReceiver(r: Incoming): Promise<void> {
     if (this.incoming.get(this.key(r.peer,r.descriptor.id)) !== r) return;
+    if (r.verifiedFrames) return;
     if (!this.config.permitted(r.peer,r.descriptor)) { this.closeIncoming(r); return; }
     if (r.pc.connectionState === 'failed') {
       this.reject(r, 'connection_failed');
@@ -155,10 +161,13 @@ export class NativeVideoTransport {
     const elapsed = performance.now() - r.started;
     if (r.pc.connectionState === 'connected') r.connectedAt ??= performance.now();
     const stats = await r.pc.getStats().catch(() => undefined);
-    if (this.incoming.get(this.key(r.peer,r.descriptor.id)) !== r) return;
-    const received = stats && [...stats.values()].some(s => s.type === 'inbound-rtp' && s.kind === 'video' &&
-      (s.framesDecoded > 0 || s.framesReceived > 0));
+    if (this.incoming.get(this.key(r.peer,r.descriptor.id)) !== r || r.verifiedFrames) return;
+    const video = stats && [...stats.values()].find(s => s.type === 'inbound-rtp' && s.kind === 'video');
+    if (video) r.videoStats = { bytesReceived: video.bytesReceived ?? 0, framesReceived: video.framesReceived ?? 0,
+      framesDecoded: video.framesDecoded ?? 0, keyFramesDecoded: video.keyFramesDecoded ?? 0 };
+    const received = video?.framesDecoded > 0;
     if (received) {
+      r.verifiedFrames = true;
       logDiagnostic('INFO', 'transmission.native', 'Native H264 receiver has video frames', {
         routeId: r.id, mediaId: r.descriptor.id, elapsedMs: Math.round(elapsed) });
       clearInterval(r.timer);
@@ -174,8 +183,8 @@ export class NativeVideoTransport {
     if (this.incoming.get(this.key(r.peer,r.descriptor.id)) !== r) return;
     logDiagnostic('WARN', 'transmission.native', 'Rejecting native video; requesting browser WebRTC fallback', {
       routeId: r.id, mediaId: r.descriptor.id, reason, error, connectionState: r.pc.connectionState,
-      iceState: r.pc.iceConnectionState, elapsedMs: Math.round(performance.now() - r.started) });
-    this.send(r.peer,{id:r.id,mediaId:r.descriptor.id,kind:'reject'}); this.closeIncoming(r);
+      iceState: r.pc.iceConnectionState, videoStats: r.videoStats, elapsedMs: Math.round(performance.now() - r.started) });
+    this.send(r.peer,{id:r.id,mediaId:r.descriptor.id,kind:'reject',reason}); this.closeIncoming(r);
   }
   private nativeIce(r: Outgoing, candidate: RTCIceCandidateInit): Promise<void> {
     return invoke('add_native_video_ice',{id:r.id,feedbackToken:r.source.feedbackToken,candidate});
@@ -233,5 +242,6 @@ export function validNativeSignal(value: unknown): value is Signal {
   if (s.kind==='offer') return typeof s.sdp==='string' && s.sdp.length<=128*1024 && validStreamDescriptors([s.descriptor]) && s.descriptor?.id===s.mediaId;
   if (s.kind==='answer') return typeof s.sdp==='string' && s.sdp.length<=128*1024;
   if (s.kind==='ice') return !!s.candidate && typeof s.candidate.candidate==='string' && s.candidate.candidate.length<=4096;
-  return s.kind==='stop' || s.kind==='reject';
+  return s.kind==='stop' || (s.kind==='reject' && (s.reason === undefined ||
+    (typeof s.reason === 'string' && /^[a-z_]{1,100}$/.test(s.reason))));
 }

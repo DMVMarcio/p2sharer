@@ -1,5 +1,6 @@
 import { normalizeNicknameStyle, type NicknameStyle } from '../core/nickname_style.ts';
 import { stateStore } from '../core/state_store.ts';
+import { logDiagnostic } from '../core/logger.ts';
 import { ProfileTransfer } from './profile_transfer.ts';
 import { profileImages, profileBanners } from '../core/profile_image.ts';
 import { profileStats } from '../core/profile_stats.ts';
@@ -1870,7 +1871,10 @@ export class GroupRoomManager {
       receive: (peerId, stream, descriptor) => this.receivePeerStream(stream, peerId, descriptor),
       fallback: (peerId, mediaId) => {
         const entry = this.localMedia.get(mediaId);
-        if (entry && this.room === boundRoom) this.dispatchMediaToPeer(peerId, true);
+        if (entry && this.room === boundRoom) {
+          logDiagnostic('INFO', 'transmission.fallback', 'Publishing browser video after native route failure', { mediaId });
+          this.dispatchMediaToPeer(peerId, false, mediaId);
+        }
       },
     });
     this.nativeVideoAction.onMessage = (data: unknown, meta: { peerId: string }) => {
@@ -1997,9 +2001,11 @@ export class GroupRoomManager {
     };
 
     // 10. Incoming Stream Listener
-    this.room.onPeerTrack = (track: MediaStreamTrack, _stream: MediaStream, peerId: string, metadata?: StreamDescriptor) => {
+    this.room.onPeerTrack = (_track: MediaStreamTrack, stream: MediaStream, peerId: string, metadata?: StreamDescriptor) => {
       if (this.room !== boundRoom || !metadata || !validStreamDescriptors([metadata])) return;
-      this.receivePeerStream(new MediaStream([track]), peerId, metadata);
+      // Keep the browser's container: fallback video may arrive after audio,
+      // without another metadata event. Its addtrack observer must survive.
+      this.receivePeerStream(stream, peerId, metadata);
     };
     this.room.onPeerStream = (stream: MediaStream, peerId: string, metadata?: StreamDescriptor) => {
       if (this.room !== boundRoom) return;
@@ -2040,6 +2046,9 @@ export class GroupRoomManager {
             incoming.addEventListener('addtrack', () => this.receivePeerStream(incoming, peerId, metadata));
           }
         }
+        if (stream !== existing) logDiagnostic('INFO', 'transmission.receive', 'Remote media tracks attached', {
+          mediaId: metadata.id, streamId: stream.id,
+          tracks: stream.getTracks().map(track => ({ id: track.id, kind: track.kind, state: track.readyState, muted: track.muted })) });
         media.set(metadata.id, stream);
         this.remoteMedia.set(peerId, media);
       }
@@ -2479,7 +2488,7 @@ export class GroupRoomManager {
     }
   }
 
-  private dispatchMediaToPeer(peerId: string, recovery = false) {
+  private dispatchMediaToPeer(peerId: string, recovery = false, mediaId?: string) {
     const room = this.room;
     if (!room) return;
     const peers = room.getPeers?.() || {};
@@ -2488,6 +2497,7 @@ export class GroupRoomManager {
     const pc: RTCPeerConnection = peerObj?.connection || peerObj?.pc || peerObj;
 
     for (const entry of this.localMedia.values()) {
+      if (mediaId !== undefined && entry.descriptor.id !== mediaId) continue;
       if (this.nativeVideo?.dispatch(peerId, entry.stream, entry.descriptor)) {
         for (const video of entry.stream.getVideoTracks()) room.removeTrack(video, { target: peerId });
         for (const audio of entry.stream.getAudioTracks()) {

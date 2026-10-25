@@ -10,6 +10,8 @@ test('native signaling bounds SDP/candidates and ties offer to advertised media 
   assert.equal(validNativeSignal({...offer,sdp:'a'.repeat(128*1024+1)}),false);
   assert.equal(validNativeSignal({id:'route',mediaId:'screen',kind:'ice',candidate:{candidate:'a'.repeat(4097)}}),false);
   assert.equal(validNativeSignal({id:'../route',mediaId:'screen',kind:'stop'}),false);
+  assert.equal(validNativeSignal({id:'route',mediaId:'screen',kind:'reject',reason:'connection_failed'}),true);
+  assert.equal(validNativeSignal({id:'route',mediaId:'screen',kind:'reject',reason:'x'.repeat(101)}),false);
 });
 test('native source registration is track-specific and ended tracks cannot authorize a sender',()=>{
   const track={id:'track',readyState:'live'} as MediaStreamTrack;
@@ -67,6 +69,29 @@ test('native receiver still falls back when setup never completes', async contex
   f.at(15000); await f.internal.checkReceiver(f.route);
   assert.equal(f.messages[0]?.kind, 'reject');
   assert.equal(f.pc.connectionState, 'closed');
+});
+
+test('native receiver falls back for received but undecodable packets', async context => {
+  const f = receiverFixture(context);
+  f.pc.connectionState = 'connected';
+  f.pc.getStats = async () => new Map([['video', { type: 'inbound-rtp', kind: 'video', framesReceived: 5, framesDecoded: 0 }]]);
+  await f.internal.checkReceiver(f.route);
+  f.at(3500);
+  await f.internal.checkReceiver(f.route);
+  assert.equal(f.messages[0]?.reason, 'no_video_before_receiver_deadline');
+  assert.equal(f.pc.connectionState, 'closed');
+});
+
+test('native receiver stops startup checks once frames decode', async context => {
+  const f = receiverFixture(context);
+  let samples = 0;
+  f.pc.getStats = async () => { samples++; return new Map([['video', { type: 'inbound-rtp', kind: 'video', framesDecoded: 1 }]]); };
+  await Promise.all([f.internal.checkReceiver(f.route), f.internal.checkReceiver(f.route)]);
+  const previous = samples;
+  f.at(20_000);
+  await f.internal.checkReceiver(f.route);
+  assert.equal(samples, previous);
+  assert.equal(f.messages.length, 0);
 });
 
 test('a completed native frame check cannot resurrect a closed receiver', async context => {
