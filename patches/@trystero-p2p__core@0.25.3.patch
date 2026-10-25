@@ -17,7 +17,7 @@ index 992caaaef5e9f1e0bcfb5e348bc9138667f8242b..43f142909ad420f48144ba974553834a
  						const currentPeer = getPeer(id, normalizedOptions.sendToPending);
  						if (!currentPeer || currentPeer !== peer) break;
 diff --git a/dist/media.mjs b/dist/media.mjs
-index 2fd4906e80aefbef3f6b9f523a77ebf58562c3af..62bf55e8bc80a175d51c2922ee4abeb88d54e0ba 100644
+index 2fd4906e80aefbef3f6b9f523a77ebf58562c3af..5fb7cfdc78ddb29f09c3ec33013d6991c29054fc 100644
 --- a/dist/media.mjs
 +++ b/dist/media.mjs
 @@ -53,6 +53,10 @@ const createMediaIdentityCache = () => {
@@ -180,3 +180,57 @@ index 8003df9196a808650bc233f9243be5eae14b4a1d..44579d8fbe661690578c96572f343f9e
  		removeTrack: (track) => {
  			const sender = pc.getSenders().find((s) => s.track === track);
  			if (sender) pc.removeTrack(sender);
+diff --git a/dist/shared-peer.mjs b/dist/shared-peer.mjs
+index 5fca48a89e823ad3a5665d121f390b505ecf9345..3a7d0f5fa5f467cadfc553600bb3b453bba14f77 100644
+--- a/dist/shared-peer.mjs
++++ b/dist/shared-peer.mjs
+@@ -162,7 +162,7 @@ var SharedPeerManager = class {
+ 			proxy: {}
+ 		};
+ 		const detachBinding = () => {
+-			if (!shared.bindings[roomId]) return;
++			if (shared.bindings[roomId] !== binding) return;
+ 			this.pruneRoomOwnership(shared, roomId);
+ 			delete shared.bindings[roomId];
+ 			if (binding.roomToken && shared.bindingsByToken[binding.roomToken] === binding) delete shared.bindingsByToken[binding.roomToken];
+@@ -199,13 +199,14 @@ var SharedPeerManager = class {
+ 			},
+ 			offerPromise: shared.peer.offerPromise,
+ 			addStream: (stream) => {
++				if (shared.bindings[roomId] !== binding) return;
+ 				const owners = shared.streamOwners.get(stream) ?? /* @__PURE__ */ new Set();
+-				const shouldAttach = owners.size === 0;
+ 				owners.add(roomId);
+ 				shared.streamOwners.set(stream, owners);
+-				if (shouldAttach) shared.peer.addStream(stream);
++				shared.peer.addStream(stream);
+ 			},
+ 			removeStream: (stream) => {
++				if (shared.bindings[roomId] !== binding) return;
+ 				const owners = shared.streamOwners.get(stream);
+ 				if (!owners) return;
+ 				owners.delete(roomId);
+@@ -215,6 +216,7 @@ var SharedPeerManager = class {
+ 				}
+ 			},
+ 			addTrack: (track, stream) => {
++				if (shared.bindings[roomId] !== binding) return;
+ 				const entry = shared.trackOwners.get(track) ?? {
+ 					stream,
+ 					rooms: /* @__PURE__ */ new Set()
+@@ -227,6 +229,7 @@ var SharedPeerManager = class {
+ 				return shared.peer.connection.getSenders().find((s) => s.track === track) ?? shared.peer.addTrack(track, stream);
+ 			},
+ 			removeTrack: (track) => {
++				if (shared.bindings[roomId] !== binding) return;
+ 				const entry = shared.trackOwners.get(track);
+ 				if (!entry) return;
+ 				entry.rooms.delete(roomId);
+@@ -236,6 +239,7 @@ var SharedPeerManager = class {
+ 				}
+ 			},
+ 			replaceTrack: (oldTrack, newTrack) => {
++				if (shared.bindings[roomId] !== binding) return;
+ 				const oldEntry = shared.trackOwners.get(oldTrack);
+ 				if (oldEntry) {
+ 					shared.trackOwners.delete(oldTrack);

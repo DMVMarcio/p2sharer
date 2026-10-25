@@ -91,7 +91,7 @@ test('native receiver stops startup checks once frames decode', async context =>
   f.at(20_000);
   await f.internal.checkReceiver(f.route);
   assert.equal(samples, previous);
-  assert.equal(f.messages.length, 0);
+  assert.equal(f.messages[0]?.kind, 'ready');
 });
 
 test('a completed native frame check cannot resurrect a closed receiver', async context => {
@@ -122,6 +122,7 @@ test('native statistics skip pending creation and ignore samples retired during 
   assert.deepEqual(await native.senderStats('screen'), []);
   assert.deepEqual(calls, []);
   route.answered = true;
+  Object.assign(route, { ready: true });
   const sampling = native.senderStats('screen');
   assert.deepEqual(calls, ['get_native_video_stats']);
   internal.outgoing.clear();
@@ -137,7 +138,7 @@ test('native statistics skip pending creation and ignore samples retired during 
 test('pending native offer replays its route and ICE history until answered, then stops', async context => {
   context.mock.timers.enable({ apis: ['setTimeout'] });
   const previousWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
-  let answers = 0;
+  let answers = 0, ready = 0;
   let acknowledge!: () => void;
   Object.defineProperty(globalThis, 'window', { configurable: true, value: { __TAURI_INTERNALS__: {
     invoke: (command: string) => {
@@ -148,7 +149,7 @@ test('pending native offer replays its route and ICE history until answered, the
   context.after(() => { if (previousWindow) Object.defineProperty(globalThis, 'window', previousWindow); else delete (globalThis as any).window; });
   const messages: any[] = [];
   const native = new NativeVideoTransport({ rtc: () => ({}), send: (_peer, signal) => messages.push(signal),
-    permitted: () => true, receive: () => {}, fallback: () => {} });
+    permitted: () => true, receive: () => {}, fallback: () => {}, ready: () => ready++ });
   const internal = native as any;
   const route = { id: 'route', peer: 'peer', descriptor: { id: 'screen' }, source: { feedbackToken: 'token' },
     started: performance.now(), offered: false, answered: false, candidates: [], localCandidates: [{ candidate: 'candidate:fixture' }],
@@ -165,6 +166,11 @@ test('pending native offer replays its route and ICE history until answered, the
   assert.equal(answers, 1, 'Retransmitted answers must not enter native negotiation twice');
   acknowledge();
   await answering;
+  assert.equal(native.sending('peer', 'screen'), false, 'An SDP answer alone must not retire browser video');
+  await native.signal('peer', { id: 'route', mediaId: 'screen', kind: 'ready' });
+  await native.signal('peer', { id: 'route', mediaId: 'screen', kind: 'ready' });
+  assert.equal(ready, 1);
+  assert.equal(native.sending('peer', 'screen'), true);
   context.mock.timers.tick(20_000);
   assert.equal(messages.length, 4);
 });
@@ -177,4 +183,45 @@ test('duplicate native offer resends the existing answer without replacing the r
   assert.equal(f.messages[0]?.kind, 'answer');
   assert.equal(f.internal.incoming.get('peer/screen'), f.route);
   assert.equal(f.pc.connectionState, 'connecting');
+});
+
+test('native negotiation probes privately and hands off only after a decoded frame', async context => {
+  const original = { MediaStream: globalThis.MediaStream, RTCPeerConnection: globalThis.RTCPeerConnection,
+    document: globalThis.document };
+  let decoded = 0, received = 0, paused = 0;
+  const track = { kind: 'video', readyState: 'live', id: 'video' };
+  const probes: any[] = [], messages: any[] = [];
+  class Stream { tracks: unknown[]; constructor(tracks: unknown[]) { this.tracks = tracks; } }
+  class Connection {
+    connectionState = 'connected'; iceConnectionState = 'connected'; localDescription: unknown;
+    ontrack?: (event: unknown) => void;
+    async setRemoteDescription() { this.ontrack?.({ track }); }
+    async createAnswer() { return { type: 'answer', sdp: 'v=0' }; }
+    async setLocalDescription(description: unknown) { this.localDescription = description; }
+    async getStats() { return new Map([['video', { type: 'inbound-rtp', kind: 'video', framesDecoded: decoded }]]); }
+    close() { this.connectionState = 'closed'; }
+    getReceivers() { return []; }
+  }
+  Object.assign(globalThis, { MediaStream: Stream, RTCPeerConnection: Connection, document: {
+    createElement: () => { const probe = { srcObject: null, play: async () => {}, pause: () => paused++ }; probes.push(probe); return probe; },
+  } });
+  context.after(() => Object.assign(globalThis, original));
+  const native = new NativeVideoTransport({ rtc: () => ({}), permitted: () => true, send: (_peer, signal) => messages.push(signal),
+    receive: () => received++, fallback: () => {} });
+  context.after(() => native.close());
+  await native.signal('peer', { id: 'route', mediaId: 'screen', kind: 'offer', sdp: 'v=0',
+    descriptor: { id: 'screen', kind: 'screen', label: 'Screen', videoTrackId: 'video', fps: 60, bitrate: 8000 } });
+  const internal = native as any, route = internal.incoming.get('peer/screen');
+  assert.equal(probes.length, 1);
+  assert.ok(probes[0].srcObject, 'The probe consumes the native track before decode can begin');
+  await internal.checkReceiver(route);
+  assert.equal(received, 0, 'An SDP track must not replace browser playback');
+  assert.equal(native.receiving('peer', 'screen'), false);
+  decoded = 1;
+  await internal.checkReceiver(route);
+  assert.equal(received, 1);
+  assert.equal(native.receiving('peer', 'screen'), true);
+  assert.equal(messages.at(-1).kind, 'ready');
+  assert.equal(probes[0].srcObject, null);
+  assert.equal(paused, 1);
 });

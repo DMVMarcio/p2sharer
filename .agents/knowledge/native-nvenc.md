@@ -36,8 +36,11 @@ local UI track. A WeakMap registers only live local capture tracks and their cap
 generation tokens. Cameras, unsupported capture devices and JPEG fallback captures retain
 the established browser WebRTC path. Native negotiation/encoding/transport rejection
 also selects that path for the affected viewer without opening a browser picker.
-Automatic enables native RTP on supported captures; failed native negotiation retains
-the existing generic fallback.
+Automatic negotiates native RTP on supported captures while browser video starts on
+the established room connection. A muted receiver probe consumes native video until
+RTP statistics prove that frames decode; only the receiver's `ready` acknowledgement
+retires the browser video sender. Failed native setup therefore cannot hold startup
+behind an ICE timeout. The temporary probe is released at handoff or teardown.
 
 Audio retains the original Trystero connection and its filters. Its per-track
 metadata callback and native video callback merge tracks into the same advertised

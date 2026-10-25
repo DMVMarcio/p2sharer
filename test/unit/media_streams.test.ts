@@ -25,22 +25,28 @@ test('spotlight follows its participant through stream start and stop without sw
   assert.equal(reconcilePinnedRoomSlot(null, [participant], [screen]), null);
 });
 
-test('native publication targets only its peer, suppresses browser video and preserves audio', () => {
+test('native publication starts browser video immediately and retires it only after decoded confirmation', () => {
   const manager = new GroupRoomManager('Owner', 'test', '', true);
   const stream = fakeStream('native-screen');
-  const audio = { id: 'audio', kind: 'audio' };
-  Object.assign(stream, { getAudioTracks: () => [audio] });
+  const audio = { id: 'audio', kind: 'audio', stop() {} };
+  const video = stream.getVideoTracks()[0];
+  Object.assign(stream, { getAudioTracks: () => [audio], getTracks: () => [video, audio] });
   const calls: Array<{ kind: string; track: any; options: any }> = [];
   const internal = manager as any;
   internal.localMedia.set('native-screen', { stream, descriptor: descriptor('native-screen') });
-  internal.nativeVideo = { dispatch: () => true };
+  let ready = false;
+  internal.nativeVideo = { dispatch: () => true, sending: () => ready };
   internal.room = {
-    addStream: () => assert.fail('Native video must not enter the browser encoder'),
+    addStream: () => assert.fail('Parallel publication uses independent track ownership'),
     removeTrack: (track: any, options: any) => calls.push({ kind: 'remove', track, options }),
     addTrack: (track: any, _stream: MediaStream, options: any) => { calls.push({ kind: 'add', track, options }); return []; },
   };
   internal.dispatchMediaToPeer('watcher');
-  assert.equal(calls.length, 2); assert.equal(calls[0].track.kind, 'video'); assert.equal(calls[1].track, audio);
+  assert.equal(calls.length, 2); assert.equal(calls[0].kind, 'add'); assert.equal(calls[0].track.kind, 'video'); assert.equal(calls[1].track, audio);
+  ready = true;
+  internal.dispatchMediaToPeer('watcher');
+  assert.equal(calls[2].kind, 'remove'); assert.equal(calls[2].track, video);
+  assert.equal(calls[3].track, audio);
   assert.ok(calls.every(call => call.options.target === 'watcher'));
   internal.nativeVideo = null; internal.room = null; manager.stopStream();
 });
@@ -178,6 +184,16 @@ test('native video and ordinary audio merge into the same advertised slot withou
     const playing = media.get('screen');
     internal.receivePeerStream(new TestStream([]), 'owner', descriptor('screen'));
     assert.equal(media.get('screen'), playing, 'An empty cached stream must not replace playable video');
+    const nativeTrack = { id: 'confirmed-native', kind: 'video', readyState: 'live' };
+    internal.nativeVideo = { receiving: () => true };
+    internal.receivePeerStream(new TestStream([nativeTrack]), 'owner', descriptor('screen'));
+    internal.room.onPeerStream(browserStream, 'owner', descriptor('screen'));
+    assert.equal(media.get('screen').getVideoTracks()[0], nativeTrack,
+      'Late browser metadata must preserve confirmed native video');
+    browserStream.addTrack({ id: 'later-audio', kind: 'audio', readyState: 'live' });
+    assert.equal(media.get('screen').getVideoTracks()[0], nativeTrack,
+      'An existing browser addtrack observer must also respect the native handoff');
+    internal.nativeVideo = null;
     internal.room = null;
   } finally { Object.assign(globalThis,{MediaStream:original}); }
 });

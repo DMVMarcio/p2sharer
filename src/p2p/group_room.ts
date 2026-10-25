@@ -1869,6 +1869,9 @@ export class GroupRoomManager {
         (!this.authority || this.localAdmitted && this.isAdmittedPeer(peerId)) &&
         (!descriptor || !!this.remoteDescriptors.get(peerId)?.some(entry => entry.id === descriptor.id && entry.videoTrackId === descriptor.videoTrackId)),
       receive: (peerId, stream, descriptor) => this.receivePeerStream(stream, peerId, descriptor),
+      ready: (peerId, mediaId) => {
+        if (this.room === boundRoom) this.dispatchMediaToPeer(peerId, false, mediaId);
+      },
       fallback: (peerId, mediaId) => {
         const entry = this.localMedia.get(mediaId);
         if (entry && this.room === boundRoom) {
@@ -2005,20 +2008,35 @@ export class GroupRoomManager {
       if (this.room !== boundRoom || !metadata || !validStreamDescriptors([metadata])) return;
       // Keep the browser's container: fallback video may arrive after audio,
       // without another metadata event. Its addtrack observer must survive.
-      this.receivePeerStream(stream, peerId, metadata);
+      this.receiveBrowserStream(stream, peerId, metadata);
     };
     this.room.onPeerStream = (stream: MediaStream, peerId: string, metadata?: StreamDescriptor) => {
       if (this.room !== boundRoom) return;
-      this.receivePeerStream(stream, peerId, metadata);
+      this.receiveBrowserStream(stream, peerId, metadata);
     };
 
   }
 
-  private receivePeerStream(stream: MediaStream, peerId: string, metadata?: StreamDescriptor): void {
+  private receiveBrowserStream(stream: MediaStream, peerId: string, metadata?: StreamDescriptor): void {
+    this.receivePeerStream(stream, peerId, metadata, true);
+  }
+
+  private receivePeerStream(stream: MediaStream, peerId: string, metadata?: StreamDescriptor, browser = false): void {
       if (this.previewOnly) return;
       if (!this.peerTracker.isVerified(peerId)) return;
       if (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(peerId))) return;
       if (metadata !== undefined && !validStreamDescriptors([metadata])) return;
+      if (browser && metadata && this.nativeVideo?.receiving(peerId, metadata.id)) {
+        const incoming = stream;
+        if (!this.observedRemoteStreams.has(incoming)) {
+          this.observedRemoteStreams.add(incoming);
+          incoming.addEventListener('addtrack', () => this.receiveBrowserStream(incoming, peerId, metadata));
+        }
+        // Browser audio can arrive after the native handoff. Preserve its
+        // container observer, but never let its retired video undo the handoff.
+        if (!stream.getAudioTracks().length) return;
+        stream = new MediaStream(stream.getAudioTracks());
+      }
       // Shared connections can replay a container emptied by SDP removal during
       // room detach. It must never replace a playable native/browser stream.
       if (!stream.getTracks().some(track => track.readyState === 'live')) {
@@ -2049,7 +2067,7 @@ export class GroupRoomManager {
             ? existing : new MediaStream(tracks);
           if (!this.observedRemoteStreams.has(incoming)) {
             this.observedRemoteStreams.add(incoming);
-            incoming.addEventListener('addtrack', () => this.receivePeerStream(incoming, peerId, metadata));
+            incoming.addEventListener('addtrack', () => this.receivePeerStream(incoming, peerId, metadata, browser));
           }
         }
         if (stream !== existing) logDiagnostic('INFO', 'transmission.receive', 'Remote media tracks attached', {
@@ -2063,7 +2081,7 @@ export class GroupRoomManager {
         this.observedRemoteStreams.add(stream);
         stream.addEventListener('addtrack', () => {
           if (this.remoteDescriptors.get(peerId)?.some((entry) => entry.id === metadata.id)) {
-            this.receivePeerStream(stream, peerId, metadata);
+            this.receivePeerStream(stream, peerId, metadata, browser);
           }
         });
       }
@@ -2504,19 +2522,16 @@ export class GroupRoomManager {
 
     for (const entry of this.localMedia.values()) {
       if (mediaId !== undefined && entry.descriptor.id !== mediaId) continue;
+      if (recovery && pc) void MediaCoordinator.requestKeyFrame(pc);
       if (this.nativeVideo?.dispatch(peerId, entry.stream, entry.descriptor)) {
-        for (const video of entry.stream.getVideoTracks()) room.removeTrack(video, { target: peerId });
-        for (const audio of entry.stream.getAudioTracks()) {
-          if (recovery && pc && typeof pc.getSenders === 'function') {
-            const sender = pc.getSenders().find((s) => s.track === audio);
-            if (sender) {
-              try {
-                pc.removeTrack(sender);
-              } catch {}
-            }
-          }
-          for (const operation of room.addTrack(audio, entry.stream, { target: peerId, metadata: entry.descriptor }) || []) {
-            void Promise.resolve(operation).catch(error => console.warn('[Media] Audio dispatch failed:', error));
+        const nativeReady = this.nativeVideo.sending(peerId, entry.descriptor.id);
+        if (nativeReady) for (const video of entry.stream.getVideoTracks()) room.removeTrack(video, { target: peerId });
+        // Start on the established room connection while native ICE negotiates.
+        // Per-track ownership lets the ready acknowledgement retire only video.
+        const tracks = nativeReady ? entry.stream.getAudioTracks() : entry.stream.getTracks();
+        for (const track of tracks) {
+          for (const operation of room.addTrack(track, entry.stream, { target: peerId, metadata: entry.descriptor }) || []) {
+            void Promise.resolve(operation).catch(error => console.warn('[Media] Track dispatch failed:', error));
           }
         }
         continue;
