@@ -3726,6 +3726,35 @@ html[data-theme="light"] :is(.stream-card, .pip-window-root) {
   line-height: 1;
 }
 
+.platform-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  opacity: 0.8;
+  transition: opacity var(--transition-fast), color var(--transition-fast);
+  pointer-events: auto;
+  cursor: default;
+  line-height: 1;
+}
+
+.platform-badge:hover {
+  opacity: 1;
+  color: var(--text-primary);
+}
+
+.participant-name-row .platform-badge,
+.stream-card-overlay .platform-badge {
+  color: var(--card-text, #ffffff);
+  opacity: 0.8;
+}
+
+.participant-name-row .platform-badge:hover,
+.stream-card-overlay .platform-badge:hover {
+  opacity: 1;
+}
+
 .participant-item .user-status-dot.connecting {
   background-color: var(--text-muted);
   opacity: 0.55;

@@ -1481,5 +1481,8 @@
   "audio.expandProcesses": "Развернуть процессы {{app}}",
   "audio.collapseProcesses": "Свернуть процессы {{app}}",
   "audio.muteProcess": "Заглушить процесс {{pid}}",
-  "audio.allowProcess": "Транслировать звук процесса {{pid}}"
+  "audio.allowProcess": "Транслировать звук процесса {{pid}}",
+  "platform.desktop": "ПК",
+  "platform.web": "Веб",
+  "platform.mobile": "Мобильное устройство"
 }

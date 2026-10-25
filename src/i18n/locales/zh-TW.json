@@ -1479,5 +1479,8 @@
   "audio.expandProcesses": "展開 {{app}} 的處理程序",
   "audio.collapseProcesses": "折疊 {{app}} 的處理程序",
   "audio.muteProcess": "將處理程序 {{pid}} 設為靜音",
-  "audio.allowProcess": "分享處理程序 {{pid}} 的音訊"
+  "audio.allowProcess": "分享處理程序 {{pid}} 的音訊",
+  "platform.desktop": "桌面端",
+  "platform.web": "網頁端",
+  "platform.mobile": "行動端"
 }

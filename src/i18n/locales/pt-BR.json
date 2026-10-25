@@ -1479,5 +1479,8 @@
   "audio.expandProcesses": "Expandir processos de {{app}}",
   "audio.collapseProcesses": "Recolher processos de {{app}}",
   "audio.muteProcess": "Silenciar processo {{pid}}",
-  "audio.allowProcess": "Compartilhar áudio do processo {{pid}}"
+  "audio.allowProcess": "Compartilhar áudio do processo {{pid}}",
+  "platform.desktop": "Desktop",
+  "platform.web": "Web",
+  "platform.mobile": "Dispositivo móvel"
 }

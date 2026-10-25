@@ -26,6 +26,7 @@ import { savedRoomCustomName, savedRooms, type SavedRoom } from '../core/saved_r
 import { latestAdminCommand, roomStateFingerprint } from '../core/room_state_sync.ts';
 import type {
   ActiveStreamInfo,
+  AppPlatform,
   ChatMessage,
   PeerInfo,
   PeerStatsInfo,
@@ -38,6 +39,7 @@ import type {
   TransportStatusInfo,
   TurnConfig,
 } from '../core/types.ts';
+import { getLocalPlatform } from '../core/platform.ts';
 import {
   buildRtcConfiguration,
   createJoinErrorHandler,
@@ -144,6 +146,7 @@ interface PeerExchangeItem {
   isStreaming: boolean;
   isCreator: boolean;
   joinedAt: number;
+  platform?: AppPlatform;
 }
 
 export class GroupRoomManager {
@@ -225,12 +228,23 @@ export class GroupRoomManager {
   private unsubscribeProfileStats: (() => void) | undefined;
   private profileStatsTimer: ReturnType<typeof setTimeout> | undefined;
 
+  private buildPresencePayload() {
+    return {
+      nicknameStyle: stateStore.nicknameStyle,
+      username: this.username,
+      isCreator: this.isRoomHost(),
+      isStreaming: Boolean(this.localStream),
+      joinedAt: this.myJoinedAt,
+      watching: [...this.localWatching],
+      watchRevision: this.watchRevision,
+      platform: getLocalPlatform(),
+    };
+  }
+
   public refreshProfile(): void {
     const name = stateStore.username || this.username;
     this.username = name;
-    this.sendRoomAction(this.presenceAction, { nicknameStyle: stateStore.nicknameStyle, username: this.username, isCreator: this.isRoomHost(),
-      isStreaming: Boolean(this.localStream), joinedAt: this.myJoinedAt,
-      watching: [...this.localWatching], watchRevision: this.watchRevision });
+    this.sendRoomAction(this.presenceAction, this.buildPresencePayload());
     for (const peerId of this.admittedTargets()) {
       void this.profileTransfer?.announce(peerId).catch(() => {});
       void this.bannerTransfer?.announce(peerId).catch(() => {});
@@ -541,6 +555,7 @@ export class GroupRoomManager {
         isStreaming: Boolean(this.localStream),
         isCreator: this.isCreator,
         joinedAt: this.myJoinedAt,
+        platform: getLocalPlatform(),
       },
     ];
 
@@ -552,6 +567,7 @@ export class GroupRoomManager {
         isStreaming: this.peerTracker.isStreaming(p.id),
         isCreator: this.peerTracker.isPeerCreator(p.id),
         joinedAt: this.peerTracker.getJoinedAt(p.id) || Date.now(),
+        platform: p.platform,
       });
     });
 
@@ -805,13 +821,7 @@ export class GroupRoomManager {
 
     // Re-announce presence and PEX
     if (this.presenceAction) {
-      this.sendRoomAction(this.presenceAction, {
-        nicknameStyle: stateStore.nicknameStyle, username: this.username,
-        isCreator: this.isCreator,
-        isStreaming: Boolean(this.localStream),
-        joinedAt: this.myJoinedAt,
-        watching: [...this.localWatching], watchRevision: this.watchRevision,
-      });
+      this.sendRoomAction(this.presenceAction, this.buildPresencePayload());
     }
 
     // Re-announce active stream if currently sharing
@@ -894,11 +904,7 @@ export class GroupRoomManager {
     if (this.previewOnly) return;
     if (!this.room || !this.peerTracker.isVerified(peerId)) return;
     if (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(peerId))) return;
-    this.presenceAction?.send({
-      nicknameStyle: stateStore.nicknameStyle, username: this.username, isCreator: this.isRoomHost(),
-      isStreaming: Boolean(this.localStream), joinedAt: this.myJoinedAt,
-      watching: [...this.localWatching], watchRevision: this.watchRevision,
-    }, { target: peerId });
+    this.presenceAction?.send(this.buildPresencePayload(), { target: peerId });
     void this.profileTransfer?.announce(peerId).catch(() => {});
     void this.bannerTransfer?.announce(peerId).catch(() => {});
     this.profileStatsAction?.send(profileStats.sharedSnapshot(), { target: peerId });
@@ -1479,7 +1485,7 @@ export class GroupRoomManager {
     // 3. Setup Presence Action (Exchange usernames, host status & broadcast stream state)
     this.presenceAction = this.room.makeAction('presence');
     this.presenceAction.onMessage = (
-      data: { username: string; nicknameStyle?: unknown; isCreator?: boolean; isStreaming?: boolean; joinedAt?: number; watching?: unknown; watchRevision?: unknown },
+      data: { username: string; nicknameStyle?: unknown; isCreator?: boolean; isStreaming?: boolean; joinedAt?: number; watching?: unknown; watchRevision?: unknown; platform?: unknown },
       meta: { peerId: string }
     ) => {
       const peerId = meta.peerId;
@@ -1490,10 +1496,14 @@ export class GroupRoomManager {
       this.peerNicknameStyles.set(peerId, normalizeNicknameStyle(data.nicknameStyle));
       this.peerTracker.touchPeer(peerId);
 
+      const platform: AppPlatform = (data.platform === 'web' || data.platform === 'desktop' || data.platform === 'mobile')
+        ? data.platform
+        : 'desktop';
+
       const suppliedName = typeof data.username === 'string' ? data.username.trim() : '';
       const newName = suppliedName || this.peerTracker.getUsername(peerId) || `Usuário (${peerId.slice(0, 4)})`;
       this.peerTracker.addPeer(peerId, newName,
-        this.authority ? this.authority.isPeerHost(peerId) : Boolean(data.isCreator), data.joinedAt);
+        this.authority ? this.authority.isPeerHost(peerId) : Boolean(data.isCreator), data.joinedAt, platform);
 
       if (suppliedName) {
         const alreadyAnnounced = this.announcedPeerNames.has(peerId);
@@ -1505,6 +1515,7 @@ export class GroupRoomManager {
             connectionState: 'connected',
             joinedAt: this.peerTracker.getJoinedAt(peerId) || Date.now(),
             isCreator: this.authority ? this.authority.isPeerHost(peerId) : Boolean(data.isCreator),
+            platform,
           });
           // A signed history may arrive before the sender's role/name presence.
           // Retry after identity metadata is pinned so claims can be validated.
@@ -1749,8 +1760,12 @@ export class GroupRoomManager {
             this.rumorIntermediaries.set(p.peerId, meta.peerId);
             hasNewRumors = true;
           }
+          const peerPlatform = (p.platform === 'web' || p.platform === 'desktop' || p.platform === 'mobile')
+            ? p.platform
+            : undefined;
           this.peerTracker.receivePeerExchange(p.peerId, false,
-            typeof p.username === 'string' ? p.username.slice(0, 80) : undefined);
+            typeof p.username === 'string' ? p.username.slice(0, 80) : undefined,
+            undefined, undefined, peerPlatform);
 
           // If peer is not yet directly connected to us, bridge via intermediary peer
           if (!isDirect && !this.peerTracker.isVerified(p.peerId)) {
@@ -1961,16 +1976,7 @@ export class GroupRoomManager {
 
       // Send presence immediately to new peer
       if (this.presenceAction) {
-        this.presenceAction.send(
-          {
-            nicknameStyle: stateStore.nicknameStyle, username: this.username,
-            isCreator: this.isCreator,
-            isStreaming: Boolean(this.localStream),
-            joinedAt: this.myJoinedAt,
-            watching: [...this.localWatching], watchRevision: this.watchRevision,
-          },
-          { target: peerId }
-        );
+        this.presenceAction.send(this.buildPresencePayload(), { target: peerId });
       }
 
       // Share known peers via PEX immediately to bridge mesh
@@ -2150,13 +2156,7 @@ export class GroupRoomManager {
       this.publishMediaManifest();
       // Broadcast presence
       if (this.presenceAction) {
-        this.sendRoomAction(this.presenceAction, {
-          nicknameStyle: stateStore.nicknameStyle, username: this.username,
-          isCreator: this.isCreator,
-          isStreaming: Boolean(this.localStream),
-          joinedAt: this.myJoinedAt,
-          watching: [...this.localWatching], watchRevision: this.watchRevision,
-        });
+        this.sendRoomAction(this.presenceAction, this.buildPresencePayload());
       }
 
       // Broadcast PEX to bridge any disconnected pairs in the mesh
@@ -2250,13 +2250,7 @@ export class GroupRoomManager {
         this.sendRoomAction(this.historyAction, { request: true });
       }
       if (this.presenceAction) {
-        this.sendRoomAction(this.presenceAction, {
-          nicknameStyle: stateStore.nicknameStyle, username: this.username,
-          isCreator: this.isCreator,
-          isStreaming: Boolean(this.localStream),
-          joinedAt: this.myJoinedAt,
-          watching: [...this.localWatching], watchRevision: this.watchRevision,
-        });
+        this.sendRoomAction(this.presenceAction, this.buildPresencePayload());
       }
     }, 400);
   }
@@ -2743,6 +2737,7 @@ export class GroupRoomManager {
       isLocal: true,
       color: profileImages.local.color,
       watchers: this.getStreamWatchers('local'),
+      platform: getLocalPlatform(),
     });
 
     // Cards use the same admitted, announced participants as the room roster.
@@ -2761,6 +2756,7 @@ export class GroupRoomManager {
         color: profileImages.color(peerId) ?? generateUserColor(uname),
         connectionState: peer.connectionState,
         watchers: isDirect ? this.getStreamWatchers(peerId) : [],
+        platform: peer.platform ?? 'desktop',
       });
     });
 

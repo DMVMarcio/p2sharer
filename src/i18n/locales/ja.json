@@ -1479,5 +1479,8 @@
   "audio.expandProcesses": "{{app}} のプロセスを展開",
   "audio.collapseProcesses": "{{app}} のプロセスを折りたたむ",
   "audio.muteProcess": "プロセス {{pid}} をミュート",
-  "audio.allowProcess": "プロセス {{pid}} の音声を共有"
+  "audio.allowProcess": "プロセス {{pid}} の音声を共有",
+  "platform.desktop": "デスクトップ",
+  "platform.web": "ウェブ",
+  "platform.mobile": "モバイル"
 }

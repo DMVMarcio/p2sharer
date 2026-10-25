@@ -1,5 +1,7 @@
 import { Nickname } from '../common/Nickname';
 import { ProfileAvatar } from '../common/ProfileAvatar';
+import { PlatformBadge } from '../common/PlatformBadge';
+import { getLocalPlatform } from '../../core/platform';
 import { profileAction } from '../common/profile_actions';
 import { useRoomCardLayoutActions } from './RoomCardLayoutContext';
 import { t } from '../../i18n';
@@ -514,6 +516,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           <ProfileAvatar peerId={slot.ownerPeerId ?? slot.peerId} name={slot.senderName}
             isLocal={slot.isLocal} color={slot.color} className="stream-profile-avatar" />
           <span className="stream-user-name"><Nickname name={slot.senderName} peerId={slot.ownerPeerId ?? slot.peerId} isLocal={slot.isLocal} />{slot.mediaLabel ? ` · ${slot.mediaLabel}` : ""}</span>
+          <PlatformBadge platform={slot.platform ?? (slot.isLocal ? getLocalPlatform() : 'desktop')} size={11} />
           {slot.isLocal && <span className="badge-you">{t("message.a03099f135b1")}</span>}
         </div>
 

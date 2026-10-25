@@ -1479,5 +1479,8 @@
   "audio.expandProcesses": "Prozesse für {{app}} erweitern",
   "audio.collapseProcesses": "Prozesse für {{app}} einklappen",
   "audio.muteProcess": "Prozess {{pid}} stummschalten",
-  "audio.allowProcess": "Audio von Prozess {{pid}} teilen"
+  "audio.allowProcess": "Audio von Prozess {{pid}} teilen",
+  "platform.desktop": "Desktop",
+  "platform.web": "Web",
+  "platform.mobile": "Mobil"
 }

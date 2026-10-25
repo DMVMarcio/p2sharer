@@ -1,6 +1,8 @@
 import { useModalDialogBehavior } from '../common/useModalDialogBehavior';
 import { Nickname } from '../common/Nickname';
 import { ProfileAvatar } from '../common/ProfileAvatar';
+import { PlatformBadge } from '../common/PlatformBadge';
+import { getLocalPlatform } from '../../core/platform';
 import { profileAction } from '../common/profile_actions';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
@@ -54,6 +56,7 @@ export const ParticipantsPane: React.FC = () => {
             <ProfileAvatar name={username} isLocal color={localColor} className="participant-item-avatar" />
             <span className="participant-item-text">
               <span className="participant-item-name"><Nickname name={username || t("message.f53bbaa05fae")} isLocal /></span>
+              <PlatformBadge platform={getLocalPlatform()} size={12} />
               <span className="badge-you">{t("message.a03099f135b1")}</span>
               {isCreator && <span className="badge-host">{t("common.hostBadge")}</span>}
               {isRoomAdmin && !isCreator && <span className="badge-host">{t("common.adminBadge")}</span>}
@@ -85,6 +88,7 @@ export const ParticipantsPane: React.FC = () => {
                 <ProfileAvatar peerId={p.id} name={p.username} color={color} className="participant-item-avatar" />
                 <span className="participant-item-text">
                   <span className="participant-item-name"><Nickname name={p.username} peerId={p.id} /></span>
+                  <PlatformBadge platform={p.platform ?? 'desktop'} size={12} />
                   {p.isCreator && <span className="badge-host">{t("common.hostBadge")}</span>}
                   {p.isAdmin && !p.isCreator && <span className="badge-host">{t("common.adminBadge")}</span>}
                   {isStreaming && <span className="badge-live-stream-mini">{t("message.b7c19868a9a8")}</span>}

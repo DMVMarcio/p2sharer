@@ -1479,5 +1479,8 @@
   "audio.expandProcesses": "Laajenna sovelluksen {{app}} prosessit",
   "audio.collapseProcesses": "Kokoa sovelluksen {{app}} prosessit",
   "audio.muteProcess": "Mykistä prosessi {{pid}}",
-  "audio.allowProcess": "Jaa ääni prosessista {{pid}}"
+  "audio.allowProcess": "Jaa ääni prosessista {{pid}}",
+  "platform.desktop": "Työpöytä",
+  "platform.web": "Web",
+  "platform.mobile": "Mobiili"
 }

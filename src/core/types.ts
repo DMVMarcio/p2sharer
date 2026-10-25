@@ -41,6 +41,8 @@ export interface ScreenSourcesResponse {
   windows: WindowSource[];
 }
 
+export type AppPlatform = 'desktop' | 'web' | 'mobile';
+
 export interface PeerInfo {
   nicknameStyle?: import("./nickname_style").NicknameStyle;
   id: string;
@@ -49,6 +51,7 @@ export interface PeerInfo {
   joinedAt: number;
   isCreator?: boolean;
   isAdmin?: boolean;
+  platform?: AppPlatform;
 }
 
 export interface StreamWatcher {
@@ -72,6 +75,7 @@ export interface RoomSlotInfo {
   color: string;
   connectionState?: PeerInfo['connectionState'];
   watchers?: StreamWatcher[];
+  platform?: AppPlatform;
 }
 
 export interface ActiveStreamInfo {

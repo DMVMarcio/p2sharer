@@ -1,4 +1,4 @@
-import type { PeerInfo, StreamWatcher } from '../core/types.ts';
+import type { AppPlatform, PeerInfo, StreamWatcher } from '../core/types.ts';
 
 /**
  * PeerTracker provides verified WebRTC peer tracking for P2Sharer rooms.
@@ -21,6 +21,7 @@ export class PeerTracker {
   private watcherNames = new Map<string, string>(); // peerId -> username
   private streamingPeers = new Set<string>(); // verified peerId set who is broadcasting
   private relayedPeers = new Set<string>();
+  private peerPlatform = new Map<string, AppPlatform>();
 
   /**
    * Processes a peer arrival from direct WebRTC connection or PEX gossip.
@@ -34,9 +35,14 @@ export class PeerTracker {
     isDirectWebRtc: boolean,
     username?: string,
     isCreator?: boolean,
-    joinedAt = Date.now()
+    joinedAt = Date.now(),
+    platform?: AppPlatform
   ): boolean {
     if (!peerId) return false;
+
+    if (platform) {
+      this.peerPlatform.set(peerId, platform);
+    }
 
     if (isDirectWebRtc) {
       const wasDirect = this.directConnectedPeers.has(peerId);
@@ -85,12 +91,16 @@ export class PeerTracker {
     return this.watcherNames.get(peerId);
   }
 
+  public getPlatform(peerId: string): AppPlatform | undefined {
+    return this.peerPlatform.get(peerId);
+  }
+
   /**
    * Directly adds and verifies a connected peer (e.g. from onPeerJoin).
    */
-  public addPeer(peerId: string, username: string, isCreator = false, joinedAt = Date.now()): void {
+  public addPeer(peerId: string, username: string, isCreator = false, joinedAt = Date.now(), platform?: AppPlatform): void {
     const firstPresence = !this.peerIsCreator.has(peerId);
-    this.receivePeerExchange(peerId, true, username, isCreator, joinedAt);
+    this.receivePeerExchange(peerId, true, username, isCreator, joinedAt, platform);
     if (firstPresence) this.peerJoinedAt.set(peerId, joinedAt);
   }
 
@@ -112,6 +122,7 @@ export class PeerTracker {
     this.watcherNames.delete(peerId);
     this.streamingPeers.delete(peerId);
     this.relayedPeers.delete(peerId);
+    this.peerPlatform.delete(peerId);
 
     // Remove as watcher from all active stream slots
     this.streamWatchers.forEach((watchers) => {
@@ -253,6 +264,7 @@ export class PeerTracker {
         connectionState: 'connected',
         joinedAt: this.peerJoinedAt.get(pId) || Date.now(),
         isCreator: this.isPeerCreator(pId),
+        platform: this.peerPlatform.get(pId) || 'desktop',
       });
     });
 
@@ -265,6 +277,7 @@ export class PeerTracker {
           username: uname,
           connectionState: (this.relayedPeers && this.relayedPeers.has(rId)) ? 'connected' : 'connecting',
           joinedAt: this.peerJoinedAt.get(rId) || Date.now(),
+          platform: this.peerPlatform.get(rId) || 'desktop',
         });
       }
     });
@@ -351,5 +364,6 @@ export class PeerTracker {
     this.watcherNames.clear();
     this.streamingPeers.clear();
     this.relayedPeers.clear();
+    this.peerPlatform.clear();
   }
 }

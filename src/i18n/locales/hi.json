@@ -1479,5 +1479,8 @@
   "audio.expandProcesses": "{{app}} की प्रक्रियाएं विस्तृत करें",
   "audio.collapseProcesses": "{{app}} की प्रक्रियाएं संक्षिप्त करें",
   "audio.muteProcess": "प्रक्रिया {{pid}} म्यूट करें",
-  "audio.allowProcess": "प्रक्रिया {{pid}} से ऑडियो साझा करें"
+  "audio.allowProcess": "प्रक्रिया {{pid}} से ऑडियो साझा करें",
+  "platform.desktop": "डेस्कटॉप",
+  "platform.web": "वेब",
+  "platform.mobile": "मोबाइल"
 }

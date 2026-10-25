@@ -1,4 +1,6 @@
 import { Nickname } from '../common/Nickname';
+import { PlatformBadge } from '../common/PlatformBadge';
+import { getLocalPlatform } from '../../core/platform';
 import { useRoomCardLayoutActions } from './RoomCardLayoutContext';
 import { contrastingTextColor } from '../../core/accent_color';
 import { profileImages, profileBanners } from '../../core/profile_image';
@@ -115,6 +117,7 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
 
       <div className="participant-name-row">
         <span className="participant-avatar-label"><Nickname name={slot.senderName} peerId={slot.ownerPeerId ?? slot.peerId} isLocal={slot.isLocal} />{slot.mediaLabel ? ` · ${slot.mediaLabel}` : ""}</span>
+        <PlatformBadge platform={slot.platform ?? (slot.isLocal ? getLocalPlatform() : 'desktop')} size={11} />
         {slot.isLocal && <span className="badge-you">{t("message.a03099f135b1")}</span>}
       </div>
 

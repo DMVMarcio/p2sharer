@@ -1479,5 +1479,8 @@
   "audio.expandProcesses": "{{app}}의 프로세스 펼치기",
   "audio.collapseProcesses": "{{app}}의 프로세스 접기",
   "audio.muteProcess": "프로세스 {{pid}} 음소거",
-  "audio.allowProcess": "프로세스 {{pid}}의 오디오 공유"
+  "audio.allowProcess": "프로세스 {{pid}}의 오디오 공유",
+  "platform.desktop": "데스크톱",
+  "platform.web": "웹",
+  "platform.mobile": "모바일"
 }

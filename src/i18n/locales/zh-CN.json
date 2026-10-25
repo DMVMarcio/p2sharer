@@ -1479,5 +1479,8 @@
   "audio.expandProcesses": "展开 {{app}} 的进程",
   "audio.collapseProcesses": "折叠 {{app}} 的进程",
   "audio.muteProcess": "静音进程 {{pid}}",
-  "audio.allowProcess": "共享进程 {{pid}} 的音频"
+  "audio.allowProcess": "共享进程 {{pid}} 的音频",
+  "platform.desktop": "桌面端",
+  "platform.web": "网页端",
+  "platform.mobile": "移动端"
 }
