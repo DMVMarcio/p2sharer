@@ -191,8 +191,55 @@ index 8003df9196a808650bc233f9243be5eae14b4a1d..44579d8fbe661690578c96572f343f9e
  		removeTrack: (track) => {
  			const sender = pc.getSenders().find((s) => s.track === track);
  			if (sender) pc.removeTrack(sender);
+diff --git a/dist/room.mjs b/dist/room.mjs
+index a09d8b9c6425b41e08fe4cf421a974d94d627a6c..006863b7a7529138010c54ae7f5ec98ce7986d52 100644
+--- a/dist/room.mjs
++++ b/dist/room.mjs
+@@ -50,12 +50,12 @@ var room_default = (onPeer, onPeerLeave, onSelfLeave, { onPeerHandshake, onHands
+ 	const clearPeerState = (id, reason = mkErr("peer disconnected")) => {
+ 		const err = toError(reason, "peer disconnected");
+ 		handshakeManager?.clearPeer(id, err);
+-		delete peerMap[id];
+-		delete activePeerMap[id];
+ 		actionManager.clearPeer(id, err);
+ 		pendingPongs[id]?.splice(0).forEach((waiter) => waiter.reject(err));
+ 		delete pendingPongs[id];
+ 		mediaManager.clearPeer(id);
++		delete peerMap[id];
++		delete activePeerMap[id];
+ 	};
+ 	const exitPeer = (id, peer, reason) => {
+ 		const current = peerMap[id];
+@@ -79,7 +79,10 @@ var room_default = (onPeer, onPeerLeave, onSelfLeave, { onPeerHandshake, onHands
+ 	};
+ 	const pingAction = makeActionInternal(internalNs("ping"));
+ 	const pongAction = makeActionInternal(internalNs("pong"));
+-	const signalAction = makeActionInternal(internalNs("signal"));
++	const signalAction = makeActionInternal(internalNs("signal"), {
++		sendToPending: true,
++		receiveWhilePending: true
++	});
+ 	const streamMetaAction = makeActionInternal(internalNs("stream"));
+ 	const trackMetaAction = makeActionInternal(internalNs("track"));
+ 	const leaveAction = makeActionInternal(internalNs("leave"), {
+@@ -113,7 +116,6 @@ var room_default = (onPeer, onPeerLeave, onSelfLeave, { onPeerHandshake, onHands
+ 		if (queue && !queue.length) delete pendingPongs[id];
+ 	});
+ 	signalAction.onMessage((sdp, id) => {
+-		if (!activePeerMap[id]) return;
+ 		peerMap[id]?.signal(sdp);
+ 	});
+ 	streamMetaAction.onMessage((meta, id) => mediaManager.receiveStreamMeta(meta, id));
+@@ -135,7 +137,6 @@ var room_default = (onPeer, onPeerLeave, onSelfLeave, { onPeerHandshake, onHands
+ 			stream: (stream) => mediaManager.receiveRemoteStream(id, stream),
+ 			track: (track, stream) => mediaManager.receiveRemoteTrack(id, track, stream),
+ 			signal: (sdp) => {
+-				if (!activePeerMap[id]) return;
+ 				signalAction.send(sdp, id);
+ 			},
+ 			close: () => exitPeer(id, peer, mkErr("peer disconnected")),
 diff --git a/dist/shared-peer.mjs b/dist/shared-peer.mjs
-index 5fca48a89e823ad3a5665d121f390b505ecf9345..589ba90970ac72b5d18e37bb451f0394f76e597e 100644
+index 5fca48a89e823ad3a5665d121f390b505ecf9345..cbf9c24b922270bc3afb0defd5afb999e1d749d7 100644
 --- a/dist/shared-peer.mjs
 +++ b/dist/shared-peer.mjs
 @@ -162,7 +162,7 @@ var SharedPeerManager = class {
@@ -245,3 +292,26 @@ index 5fca48a89e823ad3a5665d121f390b505ecf9345..589ba90970ac72b5d18e37bb451f0394
  				const oldEntry = shared.trackOwners.get(oldTrack);
  				if (oldEntry) {
  					shared.trackOwners.delete(oldTrack);
+@@ -295,7 +299,7 @@ var SharedPeerManager = class {
+ 			const current = this.byApp[shared.appId]?.[shared.peerId];
+ 			if (!current || keys(current.bindings).length > 0) return;
+ 			this.clear(shared.appId, shared.peerId, { destroyPeer: true });
+-		}, shared.idleMs);
++		}, Math.min(shared.idleMs, 500));
+ 	}
+ 	getSignalBinding(shared) {
+ 		if (shared.controlRoomId) {
+diff --git a/dist/strategy.mjs b/dist/strategy.mjs
+index a75dfcfddd14b2174d9acee37ecb84cd3c16c0eb..d42c6ee6c3d1b7b8b9b2f67d95c43ece18dd546a 100644
+--- a/dist/strategy.mjs
++++ b/dist/strategy.mjs
+@@ -330,6 +330,9 @@ var strategy_default = ({ init, subscribe, announce, deactivate }) => {
+ 				(await f)();
+ 			});
+ 			if (hasActiveRooms()) return;
++			keys(sharedPeers.getMap(appId)).forEach((peerId) => {
++				sharedPeers.clear(appId, peerId, { destroyPeer: true });
++			});
+ 			didInit = false;
+ 			pool.destroy();
+ 			offerPool = null;

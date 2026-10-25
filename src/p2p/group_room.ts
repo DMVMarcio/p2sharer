@@ -2267,7 +2267,6 @@ export class GroupRoomManager {
     this.cleanupStreamWatchers(peerId, '');
     this.remoteWatchRevisions.delete(peerId);
     this.nativeVideo?.stop(undefined, peerId);
-    this.nativeVideo?.clearBlocked(undefined, peerId);
     this.pendingChallenges.delete(peerId);
     this.fileBulk.close(peerId);
     this.payloadChannels.close(peerId); this.binaryPeers.delete(peerId);
@@ -3750,17 +3749,7 @@ export class GroupRoomManager {
 
   public requestStream(peerId: string): void {
     const owner = streamOwner(peerId);
-    if (this.streamReqAction) {
-      try {
-        const payload: StreamRequestPayload = {
-          request: true,
-          broadcasterId: owner,
-          requesterId: selfId,
-          reason: 'initial_join',
-        };
-        this.streamReqAction.send(payload, { target: owner });
-      } catch {}
-    }
+    this.requestStreamFromPeer(owner);
     this.watchStream(peerId);
   }
 
