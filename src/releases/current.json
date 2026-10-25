@@ -1,5 +1,5 @@
 {
-  "version": "1.6.0",
+  "version": "1.5.5",
   "translations": {
     "en": [
       "**Screen sharing starts without waiting for native video negotiation** and reconnects more reliably after leaving and rejoining a room. Recovery repairs missing video senders and protects new sessions from delayed cleanup. Connection logs provide clearer evidence when screen sharing fails to connect or display video.",
