@@ -2,7 +2,7 @@
 
 ## Remote Screen PiP Audio
 
-Remote screen PiP keeps audio in the main window's `AudioContextManager` sink, where remote stream playback already works, while its loopback WebRTC connection carries only the video track. The PiP video element stays muted for reliable autoplay in WebView2. Initial audio volume and mute state travel with the offer, and PiP control changes return as validated `audio-settings` signals to update the main sink. The sink remains active when PiP closes so the regular stream card inherits the latest volume.
+Remote screen PiP keeps audio in the main window's `AudioContextManager` sink, where remote stream playback already works, while its loopback WebRTC connection carries only the video track. The PiP video element stays muted for reliable autoplay in WebView2. Initial audio volume and mute state travel with the offer, and PiP control changes return as validated `audio-settings` signals to update the main sink. The sink remains active when PiP closes so the regular stream card inherits the latest volume. `audio/audio_context_recovery.ts` keeps activation, visibility/focus and context-state recovery bound to each live capture/playback context. Pending autoplay resume promises are coalesced during PCM delivery but retried synchronously on interaction; teardown removes those listeners. Audio event subscriptions reject setup failures and ignore retired listener generations.
 
 `AudioContextManager` owns an independent audio-only `MediaStream` and a hidden,
 playing HTML audio element with volume zero for each subscribed audio-bearing slot.

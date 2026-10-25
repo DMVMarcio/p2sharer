@@ -96,8 +96,12 @@ other native viewers; per-viewer renditions would need additional encoders.
 Receiver setup validates bounded signaling against current advertised descriptors.
 Incoming candidates are queued only for known route IDs, with a 64-candidate bound.
 Native source rejection, disconnected/failed routes, missing initial RTP and old
-clients that do not answer trigger generic publication; unknown clients may wait up
-to the 15-second setup deadline. Stopping/editing sources, room rebinding and peer
+clients that do not answer trigger generic publication. Setup has a 15-second
+deadline; the receiver grants 3.5 seconds for first video after the full peer
+connection reaches connected, independently of ICE connectivity. Native ICE
+gathering excludes local addresses that cannot bind a socket, preserving usable
+LAN/VPN addresses. Sender statistics sample answered routes only and discard
+results retired during IPC. Stopping/editing sources, room rebinding and peer
 leave close their native routes. Local stops and remote owner stops are scoped to
 their direction; matching media IDs from different owners do not cross-stop. Successful initial receiver checks stop polling;
 failed connection events retain recovery. Native byte counters feed the existing

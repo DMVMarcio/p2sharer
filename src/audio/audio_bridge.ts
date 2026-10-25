@@ -1,3 +1,5 @@
+import { logDiagnostic } from '../core/logger.ts';
+import { AudioContextRecovery } from './audio_context_recovery.ts';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type { AudioStreamPayload } from '../core/types.ts';
@@ -6,6 +8,7 @@ export type { AudioStreamPayload };
 
 export class AudioBridge {
   private audioCtx: AudioContext | null = null;
+  private recovery: AudioContextRecovery | undefined;
   private destNode: MediaStreamAudioDestinationNode | null = null;
   private unlisten: UnlistenFn | null = null;
   private onLevelCallback: ((level: number) => void) | null = null;
@@ -15,6 +18,7 @@ export class AudioBridge {
   private lastAudioTimestampUs = 0;
   private targetLead = 0.05;
   private stableChunks = 0;
+  private receivedPcm = false;
 
   // Preallocated buffer cache to eliminate per-chunk allocations (200 allocs/sec)
   private byteBuffer: Uint8Array = new Uint8Array(16384);
@@ -29,13 +33,13 @@ export class AudioBridge {
   }
 
   public init(onLevel?: (level: number) => void): MediaStreamTrack | null {
+    if (this.audioCtx) this.stop();
     this.onLevelCallback = onLevel || null;
     try {
       const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       this.audioCtx = new AudioContextClass({ sampleRate: 48000 });
-      if (this.audioCtx.state === 'suspended') {
-        this.audioCtx.resume().catch(() => {});
-      }
+      this.recovery?.dispose();
+      this.recovery = new AudioContextRecovery(this.audioCtx, undefined, 'capture');
       this.destNode = this.audioCtx.createMediaStreamDestination();
       this.nextPlayTime = 0;
       this.targetLead = 0.05;
@@ -53,7 +57,8 @@ export class AudioBridge {
     targetNames: string[] = []
   ): Promise<MediaStreamTrack | null> {
     const track = this.init();
-    await this.startListening();
+    try { await this.startListening(); }
+    catch (error) { this.stop(); throw error; }
     try {
       await invoke('start_audio_capture', {
         config: {
@@ -76,6 +81,7 @@ export class AudioBridge {
 
     try {
       const remove = await listen<AudioStreamPayload>(eventName, (event) => {
+        if (!this.isCapturing || generation !== this.listenerGeneration) return;
         const payload = event.payload;
         if (this.onLevelCallback) {
           this.onLevelCallback(payload.rms_level);
@@ -88,7 +94,9 @@ export class AudioBridge {
       if (!this.isCapturing || generation !== this.listenerGeneration) remove();
       else this.unlisten = remove;
     } catch (err) {
+      if (generation === this.listenerGeneration) this.isCapturing = false;
       console.warn('Tauri audio event listening failed:', err);
+      throw err;
     }
   }
 
@@ -96,9 +104,7 @@ export class AudioBridge {
     if (!this.audioCtx || !this.destNode || !payload.pcm_base64) return;
 
     try {
-      if (this.audioCtx.state === 'suspended') {
-        this.audioCtx.resume().catch(() => {});
-      }
+      this.recovery?.resume();
 
       if (typeof payload.timestamp_us === 'number') {
         this.lastAudioTimestampUs = payload.timestamp_us;
@@ -112,6 +118,10 @@ export class AudioBridge {
       const sampleRate = payload.sample_rate || 48000;
       if (channels < 1 || channels > 8 || sampleRate < 8000 || len % (channels * 4) !== 0) return;
 
+      if (!this.receivedPcm) {
+        this.receivedPcm = true;
+        logDiagnostic('INFO', 'audio.capture', 'First native PCM received', { channels, sampleRate, contextState: this.audioCtx.state });
+      }
       const currentTime = this.audioCtx.currentTime;
       // Delayed IPC bursts must not overlap audio already queued for playout.
       if (this.nextPlayTime - currentTime > 0.2) return;
@@ -180,18 +190,21 @@ export class AudioBridge {
   }
 
   public stop(): void {
+    this.recovery?.dispose();
+    this.recovery = undefined;
     this.isCapturing = false;
     this.listenerGeneration++;
     this.nextPlayTime = 0;
     this.targetLead = 0.05;
     this.stableChunks = 0;
     this.lastAudioTimestampUs = 0;
+    this.receivedPcm = false;
     if (this.unlisten) {
       this.unlisten();
       this.unlisten = null;
     }
     if (this.audioCtx && this.audioCtx.state !== 'closed') {
-      this.audioCtx.close();
+      void this.audioCtx.close().catch(() => {});
       this.audioCtx = null;
     }
     this.destNode = null;

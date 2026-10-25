@@ -94,6 +94,11 @@ fn initial_rate(budget: u32, width: u32, height: u32, fps: u32) -> u32 {
     (rate.clamp(2_000_000, 8_000_000) as u32).min(budget)
 }
 
+fn native_candidate_available(ip: std::net::IpAddr) -> bool {
+    !ip.is_unspecified() && !ip.is_multicast()
+        && std::net::UdpSocket::bind((ip, 0)).is_ok()
+}
+
 fn valid_id(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= 100
@@ -185,6 +190,9 @@ pub async fn create_native_video_offer(
         webrtc::ice::network_type::NetworkType::Udp4,
         webrtc::ice::network_type::NetworkType::Tcp4,
     ]);
+    // Windows can enumerate addresses from detached/retired adapters. Keep only
+    // addresses that can actually own a local socket, including usable LAN/VPNs.
+    setting.set_ip_filter(Box::new(native_candidate_available));
     setting.set_ice_timeouts(
         Some(Duration::from_secs(3)),
         Some(Duration::from_secs(8)),
@@ -732,6 +740,13 @@ impl FrameGate {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn native_candidates_require_a_bindable_unicast_address() {
+        use std::net::{IpAddr, Ipv4Addr};
+        assert!(native_candidate_available(IpAddr::V4(Ipv4Addr::LOCALHOST)));
+        assert!(!native_candidate_available(IpAddr::V4(Ipv4Addr::UNSPECIFIED)));
+        assert!(!native_candidate_available(IpAddr::V4(Ipv4Addr::new(224, 0, 0, 1))));
+    }
     #[test]
     fn startup_probe_scales_to_encoded_geometry_without_exceeding_user_budget() {
         assert_eq!(initial_rate(15_000_000, 1280, 720, 60), 2_000_000);

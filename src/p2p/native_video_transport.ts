@@ -5,13 +5,16 @@ import { nativeSenderSource, type NativeSenderSource } from '../video/native_sen
 import { MediaCoordinator } from './media_coordinator.ts';
 import { logDiagnostic } from '../core/logger.ts';
 
+const SETUP_TIMEOUT_MS = 15_000;
+const FIRST_VIDEO_TIMEOUT_MS = 3_500;
+
 type Signal = { id: string; kind: 'offer' | 'answer' | 'ice' | 'reject' | 'stop'; mediaId: string;
   sdp?: string; candidate?: RTCIceCandidateInit; descriptor?: StreamDescriptor };
 interface Outgoing { id: string; peer: string; descriptor: StreamDescriptor; source: NativeSenderSource; track: MediaStreamTrack;
   started: number;
   timer: ReturnType<typeof setTimeout>; offered: boolean; answered: boolean; candidates: RTCIceCandidateInit[]; localCandidates: RTCIceCandidateInit[] }
 interface Incoming { id: string; peer: string; descriptor: StreamDescriptor; pc: RTCPeerConnection;
-  timer: ReturnType<typeof setInterval>; remoteReady: boolean; candidates: RTCIceCandidateInit[]; started: number }
+  timer: ReturnType<typeof setInterval>; remoteReady: boolean; candidates: RTCIceCandidateInit[]; started: number; connectedAt?: number }
 interface TransportConfig {
   rtc: () => RTCConfiguration;
   send: (peer: string, signal: Signal) => void;
@@ -52,7 +55,7 @@ export class NativeVideoTransport {
     if (existing?.track === track) return true;
     if (existing) this.closeOutgoing(existing, true);
     const route: Outgoing = { id: crypto.randomUUID(), peer, descriptor, source, track, offered: false, answered: false, started: performance.now(),
-      candidates: [], localCandidates: [], timer: setTimeout(() => this.fail(route, 'setup_timeout'), 6_000) };
+      candidates: [], localCandidates: [], timer: setTimeout(() => this.fail(route, 'setup_timeout'), SETUP_TIMEOUT_MS) };
     this.outgoing.set(key, route);
     void this.open(route).catch(error => {
       if (this.outgoing.get(key) !== route) return;
@@ -111,6 +114,7 @@ export class NativeVideoTransport {
         started: performance.now(), timer: setInterval(() => { void this.checkReceiver(incoming); }, 500) };
       this.incoming.set(key, incoming);
       pc.onconnectionstatechange = () => {
+        if (pc.connectionState === 'connected') incoming.connectedAt ??= performance.now();
         if (pc.connectionState === 'failed') this.reject(incoming, 'connection_failed');
       };
       pc.onicecandidate = ({ candidate }) => {
@@ -149,7 +153,9 @@ export class NativeVideoTransport {
       return;
     }
     const elapsed = performance.now() - r.started;
+    if (r.pc.connectionState === 'connected') r.connectedAt ??= performance.now();
     const stats = await r.pc.getStats().catch(() => undefined);
+    if (this.incoming.get(this.key(r.peer,r.descriptor.id)) !== r) return;
     const received = stats && [...stats.values()].some(s => s.type === 'inbound-rtp' && s.kind === 'video' &&
       (s.framesDecoded > 0 || s.framesReceived > 0));
     if (received) {
@@ -158,8 +164,10 @@ export class NativeVideoTransport {
       clearInterval(r.timer);
       return;
     }
-    if (elapsed > 3_500) {
+    if (r.connectedAt !== undefined && performance.now() - r.connectedAt >= FIRST_VIDEO_TIMEOUT_MS) {
       this.reject(r, 'no_video_before_receiver_deadline');
+    } else if (r.connectedAt === undefined && elapsed >= SETUP_TIMEOUT_MS) {
+      this.reject(r, 'receiver_setup_timeout');
     }
   }
   private reject(r: Incoming, reason = 'receiver_failed', error?: unknown): void {
@@ -203,8 +211,18 @@ export class NativeVideoTransport {
   public close(): void { this.stop(); this.closed=true; this.unlisten?.(); }
   public receiver(peer: string, mediaId: string): RTCPeerConnection | undefined { return this.incoming.get(this.key(peer,mediaId))?.pc; }
   public async senderStats(mediaId: string): Promise<NativeSenderStats[]> {
-    return Promise.all([...this.outgoing.values()].filter(r => r.descriptor.id === mediaId).map(r =>
-      invoke<NativeSenderStats>('get_native_video_stats',{id:r.id,feedbackToken:r.source.feedbackToken})));
+    // Before the answer, native creation may still be pending. Teardown may also
+    // finish while an IPC sample is in flight; neither state has live statistics.
+    const samples = await Promise.all([...this.outgoing.values()].filter(r => r.descriptor.id === mediaId && r.answered).map(async r => {
+      try {
+        const stats = await invoke<NativeSenderStats>('get_native_video_stats',{id:r.id,feedbackToken:r.source.feedbackToken});
+        return this.current(r) ? stats : undefined;
+      } catch (error) {
+        if (this.current(r)) throw error;
+        return undefined;
+      }
+    }));
+    return samples.filter((stats): stats is NativeSenderStats => stats !== undefined);
   }
 }
 

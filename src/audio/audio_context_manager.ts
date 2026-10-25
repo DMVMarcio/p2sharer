@@ -1,3 +1,5 @@
+import { logDiagnostic } from '../core/logger.ts';
+import { AudioContextRecovery } from './audio_context_recovery.ts';
 import type { PeerAudioSinkState } from '../core/types.ts';
 
 export class AudioContextManager {
@@ -6,7 +8,7 @@ export class AudioContextManager {
   private peerSinks: Map<string, PeerAudioSinkState> = new Map();
   private peerAudioTracks = new Map<string, MediaStreamTrack[]>();
   private peerPullElements = new Map<string, HTMLAudioElement>();
-  private unlockListenerAttached = false;
+  private recovery: AudioContextRecovery | undefined;
 
   public static getInstance(): AudioContextManager {
     if (!AudioContextManager.instance) {
@@ -19,52 +21,20 @@ export class AudioContextManager {
     if (!this.audioCtx) {
       const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       this.audioCtx = new AudioContextClass();
+      this.recovery = new AudioContextRecovery(this.audioCtx, () => {
+        this.peerPullElements.forEach(element => { if (element.paused) this.safePlayPullElement(element); });
+      });
     }
     this.safeResumeAudioContext();
     return this.audioCtx;
   }
 
-  private safeResumeAudioContext(): void {
-    if (this.audioCtx && this.audioCtx.state === 'suspended') {
-      this.audioCtx.resume().catch((err) => {
-        if (err?.name === 'NotAllowedError') {
-          this.ensureUserInteractionUnlock();
-        }
-      });
-    }
-  }
+  private safeResumeAudioContext(): void { this.recovery?.resume(); }
 
   private safePlayPullElement(element: HTMLAudioElement): void {
-    const promise = element.play();
-    if (promise !== undefined) {
-      promise.catch((err) => {
-        if (err?.name === 'NotAllowedError') {
-          this.ensureUserInteractionUnlock();
-        }
-      });
-    }
-  }
-
-  private ensureUserInteractionUnlock(): void {
-    if (this.unlockListenerAttached || typeof window === 'undefined') return;
-    this.unlockListenerAttached = true;
-    const unlock = () => {
-      this.unlockListenerAttached = false;
-      window.removeEventListener('pointerdown', unlock, true);
-      window.removeEventListener('keydown', unlock, true);
-      window.removeEventListener('touchstart', unlock, true);
-      if (this.audioCtx && this.audioCtx.state === 'suspended') {
-        this.audioCtx.resume().catch(() => {});
-      }
-      this.peerPullElements.forEach((el) => {
-        if (el.paused) {
-          el.play().catch(() => {});
-        }
-      });
-    };
-    window.addEventListener('pointerdown', unlock, { capture: true, once: true });
-    window.addEventListener('keydown', unlock, { capture: true, once: true });
-    window.addEventListener('touchstart', unlock, { capture: true, once: true });
+    // The context recovery keeps gesture listeners armed even when play() or
+    // resume() remains pending rather than rejecting with NotAllowedError.
+    void element.play()?.catch(() => {});
   }
 
   public attachPeerAudio(peerId: string, stream: MediaStream): PeerAudioSinkState {
@@ -105,6 +75,8 @@ export class AudioContextManager {
         state.source.connect(state.gainNode);
         state.streamId = stream.id;
         this.peerAudioTracks.set(peerId, tracks);
+        logDiagnostic('INFO', 'audio.playback', 'Remote audio tracks attached', { trackCount: tracks.length,
+          contextState: ctx.state, enabled: tracks.map(track => track.enabled), muted: tracks.map(track => track.muted) });
         // Chromium remote WebRTC audio needs an active media-element sink to
         // keep pulling samples into Web Audio after the visible video enters PiP.
         // Zero element volume avoids a second audible path; gain owns the volume.
@@ -181,6 +153,8 @@ export class AudioContextManager {
   }
 
   public cleanup(): void {
+    this.recovery?.dispose();
+    this.recovery = undefined;
     this.peerSinks.forEach((_, peerId) => this.detachPeerAudio(peerId));
     this.peerSinks.clear();
     if (this.audioCtx) {
