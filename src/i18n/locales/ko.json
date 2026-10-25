@@ -1471,5 +1471,13 @@
   "chat.filePreparing": "파일 준비 중...",
   "chat.fileIndexing": "해시 계산 중...",
   "code.language": "프로그래밍 언어",
-  "code.plainText": "일반 텍스트"
+  "code.plainText": "일반 텍스트",
+  "audio.processCount_one": "프로세스 {{count}}개",
+  "audio.processCount_other": "프로세스 {{count}}개",
+  "audio.activeAudio": "활성 오디오",
+  "audio.backgroundProcess": "백그라운드 프로세스",
+  "audio.expandProcesses": "{{app}}의 프로세스 펼치기",
+  "audio.collapseProcesses": "{{app}}의 프로세스 접기",
+  "audio.muteProcess": "프로세스 {{pid}} 음소거",
+  "audio.allowProcess": "프로세스 {{pid}}의 오디오 공유"
 }

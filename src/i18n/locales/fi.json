@@ -1471,5 +1471,13 @@
   "chat.filePreparing": "Valmistellaan tiedostoa...",
   "chat.fileIndexing": "Lasketaan tiivistettä...",
   "code.language": "Ohjelmointikieli",
-  "code.plainText": "Pelkkä teksti"
+  "code.plainText": "Pelkkä teksti",
+  "audio.processCount_one": "{{count}} prosessi",
+  "audio.processCount_other": "{{count}} prosessia",
+  "audio.activeAudio": "Aktiivinen ääni",
+  "audio.backgroundProcess": "Taustaprosessi",
+  "audio.expandProcesses": "Laajenna sovelluksen {{app}} prosessit",
+  "audio.collapseProcesses": "Kokoa sovelluksen {{app}} prosessit",
+  "audio.muteProcess": "Mykistä prosessi {{pid}}",
+  "audio.allowProcess": "Jaa ääni prosessista {{pid}}"
 }

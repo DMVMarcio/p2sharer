@@ -1,3 +1,9 @@
+export interface SubProcessItem {
+  pid: number;
+  window_title?: string;
+  has_audio?: boolean;
+}
+
 export interface ProcessItem {
   pid: number;
   name: string;
@@ -5,6 +11,7 @@ export interface ProcessItem {
   exe_path?: string;
   is_likely_chat_or_voice: boolean;
   icon_base64?: string;
+  sub_processes?: SubProcessItem[];
 }
 
 export interface MonitorSource {

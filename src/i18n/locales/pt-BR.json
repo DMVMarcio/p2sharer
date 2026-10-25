@@ -1471,5 +1471,13 @@
   "chat.filePreparing": "Preparando arquivo...",
   "chat.fileIndexing": "Calculando hash...",
   "code.language": "Linguagem de programação",
-  "code.plainText": "Texto simples"
+  "code.plainText": "Texto simples",
+  "audio.processCount_one": "{{count}} processo",
+  "audio.processCount_other": "{{count}} processos",
+  "audio.activeAudio": "Áudio ativo",
+  "audio.backgroundProcess": "Processo em segundo plano",
+  "audio.expandProcesses": "Expandir processos de {{app}}",
+  "audio.collapseProcesses": "Recolher processos de {{app}}",
+  "audio.muteProcess": "Silenciar processo {{pid}}",
+  "audio.allowProcess": "Compartilhar áudio do processo {{pid}}"
 }

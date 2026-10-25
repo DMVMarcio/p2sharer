@@ -1471,5 +1471,13 @@
   "chat.filePreparing": "फ़ाइल तैयार हो रही है...",
   "chat.fileIndexing": "हैश की गणना की जा रही है...",
   "code.language": "प्रोग्रामिंग भाषा",
-  "code.plainText": "सादा पाठ"
+  "code.plainText": "सादा पाठ",
+  "audio.processCount_one": "{{count}} प्रक्रिया",
+  "audio.processCount_other": "{{count}} प्रक्रियाएं",
+  "audio.activeAudio": "सक्रिय ऑडियो",
+  "audio.backgroundProcess": "पृष्ठभूमि प्रक्रिया",
+  "audio.expandProcesses": "{{app}} की प्रक्रियाएं विस्तृत करें",
+  "audio.collapseProcesses": "{{app}} की प्रक्रियाएं संक्षिप्त करें",
+  "audio.muteProcess": "प्रक्रिया {{pid}} म्यूट करें",
+  "audio.allowProcess": "प्रक्रिया {{pid}} से ऑडियो साझा करें"
 }

@@ -1471,5 +1471,13 @@
   "chat.filePreparing": "正在準備檔案...",
   "chat.fileIndexing": "正在計算雜湊...",
   "code.language": "程式語言",
-  "code.plainText": "純文字"
+  "code.plainText": "純文字",
+  "audio.processCount_one": "{{count}} 個處理程序",
+  "audio.processCount_other": "{{count}} 個處理程序",
+  "audio.activeAudio": "作用中音訊",
+  "audio.backgroundProcess": "背景處理程序",
+  "audio.expandProcesses": "展開 {{app}} 的處理程序",
+  "audio.collapseProcesses": "折疊 {{app}} 的處理程序",
+  "audio.muteProcess": "將處理程序 {{pid}} 設為靜音",
+  "audio.allowProcess": "分享處理程序 {{pid}} 的音訊"
 }

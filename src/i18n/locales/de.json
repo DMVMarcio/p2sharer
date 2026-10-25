@@ -1471,5 +1471,13 @@
   "chat.filePreparing": "Datei wird vorbereitet...",
   "chat.fileIndexing": "Hash wird berechnet...",
   "code.language": "Programmiersprache",
-  "code.plainText": "Klartext"
+  "code.plainText": "Klartext",
+  "audio.processCount_one": "{{count}} Prozess",
+  "audio.processCount_other": "{{count}} Prozesse",
+  "audio.activeAudio": "Aktives Audio",
+  "audio.backgroundProcess": "Hintergrundprozess",
+  "audio.expandProcesses": "Prozesse für {{app}} erweitern",
+  "audio.collapseProcesses": "Prozesse für {{app}} einklappen",
+  "audio.muteProcess": "Prozess {{pid}} stummschalten",
+  "audio.allowProcess": "Audio von Prozess {{pid}} teilen"
 }

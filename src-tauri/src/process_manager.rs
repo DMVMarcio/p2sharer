@@ -2,6 +2,14 @@ use serde::{Deserialize, Serialize};
 use sysinfo::System;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SubProcessItem {
+    pub pid: u32,
+    pub window_title: Option<String>,
+    #[serde(default)]
+    pub has_audio: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ProcessItem {
     pub pid: u32,
     pub name: String,
@@ -10,6 +18,8 @@ pub struct ProcessItem {
     pub is_likely_chat_or_voice: bool,
     #[serde(default)]
     pub icon_base64: Option<String>,
+    #[serde(default)]
+    pub sub_processes: Vec<SubProcessItem>,
 }
 
 #[cfg(windows)]
@@ -175,6 +185,43 @@ unsafe extern "system" fn enum_windows_callback(hwnd: HWND, lparam: LPARAM) -> B
     BOOL(1)
 }
 
+#[cfg(windows)]
+fn get_audio_session_pids() -> std::collections::HashSet<u32> {
+    use windows::Win32::Media::Audio::{
+        eRender, eConsole, IMMDeviceEnumerator, MMDeviceEnumerator,
+        IAudioSessionManager2, IAudioSessionControl2,
+    };
+    use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_MULTITHREADED};
+    use windows::core::Interface;
+
+    let mut pids = std::collections::HashSet::new();
+    unsafe {
+        let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+        if let Ok(enumerator) = CoCreateInstance::<_, IMMDeviceEnumerator>(&MMDeviceEnumerator, None, CLSCTX_ALL) {
+            if let Ok(device) = enumerator.GetDefaultAudioEndpoint(eRender, eConsole) {
+                if let Ok(session_manager) = device.Activate::<IAudioSessionManager2>(CLSCTX_ALL, None) {
+                    if let Ok(session_enum) = session_manager.GetSessionEnumerator() {
+                        if let Ok(count) = session_enum.GetCount() {
+                            for i in 0..count {
+                                if let Ok(control) = session_enum.GetSession(i) {
+                                    if let Ok(control2) = control.cast::<IAudioSessionControl2>() {
+                                        if let Ok(pid) = control2.GetProcessId() {
+                                            if pid > 4 {
+                                                pids.insert(pid);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    pids
+}
+
 #[tauri::command]
 pub fn list_audio_processes() -> Vec<ProcessItem> {
     let mut sys = System::new_all();
@@ -188,9 +235,11 @@ pub fn list_audio_processes() -> Vec<ProcessItem> {
         let _ = EnumWindows(Some(enum_windows_callback), lparam);
     }
 
-    // Group processes by executable name so users see 1 clean entry per application
-    // rather than multiple PID entries for multi-process apps (e.g. Discord, Chrome, Steam)
-    let mut app_map: std::collections::HashMap<String, ProcessItem> = std::collections::HashMap::new();
+    #[cfg(windows)]
+    let audio_pids = get_audio_session_pids();
+    #[cfg(not(windows))]
+    let audio_pids: std::collections::HashSet<u32> = std::collections::HashSet::new();
+
     let mut icon_cache: std::collections::HashMap<String, Option<String>> = std::collections::HashMap::new();
 
     // Known communication / voice apps to highlight for easy 1-click exclusion
@@ -208,8 +257,21 @@ pub fn list_audio_processes() -> Vec<ProcessItem> {
         "guilded",
     ];
 
+    struct GroupAcc {
+        item: ProcessItem,
+        sub_processes: Vec<SubProcessItem>,
+        is_interesting: bool,
+    }
+    let mut app_map: std::collections::HashMap<String, GroupAcc> = std::collections::HashMap::new();
+
+    let self_pid = std::process::id();
+
     for (pid, process) in sys.processes() {
         let pid_u32 = pid.as_u32();
+        if pid_u32 <= 4 {
+            continue;
+        }
+
         let name = process.name().to_string_lossy().to_string();
         let name_lower = name.to_lowercase();
 
@@ -222,9 +284,9 @@ pub fn list_audio_processes() -> Vec<ProcessItem> {
         #[cfg(not(windows))]
         let window_title: Option<String> = None;
 
-        let self_pid = std::process::id();
         let is_self = pid_u32 == self_pid || name_lower.contains("p2sharer");
         let is_voice = is_self || voice_keywords.iter().any(|&k| name_lower.contains(k));
+        let has_audio = audio_pids.contains(&pid_u32);
 
         let effective_title = if is_self {
             Some("p2sharer (Este Aplicativo)".to_string())
@@ -232,43 +294,87 @@ pub fn list_audio_processes() -> Vec<ProcessItem> {
             window_title
         };
 
-        // Filter to interesting processes (either has a window or is a known audio/voice app)
-        if effective_title.is_some() || is_voice {
-            let exe_path = process.exe().map(|p| p.to_string_lossy().to_string());
+        let is_interesting = effective_title.is_some() || is_voice || has_audio;
 
-            #[cfg(windows)]
-            let icon_base64 = icon_cache
-                .entry(name_lower.clone())
-                .or_insert_with(|| unsafe { extract_icon_as_png_base64(exe_path.as_deref()) })
-                .clone();
+        let sub = SubProcessItem {
+            pid: pid_u32,
+            window_title: effective_title.clone(),
+            has_audio,
+        };
 
-            #[cfg(not(windows))]
-            let icon_base64: Option<String> = None;
-
-            let item = ProcessItem {
-                pid: pid_u32,
-                name: name.clone(),
-                exe_path,
-                window_title: effective_title,
-                is_likely_chat_or_voice: is_voice,
-                icon_base64,
-            };
-
-            // If already present, prefer the entry with a window title
-            match app_map.entry(name_lower) {
-                std::collections::hash_map::Entry::Vacant(v) => {
-                    v.insert(item);
+        match app_map.entry(name_lower) {
+            std::collections::hash_map::Entry::Vacant(v) => {
+                let exe_path = process.exe().map(|p| p.to_string_lossy().to_string());
+                let item = ProcessItem {
+                    pid: pid_u32,
+                    name: name.clone(),
+                    exe_path,
+                    window_title: effective_title,
+                    is_likely_chat_or_voice: is_voice,
+                    icon_base64: None,
+                    sub_processes: Vec::new(),
+                };
+                v.insert(GroupAcc {
+                    item,
+                    sub_processes: vec![sub],
+                    is_interesting,
+                });
+            }
+            std::collections::hash_map::Entry::Occupied(mut o) => {
+                let acc = o.get_mut();
+                if is_interesting {
+                    acc.is_interesting = true;
                 }
-                std::collections::hash_map::Entry::Occupied(mut o) => {
-                    if o.get().window_title.is_none() && item.window_title.is_some() {
-                        o.insert(item);
-                    }
+                if is_voice {
+                    acc.item.is_likely_chat_or_voice = true;
+                }
+                if acc.item.window_title.is_none() && effective_title.is_some() {
+                    acc.item.window_title = effective_title;
+                    acc.item.pid = pid_u32;
+                }
+                if acc.item.exe_path.is_none() {
+                    acc.item.exe_path = process.exe().map(|p| p.to_string_lossy().to_string());
+                }
+                if !acc.sub_processes.iter().any(|s| s.pid == pid_u32) {
+                    acc.sub_processes.push(sub);
                 }
             }
         }
     }
 
-    let mut results: Vec<ProcessItem> = app_map.into_values().collect();
+    let mut results: Vec<ProcessItem> = Vec::new();
+    for (name_lower, mut acc) in app_map {
+        if !acc.is_interesting {
+            continue;
+        }
+
+        // Sort sub_processes: window title first, then audio active, then PID
+        acc.sub_processes.sort_by(|a, b| {
+            b.window_title.is_some().cmp(&a.window_title.is_some())
+                .then_with(|| b.has_audio.cmp(&a.has_audio))
+                .then_with(|| a.pid.cmp(&b.pid))
+        });
+
+        if let Some(top) = acc.sub_processes.first() {
+            if acc.item.window_title.is_none() && top.window_title.is_some() {
+                acc.item.window_title = top.window_title.clone();
+                acc.item.pid = top.pid;
+            }
+        }
+
+        #[cfg(windows)]
+        let icon_base64 = icon_cache
+            .entry(name_lower)
+            .or_insert_with(|| unsafe { extract_icon_as_png_base64(acc.item.exe_path.as_deref()) })
+            .clone();
+
+        #[cfg(not(windows))]
+        let icon_base64: Option<String> = None;
+
+        acc.item.icon_base64 = icon_base64;
+        acc.item.sub_processes = acc.sub_processes;
+        results.push(acc.item);
+    }
 
     // Sort voice apps first, then alphabetically
     results.sort_by(|a, b| {

@@ -1471,5 +1471,13 @@
   "chat.filePreparing": "Préparation du fichier...",
   "chat.fileIndexing": "Calcul du hachage...",
   "code.language": "Langage de programmation",
-  "code.plainText": "Texte brut"
+  "code.plainText": "Texte brut",
+  "audio.processCount_one": "{{count}} processus",
+  "audio.processCount_other": "{{count}} processus",
+  "audio.activeAudio": "Audio actif",
+  "audio.backgroundProcess": "Processus en arrière-plan",
+  "audio.expandProcesses": "Développer les processus de {{app}}",
+  "audio.collapseProcesses": "Réduire les processus de {{app}}",
+  "audio.muteProcess": "Couper le son du processus {{pid}}",
+  "audio.allowProcess": "Partager l’audio du processus {{pid}}"
 }

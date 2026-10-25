@@ -1471,5 +1471,13 @@
   "chat.filePreparing": "正在准备文件...",
   "chat.fileIndexing": "正在计算哈希...",
   "code.language": "编程语言",
-  "code.plainText": "纯文本"
+  "code.plainText": "纯文本",
+  "audio.processCount_one": "{{count}} 个进程",
+  "audio.processCount_other": "{{count}} 个进程",
+  "audio.activeAudio": "活跃音频",
+  "audio.backgroundProcess": "后台进程",
+  "audio.expandProcesses": "展开 {{app}} 的进程",
+  "audio.collapseProcesses": "折叠 {{app}} 的进程",
+  "audio.muteProcess": "静音进程 {{pid}}",
+  "audio.allowProcess": "共享进程 {{pid}} 的音频"
 }

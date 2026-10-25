@@ -6,6 +6,19 @@ import { stateStore } from '../core/state_store';
 import { ProcessItem } from '../core/types';
 import { showToast } from './useToast';
 
+export function getPidsForProcess(item: ProcessItem): number[] {
+  const pids = new Set<number>();
+  if (item.sub_processes && item.sub_processes.length > 0) {
+    for (const sub of item.sub_processes) {
+      if (typeof sub.pid === 'number' && sub.pid > 0) pids.add(sub.pid);
+    }
+  }
+  if (typeof item.pid === 'number' && item.pid > 0) {
+    pids.add(item.pid);
+  }
+  return Array.from(pids);
+}
+
 export function useAudioFilter() {
   const [selectedFilterMode, setSelectedFilterMode] = useState<'exclude' | 'include'>(
     () => stateStore.selectedFilterMode
@@ -41,7 +54,11 @@ export function useAudioFilter() {
   const draftExcludeNamesRef = useRef(draftExcludeNames);
   draftExcludeNamesRef.current = draftExcludeNames;
   const draftIncludeNamesRef = useRef(draftIncludeNames);
-  draftIncludeNamesRef.current = draftIncludeNames;
+    draftIncludeNamesRef.current = draftIncludeNames;
+  const draftExcludePidsRef = useRef(draftExcludePids);
+  draftExcludePidsRef.current = draftExcludePids;
+  const draftIncludePidsRef = useRef(draftIncludePids);
+  draftIncludePidsRef.current = draftIncludePids;
 
   const loadProcesses = useCallback(async () => {
     setIsLoading(true);
@@ -65,8 +82,21 @@ export function useAudioFilter() {
 
       items.forEach((p) => {
         const nameLower = audioProcessKey(p.name);
-        if (exNames.has(nameLower)) exPids.add(p.pid);
-        if (inNames.has(nameLower)) inPids.add(p.pid);
+        const pids = getPidsForProcess(p);
+        if (exNames.has(nameLower)) {
+          pids.forEach(pid => exPids.add(pid));
+        } else {
+          pids.forEach(pid => {
+            if (draftExcludePidsRef.current.has(pid)) exPids.add(pid);
+          });
+        }
+        if (inNames.has(nameLower)) {
+          pids.forEach(pid => inPids.add(pid));
+        } else {
+          pids.forEach(pid => {
+            if (draftIncludePidsRef.current.has(pid)) inPids.add(pid);
+          });
+        }
       });
 
       setDraftExcludePids(exPids);
@@ -98,6 +128,16 @@ export function useAudioFilter() {
   const toggleProcess = useCallback(
     (item: ProcessItem, checked: boolean) => {
       const nameLower = audioProcessKey(item.name);
+      const targetPids = new Set<number>();
+      processes.forEach((p) => {
+        if (audioProcessKey(p.name) === nameLower) {
+          getPidsForProcess(p).forEach(pid => targetPids.add(pid));
+        }
+      });
+      if (targetPids.size === 0) {
+        getPidsForProcess(item).forEach(pid => targetPids.add(pid));
+      }
+
       if (selectedFilterMode === 'exclude') {
         setDraftExcludeNames((prev) => {
           const next = new Set(prev);
@@ -107,11 +147,9 @@ export function useAudioFilter() {
         });
         setDraftExcludePids((prev) => {
           const next = new Set(prev);
-          processes.forEach((p) => {
-            if (audioProcessKey(p.name) === nameLower) {
-              if (checked) next.add(p.pid);
-              else next.delete(p.pid);
-            }
+          targetPids.forEach(pid => {
+            if (checked) next.add(pid);
+            else next.delete(pid);
           });
           return next;
         });
@@ -124,17 +162,108 @@ export function useAudioFilter() {
         });
         setDraftIncludePids((prev) => {
           const next = new Set(prev);
-          processes.forEach((p) => {
-            if (audioProcessKey(p.name) === nameLower) {
-              if (checked) next.add(p.pid);
-              else next.delete(p.pid);
-            }
+          targetPids.forEach(pid => {
+            if (checked) next.add(pid);
+            else next.delete(pid);
           });
           return next;
         });
       }
     },
     [selectedFilterMode, processes]
+  );
+
+  const toggleSubProcess = useCallback(
+    (item: ProcessItem, pid: number, checked: boolean) => {
+      const nameLower = audioProcessKey(item.name);
+      const allPids = new Set<number>();
+      processes.forEach((p) => {
+        if (audioProcessKey(p.name) === nameLower) {
+          getPidsForProcess(p).forEach(pId => allPids.add(pId));
+        }
+      });
+      if (allPids.size === 0) {
+        getPidsForProcess(item).forEach(pId => allPids.add(pId));
+      }
+      const allPidsArray = Array.from(allPids);
+
+      if (selectedFilterMode === 'exclude') {
+        setDraftExcludePids((prev) => {
+          const next = new Set(prev);
+          if (checked) next.add(pid);
+          else next.delete(pid);
+
+          const allSelected = allPidsArray.length > 0 && allPidsArray.every(p => next.has(p));
+          setDraftExcludeNames((prevNames) => {
+            const nextNames = new Set(prevNames);
+            if (allSelected) {
+              nextNames.add(nameLower);
+            } else {
+              nextNames.delete(nameLower);
+            }
+            return nextNames;
+          });
+
+          return next;
+        });
+      } else {
+        setDraftIncludePids((prev) => {
+          const next = new Set(prev);
+          if (checked) next.add(pid);
+          else next.delete(pid);
+
+          const allSelected = allPidsArray.length > 0 && allPidsArray.every(p => next.has(p));
+          setDraftIncludeNames((prevNames) => {
+            const nextNames = new Set(prevNames);
+            if (allSelected) {
+              nextNames.add(nameLower);
+            } else {
+              nextNames.delete(nameLower);
+            }
+            return nextNames;
+          });
+
+          return next;
+        });
+      }
+    },
+    [selectedFilterMode, processes]
+  );
+
+  const getProcessSelectionState = useCallback(
+    (item: ProcessItem): 'all' | 'none' | 'partial' => {
+      const nameLower = audioProcessKey(item.name);
+      const allPids = new Set<number>();
+      processes.forEach((p) => {
+        if (audioProcessKey(p.name) === nameLower) {
+          getPidsForProcess(p).forEach(pId => allPids.add(pId));
+        }
+      });
+      if (allPids.size === 0) {
+        getPidsForProcess(item).forEach(pId => allPids.add(pId));
+      }
+
+      const selectedPidsSet = selectedFilterMode === 'exclude' ? draftExcludePids : draftIncludePids;
+      const selectedNamesSet = selectedFilterMode === 'exclude' ? draftExcludeNames : draftIncludeNames;
+
+      if (allPids.size === 0) {
+        return selectedNamesSet.has(nameLower) ? 'all' : 'none';
+      }
+
+      let selectedCount = 0;
+      for (const p of allPids) {
+        if (selectedPidsSet.has(p)) selectedCount++;
+      }
+
+      if (selectedCount === 0) {
+        return selectedNamesSet.has(nameLower) ? 'all' : 'none';
+      }
+      if (selectedCount === allPids.size) {
+        return 'all';
+      }
+      return 'partial';
+    },
+    [selectedFilterMode, draftExcludePids, draftIncludePids, draftExcludeNames, draftIncludeNames, processes]
   );
 
   const selectSingleProcess = useCallback(
@@ -270,11 +399,20 @@ export function useAudioFilter() {
   const filteredProcesses = processes.filter((p) => {
     if (!searchText) return true;
     const lower = searchText.toLowerCase();
-    return (
+    if (
       p.name.toLowerCase().includes(lower) ||
       (p.window_title && p.window_title.toLowerCase().includes(lower)) ||
       p.pid.toString().includes(lower)
-    );
+    ) {
+      return true;
+    }
+    if (p.sub_processes) {
+      return p.sub_processes.some((sub) =>
+        sub.pid.toString().includes(lower) ||
+        (sub.window_title && sub.window_title.toLowerCase().includes(lower))
+      );
+    }
+    return false;
   });
 
   const selectedNames = selectedFilterMode === 'exclude' ? draftExcludeNames : draftIncludeNames;
@@ -295,6 +433,8 @@ export function useAudioFilter() {
     selectedPids,
     selectedNames,
     toggleProcess,
+    toggleSubProcess,
+    getProcessSelectionState,
     selectSingleProcess,
     selectVoiceApps,
     clearSelection,

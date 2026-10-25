@@ -624,6 +624,7 @@ pub(crate) mod win_audio {
         self_pids
     }
 
+    #[allow(dead_code)]
     pub(crate) fn resolve_single_process_root(pid: u32, sys: &sysinfo::System) -> u32 {
         let start_name = sys.process(sysinfo::Pid::from_u32(pid))
             .map(|p| p.name().to_string_lossy().to_lowercase());
@@ -687,7 +688,21 @@ pub(crate) mod win_audio {
                                             let s_pid = control2.GetProcessId().unwrap_or(0);
                                             if s_pid > 4 {
                                                 if !is_pid_or_ancestor_excluded(s_pid, excluded_roots, excluded_names, self_pids, sys) {
-                                                    let root = resolve_single_process_root(s_pid, sys);
+                                                    let start_name = sys.process(sysinfo::Pid::from_u32(s_pid))
+                                                        .map(|p| p.name().to_string_lossy().to_lowercase());
+                                                    let mut root = s_pid;
+                                                    for parent in ancestors(s_pid, sys).skip(1) {
+                                                        let Some(process) = sys.process(sysinfo::Pid::from_u32(parent)) else { break; };
+                                                        if start_name.as_deref() != Some(&process.name().to_string_lossy().to_lowercase()) { break; }
+                                                        if is_pid_or_ancestor_excluded(parent, excluded_roots, excluded_names, self_pids, sys) {
+                                                            break;
+                                                        }
+                                                        let has_excluded_child = excluded_roots.iter().any(|&ex| ancestors(ex, sys).any(|a| a == parent));
+                                                        if has_excluded_child {
+                                                            break;
+                                                        }
+                                                        root = parent;
+                                                    }
                                                     if root > 4 && !non_excluded.contains(&root) {
                                                         non_excluded.push(root);
                                                     }
@@ -756,9 +771,17 @@ pub(crate) mod win_audio {
 
         let mut root_pids: Vec<u32> = Vec::new();
         for &start_pid in &top_level_candidates {
-            let r_u32 = resolve_single_process_root(start_pid, &sys);
-            if !root_pids.contains(&r_u32) {
-                root_pids.push(r_u32);
+            let start_name = sys.process(sysinfo::Pid::from_u32(start_pid))
+                .map(|p| p.name().to_string_lossy().to_lowercase());
+            let mut root = start_pid;
+            for parent in ancestors(start_pid, &sys).skip(1) {
+                if !candidate_pids.contains(&parent) { break; }
+                let Some(process) = sys.process(sysinfo::Pid::from_u32(parent)) else { break; };
+                if start_name.as_deref() != Some(&process.name().to_string_lossy().to_lowercase()) { break; }
+                root = parent;
+            }
+            if !root_pids.contains(&root) {
+                root_pids.push(root);
             }
         }
 

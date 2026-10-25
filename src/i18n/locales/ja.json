@@ -1471,5 +1471,13 @@
   "chat.filePreparing": "ファイルを準備しています...",
   "chat.fileIndexing": "ハッシュを計算しています...",
   "code.language": "プログラミング言語",
-  "code.plainText": "プレーンテキスト"
+  "code.plainText": "プレーンテキスト",
+  "audio.processCount_one": "{{count}} 個のプロセス",
+  "audio.processCount_other": "{{count}} 個のプロセス",
+  "audio.activeAudio": "アクティブな音声",
+  "audio.backgroundProcess": "バックグラウンドプロセス",
+  "audio.expandProcesses": "{{app}} のプロセスを展開",
+  "audio.collapseProcesses": "{{app}} のプロセスを折りたたむ",
+  "audio.muteProcess": "プロセス {{pid}} をミュート",
+  "audio.allowProcess": "プロセス {{pid}} の音声を共有"
 }

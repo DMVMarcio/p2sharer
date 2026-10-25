@@ -1471,5 +1471,15 @@
   "chat.filePreparing": "Подготовка файла...",
   "chat.fileIndexing": "Вычисление хеша...",
   "code.language": "Язык программирования",
-  "code.plainText": "Обычный текст"
+  "code.plainText": "Обычный текст",
+  "audio.processCount_one": "{{count}} процесс",
+  "audio.processCount_few": "{{count}} процесса",
+  "audio.processCount_many": "{{count}} процессов",
+  "audio.processCount_other": "{{count}} процессов",
+  "audio.activeAudio": "Активный звук",
+  "audio.backgroundProcess": "Фоновый процесс",
+  "audio.expandProcesses": "Развернуть процессы {{app}}",
+  "audio.collapseProcesses": "Свернуть процессы {{app}}",
+  "audio.muteProcess": "Заглушить процесс {{pid}}",
+  "audio.allowProcess": "Транслировать звук процесса {{pid}}"
 }

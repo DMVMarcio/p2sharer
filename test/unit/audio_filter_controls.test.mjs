@@ -103,3 +103,108 @@ test('audio filtering defaults, draft switching, mute-all and native apply use t
     }
   }
 });
+
+test('sub-process accordion toggling supports granular and parent all-or-nothing exclusion', async () => {
+  const require = createRequire(import.meta.url);
+  const bundle = await build({
+    stdin: { contents: "export { useAudioFilter } from './src/hooks/useAudioFilter'; export { stateStore } from './src/core/state_store';",
+      resolveDir: fileURLToPath(new URL('../../', import.meta.url)) },
+    bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic',
+    plugins: [{ name: 'fixtures', setup(builder) {
+      builder.onResolve({ filter: /^@tauri-apps\/api\/core$/ }, () => ({ path: 'invoke', namespace: 'fixture' }));
+      builder.onResolve({ filter: /useToast$/ }, () => ({ path: 'toast', namespace: 'fixture' }));
+      builder.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: args.path === 'invoke'
+        ? 'export const invoke = (...args) => globalThis.audioFilterInvoke(...args);'
+        : 'export const showToast = () => {};', loader: 'js' }));
+      builder.onResolve({ filter: /^[^./]/ }, args => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
+    } }],
+  });
+  const dom = new JSDOM('<div id="root"></div>', { url: 'https://example.test' });
+  const keys = ['window', 'document', 'navigator', 'localStorage', 'IS_REACT_ACT_ENVIRONMENT', 'audioFilterInvoke'];
+  const previous = new Map(keys.map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+  for (const key of keys.slice(0, 4)) Object.defineProperty(globalThis, key, { configurable: true, value: dom.window[key] });
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  const calls = [];
+  globalThis.audioFilterInvoke = async (command, args) => {
+    calls.push({ command, args });
+    if (command === 'list_audio_processes') return [
+      {
+        pid: 100,
+        name: 'Discord.exe',
+        window_title: 'Discord - #general',
+        sub_processes: [
+          { pid: 100, window_title: 'Discord - #general', has_audio: false },
+          { pid: 101, window_title: null, has_audio: true },
+          { pid: 102, window_title: null, has_audio: false },
+        ],
+      },
+      {
+        pid: 200,
+        name: 'P2Sharer.exe',
+        window_title: 'P2Sharer',
+        sub_processes: [{ pid: 200, window_title: 'P2Sharer', has_audio: false }],
+      },
+    ];
+  };
+  const { useAudioFilter, stateStore } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
+  const { createRoot } = await import('react-dom/client');
+  const root = createRoot(document.getElementById('root'));
+  let filter;
+  const Harness = () => { filter = useAudioFilter(); return null; };
+  let revision = 0;
+  const mount = () => act(async () => root.render(React.createElement(Harness, { key: ++revision })));
+
+  try {
+    localStorage.removeItem('p2sharer_audio_exclude_names');
+    stateStore.loadFromStorage();
+    await mount();
+    await act(async () => filter.loadProcesses());
+
+    const discord = filter.processes.find(p => p.name === 'Discord.exe');
+    assert.ok(discord);
+    assert.equal(filter.getProcessSelectionState(discord), 'all');
+    assert.deepEqual([...filter.selectedPids].sort((a, b) => a - b), [100, 101, 102, 200]);
+
+    // Uncheck only sub-process 101
+    await act(async () => filter.toggleSubProcess(discord, 101, false));
+    assert.equal(filter.getProcessSelectionState(discord), 'partial');
+    assert.equal(filter.selectedNames.has('discord'), false, 'Partial selection removes whole app name');
+    assert.deepEqual([...filter.selectedPids].sort((a, b) => a - b), [100, 102, 200]);
+
+    // Apply with partial exclusion
+    stateStore.isSharingScreen = true;
+    await act(async () => filter.applyFilters());
+    const lastConfig = calls.at(-1).args.config;
+    assert.equal(lastConfig.mode, 'exclude');
+    assert.ok(!lastConfig.target_names.includes('discord'), 'Partial exclusion must not include app name in target_names');
+    assert.ok(lastConfig.target_names.includes('p2sharer'));
+    assert.deepEqual(lastConfig.target_pids.sort((a, b) => a - b), [100, 102, 200]);
+
+    // Toggle parent off -> unselects all discord pids
+    await act(async () => filter.toggleProcess(discord, false));
+    assert.equal(filter.getProcessSelectionState(discord), 'none');
+    assert.deepEqual([...filter.selectedPids], [200]);
+
+    // Toggle parent on -> selects all discord pids and re-adds name
+    await act(async () => filter.toggleProcess(discord, true));
+    assert.equal(filter.getProcessSelectionState(discord), 'all');
+    assert.equal(filter.selectedNames.has('discord'), true);
+    assert.deepEqual([...filter.selectedPids].sort((a, b) => a - b), [100, 101, 102, 200]);
+
+    // Search by subprocess PID
+    await act(async () => filter.setSearchText('101'));
+    assert.equal(filter.processes.length, 1);
+    assert.equal(filter.processes[0].name, 'Discord.exe');
+
+    await act(async () => filter.setSearchText('nonexistent'));
+    assert.equal(filter.processes.length, 0);
+
+    await act(async () => root.unmount());
+  } finally {
+    await act(async () => root.unmount());
+    dom.window.close();
+    for (const [key, descriptor] of previous) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key];
+    }
+  }
+});
