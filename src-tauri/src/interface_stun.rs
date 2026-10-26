@@ -63,29 +63,24 @@ fn bind_interface(ip: Ipv4Addr) -> std::io::Result<Listener> {
     Ok(Listener { url: format!("stun:{ip}:{port}"), task })
 }
 
-impl InterfaceStunState {
-    fn servers(&self) -> Vec<String> {
-        let ips: BTreeSet<_> = crate::lan_signaling::interfaces().into_iter()
-            .filter_map(|interface| match interface.address.parse() {
-                Ok(IpAddr::V4(ip)) => Some(ip), _ => None,
-            }).take(MAX_INTERFACES).collect();
-        let mut listeners = self.0.lock().unwrap();
-        listeners.retain(|ip, _| ips.contains(ip));
-        for ip in ips {
-            if let std::collections::btree_map::Entry::Vacant(entry) = listeners.entry(ip) {
-                // A disappearing/unavailable interface must not prevent room entry.
-                if let Ok(listener) = bind_interface(ip) { entry.insert(listener); }
-            }
-        }
-        listeners.values().map(|listener| listener.url.clone()).collect()
-    }
-}
-
 #[tauri::command]
 pub async fn get_interface_stun_servers(window: tauri::Window,
     state: tauri::State<'_, InterfaceStunState>) -> Result<Vec<String>, String> {
     if window.label() != "main" { return Err("Only the main window can discover ICE interfaces".into()); }
-    Ok(state.servers())
+    let ips = tauri::async_runtime::spawn_blocking(|| {
+        crate::lan_signaling::interfaces().into_iter()
+            .filter_map(|interface| match interface.address.parse() {
+                Ok(IpAddr::V4(ip)) => Some(ip), _ => None,
+            }).take(MAX_INTERFACES).collect::<BTreeSet<_>>()
+    }).await.map_err(|e| e.to_string())?;
+    let mut listeners = state.0.lock().unwrap();
+    listeners.retain(|ip, _| ips.contains(ip));
+    for ip in ips {
+        if let std::collections::btree_map::Entry::Vacant(entry) = listeners.entry(ip) {
+            if let Ok(listener) = bind_interface(ip) { entry.insert(listener); }
+        }
+    }
+    Ok(listeners.values().map(|listener| listener.url.clone()).collect())
 }
 
 #[cfg(test)]

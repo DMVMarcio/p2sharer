@@ -263,9 +263,11 @@ async fn run_broker(listener: TcpListener, room: String, token: String) {
 }
 
 #[tauri::command]
-pub fn list_lan_interfaces(window: tauri::Window) -> Result<Vec<LanInterface>, String> {
+pub async fn list_lan_interfaces(window: tauri::Window) -> Result<Vec<LanInterface>, String> {
     main_only(&window)?;
-    Ok(interfaces())
+    tauri::async_runtime::spawn_blocking(interfaces)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -281,7 +283,10 @@ pub async fn start_lan_signaling(
         return Err("Invalid LAN room capability".into());
     }
     let address = endpoint_address(&endpoint)?;
-    if !interfaces()
+    let available = tauri::async_runtime::spawn_blocking(interfaces)
+        .await
+        .map_err(|e| e.to_string())?;
+    if !available
         .iter()
         .any(|interface| interface.address == address.ip().to_string())
     {

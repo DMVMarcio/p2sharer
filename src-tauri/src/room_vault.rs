@@ -109,53 +109,59 @@ fn lock_room_file(path: &Path) -> Result<File, String> {
 }
 
 #[tauri::command]
-pub fn save_room_record(app: tauri::AppHandle, room_id: String, data: String) -> Result<(), String> {
+pub async fn save_room_record(app: tauri::AppHandle, room_id: String, data: String) -> Result<(), String> {
     if data.len() > 131_072 { return Err("Room record is too large".into()); }
     let path = room_path(&app, &room_id)?;
     #[cfg(windows)]
     {
-        let _lock = lock_room_file(&path)?;
-        let mut incoming: serde_json::Value = serde_json::from_str(&data).map_err(|e| e.to_string())?;
-        if path.exists() {
-            let previous = fs::read(&path).map_err(|e| e.to_string())?;
-            let plaintext = unprotect(&previous)?;
-            let current: serde_json::Value = serde_json::from_slice(&plaintext).map_err(|e| e.to_string())?;
-            retain_newer_invite(&mut incoming, &current)?;
-        }
-        let serialized = serde_json::to_vec(&incoming).map_err(|e| e.to_string())?;
-        let ciphertext = protect(&serialized)?;
-        fs::write(path, ciphertext).map_err(|e| e.to_string())
+        tauri::async_runtime::spawn_blocking(move || {
+            let _lock = lock_room_file(&path)?;
+            let mut incoming: serde_json::Value = serde_json::from_str(&data).map_err(|e| e.to_string())?;
+            if path.exists() {
+                let previous = fs::read(&path).map_err(|e| e.to_string())?;
+                let plaintext = unprotect(&previous)?;
+                let current: serde_json::Value = serde_json::from_slice(&plaintext).map_err(|e| e.to_string())?;
+                retain_newer_invite(&mut incoming, &current)?;
+            }
+            let serialized = serde_json::to_vec(&incoming).map_err(|e| e.to_string())?;
+            let ciphertext = protect(&serialized)?;
+            fs::write(path, ciphertext).map_err(|e| e.to_string())
+        }).await.map_err(|e| e.to_string())?
     }
     #[cfg(not(windows))]
     { let _ = path; Err("Protected room storage requires Windows".into()) }
 }
 
 #[tauri::command]
-pub fn list_room_records(app: tauri::AppHandle) -> Result<Vec<String>, String> {
+pub async fn list_room_records(app: tauri::AppHandle) -> Result<Vec<String>, String> {
     let dir = app.path().app_local_data_dir().map_err(|e| e.to_string())?.join("rooms");
     if !dir.exists() { return Ok(Vec::new()); }
-    let mut records = Vec::new();
-    for entry in fs::read_dir(dir).map_err(|e| e.to_string())? {
-        let entry = entry.map_err(|e| e.to_string())?;
-        if entry.path().extension().and_then(|e| e.to_str()) != Some("vault") { continue; }
-        #[cfg(windows)]
-        let _lock = lock_room_file(&entry.path())?;
-        let ciphertext = fs::read(entry.path()).map_err(|e| e.to_string())?;
-        #[cfg(windows)]
-        records.push(String::from_utf8(unprotect(&ciphertext)?).map_err(|e| e.to_string())?);
-        #[cfg(not(windows))]
-        { let _ = ciphertext; return Err("Protected room storage requires Windows".into()); }
-    }
-    Ok(records)
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut records = Vec::new();
+        for entry in fs::read_dir(dir).map_err(|e| e.to_string())? {
+            let entry = entry.map_err(|e| e.to_string())?;
+            if entry.path().extension().and_then(|e| e.to_str()) != Some("vault") { continue; }
+            #[cfg(windows)]
+            let _lock = lock_room_file(&entry.path())?;
+            let ciphertext = fs::read(entry.path()).map_err(|e| e.to_string())?;
+            #[cfg(windows)]
+            records.push(String::from_utf8(unprotect(&ciphertext)?).map_err(|e| e.to_string())?);
+            #[cfg(not(windows))]
+            { let _ = ciphertext; return Err("Protected room storage requires Windows".into()); }
+        }
+        Ok(records)
+    }).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn delete_room_record(app: tauri::AppHandle, room_id: String) -> Result<(), String> {
+pub async fn delete_room_record(app: tauri::AppHandle, room_id: String) -> Result<(), String> {
     let path = room_path(&app, &room_id)?;
-    #[cfg(windows)]
-    let _lock = lock_room_file(&path)?;
-    if path.exists() { fs::remove_file(path).map_err(|e| e.to_string())?; }
-    Ok(())
+    tauri::async_runtime::spawn_blocking(move || {
+        #[cfg(windows)]
+        let _lock = lock_room_file(&path)?;
+        if path.exists() { fs::remove_file(path).map_err(|e| e.to_string())?; }
+        Ok(())
+    }).await.map_err(|e| e.to_string())?
 }
 
 #[cfg(all(test, windows))]

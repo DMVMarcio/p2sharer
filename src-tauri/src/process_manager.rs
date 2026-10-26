@@ -223,7 +223,13 @@ fn get_audio_session_pids() -> std::collections::HashSet<u32> {
 }
 
 #[tauri::command]
-pub fn list_audio_processes() -> Vec<ProcessItem> {
+pub async fn list_audio_processes() -> Result<Vec<ProcessItem>, String> {
+    tauri::async_runtime::spawn_blocking(list_audio_processes_sync)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+fn list_audio_processes_sync() -> Vec<ProcessItem> {
     let mut sys = System::new_all();
     sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
 

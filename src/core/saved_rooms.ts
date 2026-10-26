@@ -27,6 +27,9 @@ export function savedRoomCustomName(record: SavedRoom): string | undefined {
 }
 
 const memory = new Map<string, SavedRoom>();
+const nativeCache = new Map<string, SavedRoom>();
+let nativeCacheLoaded = false;
+let nativeLoadPromise: Promise<void> | null = null;
 const listeners = new Set<() => void>();
 const pendingMutations = new Map<string, Promise<void>>();
 const native = (): boolean => typeof window !== 'undefined' && ('__TAURI_INTERNALS__' in window || typeof indexedDB !== 'undefined');
@@ -57,6 +60,32 @@ function validRecord(value: unknown): value is SavedRoom {
     (record.hostCommands === undefined || (Array.isArray(record.hostCommands) && record.hostCommands.length <= 200));
 }
 
+async function ensureNativeCache(): Promise<void> {
+  if (nativeCacheLoaded) return;
+  if (nativeLoadPromise) return nativeLoadPromise;
+  nativeLoadPromise = (async () => {
+    try {
+      const rows = await invoke<string[]>('list_room_records');
+      const parsed = rows.flatMap((row) => {
+        try {
+          const value: unknown = JSON.parse(row);
+          return validRecord(value) ? [value] : [];
+        } catch { return []; }
+      });
+      const verified = await Promise.all(parsed.map(async (record) =>
+        await verifyRoomInvite(record.invite) ? record : null));
+      nativeCache.clear();
+      for (const record of verified) {
+        if (record) nativeCache.set(record.roomId, record);
+      }
+      nativeCacheLoaded = true;
+    } finally {
+      nativeLoadPromise = null;
+    }
+  })();
+  return nativeLoadPromise;
+}
+
 export const savedRooms = {
   reorder(ids: string[]): void {
     saveSavedRoomOrder(ids);
@@ -69,20 +98,14 @@ export const savedRooms = {
 
   async list(): Promise<SavedRoom[]> {
     if (!native()) return [...memory.values()];
-    const rows = await invoke<string[]>('list_room_records');
-    const parsed = rows.flatMap((row) => {
-      try {
-        const value: unknown = JSON.parse(row);
-        return validRecord(value) ? [value] : [];
-      } catch { return []; }
-    });
-    const verified = await Promise.all(parsed.map(async (record) =>
-      await verifyRoomInvite(record.invite) ? record : null));
-    return verified.filter((record): record is SavedRoom => record !== null);
+    await ensureNativeCache();
+    return [...nativeCache.values()];
   },
 
   async get(roomId: string): Promise<SavedRoom | undefined> {
-    return (await this.list()).find((room) => room.roomId === roomId);
+    if (!native()) return memory.get(roomId);
+    await ensureNativeCache();
+    return nativeCache.get(roomId);
   },
 
   async put(record: SavedRoom): Promise<void> {
@@ -99,16 +122,24 @@ export const savedRooms = {
         if (order < 0) record = { ...record, invite: previous.invite, name: previous.name,
           customName: record.customName ?? previous.customName };
       }
-      if (native()) await invoke('save_room_record', { roomId: record.roomId, data: JSON.stringify(record) });
-      else memory.set(record.roomId, record);
+      if (native()) {
+        await invoke('save_room_record', { roomId: record.roomId, data: JSON.stringify(record) });
+        nativeCache.set(record.roomId, record);
+      } else {
+        memory.set(record.roomId, record);
+      }
       listeners.forEach((listener) => listener());
     });
   },
 
   async remove(roomId: string): Promise<void> {
     await serializeMutation(roomId, async () => {
-      if (native()) await invoke('delete_room_record', { roomId });
-      else memory.delete(roomId);
+      if (native()) {
+        await invoke('delete_room_record', { roomId });
+        nativeCache.delete(roomId);
+      } else {
+        memory.delete(roomId);
+      }
       listeners.forEach((listener) => listener());
     });
   },

@@ -13,7 +13,7 @@ import { getRoomApp } from '../apps/registry.ts';
 import { chatHistoryChanged, chatRevision, chatRevisionKey, mergeChatHistory, nextChatOrder } from '../core/chat_history.ts';
 import { CHAT_FILE_CHUNK_BYTES, CHAT_FILE_IO_BATCH_BYTES, CHAT_FILE_IN_FLIGHT_CHUNKS, MAX_IMAGE_PREVIEW_BYTES } from '../core/chat_file_limits.ts';
 import { decodeSignedFileChunk, encodeSignedFileChunk,
-  fileChunkSignatureData, hashFileChunk } from '../core/chat_file_wire.ts';
+  fastFileChunkTag, fileChunkSignatureData, hashFileChunk } from '../core/chat_file_wire.ts';
 import { PeerAuthenticator } from '../core/peer_auth.ts';
 import { readChatFileBytes, writeChatDownloadBytes } from '../core/chat_file_io.ts';
 import { selectedIcePair, selectedIceRoute, type IceStat } from '../core/ice_route.ts';
@@ -720,7 +720,7 @@ export class GroupRoomManager {
         this.isCreator = this.authority.isLocalHost();
         this.localAdmitted = this.authority.isLocalHost();
         if (saved?.hostCommands) {
-          for (const command of saved.hostCommands) await this.acceptHostCommand(command);
+          await this.acceptHostCommands(saved.hostCommands);
         }
         if (this.isRoomAdmin()) this.localAdmitted = true;
         await this.persistJoinedIdentity(saved);
@@ -914,7 +914,7 @@ export class GroupRoomManager {
     if (this.localStream) this.sendStreamToPeer(peerId);
   }
 
-  private applyAdmittedPeer(peerId: string, key: string): void {
+  private applyAdmittedPeer(peerId: string, key: string, batch = false): void {
     if (this.previewOnly && peerId === selfId) return;
     if (this.bannedKeys.has(key)) return;
     this.admittedPeers.set(peerId, key);
@@ -924,6 +924,7 @@ export class GroupRoomManager {
         ? 'P2P (Relay Seguro)'
         : `P2P Conectado (${signalingManager.getActiveTransport().toUpperCase()})`);
     }
+    if (batch) return;
     if (this.chatAuth?.getKnownKey(peerId) === key && peerId !== selfId) this.announceToPeer(peerId);
     this.notifyPeersUpdate();
     void this.sendAuthoritySummary(peerId === selfId ? undefined : peerId).catch((error) =>
@@ -1090,35 +1091,92 @@ export class GroupRoomManager {
     }
   }
 
-  private async acceptHostCommand(command: HostCommand): Promise<void> {
-    if (!this.authority || !await this.authority.verifyCommand(command)) return;
+  private async acceptHostCommands(commands: HostCommand[]): Promise<void> {
+    if (!this.authority || commands.length === 0) return;
+    let historyAdded = false;
+    let peersUpdated = false;
+    let selfAdmitted = false;
+    const announcedTargets = new Set<string>();
+    for (const command of commands) {
+      const result = await this.acceptHostCommand(command, true);
+      if (!result) continue;
+      if (result.historyAdded) historyAdded = true;
+      if (result.peersUpdated) peersUpdated = true;
+      if (result.selfAdmitted) selfAdmitted = true;
+      if (result.admittedPeerId && result.admittedKey &&
+          this.chatAuth?.getKnownKey(result.admittedPeerId) === result.admittedKey &&
+          result.admittedPeerId !== selfId) {
+        announcedTargets.add(result.admittedPeerId);
+      }
+    }
+    if (historyAdded) void this.persistHostCommands();
+    if (selfAdmitted) {
+      for (const peerId of this.peerTracker.directConnectedPeers) {
+        if (this.admittedPeers.has(peerId)) announcedTargets.add(peerId);
+      }
+    }
+    for (const peerId of announcedTargets) {
+      if (this.admittedPeers.has(peerId)) this.announceToPeer(peerId);
+    }
+    if (peersUpdated || selfAdmitted || announcedTargets.size > 0) {
+      this.notifyPeersUpdate();
+    }
+    if (selfAdmitted || announcedTargets.size > 0) {
+      void this.sendAuthoritySummary().catch((error) =>
+        console.warn('[Rooms] Initial authority reconciliation failed:', error));
+    }
+  }
+
+  private async acceptHostCommand(command: HostCommand, batch = false): Promise<{
+    historyAdded: boolean;
+    peersUpdated: boolean;
+    selfAdmitted: boolean;
+    admittedPeerId?: string;
+    admittedKey?: string;
+  } | null> {
+    if (!this.authority || !await this.authority.verifyCommand(command)) return null;
+    let historyAdded = false;
+    let peersUpdated = false;
+    let selfAdmitted = false;
+    let admittedPeerId: string | undefined;
+    let admittedKey: string | undefined;
     if (!this.admissionHistory.some((item) => item.epoch === command.epoch && item.sequence === command.sequence)) {
       this.admissionHistory.push(command);
       this.retainAdmissionHistory();
-      void this.persistHostCommands();
+      historyAdded = true;
+      if (!batch) void this.persistHostCommands();
     }
     if (command.kind === 'admit' && command.targetPeerId && command.targetKey) {
-      this.applyAdmittedPeer(command.targetPeerId, command.targetKey);
+      this.applyAdmittedPeer(command.targetPeerId, command.targetKey, batch);
+      peersUpdated = true;
+      admittedPeerId = command.targetPeerId;
+      admittedKey = command.targetKey;
       if (command.targetPeerId === selfId) {
-        for (const peerId of this.peerTracker.directConnectedPeers) {
-          if (this.admittedPeers.has(peerId)) this.announceToPeer(peerId);
+        selfAdmitted = true;
+        if (!batch) {
+          for (const peerId of this.peerTracker.directConnectedPeers) {
+            if (this.admittedPeers.has(peerId)) this.announceToPeer(peerId);
+          }
         }
       }
     } else if (command.kind === 'kick' && command.targetPeerId && command.targetKey) {
       this.removeKickedPeer(command.targetPeerId, command.targetKey);
+      peersUpdated = true;
     } else if (command.kind === 'admin' && command.targetKey) {
       if (command.targetKey === this.chatAuth?.publicKey && this.isRoomAdmin()) {
         this.localAdmitted = true;
         this.callbacks?.onStatusChange('Administrador conectado');
       }
-      this.notifyPeersUpdate();
+      peersUpdated = true;
+      if (!batch) this.notifyPeersUpdate();
     } else if (command.kind === 'revoke-admin' && command.targetKey) {
       if (!this.hasAdminGrant(command.targetKey)) {
         for (const [peerId, admission] of this.adminAdmissions) {
           if (admission.adminKey === command.targetKey) this.adminAdmissions.delete(peerId);
         }
       }
-      this.notifyPeersUpdate();
+      peersUpdated = true;
+      if (!batch) this.notifyPeersUpdate();
     } else if (command.kind === 'password' && typeof command.password === 'string' &&
                (command.epoch > this.passwordCommandEpoch ||
                 (command.epoch === this.passwordCommandEpoch &&
@@ -1129,6 +1187,7 @@ export class GroupRoomManager {
       void this.persistRememberedPassword();
       this.callbacks?.onPasswordChange?.(this.password, 'Anfitrião');
     }
+    return { historyAdded, peersUpdated, selfAdmitted, admittedPeerId, admittedKey };
   }
 
   private bindRoomActions(): void {
@@ -1358,7 +1417,7 @@ export class GroupRoomManager {
         }
       } else if (data.kind === 'sync' && trustedStateSender &&
                  Array.isArray(data.commands) && data.commands.length <= 200) {
-        for (const command of data.commands) await this.acceptHostCommand(command);
+        await this.acceptHostCommands(data.commands);
       } else if (data.kind === 'command' && data.command) {
         await this.acceptHostCommand(data.command);
       } else if (data.kind === 'admin-admit' && data.admission &&
@@ -1466,11 +1525,19 @@ export class GroupRoomManager {
         this.historyAction.send({ history: this.chatHistory }, { target: peerId });
       } else if (Array.isArray(data?.history) && data.history.length > 0 && data.history.length <= 1000) {
         const verified: ChatMessage[] = [];
+        let verifiedChecks = 0;
         for (const message of data.history) {
+          if (!message || typeof message.id !== 'string') continue;
+          if (this.seenChatRevisions.has(chatRevisionKey(message))) continue;
+          if (verifiedChecks > 0 && verifiedChecks % 20 === 0) {
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            if (this.room !== boundRoom) return;
+          }
+          verifiedChecks++;
           if (this.chatAuth && await this.chatAuth.verify(message, peerId) &&
               this.isConsistentChatClaim(message)) verified.push(message);
         }
-        if (this.room !== boundRoom) return;
+        if (this.room !== boundRoom || verified.length === 0) return;
         const merged = mergeChatHistory(this.chatHistory, verified);
         if (chatHistoryChanged(this.chatHistory, merged)) {
           merged.forEach((m) => this.seenChatRevisions.add(chatRevisionKey(m)));
@@ -3287,7 +3354,10 @@ export class GroupRoomManager {
     if (!this.fileAction || !this.chatAuth || !this.peerTracker.isVerified(peerId) ||
         (this.authority && !this.isAdmittedPeer(peerId))) throw new Error('Peer unavailable');
     const prepareStart = performance.now();
-    const unsigned = { requestId, messageId: session.messageId, offset, hash: await hashFileChunk(bytes) };
+    const hash = session.sessionToken
+      ? fastFileChunkTag(bytes, session.sessionToken, offset)
+      : await hashFileChunk(bytes);
+    const unsigned = { requestId, messageId: session.messageId, offset, hash };
     const signature = session.sessionToken || await this.chatAuth.signControl('chat-file-chunk-v2', fileChunkSignatureData(unsigned));
     const packet = encodeSignedFileChunk({ ...unsigned, signature }, bytes);
     session.timings.prepareMs += performance.now() - prepareStart;
@@ -3301,10 +3371,12 @@ export class GroupRoomManager {
     try {
       let prefetched: { offset: number; length: number; promise: Promise<Uint8Array> } | null = null;
       while (this.fileSessions.get(requestId) === session && (session.sentOffset ?? 0) < session.total) {
-        const maxWindowBytes = (session.ackedOnce ? 1024 : CHAT_FILE_IN_FLIGHT_CHUNKS) * CHAT_FILE_CHUNK_BYTES;
+        const fastSession = Boolean(session.sessionToken || session.ackedOnce);
+        const ioBatchBytes = session.sessionToken ? 256 * CHAT_FILE_CHUNK_BYTES : CHAT_FILE_IO_BATCH_BYTES;
+        const maxWindowBytes = (fastSession ? 2048 : CHAT_FILE_IN_FLIGHT_CHUNKS) * CHAT_FILE_CHUNK_BYTES;
         if ((session.sentOffset ?? 0) - session.offset >= maxWindowBytes) break;
         const offset = session.sentOffset ?? 0;
-        const length = Math.min(CHAT_FILE_IO_BATCH_BYTES, session.total - offset,
+        const length = Math.min(ioBatchBytes, session.total - offset,
           maxWindowBytes - (offset - session.offset));
         const readStart = performance.now();
         const bytes: Uint8Array = prefetched && prefetched.offset === offset && prefetched.length === length
@@ -3315,10 +3387,12 @@ export class GroupRoomManager {
         if (this.fileSessions.get(requestId) !== session) return;
         if (bytes.length !== length) throw new Error('Source file changed or truncated');
         const nextOffset: number = offset + length;
-        const nextWindowBytes = (session.ackedOnce ? 1024 : CHAT_FILE_IN_FLIGHT_CHUNKS) * CHAT_FILE_CHUNK_BYTES;
-        const nextLength = Math.min(CHAT_FILE_IO_BATCH_BYTES, session.total - nextOffset,
+        const nextFast = Boolean(session.sessionToken || session.ackedOnce);
+        const nextBatchBytes = session.sessionToken ? 256 * CHAT_FILE_CHUNK_BYTES : CHAT_FILE_IO_BATCH_BYTES;
+        const nextWindowBytes = (nextFast ? 2048 : CHAT_FILE_IN_FLIGHT_CHUNKS) * CHAT_FILE_CHUNK_BYTES;
+        const nextLength = Math.min(nextBatchBytes, session.total - nextOffset,
           nextWindowBytes - (nextOffset - session.offset));
-        if (session.ackedOnce && nextLength > 0) {
+        if (nextFast && nextLength > 0) {
           prefetched = { offset: nextOffset, length: nextLength, promise: readChatFileBytes(session.sourceId, nextOffset, nextLength) };
         }
         // Prepare a bounded batch concurrently; never serialize a native round trip
@@ -3344,7 +3418,8 @@ export class GroupRoomManager {
       console.warn('[Files] Failed to send chunk:', error);
     } finally {
       session.sending = false;
-      const maxWindowBytes = (session.ackedOnce ? 1024 : CHAT_FILE_IN_FLIGHT_CHUNKS) * CHAT_FILE_CHUNK_BYTES;
+      const fastSession = Boolean(session.sessionToken || session.ackedOnce);
+      const maxWindowBytes = (fastSession ? 2048 : CHAT_FILE_IN_FLIGHT_CHUNKS) * CHAT_FILE_CHUNK_BYTES;
       if (this.fileSessions.get(requestId) === session && (session.sentOffset ?? 0) < session.total &&
           (session.sentOffset ?? 0) - session.offset < maxWindowBytes) {
         void this.sendNextFileChunks(requestId);
@@ -3499,7 +3574,7 @@ export class GroupRoomManager {
     const session = this.fileSessions.get(header.requestId);
     const message = this.chatHistory.find((item) => item.id === header.messageId);
     const key = this.chatAuth?.getKnownKey(peerId);
-    const maxInFlightChunks = session?.sessionToken ? 1024 : CHAT_FILE_IN_FLIGHT_CHUNKS;
+    const maxInFlightChunks = session?.sessionToken ? 2048 : CHAT_FILE_IN_FLIGHT_CHUNKS;
     if (!session || !message?.file || !key || message.authorKey !== key ||
         session.direction !== 'receive' || session.direct || session.peerId !== peerId || session.messageId !== header.messageId ||
         header.offset < (session.writingUntil ?? session.offset) || header.offset >= session.total ||
@@ -3508,10 +3583,13 @@ export class GroupRoomManager {
         session.pendingChunks?.has(header.offset) ||
         (session.pendingChunks?.size ?? 0) >= maxInFlightChunks + 1) return;
     const verifyStart = performance.now();
-    const valid = await hashFileChunk(bytes) === header.hash &&
-      ((Boolean(session.sessionToken) && header.signature === session.sessionToken) ||
-        await this.chatAuth!.verifyControl('chat-file-chunk-v2',
-          fileChunkSignatureData(header), header.signature, key));
+    const fastTokenMatch = Boolean(session.sessionToken) && header.signature === session.sessionToken;
+    const valid = fastTokenMatch && fastFileChunkTag(bytes, session.sessionToken!, header.offset) === header.hash
+      ? true
+      : await hashFileChunk(bytes) === header.hash &&
+        (fastTokenMatch ||
+          await this.chatAuth!.verifyControl('chat-file-chunk-v2',
+            fileChunkSignatureData(header), header.signature, key));
     session.timings.verifyMs += performance.now() - verifyStart;
     if (!valid) return;
     if (this.fileSessions.get(header.requestId) !== session || header.offset < (session.writingUntil ?? session.offset) ||
@@ -3527,15 +3605,20 @@ export class GroupRoomManager {
     session.receiving = true;
     try {
       while (this.fileSessions.get(requestId) === session) {
+        if (!session.pendingChunks?.has(session.offset)) break;
+        const maxWriteBatch = session.sessionToken ? 256 * CHAT_FILE_CHUNK_BYTES : CHAT_FILE_IO_BATCH_BYTES;
+        if (session.sessionToken && !session.preview) {
+          await new Promise<void>((resolve) => queueMicrotask(resolve));
+          if (this.fileSessions.get(requestId) !== session || !session.pendingChunks?.has(session.offset)) break;
+        }
         const offset = session.offset;
-        if (!session.pendingChunks?.has(offset)) break;
         const batch: Uint8Array[] = [];
         let length = 0;
         while (session.pendingChunks.has(offset + length)) {
           const bytes = session.pendingChunks.get(offset + length)!;
           if (bytes.length === 0 || bytes.length > CHAT_FILE_CHUNK_BYTES || offset + length + bytes.length > session.total)
             throw new Error('Invalid file chunk');
-          if (length + bytes.length > CHAT_FILE_IO_BATCH_BYTES) break;
+          if (length + bytes.length > maxWriteBatch) break;
           session.pendingChunks.delete(offset + length);
           batch.push(bytes);
           length += bytes.length;
@@ -3560,7 +3643,7 @@ export class GroupRoomManager {
         if (session.offset === session.total) await this.finishReceivedFile(requestId, session, message);
         const shouldAck = !session.sessionToken || session.offset === session.total ||
           !session.pendingChunks?.has(session.offset) ||
-          session.offset - (session.lastAckOffset ?? 0) >= 4 * CHAT_FILE_IO_BATCH_BYTES;
+          session.offset - (session.lastAckOffset ?? 0) >= maxWriteBatch;
         if (shouldAck) {
           session.lastAckOffset = session.offset;
           const ackStart = performance.now();

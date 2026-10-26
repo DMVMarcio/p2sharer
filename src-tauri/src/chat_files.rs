@@ -5,6 +5,7 @@ use std::{collections::HashMap, fs::{self, File, OpenOptions}, io::{Read, Write}
 use tauri::State;
 
 const CHUNK: usize = 256 * 1024;
+const MAX_IPC_BATCH: usize = 4 * 1024 * 1024;
 // File sizes and offsets cross JavaScript IPC as numbers; preserve exact integers.
 const MAX_SAFE_FILE_SIZE: u64 = (1 << 53) - 1;
 
@@ -81,26 +82,32 @@ fn read_source_index() -> Result<HashMap<String, PathBuf>, String> {
 }
 
 #[tauri::command]
-pub fn remember_chat_file_source(state: State<'_, ChatFileState>, room_id: String, message_id: String,
+pub async fn remember_chat_file_source(state: State<'_, ChatFileState>, room_id: String, message_id: String,
     source_id: String) -> Result<(), String> {
     if room_id.len() > 160 || message_id.len() > 80 { return Err("Invalid source reference".into()); }
     let source = state.sources.lock().map_err(|e| e.to_string())?.get(&source_id).cloned().ok_or("Source unavailable")?;
-    let mut index = read_source_index()?;
-    index.insert(format!("{room_id}:{message_id}"), source);
-    let target = source_index_path()?;
-    let temp = target.with_extension("tmp");
-    fs::write(&temp, serde_json::to_vec(&index).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
-    fs::rename(temp, target).map_err(|e| e.to_string())
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut index = read_source_index()?;
+        index.insert(format!("{room_id}:{message_id}"), source);
+        let target = source_index_path()?;
+        let temp = target.with_extension("tmp");
+        fs::write(&temp, serde_json::to_vec(&index).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        fs::rename(temp, target).map_err(|e| e.to_string())
+    }).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn restore_chat_file_source(state: State<'_, ChatFileState>, room_id: String,
+pub async fn restore_chat_file_source(state: State<'_, ChatFileState>, room_id: String,
     message_id: String) -> Result<Option<FileInfo>, String> {
     if room_id.len() > 160 || message_id.len() > 80 { return Err("Invalid source reference".into()); }
-    let Some(path) = read_source_index()?.get(&format!("{room_id}:{message_id}")).cloned() else { return Ok(None) };
-    if !path.exists() { return Ok(None); }
-    let id = random_id()?;
-    let info = file_info(id.clone(), &path)?;
+    let restored = tauri::async_runtime::spawn_blocking(move || -> Result<Option<(String, PathBuf, FileInfo)>, String> {
+        let Some(path) = read_source_index()?.get(&format!("{room_id}:{message_id}")).cloned() else { return Ok(None) };
+        if !path.exists() { return Ok(None); }
+        let id = random_id()?;
+        let info = file_info(id.clone(), &path)?;
+        Ok(Some((id, path, info)))
+    }).await.map_err(|e| e.to_string())??;
+    let Some((id, path, info)) = restored else { return Ok(None) };
     state.sources.lock().map_err(|e| e.to_string())?.insert(id, path);
     Ok(Some(info))
 }
@@ -133,13 +140,18 @@ pub async fn read_chat_file_chunk(state: State<'_, ChatFileState>, id: String, o
 #[tauri::command]
 pub async fn read_chat_file_bytes(state: State<'_, ChatFileState>, id: String, offset: u64,
     length: Option<usize>) -> Result<tauri::ipc::Response, String> {
-    read_source_chunk(&state, &id, offset, length).await.map(tauri::ipc::Response::new)
+    read_source_bytes(&state, &id, offset, length, MAX_IPC_BATCH).await.map(tauri::ipc::Response::new)
 }
 
 async fn read_source_chunk(state: &ChatFileState, id: &str, offset: u64,
     length: Option<usize>) -> Result<Vec<u8>, String> {
+    read_source_bytes(state, id, offset, length, CHUNK).await
+}
+
+async fn read_source_bytes(state: &ChatFileState, id: &str, offset: u64,
+    length: Option<usize>, max_chunk: usize) -> Result<Vec<u8>, String> {
     let length = length.unwrap_or(CHUNK);
-    if length == 0 || length > CHUNK { return Err("Invalid chunk size".into()); }
+    if length == 0 || length > max_chunk { return Err("Invalid chunk size".into()); }
     let cached = state.open_sources.lock().map_err(|e| e.to_string())?.get(id).cloned();
     let (file, size) = if let Some(entry) = cached {
         entry
@@ -244,11 +256,15 @@ fn download_headers(headers: &tauri::http::HeaderMap) -> Result<(&str, u64), Str
 pub async fn write_chat_download_bytes(state: State<'_, ChatFileState>, request: tauri::ipc::Request<'_>) -> Result<u64, String> {
     let (id, offset) = download_headers(request.headers())?;
     let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else { return Err("Expected binary file bytes".into()); };
-    write_download_bytes(&state, id, offset, bytes)
+    write_download_bytes_limit(&state, id, offset, bytes, MAX_IPC_BATCH)
 }
 
 pub(crate) fn write_download_bytes(state: &ChatFileState, id: &str, offset: u64, bytes: &[u8]) -> Result<u64, String> {
-    if bytes.is_empty() || bytes.len() > CHUNK { return Err("Invalid chunk size".into()); }
+    write_download_bytes_limit(state, id, offset, bytes, CHUNK)
+}
+
+fn write_download_bytes_limit(state: &ChatFileState, id: &str, offset: u64, bytes: &[u8], max_chunk: usize) -> Result<u64, String> {
+    if bytes.is_empty() || bytes.len() > max_chunk { return Err("Invalid chunk size".into()); }
     let mut downloads = state.downloads.lock().map_err(|e| e.to_string())?;
     let download = downloads.get_mut(id).ok_or("Download unavailable")?;
     if offset != download.written || offset.checked_add(bytes.len() as u64).is_none_or(|end| end > download.size) {
@@ -264,12 +280,15 @@ pub async fn finish_chat_download(state: State<'_, ChatFileState>, id: String) -
     let download = state.downloads.lock().map_err(|e| e.to_string())?.remove(&id).ok_or("Download unavailable")?;
     drop(download.file);
     if download.written != download.size { let _ = fs::remove_file(&download.temp); return Err("Incomplete download".into()); }
-    let (size, hash) = digest(&download.temp)?;
-    if size != download.size || hash != download.hash { let _ = fs::remove_file(&download.temp); return Err("File signature mismatch".into()); }
-    if download.destination.exists() { let _ = fs::remove_file(&download.temp); return Err("Destination already exists".into()); }
-    fs::rename(&download.temp, &download.destination).map_err(|e| e.to_string())?;
-    state.completed.lock().map_err(|e| e.to_string())?.insert(id, download.destination.clone());
-    Ok(download.destination.to_string_lossy().into_owned())
+    let destination = tauri::async_runtime::spawn_blocking(move || -> Result<PathBuf, String> {
+        let (size, hash) = digest(&download.temp)?;
+        if size != download.size || hash != download.hash { let _ = fs::remove_file(&download.temp); return Err("File signature mismatch".into()); }
+        if download.destination.exists() { let _ = fs::remove_file(&download.temp); return Err("Destination already exists".into()); }
+        fs::rename(&download.temp, &download.destination).map_err(|e| e.to_string())?;
+        Ok(download.destination)
+    }).await.map_err(|e| e.to_string())??;
+    state.completed.lock().map_err(|e| e.to_string())?.insert(id, destination.clone());
+    Ok(destination.to_string_lossy().into_owned())
 }
 
 #[tauri::command]
@@ -280,12 +299,14 @@ pub fn cancel_chat_download(state: State<'_, ChatFileState>, id: String) {
 }
 
 #[tauri::command]
-pub fn read_chat_image_preview(state: State<'_, ChatFileState>, id: String) -> Result<String, String> {
+pub async fn read_chat_image_preview(state: State<'_, ChatFileState>, id: String) -> Result<String, String> {
     let path = state.completed.lock().map_err(|e| e.to_string())?.get(&id).cloned()
         .or_else(|| state.sources.lock().ok()?.get(&id).cloned()).ok_or("Image unavailable")?;
-    let bytes = fs::read(path).map_err(|e| e.to_string())?;
-    if bytes.len() > 16 * 1024 * 1024 || image::guess_format(&bytes).is_err() { return Err("Invalid image preview".into()); }
-    Ok(STANDARD.encode(bytes))
+    tauri::async_runtime::spawn_blocking(move || {
+        let bytes = fs::read(path).map_err(|e| e.to_string())?;
+        if bytes.len() > 16 * 1024 * 1024 || image::guess_format(&bytes).is_err() { return Err("Invalid image preview".into()); }
+        Ok(STANDARD.encode(bytes))
+    }).await.map_err(|e| e.to_string())?
 }
 
 fn register_source(state: &ChatFileState, path: PathBuf) -> Result<FileInfo, String> {

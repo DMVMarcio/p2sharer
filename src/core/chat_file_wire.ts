@@ -21,6 +21,45 @@ export async function hashFileChunk(bytes: Uint8Array): Promise<string> {
   return Array.from(digest, (value) => value.toString(16).padStart(2, '0')).join('');
 }
 
+export function fastFileChunkTag(bytes: Uint8Array, sessionToken: string, offset: number): string {
+  let h0 = (0x243f6a88 ^ (offset & 0xffffffff)) >>> 0;
+  let h1 = (0x85a308d3 ^ Math.floor(offset / 0x100000000)) >>> 0;
+  let h2 = (0x13198a2e ^ bytes.length) >>> 0;
+  let h3 = 0x03707344 >>> 0;
+  let h4 = 0xa4093822 >>> 0;
+  let h5 = 0x299f31d0 >>> 0;
+  let h6 = 0x082efa98 >>> 0;
+  let h7 = 0xec4e6c89 >>> 0;
+  for (let i = 0; i < sessionToken.length; i++) {
+    const code = sessionToken.charCodeAt(i);
+    h0 = Math.imul(h0 ^ code, 0x9e3779b1) >>> 0;
+    h1 = Math.imul(h1 ^ ((h0 >>> 16) + code), 0x85ebca77) >>> 0;
+  }
+  const len = bytes.length;
+  let i = 0;
+  for (; i + 4 <= len; i += 4) {
+    const word = (bytes[i] | (bytes[i + 1] << 8) | (bytes[i + 2] << 16) | (bytes[i + 3] << 24)) >>> 0;
+    h0 = Math.imul(h0 ^ word, 0x85ebca77) >>> 0;
+    h1 = Math.imul(h1 ^ ((word >>> 11) | (word << 21)), 0xc2b2ae3d) >>> 0;
+    h2 = Math.imul(h2 + word, 0x27d4eb2f) >>> 0;
+    h3 = Math.imul(h3 ^ (h0 + i), 0x165667b1) >>> 0;
+    h4 = (h4 + Math.imul(word ^ h1, 0x9e3779b1)) >>> 0;
+    h5 = (h5 ^ Math.imul(word + h2, 0x85ebca77)) >>> 0;
+    h6 = (h6 + Math.imul(word ^ h3, 0xc2b2ae3d)) >>> 0;
+    h7 = (h7 ^ Math.imul(word + h4, 0x27d4eb2f)) >>> 0;
+  }
+  for (; i < len; i++) {
+    const byte = bytes[i];
+    h0 = Math.imul(h0 ^ byte, 0x85ebca77) >>> 0;
+    h1 = Math.imul(h1 + byte, 0xc2b2ae3d) >>> 0;
+    h2 = Math.imul(h2 ^ (byte << 7), 0x27d4eb2f) >>> 0;
+    h3 = Math.imul(h3 + (byte << 13), 0x165667b1) >>> 0;
+  }
+  return [h0, h1, h2, h3, h4, h5, h6, h7]
+    .map((word) => (word >>> 0).toString(16).padStart(8, '0'))
+    .join('');
+}
+
 export function decodeFileBase64(encoded: string): Uint8Array {
   const binary = atob(encoded);
   const bytes = new Uint8Array(binary.length);

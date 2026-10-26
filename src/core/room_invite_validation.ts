@@ -1,13 +1,33 @@
 import { PeerAuthenticator } from './peer_auth.ts';
 import { RoomAuthority } from './room_authority.ts';
 import type { AuthorityTransfer } from './room_authority.ts';
-import { parseRoomInvite, roomInvitePayload, type RoomInvite } from './room_invite.ts';
+import { createRoomIdentity, parseRoomInvite, roomInvitePayload, type RoomIdentity, type RoomInvite } from './room_invite.ts';
+
+const verifiedInvites = new Map<string, RoomInvite | null>();
+let verifierIdentityPromise: Promise<RoomIdentity> | null = null;
+
+function getVerifierIdentity(): Promise<RoomIdentity> {
+  verifierIdentityPromise ??= createRoomIdentity();
+  return verifierIdentityPromise;
+}
 
 export async function verifyRoomInvite(value: string): Promise<RoomInvite | null> {
+  const key = typeof value === 'string' ? value.trim() : '';
+  if (key && verifiedInvites.has(key)) {
+    const cached = verifiedInvites.get(key);
+    return cached ? structuredClone(cached) : null;
+  }
   const invite = parseRoomInvite(value);
-  if (!invite || invite.version === 3) return invite;
+  if (!invite || invite.version === 3) {
+    if (key && key.length <= 30010) {
+      if (verifiedInvites.size >= 512) verifiedInvites.clear();
+      verifiedInvites.set(key, invite ? structuredClone(invite) : null);
+    }
+    return invite;
+  }
   try {
-    const auth = await PeerAuthenticator.create(invite.roomId, 'invite-verifier');
+    const verifierIdentity = await getVerifierIdentity();
+    const auth = await PeerAuthenticator.create(invite.roomId, 'invite-verifier', verifierIdentity);
     const authority = new RoomAuthority(invite.roomId, invite.rootKey, auth);
     if (invite.authorityChain.length !== invite.epoch ||
         !await authority.importChain(invite.authorityChain) || authority.epoch !== invite.epoch) return null;
@@ -18,6 +38,10 @@ export async function verifyRoomInvite(value: string): Promise<RoomInvite | null
     }
     if (!await auth.verifyControl('invite-snapshot', roomInvitePayload(invite),
       invite.signature, authority.currentKey)) return null;
+    if (key && key.length <= 30010) {
+      if (verifiedInvites.size >= 512) verifiedInvites.clear();
+      verifiedInvites.set(key, structuredClone(invite));
+    }
     return invite;
   } catch { return null; }
 }
