@@ -63,13 +63,13 @@ function TunnelStats({ counters, rate, participants, ping }: {
 }) {
   return <div className="tunnel-stats">
     <div className="tunnel-traffic">
-      <TrafficRates rate={rate} />
-      {!participants && <TunnelPing ping={ping} />}
       <Tooltip placement="bottom" interactive content={<TunnelStatsHint counters={counters} rate={rate} participants={participants} />}>
         <button type="button" className="btn btn-sm btn-secondary tunnel-stats-info" aria-label={t('file.transferDetails')}>
           <CircleAlert size={14} aria-hidden="true" />
         </button>
       </Tooltip>
+      <TrafficRates rate={rate} />
+      {!participants && <TunnelPing ping={ping} />}
     </div>
   </div>;
 }
