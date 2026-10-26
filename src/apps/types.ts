@@ -27,6 +27,13 @@ export interface YouTubeState {
   syncReason?: 'heartbeat' | 'playback' | 'seek' | 'update' | 'queue-replace' | 'auto-advance';
 }
 
+export interface TwitchState {
+  channel: string;
+  playing: boolean;
+  updatedAt: number;
+  syncReason?: 'channel' | 'playback';
+}
+
 export type AppWireEvent =
   | { kind: 'start'; instance: RoomAppInstance }
   | { kind: 'stop'; id: string }

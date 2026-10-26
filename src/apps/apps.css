@@ -2,6 +2,7 @@
 @import './tunnels.css';
 @import './browser.css';
 @import './whiteboard.css';
+@import './twitch.css';
 
 /* Room App library */
 .modal-card.apps-library-modal { max-width: 800px; }
@@ -13,6 +14,7 @@
   color: #fff; background: linear-gradient(125deg, #334155, #172033); }
 .apps-library-banner.notepad { background: linear-gradient(125deg, #d49d3d, #75542f 65%, #302a27); }
 .apps-library-banner.youtube { background: linear-gradient(125deg, #fa424f, #b81f40 62%, #451b33); }
+.apps-library-banner.twitch { background: linear-gradient(125deg, #9146FF, #6441a5 62%, #18181b); }
 .apps-library-banner.has-image { background-position: center; background-size: cover; }
 .apps-library-banner-glow { position: absolute; width: 170px; height: 170px; right: -25px; top: -95px;
   border: 1px solid rgba(255,255,255,.28); border-radius: 50%; box-shadow: 0 0 0 34px rgba(255,255,255,.07),
@@ -22,6 +24,8 @@
   filter: drop-shadow(0 8px 18px rgba(0,0,0,.16)); }
 .apps-library-banner.youtube > svg { width: 68px; height: 68px; padding: 0; border: 0;
   border-radius: 0; background: transparent; filter: drop-shadow(0 6px 15px #0005); }
+.apps-library-banner.twitch > svg { width: 68px; height: 68px; padding: 0; border: 0;
+  border-radius: 0; background: transparent; filter: drop-shadow(0 6px 15px rgba(145, 70, 255, 0.4)); }
 .apps-library-card-content { flex: 1; display: flex; min-height: 105px; flex-direction: column; align-items: flex-start;
   padding: 14px 16px; gap: 7px; }
 .apps-library-card-content h3 { margin: 0; color: var(--text-primary); font-size: 14px; font-weight: 700; }
@@ -108,6 +112,7 @@
 .room-app-card-dot { width: 7px; height: 7px; flex-shrink: 0; border-radius: 50%; background: var(--accent-color); }
 .room-app-card-title svg { flex-shrink: 0; color: var(--text-secondary); }
 .room-app-kind-youtube .room-app-card-title svg { width: 20px; height: 20px; color: #ff0033; }
+.room-app-kind-twitch .room-app-card-title svg { width: 20px; height: 20px; color: #9146ff; }
 .room-app-shared-label { padding: 3px 6px; border-radius: var(--radius-sm); background: var(--bg-card);
   color: var(--text-muted); font-size: 10px; font-weight: 500; }
 .room-app-toolbar-actions { display: flex; flex-shrink: 0; align-items: center; gap: 4px; }
@@ -136,6 +141,7 @@
   gap: 7px; min-width: 0; padding: 12px; background: var(--bg-surface); color: var(--text-primary); text-align: center; }
 .room-app-join-panel > svg { color: var(--text-secondary); }
 .room-app-kind-youtube .room-app-join-panel > svg { color: #ff0033; }
+.room-app-kind-twitch .room-app-join-panel > svg { color: #9146ff; }
 .room-app-join-panel strong { font-size: 14px; }
 .room-app-join-panel > span { color: var(--text-secondary); font-size: 11px; }
 .room-app-join-panel > button { margin-top: 5px; padding: 6px 11px; border: 0;
@@ -146,7 +152,7 @@
 .room-app-card.compact .room-app-join-panel > button { margin-top: 0; }
 
 /* Inner app surfaces remain distinct from the shared card header. */
-.room-app-notepad, .room-app-youtube {
+.room-app-notepad, .room-app-youtube, .room-app-twitch {
   --room-app-content-bg: color-mix(in srgb, var(--bg-app) 97%, #000);
   --room-app-panel-bg: color-mix(in srgb, var(--room-app-content-bg) 75%, var(--bg-elevated));
 }

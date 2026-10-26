@@ -2,6 +2,7 @@
   "version": "1.6.0",
   "translations": {
     "en": [
+      "**Twitch live stream room app.** Watch Twitch live broadcasts together in real time with collaborative channel switching, synchronized play/pause, live chat embedding, and theater or picture-in-picture modes.",
       "**Platform indicators on participants.** Participant cards and the people sidebar list now show which platform each member is using (Desktop, Web, or Mobile) via an icon with a descriptive tooltip.",
       "**Granular audio filtering by application process.** Multi-process applications such as Discord or web browsers can be expanded into an accordion to selectively mute or share individual processes, while retaining the main switch to control the entire app at once.",
       "**Reduced screen sharing memory usage.** The app automatically suspends unnecessary video decoding in the background when the local preview is not being watched, eliminating high RAM consumption during extended broadcasting.",
@@ -9,6 +10,7 @@
       "**Lower latency in Tunnels, faster file transfers, and instant room entry.** Multiplayer sessions over Tunnels and Virtual Network now respond with significantly less lag, chat file transfers sustain much higher speeds, and joining active rooms no longer freezes the interface while loading participant profiles."
     ],
     "pt-BR": [
+      "**Novo app da Twitch na sala.** Assista a transmissões ao vivo da Twitch em sincronia com troca colaborativa de canal, play/pause compartilhado, chat ao vivo integrado e modos teatro e picture-in-picture.",
       "**Identificação da plataforma dos participantes.** Os cards da sala e a lista de pessoas na aba lateral agora exibem a plataforma de cada membro (Desktop, Web ou Dispositivo móvel) por meio de um ícone com dica descritiva.",
       "**Filtro de áudio granular por processo.** Aplicativos com múltiplos processos, como Discord e navegadores, agora podem ser expandidos em sanfona para silenciar ou transmitir processos individuais seletivamente, mantendo o controle geral do app.",
       "**Menor consumo de memória na transmissão de tela.** O aplicativo agora suspende a decodificação desnecessária de vídeo em segundo plano quando a prévia local não está sendo assistida, eliminando o consumo excessivo de RAM durante transmissões longas.",
@@ -16,6 +18,7 @@
       "**Menor latência no app Túneis, envio de arquivos mais rápido e entrada fluida na sala.** Partidas multiplayer via Túneis e Rede Virtual respondem sem travamentos, transferências de arquivos no chat alcançam velocidades muito maiores e a entrada em salas ativas não congela mais a interface ao carregar perfis dos participantes."
     ],
     "es": [
+      "**Nueva app de Twitch en la sala.** Mira transmisiones en vivo de Twitch en sincronía con cambio colaborativo de canal, reproducción compartida, chat en vivo integrado y modos teatro y picture-in-picture.",
       "**Indicadores de plataforma en participantes.** Las tarjetas de participantes y la lista lateral de personas ahora muestran la plataforma utilizada por cada miembro (Escritorio, Web o Móvil) mediante un icono con descripción emergente.",
       "**Filtro de audio granular por proceso.** Las aplicaciones con múltiples procesos, como Discord o navegadores web, ahora pueden expandirse en acordeón para silenciar o compartir procesos individuales de forma selectiva, manteniendo el control general de la app.",
       "**Menor consumo de memoria al compartir pantalla.** La aplicación suspende automáticamente la descodificación de vídeo en segundo plano cuando no se ve la vista previa local, lo que elimina el consumo excesivo de RAM durante transmisiones prolongadas.",
@@ -23,6 +26,7 @@
       "**Menor latencia en Túneles, transferencias de archivos más rápidas y entrada fluida a las salas.** Las partidas multijugador mediante Túneles y Red Virtual responden con mucha mayor fluidez, los envíos de archivos en el chat alcanzan velocidades muy superiores y al unirse a salas activas la interfaz ya no se congela mientras carga los perfiles."
     ],
     "fr": [
+      "**Nouvelle application Twitch dans le salon.** Regardez des diffusions Twitch en direct et en synchronisation avec changement collaboratif de chaîne, lecture partagée, chat intégré et modes cinéma et incrustation d'image.",
       "**Indicateurs de plateforme sur les participants.** Les cartes de participants et la liste des personnes dans la barre latérale indiquent désormais la plateforme utilisée par chaque membre (Bureau, Web ou Mobile) via une icône avec infobulle descriptive.",
       "**Filtrage audio granulaire par processus.** Les applications à processus multiples comme Discord ou les navigateurs peuvent désormais être développées en accordéon pour couper ou partager sélectivement des processus individuels, tout en conservant le contrôle global de l’application.",
       "**Consommation de mémoire réduite lors du partage d’écran.** L’application suspend automatiquement le décodage vidéo en arrière-plan lorsque l’aperçu local n’est pas affiché, évitant ainsi l’accumulation excessive de mémoire vive pendant les diffusions prolongées.",
@@ -30,6 +34,7 @@
       "**Latence réduite dans Tunnels, transferts de fichiers plus rapides et accès fluide aux salons.** Les sessions multijoueurs via Tunnels et le réseau virtuel gagnent nettement en réactivité, l’envoi de fichiers dans le chat atteint des débits bien plus élevés et l’entrée dans un salon actif ne fige plus l’interface lors du chargement des profils."
     ],
     "de": [
+      "**Neue Twitch-App im Raum.** Livestreams von Twitch gemeinsam synchron ansehen mit kollaborativem Kanalwechsel, geteilter Wiedergabe, integriertem Live-Chat sowie Kino- und Bild-in-Bild-Modus.",
       "**Plattform-Symbole für Teilnehmer.** Teilnehmerkarten und die Personenliste in der Seitenleiste zeigen jetzt anhand eines Symbols mit beschreibendem Tooltip, welche Plattform das jeweilige Mitglied nutzt (Desktop, Web oder Mobil).",
       "**Präziser Audiofilter nach Anwendungsprozessen.** Anwendungen mit mehreren Prozessen wie Discord oder Webbrowser können jetzt im Akkordeon erweitert werden, um einzelne Prozesse gezielt stummzuschalten oder freizugeben, während der Hauptschalter für die gesamte App erhalten bleibt.",
       "**Geringerer Arbeitsspeicherverbrauch bei der Bildschirmübertragung.** Die App pausiert unnötige Videodekodierung im Hintergrund, wenn die lokale Vorschau nicht aktiv ist, und verhindert so hohen RAM-Verbrauch bei längeren Übertragungen.",
@@ -37,6 +42,7 @@
       "**Geringere Latenz in Tunnel, schnellere Dateiübertragungen und flüssiger Raumbeitritt.** Mehrspieler-Sitzungen über Tunnel und das virtuelle Netzwerk reagieren deutlich verzögerungsärmer, Dateiübertragungen im Chat erreichen wesentlich höhere Geschwindigkeiten und beim Betreten aktiver Räume friert die Oberfläche beim Laden der Teilnehmerprofile nicht mehr ein."
     ],
     "it": [
+      "**Nuova app Twitch nella stanza.** Guarda le dirette streaming di Twitch in sincronia con cambio canale collaborativo, riproduzione condivisa, chat dal vivo integrata e modalità teatro e picture-in-picture.",
       "**Indicatori di piattaforma per i partecipanti.** Le schede dei partecipanti e l’elenco delle persone nella barra laterale mostrano ora quale piattaforma sta utilizzando ciascun membro (Desktop, Web o Mobile) tramite un’icona con descrizione comando.",
       "**Filtro audio granulare per processo.** Le applicazioni con più processi come Discord o i browser web possono ora essere espanse a fisarmonica per silenziare o condividere selettivamente singoli processi, mantenendo l’interruttore principale per controllare l’intera app.",
       "**Consumo di memoria ridotto durante la condivisione dello schermo.** L’app sospende la decodifica video non necessaria in background quando l’anteprima locale non è visualizzata, eliminando l’accumulo eccessivo di RAM durante le trasmissioni prolungate.",
@@ -44,6 +50,7 @@
       "**Minore latenza nei Tunnel, trasferimenti di file più rapidi e ingresso fluido nelle stanze.** Le sessioni multigiocatore tramite Tunnel e Rete virtuale rispondono senza rallentamenti, l’invio di file in chat raggiunge velocità molto più elevate e l’ingresso nelle stanze attive non blocca più l’interfaccia durante il caricamento dei profili."
     ],
     "zh-CN": [
+      "**新增 Twitch 直播应用。** 实时同步观看 Twitch 精彩直播，支持多人协作换台、同步播放与暂停、嵌入式实时聊天以及剧场模式与画中画。",
       "**参与者平台标识。** 房间内的成员卡片和侧边栏人员列表中现已通过图标及提示框显示每位成员所使用的平台（桌面端、网页端或移动端）。",
       "**按进程进行精细化音频过滤。** 像 Discord 或网页浏览器等多进程应用现在可以通过折叠面板展开，单独静音或共享各个子进程，同时保留一键控制整个应用的主开关。",
       "**降低屏幕共享时的内存占用。** 当未开启本地预览时，应用会自动暂停后台不必要的视频解码，彻底消除长时间直播过程中内存过度消耗和持续增长的问题。",
@@ -51,6 +58,7 @@
       "**隧道延迟显著降低、文件传输大幅提速且进入房间更流畅。** 通过隧道和虚拟网络进行的多人联机体验更加流畅灵敏，聊天中的文件传输速度大幅提升，同时加入活跃房间并加载成员资料时界面不再出现卡顿。"
     ],
     "zh-TW": [
+      "**新增 Twitch 直播應用。** 即時同步觀看 Twitch 精彩直播，支援多人協作切換頻道、同步播放與暫停、內嵌即時聊天以及劇院模式與子母畫面。",
       "**參與者平台標識。** 房間內的成員卡片和側邊欄人員列表中現已透過圖示及提示框顯示每位成員所使用的平台（桌面端、網頁端或行動端）。",
       "**按處理程序進行精細化音訊過濾。** 像 Discord 或網頁瀏覽器等多處理程序應用程式現在可以透過摺疊面板展開，單獨將各個子處理程序設為靜音或分享，同時保留一鍵控制整個應用程式的主開關。",
       "**降低螢幕共享時的記憶體占用。** 當未開啟本機預覽時，應用程式會自動暫停背景不必要的視訊解碼，徹底消除長時間直播過程中記憶體過度消耗和持續增長的問題。",
@@ -58,6 +66,7 @@
       "**通道延遲顯著降低、檔案傳輸大幅提速且進入房間更流暢。** 透過通道與虛擬網路進行的多人連線體驗更加流暢靈敏，聊天室中的檔案傳輸速度大幅提升，同時加入活躍房間並載入成員個人資料時介面不再出現停頓。"
     ],
     "ja": [
+      "**Twitch ライブ配信アプリを新規追加。** 参加者全員で Twitch のライブ配信をリアルタイムに同期視聴。チャンネルの共同切り替え、同期再生/一時停止、ライブチャットの埋め込み、シアターモードやピクチャーインピクチャーに対応しました。",
       "**参加者のプラットフォーム表示。** ルーム内の参加者カードやサイドバーのメンバー一覧に、各メンバーが利用している環境（デスクトップ、ウェブ、モバイル）を示すアイコンとツールチップが追加されました。",
       "**プロセス単位のきめ細かな音声フィルター。** Discordやブラウザなどの複数プロセスを持つアプリをアコーディオン形式で展開し、個別のプロセスを選択的にミュートまたは配信できるようになりました。アプリ全体を一括操作するスイッチもそのまま利用できます。",
       "**画面共有中のメモリ消費を削減。** ローカルプレビューを表示していない場合、バックグラウンドでの不要な映像デコードを自動停止し、長時間の配信でもメモリ使用量が増加し続ける問題を解消しました。",
@@ -65,6 +74,7 @@
       "**トンネルの低遅延化、ファイル転送の高速化、およびスムーズなルーム入室。** トンネルおよび仮想ネットワーク経由のマルチプレイ通信が大幅にスムーズになり、チャットでのファイル送受信速度が飛躍的に向上したほか、入室時の参加者プロフィール読み込み中に画面が一時停止する問題を解消しました。"
     ],
     "ko": [
+      "**새로운 Twitch 라이브 스트림 앱.** 방 안의 모든 참가자가 함께 실시간으로 Twitch 라이브 방송을 동기화하여 시청할 수 있습니다. 공동 채널 전환, 공유 재생/일시정지, 통합 실시간 채팅, 극장 모드 및 PIP를 지원합니다.",
       "**참가자 플랫폼 표시.** 방 내 참가자 카드와 사이드바 인원 목록에 각 사용자가 사용 중인 플랫폼(데스크톱, 웹, 모바일)을 알려주는 아이콘과 툴팁이 추가되었습니다.",
       "**프로세스별 정밀 오디오 필터링.** Discord나 웹 브라우저처럼 여러 프로세스를 사용하는 앱을 아코디언 형태로 펼쳐 개별 프로세스를 선택적으로 음소거하거나 공유할 수 있으며, 앱 전체를 한 번에 제어하는 마스터 스위치도 그대로 유지됩니다.",
       "**화면 공유 중 메모리 사용량 절감.** 로컬 미리보기를 보고 있지 않을 때 백그라운드에서의 불필요한 비디오 디코딩을 자동으로 일시 중지하여 장시간 방송 시 메모리가 계속 누적되는 문제를 해결했습니다.",
@@ -72,6 +82,7 @@
       "**터널 지연 시간 단축, 파일 전송 속도 대폭 향상 및 쾌적한 방 입장.** 터널 및 가상 네트워크를 통한 멀티플레이 세션이 훨씬 빠르고 쾌적하게 반응하며, 채팅 파일 전송 속도가 대폭 향상되었고, 방 입장 시 참가자 프로필을 불러오는 동안 화면이 멈추던 현상이 해결되었습니다."
     ],
     "hi": [
+      "**कमरे में नया Twitch ऐप।** साझा चैनल स्विचिंग, सिंक्रनाइज़्ड प्ले/पॉज़, लाइव चैट और थिएटर या पिक्चर-इन-पिक्चर मोड के साथ Twitch लाइव स्ट्रीम को एक साथ सिंक में देखें।",
       "**प्रतिभागियों पर प्लेटफ़ॉर्म संकेतक।** रूम के सहभागी कार्ड और साइडबार सूची में अब एक आइकन और टूलटिप के माध्यम से दिखाया जाता है कि प्रत्येक सदस्य किस प्लेटफ़ॉर्म (डेस्कटॉप, वेब या मोबाइल) का उपयोग कर रहा है।",
       "**प्रक्रिया अनुसार सटीक ऑडियो फ़िल्टरिंग।** Discord या वेब ब्राउज़र जैसे बहु-प्रक्रिया ऐप्स को अब अकॉर्डियन की तरह विस्तृत करके अलग-अलग प्रक्रियाओं को चुनिंदा रूप से म्यूट या साझा किया जा सकता है, जबकि पूरे ऐप को एक साथ नियंत्रित करने वाला मुख्य स्विच भी बना रहता है।",
       "**स्क्रीन शेयरिंग के दौरान मेमोरी की खपत कम की गई।** स्थानीय पूर्वावलोकन न देखे जाने पर ऐप पृष्ठभूमि में अनावश्यक वीडियो डिकोडिंग को स्वतः रोक देता है, जिससे लंबे प्रसारण के दौरान अत्यधिक रैम उपयोग समाप्त हो जाता है।",
@@ -79,6 +90,7 @@
       "**टनल में कम विलंबता, तेज़ फ़ाइल स्थानांतरण और तुरंत रूम में प्रवेश।** टनल और वर्चुअल नेटवर्क के माध्यम से मल्टीप्लेयर गेमिंग सत्र अधिक सुचारू रूप से चलते हैं, चैट में फ़ाइल स्थानांतरण की गति काफ़ी तेज़ हो गई है, और रूम में प्रवेश करते समय प्रतिभागियों की प्रोफ़ाइल लोड होने के दौरान ऐप अब फ़्रीज़ नहीं होता।"
     ],
     "fi": [
+      "**Uusi Twitch-suoratoistosovellus huoneessa.** Katso Twitch-lähetyksiä yhdessä reaaliajassa yhteisen kanavanvaihdon, jaetun toiston/tauon, integroidun live-chatin sekä teatteri- ja kuva kuvassa -tilojen avulla.",
       "**Osallistujien alustakuvakkeet.** Huoneen osallistujakortit ja sivupalkin henkilöluettelo näyttävät nyt kuvakkeella ja kuvaustekstillä, mitä alustaa kukin jäsen käyttää (työpöytä, web tai mobiili).",
       "**Tarkka äänisuodatus sovellusprosessin mukaan.** Moniprosessiset sovellukset, kuten Discord ja verkkoselaimet, voi nyt avata haitarinäkymään yksittäisten prosessien mykistämiseksi tai jakamiseksi erikseen, säilyttäen samalla koko sovelluksen pääkytkimen.",
       "**Vähemmän muistin käyttöä näytönjaon aikana.** Sovellus keskeyttää tarpeettoman videon purkamisen taustalla, kun paikallista esikatselua ei katsota, mikä poistaa liiallisen RAM-muistin kertymisen pitkien lähetysten aikana.",
@@ -86,6 +98,7 @@
       "**Pienempi viive Tunneleissa, nopeammat tiedostonsiirrot ja sujuva huoneeseen liittyminen.** Moninpeliyhteydet Tunneleiden ja virtuaaliverkon kautta toimivat huomattavasti sulavammin, chatin tiedostonsiirrot yltävät selvästi suurempiin nopeuksiin eikä huoneeseen liittyminen enää jäädytä käyttöliittymää osallistujaprofiilien latautuessa."
     ],
     "ru": [
+      "**Новое приложение Twitch в комнате.** Смотрите прямые трансляции Twitch синхронно в реальном времени с совместным переключением каналов, общей паузой/воспроизведением, встроенным чатом, а также режимами кинотеатра и «картинка в картинке».",
       "**Индикаторы платформы участников.** На карточках участников и в боковом списке пользователей теперь отображается значок с подсказкой, показывающий платформу каждого участника (ПК, Веб или Мобильное устройство).",
       "**Выборочная фильтрация звука по процессам приложений.** Приложения с несколькими процессами, такие как Discord или браузеры, теперь можно разворачивать списком для раздельного заглушения или трансляции отдельных процессов, сохраняя при этом общий переключатель для всего приложения.",
       "**Снижено потребление памяти при демонстрации экрана.** Приложение автоматически приостанавливает ненужное декодирование видео в фоновом режиме, когда локальный предпросмотр не активен, предотвращая чрезмерный расход оперативной памяти при длительных трансляциях.",

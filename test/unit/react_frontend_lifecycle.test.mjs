@@ -44,7 +44,7 @@ const mocks = {
   useRoom: 'export const useRoom = () => globalThis.frontendLifecycleFixture.room;',
   useStore: 'export const useStore = selector => selector(globalThis.frontendLifecycleFixture.store);',
   state: 'export const stateStore = globalThis.frontendLifecycleFixture.store;',
-  service: 'export const roomService = { localCaptures: new Map(), requestStream() {}, stopTransmission: id => globalThis.frontendLifecycleFixture.copied.push(id), roomManager: null };',
+  service: 'export const roomService = { localCaptures: new Map(), requestStream() {}, stopTransmission: id => globalThis.frontendLifecycleFixture.copied.push(id), setCaptureConsumer() {}, roomManager: null };',
   apps: `export const roomAppsService = { subscribe: () => () => {},
     getInstances: () => globalThis.frontendLifecycleFixture.instances, getJoinedInstances: () => [] };`,
   appCard: `import React from 'react'; export const RoomAppCard = ({ instance, style }) =>

@@ -143,7 +143,7 @@ test('all catalogs cover every literal translation key and preserve interpolatio
       }
     }
     for (const category of new Intl.PluralRules(language).resolvedOptions().pluralCategories) {
-      for (const base of ['tunnels.previewActive', 'tunnels.dropped', 'tunnels.connections', 'chat.unread', 'audio.detectedApps']) {
+      for (const base of ['tunnels.previewActive', 'tunnels.dropped', 'tunnels.connections', 'chat.unread', 'audio.detectedApps', 'audio.processCount']) {
         assert.ok(catalog[`${base}_${category}`], `${language}: ${base}_${category}`);
       }
     }

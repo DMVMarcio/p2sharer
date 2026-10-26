@@ -3,8 +3,8 @@ import protocolLabels from '../i18n/protocol.json' with { type: 'json' };
 import type React from 'react';
 import { FileText, Network, Globe, Palette } from 'lucide-react';
 import { WhiteboardModel } from './whiteboard_model.ts';
-import { SiYoutube } from 'react-icons/si';
-import { NotepadModel, YouTubeModel, type RoomAppModel, type RoomAppModelContext } from './models.ts';
+import { SiYoutube, SiTwitch } from 'react-icons/si';
+import { NotepadModel, YouTubeModel, TwitchModel, type RoomAppModel, type RoomAppModelContext } from './models.ts';
 import { TunnelModel } from './tunnel_model.ts';
 import { BrowserModel } from './browser_model.ts';
 
@@ -54,6 +54,10 @@ registerRoomApp({ kind: 'youtube', label: 'YouTube',
   get description() { return t("message.22dea6587836"); },
   icon: SiYoutube, iconStyle: 'filled', bannerClass: 'youtube', createModel: (context) => new YouTubeModel(context),
   loadView: () => import('./YouTubeApp').then((module) => ({ default: module.YouTubeApp })) });
+registerRoomApp({ kind: 'twitch', label: 'Twitch',
+  get description() { return t('twitch.description'); },
+  icon: SiTwitch, iconStyle: 'filled', bannerClass: 'twitch', createModel: (context) => new TwitchModel(context),
+  loadView: () => import('./TwitchApp').then((module) => ({ default: module.TwitchApp })) });
 registerRoomApp({ kind: 'tunnels', protocolLabel: 'Tunnels', get label() { return t('tunnels.title'); },
   get description() { return t('tunnels.description'); }, icon: Network, bannerClass: 'tunnels', detachable: false, desktopOnly: true,
   createModel: (context) => new TunnelModel(context),
