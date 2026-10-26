@@ -1485,7 +1485,7 @@
   "platform.mobile": "モバイル",
   "twitch.title": "Twitch",
   "twitch.description": "共同コントロールとチャットで、ライブ配信をリアルタイムに同期して視聴。",
-  "twitch.placeholder": "チャンネル名またはURL（例: gaules）",
+  "twitch.placeholder": "Twitch チャンネル名またはリンク",
   "twitch.tune": "視聴する",
   "twitch.live": "ライブ",
   "twitch.offline": "オフライン",
@@ -1496,12 +1496,17 @@
   "twitch.exitTheater": "シアターモードを終了",
   "twitch.emptyTitle": "みんなで Twitch を見よう",
   "twitch.emptyDesc": "上の欄に Twitch チャンネル名またはリンクを入力して、ルーム内の全員と一緒に配信を視聴しましょう。",
-  "twitch.suggested": "おすすめのチャンネル",
+  "twitch.suggested": "チャンネル",
   "twitch.scriptError": "Twitch プレイヤー SDK を読み込めませんでした。",
   "twitch.invalidChannel": "有効な Twitch チャンネル名を入力してください。",
   "twitch.activity.channel": "チャンネルを「{{v0}}」に変更しました",
   "twitch.activity.play": "配信を再開しました",
   "twitch.activity.pause": "配信を一時停止しました",
   "audio.processCount_few": "{{count}} 個のプロセス",
-  "audio.processCount_many": "{{count}} 個のプロセス"
+  "audio.processCount_many": "{{count}} 個のプロセス",
+  "twitch.pause": "配信を一時停止",
+  "twitch.play": "配信を再開",
+  "twitch.mute": "ミュート",
+  "twitch.unmute": "ミュート解除",
+  "twitch.pausedNotice": "ルームで配信が一時停止中"
 }

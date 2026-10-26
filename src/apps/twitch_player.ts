@@ -43,9 +43,44 @@ declare global {
   }
 }
 
+export function getTwitchParentHosts(): string[] {
+  const hosts = new Set(['localhost', 'tauri.localhost', '127.0.0.1']);
+  if (typeof window !== 'undefined' && window.location?.hostname) {
+    hosts.add(window.location.hostname);
+  }
+  return Array.from(hosts);
+}
+
+export function buildTwitchParentsQuery(): string {
+  return getTwitchParentHosts()
+    .map((host) => `parent=${encodeURIComponent(host)}`)
+    .join('&');
+}
+
+export function parseTwitchChannel(input: string): string | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  const urlMatch = trimmed.match(/^(?:https?:\/\/)?(?:www\.)?twitch\.tv\/([a-zA-Z0-9_]{3,25})(?:[/?#].*)?$/i);
+  if (urlMatch) return urlMatch[1].toLowerCase();
+  const directMatch = trimmed.replace(/^@/, '').match(/^[a-zA-Z0-9_]{3,25}$/);
+  if (directMatch) return directMatch[0].toLowerCase();
+  return null;
+}
+
+export function buildTwitchPlayerUrl(channel: string, autoplay = true, muted = false): string {
+  const parents = buildTwitchParentsQuery();
+  return `https://player.twitch.tv/?channel=${encodeURIComponent(channel)}&${parents}&autoplay=${autoplay}&muted=${muted}`;
+}
+
+export function buildTwitchChatUrl(channel: string): string {
+  const parents = buildTwitchParentsQuery();
+  return `https://www.twitch.tv/embed/${encodeURIComponent(channel)}/chat?${parents}&darkpopout`;
+}
+
 let scriptLoading: Promise<void> | null = null;
 
 export function loadTwitchPlayerScript(): Promise<void> {
+  if (typeof window === 'undefined') return Promise.resolve();
   if (window.Twitch?.Player) return Promise.resolve();
   if (!scriptLoading) {
     scriptLoading = new Promise<void>((resolve, reject) => {
@@ -63,32 +98,18 @@ export function loadTwitchPlayerScript(): Promise<void> {
   return scriptLoading;
 }
 
-export function getTwitchParentHost(): string {
-  return window.location.hostname || 'localhost';
-}
-
-export function parseTwitchChannel(input: string): string | null {
-  const trimmed = input.trim();
-  if (!trimmed) return null;
-  const urlMatch = trimmed.match(/^(?:https?:\/\/)?(?:www\.)?twitch\.tv\/([a-zA-Z0-9_]{3,25})(?:[/?#].*)?$/i);
-  if (urlMatch) return urlMatch[1].toLowerCase();
-  const directMatch = trimmed.replace(/^@/, '').match(/^[a-zA-Z0-9_]{3,25}$/);
-  if (directMatch) return directMatch[0].toLowerCase();
-  return null;
-}
-
 export function createTwitchPlayer(
   element: HTMLElement,
   options: TwitchPlayerOptions
 ): TwitchPlayerInstance {
   if (!window.Twitch?.Player) throw new Error(t('twitch.scriptError'));
 
-  const parent = getTwitchParentHost();
+  const parents = getTwitchParentHosts();
   const player = new window.Twitch.Player(element, {
     channel: options.channel,
     width: '100%',
     height: '100%',
-    parent: [parent],
+    parent: parents,
     autoplay: options.autoplay ?? true,
     muted: options.muted ?? false,
   });

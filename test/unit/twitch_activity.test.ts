@@ -6,15 +6,15 @@ import { validTwitchState } from '../../src/apps/models.ts';
 import type { TwitchState } from '../../src/apps/types.ts';
 
 const baseState: TwitchState = {
-  channel: 'monstercat',
+  channel: 'channel_a',
   playing: true,
   updatedAt: 1000,
 };
 
 test('twitch activity describes channel changes and playback transitions', () => {
   assert.equal(
-    describeTwitchActivity(baseState, { ...baseState, channel: 'gaules', syncReason: 'channel' }),
-    'mudou para o canal “gaules”'
+    describeTwitchActivity(baseState, { ...baseState, channel: 'channel_b', syncReason: 'channel' }),
+    'mudou para o canal “channel_b”'
   );
   assert.equal(
     describeTwitchActivity(baseState, { ...baseState, playing: false, syncReason: 'playback' }),
@@ -31,11 +31,11 @@ test('twitch activity describes channel changes and playback transitions', () =>
 });
 
 test('twitch channel input parsing handles URLs, mentions, and plain names', () => {
-  assert.equal(parseTwitchChannel('gaules'), 'gaules');
-  assert.equal(parseTwitchChannel('https://www.twitch.tv/gaules'), 'gaules');
-  assert.equal(parseTwitchChannel('https://twitch.tv/xqc?referral=123'), 'xqc');
-  assert.equal(parseTwitchChannel('@cellbit'), 'cellbit');
-  assert.equal(parseTwitchChannel('   loud_coringa   '), 'loud_coringa');
+  assert.equal(parseTwitchChannel('streamer'), 'streamer');
+  assert.equal(parseTwitchChannel('https://www.twitch.tv/streamer'), 'streamer');
+  assert.equal(parseTwitchChannel('https://twitch.tv/streamer?referral=123'), 'streamer');
+  assert.equal(parseTwitchChannel('@streamer'), 'streamer');
+  assert.equal(parseTwitchChannel('   live_gaming   '), 'live_gaming');
   assert.equal(parseTwitchChannel('invalid channel with spaces'), null);
   assert.equal(parseTwitchChannel(''), null);
 });

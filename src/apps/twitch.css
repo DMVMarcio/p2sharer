@@ -118,13 +118,13 @@
   align-items: center;
   gap: 6px;
   flex: 1;
-  max-width: 360px;
+  max-width: 380px;
   min-width: 0;
 }
 
 .twitch-input {
   width: 100%;
-  padding: 5px 10px;
+  padding: 6px 11px;
   font-size: 12px;
   background: var(--tw-surface-alt);
   border: 1px solid var(--tw-border);
@@ -148,7 +148,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 5px 12px;
+  padding: 6px 14px;
   font-size: 12px;
   font-weight: 600;
   background: var(--tw-purple);
@@ -254,17 +254,79 @@
   display: flex;
 }
 
-.twitch-player-mount {
+.twitch-player-wrapper {
+  position: relative;
   width: 100%;
   height: 100%;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
+  display: flex;
 }
 
-.twitch-player-mount iframe {
+.twitch-player-iframe {
   width: 100%;
   height: 100%;
   border: 0;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 0;
+  background: #000;
+}
+
+/* Pause overlay */
+.twitch-pause-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(14, 14, 16, 0.88);
+  backdrop-filter: blur(6px);
+}
+
+.twitch-pause-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px 32px;
+  background: var(--tw-surface);
+  border: 1px solid var(--tw-border);
+  border-radius: var(--radius-md);
+  text-align: center;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.twitch-pause-icon {
+  color: var(--tw-purple);
+}
+
+.twitch-pause-text {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tw-text);
+}
+
+.twitch-resume-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--tw-purple);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.twitch-resume-btn:hover {
+  background: var(--tw-purple-hover);
 }
 
 /* Empty state */
@@ -289,66 +351,21 @@
 }
 
 .twitch-empty-text {
-  max-width: 420px;
+  max-width: 440px;
 }
 
 .twitch-empty-title {
-  margin: 0 0 6px;
-  font-size: 17px;
+  margin: 0 0 8px;
+  font-size: 18px;
   font-weight: 700;
   color: var(--tw-text);
 }
 
 .twitch-empty-desc {
   margin: 0;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--tw-muted);
-  line-height: 1.5;
-}
-
-/* Suggested channels */
-.twitch-suggested-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  margin-top: 6px;
-}
-
-.twitch-suggested-title {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--tw-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.twitch-suggested-pills {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 7px;
-}
-
-.twitch-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 12px;
-  font-size: 12px;
-  font-weight: 500;
-  background: var(--tw-surface);
-  border: 1px solid var(--tw-border);
-  border-radius: 9999px;
-  color: var(--tw-text);
-  cursor: pointer;
-  transition: background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
-}
-
-.twitch-pill:hover {
-  background: var(--tw-surface-alt);
-  border-color: var(--tw-purple);
-  transform: translateY(-1px);
+  line-height: 1.55;
 }
 
 /* Chat sidebar */
@@ -453,7 +470,7 @@
 /* Responsive adjustments */
 @media (max-width: 720px) {
   .twitch-form {
-    max-width: 180px;
+    max-width: 200px;
   }
   .twitch-chat-pane {
     display: none;

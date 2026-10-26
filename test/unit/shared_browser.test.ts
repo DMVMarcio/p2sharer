@@ -32,7 +32,7 @@ test('control lease holds gestures, renews typing, grants host preemption and ex
 test('browser input and snapshots reject unsafe URLs, oversized data and invalid coordinates', () => {
   assert.equal(browserUrl('example.com'), 'https://example.com/');
   assert.equal(browserUrl('a shared search'), 'https://www.google.com/search?q=a%20shared%20search');
-  for (const url of ['javascript:alert(1)', 'file:///test', 'http://tauri.localhost', 'http://localhost:1420']) assert.equal(browserUrl(url), null);
+  for (const url of ['javascript:alert(1)', 'file:///test', 'http://tauri.localhost', 'https://tauri.localhost', 'http://localhost:1420']) assert.equal(browserUrl(url), null);
   const credentials = new URL('https://example.com'); credentials.username = 'fixture-user'; credentials.password = 'fixture-password';
   assert.equal(browserUrl(credentials.href), null);
   assert.equal(validBrowserCommand(move()), true);

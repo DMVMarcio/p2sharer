@@ -1485,7 +1485,7 @@
   "platform.mobile": "Mobile",
   "twitch.title": "Twitch",
   "twitch.description": "Watch live streams together in sync with collaborative control and chat.",
-  "twitch.placeholder": "Channel name or URL (e.g. gaules)",
+  "twitch.placeholder": "Channel name or Twitch link",
   "twitch.tune": "Watch",
   "twitch.live": "LIVE",
   "twitch.offline": "OFFLINE",
@@ -1496,12 +1496,17 @@
   "twitch.exitTheater": "Exit theater mode",
   "twitch.emptyTitle": "Watch Twitch together",
   "twitch.emptyDesc": "Enter a Twitch channel name or link above to start watching the broadcast with everyone in the room.",
-  "twitch.suggested": "Suggested channels",
+  "twitch.suggested": "Channels",
   "twitch.scriptError": "Unable to load Twitch Player SDK.",
   "twitch.invalidChannel": "Please enter a valid Twitch channel name.",
   "twitch.activity.channel": "changed channel to “{{v0}}”",
   "twitch.activity.play": "resumed the stream",
   "twitch.activity.pause": "paused the stream",
   "audio.processCount_few": "{{count}} processes",
-  "audio.processCount_many": "{{count}} processes"
+  "audio.processCount_many": "{{count}} processes",
+  "twitch.pause": "Pause stream",
+  "twitch.play": "Resume stream",
+  "twitch.mute": "Mute",
+  "twitch.unmute": "Unmute",
+  "twitch.pausedNotice": "Stream paused in the room"
 }

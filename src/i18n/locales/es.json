@@ -1485,7 +1485,7 @@
   "platform.mobile": "Móvil",
   "twitch.title": "Twitch",
   "twitch.description": "Mira transmisiones en vivo sincronizadas con control colaborativo y chat.",
-  "twitch.placeholder": "Nombre del canal o enlace (ej: gaules)",
+  "twitch.placeholder": "Nombre del canal o enlace de Twitch",
   "twitch.tune": "Ver",
   "twitch.live": "EN VIVO",
   "twitch.offline": "DESCONECTADO",
@@ -1496,12 +1496,17 @@
   "twitch.exitTheater": "Salir del modo teatro",
   "twitch.emptyTitle": "Ver Twitch juntos",
   "twitch.emptyDesc": "Introduce el nombre o enlace de un canal de Twitch arriba para sintonizar la transmisión con todos en la sala.",
-  "twitch.suggested": "Canales sugeridos",
+  "twitch.suggested": "Canales",
   "twitch.scriptError": "No se pudo cargar el SDK del reproductor de Twitch.",
   "twitch.invalidChannel": "Introduce un nombre de canal de Twitch válido.",
   "twitch.activity.channel": "cambió al canal “{{v0}}”",
   "twitch.activity.play": "reanudó la transmisión",
   "twitch.activity.pause": "pausó la transmisión",
   "audio.processCount_few": "{{count}} procesos",
-  "audio.processCount_many": "{{count}} procesos"
+  "audio.processCount_many": "{{count}} procesos",
+  "twitch.pause": "Pausar transmisión",
+  "twitch.play": "Reanudar transmisión",
+  "twitch.mute": "Silenciar",
+  "twitch.unmute": "Activar sonido",
+  "twitch.pausedNotice": "Transmisión pausada en la sala"
 }

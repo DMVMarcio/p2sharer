@@ -21,7 +21,8 @@
         "height": 800,
         "minWidth": 900,
         "minHeight": 600,
-        "backgroundColor": "#09090b"
+        "backgroundColor": "#09090b",
+        "useHttpsScheme": true
       }
     ],
     "security": {

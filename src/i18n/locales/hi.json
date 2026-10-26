@@ -1485,7 +1485,7 @@
   "platform.mobile": "मोबाइल",
   "twitch.title": "Twitch",
   "twitch.description": "साझा नियंत्रण और चैट के साथ लाइव स्ट्रीम को सिंक में देखें।",
-  "twitch.placeholder": "चैनल का नाम या लिंक (उदा: gaules)",
+  "twitch.placeholder": "Twitch चैनल का नाम या लिंक",
   "twitch.tune": "देखें",
   "twitch.live": "लाइव",
   "twitch.offline": "ऑफ़लाइन",
@@ -1496,12 +1496,17 @@
   "twitch.exitTheater": "थिएटर मोड से बाहर निकलें",
   "twitch.emptyTitle": "एक साथ Twitch देखें",
   "twitch.emptyDesc": "कमरे में सभी के साथ स्ट्रीम देखने के लिए ऊपर Twitch चैनल का नाम या लिंक दर्ज करें।",
-  "twitch.suggested": "सुझाए गए चैनल",
+  "twitch.suggested": "चैनल",
   "twitch.scriptError": "Twitch प्लेयर SDK लोड करने में असमर्थ।",
   "twitch.invalidChannel": "कृपया एक मान्य Twitch चैनल नाम दर्ज करें।",
   "twitch.activity.channel": "चैनल बदलकर “{{v0}}” कर दिया",
   "twitch.activity.play": "स्ट्रीम फिर से शुरू की",
   "twitch.activity.pause": "स्ट्रीम रोक दी",
   "audio.processCount_few": "{{count}} प्रक्रियाएं",
-  "audio.processCount_many": "{{count}} प्रक्रियाएं"
+  "audio.processCount_many": "{{count}} प्रक्रियाएं",
+  "twitch.pause": "स्ट्रीम रोकें",
+  "twitch.play": "स्ट्रीम फिर से शुरू करें",
+  "twitch.mute": "म्यूट करें",
+  "twitch.unmute": "अनम्यूट करें",
+  "twitch.pausedNotice": "कमरे में स्ट्रीम रोकी गई है"
 }

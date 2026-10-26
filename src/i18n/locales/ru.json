@@ -1487,7 +1487,7 @@
   "platform.mobile": "Мобильное устройство",
   "twitch.title": "Twitch",
   "twitch.description": "Смотрите прямые трансляции синхронно с совместным управлением и чатом.",
-  "twitch.placeholder": "Имя канала или ссылка (напр. gaules)",
+  "twitch.placeholder": "Имя канала или ссылка на Twitch",
   "twitch.tune": "Смотреть",
   "twitch.live": "В ЭФИРЕ",
   "twitch.offline": "НЕ В СЕТИ",
@@ -1498,10 +1498,15 @@
   "twitch.exitTheater": "Выйти из режима кинотеатра",
   "twitch.emptyTitle": "Смотрите Twitch вместе",
   "twitch.emptyDesc": "Введите имя канала или ссылку на Twitch выше, чтобы включить трансляцию для всех участников комнаты.",
-  "twitch.suggested": "Рекомендуемые каналы",
+  "twitch.suggested": "Каналы",
   "twitch.scriptError": "Не удалось загрузить Twitch Player SDK.",
   "twitch.invalidChannel": "Пожалуйста, введите корректное имя канала Twitch.",
   "twitch.activity.channel": "переключил(а) на канал «{{v0}}»",
   "twitch.activity.play": "возобновил(а) трансляцию",
-  "twitch.activity.pause": "поставил(а) трансляцию на паузу"
+  "twitch.activity.pause": "поставил(а) трансляцию на паузу",
+  "twitch.pause": "Приостановить трансляцию",
+  "twitch.play": "Возобновить трансляцию",
+  "twitch.mute": "Заглушить",
+  "twitch.unmute": "Включить звук",
+  "twitch.pausedNotice": "Трансляция приостановлена в комнате"
 }

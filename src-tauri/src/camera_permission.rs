@@ -36,7 +36,7 @@ pub fn install(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 
 fn trusted_camera_origin(uri: &str) -> bool {
     let Ok(url) = tauri::Url::parse(uri) else { return false; };
-    let packaged = url.scheme() == "http" && url.host_str() == Some("tauri.localhost") && url.port().is_none();
+    let packaged = (url.scheme() == "http" || url.scheme() == "https") && url.host_str() == Some("tauri.localhost") && url.port().is_none();
     let development = cfg!(debug_assertions) && url.origin().ascii_serialization() == "http://localhost:1420";
     packaged || development
 }
@@ -50,6 +50,7 @@ mod tests {
     #[test]
     fn permission_is_scoped_to_app_origin() {
         assert!(trusted_camera_origin("http://tauri.localhost/index.html"));
+        assert!(trusted_camera_origin("https://tauri.localhost/index.html"));
         for uri in ["https://youtube.com", "http://tauri.localhost.evil.com", "http://tauri.localhost:1234", "data:text/html,camera", "file:///camera.html"] {
             assert!(!trusted_camera_origin(uri), "{uri}");
         }

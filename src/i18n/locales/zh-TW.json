@@ -1485,7 +1485,7 @@
   "platform.mobile": "行動端",
   "twitch.title": "Twitch",
   "twitch.description": "同步觀看直播，支援多人協作控制與即時聊天。",
-  "twitch.placeholder": "頻道名稱或連結（例如：gaules）",
+  "twitch.placeholder": "Twitch 頻道名稱或連結",
   "twitch.tune": "觀看",
   "twitch.live": "直播中",
   "twitch.offline": "離線",
@@ -1496,12 +1496,17 @@
   "twitch.exitTheater": "結束劇院模式",
   "twitch.emptyTitle": "一起觀看 Twitch 直播",
   "twitch.emptyDesc": "在上方輸入 Twitch 頻道名稱或連結，與房間內的所有人一同觀賞直播。",
-  "twitch.suggested": "推薦頻道",
+  "twitch.suggested": "頻道",
   "twitch.scriptError": "無法載入 Twitch 播放器 SDK。",
   "twitch.invalidChannel": "請輸入有效的 Twitch 頻道名稱。",
   "twitch.activity.channel": "切換至頻道「{{v0}}」",
   "twitch.activity.play": "恢復了直播播放",
   "twitch.activity.pause": "暫停了直播播放",
   "audio.processCount_few": "{{count}} 個程序",
-  "audio.processCount_many": "{{count}} 個程序"
+  "audio.processCount_many": "{{count}} 個程序",
+  "twitch.pause": "暫停直播",
+  "twitch.play": "恢復直播",
+  "twitch.mute": "靜音",
+  "twitch.unmute": "取消靜音",
+  "twitch.pausedNotice": "房間已暫停直播"
 }

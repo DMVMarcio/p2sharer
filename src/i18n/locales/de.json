@@ -1485,7 +1485,7 @@
   "platform.mobile": "Mobil",
   "twitch.title": "Twitch",
   "twitch.description": "Livestreams gemeinsam synchron mit kollaborativer Steuerung und Chat ansehen.",
-  "twitch.placeholder": "Kanalname oder Link (z. B. gaules)",
+  "twitch.placeholder": "Kanalname oder Twitch-Link",
   "twitch.tune": "Ansehen",
   "twitch.live": "LIVE",
   "twitch.offline": "OFFLINE",
@@ -1496,12 +1496,17 @@
   "twitch.exitTheater": "Kinomodus beenden",
   "twitch.emptyTitle": "Twitch zusammen schauen",
   "twitch.emptyDesc": "Geben Sie oben den Namen oder Link eines Twitch-Kanals ein, um den Stream für alle im Raum zu starten.",
-  "twitch.suggested": "Vorgeschlagene Kanäle",
+  "twitch.suggested": "Kanäle",
   "twitch.scriptError": "Twitch-Player-SDK konnte nicht geladen werden.",
   "twitch.invalidChannel": "Bitte geben Sie einen gültigen Twitch-Kanalnamen ein.",
   "twitch.activity.channel": "wechselte zum Kanal „{{v0}}“",
   "twitch.activity.play": "hat den Stream fortgesetzt",
   "twitch.activity.pause": "hat den Stream pausiert",
   "audio.processCount_few": "{{count}} Prozesse",
-  "audio.processCount_many": "{{count}} Prozesse"
+  "audio.processCount_many": "{{count}} Prozesse",
+  "twitch.pause": "Stream pausieren",
+  "twitch.play": "Stream fortsetzen",
+  "twitch.mute": "Stummschalten",
+  "twitch.unmute": "Stummschaltung aufheben",
+  "twitch.pausedNotice": "Stream im Raum pausiert"
 }

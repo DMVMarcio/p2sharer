@@ -19,8 +19,9 @@ import { roomAppsService } from './room_apps_service';
 import { TwitchModel } from './models.ts';
 import type { TwitchState } from './types.ts';
 import {
+  buildTwitchChatUrl,
+  buildTwitchPlayerUrl,
   createTwitchPlayer,
-  getTwitchParentHost,
   loadTwitchPlayerScript,
   parseTwitchChannel,
   type TwitchPlayerInstance,
@@ -38,8 +39,6 @@ interface Props {
 
 const VOLUME_STORAGE = 'p2sharer_twitch_volume';
 const CHAT_STORAGE = 'p2sharer_twitch_chat';
-const RECENTS_STORAGE = 'p2sharer_twitch_recents';
-const SUGGESTED_CHANNELS = ['gaules', 'alanzoka', 'cellbit', 'shroud', 'monstercat'];
 
 export const TwitchApp: React.FC<Props> = ({ instanceId, compact = false }) => {
   useLocale();
@@ -68,15 +67,8 @@ export const TwitchApp: React.FC<Props> = ({ instanceId, compact = false }) => {
   const [muted, setMuted] = useState(false);
   const [isLive, setIsLive] = useState(false);
   const [playerReady, setPlayerReady] = useState(false);
+  const [playerLoadFailed, setPlayerLoadFailed] = useState(false);
   const [activity, setActivity] = useState<{ id: number; actor: string; message: string } | null>(null);
-  const [recentChannels, setRecentChannels] = useState<string[]>(() => {
-    try {
-      const stored = localStorage.getItem(RECENTS_STORAGE);
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
 
   const mountRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<TwitchPlayerInstance | null>(null);
@@ -135,16 +127,17 @@ export const TwitchApp: React.FC<Props> = ({ instanceId, compact = false }) => {
         playerRef.current = null;
         setPlayerReady(false);
       }
+      setPlayerLoadFailed(false);
       return;
     }
 
     let disposed = false;
+    setPlayerLoadFailed(false);
 
     loadTwitchPlayerScript()
       .then(() => {
         if (disposed || !mountRef.current) return;
 
-        // Clear mount element first
         mountRef.current.innerHTML = '';
 
         const player = createTwitchPlayer(mountRef.current, {
@@ -180,8 +173,11 @@ export const TwitchApp: React.FC<Props> = ({ instanceId, compact = false }) => {
 
         playerRef.current = player;
       })
-      .catch((err) => {
-        console.error('Failed to load Twitch Player:', err);
+      .catch((err: unknown) => {
+        console.warn('Twitch SDK load failed, falling back to direct iframe:', err);
+        if (!disposed) {
+          setPlayerLoadFailed(true);
+        }
       });
 
     return () => {
@@ -207,22 +203,17 @@ export const TwitchApp: React.FC<Props> = ({ instanceId, compact = false }) => {
     stateRef.current = fullState;
     const model = roomAppsService.getModel<TwitchModel>(instanceId);
     model?.update(fullState);
-    if (model) stateRef.current = model.state;
+    if (model) {
+      stateRef.current = model.state;
+      setState(model.state);
+    } else {
+      setState(fullState);
+    }
   }
 
   function handleSelectChannel(target: string) {
     const parsed = parseTwitchChannel(target);
     if (!parsed) return;
-
-    // Save to recents
-    const nextRecents = [parsed, ...recentChannels.filter(c => c !== parsed)].slice(0, 8);
-    setRecentChannels(nextRecents);
-    try {
-      localStorage.setItem(RECENTS_STORAGE, JSON.stringify(nextRecents));
-    } catch {
-      // Local storage full or blocked
-    }
-
     setChannelInput('');
     publish({ channel: parsed, playing: true }, 'channel');
   }
@@ -268,12 +259,11 @@ export const TwitchApp: React.FC<Props> = ({ instanceId, compact = false }) => {
     const slot = roomSlots.find((entry) => (local ? entry.isLocal : entry.peerId === actor));
     return {
       id: actor,
-      name: local ? username || 'Você' : peer?.username || 'Alguém',
+      name: local ? username || t('message.b21e91730d18') : peer?.username || t('message.1e97ddf60a0f'),
       color: slot?.color || 'var(--accent-color)',
     };
   };
 
-  const parentHost = getTwitchParentHost();
   const showChatPane = Boolean(state.channel) && chatOpen && !theater && !compact;
 
   return (
@@ -304,7 +294,7 @@ export const TwitchApp: React.FC<Props> = ({ instanceId, compact = false }) => {
         </div>
 
         {/* Tune to channel form */}
-        <form className="twitch-form" onSubmit={handleSubmitChannel}>
+        <form className="twitch-form" onSubmit={handleSubmitChannel} autoComplete="off">
           <input
             autoComplete="off"
             type="text"
@@ -327,7 +317,7 @@ export const TwitchApp: React.FC<Props> = ({ instanceId, compact = false }) => {
         <div className="twitch-header-actions">
           {state.channel && (
             <TooltipButton
-              tooltip={state.playing ? t('twitch.activity.pause') : t('twitch.activity.play')}
+              tooltip={state.playing ? t('twitch.pause') : t('twitch.play')}
               className="twitch-btn"
               onClick={handleTogglePlay}
             >
@@ -338,7 +328,7 @@ export const TwitchApp: React.FC<Props> = ({ instanceId, compact = false }) => {
           {/* Volume */}
           <div className="twitch-volume-wrapper">
             <TooltipButton
-              tooltip={muted || volume === 0 ? 'Desmutar' : 'Mutar'}
+              tooltip={muted || volume === 0 ? t('twitch.unmute') : t('twitch.mute')}
               className="twitch-btn"
               onClick={handleToggleMute}
             >
@@ -393,30 +383,43 @@ export const TwitchApp: React.FC<Props> = ({ instanceId, compact = false }) => {
       <div className="twitch-content">
         <div className="twitch-player-pane">
           {state.channel ? (
-            <div ref={mountRef} className="twitch-player-mount" />
+            <div className="twitch-player-wrapper">
+              {playerLoadFailed ? (
+                <iframe
+                  key={state.channel}
+                  title={`Twitch - ${state.channel}`}
+                  src={buildTwitchPlayerUrl(state.channel, state.playing, muted)}
+                  className="twitch-player-iframe"
+                  allowFullScreen
+                />
+              ) : (
+                <div ref={mountRef} className="twitch-player-mount" style={{ width: '100%', height: '100%' }} />
+              )}
+
+              {/* Pause overlay for room synchronization */}
+              {!state.playing && (
+                <div className="twitch-pause-overlay">
+                  <div className="twitch-pause-card">
+                    <Pause size={32} className="twitch-pause-icon" />
+                    <p className="twitch-pause-text">{t('twitch.pausedNotice')}</p>
+                    <button
+                      type="button"
+                      className="twitch-resume-btn"
+                      onClick={handleTogglePlay}
+                    >
+                      <Play size={14} />
+                      {t('twitch.play')}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           ) : (
             <div className="twitch-empty-state">
               <SiTwitch className="twitch-empty-icon" aria-hidden="true" />
               <div className="twitch-empty-text">
                 <h4 className="twitch-empty-title">{t('twitch.emptyTitle')}</h4>
                 <p className="twitch-empty-desc">{t('twitch.emptyDesc')}</p>
-              </div>
-
-              <div className="twitch-suggested-wrapper">
-                <span className="twitch-suggested-title">{t('twitch.suggested')}</span>
-                <div className="twitch-suggested-pills">
-                  {(recentChannels.length > 0 ? recentChannels : SUGGESTED_CHANNELS).map((chan) => (
-                    <button
-                      key={chan}
-                      type="button"
-                      className="twitch-pill"
-                      onClick={() => handleSelectChannel(chan)}
-                    >
-                      <SiTwitch size={11} aria-hidden="true" />
-                      {chan}
-                    </button>
-                  ))}
-                </div>
               </div>
             </div>
           )}
@@ -437,7 +440,7 @@ export const TwitchApp: React.FC<Props> = ({ instanceId, compact = false }) => {
             </div>
             <iframe
               title={`Twitch Chat - ${state.channel}`}
-              src={`https://www.twitch.tv/embed/${state.channel}/chat?parent=${parentHost}&darkpopout`}
+              src={buildTwitchChatUrl(state.channel)}
               className="twitch-chat-iframe"
             />
           </aside>

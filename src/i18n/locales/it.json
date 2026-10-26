@@ -1485,7 +1485,7 @@
   "platform.mobile": "Mobile",
   "twitch.title": "Twitch",
   "twitch.description": "Guarda le dirette streaming sincronizzate con controllo collaborativo e chat.",
-  "twitch.placeholder": "Nome del canale o link (es. gaules)",
+  "twitch.placeholder": "Nome del canale o link di Twitch",
   "twitch.tune": "Guarda",
   "twitch.live": "DAL VIVO",
   "twitch.offline": "NON IN LINEA",
@@ -1496,12 +1496,17 @@
   "twitch.exitTheater": "Esci dalla modalità teatro",
   "twitch.emptyTitle": "Guarda Twitch insieme",
   "twitch.emptyDesc": "Inserisci il nome o il link di un canale Twitch in alto per avviare la diretta per tutti nella stanza.",
-  "twitch.suggested": "Canali suggeriti",
+  "twitch.suggested": "Canali",
   "twitch.scriptError": "Impossibile caricare l'SDK del player di Twitch.",
   "twitch.invalidChannel": "Inserisci un nome di canale Twitch valido.",
   "twitch.activity.channel": "è passato al canale “{{v0}}”",
   "twitch.activity.play": "ha ripreso la trasmissione",
   "twitch.activity.pause": "ha messo in pausa la trasmissione",
   "audio.processCount_few": "{{count}} processi",
-  "audio.processCount_many": "{{count}} processi"
+  "audio.processCount_many": "{{count}} processi",
+  "twitch.pause": "Metti in pausa lo streaming",
+  "twitch.play": "Riprendi lo streaming",
+  "twitch.mute": "Disattiva audio",
+  "twitch.unmute": "Riattiva audio",
+  "twitch.pausedNotice": "Streaming in pausa nella stanza"
 }
