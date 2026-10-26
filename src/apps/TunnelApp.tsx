@@ -43,13 +43,11 @@ function TunnelPing({ ping }: { ping?: number | null }) {
 
 function TunnelStatsHint({ counters, rate, participants }: {
   counters?: TunnelCounters | NetworkCounters; rate?: TrafficSnapshot;
-  participants?: TunnelParticipant[]; ping?: number | null;
+  participants?: TunnelParticipant[];
 }) {
   return <div className="tunnel-stats-hint">
-    <span>{t('tunnels.rateWindow')}</span>
     <TrafficDetails counters={counters} rate={rate} />
     {counters && <span>{'dropped' in counters ? t('tunnels.dropped', { count: counters.dropped }) : t('tunnels.connections', { count: counters.sessions })}</span>}
-    <span className="tunnel-hint">{t('tunnels.latencyHelp')}</span>
     {participants?.map(participant => <div key={participant.id} className="tunnel-stats-participant">
       <div className="tunnel-stats-participant-heading"><strong>{participant.name}</strong><TunnelPing ping={participant.ping} /></div>
       <TrafficDetails counters={counters?.peers?.[participant.id]} rate={rate?.peers?.[participant.id]} />
