@@ -90,11 +90,22 @@ pub async fn offer_direct_chat_file(app: tauri::AppHandle, state: State<'_, Chat
     tasks.retain(|_, task| !task.is_finished());
     if tasks.len() >= 8 || tasks.contains_key(&id) { return Err("Too many direct file transfers".into()); }
     let task_id = id.clone();
+    let upnp_port = endpoint.port();
     // A gate prevents completion/removal racing registration in the managed map.
     let (start, started) = tokio::sync::oneshot::channel();
     let task = tokio::spawn(async move {
         let _ = started.await;
+        let mapped = if let Some(upnp) = app.try_state::<crate::upnp::UpnpState>() {
+            upnp.map_port(upnp_port, "TCP").await
+        } else {
+            false
+        };
         let _ = serve(listener, TlsAcceptor::from(Arc::new(config)), token, source, size).await;
+        if mapped {
+            if let Some(upnp) = app.try_state::<crate::upnp::UpnpState>() {
+                let _ = upnp.unmap_port(upnp_port, "TCP").await;
+            }
+        }
         if let Ok(mut tasks) = app.state::<DirectFileState>().0.lock() { tasks.remove(&task_id); }
     });
     tasks.insert(id, task.abort_handle());

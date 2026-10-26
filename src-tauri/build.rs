@@ -12,7 +12,9 @@ fn main() {
             println!("cargo:rustc-link-lib={library}");
         }
         println!("cargo:rustc-link-lib=delayimp");
+        println!("cargo:rustc-link-arg=delayimp.lib");
         println!("cargo:rustc-link-arg=/DELAYLOAD:mfplat.dll");
+        println!("cargo:rustc-link-arg=/DELAYLOAD:comctl32.dll");
     }
     println!("cargo:rerun-if-changed=icons/icon.ico");
     println!("cargo:rerun-if-changed=tauri.conf.json");

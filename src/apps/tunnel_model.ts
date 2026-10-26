@@ -12,6 +12,17 @@ interface Status { counters: Record<string, TunnelCounters>; forwards: TunnelFor
 interface NativeEvent { scope: string; peer: string; packet: { kind: string; session: string } }
 interface NetworkEvent { scope?: string; peer?: string; data?: string; sequence?: number; ip?: string; error?: string }
 export interface NetworkCounters extends TrafficSnapshot { dropped: number }
+interface NativeTunnelSignalEvent { scope: string; peer: string; signal: unknown }
+function formatNativeIceServers(rtc?: RTCConfiguration) {
+  return {
+    iceServers: (rtc?.iceServers ?? []).slice(0, 8).map((s) => ({
+      urls: Array.isArray(s.urls) ? s.urls : [s.urls],
+      username: s.username ?? '',
+      credential: typeof s.credential === 'string' ? s.credential : '',
+    })),
+    relayOnly: rtc?.iceTransportPolicy === 'relay',
+  };
+}
 export interface TunnelNative {
   available: boolean;
   call<T>(command: string, args: Record<string, unknown>): Promise<T>;
@@ -19,12 +30,18 @@ export interface TunnelNative {
   listenVirtual?(handler: (event: NetworkEvent) => void): Promise<() => void>;
   listenBinary?(scope: string, handler: (header: any, bytes: Uint8Array) => void): Promise<() => void>;
   receiveBinary?(scope: string, peer: string, payload: unknown): Promise<void>;
+  connectNativePeer?(scope: string, peer: string, rtc?: RTCConfiguration): Promise<unknown>;
+  signalNativePeer?(scope: string, peer: string, signal: unknown, rtc?: RTCConfiguration): Promise<unknown>;
+  listenNative?(handler: (event: NativeTunnelSignalEvent) => void): Promise<() => void>;
 }
 const native: TunnelNative = {
   available: isTauri(), call: (command, args) => invoke(command, args),
   listen: async (handler) => listen<NativeEvent>('port-tunnel-event', ({ payload }) => handler(payload)),
   listenVirtual: async (handler) => listen<NetworkEvent>('virtual-network-event', ({ payload }) => handler(payload)),
   listenBinary: listenTunnelPayloads, receiveBinary: receiveTunnelPayload,
+  connectNativePeer: (scope, peer, rtc) => invoke('connect_native_tunnel_peer', { scope, peer, ...formatNativeIceServers(rtc) }),
+  signalNativePeer: (scope, peer, signal, rtc) => invoke('signal_native_tunnel_peer', { scope, peer, signal, ...formatNativeIceServers(rtc) }),
+  listenNative: async (handler) => listen<NativeTunnelSignalEvent>('native-tunnel-event', ({ payload }) => handler(payload)),
 };
 
 /** Room state is owner-authored advertisements only; socket state stays on its device. */
@@ -55,6 +72,7 @@ export class TunnelModel implements RoomAppModel {
   private removeStorageListener?: () => void;
   private removeNetworkListener?: () => void;
   private removeBinaryListener?: () => void;
+  private removeNativeListener?: () => void;
   private binaryReady: Promise<void>;
   private incomingWire = new Map<string, { pending: number; tail: Promise<unknown> }>();
   private incomingDatagrams = 0;
@@ -83,7 +101,7 @@ export class TunnelModel implements RoomAppModel {
             packet: { kind: 'close', session: header.packet?.session } }).catch(() => {});
         });
       } else if (header.type === 'virtual-packet' && Number.isSafeInteger(header.sequence)) {
-        let failed = !allowed || !this.context.send || this.networkPending >= 32;
+        let failed = !allowed || !this.context.send || this.networkPending >= 512;
         if (failed) { void this.bridge.call('virtual_network_sent', { scope: this.scope, sequence: header.sequence, failed: true }).catch(() => {}); return; }
         this.networkPending++;
         void this.context.send!({ type: 'virtual-packet', data: bytes }, header.peer).catch(() => { failed = true; })
@@ -91,6 +109,12 @@ export class TunnelModel implements RoomAppModel {
       }
     }).then(remove => { if (this.disposed) remove(); else this.removeBinaryListener = remove; }) : Promise.resolve();
     void this.binaryReady.catch(error => { this.error = String(error); this.context.changed(); });
+    if (bridge.available && bridge.listenNative) {
+      void bridge.listenNative((event) => {
+        if (event.scope !== this.scope || !this.joined || this.disposed || !this.members.has(event.peer)) return;
+        void this.context.send?.({ type: 'native-signal', signal: event.signal }, event.peer).catch(() => {});
+      }).then((remove) => { if (this.disposed) remove(); else this.removeNativeListener = remove; }).catch(() => {});
+    }
     this.store = storage ? createTunnelRules(storage) : null;
     try { this.rules = this.store?.list() ?? []; } catch (error) { this.error = String(error); }
     this.removeStorageListener = this.store?.subscribe(() => {
@@ -135,7 +159,7 @@ export class TunnelModel implements RoomAppModel {
         if (isVirtualIp(event.ip)) { this.ip = event.ip; this.revision++; this.advertise(); this.context.changed(); return; }
         if (event.scope !== this.scope || typeof event.peer !== 'string' || typeof event.data !== 'string' || !Number.isSafeInteger(event.sequence)) return;
         const sequence = event.sequence!;
-        if (this.networkPending >= 32) { void this.bridge.call('virtual_network_sent', { scope: this.scope, sequence, failed: true }).catch(() => {}); return; }
+        if (this.networkPending >= 512) { void this.bridge.call('virtual_network_sent', { scope: this.scope, sequence, failed: true }).catch(() => {}); return; }
         this.networkPending++;
         let failed = !this.joined || !this.members.has(event.peer) || !this.context.send;
         const sent = !failed ? this.context.send!({ type: 'virtual-packet', data: event.data }, event.peer) : Promise.resolve();
@@ -196,6 +220,21 @@ export class TunnelModel implements RoomAppModel {
         this.revision++; this.advertise(); throw error;
       }
     }
+    if (this.joined && this.bridge.connectNativePeer) {
+      for (const peer of this.members) {
+        if (peer !== this.context.localActor && this.context.localActor < peer) {
+          void this.connectNativePeer(peer);
+        }
+      }
+    }
+  }
+  private connectNativePeer(peer: string): void {
+    if (!this.joined || this.disposed || !this.members.has(peer) || !this.bridge.connectNativePeer) return;
+    void this.bridge.connectNativePeer(this.scope, peer, this.context.rtcConfiguration?.()).then((signal) => {
+      if (signal && this.joined && !this.disposed && this.members.has(peer)) {
+        void this.context.send?.({ type: 'native-signal', signal }, peer).catch(() => {});
+      }
+    }).catch(() => {});
   }
   private updateNetworkConnections(): void {
     this.networkConnections.clear();
@@ -344,8 +383,9 @@ export class TunnelModel implements RoomAppModel {
   }
   apply(payload: unknown, actor: string, fromSnapshot: boolean): void {
     if (this.disposed || !this.joined || actor === this.context.localActor || !this.members.has(actor) || !payload || typeof payload !== 'object') return;
-    const data = payload as { type?: string; revision?: number; exports?: unknown; packet?: unknown; ip?: unknown; data?: unknown };
+    const data = payload as { type?: string; revision?: number; exports?: unknown; packet?: unknown; ip?: unknown; data?: unknown; signal?: unknown };
     if (data.type === 'advertise' && Number.isSafeInteger(data.revision) && data.revision! >= 0 && validTunnelAdvertisements(data.exports)) {
+      if (this.context.localActor < actor) this.connectNativePeer(actor);
       if (data.revision! < (this.revisions.get(actor) ?? -1)) return;
       this.revisions.set(actor, data.revision!);
       const previousRules = this.remote.get(actor);
@@ -356,6 +396,12 @@ export class TunnelModel implements RoomAppModel {
       if (previousIP !== this.remoteIPs.get(actor) || JSON.stringify(previousRules) !== JSON.stringify(data.exports))
         void this.command(async () => { await this.configure(); await this.reconcileRemoteProxies(); await this.refresh(); }).catch(() => {});
       this.context.changed();
+    } else if (!fromSnapshot && data.type === 'native-signal' && this.available && data.signal && typeof data.signal === 'object' && this.bridge.signalNativePeer) {
+      void this.bridge.signalNativePeer(this.scope, actor, data.signal, this.context.rtcConfiguration?.()).then((answer) => {
+        if (answer && this.joined && !this.disposed && this.members.has(actor)) {
+          void this.context.send?.({ type: 'native-signal', signal: answer }, actor).catch(() => {});
+        }
+      }).catch(() => {});
     } else if (!fromSnapshot && data.type === 'virtual-packet' && this.available && this.bridge.listenVirtual) {
       if (data.data instanceof Uint8Array && data.data.length <= 1280 && this.bridge.receiveBinary) {
         this.receiveDatagram(actor, data); return;
@@ -363,20 +409,21 @@ export class TunnelModel implements RoomAppModel {
       if (typeof data.data !== 'string' || data.data.length > 1708) return;
       void this.bridge.call('receive_virtual_network_packet', { scope: this.scope, peer: actor, data: data.data }).catch(() => {});
     } else if (!fromSnapshot && data.type === 'wire' && this.available && data.packet && typeof data.packet === 'object') {
-      const packet = data.packet as { kind?: string; data?: unknown };
+      const packet = data.packet as { kind?: string; session?: string; data?: unknown };
       if (this.bridge.receiveBinary && ['open', 'ready', 'data', 'datagram', 'ack', 'end', 'close'].includes(packet.kind || '') &&
         (!['data', 'datagram'].includes(packet.kind || '') || (packet.data instanceof Uint8Array && packet.data.length <= 65507))) {
-        if (packet.kind === 'datagram') {
+        if (packet.kind === 'datagram' || packet.kind === 'ack') {
           this.receiveDatagram(actor, data);
         } else {
-          const entry = this.incomingWire.get(actor) ?? { pending: 0, tail: Promise.resolve() };
+          const wireKey = typeof packet.session === 'string' && packet.session ? `${actor}:${packet.session}` : actor;
+          const entry = this.incomingWire.get(wireKey) ?? { pending: 0, tail: Promise.resolve() };
           if (entry.pending >= 1024) return;
-          this.incomingWire.set(actor, entry); entry.pending++;
+          this.incomingWire.set(wireKey, entry); entry.pending++;
           const epoch = this.epoch;
           entry.tail = entry.tail.then(async () => {
             if (this.disposed || !this.joined || this.epoch !== epoch || !this.members.has(actor)) return;
             await this.bridge.receiveBinary!(this.scope, actor, data);
-          }).catch(() => {}).finally(() => { if (--entry.pending === 0 && this.incomingWire.get(actor) === entry) this.incomingWire.delete(actor); });
+          }).catch(() => {}).finally(() => { if (--entry.pending === 0 && this.incomingWire.get(wireKey) === entry) this.incomingWire.delete(wireKey); });
         }
         return;
       }
@@ -387,13 +434,13 @@ export class TunnelModel implements RoomAppModel {
   }
   private remoteGenerations = new Map<string, string>();
   private receiveDatagram(actor: string, payload: unknown): void {
-    if (!this.bridge.receiveBinary || this.incomingDatagrams >= 32) return;
+    if (!this.bridge.receiveBinary || this.incomingDatagrams >= 64) return;
     this.incomingDatagrams++;
     void this.bridge.receiveBinary(this.scope, actor, payload).catch(() => {})
       .finally(() => { this.incomingDatagrams--; });
   }
   destroy(): void {
-    this.disposed = true; this.joined = false; this.active.clear(); clearInterval(this.timer); this.removeListener?.(); this.removeStorageListener?.(); this.removeNetworkListener?.(); this.removeBinaryListener?.();
+    this.disposed = true; this.joined = false; this.active.clear(); clearInterval(this.timer); this.removeListener?.(); this.removeStorageListener?.(); this.removeNetworkListener?.(); this.removeBinaryListener?.(); this.removeNativeListener?.();
     if (this.available && this.bridge.listenVirtual) void this.bridge.call('stop_virtual_network_scope', { scope: this.scope }).catch(() => {});
     // Finish any pending bind/configure before removing the scope, preventing late task resurrection.
     void this.serial.finally(async () => {

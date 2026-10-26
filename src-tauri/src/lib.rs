@@ -43,6 +43,7 @@ pub mod portable_update;
 pub mod lan_signaling;
 mod interface_stun;
 pub mod port_tunnel;
+pub mod native_tunnel;
 mod peer_payload;
 mod traffic_counters;
 pub mod virtual_network;
@@ -203,6 +204,8 @@ pub fn run() {
             port_tunnel::connect_port_tunnel,
             port_tunnel::disconnect_port_tunnel,
             port_tunnel::receive_port_tunnel,
+            native_tunnel::connect_native_tunnel_peer,
+            native_tunnel::signal_native_tunnel_peer,
             peer_payload::subscribe_tunnel_payloads,
             peer_payload::unsubscribe_tunnel_payloads,
             peer_payload::receive_tunnel_payload,

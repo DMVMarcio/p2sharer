@@ -1,7 +1,7 @@
 use base64::{engine::general_purpose::STANDARD, Engine};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
-use std::{collections::HashMap, fs::{self, File, OpenOptions}, io::{Read, Seek, SeekFrom, Write}, path::{Path, PathBuf}, sync::Mutex};
+use std::{collections::HashMap, fs::{self, File, OpenOptions}, io::{Read, Write}, path::{Path, PathBuf}, sync::{Arc, Mutex}};
 use tauri::State;
 
 const CHUNK: usize = 256 * 1024;
@@ -16,6 +16,7 @@ fn validate_file_size(size: u64) -> Result<(), String> {
 #[derive(Default)]
 pub struct ChatFileState {
     sources: Mutex<HashMap<String, PathBuf>>,
+    open_sources: Mutex<HashMap<String, (Arc<File>, u64)>>,
     downloads: Mutex<HashMap<String, Download>>,
     completed: Mutex<HashMap<String, PathBuf>>,
     clipboard_sources: Mutex<HashMap<String, PathBuf>>,
@@ -40,7 +41,7 @@ fn digest(path: &Path) -> Result<(u64, String), String> {
     let size = metadata.len();
     validate_file_size(size)?;
     let mut hasher = Sha256::new();
-    let mut buffer = [0u8; 128 * 1024];
+    let mut buffer = vec![0u8; 1024 * 1024];
     loop {
         let n = file.read(&mut buffer).map_err(|e| e.to_string())?;
         if n == 0 { break; }
@@ -118,6 +119,7 @@ pub async fn pick_chat_file(state: State<'_, ChatFileState>) -> Result<Option<Fi
 
 #[tauri::command]
 pub async fn inspect_chat_file(state: State<'_, ChatFileState>, id: String) -> Result<FileInfo, String> {
+    if let Ok(mut open) = state.open_sources.lock() { open.remove(&id); }
     let path = state.sources.lock().map_err(|e| e.to_string())?.get(&id).cloned().ok_or("Source unavailable")?;
     tauri::async_runtime::spawn_blocking(move || file_info(id, &path)).await.map_err(|e| e.to_string())?
 }
@@ -138,15 +140,42 @@ async fn read_source_chunk(state: &ChatFileState, id: &str, offset: u64,
     length: Option<usize>) -> Result<Vec<u8>, String> {
     let length = length.unwrap_or(CHUNK);
     if length == 0 || length > CHUNK { return Err("Invalid chunk size".into()); }
-    let path = state.sources.lock().map_err(|e| e.to_string())?.get(id).cloned().ok_or("Source unavailable")?;
+    let cached = state.open_sources.lock().map_err(|e| e.to_string())?.get(id).cloned();
+    let (file, size) = if let Some(entry) = cached {
+        entry
+    } else {
+        let path = state.sources.lock().map_err(|e| e.to_string())?.get(id).cloned().ok_or("Source unavailable")?;
+        let (file, size) = tauri::async_runtime::spawn_blocking(move || -> Result<(Arc<File>, u64), String> {
+            let file = File::open(path).map_err(|e| e.to_string())?;
+            let size = file.metadata().map_err(|e| e.to_string())?.len();
+            validate_file_size(size)?;
+            Ok((Arc::new(file), size))
+        }).await.map_err(|e| e.to_string())??;
+        let mut open = state.open_sources.lock().map_err(|e| e.to_string())?;
+        if open.len() >= 32 { open.clear(); }
+        open.insert(id.to_owned(), (file.clone(), size));
+        (file, size)
+    };
+    if offset > size { return Err("Invalid source offset".into()); }
+    let to_read = (length as u64).min(size - offset) as usize;
     tauri::async_runtime::spawn_blocking(move || {
-        let mut file = File::open(path).map_err(|e| e.to_string())?;
-        let size = file.metadata().map_err(|e| e.to_string())?.len();
-        validate_file_size(size)?;
-        if offset > size { return Err("Invalid source offset".into()); }
-        file.seek(SeekFrom::Start(offset)).map_err(|e| e.to_string())?;
-        let mut buffer = vec![0u8; (length as u64).min(size - offset) as usize];
-        file.read_exact(&mut buffer).map_err(|e| e.to_string())?;
+        let mut buffer = vec![0u8; to_read];
+        #[cfg(windows)]
+        {
+            use std::os::windows::fs::FileExt;
+            let mut read = 0usize;
+            while read < to_read {
+                let n = file.seek_read(&mut buffer[read..], offset + read as u64).map_err(|e| e.to_string())?;
+                if n == 0 { return Err("Unexpected end of source file".into()); }
+                read += n;
+            }
+        }
+        #[cfg(not(windows))]
+        {
+            let mut handle = file.try_clone().map_err(|e| e.to_string())?;
+            handle.seek(SeekFrom::Start(offset)).map_err(|e| e.to_string())?;
+            handle.read_exact(&mut buffer).map_err(|e| e.to_string())?;
+        }
         Ok(buffer)
     }).await.map_err(|e| e.to_string())?
 }
@@ -423,6 +452,7 @@ pub async fn paste_chat_files(state: State<'_, ChatFileState>, gif_source: Optio
 }
 
 fn discard_source(state: &ChatFileState, id: &str) {
+    if let Ok(mut open) = state.open_sources.lock() { open.remove(id); }
     if let Ok(mut sources) = state.sources.lock() { sources.remove(id); }
     if let Ok(mut sources) = state.clipboard_sources.lock() {
         if let Some(path) = sources.remove(id) { let _ = fs::remove_file(path); }

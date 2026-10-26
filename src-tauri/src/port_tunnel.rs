@@ -83,6 +83,9 @@ mod base64_bytes {
     }
 }
 fn sink(app: tauri::AppHandle) -> Sink { Arc::new(move |event| {
+    if crate::native_tunnel::try_send_port_tunnel(&event.scope, &event.peer, &event.packet) {
+        return Ok(());
+    }
     let (packet, bytes) = match &event.packet {
         Packet::Data { session, sequence, data } => (serde_json::json!({"kind":"data","session":session,"sequence":sequence}), data.as_slice()),
         Packet::Datagram { session, sequence, data } => (serde_json::json!({"kind":"datagram","session":session,"sequence":sequence}), data.as_slice()),
@@ -119,9 +122,11 @@ impl TunnelState {
             let keep = state.peers.contains(&f.info.peer); if !keep { let _ = f.cancel.send(true); } keep
         });
         state.exports = next;
+        crate::native_tunnel::retain_peers(scope, &state.peers);
         Ok(())
     }
     fn stop(&self, scope: &str) {
+        crate::native_tunnel::stop_scope(scope);
         if let Some(state) = self.scopes.lock().unwrap().remove(scope) {
             for s in state.sessions.values() { let _ = s.cancel.send(true); }
             for f in state.forwards.values() { let _ = f.cancel.send(true); }
@@ -246,9 +251,11 @@ impl TunnelState {
         let mut outgoing = 0u32;
         let mut incoming = 0u32;
         let mut datagrams = None;
-        // Keep a bounded window moving instead of waiting one network RTT per read.
-        let mut pending = std::collections::VecDeque::<(u32, Instant)>::new();
-        let window = if udp { 32 } else { 16 };
+        // Keep a large byte and packet window moving so interactive game packets never stall on RTT.
+        let mut pending = std::collections::VecDeque::<(u32, usize, Instant)>::new();
+        let mut pending_bytes = 0usize;
+        let window = if udp { 256 } else { 512 };
+        let max_pending_bytes = 4 * 1024 * 1024;
         let mut first_datagram: Option<Vec<u8>> = None;
         let mut local_ended = false;
         let mut remote_ended = false;
@@ -257,19 +264,25 @@ impl TunnelState {
         loop {
             if *cancel.borrow() { break; }
             if local_ended && remote_ended && pending.is_empty() { break; }
+            let can_send = ready && pending.len() < window && pending_bytes < max_pending_bytes;
             let data = tokio::select! {
                 _ = cancel.changed() => break,
-                data = async { first_datagram.take().unwrap() }, if ready && pending.len() < window && first_datagram.is_some() => data,
+                data = async { first_datagram.take().unwrap() }, if can_send && first_datagram.is_some() => data,
                 _ = timer.tick() => {
                     if (!ready && activity.elapsed() > Duration::from_secs(10)) ||
-                        pending.front().is_some_and(|(_, t)| t.elapsed() > Duration::from_secs(20)) ||
+                        pending.front().is_some_and(|(_, _, t)| t.elapsed() > Duration::from_secs(20)) ||
                         (udp && activity.elapsed() > Duration::from_secs(60)) { break; }
                     continue;
                 }
                 command = commands.recv() => {
                     match command {
                         Some(Command::Ready) if !ready => { ready = true; activity = Instant::now(); continue; }
-                        Some(Command::Ack(seq)) if pending.front().is_some_and(|(n, _)| *n == seq) => { pending.pop_front(); continue; }
+                        Some(Command::Ack(seq)) if pending.front().is_some_and(|(n, _, _)| *n == seq) => {
+                            if let Some((_, len, _)) = pending.pop_front() {
+                                pending_bytes = pending_bytes.saturating_sub(len);
+                            }
+                            continue;
+                        }
                         Some(Command::End) if ready && !udp && !remote_ended => {
                             let Socket::Tcp(stream) = &mut socket else { break; };
                             if stream.shutdown().await.is_err() { break; }
@@ -293,7 +306,7 @@ impl TunnelState {
                             }
                             continue;
                         }
-                        Some(Command::LocalData(data)) if ready && pending.len() < window => data,
+                        Some(Command::LocalData(data)) if can_send => data,
                         Some(Command::LocalData(data)) if !ready && udp && first_datagram.is_none() => { first_datagram = Some(data); continue; }
                         Some(Command::LocalData(_)) if udp => continue, // Bounded datagram queues drop under congestion.
                         _ => break,
@@ -305,7 +318,7 @@ impl TunnelState {
                         Socket::Udp(s, None) => s.recv(&mut buffer).await,
                         Socket::Udp(_, Some(_)) => std::future::pending().await,
                     }
-                }, if ready && pending.len() < window && !local_ended => {
+                }, if can_send && !local_ended => {
                     match read {
                         Ok(0) if !udp => {
                             local_ended = true;
@@ -321,7 +334,10 @@ impl TunnelState {
                 else { Packet::Data { session: session.clone(), sequence: outgoing, data } };
             if emit(&output, &scope, &peer, packet).is_err() { break; }
             self.count(&scope, &tunnel, &peer, length, 0);
-            if !udp { pending.push_back((outgoing, Instant::now())); }
+            if !udp {
+                pending_bytes = pending_bytes.saturating_add(length);
+                pending.push_back((outgoing, length, Instant::now()));
+            }
             let Some(next) = outgoing.checked_add(1) else { break; }; outgoing = next;
             activity = Instant::now();
         }

@@ -160,12 +160,11 @@ async fn read_frame<R: AsyncRead + Unpin>(reader: &mut R) -> Result<Frame, Strin
     Ok((kind, bytes))
 }
 async fn write_frame<W: AsyncWrite + Unpin>(writer: &mut W, frame: &Frame) -> Result<(), String> {
-    writer
-        .write_u32((frame.1.len() + 1) as u32)
-        .await
-        .map_err(|e| e.to_string())?;
-    writer.write_u8(frame.0).await.map_err(|e| e.to_string())?;
-    writer.write_all(&frame.1).await.map_err(|e| e.to_string())
+    let mut buf = Vec::with_capacity(5 + frame.1.len());
+    buf.extend_from_slice(&((frame.1.len() + 1) as u32).to_be_bytes());
+    buf.push(frame.0);
+    buf.extend_from_slice(&frame.1);
+    writer.write_all(&buf).await.map_err(|e| e.to_string())
 }
 impl VirtualNetworkState {
     fn idle(&self) -> bool {
@@ -260,6 +259,7 @@ impl VirtualNetworkState {
             let mut stream = tokio::time::timeout(Duration::from_secs(45), async {
                 loop {
                     let (mut stream, _) = listener.accept().await.map_err(|e| e.to_string())?;
+                    let _ = stream.set_nodelay(true);
                     if let Ok(Ok((0, authentication))) =
                         tokio::time::timeout(Duration::from_secs(2), read_frame(&mut stream)).await
                     {
@@ -286,7 +286,7 @@ impl VirtualNetworkState {
             if self.idle() {
                 return Err("Virtual network activation was cancelled".into());
             }
-            let (sender, mut frames) = mpsc::channel::<Frame>(64);
+            let (sender, mut frames) = mpsc::channel::<Frame>(4096);
             let (cancel, mut stop_write) = watch::channel(false);
             let mut stop_read = stop_write.clone();
             let generation = {
@@ -305,16 +305,27 @@ impl VirtualNetworkState {
             let handle = app.clone();
             tokio::spawn(async move {
                 let mut keepalive = tokio::time::interval(Duration::from_secs(2));
+                let mut batch = Vec::with_capacity(65_536);
                 loop {
                     let frame = tokio::select! {
                         _ = stop_write.changed() => break,
                         _ = keepalive.tick() => (6, Vec::new()),
                         frame = frames.recv() => match frame { Some(f) => f, None => break },
                     };
+                    batch.clear();
+                    batch.extend_from_slice(&((frame.1.len() + 1) as u32).to_be_bytes());
+                    batch.push(frame.0);
+                    batch.extend_from_slice(&frame.1);
+                    while batch.len() < 60_000 {
+                        let Ok(next) = frames.try_recv() else { break };
+                        batch.extend_from_slice(&((next.1.len() + 1) as u32).to_be_bytes());
+                        batch.push(next.0);
+                        batch.extend_from_slice(&next.1);
+                    }
                     if !matches!(
                         tokio::time::timeout(
                             Duration::from_secs(5),
-                            write_frame(&mut writer, &frame)
+                            writer.write_all(&batch)
                         )
                         .await,
                         Ok(Ok(()))
@@ -380,10 +391,21 @@ impl VirtualNetworkState {
         let Some(route) = state.policy.packet(bytes, identity.ip, None) else {
             return;
         };
+        if crate::native_tunnel::try_send_virtual(&route.scope, &route.peer, bytes) {
+            let c = state
+                .counters
+                .entry(route.scope)
+                .or_default()
+                .entry(route.rule)
+                .or_default();
+            c.sent += bytes.len() as u64;
+            crate::traffic_counters::record_peer_traffic(&mut c.peers, &route.peer, bytes.len(), 0);
+            return;
+        }
         state
             .credits
             .retain(|_, (_, _, time)| time.elapsed() < Duration::from_secs(5));
-        if state.credits.len() >= 64 {
+        if state.credits.len() >= 2048 {
             state
                 .counters
                 .entry(route.scope)
@@ -760,11 +782,11 @@ fn helper(port: u16, token: &str) -> Result<(), String> {
         sync::atomic::{AtomicBool, Ordering},
     };
     fn write(stream: &mut TcpStream, frame: &Frame) -> Result<(), String> {
-        stream
-            .write_all(&((frame.1.len() + 1) as u32).to_be_bytes())
-            .map_err(|e| e.to_string())?;
-        stream.write_all(&[frame.0]).map_err(|e| e.to_string())?;
-        stream.write_all(&frame.1).map_err(|e| e.to_string())
+        let mut buf = Vec::with_capacity(5 + frame.1.len());
+        buf.extend_from_slice(&((frame.1.len() + 1) as u32).to_be_bytes());
+        buf.push(frame.0);
+        buf.extend_from_slice(&frame.1);
+        stream.write_all(&buf).map_err(|e| e.to_string())
     }
     fn read(stream: &mut TcpStream) -> Result<Frame, String> {
         let mut size = [0; 4];
@@ -835,12 +857,23 @@ fn helper(port: u16, token: &str) -> Result<(), String> {
     };
     write(&mut stream, &(3, config.revision.to_be_bytes().to_vec()))?;
     let cancelled = Arc::new(AtomicBool::new(false));
-    let (output, frames) = std::sync::mpsc::sync_channel::<Frame>(64);
+    let (output, frames) = std::sync::mpsc::sync_channel::<Frame>(4096);
     let mut writer = stream.try_clone().map_err(|e| e.to_string())?;
     let stopped = cancelled.clone();
     let writer_thread = std::thread::spawn(move || {
+        let mut batch = Vec::with_capacity(65_536);
         while let Ok(frame) = frames.recv() {
-            if write(&mut writer, &frame).is_err() {
+            batch.clear();
+            batch.extend_from_slice(&((frame.1.len() + 1) as u32).to_be_bytes());
+            batch.push(frame.0);
+            batch.extend_from_slice(&frame.1);
+            while batch.len() < 60_000 {
+                let Ok(next) = frames.try_recv() else { break };
+                batch.extend_from_slice(&((next.1.len() + 1) as u32).to_be_bytes());
+                batch.push(next.0);
+                batch.extend_from_slice(&next.1);
+            }
+            if writer.write_all(&batch).is_err() {
                 break;
             }
         }
