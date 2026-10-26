@@ -5,6 +5,7 @@ import { listen } from '@tauri-apps/api/event';
 import { roomAppsService } from './room_apps_service';
 import { appWindowEvent, appWindowPeerId, sendAppWindow, type AppWindowMessage } from './app_window';
 import { youtubePipPeerId } from './youtube_pip';
+import { twitchPipPeerId } from './twitch_pip';
 import { stateStore } from '../core/state_store';
 import { showToast } from '../hooks/useToast';
 import type { RoomAppInstance } from './types';
@@ -20,6 +21,7 @@ export function useAppWindow(instance: RoomAppInstance) {
   const ready = useRef<Promise<unknown>>(Promise.resolve());
   const restore = async () => {
     if (instance.kind === 'youtube') await invoke('close_pip_window', { peerId: youtubePipPeerId(instance.id) });
+    if (instance.kind === 'twitch') await invoke('close_pip_window', { peerId: twitchPipPeerId(instance.id) });
     await invoke('close_pip_window', { peerId: appWindowPeerId(instance.id) });
     active.current = false;
     setDetached(false);
@@ -73,6 +75,8 @@ export function useAppWindow(instance: RoomAppInstance) {
       listen<string>('pip-window-closed', ({ payload }) => {
         if (payload === appWindowPeerId(instance.id)) {
           if (instance.kind === 'youtube') void invoke('close_pip_window', { peerId: youtubePipPeerId(instance.id) }).catch(console.warn);
+        if (instance.kind === 'twitch') void invoke('close_pip_window', { peerId: twitchPipPeerId(instance.id) }).catch(console.warn);
+          if (instance.kind === 'twitch') void invoke('close_pip_window', { peerId: twitchPipPeerId(instance.id) }).catch(console.warn);
           active.current = false;
           mediaReady = false;
           relay?.stop();
@@ -89,6 +93,7 @@ export function useAppWindow(instance: RoomAppInstance) {
       removers.forEach((remove) => remove());
       if (active.current) {
         if (instance.kind === 'youtube') void invoke('close_pip_window', { peerId: youtubePipPeerId(instance.id) }).catch(console.warn);
+        if (instance.kind === 'twitch') void invoke('close_pip_window', { peerId: twitchPipPeerId(instance.id) }).catch(console.warn);
         void invoke('close_pip_window', { peerId: appWindowPeerId(instance.id) }).catch(console.warn);
       }
       active.current = false;
@@ -101,6 +106,7 @@ export function useAppWindow(instance: RoomAppInstance) {
       await ready.current;
       // The full app takes ownership after the existing player-only window closes.
       if (instance.kind === 'youtube') await invoke('close_pip_window', { peerId: youtubePipPeerId(instance.id) });
+    if (instance.kind === 'twitch') await invoke('close_pip_window', { peerId: twitchPipPeerId(instance.id) });
       active.current = true;
       setDetached(true);
       await invoke('open_pip_window', { peerId: appWindowPeerId(instance.id), title: getRoomApp(instance.kind)?.label || instance.kind });

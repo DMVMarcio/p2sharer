@@ -3,7 +3,7 @@ import { useLocale } from '../hooks/useLocale';
 import { useElementFullscreen } from '../hooks/useElementFullscreen';
 import React, { useEffect, useRef, useState } from 'react';
 import { invoke, isTauri } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
+import { emit, listen } from '@tauri-apps/api/event';
 import { SiTwitch } from 'react-icons/si';
 import {
   Expand,
@@ -14,11 +14,19 @@ import {
   Minimize,
   Minimize2,
   Pause,
+  PictureInPicture2,
   Play,
   RefreshCw,
   Volume2,
   VolumeX,
 } from 'lucide-react';
+import {
+  twitchPipEvent,
+  twitchPipPeerId,
+  validTwitchPipCommand,
+  validTwitchPipSettings,
+  type TwitchPipMessage,
+} from './twitch_pip';
 import { roomAppsService } from './room_apps_service';
 import { TwitchModel } from './models.ts';
 import type { TwitchState } from './types.ts';
@@ -73,15 +81,63 @@ export const TwitchApp: React.FC<Props> = ({ instanceId, compact = false }) => {
   const [isLive, setIsLive] = useState(false);
   const [playerReady, setPlayerReady] = useState(false);
   const [playerLoadFailed, setPlayerLoadFailed] = useState(false);
+  const [pipActive, setPipActive] = useState(false);
   const [activity, setActivity] = useState<{ id: number; actor: string; message: string } | null>(null);
 
   const mountRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<TwitchPlayerInstance | null>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
+  const volumeRef = useRef(volume);
+  const mutedRef = useRef(muted);
+  volumeRef.current = volume;
+  mutedRef.current = muted;
   const previousStateRef = useRef(state);
   const activityIdRef = useRef(0);
   const suppressBroadcastRef = useRef(false);
+  const pipActiveRef = useRef(false);
+  const pipListenersReadyRef = useRef<Promise<void> | null>(null);
+
+  const sendPipState = () => {
+    if (!pipActiveRef.current) return;
+    const msg: TwitchPipMessage = {
+      source: 'main',
+      type: 'state',
+      state: stateRef.current,
+      settings: { volume: volumeRef.current, muted: mutedRef.current },
+    };
+    void emit(twitchPipEvent(instanceId), msg);
+  };
+
+  const restoreFromPip = () => {
+    if (!pipActiveRef.current) return;
+    pipActiveRef.current = false;
+    setPipActive(false);
+  };
+
+  const closePip = async () => {
+    if (!pipActiveRef.current) return;
+    try {
+      await invoke('close_pip_window', { peerId: twitchPipPeerId(instanceId) });
+    } catch (reason) {
+      console.warn('Failed to close Twitch PiP window:', reason);
+    }
+    restoreFromPip();
+  };
+
+  const openPip = async () => {
+    if (!isTauri() || pipActiveRef.current || !state.channel) return;
+    try {
+      await pipListenersReadyRef.current;
+      pipActiveRef.current = true;
+      setPipActive(true);
+      await invoke('open_pip_window', { peerId: twitchPipPeerId(instanceId), title: 'Twitch' });
+      if (pipActiveRef.current) sendPipState();
+    } catch (error) {
+      restoreFromPip();
+      console.warn('Failed to open Twitch PiP:', error);
+    }
+  };
 
   // Subscribe to room model changes
   useEffect(() => {
@@ -102,6 +158,7 @@ export const TwitchApp: React.FC<Props> = ({ instanceId, compact = false }) => {
       }
 
       setState(next);
+      if (pipActiveRef.current) sendPipState();
     });
   }, [instanceId]);
 
@@ -129,6 +186,59 @@ export const TwitchApp: React.FC<Props> = ({ instanceId, compact = false }) => {
     };
   }, []);
 
+  // Listen to Picture-in-Picture window events and commands
+  useEffect(() => {
+    if (!isTauri()) return;
+    let disposed = false;
+    const removers: (() => void)[] = [];
+
+    const ready = Promise.all([
+      listen<TwitchPipMessage>(twitchPipEvent(instanceId), (event) => {
+        const message = event.payload;
+        if (!pipActiveRef.current || message?.source !== 'pip') return;
+        if (message.type === 'ready') {
+          sendPipState();
+          return;
+        }
+        if (message.type === 'settings') {
+          if (!validTwitchPipSettings(message.settings)) return;
+          const { volume: nextVolume, muted: nextMuted } = message.settings;
+          setVolume(nextVolume);
+          setMuted(nextMuted);
+          localStorage.setItem(VOLUME_STORAGE, String(nextVolume));
+          return;
+        }
+        if (message.type === 'command') {
+          if (!validTwitchPipCommand(message.command)) return;
+          if (message.command.action === 'toggle') {
+            publish({ ...stateRef.current, playing: !stateRef.current.playing }, 'playback');
+          }
+        }
+      }),
+      listen<string>('pip-window-closed', (event) => {
+        if (event.payload === twitchPipPeerId(instanceId)) {
+          restoreFromPip();
+        }
+      }),
+    ]).then((unlisteners) => {
+      if (disposed) {
+        unlisteners.forEach((u) => u());
+      } else {
+        removers.push(...unlisteners);
+      }
+    });
+
+    pipListenersReadyRef.current = ready;
+
+    return () => {
+      disposed = true;
+      removers.forEach((u) => u());
+      if (pipActiveRef.current) {
+        void invoke('close_pip_window', { peerId: twitchPipPeerId(instanceId) }).catch(console.warn);
+      }
+    };
+  }, [instanceId]);
+
   // Sync player playback with state
   useEffect(() => {
     const player = playerRef.current;
@@ -151,7 +261,7 @@ export const TwitchApp: React.FC<Props> = ({ instanceId, compact = false }) => {
 
   // Mount Twitch Player when channel exists or reloadKey changes
   useEffect(() => {
-    if (!state.channel || !mountRef.current) {
+    if (!state.channel || !mountRef.current || pipActive) {
       if (playerRef.current) {
         playerRef.current = null;
         setPlayerReady(false);
@@ -187,16 +297,10 @@ export const TwitchApp: React.FC<Props> = ({ instanceId, compact = false }) => {
             if (!disposed) setIsLive(false);
           },
           onPlay: () => {
-            if (disposed || suppressBroadcastRef.current) return;
-            if (!stateRef.current.playing) {
-              publish({ ...stateRef.current, playing: true }, 'playback');
-            }
+            // Handled locally
           },
           onPause: () => {
-            if (disposed || suppressBroadcastRef.current) return;
-            if (stateRef.current.playing) {
-              publish({ ...stateRef.current, playing: false }, 'playback');
-            }
+            // Handled locally; do NOT broadcast to room on resize/internal pause
           },
         });
 
@@ -215,7 +319,7 @@ export const TwitchApp: React.FC<Props> = ({ instanceId, compact = false }) => {
       playerRef.current = null;
       setPlayerReady(false);
     };
-  }, [state.channel, reloadKey]);
+  }, [state.channel, reloadKey, pipActive]);
 
   // Handle theater mode Escape key
   useEffect(() => {
@@ -431,6 +535,17 @@ export const TwitchApp: React.FC<Props> = ({ instanceId, compact = false }) => {
             </TooltipButton>
           )}
 
+          {/* Picture-in-Picture */}
+          {isTauri() && state.channel && !pipActive && !fullscreen && (
+            <TooltipButton
+              tooltip="Picture-in-Picture"
+              className="twitch-btn"
+              onClick={() => void openPip()}
+            >
+              <PictureInPicture2 size={16} />
+            </TooltipButton>
+          )}
+
           {/* Fullscreen */}
           <TooltipButton
             tooltip={fullscreen ? t('browser.exitFullscreen') : t('browser.fullscreen')}
@@ -447,7 +562,13 @@ export const TwitchApp: React.FC<Props> = ({ instanceId, compact = false }) => {
         <div className="twitch-player-pane">
           {state.channel ? (
             <div className="twitch-player-wrapper">
-              {playerLoadFailed ? (
+              {pipActive ? (
+                <div className="youtube-pip-placeholder">
+                  <PictureInPicture2 size={28} strokeWidth={1.6} />
+                  <span>{t("message.5b4e0530d764")}</span>
+                  <button type="button" onClick={() => void closePip()}>{t("message.99b3e03aa60c")}</button>
+                </div>
+              ) : playerLoadFailed ? (
                 <iframe
                   key={`${state.channel}-${reloadKey}`}
                   title={`Twitch - ${state.channel}`}
@@ -460,7 +581,7 @@ export const TwitchApp: React.FC<Props> = ({ instanceId, compact = false }) => {
               )}
 
               {/* Pause overlay for room synchronization */}
-              {!state.playing && (
+              {!state.playing && !pipActive && (
                 <div className="twitch-pause-overlay">
                   <div className="twitch-pause-card">
                     <Pause size={32} className="twitch-pause-icon" />

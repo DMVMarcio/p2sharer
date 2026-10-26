@@ -65,11 +65,19 @@ pub fn install(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                     let mut uri = Default::default();
                     args.Uri(&mut uri)?;
                     let uri_str = CoTaskMemPWSTR::from(uri).to_string();
-                    if uri_str.contains("twitch.tv") {
+                    if crate::twitch_auth::is_twitch_auth_url(&uri_str) {
                         args.SetHandled(true)?;
                         let handle = popup_app.clone();
                         tauri::async_runtime::spawn(async move {
                             let _ = crate::twitch_auth::open_twitch_auth_window(&handle, Some(&uri_str));
+                        });
+                    } else if !uri_str.is_empty() && (uri_str.starts_with("http://") || uri_str.starts_with("https://")) {
+                        args.SetHandled(true)?;
+                        let handle = popup_app.clone();
+                        let target = uri_str.clone();
+                        tauri::async_runtime::spawn(async move {
+                            use tauri_plugin_opener::OpenerExt;
+                            let _ = handle.opener().open_url(&target, None::<&str>);
                         });
                     }
                 }

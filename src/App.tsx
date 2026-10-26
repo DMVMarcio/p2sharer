@@ -25,6 +25,7 @@ import { useAppTheme } from './hooks/useAppTheme';
 import { stateStore } from './core/state_store';
 import { PipView } from './components/room/PipView';
 import { YouTubePipView } from './apps/YouTubePipView';
+import { TwitchPipView } from './apps/TwitchPipView';
 import { RoomAppWindow } from './apps/RoomAppWindow';
 import { AppUpdateDialog } from './components/modals/AppUpdateDialog';
 import { ReleaseNotesDialog } from './components/modals/ReleaseNotesDialog';
@@ -46,6 +47,8 @@ export const App: React.FC<{ webNavigation?: WebRoomNavigation }> = ({ webNaviga
     if (pipPeerId.startsWith('app-')) return <RoomAppWindow instanceId={pipPeerId.slice(4)} />;
     if (pipPeerId.startsWith('youtube-'))
       return <YouTubePipView instanceId={pipPeerId.slice('youtube-'.length)} />;
+    if (pipPeerId.startsWith('twitch-'))
+      return <TwitchPipView instanceId={pipPeerId.slice('twitch-'.length)} />;
     return <PipView peerId={pipPeerId} />;
   }
 
