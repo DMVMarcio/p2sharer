@@ -1508,5 +1508,7 @@
   "twitch.play": "Riprendi lo streaming",
   "twitch.mute": "Disattiva audio",
   "twitch.unmute": "Riattiva audio",
-  "twitch.pausedNotice": "Streaming in pausa nella stanza"
+  "twitch.pausedNotice": "Streaming in pausa nella stanza",
+  "twitch.login": "Accedi a Twitch",
+  "twitch.reload": "Ricarica lettore e chat"
 }

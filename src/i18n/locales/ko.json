@@ -1508,5 +1508,7 @@
   "twitch.play": "방송 재생",
   "twitch.mute": "음소거",
   "twitch.unmute": "음소거 해제",
-  "twitch.pausedNotice": "방에서 방송이 일시중지됨"
+  "twitch.pausedNotice": "방에서 방송이 일시중지됨",
+  "twitch.login": "Twitch 로그인",
+  "twitch.reload": "플레이어 및 채팅 새로고침"
 }

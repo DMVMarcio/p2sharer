@@ -1508,5 +1508,7 @@
   "twitch.play": "Stream fortsetzen",
   "twitch.mute": "Stummschalten",
   "twitch.unmute": "Stummschaltung aufheben",
-  "twitch.pausedNotice": "Stream im Raum pausiert"
+  "twitch.pausedNotice": "Stream im Raum pausiert",
+  "twitch.login": "Bei Twitch anmelden",
+  "twitch.reload": "Player und Chat neu laden"
 }

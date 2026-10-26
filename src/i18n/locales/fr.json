@@ -1508,5 +1508,7 @@
   "twitch.play": "Reprendre la diffusion",
   "twitch.mute": "Couper le son",
   "twitch.unmute": "Réactiver le son",
-  "twitch.pausedNotice": "Diffusion en pause dans le salon"
+  "twitch.pausedNotice": "Diffusion en pause dans le salon",
+  "twitch.login": "Se connecter à Twitch",
+  "twitch.reload": "Recharger le lecteur et le chat"
 }

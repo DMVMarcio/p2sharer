@@ -1508,5 +1508,7 @@
   "twitch.play": "Jatka lähetystä",
   "twitch.mute": "Mykistä",
   "twitch.unmute": "Poista mykistys",
-  "twitch.pausedNotice": "Lähetys keskeytetty huoneessa"
+  "twitch.pausedNotice": "Lähetys keskeytetty huoneessa",
+  "twitch.login": "Kirjaudu Twitchiin",
+  "twitch.reload": "Lataa soitin ja keskustelu uudelleen"
 }

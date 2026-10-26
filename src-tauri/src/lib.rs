@@ -48,6 +48,7 @@ mod peer_payload;
 mod traffic_counters;
 pub mod virtual_network;
 pub mod upnp;
+pub mod twitch_auth;
 mod virtual_network_policy;
 #[cfg(all(windows, target_arch = "x86_64"))]
 mod virtual_network_driver;
@@ -228,6 +229,7 @@ pub fn run() {
             lan_signaling::send_lan_signaling,
             lan_signaling::disconnect_lan_signaling,
             app_updates::check_app_update,
+            twitch_auth::open_twitch_auth,
             portable_update::download_portable_update,
             portable_update::install_portable_update,
             portable_update::restart_after_update,

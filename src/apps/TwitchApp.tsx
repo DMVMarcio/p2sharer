@@ -2,9 +2,12 @@ import { t } from '../i18n/index.ts';
 import { useLocale } from '../hooks/useLocale';
 import { useElementFullscreen } from '../hooks/useElementFullscreen';
 import React, { useEffect, useRef, useState } from 'react';
+import { invoke, isTauri } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { SiTwitch } from 'react-icons/si';
 import {
   Expand,
+  LogIn,
   Maximize,
   MessageSquare,
   MessageSquareOff,
@@ -12,6 +15,7 @@ import {
   Minimize2,
   Pause,
   Play,
+  RefreshCw,
   Volume2,
   VolumeX,
 } from 'lucide-react';
@@ -55,6 +59,7 @@ export const TwitchApp: React.FC<Props> = ({ instanceId, compact = false }) => {
 
   const [channelInput, setChannelInput] = useState('');
   const [theater, setTheater] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [chatOpen, setChatOpen] = useState(() => {
     const saved = localStorage.getItem(CHAT_STORAGE);
     return saved === null ? true : saved === 'true';
@@ -100,6 +105,30 @@ export const TwitchApp: React.FC<Props> = ({ instanceId, compact = false }) => {
     });
   }, [instanceId]);
 
+  // Auto-dismiss activity toast after 3.8s
+  useEffect(() => {
+    if (!activity) return;
+    const timer = window.setTimeout(() => {
+      setActivity((current) => (current?.id === activity.id ? null : current));
+    }, 3800);
+    return () => window.clearTimeout(timer);
+  }, [activity]);
+
+  // Listen to Twitch auth window events to automatically reload player/chat
+  useEffect(() => {
+    if (!isTauri()) return;
+    const unlistenClosed = listen('twitch-auth-closed', () => {
+      setReloadKey((prev) => prev + 1);
+    });
+    const unlistenSuccess = listen('twitch-auth-success', () => {
+      setReloadKey((prev) => prev + 1);
+    });
+    return () => {
+      void unlistenClosed.then((fn) => fn());
+      void unlistenSuccess.then((fn) => fn());
+    };
+  }, []);
+
   // Sync player playback with state
   useEffect(() => {
     const player = playerRef.current;
@@ -120,7 +149,7 @@ export const TwitchApp: React.FC<Props> = ({ instanceId, compact = false }) => {
     }
   }, [state.channel, state.playing, playerReady]);
 
-  // Mount Twitch Player when channel exists
+  // Mount Twitch Player when channel exists or reloadKey changes
   useEffect(() => {
     if (!state.channel || !mountRef.current) {
       if (playerRef.current) {
@@ -186,7 +215,7 @@ export const TwitchApp: React.FC<Props> = ({ instanceId, compact = false }) => {
       playerRef.current = null;
       setPlayerReady(false);
     };
-  }, [state.channel]);
+  }, [state.channel, reloadKey]);
 
   // Handle theater mode Escape key
   useEffect(() => {
@@ -251,6 +280,20 @@ export const TwitchApp: React.FC<Props> = ({ instanceId, compact = false }) => {
     const nextChat = !chatOpen;
     setChatOpen(nextChat);
     localStorage.setItem(CHAT_STORAGE, String(nextChat));
+  }
+
+  function handleOpenTwitchLogin() {
+    if (isTauri()) {
+      invoke('open_twitch_auth', { url: null }).catch((err) => {
+        console.error('Failed to open Twitch login window:', err);
+      });
+    } else {
+      window.open('https://www.twitch.tv/login', '_blank');
+    }
+  }
+
+  function handleReloadSession() {
+    setReloadKey((prev) => prev + 1);
   }
 
   const personFor = (actor: string): ActivityParticipant => {
@@ -346,6 +389,26 @@ export const TwitchApp: React.FC<Props> = ({ instanceId, compact = false }) => {
             />
           </div>
 
+          {/* Login to Twitch */}
+          <TooltipButton
+            tooltip={t('twitch.login')}
+            className="twitch-btn"
+            onClick={handleOpenTwitchLogin}
+          >
+            <LogIn size={16} />
+          </TooltipButton>
+
+          {/* Reload session */}
+          {state.channel && (
+            <TooltipButton
+              tooltip={t('twitch.reload')}
+              className="twitch-btn"
+              onClick={handleReloadSession}
+            >
+              <RefreshCw size={15} />
+            </TooltipButton>
+          )}
+
           {/* Chat toggle */}
           {state.channel && (
             <TooltipButton
@@ -386,7 +449,7 @@ export const TwitchApp: React.FC<Props> = ({ instanceId, compact = false }) => {
             <div className="twitch-player-wrapper">
               {playerLoadFailed ? (
                 <iframe
-                  key={state.channel}
+                  key={`${state.channel}-${reloadKey}`}
                   title={`Twitch - ${state.channel}`}
                   src={buildTwitchPlayerUrl(state.channel, state.playing, muted)}
                   className="twitch-player-iframe"
@@ -439,6 +502,7 @@ export const TwitchApp: React.FC<Props> = ({ instanceId, compact = false }) => {
               </TooltipButton>
             </div>
             <iframe
+              key={`${state.channel}-${reloadKey}`}
               title={`Twitch Chat - ${state.channel}`}
               src={buildTwitchChatUrl(state.channel)}
               className="twitch-chat-iframe"

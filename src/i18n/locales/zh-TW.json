@@ -1508,5 +1508,7 @@
   "twitch.play": "恢復直播",
   "twitch.mute": "靜音",
   "twitch.unmute": "取消靜音",
-  "twitch.pausedNotice": "房間已暫停直播"
+  "twitch.pausedNotice": "房間已暫停直播",
+  "twitch.login": "登入 Twitch",
+  "twitch.reload": "重新載入播放器與聊天"
 }

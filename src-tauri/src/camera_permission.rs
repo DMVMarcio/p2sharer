@@ -3,7 +3,8 @@
 pub fn install(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     use tauri::Manager;
     use webview2_com::{
-        CoTaskMemPWSTR, NavigationStartingEventHandler, PermissionRequestedEventHandler,
+        CoTaskMemPWSTR, NavigationStartingEventHandler, NewWindowRequestedEventHandler,
+        PermissionRequestedEventHandler,
     };
     use webview2_com::Microsoft::Web::WebView2::Win32::{
         COREWEBVIEW2_PERMISSION_KIND, COREWEBVIEW2_PERMISSION_KIND_CAMERA,
@@ -11,8 +12,9 @@ pub fn install(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         ICoreWebView2NavigationStartingEventArgs2,
     };
     use windows_capture_api::core::{HSTRING, Interface, PCWSTR};
+    let app_handle = app.handle().clone();
     let window = app.get_webview_window("main").ok_or("main webview missing")?;
-    window.with_webview(|webview| unsafe {
+    window.with_webview(move |webview| unsafe {
         let result = (|| {
             let view = webview.controller().CoreWebView2()?;
             let handler = PermissionRequestedEventHandler::create(Box::new(|_, args| {
@@ -56,6 +58,24 @@ pub fn install(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                 Ok(())
             }));
             let _ = view.add_NavigationStarting(&nav_handler, &mut 0);
+
+            let popup_app = app_handle.clone();
+            let popup_handler = NewWindowRequestedEventHandler::create(Box::new(move |_, args| {
+                if let Some(args) = args {
+                    let mut uri = Default::default();
+                    args.Uri(&mut uri)?;
+                    let uri_str = CoTaskMemPWSTR::from(uri).to_string();
+                    if uri_str.contains("twitch.tv") {
+                        args.SetHandled(true)?;
+                        let handle = popup_app.clone();
+                        tauri::async_runtime::spawn(async move {
+                            let _ = crate::twitch_auth::open_twitch_auth_window(&handle, Some(&uri_str));
+                        });
+                    }
+                }
+                Ok(())
+            }));
+            let _ = view.add_NewWindowRequested(&popup_handler, &mut 0);
 
             Ok::<(), Box<dyn std::error::Error>>(())
         })();
