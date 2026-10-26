@@ -258,6 +258,7 @@ pub async fn open_pip_window(
         .shadow(true);
 
     let window = builder.build().map_err(|e| e.to_string())?;
+    let _ = crate::camera_permission::configure_webview(&app, &window);
     if let Some(ratio) = ratio {
         apply_video_ratio(window, ratio).await?;
     }

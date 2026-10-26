@@ -381,20 +381,9 @@
   transition: width var(--transition-normal);
 }
 
-.twitch-chat-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--tw-border);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--tw-text);
-  background: var(--tw-surface-alt);
-}
-
 .twitch-chat-iframe {
   width: 100%;
+  height: 100%;
   flex: 1;
   border: none;
   background: var(--tw-bg);

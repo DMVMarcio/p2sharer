@@ -2,6 +2,13 @@
 #[cfg(windows)]
 pub fn install(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     use tauri::Manager;
+    let window = app.get_webview_window("main").ok_or("main webview missing")?;
+    configure_webview(&app.handle(), &window)?;
+    Ok(())
+}
+
+#[cfg(windows)]
+pub fn configure_webview(app_handle: &tauri::AppHandle, window: &tauri::WebviewWindow) -> Result<(), Box<dyn std::error::Error>> {
     use webview2_com::{
         CoTaskMemPWSTR, NavigationStartingEventHandler, NewWindowRequestedEventHandler,
         PermissionRequestedEventHandler,
@@ -12,8 +19,7 @@ pub fn install(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         ICoreWebView2NavigationStartingEventArgs2,
     };
     use windows_capture_api::core::{HSTRING, Interface, PCWSTR};
-    let app_handle = app.handle().clone();
-    let window = app.get_webview_window("main").ok_or("main webview missing")?;
+    let app_handle = app_handle.clone();
     window.with_webview(move |webview| unsafe {
         let result = (|| {
             let view = webview.controller().CoreWebView2()?;
@@ -101,6 +107,9 @@ fn trusted_camera_origin(uri: &str) -> bool {
 
 #[cfg(not(windows))]
 pub fn install(_: &tauri::App) -> Result<(), Box<dyn std::error::Error>> { Ok(()) }
+
+#[cfg(not(windows))]
+pub fn configure_webview(_: &tauri::AppHandle, _: &tauri::WebviewWindow) -> Result<(), Box<dyn std::error::Error>> { Ok(()) }
 
 #[cfg(test)]
 mod tests {

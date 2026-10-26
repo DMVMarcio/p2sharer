@@ -612,16 +612,6 @@ export const TwitchApp: React.FC<Props> = ({ instanceId, compact = false }) => {
         {/* Chat sidebar */}
         {showChatPane && (
           <aside className="twitch-chat-pane">
-            <div className="twitch-chat-header">
-              <span>{t('twitch.chat')}</span>
-              <TooltipButton
-                tooltip={t('twitch.hideChat')}
-                className="twitch-btn"
-                onClick={handleToggleChat}
-              >
-                <MessageSquareOff size={15} />
-              </TooltipButton>
-            </div>
             <iframe
               key={`${state.channel}-${reloadKey}`}
               title={`Twitch Chat - ${state.channel}`}
