@@ -1508,6 +1508,7 @@
   "twitch.play": "Resume stream",
   "twitch.mute": "Mute",
   "twitch.unmute": "Unmute",
+  "twitch.volume": "Twitch volume",
   "twitch.pausedNotice": "Stream paused in the room",
   "twitch.login": "Log in to Twitch",
   "twitch.reload": "Reload player and chat"

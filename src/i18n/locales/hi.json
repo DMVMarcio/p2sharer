@@ -1508,6 +1508,7 @@
   "twitch.play": "स्ट्रीम फिर से शुरू करें",
   "twitch.mute": "म्यूट करें",
   "twitch.unmute": "अनम्यूट करें",
+  "twitch.volume": "ट्विच वॉल्यूम",
   "twitch.pausedNotice": "कमरे में स्ट्रीम रोकी गई है",
   "twitch.login": "Twitch में लॉग इन करें",
   "twitch.reload": "प्लेयर और चैट पुनः लोड करें"

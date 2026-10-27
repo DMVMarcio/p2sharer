@@ -1508,6 +1508,7 @@
   "twitch.play": "恢复直播",
   "twitch.mute": "静音",
   "twitch.unmute": "取消静音",
+  "twitch.volume": "Twitch 音量",
   "twitch.pausedNotice": "房间已暂停直播",
   "twitch.login": "登录 Twitch",
   "twitch.reload": "重新加载播放器和聊天"

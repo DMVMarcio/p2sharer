@@ -489,7 +489,7 @@ export const TwitchApp: React.FC<Props> = ({ instanceId, compact = false }) => {
               value={muted ? 0 : volume}
               onChange={(e) => handleVolumeChange(Number(e.target.value))}
               className="twitch-volume-slider"
-              aria-label="Volume"
+              aria-label={t("twitch.volume")}
             />
           </div>
 

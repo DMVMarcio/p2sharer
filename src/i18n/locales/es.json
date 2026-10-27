@@ -1508,6 +1508,7 @@
   "twitch.play": "Reanudar transmisión",
   "twitch.mute": "Silenciar",
   "twitch.unmute": "Activar sonido",
+  "twitch.volume": "Volumen de Twitch",
   "twitch.pausedNotice": "Transmisión pausada en la sala",
   "twitch.login": "Iniciar sesión en Twitch",
   "twitch.reload": "Recargar reproductor y chat"

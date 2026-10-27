@@ -1508,6 +1508,7 @@
   "twitch.play": "Возобновить трансляцию",
   "twitch.mute": "Заглушить",
   "twitch.unmute": "Включить звук",
+  "twitch.volume": "громкость Twitch",
   "twitch.pausedNotice": "Трансляция приостановлена в комнате",
   "twitch.login": "Войти в Twitch",
   "twitch.reload": "Перезагрузить плеер и чат"

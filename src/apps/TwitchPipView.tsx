@@ -308,6 +308,7 @@ export const TwitchPipView: React.FC<{ instanceId: string }> = ({ instanceId }) 
             </TooltipButton>
 
             <input
+              autoComplete="off"
               type="range"
               min={0}
               max={100}
@@ -329,7 +330,7 @@ export const TwitchPipView: React.FC<{ instanceId: string }> = ({ instanceId }) 
             </TooltipButton>
 
             <TooltipButton
-              tooltip={fullscreen ? t("theater.exitFullscreen") : t("theater.fullscreen")}
+              tooltip={fullscreen ? t("browser.exitFullscreen") : t("browser.fullscreen")}
               className="youtube-control-button"
               onClick={() => void toggleFullscreen().catch((err) => setError(localizeError(err)))}
             >

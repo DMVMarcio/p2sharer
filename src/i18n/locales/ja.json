@@ -1508,6 +1508,7 @@
   "twitch.play": "配信を再開",
   "twitch.mute": "ミュート",
   "twitch.unmute": "ミュート解除",
+  "twitch.volume": "Twitchの音量",
   "twitch.pausedNotice": "ルームで配信が一時停止中",
   "twitch.login": "Twitch にログイン",
   "twitch.reload": "プレーヤーとチャットを再読み込み"
