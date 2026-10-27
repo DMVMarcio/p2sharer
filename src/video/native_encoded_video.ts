@@ -33,6 +33,7 @@ export class NativeEncodedDecoder {
   private waitingForKey = true;
   private closed = false;
   private requestingKey = false;
+  private hasFirstOutput = false;
   private lastKeyRequest = -Infinity;
   private sessionId: string;
   private feedbackToken: string;
@@ -40,7 +41,7 @@ export class NativeEncodedDecoder {
 
   public diagnosticSnapshot(): Record<string, number | boolean> {
     return { pending: this.pending.size, queued: this.queued.length,
-      waiting_for_key: this.waitingForKey, decode_queue_size: this.decoder?.decodeQueueSize ?? 0 };
+      waiting_for_key: this.waitingForKey, decode_queue_size: this.decoder?.decodeQueueSize ?? 0, has_first_output: this.hasFirstOutput };
   }
 
   private requestKey(): void {
@@ -73,6 +74,10 @@ export class NativeEncodedDecoder {
     // valid prediction state. Presentation can discard decoded pictures safely.
     if (this.pending.size >= 8 || this.queued.length) {
       if (this.queued.length >= 8) {
+        if (!this.hasFirstOutput) {
+          this.rejectPending(new Error('Native H264 decoder stalled before first output'));
+          return null;
+        }
         this.discardPending();
         for (const queued of this.queued) queued.resolve(null);
         this.queued = [];
@@ -103,6 +108,10 @@ export class NativeEncodedDecoder {
     if (geometry !== this.geometry) { this.geometry = geometry; this.waitingForKey = true; }
     if (this.waitingForKey && !packet.key) { this.requestKey(); return null; }
     if (this.pending.size >= 8) {
+      if (!this.hasFirstOutput) {
+        this.rejectPending(new Error('Native H264 decoder stalled before first output'));
+        return null;
+      }
       this.discardPending(); this.waitingForKey = true; this.requestKey(); return null;
     }
     if (!this.decoder || packet.key && this.waitingForKey) {
@@ -111,7 +120,17 @@ export class NativeEncodedDecoder {
       if (this.decoder && this.decoder.state !== 'closed') this.decoder.close();
       this.decoder = new VideoDecoder({
         output: frame => {
-          const pending = this.pending.get(frame.timestamp); this.pending.delete(frame.timestamp);
+          this.hasFirstOutput = true;
+          let pending = this.pending.get(frame.timestamp);
+          if (!pending && this.pending.size > 0) {
+            const oldestKey = this.pending.keys().next().value;
+            if (oldestKey !== undefined) {
+              pending = this.pending.get(oldestKey);
+              this.pending.delete(oldestKey);
+            }
+          } else {
+            this.pending.delete(frame.timestamp);
+          }
           if (!pending || this.closed) { frame.close(); return; }
           clearTimeout(pending.timer); pending.resolve(frame);
           this.drainQueued();

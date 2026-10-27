@@ -134,3 +134,26 @@ test('decoder preserves all references across a bounded UI input burst without r
     const rejected=Promise.allSettled(stopping);decoder.close();assert.ok((await rejected).every(value=>value.status==='rejected'));
   } finally {decoder.close();Object.assign(globalThis,previous);}
 });
+
+test('decoder rejects pending frames when stalled before producing its first output', async () => {
+  const originalDecoder = globalThis.VideoDecoder, originalChunk = globalThis.EncodedVideoChunk;
+  class StalledDecoder {
+    state = 'unconfigured'; output: (frame: unknown) => void;
+    constructor(callbacks: { output: (frame: unknown) => void }) { this.output = callbacks.output; }
+    configure() { this.state = 'configured'; }
+    decode() {}
+    close() { this.state = 'closed'; }
+  }
+  Object.assign(globalThis, {
+    VideoDecoder: StalledDecoder,
+    EncodedVideoChunk: class { timestamp: number; constructor(init: { timestamp: number }) { this.timestamp = init.timestamp; } }
+  });
+  try {
+    const decoder = new NativeEncodedDecoder('test', 'token');
+    const promises = Array.from({ length: 17 }, (_, index) => decoder.decode(packet(index + 1, index === 0)));
+    await assert.rejects(Promise.all(promises), /Native H264 decoder stalled before first output/);
+    decoder.close();
+  } finally {
+    Object.assign(globalThis, { VideoDecoder: originalDecoder, EncodedVideoChunk: originalChunk });
+  }
+});

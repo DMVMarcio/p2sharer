@@ -617,6 +617,14 @@ export class NativeVideoBridge implements VideoCaptureBridge {
             }
             resolve(); return;
           }
+          if (receivedNativeEncoding && !nativeEncodingFailed && performance.now() - started > 1200) {
+            nativeEncodingFailed = true;
+            encodedDecoder.close();
+            logDiagnostic('WARN', 'capture.preview', 'Native H264 preview did not decode within 1200ms; falling back to JPEG', {
+              sessionId: this.sessionId, sourceId, elapsedMs: Math.round(performance.now() - captureStarted)
+            });
+            void invoke('control_capture_encoder', { sessionId: this.sessionId, feedbackToken, disable: true }).catch(() => {});
+          }
           if (!this.isCapturing || performance.now() - started > 6000) {
             logDiagnostic('ERROR', 'capture.preview', 'Native preview did not decode its first frame', {
               sessionId: this.sessionId, sourceId, encoder: wireEncoder ?? 'no image payload received',
