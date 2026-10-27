@@ -1,109 +1,44 @@
 {
-  "version": "1.6.0",
+  "version": "1.6.1",
   "translations": {
     "en": [
-      "**Twitch live streams in rooms.** Watch Twitch broadcasts together in real time with shared play/pause, live chat, theater mode, and Picture-in-Picture.",
-      "**Platform icons on members.** Cards now show whether each member is on Desktop, Web, or Mobile with clear icon badges.",
-      "**Filter audio by app processes.** Expand multi-process apps like Discord or browsers to mute or share specific audio processes.",
-      "**Reliable screen previews and lower memory.** Previews start instantly with automatic recovery and pause in the background to save RAM.",
-      "**Fixed transfer stats in Tunnels.** Network details now stay anchored in place so bandwidth changes do not shift the button under your cursor.",
-      "**Faster tunnels and file transfers.** Multiplayer connections and chat file transfers are noticeably faster and smoother."
+      "**Reliable screen sharing preview.** Screen previews now start promptly and reliably, resolving preview unavailable errors before sharing."
     ],
     "pt-BR": [
-      "**Lives da Twitch na sala.** Assista a transmissões da Twitch em sincronia com play/pause compartilhado, chat ao vivo, modo teatro e Picture-in-Picture.",
-      "**Identificação da plataforma.** Os cartões dos membros agora mostram se a pessoa está no computador, web ou celular com ícones práticos.",
-      "**Filtro de áudio por aplicativo.** Abra apps como Discord ou navegadores para silenciar ou compartilhar sons de abas e processos específicos.",
-      "**Prévias confiáveis e menor consumo de RAM.** A prévia de tela inicia sem falhas com recuperação automática e pausa em segundo plano.",
-      "**Detalhes estáveis em Túneis.** O botão de velocidade nos túneis fica fixo, impedindo que a oscilação da rede mova o botão sob o cursor.",
-      "**Túneis e envio de arquivos mais rápidos.** Partidas com conexões diretas e envio de arquivos no chat estão muito mais velozes e fluidos."
+      "**Prévia de compartilhamento corrigida.** A prévia de tela agora inicia com rapidez e segurança, eliminando avisos de prévia indisponível."
     ],
     "es": [
-      "**Directos de Twitch en la sala.** Mira emisiones de Twitch en sincronía con reproducción compartida, chat en vivo, modo teatro y Picture-in-Picture.",
-      "**Identificación de plataforma.** Las tarjetas ahora indican si cada miembro está en ordenador, web o móvil mediante iconos claros.",
-      "**Filtro de audio por aplicación.** Despliega apps como Discord o navegadores para silenciar o compartir sonidos de procesos específicos.",
-      "**Vista previa confiable y menor consumo de RAM.** La vista previa inicia sin fallos con recuperación automática y se pausa en segundo plano.",
-      "**Detalles estables en Túneles.** El botón de velocidad en los túneles permanece fijo, evitando que la variación de red lo mueva bajo el cursor.",
-      "**Túneles y envío de archivos más rápidos.** Las partidas multijugador y el envío de archivos por el chat son ahora mucho más veloces y fluidos."
+      "**Vista previa de pantalla corregida.** La vista previa se inicia de forma rápida y confiable, solucionando avisos de vista no disponible."
     ],
     "fr": [
-      "**Lives Twitch dans le salon.** Regardez Twitch en direct et en synchronisation avec lecture partagée, chat en direct, mode cinéma et Picture-in-Picture.",
-      "**Indicateur de plateforme.** Les cartes indiquent désormais si chaque membre utilise un ordinateur, le Web ou un mobile via des icônes claires.",
-      "**Filtre audio par application.** Développez des apps comme Discord ou les navigateurs pour couper ou partager le son de processus spécifiques.",
-      "**Aperçu fiable et mémoire optimisée.** L'aperçu d'écran démarre sans blocage grâce à la récupération automatique et s'économise en arrière-plan.",
-      "**Détails de trafic stables dans Tunnels.** Le bouton de débit reste fixe, évitant que les variations de vitesse ne le déplacent sous le curseur.",
-      "**Tunnels et transferts de fichiers accélérés.** Les sessions multijoueurs et l'envoi de fichiers dans le chat sont nettement plus fluides et rapides."
+      "**Aperçu de partage d'écran corrigé.** L'aperçu démarre désormais rapidement et sans accroc, éliminant l'erreur d'aperçu indisponible."
     ],
     "de": [
-      "**Twitch-Streams im Raum.** Twitch-Livestreams gemeinsam synchron ansehen mit geteilter Wiedergabe, Live-Chat, Kinomodus und Bild-in-Bild.",
-      "**Plattform-Symbole für Mitglieder.** Teilnehmerkarten zeigen jetzt per Symbol, ob jemand am PC, im Web oder am Smartphone teilnimmt.",
-      "**Audiofilter nach App-Prozessen.** Apps wie Discord oder Browser aufklappen, um den Ton einzelner Prozesse gezielt stummzuschalten oder zu teilen.",
-      "**Zuverlässige Bildschirmvorschau und weniger RAM.** Die Vorschau startet fehlerfrei mit automatischer Wiederherstellung und spart Speicher.",
-      "**Feste Übertragungsdetails in Tunnel.** Die Geschwindigkeitsanzeige bleibt fest verankert und wandert nicht mehr unter dem Mauszeiger weg.",
-      "**Schnellere Tunnel und Dateiübertragungen.** Mehrspieler-Verbindungen und Datei-Uploads im Chat laufen spürbar schneller und flüssiger."
+      "**Bildschirmvorschau korrigiert.** Die Bildschirmvorschau startet nun zuverlässig und zügig, wodurch Fehler mit nicht verfügbarer Vorschau behoben sind."
     ],
     "it": [
-      "**Live Twitch nella stanza.** Guarda dirette Twitch in sincronia con riproduzione condivisa, chat dal vivo, modalità teatro e Picture-in-Picture.",
-      "**Indicatore della piattaforma.** Le schede dei membri mostrano se ciascuno usa computer, web o smartphone tramite comode icone.",
-      "**Filtro audio per applicazione.** Espandi app come Discord o browser per silenziare o condividere i suoni di singoli processi.",
-      "**Anteprima affidabile e meno RAM.** L'anteprima si avvia senza blocchi grazie al ripristino automatico e si sospende in background.",
-      "**Dettagli di traffico stabili nei Tunnel.** Il pulsante della velocità resta fisso, evitando che le oscillazioni lo spostino sotto il cursore.",
-      "**Tunnel e invio file più veloci.** Le sessioni multigiocatore e il trasferimento di file nella chat sono notevolmente più rapidi e fluidi."
+      "**Anteprima di condivisione corretta.** L'anteprima dello schermo ora si avvia rapidamente e senza errori di anteprima non disponibile."
     ],
     "zh-CN": [
-      "**房间内畅享 Twitch 直播。** 实时同步观看 Twitch 精彩直播，支持多人协作换台、同步播放暂停、实时聊天与画中画。",
-      "**成员平台状态标识。** 房间成员卡片现已通过直观图标清晰显示成员使用的是电脑端、网页端还是手机端。",
-      "**按应用过滤音频。** 轻松展开 Discord 或浏览器等多进程应用，单独静音或共享指定进程的声音。",
-      "**屏幕预览更稳定且降低内存。** 屏幕预览加入自动恢复机制，杜绝预览不可用错误，并在后台自动休眠以节省内存。",
-      "**隧道流量信息按钮位置固定。** 隧道卡片中的传输详情按钮现已固定，避免带宽实时变动导致按钮偏移脱离鼠标。",
-      "**隧道连接与文件传输更快捷。** 多人联机体验更加流畅灵敏，聊天文件传输大幅提速，进入活跃房间更加顺畅。"
+      "**修复屏幕共享预览问题。** 屏幕预览现可稳定快速呈现，彻底解决开启共享时可能提示预览不可用的问题。"
     ],
     "zh-TW": [
-      "**房間內暢享 Twitch 直播。** 即時同步觀看 Twitch 精彩直播，支援多人協作切換頻道、同步播放暫停、即時聊天與子母畫面。",
-      "**成員平台狀態標識。** 房間成員卡片現已透過直觀圖示清楚顯示成員使用的是電腦端、網頁端還是手機端。",
-      "**按應用程式過濾音訊。** 輕鬆展開 Discord 或瀏覽器等多處理程序應用程式，單獨將指定處理程序靜音或分享聲音。",
-      "**螢幕預覽更穩定且降低記憶體。** 螢幕預覽加入自動復原機制，避免預覽不可用問題，並在背景自動休眠以節省記憶體。",
-      "**通道流量資訊按鈕位置固定。** 通道卡片中的傳輸詳細資料按鈕現已固定，避免頻寬即時變動導致按鈕偏移脫離游標。",
-      "**通道連線與檔案傳輸更快捷。** 多人連線體驗更加流暢靈敏，聊天室檔案傳輸大幅提速，進入活躍房間更加順暢。"
+      "**修復螢幕共享預覽問題。** 螢幕預覽現已穩定快速載入，徹底解決開啟共享時可能提示預覽不可用的問題。"
     ],
     "ja": [
-      "**ルームで Twitch 配信を共有。** 仲間と一緒に Twitch ライブを同期視聴。再生や一時停止の共有、チャット、ピクチャーインピクチャーに対応。",
-      "**参加者の利用環境を表示。** メンバーがパソコン、ウェブ、スマホのどれから参加しているかを分かりやすいアイコンで表示します。",
-      "**アプリ別の音声フィルター。** Discordやブラウザを展開し、特定のプロセスやタブの音声だけを選んでミュートや共有ができます。",
-      "**安定した画面プレビューと省メモリ。** プレビュー不可エラーを防ぐ自動復旧に対応し、バックグラウンド停止でメモリを節約します。",
-      "**トンネルの詳細ボタン位置を固定。** 速度表示が変動しても詳細ボタンの位置がズレず、マウスクリックがしやすくなりました。",
-      "**トンネルとファイル転送の高速化。** マルチプレイの通信遅延が改善され、チャットでのファイル送受信がさらに高速で快適になりました。"
+      "**画面共有プレビューの修正。** プレビュー不可エラーを解消し、画面共有前のプレビューが素早く安定して表示されるようになりました。"
     ],
     "ko": [
-      "**방에서 Twitch 라이브 함께 보기.** 실시간으로 Twitch 방송을 동기화하여 시청하고 채팅, 극장 모드 및 화면 속 화면(PIP)을 지원합니다.",
-      "**참가자 접속 환경 표시.** 멤버가 데스크톱, 웹, 모바일 중 어떤 환경에서 접속했는지 알아보기 쉬운 아이콘으로 보여줍니다.",
-      "**앱별 정밀 오디오 필터.** Discord나 브라우저를 펼쳐 특정 소리만 선택하여 끄거나 방송에 공유할 수 있습니다.",
-      "**안정적인 화면 미리보기 및 메모리 절약.** 자동 복구로 미리보기 불가 오류를 방지하고 백그라운드 일시 중지로 메모리를 절약합니다.",
-      "**터널 전송 상세 버튼 고정.** 실시간 전송 속도가 바뀌어도 버튼 위치가 흔들리지 않아 클릭하기 훨씬 편해졌습니다.",
-      "**터널 및 파일 전송 속도 향상.** 멀티플레이 반응 속도가 더욱 빨라졌으며, 채팅 파일 전송이 한층 쾌적하고 신속해졌습니다."
+      "**화면 공유 미리보기 수정.** 미리보기 불가 오류를 해결하여 화면 공유 전 미리보기가 빠르고 안정적으로 시작됩니다."
     ],
     "hi": [
-      "**कमरे में Twitch लाइव स्ट्रीम।** शेयर किए गए प्ले/पॉज़, लाइव चैट, थिएटर मोड और पिक्चर-इन-पिक्चर के साथ Twitch लाइव एक साथ देखें।",
-      "**सदस्यों के प्लेटफ़ॉर्म आइकन।** कार्ड अब स्पष्ट आइकन से दिखाते हैं कि कोई सदस्य डेस्कटॉप, वेब या मोबाइल पर है।",
-      "**ऐप अनुसार ऑडियो फ़िल्टर।** Discord या ब्राउज़र को विस्तृत करके अलग-अलग प्रक्रियाओं की आवाज़ को म्यूट या शेयर करें।",
-      "**भरोसेमंद स्क्रीन प्रीव्यू और कम मेमोरी।** स्क्रीन प्रीव्यू ऑटो-रिकवरी के साथ बिना अटके शुरू होता है और रैम की बचत करता है।",
-      "**टनल में स्थिर बटन।** स्पीड बदलते समय बटन कर्सर के नीचे से नहीं खिसकता, जिससे क्लिक करना आसान रहता है।",
-      "**तेज़ टनल और फ़ाइल ट्रांसफर।** मल्टीप्लेयर कनेक्शन और चैट में फ़ाइल भेजना अब काफ़ी तेज़ और सुचारू है।"
+      "**स्क्रीन शेयरिंग प्रीव्यू ठीक किया गया।** स्क्रीन प्रीव्यू अब तुरंत शुरू होता है और प्रीव्यू अनुपलब्ध होने की समस्या दूर हो गई है।"
     ],
     "fi": [
-      "**Twitch-lähetykset huoneessa.** Katso Twitchiä yhdessä reaaliajassa jaetulla toistolla, live-chatilla ja kuva kuvassa -tilalla.",
-      "**Jäsenten alustakuvakkeet.** Kortit näyttävät nyt selkein kuvakkein, kuka käyttää tietokonetta, selainta tai puhelinta.",
-      "**Äänisuodatus sovelluksen mukaan.** Avaa Discord tai selain mykistääksesi tai jakaaksesi tiettyjen prosessien äänet.",
-      "**Luotettavampi näytön esikatselu ja vähemmän muistia.** Esikatselu käynnistyy virheettömästi automaattipalautuksella ja säästää RAM-muistia.",
-      "**Vakaat tiedot Tunneleissa.** Nopeuspainike pysyy paikallaan, jolloin nopeuden vaihtelu ei siirrä sitä hiiren alta.",
-      "**Nopeammat tunnelit ja tiedostonsiirto.** Moninpeliyhteydet ja tiedostojen lähetys chatissa ovat huomattavasti nopeampia."
+      "**Näytönjaon esikatselu korjattu.** Esikatselu käynnistyy nyt nopeasti ja luotettavasti, jolloin virheilmoitusta ei enää tule."
     ],
     "ru": [
-      "**Стримы Twitch в комнате.** Смотрите прямые эфиры Twitch синхронно с общей паузой, живым чатом и режимом «картинка в картинке».",
-      "**Значки платформ участников.** На карточках теперь сразу видно, кто зашел с компьютера, через браузер или со смартфона.",
-      "**Фильтр звука по приложениям.** Раскрывайте Discord или браузер, чтобы заглушать или транслировать звук отдельных процессов.",
-      "**Надёжный предпросмотр экрана и меньше памяти.** Предпросмотр запускается без ошибок с автовосстановлением и экономит память в фоне.",
-      "**Удобная кнопка скорости в Туннелях.** Сведения о трафике зафиксированы на месте и больше не смещаются из-под курсора.",
-      "**Быстрые туннели и передача файлов.** Сетевые игры и отправка файлов через чат стали работать значительно быстрее и плавнее."
+      "**Исправлен предпросмотр экрана.** Предпросмотр теперь запускается быстро и стабильно, без ложных ошибок о недоступности видео."
     ]
   }
 }
