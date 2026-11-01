@@ -1,5 +1,5 @@
 const CHANNEL_ID = 42;
-const HIGH_WATER_BYTES = 16 * 1024 * 1024;
+const HIGH_WATER_BYTES = 8 * 1024 * 1024;
 const LOW_WATER_BYTES = 1024 * 1024;
 const WAIT_TIMEOUT_MS = 10000;
 
@@ -80,13 +80,25 @@ export class FileBulkChannelManager {
     if (maxMessageSize && packet.byteLength > maxMessageSize) {
       throw new Error('File block exceeds WebRTC message limit');
     }
-    while (channel.bufferedAmount > HIGH_WATER_BYTES) {
+    while (channel.bufferedAmount + packet.byteLength >= HIGH_WATER_BYTES) {
       await waitForEvent(channel, 'bufferedamountlow');
     }
     if (!isCurrent() || this.getChannel(peerId) !== channel || channel.readyState !== 'open') {
       throw new Error('File transfer no longer active');
     }
-    channel.send(packet);
+    try {
+      channel.send(packet);
+    } catch (error) {
+      if (channel.readyState === 'open' && isCurrent()) {
+        await waitForEvent(channel, 'bufferedamountlow');
+        if (!isCurrent() || this.getChannel(peerId) !== channel || channel.readyState !== 'open') {
+          throw new Error('File transfer no longer active');
+        }
+        channel.send(packet);
+      } else {
+        throw error;
+      }
+    }
   }
 
   public getChannel(peerId: string): RTCDataChannel | null {

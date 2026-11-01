@@ -1,44 +1,57 @@
 {
-  "version": "1.6.1",
+  "version": "1.6.2",
   "translations": {
     "en": [
-      "**Reliable screen sharing preview.** Screen previews now start promptly and reliably, resolving preview unavailable errors before sharing."
+      "**Reliable file transfers.** Large and fast file transfers in chat now finish smoothly without unexpected stalls or send failures.",
+      "**Instant screen preview.** Screen sharing previews now load instantly and reliably, eliminating long startup delays and unavailable preview alerts."
     ],
     "pt-BR": [
-      "**Prévia de compartilhamento corrigida.** A prévia de tela agora inicia com rapidez e segurança, eliminando avisos de prévia indisponível."
+      "**Envio de arquivos confiável.** O envio de arquivos grandes pelo chat da sala agora é concluído com estabilidade e sem falhas na fila.",
+      "**Prévia de tela instantânea.** A prévia ao compartilhar a tela agora carrega na hora e com estabilidade, sem demoras ou avisos de indisponibilidade."
     ],
     "es": [
-      "**Vista previa de pantalla corregida.** La vista previa se inicia de forma rápida y confiable, solucionando avisos de vista no disponible."
+      "**Envío de archivos confiable.** El envío de archivos grandes en el chat de la sala ahora finaliza con estabilidad y sin errores de cola.",
+      "**Vista previa instantánea.** La vista previa al compartir pantalla ahora carga al instante y con estabilidad, sin demoras ni avisos de error."
     ],
     "fr": [
-      "**Aperçu de partage d'écran corrigé.** L'aperçu démarre désormais rapidement et sans accroc, éliminant l'erreur d'aperçu indisponible."
+      "**Transfert de fichiers fiable.** L'envoi de fichiers volumineux dans le chat s'effectue désormais sans blocage ni échec inattendu.",
+      "**Aperçu d'écran instantané.** L'aperçu du partage d'écran se charge désormais immédiatement et sans délai ni message d'indisponibilité."
     ],
     "de": [
-      "**Bildschirmvorschau korrigiert.** Die Bildschirmvorschau startet nun zuverlässig und zügig, wodurch Fehler mit nicht verfügbarer Vorschau behoben sind."
+      "**Zuverlässiger Dateiversand.** Das Senden großer Dateien im Raum-Chat wird nun stabil und ohne unerwartete Abbrüche abgeschlossen.",
+      "**Sofortige Bildschirmvorschau.** Die Vorschau für Bildschirmübertragungen startet nun unmittelbar und stabil ohne Verzögerungen oder Fehler."
     ],
     "it": [
-      "**Anteprima di condivisione corretta.** L'anteprima dello schermo ora si avvia rapidamente e senza errori di anteprima non disponibile."
+      "**Trasferimento file affidabile.** L'invio di file di grandi dimensioni nella chat si completa ora in modo stabile e senza errori di coda.",
+      "**Anteprima schermo istantanea.** L'anteprima della condivisione dello schermo si avvia subito e con stabilità, senza ritardi o avvisi di errore."
     ],
     "zh-CN": [
-      "**修复屏幕共享预览问题。** 屏幕预览现可稳定快速呈现，彻底解决开启共享时可能提示预览不可用的问题。"
+      "**可靠的文件传输。** 房间聊天中大文件的传输现已更加稳定顺畅，消除了发送中断和传输失败的问题。",
+      "**屏幕预览即时呈现。** 开启屏幕共享时的预览现已实现秒级即时加载，彻底消除了加载缓慢和预览不可用的提示。"
     ],
     "zh-TW": [
-      "**修復螢幕共享預覽問題。** 螢幕預覽現已穩定快速載入，徹底解決開啟共享時可能提示預覽不可用的問題。"
+      "**可靠的檔案傳輸。** 房間聊天中大檔案的傳輸現已更加穩定順暢，消除了傳送中斷和傳輸失敗的問題。",
+      "**螢幕預覽即時載入。** 開啟螢幕共享時的預覽現已實現秒級即時載入，徹底消除了載入緩慢和預覽不可用的提示。"
     ],
     "ja": [
-      "**画面共有プレビューの修正。** プレビュー不可エラーを解消し、画面共有前のプレビューが素早く安定して表示されるようになりました。"
+      "**信頼性の高いファイル送信。** チャットでの大容量ファイル送信が安定し、途中で止まったり失敗したりする問題が解消されました。",
+      "**画面プレビューの高速化。** 画面共有前のプレビューが即座に安定して表示され、起動の遅延や利用不可エラーが解消されました。"
     ],
     "ko": [
-      "**화면 공유 미리보기 수정.** 미리보기 불가 오류를 해결하여 화면 공유 전 미리보기가 빠르고 안정적으로 시작됩니다."
+      "**안정적인 파일 전송.** 채팅창을 통한 대용량 파일 전송이 중단이나 전송 실패 없이 안정적으로 완료됩니다.",
+      "**즉각적인 화면 미리보기.** 화면 공유 시 미리보기가 지연이나 불가 오류 없이 즉시 안정적으로 표시됩니다."
     ],
     "hi": [
-      "**स्क्रीन शेयरिंग प्रीव्यू ठीक किया गया।** स्क्रीन प्रीव्यू अब तुरंत शुरू होता है और प्रीव्यू अनुपलब्ध होने की समस्या दूर हो गई है।"
+      "**विश्वसनीय फ़ाइल स्थानांतरण।** चैट में बड़ी फ़ाइलों का स्थानांतरण अब बिना किसी रुकावट या विफलता के सुचारू रूप से पूरा होता है।",
+      "**त्वरित स्क्रीन प्रीव्यू।** स्क्रीन शेयरिंग प्रीव्यू अब बिना किसी देरी या अनुपलब्धता चेतावनी के तुरंत और स्थिर रूप से लोड होता है।"
     ],
     "fi": [
-      "**Näytönjaon esikatselu korjattu.** Esikatselu käynnistyy nyt nopeasti ja luotettavasti, jolloin virheilmoitusta ei enää tule."
+      "**Luotettava tiedostonsiirto.** Suurten tiedostojen lähetys huoneen chatissa valmistuu nyt vakaasti ilman keskeytyksiä tai lähetysvirheitä.",
+      "**Välitön ruudun esikatselu.** Näytönjaon esikatselu latautuu nyt heti ja vakaasti ilman viiveitä tai virheilmoituksia."
     ],
     "ru": [
-      "**Исправлен предпросмотр экрана.** Предпросмотр теперь запускается быстро и стабильно, без ложных ошибок о недоступности видео."
+      "**Надежная передача файлов.** Отправка больших файлов в чате комнаты теперь завершается стабильно, без зависаний и сбоев очереди.",
+      "**Мгновенный предпросмотр экрана.** Предпросмотр демонстрации экрана теперь загружается моментально, без задержек и ложных ошибок."
     ]
   }
 }

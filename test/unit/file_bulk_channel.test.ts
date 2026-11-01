@@ -72,3 +72,24 @@ test('bulk channel does not restart without a new receiver handshake', async () 
   await assert.rejects(manager.send('peer', new Uint8Array([1]), () => true),
     /unavailable/);
 });
+
+test('bulk channel throttles when buffered amount approaches high water mark and recovers', async () => {
+  const channel = new FakeChannel();
+  channel.readyState = 'open';
+  channel.bufferedAmount = 8 * 1024 * 1024;
+  const connection = {
+    connectionState: 'connected', createDataChannel: () => channel,
+  } as unknown as RTCPeerConnection;
+  const manager = new FileBulkChannelManager(() => connection, () => {});
+  manager.ensure('peer');
+  const packet = new Uint8Array([1, 2, 3]);
+  let sent = false;
+  const pending = manager.send('peer', packet, () => true).then(() => { sent = true; });
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(sent, false);
+  channel.bufferedAmount = 512 * 1024;
+  channel.dispatchEvent(new Event('bufferedamountlow'));
+  await pending;
+  assert.equal(sent, true);
+  assert.deepEqual(channel.sent, [packet]);
+});

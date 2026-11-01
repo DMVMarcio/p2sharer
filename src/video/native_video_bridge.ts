@@ -228,6 +228,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     let nativeEncodingFailed = false;
     let receivedNativeEncoding = false;
     let terminalReason: string | undefined;
+    let onFirstFrame: (() => void) | null = null;
 
     // 1. Initialize WebCodecs MediaStreamTrackGenerator if available for zero-copy GPU video pipeline
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -541,6 +542,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
                 if (track) registerNativeSenderSource(track, { sessionId: this.sessionId, feedbackToken });
                 if (!this.hasFirstFrame) {
                   this.hasFirstFrame = true;
+                  onFirstFrame?.();
                 }
                 this.latestEncodedFrame?.close(); this.latestEncodedFrame = frame;
                 this.pendingBuffer = new Uint8Array([1, 0, 0, 0]).buffer;
@@ -565,6 +567,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
             }
             if (!this.hasFirstFrame && evt.data.byteLength > 4) {
               this.hasFirstFrame = true;
+              onFirstFrame?.();
             }
             this.pendingBuffer = evt.data;
             pumpNextFrame();
@@ -602,20 +605,35 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     if (sourceId.startsWith('window:')) return stream;
     try {
       await new Promise<void>((resolve, reject) => {
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        const cleanup = () => {
+          onFirstFrame = null;
+          if (timer) clearTimeout(timer);
+        };
+        const succeed = () => {
+          cleanup();
+          this.hasFirstFrame = true;
+          const frame = this.latestEncodedFrame || this.latestJpegFrame;
+          logDiagnostic('INFO', 'capture.preview', 'First native preview frame decoded', {
+            sessionId: this.sessionId, sourceId, encoder: wireEncoder,
+            width: frame ? ('displayWidth' in frame ? frame.displayWidth : frame.width) : undefined,
+            height: frame ? ('displayHeight' in frame ? frame.displayHeight : frame.height) : undefined,
+            elapsedMs: Math.round(performance.now() - captureStarted) });
+          if (stream.getVideoTracks()[0]) {
+            registerNativeSenderSource(stream.getVideoTracks()[0], { sessionId: this.sessionId, feedbackToken });
+          }
+          resolve();
+        };
+        if (this.hasFirstFrame || this.latestEncodedFrame || this.latestJpegFrame) {
+          succeed();
+          return;
+        }
+        onFirstFrame = succeed;
         const started = performance.now();
         const check = () => {
-          const frame = this.latestEncodedFrame || this.latestJpegFrame;
-          if (frame) {
-            this.hasFirstFrame = true;
-            logDiagnostic('INFO', 'capture.preview', 'First native preview frame decoded', {
-              sessionId: this.sessionId, sourceId, encoder: wireEncoder,
-              width: 'displayWidth' in frame ? frame.displayWidth : frame.width,
-              height: 'displayHeight' in frame ? frame.displayHeight : frame.height,
-              elapsedMs: Math.round(performance.now() - captureStarted) });
-            if (this.latestEncodedFrame && stream.getVideoTracks()[0]) {
-              registerNativeSenderSource(stream.getVideoTracks()[0], { sessionId: this.sessionId, feedbackToken });
-            }
-            resolve(); return;
+          if (this.hasFirstFrame || this.latestEncodedFrame || this.latestJpegFrame) {
+            succeed();
+            return;
           }
           if (receivedNativeEncoding && !nativeEncodingFailed && performance.now() - started > 1200) {
             nativeEncodingFailed = true;
@@ -626,6 +644,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
             void invoke('control_capture_encoder', { sessionId: this.sessionId, feedbackToken, disable: true }).catch(() => {});
           }
           if (!this.isCapturing || performance.now() - started > 6000) {
+            cleanup();
             logDiagnostic('ERROR', 'capture.preview', 'Native preview did not decode its first frame', {
               sessionId: this.sessionId, sourceId, encoder: wireEncoder ?? 'no image payload received',
               elapsedMs: Math.round(performance.now() - captureStarted), waitMs: Math.round(performance.now() - started),
@@ -633,9 +652,9 @@ export class NativeVideoBridge implements VideoCaptureBridge {
             reject(new Error(t("message.08b5364da3c6")));
             return;
           }
-          setTimeout(check, 50);
+          timer = setTimeout(check, 50);
         };
-        check();
+        timer = setTimeout(check, 50);
       });
     } catch (error) {
       await this.stopCapture();
