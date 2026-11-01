@@ -158,14 +158,11 @@ export const P2PConnectionTestModal: React.FC = () => {
           </h2>
           <button
             type="button"
-            className="modal-close-btn"
+            className="btn-close"
             onClick={closeModal}
             aria-label="Close"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
+            &times;
           </button>
         </div>
 
@@ -221,7 +218,7 @@ export const P2PConnectionTestModal: React.FC = () => {
               ) : (
                 <div className="p2p-test-panel">
                   <p className="p2p-test-hint">{t('p2pTest.joinHint')}</p>
-                  <div className="p2p-test-input-row">
+                  <div className="p2p-test-input-wrapper">
                     <input
                       type="text"
                       autoComplete="off"
@@ -234,6 +231,8 @@ export const P2PConnectionTestModal: React.FC = () => {
                         if (e.key === 'Enter') handleStartJoin();
                       }}
                     />
+                  </div>
+                  <div className="p2p-test-action-row">
                     <button
                       type="button"
                       className="btn btn-primary"

@@ -6696,17 +6696,23 @@ body:has(.fullscreen-dialog, .chat-image-viewer) .window-titlebar { display: non
   flex-direction: column;
 }
 
+.modal-p2p-test-card .modal-header {
+  padding-bottom: 8px;
+}
+
 .p2p-test-modal-body {
+  padding-top: 6px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
   overflow-y: auto;
 }
 
 .p2p-test-subtabs {
   display: flex;
   gap: 6px;
-  margin-bottom: 8px;
+  margin-top: 0;
+  margin-bottom: 4px;
 }
 
 .p2p-test-panel {
@@ -6745,18 +6751,27 @@ body:has(.fullscreen-dialog, .chat-image-viewer) .window-titlebar { display: non
   justify-content: flex-end;
 }
 
-.p2p-test-input-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
+.p2p-test-input-wrapper {
+  width: 100%;
 }
 
 .p2p-test-input {
   font-family: var(--font-mono, monospace);
-  font-size: 16px;
-  letter-spacing: 2px;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 4px;
   text-transform: uppercase;
-  flex: 1;
+  text-align: center;
+  width: 100%;
+  height: 52px;
+  box-sizing: border-box;
+  background: var(--bg-surface-elevated, #141417);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.p2p-test-input:focus {
+  border-color: var(--accent-color, #06b6d4);
 }
 
 .p2p-test-session-strip {
@@ -6919,11 +6934,17 @@ body:has(.fullscreen-dialog, .chat-image-viewer) .window-titlebar { display: non
   margin-top: 4px;
 }
 
-.p2p-test-logs-header,
-.diagnostics-logs-toggle-row {
+.p2p-test-logs-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
+}
+
+.diagnostics-logs-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .logs-header-title {
