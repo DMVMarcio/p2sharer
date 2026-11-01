@@ -27,6 +27,7 @@ import { EMOJI_PACKS, EmojiPack, getEmojiPack, saveEmojiPack } from '../../core/
 import { getTransferSpeedUnit, saveTransferSpeedUnit, type TransferSpeedUnit } from '../../core/transfer_speed';
 import { EmojiGlyph } from '../common/EmojiGlyph';
 import { RendezvousServerEditor } from '../common/RendezvousServerEditor';
+import { NetworkDiagnosticsPanel } from '../common/NetworkDiagnosticsPanel';
 import { loadRendezvousPreferences, saveRendezvousPreferences, validateRendezvousPreferences } from '../../p2p/relay_preferences.ts';
 import { isValidTurnUrl, parseTurnUrls } from '../../p2p/ice_config.ts';
 import { appUpdates } from '../../services/app_updates';
@@ -920,6 +921,7 @@ export const SettingsModal: React.FC = () => {
                     </div>
                   </div>
                 )}
+                <NetworkDiagnosticsPanel />
                 <div className="settings-pane-header rendezvous-header">
                   <h3 className="settings-pane-title">{t("message.59b7d7c38320")}</h3>
                   <p className="settings-pane-desc">

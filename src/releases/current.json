@@ -4,67 +4,80 @@
     "en": [
       "**Mobile-first experience.** The room now features a thumb-friendly bottom action dock, always-visible stream controls and stats, and an auto-closing drawer.",
       "**Reliable file transfers.** Large and fast file transfers in chat now finish smoothly without unexpected stalls or send failures.",
-      "**Instant screen preview.** Screen sharing previews now load instantly and reliably, eliminating long startup delays and unavailable preview alerts."
+      "**Instant screen preview.** Screen sharing previews now load instantly and reliably, eliminating long startup delays and unavailable preview alerts.",
+      "**Connection diagnostics.** Settings now includes a network check that tests your NAT type, CGNAT, and UPnP compatibility to help troubleshoot P2P connections."
     ],
     "pt-BR": [
       "**Experiência mobile aprimorada.** A sala agora conta com barra de ações inferior para o polegar, estatísticas e controles visíveis e gaveta retrátil automática.",
       "**Envio de arquivos confiável.** O envio de arquivos grandes pelo chat da sala agora é concluído com estabilidade e sem falhas na fila.",
-      "**Prévia de tela instantânea.** A prévia ao compartilhar a tela agora carrega na hora e com estabilidade, sem demoras ou avisos de indisponibilidade."
+      "**Prévia de tela instantânea.** A prévia ao compartilhar a tela agora carrega na hora e com estabilidade, sem demoras ou avisos de indisponibilidade.",
+      "**Diagnóstico de conexão.** As configurações agora contam com teste de rede que verifica seu tipo de NAT, CGNAT e UPnP para solucionar problemas de conexão P2P."
     ],
     "es": [
       "**Experiencia móvil mejorada.** La sala incluye barra inferior de acciones táctiles, controles y estadísticas siempre visibles y panel deslizable automático.",
       "**Envío de archivos confiable.** El envío de archivos grandes en el chat de la sala ahora finaliza con estabilidad y sin errores de cola.",
-      "**Vista previa instantánea.** La vista previa al compartir pantalla ahora carga al instante y con estabilidad, sin demoras ni avisos de error."
+      "**Vista previa instantánea.** La vista previa al compartir pantalla ahora carga al instante y con estabilidad, sin demoras ni avisos de error.",
+      "**Diagnóstico de conexión.** Los ajustes ahora incluyen una prueba de red que verifica el tipo de NAT, CGNAT y UPnP para resolver problemas de conexión P2P."
     ],
     "fr": [
       "**Expérience mobile enrichie.** Le salon intègre une barre d'actions inférieure tactile, des statistiques et commandes visibles et un tiroir automatique.",
       "**Transfert de fichiers fiable.** L'envoi de fichiers volumineux dans le chat s'effectue désormais sans blocage ni échec inattendu.",
-      "**Aperçu d'écran instantané.** L'aperçu du partage d'écran se charge désormais immédiatement et sans délai ni message d'indisponibilité."
+      "**Aperçu d'écran instantané.** L'aperçu du partage d'écran se charge désormais immédiatement et sans délai ni message d'indisponibilité.",
+      "**Diagnostic de connexion.** Les paramètres intègrent un test réseau pour vérifier le type de NAT, CGNAT et UPnP et faciliter le dépannage des connexions P2P."
     ],
     "de": [
       "**Verbesserte Mobilansicht.** Der Raum bietet eine untere Touch-Aktionsleiste, stets sichtbare Stream-Steuerungen und -Statistiken sowie ein Auto-Drawer.",
       "**Zuverlässiger Dateiversand.** Das Senden großer Dateien im Raum-Chat wird nun stabil und ohne unerwartete Abbrüche abgeschlossen.",
-      "**Sofortige Bildschirmvorschau.** Die Vorschau für Bildschirmübertragungen startet nun unmittelbar und stabil ohne Verzögerungen oder Fehler."
+      "**Sofortige Bildschirmvorschau.** Die Vorschau für Bildschirmübertragungen startet nun unmittelbar und stabil ohne Verzögerungen oder Fehler.",
+      "**Verbindungsdiagnose.** Die Einstellungen bieten nun einen Netzwerktest für NAT-Typ, CGNAT und UPnP zur einfachen Behebung von P2P-Verbindungsproblemen."
     ],
     "it": [
       "**Esperienza mobile ottimizzata.** La stanza include barra inferiore touch, statistiche e controlli sempre visibili e cassetto laterale a comparsa automatica.",
       "**Trasferimento file affidabile.** L'invio di file di grandi dimensioni nella chat si completa ora in modo stabile e senza errori di coda.",
-      "**Anteprima schermo istantanea.** L'anteprima della condivisione dello schermo si avvia subito e con stabilità, senza ritardi o avvisi di errore."
+      "**Anteprima schermo istantanea.** L'anteprima della condivisione dello schermo si avvia subito e con stabilità, senza ritardi o avvisi di errore.",
+      "**Diagnostica di connessione.** Le impostazioni includono ora un test di rete per tipo di NAT, CGNAT e UPnP per risolvere problemi di connessione P2P."
     ],
     "zh-CN": [
       "**移动端交互全面增强。** 房间新增底部触控操作栏、始终可见的画面信息与全屏控制，并优化了侧边栏自动抽屉式折叠体验。",
       "**可靠的文件传输。** 房间聊天中大文件的传输现已更加稳定顺畅，消除了发送中断和传输失败的问题。",
-      "**屏幕预览即时呈现。** 开启屏幕共享时的预览现已实现秒级即时加载，彻底消除了加载缓慢和预览不可用的提示。"
+      "**屏幕预览即时呈现。** 开启屏幕共享时的预览现已实现秒级即时加载，彻底消除了加载缓慢和预览不可用的提示。",
+      "**网络连接诊断。** 设置中现已新增网络检测功能，可快速测试 NAT 类型、CGNAT 及 UPnP 兼容性，协助排查 P2P 房间连线问题。"
     ],
     "zh-TW": [
       "**行動裝置互動全面增強。** 房間新增底部觸控操作列、一目了然的畫面資訊與全螢幕控制，並最佳化側邊欄自動抽屜收合體驗。",
       "**可靠的檔案傳輸。** 房間聊天中大檔案的傳輸現已更加穩定順暢，消除了傳送中斷和傳輸失敗的問題。",
-      "**螢幕預覽即時載入。** 開啟螢幕共享時的預覽現已實現秒級即時載入，徹底消除了載入緩慢和預覽不可用的提示。"
+      "**螢幕預覽即時載入。** 開啟螢幕共享時的預覽現已實現秒級即時載入，徹底消除了載入緩慢和預覽不可用的提示。",
+      "**網路連線診斷。** 設定中現已新增網路檢測功能，可快速測試 NAT 類型、CGNAT 及 UPnP 相容性，協助排查 P2P 房間連線問題。"
     ],
     "ja": [
       "**モバイル操作性の強化。** 部屋画面に親指で届く下部アクションバーを新設し、配信情報や全画面ボタンの常時表示、ドロワー自動収納に対応しました。",
       "**信頼性の高いファイル送信。** チャットでの大容量ファイル送信が安定し、途中で止まったり失敗したりする問題が解消されました。",
-      "**画面プレビューの高速化。** 画面共有前のプレビューが即座に安定して表示され、起動の遅延や利用不可エラーが解消されました。"
+      "**画面プレビューの高速化。** 画面共有前のプレビューが即座に安定して表示され、起動の遅延や利用不可エラーが解消されました。",
+      "**接続診断機能。** 設定にネットワーク診断を追加し、NAT タイプや CGNAT、UPnP の対応状況をテストして P2P 接続のトラブルを解決できます。"
     ],
     "ko": [
       "**모바일 사용성 대폭 개선.** 방 화면에 하단 터치 액션바를 추가하고, 스트림 정보 및 전체화면 버튼 상시 표시와 자동 서랍 접기를 지원합니다.",
       "**안정적인 파일 전송.** 채팅창을 통한 대용량 파일 전송이 중단이나 전송 실패 없이 안정적으로 완료됩니다.",
-      "**즉각적인 화면 미리보기.** 화면 공유 시 미리보기가 지연이나 불가 오류 없이 즉시 안정적으로 표시됩니다."
+      "**즉각적인 화면 미리보기.** 화면 공유 시 미리보기가 지연이나 불가 오류 없이 즉시 안정적으로 표시됩니다.",
+      "**네트워크 연결 진단.** 설정에 NAT 유형, CGNAT 및 UPnP 호환성을 테스트하여 P2P 연결 문제를 점검할 수 있는 네트워크 진단 도구가 추가되었습니다."
     ],
     "hi": [
       "**उन्नत मोबाइल अनुभव।** रूम में अब नीचे स्पर्श नियंत्रण बार, हमेशा दिखाई देने वाले स्ट्रीम आंकड़े और स्वतः स्लाइडिंग साइडबार शामिल हैं।",
       "**विश्वसनीय फ़ाइल स्थानांतरण।** चैट में बड़ी फ़ाइलों का स्थानांतरण अब बिना किसी रुकावट या विफलता के सुचारू रूप से पूरा होता है।",
-      "**त्वरित स्क्रीन प्रीव्यू।** स्क्रीन शेयरिंग प्रीव्यू अब बिना किसी देरी या अनुपलब्धता चेतावनी के तुरंत और स्थिर रूप से लोड होता है।"
+      "**त्वरित स्क्रीन प्रीव्यू।** स्क्रीन शेयरिंग प्रीव्यू अब बिना किसी देरी या अनुपलब्धता चेतावनी के तुरंत और स्थिर रूप से लोड होता है।",
+      "**कनेक्शन निदान।** सेटिंग्स में अब नेटवर्क परीक्षण शामिल है जो P2P कनेक्शन समस्याओं को हल करने के लिए NAT प्रकार, CGNAT और UPnP संगतता की जाँच करता है।"
     ],
     "fi": [
       "**Parannettu mobiilikokemus.** Huoneessa on nyt peukaloystävällinen alapalkki, aina näkyvät suoratoiston tilastot ja automaattisesti sulkeutuva sivupaneeli.",
       "**Luotettava tiedostonsiirto.** Suurten tiedostojen lähetys huoneen chatissa valmistuu nyt vakaasti ilman keskeytyksiä tai lähetysvirheitä.",
-      "**Välitön ruudun esikatselu.** Näytönjaon esikatselu latautuu nyt heti ja vakaasti ilman viiveitä tai virheilmoituksia."
+      "**Välitön ruudun esikatselu.** Näytönjaon esikatselu latautuu nyt heti ja vakaasti ilman viiveitä tai virheilmoituksia.",
+      "**Yhteysdiagnostiikka.** Asetukset sisältävät nyt verkkotestin, joka tarkistaa NAT-tyypin, CGNATin ja UPnP:n P2P-yhteysongelmien ratkaisemiseksi."
     ],
     "ru": [
       "**Улучшенный мобильный интерфейс.** В комнате появилась нижняя панель действий, постоянно видимые кнопки стрима и статистики, а также умная выдвижная панель.",
       "**Надежная передача файлов.** Отправка больших файлов в чате комнаты теперь завершается стабильно, без зависаний и сбоев очереди.",
-      "**Мгновенный предпросмотр экрана.** Предпросмотр демонстрации экрана теперь загружается моментально, без задержек и ложных ошибок."
+      "**Мгновенный предпросмотр экрана.** Предпросмотр демонстрации экрана теперь загружается моментально, без задержек и ложных ошибок.",
+      "**Диагностика сети.** В настройки добавлен тест сети, проверяющий тип NAT, CGNAT и UPnP для быстрого решения проблем с P2P-подключениями."
     ]
   }
 }

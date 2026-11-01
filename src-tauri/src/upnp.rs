@@ -85,6 +85,17 @@ impl UpnpState {
             mapped_ports,
         }
     }
+
+    pub async fn get_external_ip(&self) -> Option<String> {
+        let (control_url, service_type) = {
+            let inner = self.inner.lock().unwrap();
+            match (&inner.control_url, &inner.service_type) {
+                (Some(c), Some(s)) => (c.clone(), s.clone()),
+                _ => return None,
+            }
+        };
+        fetch_external_ip(&control_url, &service_type).await
+    }
 }
 
 async fn discover_gateway() -> Result<(String, String, Ipv4Addr), String> {
@@ -255,6 +266,48 @@ async fn delete_port_mapping(control_url: &str, service_type: &str, port: u16, p
     }
 }
 
+pub async fn fetch_external_ip(control_url: &str, service_type: &str) -> Option<String> {
+    let soap_action = format!("\"{service_type}#GetExternalIPAddress\"");
+    let body = format!(
+        concat!(
+            "<?xml version=\"1.0\"?>\r\n",
+            "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">\r\n",
+            "<s:Body>\r\n",
+            "<u:GetExternalIPAddress xmlns:u=\"{}\">\r\n",
+            "</u:GetExternalIPAddress>\r\n",
+            "</s:Body>\r\n",
+            "</s:Envelope>"
+        ),
+        service_type
+    );
+
+    let client = reqwest::Client::builder().timeout(Duration::from_millis(3000)).build().ok()?;
+    let res = client
+        .post(control_url)
+        .header("SOAPAction", soap_action)
+        .header("Content-Type", "text/xml; charset=\"utf-8\"")
+        .body(body)
+        .send()
+        .await
+        .ok()?;
+
+    let text = res.text().await.ok()?;
+    extract_tag_value(&text, "NewExternalIPAddress")
+}
+
+pub fn extract_tag_value(xml: &str, tag: &str) -> Option<String> {
+    let start_tag = format!("<{tag}>");
+    let end_tag = format!("</{tag}>");
+    let start_idx = xml.find(&start_tag)? + start_tag.len();
+    let end_idx = xml[start_idx..].find(&end_tag)?;
+    let val = xml[start_idx..start_idx + end_idx].trim();
+    if val.is_empty() {
+        None
+    } else {
+        Some(val.to_string())
+    }
+}
+
 #[tauri::command]
 pub async fn get_upnp_status(state: tauri::State<'_, UpnpState>) -> Result<UpnpStatus, String> {
     Ok(state.status())
@@ -281,6 +334,13 @@ mod tests {
         "#;
         let url = extract_control_url(xml, "urn:schemas-upnp-org:service:WANIPConnection:1");
         assert_eq!(url.as_deref(), Some("/ctl/IPConn"));
+    }
+
+    #[test]
+    fn test_extract_tag_value() {
+        let xml = "<root><NewExternalIPAddress>198.51.100.25</NewExternalIPAddress></root>";
+        assert_eq!(extract_tag_value(xml, "NewExternalIPAddress"), Some("198.51.100.25".to_string()));
+        assert_eq!(extract_tag_value(xml, "NonExistent"), None);
     }
 
     #[test]

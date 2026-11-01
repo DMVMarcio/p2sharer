@@ -48,6 +48,7 @@ mod peer_payload;
 mod traffic_counters;
 pub mod virtual_network;
 pub mod upnp;
+pub mod network_diagnostic;
 pub mod twitch_auth;
 mod virtual_network_policy;
 #[cfg(all(windows, target_arch = "x86_64"))]
@@ -235,6 +236,7 @@ pub fn run() {
             portable_update::restart_after_update,
             upnp::get_upnp_status,
             upnp::request_upnp_port,
+            network_diagnostic::run_network_diagnostics,
             prepare_app_update,
             cancel_app_update,
             exit_application,

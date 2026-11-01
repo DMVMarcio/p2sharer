@@ -153,6 +153,20 @@ export async function invokeBrowser(command: string, input?: unknown, options?: 
       return normalizeImage(await response.blob());
     }
     case 'validate_whiteboard_image': return verifyWhiteboardPng(args.data, args.hash);
+    case 'run_network_diagnostics': return {
+      nat_type: 'unknown',
+      nat_description: 'Browser environment: native STUN/UPnP sockets unavailable',
+      public_ip: null,
+      cgnat_detected: false,
+      double_nat_detected: false,
+      cgnat_details: null,
+      upnp_available: false,
+      upnp_gateway: null,
+      upnp_external_ip: null,
+      upnp_port_mapped: false,
+      stun_latency_ms: null,
+      recommendation: 'moderate'
+    };
     default: throw new Error(t('web.desktopOnly'));
   }
 }
