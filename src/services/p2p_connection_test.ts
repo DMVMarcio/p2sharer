@@ -52,6 +52,9 @@ export function formatTimestamp(): string {
 export class P2PConnectionTester {
   private room: any = null;
   private peerConnection: RTCPeerConnection | null = null;
+  private pingAction: any = null;
+  private pongAction: any = null;
+  private candInfoAction: any = null;
   private state: P2PTestState;
   private listeners = new Set<(state: P2PTestState) => void>();
   private timeoutTimer: any = null;
@@ -166,32 +169,34 @@ export class P2PConnectionTester {
   private setupRoomActions() {
     if (!this.room) return;
 
-    const [sendPing, getPing] = this.room.makeAction('diag_ping');
-    const [sendPong, getPong] = this.room.makeAction('diag_pong');
-    const [sendCandInfo, getCandInfo] = this.room.makeAction('diag_cand_info');
+    this.pingAction = this.room.makeAction('diag_ping');
+    this.pongAction = this.room.makeAction('diag_pong');
+    this.candInfoAction = this.room.makeAction('diag_cand_info');
 
     // On Ping -> reply with Pong immediately
-    getPing((data: any, peerId: string) => {
-      sendPong({ seq: data.seq, sentAt: data.sentAt }, peerId);
-    });
+    this.pingAction.onMessage = (data: any, meta: { peerId: string }) => {
+      try {
+        void this.pongAction?.send({ seq: data.seq, sentAt: data.sentAt }, { target: meta.peerId });
+      } catch {}
+    };
 
     // On Pong -> measure RTT
-    getPong((data: any) => {
+    this.pongAction.onMessage = (data: any) => {
       const now = performance.now();
       const rtt = Math.max(1, Math.round(now - data.sentAt));
       this.state.metrics.rttSamples.push(rtt);
       this.addLog(`[Canal de Dados] Ping #${data.seq} respondido em ${rtt} ms.`);
       this.updateRttAverages();
-    });
+    };
 
     // Remote candidate counts
-    getCandInfo((info: any) => {
+    this.candInfoAction.onMessage = (info: any) => {
       if (info && info.candidates) {
         this.state.metrics.remoteCandidates = { ...info.candidates };
         this.addLog(`[Candidatos Remotos] Host: ${info.candidates.host}, STUN (srflx): ${info.candidates.srflx}, Relay: ${info.candidates.relay}`);
         this.notify();
       }
-    });
+    };
 
     this.room.onPeerJoin((peerId: string) => {
       this.addLog(`[Sinalização] Peer detectado: ${peerId}. Negociando conexão WebRTC...`);
@@ -202,7 +207,7 @@ export class P2PConnectionTester {
       this.state.phase = 'negotiating';
       this.notify();
 
-      this.monitorPeerConnection(peerId, sendCandInfo, sendPing);
+      this.monitorPeerConnection(peerId);
     });
 
     this.room.onPeerLeave((peerId: string) => {
@@ -210,15 +215,15 @@ export class P2PConnectionTester {
     });
   }
 
-  private monitorPeerConnection(peerId: string, sendCandInfo: any, sendPing: any) {
+  private monitorPeerConnection(peerId: string) {
     let attempts = 0;
     const findPc = () => {
       if (this.destroyed) return;
       const pc = this.room?.getPeers?.()?.[peerId] as RTCPeerConnection | undefined;
       if (pc) {
         this.peerConnection = pc;
-        this.attachPcListeners(pc, sendCandInfo, sendPing);
-      } else if (attempts < 20) {
+        this.attachPcListeners(pc);
+      } else if (attempts < 40) {
         attempts++;
         setTimeout(findPc, 150);
       }
@@ -226,7 +231,7 @@ export class P2PConnectionTester {
     findPc();
   }
 
-  private attachPcListeners(pc: RTCPeerConnection, sendCandInfo: any, sendPing: any) {
+  private attachPcListeners(pc: RTCPeerConnection) {
     this.addLog('[WebRTC] RTCPeerConnection instanciado. Iniciando coleta de candidatos ICE...');
     this.state.stepOfferAnswer = 'success';
     this.notify();
@@ -268,7 +273,7 @@ export class P2PConnectionTester {
         this.notify();
         // Send candidate summary to peer
         try {
-          sendCandInfo({ candidates: this.state.metrics.localCandidates });
+          void this.candInfoAction?.send({ candidates: this.state.metrics.localCandidates });
         } catch {}
       }
     });
@@ -280,15 +285,22 @@ export class P2PConnectionTester {
         this.state.stepIceHandshake = 'success';
         this.state.phase = 'measuring';
         this.notify();
-        this.runDataChannelMeasurements(sendPing);
+        this.runDataChannelMeasurements();
       } else if (state === 'failed') {
         this.state.stepIceHandshake = 'failed';
         this.finishWithVerdict('failed', 'Falha no aperto de mão ICE: o firewall ou NAT descartou as conexões UDP diretas.');
       }
     });
+
+    if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+      this.state.stepIceHandshake = 'success';
+      this.state.phase = 'measuring';
+      this.notify();
+      this.runDataChannelMeasurements();
+    }
   }
 
-  private async runDataChannelMeasurements(sendPing: any) {
+  private async runDataChannelMeasurements() {
     this.state.stepDataChannel = 'running';
     this.addLog('[Canal de Dados] Rota ICE estabelecida! Iniciando medição de latência e RTT...');
     this.notify();
@@ -306,7 +318,7 @@ export class P2PConnectionTester {
       }
       sent++;
       try {
-        sendPing({ seq: sent, sentAt: performance.now() });
+        void this.pingAction?.send({ seq: sent, sentAt: performance.now() });
       } catch (e) {
         this.addLog(`[Canal de Dados] Erro ao enviar ping #${sent}: ${e}`);
       }
@@ -438,5 +450,8 @@ export class P2PConnectionTester {
       this.room = null;
     }
     this.peerConnection = null;
+    this.pingAction = null;
+    this.pongAction = null;
+    this.candInfoAction = null;
   }
 }
