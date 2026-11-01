@@ -1,6 +1,6 @@
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { usePanelSize } from '../../hooks/usePanelSize';
 import { PanelResizeHandle } from '../common/PanelResizeHandle';
 import { UnreadChatBadge } from './UnreadChatBadge';
@@ -10,7 +10,7 @@ import { RoomSidebar } from './RoomSidebar';
 import { MobileRoomDock } from './MobileRoomDock';
 import { ChatFileRequests } from './ChatFileRequests';
 import { useRoom } from '../../hooks/useRoom';
-import { isMobileDevice } from '../../core/platform';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import { stateStore } from '../../core/state_store';
 
 export const RoomView: React.FC = () => {
@@ -18,25 +18,14 @@ export const RoomView: React.FC = () => {
   const { isSidebarCollapsed, toggleSidebar, unreadChatMessages } = useRoom();
   const layoutRef = useRef<HTMLDivElement>(null);
   const edgeRef = useRef<HTMLDivElement>(null);
-  const sidebarSize = usePanelSize(layoutRef, 'width', 'p2sharer_sidebar_width', 320, 240, 240);
-  const [isMobile, setIsMobile] = useState(() => isMobileDevice());
+  const isMobile = useIsMobile();
+  const sidebarSize = usePanelSize(layoutRef, 'width', 'p2sharer_sidebar_width', 320, 240, 240, !isMobile);
 
   useEffect(() => {
-    const checkMobile = () => {
-      const mobile = isMobileDevice();
-      setIsMobile(mobile);
-      if (mobile) {
-        stateStore.set((s) => { s.isSidebarCollapsed = true; });
-      }
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    window.addEventListener('orientationchange', checkMobile);
-    return () => {
-      window.removeEventListener('resize', checkMobile);
-      window.removeEventListener('orientationchange', checkMobile);
-    };
-  }, []);
+    if (isMobile) {
+      stateStore.set((s) => { s.isSidebarCollapsed = true; });
+    }
+  }, [isMobile]);
 
   useEffect(() => {
     const container = layoutRef.current;
@@ -92,7 +81,7 @@ export const RoomView: React.FC = () => {
         className={`room-layout ${isMobile ? 'is-mobile' : ''}`}
         id="room-layout-container"
         ref={layoutRef}
-        style={{ '--room-sidebar-width': `${sidebarSize.size}px` } as React.CSSProperties}
+        style={!isMobile ? ({ '--room-sidebar-width': `${sidebarSize.size}px` } as React.CSSProperties) : undefined}
       >
         <div className="stream-area">
           <StreamHeaderBar />

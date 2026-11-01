@@ -1,7 +1,8 @@
 import { Nickname } from '../common/Nickname';
 import { ProfileAvatar } from '../common/ProfileAvatar';
 import { PlatformBadge } from '../common/PlatformBadge';
-import { getLocalPlatform, isMobileDevice } from '../../core/platform';
+import { getLocalPlatform } from '../../core/platform';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import { profileAction } from '../common/profile_actions';
 import { useRoomCardLayoutActions } from './RoomCardLayoutContext';
 import { t } from '../../i18n';
@@ -71,7 +72,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   const setShowLocalPreview = (visible: boolean) => stateStore.set((s) => {
     s.localPreviewStreams = { ...s.localPreviewStreams, [slot.peerId]: visible };
   });
-  const isMobile = isMobileDevice();
+  const isMobile = useIsMobile();
   const [isHudPinned, setIsHudPinned] = useState<boolean>(false);
   const [mobileHudVisible, setMobileHudVisible] = useState(false);
   const mobileHudTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);

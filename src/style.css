@@ -891,20 +891,33 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   position: relative;
 }
 
+.room-layout.is-mobile {
+  flex-direction: column !important;
+}
+
+.room-layout.is-mobile > .stream-area {
+  width: 100% !important;
+  max-width: 100% !important;
+  flex: 1 1 100% !important;
+}
+
 .room-layout.is-mobile .room-sidebar {
   position: absolute !important;
   top: 0 !important;
   right: 0 !important;
   bottom: 0 !important;
-  left: auto !important;
+  left: 0 !important;
   z-index: 50 !important;
   width: 100% !important;
   max-width: 100% !important;
+  box-shadow: var(--shadow-lg) !important;
+  transform: translateX(0);
 }
 
 .room-layout.is-mobile .room-sidebar.collapsed {
+  display: none !important;
+  width: 0 !important;
   transform: translateX(100%) !important;
-  width: 100% !important;
   pointer-events: none !important;
   visibility: hidden !important;
 }
@@ -1780,11 +1793,36 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 .stream-card:not(.in-tray).is-hud-active .btn-stop-watch-stream,
 .stream-card:not(.in-tray).is-hud-active .stream-card-overlay,
 .stream-card:not(.in-tray).is-hud-active .stream-controls-group,
-.stream-card:not(.in-tray).is-hud-active .stream-zoom-bar {
+.stream-card:not(.in-tray).is-hud-active .stream-zoom-bar,
+.stream-card.is-mobile-stream:not(.in-tray) .stream-card-stats-hud,
+.stream-card.is-mobile-stream:not(.in-tray) .btn-stop-watch-stream,
+.stream-card.is-mobile-stream:not(.in-tray) .stream-card-overlay,
+.stream-card.is-mobile-stream:not(.in-tray) .stream-controls-group {
   opacity: 1;
   pointer-events: auto;
   transition: opacity 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
               visibility 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.stream-card.is-mobile-stream:not(.in-tray) .stream-card-stats-hud {
+  top: 6px;
+  left: 6px;
+  gap: 4px;
+  max-width: calc(100% - 12px);
+}
+
+.stream-card.is-mobile-stream:not(.in-tray) .stream-card-footer {
+  padding: 6px 8px;
+}
+
+.stream-card.is-mobile-stream:not(.in-tray) .stream-controls-group {
+  gap: 4px;
+}
+
+.stream-card.is-mobile-stream:not(.in-tray) .stream-controls-group button {
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
 }
 
 /* In grid mode, the broadcaster identity overlay is always visible on streaming cards */
@@ -2746,6 +2784,20 @@ html[data-theme="light"] :is(.stream-card, .pip-window-root) {
 }
 
 @media (max-width: 900px), (max-height: 540px), (hover: none) and (pointer: coarse) {
+  .room-layout {
+    display: flex !important;
+    flex-direction: column !important;
+    position: relative !important;
+    width: 100% !important;
+    overflow: hidden !important;
+  }
+
+  .room-layout > .stream-area {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 1 1 100% !important;
+  }
+
   .sidebar-toggle-edge {
     display: none !important;
   }
@@ -2788,7 +2840,7 @@ html[data-theme="light"] :is(.stream-card, .pip-window-root) {
     top: 0 !important;
     right: 0 !important;
     bottom: 0 !important;
-    left: auto !important;
+    left: 0 !important;
     z-index: 50 !important;
     width: 100% !important;
     max-width: 100% !important;
@@ -2798,10 +2850,42 @@ html[data-theme="light"] :is(.stream-card, .pip-window-root) {
   }
 
   .room-sidebar.collapsed {
+    display: none !important;
+    width: 0 !important;
     transform: translateX(100%) !important;
-    width: 100% !important;
     pointer-events: none !important;
     visibility: hidden !important;
+  }
+
+  /* Mobile Stream HUD Controls */
+  .stream-card:not(.in-tray) .stream-card-stats-hud,
+  .stream-card:not(.in-tray) .stream-controls-group,
+  .stream-card:not(.in-tray) .stream-card-overlay,
+  .stream-card:not(.in-tray) .btn-stop-watch-stream {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    visibility: visible !important;
+  }
+
+  .stream-card:not(.in-tray) .stream-card-stats-hud {
+    top: 6px !important;
+    left: 6px !important;
+    gap: 4px !important;
+    max-width: calc(100% - 12px) !important;
+  }
+
+  .stream-card:not(.in-tray) .stream-card-footer {
+    padding: 6px 8px !important;
+  }
+
+  .stream-card:not(.in-tray) .stream-controls-group {
+    gap: 4px !important;
+  }
+
+  .stream-card:not(.in-tray) .stream-controls-group button {
+    width: 32px !important;
+    height: 32px !important;
+    min-height: 32px !important;
   }
 
   .room-sidebar-backdrop {

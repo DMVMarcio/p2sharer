@@ -652,7 +652,12 @@ export class RoomService {
   }
 
   private syncCaptureState() {
-    stateStore.set((state) => { state.isSharingScreen = Array.from(this.localCaptures.values()).some((entry) => entry.kind === 'screen'); });
+    stateStore.set((state) => {
+      state.isSharingScreen = Array.from(this.localCaptures.values()).some((entry) => entry.kind === 'screen');
+      if (isMobileDevice()) {
+        state.isSidebarCollapsed = true;
+      }
+    });
     const screen = Array.from(this.localCaptures.values()).find((entry) => entry.kind === 'screen');
     if (isTauri()) void invoke('select_pointer_capture', { sessionId: screen?.bridge?.sessionId || null }).catch(console.warn);
     this.notify();
