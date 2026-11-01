@@ -74,7 +74,7 @@ export const RoomView: React.FC = () => {
           <RoomVideoContainer />
         </div>
 
-        {/* Hoverable lateral sidebar toggle arrow */}
+        {/* Hoverable lateral sidebar toggle arrow (Desktop) */}
         <div
           ref={edgeRef}
           className={`sidebar-toggle-edge ${isSidebarCollapsed ? 'collapsed' : 'expanded'} ${unreadChatMessages > 0 ? 'has-unread' : ''}`}
@@ -107,6 +107,13 @@ export const RoomView: React.FC = () => {
             {isSidebarCollapsed && <UnreadChatBadge count={unreadChatMessages} />}
           </button>
         </div>
+
+        {/* Mobile backdrop for drawer sidebar */}
+        <div
+          className={`room-sidebar-backdrop ${!isSidebarCollapsed ? 'visible' : ''}`}
+          onClick={toggleSidebar}
+          aria-hidden="true"
+        />
 
         {!isSidebarCollapsed && <PanelResizeHandle axis="width" label={t('layout.resizeChat')} controls="room-sidebar" {...sidebarSize} />}
         <RoomSidebar />

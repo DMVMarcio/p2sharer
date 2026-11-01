@@ -494,3 +494,49 @@
 .room-app-window { height: 100vh; display: flex; flex-direction: column; background: var(--bg-app); overflow: hidden; }
 .room-app-window > .pip-top-bar { position: static; flex-shrink: 0; }
 .room-app-window > .room-app-card-body { flex: 1; min-height: 0; }
+
+
+@media (max-width: 640px) {
+  .apps-library-modal {
+    max-width: 100%;
+    margin: 0;
+  }
+  .apps-library-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .apps-library-banner {
+    height: 90px;
+  }
+  .apps-library-footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .apps-library-footer .apps-library-start {
+    width: 100%;
+    justify-content: center;
+  }
+  .room-app-notepad-tools {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    padding: 6px 8px;
+    gap: 4px;
+  }
+  .room-app-notepad-tool {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+  }
+  .room-app-notepad-tools .room-app-notepad-select {
+    width: 100px;
+    min-height: 30px;
+    height: 30px;
+    flex-shrink: 0;
+  }
+  .room-app-notepad-editor {
+    padding: 12px 14px;
+    font-size: 14px;
+  }
+}

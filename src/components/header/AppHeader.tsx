@@ -125,7 +125,7 @@ export const AppHeader: React.FC<{ showUpdate?: boolean; homeScrolled?: boolean;
       </div>
 
       <div className="header-user-info">
-        {!isTauri() && <DownloadButton compact newTab />}
+        {!isTauri() && <span className="header-download-link"><DownloadButton compact newTab /></span>}
         <button
           className="user-pill"
           id="user-pill"

@@ -95,7 +95,138 @@ export function useStreamZoom(
     return () => {
       el.removeEventListener('wheel', handleWheel);
     };
-  }, [cardRef]);
+  }, [cardRef, enabled]);
+
+  // Touch pinch-to-zoom and pan support for mobile devices
+  useEffect(() => {
+    if (!enabled) return;
+    const el = cardRef.current;
+    if (!el) return;
+
+    let initialPinchDistance: number | null = null;
+    let initialPinchZoom = 1.0;
+    let pinchCenter = { x: 0, y: 0 };
+    let singleTouchState: {
+      startX: number;
+      startY: number;
+      initialPanX: number;
+      initialPanY: number;
+      moved: boolean;
+    } | null = null;
+    let lastTapTime = 0;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.closest('button, input, textarea, a, select, [role="button"], .stream-controls-group, .stream-zoom-bar, .stream-card-stats-hud')) {
+        return;
+      }
+
+      if (e.touches.length === 2) {
+        // Pinch-to-zoom start
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        initialPinchDistance = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+        initialPinchZoom = zoomRef.current;
+        const rect = el.getBoundingClientRect();
+        pinchCenter = {
+          x: (t1.clientX + t2.clientX) / 2 - rect.left,
+          y: (t1.clientY + t2.clientY) / 2 - rect.top,
+        };
+        singleTouchState = null;
+      } else if (e.touches.length === 1) {
+        const now = Date.now();
+        if (now - lastTapTime < 300 && zoomRef.current > 1.0) {
+          // Double-tap reset
+          setZoom(1.0);
+          setPan({ x: 0, y: 0 });
+          lastTapTime = 0;
+          return;
+        }
+        lastTapTime = now;
+
+        if (zoomRef.current > 1.0) {
+          singleTouchState = {
+            startX: e.touches[0].clientX,
+            startY: e.touches[0].clientY,
+            initialPanX: panRef.current.x,
+            initialPanY: panRef.current.y,
+            moved: false,
+          };
+        }
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2 && initialPinchDistance !== null) {
+        e.preventDefault();
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        const currentDistance = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+        if (initialPinchDistance > 0) {
+          const scale = currentDistance / initialPinchDistance;
+          const targetZoom = clampZoom(initialPinchZoom * scale);
+          const nextZoom = targetZoom < 1.05 ? 1.0 : targetZoom;
+
+          const rect = el.getBoundingClientRect();
+          const result = calculateFocalZoom({
+            currentZoom: zoomRef.current,
+            nextZoom,
+            cursorX: pinchCenter.x,
+            cursorY: pinchCenter.y,
+            containerWidth: rect.width,
+            containerHeight: rect.height,
+            currentPan: panRef.current,
+          });
+
+          setZoom(result.zoom);
+          setPan(result.pan);
+        }
+      } else if (e.touches.length === 1 && singleTouchState && zoomRef.current > 1.0) {
+        const dx = e.touches[0].clientX - singleTouchState.startX;
+        const dy = e.touches[0].clientY - singleTouchState.startY;
+        if (!singleTouchState.moved && Math.hypot(dx, dy) > 5) {
+          singleTouchState.moved = true;
+          setIsDragging(true);
+        }
+        if (singleTouchState.moved) {
+          e.preventDefault();
+          const width = el.clientWidth || 0;
+          const height = el.clientHeight || 0;
+          const nextPan = clampPanOffset(
+            { x: singleTouchState.initialPanX + dx, y: singleTouchState.initialPanY + dy },
+            zoomRef.current,
+            width,
+            height
+          );
+          setPan(nextPan);
+        }
+      }
+    };
+
+    const handleTouchEnd = () => {
+      initialPinchDistance = null;
+      if (singleTouchState?.moved) {
+        didDragRef.current = true;
+        setTimeout(() => {
+          didDragRef.current = false;
+        }, 100);
+      }
+      setIsDragging(false);
+      singleTouchState = null;
+    };
+
+    el.addEventListener('touchstart', handleTouchStart, { passive: true });
+    el.addEventListener('touchmove', handleTouchMove, { passive: false });
+    el.addEventListener('touchend', handleTouchEnd);
+    el.addEventListener('touchcancel', handleTouchEnd);
+
+    return () => {
+      el.removeEventListener('touchstart', handleTouchStart);
+      el.removeEventListener('touchmove', handleTouchMove);
+      el.removeEventListener('touchend', handleTouchEnd);
+      el.removeEventListener('touchcancel', handleTouchEnd);
+    };
+  }, [cardRef, enabled]);
 
   const setZoomDirect = useCallback(
     (newZoom: number) => {
@@ -192,7 +323,7 @@ export function useStreamZoom(
       window.addEventListener('mousemove', onMouseMove);
       window.addEventListener('mouseup', onMouseUp);
     },
-    [cardRef]
+    [cardRef, enabled]
   );
 
   const handleDoubleClick = useCallback(
@@ -211,7 +342,7 @@ export function useStreamZoom(
         resetZoom();
       }
     },
-    [resetZoom]
+    [enabled, resetZoom]
   );
 
   return {

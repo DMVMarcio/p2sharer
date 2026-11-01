@@ -72,7 +72,7 @@ export class StateStore {
   public excludePids: Set<number> = new Set();
   public includePids: Set<number> = new Set();
 
-  public isSidebarCollapsed: boolean = false;
+  public isSidebarCollapsed: boolean = typeof window !== 'undefined' && window.innerWidth <= 768;
   public sidebarTab: 'chat' | 'participants' = 'chat';
   public unreadChatMessages = 0;
   public isSpotlightTrayCollapsed: boolean = false;

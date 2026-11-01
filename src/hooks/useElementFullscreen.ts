@@ -10,40 +10,65 @@ export function useElementFullscreen<T extends HTMLElement>() {
   const [fullscreen, setFullscreen] = useState(false);
   useEffect(() => {
     const element = ref.current;
+    const isDocFullscreen = () => {
+      const doc = document as any;
+      return (doc.fullscreenElement || doc.webkitFullscreenElement) === element;
+    };
     const changed = () => {
-      const active = document.fullscreenElement === element;
+      const active = isDocFullscreen();
       setFullscreen(active);
       if (!active) void nativeRef.current.exitFullscreen().catch(console.warn);
     };
     document.addEventListener('fullscreenchange', changed);
+    document.addEventListener('webkitfullscreenchange', changed);
     return () => {
       document.removeEventListener('fullscreenchange', changed);
-      if (element && document.fullscreenElement === element) void document.exitFullscreen().catch(() => {});
+      document.removeEventListener('webkitfullscreenchange', changed);
+      if (element && isDocFullscreen()) {
+        const doc = document as any;
+        if (doc.exitFullscreen) void doc.exitFullscreen().catch(() => {});
+        else if (doc.webkitExitFullscreen) void doc.webkitExitFullscreen().catch(() => {});
+      }
     };
   }, []);
   const operations = useRef<Promise<void>>(Promise.resolve());
   const transition = useCallback(async () => {
-    const element = ref.current;
+    const element = ref.current as any;
     if (!element) return;
-    if (document.fullscreenElement === element) {
-      await document.exitFullscreen();
+    const doc = document as any;
+    const isCurrent = (doc.fullscreenElement || doc.webkitFullscreenElement) === element;
+    if (isCurrent) {
+      if (doc.exitFullscreen) await doc.exitFullscreen();
+      else if (doc.webkitExitFullscreen) await doc.webkitExitFullscreen();
       await nativeRef.current.exitFullscreen();
     }
     else {
       try {
-        // Snapshot the host before WebView2's DOM fullscreen transition can resize it
-        // or change the value returned by isFullscreen(). User activation persists
-        // across this short IPC operation.
         await nativeRef.current.enterFullscreen();
         if (!element.isConnected) { await nativeRef.current.exitFullscreen(); return; }
-        await element.requestFullscreen();
+        if (element.requestFullscreen) {
+          await element.requestFullscreen();
+        } else if (element.webkitRequestFullscreen) {
+          await element.webkitRequestFullscreen();
+        } else {
+          // iOS Safari on iPhone requires video.webkitEnterFullscreen()
+          const video = element.querySelector?.('video') as any;
+          if (video?.webkitEnterFullscreen) {
+            video.webkitEnterFullscreen();
+          }
+        }
       } catch (error) {
-        if (document.fullscreenElement === element) await document.exitFullscreen();
+        if ((doc.fullscreenElement || doc.webkitFullscreenElement) === element) {
+          if (doc.exitFullscreen) await doc.exitFullscreen();
+          else if (doc.webkitExitFullscreen) await doc.webkitExitFullscreen();
+        }
         await nativeRef.current.exitFullscreen();
         throw error;
       }
-      // A request can finish after its player was closed.
-      if (!element.isConnected && document.fullscreenElement === element) await document.exitFullscreen();
+      if (!element.isConnected && (doc.fullscreenElement || doc.webkitFullscreenElement) === element) {
+        if (doc.exitFullscreen) await doc.exitFullscreen();
+        else if (doc.webkitExitFullscreen) await doc.webkitExitFullscreen();
+      }
     }
   }, []);
   const toggleFullscreen = useCallback(() => {

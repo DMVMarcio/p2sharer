@@ -72,8 +72,29 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     s.localPreviewStreams = { ...s.localPreviewStreams, [slot.peerId]: visible };
   });
   const [isHudPinned, setIsHudPinned] = useState<boolean>(false);
+  const [mobileHudVisible, setMobileHudVisible] = useState(false);
+  const mobileHudTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [activeTooltips, setActiveTooltips] = useState<number>(0);
   const [isVideoReady, setIsVideoReady] = useState<boolean>(() => Boolean(slot.isLocal));
+
+  const triggerMobileHud = useCallback(() => {
+    setMobileHudVisible((prev) => {
+      const next = !prev;
+      if (mobileHudTimerRef.current) clearTimeout(mobileHudTimerRef.current);
+      if (next) {
+        mobileHudTimerRef.current = setTimeout(() => {
+          setMobileHudVisible(false);
+        }, 4000);
+      }
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (mobileHudTimerRef.current) clearTimeout(mobileHudTimerRef.current);
+    };
+  }, []);
 
   const handleTooltipOpenChange = useCallback((open: boolean) => {
     setActiveTooltips((prev) => Math.max(0, prev + (open ? 1 : -1)));
@@ -248,6 +269,9 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     if (zoom > 1.0) {
       return;
     }
+    if (typeof window !== 'undefined' && window.matchMedia('(hover: none)').matches) {
+      triggerMobileHud();
+    }
     togglePin(slot.peerId);
   };
 
@@ -326,7 +350,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   return (
     <div
       ref={cardRef}
-      className={`stream-card ${isFeatured ? 'featured' : ''} ${inTray ? 'in-tray' : ''} ${isSelectedFeatured ? 'selected-featured' : ''} ${zoom > 1.0 && !inTray ? 'is-zoomed' : ''} ${isDragging && !inTray ? 'is-dragging' : ''} ${!slot.isLocal && !inTray ? 'has-volume-controller' : ''} ${isHudPinned ? 'is-hud-pinned' : ''} ${activeTooltips > 0 ? 'is-hud-active' : ''} ${pointer.enabled ? 'is-stream-pointer-active' : ''}`}
+      className={`stream-card ${isFeatured ? 'featured' : ''} ${inTray ? 'in-tray' : ''} ${isSelectedFeatured ? 'selected-featured' : ''} ${zoom > 1.0 && !inTray ? 'is-zoomed' : ''} ${isDragging && !inTray ? 'is-dragging' : ''} ${!slot.isLocal && !inTray ? 'has-volume-controller' : ''} ${isHudPinned ? 'is-hud-pinned' : ''} ${activeTooltips > 0 || mobileHudVisible ? 'is-hud-active' : ''} ${pointer.enabled ? 'is-stream-pointer-active' : ''}`}
       data-peer-id={slot.peerId}
       onClick={handleCardClick}
       onContextMenu={handleContextMenu}

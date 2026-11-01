@@ -2,7 +2,7 @@ import { websiteUrl } from '../../platform/website';
 import { isTauri } from '@tauri-apps/api/core';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
-import { Settings2 } from 'lucide-react';
+import { Settings2, MessageSquare, Users } from 'lucide-react';
 import { stateStore } from '../../core/state_store';
 import React, { useEffect, useState } from 'react';
 import { roomAppsService } from '../../apps/room_apps_service';
@@ -13,6 +13,7 @@ import { Tooltip } from '../common/Tooltip';
 import { AppWindow, Square, ChevronDown, Camera, Monitor, Plus, Pencil } from 'lucide-react';
 import { useContextMenu, type ContextMenuAction } from '../common/ContextMenu';
 import { roomService } from '../../services/room_service';
+import { UnreadChatBadge } from './UnreadChatBadge';
 
 export const StreamHeaderBar: React.FC = () => {
   useLocale();
@@ -30,6 +31,10 @@ export const StreamHeaderBar: React.FC = () => {
     roomSlots,
     streamFilter,
     setStreamFilter,
+    peers,
+    isSidebarCollapsed,
+    sidebarTab,
+    unreadChatMessages,
   } = useRoom();
   const { openModal } = useModal();
   const openContextMenu = useContextMenu();
@@ -133,6 +138,55 @@ export const StreamHeaderBar: React.FC = () => {
       </div>
 
       <div className="stream-actions">
+        {/* Mobile Chat and Participants Sidebar Toggles */}
+        <div className="stream-mobile-sidebar-toggles" role="group">
+          <button
+            type="button"
+            className={`btn btn-sm btn-compact btn-outline stream-mobile-tab-btn ${!isSidebarCollapsed && sidebarTab === 'chat' ? 'active' : ''}`}
+            onClick={() => {
+              stateStore.set((state) => {
+                if (state.isSidebarCollapsed) {
+                  state.isSidebarCollapsed = false;
+                  state.sidebarTab = 'chat';
+                  state.unreadChatMessages = 0;
+                } else if (state.sidebarTab === 'chat') {
+                  state.isSidebarCollapsed = true;
+                } else {
+                  state.sidebarTab = 'chat';
+                  state.unreadChatMessages = 0;
+                }
+              });
+            }}
+            aria-expanded={!isSidebarCollapsed && sidebarTab === 'chat'}
+            aria-label={t("message.86d416fc47cf")}
+          >
+            <MessageSquare size={14} aria-hidden="true" />
+            <span className="btn-text">{t("twitch.chat")}</span>
+            {unreadChatMessages > 0 && <UnreadChatBadge count={unreadChatMessages} />}
+          </button>
+          <button
+            type="button"
+            className={`btn btn-sm btn-compact btn-outline stream-mobile-tab-btn ${!isSidebarCollapsed && sidebarTab === 'participants' ? 'active' : ''}`}
+            onClick={() => {
+              stateStore.set((state) => {
+                if (state.isSidebarCollapsed) {
+                  state.isSidebarCollapsed = false;
+                  state.sidebarTab = 'participants';
+                } else if (state.sidebarTab === 'participants') {
+                  state.isSidebarCollapsed = true;
+                } else {
+                  state.sidebarTab = 'participants';
+                }
+              });
+            }}
+            aria-expanded={!isSidebarCollapsed && sidebarTab === 'participants'}
+            aria-label={t("message.a055745d0aa7")}
+          >
+            <Users size={14} aria-hidden="true" />
+            <span className="btn-text">{peers.length + 1}</span>
+          </button>
+        </div>
+
         <Tooltip content={t("message.88aff1752712")}>
           <button className="btn btn-sm btn-outline btn-compact" aria-label={t("message.7679ca8f8a85")}
             onClick={() => openModal('apps')}><AppWindow size={14} strokeWidth={2} /><span className="btn-text">{t("common.apps")}</span></button>

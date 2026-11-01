@@ -2,6 +2,7 @@ import { ContentTransition } from '../common/ContentTransition';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React from 'react';
+import { X } from 'lucide-react';
 import { stateStore } from '../../core/state_store';
 import { UnreadChatBadge } from './UnreadChatBadge';
 import { useRoom } from '../../hooks/useRoom';
@@ -39,6 +40,14 @@ export const RoomSidebar: React.FC = () => {
           onClick={() => setActiveTab('participants')}
         >
           {t("message.a055745d0aa7")}<span id="count-participants">{totalParticipants}</span>)
+        </button>
+        <button
+          type="button"
+          className="sidebar-mobile-close-btn"
+          onClick={() => stateStore.set((s) => { s.isSidebarCollapsed = true; })}
+          aria-label={t("message.0f2bd88ef0ac")}
+        >
+          <X size={18} aria-hidden="true" />
         </button>
       </div>
 

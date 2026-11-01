@@ -305,6 +305,7 @@ html[data-theme="light"][data-accent="zinc"] {
 html,
 body {
   height: 100%;
+  min-height: 100dvh;
   width: 100%;
   background-color: var(--bg-app);
 }
@@ -314,6 +315,7 @@ body {
   background-color: var(--bg-app);
   color: var(--text-primary);
   height: 100%;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -324,6 +326,7 @@ body {
 
 #root {
   height: 100%;
+  min-height: 100dvh;
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -545,7 +548,17 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
    APP MAIN & VIEWS
    ========================================================================== */
 
-.app-workspace { display: flex; flex: 1; flex-direction: column; min-height: 0; overflow: hidden; }
+.app-workspace {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
 .app-workspace.is-home { background: radial-gradient(ellipse at 100% 0%, color-mix(in srgb, var(--ambient-glow, #00225c) 12%, transparent), transparent 65%); }
 .app-workspace.is-home .app-header { background-color: transparent; transition: background-color var(--transition-fast), box-shadow var(--transition-fast); }
 .app-workspace.is-home .app-header.is-home-scrolled { background-color: color-mix(in srgb, var(--bg-app) 94%, transparent); box-shadow: var(--shadow-sm); backdrop-filter: blur(8px); }
@@ -681,16 +694,28 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
   .home-hero { --hero-art-width: 200px; }
   .hero-container { gap: 24px; }
 }
-@media (max-width: 540px) {
-  .home-hero { grid-template-columns: minmax(0, 1fr); padding: 12px 20px; }
-  .hero-brand { display: none; }
-  .hero-actions .btn { width: 100%; }
-  .header-invite-label { display: none; }
-  .btn.header-room-action { min-width: 0; }
-  .app-header.is-in-room { padding-inline: 12px; gap: 8px; }
+@media (max-width: 640px) {
+  .header-download-link { display: none !important; }
+  .app-header { height: 56px; padding: 0 12px; }
+  .app-header.is-in-room { height: 56px; padding-inline: 10px; gap: 6px; }
   .header-room-name { margin-right: 0; }
+  .header-room-name strong { max-width: clamp(80px, 28vw, 160px); font-size: 14px; }
+  .btn.header-room-action { min-width: 36px; padding: 6px 10px; height: 34px; }
+  .header-invite-label { display: none; }
   .is-in-room .user-pill #current-username-display { display: none; }
-  .app-header { padding: 0 16px; }
+  .user-pill .header-profile-avatar { width: 32px; height: 32px; font-size: 13px; }
+  .btn-icon-header { min-width: 34px; min-height: 34px; width: 34px; height: 34px; }
+}
+@media (max-width: 540px) {
+  .home-hero { grid-template-columns: minmax(0, 1fr); padding: 14px 16px; }
+  .hero-brand { display: none; }
+  .hero-title { font-size: clamp(26px, 7vw, 36px); margin-bottom: 12px; }
+  .hero-subtitle { font-size: 14px; margin-bottom: 20px; line-height: 1.6; }
+  .hero-actions { flex-direction: column; width: 100%; gap: 10px; }
+  .hero-actions .btn { width: 100%; min-height: 46px; font-size: 14px; }
+  .btn.header-room-action { min-width: 0; padding: 6px 8px; }
+  .app-header.is-in-room { padding-inline: 8px; gap: 4px; }
+  .app-header { padding: 0 12px; }
 }
 
 .saved-rooms-section {
@@ -2661,6 +2686,105 @@ html[data-theme="light"] :is(.stream-card, .pip-window-root) {
   flex-shrink: 0;
 }
 
+/* Mobile Sidebar Drawer and Backdrop */
+.sidebar-mobile-close-btn {
+  display: none;
+}
+
+.room-sidebar-backdrop {
+  display: none;
+}
+
+.stream-mobile-sidebar-toggles {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .sidebar-toggle-edge {
+    display: none !important;
+  }
+
+  .room-layout > .panel-resize-handle {
+    display: none !important;
+  }
+
+  .stream-mobile-sidebar-toggles {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .stream-mobile-tab-btn {
+    min-height: 34px;
+    padding: 6px 12px;
+    font-size: 12px;
+    border-radius: var(--radius-full);
+  }
+
+  .stream-mobile-tab-btn.active {
+    background: var(--accent-subtle);
+    color: var(--accent-color);
+    border-color: var(--accent-border);
+  }
+
+  .room-sidebar {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 50;
+    width: 100% !important;
+    max-width: 100%;
+    box-shadow: var(--shadow-lg);
+    transform: translateX(0);
+    transition: transform var(--transition-normal), visibility var(--transition-normal);
+  }
+
+  .room-sidebar.collapsed {
+    transform: translateX(100%);
+    width: 100% !important;
+    pointer-events: none;
+    visibility: hidden;
+  }
+
+  .room-sidebar-backdrop {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 48;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(2px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--transition-fast);
+  }
+
+  .room-sidebar-backdrop.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .sidebar-mobile-close-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 100%;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background-color var(--transition-fast), color var(--transition-fast);
+  }
+
+  .sidebar-mobile-close-btn:hover {
+    background: var(--bg-card-hover);
+    color: var(--text-primary);
+  }
+}
+
 .tab-btn {
   flex: 1;
   height: 100%;
@@ -4225,6 +4349,137 @@ html[data-theme="light"] :is(.stream-card, .pip-window-root) {
   }
   .sfx-test-buttons-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Mobile & Touch Controls Adaptations */
+@media (max-width: 640px) {
+  .modal-overlay {
+    padding: 8px;
+    align-items: flex-end;
+  }
+  .modal-card {
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(100dvh - 16px);
+    border-radius: var(--radius-lg);
+  }
+  .modal-header {
+    padding: 14px 16px;
+  }
+  .modal-header .btn-close {
+    width: 38px;
+    height: 38px;
+    font-size: 22px;
+  }
+  .modal-body {
+    padding: 14px 16px;
+  }
+  .modal-footer {
+    padding: 12px 16px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .modal-footer .btn {
+    flex: 1 1 calc(50% - 4px);
+    min-height: 42px;
+  }
+  .text-input,
+  .text-input-sm {
+    min-height: 42px;
+    font-size: 16px; /* Prevents auto-zoom in Safari on iOS */
+  }
+  .app-select {
+    min-height: 42px;
+    font-size: 14px;
+  }
+  .app-select-option {
+    min-height: 40px;
+    padding: 8px 12px;
+    font-size: 14px;
+  }
+  .context-menu button {
+    min-height: 38px;
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+  .btn {
+    min-height: 40px;
+  }
+  .btn-sm {
+    min-height: 34px;
+  }
+  .chat-input-bar {
+    padding: 8px 10px;
+    padding-bottom: max(10px, env(safe-area-inset-bottom, 0px));
+  }
+  .chat-composer-editor {
+    font-size: 16px; /* Prevents auto-zoom in Safari on iOS */
+    line-height: 22px;
+    min-height: 44px;
+  }
+  .chat-input-actions .btn-chat-emoji,
+  .chat-input-actions .btn-chat-send,
+  .btn-chat-transfer {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    min-height: 38px;
+  }
+  .chat-msg-menu-wrap {
+    opacity: 1 !important;
+  }
+  .chat-msg-menu-trigger {
+    width: 28px !important;
+    height: 28px !important;
+    opacity: 0.8 !important;
+  }
+  .stream-controls-group {
+    padding: 4px 6px;
+    gap: 4px;
+    bottom: 6px;
+    right: 6px;
+  }
+  .stream-controls-group button {
+    width: 34px;
+    height: 34px;
+    min-height: 34px;
+  }
+  .stream-card-overlay {
+    bottom: 6px;
+    left: 6px;
+    padding: 4px 8px;
+    font-size: 11px;
+    max-width: calc(100% - 12px);
+  }
+  .stream-card-stats-hud {
+    top: 6px;
+    left: 6px;
+    gap: 4px;
+    max-width: calc(100% - 90px);
+  }
+  .btn-stop-watch-stream {
+    top: 6px;
+    right: 6px;
+    font-size: 11px;
+    padding: 4px 8px;
+  }
+}
+
+/* Touch device optimizations (mobile phones and tablets) */
+@media (hover: none) {
+  .chat-msg-menu-wrap {
+    opacity: 1 !important;
+  }
+  .chat-msg-menu-trigger {
+    width: 28px !important;
+    height: 28px !important;
+    opacity: 0.8 !important;
+  }
+  .stream-card:not(.in-tray) .stream-controls-group button,
+  .btn-icon-header,
+  .btn-stream-volume {
+    touch-action: manipulation;
   }
 }
 

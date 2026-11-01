@@ -81,6 +81,32 @@
 .whiteboard-layer-name:hover span { text-decoration: underline; text-underline-offset: 3px; }
 .whiteboard-layer-name:focus-visible, .whiteboard-layer-select:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 2px; }
 .whiteboard-layer .whiteboard-layer-name-input:focus { box-shadow: none; outline: none; }
+
+@media (max-width: 640px) {
+  .whiteboard-toolbar {
+    width: calc(100% - 16px);
+    bottom: 8px;
+    padding: 6px 8px;
+    max-height: 50vh;
+  }
+  .whiteboard-toolbar-main-row {
+    gap: 4px;
+  }
+  .whiteboard-tool-choices {
+    max-width: 100%;
+    gap: 2px;
+  }
+  .whiteboard-toolbar-history .room-app-notepad-tool,
+  .whiteboard-tool-choices .room-app-notepad-tool,
+  .whiteboard-toolbar-toggle {
+    width: 32px;
+    height: 32px;
+  }
+  .whiteboard-layers {
+    width: 180px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .whiteboard-toolbar, .whiteboard-layers, .whiteboard-toolbar-history, .whiteboard-tool-choices, .whiteboard-toolbar-toggle svg, .whiteboard-layers-toggle svg:last-child { transition: none; }
 }
