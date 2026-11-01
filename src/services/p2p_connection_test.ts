@@ -231,6 +231,27 @@ export class P2PConnectionTester {
     this.state.stepOfferAnswer = 'success';
     this.notify();
 
+    pc.addEventListener('signalingstatechange', () => {
+      this.addLog(`[WebRTC SDP] Estado de sinalização SDP: ${pc.signalingState}`);
+    });
+
+    pc.addEventListener('icegatheringstatechange', () => {
+      this.addLog(`[WebRTC ICE] Estado da coleta de candidatos: ${pc.iceGatheringState}`);
+    });
+
+    pc.addEventListener('connectionstatechange', () => {
+      this.addLog(`[WebRTC Peer] Estado geral da conexão (DTLS): ${pc.connectionState}`);
+      if (pc.connectionState === 'failed') {
+        this.addLog('[WebRTC Peer] Falha crítica no handshake de criptografia DTLS ou queda de transporte.');
+      }
+    });
+
+    pc.addEventListener('icecandidateerror', (event: Event) => {
+      const err = event as RTCPeerConnectionIceErrorEvent;
+      const host = err.url ? ` (${err.url})` : '';
+      this.addLog(`[WebRTC ICE Erro] Falha ao consultar endpoint STUN/TURN${host}: Código ${err.errorCode} - ${err.errorText || 'desconhecido'}`);
+    });
+
     pc.addEventListener('icecandidate', (e) => {
       if (e.candidate) {
         const type = e.candidate.type ?? 'unknown';
