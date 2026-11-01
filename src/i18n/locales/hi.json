@@ -1539,7 +1539,7 @@
   "p2pTest.hostHint": "यह अस्थायी परीक्षण कोड अपने साथी के साथ साझा करें। जब दोनों शुरू करेंगे, तो P2P निदान चलेगा।",
   "p2pTest.joinHint": "पारस्परिक कनेक्शन परीक्षण शुरू करने के लिए अपने साथी द्वारा जनरेट किया गया 6-अंकीय कोड दर्ज करें।",
   "p2pTest.startTest": "P2P परीक्षण शुरू करें",
-  "p2pTest.stepSignaling": "सिग्नलिंग और रेंडेवू",
+  "p2pTest.stepSignaling": "सिग्नलिंग और डिस्कवरी",
   "p2pTest.stepOfferAnswer": "SDP ऑफ़र / उत्तर विनिमय",
   "p2pTest.stepIceGathering": "ICE उम्मीदवार संग्रह",
   "p2pTest.stepIceHandshake": "ICE और DTLS कनेक्टिविटी हैंडशेक",

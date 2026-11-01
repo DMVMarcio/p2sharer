@@ -1539,7 +1539,7 @@
   "p2pTest.hostHint": "このテストコードを相手に共有してください。双方が開始すると P2P 診断が実行されます。",
   "p2pTest.joinHint": "相手が生成した 6 桁のコードを入力して、相互接続テストを開始します。",
   "p2pTest.startTest": "P2P テスト開始",
-  "p2pTest.stepSignaling": "シグナリング & ランデブー",
+  "p2pTest.stepSignaling": "シグナリングとピア検出",
   "p2pTest.stepOfferAnswer": "SDP オファー / アンサー交換",
   "p2pTest.stepIceGathering": "ICE 候補の収集",
   "p2pTest.stepIceHandshake": "ICE & DTLS 接続ハンドシェイク",

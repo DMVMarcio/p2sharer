@@ -1539,7 +1539,7 @@
   "p2pTest.hostHint": "將此臨時代碼分享給對方。雙方均開始測試後，將即時執行詳細的 P2P 診斷。",
   "p2pTest.joinHint": "輸入對方產生的 6 位代碼以開始雙向連線測試。",
   "p2pTest.startTest": "開始 P2P 測試",
-  "p2pTest.stepSignaling": "信令交握與轉發發現",
+  "p2pTest.stepSignaling": "信令與端點探索",
   "p2pTest.stepOfferAnswer": "SDP 提議與應答交換",
   "p2pTest.stepIceGathering": "ICE 候選路由搜尋與收集",
   "p2pTest.stepIceHandshake": "ICE 與 DTLS 加密連線交握",

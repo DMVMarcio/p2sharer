@@ -1539,7 +1539,7 @@
   "p2pTest.hostHint": "Comparta este código temporal con su amigo. Cuando ambos inicien la prueba, se ejecutará el diagnóstico P2P.",
   "p2pTest.joinHint": "Introduzca el código de 6 caracteres generado por su amigo para iniciar la prueba mutua de conexión.",
   "p2pTest.startTest": "Iniciar Prueba P2P",
-  "p2pTest.stepSignaling": "Señalización y Rendezvous",
+  "p2pTest.stepSignaling": "Señalización y descubrimiento",
   "p2pTest.stepOfferAnswer": "Intercambio de Oferta / Respuesta SDP",
   "p2pTest.stepIceGathering": "Recopilación de Candidatos ICE",
   "p2pTest.stepIceHandshake": "Apretón de Manos ICE y DTLS",

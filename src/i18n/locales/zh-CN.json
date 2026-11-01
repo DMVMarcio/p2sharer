@@ -1539,7 +1539,7 @@
   "p2pTest.hostHint": "将此临时代码分享给对方。双方均开始测试后，将实时运行详细的 P2P 诊断。",
   "p2pTest.joinHint": "输入对方生成的 6 位代码以开始双向连接测试。",
   "p2pTest.startTest": "开始 P2P 测试",
-  "p2pTest.stepSignaling": "信令握手与中继发现",
+  "p2pTest.stepSignaling": "信令与对端发现",
   "p2pTest.stepOfferAnswer": "SDP 提议与应答交换",
   "p2pTest.stepIceGathering": "ICE 候选路由发现与收集",
   "p2pTest.stepIceHandshake": "ICE 与 DTLS 加密连接握手",

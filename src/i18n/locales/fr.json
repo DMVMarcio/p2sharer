@@ -1539,7 +1539,7 @@
   "p2pTest.hostHint": "Partagez ce code temporaire avec votre pair. Lorsque les deux lanceront le test, le diagnostic s'exécutera.",
   "p2pTest.joinHint": "Saisissez le code à 6 caractères généré par votre pair pour lancer le test de connexion mutuel.",
   "p2pTest.startTest": "Démarrer le test P2P",
-  "p2pTest.stepSignaling": "Signalisation et Rendez-vous",
+  "p2pTest.stepSignaling": "Signalisation et découverte",
   "p2pTest.stepOfferAnswer": "Échange Offre / Réponse SDP",
   "p2pTest.stepIceGathering": "Collecte des candidats ICE",
   "p2pTest.stepIceHandshake": "Négociation de connectivité ICE et DTLS",

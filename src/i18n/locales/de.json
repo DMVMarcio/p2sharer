@@ -1539,7 +1539,7 @@
   "p2pTest.hostHint": "Teilen Sie diesen temporären Code mit Ihrem Peer. Sobald beide starten, wird die P2P-Diagnose ausgeführt.",
   "p2pTest.joinHint": "Geben Sie den vom Peer generierten 6-stelligen Code ein, um den Verbindungstest zu starten.",
   "p2pTest.startTest": "P2P-Test starten",
-  "p2pTest.stepSignaling": "Signalisierung und Rendezvous",
+  "p2pTest.stepSignaling": "Signalisierung und Erkennung",
   "p2pTest.stepOfferAnswer": "SDP-Offer/Answer-Austausch",
   "p2pTest.stepIceGathering": "ICE-Kandidatensammlung",
   "p2pTest.stepIceHandshake": "ICE- und DTLS-Verbindungsaufbau",

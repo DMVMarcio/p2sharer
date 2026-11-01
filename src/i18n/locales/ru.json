@@ -1539,7 +1539,7 @@
   "p2pTest.hostHint": "Поделитесь этим временным кодом с другим пользователем. Когда оба запустят тест, начнется диагностика.",
   "p2pTest.joinHint": "Введите 6-значный код, созданный другим пользователем, чтобы начать тест соединения.",
   "p2pTest.startTest": "Начать P2P-тест",
-  "p2pTest.stepSignaling": "Сигнализация и рандеву",
+  "p2pTest.stepSignaling": "Сигнализация и обнаружение",
   "p2pTest.stepOfferAnswer": "Обмен SDP Offer / Answer",
   "p2pTest.stepIceGathering": "Сбор кандидатов ICE",
   "p2pTest.stepIceHandshake": "Рукопожатие ICE и DTLS",
