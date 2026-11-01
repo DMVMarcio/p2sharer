@@ -6,12 +6,14 @@ import { X } from 'lucide-react';
 import { stateStore } from '../../core/state_store';
 import { UnreadChatBadge } from './UnreadChatBadge';
 import { useRoom } from '../../hooks/useRoom';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import { ChatPane } from './ChatPane';
 import { ParticipantsPane } from './ParticipantsPane';
 
 export const RoomSidebar: React.FC = () => {
   useLocale();
   const { isSidebarCollapsed, peers, sidebarTab: activeTab, unreadChatMessages } = useRoom();
+  const isMobile = useIsMobile();
   const setActiveTab = (tab: 'chat' | 'participants') => stateStore.set((state) => {
     state.sidebarTab = tab;
     if (tab === 'chat' && !state.isSidebarCollapsed) state.unreadChatMessages = 0;
@@ -41,14 +43,16 @@ export const RoomSidebar: React.FC = () => {
         >
           {t("message.a055745d0aa7")}<span id="count-participants">{totalParticipants}</span>)
         </button>
-        <button
-          type="button"
-          className="sidebar-close-btn sidebar-mobile-close-btn"
-          onClick={() => stateStore.set((s) => { s.isSidebarCollapsed = true; })}
-          aria-label={t("message.0f2bd88ef0ac")}
-        >
-          <X size={18} aria-hidden="true" />
-        </button>
+        {isMobile && (
+          <button
+            type="button"
+            className="sidebar-close-btn sidebar-mobile-close-btn"
+            onClick={() => stateStore.set((s) => { s.isSidebarCollapsed = true; })}
+            aria-label={t("message.0f2bd88ef0ac")}
+          >
+            <X size={18} aria-hidden="true" />
+          </button>
+        )}
       </div>
 
       <ContentTransition value={activeTab} className="content-transition-fill">

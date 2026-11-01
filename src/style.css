@@ -927,6 +927,11 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   display: none !important;
 }
 
+.room-layout.is-mobile .sidebar-close-btn,
+.room-layout.is-mobile .sidebar-mobile-close-btn {
+  display: inline-flex !important;
+}
+
 .stream-area {
   flex: 1;
   min-width: 0;
@@ -2747,10 +2752,10 @@ html[data-theme="light"] :is(.stream-card, .pip-window-root) {
   flex-shrink: 0;
 }
 
-/* Sidebar Close Button */
+/* Sidebar Close Button (Mobile only) */
 .sidebar-close-btn,
 .sidebar-mobile-close-btn {
-  display: inline-flex;
+  display: none;
   align-items: center;
   justify-content: center;
   width: 40px;
@@ -2800,6 +2805,11 @@ html[data-theme="light"] :is(.stream-card, .pip-window-root) {
 
   .sidebar-toggle-edge {
     display: none !important;
+  }
+
+  .sidebar-close-btn,
+  .sidebar-mobile-close-btn {
+    display: inline-flex !important;
   }
 
   .room-layout > .panel-resize-handle {
