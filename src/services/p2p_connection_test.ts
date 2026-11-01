@@ -124,14 +124,14 @@ export class P2PConnectionTester {
     this.state = this.initialState(cleanCode, isHost);
     this.state.phase = 'signaling';
     this.state.stepSignaling = 'running';
-    this.addLog(`Iniciando teste de conectividade P2P (${isHost ? 'Host' : 'Conector'}). Código: ${cleanCode}`);
+    this.addLog(`Starting P2P connectivity test (${isHost ? 'Host' : 'Connector'}). Code: ${cleanCode}`);
     this.notify();
 
     const topic = `p2s-diag-${cleanCode.toLowerCase()}`;
     const prefs = loadRendezvousPreferences();
     const urls = enabledRendezvousUrls(prefs, 'mqtt');
     const relayConfig = { urls, redundancy: urls.length };
-    this.addLog(`Conectando ao broker de sinalização MQTT (${urls.length} relays configurados)...`);
+    this.addLog(`Connecting to MQTT signaling relay broker (${urls.length} relays configured)...`);
 
     try {
       this.room = joinMqttRoom(
@@ -146,7 +146,7 @@ export class P2PConnectionTester {
       );
 
       this.state.stepSignaling = 'success';
-      this.addLog(`Conectado à sala de sinalização "${topic}". Aguardando par...`);
+      this.addLog(`Connected to signaling topic "${topic}". Waiting for peer...`);
 
       // Set a 25-second overall timeout
       this.timeoutTimer = setTimeout(() => {
@@ -161,7 +161,7 @@ export class P2PConnectionTester {
       this.state.stepSignaling = 'failed';
       this.state.verdict = 'failed';
       this.state.verdictMessage = err instanceof Error ? err.message : String(err);
-      this.addLog(`Erro ao inicializar sinalização: ${this.state.verdictMessage}`);
+      this.addLog(`Signaling initialization error: ${this.state.verdictMessage}`);
       this.notify();
     }
   }
@@ -185,7 +185,7 @@ export class P2PConnectionTester {
       const now = performance.now();
       const rtt = Math.max(1, Math.round(now - data.sentAt));
       this.state.metrics.rttSamples.push(rtt);
-      this.addLog(`[Canal de Dados] Ping #${data.seq} respondido em ${rtt} ms.`);
+      this.addLog(`[DataChannel] Ping #${data.seq} acknowledged in ${rtt} ms.`);
       this.updateRttAverages();
     };
 
@@ -193,13 +193,14 @@ export class P2PConnectionTester {
     this.candInfoAction.onMessage = (info: any) => {
       if (info && info.candidates) {
         this.state.metrics.remoteCandidates = { ...info.candidates };
-        this.addLog(`[Candidatos Remotos] Host: ${info.candidates.host}, STUN (srflx): ${info.candidates.srflx}, Relay: ${info.candidates.relay}`);
+        this.addLog(`[Remote Candidates] Host: ${info.candidates.host}, STUN (srflx): ${info.candidates.srflx}, Relay: ${info.candidates.relay}`);
         this.notify();
       }
     };
 
-    this.room.onPeerJoin((peerId: string) => {
-      this.addLog(`[Sinalização] Peer detectado: ${peerId}. Negociando conexão WebRTC...`);
+    // Direct property assignment for Trystero v0.25 peer event handlers
+    this.room.onPeerJoin = (peerId: string) => {
+      this.addLog(`[Signaling] Peer detected: ${peerId}. Initiating WebRTC negotiation...`);
       this.state.remotePeerId = peerId;
       this.state.stepOfferAnswer = 'running';
       this.state.stepIceGathering = 'running';
@@ -208,11 +209,11 @@ export class P2PConnectionTester {
       this.notify();
 
       this.monitorPeerConnection(peerId);
-    });
+    };
 
-    this.room.onPeerLeave((peerId: string) => {
-      this.addLog(`[Sinalização] Peer ${peerId} saiu da sala.`);
-    });
+    this.room.onPeerLeave = (peerId: string) => {
+      this.addLog(`[Signaling] Peer ${peerId} left the room.`);
+    };
   }
 
   private monitorPeerConnection(peerId: string) {
@@ -232,29 +233,29 @@ export class P2PConnectionTester {
   }
 
   private attachPcListeners(pc: RTCPeerConnection) {
-    this.addLog('[WebRTC] RTCPeerConnection instanciado. Iniciando coleta de candidatos ICE...');
+    this.addLog('[WebRTC] RTCPeerConnection initialized. Starting ICE candidate gathering...');
     this.state.stepOfferAnswer = 'success';
     this.notify();
 
     pc.addEventListener('signalingstatechange', () => {
-      this.addLog(`[WebRTC SDP] Estado de sinalização SDP: ${pc.signalingState}`);
+      this.addLog(`[WebRTC SDP] Signaling state: ${pc.signalingState}`);
     });
 
     pc.addEventListener('icegatheringstatechange', () => {
-      this.addLog(`[WebRTC ICE] Estado da coleta de candidatos: ${pc.iceGatheringState}`);
+      this.addLog(`[WebRTC ICE] Gathering state: ${pc.iceGatheringState}`);
     });
 
     pc.addEventListener('connectionstatechange', () => {
-      this.addLog(`[WebRTC Peer] Estado geral da conexão (DTLS): ${pc.connectionState}`);
+      this.addLog(`[WebRTC Peer] Connection state (DTLS): ${pc.connectionState}`);
       if (pc.connectionState === 'failed') {
-        this.addLog('[WebRTC Peer] Falha crítica no handshake de criptografia DTLS ou queda de transporte.');
+        this.addLog('[WebRTC Peer] Critical failure in DTLS encryption handshake or transport teardown.');
       }
     });
 
     pc.addEventListener('icecandidateerror', (event: Event) => {
       const err = event as RTCPeerConnectionIceErrorEvent;
       const host = err.url ? ` (${err.url})` : '';
-      this.addLog(`[WebRTC ICE Erro] Falha ao consultar endpoint STUN/TURN${host}: Código ${err.errorCode} - ${err.errorText || 'desconhecido'}`);
+      this.addLog(`[WebRTC ICE Error] Failed to query STUN/TURN endpoint${host}: Code ${err.errorCode} - ${err.errorText || 'unknown'}`);
     });
 
     pc.addEventListener('icecandidate', (e) => {
@@ -265,10 +266,10 @@ export class P2PConnectionTester {
         else if (type === 'srflx') this.state.metrics.localCandidates.srflx++;
         else if (type === 'relay') this.state.metrics.localCandidates.relay++;
 
-        this.addLog(`[ICE Local] Candidato descoberto: ${type} ${address}:${e.candidate.port ?? ''} (${e.candidate.protocol ?? 'udp'})`);
+        this.addLog(`[ICE Local] Candidate discovered: ${type} ${address}:${e.candidate.port ?? ''} (${e.candidate.protocol ?? 'udp'})`);
         this.notify();
       } else {
-        this.addLog('[ICE Local] Coleta de candidatos locais concluída.');
+        this.addLog('[ICE Local] Local candidate gathering completed.');
         this.state.stepIceGathering = 'success';
         this.notify();
         // Send candidate summary to peer
@@ -280,7 +281,7 @@ export class P2PConnectionTester {
 
     pc.addEventListener('iceconnectionstatechange', () => {
       const state = pc.iceConnectionState;
-      this.addLog(`[ICE Estado] Transição de estado de conexão ICE: ${state}`);
+      this.addLog(`[ICE State] Connection state transition: ${state}`);
       if (state === 'connected' || state === 'completed') {
         this.state.stepIceHandshake = 'success';
         this.state.phase = 'measuring';
@@ -288,7 +289,7 @@ export class P2PConnectionTester {
         this.runDataChannelMeasurements();
       } else if (state === 'failed') {
         this.state.stepIceHandshake = 'failed';
-        this.finishWithVerdict('failed', 'Falha no aperto de mão ICE: o firewall ou NAT descartou as conexões UDP diretas.');
+        this.finishWithVerdict('failed', 'ICE handshake failed: firewall or symmetric NAT dropped direct UDP connections.');
       }
     });
 
@@ -302,7 +303,7 @@ export class P2PConnectionTester {
 
   private async runDataChannelMeasurements() {
     this.state.stepDataChannel = 'running';
-    this.addLog('[Canal de Dados] Rota ICE estabelecida! Iniciando medição de latência e RTT...');
+    this.addLog('[DataChannel] ICE route established. Running RTT and latency measurement...');
     this.notify();
 
     let sent = 0;
@@ -320,7 +321,7 @@ export class P2PConnectionTester {
       try {
         void this.pingAction?.send({ seq: sent, sentAt: performance.now() });
       } catch (e) {
-        this.addLog(`[Canal de Dados] Erro ao enviar ping #${sent}: ${e}`);
+        this.addLog(`[DataChannel] Error sending ping probe #${sent}: ${e}`);
       }
     }, 400);
   }
@@ -337,7 +338,7 @@ export class P2PConnectionTester {
 
   private async inspectFinalStats() {
     if (!this.peerConnection) {
-      this.finishWithVerdict('optimal', 'Conexão direta estabelecida com sucesso.');
+      this.finishWithVerdict('optimal', 'Direct P2P connection successfully established.');
       return;
     }
 
@@ -354,10 +355,10 @@ export class P2PConnectionTester {
         const localAddr = local?.address ?? '';
         const remoteAddr = remote?.address ?? '';
 
-        this.state.metrics.localSelectedCandidate = `${localType} (${localAddr || 'protegido'})`;
-        this.state.metrics.remoteSelectedCandidate = `${remoteType} (${remoteAddr || 'protegido'})`;
+        this.state.metrics.localSelectedCandidate = `${localType} (${localAddr || 'protected'})`;
+        this.state.metrics.remoteSelectedCandidate = `${remoteType} (${remoteAddr || 'protected'})`;
 
-        this.addLog(`[Rota Selecionada] Local: ${this.state.metrics.localSelectedCandidate} <-> Remoto: ${this.state.metrics.remoteSelectedCandidate}`);
+        this.addLog(`[Selected Route] Local: ${this.state.metrics.localSelectedCandidate} <-> Remote: ${this.state.metrics.remoteSelectedCandidate}`);
 
         const isVpn = localAddr.startsWith('26.') || remoteAddr.startsWith('26.');
         const isRelay = localType === 'relay' || remoteType === 'relay';
@@ -365,22 +366,22 @@ export class P2PConnectionTester {
 
         if (isVpn) {
           this.state.metrics.connectionType = 'virtual_vpn';
-          this.finishWithVerdict('vpn', 'Conexão estabelecida com sucesso através do adaptador virtual VPN (Radmin/Hamachi).');
+          this.finishWithVerdict('vpn', 'Connection successfully routed through virtual VPN adapter (Radmin/Hamachi).');
         } else if (isRelay) {
           this.state.metrics.connectionType = 'turn_relay';
-          this.finishWithVerdict('optimal', 'Conexão estabelecida via servidor de retransmissão TURN.');
+          this.finishWithVerdict('optimal', 'Connection established via TURN relay server.');
         } else if (isLan) {
           this.state.metrics.connectionType = 'local_lan';
-          this.finishWithVerdict('optimal', 'Conexão direta na mesma rede local (LAN).');
+          this.finishWithVerdict('optimal', 'Direct local network connection (LAN).');
         } else {
           this.state.metrics.connectionType = 'direct_stun';
-          this.finishWithVerdict('optimal', 'Conexão P2P direta via Internet (STUN / Server-Reflexive). Excelente compatibilidade!');
+          this.finishWithVerdict('optimal', 'Direct P2P Internet connection (STUN / Server-Reflexive). Optimal compatibility.');
         }
       } else {
-        this.finishWithVerdict('optimal', 'Conexão P2P direta estabelecida com sucesso.');
+        this.finishWithVerdict('optimal', 'Direct P2P connection successfully established.');
       }
     } catch {
-      this.finishWithVerdict('optimal', 'Conexão P2P direta estabelecida com sucesso.');
+      this.finishWithVerdict('optimal', 'Direct P2P connection successfully established.');
     }
   }
 
@@ -390,18 +391,18 @@ export class P2PConnectionTester {
     this.state.stepDataChannel = verdict === 'failed' || verdict === 'timeout' ? 'failed' : 'success';
     this.state.verdict = verdict;
     this.state.verdictMessage = message;
-    this.addLog(`[Veredito] ${message}`);
+    this.addLog(`[Verdict] ${message}`);
     this.notify();
   }
 
   private handleTimeout() {
     if (this.state.phase === 'done') return;
-    this.addLog('[Tempo Esgotado] O teste não conseguiu estabelecer a conexão no tempo limite de 25 segundos.');
+    this.addLog('[Timeout] Test did not establish connection within 25-second limit.');
 
     if (!this.state.remotePeerId) {
-      this.finishWithVerdict('timeout', 'O outro usuário não entrou na sala de teste com o código fornecido. Verifique o código e tente novamente.');
+      this.finishWithVerdict('timeout', 'The other user did not join the test room with the provided session code.');
     } else {
-      this.finishWithVerdict('failed', 'Ambos os usuários entraram na sala, mas os roteadores descartaram a negociação de rota direta (típico de CGNAT duplo ou NAT Simétrico sem UPnP). Recomendado: usar o modo VPN (Radmin) ou servidor TURN.');
+      this.finishWithVerdict('failed', 'Both users joined the room, but routers dropped direct path negotiation (typical of double CGNAT or Symmetric NAT without UPnP). Recommendation: use VPN mode (Radmin) or TURN relay.');
     }
   }
 
@@ -410,24 +411,24 @@ export class P2PConnectionTester {
     const m = s.metrics;
     return [
       '==================================================',
-      '      RELATÓRIO DE DIAGNÓSTICO P2P - P2SHARER     ',
+      '         P2P DIAGNOSTIC REPORT - P2SHARER         ',
       '==================================================',
-      `Data/Hora: ${new Date().toLocaleString()}`,
-      `Código da Sessão: ${s.code}`,
-      `Papel Local: ${s.isHost ? 'Host (Criador)' : 'Conector (Participante)'}`,
-      `Peer Remoto: ${s.remotePeerId ?? 'Não conectado'}`,
-      `Veredito: ${s.verdictMessage ?? 'Inconclusivo'}`,
+      `Date/Time: ${new Date().toISOString()}`,
+      `Session Code: ${s.code}`,
+      `Local Role: ${s.isHost ? 'Host' : 'Connector'}`,
+      `Remote Peer: ${s.remotePeerId ?? 'Not connected'}`,
+      `Verdict: ${s.verdictMessage ?? 'Inconclusive'}`,
       '',
-      '--- MÉTRICAS DE REDE ---',
-      `Tipo de Rota: ${m.connectionType ?? 'N/A'}`,
-      `Candidato Local: ${m.localSelectedCandidate ?? 'N/A'}`,
-      `Candidato Remoto: ${m.remoteSelectedCandidate ?? 'N/A'}`,
-      `Latência RTT Média: ${m.avgRttMs != null ? m.avgRttMs + ' ms' : 'N/A'} (Mín: ${m.minRttMs ?? '—'}, Máx: ${m.maxRttMs ?? '—'})`,
-      `Amostras de Ping: ${m.rttSamples.join(', ') || 'Nenhuma'}`,
-      `Candidatos Locais Descobertos: Host=${m.localCandidates.host}, STUN=${m.localCandidates.srflx}, Relay=${m.localCandidates.relay}`,
-      `Candidatos Remotos Descobertos: Host=${m.remoteCandidates.host}, STUN=${m.remoteCandidates.srflx}, Relay=${m.remoteCandidates.relay}`,
+      '--- NETWORK METRICS ---',
+      `Route Type: ${m.connectionType ?? 'N/A'}`,
+      `Local Candidate: ${m.localSelectedCandidate ?? 'N/A'}`,
+      `Remote Candidate: ${m.remoteSelectedCandidate ?? 'N/A'}`,
+      `Average RTT Latency: ${m.avgRttMs != null ? m.avgRttMs + ' ms' : 'N/A'} (Min: ${m.minRttMs ?? '—'}, Max: ${m.maxRttMs ?? '—'})`,
+      `Ping Samples: ${m.rttSamples.join(', ') || 'None'}`,
+      `Discovered Local Candidates: Host=${m.localCandidates.host}, STUN=${m.localCandidates.srflx}, Relay=${m.localCandidates.relay}`,
+      `Discovered Remote Candidates: Host=${m.remoteCandidates.host}, STUN=${m.remoteCandidates.srflx}, Relay=${m.remoteCandidates.relay}`,
       '',
-      '--- LOGS TÉCNICOS DETALHADOS ---',
+      '--- DETAILED TECHNICAL LOGS ---',
       ...s.logs,
       '==================================================',
     ].join('\n');
