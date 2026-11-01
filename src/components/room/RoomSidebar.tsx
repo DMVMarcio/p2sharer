@@ -43,7 +43,7 @@ export const RoomSidebar: React.FC = () => {
         </button>
         <button
           type="button"
-          className="sidebar-mobile-close-btn"
+          className="sidebar-close-btn sidebar-mobile-close-btn"
           onClick={() => stateStore.set((s) => { s.isSidebarCollapsed = true; })}
           aria-label={t("message.0f2bd88ef0ac")}
         >

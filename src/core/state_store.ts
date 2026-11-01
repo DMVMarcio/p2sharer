@@ -11,6 +11,7 @@ function isWebRuntime(): boolean {
   const isTauriGlobal = typeof g.isTauri === 'function' ? g.isTauri() : Boolean(g.isTauri);
   return !('__TAURI_INTERNALS__' in window || '__TAURI__' in window || isTauriGlobal);
 }
+import { isMobileDevice } from './platform.ts';
 import { detectHardwareAcceleration } from './hardware_acceleration.ts';
 import { applyAppearanceAttributes } from './appearance_preferences.ts';
 
@@ -72,7 +73,7 @@ export class StateStore {
   public excludePids: Set<number> = new Set();
   public includePids: Set<number> = new Set();
 
-  public isSidebarCollapsed: boolean = typeof window !== 'undefined' && window.innerWidth <= 768;
+  public isSidebarCollapsed: boolean = isMobileDevice();
   public sidebarTab: 'chat' | 'participants' = 'chat';
   public unreadChatMessages = 0;
   public isSpotlightTrayCollapsed: boolean = false;

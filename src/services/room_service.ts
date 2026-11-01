@@ -1,3 +1,4 @@
+import { isMobileDevice } from '../core/platform.ts';
 import { localizeError, t } from '../i18n/index.ts';
 import { reconcilePinnedRoomSlot, streamOwner, type MediaKind, type StreamDescriptor } from "../core/media_streams.ts";
 import { StreamPointerReceiver } from './stream_pointer_receiver.ts';
@@ -241,7 +242,13 @@ export class RoomService {
 
     this.clearImagePreviews();
     this.chatMessages = [];
-    stateStore.set((state) => { state.unreadChatMessages = 0; state.sidebarTab = 'chat'; });
+    stateStore.set((state) => {
+      state.unreadChatMessages = 0;
+      state.sidebarTab = 'chat';
+      if (isMobileDevice()) {
+        state.isSidebarCollapsed = true;
+      }
+    });
     this.fileRequests = [];
     this.fileProgress = {};
     this.transferRates.clear();
@@ -762,7 +769,13 @@ export class RoomService {
     });
 
     this.chatMessages = [];
-    stateStore.set((state) => { state.unreadChatMessages = 0; state.sidebarTab = 'chat'; });
+    stateStore.set((state) => {
+      state.unreadChatMessages = 0;
+      state.sidebarTab = 'chat';
+      if (isMobileDevice()) {
+        state.isSidebarCollapsed = true;
+      }
+    });
     this.fileRequests = [];
     this.fileProgress = {};
     this.transferRates.clear();

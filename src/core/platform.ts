@@ -16,3 +16,17 @@ export function getLocalPlatform(): AppPlatform {
   }
   return 'web';
 }
+
+/**
+ * Detects if the current client is running on a mobile device or touch/small viewport.
+ */
+export function isMobileDevice(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (getLocalPlatform() === 'mobile') return true;
+  if (typeof window.matchMedia === 'function') {
+    if (window.matchMedia('(hover: none) and (pointer: coarse)').matches) return true;
+    if (window.matchMedia('(max-width: 900px)').matches) return true;
+    if (window.matchMedia('(max-height: 540px)').matches) return true;
+  }
+  return window.innerWidth <= 900 || window.innerHeight <= 540;
+}

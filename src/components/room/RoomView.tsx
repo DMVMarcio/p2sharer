@@ -1,14 +1,17 @@
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { usePanelSize } from '../../hooks/usePanelSize';
 import { PanelResizeHandle } from '../common/PanelResizeHandle';
 import { UnreadChatBadge } from './UnreadChatBadge';
 import { StreamHeaderBar } from './StreamHeaderBar';
 import { RoomVideoContainer } from './RoomVideoContainer';
 import { RoomSidebar } from './RoomSidebar';
+import { MobileRoomDock } from './MobileRoomDock';
 import { ChatFileRequests } from './ChatFileRequests';
 import { useRoom } from '../../hooks/useRoom';
+import { isMobileDevice } from '../../core/platform';
+import { stateStore } from '../../core/state_store';
 
 export const RoomView: React.FC = () => {
   useLocale();
@@ -16,10 +19,28 @@ export const RoomView: React.FC = () => {
   const layoutRef = useRef<HTMLDivElement>(null);
   const edgeRef = useRef<HTMLDivElement>(null);
   const sidebarSize = usePanelSize(layoutRef, 'width', 'p2sharer_sidebar_width', 320, 240, 240);
+  const [isMobile, setIsMobile] = useState(() => isMobileDevice());
+
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = isMobileDevice();
+      setIsMobile(mobile);
+      if (mobile) {
+        stateStore.set((s) => { s.isSidebarCollapsed = true; });
+      }
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    window.addEventListener('orientationchange', checkMobile);
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+      window.removeEventListener('orientationchange', checkMobile);
+    };
+  }, []);
 
   useEffect(() => {
     const container = layoutRef.current;
-    if (!container) return;
+    if (!container || isMobile) return;
 
     let isNearby = false;
     let rafId: number | null = null;
@@ -63,59 +84,73 @@ export const RoomView: React.FC = () => {
       container.removeEventListener('pointerleave', onPointerLeave);
       edgeRef.current?.classList.remove('is-nearby');
     };
-  }, []);
+  }, [isMobile]);
 
   return (
     <section className="view active" id="view-group-room">
-      <div className="room-layout" id="room-layout-container" ref={layoutRef}
-        style={{ '--room-sidebar-width': `${sidebarSize.size}px` } as React.CSSProperties}>
+      <div
+        className={`room-layout ${isMobile ? 'is-mobile' : ''}`}
+        id="room-layout-container"
+        ref={layoutRef}
+        style={{ '--room-sidebar-width': `${sidebarSize.size}px` } as React.CSSProperties}
+      >
         <div className="stream-area">
           <StreamHeaderBar />
           <RoomVideoContainer />
+          <MobileRoomDock />
         </div>
 
-        {/* Hoverable lateral sidebar toggle arrow (Desktop) */}
-        <div
-          ref={edgeRef}
-          className={`sidebar-toggle-edge ${isSidebarCollapsed ? 'collapsed' : 'expanded'} ${unreadChatMessages > 0 ? 'has-unread' : ''}`}
-        >
-          <button
-            type="button"
-            className="sidebar-edge-toggle-btn"
-            id="btn-sidebar-edge-toggle"
-            onClick={toggleSidebar}
-            aria-expanded={!isSidebarCollapsed}
-            aria-controls="room-sidebar"
-            aria-label={isSidebarCollapsed ? t("message.86d416fc47cf") : t("message.182641374267")}
+        {/* Hoverable lateral sidebar toggle arrow (Desktop only) */}
+        {!isMobile && (
+          <div
+            ref={edgeRef}
+            className={`sidebar-toggle-edge ${isSidebarCollapsed ? 'collapsed' : 'expanded'} ${unreadChatMessages > 0 ? 'has-unread' : ''}`}
           >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+            <button
+              type="button"
+              className="sidebar-edge-toggle-btn"
+              id="btn-sidebar-edge-toggle"
+              onClick={toggleSidebar}
+              aria-expanded={!isSidebarCollapsed}
+              aria-controls="room-sidebar"
+              aria-label={isSidebarCollapsed ? t("message.86d416fc47cf") : t("message.182641374267")}
             >
-              {isSidebarCollapsed ? (
-                <polyline points="15 18 9 12 15 6" />
-              ) : (
-                <polyline points="9 18 15 12 9 6" />
-              )}
-            </svg>
-            {isSidebarCollapsed && <UnreadChatBadge count={unreadChatMessages} />}
-          </button>
-        </div>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                {isSidebarCollapsed ? (
+                  <polyline points="15 18 9 12 15 6" />
+                ) : (
+                  <polyline points="9 18 15 12 9 6" />
+                )}
+              </svg>
+              {isSidebarCollapsed && <UnreadChatBadge count={unreadChatMessages} />}
+            </button>
+          </div>
+        )}
 
-        {/* Mobile backdrop for drawer sidebar */}
+        {/* Backdrop for drawer sidebar on mobile / overlay */}
         <div
           className={`room-sidebar-backdrop ${!isSidebarCollapsed ? 'visible' : ''}`}
           onClick={toggleSidebar}
           aria-hidden="true"
         />
 
-        {!isSidebarCollapsed && <PanelResizeHandle axis="width" label={t('layout.resizeChat')} controls="room-sidebar" {...sidebarSize} />}
+        {!isSidebarCollapsed && !isMobile && (
+          <PanelResizeHandle
+            axis="width"
+            label={t('layout.resizeChat')}
+            controls="room-sidebar"
+            {...sidebarSize}
+          />
+        )}
         <RoomSidebar />
       </div>
       <ChatFileRequests />
