@@ -2754,6 +2754,16 @@ html[data-theme="light"] :is(.stream-card, .pip-window-root) {
     display: none !important;
   }
 
+  .streams-grid-wrapper {
+    scrollbar-gutter: auto;
+    overflow-x: hidden;
+  }
+
+  .room-card-canvas {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
   .stream-mobile-sidebar-toggles {
     display: inline-flex;
     align-items: center;

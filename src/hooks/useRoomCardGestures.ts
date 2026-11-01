@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type RefObject } from 'react';
 import { moveOrderedItem } from '../core/ordered_items';
 import { placeCardAtPoint, resizeCardScale, type CardLayout, type CardResizeEdge } from '../core/room_card_layout';
+import { isMobileDevice } from '../core/platform';
 
 interface Options {
   mode: 'grid' | 'spotlight';
@@ -147,7 +148,7 @@ export function useRoomCardGestures(options: Options) {
     ? target.closest<HTMLElement>('[data-sortable-id], [data-room-layout-id]')?.dataset : undefined;
   const onPointerDownCapture = (event: ReactPointerEvent<HTMLDivElement>) => {
     suppressClick.current = null;
-    if (event.button !== 0 || event.shiftKey || pending.current || !(event.target instanceof Element)) return;
+    if (isMobileDevice() || event.button !== 0 || event.shiftKey || pending.current || !(event.target instanceof Element)) return;
     const data = identity(event.target);
     const id = data?.sortableId || data?.roomLayoutId;
     const node = id && nodes.current.get(id);

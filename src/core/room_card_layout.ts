@@ -17,7 +17,8 @@ export function automaticCardRows(ids: string[], width: number, height: number):
   if (!ids.length) return { rows: [], baseWidth: 0 };
   let columns = 1;
   let best = 0;
-  for (let count = ids.length === 2 ? 2 : 1; count <= ids.length; count++) {
+  const forcePair = ids.length === 2 && width >= 600 && width >= height;
+  for (let count = forcePair ? 2 : 1; count <= ids.length; count++) {
     const rows = Math.ceil(ids.length / count);
     const size = Math.min((width - GAP * (count - 1)) / count, (height - GAP * (rows - 1)) / rows * ASPECT);
     if (size > best) { best = size; columns = count; }

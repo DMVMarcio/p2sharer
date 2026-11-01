@@ -16,6 +16,7 @@ import { ParticipantCard } from './ParticipantCard';
 import { RoomSlotInfo } from '../../core/types';
 import { useRoomCardGestures } from '../../hooks/useRoomCardGestures';
 import { calculateCardLayout } from '../../core/room_card_layout';
+import { isMobileDevice } from '../../core/platform';
 import { RoomCardFrame, RoomCardPlaceholder } from './RoomCardFrame';
 import { RoomCardLayoutContext, RoomCardLayoutSurface } from './RoomCardLayoutContext';
 
@@ -151,7 +152,7 @@ export const RoomVideoContainer: React.FC = () => {
     const dragging = gestures.draggingId === id;
     return <React.Fragment key={id}>
       {inTray && dragging && <RoomCardPlaceholder key={`placeholder:${id}`} />}
-      <RoomCardFrame key={id} id={id} cardRef={gestures.cardRef(id)} dragging={dragging} resizable={!inTray}
+      <RoomCardFrame key={id} id={id} cardRef={gestures.cardRef(id)} dragging={dragging} resizable={!inTray && !isMobileDevice()}
         style={dragging ? floating : inTray ? undefined : placement && { position: 'absolute', left: placement.left, top: placement.top,
           width: placement.width, height: placement.height }}>
         {renderSlotCard(slot, false, inTray, inTray && id === (featuredSlot && entryId(featuredSlot)))}

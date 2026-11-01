@@ -12,10 +12,13 @@ test('every border and corner resizes outward consistently and clamps unsafe siz
   assert.equal(resizeCardScale(1, 200, 100, 'se', 10000, 10000), 2.5);
 });
 
-test('automatic layout keeps pairs horizontal and optimizes larger groups', () => {
-  for (const [width, height] of [[1200, 800], [480, 900]]) {
+test('automatic layout keeps pairs horizontal on wide screens, vertical on mobile/portrait, and optimizes larger groups', () => {
+  for (const [width, height] of [[1200, 800], [800, 500]]) {
     assert.deepEqual(calculateCardLayout(['a', 'b'], width, height).rows, [['a', 'b']]);
     assert.deepEqual(calculateCardLayout(['a', 'b'], width, height, {}, [['a'], ['b']]).rows, [['a'], ['b']]);
+  }
+  for (const [width, height] of [[480, 900], [390, 844]]) {
+    assert.deepEqual(calculateCardLayout(['a', 'b'], width, height).rows, [['a'], ['b']]);
   }
   const layout = calculateCardLayout(['a', 'b', 'c'], 1200, 800);
   assert.deepEqual(layout.rows, [['a'], ['b', 'c']]);
