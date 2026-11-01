@@ -40,6 +40,7 @@ pub struct NetworkDiagnosticResult {
     pub upnp_port_mapped: bool,
     pub stun_latency_ms: Option<u64>,
     pub recommendation: String,
+    pub logs: Vec<String>,
 }
 
 pub fn is_cgnat_ip(ip: Ipv4Addr) -> bool {
@@ -169,45 +170,82 @@ async fn query_stun_server(socket: &UdpSocket, server_str: &str) -> Result<(Sock
 pub async fn run_network_diagnostics(
     upnp_state: tauri::State<'_, crate::upnp::UpnpState>,
 ) -> Result<NetworkDiagnosticResult, String> {
+    let mut logs = Vec::new();
+
     // 1. UPnP Discovery & Status
+    logs.push("[UPnP] Initiating SSDP discovery for InternetGatewayDevice...".into());
     upnp_state.init_discovery().await;
     let upnp_status = upnp_state.status();
     let upnp_available = upnp_status.available;
     let upnp_gateway = upnp_status.gateway.clone();
     let upnp_external_ip = upnp_state.get_external_ip().await;
 
+    if upnp_available {
+        logs.push(format!("[UPnP] Gateway discovered: {}", upnp_gateway.as_deref().unwrap_or("available")));
+        if let Some(ext) = &upnp_external_ip {
+            logs.push(format!("[UPnP] Gateway WAN external IP: {}", ext));
+        }
+    } else {
+        logs.push("[UPnP] No responsive UPnP IGD gateway found on local network".into());
+    }
+
     // Test UPnP UDP port mapping on a dynamic port
     let upnp_port_mapped = if upnp_available {
-        upnp_state.map_port(54320, "UDP").await
+        let mapped = upnp_state.map_port(54320, "UDP").await;
+        if mapped {
+            logs.push("[UPnP] Port mapping test: UDP port 54320 mapped successfully".into());
+        } else {
+            logs.push("[UPnP] Port mapping test: Gateway rejected port map request".into());
+        }
+        mapped
     } else {
         false
     };
 
     // 2. STUN Resolution & NAT Type Determination
+    logs.push("[STUN] Binding ephemeral local UDP socket...".into());
     let socket = UdpSocket::bind("0.0.0.0:0")
         .await
         .map_err(|e| format!("Failed to bind local UDP socket: {e}"))?;
 
+    logs.push(format!("[STUN] Querying primary STUN endpoint: {}", DEFAULT_STUN_SERVERS[0]));
     let primary_res = query_stun_server(&socket, DEFAULT_STUN_SERVERS[0]).await;
+    match &primary_res {
+        Ok((ep, rtt)) => logs.push(format!("[STUN] Primary response received in {}ms: mapped to {}", rtt.as_millis(), ep)),
+        Err(e) => logs.push(format!("[STUN] Primary query failed: {}", e)),
+    }
+
+    logs.push(format!("[STUN] Querying secondary STUN endpoint from same socket: {}", DEFAULT_STUN_SERVERS[1]));
     let secondary_res = query_stun_server(&socket, DEFAULT_STUN_SERVERS[1]).await;
+    match &secondary_res {
+        Ok((ep, rtt)) => logs.push(format!("[STUN] Secondary response received in {}ms: mapped to {}", rtt.as_millis(), ep)),
+        Err(e) => logs.push(format!("[STUN] Secondary query failed: {}", e)),
+    }
 
     let (nat_type, public_ip, stun_latency_ms) = match (&primary_res, &secondary_res) {
         (Ok((ep1, rtt1)), Ok((ep2, _rtt2))) => {
             let ip_str = ep1.ip().to_string();
             let latency = rtt1.as_millis() as u64;
             if ep1.port() == ep2.port() {
+                logs.push(format!("[NAT Analysis] Both queries mapped to same port {}. Classification: Cone / Open.", ep1.port()));
                 (NatType::Cone, Some(ip_str), Some(latency))
             } else {
+                logs.push(format!("[NAT Analysis] Port changed between destinations ({} -> {}). Classification: Symmetric / Strict.", ep1.port(), ep2.port()));
                 (NatType::Symmetric, Some(ip_str), Some(latency))
             }
         }
         (Ok((ep, rtt)), Err(_)) => {
+            logs.push("[NAT Analysis] Only primary STUN server responded. Assuming Moderate / Cone.".into());
             (NatType::Cone, Some(ep.ip().to_string()), Some(rtt.as_millis() as u64))
         }
         (Err(_), Ok((ep, rtt))) => {
+            logs.push("[NAT Analysis] Only secondary STUN server responded. Assuming Moderate / Cone.".into());
             (NatType::Cone, Some(ep.ip().to_string()), Some(rtt.as_millis() as u64))
         }
-        (Err(_), Err(_)) => (NatType::Blocked, None, None),
+        (Err(_), Err(_)) => {
+            logs.push("[NAT Analysis] Both STUN queries failed. UDP packets appear blocked by firewall or ISP.".into());
+            (NatType::Blocked, None, None)
+        }
     };
 
     // 3. CGNAT & Double NAT Classification
@@ -220,12 +258,15 @@ pub async fn run_network_diagnostics(
             if is_cgnat_ip(ip) {
                 cgnat_detected = true;
                 cgnat_details = Some("Carrier-Grade NAT (RFC 6598) detected on gateway WAN".into());
+                logs.push("[Topology] Carrier-Grade NAT confirmed via router WAN IP range (RFC 6598 prefix)".into());
             } else if is_private_ip(ip) {
                 double_nat_detected = true;
                 cgnat_details = Some("Double NAT detected (gateway WAN IP is in a private network range)".into());
+                logs.push("[Topology] Double NAT confirmed: Gateway WAN IP is in private subnet range".into());
             } else {
                 cgnat_detected = false;
                 cgnat_details = Some("Direct public IP confirmed on gateway WAN (no CGNAT)".into());
+                logs.push("[Topology] Direct public IP verified on gateway WAN interface".into());
             }
         }
     } else {
@@ -242,9 +283,11 @@ pub async fn run_network_diagnostics(
         if has_cgnat_interface {
             cgnat_detected = true;
             cgnat_details = Some("Carrier-Grade NAT IP found directly on a local network interface".into());
+            logs.push("[Topology] Carrier-Grade NAT IP detected directly on host network interface".into());
         } else if nat_type == NatType::Symmetric {
             cgnat_detected = true;
             cgnat_details = Some("Symmetric NAT detected via STUN (typical of strict ISP CGNAT or corporate firewalls)".into());
+            logs.push("[Topology] Symmetric NAT heuristic suggests Carrier-Grade NAT or restrictive firewall".into());
         }
     }
 
@@ -269,6 +312,8 @@ pub async fn run_network_diagnostics(
         _ => "moderate".into(),
     };
 
+    logs.push(format!("[Verdict] NAT: {} | Recommendation: {}", nat_description, recommendation));
+
     Ok(NetworkDiagnosticResult {
         nat_type,
         nat_description,
@@ -282,6 +327,7 @@ pub async fn run_network_diagnostics(
         upnp_port_mapped,
         stun_latency_ms,
         recommendation,
+        logs,
     })
 }
 

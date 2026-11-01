@@ -165,7 +165,8 @@ export async function invokeBrowser(command: string, input?: unknown, options?: 
       upnp_external_ip: null,
       upnp_port_mapped: false,
       stun_latency_ms: null,
-      recommendation: 'moderate'
+      recommendation: 'moderate',
+      logs: ['[Browser] Native STUN and UPnP sockets are not supported in web browser mode.']
     };
     default: throw new Error(t('web.desktopOnly'));
   }

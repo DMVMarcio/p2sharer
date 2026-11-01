@@ -1531,5 +1531,21 @@
   "network.diagnostics.recOptimal": "Excellent ! Votre réseau prend en charge les connexions P2P directes sans restriction.",
   "network.diagnostics.recModerate": "Bonne connectivité. Le P2P direct devrait fonctionner avec la plupart des pairs.",
   "network.diagnostics.recRestricted": "NAT symétrique ou CGNAT détecté. En cas de difficulté à vous connecter, activez UPnP sur votre routeur, utilisez le mode Réseau local / VPN (Radmin) ou configurez un serveur TURN.",
-  "network.diagnostics.recBlocked": "Trafic UDP bloqué. Vérifiez le pare-feu Windows ou votre antivirus pour autoriser P2Sharer."
+  "network.diagnostics.recBlocked": "Trafic UDP bloqué. Vérifiez le pare-feu Windows ou votre antivirus pour autoriser P2Sharer.",
+  "p2pTest.modalTitle": "Test de connexion pair-à-pair",
+  "p2pTest.openButton": "Tester avec un pair",
+  "p2pTest.tabHost": "Créer une session (Hôte)",
+  "p2pTest.tabJoin": "Rejoindre avec un code",
+  "p2pTest.hostHint": "Partagez ce code temporaire avec votre pair. Lorsque les deux lanceront le test, le diagnostic s'exécutera.",
+  "p2pTest.joinHint": "Saisissez le code à 6 caractères généré par votre pair pour lancer le test de connexion mutuel.",
+  "p2pTest.startTest": "Démarrer le test P2P",
+  "p2pTest.stepSignaling": "Signalisation et Rendez-vous",
+  "p2pTest.stepOfferAnswer": "Échange Offre / Réponse SDP",
+  "p2pTest.stepIceGathering": "Collecte des candidats ICE",
+  "p2pTest.stepIceHandshake": "Négociation de connectivité ICE et DTLS",
+  "p2pTest.stepDataChannel": "Canal de données et mesure de latence",
+  "p2pTest.copyReport": "Copier le rapport complet",
+  "p2pTest.reportCopied": "Rapport copié dans le presse-papiers !",
+  "network.diagnostics.viewLogs": "Afficher les journaux techniques",
+  "network.diagnostics.copyLogs": "Copier les journaux"
 }

@@ -1531,5 +1531,21 @@
   "network.diagnostics.recOptimal": "極佳！您的網路環境支援順暢的直接 P2P 連線，無任何限制。",
   "network.diagnostics.recModerate": "連線良好。直接 P2P 應可與多數使用者正常建立。",
   "network.diagnostics.recRestricted": "偵測到對稱型 NAT 或電信 CGNAT。若與部分使用者連線受阻，請在路由器啟用 UPnP、改用區域網路 / VPN 模式（如 Radmin），或設定自建 TURN 轉發伺服器。",
-  "network.diagnostics.recBlocked": "UDP 通訊受阻。請檢查 Windows 防火牆或防毒軟體設定以允許 P2Sharer。"
+  "network.diagnostics.recBlocked": "UDP 通訊受阻。請檢查 Windows 防火牆或防毒軟體設定以允許 P2Sharer。",
+  "p2pTest.modalTitle": "點對點 (P2P) 連線測試",
+  "p2pTest.openButton": "與好友進行 P2P 測速",
+  "p2pTest.tabHost": "建立測試（發起端）",
+  "p2pTest.tabJoin": "輸入代碼加入",
+  "p2pTest.hostHint": "將此臨時代碼分享給對方。雙方均開始測試後，將即時執行詳細的 P2P 診斷。",
+  "p2pTest.joinHint": "輸入對方產生的 6 位代碼以開始雙向連線測試。",
+  "p2pTest.startTest": "開始 P2P 測試",
+  "p2pTest.stepSignaling": "信令交握與轉發發現",
+  "p2pTest.stepOfferAnswer": "SDP 提議與應答交換",
+  "p2pTest.stepIceGathering": "ICE 候選路由搜尋與收集",
+  "p2pTest.stepIceHandshake": "ICE 與 DTLS 加密連線交握",
+  "p2pTest.stepDataChannel": "資料通道建立與往返延遲測定",
+  "p2pTest.copyReport": "複製完整診斷報告",
+  "p2pTest.reportCopied": "診斷報告已複製至剪貼簿！",
+  "network.diagnostics.viewLogs": "檢視技術記錄",
+  "network.diagnostics.copyLogs": "複製記錄"
 }

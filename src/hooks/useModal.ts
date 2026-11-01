@@ -14,6 +14,7 @@ export type ModalType =
   | 'roomSecurity'
   | 'externalLink'
   | 'apps'
+  | 'p2pTest'
   | null;
 
 export interface ProfileTarget { peerId: string; name: string; isLocal?: boolean; color?: string }

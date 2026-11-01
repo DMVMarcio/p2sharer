@@ -1531,5 +1531,21 @@
   "network.diagnostics.recOptimal": "良好です！お使いのネットワークは制限なくダイレクト P2P 接続に対応しています。",
   "network.diagnostics.recModerate": "安定しています。大半の相手とダイレクト P2P 接続が可能です。",
   "network.diagnostics.recRestricted": "対称型 NAT または CGNAT が検出されました。特定の相手と接続できない場合は、ルーターで UPnP を有効にするか、ローカル / VPN モード（Radmin 等）を使用するか、独自の TURN サーバーを設定してください。",
-  "network.diagnostics.recBlocked": "UDP 通信が遮断されています。Windows ファイアウォールやセキュリティソフトで P2Sharer を許可してください。"
+  "network.diagnostics.recBlocked": "UDP 通信が遮断されています。Windows ファイアウォールやセキュリティソフトで P2Sharer を許可してください。",
+  "p2pTest.modalTitle": "P2P ピア間接続テスト",
+  "p2pTest.openButton": "相手と接続テスト",
+  "p2pTest.tabHost": "セッション作成（ホスト）",
+  "p2pTest.tabJoin": "コードで参加",
+  "p2pTest.hostHint": "このテストコードを相手に共有してください。双方が開始すると P2P 診断が実行されます。",
+  "p2pTest.joinHint": "相手が生成した 6 桁のコードを入力して、相互接続テストを開始します。",
+  "p2pTest.startTest": "P2P テスト開始",
+  "p2pTest.stepSignaling": "シグナリング & ランデブー",
+  "p2pTest.stepOfferAnswer": "SDP オファー / アンサー交換",
+  "p2pTest.stepIceGathering": "ICE 候補の収集",
+  "p2pTest.stepIceHandshake": "ICE & DTLS 接続ハンドシェイク",
+  "p2pTest.stepDataChannel": "データチャネル & 遅延測定",
+  "p2pTest.copyReport": "診断レポートをコピー",
+  "p2pTest.reportCopied": "レポートをクリップボードにコピーしました！",
+  "network.diagnostics.viewLogs": "技術ログを表示",
+  "network.diagnostics.copyLogs": "ログをコピー"
 }

@@ -1531,5 +1531,21 @@
   "network.diagnostics.recOptimal": "Отлично! Ваша сеть поддерживает прямые P2P-соединения без ограничений.",
   "network.diagnostics.recModerate": "Хорошее соединение. Прямой P2P должен работать с большинством пользователей.",
   "network.diagnostics.recRestricted": "Обнаружен симметричный NAT или CGNAT. При проблемах с подключением включите UPnP на роутере, используйте режим Локальная сеть / VPN (Radmin) или настройте собственный TURN-сервер.",
-  "network.diagnostics.recBlocked": "UDP-трафик заблокирован. Проверьте Брандмауэр Windows или антивирус, чтобы разрешить P2Sharer."
+  "network.diagnostics.recBlocked": "UDP-трафик заблокирован. Проверьте Брандмауэр Windows или антивирус, чтобы разрешить P2Sharer.",
+  "p2pTest.modalTitle": "Тест P2P-соединения между пирами",
+  "p2pTest.openButton": "Тест с другим пользователем",
+  "p2pTest.tabHost": "Создать сессию (Хост)",
+  "p2pTest.tabJoin": "Войти по коду",
+  "p2pTest.hostHint": "Поделитесь этим временным кодом с другим пользователем. Когда оба запустят тест, начнется диагностика.",
+  "p2pTest.joinHint": "Введите 6-значный код, созданный другим пользователем, чтобы начать тест соединения.",
+  "p2pTest.startTest": "Начать P2P-тест",
+  "p2pTest.stepSignaling": "Сигнализация и рандеву",
+  "p2pTest.stepOfferAnswer": "Обмен SDP Offer / Answer",
+  "p2pTest.stepIceGathering": "Сбор кандидатов ICE",
+  "p2pTest.stepIceHandshake": "Рукопожатие ICE и DTLS",
+  "p2pTest.stepDataChannel": "Канал данных и измерение задержки",
+  "p2pTest.copyReport": "Скопировать полный отчет",
+  "p2pTest.reportCopied": "Отчет скопирован в буфер обмена!",
+  "network.diagnostics.viewLogs": "Посмотреть тех. логи",
+  "network.diagnostics.copyLogs": "Скопировать логи"
 }

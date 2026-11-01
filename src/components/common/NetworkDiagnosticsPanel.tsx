@@ -1,13 +1,17 @@
 import React, { useState, useCallback } from 'react';
 import { t } from '../../i18n/index.ts';
 import { useLocale } from '../../hooks/useLocale.ts';
+import { useModal } from '../../hooks/useModal.ts';
+import { showToast } from '../../hooks/useToast.ts';
 import { runNetworkDiagnostics, type NetworkDiagnosticResult } from '../../services/network_diagnostics.ts';
 
 export const NetworkDiagnosticsPanel: React.FC = () => {
   useLocale();
+  const { openModal } = useModal();
   const [isRunning, setIsRunning] = useState(false);
   const [result, setResult] = useState<NetworkDiagnosticResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showLogs, setShowLogs] = useState(false);
 
   const handleRun = useCallback(async () => {
     setIsRunning(true);
@@ -21,6 +25,16 @@ export const NetworkDiagnosticsPanel: React.FC = () => {
       setIsRunning(false);
     }
   }, []);
+
+  const handleCopyLogs = async () => {
+    if (!result?.logs) return;
+    try {
+      await navigator.clipboard.writeText(result.logs.join('\n'));
+      showToast(t('p2pTest.reportCopied'));
+    } catch {
+      showToast('Logs copiados!');
+    }
+  };
 
   return (
     <div className="network-diagnostics-container">
@@ -53,6 +67,20 @@ export const NetworkDiagnosticsPanel: React.FC = () => {
               <span>{t('network.diagnostics.run')}</span>
             </>
           )}
+        </button>
+
+        <button
+          type="button"
+          className="btn btn-sm btn-primary network-diagnostics-btn"
+          onClick={() => openModal('p2pTest')}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <line x1="19" y1="8" x2="19" y2="14" />
+            <line x1="22" y1="11" x2="16" y2="11" />
+          </svg>
+          <span>{t('p2pTest.openButton')}</span>
         </button>
       </div>
 
@@ -158,6 +186,50 @@ export const NetworkDiagnosticsPanel: React.FC = () => {
                 : t('network.diagnostics.recModerate')}
             </p>
           </div>
+
+          {/* Expandable Technical Logs */}
+          {result.logs && result.logs.length > 0 && (
+            <div className="diagnostics-logs-section">
+              <div className="diagnostics-logs-toggle-row">
+                <button
+                  type="button"
+                  className="btn btn-xs btn-outline"
+                  onClick={() => setShowLogs(!showLogs)}
+                >
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    style={{ transform: showLogs ? 'rotate(180deg)' : 'none', transition: 'transform 150ms' }}
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                  <span>{t('network.diagnostics.viewLogs')}</span>
+                </button>
+                {showLogs && (
+                  <button
+                    type="button"
+                    className="btn btn-xs btn-outline"
+                    onClick={handleCopyLogs}
+                  >
+                    {t('network.diagnostics.copyLogs')}
+                  </button>
+                )}
+              </div>
+              {showLogs && (
+                <div className="diagnostics-logs-scroll">
+                  {result.logs.map((log, idx) => (
+                    <div key={idx} className="p2p-test-log-line">
+                      {log}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

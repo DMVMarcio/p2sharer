@@ -13,6 +13,7 @@ export interface NetworkDiagnosticResult {
   upnp_port_mapped: boolean;
   stun_latency_ms: number | null;
   recommendation: 'optimal' | 'moderate' | 'restricted' | 'blocked';
+  logs: string[];
 }
 
 export async function runNetworkDiagnostics(): Promise<NetworkDiagnosticResult> {

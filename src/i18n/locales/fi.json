@@ -1531,5 +1531,21 @@
   "network.diagnostics.recOptimal": "Erinomainen! Verkkosi tukee suoria P2P-yhteyksiä ilman rajoituksia.",
   "network.diagnostics.recModerate": "Hyvä yhteys. Suoran P2P-yhteyden pitäisi toimia useimpien käyttäjien kanssa.",
   "network.diagnostics.recRestricted": "Symmetrinen NAT tai CGNAT havaittu. Jos et saa yhteyttä tiettyihin käyttäjiin, ota UPnP käyttöön reitittimessä, käytä Paikallisverkko / VPN -tilaa (Radmin) tai määritä oma TURN-palvelin.",
-  "network.diagnostics.recBlocked": "UDP-liikenne on estetty. Tarkista Windowsin palomuuri tai virustorjunta salliaksesi P2Sharer."
+  "network.diagnostics.recBlocked": "UDP-liikenne on estetty. Tarkista Windowsin palomuuri tai virustorjunta salliaksesi P2Sharer.",
+  "p2pTest.modalTitle": "Vertaisverkon (P2P) yhteystesti",
+  "p2pTest.openButton": "Testaa toisen käyttäjän kanssa",
+  "p2pTest.tabHost": "Luo istunto (Isäntä)",
+  "p2pTest.tabJoin": "Liity koodilla",
+  "p2pTest.hostHint": "Jaa tämä väliaikainen koodi toiselle käyttäjälle. Kun molemmat aloittavat, P2P-diagnostiikka suoritetaan.",
+  "p2pTest.joinHint": "Syötä toisen käyttäjän luoma 6-merkkinen koodi aloittaaksesi yhteystestin.",
+  "p2pTest.startTest": "Aloita P2P-testi",
+  "p2pTest.stepSignaling": "Signalointi ja kohtaaminen",
+  "p2pTest.stepOfferAnswer": "SDP-tarjouksen ja vastauksen vaihto",
+  "p2pTest.stepIceGathering": "ICE-kandidaattien kerääminen",
+  "p2pTest.stepIceHandshake": "ICE- ja DTLS-yhteyskättely",
+  "p2pTest.stepDataChannel": "Datakanava ja latenssimittaus",
+  "p2pTest.copyReport": "Kopioi koko raportti",
+  "p2pTest.reportCopied": "Raportti kopioitu leikepöydälle!",
+  "network.diagnostics.viewLogs": "Näytä tekniset lokit",
+  "network.diagnostics.copyLogs": "Kopioi lokit"
 }

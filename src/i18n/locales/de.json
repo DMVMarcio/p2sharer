@@ -1531,5 +1531,21 @@
   "network.diagnostics.recOptimal": "Hervorragend! Ihr Netzwerk unterstützt direkte P2P-Verbindungen ohne Einschränkungen.",
   "network.diagnostics.recModerate": "Gute Konnektivität. Direktes P2P sollte mit den meisten Teilnehmern funktionieren.",
   "network.diagnostics.recRestricted": "Symmetrisches NAT oder CGNAT erkannt. Bei Verbindungsproblemen aktivieren Sie UPnP im Router, nutzen Sie den Modus Lokales Netzwerk / VPN (Radmin) oder konfigurieren Sie einen TURN-Server.",
-  "network.diagnostics.recBlocked": "UDP-Datenverkehr blockiert. Überprüfen Sie Windows-Firewall oder Antivirus, um P2Sharer zuzulassen."
+  "network.diagnostics.recBlocked": "UDP-Datenverkehr blockiert. Überprüfen Sie Windows-Firewall oder Antivirus, um P2Sharer zuzulassen.",
+  "p2pTest.modalTitle": "Peer-to-Peer-Verbindungstest",
+  "p2pTest.openButton": "Mit einem Peer testen",
+  "p2pTest.tabHost": "Sitzung erstellen (Host)",
+  "p2pTest.tabJoin": "Mit Code beitreten",
+  "p2pTest.hostHint": "Teilen Sie diesen temporären Code mit Ihrem Peer. Sobald beide starten, wird die P2P-Diagnose ausgeführt.",
+  "p2pTest.joinHint": "Geben Sie den vom Peer generierten 6-stelligen Code ein, um den Verbindungstest zu starten.",
+  "p2pTest.startTest": "P2P-Test starten",
+  "p2pTest.stepSignaling": "Signalisierung und Rendezvous",
+  "p2pTest.stepOfferAnswer": "SDP-Offer/Answer-Austausch",
+  "p2pTest.stepIceGathering": "ICE-Kandidatensammlung",
+  "p2pTest.stepIceHandshake": "ICE- und DTLS-Verbindungsaufbau",
+  "p2pTest.stepDataChannel": "DataChannel und Latenzmessung",
+  "p2pTest.copyReport": "Vollständigen Bericht kopieren",
+  "p2pTest.reportCopied": "Bericht in die Zwischenablage kopiert!",
+  "network.diagnostics.viewLogs": "Technische Protokolle anzeigen",
+  "network.diagnostics.copyLogs": "Protokolle kopieren"
 }

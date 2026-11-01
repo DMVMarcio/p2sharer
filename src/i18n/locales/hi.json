@@ -1531,5 +1531,21 @@
   "network.diagnostics.recOptimal": "उत्कृष्ट! आपका नेटवर्क बिना किसी प्रतिबंध के सीधे P2P कनेक्शन का समर्थन करता है।",
   "network.diagnostics.recModerate": "अच्छा कनेक्शन। अधिकांश उपयोगकर्ताओं के साथ सीधा P2P काम करना चाहिए।",
   "network.diagnostics.recRestricted": "सममित NAT या CGNAT पाया गया। यदि आप कुछ उपयोगकर्ताओं से कनेक्ट नहीं हो पा रहे हैं, तो अपने राउटर पर UPnP सक्षम करें, स्थानीय नेटवर्क / VPN मोड (Radmin) का उपयोग करें, या अपना TURN सर्वर कॉन्फ़िगर करें।",
-  "network.diagnostics.recBlocked": "UDP ट्रैफ़िक अवरुद्ध है। P2Sharer की अनुमति देने के लिए अपने Windows फ़ायरवॉल या एंटीवायरस की जाँच करें।"
+  "network.diagnostics.recBlocked": "UDP ट्रैफ़िक अवरुद्ध है। P2Sharer की अनुमति देने के लिए अपने Windows फ़ायरवॉल या एंटीवायरस की जाँच करें।",
+  "p2pTest.modalTitle": "पीयर-टू-पीयर कनेक्शन परीक्षण",
+  "p2pTest.openButton": "साथी के साथ परीक्षण करें",
+  "p2pTest.tabHost": "सत्र बनाएं (होस्ट)",
+  "p2pTest.tabJoin": "कोड से जुड़ें",
+  "p2pTest.hostHint": "यह अस्थायी परीक्षण कोड अपने साथी के साथ साझा करें। जब दोनों शुरू करेंगे, तो P2P निदान चलेगा।",
+  "p2pTest.joinHint": "पारस्परिक कनेक्शन परीक्षण शुरू करने के लिए अपने साथी द्वारा जनरेट किया गया 6-अंकीय कोड दर्ज करें।",
+  "p2pTest.startTest": "P2P परीक्षण शुरू करें",
+  "p2pTest.stepSignaling": "सिग्नलिंग और रेंडेवू",
+  "p2pTest.stepOfferAnswer": "SDP ऑफ़र / उत्तर विनिमय",
+  "p2pTest.stepIceGathering": "ICE उम्मीदवार संग्रह",
+  "p2pTest.stepIceHandshake": "ICE और DTLS कनेक्टिविटी हैंडशेक",
+  "p2pTest.stepDataChannel": "डेटा चैनल और विलंबता माप",
+  "p2pTest.copyReport": "पूरी रिपोर्ट कॉपी करें",
+  "p2pTest.reportCopied": "रिपोर्ट क्लिपबोर्ड पर कॉपी हो गई!",
+  "network.diagnostics.viewLogs": "तकनीकी लॉग देखें",
+  "network.diagnostics.copyLogs": "लॉग कॉपी करें"
 }
