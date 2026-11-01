@@ -83,14 +83,14 @@ export const MobileRoomDock: React.FC = () => {
         type="button"
         className={`mobile-dock-btn ${!isSidebarCollapsed && sidebarTab === 'participants' ? 'active' : ''}`}
         onClick={handleToggleParticipants}
-        aria-label={t("message.a055745d0aa7")}
+        aria-label={t("common.people")}
         aria-expanded={!isSidebarCollapsed && sidebarTab === 'participants'}
       >
         <span className="mobile-dock-icon-wrapper">
           <Users size={19} aria-hidden="true" />
           <span className="mobile-dock-badge">{peers.length + 1}</span>
         </span>
-        <span className="mobile-dock-label">{t("message.a055745d0aa7")}</span>
+        <span className="mobile-dock-label">{t("common.people")}</span>
       </button>
 
       <button

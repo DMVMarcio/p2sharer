@@ -180,7 +180,7 @@ export const StreamHeaderBar: React.FC = () => {
               });
             }}
             aria-expanded={!isSidebarCollapsed && sidebarTab === 'participants'}
-            aria-label={t("message.a055745d0aa7")}
+            aria-label={t("common.people")}
           >
             <Users size={14} aria-hidden="true" />
             <span className="btn-text">{peers.length + 1}</span>
