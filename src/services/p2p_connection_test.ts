@@ -13,7 +13,7 @@ export interface P2PTestMetrics {
   packetLossPercent: number;
   localCandidates: { host: number; srflx: number; relay: number };
   remoteCandidates: { host: number; srflx: number; relay: number };
-  connectionType: 'direct_stun' | 'virtual_vpn' | 'local_lan' | 'turn_relay' | 'unknown' | null;
+  connectionType: 'direct_stun' | 'direct_ipv6' | 'virtual_vpn' | 'local_lan' | 'turn_relay' | 'unknown' | null;
   localSelectedCandidate: string | null;
   remoteSelectedCandidate: string | null;
 }
@@ -283,6 +283,7 @@ export class P2PConnectionTester {
       const state = pc.iceConnectionState;
       this.addLog(`[ICE State] Connection state transition: ${state}`);
       if (state === 'connected' || state === 'completed') {
+        this.state.stepIceGathering = 'success';
         this.state.stepIceHandshake = 'success';
         this.state.phase = 'measuring';
         this.notify();
@@ -294,6 +295,7 @@ export class P2PConnectionTester {
     });
 
     if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+      this.state.stepIceGathering = 'success';
       this.state.stepIceHandshake = 'success';
       this.state.phase = 'measuring';
       this.notify();
@@ -347,6 +349,32 @@ export class P2PConnectionTester {
       const reports: IceStat[] = [];
       stats.forEach((r) => reports.push(r as unknown as IceStat));
 
+      let localHost = 0;
+      let localSrflx = 0;
+      let localRelay = 0;
+      let remoteHost = 0;
+      let remoteSrflx = 0;
+      let remoteRelay = 0;
+
+      reports.forEach((r: any) => {
+        if (r.type === 'local-candidate') {
+          if (r.candidateType === 'host') localHost++;
+          else if (r.candidateType === 'srflx') localSrflx++;
+          else if (r.candidateType === 'relay') localRelay++;
+        } else if (r.type === 'remote-candidate') {
+          if (r.candidateType === 'host') remoteHost++;
+          else if (r.candidateType === 'srflx') remoteSrflx++;
+          else if (r.candidateType === 'relay') remoteRelay++;
+        }
+      });
+
+      if (localHost + localSrflx + localRelay > 0) {
+        this.state.metrics.localCandidates = { host: localHost, srflx: localSrflx, relay: localRelay };
+      }
+      if (remoteHost + remoteSrflx + remoteRelay > 0) {
+        this.state.metrics.remoteCandidates = { host: remoteHost, srflx: remoteSrflx, relay: remoteRelay };
+      }
+
       const selected = selectedIcePair(reports);
       if (selected) {
         const { local, remote } = selected;
@@ -355,6 +383,20 @@ export class P2PConnectionTester {
         const localAddr = local?.address ?? '';
         const remoteAddr = remote?.address ?? '';
 
+        if (this.state.metrics.localCandidates.host === 0 && this.state.metrics.localCandidates.srflx === 0 && local) {
+          const t = local.candidateType;
+          if (t === 'host') this.state.metrics.localCandidates.host = 1;
+          else if (t === 'srflx') this.state.metrics.localCandidates.srflx = 1;
+          else if (t === 'relay') this.state.metrics.localCandidates.relay = 1;
+        }
+        if (this.state.metrics.remoteCandidates.host === 0 && this.state.metrics.remoteCandidates.srflx === 0 && remote) {
+          const t = remote.candidateType;
+          if (t === 'host') this.state.metrics.remoteCandidates.host = 1;
+          else if (t === 'srflx') this.state.metrics.remoteCandidates.srflx = 1;
+          else if (t === 'relay') this.state.metrics.remoteCandidates.relay = 1;
+        }
+
+        this.state.stepIceGathering = 'success';
         this.state.metrics.localSelectedCandidate = `${localType} (${localAddr || 'protected'})`;
         this.state.metrics.remoteSelectedCandidate = `${remoteType} (${remoteAddr || 'protected'})`;
 
@@ -362,7 +404,9 @@ export class P2PConnectionTester {
 
         const isVpn = localAddr.startsWith('26.') || remoteAddr.startsWith('26.');
         const isRelay = localType === 'relay' || remoteType === 'relay';
-        const isLan = localType === 'host' && remoteType === 'host';
+        const isIpv6Global = (localAddr.includes(':') && !localAddr.startsWith('fe80') && !localAddr.startsWith('fc') && !localAddr.startsWith('fd') && !localAddr.startsWith('::1')) ||
+                             (remoteAddr.includes(':') && !remoteAddr.startsWith('fe80') && !remoteAddr.startsWith('fc') && !remoteAddr.startsWith('fd') && !remoteAddr.startsWith('::1'));
+        const isLan = (localType === 'host' && remoteType === 'host') && !isIpv6Global;
 
         if (isVpn) {
           this.state.metrics.connectionType = 'virtual_vpn';
@@ -370,6 +414,9 @@ export class P2PConnectionTester {
         } else if (isRelay) {
           this.state.metrics.connectionType = 'turn_relay';
           this.finishWithVerdict('optimal', 'Connection established via TURN relay server.');
+        } else if (isIpv6Global) {
+          this.state.metrics.connectionType = 'direct_ipv6';
+          this.finishWithVerdict('optimal', 'Direct P2P Internet connection via IPv6 (Global Unicast). Bypasses CGNAT completely with optimal end-to-end routing!');
         } else if (isLan) {
           this.state.metrics.connectionType = 'local_lan';
           this.finishWithVerdict('optimal', 'Direct local network connection (LAN).');
@@ -378,9 +425,11 @@ export class P2PConnectionTester {
           this.finishWithVerdict('optimal', 'Direct P2P Internet connection (STUN / Server-Reflexive). Optimal compatibility.');
         }
       } else {
+        this.state.stepIceGathering = 'success';
         this.finishWithVerdict('optimal', 'Direct P2P connection successfully established.');
       }
     } catch {
+      this.state.stepIceGathering = 'success';
       this.finishWithVerdict('optimal', 'Direct P2P connection successfully established.');
     }
   }

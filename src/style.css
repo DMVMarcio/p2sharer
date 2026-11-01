@@ -6774,6 +6774,12 @@ body:has(.fullscreen-dialog, .chat-image-viewer) .window-titlebar { display: non
   border-color: var(--accent-color, #06b6d4);
 }
 
+.p2p-test-live {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
 .p2p-test-session-strip {
   display: flex;
   justify-content: space-between;

@@ -297,7 +297,17 @@ export const P2PConnectionTestModal: React.FC = () => {
                     <span className="step-title">{t('p2pTest.stepIceHandshake')}</span>
                     {testState.metrics.connectionType && (
                       <span className="step-detail">
-                        Rota: {testState.metrics.connectionType === 'virtual_vpn' ? 'VPN (Radmin/Hamachi)' : testState.metrics.connectionType === 'direct_stun' ? 'P2P Direto (STUN)' : testState.metrics.connectionType}
+                        Rota: {testState.metrics.connectionType === 'virtual_vpn'
+                          ? 'VPN (Radmin/Hamachi)'
+                          : testState.metrics.connectionType === 'direct_ipv6'
+                          ? 'P2P Direto (IPv6)'
+                          : testState.metrics.connectionType === 'direct_stun'
+                          ? 'P2P Direto (STUN)'
+                          : testState.metrics.connectionType === 'local_lan'
+                          ? 'Rede Local (LAN)'
+                          : testState.metrics.connectionType === 'turn_relay'
+                          ? 'Relay (TURN)'
+                          : testState.metrics.connectionType}
                       </span>
                     )}
                   </div>
