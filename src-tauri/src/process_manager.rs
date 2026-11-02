@@ -21,9 +21,9 @@ pub fn classify_subprocess(
     window_title: Option<&str>,
 ) -> (Option<String>, Option<String>) {
     if cmd_args.iter().any(|arg| arg.contains("audio.mojom.AudioService") || arg.contains("utility-sub-type=audio")) {
-        (Some("voice_audio".to_string()), Some("voice_audio".to_string()))
-    } else if cmd_args.iter().any(|arg| arg.contains("--type=renderer")) {
         (Some("chat_media".to_string()), Some("chat_media".to_string()))
+    } else if cmd_args.iter().any(|arg| arg.contains("--type=renderer")) {
+        (Some("voice_audio".to_string()), Some("voice_audio".to_string()))
     } else if cmd_args.iter().any(|arg| arg.contains("--type=gpu-process")) {
         (Some("gpu".to_string()), Some("gpu".to_string()))
     } else if cmd_args.iter().any(|arg| arg.contains("--type=crashpad-handler")) {
@@ -562,6 +562,28 @@ mod updater_job_tests {
         IsProcessInJob, QueryInformationJobObject, JobObjectExtendedLimitInformation,
         JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
     }};
+
+    #[test]
+    fn subprocess_classification_assigns_correct_discord_roles() {
+        let renderer_args = vec!["Discord.exe".to_string(), "--type=renderer".to_string()];
+        let (role_renderer, stable_renderer) = classify_subprocess(&renderer_args, false, None);
+        assert_eq!(role_renderer.as_deref(), Some("voice_audio"));
+        assert_eq!(stable_renderer.as_deref(), Some("voice_audio"));
+
+        let audio_service_args = vec![
+            "Discord.exe".to_string(),
+            "--type=utility".to_string(),
+            "--utility-sub-type=audio.mojom.AudioService".to_string(),
+        ];
+        let (role_audio, stable_audio) = classify_subprocess(&audio_service_args, false, None);
+        assert_eq!(role_audio.as_deref(), Some("chat_media"));
+        assert_eq!(stable_audio.as_deref(), Some("chat_media"));
+
+        let root_args = vec!["Discord.exe".to_string()];
+        let (role_root, stable_root) = classify_subprocess(&root_args, true, None);
+        assert_eq!(role_root.as_deref(), Some("main"));
+        assert_eq!(stable_root.as_deref(), Some("main"));
+    }
 
     #[test]
     fn installer_breakaway_preserves_normal_child_teardown_and_can_be_cancelled() {
