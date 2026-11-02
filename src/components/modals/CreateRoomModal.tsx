@@ -52,8 +52,12 @@ export const CreateRoomModal: React.FC = () => {
       const { invite, identity } = await createAuthenticatedInvite(roomName,
         mode === 'lan' ? createLanConnection(address) : undefined);
       const roomId = parseRoomInvite(invite)!.roomId;
-      await savedRooms.put({ roomId, invite, name: roomName,
-        saved: true, owned: true, protected: Boolean(finalPass), password: finalPass || undefined, identity });
+      try {
+        await savedRooms.put({ roomId, invite, name: roomName,
+          saved: true, owned: true, protected: Boolean(finalPass), password: finalPass || undefined, identity });
+      } catch (saveError) {
+        console.warn('[Rooms] Could not persist created room:', saveError);
+      }
       closeModal();
       joinRoom(invite, finalPass, true);
       showToast(t("message.71421eda382c"), 3500, 'success');

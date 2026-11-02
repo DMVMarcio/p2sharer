@@ -636,12 +636,16 @@ export class GroupRoomManager {
 
   private async persistJoinedIdentity(saved?: SavedRoom): Promise<void> {
     if (this.guestInOwnedRoom || this.previewOnly || !this.invite || !this.chatAuth || !this.authority) return;
-    await savedRooms.put({ roomId: this.roomId, invite: this.invite, name: this.roomName,
-      customName: saved ? savedRoomCustomName(saved) : undefined,
-      saved: saved?.saved ?? this.isCreator, owned: this.isCreator,
-      protected: saved?.protected ?? Boolean(this.password), password: saved?.password,
-      identity: this.chatAuth.exportIdentity(), authorityChain: this.authority.history(),
-      hostCommands: this.admissionHistory });
+    try {
+      await savedRooms.put({ roomId: this.roomId, invite: this.invite, name: this.roomName,
+        customName: saved ? savedRoomCustomName(saved) : undefined,
+        saved: saved?.saved ?? this.isCreator, owned: this.isCreator,
+        protected: saved?.protected ?? Boolean(this.password), password: saved?.password,
+        identity: this.chatAuth.exportIdentity(), authorityChain: this.authority.history(),
+        hostCommands: this.admissionHistory });
+    } catch (persistError) {
+      console.warn('[P2P] Could not persist joined identity to room store:', persistError);
+    }
   }
 
   public async join(callbacks: RoomCallbacks, previewOnly = false, password = this.password) {
@@ -655,7 +659,12 @@ export class GroupRoomManager {
       this.callbacks = callbacks;
       this.password = password;
       this.previewOnly = false;
-      const saved = await savedRooms.get(this.roomId);
+      let saved: SavedRoom | undefined;
+      try {
+        saved = await savedRooms.get(this.roomId);
+      } catch (savedError) {
+        console.warn('[P2P] Could not retrieve saved room record on rejoin:', savedError);
+      }
       if (this.leavePromise) return;
       await this.persistJoinedIdentity(saved);
       if (this.leavePromise) return;
@@ -688,7 +697,12 @@ export class GroupRoomManager {
     });
 
     try {
-      const saved = this.invite ? await savedRooms.get(this.roomId) : undefined;
+      let saved: SavedRoom | undefined;
+      try {
+        saved = this.invite ? await savedRooms.get(this.roomId) : undefined;
+      } catch (savedError) {
+        console.warn('[P2P] Could not retrieve saved room record on join:', savedError);
+      }
       const incomingInvite = this.invite ? await verifyRoomInvite(this.invite) : null;
       if (this.invite && !incomingInvite) throw new Error('Room invitation signature is invalid');
       if (saved && parseRoomInvite(saved.invite)?.rootKey !== this.rootKey) {
@@ -1220,7 +1234,12 @@ export class GroupRoomManager {
         try {
           const candidate = await verifyRoomInvite(data.invite);
           if (!candidate || candidate.version === 3 || candidate.roomId !== this.roomId || candidate.connection) return;
-          const saved = await savedRooms.get(this.roomId);
+          let saved: SavedRoom | undefined;
+      try {
+        saved = await savedRooms.get(this.roomId);
+      } catch (savedError) {
+        console.warn('[P2P] Could not retrieve saved room record on rejoin:', savedError);
+      }
           if (saved && parseRoomInvite(saved.invite)?.rootKey !== candidate.rootKey) return;
           const authority = new RoomAuthority(this.roomId, candidate.rootKey, this.chatAuth);
           if (!await authority.importChain(candidate.authorityChain) || this.room !== boundRoom || this.rootKey) return;

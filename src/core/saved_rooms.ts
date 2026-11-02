@@ -79,6 +79,9 @@ async function ensureNativeCache(): Promise<void> {
         if (record) nativeCache.set(record.roomId, record);
       }
       nativeCacheLoaded = true;
+    } catch (error) {
+      console.warn('[Rooms] Could not load saved rooms from vault:', error);
+      nativeCacheLoaded = true;
     } finally {
       nativeLoadPromise = null;
     }
@@ -123,7 +126,11 @@ export const savedRooms = {
           customName: record.customName ?? previous.customName };
       }
       if (native()) {
-        await invoke('save_room_record', { roomId: record.roomId, data: JSON.stringify(record) });
+        try {
+          await invoke('save_room_record', { roomId: record.roomId, data: JSON.stringify(record) });
+        } catch (vaultError) {
+          console.warn('[Rooms] Could not persist room to native vault:', vaultError);
+        }
         nativeCache.set(record.roomId, record);
       } else {
         memory.set(record.roomId, record);
@@ -135,7 +142,11 @@ export const savedRooms = {
   async remove(roomId: string): Promise<void> {
     await serializeMutation(roomId, async () => {
       if (native()) {
-        await invoke('delete_room_record', { roomId });
+        try {
+          await invoke('delete_room_record', { roomId });
+        } catch (vaultError) {
+          console.warn('[Rooms] Could not delete room from native vault:', vaultError);
+        }
         nativeCache.delete(roomId);
       } else {
         memory.delete(roomId);
