@@ -58,6 +58,7 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
   const toolWidthsRef = useRef<Record<WidthTool, number>>(loadToolWidths());
   const lastWidthToolRef = useRef<WidthTool>('brush');
   const [spaceHeld, setSpaceHeld] = useState(false);
+  const [altHeld, setAltHeld] = useState(false);
   const [recentColors, setRecentColors] = useState<string[]>(loadRecentColors);
   const [selectionPolygon, setSelectionPolygon] = useState<BoardPoint[] | null>(null);
   const [canvasDialogOpen, setCanvasDialogOpen] = useState(false);
@@ -227,12 +228,17 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
   useEffect(() => roomAppsService.subscribe(() => refresh(n => n + 1)), []);
 
   useEffect(() => {
-    if (compact) { setSpaceHeld(false); return; }
+    if (compact) { setSpaceHeld(false); setAltHeld(false); return; }
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || isBlockedShortcutTarget(event.target)) return;
       if (document.activeElement !== document.body && !fullscreenRef.current?.contains(document.activeElement)) return;
-      if (fullscreenRef.current?.contains(event.target as Node)) return;
+      if (event.target instanceof Node && fullscreenRef.current?.contains(event.target)) return;
       const mod = event.ctrlKey || event.metaKey, key = event.key.toLowerCase();
+      if (event.key === 'Alt' && !mod && !event.shiftKey) {
+        event.preventDefault();
+        if (!event.repeat) setAltHeld(true);
+        return;
+      }
       if (!mod && !event.altKey) {
         if (event.code === 'Space' || event.key === ' ') {
           event.preventDefault();
@@ -264,8 +270,12 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
     };
     const onKeyUp = (event: KeyboardEvent) => {
       if (event.code === 'Space' || event.key === ' ') setSpaceHeld(false);
+      if (event.key === 'Alt' || !event.altKey) setAltHeld(false);
     };
-    const onBlur = () => setSpaceHeld(false);
+    const onBlur = () => {
+      setSpaceHeld(false);
+      setAltHeld(false);
+    };
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp, true);
     window.addEventListener('blur', onBlur);
@@ -382,10 +392,18 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
           if (!isBlockedShortcutTarget(event.target)) event.preventDefault();
           setSpaceHeld(false);
         }
+        if (event.key === 'Alt' || !event.altKey) {
+          setAltHeld(false);
+        }
       }}
       onKeyDown={event => {
         if (compact || isBlockedShortcutTarget(event.target)) return;
         const mod = event.ctrlKey || event.metaKey, key = event.key.toLowerCase();
+        if (event.key === 'Alt' && !mod && !event.shiftKey) {
+          event.preventDefault();
+          if (!event.repeat) setAltHeld(true);
+          return;
+        }
         if (!mod && !event.altKey && (event.code === 'Space' || event.key === ' ')) {
           event.preventDefault();
           if (!event.repeat) setSpaceHeld(true);
@@ -476,9 +494,8 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
               onFillSelectionPixels={fillSelectionPixels}
               fileActions={files.actions}
               fileStatus={files.status}
-              onOpenCanvasSettings={() => setCanvasDialogOpen(true)}
-              fullscreen={fullscreen}
-              onToggleFullscreen={() => void toggleFullscreen().catch(error)}
+              boardDimensions={`${model.canvasSettings.width}×${model.canvasSettings.height}`}
+              altHeld={altHeld}
             />
           )}
           <WhiteboardCanvas
@@ -486,6 +503,7 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
             activeLayer={currentLayer}
             settings={settings}
             spaceHeld={spaceHeld}
+            altHeld={altHeld}
             viewport={viewport}
             onViewport={setViewport}
             selected={selected}
@@ -496,6 +514,9 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
               pushRecentColor(picked);
               applySettings({ ...settingsRef.current, color: picked });
             }}
+            onOpenCanvasSettings={() => setCanvasDialogOpen(true)}
+            fullscreen={fullscreen}
+            onToggleFullscreen={() => void toggleFullscreen().catch(error)}
             compact={compact}
             actor={roomAppsService.getLocalActor()}
             name={username}
@@ -516,7 +537,7 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
             color={settings.color}
             secondaryColor={settings.secondaryColor ?? '#ffffff'}
             recentColors={recentColors}
-            isEyedropper={settings.tool === 'eyedropper'}
+            isEyedropper={altHeld || settings.tool === 'eyedropper'}
             onColorChange={color => applySettings({ ...settingsRef.current, color })}
             onSecondaryColorChange={secondaryColor => applySettings({ ...settingsRef.current, secondaryColor })}
             onCommitColor={pushRecentColor}

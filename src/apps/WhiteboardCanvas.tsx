@@ -1,6 +1,9 @@
 import { useEffect, useLayoutEffect, useId, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
-import { ImagePlus, ZoomIn, ZoomOut, Maximize2, FlipHorizontal, Grid, Trash2, CheckSquare } from 'lucide-react';
+import {
+  ImagePlus, ZoomIn, ZoomOut, Maximize2, FlipHorizontal, Grid, Trash2, CheckSquare,
+  Maximize, Minimize, SlidersHorizontal,
+} from 'lucide-react';
 import { useContextMenu } from '../components/common/ContextMenu';
 import { TooltipButton } from '../components/common/TooltipButton';
 import { StreamPointerGlyph } from '../components/room/StreamPointerGlyph';
@@ -12,6 +15,7 @@ import {
 import type { BoardCursor, WhiteboardModel } from './whiteboard_model';
 import type { BoardSettings } from './WhiteboardToolbar';
 import { computeFloodMask, selectionMaskToPolygon } from './whiteboard_raster';
+import { WhiteboardCanvas2DRenderer } from './whiteboard_canvas2d';
 import { t } from '../i18n';
 import {
   boardContains, boardResizeHandles, clampBoardPoint, containBoardLayer,
@@ -24,7 +28,8 @@ type Cursor = Omit<BoardCursor, 'seenAt'>;
 type Gesture = {
   pointer: number;
   start: BoardPoint;
-  mode: 'pan' | 'move' | 'resize' | 'draw' | 'select';
+  localStart?: BoardPoint;
+  mode: 'pan' | 'move' | 'resize' | 'draw' | 'select' | 'eyedropper';
   spacePan?: boolean;
   handle?: BoardResizeHandle;
   initialBounds?: BoardBox;
@@ -38,6 +43,40 @@ type Gesture = {
 };
 type ResizePreview = { id: string; layer: BoardLayer; shapes: BoardShape[]; bounds: BoardBox };
 type TextDraft = { x: number; y: number; layerId: string; value: string };
+
+function constrainShapeEndpoints(
+  start: BoardPoint,
+  current: BoardPoint,
+  shiftKey: boolean,
+  altKey: boolean,
+  mode: 'rect' | 'line',
+): [BoardPoint, BoardPoint] {
+  let dx = current.x - start.x;
+  let dy = current.y - start.y;
+  if (mode === 'line') {
+    if (shiftKey && (dx !== 0 || dy !== 0)) {
+      const len = Math.hypot(dx, dy);
+      const snappedAngle = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4);
+      dx = Math.round(Math.cos(snappedAngle) * len * 100) / 100;
+      dy = Math.round(Math.sin(snappedAngle) * len * 100) / 100;
+    }
+    const end: BoardPoint = { x: Math.round((start.x + dx) * 100) / 100, y: Math.round((start.y + dy) * 100) / 100 };
+    const begin: BoardPoint = altKey
+      ? { x: Math.round((start.x - dx) * 100) / 100, y: Math.round((start.y - dy) * 100) / 100 }
+      : start;
+    return [begin, end];
+  }
+  if (shiftKey) {
+    const side = Math.max(Math.abs(dx), Math.abs(dy));
+    dx = (dx < 0 ? -1 : 1) * side;
+    dy = (dy < 0 ? -1 : 1) * side;
+  }
+  const end: BoardPoint = { x: Math.round((start.x + dx) * 100) / 100, y: Math.round((start.y + dy) * 100) / 100 };
+  const begin: BoardPoint = altKey
+    ? { x: Math.round((start.x - dx) * 100) / 100, y: Math.round((start.y - dy) * 100) / 100 }
+    : start;
+  return [begin, end];
+}
 
 function pointerPressure(event: { pointerType?: string; pressure?: number }, final = false): number | undefined {
   if (event.pointerType === 'pen') {
@@ -85,6 +124,7 @@ export function WhiteboardCanvas({
   activeLayer,
   settings,
   spaceHeld = false,
+  altHeld = false,
   viewport,
   onViewport,
   selected,
@@ -92,6 +132,9 @@ export function WhiteboardCanvas({
   selectionPolygon = null,
   onSelectionChange,
   onPickColor,
+  onOpenCanvasSettings,
+  fullscreen = false,
+  onToggleFullscreen,
   compact,
   actor,
   name,
@@ -103,6 +146,7 @@ export function WhiteboardCanvas({
   activeLayer: string;
   settings: BoardSettings;
   spaceHeld?: boolean;
+  altHeld?: boolean;
   viewport: BoardViewport;
   onViewport(viewport: BoardViewport): void;
   selected: string | null;
@@ -110,6 +154,9 @@ export function WhiteboardCanvas({
   selectionPolygon?: BoardPoint[] | null;
   onSelectionChange?(polygon: BoardPoint[] | null): void;
   onPickColor?(color: string): void;
+  onOpenCanvasSettings?(): void;
+  fullscreen?: boolean;
+  onToggleFullscreen?(): void;
   compact: boolean;
   actor: string;
   name: string;
@@ -118,6 +165,9 @@ export function WhiteboardCanvas({
   onPasteImage?(): void;
 }) {
   const root = useRef<HTMLDivElement>(null), clipId = useId();
+  const rasterCanvasRef = useRef<HTMLCanvasElement>(null);
+  const canvas2dRendererRef = useRef(new WhiteboardCanvas2DRenderer());
+  const [canvas2dActive, setCanvas2dActive] = useState(false);
   const menu = useContextMenu();
   const { width: boardWidth, height: boardHeight, backgroundColor, transparent } = model.canvasSettings;
   const navigation = useWhiteboardViewport(root, viewport, onViewport, boardWidth, boardHeight);
@@ -132,8 +182,8 @@ export function WhiteboardCanvas({
   const [mirrorView, setMirrorView] = useState(false);
   const [showGrid, setShowGrid] = useState(false);
   const physicalScreen = useRef<BoardPoint | null>(null);
-  const current = useRef({ settings, compact, spaceHeld });
-  current.current = { settings, compact, spaceHeld };
+  const current = useRef({ settings, compact, spaceHeld, altHeld });
+  current.current = { settings, compact, spaceHeld, altHeld };
   const lastSent = useRef(0), latestCursor = useRef<Cursor | null>(null);
 
   const screenPoint = (event: { clientX: number; clientY: number }): BoardPoint => {
@@ -145,7 +195,7 @@ export function WhiteboardCanvas({
     return { x: (p.x - view.x) / view.zoom, y: (p.y - view.y) / view.zoom };
   };
 
-  // Decode cached base64 PNG images into model.raster.decodedImages when running in a browser context
+  // Decode cached base64 PNG images into model.raster.decodedImages and canvas2dRenderer when running in a browser context
   useEffect(() => {
     if (typeof document === 'undefined') return;
     for (const [hash, raw] of model.images) {
@@ -154,6 +204,7 @@ export function WhiteboardCanvas({
       const img = new Image();
       img.onload = () => {
         try {
+          canvas2dRendererRef.current.registerImage(hash, img);
           const w = img.naturalWidth || img.width || 1;
           const h = img.naturalHeight || img.height || 1;
           const c = document.createElement('canvas');
@@ -249,12 +300,46 @@ export function WhiteboardCanvas({
     if (screen && !gesture.current && !compact) {
       publish({
         ...worldPoint(screen),
-        tool: spaceHeld ? 'pointer' : settings.tool,
+        tool: spaceHeld ? 'pointer' : altHeld ? 'eyedropper' : settings.tool,
         width: boardBrushWidth(settings.width),
         color: settings.color,
       }, screen);
     }
-  }, [spaceHeld, viewport.x, viewport.y, viewport.zoom, settings.tool, settings.width, settings.color, compact]);
+  }, [spaceHeld, altHeld, viewport.x, viewport.y, viewport.zoom, settings.tool, settings.width, settings.color, compact]);
+
+  // Render scene onto the hardware-accelerated 2D pixel canvas at exact board resolution
+  useLayoutEffect(() => {
+    const canvasEl = rasterCanvasRef.current;
+    if (!canvasEl) return;
+    const draftsByLayer = new Map<string, BoardShape[]>();
+    for (const [id, c] of model.cursors) {
+      if (id !== actor && c.draft) {
+        const lid = c.draft.layerId ?? DEFAULT_BOARD_LAYER;
+        const arr = draftsByLayer.get(lid) ?? [];
+        arr.push(c.draft);
+        draftsByLayer.set(lid, arr);
+      }
+    }
+    if (draft) {
+      const lid = draft.layerId ?? DEFAULT_BOARD_LAYER;
+      const arr = draftsByLayer.get(lid) ?? [];
+      arr.push(draft);
+      draftsByLayer.set(lid, arr);
+    }
+    const ok = canvas2dRendererRef.current.renderScene(
+      canvasEl,
+      model.layers,
+      model.shapes,
+      draftsByLayer,
+      moving,
+      resizing,
+      boardWidth,
+      boardHeight,
+      backgroundColor,
+      transparent,
+    );
+    if (ok !== canvas2dActive) setCanvas2dActive(ok);
+  });
 
   useEffect(() => {
     const element = root.current;
@@ -314,9 +399,20 @@ export function WhiteboardCanvas({
       if (g.mode === 'pan') {
         navigation.set({ ...g.viewport, x: g.viewport.x + screen.x - g.start.x, y: g.viewport.y + screen.y - g.start.y });
         point = worldPoint(screen);
+      } else if (g.mode === 'eyedropper') {
+        if (boardContains(point, boardWidth, boardHeight)) {
+          const picked = model.sampleColor(point.x, point.y, true, activeLayer);
+          onPickColor?.(picked);
+        }
       } else if (g.mode === 'move' && g.original) {
+        let dx = point.x - g.start.x;
+        let dy = point.y - g.start.y;
+        if (event.shiftKey) {
+          if (Math.abs(dx) >= Math.abs(dy)) dy = 0;
+          else dx = 0;
+        }
         const layer = containBoardLayer(
-          { ...g.original, x: g.original.x + point.x - g.start.x, y: g.original.y + point.y - g.start.y },
+          { ...g.original, x: g.original.x + dx, y: g.original.y + dy },
           model.shapes,
           boardWidth,
           boardHeight,
@@ -338,11 +434,19 @@ export function WhiteboardCanvas({
           }
           setSelectionDraft(g.selectionPoints);
         } else if (settings.tool === 'selectEllipse') {
-          const poly = buildEllipsePolygon(g.start, clamped);
+          const [a, b] = constrainShapeEndpoints(g.start, clamped, event.shiftKey, event.altKey, 'rect');
+          const poly = buildEllipsePolygon(
+            clampBoardPoint(a, boardWidth, boardHeight),
+            clampBoardPoint(b, boardWidth, boardHeight),
+          );
           g.selectionPoints = poly;
           setSelectionDraft(poly);
         } else {
-          const poly = buildRectPolygon(g.start, clamped);
+          const [a, b] = constrainShapeEndpoints(g.start, clamped, event.shiftKey, event.altKey, 'rect');
+          const poly = buildRectPolygon(
+            clampBoardPoint(a, boardWidth, boardHeight),
+            clampBoardPoint(b, boardWidth, boardHeight),
+          );
           g.selectionPoints = poly;
           setSelectionDraft(poly);
         }
@@ -359,7 +463,7 @@ export function WhiteboardCanvas({
             y: Math.round((sampleWorld.y - g.layer.y) * 100) / 100,
             ...(p !== undefined ? { p } : {}),
           };
-          if (g.stabilizer && !final) {
+          if (g.stabilizer && !final && !event.shiftKey) {
             const stabilized = g.stabilizer.sample(local, sample.timeStamp || event.timeStamp, settings.smoothing);
             local = {
               x: Math.round(stabilized.x * 100) / 100,
@@ -367,15 +471,30 @@ export function WhiteboardCanvas({
               ...(stabilized.p !== undefined ? { p: stabilized.p } : {}),
             };
           }
-          lastLocal = local;
           if (g.draft.tool === 'brush' || g.draft.tool === 'eraser') {
-            if (Math.hypot(local.x - points[points.length - 1].x, local.y - points[points.length - 1].y) >= .5 / viewport.zoom) {
-              points = [...points, local];
-            } else if (local.p !== undefined && (points[points.length - 1].p === undefined || Math.abs(local.p - points[points.length - 1].p!) >= 0.02)) {
-              points = [...points.slice(0, -1), { ...points[points.length - 1], p: local.p }];
+            if (event.shiftKey) {
+              const origin = g.localStart ?? points[0];
+              if (Math.abs(local.x - origin.x) >= Math.abs(local.y - origin.y)) {
+                local = { ...local, y: origin.y };
+              } else {
+                local = { ...local, x: origin.x };
+              }
+              lastLocal = local;
+              points = [origin, local];
+            } else {
+              lastLocal = local;
+              if (Math.hypot(local.x - points[points.length - 1].x, local.y - points[points.length - 1].y) >= .5 / viewport.zoom) {
+                points = [...points, local];
+              } else if (local.p !== undefined && (points[points.length - 1].p === undefined || Math.abs(local.p - points[points.length - 1].p!) >= 0.02)) {
+                points = [...points.slice(0, -1), { ...points[points.length - 1], p: local.p }];
+              }
             }
           } else {
-            points = [points[0], local];
+            const origin = g.localStart ?? points[0];
+            const mode = g.draft.tool === 'line' || g.draft.tool === 'gradient' ? 'line' : 'rect';
+            const [a, b] = constrainShapeEndpoints(origin, local, event.shiftKey, event.altKey, mode);
+            lastLocal = b;
+            points = [a, b];
           }
         }
         drawing = { ...g.draft, points };
@@ -390,7 +509,15 @@ export function WhiteboardCanvas({
     const activeWidth = boardBrushWidth(settings.width) * (p !== undefined && settings.pressureSize !== false ? 0.25 + 0.75 * p : 1);
     publish({
       ...point,
-      tool: g?.mode === 'pan' ? 'hand' : g?.mode === 'move' || g?.mode === 'resize' ? 'move' : spaceHeld ? 'pointer' : settings.tool,
+      tool: g?.mode === 'pan'
+        ? 'hand'
+        : g?.mode === 'move' || g?.mode === 'resize'
+          ? 'move'
+          : g?.mode === 'eyedropper' || altHeld
+            ? 'eyedropper'
+            : spaceHeld
+              ? 'pointer'
+              : settings.tool,
       width: activeWidth,
       color: settings.color,
       ...(drawing ? { draft: drawing } : {}),
@@ -414,16 +541,33 @@ export function WhiteboardCanvas({
       return;
     }
 
-    // Eyedropper tool or Alt-click color pickup
-    if (event.button === 0 && (settings.tool === 'eyedropper' || (event.altKey && (settings.tool === 'brush' || settings.tool === 'bucket' || settings.tool === 'gradient')))) {
+    // Eyedropper tool or Alt-held temporary eyedropper
+    if (event.button === 0 && (settings.tool === 'eyedropper' || altHeld || event.altKey)) {
       if (boardContains(point, boardWidth, boardHeight)) {
         const picked = model.sampleColor(point.x, point.y, true, activeLayer);
         onPickColor?.(picked);
       }
+      navigation.stop();
+      root.current?.setPointerCapture(event.pointerId);
+      gesture.current = { pointer: event.pointerId, mode: 'eyedropper', start: point, viewport };
       return;
     }
 
     const layer = model.layers.find(l => l.id === activeLayer);
+
+    // Ctrl-drag temporary layer move from any tool (like Photoshop/FireAlpaca)
+    if (event.button === 0 && (event.ctrlKey || event.metaKey) && settings.tool !== 'pointer') {
+      const hitCtrl = [...model.layers].reverse().find(l => !l.hidden && !l.locked && hitBoardLayer(model.shapes, l, point, 5 / viewport.zoom)) ??
+        (layer && !layer.hidden && !layer.locked ? layer : undefined);
+      if (hitCtrl) {
+        navigation.stop();
+        root.current?.setPointerCapture(event.pointerId);
+        onSelect(hitCtrl.id);
+        gesture.current = { pointer: event.pointerId, mode: 'move', start: point, original: hitCtrl, layer: hitCtrl, viewport };
+        update(event);
+        return;
+      }
+    }
 
     // Selection tools (Marquee Rect, Marquee Ellipse, Lasso, Magic Wand)
     if (event.button === 0 && ['selectRect', 'selectEllipse', 'lasso', 'wand'].includes(settings.tool)) {
@@ -643,6 +787,7 @@ export function WhiteboardCanvas({
         pointer: event.pointerId,
         mode: 'draw',
         start: point,
+        localStart: local,
         layer,
         draft: shape,
         viewport,
@@ -661,7 +806,7 @@ export function WhiteboardCanvas({
       if (g.mode === 'select') {
         const pts = g.selectionPoints ?? [];
         onSelectionChange?.(pts.length >= 3 ? pts.slice(0, 256) : null);
-      } else {
+      } else if (g.mode !== 'eyedropper') {
         const live = g.layer && model.layers.find(l => l.id === g.layer!.id);
         if (g.mode === 'draw' && g.draft && live && !live.locked && !live.hidden && live.x === g.layer!.x && live.y === g.layer!.y) {
           model.put(g.draft);
@@ -696,7 +841,7 @@ export function WhiteboardCanvas({
     if (root.current?.hasPointerCapture(event.pointerId)) root.current.releasePointerCapture(event.pointerId);
     publish({
       ...worldPoint(screenPoint(event)),
-      tool: spaceHeld ? 'pointer' : settings.tool,
+      tool: spaceHeld ? 'pointer' : altHeld ? 'eyedropper' : settings.tool,
       width: boardBrushWidth(settings.width),
       color: settings.color,
     }, screenPoint(event), true);
@@ -781,7 +926,12 @@ export function WhiteboardCanvas({
           height: boardHeight,
         }}
       >
-        <div className={`whiteboard-raster-canvas ${showGrid ? 'show-grid' : ''}`} />
+        <canvas
+          ref={rasterCanvasRef}
+          width={boardWidth}
+          height={boardHeight}
+          className={`whiteboard-raster-canvas ${showGrid ? 'show-grid' : ''}`}
+        />
       </div>
 
       <svg className="whiteboard-art" aria-hidden="true">
@@ -804,73 +954,114 @@ export function WhiteboardCanvas({
             className="whiteboard-paper"
             width={boardWidth}
             height={boardHeight}
-            fill={transparent ? 'none' : backgroundColor}
+            fill={canvas2dActive ? 'none' : (transparent ? 'none' : backgroundColor)}
           />
           <g clipPath={`url(#${clipId})`}>
-            {(() => {
-              const visibleLayers = model.layers.filter(l => !l.hidden);
-              let currentBaseLayerId: string | null = null;
-              let currentBaseView: BoardLayer | null = null;
-              let currentBaseShapes: BoardShape[] = [];
-              return visibleLayers.map((layer, idx) => {
-                const view = resizing?.id === layer.id ? resizing.layer : moving?.id === layer.id ? moving : layer;
-                const shapes = resizing?.id === layer.id ? resizing.shapes : model.shapes.filter(s => (s.layerId ?? DEFAULT_BOARD_LAYER) === layer.id);
-                const drafts = [...model.cursors]
-                  .filter(([id, c]) => id !== actor && c.draft && (c.draft.layerId ?? DEFAULT_BOARD_LAYER) === layer.id && !shapes.some(s => s.id === c.draft!.id))
-                  .map(([, c]) => c.draft!);
-                const allShapes = [...shapes, ...drafts, ...(draft?.layerId === layer.id ? [draft] : [])];
-                const layerOpacity = (view.opacity ?? 100) / 100;
-                const isClipped = Boolean(view.clipping) && currentBaseLayerId !== null && currentBaseView !== null;
-                if (!view.clipping) {
-                  currentBaseLayerId = layer.id;
-                  currentBaseView = view;
-                  currentBaseShapes = allShapes;
-                }
-                const needsClipDef = !view.clipping && visibleLayers.slice(idx + 1).some(next => next.clipping);
-                const clipMaskId = isClipped ? `${clipId}-layerclip-${currentBaseLayerId}` : undefined;
-                return (
-                  <g key={layer.id}>
-                    {needsClipDef && (
-                      <defs>
-                        <mask
-                          id={`${clipId}-layerclip-${layer.id}`}
-                          maskUnits="userSpaceOnUse"
-                          x={-16000}
-                          y={-10000}
-                          width={48000}
-                          height={30000}
-                          style={{ maskType: 'alpha' }}
-                        >
-                          <g transform={`translate(${view.x} ${view.y})`}>
-                            <WhiteboardLayerArt
-                              shapes={currentBaseShapes}
-                              imageHref={imageHref}
-                              canvasWidth={boardWidth}
-                              canvasHeight={boardHeight}
-                            />
-                          </g>
-                        </mask>
-                      </defs>
-                    )}
-                    <g
-                      data-board-layer={layer.id}
-                      mask={clipMaskId ? `url(#${clipMaskId})` : undefined}
-                      transform={`translate(${view.x} ${view.y})`}
-                      opacity={layerOpacity < 1 ? layerOpacity : undefined}
-                      style={view.blendMode && view.blendMode !== 'normal' ? { mixBlendMode: view.blendMode } : undefined}
-                    >
-                      <WhiteboardLayerArt
-                        shapes={allShapes}
-                        imageHref={imageHref}
-                        canvasWidth={boardWidth}
-                        canvasHeight={boardHeight}
-                        alphaLock={Boolean(view.alphaLock)}
-                      />
+            <g className="whiteboard-svg-layers" opacity={canvas2dActive ? 0 : undefined}>
+              {(() => {
+                const visibleLayers = model.layers.filter(l => !l.hidden);
+                let currentBaseLayerId: string | null = null;
+                let currentBaseView: BoardLayer | null = null;
+                let currentBaseShapes: BoardShape[] = [];
+                return visibleLayers.map((layer, idx) => {
+                  const view = resizing?.id === layer.id ? resizing.layer : moving?.id === layer.id ? moving : layer;
+                  const shapes = resizing?.id === layer.id ? resizing.shapes : model.shapes.filter(s => (s.layerId ?? DEFAULT_BOARD_LAYER) === layer.id);
+                  const drafts = [...model.cursors]
+                    .filter(([id, c]) => id !== actor && c.draft && (c.draft.layerId ?? DEFAULT_BOARD_LAYER) === layer.id && !shapes.some(s => s.id === c.draft!.id))
+                    .map(([, c]) => c.draft!);
+                  const allShapes = [...shapes, ...drafts, ...(draft?.layerId === layer.id ? [draft] : [])];
+                  const layerOpacity = (view.opacity ?? 100) / 100;
+                  const isClipped = Boolean(view.clipping) && currentBaseLayerId !== null && currentBaseView !== null;
+                  if (!view.clipping) {
+                    currentBaseLayerId = layer.id;
+                    currentBaseView = view;
+                    currentBaseShapes = allShapes;
+                  }
+                  const needsClipDef = !view.clipping && visibleLayers.slice(idx + 1).some(next => next.clipping);
+                  const clipMaskId = isClipped ? `${clipId}-layerclip-${currentBaseLayerId}` : undefined;
+                  return (
+                    <g key={layer.id}>
+                      {needsClipDef && (
+                        <defs>
+                          <mask
+                            id={`${clipId}-layerclip-${layer.id}`}
+                            maskUnits="userSpaceOnUse"
+                            x={-16000}
+                            y={-10000}
+                            width={48000}
+                            height={30000}
+                            style={{ maskType: 'alpha' }}
+                          >
+                            <g transform={`translate(${view.x} ${view.y})`}>
+                              <WhiteboardLayerArt
+                                shapes={currentBaseShapes}
+                                imageHref={imageHref}
+                                canvasWidth={boardWidth}
+                                canvasHeight={boardHeight}
+                              />
+                            </g>
+                          </mask>
+                        </defs>
+                      )}
+                      <g
+                        data-board-layer={layer.id}
+                        mask={clipMaskId ? `url(#${clipMaskId})` : undefined}
+                        transform={`translate(${view.x} ${view.y})`}
+                        opacity={layerOpacity < 1 ? layerOpacity : undefined}
+                        style={view.blendMode && view.blendMode !== 'normal' ? { mixBlendMode: view.blendMode } : undefined}
+                      >
+                        <WhiteboardLayerArt
+                          shapes={allShapes}
+                          imageHref={imageHref}
+                          canvasWidth={boardWidth}
+                          canvasHeight={boardHeight}
+                          alphaLock={Boolean(view.alphaLock)}
+                        />
+                      </g>
                     </g>
-                  </g>
-                );
-              });
-            })()}
+                  );
+                });
+              })()}
+            </g>
+
+            {showGrid && (
+              <g className="whiteboard-pixel-grid-overlay" pointerEvents="none">
+                <defs>
+                  <pattern
+                    id={`${clipId}-grid-major`}
+                    width={16}
+                    height={16}
+                    patternUnits="userSpaceOnUse"
+                  >
+                    <path
+                      d="M 16 0 L 0 0 0 16"
+                      fill="none"
+                      stroke="rgba(100, 116, 139, 0.36)"
+                      strokeWidth={1 / viewport.zoom}
+                    />
+                  </pattern>
+                  {viewport.zoom >= 5 && (
+                    <pattern
+                      id={`${clipId}-grid-pixel`}
+                      width={1}
+                      height={1}
+                      patternUnits="userSpaceOnUse"
+                    >
+                      <path
+                        d="M 1 0 L 0 0 0 1"
+                        fill="none"
+                        stroke="rgba(148, 163, 184, 0.28)"
+                        strokeWidth={0.75 / viewport.zoom}
+                      />
+                    </pattern>
+                  )}
+                </defs>
+                {viewport.zoom >= 5 && (
+                  <rect width={boardWidth} height={boardHeight} fill={`url(#${clipId}-grid-pixel)`} />
+                )}
+                <rect width={boardWidth} height={boardHeight} fill={`url(#${clipId}-grid-major)`} />
+              </g>
+            )}
 
             {!compact && settings.symmetry && settings.symmetry !== 'none' && (
               <g className="whiteboard-symmetry-guides">
@@ -1040,7 +1231,32 @@ export function WhiteboardCanvas({
           >
             <Grid size={13} />
           </TooltipButton>
-          <span className="whiteboard-canvas-dims">{boardWidth}×{boardHeight}</span>
+          {(onOpenCanvasSettings || onToggleFullscreen) && (
+            <>
+              <span className="whiteboard-hud-divider" aria-hidden="true" />
+              {onOpenCanvasSettings && (
+                <TooltipButton
+                  tooltip={t('whiteboard.canvasSettings')}
+                  aria-label={t('whiteboard.canvasSettings')}
+                  className="room-app-notepad-tool whiteboard-hud-btn"
+                  onClick={onOpenCanvasSettings}
+                >
+                  <SlidersHorizontal size={13} />
+                </TooltipButton>
+              )}
+              {onToggleFullscreen && (
+                <TooltipButton
+                  tooltip={t(fullscreen ? 'browser.exitFullscreen' : 'browser.fullscreen')}
+                  aria-label={t(fullscreen ? 'browser.exitFullscreen' : 'browser.fullscreen')}
+                  aria-pressed={fullscreen}
+                  className="room-app-notepad-tool whiteboard-hud-btn"
+                  onClick={onToggleFullscreen}
+                >
+                  {fullscreen ? <Minimize size={13} /> : <Maximize size={13} />}
+                </TooltipButton>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>

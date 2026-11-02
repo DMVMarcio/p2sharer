@@ -1,9 +1,9 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Brush, Pencil, Pen, Eraser, MousePointer2, Square, Circle, Minus, ImagePlus,
   Undo2, Redo2, PaintBucket, Pipette, Type, BoxSelect, Lasso,
   Wand2, Blend, Sparkles, Droplets, Highlighter, Grid3x3, Flame, FlipHorizontal,
-  Trash2, CheckSquare, SquareDashedMousePointer, Maximize, Minimize, SlidersHorizontal,
+  Trash2, CheckSquare, SquareDashedMousePointer, ChevronDown,
 } from 'lucide-react';
 import { TooltipButton } from '../components/common/TooltipButton';
 import { useContextMenu } from '../components/common/ContextMenu';
@@ -44,6 +44,61 @@ type SelectionToolKind = (typeof SELECTION_TOOLS)[number];
 const isSelectionTool = (tool: BoardTool): tool is SelectionToolKind =>
   (SELECTION_TOOLS as readonly string[]).includes(tool);
 
+function DropdownSlider({
+  id,
+  label,
+  min,
+  max,
+  value,
+  unit = '',
+  openId,
+  onToggle,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  min: number;
+  max: number;
+  value: number;
+  unit?: string;
+  openId: string | null;
+  onToggle(id: string): void;
+  onChange(value: number): void;
+}) {
+  const isOpen = openId === id;
+  return (
+    <div className={`whiteboard-slider-dropdown ${isOpen ? 'is-open' : ''}`}>
+      <div
+        role="button"
+        tabIndex={0}
+        aria-expanded={isOpen}
+        className={`whiteboard-slider-pill ${isOpen ? 'active' : ''}`}
+        onClick={() => onToggle(id)}
+        onKeyDown={e => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onToggle(id);
+          } else if (e.key === 'Escape' && isOpen) {
+            e.preventDefault();
+            onToggle(id);
+          }
+        }}
+      >
+        <span className="whiteboard-slider-pill-label">{label}:</span>
+        <strong className="whiteboard-slider-pill-value">{value}{unit}</strong>
+        <ChevronDown size={11} className="whiteboard-slider-pill-chevron" />
+      </div>
+      <div
+        className={`whiteboard-slider-popover ${isOpen ? 'is-open' : ''}`}
+        onPointerDown={e => e.stopPropagation()}
+        onClick={e => e.stopPropagation()}
+      >
+        <IntegerSlider label={label} min={min} max={max} value={value} onChange={onChange} />
+      </div>
+    </div>
+  );
+}
+
 export function WhiteboardToolbar({
   settings,
   onChange,
@@ -60,9 +115,8 @@ export function WhiteboardToolbar({
   onFillSelectionPixels,
   fileActions,
   fileStatus,
-  onOpenCanvasSettings,
-  fullscreen = false,
-  onToggleFullscreen,
+  boardDimensions,
+  altHeld = false,
 }: {
   settings: BoardSettings;
   onChange(settings: BoardSettings): void;
@@ -79,13 +133,35 @@ export function WhiteboardToolbar({
   onFillSelectionPixels?(): void;
   fileActions?: ReactNode;
   fileStatus?: ReactNode;
-  onOpenCanvasSettings?(): void;
-  fullscreen?: boolean;
-  onToggleFullscreen?(): void;
+  boardDimensions?: string;
+  altHeld?: boolean;
 }) {
   const menu = useContextMenu();
   const [lastSelectionTool, setLastSelectionTool] = useState<SelectionToolKind>('selectRect');
+  const [openSlider, setOpenSlider] = useState<string | null>(null);
+  const propsRef = useRef<HTMLDivElement>(null);
   const shapeFilled = settings.shapeFilled ?? { rectangle: false, ellipse: false };
+  const effectiveTool: BoardTool = altHeld ? 'eyedropper' : settings.tool;
+
+  useEffect(() => {
+    if (!openSlider) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (propsRef.current && event.target instanceof Node && !propsRef.current.contains(event.target)) {
+        setOpenSlider(null);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpenSlider(null);
+    };
+    window.addEventListener('pointerdown', onPointerDown, true);
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown, true);
+      window.removeEventListener('keydown', onKeyDown, true);
+    };
+  }, [openSlider]);
+
+  const toggleSlider = (id: string) => setOpenSlider(prev => (prev === id ? null : id));
 
   const brushVariants = [
     ['pencil', Pencil, 'whiteboard.pencil'],
@@ -145,197 +221,190 @@ export function WhiteboardToolbar({
 
   return (
     <div className="whiteboard-studio-chrome" role="toolbar" aria-label={t('whiteboard.tools')}>
-      <div className="whiteboard-top-bar">
-        <div className="whiteboard-toolbar-main-row">
-          <div className="whiteboard-toolbar-history">
-            <TooltipButton
-              aria-label={t('message.786b48222848')}
-              aria-keyshortcuts="Control+Z"
-              tooltip={`${t('message.786b48222848')} (Ctrl+Z)`}
-              className="room-app-notepad-tool"
-              disabled={!canUndo}
-              onClick={onUndo}
-            >
-              <Undo2 size={16} />
-            </TooltipButton>
-            <TooltipButton
-              aria-label={t('message.7b659c9caa5e')}
-              aria-keyshortcuts="Control+Y"
-              tooltip={`${t('message.7b659c9caa5e')} (Ctrl+Y)`}
-              className="room-app-notepad-tool"
-              disabled={!canRedo}
-              onClick={onRedo}
-            >
-              <Redo2 size={16} />
-            </TooltipButton>
-          </div>
-          {fileActions && (
-            <>
-              <span className="whiteboard-top-divider" aria-hidden="true" />
-              {fileActions}
-            </>
-          )}
-          {(onOpenCanvasSettings || onToggleFullscreen) && (
-            <>
-              <span className="whiteboard-top-divider" aria-hidden="true" />
-              <div className="whiteboard-top-system-actions">
-                {onOpenCanvasSettings && (
-                  <TooltipButton
-                    tooltip={t('whiteboard.canvasSettings')}
-                    aria-label={t('whiteboard.canvasSettings')}
-                    className="room-app-notepad-tool"
-                    onClick={onOpenCanvasSettings}
-                  >
-                    <SlidersHorizontal size={16} />
-                  </TooltipButton>
-                )}
-                {onToggleFullscreen && (
-                  <TooltipButton
-                    tooltip={t(fullscreen ? 'browser.exitFullscreen' : 'browser.fullscreen')}
-                    aria-label={t(fullscreen ? 'browser.exitFullscreen' : 'browser.fullscreen')}
-                    aria-pressed={fullscreen}
-                    className="room-app-notepad-tool"
-                    onClick={onToggleFullscreen}
-                  >
-                    {fullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
-                  </TooltipButton>
-                )}
-              </div>
-            </>
-          )}
-          {fileStatus}
+      <div className="whiteboard-toolbar-main-row">
+        <div className="whiteboard-toolbar-history">
+          <TooltipButton
+            aria-label={t('message.786b48222848')}
+            aria-keyshortcuts="Control+Z"
+            tooltip={`${t('message.786b48222848')} (Ctrl+Z)`}
+            className="room-app-notepad-tool"
+            disabled={!canUndo}
+            onClick={onUndo}
+          >
+            <Undo2 size={16} />
+          </TooltipButton>
+          <TooltipButton
+            aria-label={t('message.7b659c9caa5e')}
+            aria-keyshortcuts="Control+Y"
+            tooltip={`${t('message.7b659c9caa5e')} (Ctrl+Y)`}
+            className="room-app-notepad-tool"
+            disabled={!canRedo}
+            onClick={onRedo}
+          >
+            <Redo2 size={16} />
+          </TooltipButton>
         </div>
+      </div>
 
-        <div className="whiteboard-tool-properties">
-          <div className="whiteboard-brush-preview-card" aria-hidden="true">
-            <div className="whiteboard-brush-preview-stage">
-              <span
-                className={`whiteboard-brush-preview-dot ${settings.tool === 'brush' && (settings.brushType === 'pixel' || settings.brushType === 'marker') ? 'is-square' : ''}`}
-                style={{
-                  width: `${Math.max(3, Math.min(26, settings.width * 0.34))}px`,
-                  height: `${Math.max(3, Math.min(26, settings.width * 0.34))}px`,
-                  backgroundColor: settings.tool === 'eraser' ? 'transparent' : settings.color,
-                  border: settings.tool === 'eraser' ? '1.5px dashed var(--text-secondary)' : 'none',
-                  opacity: Math.max(0.15, (settings.opacity ?? 100) / 100),
-                  filter: showBrushSliders && (settings.hardness ?? 80) < 70
-                    ? `blur(${Math.round(((70 - (settings.hardness ?? 80)) / 70) * 3 * 10) / 10}px)`
-                    : undefined,
-                }}
-              />
-            </div>
-            <div className="whiteboard-brush-preview-meta">
-              <span className="whiteboard-brush-preview-title">
-                {t(
-                  settings.tool === 'brush'
-                    ? activeBrushLabel
-                    : isSelectionTool(settings.tool)
-                      ? activeSelectionLabel
-                      : `whiteboard.${settings.tool}`,
-                )}
-              </span>
-              <span className="whiteboard-brush-preview-size">{settings.width}px · {settings.opacity}%</span>
-            </div>
+      <div ref={propsRef} className="whiteboard-tool-properties">
+        <div className="whiteboard-brush-preview-card" aria-hidden="true">
+          <div className="whiteboard-brush-preview-stage">
+            <span
+              className={`whiteboard-brush-preview-dot ${settings.tool === 'brush' && (settings.brushType === 'pixel' || settings.brushType === 'marker') ? 'is-square' : ''}`}
+              style={{
+                width: `${Math.max(3, Math.min(26, settings.width * 0.34))}px`,
+                height: `${Math.max(3, Math.min(26, settings.width * 0.34))}px`,
+                backgroundColor: settings.tool === 'eraser' ? 'transparent' : settings.color,
+                border: settings.tool === 'eraser' ? '1.5px dashed var(--text-secondary)' : 'none',
+                opacity: Math.max(0.15, (settings.opacity ?? 100) / 100),
+                filter: showBrushSliders && (settings.hardness ?? 80) < 70
+                  ? `blur(${Math.round(((70 - (settings.hardness ?? 80)) / 70) * 3 * 10) / 10}px)`
+                  : undefined,
+              }}
+            />
           </div>
-          <IntegerSlider
-            label={t('whiteboard.width')}
-            min={1}
-            max={100}
-            value={settings.width}
-            onChange={width => onChange({ ...settings, width })}
-          />
-          <IntegerSlider
-            label={t('whiteboard.opacity')}
-            min={1}
-            max={100}
-            value={settings.opacity}
-            onChange={opacity => onChange({ ...settings, opacity })}
-          />
-          {showBrushSliders && (
-            <>
-              <IntegerSlider
-                label={t('whiteboard.hardness')}
-                min={0}
-                max={100}
-                value={settings.hardness ?? 80}
-                onChange={hardness => onChange({ ...settings, hardness })}
-              />
-              <IntegerSlider
-                label={t('whiteboard.flow')}
-                min={1}
-                max={100}
-                value={settings.flow ?? 100}
-                onChange={flow => onChange({ ...settings, flow })}
-              />
-            </>
-          )}
-          {(showBrushSliders || showShapeSliders || settings.tool === 'pointer') && (
-            <IntegerSlider
-              label={t('whiteboard.smoothing')}
+          <div className="whiteboard-brush-preview-meta">
+            <span className="whiteboard-brush-preview-title">
+              {t(
+                effectiveTool === 'brush'
+                  ? activeBrushLabel
+                  : isSelectionTool(effectiveTool)
+                    ? activeSelectionLabel
+                    : `whiteboard.${effectiveTool}`,
+              )}
+            </span>
+          </div>
+        </div>
+        <DropdownSlider
+          id="width"
+          label={t('whiteboard.width')}
+          min={1}
+          max={100}
+          value={settings.width}
+          unit="px"
+          openId={openSlider}
+          onToggle={toggleSlider}
+          onChange={width => onChange({ ...settings, width })}
+        />
+        <DropdownSlider
+          id="opacity"
+          label={t('whiteboard.opacity')}
+          min={1}
+          max={100}
+          value={settings.opacity}
+          unit="%"
+          openId={openSlider}
+          onToggle={toggleSlider}
+          onChange={opacity => onChange({ ...settings, opacity })}
+        />
+        {showBrushSliders && (
+          <>
+            <DropdownSlider
+              id="hardness"
+              label={t('whiteboard.hardness')}
               min={0}
               max={100}
-              value={settings.smoothing}
-              onChange={smoothing => onChange({ ...settings, smoothing })}
+              value={settings.hardness ?? 80}
+              unit="%"
+              openId={openSlider}
+              onToggle={toggleSlider}
+              onChange={hardness => onChange({ ...settings, hardness })}
             />
-          )}
-          {showBucketSliders && (
-            <>
-              <IntegerSlider
-                label={t('whiteboard.tolerance')}
-                min={0}
-                max={255}
-                value={settings.fillTolerance ?? 32}
-                onChange={fillTolerance => onChange({ ...settings, fillTolerance })}
+            <DropdownSlider
+              id="flow"
+              label={t('whiteboard.flow')}
+              min={1}
+              max={100}
+              value={settings.flow ?? 100}
+              unit="%"
+              openId={openSlider}
+              onToggle={toggleSlider}
+              onChange={flow => onChange({ ...settings, flow })}
+            />
+          </>
+        )}
+        {(showBrushSliders || showShapeSliders || settings.tool === 'pointer') && (
+          <DropdownSlider
+            id="smoothing"
+            label={t('whiteboard.smoothing')}
+            min={0}
+            max={100}
+            value={settings.smoothing}
+            unit="%"
+            openId={openSlider}
+            onToggle={toggleSlider}
+            onChange={smoothing => onChange({ ...settings, smoothing })}
+          />
+        )}
+        {showBucketSliders && (
+          <>
+            <DropdownSlider
+              id="tolerance"
+              label={t('whiteboard.tolerance')}
+              min={0}
+              max={255}
+              value={settings.fillTolerance ?? 32}
+              openId={openSlider}
+              onToggle={toggleSlider}
+              onChange={fillTolerance => onChange({ ...settings, fillTolerance })}
+            />
+            {settings.tool === 'bucket' && (
+              <DropdownSlider
+                id="fillExpand"
+                label={t('whiteboard.fillExpand')}
+                min={-10}
+                max={20}
+                value={settings.fillExpand ?? 1}
+                unit="px"
+                openId={openSlider}
+                onToggle={toggleSlider}
+                onChange={fillExpand => onChange({ ...settings, fillExpand })}
               />
-              {settings.tool === 'bucket' && (
-                <IntegerSlider
-                  label={t('whiteboard.fillExpand')}
-                  min={-10}
-                  max={20}
-                  value={settings.fillExpand ?? 1}
-                  onChange={fillExpand => onChange({ ...settings, fillExpand })}
-                />
-              )}
-              <label className="whiteboard-inline-switch">
-                <input
-                  autoComplete="off"
-                  type="checkbox"
-                  checked={settings.fillContiguous !== false}
-                  onChange={e => onChange({ ...settings, fillContiguous: e.target.checked })}
-                />
-                <span>{t('whiteboard.fillContiguous')}</span>
-              </label>
-              <label className="whiteboard-inline-switch">
-                <input
-                  autoComplete="off"
-                  type="checkbox"
-                  checked={settings.fillSample === 'all'}
-                  onChange={e => onChange({ ...settings, fillSample: e.target.checked ? 'all' : 'layer' })}
-                />
-                <span>{t('whiteboard.fillSampleAll')}</span>
-              </label>
-            </>
-          )}
-          {showGradientSliders && (
+            )}
             <label className="whiteboard-inline-switch">
               <input
                 autoComplete="off"
                 type="checkbox"
-                checked={Boolean(settings.gradientTransparent)}
-                onChange={e => onChange({ ...settings, gradientTransparent: e.target.checked })}
+                checked={settings.fillContiguous !== false}
+                onChange={e => onChange({ ...settings, fillContiguous: e.target.checked })}
               />
-              <span>{t('whiteboard.gradientTransparent')}</span>
+              <span>{t('whiteboard.fillContiguous')}</span>
             </label>
-          )}
-          {showTextSliders && (
-            <IntegerSlider
-              label={t('whiteboard.fontSize')}
-              min={8}
-              max={160}
-              value={settings.fontSize ?? 28}
-              onChange={fontSize => onChange({ ...settings, fontSize })}
+            <label className="whiteboard-inline-switch">
+              <input
+                autoComplete="off"
+                type="checkbox"
+                checked={settings.fillSample === 'all'}
+                onChange={e => onChange({ ...settings, fillSample: e.target.checked ? 'all' : 'layer' })}
+              />
+              <span>{t('whiteboard.fillSampleAll')}</span>
+            </label>
+          </>
+        )}
+        {showGradientSliders && (
+          <label className="whiteboard-inline-switch">
+            <input
+              autoComplete="off"
+              type="checkbox"
+              checked={Boolean(settings.gradientTransparent)}
+              onChange={e => onChange({ ...settings, gradientTransparent: e.target.checked })}
             />
-          )}
-        </div>
+            <span>{t('whiteboard.gradientTransparent')}</span>
+          </label>
+        )}
+        {showTextSliders && (
+          <DropdownSlider
+            id="fontSize"
+            label={t('whiteboard.fontSize')}
+            min={8}
+            max={160}
+            value={settings.fontSize ?? 28}
+            unit="px"
+            openId={openSlider}
+            onToggle={toggleSlider}
+            onChange={fontSize => onChange({ ...settings, fontSize })}
+          />
+        )}
       </div>
 
       <div className="whiteboard-toolbar">
@@ -343,7 +412,7 @@ export function WhiteboardToolbar({
           {tools.map(([toolKey, Icon, shortcut]) => {
             const isSelGroup = toolKey === 'selection';
             const actualTool: BoardTool = isSelGroup ? currentSelectionKind : (toolKey as BoardTool);
-            const active = isSelGroup ? isSelectionTool(settings.tool) : settings.tool === actualTool;
+            const active = isSelGroup ? isSelectionTool(effectiveTool) : effectiveTool === actualTool;
             const hasFlyout = isSelGroup || toolKey === 'brush' || toolKey === 'rectangle' || toolKey === 'ellipse' || toolKey === 'gradient';
             const baseLabel = t(
               toolKey === 'brush'
@@ -471,7 +540,7 @@ export function WhiteboardToolbar({
             </TooltipButton>
           )}
 
-          {(isSelectionTool(settings.tool) || hasSelection) && (
+          {(isSelectionTool(effectiveTool) || hasSelection) && (
             <div className="whiteboard-selection-quick-actions">
               {onSelectAll && (
                 <TooltipButton
@@ -527,6 +596,18 @@ export function WhiteboardToolbar({
           )}
         </div>
       </div>
+
+      {(fileActions || fileStatus || boardDimensions) && (
+        <div
+          className="whiteboard-bottom-left-hud"
+          onPointerDown={e => e.stopPropagation()}
+          onClick={e => e.stopPropagation()}
+        >
+          {fileActions}
+          {fileStatus}
+          {boardDimensions && <span className="whiteboard-canvas-dims">{boardDimensions}</span>}
+        </div>
+      )}
     </div>
   );
 }

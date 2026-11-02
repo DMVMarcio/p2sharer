@@ -524,6 +524,42 @@ test('studio paint bucket, color panel, eyedropper, selection marquee, layer ble
   assert.ok(document.querySelector('.whiteboard-selection-marquee'));
   await click('Deselect');
   assert.equal(document.querySelector('.whiteboard-selection-marquee'), null);
+  // Dropdown slider pills open and close via click and Escape
+  const pill = document.querySelector('.whiteboard-slider-pill');
+  assert.ok(pill);
+  await act(async () => pill.click());
+  assert.ok(document.querySelector('.whiteboard-slider-popover.is-open'));
+  await act(async () => window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  assert.equal(document.querySelector('.whiteboard-slider-popover.is-open'), null);
+  // Holding Alt temporarily activates Eyedropper until released
+  await act(async () => canvas().dispatchEvent(new window.KeyboardEvent('keydown', { key: 'b', bubbles: true })));
+  assert.equal(button('Brush').getAttribute('aria-pressed'), 'true');
+  await act(async () => canvas().dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Alt', altKey: true, bubbles: true })));
+  assert.equal(button('Eyedropper').getAttribute('aria-pressed'), 'true');
+  await act(async () => window.dispatchEvent(new window.KeyboardEvent('keyup', { key: 'Alt', altKey: false, bubbles: true })));
+  assert.equal(button('Brush').getAttribute('aria-pressed'), 'true');
+  // Shift-constrained Rectangle creates a 1:1 square
+  await act(async () => canvas().dispatchEvent(new window.KeyboardEvent('keydown', { key: 'r', bubbles: true })));
+  await act(async () => {
+    const d = new window.MouseEvent('pointerdown', { bubbles: true, cancelable: true, clientX: 200, clientY: 200, button: 0, shiftKey: true });
+    Object.defineProperty(d, 'pointerId', { value: 11 }); canvas().dispatchEvent(d);
+    const m = new window.MouseEvent('pointermove', { bubbles: true, cancelable: true, clientX: 260, clientY: 225, button: 0, shiftKey: true });
+    Object.defineProperty(m, 'pointerId', { value: 11 }); canvas().dispatchEvent(m);
+    const u = new window.MouseEvent('pointerup', { bubbles: true, cancelable: true, clientX: 260, clientY: 225, button: 0, shiftKey: true });
+    Object.defineProperty(u, 'pointerId', { value: 11 }); canvas().dispatchEvent(u);
+  });
+  const sqPts = fixture.model.shapes.at(-1).points;
+  assert.equal(Math.round(Math.abs(sqPts[1].x - sqPts[0].x)), Math.round(Math.abs(sqPts[1].y - sqPts[0].y)));
+  // Toggle pixel grid renders and hides .whiteboard-pixel-grid-overlay
+  assert.equal(document.querySelector('.whiteboard-pixel-grid-overlay'), null);
+  await click('Toggle pixel grid');
+  assert.ok(document.querySelector('.whiteboard-pixel-grid-overlay'));
+  await click('Toggle pixel grid');
+  assert.equal(document.querySelector('.whiteboard-pixel-grid-overlay'), null);
+  // Bottom-left HUD houses file actions + board dimensions, bottom-right HUD houses Canvas settings + Full screen
+  assert.equal(document.querySelectorAll('.whiteboard-bottom-left-hud button').length, 4);
+  assert.ok(button('Canvas settings', document.querySelector('.whiteboard-navigation-hud')));
+  assert.ok(button('Full screen', document.querySelector('.whiteboard-navigation-hud')));
   // Open Canvas Settings dialog and update canvas dimensions
   await click('Canvas settings');
   const dialog = document.querySelector('[role="dialog"]');
