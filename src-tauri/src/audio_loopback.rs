@@ -15,6 +15,8 @@ pub struct AudioConfig {
     pub target_pids: Vec<u32>,
     #[serde(default)]
     pub target_names: Vec<String>,
+    #[serde(default)]
+    pub target_sub_keys: Vec<String>,
     #[serde(default = "default_sample_rate")]
     pub sample_rate: u32,
 }
@@ -455,7 +457,7 @@ pub fn start_browser_audio(app: AppHandle, pid: u32, event_name: String) -> Arc<
     let running = Arc::new(AtomicBool::new(true));
     let flag = running.clone();
     std::thread::spawn(move || win_audio::run_capture_loop(app, AudioConfig {
-        mode: "include".into(), target_pids: vec![pid], target_names: vec![], sample_rate: 48000,
+        mode: "include".into(), target_pids: vec![pid], target_names: vec![], target_sub_keys: vec![], sample_rate: 48000,
     }, flag, event_name));
     running
 }
@@ -569,7 +571,7 @@ pub(crate) mod win_audio {
     /// Audio routing only needs names and parent PIDs, not CPU, disk or executable queries.
     pub(crate) fn refresh_process_tree(sys: &mut sysinfo::System) {
         sys.refresh_processes_specifics(
-            sysinfo::ProcessesToUpdate::All, true, sysinfo::ProcessRefreshKind::new(),
+            sysinfo::ProcessesToUpdate::All, true, sysinfo::ProcessRefreshKind::new().with_cmd(sysinfo::UpdateKind::OnlyIfNotSet),
         );
     }
 
@@ -724,6 +726,7 @@ pub(crate) mod win_audio {
     pub(crate) fn resolve_target_process_roots(
         target_names: &[String],
         target_pids: &[u32],
+        target_sub_keys: &[String],
     ) -> Vec<u32> {
         let mut sys = sysinfo::System::new();
         refresh_process_tree(&mut sys);
@@ -751,6 +754,32 @@ pub(crate) mod win_audio {
                 let u = pid.as_u32();
                 if !candidate_pids.contains(&u) {
                     candidate_pids.push(u);
+                }
+            }
+        }
+
+        for sub_key in target_sub_keys {
+            let parts: Vec<&str> = sub_key.splitn(2, ':').collect();
+            if parts.len() == 2 {
+                let app_target = parts[0].trim().to_lowercase();
+                let role_target = parts[1].trim();
+
+                for (pid, proc) in sys.processes() {
+                    let p_name = proc.name().to_string_lossy().to_lowercase();
+                    let p_clean = p_name.trim_end_matches(".exe");
+                    let app_clean = app_target.trim_end_matches(".exe");
+                    if p_clean == app_clean || p_name.contains(&app_target) || app_target.contains(&p_name) {
+                        let cmd_args: Vec<String> = proc.cmd().iter().map(|s| s.to_string_lossy().to_string()).collect();
+                        let is_root = proc.parent().and_then(|p| sys.process(p)).map(|p| p.name() == proc.name()).unwrap_or(false) == false;
+                        let (_role, stable_id) = crate::process_manager::classify_subprocess(&cmd_args, is_root, None);
+
+                        if stable_id.as_deref() == Some(role_target) {
+                            let u = pid.as_u32();
+                            if !candidate_pids.contains(&u) {
+                                candidate_pids.push(u);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -993,7 +1022,7 @@ pub(crate) mod win_audio {
             let mut multi_sources: Vec<MultiCaptureSource> = Vec::new();
 
             let excluded_roots = if config.mode == "exclude" {
-                let roots = resolve_target_process_roots(&config.target_names, &config.target_pids);
+                let roots = resolve_target_process_roots(&config.target_names, &config.target_pids, &config.target_sub_keys);
                 let specifies_self = normalized_names.iter().any(|t| t.contains("p2sharer"))
                     || config.target_pids.iter().any(|&p| self_pids.contains(&p))
                     || roots.iter().any(|&p| self_pids.contains(&p));
@@ -1014,7 +1043,7 @@ pub(crate) mod win_audio {
             let is_multi_exclude = config.mode == "exclude" && excluded_roots.len() > 1;
 
             let is_multi_include = config.mode == "include" && {
-                let roots = resolve_target_process_roots(&config.target_names, &config.target_pids);
+                let roots = resolve_target_process_roots(&config.target_names, &config.target_pids, &config.target_sub_keys);
                 !roots.is_empty()
             };
 
@@ -1026,7 +1055,7 @@ pub(crate) mod win_audio {
                     }
                 }
             } else if config.mode == "include" {
-                let include_roots = resolve_target_process_roots(&config.target_names, &config.target_pids);
+                let include_roots = resolve_target_process_roots(&config.target_names, &config.target_pids, &config.target_sub_keys);
                 println!(
                     "[Audio Loopback] Mode: INCLUDE. Resolved {} target root(s): {:?}",
                     include_roots.len(),
@@ -1122,6 +1151,7 @@ pub(crate) mod win_audio {
                 let worker_self_pids = self_pids.clone();
                 let worker_targets = config.target_names.clone();
                 let worker_target_pids = config.target_pids.clone();
+                let worker_sub_keys = config.target_sub_keys.clone();
                 std::thread::spawn(move || {
                     let initialized = CoInitializeEx(None, COINIT_MULTITHREADED).is_ok();
                     let mut worker_sys = sysinfo::System::new();
@@ -1131,7 +1161,7 @@ pub(crate) mod win_audio {
                                 &worker_excluded_roots, &worker_names, &worker_self_pids, &mut worker_sys,
                             )
                         } else {
-                            resolve_target_process_roots(&worker_targets, &worker_target_pids)
+                            resolve_target_process_roots(&worker_targets, &worker_target_pids, &worker_sub_keys)
                         };
                         refresh_process_tree(&mut worker_sys);
                         let live: Vec<u32> = worker_sys.processes().keys().map(|pid| pid.as_u32()).collect();
@@ -1371,6 +1401,7 @@ pub fn start_audio_capture(app: AppHandle, config: Option<AudioConfig>) -> Resul
         mode: "exclude".to_string(),
         target_pids: vec![],
         target_names: vec![],
+        target_sub_keys: vec![],
         sample_rate: 48000,
     });
 
@@ -1658,7 +1689,7 @@ mod tests {
         }
 
         let my_pid = std::process::id();
-        let roots = win_audio::resolve_target_process_roots(&[], &[my_pid]);
+        let roots = win_audio::resolve_target_process_roots(&[], &[my_pid], &[]);
         assert!(!roots.is_empty(), "Should resolve root for current process");
     }
 
@@ -1666,7 +1697,7 @@ mod tests {
     #[test]
     fn test_multi_process_exclusion_filtering() {
         let my_pid = std::process::id();
-        let roots = win_audio::resolve_target_process_roots(&["p2sharer".to_string()], &[my_pid]);
+        let roots = win_audio::resolve_target_process_roots(&["p2sharer".to_string()], &[my_pid], &[]);
         assert!(!roots.is_empty(), "Should resolve roots for target");
 
         let mut sys = sysinfo::System::new();

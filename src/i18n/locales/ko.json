@@ -1633,5 +1633,11 @@
   "whiteboard.pickerSquare": "사각형 피커",
   "whiteboard.pickerTriangle": "삼각형 색상환",
   "whiteboard.pickerWheel": "원형 색상환",
-  "whiteboard.colorBrightness": "명도"
+  "whiteboard.colorBrightness": "명도",
+  "audio.subProcessRole.main": "애플리케이션 메인 프로세스",
+  "audio.subProcessRole.voice": "음성 통화 및 오디오",
+  "audio.subProcessRole.media": "채팅, 미디어 및 동영상",
+  "audio.subProcessRole.gpu": "그래픽 렌더링 (GPU)",
+  "audio.subProcessRole.crashpad": "오류 보고서",
+  "audio.subProcessRole.utility": "백그라운드 유틸리티"
 }

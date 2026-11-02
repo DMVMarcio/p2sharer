@@ -1633,5 +1633,11 @@
   "whiteboard.pickerSquare": "वर्गाकार पिकर",
   "whiteboard.pickerTriangle": "त्रिकोण रंग चक्र",
   "whiteboard.pickerWheel": "रंग चक्र",
-  "whiteboard.colorBrightness": "चमक"
+  "whiteboard.colorBrightness": "चमक",
+  "audio.subProcessRole.main": "मुख्य अनुप्रयोग प्रक्रिया",
+  "audio.subProcessRole.voice": "वॉयस कॉल और ऑडियो",
+  "audio.subProcessRole.media": "चैट, मीडिया और वीडियो",
+  "audio.subProcessRole.gpu": "ग्राफ़िक्स रेंडरिंग (GPU)",
+  "audio.subProcessRole.crashpad": "क्रैश हैंडलर",
+  "audio.subProcessRole.utility": "बैकग्राउंड सेवा"
 }

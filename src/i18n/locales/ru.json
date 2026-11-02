@@ -1633,5 +1633,11 @@
   "whiteboard.pickerSquare": "Квадратная палитра",
   "whiteboard.pickerTriangle": "Треугольный круг",
   "whiteboard.pickerWheel": "Цветовой круг",
-  "whiteboard.colorBrightness": "Яркость"
+  "whiteboard.colorBrightness": "Яркость",
+  "audio.subProcessRole.main": "Главный процесс приложения",
+  "audio.subProcessRole.voice": "Голосовые звонки и аудио",
+  "audio.subProcessRole.media": "Чат, медиа и видео",
+  "audio.subProcessRole.gpu": "Обработка графики (GPU)",
+  "audio.subProcessRole.crashpad": "Обработчик сбоев",
+  "audio.subProcessRole.utility": "Фоновая служба"
 }

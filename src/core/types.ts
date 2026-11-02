@@ -2,6 +2,9 @@ export interface SubProcessItem {
   pid: number;
   window_title?: string;
   has_audio?: boolean;
+  is_root?: boolean;
+  role?: string;
+  stable_id?: string;
 }
 
 export interface ProcessItem {

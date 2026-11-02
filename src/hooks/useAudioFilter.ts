@@ -1,9 +1,9 @@
-import { audioProcessKey, type AudioCaptureChoice } from '../core/audio_filter_presets.ts';
+import { audioProcessKey, audioSubProcessKey, type AudioCaptureChoice } from '../core/audio_filter_presets.ts';
 import { t } from '../i18n/index.ts';
 import { useState, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { stateStore } from '../core/state_store';
-import { ProcessItem } from '../core/types';
+import { ProcessItem, SubProcessItem } from '../core/types';
 import { showToast } from './useToast';
 
 export function getPidsForProcess(item: ProcessItem): number[] {
@@ -44,6 +44,12 @@ export function useAudioFilter() {
   const [draftIncludePids, setDraftIncludePids] = useState<Set<number>>(
     () => new Set(stateStore.includePids)
   );
+  const [draftExcludeSubKeys, setDraftExcludeSubKeys] = useState<Set<string>>(
+    () => new Set(stateStore.excludeSubProcessKeys)
+  );
+  const [draftIncludeSubKeys, setDraftIncludeSubKeys] = useState<Set<string>>(
+    () => new Set(stateStore.includeSubProcessKeys)
+  );
 
   // Freeze the opening selection/order so controls never move beneath the pointer.
   const openingSelection = useRef(new Set(Array.from(
@@ -59,6 +65,10 @@ export function useAudioFilter() {
   draftExcludePidsRef.current = draftExcludePids;
   const draftIncludePidsRef = useRef(draftIncludePids);
   draftIncludePidsRef.current = draftIncludePids;
+  const draftExcludeSubKeysRef = useRef(draftExcludeSubKeys);
+  draftExcludeSubKeysRef.current = draftExcludeSubKeys;
+  const draftIncludeSubKeysRef = useRef(draftIncludeSubKeys);
+  draftIncludeSubKeysRef.current = draftIncludeSubKeys;
 
   const loadProcesses = useCallback(async () => {
     setIsLoading(true);
@@ -83,19 +93,38 @@ export function useAudioFilter() {
       items.forEach((p) => {
         const nameLower = audioProcessKey(p.name);
         const pids = getPidsForProcess(p);
+        const subList = p.sub_processes || [];
+
         if (exNames.has(nameLower)) {
           pids.forEach(pid => exPids.add(pid));
         } else {
-          pids.forEach(pid => {
-            if (draftExcludePidsRef.current.has(pid)) exPids.add(pid);
+          subList.forEach((sub) => {
+            const subKey = audioSubProcessKey(p.name, sub);
+            if (draftExcludeSubKeysRef.current.has(subKey) || draftExcludePidsRef.current.has(sub.pid)) {
+              exPids.add(sub.pid);
+            }
           });
+          if (subList.length === 0) {
+            pids.forEach(pid => {
+              if (draftExcludePidsRef.current.has(pid)) exPids.add(pid);
+            });
+          }
         }
+
         if (inNames.has(nameLower)) {
           pids.forEach(pid => inPids.add(pid));
         } else {
-          pids.forEach(pid => {
-            if (draftIncludePidsRef.current.has(pid)) inPids.add(pid);
+          subList.forEach((sub) => {
+            const subKey = audioSubProcessKey(p.name, sub);
+            if (draftIncludeSubKeysRef.current.has(subKey) || draftIncludePidsRef.current.has(sub.pid)) {
+              inPids.add(sub.pid);
+            }
           });
+          if (subList.length === 0) {
+            pids.forEach(pid => {
+              if (draftIncludePidsRef.current.has(pid)) inPids.add(pid);
+            });
+          }
         }
       });
 
@@ -153,6 +182,14 @@ export function useAudioFilter() {
           });
           return next;
         });
+        setDraftExcludeSubKeys((prev) => {
+          const next = new Set(prev);
+          const prefix = `${nameLower}:`;
+          for (const key of prev) {
+            if (key.startsWith(prefix)) next.delete(key);
+          }
+          return next;
+        });
       } else {
         setDraftIncludeNames((prev) => {
           const next = new Set(prev);
@@ -168,14 +205,31 @@ export function useAudioFilter() {
           });
           return next;
         });
+        setDraftIncludeSubKeys((prev) => {
+          const next = new Set(prev);
+          const prefix = `${nameLower}:`;
+          for (const key of prev) {
+            if (key.startsWith(prefix)) next.delete(key);
+          }
+          return next;
+        });
       }
     },
     [selectedFilterMode, processes]
   );
 
   const toggleSubProcess = useCallback(
-    (item: ProcessItem, pid: number, checked: boolean) => {
+    (item: ProcessItem, target: number | SubProcessItem, checked: boolean) => {
+      const pid = typeof target === 'number' ? target : target.pid;
+      const subProcesses = item.sub_processes && item.sub_processes.length > 0
+        ? item.sub_processes
+        : [{ pid: item.pid, window_title: item.window_title, has_audio: false, is_root: true }];
+      const sub = typeof target === 'number'
+        ? (subProcesses.find(s => s.pid === target) || { pid: target, is_root: target === item.pid })
+        : target;
+      const subKey = audioSubProcessKey(item.name, sub);
       const nameLower = audioProcessKey(item.name);
+
       const allPids = new Set<number>();
       processes.forEach((p) => {
         if (audioProcessKey(p.name) === nameLower) {
@@ -188,10 +242,37 @@ export function useAudioFilter() {
       const allPidsArray = Array.from(allPids);
 
       if (selectedFilterMode === 'exclude') {
+        setDraftExcludeSubKeys((prev) => {
+          const next = new Set(prev);
+          if (checked) {
+            next.add(subKey);
+            // If checking a non-root subprocess, automatically decouple the root process so
+            // the root parent doesn't silence all child processes (e.g. video audio).
+            if (!sub.is_root) {
+              const rootSub = subProcesses.find(s => s.is_root);
+              if (rootSub) {
+                next.delete(audioSubProcessKey(item.name, rootSub));
+              }
+            }
+          } else {
+            next.delete(subKey);
+          }
+          return next;
+        });
+
         setDraftExcludePids((prev) => {
           const next = new Set(prev);
-          if (checked) next.add(pid);
-          else next.delete(pid);
+          if (checked) {
+            next.add(pid);
+            if (!sub.is_root) {
+              const rootSub = subProcesses.find(s => s.is_root);
+              if (rootSub) {
+                next.delete(rootSub.pid);
+              }
+            }
+          } else {
+            next.delete(pid);
+          }
 
           const allSelected = allPidsArray.length > 0 && allPidsArray.every(p => next.has(p));
           setDraftExcludeNames((prevNames) => {
@@ -207,6 +288,13 @@ export function useAudioFilter() {
           return next;
         });
       } else {
+        setDraftIncludeSubKeys((prev) => {
+          const next = new Set(prev);
+          if (checked) next.add(subKey);
+          else next.delete(subKey);
+          return next;
+        });
+
         setDraftIncludePids((prev) => {
           const next = new Set(prev);
           if (checked) next.add(pid);
@@ -245,9 +333,14 @@ export function useAudioFilter() {
 
       const selectedPidsSet = selectedFilterMode === 'exclude' ? draftExcludePids : draftIncludePids;
       const selectedNamesSet = selectedFilterMode === 'exclude' ? draftExcludeNames : draftIncludeNames;
+      const selectedSubKeysSet = selectedFilterMode === 'exclude' ? draftExcludeSubKeys : draftIncludeSubKeys;
+
+      if (selectedNamesSet.has(nameLower)) {
+        return 'all';
+      }
 
       if (allPids.size === 0) {
-        return selectedNamesSet.has(nameLower) ? 'all' : 'none';
+        return 'none';
       }
 
       let selectedCount = 0;
@@ -255,15 +348,18 @@ export function useAudioFilter() {
         if (selectedPidsSet.has(p)) selectedCount++;
       }
 
-      if (selectedCount === 0) {
-        return selectedNamesSet.has(nameLower) ? 'all' : 'none';
+      const subList = item.sub_processes || [];
+      const hasSubKeyMatch = subList.some(s => selectedSubKeysSet.has(audioSubProcessKey(item.name, s)));
+
+      if (selectedCount === 0 && !hasSubKeyMatch) {
+        return 'none';
       }
-      if (selectedCount === allPids.size) {
+      if (selectedCount === allPids.size && allPids.size > 0) {
         return 'all';
       }
       return 'partial';
     },
-    [selectedFilterMode, draftExcludePids, draftIncludePids, draftExcludeNames, draftIncludeNames, processes]
+    [selectedFilterMode, draftExcludePids, draftIncludePids, draftExcludeNames, draftIncludeNames, draftExcludeSubKeys, draftIncludeSubKeys, processes]
   );
 
   const selectSingleProcess = useCallback(
@@ -282,9 +378,11 @@ export function useAudioFilter() {
       if (selectedFilterMode === 'exclude') {
         setDraftExcludeNames(new Set([nameLower]));
         setDraftExcludePids(targetPids);
+        setDraftExcludeSubKeys(new Set());
       } else {
         setDraftIncludeNames(new Set([nameLower]));
         setDraftIncludePids(targetPids);
+        setDraftIncludeSubKeys(new Set());
       }
     },
     [selectedFilterMode, processes]
@@ -294,9 +392,11 @@ export function useAudioFilter() {
     if (selectedFilterMode === 'exclude') {
       setDraftExcludeNames(new Set());
       setDraftExcludePids(new Set());
+      setDraftExcludeSubKeys(new Set());
     } else {
       setDraftIncludeNames(new Set());
       setDraftIncludePids(new Set());
+      setDraftIncludeSubKeys(new Set());
     }
   }, [selectedFilterMode]);
 
@@ -314,9 +414,11 @@ export function useAudioFilter() {
     if (selectedFilterMode === 'exclude') {
       setDraftExcludeNames(nextNames);
       setDraftExcludePids(nextPids);
+      setDraftExcludeSubKeys(new Set());
     } else {
       setDraftIncludeNames(nextNames);
       setDraftIncludePids(nextPids);
+      setDraftIncludeSubKeys(new Set());
     }
   }, [processes, selectedFilterMode]);
 
@@ -324,6 +426,7 @@ export function useAudioFilter() {
     const effectiveMode = isAllMuted ? 'include' : selectedFilterMode;
     const effectiveIncludeNames = isAllMuted ? new Set<string>() : draftIncludeNames;
     const effectiveIncludePids = isAllMuted ? new Set<number>() : draftIncludePids;
+    const effectiveSubKeys = isAllMuted ? new Set<string>() : (effectiveMode === 'exclude' ? draftExcludeSubKeys : draftIncludeSubKeys);
     // 1. Commit draft state to persistent store and localStorage
     stateStore.set((s) => {
       s.isAudioFilterFullAudio = isFullAudio;
@@ -332,12 +435,15 @@ export function useAudioFilter() {
       s.includeProcessNames = new Set(effectiveIncludeNames);
       s.excludePids = new Set(draftExcludePids);
       s.includePids = new Set(effectiveIncludePids);
+      s.excludeSubProcessKeys = new Set(draftExcludeSubKeys);
+      s.includeSubProcessKeys = new Set(effectiveSubKeys);
       s.saveAudioFilterPresets();
     });
 
     const pidsArray = Array.from(effectiveMode === 'exclude' ? draftExcludePids : effectiveIncludePids);
     const namesArray = Array.from(effectiveMode === 'exclude' ? draftExcludeNames : effectiveIncludeNames);
-    const count = namesArray.length || pidsArray.length;
+    const subKeysArray = Array.from(effectiveSubKeys);
+    const count = namesArray.length || pidsArray.length || subKeysArray.length;
 
     let successMsg = '';
     if (isFullAudio) {
@@ -386,6 +492,7 @@ export function useAudioFilter() {
           mode: effectiveMode,
           target_pids: pidsArray,
           target_names: namesArray,
+          target_sub_keys: subKeysArray,
           sample_rate: 48000,
         },
       });
@@ -442,6 +549,7 @@ export function useAudioFilter() {
     setFilterMode,
     selectedPids,
     selectedNames,
+    selectedSubKeys: selectedFilterMode === 'exclude' ? draftExcludeSubKeys : draftIncludeSubKeys,
     toggleProcess,
     toggleSubProcess,
     getProcessSelectionState,

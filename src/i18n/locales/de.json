@@ -1633,5 +1633,11 @@
   "whiteboard.pickerSquare": "Quadrat-Wähler",
   "whiteboard.pickerTriangle": "Dreiecksrad",
   "whiteboard.pickerWheel": "Farbrad",
-  "whiteboard.colorBrightness": "Helligkeit"
+  "whiteboard.colorBrightness": "Helligkeit",
+  "audio.subProcessRole.main": "Hauptanwendungsprozess",
+  "audio.subProcessRole.voice": "Sprachanrufe und Audio",
+  "audio.subProcessRole.media": "Chat, Medien und Videos",
+  "audio.subProcessRole.gpu": "Grafik-Rendering (GPU)",
+  "audio.subProcessRole.crashpad": "Absturzmelder",
+  "audio.subProcessRole.utility": "Hintergrunddienst"
 }

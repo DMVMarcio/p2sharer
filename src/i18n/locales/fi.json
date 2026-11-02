@@ -1633,5 +1633,11 @@
   "whiteboard.pickerSquare": "Neliövalitsin",
   "whiteboard.pickerTriangle": "Kolmioväriympyrä",
   "whiteboard.pickerWheel": "Väriympyrä",
-  "whiteboard.colorBrightness": "Kirkkaus"
+  "whiteboard.colorBrightness": "Kirkkaus",
+  "audio.subProcessRole.main": "Sovelluksen pääprosessi",
+  "audio.subProcessRole.voice": "Äänipuhelut ja puheääni",
+  "audio.subProcessRole.media": "Keskustelu, media ja videot",
+  "audio.subProcessRole.gpu": "Grafiikan renderöinti (GPU)",
+  "audio.subProcessRole.crashpad": "Virheraportointi",
+  "audio.subProcessRole.utility": "Taustapalvelu"
 }

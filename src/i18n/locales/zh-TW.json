@@ -1633,5 +1633,11 @@
   "whiteboard.pickerSquare": "方形檢色器",
   "whiteboard.pickerTriangle": "三角規律色環",
   "whiteboard.pickerWheel": "圓形色盤",
-  "whiteboard.colorBrightness": "明度"
+  "whiteboard.colorBrightness": "明度",
+  "audio.subProcessRole.main": "應用程式主程序",
+  "audio.subProcessRole.voice": "語音通話與音訊",
+  "audio.subProcessRole.media": "聊天、媒體與影片",
+  "audio.subProcessRole.gpu": "圖形渲染 (GPU)",
+  "audio.subProcessRole.crashpad": "當機回報程式",
+  "audio.subProcessRole.utility": "背景公用程式"
 }

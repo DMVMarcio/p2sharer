@@ -7,6 +7,41 @@ pub struct SubProcessItem {
     pub window_title: Option<String>,
     #[serde(default)]
     pub has_audio: bool,
+    #[serde(default)]
+    pub is_root: bool,
+    #[serde(default)]
+    pub role: Option<String>,
+    #[serde(default)]
+    pub stable_id: Option<String>,
+}
+
+pub fn classify_subprocess(
+    cmd_args: &[String],
+    is_root: bool,
+    window_title: Option<&str>,
+) -> (Option<String>, Option<String>) {
+    if cmd_args.iter().any(|arg| arg.contains("audio.mojom.AudioService") || arg.contains("utility-sub-type=audio")) {
+        (Some("voice_audio".to_string()), Some("voice_audio".to_string()))
+    } else if cmd_args.iter().any(|arg| arg.contains("--type=renderer")) {
+        (Some("chat_media".to_string()), Some("chat_media".to_string()))
+    } else if cmd_args.iter().any(|arg| arg.contains("--type=gpu-process")) {
+        (Some("gpu".to_string()), Some("gpu".to_string()))
+    } else if cmd_args.iter().any(|arg| arg.contains("--type=crashpad-handler")) {
+        (Some("crashpad".to_string()), Some("crashpad".to_string()))
+    } else if cmd_args.iter().any(|arg| arg.contains("--type=utility")) {
+        (Some("utility".to_string()), Some("utility".to_string()))
+    } else if is_root {
+        (Some("main".to_string()), Some("main".to_string()))
+    } else if let Some(title) = window_title {
+        let trimmed = title.trim();
+        if !trimmed.is_empty() {
+            (Some("window".to_string()), Some(format!("title:{}", trimmed.to_lowercase())))
+        } else {
+            (Some("background".to_string()), None)
+        }
+    } else {
+        (Some("background".to_string()), None)
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -302,10 +337,28 @@ fn list_audio_processes_sync() -> Vec<ProcessItem> {
 
         let is_interesting = effective_title.is_some() || is_voice || has_audio;
 
+        let is_root = process
+            .parent()
+            .and_then(|parent_pid| sys.process(parent_pid))
+            .map(|parent_proc| parent_proc.name() == process.name())
+            .unwrap_or(false)
+            == false;
+
+        let cmd_args: Vec<String> = process
+            .cmd()
+            .iter()
+            .map(|s| s.to_string_lossy().to_string())
+            .collect();
+
+        let (role, stable_id) = classify_subprocess(&cmd_args, is_root, effective_title.as_deref());
+
         let sub = SubProcessItem {
             pid: pid_u32,
             window_title: effective_title.clone(),
             has_audio,
+            is_root,
+            role,
+            stable_id,
         };
 
         match app_map.entry(name_lower) {
@@ -354,9 +407,26 @@ fn list_audio_processes_sync() -> Vec<ProcessItem> {
             continue;
         }
 
-        // Sort sub_processes: window title first, then audio active, then PID
+        // Sort sub_processes: root first, then voice_audio, chat_media, active audio, window title, PID
         acc.sub_processes.sort_by(|a, b| {
-            b.window_title.is_some().cmp(&a.window_title.is_some())
+            let role_rank = |item: &SubProcessItem| -> u8 {
+                if item.is_root {
+                    0
+                } else if item.role.as_deref() == Some("voice_audio") {
+                    1
+                } else if item.role.as_deref() == Some("chat_media") {
+                    2
+                } else if item.has_audio {
+                    3
+                } else if item.window_title.is_some() {
+                    4
+                } else {
+                    5
+                }
+            };
+
+            role_rank(a)
+                .cmp(&role_rank(b))
                 .then_with(|| b.has_audio.cmp(&a.has_audio))
                 .then_with(|| a.pid.cmp(&b.pid))
         });

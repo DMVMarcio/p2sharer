@@ -54,7 +54,8 @@ export class AudioBridge {
   public async startCapture(
     mode: string = 'exclude',
     targetPids: number[] = [],
-    targetNames: string[] = []
+    targetNames: string[] = [],
+    targetSubKeys: string[] = []
   ): Promise<MediaStreamTrack | null> {
     const track = this.init();
     try { await this.startListening(); }
@@ -65,6 +66,7 @@ export class AudioBridge {
           mode,
           target_pids: targetPids,
           target_names: targetNames,
+          target_sub_keys: targetSubKeys,
           sample_rate: 48000,
         },
       });

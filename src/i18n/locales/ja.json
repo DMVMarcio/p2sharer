@@ -1633,5 +1633,11 @@
   "whiteboard.pickerSquare": "四角ピッカー",
   "whiteboard.pickerTriangle": "色相環＋三角形",
   "whiteboard.pickerWheel": "カラーホイール",
-  "whiteboard.colorBrightness": "明度"
+  "whiteboard.colorBrightness": "明度",
+  "audio.subProcessRole.main": "アプリのメインプロセス",
+  "audio.subProcessRole.voice": "音声通話とボイスオーディオ",
+  "audio.subProcessRole.media": "チャット・メディア・動画",
+  "audio.subProcessRole.gpu": "グラフィックレンダリング (GPU)",
+  "audio.subProcessRole.crashpad": "クラッシュハンドラー",
+  "audio.subProcessRole.utility": "バックグラウンドサービス"
 }

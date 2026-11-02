@@ -616,7 +616,8 @@ export class RoomService {
           if (isTauri() && kind === 'screen' && !Array.from(this.localCaptures.values()).some((entry) => entry.kind === 'screen')) {
             const audio = await this.audioBridge.startCapture(stateStore.isAudioFilterFullAudio ? 'full' : stateStore.selectedFilterMode,
               stateStore.isAudioFilterFullAudio ? [] : stateStore.getActiveFilterPids(),
-              stateStore.isAudioFilterFullAudio ? [] : stateStore.getActiveFilterNames());
+              stateStore.isAudioFilterFullAudio ? [] : stateStore.getActiveFilterNames(),
+              stateStore.isAudioFilterFullAudio ? [] : stateStore.getActiveFilterSubKeys());
             if (audio) stream.addTrack(audio);
           }
           manager.shareStream(stream, bitrate * 1000, fps, descriptor);

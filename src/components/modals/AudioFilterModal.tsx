@@ -161,7 +161,19 @@ export const AudioFilterModal = () => {
                     <div className="audio-filter-subprocesses" role="group" aria-label={t('audio.expandProcesses', { app: process.name })}>
                       {subProcesses.map((sub) => {
                         const isSubSelected = filter.selectedPids.has(sub.pid);
-                        const subTitle = sub.window_title?.trim() || t('audio.backgroundProcess');
+                        const subTitle = sub.role === 'voice_audio'
+                          ? t('audio.subProcessRole.voice')
+                          : sub.role === 'chat_media'
+                          ? t('audio.subProcessRole.media')
+                          : sub.is_root
+                          ? t('audio.subProcessRole.main')
+                          : sub.window_title?.trim() || (sub.role === 'gpu'
+                            ? t('audio.subProcessRole.gpu')
+                            : sub.role === 'crashpad'
+                            ? t('audio.subProcessRole.crashpad')
+                            : sub.role === 'utility'
+                            ? t('audio.subProcessRole.utility')
+                            : t('audio.backgroundProcess'));
                         return (
                           <label
                             key={`${sub.pid}_${process.name}`}
@@ -186,7 +198,7 @@ export const AudioFilterModal = () => {
                                 disabled={pending}
                                 checked={isSubSelected}
                                 aria-label={t(choice === 'exclude' ? 'audio.muteProcess' : 'audio.allowProcess', { pid: sub.pid })}
-                                onChange={(event) => filter.toggleSubProcess(process, sub.pid, event.target.checked)}
+                                onChange={(event) => filter.toggleSubProcess(process, sub, event.target.checked)}
                               />
                               <span className="switch-slider" />
                             </span>

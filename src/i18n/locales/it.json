@@ -1633,5 +1633,11 @@
   "whiteboard.pickerSquare": "Selettore quadrato",
   "whiteboard.pickerTriangle": "Ruota a triangolo",
   "whiteboard.pickerWheel": "Ruota dei colori",
-  "whiteboard.colorBrightness": "Luminosità"
+  "whiteboard.colorBrightness": "Luminosità",
+  "audio.subProcessRole.main": "Processo principale dell'applicazione",
+  "audio.subProcessRole.voice": "Chiamate vocali e audio",
+  "audio.subProcessRole.media": "Chat, contenuti e video",
+  "audio.subProcessRole.gpu": "Rendering grafico (GPU)",
+  "audio.subProcessRole.crashpad": "Gestione arresti anomali",
+  "audio.subProcessRole.utility": "Servizio in background"
 }

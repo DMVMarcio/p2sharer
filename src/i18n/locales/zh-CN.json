@@ -1633,5 +1633,11 @@
   "whiteboard.pickerSquare": "方形拾色器",
   "whiteboard.pickerTriangle": "三角规律色环",
   "whiteboard.pickerWheel": "圆形色盘",
-  "whiteboard.colorBrightness": "明度"
+  "whiteboard.colorBrightness": "明度",
+  "audio.subProcessRole.main": "应用程序主进程",
+  "audio.subProcessRole.voice": "语音通话与音频",
+  "audio.subProcessRole.media": "聊天、媒体与视频",
+  "audio.subProcessRole.gpu": "图形渲染 (GPU)",
+  "audio.subProcessRole.crashpad": "崩溃报告程序",
+  "audio.subProcessRole.utility": "后台实用服务"
 }

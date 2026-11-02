@@ -72,6 +72,8 @@ export class StateStore {
   public includeProcessNames: Set<string> = new Set();
   public excludePids: Set<number> = new Set();
   public includePids: Set<number> = new Set();
+  public excludeSubProcessKeys: Set<string> = new Set();
+  public includeSubProcessKeys: Set<string> = new Set();
 
   public isSidebarCollapsed: boolean = isMobileDevice();
   public sidebarTab: 'chat' | 'participants' = 'chat';
@@ -204,6 +206,24 @@ export class StateStore {
     } catch {
       this.includeProcessNames = new Set();
     }
+
+    try {
+      const savedExSub = JSON.parse(localStorage.getItem('p2sharer_audio_exclude_sub_keys') || '[]');
+      if (Array.isArray(savedExSub)) {
+        this.excludeSubProcessKeys = new Set(savedExSub.map((k: string) => k.toLowerCase()));
+      }
+    } catch {
+      this.excludeSubProcessKeys = new Set();
+    }
+
+    try {
+      const savedInSub = JSON.parse(localStorage.getItem('p2sharer_audio_include_sub_keys') || '[]');
+      if (Array.isArray(savedInSub)) {
+        this.includeSubProcessKeys = new Set(savedInSub.map((k: string) => k.toLowerCase()));
+      }
+    } catch {
+      this.includeSubProcessKeys = new Set();
+    }
   }
 
   public saveTransmissionDefaults(settings: TransmissionDefaults): void {
@@ -272,6 +292,8 @@ export class StateStore {
     localStorage.setItem('p2sharer_audio_filter_mode', this.selectedFilterMode);
     localStorage.setItem('p2sharer_audio_exclude_names', JSON.stringify(Array.from(this.excludeProcessNames)));
     localStorage.setItem('p2sharer_audio_include_names', JSON.stringify(Array.from(this.includeProcessNames)));
+    localStorage.setItem('p2sharer_audio_exclude_sub_keys', JSON.stringify(Array.from(this.excludeSubProcessKeys)));
+    localStorage.setItem('p2sharer_audio_include_sub_keys', JSON.stringify(Array.from(this.includeSubProcessKeys)));
   }
 
   public getActiveFilterPids(): number[] {
@@ -280,6 +302,10 @@ export class StateStore {
 
   public getActiveFilterNames(): string[] {
     return Array.from(this.selectedFilterMode === 'exclude' ? this.excludeProcessNames : this.includeProcessNames);
+  }
+
+  public getActiveFilterSubKeys(): string[] {
+    return Array.from(this.selectedFilterMode === 'exclude' ? this.excludeSubProcessKeys : this.includeSubProcessKeys);
   }
 
   public getTurnConfig(): TurnConfig {
