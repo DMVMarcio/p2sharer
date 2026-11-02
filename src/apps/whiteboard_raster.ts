@@ -13,9 +13,11 @@ export interface DecodedRasterImage {
 export function parseHexRgb(hex: string): [number, number, number] {
   const clean = hex.startsWith('#') ? hex.slice(1) : hex;
   if (clean.length !== 6) return [0, 0, 0];
-  const n = Number.parseInt(clean, 16);
-  if (!Number.isFinite(n)) return [0, 0, 0];
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  const r = Number.parseInt(clean.slice(0, 2), 16);
+  const g = Number.parseInt(clean.slice(2, 4), 16);
+  const b = Number.parseInt(clean.slice(4, 6), 16);
+  if (!Number.isFinite(r) || !Number.isFinite(g) || !Number.isFinite(b)) return [0, 0, 0];
+  return [r, g, b];
 }
 
 export function rgbToHex(r: number, g: number, b: number): string {
@@ -689,7 +691,7 @@ export function rasterizeShapeOntoBuffer(
             }
             if (isPencil) {
               // Deterministic fine paper tooth modulation for pencil
-              const grain = (((x * 73856093) ^ (y * 19349663)) & 255) / 255;
+              const grain = 0.5 + 0.5 * Math.sin(x * 12.9898 + y * 78.233);
               falloff *= 0.72 + 0.28 * grain;
             }
           }

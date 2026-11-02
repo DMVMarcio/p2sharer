@@ -54,7 +54,11 @@ export class WhiteboardModel implements RoomAppModel {
   readonly history = new Y.UndoManager([this.objects, this.layerMap], { trackedOrigins: new Set([LOCAL]), captureTimeout: 0 });
   readonly cursors = new Map<string, BoardCursor>();
   readonly images = new Map<string, string>();
-  readonly raster = new WhiteboardRasterEngine();
+  private _raster: WhiteboardRasterEngine | null = null;
+  get raster(): WhiteboardRasterEngine {
+    if (!this._raster) this._raster = new WhiteboardRasterEngine();
+    return this._raster;
+  }
   private imageSizes = new Map<string, number>();
   private imageSources = new Map<string, string>();
   private pendingImages = new Map<string, PendingImage>();
@@ -481,7 +485,7 @@ export class WhiteboardModel implements RoomAppModel {
       if (file.canvas) meta.set('canvas', JSON.stringify(file.canvas));
       else meta.delete('canvas');
     });
-    this.raster.clear();
+    this._raster?.clear();
     this.history.clear();
   }
   undo(): void { this.history.undo(); this.context.changed(); }
@@ -677,7 +681,7 @@ export class WhiteboardModel implements RoomAppModel {
     clearInterval(this.expiry);
     this.pendingImages.clear();
     this.queuedRequests.clear();
-    this.raster.clear();
+    this._raster?.clear();
     this.history.destroy();
     this.document.destroy();
     this.cursors.clear();
