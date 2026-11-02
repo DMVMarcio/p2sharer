@@ -32,8 +32,13 @@ export function clampBoardViewport(
   boardHeight = BOARD_HEIGHT,
 ): BoardViewport {
   const zoom = Math.max(BOARD_MIN_ZOOM, Math.min(BOARD_MAX_ZOOM, view.zoom));
-  const axis = (position: number, size: number, board: number) => board * zoom + 192 <= size
-    ? (size - board * zoom) / 2 : Math.max(size - board * zoom - 96, Math.min(96, position));
+  const axis = (position: number, size: number, board: number) => {
+    const scaled = board * zoom;
+    const minVisible = Math.min(80, Math.max(24, scaled * 0.25));
+    const minPos = Math.min(size - scaled - 96, minVisible - scaled);
+    const maxPos = Math.max(96, size - minVisible);
+    return Math.max(minPos, Math.min(maxPos, position));
+  };
   return { x: axis(view.x, width, boardWidth), y: axis(view.y, height, boardHeight), zoom };
 }
 

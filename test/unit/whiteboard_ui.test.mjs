@@ -476,6 +476,30 @@ test('remote cursors retain world coordinates while every zoom frame uses the sa
 });
 test('studio paint bucket, color panel, eyedropper, selection marquee, layer blend controls and canvas settings operate interactively', async () => {
   assert.ok(document.querySelector('[aria-label="Color Studio"]'));
+  assert.equal(document.querySelector('.whiteboard-swatches-grid'), null);
+  // Dragging across the SV color square updates live color without spamming recent colors until pointerup
+  const svSquare = document.querySelector('[aria-label="Saturation and brightness"]');
+  svSquare.getBoundingClientRect = () => new window.DOMRect(0, 0, 100, 100);
+  const beforeRecents = [...document.querySelectorAll('.whiteboard-recent-colors button')].map(b => b.getAttribute('aria-label'));
+  await act(async () => {
+    const downEv = new window.MouseEvent('pointerdown', { bubbles: true, cancelable: true, clientX: 20, clientY: 20, button: 0 });
+    Object.defineProperty(downEv, 'pointerId', { value: 7 });
+    svSquare.dispatchEvent(downEv);
+    for (let x = 25; x <= 75; x += 10) {
+      const moveEv = new window.MouseEvent('pointermove', { bubbles: true, cancelable: true, clientX: x, clientY: 30, button: 0 });
+      Object.defineProperty(moveEv, 'pointerId', { value: 7 });
+      svSquare.dispatchEvent(moveEv);
+    }
+  });
+  const duringDragRecents = [...document.querySelectorAll('.whiteboard-recent-colors button')].map(b => b.getAttribute('aria-label'));
+  assert.deepEqual(duringDragRecents, beforeRecents, 'Recent colors do not update while dragging');
+  await act(async () => {
+    const upEv = new window.MouseEvent('pointerup', { bubbles: true, cancelable: true, clientX: 80, clientY: 25, button: 0 });
+    Object.defineProperty(upEv, 'pointerId', { value: 7 });
+    svSquare.dispatchEvent(upEv);
+  });
+  const afterUpRecents = [...document.querySelectorAll('.whiteboard-recent-colors button')].map(b => b.getAttribute('aria-label'));
+  assert.notDeepEqual(afterUpRecents, beforeRecents, 'Chosen color is committed to recent colors on pointerup');
   // Swap & reset colors via keyboard shortcuts X and D
   await act(async () => canvas().dispatchEvent(new window.KeyboardEvent('keydown', { key: 'd', bubbles: true })));
   await act(async () => canvas().dispatchEvent(new window.KeyboardEvent('keydown', { key: 'x', bubbles: true })));
@@ -495,10 +519,14 @@ test('studio paint bucket, color panel, eyedropper, selection marquee, layer ble
   const layerCountBeforeDup = fixture.model.layers.length;
   await click('Duplicate layer');
   assert.equal(fixture.model.layers.length, layerCountBeforeDup + 1);
-  // Selection marquee (M), Select All (Ctrl+A), Deselect (Ctrl+D)
+  // Selection marquee (M), Select All (Ctrl+A), Invert Selection, Deselect (Ctrl+D)
   await act(async () => canvas().dispatchEvent(new window.KeyboardEvent('keydown', { key: 'm', bubbles: true })));
   assert.equal(button('Rectangular marquee').getAttribute('aria-pressed'), 'true');
   await click('Select all');
+  assert.ok(document.querySelector('.whiteboard-selection-marquee'));
+  await click('Invert selection');
+  assert.ok(document.querySelector('.whiteboard-selection-marquee'));
+  await click('Invert selection');
   assert.ok(document.querySelector('.whiteboard-selection-marquee'));
   await click('Deselect');
   assert.equal(document.querySelector('.whiteboard-selection-marquee'), null);

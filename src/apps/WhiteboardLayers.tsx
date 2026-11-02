@@ -34,6 +34,7 @@ export function WhiteboardLayers({
   isEyedropper,
   onColorChange,
   onSecondaryColorChange,
+  onCommitColor,
   onSwapColors,
   onResetColors,
   onPickEyedropper,
@@ -57,6 +58,7 @@ export function WhiteboardLayers({
   isEyedropper?: boolean;
   onColorChange?(color: string): void;
   onSecondaryColorChange?(color: string): void;
+  onCommitColor?(color: string): void;
   onSwapColors?(): void;
   onResetColors?(): void;
   onPickEyedropper?(): void;
@@ -114,6 +116,7 @@ export function WhiteboardLayers({
             isEyedropper={Boolean(isEyedropper)}
             onColorChange={onColorChange}
             onSecondaryColorChange={onSecondaryColorChange ?? (() => {})}
+            onCommitColor={onCommitColor}
             onSwapColors={onSwapColors ?? (() => {})}
             onResetColors={onResetColors ?? (() => {})}
             onPickEyedropper={onPickEyedropper ?? (() => {})}

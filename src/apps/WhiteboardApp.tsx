@@ -17,7 +17,6 @@ import { WhiteboardLayers } from './WhiteboardLayers';
 import { WhiteboardCanvas } from './WhiteboardCanvas';
 import { CANVAS_PRESETS, containBoardLayer, type BoardViewport } from './whiteboard_interaction';
 import { prepareWhiteboardImage, readClipboardImageDataUrl } from './whiteboard_image';
-import { invertSelectionMask, polygonToMask, selectionMaskToPolygon } from './whiteboard_raster';
 import { boardError, useWhiteboardFiles } from './useWhiteboardFiles';
 
 type WidthTool = 'brush' | 'eraser' | 'rectangle' | 'ellipse' | 'line';
@@ -113,9 +112,6 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
   };
 
   const applySettings = (next: BoardSettings) => {
-    if (next.color !== settingsRef.current.color) {
-      pushRecentColor(next.color);
-    }
     setSettings(prev => {
       let width = next.width;
       const widthChanged = next.width !== prev.width;
@@ -164,10 +160,31 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
   const invertSelection = () => {
     if (!model || !selectionPolygon?.length) return;
     const { width, height } = model.canvasSettings;
-    const mask = polygonToMask(selectionPolygon, width, height);
-    const inv = invertSelectionMask(mask);
-    const poly = selectionMaskToPolygon(inv, width, height);
-    setSelectionPolygon(poly.length >= 3 ? poly : null);
+    // If already an inverted keyhole polygon (starts with the 5 outer frame vertices), unwrap the inner polygon
+    if (
+      selectionPolygon.length > 7 &&
+      selectionPolygon[0].x === 0 && selectionPolygon[0].y === 0 &&
+      selectionPolygon[1].x === width && selectionPolygon[1].y === 0 &&
+      selectionPolygon[2].x === width && selectionPolygon[2].y === height &&
+      selectionPolygon[3].x === 0 && selectionPolygon[3].y === height &&
+      selectionPolygon[4].x === 0 && selectionPolygon[4].y === 0
+    ) {
+      const inner = selectionPolygon.slice(5, -2);
+      setSelectionPolygon(inner.length >= 3 ? inner : null);
+      return;
+    }
+    // Construct an even-odd keyhole polygon connecting the outer board boundary to the inner selection contour
+    const first = selectionPolygon[0];
+    setSelectionPolygon([
+      { x: 0, y: 0 },
+      { x: width, y: 0 },
+      { x: width, y: height },
+      { x: 0, y: height },
+      { x: 0, y: 0 },
+      ...selectionPolygon,
+      { x: first.x, y: first.y },
+      { x: 0, y: 0 },
+    ]);
   };
 
   const deleteSelectionPixels = () => {
@@ -496,7 +513,10 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
             onSelect={select}
             selectionPolygon={selectionPolygon}
             onSelectionChange={setSelectionPolygon}
-            onPickColor={picked => applySettings({ ...settingsRef.current, color: picked })}
+            onPickColor={picked => {
+              pushRecentColor(picked);
+              applySettings({ ...settingsRef.current, color: picked });
+            }}
             compact={compact}
             actor={roomAppsService.getLocalActor()}
             name={username}
@@ -520,6 +540,7 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
             isEyedropper={settings.tool === 'eyedropper'}
             onColorChange={color => applySettings({ ...settingsRef.current, color })}
             onSecondaryColorChange={secondaryColor => applySettings({ ...settingsRef.current, secondaryColor })}
+            onCommitColor={pushRecentColor}
             onSwapColors={() => {
               const cur = settingsRef.current;
               applySettings({ ...cur, color: cur.secondaryColor ?? '#ffffff', secondaryColor: cur.color });

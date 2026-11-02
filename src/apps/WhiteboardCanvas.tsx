@@ -118,7 +118,6 @@ export function WhiteboardCanvas({
   onPasteImage?(): void;
 }) {
   const root = useRef<HTMLDivElement>(null), clipId = useId();
-  const rasterCanvasRef = useRef<HTMLCanvasElement>(null);
   const menu = useContextMenu();
   const { width: boardWidth, height: boardHeight, backgroundColor, transparent } = model.canvasSettings;
   const navigation = useWhiteboardViewport(root, viewport, onViewport, boardWidth, boardHeight);
@@ -170,30 +169,6 @@ export function WhiteboardCanvas({
       img.src = `data:image/png;base64,${raw}`;
     }
   }, [model, model.images.size]);
-
-  // Paint real RGBA raster composite onto the hardware canvas whenever layers, shapes, or live drafts update
-  useEffect(() => {
-    const canvasEl = rasterCanvasRef.current;
-    if (!canvasEl || typeof ImageData !== 'function') return;
-    try {
-      const ctx = canvasEl.getContext('2d');
-      if (!ctx || typeof ctx.putImageData !== 'function') return;
-      const draftsByLayer = new Map<string, BoardShape[]>();
-      if (draft && draft.layerId) {
-        draftsByLayer.set(draft.layerId, [draft]);
-      }
-      for (const [peerId, c] of model.cursors) {
-        if (peerId !== actor && c.draft) {
-          const lid = c.draft.layerId ?? DEFAULT_BOARD_LAYER;
-          const list = draftsByLayer.get(lid) ?? [];
-          list.push(c.draft);
-          draftsByLayer.set(lid, list);
-        }
-      }
-      const composite = model.getCompositePixels(draftsByLayer, !transparent);
-      ctx.putImageData(new ImageData(new Uint8ClampedArray(composite), boardWidth, boardHeight), 0, 0);
-    } catch { /* JSDOM fallback uses the synchronized layer tree */ }
-  }, [model, model.shapes, model.layers, draft, boardWidth, boardHeight, backgroundColor, transparent, actor]);
 
   const publish = (value: Cursor | null, screen: BoardPoint | null = physicalScreen.current, force = false) => {
     const wire = value?.draft && value.draft.points.length > BOARD_MAX_POINTS
@@ -457,6 +432,18 @@ export function WhiteboardCanvas({
         return;
       }
       if (settings.tool === 'wand') {
+        const hasRelevantShapes = settings.fillSample === 'all'
+          ? model.shapes.some(s => !s.hidden)
+          : model.shapes.some(s => !s.hidden && (s.layerId ?? DEFAULT_BOARD_LAYER) === activeLayer);
+        if (!hasRelevantShapes) {
+          onSelectionChange?.([
+            { x: 0, y: 0 },
+            { x: boardWidth, y: 0 },
+            { x: boardWidth, y: boardHeight },
+            { x: 0, y: boardHeight },
+          ]);
+          return;
+        }
         const sampleBuf = settings.fillSample === 'all'
           ? model.getCompositePixels(undefined, false)
           : model.getLayerPixels(activeLayer);
@@ -512,25 +499,30 @@ export function WhiteboardCanvas({
               y: Math.round((p.y - layer.y) * 100) / 100,
             }))
           : undefined;
-        // Compute flood-fill boundary polygon from real pixels so both raster & SVG representations match
-        const sampleBuf = settings.fillSample === 'all'
-          ? model.getCompositePixels(undefined, false)
-          : model.getLayerPixels(layer.id);
-        const mask = computeFloodMask(
-          sampleBuf,
-          boardWidth,
-          boardHeight,
-          settings.fillSample === 'all' ? point.x : localSeed.x,
-          settings.fillSample === 'all' ? point.y : localSeed.y,
-          settings.fillTolerance ?? 32,
-          settings.fillContiguous !== false,
-          settings.fillExpand ?? 1,
-        );
-        const floodPoly = selectionMaskToPolygon(mask, boardWidth, boardHeight).map(p => ({
-          x: Math.round((p.x - (settings.fillSample === 'all' ? layer.x : 0)) * 100) / 100,
-          y: Math.round((p.y - (settings.fillSample === 'all' ? layer.y : 0)) * 100) / 100,
-        }));
-        const clipPolygon = activeClipLocal ?? (floodPoly.length >= 3 ? floodPoly : undefined);
+        const hasRelevantShapes = settings.fillSample === 'all'
+          ? model.shapes.some(s => !s.hidden)
+          : model.shapes.some(s => !s.hidden && (s.layerId ?? DEFAULT_BOARD_LAYER) === layer.id);
+        let clipPolygon = activeClipLocal;
+        if (!clipPolygon && hasRelevantShapes) {
+          const sampleBuf = settings.fillSample === 'all'
+            ? model.getCompositePixels(undefined, false)
+            : model.getLayerPixels(layer.id);
+          const mask = computeFloodMask(
+            sampleBuf,
+            boardWidth,
+            boardHeight,
+            settings.fillSample === 'all' ? point.x : localSeed.x,
+            settings.fillSample === 'all' ? point.y : localSeed.y,
+            settings.fillTolerance ?? 32,
+            settings.fillContiguous !== false,
+            settings.fillExpand ?? 1,
+          );
+          const floodPoly = selectionMaskToPolygon(mask, boardWidth, boardHeight).map(p => ({
+            x: Math.round((p.x - (settings.fillSample === 'all' ? layer.x : 0)) * 100) / 100,
+            y: Math.round((p.y - (settings.fillSample === 'all' ? layer.y : 0)) * 100) / 100,
+          }));
+          if (floodPoly.length >= 3) clipPolygon = floodPoly;
+        }
         model.put({
           id: crypto.randomUUID(),
           layerId: layer.id,
@@ -783,12 +775,7 @@ export function WhiteboardCanvas({
           height: boardHeight,
         }}
       >
-        <canvas
-          ref={rasterCanvasRef}
-          className={`whiteboard-raster-canvas ${showGrid ? 'show-grid' : ''}`}
-          width={boardWidth}
-          height={boardHeight}
-        />
+        <div className={`whiteboard-raster-canvas ${showGrid ? 'show-grid' : ''}`} />
       </div>
 
       <svg className="whiteboard-art" aria-hidden="true">
@@ -862,6 +849,7 @@ export function WhiteboardCanvas({
                 <polygon
                   points={activeSelectionPoly.map(p => `${p.x},${p.y}`).join(' ')}
                   fill="rgba(59, 130, 246, 0.08)"
+                  fillRule="evenodd"
                   stroke="#ffffff"
                   strokeWidth={1.5 / viewport.zoom}
                 />

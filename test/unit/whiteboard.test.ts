@@ -93,14 +93,14 @@ test('hit testing respects actual outlines, fills, locks, hidden objects and wor
   assert.throws(() => parseBoardFile(JSON.stringify({ version: 1, shapes: [rect, rect] })));
 });
 
-test('bounded navigation exposes a margin, centers a zoomed-out page and keeps objects inside the board', () => {
+test('bounded navigation allows free overscroll while keeping a visible edge of the board in view', () => {
   const left = clampBoardViewport({ x: 1e6, y: 1e6, zoom: 1 }, 800, 500);
-  assert.equal(left.x, 96); assert.equal(left.y, 96);
+  assert.equal(left.x, 800 - 80); assert.equal(left.y, 500 - 80);
   const right = clampBoardViewport({ x: -1e6, y: -1e6, zoom: 1 }, 800, 500);
-  assert.equal(right.x + BOARD_WIDTH, 800 - 96);
-  assert.equal(right.y + BOARD_HEIGHT, 500 - 96);
+  assert.equal(right.x + BOARD_WIDTH, 80);
+  assert.equal(right.y + BOARD_HEIGHT, 80);
   const overview = clampBoardViewport({ x: 1e6, y: -1e6, zoom: .025 }, 800, 500);
-  assert.equal(overview.x, (800 - BOARD_WIDTH * overview.zoom) / 2);
+  assert.equal(overview.x, 800 - BOARD_WIDTH * overview.zoom * 0.25);
   assert.equal(boardContains({ x: -1, y: 0 }), false);
   assert.deepEqual(clampBoardPoint({ x: -100, y: BOARD_HEIGHT + 20 }), { x: 0, y: BOARD_HEIGHT });
   const moved = containBoardShape(shape({ x: -1000, y: -1000 }));

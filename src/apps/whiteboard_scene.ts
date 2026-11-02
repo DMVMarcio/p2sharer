@@ -329,35 +329,34 @@ export function brushCurves(points: BoardPoint[]): { control: BoardPoint; end: B
 }
 
 export function hasVariablePressure(s: BoardShape): boolean {
-  return (s.tool === 'brush' && Boolean(s.brushType) && s.brushType !== 'pixel') ||
-    ((s.tool === 'brush' || s.tool === 'eraser') && s.points.some(p => p.p !== undefined));
+  return (s.tool === 'brush' || s.tool === 'eraser') && s.points.some(p => p.p !== undefined);
 }
 
 export function brushProfile(s: BoardShape, hasPressure: boolean) {
   const pressureSize = s.pressureSize !== false;
   const useP = hasPressure && pressureSize;
   if (s.tool === 'eraser') {
-    return { base: s.width * 0.5, min: useP ? 0.3 : 1.0, max: 1.0, exp: 0.9, taper: 0, tip: 1.0, defaultHardness: 85, defaultFlow: 100 };
+    return { base: s.width * 0.5, min: useP ? 0.35 : 1.0, max: 1.0, exp: 0.85, taper: 0, tip: 1.0, defaultHardness: 85, defaultFlow: 100 };
   }
   switch (s.brushType) {
     case 'pencil':
-      return { base: s.width * 0.38, min: useP ? 0.28 : 0.45, max: 0.94, exp: 0.78, taper: 1.6, tip: useP ? 0.18 : 0.28, defaultHardness: 82, defaultFlow: 78 };
+      return { base: s.width * 0.45, min: useP ? 0.4 : 1.0, max: 1.0, exp: 0.78, taper: 0, tip: 1.0, defaultHardness: 82, defaultFlow: 78 };
     case 'pen':
-      return { base: s.width * 0.48, min: useP ? 0.05 : 0.16, max: 1.04, exp: 1.15, taper: 3.2, tip: useP ? 0.04 : 0.08, defaultHardness: 96, defaultFlow: 100 };
+      return { base: s.width * 0.5, min: useP ? 0.25 : 1.0, max: 1.0, exp: 0.9, taper: 0, tip: 1.0, defaultHardness: 96, defaultFlow: 100 };
     case 'airbrush':
-      return { base: s.width * 0.65, min: useP ? 0.35 : 0.75, max: 1.15, exp: 0.7, taper: 0.8, tip: 0.45, defaultHardness: 8, defaultFlow: 28 };
+      return { base: s.width * 0.65, min: useP ? 0.45 : 1.0, max: 1.15, exp: 0.7, taper: 0, tip: 1.0, defaultHardness: 8, defaultFlow: 28 };
     case 'watercolor':
-      return { base: s.width * 0.56, min: useP ? 0.22 : 0.5, max: 1.1, exp: 0.82, taper: 1.4, tip: 0.22, defaultHardness: 38, defaultFlow: 48 };
+      return { base: s.width * 0.56, min: useP ? 0.4 : 1.0, max: 1.08, exp: 0.8, taper: 0, tip: 1.0, defaultHardness: 38, defaultFlow: 48 };
     case 'marker':
-      return { base: s.width * 0.52, min: useP ? 0.65 : 0.88, max: 1.02, exp: 0.6, taper: 0.4, tip: 0.7, defaultHardness: 88, defaultFlow: 65 };
+      return { base: s.width * 0.52, min: useP ? 0.7 : 1.0, max: 1.02, exp: 0.6, taper: 0, tip: 1.0, defaultHardness: 88, defaultFlow: 65 };
     case 'pixel':
       return { base: s.width * 0.5, min: 1.0, max: 1.0, exp: 1.0, taper: 0, tip: 1.0, defaultHardness: 100, defaultFlow: 100 };
     case 'smudge':
-      return { base: s.width * 0.55, min: useP ? 0.35 : 0.75, max: 1.05, exp: 0.8, taper: 0.6, tip: 0.4, defaultHardness: 35, defaultFlow: 60 };
+      return { base: s.width * 0.55, min: useP ? 0.45 : 1.0, max: 1.05, exp: 0.8, taper: 0, tip: 1.0, defaultHardness: 35, defaultFlow: 60 };
     case 'blur':
-      return { base: s.width * 0.58, min: useP ? 0.4 : 0.8, max: 1.05, exp: 0.75, taper: 0.5, tip: 0.5, defaultHardness: 25, defaultFlow: 55 };
+      return { base: s.width * 0.58, min: useP ? 0.5 : 1.0, max: 1.05, exp: 0.75, taper: 0, tip: 1.0, defaultHardness: 25, defaultFlow: 55 };
     default:
-      return { base: s.width * 0.52, min: useP ? 0.12 : 0.24, max: 1.14, exp: 0.86, taper: 2.2, tip: useP ? 0.08 : 0.16, defaultHardness: 75, defaultFlow: 88 };
+      return { base: s.width * 0.5, min: useP ? 0.35 : 1.0, max: 1.0, exp: 0.82, taper: 0, tip: 1.0, defaultHardness: 75, defaultFlow: 88 };
   }
 }
 
@@ -484,8 +483,6 @@ function variableWidthBrushPath(s: BoardShape): string {
   }
   const pressures = spine.map(p => Math.max(0.02, Math.min(1, p.p ?? 0.5)));
   if (hasPressure && pressures.length >= 3) {
-    pressures[0] = Math.min(pressures[0], pressures[1] * 0.85);
-    pressures[pressures.length - 1] = Math.min(pressures[pressures.length - 1], pressures[pressures.length - 2] * 0.75);
     for (let pass = 0; pass < 2; pass++) {
       for (let i = 1; i < pressures.length - 1; i++) {
         pressures[i] = pressures[i - 1] * 0.25 + pressures[i] * 0.5 + pressures[i + 1] * 0.25;
@@ -675,19 +672,19 @@ export function shapeSvg(s: BoardShape, images?: ReadonlyMap<string, string> | R
   const transform = `transform="${shapeTransform(s)}"`;
   const [a, b = a] = s.points;
   const clipPrefix = s.clipPolygon?.length
-    ? `<defs><clipPath id="clip-${s.id}"><polygon points="${s.clipPolygon.map(p => `${round(p.x)},${round(p.y)}`).join(' ')}"/></clipPath></defs>`
+    ? `<defs><clipPath id="clip-${s.id}"><polygon points="${s.clipPolygon.map(p => `${round(p.x)},${round(p.y)}`).join(' ')}" clip-rule="evenodd"/></clipPath></defs>`
     : '';
   const wrapClip = (inner: string) => s.clipPolygon?.length ? `${clipPrefix}<g clip-path="url(#clip-${s.id})">${inner}</g>` : inner;
 
   if (s.tool === 'clear') {
     if (s.clipPolygon?.length) {
-      return `<polygon points="${s.clipPolygon.map(p => `${round(p.x)},${round(p.y)}`).join(' ')}" fill="#000000" ${transform}/>`;
+      return `<polygon points="${s.clipPolygon.map(p => `${round(p.x)},${round(p.y)}`).join(' ')}" fill="#000000" fill-rule="evenodd" ${transform}/>`;
     }
     return `<rect x="-16000" y="-10000" width="48000" height="30000" fill="#000000"/>`;
   }
   if (s.tool === 'bucket') {
     if (s.clipPolygon?.length) {
-      return `<polygon points="${s.clipPolygon.map(p => `${round(p.x)},${round(p.y)}`).join(' ')}" fill="${s.color}"${opacityAttr} ${transform}/>`;
+      return `<polygon points="${s.clipPolygon.map(p => `${round(p.x)},${round(p.y)}`).join(' ')}" fill="${s.color}" fill-rule="evenodd"${opacityAttr} ${transform}/>`;
     }
     if (s.points.length === 2) {
       return `<rect x="${Math.min(a.x, b.x)}" y="${Math.min(a.y, b.y)}" width="${Math.abs(b.x - a.x)}" height="${Math.abs(b.y - a.y)}" fill="${s.color}"${opacityAttr} ${transform}/>`;
@@ -718,13 +715,20 @@ export function shapeSvg(s: BoardShape, images?: ReadonlyMap<string, string> | R
   }
   if (s.tool === 'brush' || s.tool === 'eraser' || s.tool === 'line') {
     const copies = expandSymmetryPointLists(s.points, s.symmetry, canvasSize.width / 2, canvasSize.height / 2);
+    const isSquareCap = s.tool === 'brush' && (s.brushType === 'marker' || s.brushType === 'pixel');
+    const lineCap = isSquareCap ? 'square' : 'round';
+    const lineJoin = s.tool === 'brush' && s.brushType === 'pixel'
+      ? 'miter'
+      : s.tool === 'brush' && s.brushType === 'marker'
+        ? 'bevel'
+        : 'round';
     const rendered = copies.map(pts => {
       const subShape: BoardShape = { ...s, points: pts };
       const d = brushPath(subShape);
       if (hasVariablePressure(subShape)) {
         return `<path fill="${s.color}" fill-rule="nonzero" stroke="none"${opacityAttr} ${transform} d="${d}"/>`;
       }
-      return `<path stroke="${s.color}" stroke-width="${s.width}" fill="none"${opacityAttr} stroke-linecap="round" stroke-linejoin="round" ${transform} d="${d}"/>`;
+      return `<path stroke="${s.color}" stroke-width="${s.width}" fill="none"${opacityAttr} stroke-linecap="${lineCap}" stroke-linejoin="${lineJoin}" ${transform} d="${d}"/>`;
     }).join('');
     return wrapClip(rendered);
   }

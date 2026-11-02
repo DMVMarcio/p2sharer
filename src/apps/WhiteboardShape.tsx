@@ -23,7 +23,7 @@ export const WhiteboardShape = memo(function WhiteboardShape({
     <g>
       <defs>
         <clipPath id={clipId}>
-          <polygon points={s.clipPolygon.map(p => `${p.x},${p.y}`).join(' ')} />
+          <polygon points={s.clipPolygon.map(p => `${p.x},${p.y}`).join(' ')} clipRule="evenodd" />
         </clipPath>
       </defs>
       <g clipPath={`url(#${clipId})`}>{node}</g>
@@ -32,13 +32,13 @@ export const WhiteboardShape = memo(function WhiteboardShape({
 
   if (s.tool === 'clear') {
     if (s.clipPolygon?.length) {
-      return <polygon points={s.clipPolygon.map(p => `${p.x},${p.y}`).join(' ')} fill="#000000" transform={transform} />;
+      return <polygon points={s.clipPolygon.map(p => `${p.x},${p.y}`).join(' ')} fill="#000000" fillRule="evenodd" transform={transform} />;
     }
     return <rect x={-16000} y={-10000} width={48000} height={30000} fill="#000000" />;
   }
   if (s.tool === 'bucket') {
     if (s.clipPolygon?.length) {
-      return <polygon points={s.clipPolygon.map(p => `${p.x},${p.y}`).join(' ')} fill={s.color} opacity={opacity < 1 ? opacity : undefined} transform={transform} />;
+      return <polygon points={s.clipPolygon.map(p => `${p.x},${p.y}`).join(' ')} fill={s.color} fillRule="evenodd" opacity={opacity < 1 ? opacity : undefined} transform={transform} />;
     }
     if (s.points.length === 2) {
       return <rect x={Math.min(a.x, b.x)} y={Math.min(a.y, b.y)} width={Math.abs(b.x - a.x)} height={Math.abs(b.y - a.y)}
@@ -90,16 +90,38 @@ export const WhiteboardShape = memo(function WhiteboardShape({
   }
   if (s.tool === 'brush' || s.tool === 'eraser' || s.tool === 'line') {
     const copies = expandSymmetryPointLists(s.points, s.symmetry, canvasWidth / 2, canvasHeight / 2);
+    const isSquareCap = s.tool === 'brush' && (s.brushType === 'marker' || s.brushType === 'pixel');
+    const lineCap = isSquareCap ? 'square' : 'round';
+    const lineJoin = s.tool === 'brush' && s.brushType === 'pixel'
+      ? 'miter'
+      : s.tool === 'brush' && s.brushType === 'marker'
+        ? 'bevel'
+        : 'round';
+    const hardness = s.hardness ?? (
+      s.brushType === 'airbrush' ? 15
+        : s.brushType === 'blur' ? 20
+          : s.brushType === 'smudge' ? 35
+            : s.brushType === 'watercolor' ? 45
+              : 85
+    );
+    const softBlurPx = s.tool === 'brush' && s.brushType !== 'pixel' && hardness < 65
+      ? Math.round(((65 - hardness) / 65) * Math.max(1.5, s.width * 0.22) * 10) / 10
+      : 0;
+    const strokeStyle = softBlurPx > 0.3
+      ? { filter: `blur(${softBlurPx}px)` }
+      : s.tool === 'brush' && s.brushType === 'pixel'
+        ? { shapeRendering: 'crispEdges' as const }
+        : undefined;
     return wrapClip(
       <>
         {copies.map((pts, idx) => {
           const subShape: BoardShape = { ...s, points: pts };
           const d = brushPath(subShape);
           if (hasVariablePressure(subShape)) {
-            return <path key={idx} fill={s.color} fillRule="nonzero" stroke="none" opacity={opacity < 1 ? opacity : undefined} transform={transform} d={d} />;
+            return <path key={idx} fill={s.color} fillRule="nonzero" stroke="none" opacity={opacity < 1 ? opacity : undefined} style={strokeStyle} transform={transform} d={d} />;
           }
           return <path key={idx} stroke={s.color} strokeWidth={s.width} fill="none" opacity={opacity < 1 ? opacity : undefined}
-            strokeLinecap="round" strokeLinejoin="round" transform={transform} d={d} />;
+            strokeLinecap={lineCap} strokeLinejoin={lineJoin} style={strokeStyle} transform={transform} d={d} />;
         })}
       </>
     );

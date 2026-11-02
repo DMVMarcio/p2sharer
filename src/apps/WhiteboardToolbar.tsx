@@ -1,7 +1,7 @@
 import { useId, useState } from 'react';
 import {
   Brush, Pencil, Pen, Eraser, MousePointer2, Square, Circle, Minus, ImagePlus,
-  Undo2, Redo2, ChevronDown, PaintBucket, Pipette, Type, BoxSelect, Lasso,
+  Undo2, Redo2, ChevronLeft, PaintBucket, Pipette, Type, BoxSelect, Lasso,
   Wand2, Blend, Sparkles, Droplets, Highlighter, Grid3x3, Flame, FlipHorizontal,
   Trash2, CheckSquare, SquareDashedMousePointer,
 } from 'lucide-react';
@@ -129,20 +129,6 @@ export function WhiteboardToolbar({
     ['text', Type, 'T'],
     ['eyedropper', Pipette, 'I'],
   ] as const;
-
-  const colors = [
-    ['#a47754', 'color.brown'],
-    ['#ef4444', 'message.6741b8b5e1c2'],
-    ['#f97316', 'message.2b2b4ad00333'],
-    ['#facc15', 'message.1875203bcdcc'],
-    ['#22c55e', 'message.40598e1cb1d2'],
-    ['#06b6d4', 'message.c954e4de2019'],
-    ['#3b82f6', 'message.b0bf526b23af'],
-    ['#a855f7', 'message.57a73ede5f6f'],
-    ['#ec4899', 'message.75f9577a1637'],
-    ['#ffffff', 'message.3683a74222dd'],
-    ['#000000', 'message.4b652af43d8d'],
-  ];
 
   const showBrushSliders = settings.tool === 'brush' || settings.tool === 'eraser';
   const showShapeSliders = settings.tool === 'rectangle' || settings.tool === 'ellipse' || settings.tool === 'line';
@@ -311,26 +297,6 @@ export function WhiteboardToolbar({
             </TooltipButton>
           )}
 
-          <TooltipButton
-            tooltip={t('message.2237b88f398f')}
-            className="room-app-notepad-tool"
-            onClick={event =>
-              menu(
-                event,
-                colors.map(([color, label]) => ({
-                  id: color,
-                  label: t(label),
-                  selected: color === settings.color,
-                  icon: <span className="stream-drawing-swatch" style={{ background: color }} />,
-                  onSelect: () => onChange({ ...settings, color }),
-                })),
-                { toggle: true },
-              )
-            }
-          >
-            <span className="stream-drawing-swatch" style={{ background: settings.color }} />
-          </TooltipButton>
-
           {(isSelectionTool(settings.tool) || hasSelection) && (
             <div className="whiteboard-selection-quick-actions">
               {onSelectAll && (
@@ -394,12 +360,41 @@ export function WhiteboardToolbar({
           aria-controls={contentId}
           onClick={() => setOpen(value => !value)}
         >
-          <ChevronDown size={20} strokeWidth={2.5} className={open ? '' : 'is-reversed'} />
+          <ChevronLeft size={18} strokeWidth={2.3} className={open ? '' : 'is-reversed'} />
         </TooltipButton>
       </div>
 
       <CollapsibleRegion open={open} id={contentId}>
         <div className="whiteboard-tool-properties">
+          <div className="whiteboard-brush-preview-card" aria-hidden="true">
+            <div className="whiteboard-brush-preview-stage">
+              <span
+                className={`whiteboard-brush-preview-dot ${settings.tool === 'brush' && (settings.brushType === 'pixel' || settings.brushType === 'marker') ? 'is-square' : ''}`}
+                style={{
+                  width: `${Math.max(3, Math.min(42, settings.width * 0.42))}px`,
+                  height: `${Math.max(3, Math.min(42, settings.width * 0.42))}px`,
+                  backgroundColor: settings.tool === 'eraser' ? 'transparent' : settings.color,
+                  border: settings.tool === 'eraser' ? '1.5px dashed var(--text-secondary)' : 'none',
+                  opacity: Math.max(0.15, (settings.opacity ?? 100) / 100),
+                  filter: showBrushSliders && (settings.hardness ?? 80) < 70
+                    ? `blur(${Math.round(((70 - (settings.hardness ?? 80)) / 70) * 3.5 * 10) / 10}px)`
+                    : undefined,
+                }}
+              />
+            </div>
+            <div className="whiteboard-brush-preview-meta">
+              <span className="whiteboard-brush-preview-title">
+                {t(
+                  settings.tool === 'brush'
+                    ? activeBrushLabel
+                    : isSelectionTool(settings.tool)
+                      ? activeSelectionLabel
+                      : `whiteboard.${settings.tool}`,
+                )}
+              </span>
+              <span className="whiteboard-brush-preview-size">{settings.width}px · {settings.opacity}%</span>
+            </div>
+          </div>
           <IntegerSlider
             label={t('whiteboard.width')}
             min={1}

@@ -129,12 +129,20 @@ export function computeFloodMask(
   const sa = sampleData[seedIdx4 + 3];
   const tol = Math.max(0, Math.min(255, Math.round(tolerance)));
 
+  let minX = width, minY = height, maxX = -1, maxY = -1;
   if (!contiguous) {
-    const total = width * height;
-    for (let i = 0; i < total; i++) {
-      if (clipMask && clipMask[i] === 0) continue;
-      if (colorMatches(sampleData, i * 4, sr, sg, sb, sa, tol)) {
-        mask[i] = 255;
+    for (let y = 0; y < height; y++) {
+      const row = y * width;
+      for (let x = 0; x < width; x++) {
+        const i = row + x;
+        if (clipMask && clipMask[i] === 0) continue;
+        if (colorMatches(sampleData, i * 4, sr, sg, sb, sa, tol)) {
+          mask[i] = 255;
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
       }
     }
   } else {
@@ -165,6 +173,12 @@ export function computeFloodMask(
         rx++;
       }
       rx--;
+      if (lx <= rx) {
+        if (lx < minX) minX = lx;
+        if (rx > maxX) maxX = rx;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
       let spanAbove = false;
       let spanBelow = false;
       for (let ix = lx; ix <= rx; ix++) {
@@ -202,37 +216,49 @@ export function computeFloodMask(
   }
 
   const expandSteps = Math.max(-10, Math.min(20, Math.round(expand)));
-  if (expandSteps !== 0) {
-    const total = width * height;
-    const dist = new Uint16Array(total);
-    const INF = 30000;
+  if (expandSteps !== 0 && maxX >= minX && maxY >= minY) {
     const dilate = expandSteps > 0;
     const radius = Math.abs(expandSteps);
-    for (let i = 0; i < total; i++) {
-      dist[i] = (dilate ? mask[i] > 0 : mask[i] === 0) ? 0 : INF;
+    const bx0 = Math.max(0, minX - radius - 1);
+    const bx1 = Math.min(width - 1, maxX + radius + 1);
+    const by0 = Math.max(0, minY - radius - 1);
+    const by1 = Math.min(height - 1, maxY + radius + 1);
+    const bw = bx1 - bx0 + 1;
+    const bh = by1 - by0 + 1;
+    const dist = new Uint16Array(bw * bh);
+    const INF = 30000;
+    for (let ly = 0; ly < bh; ly++) {
+      const srcRow = (by0 + ly) * width + bx0;
+      const dstRow = ly * bw;
+      for (let lx = 0; lx < bw; lx++) {
+        const m = mask[srcRow + lx];
+        dist[dstRow + lx] = (dilate ? m > 0 : m === 0) ? 0 : INF;
+      }
     }
-    for (let y = 0; y < height; y++) {
-      const row = y * width;
-      for (let x = 0; x < width; x++) {
-        const idx = row + x;
+    for (let ly = 0; ly < bh; ly++) {
+      const row = ly * bw;
+      for (let lx = 0; lx < bw; lx++) {
+        const idx = row + lx;
         let d = dist[idx];
-        if (x > 0 && dist[idx - 1] + 1 < d) d = dist[idx - 1] + 1;
-        if (y > 0 && dist[idx - width] + 1 < d) d = dist[idx - width] + 1;
+        if (lx > 0 && dist[idx - 1] + 1 < d) d = dist[idx - 1] + 1;
+        if (ly > 0 && dist[idx - bw] + 1 < d) d = dist[idx - bw] + 1;
         dist[idx] = d;
       }
     }
-    for (let y = height - 1; y >= 0; y--) {
-      const row = y * width;
-      for (let x = width - 1; x >= 0; x--) {
-        const idx = row + x;
+    for (let ly = bh - 1; ly >= 0; ly--) {
+      const row = ly * bw;
+      const dstRow = (by0 + ly) * width + bx0;
+      for (let lx = bw - 1; lx >= 0; lx--) {
+        const idx = row + lx;
         let d = dist[idx];
-        if (x < width - 1 && dist[idx + 1] + 1 < d) d = dist[idx + 1] + 1;
-        if (y < height - 1 && dist[idx + width] + 1 < d) d = dist[idx + width] + 1;
+        if (lx < bw - 1 && dist[idx + 1] + 1 < d) d = dist[idx + 1] + 1;
+        if (ly < bh - 1 && dist[idx + bw] + 1 < d) d = dist[idx + bw] + 1;
         dist[idx] = d;
+        const mIdx = dstRow + lx;
         if (dilate) {
-          if (d <= radius && (!clipMask || clipMask[idx] > 0)) mask[idx] = 255;
+          if (d <= radius && (!clipMask || clipMask[mIdx] > 0)) mask[mIdx] = 255;
         } else {
-          if (d <= radius) mask[idx] = 0;
+          if (d <= radius) mask[mIdx] = 0;
         }
       }
     }

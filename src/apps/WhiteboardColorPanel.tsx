@@ -4,13 +4,6 @@ import { TooltipButton } from '../components/common/TooltipButton';
 import { hexToHsv, hsvToHex, type Hsv } from '../core/hsv_color';
 import { t } from '../i18n';
 
-const STUDIO_SWATCHES = [
-  '#000000', '#334155', '#64748b', '#94a3b8', '#cbd5e1', '#ffffff',
-  '#ef4444', '#f97316', '#f59e0b', '#facc15', '#84cc16', '#22c55e',
-  '#10b981', '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6',
-  '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#a47754', '#78350f',
-] as const;
-
 export function WhiteboardColorPanel({
   color,
   secondaryColor,
@@ -18,6 +11,7 @@ export function WhiteboardColorPanel({
   isEyedropper,
   onColorChange,
   onSecondaryColorChange,
+  onCommitColor,
   onSwapColors,
   onResetColors,
   onPickEyedropper,
@@ -28,6 +22,7 @@ export function WhiteboardColorPanel({
   isEyedropper: boolean;
   onColorChange(color: string): void;
   onSecondaryColorChange(color: string): void;
+  onCommitColor?(color: string): void;
   onSwapColors(): void;
   onResetColors(): void;
   onPickEyedropper(): void;
@@ -42,21 +37,22 @@ export function WhiteboardColorPanel({
     setHexDraft(activeHex);
   }, [activeHex]);
 
-  const applyColor = (nextHex: string, nextHsv?: Hsv) => {
+  const applyColor = (nextHex: string, nextHsv?: Hsv, commit = false) => {
     const normalized = nextHex.toLowerCase();
     if (nextHsv) setHsv(nextHsv);
     setHexDraft(normalized);
     if (editingSecondary) onSecondaryColorChange(normalized);
     else onColorChange(normalized);
+    if (commit) onCommitColor?.(normalized);
   };
 
-  const updateSvFromPointer = (event: React.PointerEvent<HTMLDivElement>) => {
+  const updateSvFromPointer = (event: React.PointerEvent<HTMLDivElement>, commit = false) => {
     const rect = event.currentTarget.getBoundingClientRect();
     const w = Math.max(1, rect.width), h = Math.max(1, rect.height);
     const s = Math.max(0, Math.min(1, (event.clientX - rect.left) / w));
     const v = 1 - Math.max(0, Math.min(1, (event.clientY - rect.top) / h));
     const nextHsv: Hsv = { h: hsv.h, s, v };
-    applyColor(hsvToHex(nextHsv), nextHsv);
+    applyColor(hsvToHex(nextHsv), nextHsv, commit);
   };
 
   return (
@@ -114,7 +110,18 @@ export function WhiteboardColorPanel({
                 applyColor(candidate, hexToHsv(candidate));
               }
             }}
-            onBlur={() => setHexDraft(activeHex)}
+            onBlur={() => {
+              const candidate = hexDraft.startsWith('#') ? hexDraft : `#${hexDraft}`;
+              if (/^#[0-9a-f]{6}$/i.test(candidate)) {
+                onCommitColor?.(candidate.toLowerCase());
+              }
+              setHexDraft(activeHex);
+            }}
+            onKeyDown={event => {
+              if (event.key === 'Enter') {
+                event.currentTarget.blur();
+              }
+            }}
           />
           <TooltipButton
             tooltip={`${t('whiteboard.eyedropper')} (I)`}
@@ -135,11 +142,23 @@ export function WhiteboardColorPanel({
         aria-label={t('whiteboard.colorSquare')}
         onPointerDown={event => {
           event.currentTarget.setPointerCapture(event.pointerId);
-          updateSvFromPointer(event);
+          updateSvFromPointer(event, false);
         }}
         onPointerMove={event => {
           if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-            updateSvFromPointer(event);
+            updateSvFromPointer(event, false);
+          }
+        }}
+        onPointerUp={event => {
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+            updateSvFromPointer(event, true);
+          }
+        }}
+        onPointerCancel={event => {
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+            onCommitColor?.(activeHex);
           }
         }}
       >
@@ -161,23 +180,11 @@ export function WhiteboardColorPanel({
           className="settings-slider-input color-picker-hue whiteboard-hue-slider"
           onChange={event => {
             const nextHsv: Hsv = { ...hsv, h: Number(event.target.value) };
-            applyColor(hsvToHex(nextHsv), nextHsv);
+            applyColor(hsvToHex(nextHsv), nextHsv, false);
           }}
+          onPointerUp={() => onCommitColor?.(activeHex)}
+          onKeyUp={() => onCommitColor?.(activeHex)}
         />
-      </div>
-
-      <div className="whiteboard-swatches-grid" role="group" aria-label={t('whiteboard.swatches')}>
-        {STUDIO_SWATCHES.map(swatch => (
-          <button
-            key={swatch}
-            type="button"
-            aria-label={swatch}
-            aria-pressed={activeHex.toLowerCase() === swatch}
-            className={`whiteboard-swatch-btn ${activeHex.toLowerCase() === swatch ? 'active' : ''}`}
-            style={{ backgroundColor: swatch }}
-            onClick={() => applyColor(swatch, hexToHsv(swatch))}
-          />
-        ))}
       </div>
 
       {recentColors.length > 0 && (
@@ -189,7 +196,7 @@ export function WhiteboardColorPanel({
               aria-label={recent}
               className={`whiteboard-swatch-btn is-recent ${activeHex.toLowerCase() === recent.toLowerCase() ? 'active' : ''}`}
               style={{ backgroundColor: recent }}
-              onClick={() => applyColor(recent, hexToHsv(recent))}
+              onClick={() => applyColor(recent, hexToHsv(recent), true)}
             />
           ))}
         </div>
