@@ -31,7 +31,7 @@ const mocks = {
       return { busy: !!globalThis.transmissionDefaultsFixture.previewBusy, take, retry };
     };`,
   cameras: 'export const listCameras = async (requestPermission = false) => { globalThis.transmissionDefaultsFixture.cameraRequests.push(requestPermission); return [{ kind: "videoinput", deviceId: "fixture-camera", label: "Camera" }]; }; export const preferredCameraFrameRate = (rates, fps) => rates.includes(fps) ? fps : rates[0];',
-  tauri: 'export const invoke = async () => ({ monitors: [{ id: "screen:0", name: "Monitor" }], windows: [] });',
+  tauri: 'export const invoke = async () => ({ monitors: [{ id: "screen:0", name: "Monitor" }], windows: [] }); export const isTauri = () => true;',
 };
 const bundle = await build({ stdin: { contents: `export { useScreenPicker } from './src/hooks/useScreenPicker.ts';
 export { stateStore, StateStore } from './src/core/state_store.ts';`, resolveDir: process.cwd() },

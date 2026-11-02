@@ -1,5 +1,16 @@
-import { isTauri } from '@tauri-apps/api/core';
 import type { AppPlatform } from './types';
+
+/**
+ * Detects whether the current runtime is inside native Tauri desktop.
+ */
+function isTauriContext(): boolean {
+  if (typeof window === 'undefined') return false;
+  return Boolean(
+    ('__TAURI_INTERNALS__' in window) ||
+    ('__TAURI__' in window) ||
+    (window as unknown as { isTauri?: boolean }).isTauri
+  );
+}
 
 /**
  * Detects the client runtime platform:
@@ -8,7 +19,7 @@ import type { AppPlatform } from './types';
  * - 'web': Standard browser on desktop/laptop
  */
 export function getLocalPlatform(): AppPlatform {
-  if (typeof window !== 'undefined' && ('__TAURI_INTERNALS__' in window || isTauri())) {
+  if (isTauriContext()) {
     return 'desktop';
   }
   if (typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)) {

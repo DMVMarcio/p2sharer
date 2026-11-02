@@ -16,7 +16,7 @@ test('audio filtering defaults, draft switching, mute-all and native apply use t
       builder.onResolve({ filter: /^@tauri-apps\/api\/core$/ }, () => ({ path: 'invoke', namespace: 'fixture' }));
       builder.onResolve({ filter: /useToast$/ }, () => ({ path: 'toast', namespace: 'fixture' }));
       builder.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: args.path === 'invoke'
-        ? 'export const invoke = (...args) => globalThis.audioFilterInvoke(...args);'
+        ? 'export const invoke = (...args) => globalThis.audioFilterInvoke(...args); export const isTauri = () => true;'
         : 'export const showToast = () => {};', loader: 'js' }));
       builder.onResolve({ filter: /^[^./]/ }, args => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
     } }],
@@ -114,7 +114,7 @@ test('sub-process accordion toggling supports granular and parent all-or-nothing
       builder.onResolve({ filter: /^@tauri-apps\/api\/core$/ }, () => ({ path: 'invoke', namespace: 'fixture' }));
       builder.onResolve({ filter: /useToast$/ }, () => ({ path: 'toast', namespace: 'fixture' }));
       builder.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: args.path === 'invoke'
-        ? 'export const invoke = (...args) => globalThis.audioFilterInvoke(...args);'
+        ? 'export const invoke = (...args) => globalThis.audioFilterInvoke(...args); export const isTauri = () => true;'
         : 'export const showToast = () => {};', loader: 'js' }));
       builder.onResolve({ filter: /^[^./]/ }, args => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
     } }],
