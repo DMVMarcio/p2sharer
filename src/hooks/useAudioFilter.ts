@@ -52,10 +52,10 @@ export function useAudioFilter() {
   );
 
   // Freeze the opening selection/order so controls never move beneath the pointer.
-  const openingSelection = useRef(new Set(Array.from(
-    stateStore.selectedFilterMode === 'exclude' ? stateStore.excludeProcessNames : stateStore.includeProcessNames,
-    audioProcessKey,
-  )));
+  const openingSelection = useRef(new Set([
+    ...Array.from(stateStore.selectedFilterMode === 'exclude' ? stateStore.excludeProcessNames : stateStore.includeProcessNames, audioProcessKey),
+    ...Array.from(stateStore.selectedFilterMode === 'exclude' ? stateStore.excludeSubProcessKeys : stateStore.includeSubProcessKeys, k => audioProcessKey(k.split(':')[0])),
+  ]));
   const processOrder = useRef<Map<string, number> | null>(null);
   const draftExcludeNamesRef = useRef(draftExcludeNames);
   draftExcludeNamesRef.current = draftExcludeNames;

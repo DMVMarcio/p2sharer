@@ -30,7 +30,9 @@ test('audio filtering defaults, draft switching, mute-all and native apply use t
   globalThis.audioFilterInvoke = async (command, args) => {
     calls.push({ command, args });
     if (command === 'list_audio_processes') return [
-      { pid: 3, name: 'Game.exe' }, { pid: 1, name: 'Discord.exe' }, { pid: 2, name: 'P2Sharer.exe' },
+      { pid: 3, name: 'Game.exe' },
+      { pid: 1, name: 'Discord.exe', sub_processes: [{ pid: 1, is_root: false, role: 'voice_audio', stable_id: 'voice_audio', has_audio: true }] },
+      { pid: 2, name: 'P2Sharer.exe' },
     ];
   };
   const { useAudioFilter, stateStore } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
@@ -41,8 +43,8 @@ test('audio filtering defaults, draft switching, mute-all and native apply use t
   let revision = 0;
   const mount = () => act(async () => root.render(React.createElement(Harness, { key: ++revision })));
   try {
-    assert.ok(stateStore.excludeProcessNames.has('discord'));
     assert.ok(stateStore.excludeProcessNames.has('p2sharer'));
+    assert.ok(stateStore.excludeSubProcessKeys.has('discord:voice_audio'));
     localStorage.setItem('p2sharer_audio_exclude_names', '[]');
     stateStore.loadFromStorage();
     assert.equal(stateStore.excludeProcessNames.size, 0, 'saved empty exclusions remain intentional');
@@ -51,7 +53,8 @@ test('audio filtering defaults, draft switching, mute-all and native apply use t
     await mount();
     await act(async () => filter.loadProcesses());
     assert.deepEqual([...filter.selectedPids], [1, 2]);
-    assert.equal(filter.selectedNames.size, 2, 'executable aliases share one selection');
+    assert.equal(filter.selectedNames.size, 1);
+    assert.ok(filter.selectedSubKeys.has('discord:voice_audio'));
     const openingOrder = filter.processes.map(process => process.name);
     assert.deepEqual(openingOrder, ['Discord.exe', 'P2Sharer.exe', 'Game.exe']);
     await act(async () => filter.toggleProcess(filter.processes[0], false));
@@ -163,6 +166,7 @@ test('sub-process accordion toggling supports granular and parent all-or-nothing
 
     const discord = filter.processes.find(p => p.name === 'Discord.exe');
     assert.ok(discord);
+    await act(async () => filter.toggleProcess(discord, true));
     assert.equal(filter.getProcessSelectionState(discord), 'all');
     assert.deepEqual([...filter.selectedPids].sort((a, b) => a - b), [100, 101, 102, 200]);
 
@@ -284,17 +288,11 @@ test('sub-process stable keys persist across process restarts and decouple root 
     const discord = filter.processes.find(p => p.name === 'Discord.exe');
     assert.ok(discord);
 
-    // Initially Discord starts as fully selected (default exclusions)
-    assert.equal(filter.getProcessSelectionState(discord), 'all');
-
-    // Unselect Discord as a whole
-    await act(async () => filter.toggleProcess(discord, false));
-    assert.equal(filter.getProcessSelectionState(discord), 'none');
-
-    // Select specifically the voice_audio subprocess (PID 101)
-    const voiceSub = discord.sub_processes.find(s => s.role === 'voice_audio');
-    assert.ok(voiceSub);
-    await act(async () => filter.toggleSubProcess(discord, voiceSub, true));
+    // Initially Discord starts with voice_audio isolated by default (partial selection)
+    assert.equal(filter.getProcessSelectionState(discord), 'partial');
+    assert.ok(filter.selectedPids.has(101), 'Voice audio PID must be selected by default');
+    assert.ok(!filter.selectedPids.has(100), 'Root parent PID must be automatically decoupled');
+    assert.ok(!filter.selectedPids.has(102), 'Chat media PID must remain unselected');
 
     // Verify root process 100 was decoupled and only voice 101 is selected
     assert.equal(filter.getProcessSelectionState(discord), 'partial');
@@ -335,6 +333,96 @@ test('sub-process stable keys persist across process restarts and decouple root 
     await act(async () => root.unmount());
   } finally {
     await act(async () => root.unmount());
+    dom.window.close();
+    for (const [key, descriptor] of previous) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key];
+    }
+  }
+});
+
+test('one-time migration converts existing whole-app Discord exclusion to voice call isolation', async () => {
+  const dom = new JSDOM('<div id="root"></div>', { url: 'https://example.test' });
+  const keys = ['window', 'document', 'navigator', 'localStorage'];
+  const previous = new Map(keys.map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+  for (const key of keys) Object.defineProperty(globalThis, key, { configurable: true, value: dom.window[key] });
+
+  try {
+    const require = createRequire(import.meta.url);
+    const bundle = await build({
+      stdin: { contents: "export { stateStore } from './src/core/state_store';",
+        resolveDir: fileURLToPath(new URL('../../', import.meta.url)) },
+      bundle: true, write: false, format: 'esm', platform: 'node',
+      plugins: [{ name: 'fixtures', setup(builder) {
+        builder.onResolve({ filter: /^@tauri-apps\/api\/core$/ }, () => ({ path: 'invoke', namespace: 'fixture' }));
+        builder.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({ contents: 'export const invoke = () => {}; export const isTauri = () => true;', loader: 'js' }));
+        builder.onResolve({ filter: /^[^./]/ }, args => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
+      } }],
+    });
+    const { stateStore } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
+
+    // Simulate existing user with legacy defaults
+    localStorage.setItem('p2sharer_audio_exclude_names', JSON.stringify(['discord', 'discord.exe', 'p2sharer', 'p2sharer.exe']));
+    localStorage.removeItem('p2sharer_audio_exclude_sub_keys');
+    localStorage.removeItem('p2sharer_audio_discord_voice_migrated');
+
+    stateStore.loadFromStorage();
+
+    assert.equal(stateStore.excludeProcessNames.has('discord'), false, 'Whole-app discord must be removed');
+    assert.equal(stateStore.excludeProcessNames.has('discord.exe'), false, 'Whole-app discord.exe must be removed');
+    assert.equal(stateStore.excludeProcessNames.has('p2sharer'), true, 'p2sharer must remain');
+    assert.equal(stateStore.excludeSubProcessKeys.has('discord:voice_audio'), true, 'discord:voice_audio must be added');
+    assert.equal(localStorage.getItem('p2sharer_audio_discord_voice_migrated'), 'true', 'Migration flag must be set');
+
+    const storedNames = JSON.parse(localStorage.getItem('p2sharer_audio_exclude_names'));
+    const storedSubKeys = JSON.parse(localStorage.getItem('p2sharer_audio_exclude_sub_keys'));
+    assert.ok(!storedNames.includes('discord'));
+    assert.deepEqual(storedSubKeys, ['discord:voice_audio']);
+  } finally {
+    dom.window.close();
+    for (const [key, descriptor] of previous) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key];
+    }
+  }
+});
+
+test('migration does not re-run on subsequent sessions and respects user customizations', async () => {
+  const dom = new JSDOM('<div id="root"></div>', { url: 'https://example.test' });
+  const keys = ['window', 'document', 'navigator', 'localStorage'];
+  const previous = new Map(keys.map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+  for (const key of keys) Object.defineProperty(globalThis, key, { configurable: true, value: dom.window[key] });
+
+  try {
+    const require = createRequire(import.meta.url);
+    const bundle = await build({
+      stdin: { contents: "export { stateStore } from './src/core/state_store';",
+        resolveDir: fileURLToPath(new URL('../../', import.meta.url)) },
+      bundle: true, write: false, format: 'esm', platform: 'node',
+      plugins: [{ name: 'fixtures', setup(builder) {
+        builder.onResolve({ filter: /^@tauri-apps\/api\/core$/ }, () => ({ path: 'invoke', namespace: 'fixture' }));
+        builder.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({ contents: 'export const invoke = () => {}; export const isTauri = () => true;', loader: 'js' }));
+        builder.onResolve({ filter: /^[^./]/ }, args => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
+      } }],
+    });
+    const { stateStore } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
+
+    // Case 1: Migrated user who later customized to mute entire Discord
+    localStorage.setItem('p2sharer_audio_discord_voice_migrated', 'true');
+    localStorage.setItem('p2sharer_audio_exclude_names', JSON.stringify(['discord', 'p2sharer']));
+    localStorage.setItem('p2sharer_audio_exclude_sub_keys', JSON.stringify([]));
+
+    stateStore.loadFromStorage();
+    assert.equal(stateStore.excludeProcessNames.has('discord'), true, 'User customization must NOT be overwritten');
+    assert.equal(stateStore.excludeSubProcessKeys.size, 0, 'Migration must not re-run');
+
+    // Case 2: Existing user who unmuted Discord before updating
+    localStorage.removeItem('p2sharer_audio_discord_voice_migrated');
+    localStorage.setItem('p2sharer_audio_exclude_names', JSON.stringify(['p2sharer', 'p2sharer.exe']));
+    localStorage.removeItem('p2sharer_audio_exclude_sub_keys');
+
+    stateStore.loadFromStorage();
+    assert.equal(stateStore.excludeSubProcessKeys.size, 0, 'Must not force voice mute when user previously unmuted Discord');
+    assert.equal(localStorage.getItem('p2sharer_audio_discord_voice_migrated'), 'true');
+  } finally {
     dom.window.close();
     for (const [key, descriptor] of previous) {
       if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key];

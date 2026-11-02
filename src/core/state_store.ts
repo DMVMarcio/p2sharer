@@ -1,4 +1,4 @@
-import { DEFAULT_AUDIO_EXCLUSIONS } from './audio_filter_presets.ts';
+import { DEFAULT_AUDIO_EXCLUSIONS, DEFAULT_AUDIO_SUB_EXCLUSIONS } from './audio_filter_presets.ts';
 import { readNicknameStyle, type NicknameStyle } from './nickname_style.ts';
 import { normalizeBackground } from './background_color.ts';
 import { streamDrawingLimit, STREAM_DRAWING_MAX } from './stream_pointer.ts';
@@ -72,7 +72,7 @@ export class StateStore {
   public includeProcessNames: Set<string> = new Set();
   public excludePids: Set<number> = new Set();
   public includePids: Set<number> = new Set();
-  public excludeSubProcessKeys: Set<string> = new Set();
+  public excludeSubProcessKeys: Set<string> = new Set(DEFAULT_AUDIO_SUB_EXCLUSIONS);
   public includeSubProcessKeys: Set<string> = new Set();
 
   public isSidebarCollapsed: boolean = isMobileDevice();
@@ -182,6 +182,8 @@ export class StateStore {
 
     this.isAudioFilterFullAudio = localStorage.getItem('p2sharer_audio_filter_full') === 'true';
     this.selectedFilterMode = (localStorage.getItem('p2sharer_audio_filter_mode') as 'exclude' | 'include') || 'exclude';
+    this.excludePids = new Set();
+    this.includePids = new Set();
     const rawExclude = localStorage.getItem('p2sharer_audio_exclude_names');
     if (rawExclude !== null) {
       try {
@@ -207,13 +209,22 @@ export class StateStore {
       this.includeProcessNames = new Set();
     }
 
-    try {
-      const savedExSub = JSON.parse(localStorage.getItem('p2sharer_audio_exclude_sub_keys') || '[]');
-      if (Array.isArray(savedExSub)) {
-        this.excludeSubProcessKeys = new Set(savedExSub.map((k: string) => k.toLowerCase()));
+    const rawExcludeSub = localStorage.getItem('p2sharer_audio_exclude_sub_keys');
+    if (rawExcludeSub !== null) {
+      try {
+        const savedExSub = JSON.parse(rawExcludeSub);
+        if (Array.isArray(savedExSub)) {
+          this.excludeSubProcessKeys = new Set(savedExSub.map((k: string) => k.toLowerCase()));
+        } else {
+          this.excludeSubProcessKeys = new Set(DEFAULT_AUDIO_SUB_EXCLUSIONS);
+        }
+      } catch {
+        this.excludeSubProcessKeys = new Set(DEFAULT_AUDIO_SUB_EXCLUSIONS);
       }
-    } catch {
-      this.excludeSubProcessKeys = new Set();
+    } else {
+      this.excludeSubProcessKeys = rawExclude === null
+        ? new Set(DEFAULT_AUDIO_SUB_EXCLUSIONS)
+        : new Set();
     }
 
     try {
@@ -223,6 +234,21 @@ export class StateStore {
       }
     } catch {
       this.includeSubProcessKeys = new Set();
+    }
+
+    const discordVoiceMigrationKey = 'p2sharer_audio_discord_voice_migrated';
+    if (localStorage.getItem(discordVoiceMigrationKey) !== 'true') {
+      const hadDiscordWholeApp =
+        this.excludeProcessNames.has('discord') ||
+        this.excludeProcessNames.has('discord.exe');
+
+      if (hadDiscordWholeApp) {
+        this.excludeProcessNames.delete('discord');
+        this.excludeProcessNames.delete('discord.exe');
+        this.excludeSubProcessKeys.add('discord:voice_audio');
+        this.saveAudioFilterPresets();
+      }
+      localStorage.setItem(discordVoiceMigrationKey, 'true');
     }
   }
 
