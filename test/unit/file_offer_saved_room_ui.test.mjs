@@ -7,10 +7,12 @@ import { JSDOM } from 'jsdom';
 import React, { act } from 'react';
 import { selfId } from '@trystero-p2p/core';
 
-const dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost' });
+const dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost', pretendToBeVisual: true });
 for (const key of ['window', 'document', 'HTMLElement', 'Element', 'localStorage']) globalThis[key] = dom.window[key];
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 window.matchMedia = () => ({ matches: false });
+globalThis.requestAnimationFrame = dom.window.requestAnimationFrame?.bind(dom.window) ?? (cb => setTimeout(() => cb(Date.now()), 16));
+globalThis.cancelAnimationFrame = dom.window.cancelAnimationFrame?.bind(dom.window) ?? clearTimeout;
 const record = { roomId: 'room-one', name: 'Original name', customName: 'My saved room', saved: true, owned: true, password: 'secret' };
 const writes = [];
 const fixture = globalThis.fileOfferSavedRoomFixture = {

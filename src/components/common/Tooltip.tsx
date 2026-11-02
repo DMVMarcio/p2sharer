@@ -273,6 +273,16 @@ export const Tooltip: React.FC<TooltipProps> = ({
     const initial = anchor?.getBoundingClientRect();
     const layoutSize = { width: anchor?.offsetWidth, height: anchor?.offsetHeight };
     const screenPosition = { x: window.screenX, y: window.screenY };
+    const raf = typeof requestAnimationFrame === 'function'
+      ? requestAnimationFrame
+      : typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function'
+        ? window.requestAnimationFrame.bind(window)
+        : (cb: FrameRequestCallback) => (setTimeout(cb, 16) as unknown as number);
+    const caf = typeof cancelAnimationFrame === 'function'
+      ? cancelAnimationFrame
+      : typeof window !== 'undefined' && typeof window.cancelAnimationFrame === 'function'
+        ? window.cancelAnimationFrame.bind(window)
+        : (id: number) => clearTimeout(id);
     let frame: number;
     const checkAnchor = () => {
       const rect = anchor?.getBoundingClientRect();
@@ -286,10 +296,10 @@ export const Tooltip: React.FC<TooltipProps> = ({
         dismiss();
         return;
       }
-      frame = requestAnimationFrame(checkAnchor);
+      frame = raf(checkAnchor);
     };
-    frame = requestAnimationFrame(checkAnchor);
-    return () => cancelAnimationFrame(frame);
+    frame = raf(checkAnchor);
+    return () => caf(frame);
   }, [isOpen, dismiss]);
 
   // Cleanup on unmount
