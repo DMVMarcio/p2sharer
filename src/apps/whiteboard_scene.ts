@@ -1,50 +1,215 @@
-export type BoardTool = 'pointer' | 'brush' | 'eraser' | 'rectangle' | 'ellipse' | 'line' | 'image';
-export type BoardBrushType = 'pencil' | 'pen' | 'brush';
+export type BoardTool =
+  | 'pointer'
+  | 'brush'
+  | 'eraser'
+  | 'bucket'
+  | 'gradient'
+  | 'eyedropper'
+  | 'selectRect'
+  | 'selectEllipse'
+  | 'lasso'
+  | 'wand'
+  | 'rectangle'
+  | 'ellipse'
+  | 'line'
+  | 'text'
+  | 'image'
+  | 'clear';
+
+export type BoardBrushType =
+  | 'pencil'
+  | 'pen'
+  | 'brush'
+  | 'airbrush'
+  | 'watercolor'
+  | 'marker'
+  | 'pixel'
+  | 'smudge'
+  | 'blur';
+
+export type BoardBlendMode =
+  | 'normal'
+  | 'multiply'
+  | 'screen'
+  | 'overlay'
+  | 'darken'
+  | 'lighten'
+  | 'color-dodge'
+  | 'difference';
+
+export type BoardSymmetryMode = 'none' | 'vertical' | 'horizontal' | 'quad' | 'radial';
+
+export const BOARD_BRUSH_TYPES: readonly BoardBrushType[] = [
+  'pencil', 'pen', 'brush', 'airbrush', 'watercolor', 'marker', 'pixel', 'smudge', 'blur',
+];
+
+export const BOARD_BLEND_MODES: readonly BoardBlendMode[] = [
+  'normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten', 'color-dodge', 'difference',
+];
+
+export const BOARD_SYMMETRY_MODES: readonly BoardSymmetryMode[] = [
+  'none', 'vertical', 'horizontal', 'quad', 'radial',
+];
+
 export const DEFAULT_BOARD_LAYER = '00000000-0000-4000-8000-000000000001';
-export interface BoardLayer { id: string; name: string; order: number; hidden: boolean; locked: boolean; x: number; y: number; deleted?: boolean }
-export const defaultBoardLayer = (): BoardLayer => ({ id: DEFAULT_BOARD_LAYER, name: '', order: 0, hidden: false, locked: false, x: 0, y: 0 });
+
+export interface BoardLayer {
+  id: string;
+  name: string;
+  order: number;
+  hidden: boolean;
+  locked: boolean;
+  x: number;
+  y: number;
+  opacity?: number;
+  blendMode?: BoardBlendMode;
+  alphaLock?: boolean;
+  clipping?: boolean;
+  rotation?: number;
+  flipX?: boolean;
+  flipY?: boolean;
+  deleted?: boolean;
+}
+
+export const defaultBoardLayer = (): BoardLayer => ({
+  id: DEFAULT_BOARD_LAYER,
+  name: '',
+  order: 0,
+  hidden: false,
+  locked: false,
+  x: 0,
+  y: 0,
+  opacity: 100,
+  blendMode: 'normal',
+});
+
+export interface BoardCanvasSettings {
+  width: number;
+  height: number;
+  backgroundColor: string;
+  transparent: boolean;
+}
+
+export const defaultBoardCanvasSettings = (): BoardCanvasSettings => ({
+  width: 1920,
+  height: 1080,
+  backgroundColor: '#ffffff',
+  transparent: false,
+});
+
 export interface BoardPoint { x: number; y: number; p?: number }
+
+export type BoardDrawableTool = Exclude<
+  BoardTool,
+  'pointer' | 'eyedropper' | 'selectRect' | 'selectEllipse' | 'lasso' | 'wand'
+>;
+
 export interface BoardShape {
-  id: string; tool: Exclude<BoardTool, 'pointer'>; points: BoardPoint[];
-  color: string; width: number; filled: boolean; x: number; y: number;
-  order: number; hidden: boolean; locked: boolean;
+  id: string;
+  tool: BoardDrawableTool;
+  points: BoardPoint[];
+  color: string;
+  secondaryColor?: string;
+  width: number;
+  filled: boolean;
+  x: number;
+  y: number;
+  order: number;
+  hidden: boolean;
+  locked: boolean;
   smoothing?: number;
   opacity?: number;
+  flow?: number;
+  hardness?: number;
+  spacing?: number;
+  pressureSize?: boolean;
+  pressureOpacity?: boolean;
   brushType?: BoardBrushType;
+  symmetry?: BoardSymmetryMode;
+  fillTolerance?: number;
+  fillExpand?: number;
+  fillContiguous?: boolean;
+  fillAntiAlias?: boolean;
+  fillSample?: 'layer' | 'all';
+  gradientType?: 'linear' | 'radial';
+  gradientTransparent?: boolean;
+  text?: string;
+  fontSize?: number;
+  fontBold?: boolean;
+  fontItalic?: boolean;
+  rotation?: number;
+  flipX?: boolean;
+  flipY?: boolean;
+  clipPolygon?: BoardPoint[];
   scaleX?: number;
   scaleY?: number;
   imageHash?: string;
   groupId?: string;
   layerId?: string;
 }
-export interface BoardFile { version: 1 | 2; shapes: BoardShape[]; layers?: BoardLayer[]; images?: Record<string, string> }
+
+export interface BoardFile {
+  version: 1 | 2;
+  shapes: BoardShape[];
+  layers?: BoardLayer[];
+  images?: Record<string, string>;
+  canvas?: BoardCanvasSettings;
+}
+
 export const BOARD_MAX_SHAPES = 4096;
 export const BOARD_MAX_POINTS = 4096;
 export const boardId = (value: unknown): value is string => typeof value === 'string' && /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i.test(value);
 export const validBoardHash = (value: unknown): value is string => typeof value === 'string' && /^[\da-f]{64}$/.test(value);
 export const boardCoordinate = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= 1_000_000;
 export const boardScale = (value: unknown): boolean => value === undefined || (typeof value === 'number' && Number.isFinite(value) && value >= 0.001 && value <= 1000);
-export const boardBrushWidth = (value: number): number => 20 + (value - 1) * 1380 / 99;
+export const boardBrushWidth = (value: number): number => Math.max(1, Math.min(300, Math.round(value)));
 const round = (value: number): number => Math.round(value * 100) / 100;
+
+export function validBoardCanvasSettings(value: unknown): value is BoardCanvasSettings {
+  if (!value || typeof value !== 'object') return false;
+  const c = value as BoardCanvasSettings;
+  return Number.isInteger(c.width) && c.width >= 64 && c.width <= 4096 &&
+    Number.isInteger(c.height) && c.height >= 64 && c.height <= 4096 &&
+    typeof c.backgroundColor === 'string' && /^#[\da-f]{6}$/i.test(c.backgroundColor) &&
+    typeof c.transparent === 'boolean';
+}
 
 export function validBoardLayer(value: unknown): value is BoardLayer {
   const l = value as BoardLayer;
   return Boolean(l && boardId(l.id) && typeof l.name === 'string' && l.name.length <= 80 &&
     Number.isFinite(l.order) && Math.abs(l.order) <= 1e9 && typeof l.hidden === 'boolean' && typeof l.locked === 'boolean' &&
-    boardCoordinate(l.x) && boardCoordinate(l.y) && (l.deleted === undefined || typeof l.deleted === 'boolean'));
+    boardCoordinate(l.x) && boardCoordinate(l.y) &&
+    (l.opacity === undefined || (Number.isFinite(l.opacity) && l.opacity >= 0 && l.opacity <= 100)) &&
+    (l.blendMode === undefined || BOARD_BLEND_MODES.includes(l.blendMode)) &&
+    (l.alphaLock === undefined || typeof l.alphaLock === 'boolean') &&
+    (l.clipping === undefined || typeof l.clipping === 'boolean') &&
+    (l.rotation === undefined || (Number.isFinite(l.rotation) && Math.abs(l.rotation) <= 360)) &&
+    (l.flipX === undefined || typeof l.flipX === 'boolean') &&
+    (l.flipY === undefined || typeof l.flipY === 'boolean') &&
+    (l.deleted === undefined || typeof l.deleted === 'boolean'));
 }
+
+const VALID_DRAWABLE_TOOLS = [
+  'brush', 'eraser', 'bucket', 'gradient', 'rectangle', 'ellipse', 'line', 'text', 'image', 'clear',
+];
+
 export function validBoardShape(value: unknown): value is BoardShape {
   if (!value || typeof value !== 'object') return false;
   const s = value as BoardShape;
-  return boardId(s.id) && ['brush', 'eraser', 'rectangle', 'ellipse', 'line', 'image'].includes(s.tool) &&
-    Array.isArray(s.points) && s.points.length >= 1 && s.points.length <= BOARD_MAX_POINTS &&
+  if (!Array.isArray(s.points) || s.points.length < 1 || s.points.length > BOARD_MAX_POINTS) return false;
+  const validToolPoints =
+    s.tool === 'brush' || s.tool === 'eraser' ? s.points.length >= 1 :
+    s.tool === 'bucket' || s.tool === 'text' || s.tool === 'clear' ? s.points.length >= 1 && s.points.length <= 2 :
+    s.points.length === 2;
+  return boardId(s.id) && VALID_DRAWABLE_TOOLS.includes(s.tool) &&
     s.points.every(p => p && boardCoordinate(p.x) && boardCoordinate(p.y) &&
       (p.p === undefined || (typeof p.p === 'number' && Number.isFinite(p.p) && p.p >= 0 && p.p <= 1))) &&
-    (s.tool === 'brush' || s.tool === 'eraser' || s.points.length === 2) &&
+    validToolPoints &&
     (s.tool === 'image'
       ? validBoardHash(s.imageHash) && Math.abs(s.points[1].x - s.points[0].x) >= 1 && Math.abs(s.points[1].y - s.points[0].y) >= 1
       : s.imageHash === undefined) &&
     /^#[\da-f]{6}$/i.test(s.color) &&
+    (s.secondaryColor === undefined || /^#[\da-f]{6}$/i.test(s.secondaryColor)) &&
     Number.isFinite(s.width) && s.width >= 1 && s.width <= 2000 && (s.layerId === undefined || boardId(s.layerId)) &&
     (s.groupId === undefined || boardId(s.groupId)) &&
     boardCoordinate(s.x) && boardCoordinate(s.y) && boardScale(s.scaleX) && boardScale(s.scaleY) &&
@@ -52,8 +217,31 @@ export function validBoardShape(value: unknown): value is BoardShape {
     typeof s.filled === 'boolean' && typeof s.hidden === 'boolean' && typeof s.locked === 'boolean' &&
     (s.smoothing === undefined || (Number.isFinite(s.smoothing) && s.smoothing >= 0 && s.smoothing <= 100)) &&
     (s.opacity === undefined || (Number.isFinite(s.opacity) && s.opacity >= 1 && s.opacity <= 100)) &&
-    (s.brushType === undefined || ['pencil', 'pen', 'brush'].includes(s.brushType));
+    (s.flow === undefined || (Number.isFinite(s.flow) && s.flow >= 1 && s.flow <= 100)) &&
+    (s.hardness === undefined || (Number.isFinite(s.hardness) && s.hardness >= 0 && s.hardness <= 100)) &&
+    (s.spacing === undefined || (Number.isFinite(s.spacing) && s.spacing >= 1 && s.spacing <= 100)) &&
+    (s.pressureSize === undefined || typeof s.pressureSize === 'boolean') &&
+    (s.pressureOpacity === undefined || typeof s.pressureOpacity === 'boolean') &&
+    (s.brushType === undefined || BOARD_BRUSH_TYPES.includes(s.brushType)) &&
+    (s.symmetry === undefined || BOARD_SYMMETRY_MODES.includes(s.symmetry)) &&
+    (s.fillTolerance === undefined || (Number.isFinite(s.fillTolerance) && s.fillTolerance >= 0 && s.fillTolerance <= 255)) &&
+    (s.fillExpand === undefined || (Number.isFinite(s.fillExpand) && s.fillExpand >= -20 && s.fillExpand <= 40)) &&
+    (s.fillContiguous === undefined || typeof s.fillContiguous === 'boolean') &&
+    (s.fillAntiAlias === undefined || typeof s.fillAntiAlias === 'boolean') &&
+    (s.fillSample === undefined || s.fillSample === 'layer' || s.fillSample === 'all') &&
+    (s.gradientType === undefined || s.gradientType === 'linear' || s.gradientType === 'radial') &&
+    (s.gradientTransparent === undefined || typeof s.gradientTransparent === 'boolean') &&
+    (s.text === undefined || (typeof s.text === 'string' && s.text.length <= 500)) &&
+    (s.fontSize === undefined || (Number.isFinite(s.fontSize) && s.fontSize >= 6 && s.fontSize <= 400)) &&
+    (s.fontBold === undefined || typeof s.fontBold === 'boolean') &&
+    (s.fontItalic === undefined || typeof s.fontItalic === 'boolean') &&
+    (s.rotation === undefined || (Number.isFinite(s.rotation) && Math.abs(s.rotation) <= 360)) &&
+    (s.flipX === undefined || typeof s.flipX === 'boolean') &&
+    (s.flipY === undefined || typeof s.flipY === 'boolean') &&
+    (s.clipPolygon === undefined || (Array.isArray(s.clipPolygon) && s.clipPolygon.length >= 3 && s.clipPolygon.length <= 512 &&
+      s.clipPolygon.every(p => p && boardCoordinate(p.x) && boardCoordinate(p.y))));
 }
+
 export function parseBoardFile(content: string): BoardFile {
   if (content.length > 16_000_000) throw new Error('whiteboard.invalidFile');
   const file = JSON.parse(content) as BoardFile;
@@ -66,17 +254,54 @@ export function parseBoardFile(content: string): BoardFile {
         !data.length || data.length > 12_000_000 || !/^[A-Za-z0-9+/]*={0,2}$/.test(data)))
       throw new Error('whiteboard.invalidFile');
   }
+  if (file.canvas !== undefined && !validBoardCanvasSettings(file.canvas)) {
+    throw new Error('whiteboard.invalidFile');
+  }
   if (file.version === 2 && (!Array.isArray(file.layers) || !file.layers.length || file.layers.length > 64 ||
     !file.layers.every(l => validBoardLayer(l) && !l.deleted) || new Set(file.layers.map(l => l.id)).size !== file.layers.length ||
     !file.shapes.every(s => file.layers!.some(l => l.id === (s.layerId ?? DEFAULT_BOARD_LAYER))))) throw new Error('whiteboard.invalidFile');
-  return file.version === 1 ? { version: 1, shapes: file.shapes.map(s => ({ ...s, layerId: DEFAULT_BOARD_LAYER })), ...(file.images ? { images: file.images } : {}) } : file;
+  return file.version === 1
+    ? {
+        version: 1,
+        shapes: file.shapes.map(s => ({ ...s, layerId: DEFAULT_BOARD_LAYER })),
+        ...(file.images ? { images: file.images } : {}),
+        ...(file.canvas ? { canvas: file.canvas } : {}),
+      }
+    : file;
 }
+
 function geometryBounds(s: BoardShape) {
+  if (s.tool === 'text') {
+    const pt = s.points[0] ?? { x: 0, y: 0 };
+    const fontSize = s.fontSize ?? Math.max(14, s.width * 2);
+    const lines = (s.text ?? '').split('\n');
+    const maxChars = Math.max(1, ...lines.map(l => l.length));
+    return {
+      x: pt.x,
+      y: pt.y,
+      width: Math.max(fontSize, maxChars * fontSize * 0.6),
+      height: Math.max(fontSize * 1.25, lines.length * fontSize * 1.25),
+    };
+  }
+  if (s.tool === 'bucket' || s.tool === 'clear') {
+    if (s.clipPolygon?.length) {
+      const xs = s.clipPolygon.map(p => p.x), ys = s.clipPolygon.map(p => p.y);
+      return { x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) };
+    }
+    const a = s.points[0] ?? { x: 0, y: 0 };
+    const b = s.points[1] ?? a;
+    if (s.points.length === 2) {
+      return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), width: Math.abs(b.x - a.x), height: Math.abs(b.y - a.y) };
+    }
+    return { x: a.x, y: a.y, width: 1, height: 1 };
+  }
   const xs = s.points.map(p => p.x), ys = s.points.map(p => p.y);
   return { x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) };
 }
+
 export function shapeBounds(s: BoardShape) {
-  const bounds = geometryBounds(s), radius = s.tool === 'image' ? 0 : s.width / 2;
+  const bounds = geometryBounds(s);
+  const radius = s.tool === 'image' || s.tool === 'text' || s.tool === 'bucket' || s.tool === 'gradient' || s.tool === 'clear' ? 0 : s.width / 2;
   const sx = s.scaleX ?? 1, sy = s.scaleY ?? 1;
   return {
     x: s.x + (bounds.x - radius) * sx,
@@ -85,12 +310,14 @@ export function shapeBounds(s: BoardShape) {
     height: (bounds.height + radius * 2) * sy,
   };
 }
+
 function segmentDistance(p: BoardPoint, a: BoardPoint, b: BoardPoint): number {
   const dx = b.x - a.x, dy = b.y - a.y;
   const f = dx || dy ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy))) : 0;
   return Math.hypot(p.x - a.x - f * dx, p.y - a.y - f * dy);
 }
-function brushCurves(points: BoardPoint[]): { control: BoardPoint; end: BoardPoint }[] {
+
+export function brushCurves(points: BoardPoint[]): { control: BoardPoint; end: BoardPoint }[] {
   return [...points.slice(1).map((point, i) => ({
     control: points[i],
     end: {
@@ -100,33 +327,53 @@ function brushCurves(points: BoardPoint[]): { control: BoardPoint; end: BoardPoi
     },
   })), { control: points[points.length - 1], end: points[points.length - 1] }];
 }
+
 export function hasVariablePressure(s: BoardShape): boolean {
-  return (s.tool === 'brush' && Boolean(s.brushType)) ||
+  return (s.tool === 'brush' && Boolean(s.brushType) && s.brushType !== 'pixel') ||
     ((s.tool === 'brush' || s.tool === 'eraser') && s.points.some(p => p.p !== undefined));
 }
-function brushProfile(s: BoardShape, hasPressure: boolean) {
+
+export function brushProfile(s: BoardShape, hasPressure: boolean) {
+  const pressureSize = s.pressureSize !== false;
+  const useP = hasPressure && pressureSize;
   if (s.tool === 'eraser') {
-    return { base: s.width * 0.5, min: 0.3, max: 1.0, exp: 0.9, taper: 0, tip: 1.0 };
+    return { base: s.width * 0.5, min: useP ? 0.3 : 1.0, max: 1.0, exp: 0.9, taper: 0, tip: 1.0, defaultHardness: 85, defaultFlow: 100 };
   }
-  if (s.brushType === 'pencil') {
-    return { base: s.width * 0.32, min: hasPressure ? 0.26 : 0.34, max: 0.92, exp: 0.78, taper: 1.8, tip: hasPressure ? 0.16 : 0.26 };
+  switch (s.brushType) {
+    case 'pencil':
+      return { base: s.width * 0.38, min: useP ? 0.28 : 0.45, max: 0.94, exp: 0.78, taper: 1.6, tip: useP ? 0.18 : 0.28, defaultHardness: 82, defaultFlow: 78 };
+    case 'pen':
+      return { base: s.width * 0.48, min: useP ? 0.05 : 0.16, max: 1.04, exp: 1.15, taper: 3.2, tip: useP ? 0.04 : 0.08, defaultHardness: 96, defaultFlow: 100 };
+    case 'airbrush':
+      return { base: s.width * 0.65, min: useP ? 0.35 : 0.75, max: 1.15, exp: 0.7, taper: 0.8, tip: 0.45, defaultHardness: 8, defaultFlow: 28 };
+    case 'watercolor':
+      return { base: s.width * 0.56, min: useP ? 0.22 : 0.5, max: 1.1, exp: 0.82, taper: 1.4, tip: 0.22, defaultHardness: 38, defaultFlow: 48 };
+    case 'marker':
+      return { base: s.width * 0.52, min: useP ? 0.65 : 0.88, max: 1.02, exp: 0.6, taper: 0.4, tip: 0.7, defaultHardness: 88, defaultFlow: 65 };
+    case 'pixel':
+      return { base: s.width * 0.5, min: 1.0, max: 1.0, exp: 1.0, taper: 0, tip: 1.0, defaultHardness: 100, defaultFlow: 100 };
+    case 'smudge':
+      return { base: s.width * 0.55, min: useP ? 0.35 : 0.75, max: 1.05, exp: 0.8, taper: 0.6, tip: 0.4, defaultHardness: 35, defaultFlow: 60 };
+    case 'blur':
+      return { base: s.width * 0.58, min: useP ? 0.4 : 0.8, max: 1.05, exp: 0.75, taper: 0.5, tip: 0.5, defaultHardness: 25, defaultFlow: 55 };
+    default:
+      return { base: s.width * 0.52, min: useP ? 0.12 : 0.24, max: 1.14, exp: 0.86, taper: 2.2, tip: useP ? 0.08 : 0.16, defaultHardness: 75, defaultFlow: 88 };
   }
-  if (s.brushType === 'pen') {
-    return { base: s.width * 0.48, min: hasPressure ? 0.05 : 0.14, max: 1.04, exp: 1.15, taper: 3.2, tip: hasPressure ? 0.04 : 0.08 };
-  }
-  return { base: s.width * 0.55, min: hasPressure ? 0.10 : 0.20, max: 1.18, exp: 0.86, taper: 2.5, tip: hasPressure ? 0.08 : 0.14 };
 }
+
 export function shapeOpacity(s: BoardShape): number {
   const base = Math.max(1, Math.min(100, s.opacity ?? 100)) / 100;
-  if (s.tool === 'brush' && s.brushType === 'pencil') {
+  const flowFactor = s.flow !== undefined ? Math.max(0.15, Math.min(1, 0.35 + 0.65 * (s.flow / 100))) : 1;
+  if (s.tool === 'brush' && (s.brushType === 'pencil' || s.brushType === 'watercolor' || s.brushType === 'airbrush')) {
     const pressures = s.points.filter(p => p.p !== undefined).map(p => p.p!);
-    const pressureFactor = pressures.length
+    const pressureFactor = pressures.length && s.pressureOpacity !== false
       ? 0.52 + 0.44 * Math.pow(pressures.reduce((a, b) => a + b, 0) / pressures.length, 0.8)
-      : 0.86;
-    return round(Math.max(0.05, Math.min(1, base * pressureFactor)));
+      : s.brushType === 'airbrush' ? 0.62 : s.brushType === 'watercolor' ? 0.74 : 0.86;
+    return round(Math.max(0.05, Math.min(1, base * pressureFactor * flowFactor)));
   }
-  return round(base);
+  return round(Math.max(0.05, Math.min(1, base)));
 }
+
 function traceContourSide(pts: BoardPoint[], smooth: boolean): string {
   if (pts.length <= 1) return '';
   if (!smooth || pts.length === 2) return pts.slice(1).map(p => `L${round(p.x)} ${round(p.y)}`).join(' ');
@@ -140,6 +387,7 @@ function traceContourSide(pts: BoardPoint[], smooth: boolean): string {
   cmds.push(`L${round(last.x)} ${round(last.y)}`);
   return cmds.join(' ');
 }
+
 function circleSubpath(center: BoardPoint, radius: number): string {
   const r = Math.max(0.4, radius);
   const pts: string[] = [];
@@ -151,6 +399,7 @@ function circleSubpath(center: BoardPoint, radius: number): string {
   }
   return `${pts.join(' ')} Z`;
 }
+
 function subStrokeContour(pts: BoardPoint[], radii: number[], windowDist: number, smooth: boolean): string {
   if (pts.length === 1) return circleSubpath(pts[0], radii[0]);
   let total = 0;
@@ -212,6 +461,7 @@ function subStrokeContour(pts: BoardPoint[], radii: number[], windowDist: number
     'Z',
   ].filter(Boolean).join(' ');
 }
+
 function variableWidthBrushPath(s: BoardShape): string {
   const hasPressure = s.points.some(p => p.p !== undefined);
   const profile = brushProfile(s, hasPressure);
@@ -251,7 +501,7 @@ function variableWidthBrushPath(s: BoardShape): string {
     ? Math.min(totalLen * 0.42, baseRadius * 2 * profile.taper)
     : 0;
   const radii = spine.map((_, i) => {
-    const pScale = hasPressure
+    const pScale = hasPressure && s.pressureSize !== false
       ? profile.min + (profile.max - profile.min) * Math.pow(pressures[i], profile.exp)
       : profile.max;
     let taperScale = 1;
@@ -282,6 +532,7 @@ function variableWidthBrushPath(s: BoardShape): string {
   const smooth = Boolean(s.smoothing);
   return subStrokes.map(sub => subStrokeContour(sub.pts, sub.radii, windowDist, smooth)).join(' ');
 }
+
 export function brushPath(s: BoardShape): string {
   if (hasVariablePressure(s)) return variableWidthBrushPath(s);
   const first = s.points[0], prefix = `M${first.x} ${first.y}`;
@@ -289,7 +540,8 @@ export function brushPath(s: BoardShape): string {
   return (s.tool === 'brush' || s.tool === 'eraser') && s.smoothing ? `${prefix} ${brushCurves(s.points).map(({ control: c, end: e }) => `Q${c.x} ${c.y} ${e.x} ${e.y}`).join(' ')}`
     : `${prefix} ${s.points.slice(1).map(p => `L${p.x} ${p.y}`).join(' ')}`;
 }
-function brushHitPoints(s: BoardShape): BoardPoint[] {
+
+export function brushHitPoints(s: BoardShape): BoardPoint[] {
   const subdivide = (s.tool === 'brush' || s.tool === 'eraser') && (Boolean(s.smoothing) || Boolean(s.brushType) || s.points.some(p => p.p !== undefined));
   if (!subdivide || s.points.length < 2) return s.points;
   const steps = s.smoothing ? 8 : 4;
@@ -310,99 +562,220 @@ function brushHitPoints(s: BoardShape): BoardPoint[] {
   }
   return result;
 }
+
+export function expandSymmetryPointLists(
+  points: BoardPoint[],
+  symmetry: BoardSymmetryMode | undefined,
+  centerX = 960,
+  centerY = 540,
+): BoardPoint[][] {
+  if (!symmetry || symmetry === 'none') return [points];
+  const mirrorX = (pts: BoardPoint[]) => pts.map(p => ({ ...p, x: round(2 * centerX - p.x) }));
+  const mirrorY = (pts: BoardPoint[]) => pts.map(p => ({ ...p, y: round(2 * centerY - p.y) }));
+  if (symmetry === 'vertical') return [points, mirrorX(points)];
+  if (symmetry === 'horizontal') return [points, mirrorY(points)];
+  if (symmetry === 'quad') {
+    const mx = mirrorX(points);
+    return [points, mx, mirrorY(points), mirrorY(mx)];
+  }
+  if (symmetry === 'radial') {
+    const copies: BoardPoint[][] = [];
+    const sectors = 6;
+    for (let k = 0; k < sectors; k++) {
+      const angle = (k * Math.PI * 2) / sectors;
+      const cos = Math.cos(angle), sin = Math.sin(angle);
+      copies.push(points.map(p => {
+        const dx = p.x - centerX, dy = p.y - centerY;
+        return {
+          ...p,
+          x: round(centerX + dx * cos - dy * sin),
+          y: round(centerY + dx * sin + dy * cos),
+        };
+      }));
+    }
+    return copies;
+  }
+  return [points];
+}
+
 export function hitBoardShape(s: BoardShape, point: BoardPoint, tolerance: number): boolean {
-  if (s.hidden || s.locked || s.tool === 'eraser') return false;
+  if (s.hidden || s.locked || s.tool === 'eraser' || s.tool === 'clear') return false;
   const sx = s.scaleX ?? 1, sy = s.scaleY ?? 1;
   const p = { x: (point.x - s.x) / sx, y: (point.y - s.y) / sy };
   const localTolerance = tolerance / Math.max(0.001, Math.min(sx, sy));
-  const margin = localTolerance + (s.tool === 'image' ? 0 : s.width / 2);
+  const margin = localTolerance + (s.tool === 'image' || s.tool === 'text' || s.tool === 'bucket' || s.tool === 'gradient' ? 0 : s.width / 2);
+  if (s.tool === 'bucket' || s.tool === 'gradient') {
+    const b = geometryBounds(s);
+    if (s.tool === 'bucket' && b.width <= 1 && b.height <= 1) {
+      return Math.hypot(p.x - b.x, p.y - b.y) <= Math.max(12, margin);
+    }
+    return p.x >= b.x - margin && p.y >= b.y - margin && p.x <= b.x + b.width + margin && p.y <= b.y + b.height + margin;
+  }
   if (s.tool === 'brush' || s.tool === 'line') {
     const points = brushHitPoints(s);
     return points.length === 1 ? segmentDistance(p, points[0], points[0]) <= margin
       : points.slice(1).some((b, i) => segmentDistance(p, points[i], b) <= margin);
   }
   const b = geometryBounds(s), x = p.x - b.x, y = p.y - b.y;
-  if (s.tool === 'image') return x >= -margin && y >= -margin && x <= b.width + margin && y <= b.height + margin;
+  if (s.tool === 'image' || s.tool === 'text') return x >= -margin && y >= -margin && x <= b.width + margin && y <= b.height + margin;
   if (s.tool === 'rectangle') return x >= -margin && y >= -margin && x <= b.width + margin && y <= b.height + margin &&
     (s.filled || Math.min(x, y, b.width - x, b.height - y) <= margin);
   const rx = b.width / 2, ry = b.height / 2;
-  if (!rx || !ry) return segmentDistance(p, s.points[0], s.points[1]) <= margin;
+  if (!rx || !ry) return segmentDistance(p, s.points[0], s.points[1] ?? s.points[0]) <= margin;
   const radius = Math.hypot((x - rx) / rx, (y - ry) / ry);
   return s.filled ? radius <= 1 + margin / Math.min(rx, ry) : Math.abs(radius - 1) <= margin / Math.min(rx, ry);
 }
+
 export function hitBoardLayer(shapes: BoardShape[], layer: BoardLayer, point: BoardPoint, tolerance: number): boolean {
   if (layer.hidden || layer.locked) return false;
   const local = { x: point.x - layer.x, y: point.y - layer.y };
   for (const s of [...shapes].reverse().filter(s => (s.layerId ?? DEFAULT_BOARD_LAYER) === layer.id && !s.hidden)) {
+    if (s.tool === 'clear') return false;
     if (s.tool === 'eraser') { if (hitBoardShape({ ...s, tool: 'brush' }, local, 0)) return false; }
     else if (hitBoardShape(s, local, tolerance)) return true;
   }
   return false;
 }
+
 export function boardLayerBounds(shapes: BoardShape[], layer: BoardLayer) {
-  const boxes = shapes.filter(s => (s.layerId ?? DEFAULT_BOARD_LAYER) === layer.id && s.tool !== 'eraser' && !s.hidden).map(shapeBounds);
+  const active: BoardShape[] = [];
+  for (const s of shapes) {
+    if ((s.layerId ?? DEFAULT_BOARD_LAYER) !== layer.id || s.hidden) continue;
+    if (s.tool === 'clear' && !s.clipPolygon?.length) {
+      active.length = 0;
+      continue;
+    }
+    if (s.tool !== 'eraser' && s.tool !== 'clear') active.push(s);
+  }
+  const boxes = active.map(shapeBounds);
   if (!boxes.length) return null;
   const x = Math.min(...boxes.map(b => b.x)), y = Math.min(...boxes.map(b => b.y));
   return { x: x + layer.x, y: y + layer.y, width: Math.max(...boxes.map(b => b.x + b.width)) - x, height: Math.max(...boxes.map(b => b.y + b.height)) - y };
 }
+
 export function shapeTransform(s: BoardShape): string {
   const sx = s.scaleX ?? 1, sy = s.scaleY ?? 1;
   return sx !== 1 || sy !== 1 ? `translate(${s.x} ${s.y}) scale(${sx} ${sy})` : `translate(${s.x} ${s.y})`;
 }
+
+function escapeXml(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 function resolveImageHref(hash: string | undefined, images?: ReadonlyMap<string, string> | Record<string, string>): string | undefined {
   if (!hash || !images) return undefined;
   const raw = images instanceof Map ? images.get(hash) : (images as Record<string, string>)[hash];
   if (!raw) return undefined;
   return raw.startsWith('data:') || raw.startsWith('blob:') ? raw : `data:image/png;base64,${raw}`;
 }
-export function shapeSvg(s: BoardShape, images?: ReadonlyMap<string, string> | Record<string, string>, ignoreOpacity = false): string {
+
+export function shapeSvg(s: BoardShape, images?: ReadonlyMap<string, string> | Record<string, string>, ignoreOpacity = false, canvasSize = { width: 1920, height: 1080 }): string {
   const opacity = !ignoreOpacity ? shapeOpacity(s) : 1;
   const opacityAttr = opacity < 1 ? ` opacity="${opacity}"` : '';
   const transform = `transform="${shapeTransform(s)}"`;
   const [a, b = a] = s.points;
+  const clipPrefix = s.clipPolygon?.length
+    ? `<defs><clipPath id="clip-${s.id}"><polygon points="${s.clipPolygon.map(p => `${round(p.x)},${round(p.y)}`).join(' ')}"/></clipPath></defs>`
+    : '';
+  const wrapClip = (inner: string) => s.clipPolygon?.length ? `${clipPrefix}<g clip-path="url(#clip-${s.id})">${inner}</g>` : inner;
+
+  if (s.tool === 'clear') {
+    if (s.clipPolygon?.length) {
+      return `<polygon points="${s.clipPolygon.map(p => `${round(p.x)},${round(p.y)}`).join(' ')}" fill="#000000" ${transform}/>`;
+    }
+    return `<rect x="-16000" y="-10000" width="48000" height="30000" fill="#000000"/>`;
+  }
+  if (s.tool === 'bucket') {
+    if (s.clipPolygon?.length) {
+      return `<polygon points="${s.clipPolygon.map(p => `${round(p.x)},${round(p.y)}`).join(' ')}" fill="${s.color}"${opacityAttr} ${transform}/>`;
+    }
+    if (s.points.length === 2) {
+      return `<rect x="${Math.min(a.x, b.x)}" y="${Math.min(a.y, b.y)}" width="${Math.abs(b.x - a.x)}" height="${Math.abs(b.y - a.y)}" fill="${s.color}"${opacityAttr} ${transform}/>`;
+    }
+    return `<rect x="0" y="0" width="${canvasSize.width}" height="${canvasSize.height}" fill="${s.color}"${opacityAttr} ${transform}/>`;
+  }
+  if (s.tool === 'gradient') {
+    const gradId = `grad-${s.id}`;
+    const endColor = s.gradientTransparent ? s.color : (s.secondaryColor ?? '#ffffff');
+    const endOpacity = s.gradientTransparent ? 0 : 1;
+    const def = s.gradientType === 'radial'
+      ? `<radialGradient id="${gradId}" gradientUnits="userSpaceOnUse" cx="${a.x}" cy="${a.y}" r="${Math.max(1, Math.hypot(b.x - a.x, b.y - a.y))}"><stop offset="0%" stop-color="${s.color}" stop-opacity="1"/><stop offset="100%" stop-color="${endColor}" stop-opacity="${endOpacity}"/></radialGradient>`
+      : `<linearGradient id="${gradId}" gradientUnits="userSpaceOnUse" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"><stop offset="0%" stop-color="${s.color}" stop-opacity="1"/><stop offset="100%" stop-color="${endColor}" stop-opacity="${endOpacity}"/></linearGradient>`;
+    return wrapClip(`<defs>${def}</defs><rect x="0" y="0" width="${canvasSize.width}" height="${canvasSize.height}" fill="url(#${gradId})"${opacityAttr} ${transform}/>`);
+  }
+  if (s.tool === 'text') {
+    const fontSize = s.fontSize ?? Math.max(14, s.width * 2);
+    const weight = s.fontBold ? 'bold' : 'normal';
+    const style = s.fontItalic ? 'italic' : 'normal';
+    const lines = (s.text ?? '').split('\n');
+    const tspans = lines.map((line, idx) => `<tspan x="${a.x}" dy="${idx === 0 ? fontSize : fontSize * 1.25}">${escapeXml(line)}</tspan>`).join('');
+    return wrapClip(`<text x="${a.x}" y="${a.y}" fill="${s.color}" font-family="sans-serif" font-size="${fontSize}" font-weight="${weight}" font-style="${style}"${opacityAttr} ${transform}>${tspans}</text>`);
+  }
   if (s.tool === 'image') {
     const href = resolveImageHref(s.imageHash, images);
     if (!href) return '';
-    return `<image href="${href}" x="${Math.min(a.x, b.x)}" y="${Math.min(a.y, b.y)}" width="${Math.abs(b.x - a.x)}" height="${Math.abs(b.y - a.y)}" preserveAspectRatio="none"${opacityAttr} ${transform}/>`;
+    return wrapClip(`<image href="${href}" x="${Math.min(a.x, b.x)}" y="${Math.min(a.y, b.y)}" width="${Math.abs(b.x - a.x)}" height="${Math.abs(b.y - a.y)}" preserveAspectRatio="none"${opacityAttr} ${transform}/>`);
   }
   if (s.tool === 'brush' || s.tool === 'eraser' || s.tool === 'line') {
-    const d = brushPath(s);
-    if (hasVariablePressure(s)) {
-      return `<path fill="${s.color}" fill-rule="nonzero" stroke="none"${opacityAttr} ${transform} d="${d}"/>`;
-    }
-    return `<path stroke="${s.color}" stroke-width="${s.width}" fill="none"${opacityAttr} stroke-linecap="round" stroke-linejoin="round" ${transform} d="${d}"/>`;
+    const copies = expandSymmetryPointLists(s.points, s.symmetry, canvasSize.width / 2, canvasSize.height / 2);
+    const rendered = copies.map(pts => {
+      const subShape: BoardShape = { ...s, points: pts };
+      const d = brushPath(subShape);
+      if (hasVariablePressure(subShape)) {
+        return `<path fill="${s.color}" fill-rule="nonzero" stroke="none"${opacityAttr} ${transform} d="${d}"/>`;
+      }
+      return `<path stroke="${s.color}" stroke-width="${s.width}" fill="none"${opacityAttr} stroke-linecap="round" stroke-linejoin="round" ${transform} d="${d}"/>`;
+    }).join('');
+    return wrapClip(rendered);
   }
   const common = `stroke="${s.color}" stroke-width="${s.width}" fill="${s.filled ? s.color : 'none'}"${opacityAttr} stroke-linecap="round" stroke-linejoin="round" ${transform}`;
-  if (s.tool === 'rectangle') return `<rect ${common} x="${Math.min(a.x, b.x)}" y="${Math.min(a.y, b.y)}" width="${Math.abs(b.x - a.x)}" height="${Math.abs(b.y - a.y)}"/>`;
-  return `<ellipse ${common} cx="${(a.x + b.x) / 2}" cy="${(a.y + b.y) / 2}" rx="${Math.abs(b.x - a.x) / 2}" ry="${Math.abs(b.y - a.y) / 2}"/>`;
+  if (s.tool === 'rectangle') return wrapClip(`<rect ${common} x="${Math.min(a.x, b.x)}" y="${Math.min(a.y, b.y)}" width="${Math.abs(b.x - a.x)}" height="${Math.abs(b.y - a.y)}"/>`);
+  return wrapClip(`<ellipse ${common} cx="${(a.x + b.x) / 2}" cy="${(a.y + b.y) / 2}" rx="${Math.abs(b.x - a.x) / 2}" ry="${Math.abs(b.y - a.y) / 2}"/>`);
 }
-export function boardSvg(shapes: BoardShape[], layers: BoardLayer[] = [defaultBoardLayer()], fullBoard = false, images?: ReadonlyMap<string, string> | Record<string, string>): string {
-  const visible = layers.filter(l => !l.hidden).flatMap(l => shapes.filter(s => !s.hidden && (s.layerId ?? DEFAULT_BOARD_LAYER) === l.id).map(s => ({ ...s, x: s.x + l.x, y: s.y + l.y }))), bounds = visible.map(shapeBounds);
+
+export function boardSvg(
+  shapes: BoardShape[],
+  layers: BoardLayer[] = [defaultBoardLayer()],
+  fullBoard = false,
+  images?: ReadonlyMap<string, string> | Record<string, string>,
+  canvasSettings?: BoardCanvasSettings,
+): string {
+  const boardW = canvasSettings?.width ?? 1920;
+  const boardH = canvasSettings?.height ?? 1080;
+  const bg = canvasSettings?.backgroundColor ?? '#ffffff';
+  const transparent = canvasSettings?.transparent ?? false;
+  const visible = layers.filter(l => !l.hidden && (l.opacity ?? 100) > 0).flatMap(l => shapes.filter(s => !s.hidden && (s.layerId ?? DEFAULT_BOARD_LAYER) === l.id).map(s => ({ ...s, x: s.x + l.x, y: s.y + l.y })));
+  const bounds = visible.map(shapeBounds);
   const pad = 60, x = Math.min(0, ...bounds.map(b => b.x)) - pad, y = Math.min(0, ...bounds.map(b => b.y)) - pad;
   const width = Math.max(100, ...bounds.map(b => b.x + b.width)) - x + pad;
   const height = Math.max(100, ...bounds.map(b => b.y + b.height)) - y + pad;
-  const art = layers.filter(l => !l.hidden).map(l => {
+  const art = layers.filter(l => !l.hidden && (l.opacity ?? 100) > 0).map(l => {
     let content = '';
     const layerShapes = shapes.filter(s => !s.hidden && (s.layerId ?? DEFAULT_BOARD_LAYER) === l.id);
     for (let i = 0; i < layerShapes.length; i++) {
       const s = layerShapes[i];
-      if (s.tool === 'eraser') {
-        content = `<defs><mask id="erase-${s.id}" maskUnits="userSpaceOnUse" x="-16000" y="-10000" width="48000" height="30000"><rect x="-16000" y="-10000" width="48000" height="30000" fill="white"/>${shapeSvg({ ...s, color: '#000000', opacity: 100 }, images, true)}</mask></defs><g mask="url(#erase-${s.id})">${content}</g>`;
+      if (s.tool === 'eraser' || s.tool === 'clear') {
+        content = `<defs><mask id="erase-${s.id}" maskUnits="userSpaceOnUse" x="-16000" y="-10000" width="48000" height="30000"><rect x="-16000" y="-10000" width="48000" height="30000" fill="white"/>${shapeSvg({ ...s, color: '#000000', opacity: 100 }, images, true, { width: boardW, height: boardH })}</mask></defs><g mask="url(#erase-${s.id})">${content}</g>`;
       } else if (s.groupId && shapeOpacity(s) < 1) {
         const groupOpacity = shapeOpacity(s);
-        let groupContent = shapeSvg(s, images, true);
-        while (i + 1 < layerShapes.length && layerShapes[i + 1].groupId === s.groupId && layerShapes[i + 1].tool !== 'eraser') {
+        let groupContent = shapeSvg(s, images, true, { width: boardW, height: boardH });
+        while (i + 1 < layerShapes.length && layerShapes[i + 1].groupId === s.groupId && layerShapes[i + 1].tool !== 'eraser' && layerShapes[i + 1].tool !== 'clear') {
           i++;
-          groupContent += shapeSvg(layerShapes[i], images, true);
+          groupContent += shapeSvg(layerShapes[i], images, true, { width: boardW, height: boardH });
         }
         content += `<g opacity="${groupOpacity}">${groupContent}</g>`;
       } else {
-        content += shapeSvg(s, images);
+        content += shapeSvg(s, images, false, { width: boardW, height: boardH });
       }
     }
-    return `<g transform="translate(${l.x} ${l.y})">${content}</g>`;
+    const layerOpacity = (l.opacity ?? 100) < 100 ? ` opacity="${round((l.opacity ?? 100) / 100)}"` : '';
+    const blendStyle = l.blendMode && l.blendMode !== 'normal' ? ` style="mix-blend-mode:${l.blendMode}"` : '';
+    return `<g transform="translate(${l.x} ${l.y})"${layerOpacity}${blendStyle}>${content}</g>`;
   }).join('');
-  return fullBoard
-    ? `<svg xmlns="http://www.w3.org/2000/svg" width="4096" height="2560" viewBox="0 0 16000 10000"><rect width="16000" height="10000" fill="white"/>${art}</svg>`
-    : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${x} ${y} ${width} ${height}">${art}</svg>`;
+  if (fullBoard) {
+    const fillAttr = bg.toLowerCase() === '#ffffff' ? 'white' : bg;
+    const bgRect = transparent ? '' : `<rect width="${boardW}" height="${boardH}" fill="${fillAttr}"/>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${boardW}" height="${boardH}" viewBox="0 0 ${boardW} ${boardH}">${bgRect}${art}</svg>`;
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${x} ${y} ${width} ${height}">${art}</svg>`;
 }

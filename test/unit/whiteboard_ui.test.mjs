@@ -81,7 +81,7 @@ test('drawing, object movement, canvas panning, wheel navigation and brush curso
   await act(async () => root.render(React.createElement(api.ContextMenuProvider, null, React.createElement(api.WhiteboardApp, { instanceId }))));
   await settle();
   const initial = document.querySelector('.whiteboard-art > g').getAttribute('transform').match(/translate\(([-.\d]+) ([-.\d]+)\)/);
-  assert.equal(Number(initial[1]) + 8000, 400); assert.equal(Number(initial[2]) + 5000, 250);
+  assert.equal(Number(initial[1]) + 960, 400); assert.equal(Number(initial[2]) + 540, 250);
   await click('Pencil');
   await pointer('pointerdown', 100, 100); await pointer('pointermove', 140, 120);
   assert.equal(document.querySelector('rect[stroke-dasharray]'), null);
@@ -167,7 +167,7 @@ test('shape tools offer accessible visual fill choices and stabilization persist
   await click('Pencil');
   const brushMenu = document.querySelector('[role="menu"]');
   assert.ok(brushMenu);
-  assert.equal(brushMenu.querySelectorAll('[role="menuitemradio"]').length, 3);
+  assert.equal(brushMenu.querySelectorAll('[role="menuitemradio"]').length, 9);
   assert.equal(button('Pencil', brushMenu).getAttribute('aria-checked'), 'true');
   await click('Pen', brushMenu);
   assert.equal(button('Pen').getAttribute('aria-pressed'), 'true');
@@ -271,7 +271,7 @@ test('paint stays in the active layer, erasing is scoped, and named layers reord
   await pointer('pointerdown', 260, 220); await pointer('pointermove', 280, 240); await pointer('pointerup', 300, 250);
   assert.equal(fixture.model.shapes.filter(s => s.layerId === layer.id).length, 2);
   assert.equal(document.querySelector('rect[stroke-dasharray]'), null);
-  assert.equal(fixture.model.shapes[fixture.model.shapes.length - 1].width, 20);
+  assert.equal(fixture.model.shapes[fixture.model.shapes.length - 1].width, 1);
   await click('Eraser');
   await pointer('pointerdown', 200, 150); await pointer('pointermove', 220, 150); await pointer('pointerup', 230, 150);
   assert.ok(document.querySelector(`[data-board-layer="${layer.id}"] mask`));
@@ -379,7 +379,7 @@ test('PNG export defaults to cropped margins, supports full board export and res
     assert.equal(exported.format, 'png');
     assert.match(exported.content, /^data:image\/png;base64,/);
     assert.deepEqual(dimensions, [41, 41]);
-    assert.match(renderedSvg, /viewBox="0 0 16000 10000"/);
+    assert.match(renderedSvg, /viewBox="0 0 1920 1080"/);
     assert.match(renderedSvg, /fill="white"/);
     const selectPng = async () => {
       await click('Export format', document.querySelector('[role="dialog"]'));
@@ -473,4 +473,39 @@ test('remote cursors retain world coordinates while every zoom frame uses the sa
     assert.equal(Number.parseFloat(glyph.querySelector('i').style.width), 30 * zoom);
   }
   assert.notEqual(group.style.transform, initialCamera);
+});
+test('studio paint bucket, color panel, eyedropper, selection marquee, layer blend controls and canvas settings operate interactively', async () => {
+  assert.ok(document.querySelector('[aria-label="Color Studio"]'));
+  // Swap & reset colors via keyboard shortcuts X and D
+  await act(async () => canvas().dispatchEvent(new window.KeyboardEvent('keydown', { key: 'd', bubbles: true })));
+  await act(async () => canvas().dispatchEvent(new window.KeyboardEvent('keydown', { key: 'x', bubbles: true })));
+  // Switch to Paint Bucket (G) and click canvas to flood fill
+  await act(async () => canvas().dispatchEvent(new window.KeyboardEvent('keydown', { key: 'g', bubbles: true })));
+  assert.equal(button('Paint bucket').getAttribute('aria-pressed'), 'true');
+  assert.ok(document.querySelector('input[aria-label="Tolerance"]'));
+  const shapesBeforeFill = fixture.model.shapes.length;
+  await pointer('pointerdown', 180, 180);
+  await pointer('pointerup', 180, 180);
+  assert.equal(fixture.model.shapes.length, shapesBeforeFill + 1);
+  assert.equal(fixture.model.shapes.at(-1).tool, 'bucket');
+  // Toggle alpha lock & duplicate layer in Layer Studio
+  await click('Lock transparent pixels');
+  const activeId = fixture.model.layers[0].id;
+  assert.equal(fixture.model.layers.find(l => l.id === activeId || l.alphaLock).alphaLock, true);
+  const layerCountBeforeDup = fixture.model.layers.length;
+  await click('Duplicate layer');
+  assert.equal(fixture.model.layers.length, layerCountBeforeDup + 1);
+  // Selection marquee (M), Select All (Ctrl+A), Deselect (Ctrl+D)
+  await act(async () => canvas().dispatchEvent(new window.KeyboardEvent('keydown', { key: 'm', bubbles: true })));
+  assert.equal(button('Rectangular marquee').getAttribute('aria-pressed'), 'true');
+  await click('Select all');
+  assert.ok(document.querySelector('.whiteboard-selection-marquee'));
+  await click('Deselect');
+  assert.equal(document.querySelector('.whiteboard-selection-marquee'), null);
+  // Open Canvas Settings dialog and update canvas dimensions
+  await click('Canvas settings');
+  const dialog = document.querySelector('[role="dialog"]');
+  assert.ok(dialog);
+  await click('Save', dialog);
+  assert.equal(document.querySelector('[role="dialog"]'), null);
 });

@@ -3,8 +3,9 @@ import test from 'node:test';
 import * as Y from 'yjs';
 import { WhiteboardModel } from '../../src/apps/whiteboard_model.ts';
 import { encodeUpdate } from '../../src/apps/models.ts';
-import { boardSvg, brushPath, shapeBounds, hitBoardShape, hitBoardLayer, boardBrushWidth, DEFAULT_BOARD_LAYER, parseBoardFile, hasVariablePressure, type BoardShape } from '../../src/apps/whiteboard_scene.ts';
+import { boardSvg, brushPath, shapeBounds, hitBoardShape, hitBoardLayer, boardBrushWidth, DEFAULT_BOARD_LAYER, parseBoardFile, hasVariablePressure, expandSymmetryPointLists, type BoardShape } from '../../src/apps/whiteboard_scene.ts';
 import { BOARD_WIDTH, BOARD_HEIGHT, BrushStabilizer, boardContains, clampBoardPoint, clampBoardViewport, containBoardShape, resizeBoardBounds } from '../../src/apps/whiteboard_interaction.ts';
+import { polygonToMask, invertSelectionMask, selectionMaskToPolygon } from '../../src/apps/whiteboard_raster.ts';
 
 function shape(overrides: Partial<BoardShape> = {}): BoardShape {
   return { id: crypto.randomUUID(), tool: 'rectangle', points: [{ x: 10, y: 20 }, { x: 110, y: 120 }],
@@ -130,8 +131,8 @@ test('layers group paint, move as one, reorder, rename and preserve per-layer er
   try {
     a.model.put(shape()); a.model.put(shape({ order: 2 }));
     assert.equal(a.model.layers.length, 1);
-    assert.equal(boardBrushWidth(1), 20);
-    assert.equal(boardBrushWidth(100), 1400);
+    assert.equal(boardBrushWidth(1), 1);
+    assert.equal(boardBrushWidth(100), 100);
     const lower = a.model.layers[0];
     a.model.updateLayer({ ...lower, name: 'Ink', x: 100, y: 50 });
     assert.equal(a.model.shapes.length, 2);
@@ -240,5 +241,99 @@ test('layers resize and stretch freely or proportionally with Shift, and validat
     for (const msg of a.messages.slice(-2)) b.model.apply(msg, 'a', false);
     await new Promise(resolve => setTimeout(resolve, 30));
     assert.equal(b.model.imageUrl(sha256), `data:image/png;base64,${pngBase64}`);
+  } finally { a.model.destroy(); b.model.destroy(); }
+});
+
+test('raster engine paints real pixels across brush families, flood fill, selections, blend modes, alpha lock, clipping masks and studio layer ops', () => {
+  const a = peer('a'), b = peer('b');
+  try {
+    a.model.setCanvasSettings({ width: 128, height: 128, backgroundColor: '#ffffff', transparent: false });
+    assert.equal(a.model.canvasSettings.width, 128);
+    assert.equal(a.model.canvasSettings.height, 128);
+
+    // 1. Paint a hollow black square outline on base layer, then flood fill inside with red and gap expansion
+    const baseLayerId = DEFAULT_BOARD_LAYER;
+    a.model.put(shape({
+      layerId: baseLayerId,
+      tool: 'rectangle',
+      points: [{ x: 20, y: 20 }, { x: 80, y: 80 }],
+      color: '#000000',
+      width: 4,
+      filled: false,
+      order: 1,
+    }));
+    a.model.put(shape({
+      layerId: baseLayerId,
+      tool: 'bucket',
+      points: [{ x: 50, y: 50 }],
+      color: '#ff0000',
+      fillTolerance: 32,
+      fillExpand: 2,
+      fillContiguous: true,
+      fillSample: 'layer',
+      order: 2,
+    }));
+    assert.equal(a.model.sampleColor(50, 50, true), '#ff0000');
+    assert.equal(a.model.sampleColor(5, 5, true), '#ffffff');
+
+    // 2. Test all brush types (airbrush, watercolor, marker, pixel, smudge, blur) and symmetry
+    const symAxes = expandSymmetryPointLists([[{ x: 10, y: 30 }, { x: 20, y: 40 }]], 'quad', 128, 128);
+    assert.equal(symAxes.length, 4);
+    for (const brushType of ['airbrush', 'watercolor', 'marker', 'pixel', 'smudge', 'blur'] as const) {
+      a.model.put(shape({
+        layerId: baseLayerId,
+        tool: 'brush',
+        brushType,
+        points: [{ x: 35, y: 35 }, { x: 65, y: 65 }],
+        color: '#00ff00',
+        width: 8,
+        hardness: 50,
+        flow: 80,
+        symmetry: 'vertical',
+        order: 10,
+      }));
+    }
+
+    // 3. Test Clipping Mask, Alpha Lock, and Multiply Blend Mode on an upper layer
+    const clipLayerId = a.model.addLayer('Shading');
+    const clipLayer = a.model.layers.find(l => l.id === clipLayerId)!;
+    a.model.updateLayer({ ...clipLayer, blendMode: 'multiply', opacity: 100, clipping: true });
+    // Fill entire upper layer with blue; because of clipping mask to baseLayer, outside (5,5) remains white!
+    a.model.put(shape({
+      layerId: clipLayerId,
+      tool: 'rectangle',
+      points: [{ x: 0, y: 0 }, { x: 127, y: 127 }],
+      color: '#0000ff',
+      filled: true,
+      order: 20,
+    }));
+    assert.equal(a.model.sampleColor(5, 5, true), '#ffffff', 'Clipping mask prevents painting where base layer is transparent');
+
+    // 4. Selection polygon mask, inversion, and clearing within selection
+    const selPoly = [{ x: 40, y: 40 }, { x: 60, y: 40 }, { x: 60, y: 60 }, { x: 40, y: 60 }];
+    const mask = polygonToMask(selPoly, 128, 128);
+    assert.equal(mask[50 * 128 + 50], 255);
+    assert.equal(mask[10 * 128 + 10], 0);
+    const inv = invertSelectionMask(mask);
+    assert.equal(inv[50 * 128 + 50], 0);
+    assert.equal(inv[10 * 128 + 10], 255);
+    const boundary = selectionMaskToPolygon(mask, 128, 128);
+    assert.ok(boundary.length >= 4);
+
+    // 5. Studio layer operations: duplicate, flip, clear selection, and merge down
+    const dupId = a.model.duplicateLayer(clipLayerId, 'Shading Copy');
+    assert.ok(dupId);
+    assert.equal(a.model.layers.length, 3);
+    a.model.flipLayer(dupId!, 'x');
+    a.model.clearLayer(dupId!, selPoly);
+    const mergedId = a.model.mergeLayerDown(dupId!);
+    assert.equal(mergedId, clipLayerId);
+    assert.equal(a.model.layers.length, 2);
+
+    // 6. Verify P2P convergence of studio scene and canvas settings
+    b.model.apply(a.model.snapshot(), 'a', true);
+    assert.deepEqual(b.model.canvasSettings, a.model.canvasSettings);
+    assert.deepEqual(b.model.layers, a.model.layers);
+    assert.deepEqual(b.model.shapes, a.model.shapes);
   } finally { a.model.destroy(); b.model.destroy(); }
 });

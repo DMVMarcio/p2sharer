@@ -2,11 +2,13 @@ import * as Y from 'yjs';
 import { PROFILE_CHUNK, PROFILE_MAX_BYTES } from '../core/profile_image.ts';
 import { decodeUpdate, encodeUpdate, type RoomAppModel, type RoomAppModelContext } from './models.ts';
 import { inspectPngBytes, verifyWhiteboardPng, type WhiteboardImageRecord } from './whiteboard_image.ts';
-import { scaleBoardLayer, type BoardBox } from './whiteboard_interaction.ts';
+import { flipBoardLayer, scaleBoardLayer, type BoardBox } from './whiteboard_interaction.ts';
+import { WhiteboardRasterEngine } from './whiteboard_raster.ts';
 import {
   boardCoordinate, boardId, BOARD_MAX_POINTS, BOARD_MAX_SHAPES, DEFAULT_BOARD_LAYER,
-  defaultBoardLayer, parseBoardFile, validBoardHash, validBoardLayer, validBoardShape,
-  type BoardLayer, type BoardPoint, type BoardShape, type BoardTool,
+  defaultBoardCanvasSettings, defaultBoardLayer, parseBoardFile, validBoardCanvasSettings,
+  validBoardHash, validBoardLayer, validBoardShape,
+  type BoardCanvasSettings, type BoardLayer, type BoardPoint, type BoardShape, type BoardTool,
 } from './whiteboard_scene.ts';
 
 export interface BoardCursor extends BoardPoint {
@@ -29,6 +31,19 @@ interface PendingImage {
 const LOCAL = 'board-local';
 const MAX_UPDATE = 3_000_000;
 const MAX_CACHE_BYTES = 64 * 1024 * 1024;
+const CURSOR_TOOLS = [
+  'pointer', 'hand', 'move', 'brush', 'eraser', 'bucket', 'gradient', 'eyedropper',
+  'selectRect', 'selectEllipse', 'lasso', 'wand', 'rectangle', 'ellipse', 'line', 'text',
+];
+
+function validCanvasMeta(value: unknown): boolean {
+  if (typeof value !== 'string' || value.length > 240) return false;
+  try {
+    return validBoardCanvasSettings(JSON.parse(value));
+  } catch {
+    return false;
+  }
+}
 
 export class WhiteboardModel implements RoomAppModel {
   readonly document = new Y.Doc();
@@ -39,6 +54,7 @@ export class WhiteboardModel implements RoomAppModel {
   readonly history = new Y.UndoManager([this.objects, this.layerMap], { trackedOrigins: new Set([LOCAL]), captureTimeout: 0 });
   readonly cursors = new Map<string, BoardCursor>();
   readonly images = new Map<string, string>();
+  readonly raster = new WhiteboardRasterEngine();
   private imageSizes = new Map<string, number>();
   private imageSources = new Map<string, string>();
   private pendingImages = new Map<string, PendingImage>();
@@ -79,6 +95,16 @@ export class WhiteboardModel implements RoomAppModel {
     if (!this.layerMap.size) layers.push(this.fallbackLayer);
     return layers.sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
   }
+  get canvasSettings(): BoardCanvasSettings {
+    const raw = this.metadata.get('canvas');
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (validBoardCanvasSettings(parsed)) return parsed;
+      } catch { /* fallback */ }
+    }
+    return defaultBoardCanvasSettings();
+  }
   get identity(): { id: string; name: string } | null {
     const id = this.metadata.get('id'), name = this.metadata.get('name');
     return boardId(id) && name ? { id, name } : null;
@@ -91,12 +117,47 @@ export class WhiteboardModel implements RoomAppModel {
         usedImages[s.imageHash] = this.images.get(s.imageHash)!;
       }
     }
+    const rawCanvas = this.metadata.get('canvas');
     return JSON.stringify({
       version: 2,
       shapes: activeShapes,
       layers: this.layers,
       ...(Object.keys(usedImages).length ? { images: usedImages } : {}),
+      ...(rawCanvas ? { canvas: this.canvasSettings } : {}),
     });
+  }
+
+  getLayerPixels(layerId: string, drafts?: readonly BoardShape[]): Uint8ClampedArray {
+    const layer = this.layers.find(l => l.id === layerId) ?? this.layers[0] ?? this.fallbackLayer;
+    const { width, height } = this.canvasSettings;
+    return this.raster.getLayerBuffer(layer, this.shapes, width, height, this.layers, drafts);
+  }
+
+  getCompositePixels(draftsByLayer?: ReadonlyMap<string, BoardShape[]>, includeBackground = true): Uint8ClampedArray {
+    const { width, height, backgroundColor, transparent } = this.canvasSettings;
+    return this.raster.getCompositeBuffer(
+      this.layers,
+      this.shapes,
+      width,
+      height,
+      includeBackground && !transparent ? backgroundColor : null,
+      draftsByLayer,
+    );
+  }
+
+  sampleColor(x: number, y: number, sampleAll = true, activeLayerId = DEFAULT_BOARD_LAYER): string {
+    const { width, height, backgroundColor } = this.canvasSettings;
+    return this.raster.samplePixelHex(
+      this.layers,
+      this.shapes,
+      width,
+      height,
+      x,
+      y,
+      sampleAll,
+      activeLayerId,
+      backgroundColor,
+    );
   }
 
   imageUrl(hash: string): string | undefined {
@@ -123,6 +184,13 @@ export class WhiteboardModel implements RoomAppModel {
     this.document.transact(() => { this.metadata.set('id', id); this.metadata.set('name', name.trim()); }, LOCAL);
   }
 
+  setCanvasSettings(settings: BoardCanvasSettings): void {
+    if (!validBoardCanvasSettings(settings)) throw new Error('whiteboard.invalidFile');
+    this.transact(doc => {
+      doc.getMap('file').set('canvas', JSON.stringify(settings));
+    });
+  }
+
   private validDocument(doc: Y.Doc): boolean {
     const shapes = doc.getMap<BoardShape>('shapes'), meta = doc.getMap('file');
     return [...doc.share.keys()].every(key => key === 'shapes' || key === 'file' || key === 'layers') &&
@@ -130,8 +198,10 @@ export class WhiteboardModel implements RoomAppModel {
       [...doc.getMap<BoardLayer>('layers').values()].filter(l => !l.deleted).length <= 64 &&
       shapes.size <= BOARD_MAX_SHAPES && [...shapes].every(([id, shape]) => validBoardShape(shape) && id === shape.id) &&
       JSON.stringify({ version: 2, shapes: [...shapes.values()], layers: [...doc.getMap('layers').values()] }).length <= 4_000_000 &&
-      meta.size <= 2 && [...meta].every(([key, value]) =>
-        key === 'id' ? boardId(value) : key === 'name' && typeof value === 'string' && value.trim().length > 0 && value.length <= 80) &&
+      meta.size <= 3 && [...meta].every(([key, value]) =>
+        key === 'id' ? boardId(value) :
+        key === 'name' ? typeof value === 'string' && value.trim().length > 0 && value.length <= 80 :
+        key === 'canvas' && validCanvasMeta(value)) &&
       Y.encodeStateAsUpdate(doc).byteLength <= MAX_UPDATE;
   }
 
@@ -141,7 +211,6 @@ export class WhiteboardModel implements RoomAppModel {
       Y.applyUpdate(candidate, Y.encodeStateAsUpdate(this.document));
       candidate.transact(() => action(candidate), LOCAL);
       if (!this.validDocument(candidate)) throw new Error('whiteboard.limit');
-      // Apply the validated changes as one undoable, convergent transaction.
       Y.applyUpdate(this.document, Y.encodeStateAsUpdate(candidate, Y.encodeStateVector(this.document)), LOCAL);
     } finally { candidate.destroy(); }
   }
@@ -232,6 +301,129 @@ export class WhiteboardModel implements RoomAppModel {
     });
   }
 
+  flipLayer(id: string, axis: 'x' | 'y'): void {
+    const layer = this.layers.find(l => l.id === id);
+    if (!layer || layer.locked || layer.hidden) return;
+    const { width, height } = this.canvasSettings;
+    const { layer: nextLayer, shapes: nextShapes } = flipBoardLayer(layer, this.shapes, axis, width, height);
+    this.transact(doc => {
+      const layers = doc.getMap('layers');
+      if (!layers.size) layers.set(DEFAULT_BOARD_LAYER, defaultBoardLayer());
+      layers.set(nextLayer.id, nextLayer);
+      const shapesMap = doc.getMap('shapes');
+      for (const s of nextShapes) shapesMap.set(s.id, s);
+    });
+  }
+
+  clearLayer(id: string, clipPolygon?: BoardPoint[]): void {
+    const layer = this.layers.find(l => l.id === id);
+    if (!layer || layer.locked || layer.hidden) return;
+    const maxOrder = this.shapes[this.shapes.length - 1]?.order ?? 0;
+    const localPolygon = clipPolygon?.map(p => ({
+      x: Math.round((p.x - layer.x) * 100) / 100,
+      y: Math.round((p.y - layer.y) * 100) / 100,
+    }));
+    const clearShape: BoardShape = {
+      id: crypto.randomUUID(),
+      layerId: id,
+      tool: 'clear',
+      points: [{ x: 0, y: 0 }],
+      color: '#000000',
+      width: 1,
+      filled: true,
+      x: 0,
+      y: 0,
+      order: maxOrder + 1,
+      hidden: false,
+      locked: false,
+      ...(localPolygon?.length ? { clipPolygon: localPolygon } : {}),
+    };
+    this.put(clearShape);
+  }
+
+  duplicateLayer(id: string, name: string): string {
+    const source = this.layers.find(l => l.id === id);
+    if (!source || this.layers.length >= 64) throw new Error('whiteboard.limit');
+    const newId = crypto.randomUUID();
+    const sourceShapes = this.shapes.filter(s => (s.layerId ?? DEFAULT_BOARD_LAYER) === id);
+    let nextOrder = (this.shapes[this.shapes.length - 1]?.order ?? 0) + 1;
+    const groupMap = new Map<string, string>();
+    const clonedShapes = sourceShapes.map(s => {
+      let groupId = s.groupId;
+      if (groupId) {
+        if (!groupMap.has(groupId)) groupMap.set(groupId, crypto.randomUUID());
+        groupId = groupMap.get(groupId);
+      }
+      return {
+        ...s,
+        id: crypto.randomUUID(),
+        layerId: newId,
+        order: nextOrder++,
+        ...(groupId ? { groupId } : {}),
+      };
+    });
+    const layers = this.layers;
+    const sourceIdx = layers.findIndex(l => l.id === id);
+    const updatedOrders = new Map<string, number>();
+    let orderCounter = 0;
+    for (let i = 0; i < layers.length; i++) {
+      updatedOrders.set(layers[i].id, orderCounter++);
+      if (i === sourceIdx) orderCounter++;
+    }
+    const newLayerOrder = (updatedOrders.get(id) ?? 0) + 1;
+
+    this.transact(doc => {
+      const layerMap = doc.getMap<BoardLayer>('layers');
+      if (!layerMap.size) layerMap.set(DEFAULT_BOARD_LAYER, defaultBoardLayer());
+      for (const l of layers) {
+        layerMap.set(l.id, { ...l, order: updatedOrders.get(l.id) ?? l.order });
+      }
+      layerMap.set(newId, {
+        ...source,
+        id: newId,
+        name: name.trim().slice(0, 80),
+        order: newLayerOrder,
+        locked: false,
+      });
+      const shapesMap = doc.getMap<BoardShape>('shapes');
+      for (const cs of clonedShapes) shapesMap.set(cs.id, cs);
+    });
+    return newId;
+  }
+
+  mergeLayerDown(id: string): string | null {
+    const layers = this.layers;
+    const idx = layers.findIndex(l => l.id === id);
+    if (idx <= 0) return null;
+    const upper = layers[idx];
+    const lower = layers[idx - 1];
+    if (upper.locked || lower.locked || upper.hidden || lower.hidden) return null;
+    const dx = upper.x - lower.x;
+    const dy = upper.y - lower.y;
+    const upperOpacityFactor = (upper.opacity ?? 100) / 100;
+    const upperShapes = this.shapes.filter(s => (s.layerId ?? DEFAULT_BOARD_LAYER) === upper.id);
+    let nextOrder = (this.shapes[this.shapes.length - 1]?.order ?? 0) + 1;
+
+    this.transact(doc => {
+      const layerMap = doc.getMap<BoardLayer>('layers');
+      if (!layerMap.size) layerMap.set(DEFAULT_BOARD_LAYER, defaultBoardLayer());
+      layerMap.set(upper.id, { ...upper, deleted: true });
+      const shapesMap = doc.getMap<BoardShape>('shapes');
+      for (const s of upperShapes) {
+        const mergedOpacity = Math.max(1, Math.min(100, Math.round((s.opacity ?? 100) * upperOpacityFactor)));
+        shapesMap.set(s.id, {
+          ...s,
+          layerId: lower.id,
+          x: Math.round((s.x + dx) * 100) / 100,
+          y: Math.round((s.y + dy) * 100) / 100,
+          opacity: mergedOpacity,
+          order: nextOrder++,
+        });
+      }
+    });
+    return lower.id;
+  }
+
   addLayer(name: string): string {
     const id = crypto.randomUUID();
     this.transact(doc => {
@@ -284,8 +476,12 @@ export class WhiteboardModel implements RoomAppModel {
       const layers = doc.getMap('layers'); layers.clear();
       for (const layer of file.layers ?? [defaultBoardLayer()]) layers.set(layer.id, layer);
       for (const shape of file.shapes) shapes.set(shape.id, shape);
-      doc.getMap('file').set('id', id); doc.getMap('file').set('name', name);
+      const meta = doc.getMap('file');
+      meta.set('id', id); meta.set('name', name);
+      if (file.canvas) meta.set('canvas', JSON.stringify(file.canvas));
+      else meta.delete('canvas');
     });
+    this.raster.clear();
     this.history.clear();
   }
   undo(): void { this.history.undo(); this.context.changed(); }
@@ -425,7 +621,7 @@ export class WhiteboardModel implements RoomAppModel {
   private acceptCursor(value: unknown, actor: string): void {
     if (value === null) { if (this.cursors.delete(actor)) this.context.changed(); return; }
     const c = value as BoardCursor;
-    if (!c || !boardCoordinate(c.x) || !boardCoordinate(c.y) || !['pointer', 'hand', 'move', 'brush', 'eraser', 'rectangle', 'ellipse', 'line'].includes(c.tool) ||
+    if (!c || !boardCoordinate(c.x) || !boardCoordinate(c.y) || !CURSOR_TOOLS.includes(c.tool) ||
       !Number.isFinite(c.width) || c.width < 1 || c.width > 2000 || typeof c.color !== 'string' || !/^#[\da-f]{6}$/i.test(c.color) ||
       (c.draft !== undefined && !validBoardShape(c.draft))) return;
     const previous = this.cursors.get(actor);
@@ -481,6 +677,7 @@ export class WhiteboardModel implements RoomAppModel {
     clearInterval(this.expiry);
     this.pendingImages.clear();
     this.queuedRequests.clear();
+    this.raster.clear();
     this.history.destroy();
     this.document.destroy();
     this.cursors.clear();
