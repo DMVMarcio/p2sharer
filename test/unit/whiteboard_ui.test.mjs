@@ -534,9 +534,22 @@ test('studio paint bucket, color panel, eyedropper, selection marquee, layer ble
   // Holding Alt temporarily activates Eyedropper until released
   await act(async () => canvas().dispatchEvent(new window.KeyboardEvent('keydown', { key: 'b', bubbles: true })));
   assert.equal(button('Brush').getAttribute('aria-pressed'), 'true');
+  await pointer('pointermove', 220, 220);
   await act(async () => canvas().dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Alt', altKey: true, bubbles: true })));
   assert.equal(button('Eyedropper').getAttribute('aria-pressed'), 'true');
+  assert.ok(document.querySelector('[data-cursor-shape="eyedropper"] .stream-pointer-eyedropper'));
+  assert.ok(document.querySelector('.whiteboard-eyedropper-loupe'));
+  assert.equal(document.querySelectorAll('.whiteboard-eyedropper-loupe-cell').length, 81);
+  assert.ok(document.querySelector('.whiteboard-eyedropper-loupe-cell.is-center'));
   await act(async () => window.dispatchEvent(new window.KeyboardEvent('keyup', { key: 'Alt', altKey: false, bubbles: true })));
+  assert.equal(document.querySelector('.whiteboard-eyedropper-loupe'), null);
+  await click('Triangle wheel');
+  assert.ok(document.querySelector('.whiteboard-color-wheel-stage.is-triangle'));
+  await click('Color wheel');
+  assert.ok(document.querySelector('.whiteboard-color-wheel-stage.is-disc'));
+  assert.ok(document.querySelector('input[aria-label="Brightness"]'));
+  await click('Square picker');
+  assert.ok(document.querySelector('.whiteboard-color-sv'));
   assert.equal(button('Brush').getAttribute('aria-pressed'), 'true');
   // Shift-constrained Rectangle creates a 1:1 square
   await act(async () => canvas().dispatchEvent(new window.KeyboardEvent('keydown', { key: 'r', bubbles: true })));

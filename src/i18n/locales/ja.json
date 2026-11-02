@@ -1629,5 +1629,9 @@
   "whiteboard.presetPortrait": "縦長イラスト",
   "whiteboard.presetHd": "HD (720p)",
   "whiteboard.zoomIn": "拡大",
-  "whiteboard.zoomOut": "縮小"
+  "whiteboard.zoomOut": "縮小",
+  "whiteboard.pickerSquare": "四角ピッカー",
+  "whiteboard.pickerTriangle": "色相環＋三角形",
+  "whiteboard.pickerWheel": "カラーホイール",
+  "whiteboard.colorBrightness": "明度"
 }

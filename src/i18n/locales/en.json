@@ -1629,5 +1629,9 @@
   "whiteboard.presetPortrait": "Portrait Illustration",
   "whiteboard.presetHd": "HD (720p)",
   "whiteboard.zoomIn": "Zoom in",
-  "whiteboard.zoomOut": "Zoom out"
+  "whiteboard.zoomOut": "Zoom out",
+  "whiteboard.pickerSquare": "Square picker",
+  "whiteboard.pickerTriangle": "Triangle wheel",
+  "whiteboard.pickerWheel": "Color wheel",
+  "whiteboard.colorBrightness": "Brightness"
 }

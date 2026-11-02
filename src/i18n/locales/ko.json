@@ -1629,5 +1629,9 @@
   "whiteboard.presetPortrait": "세로 일러스트",
   "whiteboard.presetHd": "HD (720p)",
   "whiteboard.zoomIn": "확대",
-  "whiteboard.zoomOut": "축소"
+  "whiteboard.zoomOut": "축소",
+  "whiteboard.pickerSquare": "사각형 피커",
+  "whiteboard.pickerTriangle": "삼각형 색상환",
+  "whiteboard.pickerWheel": "원형 색상환",
+  "whiteboard.colorBrightness": "명도"
 }

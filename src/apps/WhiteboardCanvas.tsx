@@ -390,6 +390,79 @@ export function WhiteboardCanvas({
     }
   };
 
+  const sampleBoardPixel = (x: number, y: number): string => {
+    const px = Math.floor(x);
+    const py = Math.floor(y);
+    if (px < 0 || py < 0 || px >= boardWidth || py >= boardHeight) {
+      return transparent ? '#ffffff' : backgroundColor;
+    }
+    if (canvas2dActive && rasterCanvasRef.current) {
+      try {
+        const ctx = rasterCanvasRef.current.getContext('2d');
+        if (ctx) {
+          const data = ctx.getImageData(px, py, 1, 1).data;
+          if (data[3] === 0) return transparent ? '#ffffff' : backgroundColor;
+          return `#${data[0].toString(16).padStart(2, '0')}${data[1].toString(16).padStart(2, '0')}${data[2].toString(16).padStart(2, '0')}`;
+        }
+      } catch { /* fall back to software rasterizer */ }
+    }
+    return model.sampleColor(x, y, true, activeLayer);
+  };
+
+  const sampleLoupePatch = (centerX: number, centerY: number): { grid: string[]; centerHex: string; px: number; py: number } => {
+    const radius = 4;
+    const size = radius * 2 + 1;
+    const cx = Math.max(0, Math.min(boardWidth - 1, Math.floor(centerX)));
+    const cy = Math.max(0, Math.min(boardHeight - 1, Math.floor(centerY)));
+    const grid: string[] = [];
+    if (canvas2dActive && rasterCanvasRef.current) {
+      try {
+        const ctx = rasterCanvasRef.current.getContext('2d');
+        if (ctx) {
+          const sx = Math.max(0, cx - radius);
+          const sy = Math.max(0, cy - radius);
+          const ex = Math.min(boardWidth, cx + radius + 1);
+          const ey = Math.min(boardHeight, cy + radius + 1);
+          const sw = Math.max(1, ex - sx);
+          const sh = Math.max(1, ey - sy);
+          const img = ctx.getImageData(sx, sy, sw, sh).data;
+          for (let dy = -radius; dy <= radius; dy++) {
+            const y = cy + dy;
+            for (let dx = -radius; dx <= radius; dx++) {
+              const x = cx + dx;
+              if (x < 0 || y < 0 || x >= boardWidth || y >= boardHeight) {
+                grid.push(transparent ? 'transparent' : backgroundColor);
+              } else {
+                const idx = ((y - sy) * sw + (x - sx)) * 4;
+                const r = img[idx], g = img[idx + 1], b = img[idx + 2], a = img[idx + 3];
+                if (a === 0) grid.push(transparent ? 'transparent' : backgroundColor);
+                else grid.push(`#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`);
+              }
+            }
+          }
+          const centerCell = grid[Math.floor((size * size) / 2)] || settings.color;
+          const centerHex = centerCell === 'transparent' ? (transparent ? '#ffffff' : backgroundColor) : centerCell;
+          return { grid, centerHex, px: cx, py: cy };
+        }
+      } catch { /* fall back to software rasterizer */ }
+    }
+    const centerHex = model.sampleColor(cx, cy, true, activeLayer);
+    for (let dy = -radius; dy <= radius; dy++) {
+      const y = cy + dy;
+      for (let dx = -radius; dx <= radius; dx++) {
+        const x = cx + dx;
+        if (x < 0 || y < 0 || x >= boardWidth || y >= boardHeight) {
+          grid.push(transparent ? 'transparent' : backgroundColor);
+        } else if (dx === 0 && dy === 0) {
+          grid.push(centerHex);
+        } else {
+          grid.push(model.sampleColor(x, y, true, activeLayer));
+        }
+      }
+    }
+    return { grid, centerHex, px: cx, py: cy };
+  };
+
   const update = (event: ReactPointerEvent<HTMLDivElement>, final = false) => {
     if (compact) return;
     const screen = screenPoint(event), g = gesture.current;
@@ -401,7 +474,7 @@ export function WhiteboardCanvas({
         point = worldPoint(screen);
       } else if (g.mode === 'eyedropper') {
         if (boardContains(point, boardWidth, boardHeight)) {
-          const picked = model.sampleColor(point.x, point.y, true, activeLayer);
+          const picked = sampleBoardPixel(point.x, point.y);
           onPickColor?.(picked);
         }
       } else if (g.mode === 'move' && g.original) {
@@ -544,7 +617,7 @@ export function WhiteboardCanvas({
     // Eyedropper tool or Alt-held temporary eyedropper
     if (event.button === 0 && (settings.tool === 'eyedropper' || altHeld || event.altKey)) {
       if (boardContains(point, boardWidth, boardHeight)) {
-        const picked = model.sampleColor(point.x, point.y, true, activeLayer);
+        const picked = sampleBoardPixel(point.x, point.y);
         onPickColor?.(picked);
       }
       navigation.stop();
@@ -865,9 +938,11 @@ export function WhiteboardCanvas({
           ? 'hand'
           : c.tool === 'move'
             ? 'move'
-            : c.tool === 'pointer' || c.tool === 'eyedropper' || c.tool === 'bucket' || c.tool === 'text' || c.tool.startsWith('select') || c.tool === 'lasso' || c.tool === 'wand'
-              ? 'pointer'
-              : 'brush'
+            : c.tool === 'eyedropper'
+              ? 'eyedropper'
+              : c.tool === 'pointer' || c.tool === 'bucket' || c.tool === 'text' || c.tool.startsWith('select') || c.tool === 'lasso' || c.tool === 'wand'
+                ? 'pointer'
+                : 'brush'
       }
       diameter={c.width * viewport.zoom}
       style={{
@@ -1178,6 +1253,40 @@ export function WhiteboardCanvas({
           {[...model.cursors].filter(([id]) => id !== actor).map(([id, c]) => cursorGlyph(id, c))}
         </div>
         {!compact && cursor && cursorGlyph(name, cursor, true)}
+        {!compact && cursor && cursorScreen && cursor.tool === 'eyedropper' && (() => {
+          const patch = sampleLoupePatch(cursor.x, cursor.y);
+          const stageW = root.current?.clientWidth || 800;
+          const flipX = cursorScreen.x + 128 > stageW;
+          const flipY = cursorScreen.y - 122 < 12;
+          return (
+            <div
+              className="whiteboard-eyedropper-loupe"
+              style={{
+                left: flipX ? cursorScreen.x - 114 : cursorScreen.x + 18,
+                top: flipY ? cursorScreen.y + 18 : cursorScreen.y - 114,
+              }}
+            >
+              <div
+                className="whiteboard-eyedropper-loupe-ring"
+                style={{ borderColor: patch.centerHex }}
+              >
+                <div className="whiteboard-eyedropper-loupe-grid">
+                  {patch.grid.map((cellColor, idx) => (
+                    <span
+                      key={idx}
+                      className={`whiteboard-eyedropper-loupe-cell ${idx === 40 ? 'is-center' : ''}`}
+                      style={cellColor !== 'transparent' ? { backgroundColor: cellColor } : undefined}
+                    />
+                  ))}
+                </div>
+              </div>
+              <span className="whiteboard-eyedropper-loupe-badge">
+                <i style={{ backgroundColor: patch.centerHex }} />
+                {patch.centerHex.toUpperCase()}
+              </span>
+            </div>
+          );
+        })()}
       </div>
 
       {!compact && (

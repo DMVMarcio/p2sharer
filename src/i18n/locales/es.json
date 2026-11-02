@@ -1629,5 +1629,9 @@
   "whiteboard.presetPortrait": "Ilustración vertical",
   "whiteboard.presetHd": "HD (720p)",
   "whiteboard.zoomIn": "Acercar",
-  "whiteboard.zoomOut": "Alejar"
+  "whiteboard.zoomOut": "Alejar",
+  "whiteboard.pickerSquare": "Selector cuadrado",
+  "whiteboard.pickerTriangle": "Rueda triangular",
+  "whiteboard.pickerWheel": "Rueda de color",
+  "whiteboard.colorBrightness": "Brillo"
 }

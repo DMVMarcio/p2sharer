@@ -214,16 +214,59 @@
 .whiteboard-color-mini-btn { width: 24px; height: 24px; }
 .whiteboard-color-hex-group { display: flex; align-items: center; gap: 3px; min-width: 0; }
 .whiteboard-color-hex-input { width: 68px; height: 24px; min-height: 24px; padding: 2px 5px; font-family: var(--font-mono); font-size: 11px; }
+.whiteboard-color-mode-bar {
+  display: flex; align-items: center; justify-content: flex-end; gap: 3px;
+}
+.whiteboard-color-mode-btn {
+  width: 24px; height: 22px; border-radius: var(--radius-xs);
+}
+.whiteboard-color-mode-btn.active {
+  background: var(--accent-subtle); color: var(--accent-color); box-shadow: inset 0 0 0 1px var(--accent-color);
+}
 .whiteboard-color-sv {
   position: relative; width: 100%; height: 104px; border-radius: var(--radius-sm);
   background-image: linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, transparent);
   cursor: crosshair; touch-action: none; user-select: none; overflow: hidden;
   border: 1px solid var(--border-subtle);
 }
+.whiteboard-color-wheel-stage {
+  position: relative; width: 156px; height: 156px; margin: 0 auto;
+  cursor: crosshair; touch-action: none; user-select: none;
+}
+.whiteboard-color-hue-ring {
+  position: absolute; inset: 6px; border-radius: 50%;
+  background: conic-gradient(from 90deg, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000);
+  -webkit-mask: radial-gradient(circle, transparent 57px, #000 58px);
+  mask: radial-gradient(circle, transparent 57px, #000 58px);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.22);
+  pointer-events: none;
+}
+.whiteboard-color-triangle-svg {
+  position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.35));
+}
+.whiteboard-color-hs-disc {
+  position: absolute; inset: 8px; border-radius: 50%; overflow: hidden;
+  background:
+    radial-gradient(circle, #ffffff 0%, rgba(255, 255, 255, 0) 70%),
+    conic-gradient(from 90deg, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000);
+  border: 1px solid var(--border-subtle);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+}
+.whiteboard-color-hs-disc-shade {
+  position: absolute; inset: 0; background: #000000; pointer-events: none;
+}
+.whiteboard-brightness-slider {
+  width: 100%; margin: 0; border-radius: 999px;
+}
 .whiteboard-color-sv-cursor {
   position: absolute; width: 12px; height: 12px; border-radius: 50%;
   border: 2px solid #fff; box-shadow: 0 0 3px rgba(0, 0, 0, 0.85);
   transform: translate(-50%, -50%); pointer-events: none;
+}
+.whiteboard-color-sv-cursor.is-ring-cursor {
+  width: 11px; height: 11px;
 }
 .whiteboard-color-hue-row { display: flex; align-items: center; }
 .whiteboard-hue-slider { width: 100%; margin: 0; }
@@ -268,6 +311,47 @@
 .stream-pointer-brush { display: block; box-sizing: border-box; border: 1.5px solid currentColor; border-radius: 50%;
   position: absolute; transform: translate(-50%, -50%); box-shadow: 0 0 0 1px #fff8; }
 .whiteboard-cursors .stream-pointer-remote { z-index: 1; }
+.whiteboard-eyedropper-loupe {
+  position: absolute; z-index: 4; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  pointer-events: none;
+}
+.whiteboard-eyedropper-loupe-ring {
+  width: 90px; height: 90px; border-radius: 50%; overflow: hidden;
+  border: 3px solid var(--accent-color);
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.9), 0 6px 16px rgba(0, 0, 0, 0.45);
+  background-color: #f8fafc;
+  background-image:
+    linear-gradient(45deg, #e2e8f0 25%, transparent 25%),
+    linear-gradient(-45deg, #e2e8f0 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #e2e8f0 75%),
+    linear-gradient(-45deg, transparent 75%, #e2e8f0 75%);
+  background-size: 10px 10px;
+  background-position: 0 0, 0 5px, 5px -5px, -5px 0;
+}
+.whiteboard-eyedropper-loupe-grid {
+  display: grid; grid-template-columns: repeat(9, 1fr); grid-template-rows: repeat(9, 1fr);
+  width: 100%; height: 100%;
+}
+.whiteboard-eyedropper-loupe-cell {
+  box-sizing: border-box;
+  border-right: 1px solid rgba(148, 163, 184, 0.22);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.22);
+}
+.whiteboard-eyedropper-loupe-cell.is-center {
+  position: relative; z-index: 2;
+  outline: 1.5px solid #ffffff;
+  box-shadow: 0 0 0 1.5px #0f172a;
+}
+.whiteboard-eyedropper-loupe-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 6px; border-radius: 999px;
+  background: rgba(15, 23, 42, 0.88); color: #ffffff;
+  font-family: var(--font-mono); font-size: 10px; font-weight: 600; line-height: 1.2;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.18);
+}
+.whiteboard-eyedropper-loupe-badge i {
+  width: 8px; height: 8px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.8); flex-shrink: 0;
+}
 
 .whiteboard-layer .whiteboard-layer-handle { width: 24px; height: auto; align-self: stretch; cursor: grab; touch-action: none; flex-shrink: 0; }
 .whiteboard-layer.is-dragging { background: var(--accent-subtle); outline: 1px dashed var(--accent-color); box-shadow: none; }

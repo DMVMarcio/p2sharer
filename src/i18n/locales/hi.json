@@ -1629,5 +1629,9 @@
   "whiteboard.presetPortrait": "पोर्ट्रेट चित्रण",
   "whiteboard.presetHd": "एचडी (720p)",
   "whiteboard.zoomIn": "ज़ूम इन करें",
-  "whiteboard.zoomOut": "ज़ूम आउट करें"
+  "whiteboard.zoomOut": "ज़ूम आउट करें",
+  "whiteboard.pickerSquare": "वर्गाकार पिकर",
+  "whiteboard.pickerTriangle": "त्रिकोण रंग चक्र",
+  "whiteboard.pickerWheel": "रंग चक्र",
+  "whiteboard.colorBrightness": "चमक"
 }

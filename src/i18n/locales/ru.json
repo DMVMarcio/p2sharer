@@ -1629,5 +1629,9 @@
   "whiteboard.presetPortrait": "Вертикальная иллюстрация",
   "whiteboard.presetHd": "HD (720p)",
   "whiteboard.zoomIn": "Увеличить масштаб",
-  "whiteboard.zoomOut": "Уменьшить масштаб"
+  "whiteboard.zoomOut": "Уменьшить масштаб",
+  "whiteboard.pickerSquare": "Квадратная палитра",
+  "whiteboard.pickerTriangle": "Треугольный круг",
+  "whiteboard.pickerWheel": "Цветовой круг",
+  "whiteboard.colorBrightness": "Яркость"
 }

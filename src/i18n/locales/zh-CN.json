@@ -1629,5 +1629,9 @@
   "whiteboard.presetPortrait": "竖版插画",
   "whiteboard.presetHd": "高清 (720p)",
   "whiteboard.zoomIn": "放大",
-  "whiteboard.zoomOut": "缩小"
+  "whiteboard.zoomOut": "缩小",
+  "whiteboard.pickerSquare": "方形拾色器",
+  "whiteboard.pickerTriangle": "三角规律色环",
+  "whiteboard.pickerWheel": "圆形色盘",
+  "whiteboard.colorBrightness": "明度"
 }

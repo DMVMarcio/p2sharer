@@ -1629,5 +1629,9 @@
   "whiteboard.presetPortrait": "Pystykuva",
   "whiteboard.presetHd": "HD (720p)",
   "whiteboard.zoomIn": "Lähennä",
-  "whiteboard.zoomOut": "Loitonna"
+  "whiteboard.zoomOut": "Loitonna",
+  "whiteboard.pickerSquare": "Neliövalitsin",
+  "whiteboard.pickerTriangle": "Kolmioväriympyrä",
+  "whiteboard.pickerWheel": "Väriympyrä",
+  "whiteboard.colorBrightness": "Kirkkaus"
 }

@@ -1629,5 +1629,9 @@
   "whiteboard.presetPortrait": "Illustration portrait",
   "whiteboard.presetHd": "HD (720p)",
   "whiteboard.zoomIn": "Zoom avant",
-  "whiteboard.zoomOut": "Zoom arrière"
+  "whiteboard.zoomOut": "Zoom arrière",
+  "whiteboard.pickerSquare": "Sélecteur carré",
+  "whiteboard.pickerTriangle": "Roue triangulaire",
+  "whiteboard.pickerWheel": "Roue chromatique",
+  "whiteboard.colorBrightness": "Luminosité"
 }
