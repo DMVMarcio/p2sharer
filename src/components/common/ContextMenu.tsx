@@ -33,11 +33,11 @@ interface MenuState {
   source: HTMLElement;
   toggle?: boolean;
   layout?: 'grid';
-  placement?: 'top-center';
+  placement?: 'top-center' | 'right-start';
 }
 
 type MenuEvent = { preventDefault: () => void; stopPropagation: () => void; clientX: number; clientY: number; currentTarget: EventTarget | null };
-const MenuContext = createContext<(event: MenuEvent, actions: ContextMenuAction[], options?: { toggle?: boolean; layout?: 'grid'; placement?: 'top-center' }) => void>(() => {});
+const MenuContext = createContext<(event: MenuEvent, actions: ContextMenuAction[], options?: { toggle?: boolean; layout?: 'grid'; placement?: 'top-center' | 'right-start' }) => void>(() => {});
 export const useContextMenu = () => useContext(MenuContext);
 
 /** Feature menus defer editor targets to the central text editing menu. */
@@ -71,7 +71,7 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
     setActiveSubmenu(null);
     setMenu(null);
   }, []);
-  const open = useCallback((event: MenuEvent, actions: ContextMenuAction[], options?: { toggle?: boolean; layout?: 'grid'; placement?: 'top-center' }) => {
+  const open = useCallback((event: MenuEvent, actions: ContextMenuAction[], options?: { toggle?: boolean; layout?: 'grid'; placement?: 'top-center' | 'right-start' }) => {
     event.preventDefault();
     event.stopPropagation();
     setActiveSubmenu(null);
@@ -144,8 +144,16 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
     if (!menu || !menuRef.current) return;
     const { offsetWidth, offsetHeight } = menuRef.current;
     const source = menu.source.getBoundingClientRect();
-    const x = menu.placement === 'top-center' ? source.left + source.width / 2 - offsetWidth / 2 : menu.x;
-    const y = menu.placement === 'top-center' ? source.top - offsetHeight - 12 : menu.y;
+    const x = menu.placement === 'top-center'
+      ? source.left + source.width / 2 - offsetWidth / 2
+      : menu.placement === 'right-start'
+        ? source.right + 8
+        : menu.x;
+    const y = menu.placement === 'top-center'
+      ? source.top - offsetHeight - 12
+      : menu.placement === 'right-start'
+        ? source.top
+        : menu.y;
     const left = Math.max(8, Math.min(x, window.innerWidth - offsetWidth - 8));
     setPosition({ x: left, y: Math.max(8, Math.min(y, window.innerHeight - offsetHeight - 8)),
       arrow: Math.max(10, Math.min(offsetWidth - 10, source.left + source.width / 2 - left)) });

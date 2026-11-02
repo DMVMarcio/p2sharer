@@ -1,5 +1,8 @@
 import { memo, useId } from 'react';
-import { brushPath, expandSymmetryPointLists, hasVariablePressure, shapeOpacity, shapeTransform, type BoardShape } from './whiteboard_scene';
+import {
+  brushPath, chiselMarkerPath, expandSymmetryPointLists, gPenCalligraphicPath,
+  hasVariablePressure, pixelArtPath, shapeOpacity, shapeTransform, type BoardShape,
+} from './whiteboard_scene';
 
 export const WhiteboardShape = memo(function WhiteboardShape({
   shape: s,
@@ -83,45 +86,195 @@ export const WhiteboardShape = memo(function WhiteboardShape({
   }
   if (s.tool === 'image') {
     if (!imageHref) return null;
+    const ix = Math.min(a.x, b.x), iy = Math.min(a.y, b.y);
+    const iw = Math.abs(b.x - a.x), ih = Math.abs(b.y - a.y);
+    const cx = ix + iw / 2, cy = iy + ih / 2;
+    const flipTransform = s.flipX || s.flipY
+      ? `${transform} translate(${cx} ${cy}) scale(${s.flipX ? -1 : 1} ${s.flipY ? -1 : 1}) translate(${-cx} ${-cy})`
+      : transform;
     return wrapClip(
-      <image href={imageHref} x={Math.min(a.x, b.x)} y={Math.min(a.y, b.y)} width={Math.abs(b.x - a.x)} height={Math.abs(b.y - a.y)}
-        preserveAspectRatio="none" opacity={opacity < 1 ? opacity : undefined} transform={transform} />
+      <image href={imageHref} x={ix} y={iy} width={iw} height={ih}
+        preserveAspectRatio="none" opacity={opacity < 1 ? opacity : undefined} transform={flipTransform} />
     );
   }
   if (s.tool === 'brush' || s.tool === 'eraser' || s.tool === 'line') {
     const copies = expandSymmetryPointLists(s.points, s.symmetry, canvasWidth / 2, canvasHeight / 2);
-    const isSquareCap = s.tool === 'brush' && (s.brushType === 'marker' || s.brushType === 'pixel');
-    const lineCap = isSquareCap ? 'square' : 'round';
-    const lineJoin = s.tool === 'brush' && s.brushType === 'pixel'
-      ? 'miter'
-      : s.tool === 'brush' && s.brushType === 'marker'
-        ? 'bevel'
-        : 'round';
-    const hardness = s.hardness ?? (
-      s.brushType === 'airbrush' ? 15
-        : s.brushType === 'blur' ? 20
-          : s.brushType === 'smudge' ? 35
-            : s.brushType === 'watercolor' ? 45
-              : 85
-    );
-    const softBlurPx = s.tool === 'brush' && s.brushType !== 'pixel' && hardness < 65
-      ? Math.round(((65 - hardness) / 65) * Math.max(1.5, s.width * 0.22) * 10) / 10
-      : 0;
-    const strokeStyle = softBlurPx > 0.3
-      ? { filter: `blur(${softBlurPx}px)` }
-      : s.tool === 'brush' && s.brushType === 'pixel'
-        ? { shapeRendering: 'crispEdges' as const }
-        : undefined;
+    const hardness = s.hardness ?? 80;
+    const extraBlur = hardness < 65 ? Math.round(((65 - hardness) / 65) * Math.max(1, s.width * 0.18) * 10) / 10 : 0;
+
     return wrapClip(
       <>
         {copies.map((pts, idx) => {
           const subShape: BoardShape = { ...s, points: pts };
           const d = brushPath(subShape);
-          if (hasVariablePressure(subShape)) {
-            return <path key={idx} fill={s.color} fillRule="nonzero" stroke="none" opacity={opacity < 1 ? opacity : undefined} style={strokeStyle} transform={transform} d={d} />;
+
+          if (s.tool === 'eraser' || s.tool === 'line') {
+            if (hasVariablePressure(subShape)) {
+              return <path key={idx} fill={s.color} fillRule="nonzero" stroke="none" opacity={opacity < 1 ? opacity : undefined} transform={transform} d={d} />;
+            }
+            return <path key={idx} stroke={s.color} strokeWidth={s.width} fill="none" opacity={opacity < 1 ? opacity : undefined}
+              strokeLinecap="round" strokeLinejoin="round" transform={transform} d={d} />;
           }
-          return <path key={idx} stroke={s.color} strokeWidth={s.width} fill="none" opacity={opacity < 1 ? opacity : undefined}
-            strokeLinecap={lineCap} strokeLinejoin={lineJoin} style={strokeStyle} transform={transform} d={d} />;
+
+          // 1. Pixel Art Brush: crisp integer-grid Bresenham staircase blocks
+          if (s.brushType === 'pixel') {
+            const pd = pixelArtPath(subShape);
+            return (
+              <path
+                key={idx}
+                fill={s.color}
+                stroke="none"
+                opacity={opacity < 1 ? opacity : undefined}
+                style={{ shapeRendering: 'crispEdges' }}
+                transform={transform}
+                d={pd}
+              />
+            );
+          }
+
+          // 2. Chisel Marker: angled -35° calligraphic nib ribbon with multiply ink blending
+          if (s.brushType === 'marker') {
+            const md = chiselMarkerPath(subShape);
+            return (
+              <path
+                key={idx}
+                fill={s.color}
+                fillRule="nonzero"
+                stroke="none"
+                opacity={Math.round(opacity * 0.72 * 1000) / 1000}
+                style={{ mixBlendMode: 'multiply' }}
+                transform={transform}
+                d={md}
+              />
+            );
+          }
+
+          // 3. G-Pen (Ink Pen): razor-sharp calligraphic contour with tapered entry/exit nib
+          if (s.brushType === 'pen') {
+            const penD = hasVariablePressure(subShape) ? d : gPenCalligraphicPath(subShape);
+            return (
+              <path
+                key={idx}
+                fill={s.color}
+                fillRule="nonzero"
+                stroke="none"
+                opacity={opacity < 1 ? opacity : undefined}
+                style={extraBlur > 0.3 ? { filter: `blur(${extraBlur}px)` } : undefined}
+                transform={transform}
+                d={penD}
+              />
+            );
+          }
+
+          // 4. Graphite Pencil: dry paper-tooth grain filter + sketchy graphite core
+          if (s.brushType === 'pencil') {
+            if (hasVariablePressure(subShape)) {
+              return (
+                <path
+                  key={idx}
+                  fill={s.color}
+                  fillRule="nonzero"
+                  stroke="none"
+                  filter="url(#wb-filter-pencil)"
+                  opacity={Math.round(opacity * 0.88 * 1000) / 1000}
+                  transform={transform}
+                  d={d}
+                />
+              );
+            }
+            return (
+              <g key={idx} filter="url(#wb-filter-pencil)" opacity={Math.round(opacity * 0.88 * 1000) / 1000} transform={transform}>
+                <path stroke={s.color} strokeWidth={Math.max(1, s.width * 0.9)} fill="none" strokeLinecap="round" strokeLinejoin="round" d={d} />
+              </g>
+            );
+          }
+
+          // 5. Soft Airbrush: 3-ring radial Gaussian cloud spray with zero hard outline
+          if (s.brushType === 'airbrush') {
+            const bOuter = Math.max(3, Math.round(s.width * 0.42 * 10) / 10);
+            const bMid = Math.max(2, Math.round(s.width * 0.24 * 10) / 10);
+            const bCore = Math.max(1.2, Math.round(s.width * 0.12 * 10) / 10);
+            return (
+              <g key={idx} transform={transform}>
+                <path stroke={s.color} strokeWidth={s.width * 1.85} fill="none" strokeLinecap="round" strokeLinejoin="round"
+                  opacity={Math.round(opacity * 0.16 * 1000) / 1000} style={{ filter: `blur(${bOuter}px)` }} d={d} />
+                <path stroke={s.color} strokeWidth={s.width * 1.15} fill="none" strokeLinecap="round" strokeLinejoin="round"
+                  opacity={Math.round(opacity * 0.26 * 1000) / 1000} style={{ filter: `blur(${bMid}px)` }} d={d} />
+                <path stroke={s.color} strokeWidth={s.width * 0.55} fill="none" strokeLinecap="round" strokeLinejoin="round"
+                  opacity={Math.round(opacity * 0.36 * 1000) / 1000} style={{ filter: `blur(${bCore}px)` }} d={d} />
+              </g>
+            );
+          }
+
+          // 6. Wet Watercolor: translucent multiply wash with wet pigment edge pooling & organic bleed
+          if (s.brushType === 'watercolor') {
+            const washBlur = Math.max(1, Math.round(s.width * 0.1 * 10) / 10);
+            return (
+              <g key={idx} filter="url(#wb-filter-watercolor)" style={{ mixBlendMode: 'multiply' }} transform={transform}>
+                <path stroke={s.color} strokeWidth={s.width * 1.06} fill="none" strokeLinecap="round" strokeLinejoin="round"
+                  opacity={Math.round(opacity * 0.24 * 1000) / 1000} d={d} />
+                <path stroke={s.color} strokeWidth={Math.max(1, s.width * 0.88)} fill="none" strokeLinecap="round" strokeLinejoin="round"
+                  opacity={Math.round(opacity * 0.44 * 1000) / 1000} style={{ filter: `blur(${washBlur}px)` }} d={d} />
+              </g>
+            );
+          }
+
+          // 7. Smudge (Color Blender): streaky feathered color pull
+          if (s.brushType === 'smudge') {
+            const smudgeBlur = Math.max(2, Math.round(s.width * 0.25 * 10) / 10);
+            return (
+              <g key={idx} transform={transform}>
+                <path stroke={s.color} strokeWidth={s.width * 1.2} fill="none" strokeLinecap="round" strokeLinejoin="round"
+                  opacity={Math.round(opacity * 0.45 * 1000) / 1000} style={{ filter: `blur(${smudgeBlur}px)` }} d={d} />
+                <path stroke={s.color} strokeWidth={Math.max(1, s.width * 0.68)} fill="none" strokeLinecap="round" strokeLinejoin="round"
+                  opacity={Math.round(opacity * 0.68 * 1000) / 1000} style={{ filter: `blur(${Math.max(1, smudgeBlur * 0.45)}px)` }} d={d} />
+              </g>
+            );
+          }
+
+          // 8. Blur (Softening Glaze): wide heavy Gaussian feather
+          if (s.brushType === 'blur') {
+            const blurRad = Math.max(3.5, Math.round(s.width * 0.48 * 10) / 10);
+            return (
+              <path
+                key={idx}
+                stroke={s.color}
+                strokeWidth={s.width * 1.45}
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity={Math.round(opacity * 0.32 * 1000) / 1000}
+                style={{ filter: `blur(${blurRad}px)` }}
+                transform={transform}
+                d={d}
+              />
+            );
+          }
+
+          // 9. Paint Brush ('brush' — Oil/Acrylic): soft outer bristle feather + saturated inner pigment core
+          if (hasVariablePressure(subShape)) {
+            return (
+              <path
+                key={idx}
+                fill={s.color}
+                fillRule="nonzero"
+                stroke="none"
+                opacity={opacity < 1 ? opacity : undefined}
+                style={extraBlur > 0.3 ? { filter: `blur(${extraBlur}px)` } : undefined}
+                transform={transform}
+                d={d}
+              />
+            );
+          }
+          const bristleBlur = Math.max(0.8, Math.round((extraBlur + s.width * 0.12) * 10) / 10);
+          return (
+            <g key={idx} transform={transform}>
+              <path stroke={s.color} strokeWidth={s.width * 1.08} fill="none" strokeLinecap="round" strokeLinejoin="round"
+                opacity={Math.round(opacity * 0.38 * 1000) / 1000} style={{ filter: `blur(${bristleBlur}px)` }} d={d} />
+              <path stroke={s.color} strokeWidth={Math.max(1, s.width * 0.76)} fill="none" strokeLinecap="round" strokeLinejoin="round"
+                opacity={Math.round(opacity * 0.92 * 1000) / 1000} d={d} />
+            </g>
+          );
         })}
       </>
     );

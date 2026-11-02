@@ -190,9 +190,9 @@ export function WhiteboardColorPanel({
       {recentColors.length > 0 && (
         <div className="whiteboard-recent-colors" role="group" aria-label={t('whiteboard.recentColors')}>
           {recentColors.slice(0, 8).map(recent => (
-            <button
+            <TooltipButton
               key={recent}
-              type="button"
+              tooltip={recent}
               aria-label={recent}
               className={`whiteboard-swatch-btn is-recent ${activeHex.toLowerCase() === recent.toLowerCase() ? 'active' : ''}`}
               style={{ backgroundColor: recent }}

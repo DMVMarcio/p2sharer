@@ -162,9 +162,8 @@ export function flipBoardLayer(
   boardWidth = BOARD_WIDTH,
   boardHeight = BOARD_HEIGHT,
 ): { layer: BoardLayer; shapes: BoardShape[] } {
-  const bounds = boardLayerBounds(shapes, layer) ?? { x: 0, y: 0, width: boardWidth, height: boardHeight };
-  const centerX = bounds.x + bounds.width / 2 - layer.x;
-  const centerY = bounds.y + bounds.height / 2 - layer.y;
+  const centerX = boardWidth / 2 - layer.x;
+  const centerY = boardHeight / 2 - layer.y;
   const nextLayer: BoardLayer = {
     ...layer,
     ...(axis === 'x' ? { flipX: !layer.flipX } : { flipY: !layer.flipY }),
@@ -173,14 +172,15 @@ export function flipBoardLayer(
     .filter(s => (s.layerId ?? DEFAULT_BOARD_LAYER) === layer.id)
     .map(s => {
       const sx = s.scaleX ?? 1, sy = s.scaleY ?? 1;
-      const flippedPoints = s.points.map(p => ({
+      const flipPt = (p: BoardPoint): BoardPoint => ({
         ...p,
         x: axis === 'x' ? Math.round((2 * (centerX - s.x) / sx - p.x) * 100) / 100 : p.x,
         y: axis === 'y' ? Math.round((2 * (centerY - s.y) / sy - p.y) * 100) / 100 : p.y,
-      }));
+      });
       return {
         ...s,
-        points: flippedPoints,
+        points: s.points.map(flipPt),
+        ...(s.clipPolygon?.length ? { clipPolygon: s.clipPolygon.map(flipPt) } : {}),
         ...(s.tool === 'image' ? (axis === 'x' ? { flipX: !s.flipX } : { flipY: !s.flipY }) : {}),
       };
     });

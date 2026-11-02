@@ -130,9 +130,11 @@ export function WhiteboardLayers({
               <TooltipButton
                 tooltip={t('whiteboard.duplicateLayer')}
                 aria-label={t('whiteboard.duplicateLayer')}
-                className="room-app-notepad-tool"
-                disabled={layers.length >= 64}
-                onClick={() => onDuplicate(activeLayerObj.id)}
+                aria-disabled={layers.length >= 64 || undefined}
+                className={`room-app-notepad-tool ${layers.length >= 64 ? 'is-disabled' : ''}`}
+                onClick={() => {
+                  if (layers.length < 64) onDuplicate(activeLayerObj.id);
+                }}
               >
                 <Copy size={14} />
               </TooltipButton>
@@ -141,9 +143,11 @@ export function WhiteboardLayers({
               <TooltipButton
                 tooltip={t('whiteboard.mergeDown')}
                 aria-label={t('whiteboard.mergeDown')}
-                className="room-app-notepad-tool"
-                disabled={!canMergeDown}
-                onClick={() => onMergeDown(activeLayerObj.id)}
+                aria-disabled={!canMergeDown || undefined}
+                className={`room-app-notepad-tool ${!canMergeDown ? 'is-disabled' : ''}`}
+                onClick={() => {
+                  if (canMergeDown) onMergeDown(activeLayerObj.id);
+                }}
               >
                 <Merge size={14} />
               </TooltipButton>
@@ -152,9 +156,11 @@ export function WhiteboardLayers({
               <TooltipButton
                 tooltip={t('whiteboard.clearLayer')}
                 aria-label={t('whiteboard.clearLayer')}
-                className="room-app-notepad-tool"
-                disabled={activeLayerObj.locked || activeLayerObj.hidden}
-                onClick={() => onClearLayer(activeLayerObj.id)}
+                aria-disabled={activeLayerObj.locked || activeLayerObj.hidden || undefined}
+                className={`room-app-notepad-tool ${activeLayerObj.locked || activeLayerObj.hidden ? 'is-disabled' : ''}`}
+                onClick={() => {
+                  if (!activeLayerObj.locked && !activeLayerObj.hidden) onClearLayer(activeLayerObj.id);
+                }}
               >
                 <Eraser size={14} />
               </TooltipButton>
@@ -162,9 +168,11 @@ export function WhiteboardLayers({
             <TooltipButton
               tooltip={t('whiteboard.addLayer')}
               aria-label={t('whiteboard.addLayer')}
-              className="room-app-notepad-tool"
-              disabled={layers.length >= 64}
-              onClick={onAdd}
+              aria-disabled={layers.length >= 64 || undefined}
+              className={`room-app-notepad-tool ${layers.length >= 64 ? 'is-disabled' : ''}`}
+              onClick={() => {
+                if (layers.length < 64) onAdd();
+              }}
             >
               <Plus size={16} />
             </TooltipButton>
@@ -186,9 +194,11 @@ export function WhiteboardLayers({
                 tooltip={t('whiteboard.alphaLock')}
                 aria-label={t('whiteboard.alphaLock')}
                 aria-pressed={Boolean(activeLayerObj.alphaLock)}
-                disabled={activeLayerObj.locked}
-                className={`room-app-notepad-tool ${activeLayerObj.alphaLock ? 'active' : ''}`}
-                onClick={() => onChange({ ...activeLayerObj, alphaLock: !activeLayerObj.alphaLock })}
+                aria-disabled={activeLayerObj.locked || undefined}
+                className={`room-app-notepad-tool ${activeLayerObj.alphaLock ? 'active' : ''} ${activeLayerObj.locked ? 'is-disabled' : ''}`}
+                onClick={() => {
+                  if (!activeLayerObj.locked) onChange({ ...activeLayerObj, alphaLock: !activeLayerObj.alphaLock });
+                }}
               >
                 <Grid2x2Check size={14} />
               </TooltipButton>
@@ -196,9 +206,11 @@ export function WhiteboardLayers({
                 tooltip={t('whiteboard.clippingMask')}
                 aria-label={t('whiteboard.clippingMask')}
                 aria-pressed={Boolean(activeLayerObj.clipping)}
-                disabled={activeLayerObj.locked || activeIdx === 0}
-                className={`room-app-notepad-tool ${activeLayerObj.clipping ? 'active' : ''}`}
-                onClick={() => onChange({ ...activeLayerObj, clipping: !activeLayerObj.clipping })}
+                aria-disabled={activeLayerObj.locked || undefined}
+                className={`room-app-notepad-tool ${activeLayerObj.clipping ? 'active' : ''} ${activeLayerObj.locked ? 'is-disabled' : ''}`}
+                onClick={() => {
+                  if (!activeLayerObj.locked) onChange({ ...activeLayerObj, clipping: !activeLayerObj.clipping });
+                }}
               >
                 <CornerDownRight size={14} />
               </TooltipButton>
@@ -207,18 +219,22 @@ export function WhiteboardLayers({
                   <TooltipButton
                     tooltip={t('whiteboard.flipHorizontal')}
                     aria-label={t('whiteboard.flipHorizontal')}
-                    disabled={activeLayerObj.locked || activeLayerObj.hidden}
-                    className="room-app-notepad-tool"
-                    onClick={() => onFlipLayer(activeLayerObj.id, 'x')}
+                    aria-disabled={activeLayerObj.locked || activeLayerObj.hidden || undefined}
+                    className={`room-app-notepad-tool ${activeLayerObj.locked || activeLayerObj.hidden ? 'is-disabled' : ''}`}
+                    onClick={() => {
+                      if (!activeLayerObj.locked && !activeLayerObj.hidden) onFlipLayer(activeLayerObj.id, 'x');
+                    }}
                   >
                     <FlipHorizontal2 size={14} />
                   </TooltipButton>
                   <TooltipButton
                     tooltip={t('whiteboard.flipVertical')}
                     aria-label={t('whiteboard.flipVertical')}
-                    disabled={activeLayerObj.locked || activeLayerObj.hidden}
-                    className="room-app-notepad-tool"
-                    onClick={() => onFlipLayer(activeLayerObj.id, 'y')}
+                    aria-disabled={activeLayerObj.locked || activeLayerObj.hidden || undefined}
+                    className={`room-app-notepad-tool ${activeLayerObj.locked || activeLayerObj.hidden ? 'is-disabled' : ''}`}
+                    onClick={() => {
+                      if (!activeLayerObj.locked && !activeLayerObj.hidden) onFlipLayer(activeLayerObj.id, 'y');
+                    }}
                   >
                     <FlipVertical2 size={14} />
                   </TooltipButton>

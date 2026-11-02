@@ -146,8 +146,8 @@ test('shape tools offer accessible visual fill choices and stabilization persist
   assert.equal(menu.querySelectorAll('[role="menuitemradio"]').length, 2);
   assert.equal(button('Outline', menu).getAttribute('aria-checked'), 'true');
   assert.equal(menu.textContent, '');
-  assert.equal(Number.parseFloat(menu.style.left) + menu.offsetWidth / 2, 318);
-  assert.ok(Number.parseFloat(menu.style.top) + menu.offsetHeight < 400);
+  assert.equal(Number.parseFloat(menu.style.left), 344);
+  assert.equal(Number.parseFloat(menu.style.top), 400);
   await click('Filled', menu);
   Object.defineProperty(HTMLElement.prototype, 'offsetWidth', widthDescriptor);
   Object.defineProperty(HTMLElement.prototype, 'offsetHeight', heightDescriptor);
@@ -304,12 +304,6 @@ test('layer cards select grouped paint, names edit directly and panels collapse 
   assert.ok(document.querySelector('rect[stroke-dasharray]'));
   assert.ok(row.querySelector('.whiteboard-layer-preview path'));
   const content = fixture.model.content;
-  await click('Hide tools');
-  const tools = document.getElementById(button('Show tools').getAttribute('aria-controls'));
-  assert.equal(tools.getAttribute('aria-hidden'), 'true');
-  assert.ok(tools.hasAttribute('inert'));
-  await click('Show tools');
-  assert.equal(tools.hasAttribute('inert'), false);
   await click('Hide layers');
   const layers = document.getElementById(button('Show layers').getAttribute('aria-controls'));
   assert.ok(layers.hasAttribute('inert'));

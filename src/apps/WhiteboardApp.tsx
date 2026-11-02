@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
-import { Maximize, Minimize, SlidersHorizontal } from 'lucide-react';
 import { ModalDialog } from '../components/common/ModalDialog';
 import { Select } from '../components/common/Select';
-import { TooltipButton } from '../components/common/TooltipButton';
 import { useElementFullscreen } from '../hooks/useElementFullscreen';
 import { useLocale } from '../hooks/useLocale';
 import { useRoom } from '../hooks/useRoom';
@@ -459,30 +457,6 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
         }
       }}
     >
-      {!compact && (
-        <>
-          <div className="whiteboard-file-actions">
-            {files.actions}
-            <TooltipButton
-              tooltip={t('whiteboard.canvasSettings')}
-              aria-label={t('whiteboard.canvasSettings')}
-              className="room-app-notepad-tool"
-              onClick={() => setCanvasDialogOpen(true)}
-            >
-              <SlidersHorizontal size={16} />
-            </TooltipButton>
-            <TooltipButton
-              tooltip={t(fullscreen ? 'browser.exitFullscreen' : 'browser.fullscreen')}
-              aria-pressed={fullscreen}
-              className="room-app-notepad-tool"
-              onClick={() => void toggleFullscreen().catch(error)}
-            >
-              {fullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
-            </TooltipButton>
-          </div>
-          {files.status}
-        </>
-      )}
       <div className="whiteboard-workspace">
         <div className="whiteboard-stage">
           {!compact && (
@@ -500,6 +474,11 @@ export function WhiteboardApp({ instanceId, compact = false }: { instanceId: str
               onInvertSelection={invertSelection}
               onDeleteSelectionPixels={deleteSelectionPixels}
               onFillSelectionPixels={fillSelectionPixels}
+              fileActions={files.actions}
+              fileStatus={files.status}
+              onOpenCanvasSettings={() => setCanvasDialogOpen(true)}
+              fullscreen={fullscreen}
+              onToggleFullscreen={() => void toggleFullscreen().catch(error)}
             />
           )}
           <WhiteboardCanvas

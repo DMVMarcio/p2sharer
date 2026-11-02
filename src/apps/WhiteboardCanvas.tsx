@@ -604,13 +604,19 @@ export function WhiteboardCanvas({
             y: Math.round((pt.y - layer.y) * 100) / 100,
           }))
         : undefined;
+      const strokeColor = settings.tool === 'brush' && settings.brushType === 'smudge'
+        ? (() => {
+            const hasShapes = model.shapes.some(s => !s.hidden && (s.layerId ?? DEFAULT_BOARD_LAYER) === layer.id);
+            return hasShapes ? model.sampleColor(point.x, point.y, true, layer.id) : settings.color;
+          })()
+        : settings.color;
       const shape: BoardShape = {
         id: crypto.randomUUID(),
         layerId: layer.id,
         tool: settings.tool as BoardShape['tool'],
         ...(settings.tool === 'brush' ? { brushType: settings.brushType } : {}),
         points: settings.tool === 'brush' || settings.tool === 'eraser' ? [local] : [local, local],
-        color: settings.color,
+        color: strokeColor,
         ...(settings.secondaryColor ? { secondaryColor: settings.secondaryColor } : {}),
         width: boardBrushWidth(settings.width),
         opacity: settings.opacity,
@@ -783,6 +789,15 @@ export function WhiteboardCanvas({
           <clipPath id={clipId}>
             <rect width={boardWidth} height={boardHeight} />
           </clipPath>
+          <filter id="wb-filter-pencil" x="-10%" y="-10%" width="120%" height="120%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="3" result="grain" />
+            <feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -0.58 1.18" in="grain" result="tooth" />
+            <feComposite in="SourceGraphic" in2="tooth" operator="in" />
+          </filter>
+          <filter id="wb-filter-watercolor" x="-15%" y="-15%" width="130%" height="130%">
+            <feTurbulence type="turbulence" baseFrequency="0.035" numOctaves="2" result="wash" />
+            <feDisplacementMap in="SourceGraphic" in2="wash" scale="2.4" xChannelSelector="R" yChannelSelector="G" />
+          </filter>
         </defs>
         <g transform={`translate(${viewport.x} ${viewport.y}) scale(${viewport.zoom})`}>
           <rect
@@ -792,30 +807,70 @@ export function WhiteboardCanvas({
             fill={transparent ? 'none' : backgroundColor}
           />
           <g clipPath={`url(#${clipId})`}>
-            {model.layers.filter(l => !l.hidden).map(layer => {
-              const view = resizing?.id === layer.id ? resizing.layer : moving?.id === layer.id ? moving : layer;
-              const shapes = resizing?.id === layer.id ? resizing.shapes : model.shapes.filter(s => (s.layerId ?? DEFAULT_BOARD_LAYER) === layer.id);
-              const drafts = [...model.cursors]
-                .filter(([id, c]) => id !== actor && c.draft && (c.draft.layerId ?? DEFAULT_BOARD_LAYER) === layer.id && !shapes.some(s => s.id === c.draft!.id))
-                .map(([, c]) => c.draft!);
-              const layerOpacity = (view.opacity ?? 100) / 100;
-              return (
-                <g
-                  key={layer.id}
-                  data-board-layer={layer.id}
-                  transform={`translate(${view.x} ${view.y})`}
-                  opacity={layerOpacity < 1 ? layerOpacity : undefined}
-                  style={view.blendMode && view.blendMode !== 'normal' ? { mixBlendMode: view.blendMode } : undefined}
-                >
-                  <WhiteboardLayerArt
-                    shapes={[...shapes, ...drafts, ...(draft?.layerId === layer.id ? [draft] : [])]}
-                    imageHref={imageHref}
-                    canvasWidth={boardWidth}
-                    canvasHeight={boardHeight}
-                  />
-                </g>
-              );
-            })}
+            {(() => {
+              const visibleLayers = model.layers.filter(l => !l.hidden);
+              let currentBaseLayerId: string | null = null;
+              let currentBaseView: BoardLayer | null = null;
+              let currentBaseShapes: BoardShape[] = [];
+              return visibleLayers.map((layer, idx) => {
+                const view = resizing?.id === layer.id ? resizing.layer : moving?.id === layer.id ? moving : layer;
+                const shapes = resizing?.id === layer.id ? resizing.shapes : model.shapes.filter(s => (s.layerId ?? DEFAULT_BOARD_LAYER) === layer.id);
+                const drafts = [...model.cursors]
+                  .filter(([id, c]) => id !== actor && c.draft && (c.draft.layerId ?? DEFAULT_BOARD_LAYER) === layer.id && !shapes.some(s => s.id === c.draft!.id))
+                  .map(([, c]) => c.draft!);
+                const allShapes = [...shapes, ...drafts, ...(draft?.layerId === layer.id ? [draft] : [])];
+                const layerOpacity = (view.opacity ?? 100) / 100;
+                const isClipped = Boolean(view.clipping) && currentBaseLayerId !== null && currentBaseView !== null;
+                if (!view.clipping) {
+                  currentBaseLayerId = layer.id;
+                  currentBaseView = view;
+                  currentBaseShapes = allShapes;
+                }
+                const needsClipDef = !view.clipping && visibleLayers.slice(idx + 1).some(next => next.clipping);
+                const clipMaskId = isClipped ? `${clipId}-layerclip-${currentBaseLayerId}` : undefined;
+                return (
+                  <g key={layer.id}>
+                    {needsClipDef && (
+                      <defs>
+                        <mask
+                          id={`${clipId}-layerclip-${layer.id}`}
+                          maskUnits="userSpaceOnUse"
+                          x={-16000}
+                          y={-10000}
+                          width={48000}
+                          height={30000}
+                          style={{ maskType: 'alpha' }}
+                        >
+                          <g transform={`translate(${view.x} ${view.y})`}>
+                            <WhiteboardLayerArt
+                              shapes={currentBaseShapes}
+                              imageHref={imageHref}
+                              canvasWidth={boardWidth}
+                              canvasHeight={boardHeight}
+                            />
+                          </g>
+                        </mask>
+                      </defs>
+                    )}
+                    <g
+                      data-board-layer={layer.id}
+                      mask={clipMaskId ? `url(#${clipMaskId})` : undefined}
+                      transform={`translate(${view.x} ${view.y})`}
+                      opacity={layerOpacity < 1 ? layerOpacity : undefined}
+                      style={view.blendMode && view.blendMode !== 'normal' ? { mixBlendMode: view.blendMode } : undefined}
+                    >
+                      <WhiteboardLayerArt
+                        shapes={allShapes}
+                        imageHref={imageHref}
+                        canvasWidth={boardWidth}
+                        canvasHeight={boardHeight}
+                        alphaLock={Boolean(view.alphaLock)}
+                      />
+                    </g>
+                  </g>
+                );
+              });
+            })()}
 
             {!compact && settings.symmetry && settings.symmetry !== 'none' && (
               <g className="whiteboard-symmetry-guides">

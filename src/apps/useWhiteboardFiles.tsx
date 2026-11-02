@@ -3,6 +3,7 @@ import { invoke } from '../platform/commands.ts';
 import { FilePlus2, FolderOpen, Save, Download } from 'lucide-react';
 import { DocumentFilesDialog, type NoteLibrary, type SavedNote } from './NotepadFilesDialog';
 import { ModalDialog } from '../components/common/ModalDialog';
+import { TooltipButton } from '../components/common/TooltipButton';
 import { showToast } from '../hooks/useToast';
 import { getLanguage, localizeError, t } from '../i18n';
 import type { WhiteboardModel } from './whiteboard_model';
@@ -75,10 +76,10 @@ export function useWhiteboardFiles(model: WhiteboardModel | undefined, instanceI
   return {
     save,
     actions: <div className="room-app-toolbar-actions room-app-notepad-file-actions">
-      <button className="btn btn-sm btn-outline" disabled={busy} onClick={() => requestReplace('new')}><FilePlus2 size={14} />{t('notepad.new')}</button>
-      <button className="btn btn-sm btn-outline" disabled={busy} onClick={() => setDialog('open')}><FolderOpen size={14} />{t('message.a01a5fce396e')}</button>
-      <button className="btn btn-sm btn-outline" disabled={busy} onClick={save}><Save size={14} />{t('notepad.save')}</button>
-      <button className="btn btn-sm btn-outline" disabled={busy} onClick={() => setDialog('export')}><Download size={14} />{t('notepad.export')}</button>
+      <TooltipButton className="room-app-notepad-tool" tooltip={t('notepad.new')} aria-label={t('notepad.new')} disabled={busy} onClick={() => requestReplace('new')}><FilePlus2 size={16} /></TooltipButton>
+      <TooltipButton className="room-app-notepad-tool" tooltip={t('message.a01a5fce396e')} aria-label={t('message.a01a5fce396e')} disabled={busy} onClick={() => setDialog('open')}><FolderOpen size={16} /></TooltipButton>
+      <TooltipButton className="room-app-notepad-tool" tooltip={`${t('notepad.save')} (Ctrl+S)`} aria-label={t('notepad.save')} disabled={busy} onClick={save}><Save size={16} /></TooltipButton>
+      <TooltipButton className="room-app-notepad-tool" tooltip={t('notepad.export')} aria-label={t('notepad.export')} disabled={busy} onClick={() => setDialog('export')}><Download size={16} /></TooltipButton>
     </div>,
     status: <div className="notepad-file-status" role="status"><strong>{name}</strong><span>{t(busy ? 'notepad.saving' : local?.content === model?.content ? 'notepad.saved' : local ? 'notepad.modified' : 'notepad.unsaved')}</span></div>,
     dialogs: <>{dialog && <DocumentFilesDialog mode={dialog} library="whiteboard" initialName={name} onOpen={requestReplace}

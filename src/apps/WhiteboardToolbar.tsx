@@ -1,11 +1,10 @@
-import { useId, useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   Brush, Pencil, Pen, Eraser, MousePointer2, Square, Circle, Minus, ImagePlus,
-  Undo2, Redo2, ChevronLeft, PaintBucket, Pipette, Type, BoxSelect, Lasso,
+  Undo2, Redo2, PaintBucket, Pipette, Type, BoxSelect, Lasso,
   Wand2, Blend, Sparkles, Droplets, Highlighter, Grid3x3, Flame, FlipHorizontal,
-  Trash2, CheckSquare, SquareDashedMousePointer,
+  Trash2, CheckSquare, SquareDashedMousePointer, Maximize, Minimize, SlidersHorizontal,
 } from 'lucide-react';
-import { CollapsibleRegion } from '../components/common/CollapsibleRegion';
 import { TooltipButton } from '../components/common/TooltipButton';
 import { useContextMenu } from '../components/common/ContextMenu';
 import { IntegerSlider } from '../components/common/IntegerSlider';
@@ -59,6 +58,11 @@ export function WhiteboardToolbar({
   onInvertSelection,
   onDeleteSelectionPixels,
   onFillSelectionPixels,
+  fileActions,
+  fileStatus,
+  onOpenCanvasSettings,
+  fullscreen = false,
+  onToggleFullscreen,
 }: {
   settings: BoardSettings;
   onChange(settings: BoardSettings): void;
@@ -73,12 +77,15 @@ export function WhiteboardToolbar({
   onInvertSelection?(): void;
   onDeleteSelectionPixels?(): void;
   onFillSelectionPixels?(): void;
+  fileActions?: ReactNode;
+  fileStatus?: ReactNode;
+  onOpenCanvasSettings?(): void;
+  fullscreen?: boolean;
+  onToggleFullscreen?(): void;
 }) {
   const menu = useContextMenu();
-  const [open, setOpen] = useState(true);
   const [lastSelectionTool, setLastSelectionTool] = useState<SelectionToolKind>('selectRect');
   const shapeFilled = settings.shapeFilled ?? { rectangle: false, ellipse: false };
-  const contentId = useId();
 
   const brushVariants = [
     ['pencil', Pencil, 'whiteboard.pencil'],
@@ -137,247 +144,81 @@ export function WhiteboardToolbar({
   const showTextSliders = settings.tool === 'text';
 
   return (
-    <div className={`whiteboard-toolbar ${open ? '' : 'is-collapsed'}`} role="toolbar" aria-label={t('whiteboard.tools')}>
-      <div className="whiteboard-toolbar-main-row">
-        <div className="whiteboard-toolbar-history" inert={!open || undefined} aria-hidden={!open || undefined}>
-          <TooltipButton
-            aria-label={t('message.786b48222848')}
-            aria-keyshortcuts="Control+Z"
-            tooltip={`${t('message.786b48222848')} (Ctrl+Z)`}
-            className="room-app-notepad-tool"
-            disabled={!canUndo}
-            onClick={onUndo}
-          >
-            <Undo2 size={17} />
-          </TooltipButton>
-          <TooltipButton
-            aria-label={t('message.7b659c9caa5e')}
-            aria-keyshortcuts="Control+Y"
-            tooltip={`${t('message.7b659c9caa5e')} (Ctrl+Y)`}
-            className="room-app-notepad-tool"
-            disabled={!canRedo}
-            onClick={onRedo}
-          >
-            <Redo2 size={17} />
-          </TooltipButton>
-        </div>
-
-        <div className="whiteboard-tool-choices" inert={!open || undefined} aria-hidden={!open || undefined}>
-          {tools.map(([toolKey, Icon, shortcut]) => {
-            const isSelGroup = toolKey === 'selection';
-            const actualTool: BoardTool = isSelGroup ? currentSelectionKind : (toolKey as BoardTool);
-            const active = isSelGroup ? isSelectionTool(settings.tool) : settings.tool === actualTool;
-            const baseLabel = t(
-              toolKey === 'brush'
-                ? activeBrushLabel
-                : isSelGroup
-                  ? activeSelectionLabel
-                  : `whiteboard.${toolKey}`,
-            );
-            return (
-              <TooltipButton
-                key={toolKey}
-                aria-label={baseLabel}
-                aria-keyshortcuts={shortcut}
-                tooltip={`${baseLabel} (${shortcut})`}
-                aria-pressed={active}
-                className={`room-app-notepad-tool ${active ? 'active' : ''}`}
-                onClick={event => {
-                  if (isSelGroup) {
-                    onChange({ ...settings, tool: currentSelectionKind });
-                    menu(
-                      event,
-                      selectionVariants.map(([selKind, SelIcon, labelKey]) => ({
-                        id: `sel-${selKind}`,
-                        label: t(labelKey),
-                        tooltip: t(labelKey),
-                        iconOnly: true,
-                        selected: currentSelectionKind === selKind,
-                        icon: <SelIcon size={18} strokeWidth={1.8} />,
-                        onSelect: () => {
-                          setLastSelectionTool(selKind);
-                          onChange({ ...settings, tool: selKind });
-                        },
-                      })),
-                      { toggle: true, layout: 'grid', placement: 'top-center' },
-                    );
-                  } else if (toolKey === 'brush') {
-                    const currentBrush = activeBrush[0];
-                    onChange({ ...settings, tool: 'brush', brushType: currentBrush });
-                    menu(
-                      event,
-                      brushVariants.map(([brushType, VariantIcon, labelKey]) => ({
-                        id: `brush-${brushType}`,
-                        label: t(labelKey),
-                        tooltip: t(labelKey),
-                        iconOnly: true,
-                        selected: currentBrush === brushType,
-                        icon: <VariantIcon size={18} strokeWidth={1.8} />,
-                        onSelect: () => onChange({ ...settings, tool: 'brush', brushType }),
-                      })),
-                      { toggle: true, layout: 'grid', placement: 'top-center' },
-                    );
-                  } else if (toolKey === 'rectangle' || toolKey === 'ellipse') {
-                    const currentFilled = shapeFilled[toolKey];
-                    onChange({ ...settings, tool: toolKey, filled: currentFilled });
-                    menu(
-                      event,
-                      [false, true].map(filled => ({
-                        id: `${toolKey}-${filled}`,
-                        label: t(filled ? 'whiteboard.filled' : 'whiteboard.outline'),
-                        tooltip: t(filled ? 'whiteboard.filled' : 'whiteboard.outline'),
-                        iconOnly: true,
-                        selected: currentFilled === filled,
-                        icon: <Icon size={18} fill={filled ? 'currentColor' : 'none'} strokeWidth={1.8} />,
-                        onSelect: () => {
-                          const nextShapeFilled = { ...shapeFilled, [toolKey]: filled };
-                          onChange({ ...settings, tool: toolKey, filled, shapeFilled: nextShapeFilled });
-                        },
-                      })),
-                      { toggle: true, layout: 'grid', placement: 'top-center' },
-                    );
-                  } else if (toolKey === 'gradient') {
-                    const currentGrad = settings.gradientType ?? 'linear';
-                    onChange({ ...settings, tool: 'gradient', gradientType: currentGrad });
-                    menu(
-                      event,
-                      ([
-                        ['linear', 'whiteboard.gradient'],
-                        ['radial', 'whiteboard.gradientRadial'],
-                      ] as const).map(([gradientType, labelKey]) => ({
-                        id: `gradient-${gradientType}`,
-                        label: t(labelKey),
-                        selected: currentGrad === gradientType,
-                        onSelect: () => onChange({ ...settings, tool: 'gradient', gradientType }),
-                      })),
-                      { toggle: true, placement: 'top-center' },
-                    );
-                  } else {
-                    onChange({ ...settings, tool: actualTool });
-                  }
-                }}
-              >
-                <Icon
-                  size={18}
-                  fill={
-                    (toolKey === 'rectangle' || toolKey === 'ellipse') &&
-                    (settings.tool === toolKey ? settings.filled : shapeFilled[toolKey])
-                      ? 'currentColor'
-                      : 'none'
-                  }
-                />
-              </TooltipButton>
-            );
-          })}
-
-          <TooltipButton
-            tooltip={t('whiteboard.symmetry')}
-            aria-label={t('whiteboard.symmetry')}
-            aria-pressed={Boolean(settings.symmetry && settings.symmetry !== 'none')}
-            className={`room-app-notepad-tool ${settings.symmetry && settings.symmetry !== 'none' ? 'active' : ''}`}
-            onClick={event =>
-              menu(
-                event,
-                symmetryVariants.map(([mode, labelKey]) => ({
-                  id: `sym-${mode}`,
-                  label: t(labelKey),
-                  selected: (settings.symmetry ?? 'none') === mode,
-                  onSelect: () => onChange({ ...settings, symmetry: mode }),
-                })),
-                { toggle: true, placement: 'top-center' },
-              )
-            }
-          >
-            <FlipHorizontal size={18} />
-          </TooltipButton>
-
-          {onPasteImage && (
-            <TooltipButton tooltip={t('whiteboard.pasteImage')} className="room-app-notepad-tool" onClick={onPasteImage}>
-              <ImagePlus size={18} />
+    <div className="whiteboard-studio-chrome" role="toolbar" aria-label={t('whiteboard.tools')}>
+      <div className="whiteboard-top-bar">
+        <div className="whiteboard-toolbar-main-row">
+          <div className="whiteboard-toolbar-history">
+            <TooltipButton
+              aria-label={t('message.786b48222848')}
+              aria-keyshortcuts="Control+Z"
+              tooltip={`${t('message.786b48222848')} (Ctrl+Z)`}
+              className="room-app-notepad-tool"
+              disabled={!canUndo}
+              onClick={onUndo}
+            >
+              <Undo2 size={16} />
             </TooltipButton>
+            <TooltipButton
+              aria-label={t('message.7b659c9caa5e')}
+              aria-keyshortcuts="Control+Y"
+              tooltip={`${t('message.7b659c9caa5e')} (Ctrl+Y)`}
+              className="room-app-notepad-tool"
+              disabled={!canRedo}
+              onClick={onRedo}
+            >
+              <Redo2 size={16} />
+            </TooltipButton>
+          </div>
+          {fileActions && (
+            <>
+              <span className="whiteboard-top-divider" aria-hidden="true" />
+              {fileActions}
+            </>
           )}
-
-          {(isSelectionTool(settings.tool) || hasSelection) && (
-            <div className="whiteboard-selection-quick-actions">
-              {onSelectAll && (
-                <TooltipButton
-                  tooltip={`${t('whiteboard.selectAll')} (Ctrl+A)`}
-                  aria-label={t('whiteboard.selectAll')}
-                  className="room-app-notepad-tool"
-                  onClick={onSelectAll}
-                >
-                  <CheckSquare size={16} />
-                </TooltipButton>
-              )}
-              {hasSelection && onInvertSelection && (
-                <TooltipButton
-                  tooltip={`${t('whiteboard.invertSelection')} (Ctrl+Shift+I)`}
-                  aria-label={t('whiteboard.invertSelection')}
-                  className="room-app-notepad-tool"
-                  onClick={onInvertSelection}
-                >
-                  <SquareDashedMousePointer size={16} />
-                </TooltipButton>
-              )}
-              {hasSelection && onFillSelectionPixels && (
-                <TooltipButton
-                  tooltip={t('whiteboard.fillSelection')}
-                  aria-label={t('whiteboard.fillSelection')}
-                  className="room-app-notepad-tool"
-                  onClick={onFillSelectionPixels}
-                >
-                  <PaintBucket size={16} />
-                </TooltipButton>
-              )}
-              {hasSelection && onDeleteSelectionPixels && (
-                <TooltipButton
-                  tooltip={`${t('whiteboard.clearSelection')} (Del)`}
-                  aria-label={t('whiteboard.clearSelection')}
-                  className="room-app-notepad-tool"
-                  onClick={onDeleteSelectionPixels}
-                >
-                  <Trash2 size={16} />
-                </TooltipButton>
-              )}
-              {hasSelection && onClearSelection && (
-                <TooltipButton
-                  tooltip={`${t('whiteboard.deselect')} (Ctrl+D)`}
-                  aria-label={t('whiteboard.deselect')}
-                  className="room-app-notepad-tool"
-                  onClick={onClearSelection}
-                >
-                  <Square size={15} />
-                </TooltipButton>
-              )}
-            </div>
+          {(onOpenCanvasSettings || onToggleFullscreen) && (
+            <>
+              <span className="whiteboard-top-divider" aria-hidden="true" />
+              <div className="whiteboard-top-system-actions">
+                {onOpenCanvasSettings && (
+                  <TooltipButton
+                    tooltip={t('whiteboard.canvasSettings')}
+                    aria-label={t('whiteboard.canvasSettings')}
+                    className="room-app-notepad-tool"
+                    onClick={onOpenCanvasSettings}
+                  >
+                    <SlidersHorizontal size={16} />
+                  </TooltipButton>
+                )}
+                {onToggleFullscreen && (
+                  <TooltipButton
+                    tooltip={t(fullscreen ? 'browser.exitFullscreen' : 'browser.fullscreen')}
+                    aria-label={t(fullscreen ? 'browser.exitFullscreen' : 'browser.fullscreen')}
+                    aria-pressed={fullscreen}
+                    className="room-app-notepad-tool"
+                    onClick={onToggleFullscreen}
+                  >
+                    {fullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
+                  </TooltipButton>
+                )}
+              </div>
+            </>
           )}
+          {fileStatus}
         </div>
 
-        <TooltipButton
-          tooltip={t(open ? 'whiteboard.hideTools' : 'whiteboard.showTools')}
-          className="room-app-notepad-tool whiteboard-toolbar-toggle"
-          aria-expanded={open}
-          aria-controls={contentId}
-          onClick={() => setOpen(value => !value)}
-        >
-          <ChevronLeft size={18} strokeWidth={2.3} className={open ? '' : 'is-reversed'} />
-        </TooltipButton>
-      </div>
-
-      <CollapsibleRegion open={open} id={contentId}>
         <div className="whiteboard-tool-properties">
           <div className="whiteboard-brush-preview-card" aria-hidden="true">
             <div className="whiteboard-brush-preview-stage">
               <span
                 className={`whiteboard-brush-preview-dot ${settings.tool === 'brush' && (settings.brushType === 'pixel' || settings.brushType === 'marker') ? 'is-square' : ''}`}
                 style={{
-                  width: `${Math.max(3, Math.min(42, settings.width * 0.42))}px`,
-                  height: `${Math.max(3, Math.min(42, settings.width * 0.42))}px`,
+                  width: `${Math.max(3, Math.min(26, settings.width * 0.34))}px`,
+                  height: `${Math.max(3, Math.min(26, settings.width * 0.34))}px`,
                   backgroundColor: settings.tool === 'eraser' ? 'transparent' : settings.color,
                   border: settings.tool === 'eraser' ? '1.5px dashed var(--text-secondary)' : 'none',
                   opacity: Math.max(0.15, (settings.opacity ?? 100) / 100),
                   filter: showBrushSliders && (settings.hardness ?? 80) < 70
-                    ? `blur(${Math.round(((70 - (settings.hardness ?? 80)) / 70) * 3.5 * 10) / 10}px)`
+                    ? `blur(${Math.round(((70 - (settings.hardness ?? 80)) / 70) * 3 * 10) / 10}px)`
                     : undefined,
                 }}
               />
@@ -495,7 +336,197 @@ export function WhiteboardToolbar({
             />
           )}
         </div>
-      </CollapsibleRegion>
+      </div>
+
+      <div className="whiteboard-toolbar">
+        <div className="whiteboard-tool-choices">
+          {tools.map(([toolKey, Icon, shortcut]) => {
+            const isSelGroup = toolKey === 'selection';
+            const actualTool: BoardTool = isSelGroup ? currentSelectionKind : (toolKey as BoardTool);
+            const active = isSelGroup ? isSelectionTool(settings.tool) : settings.tool === actualTool;
+            const hasFlyout = isSelGroup || toolKey === 'brush' || toolKey === 'rectangle' || toolKey === 'ellipse' || toolKey === 'gradient';
+            const baseLabel = t(
+              toolKey === 'brush'
+                ? activeBrushLabel
+                : isSelGroup
+                  ? activeSelectionLabel
+                  : `whiteboard.${toolKey}`,
+            );
+            return (
+              <TooltipButton
+                key={toolKey}
+                aria-label={baseLabel}
+                aria-keyshortcuts={shortcut}
+                tooltip={`${baseLabel} (${shortcut})`}
+                aria-pressed={active}
+                className={`room-app-notepad-tool ${active ? 'active' : ''} ${hasFlyout ? 'has-flyout' : ''}`}
+                onClick={event => {
+                  if (isSelGroup) {
+                    onChange({ ...settings, tool: currentSelectionKind });
+                    menu(
+                      event,
+                      selectionVariants.map(([selKind, SelIcon, labelKey]) => ({
+                        id: `sel-${selKind}`,
+                        label: t(labelKey),
+                        selected: currentSelectionKind === selKind,
+                        icon: <SelIcon size={17} strokeWidth={1.8} />,
+                        onSelect: () => {
+                          setLastSelectionTool(selKind);
+                          onChange({ ...settings, tool: selKind });
+                        },
+                      })),
+                      { toggle: true, placement: 'right-start' },
+                    );
+                  } else if (toolKey === 'brush') {
+                    const currentBrush = activeBrush[0];
+                    onChange({ ...settings, tool: 'brush', brushType: currentBrush });
+                    menu(
+                      event,
+                      brushVariants.map(([brushType, VariantIcon, labelKey]) => ({
+                        id: `brush-${brushType}`,
+                        label: t(labelKey),
+                        selected: currentBrush === brushType,
+                        icon: <VariantIcon size={17} strokeWidth={1.8} />,
+                        onSelect: () => onChange({ ...settings, tool: 'brush', brushType }),
+                      })),
+                      { toggle: true, placement: 'right-start' },
+                    );
+                  } else if (toolKey === 'rectangle' || toolKey === 'ellipse') {
+                    const currentFilled = shapeFilled[toolKey];
+                    onChange({ ...settings, tool: toolKey, filled: currentFilled });
+                    menu(
+                      event,
+                      [false, true].map(filled => ({
+                        id: `${toolKey}-${filled}`,
+                        label: t(filled ? 'whiteboard.filled' : 'whiteboard.outline'),
+                        tooltip: t(filled ? 'whiteboard.filled' : 'whiteboard.outline'),
+                        iconOnly: true,
+                        selected: currentFilled === filled,
+                        icon: <Icon size={18} fill={filled ? 'currentColor' : 'none'} strokeWidth={1.8} />,
+                        onSelect: () => {
+                          const nextShapeFilled = { ...shapeFilled, [toolKey]: filled };
+                          onChange({ ...settings, tool: toolKey, filled, shapeFilled: nextShapeFilled });
+                        },
+                      })),
+                      { toggle: true, layout: 'grid', placement: 'right-start' },
+                    );
+                  } else if (toolKey === 'gradient') {
+                    const currentGrad = settings.gradientType ?? 'linear';
+                    onChange({ ...settings, tool: 'gradient', gradientType: currentGrad });
+                    menu(
+                      event,
+                      ([
+                        ['linear', 'whiteboard.gradient'],
+                        ['radial', 'whiteboard.gradientRadial'],
+                      ] as const).map(([gradientType, labelKey]) => ({
+                        id: `gradient-${gradientType}`,
+                        label: t(labelKey),
+                        selected: currentGrad === gradientType,
+                        onSelect: () => onChange({ ...settings, tool: 'gradient', gradientType }),
+                      })),
+                      { toggle: true, placement: 'right-start' },
+                    );
+                  } else {
+                    onChange({ ...settings, tool: actualTool });
+                  }
+                }}
+              >
+                <Icon
+                  size={18}
+                  fill={
+                    (toolKey === 'rectangle' || toolKey === 'ellipse') &&
+                    (settings.tool === toolKey ? settings.filled : shapeFilled[toolKey])
+                      ? 'currentColor'
+                      : 'none'
+                  }
+                />
+              </TooltipButton>
+            );
+          })}
+
+          <TooltipButton
+            tooltip={t('whiteboard.symmetry')}
+            aria-label={t('whiteboard.symmetry')}
+            aria-pressed={Boolean(settings.symmetry && settings.symmetry !== 'none')}
+            className={`room-app-notepad-tool has-flyout ${settings.symmetry && settings.symmetry !== 'none' ? 'active' : ''}`}
+            onClick={event =>
+              menu(
+                event,
+                symmetryVariants.map(([mode, labelKey]) => ({
+                  id: `sym-${mode}`,
+                  label: t(labelKey),
+                  selected: (settings.symmetry ?? 'none') === mode,
+                  onSelect: () => onChange({ ...settings, symmetry: mode }),
+                })),
+                { toggle: true, placement: 'right-start' },
+              )
+            }
+          >
+            <FlipHorizontal size={18} />
+          </TooltipButton>
+
+          {onPasteImage && (
+            <TooltipButton tooltip={t('whiteboard.pasteImage')} aria-label={t('whiteboard.pasteImage')} className="room-app-notepad-tool" onClick={onPasteImage}>
+              <ImagePlus size={18} />
+            </TooltipButton>
+          )}
+
+          {(isSelectionTool(settings.tool) || hasSelection) && (
+            <div className="whiteboard-selection-quick-actions">
+              {onSelectAll && (
+                <TooltipButton
+                  tooltip={`${t('whiteboard.selectAll')} (Ctrl+A)`}
+                  aria-label={t('whiteboard.selectAll')}
+                  className="room-app-notepad-tool"
+                  onClick={onSelectAll}
+                >
+                  <CheckSquare size={16} />
+                </TooltipButton>
+              )}
+              {hasSelection && onInvertSelection && (
+                <TooltipButton
+                  tooltip={`${t('whiteboard.invertSelection')} (Ctrl+Shift+I)`}
+                  aria-label={t('whiteboard.invertSelection')}
+                  className="room-app-notepad-tool"
+                  onClick={onInvertSelection}
+                >
+                  <SquareDashedMousePointer size={16} />
+                </TooltipButton>
+              )}
+              {hasSelection && onFillSelectionPixels && (
+                <TooltipButton
+                  tooltip={t('whiteboard.fillSelection')}
+                  aria-label={t('whiteboard.fillSelection')}
+                  className="room-app-notepad-tool"
+                  onClick={onFillSelectionPixels}
+                >
+                  <PaintBucket size={16} />
+                </TooltipButton>
+              )}
+              {hasSelection && onDeleteSelectionPixels && (
+                <TooltipButton
+                  tooltip={`${t('whiteboard.clearSelection')} (Del)`}
+                  aria-label={t('whiteboard.clearSelection')}
+                  className="room-app-notepad-tool"
+                  onClick={onDeleteSelectionPixels}
+                >
+                  <Trash2 size={16} />
+                </TooltipButton>
+              )}
+              {hasSelection && onClearSelection && (
+                <TooltipButton
+                  tooltip={`${t('whiteboard.deselect')} (Ctrl+D)`}
+                  aria-label={t('whiteboard.deselect')}
+                  className="room-app-notepad-tool"
+                  onClick={onClearSelection}
+                >
+                  <Square size={15} />
+                </TooltipButton>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

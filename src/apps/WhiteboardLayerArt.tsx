@@ -8,11 +8,13 @@ export function WhiteboardLayerArt({
   imageHref,
   canvasWidth = 1920,
   canvasHeight = 1080,
+  alphaLock = false,
 }: {
   shapes: BoardShape[];
   imageHref?: (hash: string) => string | undefined;
   canvasWidth?: number;
   canvasHeight?: number;
+  alphaLock?: boolean;
 }) {
   const prefix = useId();
   let art: ReactNode[] = [];
@@ -39,6 +41,22 @@ export function WhiteboardLayerArt({
     } else {
       art.push(<WhiteboardShape key={shape.id} shape={shape} imageHref={shape.imageHash ? imageHref?.(shape.imageHash) : undefined} canvasWidth={canvasWidth} canvasHeight={canvasHeight} />);
     }
+  }
+  if (alphaLock && art.length > 1) {
+    const alphaMaskId = `${prefix}-alphalock`;
+    const baseNode = art[0];
+    const overlayNodes = art.slice(1);
+    return (
+      <>
+        {baseNode}
+        <defs>
+          <mask id={alphaMaskId} maskUnits="userSpaceOnUse" x={-16000} y={-10000} width={48000} height={30000} style={{ maskType: 'alpha' }}>
+            {baseNode}
+          </mask>
+        </defs>
+        <g mask={`url(#${alphaMaskId})`}>{overlayNodes}</g>
+      </>
+    );
   }
   return <>{art}</>;
 }

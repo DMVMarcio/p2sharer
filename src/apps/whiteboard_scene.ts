@@ -538,6 +538,89 @@ export function brushPath(s: BoardShape): string {
     : `${prefix} ${s.points.slice(1).map(p => `L${p.x} ${p.y}`).join(' ')}`;
 }
 
+/** Generates a crisp grid-snapped Bresenham staircase pixel-art SVG path for the `pixel` brush. */
+export function pixelArtPath(s: BoardShape): string {
+  const cell = Math.max(2, Math.round(s.width));
+  const visited = new Set<string>();
+  const blocks: string[] = [];
+  const addCell = (gx: number, gy: number) => {
+    const key = `${gx},${gy}`;
+    if (visited.has(key)) return;
+    visited.add(key);
+    const x = gx * cell - cell / 2;
+    const y = gy * cell - cell / 2;
+    blocks.push(`M${round(x)} ${round(y)}h${cell}v${cell}h-${cell}Z`);
+  };
+  const pts = s.points;
+  if (!pts.length) return '';
+  let gx0 = Math.round(pts[0].x / cell);
+  let gy0 = Math.round(pts[0].y / cell);
+  addCell(gx0, gy0);
+  for (let i = 1; i < pts.length; i++) {
+    const gx1 = Math.round(pts[i].x / cell);
+    const gy1 = Math.round(pts[i].y / cell);
+    let dx = Math.abs(gx1 - gx0), sx = gx0 < gx1 ? 1 : -1;
+    let dy = -Math.abs(gy1 - gy0), sy = gy0 < gy1 ? 1 : -1;
+    let err = dx + dy;
+    while (true) {
+      addCell(gx0, gy0);
+      if (gx0 === gx1 && gy0 === gy1) break;
+      const e2 = 2 * err;
+      if (e2 >= dy) { err += dy; gx0 += sx; }
+      if (e2 <= dx) { err += dx; gy0 += sy; }
+    }
+  }
+  return blocks.join(' ');
+}
+
+/** Generates an angled chisel-nib calligraphic ribbon path (-35 deg nib) for the `marker` brush. */
+export function chiselMarkerPath(s: BoardShape): string {
+  const pts = brushHitPoints(s);
+  if (!pts.length) return '';
+  const halfW = Math.max(1.5, s.width * 0.58);
+  const angle = -0.61; // -35 degrees chisel nib
+  const nx = round(Math.cos(angle) * halfW);
+  const ny = round(Math.sin(angle) * halfW);
+  if (pts.length === 1) {
+    const p = pts[0];
+    return `M${round(p.x - nx - 1)} ${round(p.y - ny - 1)} L${round(p.x + nx - 1)} ${round(p.y + ny - 1)} L${round(p.x + nx + 1)} ${round(p.y + ny + 1)} L${round(p.x - nx + 1)} ${round(p.y - ny + 1)} Z`;
+  }
+  const upper = pts.map(p => `${round(p.x + nx)} ${round(p.y + ny)}`);
+  const lower = [...pts].reverse().map(p => `${round(p.x - nx)} ${round(p.y - ny)}`);
+  return `M${upper[0]} ${upper.slice(1).map(c => `L${c}`).join(' ')} ${lower.map(c => `L${c}`).join(' ')} Z`;
+}
+
+/** Generates a sleek FireAlpaca G-Pen calligraphic contour with subtle nib entry/exit and curve modulation. */
+export function gPenCalligraphicPath(s: BoardShape): string {
+  const pts = brushHitPoints(s);
+  const baseRadius = Math.max(0.6, s.width * 0.5);
+  if (pts.length <= 1) return circleSubpath(pts[0] ?? { x: 0, y: 0 }, baseRadius);
+  const spine: BoardPoint[] = [pts[0]];
+  const minStep = Math.max(0.45, Math.min(2, baseRadius * 0.25));
+  for (let i = 1; i < pts.length; i++) {
+    if (Math.hypot(pts[i].x - spine[spine.length - 1].x, pts[i].y - spine[spine.length - 1].y) >= minStep) {
+      spine.push(pts[i]);
+    }
+  }
+  if (spine.length === 1) return circleSubpath(spine[0], baseRadius);
+  const arc: number[] = [0];
+  for (let i = 1; i < spine.length; i++) {
+    arc.push(arc[i - 1] + Math.hypot(spine[i].x - spine[i - 1].x, spine[i].y - spine[i - 1].y));
+  }
+  const totalLen = arc[arc.length - 1];
+  const taperDist = Math.min(14, totalLen * 0.16, baseRadius * 2.2);
+  const radii = spine.map((_, i) => {
+    let scale = 1;
+    if (taperDist > 1) {
+      const dStart = arc[i], dEnd = totalLen - arc[i];
+      if (dStart < taperDist) scale = Math.min(scale, 0.32 + 0.68 * Math.sin((dStart / taperDist) * (Math.PI / 2)));
+      if (dEnd < taperDist) scale = Math.min(scale, 0.28 + 0.72 * Math.sin((dEnd / taperDist) * (Math.PI / 2)));
+    }
+    return Math.max(0.4, baseRadius * scale);
+  });
+  return subStrokeContour(spine, radii, Math.max(1.5, baseRadius * 0.45), Boolean(s.smoothing));
+}
+
 export function brushHitPoints(s: BoardShape): BoardPoint[] {
   const subdivide = (s.tool === 'brush' || s.tool === 'eraser') && (Boolean(s.smoothing) || Boolean(s.brushType) || s.points.some(p => p.p !== undefined));
   if (!subdivide || s.points.length < 2) return s.points;
@@ -711,7 +794,13 @@ export function shapeSvg(s: BoardShape, images?: ReadonlyMap<string, string> | R
   if (s.tool === 'image') {
     const href = resolveImageHref(s.imageHash, images);
     if (!href) return '';
-    return wrapClip(`<image href="${href}" x="${Math.min(a.x, b.x)}" y="${Math.min(a.y, b.y)}" width="${Math.abs(b.x - a.x)}" height="${Math.abs(b.y - a.y)}" preserveAspectRatio="none"${opacityAttr} ${transform}/>`);
+    const ix = Math.min(a.x, b.x), iy = Math.min(a.y, b.y);
+    const iw = Math.abs(b.x - a.x), ih = Math.abs(b.y - a.y);
+    const cx = ix + iw / 2, cy = iy + ih / 2;
+    const flipTransform = s.flipX || s.flipY
+      ? `${shapeTransform(s)} translate(${cx} ${cy}) scale(${s.flipX ? -1 : 1} ${s.flipY ? -1 : 1}) translate(${-cx} ${-cy})`
+      : shapeTransform(s);
+    return wrapClip(`<image href="${href}" x="${ix}" y="${iy}" width="${iw}" height="${ih}" preserveAspectRatio="none"${opacityAttr} transform="${flipTransform}"/>`);
   }
   if (s.tool === 'brush' || s.tool === 'eraser' || s.tool === 'line') {
     const copies = expandSymmetryPointLists(s.points, s.symmetry, canvasSize.width / 2, canvasSize.height / 2);
