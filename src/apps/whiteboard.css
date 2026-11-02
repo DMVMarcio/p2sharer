@@ -310,6 +310,26 @@
 .whiteboard-layer .room-app-toolbar-actions { flex-wrap: wrap; }
 .stream-pointer-brush { display: block; box-sizing: border-box; border: 1.5px solid currentColor; border-radius: 50%;
   position: absolute; transform: translate(-50%, -50%); box-shadow: 0 0 0 1px #fff8; }
+.stream-pointer-selection {
+  position: relative; display: block; width: 0; height: 0; pointer-events: none;
+}
+.stream-pointer-crosshair {
+  position: absolute; top: 0; left: 0; width: 0; height: 0; display: block;
+}
+.stream-pointer-crosshair::before,
+.stream-pointer-crosshair::after {
+  content: ''; position: absolute; background: #ffffff;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.9);
+}
+.stream-pointer-crosshair::before {
+  width: 15px; height: 1.5px; left: -7.5px; top: -0.75px;
+}
+.stream-pointer-crosshair::after {
+  width: 1.5px; height: 15px; left: -0.75px; top: -7.5px;
+}
+.stream-pointer-selection svg {
+  position: absolute; top: 0; left: 0; pointer-events: none;
+}
 .whiteboard-cursors .stream-pointer-remote { z-index: 1; }
 .whiteboard-eyedropper-loupe {
   position: absolute; z-index: 4; display: flex; flex-direction: column; align-items: center; gap: 4px;

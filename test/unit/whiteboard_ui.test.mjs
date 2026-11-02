@@ -504,6 +504,7 @@ test('studio paint bucket, color panel, eyedropper, selection marquee, layer ble
   const shapesBeforeFill = fixture.model.shapes.length;
   await pointer('pointerdown', 180, 180);
   await pointer('pointerup', 180, 180);
+  assert.ok(document.querySelector('[data-cursor-shape="bucket"] .stream-pointer-bucket'));
   assert.equal(fixture.model.shapes.length, shapesBeforeFill + 1);
   assert.equal(fixture.model.shapes.at(-1).tool, 'bucket');
   // Toggle alpha lock & duplicate layer in Layer Studio
@@ -516,6 +517,12 @@ test('studio paint bucket, color panel, eyedropper, selection marquee, layer ble
   // Selection marquee (M), Select All (Ctrl+A), Invert Selection, Deselect (Ctrl+D)
   await act(async () => canvas().dispatchEvent(new window.KeyboardEvent('keydown', { key: 'm', bubbles: true })));
   assert.equal(button('Rectangular marquee').getAttribute('aria-pressed'), 'true');
+  assert.ok(document.querySelector('[data-cursor-shape="selectRect"] .stream-pointer-selection.is-rect'));
+  await act(async () => canvas().dispatchEvent(new window.KeyboardEvent('keydown', { key: 'w', bubbles: true })));
+  assert.ok(document.querySelector('[data-cursor-shape="wand"] .stream-pointer-wand'));
+  await act(async () => canvas().dispatchEvent(new window.KeyboardEvent('keydown', { key: 't', bubbles: true })));
+  assert.ok(document.querySelector('[data-cursor-shape="text"] .stream-pointer-text'));
+  await act(async () => canvas().dispatchEvent(new window.KeyboardEvent('keydown', { key: 'm', bubbles: true })));
   await click('Select all');
   assert.ok(document.querySelector('.whiteboard-selection-marquee'));
   await click('Invert selection');
