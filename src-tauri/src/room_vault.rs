@@ -111,9 +111,71 @@ fn lock_room_file(path: &Path) -> Result<File, String> {
     Err("Room vault is busy".into())
 }
 
+pub const DEFAULT_MAX_DISPOSABLE_ROOMS: usize = 30;
+
+#[cfg(windows)]
+pub fn prune_disposable_vault_records(dir: &Path, max_disposable: usize) -> Result<usize, String> {
+    if !dir.exists() { return Ok(0); }
+    let entries = match fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(e) => return Err(e.to_string()),
+    };
+    let mut lock_paths = Vec::new();
+    let mut disposable_vaults: Vec<(PathBuf, std::time::SystemTime)> = Vec::new();
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) == Some("lock") {
+            lock_paths.push(path);
+            continue;
+        }
+        if path.extension().and_then(|e| e.to_str()) != Some("vault") {
+            continue;
+        }
+        let mtime = entry.metadata().and_then(|m| m.modified()).unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+        if let Ok(ciphertext) = fs::read(&path) {
+            if let Ok(plaintext) = unprotect(&ciphertext) {
+                if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&plaintext) {
+                    let saved = json.get("saved").and_then(|v| v.as_bool()).unwrap_or(false);
+                    let owned = json.get("owned").and_then(|v| v.as_bool()).unwrap_or(false);
+                    if !saved && !owned {
+                        disposable_vaults.push((path, mtime));
+                    }
+                }
+            }
+        }
+    }
+
+    // Clean up orphaned lock files that have no matching vault file
+    for lock in lock_paths {
+        let vault = lock.with_extension("vault");
+        if !vault.exists() {
+            let _ = fs::remove_file(lock);
+        }
+    }
+
+    let mut removed = 0;
+    if disposable_vaults.len() > max_disposable {
+        // Sort descending: newest first, oldest last
+        disposable_vaults.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| b.0.cmp(&a.0)));
+        for (excess_path, _) in &disposable_vaults[max_disposable..] {
+            if fs::remove_file(excess_path).is_ok() {
+                removed += 1;
+                let lock_file = excess_path.with_extension("lock");
+                if lock_file.exists() {
+                    let _ = fs::remove_file(lock_file);
+                }
+            }
+        }
+    }
+
+    Ok(removed)
+}
+
 #[cfg(windows)]
 pub fn read_room_records_from_dir(dir: &Path) -> Result<Vec<String>, String> {
     if !dir.exists() { return Ok(Vec::new()); }
+    let _ = prune_disposable_vault_records(dir, DEFAULT_MAX_DISPOSABLE_ROOMS);
     let mut records = Vec::new();
     let entries = match fs::read_dir(dir) {
         Ok(entries) => entries,
@@ -193,6 +255,9 @@ pub async fn save_room_record(app: tauri::AppHandle, room_id: String, data: Stri
             let serialized = serde_json::to_vec(&incoming).map_err(|e| e.to_string())?;
             let ciphertext = protect(&serialized)?;
             fs::write(&path, ciphertext).map_err(|e| e.to_string())?;
+            if let Some(parent) = path.parent() {
+                let _ = prune_disposable_vault_records(parent, DEFAULT_MAX_DISPOSABLE_ROOMS);
+            }
             Ok(())
         }).await.map_err(|e| e.to_string())?
     }
@@ -279,6 +344,58 @@ mod tests {
 
         assert!(!corrupt_file.exists());
         assert!(temp_dir.join("ffffffffffffffffffffffffffffffff.vault.corrupt").exists());
+
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn prune_disposable_vault_records_retains_recent_and_preserves_saved_and_owned() {
+        let temp_dir = std::env::temp_dir().join(format!("p2s_test_prune_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        fs::create_dir_all(&temp_dir).unwrap();
+
+        // 1 saved room
+        let saved_cipher = protect(br#"{"saved": true, "owned": false, "name": "Saved Room"}"#).unwrap();
+        let saved_file = temp_dir.join("saved1.vault");
+        fs::write(&saved_file, &saved_cipher).unwrap();
+
+        // 1 owned room
+        let owned_cipher = protect(br#"{"saved": false, "owned": true, "name": "Owned Room"}"#).unwrap();
+        let owned_file = temp_dir.join("owned1.vault");
+        fs::write(&owned_file, &owned_cipher).unwrap();
+
+        // 4 disposable rooms written sequentially
+        let mut disp_files = Vec::new();
+        for i in 0..4 {
+            let disp_cipher = protect(format!(r#"{{"saved": false, "owned": false, "name": "Disp {}"}}"#, i).as_bytes()).unwrap();
+            let disp_file = temp_dir.join(format!("disp_{}.vault", i));
+            fs::write(&disp_file, &disp_cipher).unwrap();
+            disp_files.push(disp_file);
+            std::thread::sleep(std::time::Duration::from_millis(15));
+        }
+
+        // 1 orphaned lock file
+        let orphan_lock = temp_dir.join("orphan.lock");
+        fs::write(&orphan_lock, b"lock").unwrap();
+        assert!(orphan_lock.exists());
+
+        // Prune keeping at most 2 disposable rooms
+        let removed = prune_disposable_vault_records(&temp_dir, 2).unwrap();
+        assert_eq!(removed, 2);
+
+        // Saved and owned must still exist
+        assert!(saved_file.exists());
+        assert!(owned_file.exists());
+
+        // Oldest 2 disposable rooms (disp_0 and disp_1) should be removed
+        assert!(!disp_files[0].exists());
+        assert!(!disp_files[1].exists());
+
+        // Newest 2 disposable rooms (disp_2 and disp_3) must still exist
+        assert!(disp_files[2].exists());
+        assert!(disp_files[3].exists());
+
+        // Orphaned lock file should be cleaned up
+        assert!(!orphan_lock.exists());
 
         let _ = fs::remove_dir_all(&temp_dir);
     }

@@ -92,6 +92,7 @@ fn cancel_app_update(window: tauri::Window) -> Result<(), String> {
 fn exit_application(app: tauri::AppHandle) -> Result<(), String> {
     let _ = stop_native_screen_capture();
     let _ = stop_audio_capture();
+    chat_files::sweep_chat_clipboard();
     app.exit(0);
     std::process::exit(0);
 }
@@ -100,6 +101,7 @@ fn exit_application(app: tauri::AppHandle) -> Result<(), String> {
 pub fn run() {
     if invitation_routing::forward_startup_invitation() { return; }
     app_data_migration::migrate_legacy_data().expect("Could not migrate previous application data; close older P2Sharer instances and retry");
+    chat_files::sweep_chat_clipboard();
     // Bind process to Windows Job Object to guarantee atomic child teardown on exit.
     setup_job_object_for_clean_child_teardown();
 
@@ -174,6 +176,7 @@ pub fn run() {
             if matches!(event, tauri::WindowEvent::Destroyed) && window.label() == "main" {
                 let _ = stop_native_screen_capture();
                 let _ = stop_audio_capture();
+                chat_files::sweep_chat_clipboard();
                 std::process::exit(0);
             }
         })

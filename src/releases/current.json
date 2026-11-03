@@ -2,43 +2,56 @@
   "version": "1.6.4",
   "translations": {
     "en": [
-      "**Reliable room access.** Direct room storage and streamlined connection discovery resolve false security alerts, ensuring smooth and instant room joining."
+      "**Reliable room access.** Direct room storage and streamlined connection discovery resolve false security alerts, ensuring smooth and instant room joining.",
+      "**Automated storage maintenance.** Temporary clipboard files and excess disposable rooms are automatically cleaned up to save disk space."
     ],
     "pt-BR": [
-      "**Acesso confiável às salas.** O armazenamento direto e a descoberta otimizada de conexão evitam alertas de segurança falso-positivos ao entrar nas salas."
+      "**Acesso confiável às salas.** O armazenamento direto e a descoberta otimizada de conexão evitam alertas de segurança falso-positivos ao entrar nas salas.",
+      "**Manutenção automática de dados.** Arquivos temporários da área de transferência e salas descartáveis em excesso são limpos automaticamente."
     ],
     "es": [
-      "**Acceso confiable a salas.** El guardado directo y la detección optimizada de conexión evitan alertas de seguridad falsas al unirse a cualquier sala."
+      "**Acceso confiable a salas.** El guardado directo y la detección optimizada de conexión evitan alertas de seguridad falsas al unirse a cualquier sala.",
+      "**Mantenimiento automático de datos.** Los archivos temporales del portapapeles y salas desechables en exceso se limpian automáticamente."
     ],
     "fr": [
-      "**Accès fiable aux salons.** Le stockage direct et la détection optimisée évitent les fausses alertes de sécurité pour rejoindre vos salons en toute sérénité."
+      "**Accès fiable aux salons.** Le stockage direct et la détection optimisée évitent les fausses alertes de sécurité pour rejoindre vos salons en toute sérénité.",
+      "**Nettoyage automatique du stockage.** Les fichiers temporaires du presse-papiers et les salons jetables en excès sont nettoyés automatiquement."
     ],
     "de": [
-      "**Zuverlässiger Raumbeitritt.** Direkte Raumspeicherung und optimierte Verbindungserkennung verhindern Fehlalarme von Sicherheitsprogrammen beim Beitreten."
+      "**Zuverlässiger Raumbeitritt.** Direkte Raumspeicherung und optimierte Verbindungserkennung verhindern Fehlalarme von Sicherheitsprogrammen beim Beitreten.",
+      "**Automatische Speicherbereinigung.** Temporäre Zwischenablage-Dateien und überschüssige Einweg-Räume werden automatisch aufgeräumt."
     ],
     "it": [
-      "**Accesso affidabile alle stanze.** Il salvataggio diretto e il rilevamento ottimizzato evitano falsi allarmi di sicurezza per entrare nelle stanze senza intoppi."
+      "**Accesso affidabile alle stanze.** Il salvataggio diretto e il rilevamento ottimizzato evitano falsi allarmi di segurança per entrare nelle stanze senza intoppi.",
+      "**Pulizia automatica dello spazio.** I file temporanei degli appunti e le stanze temporanee in eccesso vengono ripuliti automaticamente."
     ],
     "zh-CN": [
-      "**更可靠的房间连接。** 优化本地房间加密存储与网络发现流程，彻底消除安全软件误报，确保稳定即时进入房间。"
+      "**更可靠的房间连接。** 优化本地房间加密存储与网络发现流程，彻底消除安全软件误报，确保稳定即时进入房间。",
+      "**自动存储维护。** 自动清理过期的剪贴板临时文件与多余的一次性房间记录，释放磁盘空间。"
     ],
     "zh-TW": [
-      "**更可靠的房間連線。** 最佳化本機房間加密儲存與網路探索機制，徹底排除安全軟體誤報，確保穩定即時進入房間。"
+      "**更可靠的房間連線。** 最佳化本機房間加密儲存與網路探索機制，徹底排除安全軟體誤報，確保穩定即時進入房間。",
+      "**自動儲存維護。** 自動清理過期的剪貼簿暫存檔與多餘的一次性房間紀錄，釋放磁碟空間。"
     ],
     "ja": [
-      "**部屋接続の安定性向上。** 暗号化保存とネットワーク接続の検出処理を最適化し、セキュリティソフトの誤検知を防いでスムーズな入室を保証します。"
+      "**部屋接続の安定性向上。** 暗号化保存とネットワーク接続の検出処理を最適化し、セキュリティソフトの誤検知を防いでスムーズな入室を保証します。",
+      "**自動ストレージ管理。** クリップボードの一時ファイルや不要になった一時的な部屋履歴を自動で整理し、空き容量を保ちます。"
     ],
     "ko": [
-      "**안정적인 방 참가.** 로컬 방 데이터 암호화 저장 및 네트워크 감지를 최적화하여 보안 프로그램의 오탐을 방지하고 원활한 방 입장을 보장합니다."
+      "**안정적인 방 참가.** 로컬 방 데이터 암호화 저장 및 네트워크 감지를 최적화하여 보안 프로그램의 오탐을 방지하고 원활한 방 입장을 보장합니다.",
+      "**자동 저장 공간 관리.** 클립보드 임시 파일과 불필요한 일회용 방 기록을 자동으로 정리하여 저장 공간을 확보합니다."
     ],
     "hi": [
-      "**विश्वसनीय रूम एक्सेस।** रूम स्टोरेज और नेटवर्क डिटेक्शन में सुधार से सुरक्षा अलर्ट की समस्या हल हो गई है, जिससे रूम में तुरंत प्रवेश संभव होता है।"
+      "**विश्वसनीय रूम एक्सेस।** रूम स्टोरेज और नेटवर्क डिटेक्शन में सुधार से सुरक्षा अलर्ट की समस्या हल हो गई है, जिससे रूम में तुरंत प्रवेश संभव होता है।",
+      "**स्वचालित मेमोरी प्रबंधन।** क्लिपबोर्ड फ़ाइलें और अतिरिक्त अस्थायी रूम डेटा स्वचालित रूप से साफ़ कर डिस्क स्पेस बचाया जाता है।"
     ],
     "fi": [
-      "**Luotettava huoneisiin liittyminen.** Suora huonetallennus ja optimoitu verkkotunnistus estävät virheelliset tietoturvavaroitukset huoneeseen astuttaessa."
+      "**Luotettava huoneisiin liittyminen.** Suora huonetallennus ja optimoitu verkkotunnistus estävät virheelliset tietoturvavaroitukset huoneeseen astuttaessa.",
+      "**Automaattinen tallennustilan ylläpito.** Väliaikaiset leikepöytätiedostot ja ylimääräiset kertakäyttöhuoneet siivotaan automaattisesti."
     ],
     "ru": [
-      "**Надежный вход в комнаты.** Прямое сохранение комнат и оптимизация сетевого подключения предотвращают ложные срабатывания защиты при входе."
+      "**Надежный вход в комнаты.** Прямое сохранение комнат и оптимизация сетевого подключения предотвращают ложные срабатывания защиты при входе.",
+      "**Автоматическая очистка хранилища.** Временные файлы буфера обмена и лишние одноразовые комнаты удаляются автоматически."
     ]
   }
 }

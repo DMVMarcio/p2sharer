@@ -23,6 +23,16 @@ pub struct ChatFileState {
     clipboard_sources: Mutex<HashMap<String, PathBuf>>,
 }
 
+impl Drop for ChatFileState {
+    fn drop(&mut self) {
+        if let Ok(mut sources) = self.clipboard_sources.lock() {
+            for (_, path) in sources.drain() {
+                let _ = fs::remove_file(path);
+            }
+        }
+    }
+}
+
 struct Download { temp: PathBuf, destination: PathBuf, file: File, size: u64, written: u64, hash: String }
 
 #[derive(Serialize)]
@@ -65,6 +75,39 @@ fn file_info(id: String, path: &Path) -> Result<FileInfo, String> {
     let extension = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
     Ok(FileInfo { id, name, path: path.to_string_lossy().into_owned(), size, hash,
         is_image: matches!(extension.as_str(), "png" | "jpg" | "jpeg" | "gif" | "webp" | "bmp") })
+}
+
+pub fn chat_clipboard_dir() -> Option<PathBuf> {
+    dirs::data_local_dir().map(|dir| dir.join("P2Sharer").join("chat-clipboard"))
+}
+
+pub fn sweep_chat_clipboard_dir(dir: &Path) -> usize {
+    if !dir.exists() { return 0; }
+    let entries = match fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(_) => return 0,
+    };
+    let mut removed = 0;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_file() {
+            let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            if file_name.starts_with("clipboard-") {
+                if fs::remove_file(&path).is_ok() {
+                    removed += 1;
+                }
+            }
+        }
+    }
+    removed
+}
+
+pub fn sweep_chat_clipboard() -> usize {
+    if let Some(dir) = chat_clipboard_dir() {
+        sweep_chat_clipboard_dir(&dir)
+    } else {
+        0
+    }
 }
 
 fn source_index_path() -> Result<PathBuf, String> {
@@ -430,7 +473,7 @@ pub async fn paste_chat_files(state: State<'_, ChatFileState>, gif_source: Optio
             Err(error) => return Err(error.to_string()),
         }
         if let Some(bytes) = gif.or_else(native_clipboard_gif) {
-            let directory = dirs::data_local_dir().ok_or("Local data folder unavailable")?.join("P2Sharer").join("chat-clipboard");
+            let directory = chat_clipboard_dir().ok_or("Local data folder unavailable")?;
             fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
             let path = directory.join(format!("clipboard-{}.gif", random_id()?));
             if let Err(error) = fs::write(&path, bytes) { let _ = fs::remove_file(&path); return Err(error.to_string()); }
@@ -445,8 +488,7 @@ pub async fn paste_chat_files(state: State<'_, ChatFileState>, gif_source: Optio
         let height = u32::try_from(pixels.height).map_err(|_| "Image too tall")?;
         if pixels.bytes.len() > 256 * 1024 * 1024 { return Err("Clipboard image too large".into()); }
         let image = image::RgbaImage::from_raw(width, height, pixels.bytes.into_owned()).ok_or("Invalid clipboard image")?;
-        let directory = dirs::data_local_dir().ok_or("Local data folder unavailable")?
-            .join("P2Sharer").join("chat-clipboard");
+        let directory = chat_clipboard_dir().ok_or("Local data folder unavailable")?;
         fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
         let path = directory.join(format!("clipboard-{}.png", random_id()?));
         if let Err(error) = image.save_with_format(&path, image::ImageFormat::Png) {
@@ -672,5 +714,27 @@ mod tests {
         assert_eq!(h, 4);
         assert_eq!(raw.len(), 3 * 4 * 4);
         assert_eq!(&raw[0..4], &[10, 20, 30, 255]);
+    }
+
+    #[test]
+    fn sweep_chat_clipboard_dir_removes_clipboard_files_and_preserves_others() {
+        let temp_dir = std::env::temp_dir().join(format!("p2s_test_clip_sweep_{}", random_id().unwrap()));
+        fs::create_dir_all(&temp_dir).unwrap();
+
+        let clip1 = temp_dir.join("clipboard-12345.png");
+        let clip2 = temp_dir.join("clipboard-67890.gif");
+        let other = temp_dir.join("other-file.txt");
+
+        fs::write(&clip1, b"png data").unwrap();
+        fs::write(&clip2, b"gif data").unwrap();
+        fs::write(&other, b"text data").unwrap();
+
+        assert_eq!(sweep_chat_clipboard_dir(&temp_dir), 2);
+
+        assert!(!clip1.exists());
+        assert!(!clip2.exists());
+        assert!(other.exists());
+
+        let _ = fs::remove_dir_all(&temp_dir);
     }
 }
