@@ -571,7 +571,7 @@ pub(crate) mod win_audio {
     /// Audio routing only needs names and parent PIDs, not CPU, disk or executable queries.
     pub(crate) fn refresh_process_tree(sys: &mut sysinfo::System) {
         sys.refresh_processes_specifics(
-            sysinfo::ProcessesToUpdate::All, true, sysinfo::ProcessRefreshKind::new().with_cmd(sysinfo::UpdateKind::OnlyIfNotSet),
+            sysinfo::ProcessesToUpdate::All, true, sysinfo::ProcessRefreshKind::new(),
         );
     }
 
@@ -758,6 +758,8 @@ pub(crate) mod win_audio {
             }
         }
 
+        let audio_pids = crate::process_manager::get_audio_session_pids();
+
         for sub_key in target_sub_keys {
             let parts: Vec<&str> = sub_key.splitn(2, ':').collect();
             if parts.len() == 2 {
@@ -769,10 +771,19 @@ pub(crate) mod win_audio {
                     let p_clean = p_name.trim_end_matches(".exe");
                     let app_clean = app_target.trim_end_matches(".exe");
                     if p_clean == app_clean || p_name.contains(&app_target) || app_target.contains(&p_name) {
-                        let cmd_args: Vec<String> = proc.cmd().iter().map(|s| s.to_string_lossy().to_string()).collect();
+                        let u = pid.as_u32();
                         let is_root = proc.parent().and_then(|p| sys.process(p)).map(|p| p.name() == proc.name()).unwrap_or(false) == false;
-                        let (_role, stable_id) = crate::process_manager::classify_subprocess(&cmd_args, is_root, None);
+                        let has_audio = audio_pids.contains(&u);
+                        let (_role, stable_id) = crate::process_manager::classify_subprocess(has_audio, is_root, None);
 
+                        if let Some(target_pid_str) = role_target.strip_prefix("pid:") {
+                            if let Ok(target_pid) = target_pid_str.parse::<u32>() {
+                                if u == target_pid && !candidate_pids.contains(&u) {
+                                    candidate_pids.push(u);
+                                }
+                                continue;
+                            }
+                        }
                         if stable_id.as_deref() == Some(role_target) {
                             let u = pid.as_u32();
                             if !candidate_pids.contains(&u) {
