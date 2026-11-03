@@ -1,57 +1,44 @@
 {
-  "version": "1.6.4",
+  "version": "1.6.5",
   "translations": {
     "en": [
-      "**Reliable room access.** Direct room storage and streamlined connection discovery resolve false security alerts, ensuring smooth and instant room joining.",
-      "**Automated storage maintenance.** Temporary clipboard files and excess disposable rooms are automatically cleaned up to save disk space."
+      "**Clearer audio filtering.** Restored application icons and precise subprocess detection, making it easy to separate Discord voice calls from chat sounds."
     ],
     "pt-BR": [
-      "**Acesso confiável às salas.** O armazenamento direto e a descoberta otimizada de conexão evitam alertas de segurança falso-positivos ao entrar nas salas.",
-      "**Manutenção automática de dados.** Arquivos temporários da área de transferência e salas descartáveis em excesso são limpos automaticamente."
+      "**Filtro de áudio mais claro.** Ícones de aplicativos e identificação de subprocessos restaurados, facilitando separar chamadas de voz e sons do Discord."
     ],
     "es": [
-      "**Acceso confiable a salas.** El guardado directo y la detección optimizada de conexión evitan alertas de seguridad falsas al unirse a cualquier sala.",
-      "**Mantenimiento automático de datos.** Los archivos temporales del portapapeles y salas desechables en exceso se limpian automáticamente."
+      "**Filtro de audio más claro.** Se restauraron los íconos y la detección de subprocesos, facilitando separar llamadas de voz y sonidos de Discord."
     ],
     "fr": [
-      "**Accès fiable aux salons.** Le stockage direct et la détection optimisée évitent les fausses alertes de sécurité pour rejoindre vos salons en toute sérénité.",
-      "**Nettoyage automatique du stockage.** Les fichiers temporaires du presse-papiers et les salons jetables en excès sont nettoyés automatiquement."
+      "**Filtrage audio plus clair.** Icônes d'apps et détection des sous-processus restaurées pour distinguer facilement les appels et sons de Discord."
     ],
     "de": [
-      "**Zuverlässiger Raumbeitritt.** Direkte Raumspeicherung und optimierte Verbindungserkennung verhindern Fehlalarme von Sicherheitsprogrammen beim Beitreten.",
-      "**Automatische Speicherbereinigung.** Temporäre Zwischenablage-Dateien und überschüssige Einweg-Räume werden automatisch aufgeräumt."
+      "**Übersichtlichere Audiofilterung.** App-Icons und Unterprozess-Erkennung wiederhergestellt, um Discord-Anrufe und Chat-Sounds einfach zu trennen."
     ],
     "it": [
-      "**Accesso affidabile alle stanze.** Il salvataggio diretto e il rilevamento ottimizzato evitano falsi allarmi di segurança per entrare nelle stanze senza intoppi.",
-      "**Pulizia automatica dello spazio.** I file temporanei degli appunti e le stanze temporanee in eccesso vengono ripuliti automaticamente."
+      "**Filtro audio più chiaro.** Ripristinate le icone delle app e il rilevamento dei sottoprocessi per separare facilmente chiamate e suoni di Discord."
     ],
     "zh-CN": [
-      "**更可靠的房间连接。** 优化本地房间加密存储与网络发现流程，彻底消除安全软件误报，确保稳定即时进入房间。",
-      "**自动存储维护。** 自动清理过期的剪贴板临时文件与多余的一次性房间记录，释放磁盘空间。"
+      "**更清晰的音频过滤。** 恢复应用图标与子进程精准识别，方便轻松区分 Discord 语音通话与聊天媒体声音。"
     ],
     "zh-TW": [
-      "**更可靠的房間連線。** 最佳化本機房間加密儲存與網路探索機制，徹底排除安全軟體誤報，確保穩定即時進入房間。",
-      "**自動儲存維護。** 自動清理過期的剪貼簿暫存檔與多餘的一次性房間紀錄，釋放磁碟空間。"
+      "**更清晰的音訊過濾。** 恢復應用程式圖示與子處理程序精確辨識，輕鬆區分 Discord 語音通話與聊天媒體聲音。"
     ],
     "ja": [
-      "**部屋接続の安定性向上。** 暗号化保存とネットワーク接続の検出処理を最適化し、セキュリティソフトの誤検知を防いでスムーズな入室を保証します。",
-      "**自動ストレージ管理。** クリップボードの一時ファイルや不要になった一時的な部屋履歴を自動で整理し、空き容量を保ちます。"
+      "**音声フィルターの表示改善。** アプリアイコンとサブプロセス識別を復元し、Discordの通話音声とチャット音声を簡単に選別できます。"
     ],
     "ko": [
-      "**안정적인 방 참가.** 로컬 방 데이터 암호화 저장 및 네트워크 감지를 최적화하여 보안 프로그램의 오탐을 방지하고 원활한 방 입장을 보장합니다.",
-      "**자동 저장 공간 관리.** 클립보드 임시 파일과 불필요한 일회용 방 기록을 자동으로 정리하여 저장 공간을 확보합니다."
+      "**향상된 오디오 필터링.** 앱 아이콘 및 하위 프로세스 감지를 복원하여 Discord 음성 통화와 채팅 미디어 소리를 쉽게 분리할 수 있습니다."
     ],
     "hi": [
-      "**विश्वसनीय रूम एक्सेस।** रूम स्टोरेज और नेटवर्क डिटेक्शन में सुधार से सुरक्षा अलर्ट की समस्या हल हो गई है, जिससे रूम में तुरंत प्रवेश संभव होता है।",
-      "**स्वचालित मेमोरी प्रबंधन।** क्लिपबोर्ड फ़ाइलें और अतिरिक्त अस्थायी रूम डेटा स्वचालित रूप से साफ़ कर डिस्क स्पेस बचाया जाता है।"
+      "**स्पष्ट ऑडियो फ़िल्टरिंग।** ऐप आइकन और सब-प्रोसेस पहचान बहाल की गई, जिससे डिस्कॉर्ड कॉल और चैट साउंड को अलग करना आसान हो जाता है।"
     ],
     "fi": [
-      "**Luotettava huoneisiin liittyminen.** Suora huonetallennus ja optimoitu verkkotunnistus estävät virheelliset tietoturvavaroitukset huoneeseen astuttaessa.",
-      "**Automaattinen tallennustilan ylläpito.** Väliaikaiset leikepöytätiedostot ja ylimääräiset kertakäyttöhuoneet siivotaan automaattisesti."
+      "**Selkeämpi äänen suodatus.** Sovelluskuvakkeet ja aliprosessien tunnistus palautettu, jotta Discord-puhelut ja äänet on helppo erottaa."
     ],
     "ru": [
-      "**Надежный вход в комнаты.** Прямое сохранение комнат и оптимизация сетевого подключения предотвращают ложные срабатывания защиты при входе.",
-      "**Автоматическая очистка хранилища.** Временные файлы буфера обмена и лишние одноразовые комнаты удаляются автоматически."
+      "**Улучшенная фильтрация звука.** Восстановлены значки приложений и определение подпроцессов для легкого разделения звонков и звуков Discord."
     ]
   }
 }

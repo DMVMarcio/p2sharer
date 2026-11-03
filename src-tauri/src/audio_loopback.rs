@@ -571,7 +571,7 @@ pub(crate) mod win_audio {
     /// Audio routing only needs names and parent PIDs, not CPU, disk or executable queries.
     pub(crate) fn refresh_process_tree(sys: &mut sysinfo::System) {
         sys.refresh_processes_specifics(
-            sysinfo::ProcessesToUpdate::All, true, sysinfo::ProcessRefreshKind::new(),
+            sysinfo::ProcessesToUpdate::All, true, sysinfo::ProcessRefreshKind::new().with_cmd(sysinfo::UpdateKind::OnlyIfNotSet),
         );
     }
 
@@ -758,8 +758,6 @@ pub(crate) mod win_audio {
             }
         }
 
-        let audio_pids = crate::process_manager::get_audio_session_pids();
-
         for sub_key in target_sub_keys {
             let parts: Vec<&str> = sub_key.splitn(2, ':').collect();
             if parts.len() == 2 {
@@ -773,8 +771,8 @@ pub(crate) mod win_audio {
                     if p_clean == app_clean || p_name.contains(&app_target) || app_target.contains(&p_name) {
                         let u = pid.as_u32();
                         let is_root = proc.parent().and_then(|p| sys.process(p)).map(|p| p.name() == proc.name()).unwrap_or(false) == false;
-                        let has_audio = audio_pids.contains(&u);
-                        let (_role, stable_id) = crate::process_manager::classify_subprocess(has_audio, is_root, None);
+                        let cmd_args: Vec<String> = proc.cmd().iter().map(|s| s.to_string_lossy().to_string()).collect();
+                        let (_role, stable_id) = crate::process_manager::classify_subprocess(&cmd_args, is_root, None);
 
                         if let Some(target_pid_str) = role_target.strip_prefix("pid:") {
                             if let Ok(target_pid) = target_pid_str.parse::<u32>() {
