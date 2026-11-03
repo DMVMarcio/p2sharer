@@ -248,7 +248,13 @@ export class StateStore {
         this.excludeSubProcessKeys.add('discord:voice_audio');
         this.saveAudioFilterPresets();
       }
-      localStorage.setItem(discordVoiceMigrationKey, 'true');
+      if (typeof localStorage.setItem === 'function') {
+        try {
+          localStorage.setItem(discordVoiceMigrationKey, 'true');
+        } catch {
+          // ignore storage write errors
+        }
+      }
     }
   }
 

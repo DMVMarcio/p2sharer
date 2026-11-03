@@ -70,7 +70,12 @@ test('cursor-only frames preserve existing drawings and PiP readiness provides a
 test('drawing limit loads persistently and clamps invalid settings', context => {
   const originalStorage = globalThis.localStorage;
   context.after(() => { globalThis.localStorage = originalStorage; });
-  globalThis.localStorage = { getItem: (key: string) => key === 'p2sharer_drawing_limit' ? '640' : null } as Storage;
+  globalThis.localStorage = {
+    getItem: (key: string) => key === 'p2sharer_drawing_limit' ? '640' : null,
+    setItem: () => {},
+    removeItem: () => {},
+    clear: () => {},
+  } as unknown as Storage;
   assert.equal(new StateStore().participantDrawingLimit, 640);
   assert.equal(streamDrawingLimit(NaN), 1024); assert.equal(streamDrawingLimit(Infinity), 1024);
   assert.equal(streamDrawingLimit(1280), 1024);
