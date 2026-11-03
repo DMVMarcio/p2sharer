@@ -1,0 +1,70 @@
+{
+  "version": "1.6.3",
+  "translations": {
+    "en": [
+      "**Resilient room storage.** The app now automatically recovers from corrupted room saves, ensuring room creation and joining always work reliably without storage errors.",
+      "**Collaborative painting studio.** The Whiteboard now offers a full raster canvas with 9 brushes, flood fill, selections, blend modes, clipping masks, and symmetry.",
+      "**Smart Discord audio isolation.** Discord voice calls are now isolated by default while chat media plays through, seamlessly upgrading existing setups without resetting."
+    ],
+    "pt-BR": [
+      "**Armazenamento de salas resiliente.** O app agora recupera salas salvas corrompidas automaticamente, garantindo criar e entrar em salas sem falhas de armazenamento.",
+      "**Estúdio de pintura colaborativo.** O Quadro Branco agora traz pintura em pixels reais com 9 pincéis, balde de tinta, seleções, modos de mesclagem e simetria.",
+      "**Isolamento de áudio do Discord.** Chamadas do Discord agora são isoladas por padrão mantendo o som de mídias, atualizando filtros existentes sem redefinir opções."
+    ],
+    "es": [
+      "**Almacenamiento de salas resiliente.** La app recupera salas dañadas automáticamente, garantizando crear y unirse a salas sin bloqueos ni errores de almacenamiento.",
+      "**Estudio de pintura colaborativo.** La Pizarra ahora ofrece lienzo de píxeles reales con 9 pinceles, bote de pintura, selecciones, modos de fusión y simetría.",
+      "**Aislamiento de audio de Discord.** Las llamadas se aíslan por defecto permitiendo oír vídeos del chat, actualizando filtros previos sin restablecer preferencias."
+    ],
+    "fr": [
+      "**Stockage résilient des salons.** L'application répare automatiquement les salons corrompus, garantissant la création et la connexion aux salons sans aucune erreur.",
+      "**Studio de peinture collaboratif.** Le Tableau blanc offre désormais une toile pixel avec 9 pinceaux, pot de peinture, sélections, modes de fusion et symétrie.",
+      "**Isolation audio de Discord.** Les appels Discord sont isolés par défaut en conservant les vidéos du chat, mettant à niveau vos filtres sans réinitialiser vos choix."
+    ],
+    "de": [
+      "**Robuste Raumspeicherung.** Die App repariert beschädigte Raumeinträge nun automatisch, sodass das Erstellen und Beitreten stets zuverlässig und fehlerfrei gelingt.",
+      "**Kollaboratives Malstudio.** Das Whiteboard bietet nun eine echte Pixelleinwand mit 9 Pinseln, Fülleimer, Auswahlwerkzeugen, Mischmodi, Schnittmasken und Symmetrie.",
+      "**Klare Discord-Audioisolierung.** Discord-Anrufe werden standardmäßig isoliert, während Chat-Medien hörbar bleiben und bestehende Filter nahtlos erhalten bleiben."
+    ],
+    "it": [
+      "**Archiviazione stanze resiliente.** L'app ripristina automaticamente i salvataggi danneggiati, assicurando creazione e accesso alle stanze senza errori di memoria.",
+      "**Studio di pittura collaborativo.** La Lavagna offre ora una tela pixel con 9 pennelli, secchiello, selezioni, metodi di fusione, maschere di ritaglio e simmetria.",
+      "**Isolamento audio per Discord.** Le chiamate Discord sono ora isolate di default consentendo l'audio dei media, aggiornando i filtri senza azzerare le preferenze."
+    ],
+    "zh-CN": [
+      "**更可靠的房间存储恢复。** 应用现可自动隔离并修复损坏的本地房间数据，确保创建和加入房间始终稳定可用，彻底避免存储错误。",
+      "**协作数字绘画工作室。** 白板现已升级为真实像素画布，内置 9 种专业画笔、油漆桶填充、选区工具、图层混合模式、剪贴蒙版与对称尺。",
+      "**智能 Discord 音频分离。** 现默认仅静音 Discord 语音通话并保留聊天视频声音，同时无缝升级已有过滤配置且不重置个性化设置。"
+    ],
+    "zh-TW": [
+      "**更可靠的房間儲存復原。** 應用程式現可自動隔離並修復損毀的本機房間資料，確保建立與加入房間始終穩定可用，徹底避免儲存錯誤。",
+      "**協作數位繪畫工作室。** 白板現已升級為真實像素畫布，內建 9 種專業畫筆、油漆桶填色、選取工具、圖層混合模式、剪裁遮色片與對稱尺規。",
+      "**智慧 Discord 音訊分離。** 現預設僅靜音 Discord 語音通話並保留聊天影片聲音，同時無縫升級既有過濾設定且不重置個人化偏好。"
+    ],
+    "ja": [
+      "**部屋保存の復旧強化。** 破損した保存データを自動検知して修復・隔離し、保存エラーによる部屋の作成や参加の失敗を防いで安定した接続を保ちます。",
+      "**共同ペイントスタジオ。** ホワイトボードが本格的なピクセルキャンバスに進化し、9種のブラシ、バケツ塗り、選択範囲、ブレンドモード、対称定規に対応しました。",
+      "**Discord 音声の個別分離。** 通話音声のみを標準でミュートしチャット動画の音はそのまま配信可能に。既存の設定も初期化せず自動で引き継ぎます。"
+    ],
+    "ko": [
+      "**복원력 높은 방 데이터 저장.** 손상된 저장 파일을 자동으로 감지 및 복구하여, 저장소 오류 없이 언제나 안정적으로 방을 만들고 참가할 수 있습니다.",
+      "**협업 디지털 페인팅 스튜디오.** 화이트보드가 9종의 브러시, 페인트통 채우기, 선택 도구, 레이어 블렌드 모드, 클리핑 마스크와 대칭 자를 갖춘 픽셀 캔버스로 업그레이드되었습니다.",
+      "**스마트 Discord 오디오 분리.** 이제 Discord 통화 음성만 기본 음소거하고 채팅 미디어 소리는 유지하며, 기존 설정을 초기화 없이 안전하게 업그레이드합니다."
+    ],
+    "hi": [
+      "**मजबूत रूम स्टोरेज।** ऐप अब दूषित रूम डेटा को स्वतः ठीक करता है, जिससे बिना किसी स्टोरेज त्रुटि के रूम बनाना और जुड़ना हमेशा सुचारू रूप से काम करता है।",
+      "**सहयोगी पेंटिंग स्टूडियो।** व्हाइटबोर्ड अब 9 ब्रश, पेंट बकेट, चयन टूल, लेयर ब्लेंड मोड, क्लिपिंग मास्क और सममिति रूलर के साथ वास्तविक पिक्सेल कैनवास प्रदान करता है।",
+      "**स्मार्ट डिस्कॉर्ड ऑडियो पृथक्करण।** डिस्कॉर्ड वॉयस कॉल अब डिफ़ॉल्ट रूप से अलग होती हैं जबकि चैट मीडिया बजता है, बिना रीसेट किए सेटिंग्स अपग्रेड होती हैं।"
+    ],
+    "fi": [
+      "**Kestävä huonetallennus.** Sovellus toipuu nyt vioittuneista tallennuksista automaattisesti, taaten huoneiden luonnin ja liittymisen luotettavasti ilman virheitä.",
+      "**Yhteinen maalausstudio.** Valkotaulu tarjoaa nyt aidon pikselikankaan, 9 sivellintä, maaliämpärin, valintatyökalut, sekoitustilat, leikkausmaskit ja symmetrian.",
+      "**Älykäs Discord-äänen eristys.** Discord-puhelut mykistetään nyt oletuksena sallien chat-videoiden äänet, päivittäen aiemmat suodattimet asetuksia nollaamatta."
+    ],
+    "ru": [
+      "**Надежное хранение комнат.** Приложение теперь автоматически восстанавливается после повреждения данных комнат, гарантируя стабильное создание и вход без ошибок.",
+      "**Совместная студия рисования.** Доска теперь работает с реальными пикселями и включает 9 кистей, заливку, выделение, режимы наложения, обтравочные маски и симметрию.",
+      "**Умная изоляция звука Discord.** Звонки Discord изолируются по умолчанию, пропуская видео из чата и обновляя старые фильтры без сброса пользовательских настроек."
+    ]
+  }
+}
