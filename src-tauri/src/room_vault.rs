@@ -192,9 +192,7 @@ pub async fn save_room_record(app: tauri::AppHandle, room_id: String, data: Stri
             }
             let serialized = serde_json::to_vec(&incoming).map_err(|e| e.to_string())?;
             let ciphertext = protect(&serialized)?;
-            let temp_path = path.with_extension("tmp");
-            fs::write(&temp_path, ciphertext).map_err(|e| e.to_string())?;
-            fs::rename(&temp_path, &path).map_err(|e| e.to_string())?;
+            fs::write(&path, ciphertext).map_err(|e| e.to_string())?;
             Ok(())
         }).await.map_err(|e| e.to_string())?
     }

@@ -63,6 +63,15 @@ fn bind_interface(ip: Ipv4Addr) -> std::io::Result<Listener> {
     Ok(Listener { url: format!("stun:{ip}:{port}"), task })
 }
 
+pub(crate) fn is_private_or_link_local(ip: Ipv4Addr) -> bool {
+    let octets = ip.octets();
+    let is_rfc1918 = octets[0] == 10
+        || (octets[0] == 172 && (16..=31).contains(&octets[1]))
+        || (octets[0] == 192 && octets[1] == 168);
+    let is_link_local = octets[0] == 169 && octets[1] == 254;
+    is_rfc1918 || is_link_local
+}
+
 #[tauri::command]
 pub async fn get_interface_stun_servers(window: tauri::Window,
     state: tauri::State<'_, InterfaceStunState>) -> Result<Vec<String>, String> {
@@ -70,7 +79,8 @@ pub async fn get_interface_stun_servers(window: tauri::Window,
     let ips = tauri::async_runtime::spawn_blocking(|| {
         crate::lan_signaling::interfaces().into_iter()
             .filter_map(|interface| match interface.address.parse() {
-                Ok(IpAddr::V4(ip)) => Some(ip), _ => None,
+                Ok(IpAddr::V4(ip)) if is_private_or_link_local(ip) => Some(ip),
+                _ => None,
             }).take(MAX_INTERFACES).collect::<BTreeSet<_>>()
     }).await.map_err(|e| e.to_string())?;
     let mut listeners = state.0.lock().unwrap();
@@ -93,6 +103,21 @@ mod tests {
         request[4..8].copy_from_slice(&COOKIE);
         request[8..20].copy_from_slice(b"transaction!");
         request
+    }
+
+    #[test]
+    fn private_or_link_local_excludes_public_and_vpn_subnets() {
+        assert!(is_private_or_link_local(Ipv4Addr::new(192, 168, 1, 100)));
+        assert!(is_private_or_link_local(Ipv4Addr::new(10, 0, 0, 1)));
+        assert!(is_private_or_link_local(Ipv4Addr::new(172, 16, 0, 1)));
+        assert!(is_private_or_link_local(Ipv4Addr::new(172, 31, 255, 255)));
+        assert!(is_private_or_link_local(Ipv4Addr::new(169, 254, 1, 1)));
+
+        // Public or documentation subnets must be excluded
+        assert!(!is_private_or_link_local(Ipv4Addr::new(26, 171, 67, 174)));
+        assert!(!is_private_or_link_local(Ipv4Addr::new(8, 8, 8, 8)));
+        assert!(!is_private_or_link_local(Ipv4Addr::new(192, 0, 2, 1)));
+        assert!(!is_private_or_link_local(Ipv4Addr::new(172, 32, 0, 1)));
     }
 
     #[test]

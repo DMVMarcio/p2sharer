@@ -750,8 +750,8 @@ export class GroupRoomManager {
           if (!connected) this.callbacks?.onStatusChange(t('lan.signalingUnavailable'));
           else if (this.room) this.callbacks?.onStatusChange(t('lan.signalingRestored'));
         });
+        this.rtcConfig = await withLocalInterfaceStun(this.rtcConfig);
       }
-      this.rtcConfig = await withLocalInterfaceStun(this.rtcConfig!);
       if (this.leavePromise) {
         if (this.snapshot?.connection) await signalingManager.leaveRoom();
         return;
@@ -819,9 +819,10 @@ export class GroupRoomManager {
   private async reconnectOnNewTransport(): Promise<void> {
     if (!this.callbacks || !this.signalingTopic) return;
 
-    this.rtcConfig = await withLocalInterfaceStun(this.snapshot?.connection
+    const baseRtcConfig: RTCConfiguration = this.snapshot?.connection
       ? { iceServers: [], iceTransportPolicy: 'all', iceCandidatePoolSize: 0 }
-      : buildRtcConfiguration(this.turnConfig));
+      : buildRtcConfiguration(this.turnConfig);
+    this.rtcConfig = this.snapshot?.connection ? await withLocalInterfaceStun(baseRtcConfig) : baseRtcConfig;
     if (this.leavePromise) return;
 
     console.log('[P2P] Re-establishing room bindings on new transport...');
