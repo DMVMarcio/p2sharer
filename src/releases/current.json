@@ -2,56 +2,43 @@
   "version": "1.6.4",
   "translations": {
     "en": [
-      "**Reliable room access.** Direct room storage and streamlined connection discovery resolve false security alerts, ensuring smooth and instant room joining.",
-      "**Refined creative studio.** The Whiteboard features dedicated tool cursors, pixel-accurate loupe zoom, and flexible triangle/wheel color pickers."
+      "**Reliable room access.** Direct room storage and streamlined connection discovery resolve false security alerts, ensuring smooth and instant room joining."
     ],
     "pt-BR": [
-      "**Acesso confiável às salas.** O armazenamento direto e a descoberta otimizada de conexão evitam alertas de segurança falso-positivos ao entrar nas salas.",
-      "**Estúdio criativo aprimorado.** O Quadro Branco conta com cursores dedicados por ferramenta, lupa de zoom com precisão de pixel e seletores de cor em triângulo e roda."
+      "**Acesso confiável às salas.** O armazenamento direto e a descoberta otimizada de conexão evitam alertas de segurança falso-positivos ao entrar nas salas."
     ],
     "es": [
-      "**Acceso confiable a salas.** El guardado directo y la detección optimizada de conexión evitan alertas de seguridad falsas al unirse a cualquier sala.",
-      "**Estudio creativo mejorado.** La Pizarra incorpora cursores dedicados, lupa de píxeles con zoom de precisión y selectores de color en triángulo y rueda."
+      "**Acceso confiable a salas.** El guardado directo y la detección optimizada de conexión evitan alertas de seguridad falsas al unirse a cualquier sala."
     ],
     "fr": [
-      "**Accès fiable aux salons.** Le stockage direct et la détection optimisée évitent les fausses alertes de sécurité pour rejoindre vos salons en toute sérénité.",
-      "**Studio créatif perfectionné.** Le Tableau blanc propose des curseurs adaptés, une loupe de zoom au pixel près et des sélecteurs de couleur triangle et roue."
+      "**Accès fiable aux salons.** Le stockage direct et la détection optimisée évitent les fausses alertes de sécurité pour rejoindre vos salons en toute sérénité."
     ],
     "de": [
-      "**Zuverlässiger Raumbeitritt.** Direkte Raumspeicherung und optimierte Verbindungserkennung verhindern Fehlalarme von Sicherheitsprogrammen beim Beitreten.",
-      "**Verfeinertes Malstudio.** Das Whiteboard bietet eigene Werkzeug-Cursor, pixelgenaue Zoom-Lupe sowie Farbwähler als Dreieck und Farbkreis."
+      "**Zuverlässiger Raumbeitritt.** Direkte Raumspeicherung und optimierte Verbindungserkennung verhindern Fehlalarme von Sicherheitsprogrammen beim Beitreten."
     ],
     "it": [
-      "**Accesso affidabile alle stanze.** Il salvataggio diretto e il rilevamento ottimizzato evitano falsi allarmi di sicurezza per entrare nelle stanze senza intoppi.",
-      "**Studio creativo perfezionato.** La Lavagna include cursori dedicati per strumento, lente d'ingrandimento al pixel e selettori colore a triangolo e ruota."
+      "**Accesso affidabile alle stanze.** Il salvataggio diretto e il rilevamento ottimizzato evitano falsi allarmi di sicurezza per entrare nelle stanze senza intoppi."
     ],
     "zh-CN": [
-      "**更可靠的房间连接。** 优化本地房间加密存储与网络发现流程，彻底消除安全软件误报，确保稳定即时进入房间。",
-      "**绘画工作室体验升级。** 白板新增专属工具光标、像素级放大取色镜，以及三角与色轮双调色盘选择器。"
+      "**更可靠的房间连接。** 优化本地房间加密存储与网络发现流程，彻底消除安全软件误报，确保稳定即时进入房间。"
     ],
     "zh-TW": [
-      "**更可靠的房間連線。** 最佳化本機房間加密儲存與網路探索機制，徹底排除安全軟體誤報，確保穩定即時進入房間。",
-      "**繪畫工作室體驗升級。** 白板新增專屬工具游標、像素級放大取色鏡，以及三角與色環雙調色盤選擇器。"
+      "**更可靠的房間連線。** 最佳化本機房間加密儲存與網路探索機制，徹底排除安全軟體誤報，確保穩定即時進入房間。"
     ],
     "ja": [
-      "**部屋接続の安定性向上。** 暗号化保存とネットワーク接続の検出処理を最適化し、セキュリティソフトの誤検知を防いでスムーズな入室を保証します。",
-      "**ペイントツールの表現力向上。** ツール専用カーソル、ピクセル拡大鏡プレビュー、三角形やホイール式のカラーピッカーを白板に追加しました。"
+      "**部屋接続の安定性向上。** 暗号化保存とネットワーク接続の検出処理を最適化し、セキュリティソフトの誤検知を防いでスムーズな入室を保証します。"
     ],
     "ko": [
-      "**안정적인 방 참가.** 로컬 방 데이터 암호화 저장 및 네트워크 감지를 최적화하여 보안 프로그램의 오탐을 방지하고 원활한 방 입장을 보장합니다.",
-      "**창작 스튜디오 기능 개선.** 화이트보드에 도구별 전용 커서, 픽셀 단위 확대 돋보기, 삼각형 및 휠 색상 선택기가 추가되었습니다."
+      "**안정적인 방 참가.** 로컬 방 데이터 암호화 저장 및 네트워크 감지를 최적화하여 보안 프로그램의 오탐을 방지하고 원활한 방 입장을 보장합니다."
     ],
     "hi": [
-      "**विश्वसनीय रूम एक्सेस।** रूम स्टोरेज और नेटवर्क डिटेक्शन में सुधार से सुरक्षा अलर्ट की समस्या हल हो गई है, जिससे रूम में तुरंत प्रवेश संभव होता है।",
-      "**उन्नत डिजिटल व्हाइटबोर्ड।** व्हाइटबोर्ड में टूल-विशिष्ट कर्सर, सटीक पिक्सेल ज़ूम मैग्निफायर और त्रिभुज/पहिया रंग पिकर जोड़े गए हैं।"
+      "**विश्वसनीय रूम एक्सेस।** रूम स्टोरेज और नेटवर्क डिटेक्शन में सुधार से सुरक्षा अलर्ट की समस्या हल हो गई है, जिससे रूम में तुरंत प्रवेश संभव होता है।"
     ],
     "fi": [
-      "**Luotettava huoneisiin liittyminen.** Suora huonetallennus ja optimoitu verkkotunnistus estävät virheelliset tietoturvavaroitukset huoneeseen astuttaessa.",
-      "**Paranneltu luova studio.** Valkotaulu sisältää nyt työkalukohtaiset kursorit, pikselintarkan suurennuslasin sekä kolmio- ja ympyrävärivalitsimet."
+      "**Luotettava huoneisiin liittyminen.** Suora huonetallennus ja optimoitu verkkotunnistus estävät virheelliset tietoturvavaroitukset huoneeseen astuttaessa."
     ],
     "ru": [
-      "**Надежный вход в комнаты.** Прямое сохранение комнат и оптимизация сетевого подключения предотвращают ложные срабатывания защиты при входе.",
-      "**Улучшенная цифровая доска.** Добавлены специальные курсоры для инструментов, лупа с точностью до пикселя и выбор цвета через треугольник и круг."
+      "**Надежный вход в комнаты.** Прямое сохранение комнат и оптимизация сетевого подключения предотвращают ложные срабатывания защиты при входе."
     ]
   }
 }
