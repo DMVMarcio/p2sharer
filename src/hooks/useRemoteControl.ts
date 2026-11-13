@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { isTauri } from '@tauri-apps/api/core';
-import { streamPointerPosition } from '../core/stream_pointer.ts';
+import {
+  streamPointerClampedPosition,
+  streamPointerPosition,
+  streamPointerVideoRect,
+} from '../core/stream_pointer.ts';
 import type {
   RemoteControlStatus,
   RemoteControlViewerState,
@@ -29,11 +33,13 @@ export interface RemoteControlHookState {
   cursorCaptured: boolean;
   cursorShape: RemoteCursorShape;
   immersive: boolean;
+  localCursor: boolean;
   pointerInside: boolean;
   cursorCss: string | undefined;
   toggleRequest: () => void;
   exit: () => void;
   toggleImmersive: () => void;
+  toggleLocalCursor: () => void;
   setOverlayHovered: (hovered: boolean) => void;
 }
 
@@ -60,6 +66,15 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return Boolean(target.closest('input, textarea, select, [contenteditable="true"], .remote-control-floating-overlay'));
 }
 
+function isTextInputElement(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  return Boolean(
+    target.closest(
+      'input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select, [contenteditable="true"]',
+    ),
+  );
+}
+
 export function useRemoteControl(
   containerRef: RefObject<HTMLElement | null>,
   videoRef: RefObject<HTMLVideoElement | null>,
@@ -77,8 +92,10 @@ export function useRemoteControl(
   const cursorShape: RemoteCursorShape = viewerState?.cursorShape ?? 'default';
 
   const [immersive, setImmersive] = useState(false);
+  const [localCursor, setLocalCursor] = useState(true);
   const [pointerInside, setPointerInside] = useState(false);
   const [overlayHovered, setOverlayHovered] = useState(false);
+  const [holdingInput, setHoldingInput] = useState(false);
   const [windowFocused, setWindowFocused] = useState(() =>
     typeof document === 'undefined' ? true : document.hasFocus() && !document.hidden,
   );
@@ -87,8 +104,13 @@ export function useRemoteControl(
   const pendingMoveRef = useRef<{ x: number; y: number } | null>(null);
   const trailingMoveRafRef = useRef<number | null>(null);
   const hadActiveInputRef = useRef(false);
+  const heldButtonsRef = useRef(new Set<RemoteMouseButton>());
+  const heldKeysRef = useRef(new Set<string>());
+  const clipActiveRef = useRef(false);
+  const activePointerIdRef = useRef<number | null>(null);
   const pointerInsideRef = useRef(false);
   const overlayHoveredRef = useRef(false);
+  const immersiveRef = useRef(immersive);
   const windowFocusedRef = useRef(windowFocused);
   const hostBusyRef = useRef(hostBusy);
   const mouseEnabledRef = useRef(mouseEnabled);
@@ -96,12 +118,71 @@ export function useRemoteControl(
 
   pointerInsideRef.current = pointerInside;
   overlayHoveredRef.current = overlayHovered;
+  immersiveRef.current = immersive;
   windowFocusedRef.current = windowFocused;
   hostBusyRef.current = hostBusy;
   mouseEnabledRef.current = mouseEnabled;
   keyboardEnabledRef.current = keyboardEnabled;
 
+  const hasActiveHold = useCallback(
+    () => heldButtonsRef.current.size > 0 || heldKeysRef.current.size > 0,
+    [],
+  );
+
+  const syncCursorClip = useCallback(
+    (forceUnlock = false) => {
+      if (!isTauri()) return;
+      const shouldClip =
+        !forceUnlock &&
+        active &&
+        !hostBusyRef.current &&
+        windowFocusedRef.current &&
+        !document.hidden &&
+        document.hasFocus() &&
+        !overlayHoveredRef.current &&
+        (heldButtonsRef.current.size > 0 || heldKeysRef.current.size > 0);
+      if (!shouldClip) {
+        if (clipActiveRef.current) {
+          clipActiveRef.current = false;
+          void invoke('set_remote_control_cursor_clip', { rect: null }).catch(() => {});
+        }
+        return;
+      }
+      const video = videoRef.current;
+      if (!video) return;
+      const imageRect = streamPointerVideoRect(
+        video.getBoundingClientRect(),
+        video.videoWidth,
+        video.videoHeight,
+      );
+      if (!imageRect || imageRect.width < 2 || imageRect.height < 2) return;
+      clipActiveRef.current = true;
+      void invoke('set_remote_control_cursor_clip', { rect: imageRect }).catch(() => {});
+    },
+    [active, videoRef],
+  );
+
+  const updateHoldTracking = useCallback(
+    (forceUnlock = false) => {
+      const nextHolding = !forceUnlock && (heldButtonsRef.current.size > 0 || heldKeysRef.current.size > 0);
+      setHoldingInput(nextHolding);
+      syncCursorClip(forceUnlock);
+    },
+    [syncCursorClip],
+  );
+
   const sendReleaseAll = useCallback(() => {
+    heldButtonsRef.current.clear();
+    heldKeysRef.current.clear();
+    if (activePointerIdRef.current !== null && containerRef.current) {
+      try {
+        if (containerRef.current.hasPointerCapture(activePointerIdRef.current)) {
+          containerRef.current.releasePointerCapture(activePointerIdRef.current);
+        }
+      } catch {}
+      activePointerIdRef.current = null;
+    }
+    updateHoldTracking(true);
     if (!hadActiveInputRef.current) return;
     hadActiveInputRef.current = false;
     pendingMoveRef.current = null;
@@ -110,7 +191,7 @@ export function useRemoteControl(
       trailingMoveRafRef.current = null;
     }
     roomService.sendRemoteControlInput(slotPeerId, { kind: 'releaseAll' });
-  }, [slotPeerId]);
+  }, [containerRef, slotPeerId, updateHoldTracking]);
 
   const toggleRequest = useCallback(() => {
     if (!eligible) return;
@@ -126,7 +207,17 @@ export function useRemoteControl(
   }, [sendReleaseAll, slotPeerId]);
 
   const toggleImmersive = useCallback(() => {
-    setImmersive((prev) => !prev);
+    setImmersive((prev) => {
+      const next = !prev;
+      if (next) {
+        containerRef.current?.focus({ preventScroll: true });
+      }
+      return next;
+    });
+  }, [containerRef]);
+
+  const toggleLocalCursor = useCallback(() => {
+    setLocalCursor((prev) => !prev);
   }, []);
 
   // Reset local interactive state when leaving active mode or becoming ineligible.
@@ -135,17 +226,25 @@ export function useRemoteControl(
       setImmersive(false);
       setPointerInside(false);
       setOverlayHovered(false);
+      heldButtonsRef.current.clear();
+      heldKeysRef.current.clear();
+      activePointerIdRef.current = null;
+      setHoldingInput(false);
       hadActiveInputRef.current = false;
       pendingMoveRef.current = null;
       if (trailingMoveRafRef.current !== null) {
         cancelAnimationFrame(trailingMoveRafRef.current);
         trailingMoveRafRef.current = null;
       }
+      if (clipActiveRef.current && isTauri()) {
+        clipActiveRef.current = false;
+        void invoke('set_remote_control_cursor_clip', { rect: null }).catch(() => {});
+      }
     }
   }, [active]);
 
-  // Keep OS low-level immersive hook strictly scoped to active foreground hover inside the video.
-  const hookLive = active && !hostBusy && immersive && pointerInside && !overlayHovered && windowFocused;
+  // Keep OS low-level immersive hook active whenever immersive is enabled and our window is focused.
+  const hookLive = active && !hostBusy && immersive && windowFocused;
   useEffect(() => {
     if (!isTauri()) return;
     void invoke('set_remote_control_immersive', { enabled: hookLive }).catch(() => {});
@@ -170,7 +269,16 @@ export function useRemoteControl(
     let disposed = false;
     let unlisten: (() => void) | undefined;
     void listen<ImmersiveKeyPayload>('remote-control-immersive-key', ({ payload }) => {
-      if (disposed || !payload || !keyboardEnabled || hostBusy || !pointerInside || overlayHovered) return;
+      if (
+        disposed ||
+        !payload ||
+        !keyboardEnabled ||
+        hostBusy ||
+        isTextInputElement(document.activeElement) ||
+        (!pointerInside && !hasActiveHold() && !immersive)
+      ) {
+        return;
+      }
       hadActiveInputRef.current = true;
       roomService.sendRemoteControlInput(slotPeerId, {
         kind: 'key',
@@ -187,13 +295,13 @@ export function useRemoteControl(
       disposed = true;
       unlisten?.();
     };
-  }, [active, hostBusy, keyboardEnabled, overlayHovered, pointerInside, slotPeerId]);
+  }, [active, hasActiveHold, hostBusy, immersive, keyboardEnabled, pointerInside, slotPeerId]);
 
   useEffect(() => {
-    if (hostBusy || !pointerInside || overlayHovered || !windowFocused) {
+    if (hostBusy || overlayHovered || !windowFocused || (!pointerInside && !hasActiveHold())) {
       sendReleaseAll();
     }
-  }, [hostBusy, overlayHovered, pointerInside, sendReleaseAll, windowFocused]);
+  }, [hasActiveHold, hostBusy, overlayHovered, pointerInside, sendReleaseAll, windowFocused]);
 
   // Pointer + keyboard forwarding over the watched video area.
   useEffect(() => {
@@ -242,6 +350,9 @@ export function useRemoteControl(
     const getPos = (clientX: number, clientY: number) =>
       streamPointerPosition(video.getBoundingClientRect(), video.videoWidth, video.videoHeight, clientX, clientY);
 
+    const getClampedPos = (clientX: number, clientY: number) =>
+      streamPointerClampedPosition(video.getBoundingClientRect(), video.videoWidth, video.videoHeight, clientX, clientY);
+
     const clearStuckOverlayHover = (target: EventTarget | null) => {
       if (overlayHoveredRef.current && isVideoInteractionTarget(target, container)) {
         overlayHoveredRef.current = false;
@@ -249,15 +360,33 @@ export function useRemoteControl(
       }
     };
 
-    const handlePointerMove = (event: PointerEvent) => {
+    const handlePointerDown = (event: PointerEvent) => {
       clearStuckOverlayHover(event.target);
-      if (!isVideoInteractionTarget(event.target, container) || document.hidden || overlayHoveredRef.current) {
-        if (pointerInsideRef.current) setPointerInside(false);
+      if (!isVideoInteractionTarget(event.target, container) || overlayHoveredRef.current) return;
+      if (!getPos(event.clientX, event.clientY)) return;
+      activePointerIdRef.current = event.pointerId;
+      try {
+        container.setPointerCapture(event.pointerId);
+      } catch {}
+    };
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const holding = hasActiveHold();
+      if (!holding) {
+        clearStuckOverlayHover(event.target);
+        if (!isVideoInteractionTarget(event.target, container) || document.hidden || overlayHoveredRef.current) {
+          if (pointerInsideRef.current) setPointerInside(false);
+          return;
+        }
+      } else if (document.hidden || !windowFocusedRef.current) {
         return;
       }
-      const pos = getPos(event.clientX, event.clientY);
+
+      const pos = holding
+        ? getClampedPos(event.clientX, event.clientY)
+        : getPos(event.clientX, event.clientY);
       if (!pos) {
-        if (pointerInsideRef.current) setPointerInside(false);
+        if (!holding && pointerInsideRef.current) setPointerInside(false);
         return;
       }
       if (!pointerInsideRef.current) setPointerInside(true);
@@ -285,6 +414,7 @@ export function useRemoteControl(
     };
 
     const handlePointerLeave = () => {
+      if (hasActiveHold()) return;
       if (pointerInsideRef.current) setPointerInside(false);
       sendReleaseAll();
     };
@@ -302,6 +432,8 @@ export function useRemoteControl(
       const button = MOUSE_BUTTON_MAP[event.button];
       if (!button) return;
       flushPendingMove();
+      heldButtonsRef.current.add(button);
+      updateHoldTracking();
       hadActiveInputRef.current = true;
       roomService.sendRemoteControlInput(slotPeerId, {
         kind: 'mouseButton',
@@ -313,10 +445,26 @@ export function useRemoteControl(
     };
 
     const handleMouseUp = (event: MouseEvent) => {
-      if (!isVideoInteractionTarget(event.target, container) || overlayHoveredRef.current) return;
       const button = MOUSE_BUTTON_MAP[event.button];
+      const wasHeld = button ? heldButtonsRef.current.delete(button) : false;
+      if (wasHeld) {
+        if (heldButtonsRef.current.size === 0 && activePointerIdRef.current !== null) {
+          try {
+            if (container.hasPointerCapture(activePointerIdRef.current)) {
+              container.releasePointerCapture(activePointerIdRef.current);
+            }
+          } catch {}
+          activePointerIdRef.current = null;
+        }
+        updateHoldTracking();
+      }
+      const insideTarget = isVideoInteractionTarget(event.target, container) && !overlayHoveredRef.current;
+      if (!wasHeld && !insideTarget) return;
       if (!button || hostBusyRef.current || !mouseEnabledRef.current) return;
-      const pos = getPos(event.clientX, event.clientY);
+      const pos = wasHeld ? getClampedPos(event.clientX, event.clientY) : getPos(event.clientX, event.clientY);
+      if (!insideTarget && !getPos(event.clientX, event.clientY) && !hasActiveHold()) {
+        setPointerInside(false);
+      }
       event.preventDefault();
       event.stopPropagation();
       hadActiveInputRef.current = true;
@@ -329,7 +477,8 @@ export function useRemoteControl(
     };
 
     const handleContextMenu = (event: MouseEvent) => {
-      if (!isVideoInteractionTarget(event.target, container) || overlayHoveredRef.current) return;
+      if (!isVideoInteractionTarget(event.target, container) && !hasActiveHold()) return;
+      if (overlayHoveredRef.current && !hasActiveHold()) return;
       event.preventDefault();
       event.stopPropagation();
     };
@@ -353,20 +502,39 @@ export function useRemoteControl(
     };
 
     const handleKey = (event: KeyboardEvent, down: boolean) => {
+      const codeKey = event.code || event.key;
+      const wasHeld = !down && codeKey ? heldKeysRef.current.has(codeKey) : false;
       if (
         !keyboardEnabledRef.current ||
         hostBusyRef.current ||
-        !pointerInsideRef.current ||
-        overlayHoveredRef.current ||
         !windowFocusedRef.current ||
         document.hidden ||
         !document.hasFocus()
       ) {
         return;
       }
-      if (isEditableTarget(event.target)) return;
+      if (!wasHeld) {
+        const allowScope =
+          pointerInsideRef.current || hasActiveHold() || (immersiveRef.current && !isTextInputElement(event.target));
+        if (!allowScope || (overlayHoveredRef.current && !immersiveRef.current && !hasActiveHold())) {
+          return;
+        }
+        if (immersiveRef.current ? isTextInputElement(event.target) : isEditableTarget(event.target)) {
+          return;
+        }
+      }
       event.preventDefault();
       event.stopPropagation();
+      if (codeKey) {
+        if (down) {
+          if (!heldKeysRef.current.has(codeKey)) {
+            heldKeysRef.current.add(codeKey);
+            updateHoldTracking();
+          }
+        } else if (heldKeysRef.current.delete(codeKey)) {
+          updateHoldTracking();
+        }
+      }
       hadActiveInputRef.current = true;
       roomService.sendRemoteControlInput(slotPeerId, {
         kind: 'key',
@@ -400,6 +568,7 @@ export function useRemoteControl(
       }
     };
 
+    container.addEventListener('pointerdown', handlePointerDown);
     container.addEventListener('pointermove', handlePointerMove);
     container.addEventListener('pointerleave', handlePointerLeave);
     container.addEventListener('mousedown', handleMouseDown, { capture: true });
@@ -416,6 +585,7 @@ export function useRemoteControl(
       container.classList.remove('is-remote-control-active');
       video.classList.remove('is-remote-control-active');
       if (!hadTabIndex) container.removeAttribute('tabindex');
+      container.removeEventListener('pointerdown', handlePointerDown);
       container.removeEventListener('pointermove', handlePointerMove);
       container.removeEventListener('pointerleave', handlePointerLeave);
       container.removeEventListener('mousedown', handleMouseDown, { capture: true });
@@ -429,13 +599,13 @@ export function useRemoteControl(
       document.removeEventListener('visibilitychange', onVisibilityChange);
       sendReleaseAll();
     };
-  }, [active, containerRef, sendReleaseAll, slotPeerId, videoRef]);
+  }, [active, containerRef, hasActiveHold, sendReleaseAll, slotPeerId, updateHoldTracking, videoRef]);
 
   const cursorCss =
-    active && !hostBusy && pointerInside && !overlayHovered && mouseEnabled
-      ? cursorCaptured
-        ? 'none'
-        : cursorShape
+    active && !hostBusy && (pointerInside || holdingInput) && !overlayHovered && mouseEnabled
+      ? localCursor || !cursorCaptured
+        ? cursorShape
+        : 'none'
       : undefined;
 
   return {
@@ -448,11 +618,13 @@ export function useRemoteControl(
     cursorCaptured,
     cursorShape,
     immersive,
+    localCursor,
     pointerInside,
     cursorCss,
     toggleRequest,
     exit,
     toggleImmersive,
+    toggleLocalCursor,
     setOverlayHovered,
   };
 }

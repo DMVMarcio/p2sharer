@@ -1659,6 +1659,8 @@
   "remoteControl.keyboardDisabledHint": "键盘已禁用",
   "remoteControl.immersiveMode": "沉浸模式",
   "remoteControl.immersiveHint": "将 Alt+Tab、Windows 键和系统快捷键发送到远程电脑",
+  "remoteControl.localCursor": "本地光标 (0 ms)",
+  "remoteControl.localCursorHint": "保持本地硬件光标可见以实现零视觉延迟，并同步远程指针样式",
   "remoteControl.exitAction": "停止控制",
   "remoteControl.manageAction": "远程控制",
   "remoteControl.managerTitle": "远程控制",

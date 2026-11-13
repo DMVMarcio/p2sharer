@@ -64,6 +64,10 @@ impl<T: Clone> FramePacer<T> {
         }
     }
 
+    pub fn deliver_now(&mut self, now_us: u64) {
+        self.next_tick_ns = Some(now_us.saturating_mul(1000));
+    }
+
     pub fn next_tick_us(&self) -> Option<u64> { self.next_tick_ns.map(|deadline| deadline.div_ceil(1000)) }
 
     pub fn tick(&mut self, now_us: u64) -> Option<PacedFrame<T>> {

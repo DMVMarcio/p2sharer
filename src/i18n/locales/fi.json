@@ -1659,6 +1659,8 @@
   "remoteControl.keyboardDisabledHint": "Näppäimistö estetty",
   "remoteControl.immersiveMode": "Immersiivinen tila",
   "remoteControl.immersiveHint": "Lähettää Alt+Tab-, Windows-näppäimen ja järjestelmäpikanäppäimet etäkoneelle",
+  "remoteControl.localCursor": "Paikallinen osoitin (0 ms)",
+  "remoteControl.localCursorHint": "Pidä paikallinen osoitin näkyvissä viiveettömänä etäosoittimen muotoa seuraten",
   "remoteControl.exitAction": "Lopeta hallinta",
   "remoteControl.manageAction": "Etähallinta",
   "remoteControl.managerTitle": "Etähallinta",

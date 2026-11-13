@@ -90,6 +90,14 @@ export class RoomService {
   private listeners: Set<Listener> = new Set();
   private roomConnectingTimeout: ReturnType<typeof setTimeout> | null = null;
   private roomTransition: Promise<void> = Promise.resolve();
+  private remoteControlMoveQueues = new Map<
+    string,
+    {
+      inFlight: boolean;
+      pending: { sessionId: string | null; event: RemoteInputEvent } | null;
+      promise?: Promise<{ accepted: boolean; hostBusy: boolean }>;
+    }
+  >();
 
   public static getInstance(): RoomService {
     if (!RoomService.instance) {
@@ -595,11 +603,7 @@ export class RoomService {
     },
     applyInput: (controllerId, sessionId, event) => {
       if (!isTauri()) return Promise.resolve({ accepted: false, hostBusy: false });
-      return invoke<{ accepted: boolean; hostBusy: boolean }>('apply_remote_control_input', {
-        controllerId,
-        sessionId: sessionId ?? null,
-        event,
-      });
+      return this.dispatchCoalescedHostInput(controllerId, sessionId ?? null, event);
     },
     releaseInputs: (controllerId) => {
       if (!isTauri()) return;
@@ -612,6 +616,61 @@ export class RoomService {
       this.notify();
     },
   });
+
+  private dispatchCoalescedHostInput(
+    controllerId: string,
+    sessionId: string | null,
+    event: RemoteInputEvent,
+  ): Promise<{ accepted: boolean; hostBusy: boolean }> {
+    let slot = this.remoteControlMoveQueues.get(controllerId);
+    if (!slot) {
+      slot = { inFlight: false, pending: null };
+      this.remoteControlMoveQueues.set(controllerId, slot);
+    }
+
+    if (event.kind !== 'mouseMove') {
+      // Clear any queued move on explicit clicks/wheels/releaseAll so stale moves never replay afterwards.
+      if (event.kind === 'releaseAll' || event.kind === 'mouseButton' || event.kind === 'mouseWheel') {
+        slot.pending = null;
+      }
+      return invoke<{ accepted: boolean; hostBusy: boolean }>('apply_remote_control_input', {
+        controllerId,
+        sessionId,
+        event,
+      });
+    }
+
+    if (slot.inFlight) {
+      slot.pending = { sessionId, event };
+      return slot.promise ?? Promise.resolve({ accepted: true, hostBusy: false });
+    }
+
+    const runMove = (
+      nextSessionId: string | null,
+      nextEvent: RemoteInputEvent,
+    ): Promise<{ accepted: boolean; hostBusy: boolean }> => {
+      slot!.inFlight = true;
+      const req = invoke<{ accepted: boolean; hostBusy: boolean }>('apply_remote_control_input', {
+        controllerId,
+        sessionId: nextSessionId,
+        event: nextEvent,
+      }).finally(() => {
+        const queued = slot!.pending;
+        slot!.pending = null;
+        if (queued) {
+          void runMove(queued.sessionId, queued.event);
+        } else {
+          slot!.inFlight = false;
+          slot!.promise = undefined;
+          this.remoteControlMoveQueues.delete(controllerId);
+        }
+      });
+      slot!.promise = req;
+      return req;
+    };
+
+    return runMove(sessionId, event);
+  }
 
   private pruneRemoteControlViewerByOwner(ownerPeerId: string): void {
     const next = { ...this.remoteControlViewerStates };

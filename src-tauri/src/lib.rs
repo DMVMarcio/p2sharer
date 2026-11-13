@@ -264,6 +264,7 @@ pub fn run() {
             remote_control::apply_remote_control_input,
             remote_control::release_remote_control_inputs,
             remote_control::set_remote_control_immersive,
+            remote_control::set_remote_control_cursor_clip,
             list_audio_processes,
             list_screen_sources,
             start_native_screen_capture,

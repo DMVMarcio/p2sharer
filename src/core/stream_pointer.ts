@@ -70,3 +70,12 @@ export function streamPointerPosition(rect: { left: number; top: number; width: 
   const y = (clientY - image.top) / image.height;
   return x >= 0 && x <= 1 && y >= 0 && y <= 1 ? { x, y } : null;
 }
+
+export function streamPointerClampedPosition(rect: { left: number; top: number; width: number; height: number },
+  videoWidth: number, videoHeight: number, clientX: number, clientY: number) {
+  const image = streamPointerVideoRect(rect, videoWidth, videoHeight);
+  if (!image) return null;
+  const x = Math.max(0, Math.min(1, (clientX - image.left) / image.width));
+  const y = Math.max(0, Math.min(1, (clientY - image.top) / image.height));
+  return { x, y };
+}

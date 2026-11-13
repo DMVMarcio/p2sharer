@@ -11,6 +11,8 @@ interface RemoteControlFloatingOverlayProps {
   onExitRemoteControl: () => void;
   immersive: boolean;
   onToggleImmersive: () => void;
+  localCursor: boolean;
+  onToggleLocalCursor: () => void;
   hostBusy: boolean;
   mouseEnabled: boolean;
   keyboardEnabled: boolean;
@@ -47,6 +49,8 @@ export function RemoteControlFloatingOverlay({
   onExitRemoteControl,
   immersive,
   onToggleImmersive,
+  localCursor,
+  onToggleLocalCursor,
   hostBusy,
   mouseEnabled,
   keyboardEnabled,
@@ -356,6 +360,23 @@ export function RemoteControlFloatingOverlay({
                 checked={immersive}
                 onChange={onToggleImmersive}
                 aria-label={t('remoteControl.immersiveMode')}
+              />
+              <span className="switch-slider" />
+            </span>
+          </label>
+
+          <label className="remote-control-floating-row">
+            <span className="remote-control-floating-row-copy">
+              <strong>{t('remoteControl.localCursor')}</strong>
+              <small>{t('remoteControl.localCursorHint')}</small>
+            </span>
+            <span className="modern-switch">
+              <input
+                type="checkbox"
+                autoComplete="off"
+                checked={localCursor}
+                onChange={onToggleLocalCursor}
+                aria-label={t('remoteControl.localCursor')}
               />
               <span className="switch-slider" />
             </span>

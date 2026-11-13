@@ -1659,6 +1659,8 @@
   "remoteControl.keyboardDisabledHint": "キーボード無効",
   "remoteControl.immersiveMode": "没入モード",
   "remoteControl.immersiveHint": "Alt+Tab や Windows キーなどのシステムショートカットを相手 PC に送信します",
+  "remoteControl.localCursor": "ローカルカーソル (0 ms)",
+  "remoteControl.localCursorHint": "表示遅延ゼロのためローカルカーソルを表示したまま遠隔のカーソル形状に合わせます",
   "remoteControl.exitAction": "操作を終了",
   "remoteControl.manageAction": "リモート操作",
   "remoteControl.managerTitle": "リモート操作",

@@ -1,57 +1,44 @@
 {
-  "version": "1.6.5",
+  "version": "1.7.0",
   "translations": {
     "en": [
-      "**Remote control.** Share screen control with consent, keeping local priority, a draggable corner overlay with immersive mode, and per-user permissions.",
-      "**Clearer audio filtering.** Restored application icons and precise subprocess detection, making it easy to separate Discord voice calls from chat sounds."
+      "**Remote control.** Share screen control with consent, low-latency input, local hardware cursor option, hold-lock inside the stream, immersive shortcuts, and permissions."
     ],
     "pt-BR": [
-      "**Controle remoto.** Controle telas com consentimento, prioridade do anfitrião, overlay arrastável com modo imersivo e controle por usuário.",
-      "**Filtro de áudio mais claro.** Ícones de aplicativos e identificação de subprocessos restaurados, facilitando separar chamadas de voz e sons do Discord."
+      "**Controle remoto.** Controle telas com consentimento, baixa latência, cursor local imediato, trava ao arrastar, overlay arrastável com modo imersivo e permissões."
     ],
     "es": [
-      "**Control remoto.** Comparte el control de pantalla con consentimiento, prioridad local, menú flotante con modo inmersivo y permisos por usuario.",
-      "**Filtro de audio más claro.** Se restauraron los íconos y la detección de subprocesos, facilitando separar llamadas de voz y sonidos de Discord."
+      "**Control remoto.** Comparte control de pantalla con consentimiento, baja latencia, cursor local inmediato, bloqueo al arrastrar, modo inmersivo y permisos por usuario."
     ],
     "fr": [
-      "**Contrôle à distance.** Partagez le contrôle d'écran sur consentement avec priorité locale, menu flottant immersif et droits par utilisateur.",
-      "**Filtrage audio plus clair.** Icônes d'apps et détection des sous-processus restaurées pour distinguer facilement les appels et sons de Discord."
+      "**Contrôle à distance.** Partagez l'écran sur consentement avec faible latence, curseur local immédiat, maintien au glisser, mode immersif et droits par utilisateur."
     ],
     "de": [
-      "**Fernsteuerung.** Teile Bildschirmsteuerung mit Zustimmung, lokalem Vorrang, verschiebbarem Overlay mit immersivem Modus und Rechten pro Person.",
-      "**Übersichtlichere Audiofilterung.** App-Icons und Unterprozess-Erkennung wiederhergestellt, um Discord-Anrufe und Chat-Sounds einfach zu trennen."
+      "**Fernsteuerung.** Teile Steuerung mit Zustimmung, geringer Latenz, direktem lokalem Cursor, Haltesperre beim Ziehen, immersivem Modus und Rechten pro Person."
     ],
     "it": [
-      "**Controllo remoto.** Condividi il controllo dello schermo con consenso, priorità locale, menu trascinabile immersivo e permessi per utente.",
-      "**Filtro audio più chiaro.** Ripristinate le icone delle app e il rilevamento dei sottoprocessi per separare facilmente chiamate e suoni di Discord."
+      "**Controllo remoto.** Condividi il controllo con consenso, bassa latenza, cursore locale immediato, blocco durante il trascinamento, modalità immersiva e permessi."
     ],
     "zh-CN": [
-      "**远程控制。** 经同意共享屏幕控制权，保留主播优先权，提供支持沉浸模式的可拖动浮窗与分用户权限管理。",
-      "**更清晰的音频过滤。** 恢复应用图标与子进程精准识别，方便轻松区分 Discord 语音通话与聊天媒体声音。"
+      "**远程控制。** 经同意共享屏幕控制权，支持低延迟输入、零延迟本地光标、拖拽锁定、带沉浸模式的可拖动浮窗及分用户权限管理。"
     ],
     "zh-TW": [
-      "**遠端控制。** 經同意即可共享畫面控制權，保留主講者優先權，提供支援沉浸模式的可拖曳浮窗與分使用者權限。",
-      "**更清晰的音訊過濾。** 恢復應用程式圖示與子處理程序精確辨識，輕鬆區分 Discord 語音通話與聊天媒體聲音。"
+      "**遠端控制。** 經同意即可共享畫面控制權，支援低延遲輸入、零延遲本地游標、拖曳鎖定、支援沉浸模式的可拖曳浮窗與分使用者權限。"
     ],
     "ja": [
-      "**リモート操作。** 同意制で画面操作を共有でき、ホスト優先制御、没入モード対応の移動可能なオーバーレイ、ユーザー別権限管理を備えました。",
-      "**音声フィルターの表示改善。** アプリアイコンとサブプロセス識別を復元し、Discordの通話音声とチャット音声を簡単に選別できます。"
+      "**リモート操作。** 同意制で低遅延な画面操作を共有でき、即時ローカルカーソル、ドラッグ時の範囲ロック、没入モード、ユーザー別権限に対応しました。"
     ],
     "ko": [
-      "**원격 제어.** 동의를 통해 화면 제어를 공유하고, 호스트 우선권, 몰입 모드를 지원하는 이동식 오버레이 및 사용자별 권한 관리를 제공합니다.",
-      "**향상된 오디오 필터링.** 앱 아이콘 및 하위 프로세스 감지를 복원하여 Discord 음성 통화와 채팅 미디어 소리를 쉽게 분리할 수 있습니다."
+      "**원격 제어.** 동의를 통해 저지연 화면 제어를 공유하고, 즉시 반응하는 로컬 커서, 드래그 잠금, 몰입 모드 및 사용자별 권한 관리를 제공합니다."
     ],
     "hi": [
-      "**रिमोट कंट्रोल।** सहमति से स्क्रीन नियंत्रण साझा करें, जिसमें होस्ट प्राथमिकता, इमर्सिव मोड वाला फ़्लोटिंग ओवरले और उपयोगकर्ता अनुमतियाँ शामिल हैं।",
-      "**स्पष्ट ऑडियो फ़िल्टरिंग।** ऐप आइकन और सब-प्रोसेस पहचान बहाल की गई, जिससे डिस्कॉर्ड कॉल और चैट साउंड को अलग करना आसान हो जाता है।"
+      "**रिमोट कंट्रोल।** सहमति से कम-विलंबता स्क्रीन नियंत्रण, त्वरित लोकल कर्सर, ड्रैग लॉक, इमर्सिव शॉर्टकट और उपयोगकर्ता अनुमतियाँ साझा करें।"
     ],
     "fi": [
-      "**Etähallinta.** Jaa näytön hallinta luvalla säilyttäen oman etusijan, siirrettävällä kelluvalla valikolla, immersiotilalla ja käyttäjäluvilla.",
-      "**Selkeämpi äänen suodatus.** Sovelluskuvakkeet ja aliprosessien tunnistus palautettu, jotta Discord-puhelut ja äänet on helppo erottaa."
+      "**Etähallinta.** Jaa näytön hallinta luvalla matalalla viiveellä, välittömällä paikallisella osoittimella, vedon lukituksella, immersiotilalla ja käyttäjäluvilla."
     ],
     "ru": [
-      "**Удалённое управление.** Передавайте управление экраном с согласия, приоритетом хоста, перетаскиваемым оверлеем с иммерсивным режимом и правами.",
-      "**Улучшенная фильтрация звука.** Восстановлены значки приложений и определение подпроцессов для легкого разделения звонков и звуков Discord."
+      "**Удалённое управление.** Передавайте управление с согласия, с минимальной задержкой, мгновенным локальным курсором, захватом при перетаскивании и иммерсивным режимом."
     ]
   }
 }

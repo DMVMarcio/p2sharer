@@ -1659,6 +1659,8 @@
   "remoteControl.keyboardDisabledHint": "कीबोर्ड अक्षम",
   "remoteControl.immersiveMode": "इमर्सिव मोड",
   "remoteControl.immersiveHint": "Alt+Tab, Windows कुंजी और सिस्टम शॉर्टकट दूरस्थ पीसी पर भेजें",
+  "remoteControl.localCursor": "लोकल कर्सर (0 ms)",
+  "remoteControl.localCursorHint": "शून्य विज़ुअल लैग के लिए स्थानीय हार्डवेयर कर्सर दृश्यमान रखें और रिमोट आकृति सिंक करें",
   "remoteControl.exitAction": "कंट्रोल रोकें",
   "remoteControl.manageAction": "रिमोट कंट्रोल",
   "remoteControl.managerTitle": "रिमोट कंट्रोल",

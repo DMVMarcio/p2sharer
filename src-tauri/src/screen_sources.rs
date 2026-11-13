@@ -299,6 +299,9 @@ fn enqueue_capture_frame(delivery: &FrameDelivery, frame: Arc<Vec<u8>>, ready_us
         else if frame.starts_with(b"P2NV") {
             if !pacer.enqueue_dependent(frame.clone(), ready_us) { return false; }
         } else { pacer.enqueue(frame.clone(), ready_us); }
+        if !legacy && crate::remote_control::is_host_control_active() {
+            pacer.deliver_now(ready_us);
+        }
     } else { return false; }
     if legacy && active.load(Ordering::Relaxed) {
         send_paced_frame(PacedFrame::Fresh { frame, age_us: 0 }, sender, metrics);

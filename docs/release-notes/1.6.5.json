@@ -1,0 +1,44 @@
+{
+  "version": "1.6.5",
+  "translations": {
+    "en": [
+      "**Clearer audio filtering.** Restored application icons and precise subprocess detection, making it easy to separate Discord voice calls from chat sounds."
+    ],
+    "pt-BR": [
+      "**Filtro de áudio mais claro.** Ícones de aplicativos e identificação de subprocessos restaurados, facilitando separar chamadas de voz e sons do Discord."
+    ],
+    "es": [
+      "**Filtro de audio más claro.** Se restauraron los íconos y la detección de subprocesos, facilitando separar llamadas de voz y sonidos de Discord."
+    ],
+    "fr": [
+      "**Filtrage audio plus clair.** Icônes d'apps et détection des sous-processus restaurées pour distinguer facilement les appels et sons de Discord."
+    ],
+    "de": [
+      "**Übersichtlichere Audiofilterung.** App-Icons und Unterprozess-Erkennung wiederhergestellt, um Discord-Anrufe und Chat-Sounds einfach zu trennen."
+    ],
+    "it": [
+      "**Filtro audio più chiaro.** Ripristinate le icone delle app e il rilevamento dei sottoprocessi per separare facilmente chiamate e suoni di Discord."
+    ],
+    "zh-CN": [
+      "**更清晰的音频过滤。** 恢复应用图标与子进程精准识别，方便轻松区分 Discord 语音通话与聊天媒体声音。"
+    ],
+    "zh-TW": [
+      "**更清晰的音訊過濾。** 恢復應用程式圖示與子處理程序精確辨識，輕鬆區分 Discord 語音通話與聊天媒體聲音。"
+    ],
+    "ja": [
+      "**音声フィルターの表示改善。** アプリアイコンとサブプロセス識別を復元し、Discordの通話音声とチャット音声を簡単に選別できます。"
+    ],
+    "ko": [
+      "**향상된 오디오 필터링.** 앱 아이콘 및 하위 프로세스 감지를 복원하여 Discord 음성 통화와 채팅 미디어 소리를 쉽게 분리할 수 있습니다."
+    ],
+    "hi": [
+      "**स्पष्ट ऑडियो फ़िल्टरिंग।** ऐप आइकन और सब-प्रोसेस पहचान बहाल की गई, जिससे डिस्कॉर्ड कॉल और चैट साउंड को अलग करना आसान हो जाता है।"
+    ],
+    "fi": [
+      "**Selkeämpi äänen suodatus.** Sovelluskuvakkeet ja aliprosessien tunnistus palautettu, jotta Discord-puhelut ja äänet on helppo erottaa."
+    ],
+    "ru": [
+      "**Улучшенная фильтрация звука.** Восстановлены значки приложений и определение подпроцессов для легкого разделения звонков и звуков Discord."
+    ]
+  }
+}
