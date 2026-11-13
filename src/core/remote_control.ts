@@ -21,6 +21,11 @@ export type RemoteInputEvent =
       y: number;
     }
   | {
+      kind: 'mouseDelta';
+      dx: number;
+      dy: number;
+    }
+  | {
       kind: 'mouseButton';
       button: RemoteMouseButton;
       down: boolean;
@@ -106,10 +111,31 @@ export type RemoteControlHostPacket =
       x: number;
       y: number;
       cursorShape: RemoteCursorShape;
+      imageId?: string;
+      mouseLocked?: boolean;
       hostBusy: boolean;
       actorPeerId: string;
       embeddedInVideo: boolean;
+    }
+  | {
+      type: 'cursorImage';
+      mediaId: string;
+      imageId: string;
+      width: number;
+      height: number;
+      hotX: number;
+      hotY: number;
+      pngBase64: string;
     };
+
+export interface RemoteCursorImageAsset {
+  imageId: string;
+  width: number;
+  height: number;
+  hotX: number;
+  hotY: number;
+  dataUrl: string;
+}
 
 export interface RemoteCursorSyncState {
   mediaId: string;
@@ -119,6 +145,8 @@ export interface RemoteCursorSyncState {
   x: number;
   y: number;
   cursorShape: RemoteCursorShape;
+  imageId: string;
+  mouseLocked: boolean;
   hostBusy: boolean;
   actorPeerId: string;
   embeddedInVideo: boolean;
@@ -195,6 +223,15 @@ export function validRemoteInputEvent(raw: unknown): raw is RemoteInputEvent {
   switch (event.kind) {
     case 'mouseMove':
       return isFiniteCoord(event.x) && isFiniteCoord(event.y);
+    case 'mouseDelta':
+      return (
+        typeof event.dx === 'number' &&
+        Number.isInteger(event.dx) &&
+        Math.abs(event.dx) <= 10000 &&
+        typeof event.dy === 'number' &&
+        Number.isInteger(event.dy) &&
+        Math.abs(event.dy) <= 10000
+      );
     case 'mouseButton':
       return (
         typeof event.button === 'string' &&
@@ -289,10 +326,37 @@ export function validRemoteControlHostPacket(raw: unknown): raw is RemoteControl
         isFiniteCoord(pkt.y) &&
         typeof pkt.cursorShape === 'string' &&
         VALID_CURSOR_SHAPES.has(pkt.cursorShape as RemoteCursorShape) &&
+        (pkt.imageId === undefined || (typeof pkt.imageId === 'string' && pkt.imageId.length <= 64)) &&
+        (pkt.mouseLocked === undefined || typeof pkt.mouseLocked === 'boolean') &&
         typeof pkt.hostBusy === 'boolean' &&
         typeof pkt.actorPeerId === 'string' &&
         pkt.actorPeerId.length <= 96 &&
         typeof pkt.embeddedInVideo === 'boolean'
+      );
+    case 'cursorImage':
+      return (
+        typeof pkt.imageId === 'string' &&
+        pkt.imageId.length > 0 &&
+        pkt.imageId.length <= 64 &&
+        typeof pkt.width === 'number' &&
+        Number.isInteger(pkt.width) &&
+        pkt.width >= 1 &&
+        pkt.width <= 128 &&
+        typeof pkt.height === 'number' &&
+        Number.isInteger(pkt.height) &&
+        pkt.height >= 1 &&
+        pkt.height <= 128 &&
+        typeof pkt.hotX === 'number' &&
+        Number.isInteger(pkt.hotX) &&
+        pkt.hotX >= 0 &&
+        pkt.hotX < pkt.width &&
+        typeof pkt.hotY === 'number' &&
+        Number.isInteger(pkt.hotY) &&
+        pkt.hotY >= 0 &&
+        pkt.hotY < pkt.height &&
+        typeof pkt.pngBase64 === 'string' &&
+        pkt.pngBase64.length > 0 &&
+        pkt.pngBase64.length <= 65536
       );
     default:
       return false;
@@ -323,6 +387,7 @@ const OP_MOUSE_WHEEL = 3;
 const OP_KEY = 4;
 const OP_RELEASE_ALL = 5;
 const OP_CURSOR_SYNC = 6;
+const OP_MOUSE_DELTA = 7;
 const MOUSE_BUTTONS: RemoteMouseButton[] = ['left', 'right', 'middle', 'x1', 'x2'];
 const CURSOR_SHAPES_ORDER: RemoteCursorShape[] = [
   'default',
@@ -378,6 +443,14 @@ export function encodeRemoteControlBinaryInput(
       const { buf, view, offset } = alloc(OP_MOUSE_MOVE, 8);
       view.setFloat32(offset, event.x);
       view.setFloat32(offset + 4, event.y);
+      return buf;
+    }
+    case 'mouseDelta': {
+      const dx = Math.max(-10000, Math.min(10000, Math.round(event.dx)));
+      const dy = Math.max(-10000, Math.min(10000, Math.round(event.dy)));
+      const { buf, view, offset } = alloc(OP_MOUSE_DELTA, 8);
+      view.setInt32(offset, dx);
+      view.setInt32(offset + 4, dy);
       return buf;
     }
     case 'mouseButton': {
@@ -460,6 +533,13 @@ export function decodeRemoteControlBinaryInput(frame: Uint8Array): DecodedRemote
       const x = readCoord(view.getFloat32(offset));
       const y = readCoord(view.getFloat32(offset + 4));
       event = { kind: 'mouseMove', x, y };
+      break;
+    }
+    case OP_MOUSE_DELTA: {
+      if (frame.length !== offset + 8) return null;
+      const dx = view.getInt32(offset);
+      const dy = view.getInt32(offset + 4);
+      event = { kind: 'mouseDelta', dx, dy };
       break;
     }
     case OP_MOUSE_BUTTON: {
@@ -554,12 +634,20 @@ export function encodeRemoteControlCursorSync(
   if (!validRemoteControlHostPacket(packet)) return null;
   const mediaBytes = rcTextEncoder.encode(packet.mediaId);
   const actorBytes = rcTextEncoder.encode(packet.actorPeerId);
-  if (mediaBytes.length === 0 || mediaBytes.length > 64 || actorBytes.length > 96) return null;
+  const imageBytes = rcTextEncoder.encode(packet.imageId ?? '');
+  if (
+    mediaBytes.length === 0 ||
+    mediaBytes.length > 64 ||
+    actorBytes.length > 96 ||
+    imageBytes.length > 64
+  ) {
+    return null;
+  }
   const shapeIdx = CURSOR_SHAPES_ORDER.indexOf(packet.cursorShape);
   if (shapeIdx < 0) return null;
 
   const headerSize = 9 + mediaBytes.length;
-  const buf = new Uint8Array(headerSize + 11 + actorBytes.length);
+  const buf = new Uint8Array(headerSize + 12 + actorBytes.length + imageBytes.length);
   const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
   buf[0] = RC_MAGIC_0;
   buf[1] = RC_MAGIC_1;
@@ -573,13 +661,16 @@ export function encodeRemoteControlCursorSync(
     (packet.active ? 1 : 0) |
     (packet.visible ? 2 : 0) |
     (packet.hostBusy ? 4 : 0) |
-    (packet.embeddedInVideo ? 8 : 0);
+    (packet.embeddedInVideo ? 8 : 0) |
+    (packet.mouseLocked ? 16 : 0);
   buf[headerSize] = flags;
   buf[headerSize + 1] = shapeIdx;
   buf[headerSize + 2] = actorBytes.length;
   view.setFloat32(headerSize + 3, packet.x);
   view.setFloat32(headerSize + 7, packet.y);
   buf.set(actorBytes, headerSize + 11);
+  buf[headerSize + 11 + actorBytes.length] = imageBytes.length;
+  buf.set(imageBytes, headerSize + 12 + actorBytes.length);
   return buf;
 }
 
@@ -601,10 +692,17 @@ export function decodeRemoteControlCursorSync(frame: Uint8Array): DecodedRemoteC
   const flags = frame[offset];
   const cursorShape = CURSOR_SHAPES_ORDER[frame[offset + 1]];
   const actorLen = frame[offset + 2];
-  if (!cursorShape || actorLen > 96 || frame.length !== offset + 11 + actorLen) return null;
+  if (!cursorShape || actorLen > 96 || offset + 11 + actorLen > frame.length) return null;
   let actorPeerId: string;
+  let imageId = '';
   try {
     actorPeerId = rcTextDecoder.decode(frame.subarray(offset + 11, offset + 11 + actorLen));
+    const tailOffset = offset + 11 + actorLen;
+    if (tailOffset < frame.length) {
+      const imageLen = frame[tailOffset];
+      if (imageLen > 64 || frame.length !== tailOffset + 1 + imageLen) return null;
+      imageId = rcTextDecoder.decode(frame.subarray(tailOffset + 1, tailOffset + 1 + imageLen));
+    }
   } catch {
     return null;
   }
@@ -617,6 +715,8 @@ export function decodeRemoteControlCursorSync(frame: Uint8Array): DecodedRemoteC
     x: readCoord(view.getFloat32(offset + 3)),
     y: readCoord(view.getFloat32(offset + 7)),
     cursorShape,
+    imageId,
+    mouseLocked: (flags & 16) !== 0,
     hostBusy: (flags & 4) !== 0,
     actorPeerId,
     embeddedInVideo: (flags & 8) !== 0,

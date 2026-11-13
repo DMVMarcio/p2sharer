@@ -11,6 +11,7 @@ import {
   type RemoteControlRequest,
   type RemoteControlViewerState,
   type RemoteControllerInfo,
+  type RemoteCursorImageAsset,
   type RemoteCursorSyncState,
   type RemoteInputEvent,
 } from '../core/remote_control.ts';
@@ -81,6 +82,12 @@ export class RoomService {
   public remoteControlHostBusy = false;
   public remoteControlViewerStates: Record<string, RemoteControlViewerState> = {};
   public remoteCursorStates: Record<string, RemoteCursorSyncState> = {};
+  public remoteCursorImages: Record<string, RemoteCursorImageAsset> = {};
+  private hostCapturedCursorImages = new Map<
+    string,
+    { imageId: string; width: number; height: number; hotX: number; hotY: number; pngBase64: string }
+  >();
+  private peerSeenCursorImageIds = new Map<string, Set<string>>();
   public roomStatusText: string = t("message.e56841de8c6f");
   public connectingOverlay: ConnectingOverlayState = {
     visible: false,
@@ -143,12 +150,48 @@ export class RoomService {
         }
       }).catch(console.warn);
       void listen<{
+        imageId?: string;
+        width?: number;
+        height?: number;
+        hotX?: number;
+        hotY?: number;
+        pngBase64?: string;
+      }>('remote-control-cursor-image', ({ payload }) => {
+        if (
+          !payload ||
+          typeof payload.imageId !== 'string' ||
+          !payload.imageId ||
+          typeof payload.pngBase64 !== 'string' ||
+          !payload.pngBase64 ||
+          typeof payload.width !== 'number' ||
+          typeof payload.height !== 'number'
+        ) {
+          return;
+        }
+        if (this.hostCapturedCursorImages.size >= 64 && !this.hostCapturedCursorImages.has(payload.imageId)) {
+          const oldest = this.hostCapturedCursorImages.keys().next().value;
+          if (oldest) this.hostCapturedCursorImages.delete(oldest);
+        }
+        const entry = {
+          imageId: payload.imageId,
+          width: payload.width,
+          height: payload.height,
+          hotX: typeof payload.hotX === 'number' ? payload.hotX : 0,
+          hotY: typeof payload.hotY === 'number' ? payload.hotY : 0,
+          pngBase64: payload.pngBase64,
+        };
+        this.hostCapturedCursorImages.set(payload.imageId, entry);
+        this.sendCursorImageToUnseenWatchers(payload.imageId);
+      }).catch(console.warn);
+      void listen<{
         sessionId?: string;
         active?: boolean;
         visible?: boolean;
         x?: number;
         y?: number;
         cursorShape?: string;
+        imageId?: string;
+        mouseLocked?: boolean;
         hostBusy?: boolean;
         actorControllerId?: string;
         embeddedInVideo?: boolean;
@@ -157,6 +200,11 @@ export class RoomService {
         const active = Boolean(payload.active);
         const rawActor = typeof payload.actorControllerId === 'string' ? payload.actorControllerId : '';
         const shape = normalizeCursorShape(payload.cursorShape);
+        const imageId = typeof payload.imageId === 'string' ? payload.imageId : '';
+        const mouseLocked = Boolean(payload.mouseLocked);
+        if (active && imageId) {
+          this.sendCursorImageToUnseenWatchers(imageId);
+        }
         for (const [mediaId, capture] of this.localCaptures) {
           if (capture.kind !== 'screen') continue;
           if (active && payload.sessionId && capture.bridge?.sessionId !== payload.sessionId) continue;
@@ -177,6 +225,8 @@ export class RoomService {
             x: typeof payload.x === 'number' && Number.isFinite(payload.x) ? Math.max(0, Math.min(1, payload.x)) : 0,
             y: typeof payload.y === 'number' && Number.isFinite(payload.y) ? Math.max(0, Math.min(1, payload.y)) : 0,
             cursorShape: shape,
+            imageId,
+            mouseLocked,
             hostBusy: Boolean(payload.hostBusy),
             actorPeerId: actorPeerId.slice(0, 96),
             embeddedInVideo: Boolean(payload.embeddedInVideo),
@@ -284,6 +334,9 @@ export class RoomService {
     this.remoteControlHost.clear();
     this.remoteControlViewerStates = {};
     this.remoteCursorStates = {};
+    this.remoteCursorImages = {};
+    this.hostCapturedCursorImages.clear();
+    this.peerSeenCursorImageIds.clear();
     streamPointerView.clear();
     roomAppsService.reset();
     const parsed = await verifyRoomInvite(code);
@@ -499,6 +552,7 @@ export class RoomService {
         if (this.roomManager !== manager) return;
         this.fileRequests = this.fileRequests.filter((request) => request.peerId !== _peerId);
         this.remoteControlHost.forgetPeer(_peerId);
+        this.peerSeenCursorImageIds.delete(_peerId);
         this.pruneRemoteControlViewerByOwner(_peerId);
         this.notify();
         roomAppsService.forgetPeer(_peerId);
@@ -529,6 +583,7 @@ export class RoomService {
         }
         const owner = streamOwner(broadcasterPeerId);
         if (owner === 'local' || owner === manager.getLocalPeerId()) {
+          this.peerSeenCursorImageIds.delete(watcherPeerId);
           const slashIdx = broadcasterPeerId.indexOf('/');
           if (slashIdx >= 0) this.remoteControlHost.revokeController(watcherPeerId, broadcasterPeerId.slice(slashIdx + 1), 'revoked');
           else this.remoteControlHost.forgetPeer(watcherPeerId);
@@ -748,6 +803,37 @@ export class RoomService {
     if (changed) this.remoteControlViewerStates = next;
   }
 
+  private sendCursorImageToUnseenWatchers(imageId: string): void {
+    const asset = this.hostCapturedCursorImages.get(imageId);
+    if (!asset || !this.roomManager) return;
+    for (const [mediaId, capture] of this.localCaptures) {
+      if (capture.kind !== 'screen') continue;
+      const watchers = this.roomManager.getRemoteControlWatchers(mediaId);
+      for (const peerId of watchers) {
+        let seen = this.peerSeenCursorImageIds.get(peerId);
+        if (!seen) {
+          seen = new Set();
+          this.peerSeenCursorImageIds.set(peerId, seen);
+        }
+        if (seen.has(imageId)) continue;
+        seen.add(imageId);
+        this.roomManager.sendRemoteControlHost(
+          {
+            type: 'cursorImage',
+            mediaId,
+            imageId: asset.imageId,
+            width: asset.width,
+            height: asset.height,
+            hotX: asset.hotX,
+            hotY: asset.hotY,
+            pngBase64: asset.pngBase64,
+          },
+          peerId,
+        );
+      }
+    }
+  }
+
   private handleRemoteControlHostPacket(packet: RemoteControlHostPacket, broadcasterId: string): void {
     const slot = stateStore.roomSlots.find(
       (candidate) =>
@@ -755,6 +841,28 @@ export class RoomService {
         candidate.pointerEligible !== false &&
         (candidate.mediaId || 'default') === packet.mediaId,
     );
+
+    if (packet.type === 'cursorImage') {
+      if (!slot || !stateStore.subscribedStreams.has(slot.peerId)) return;
+      const existing = this.remoteCursorImages[packet.imageId];
+      if (existing) return;
+      const nextImages: Record<string, RemoteCursorImageAsset> = { ...this.remoteCursorImages };
+      const keys = Object.keys(nextImages);
+      if (keys.length >= 64) {
+        delete nextImages[keys[0]];
+      }
+      nextImages[packet.imageId] = {
+        imageId: packet.imageId,
+        width: packet.width,
+        height: packet.height,
+        hotX: packet.hotX,
+        hotY: packet.hotY,
+        dataUrl: `data:image/png;base64,${packet.pngBase64}`,
+      };
+      this.remoteCursorImages = nextImages;
+      this.notify();
+      return;
+    }
 
     if (packet.type === 'cursorSync') {
       const targetKey = slot?.peerId;
@@ -788,6 +896,8 @@ export class RoomService {
           x: packet.x,
           y: packet.y,
           cursorShape: packet.cursorShape,
+          imageId: packet.imageId ?? '',
+          mouseLocked: Boolean(packet.mouseLocked),
           hostBusy: packet.hostBusy,
           actorPeerId: packet.actorPeerId,
           embeddedInVideo: packet.embeddedInVideo,
@@ -1098,6 +1208,8 @@ export class RoomService {
 
   public stopScreenSharing(): void {
     this.remoteControlHost.clear();
+    this.hostCapturedCursorImages.clear();
+    this.peerSeenCursorImageIds.clear();
     this.roomManager?.stopStream();
     for (const id of [...this.localCaptures.keys()]) this.stopTransmission(id, false);
     this.pointerReceiver.clear();
@@ -1155,6 +1267,9 @@ export class RoomService {
     this.remoteControlHost.clear();
     this.remoteControlViewerStates = {};
     this.remoteCursorStates = {};
+    this.remoteCursorImages = {};
+    this.hostCapturedCursorImages.clear();
+    this.peerSeenCursorImageIds.clear();
     streamPointerView.clear();
     roomAppsService.reset();
     if (this.roomConnectingTimeout) {

@@ -7050,12 +7050,22 @@ body:has(.fullscreen-dialog, .chat-image-viewer) .window-titlebar { display: non
   position: absolute;
   top: 0;
   left: 0;
-  width: 24px;
-  height: 24px;
+  width: auto;
+  height: auto;
   z-index: 25;
   pointer-events: none;
   will-change: transform;
+}
+
+.remote-cursor-overlay svg {
+  display: block;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+}
+
+.remote-cursor-overlay img {
+  display: block;
+  pointer-events: none;
+  user-select: none;
 }
 
 .remote-control-floating-pill {

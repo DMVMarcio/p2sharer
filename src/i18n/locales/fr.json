@@ -1659,6 +1659,8 @@
   "remoteControl.keyboardDisabledHint": "Clavier désactivé",
   "remoteControl.immersiveMode": "Mode immersif",
   "remoteControl.immersiveHint": "Envoie Alt+Tab, la touche Windows et les raccourcis système au PC distant",
+  "remoteControl.mouseLock": "Souris verrouillée (jeux)",
+  "remoteControl.mouseLockHint": "Capture le mouvement relatif pour jeux et caméras 3D (Échap libère)",
   "remoteControl.exitAction": "Arrêter le contrôle",
   "remoteControl.manageAction": "Contrôle à distance",
   "remoteControl.managerTitle": "Contrôle à distance",

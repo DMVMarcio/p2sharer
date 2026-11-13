@@ -17,6 +17,10 @@ pub enum RemoteInputEvent {
         x: f64,
         y: f64,
     },
+    MouseDelta {
+        dx: i32,
+        dy: i32,
+    },
     MouseButton {
         button: String,
         down: bool,
@@ -70,9 +74,22 @@ struct CursorSyncPayload {
     x: f64,
     y: f64,
     cursor_shape: String,
+    image_id: String,
+    mouse_locked: bool,
     host_busy: bool,
     actor_controller_id: String,
     embedded_in_video: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CursorImagePayload {
+    pub image_id: String,
+    pub width: u32,
+    pub height: u32,
+    pub hot_x: u32,
+    pub hot_y: u32,
+    pub png_base64: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -101,6 +118,12 @@ struct HostControlState {
     host_paused_until: u64,
     was_host_paused: bool,
     last_cursor_shape: String,
+    last_cursor_handle: isize,
+    last_cursor_image_id: String,
+    last_cursor_capture_ms: u64,
+    sent_cursor_images: HashMap<String, u64>,
+    cursor_hidden_since_ms: Option<u64>,
+    controller_moved_while_hidden: bool,
     last_session_id: Option<String>,
     last_mouse_actor_id: Option<String>,
     held_buttons: HashMap<String, HashSet<String>>,
@@ -125,6 +148,12 @@ impl Default for HostControlState {
             host_paused_until: 0,
             was_host_paused: false,
             last_cursor_shape: "default".to_string(),
+            last_cursor_handle: 0,
+            last_cursor_image_id: String::new(),
+            last_cursor_capture_ms: 0,
+            sent_cursor_images: HashMap::new(),
+            cursor_hidden_since_ms: None,
+            controller_moved_while_hidden: false,
             last_session_id: None,
             last_mouse_actor_id: None,
             held_buttons: HashMap::new(),
@@ -237,53 +266,389 @@ fn read_cursor_pos() -> Option<(i32, i32)> {
     }
 }
 
+const MAX_CURSOR_IMAGE_DIM: u32 = 128;
+const CURSOR_IMAGE_CACHE_LIMIT: usize = 64;
+const CURSOR_RESAMPLE_MS: u64 = 120;
+const LOCKED_CURSOR_HIDDEN_MS: u64 = 350;
+
+fn rgba_from_color_and_mask(
+    width: u32,
+    height: u32,
+    color_bgra: &[u8],
+    mask_bgra: Option<&[u8]>,
+) -> Vec<u8> {
+    let pixel_count = (width as usize).saturating_mul(height as usize);
+    let mut rgba = vec![0u8; pixel_count * 4];
+    if color_bgra.len() < pixel_count * 4 {
+        return rgba;
+    }
+    let has_alpha = color_bgra[..pixel_count * 4]
+        .chunks_exact(4)
+        .any(|px| px[3] != 0);
+    for idx in 0..pixel_count {
+        let base = idx * 4;
+        let b = color_bgra[base];
+        let g = color_bgra[base + 1];
+        let r = color_bgra[base + 2];
+        let mut a = color_bgra[base + 3];
+        if !has_alpha {
+            let opaque = mask_bgra
+                .and_then(|mask| mask.get(base..base + 3))
+                .map(|m| m[0] == 0 && m[1] == 0 && m[2] == 0)
+                .unwrap_or_else(|| r != 0 || g != 0 || b != 0);
+            a = if opaque { 255 } else { 0 };
+        }
+        rgba[base] = r;
+        rgba[base + 1] = g;
+        rgba[base + 2] = b;
+        rgba[base + 3] = a;
+    }
+    rgba
+}
+
+fn rgba_from_monochrome_mask(width: u32, height: u32, mask_bgra: &[u8]) -> Vec<u8> {
+    let w = width as usize;
+    let h = height as usize;
+    let pixel_count = w.saturating_mul(h);
+    let mut rgba = vec![0u8; pixel_count * 4];
+    let needed = pixel_count.saturating_mul(2).saturating_mul(4);
+    if mask_bgra.len() < needed {
+        return rgba;
+    }
+    let mut xor_mask = vec![false; pixel_count];
+    for y in 0..h {
+        for x in 0..w {
+            let idx = y * w + x;
+            let and_off = idx * 4;
+            let xor_off = (pixel_count + idx) * 4;
+            let and_white = mask_bgra[and_off] > 127;
+            let xor_white = mask_bgra[xor_off] > 127;
+            let out_off = idx * 4;
+            match (and_white, xor_white) {
+                (false, false) => {
+                    rgba[out_off..out_off + 4].copy_from_slice(&[0, 0, 0, 255]);
+                }
+                (false, true) => {
+                    rgba[out_off..out_off + 4].copy_from_slice(&[255, 255, 255, 255]);
+                }
+                (true, false) => {
+                    rgba[out_off..out_off + 4].copy_from_slice(&[0, 0, 0, 0]);
+                }
+                (true, true) => {
+                    // Inverted XOR pixels (e.g. monochrome I-beam): crisp dark core + halo added below.
+                    rgba[out_off..out_off + 4].copy_from_slice(&[17, 24, 39, 255]);
+                    xor_mask[idx] = true;
+                }
+            }
+        }
+    }
+    for y in 0..h {
+        for x in 0..w {
+            let idx = y * w + x;
+            if rgba[idx * 4 + 3] != 0 {
+                continue;
+            }
+            let touches_xor = [
+                (x > 0).then(|| idx - 1),
+                (x + 1 < w).then(|| idx + 1),
+                (y > 0).then(|| idx - w),
+                (y + 1 < h).then(|| idx + w),
+            ]
+            .into_iter()
+            .flatten()
+            .any(|n| xor_mask[n]);
+            if touches_xor {
+                rgba[idx * 4..idx * 4 + 4].copy_from_slice(&[255, 255, 255, 215]);
+            }
+        }
+    }
+    rgba
+}
+
+fn clamp_cursor_bitmap(
+    width: u32,
+    height: u32,
+    hot_x: u32,
+    hot_y: u32,
+    rgba: Vec<u8>,
+) -> (u32, u32, u32, u32, Vec<u8>) {
+    if width <= MAX_CURSOR_IMAGE_DIM && height <= MAX_CURSOR_IMAGE_DIM {
+        return (
+            width,
+            height,
+            hot_x.min(width.saturating_sub(1)),
+            hot_y.min(height.saturating_sub(1)),
+            rgba,
+        );
+    }
+    let scale = (MAX_CURSOR_IMAGE_DIM as f64 / width.max(height) as f64).min(1.0);
+    let dst_w = ((width as f64 * scale).round() as u32).clamp(1, MAX_CURSOR_IMAGE_DIM);
+    let dst_h = ((height as f64 * scale).round() as u32).clamp(1, MAX_CURSOR_IMAGE_DIM);
+    let mut scaled = vec![0u8; (dst_w * dst_h * 4) as usize];
+    for dy in 0..dst_h {
+        let sy = ((dy as u64 * height as u64) / dst_h as u64).min(height.saturating_sub(1) as u64)
+            as u32;
+        for dx in 0..dst_w {
+            let sx = ((dx as u64 * width as u64) / dst_w as u64)
+                .min(width.saturating_sub(1) as u64) as u32;
+            let src_idx = ((sy * width + sx) * 4) as usize;
+            let dst_idx = ((dy * dst_w + dx) * 4) as usize;
+            scaled[dst_idx..dst_idx + 4].copy_from_slice(&rgba[src_idx..src_idx + 4]);
+        }
+    }
+    let scaled_hx = ((hot_x as f64 * scale).round() as u32).min(dst_w.saturating_sub(1));
+    let scaled_hy = ((hot_y as f64 * scale).round() as u32).min(dst_h.saturating_sub(1));
+    (dst_w, dst_h, scaled_hx, scaled_hy, scaled)
+}
+
+fn encode_cursor_png_with_hash(
+    width: u32,
+    height: u32,
+    hot_x: u32,
+    hot_y: u32,
+    rgba: &[u8],
+) -> Result<CursorImagePayload, String> {
+    use base64::Engine as _;
+    use sha2::{Digest, Sha256};
+
+    if width == 0 || height == 0 || rgba.len() != (width as usize * height as usize * 4) {
+        return Err("Invalid cursor RGBA dimensions".to_string());
+    }
+    let mut png_bytes = Vec::new();
+    {
+        let mut encoder = png::Encoder::new(&mut png_bytes, width, height);
+        encoder.set_color(png::ColorType::Rgba);
+        encoder.set_depth(png::BitDepth::Eight);
+        encoder.set_compression(png::Compression::Fast);
+        let mut writer = encoder.write_header().map_err(|e| e.to_string())?;
+        writer
+            .write_image_data(rgba)
+            .map_err(|e| e.to_string())?;
+    }
+    let mut hasher = Sha256::new();
+    hasher.update(format!("{width}:{height}:{hot_x}:{hot_y}:").as_bytes());
+    hasher.update(&png_bytes);
+    let digest = hasher.finalize();
+    let image_id = digest[..8]
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect::<String>();
+    let png_base64 = base64::engine::general_purpose::STANDARD.encode(&png_bytes);
+    Ok(CursorImagePayload {
+        image_id,
+        width,
+        height,
+        hot_x,
+        hot_y,
+        png_base64,
+    })
+}
+
 #[cfg(windows)]
-fn read_cursor_shape() -> String {
+fn map_hcursor_to_shape(h: windows::Win32::UI::WindowsAndMessaging::HCURSOR) -> String {
     use windows::Win32::UI::WindowsAndMessaging::{
-        GetCursorInfo, LoadCursorW, CURSORINFO, CURSOR_SHOWING, IDC_APPSTARTING, IDC_ARROW,
-        IDC_CROSS, IDC_HAND, IDC_IBEAM, IDC_NO, IDC_SIZEALL, IDC_SIZENESW, IDC_SIZENS,
-        IDC_SIZENWSE, IDC_SIZEWE, IDC_WAIT,
+        LoadCursorW, IDC_APPSTARTING, IDC_ARROW, IDC_CROSS, IDC_HAND, IDC_IBEAM, IDC_NO,
+        IDC_SIZEALL, IDC_SIZENESW, IDC_SIZENS, IDC_SIZENWSE, IDC_SIZEWE, IDC_WAIT,
     };
+    let matches = |id| unsafe { LoadCursorW(None, id).map(|c| c == h).unwrap_or(false) };
+    if matches(IDC_IBEAM) {
+        "text".to_string()
+    } else if matches(IDC_HAND) {
+        "pointer".to_string()
+    } else if matches(IDC_WAIT) {
+        "wait".to_string()
+    } else if matches(IDC_APPSTARTING) {
+        "progress".to_string()
+    } else if matches(IDC_CROSS) {
+        "crosshair".to_string()
+    } else if matches(IDC_SIZEWE) {
+        "ew-resize".to_string()
+    } else if matches(IDC_SIZENS) {
+        "ns-resize".to_string()
+    } else if matches(IDC_SIZENWSE) {
+        "nwse-resize".to_string()
+    } else if matches(IDC_SIZENESW) {
+        "nesw-resize".to_string()
+    } else if matches(IDC_SIZEALL) {
+        "move".to_string()
+    } else if matches(IDC_NO) {
+        "not-allowed".to_string()
+    } else if matches(IDC_ARROW) {
+        "default".to_string()
+    } else {
+        "default".to_string()
+    }
+}
+
+#[cfg(windows)]
+fn read_cursor_info_win32() -> Option<(bool, isize, String)> {
+    use windows::Win32::UI::WindowsAndMessaging::{GetCursorInfo, CURSORINFO, CURSOR_SHOWING};
     let mut ci = CURSORINFO {
         cbSize: std::mem::size_of::<CURSORINFO>() as u32,
         ..Default::default()
     };
     unsafe {
         if GetCursorInfo(&mut ci).is_err() {
-            return "default".to_string();
+            return None;
         }
-        if (ci.flags.0 & CURSOR_SHOWING.0) == 0 {
-            return "default".to_string();
-        }
-        let h = ci.hCursor;
-        let matches = |id| LoadCursorW(None, id).map(|c| c == h).unwrap_or(false);
-        if matches(IDC_IBEAM) {
-            "text".to_string()
-        } else if matches(IDC_HAND) {
-            "pointer".to_string()
-        } else if matches(IDC_WAIT) {
-            "wait".to_string()
-        } else if matches(IDC_APPSTARTING) {
-            "progress".to_string()
-        } else if matches(IDC_CROSS) {
-            "crosshair".to_string()
-        } else if matches(IDC_SIZEWE) {
-            "ew-resize".to_string()
-        } else if matches(IDC_SIZENS) {
-            "ns-resize".to_string()
-        } else if matches(IDC_SIZENWSE) {
-            "nwse-resize".to_string()
-        } else if matches(IDC_SIZENESW) {
-            "nesw-resize".to_string()
-        } else if matches(IDC_SIZEALL) {
-            "move".to_string()
-        } else if matches(IDC_NO) {
-            "not-allowed".to_string()
-        } else if matches(IDC_ARROW) {
-            "default".to_string()
+        let showing = (ci.flags.0 & CURSOR_SHOWING.0) != 0;
+        let shape = if showing {
+            map_hcursor_to_shape(ci.hCursor)
         } else {
             "default".to_string()
+        };
+        Some((showing, ci.hCursor.0 as isize, shape))
+    }
+}
+
+#[cfg(windows)]
+fn read_cursor_shape() -> String {
+    read_cursor_info_win32()
+        .map(|(_, _, shape)| shape)
+        .unwrap_or_else(|| "default".to_string())
+}
+
+#[cfg(windows)]
+fn capture_hcursor_png_win32(hcursor_raw: isize) -> Option<CursorImagePayload> {
+    use std::ffi::c_void;
+    use windows::Win32::Graphics::Gdi::{
+        DeleteObject, GetDC, GetDIBits, GetObjectW, ReleaseDC, BITMAP, BITMAPINFO,
+        BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HBITMAP, HGDIOBJ,
+    };
+    use windows::Win32::UI::WindowsAndMessaging::{
+        CopyIcon, DestroyIcon, GetIconInfo, HICON, ICONINFO,
+    };
+
+    if hcursor_raw == 0 {
+        return None;
+    }
+
+    struct OwnedIcon(HICON);
+    impl Drop for OwnedIcon {
+        fn drop(&mut self) {
+            if !self.0.is_invalid() {
+                unsafe {
+                    let _ = DestroyIcon(self.0);
+                }
+            }
         }
+    }
+    struct IconBitmaps(ICONINFO);
+    impl Drop for IconBitmaps {
+        fn drop(&mut self) {
+            unsafe {
+                if !self.0.hbmColor.is_invalid() {
+                    let _ = DeleteObject(HGDIOBJ(self.0.hbmColor.0));
+                }
+                if !self.0.hbmMask.is_invalid() {
+                    let _ = DeleteObject(HGDIOBJ(self.0.hbmMask.0));
+                }
+            }
+        }
+    }
+    struct ScreenDc(windows::Win32::Graphics::Gdi::HDC);
+    impl Drop for ScreenDc {
+        fn drop(&mut self) {
+            if !self.0.is_invalid() {
+                unsafe {
+                    let _ = ReleaseDC(None, self.0);
+                }
+            }
+        }
+    }
+
+    unsafe {
+        let orig = HICON(hcursor_raw as *mut c_void);
+        let copied = CopyIcon(orig).ok().map(OwnedIcon);
+        let icon_handle = copied.as_ref().map(|o| o.0).unwrap_or(orig);
+        let mut raw_info = ICONINFO::default();
+        if GetIconInfo(icon_handle, &mut raw_info).is_err() {
+            return None;
+        }
+        let guard = IconBitmaps(raw_info);
+        let has_color = !guard.0.hbmColor.is_invalid();
+        let target_bm: HBITMAP = if has_color {
+            guard.0.hbmColor
+        } else {
+            guard.0.hbmMask
+        };
+        if target_bm.is_invalid() {
+            return None;
+        }
+        let mut bm = BITMAP::default();
+        if GetObjectW(
+            HGDIOBJ(target_bm.0),
+            std::mem::size_of::<BITMAP>() as i32,
+            Some(&mut bm as *mut BITMAP as *mut c_void),
+        ) == 0
+        {
+            return None;
+        }
+        let raw_w = bm.bmWidth.max(0) as u32;
+        let raw_h = bm.bmHeight.unsigned_abs();
+        if raw_w == 0 || raw_h == 0 || raw_w > 512 || raw_h > 1024 {
+            return None;
+        }
+        let dc = ScreenDc(GetDC(None));
+        if dc.0.is_invalid() {
+            return None;
+        }
+        let read_bgra = |hbm: HBITMAP, w: u32, h: u32| -> Option<Vec<u8>> {
+            let mut bmi = BITMAPINFO::default();
+            bmi.bmiHeader = BITMAPINFOHEADER {
+                biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+                biWidth: w as i32,
+                biHeight: -(h as i32),
+                biPlanes: 1,
+                biBitCount: 32,
+                biCompression: BI_RGB.0,
+                ..Default::default()
+            };
+            let mut buf = vec![0u8; (w as usize) * (h as usize) * 4];
+            let lines = GetDIBits(
+                dc.0,
+                hbm,
+                0,
+                h,
+                Some(buf.as_mut_ptr() as *mut c_void),
+                &mut bmi,
+                DIB_RGB_COLORS,
+            );
+            if lines <= 0 {
+                None
+            } else {
+                Some(buf)
+            }
+        };
+
+        let (height, rgba) = if has_color {
+            let color = read_bgra(guard.0.hbmColor, raw_w, raw_h)?;
+            let mask = if !guard.0.hbmMask.is_invalid() {
+                read_bgra(guard.0.hbmMask, raw_w, raw_h)
+            } else {
+                None
+            };
+            (
+                raw_h,
+                rgba_from_color_and_mask(raw_w, raw_h, &color, mask.as_deref()),
+            )
+        } else {
+            let logical_h = raw_h / 2;
+            if logical_h == 0 {
+                return None;
+            }
+            let mask = read_bgra(guard.0.hbmMask, raw_w, raw_h)?;
+            (logical_h, rgba_from_monochrome_mask(raw_w, logical_h, &mask))
+        };
+
+        let (final_w, final_h, hot_x, hot_y, final_rgba) = clamp_cursor_bitmap(
+            raw_w,
+            height,
+            guard.0.xHotspot,
+            guard.0.yHotspot,
+            rgba,
+        );
+        encode_cursor_png_with_hash(final_w, final_h, hot_x, hot_y, &final_rgba).ok()
     }
 }
 
@@ -916,40 +1281,152 @@ fn poll_host_activity_locked(state: &mut HostControlState) -> bool {
 }
 
 #[cfg(windows)]
-fn sample_cursor_sync(
-    preferred_session_id: Option<&str>,
+fn is_mouse_locked_win32(
+    source_bounds: (i32, i32, u32, u32),
+    cursor_showing: bool,
+    hidden_since_ms: Option<u64>,
+    controller_moved_while_hidden: bool,
+    now: u64,
+) -> bool {
+    use windows::Win32::Foundation::RECT;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GetClipCursor, GetSystemMetrics, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN,
+    };
+
+    let mut clip = RECT::default();
+    let clip_dims = unsafe {
+        if GetClipCursor(&mut clip).is_ok() {
+            let cw = (clip.right - clip.left).max(0) as u32;
+            let ch = (clip.bottom - clip.top).max(0) as u32;
+            Some((cw, ch))
+        } else {
+            None
+        }
+    };
+    let (src_w, src_h) = (source_bounds.2.max(1), source_bounds.3.max(1));
+    let (virt_w, virt_h) = unsafe {
+        (
+            GetSystemMetrics(SM_CXVIRTUALSCREEN).max(1) as u32,
+            GetSystemMetrics(SM_CYVIRTUALSCREEN).max(1) as u32,
+        )
+    };
+
+    if let Some((cw, ch)) = clip_dims {
+        // A tiny clip box (<= 32px, e.g. 1x1 game trap) indicates locked relative capture even if cursor flag stays set.
+        if cw > 0 && ch > 0 && cw <= 32 && ch <= 32 {
+            return true;
+        }
+        if !cursor_showing && cw > 0 && ch > 0 && (cw + 4 < virt_w.min(src_w) || ch + 4 < virt_h.min(src_h))
+        {
+            return true;
+        }
+    }
+
+    if cursor_showing {
+        return false;
+    }
+
+    controller_moved_while_hidden
+        || hidden_since_ms
+            .map(|since| now.saturating_sub(since) >= LOCKED_CURSOR_HIDDEN_MS)
+            .unwrap_or(false)
+}
+
+#[cfg(windows)]
+fn sample_cursor_and_image_locked(
+    state: &mut HostControlState,
     host_busy: bool,
-    cursor_shape: &str,
-    actor_controller_id: Option<&str>,
-) -> Option<CursorSyncPayload> {
+) -> Option<(CursorSyncPayload, Option<CursorImagePayload>)> {
+    let now = now_ms();
     let (session_id, source, embedded_in_video) =
-        crate::screen_sources::active_cursor_session_info(preferred_session_id)?;
-    let (left, top, width, height) = crate::stream_pointer::source_bounds(&source)?;
+        crate::screen_sources::active_cursor_session_info(state.last_session_id.as_deref())?;
+    let bounds @ (left, top, width, height) = crate::stream_pointer::source_bounds(&source)?;
     let (px, py) = read_cursor_pos()?;
-    let visible = width > 1
+    let (cursor_showing, cursor_handle, cursor_shape) =
+        read_cursor_info_win32().unwrap_or((true, 0, "default".to_string()));
+    state.last_cursor_shape = cursor_shape.clone();
+
+    if cursor_showing {
+        state.cursor_hidden_since_ms = None;
+        state.controller_moved_while_hidden = false;
+    } else if state.cursor_hidden_since_ms.is_none() {
+        state.cursor_hidden_since_ms = Some(now);
+    }
+
+    let mouse_locked = is_mouse_locked_win32(
+        bounds,
+        cursor_showing,
+        state.cursor_hidden_since_ms,
+        state.controller_moved_while_hidden,
+        now,
+    );
+
+    let (image_id, new_image) = if !cursor_showing || cursor_handle == 0 || mouse_locked {
+        (state.last_cursor_image_id.clone(), None)
+    } else if cursor_handle != state.last_cursor_handle
+        || state.last_cursor_image_id.is_empty()
+        || now.saturating_sub(state.last_cursor_capture_ms) >= CURSOR_RESAMPLE_MS
+    {
+        state.last_cursor_handle = cursor_handle;
+        state.last_cursor_capture_ms = now;
+        if let Some(payload) = capture_hcursor_png_win32(cursor_handle) {
+            let id = payload.image_id.clone();
+            state.last_cursor_image_id = id.clone();
+            let already_sent = state.sent_cursor_images.contains_key(&id);
+            if !already_sent && state.sent_cursor_images.len() >= CURSOR_IMAGE_CACHE_LIMIT {
+                if let Some(oldest_key) = state
+                    .sent_cursor_images
+                    .iter()
+                    .min_by_key(|(_, ts)| *ts)
+                    .map(|(k, _)| k.clone())
+                {
+                    state.sent_cursor_images.remove(&oldest_key);
+                }
+            }
+            state.sent_cursor_images.insert(id.clone(), now);
+            (id, if already_sent { None } else { Some(payload) })
+        } else {
+            (state.last_cursor_image_id.clone(), None)
+        }
+    } else {
+        (state.last_cursor_image_id.clone(), None)
+    };
+
+    let inside = width > 1
         && height > 1
         && px >= left
         && px < left + width as i32
         && py >= top
         && py < top + height as i32;
+    let visible = inside && cursor_showing && !mouse_locked;
     let x = ((px - left) as f64 / (width.saturating_sub(1).max(1) as f64)).clamp(0.0, 1.0);
     let y = ((py - top) as f64 / (height.saturating_sub(1).max(1) as f64)).clamp(0.0, 1.0);
     let actor = if host_busy {
         "host".to_string()
     } else {
-        actor_controller_id.unwrap_or("host").to_string()
+        state
+            .last_mouse_actor_id
+            .as_deref()
+            .unwrap_or("host")
+            .to_string()
     };
-    Some(CursorSyncPayload {
-        session_id,
-        active: true,
-        visible,
-        x,
-        y,
-        cursor_shape: cursor_shape.to_string(),
-        host_busy,
-        actor_controller_id: actor,
-        embedded_in_video,
-    })
+
+    Some((
+        CursorSyncPayload {
+            session_id,
+            active: true,
+            visible,
+            x,
+            y,
+            cursor_shape,
+            image_id,
+            mouse_locked,
+            host_busy,
+            actor_controller_id: actor,
+            embedded_in_video,
+        },
+        new_image,
+    ))
 }
 
 fn emit_inactive_cursor_sync(app: &AppHandle) {
@@ -963,6 +1440,8 @@ fn emit_inactive_cursor_sync(app: &AppHandle) {
             x: 0.0,
             y: 0.0,
             cursor_shape: "default".to_string(),
+            image_id: String::new(),
+            mouse_locked: false,
             host_busy: false,
             actor_controller_id: String::new(),
             embedded_in_video: true,
@@ -1000,6 +1479,12 @@ pub fn set_remote_control_active(
                 state.host_paused_until = 0;
                 state.was_host_paused = false;
                 state.last_cursor_shape = read_cursor_shape();
+                state.last_cursor_handle = 0;
+                state.last_cursor_image_id.clear();
+                state.last_cursor_capture_ms = 0;
+                state.sent_cursor_images.clear();
+                state.cursor_hidden_since_ms = None;
+                state.controller_moved_while_hidden = false;
                 if !state.monitor_running {
                     state.monitor_running = true;
                     should_spawn = true;
@@ -1011,6 +1496,9 @@ pub fn set_remote_control_active(
                 state.last_session_id = None;
                 state.last_mouse_actor_id = None;
                 state.mapping_cache = None;
+                state.sent_cursor_images.clear();
+                state.cursor_hidden_since_ms = None;
+                state.controller_moved_while_hidden = false;
             }
         }
         if !active {
@@ -1024,7 +1512,7 @@ pub fn set_remote_control_active(
                 let mut last_cursor_emit_ms: u64 = 0;
                 loop {
                     std::thread::sleep(std::time::Duration::from_millis(MONITOR_INTERVAL_MS));
-                    let (still_active, paused, shape, preferred_sid, actor) = {
+                    let (still_active, paused, shape, sync_and_image) = {
                         let Ok(mut state) = HOST_STATE.lock() else {
                             break;
                         };
@@ -1033,15 +1521,9 @@ pub fn set_remote_control_active(
                             break;
                         }
                         let paused = poll_host_activity_locked(&mut state);
-                        let shape = read_cursor_shape();
-                        state.last_cursor_shape = shape.clone();
-                        (
-                            true,
-                            paused,
-                            shape,
-                            state.last_session_id.clone(),
-                            state.last_mouse_actor_id.clone(),
-                        )
+                        let sampled = sample_cursor_and_image_locked(&mut state, paused);
+                        let shape = state.last_cursor_shape.clone();
+                        (true, paused, shape, sampled)
                     };
                     if !still_active {
                         break;
@@ -1058,12 +1540,10 @@ pub fn set_remote_control_active(
                             },
                         );
                     }
-                    if let Some(sync_payload) = sample_cursor_sync(
-                        preferred_sid.as_deref(),
-                        paused,
-                        &shape,
-                        actor.as_deref(),
-                    ) {
+                    if let Some((sync_payload, new_image)) = sync_and_image {
+                        if let Some(img) = new_image {
+                            let _ = app.emit_to("main", "remote-control-cursor-image", img);
+                        }
                         let now = now_ms();
                         let changed = prev_cursor_sync.as_ref() != Some(&sync_payload);
                         if changed || now.saturating_sub(last_cursor_emit_ms) >= 450 {
@@ -1134,11 +1614,20 @@ pub fn apply_remote_control_input(
         let is_mouse_event = matches!(
             event,
             RemoteInputEvent::MouseMove { .. }
+                | RemoteInputEvent::MouseDelta { .. }
                 | RemoteInputEvent::MouseButton { .. }
                 | RemoteInputEvent::MouseWheel { .. }
         );
         if is_mouse_event {
             state.last_mouse_actor_id = Some(controller_id.clone());
+            if state.cursor_hidden_since_ms.is_some()
+                && matches!(
+                    event,
+                    RemoteInputEvent::MouseMove { .. } | RemoteInputEvent::MouseDelta { .. }
+                )
+            {
+                state.controller_moved_while_hidden = true;
+            }
         }
         let mut moved_cursor = false;
         match event {
@@ -1168,6 +1657,27 @@ pub fn apply_remote_control_input(
                 };
                 send_win32_inputs(&[input]);
                 moved_cursor = true;
+            }
+            RemoteInputEvent::MouseDelta { dx, dy } => {
+                let clamped_dx = dx.clamp(-10_000, 10_000);
+                let clamped_dy = dy.clamp(-10_000, 10_000);
+                if clamped_dx != 0 || clamped_dy != 0 {
+                    let input = INPUT {
+                        r#type: INPUT_MOUSE,
+                        Anonymous: INPUT_0 {
+                            mi: MOUSEINPUT {
+                                dx: clamped_dx,
+                                dy: clamped_dy,
+                                mouseData: 0,
+                                dwFlags: MOUSEEVENTF_MOVE,
+                                time: 0,
+                                dwExtraInfo: P2SHARER_INPUT_TAG,
+                            },
+                        },
+                    };
+                    send_win32_inputs(&[input]);
+                    moved_cursor = true;
+                }
             }
             RemoteInputEvent::MouseButton {
                 button,
@@ -1743,5 +2253,48 @@ mod tests {
         assert!(is_punctuation_code("IntlBackslash"));
         assert!(!is_punctuation_code("KeyA"));
         assert!(!is_punctuation_code("Enter"));
+    }
+
+    #[test]
+    fn cursor_bitmap_conversion_and_png_encoding_produce_stable_ids() {
+        // 2x2 monochrome cursor: (black, white) on row 0; (transparent, inverted XOR) on row 1.
+        let mono_bgra = vec![
+            0, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 0, 255, 255, 255, 0,
+            0, 0, 0, 0, 255, 255, 255, 0, 0, 0, 0, 0, 255, 255, 255, 0,
+        ];
+        let mono_rgba = rgba_from_monochrome_mask(2, 2, &mono_bgra);
+        assert_eq!(&mono_rgba[0..4], &[0, 0, 0, 255]);
+        assert_eq!(&mono_rgba[4..8], &[255, 255, 255, 255]);
+        // Transparent neighbor gets crisp light outline halo next to the XOR pixel at (1, 1)
+        assert_eq!(&mono_rgba[8..12], &[255, 255, 255, 215]);
+        assert_eq!(&mono_rgba[12..16], &[17, 24, 39, 255]);
+
+        let color_bgra = vec![10, 20, 30, 0, 40, 50, 60, 0];
+        let color_mask = vec![0, 0, 0, 0, 255, 255, 255, 0];
+        let color_rgba = rgba_from_color_and_mask(2, 1, &color_bgra, Some(&color_mask));
+        assert_eq!(&color_rgba[0..4], &[30, 20, 10, 255]);
+        assert_eq!(&color_rgba[4..8], &[60, 50, 40, 0]);
+
+        let p1 = encode_cursor_png_with_hash(2, 2, 0, 1, &mono_rgba).expect("png encode");
+        let p2 = encode_cursor_png_with_hash(2, 2, 0, 1, &mono_rgba).expect("png encode");
+        let p3 = encode_cursor_png_with_hash(2, 2, 1, 1, &mono_rgba).expect("png encode");
+        assert_eq!(p1.image_id, p2.image_id);
+        assert_ne!(p1.image_id, p3.image_id);
+        assert!(!p1.png_base64.is_empty());
+
+        let (sw, sh, hx, hy, scaled) = clamp_cursor_bitmap(256, 256, 64, 128, vec![255; 256 * 256 * 4]);
+        assert_eq!((sw, sh, hx, hy), (128, 128, 32, 64));
+        assert_eq!(scaled.len(), 128 * 128 * 4);
+    }
+
+    #[test]
+    fn mouse_delta_event_deserializes() {
+        let ev: RemoteInputEvent =
+            serde_json::from_str(r#"{"kind":"mouseDelta","dx":-18,"dy":42}"#)
+                .expect("mouseDelta json");
+        match ev {
+            RemoteInputEvent::MouseDelta { dx, dy } => assert_eq!((dx, dy), (-18, 42)),
+            other => panic!("unexpected variant: {other:?}"),
+        }
     }
 }

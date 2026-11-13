@@ -12,6 +12,8 @@ interface RemoteControlFloatingOverlayProps {
   onExitRemoteControl: () => void;
   immersive: boolean;
   onToggleImmersive: () => void;
+  mouseLock: boolean;
+  onToggleMouseLock: () => void;
   hostBusy: boolean;
   mouseEnabled: boolean;
   keyboardEnabled: boolean;
@@ -20,6 +22,7 @@ interface RemoteControlFloatingOverlayProps {
   onVolumeChange: (volume: number) => void;
   onToggleMute: () => void;
   onOverlayHoverChange: (hovered: boolean) => void;
+  onOverlayMenuOpenChange?: (open: boolean) => void;
   qualityText: string;
   liveBitrateKbps: number;
   configuredBitrateKbps: number;
@@ -42,6 +45,8 @@ export function RemoteControlFloatingOverlay({
   onExitRemoteControl,
   immersive,
   onToggleImmersive,
+  mouseLock,
+  onToggleMouseLock,
   hostBusy,
   mouseEnabled,
   keyboardEnabled,
@@ -50,6 +55,7 @@ export function RemoteControlFloatingOverlay({
   onVolumeChange,
   onToggleMute,
   onOverlayHoverChange,
+  onOverlayMenuOpenChange,
   qualityText,
   liveBitrateKbps,
   configuredBitrateKbps,
@@ -64,6 +70,8 @@ export function RemoteControlFloatingOverlay({
   const dragCleanupRef = useRef<(() => void) | null>(null);
   const onOverlayHoverChangeRef = useRef(onOverlayHoverChange);
   onOverlayHoverChangeRef.current = onOverlayHoverChange;
+  const onOverlayMenuOpenChangeRef = useRef(onOverlayMenuOpenChange);
+  onOverlayMenuOpenChangeRef.current = onOverlayMenuOpenChange;
 
   const [open, setOpen] = useState(false);
   const [anchor, setAnchor] = useState<{ rx: number; ry: number }>(
@@ -116,10 +124,12 @@ export function RemoteControlFloatingOverlay({
       dragCleanupRef.current?.();
       dragCleanupRef.current = null;
       onOverlayHoverChangeRef.current(false);
+      onOverlayMenuOpenChangeRef.current?.(false);
     };
   }, []);
 
   useEffect(() => {
+    onOverlayMenuOpenChangeRef.current?.(open);
     if (!open) {
       onOverlayHoverChangeRef.current(false);
       return;
@@ -364,6 +374,32 @@ export function RemoteControlFloatingOverlay({
                 checked={immersive}
                 onChange={onToggleImmersive}
                 aria-label={t('remoteControl.immersiveMode')}
+              />
+              <span className="switch-slider" />
+            </span>
+          </label>
+
+          <label className="remote-control-floating-row remote-control-mouselock-row">
+            <span className="remote-control-floating-row-copy">
+              <strong>{t('remoteControl.mouseLock')}</strong>
+              <small>{t('remoteControl.mouseLockHint')}</small>
+            </span>
+            <span className="modern-switch">
+              <input
+                type="checkbox"
+                autoComplete="off"
+                checked={mouseLock}
+                disabled={!mouseEnabled}
+                onChange={() => {
+                  const turningOn = !mouseLock;
+                  if (turningOn) {
+                    setOpen(false);
+                    onOverlayHoverChangeRef.current(false);
+                    onOverlayMenuOpenChangeRef.current?.(false);
+                  }
+                  onToggleMouseLock();
+                }}
+                aria-label={t('remoteControl.mouseLock')}
               />
               <span className="switch-slider" />
             </span>

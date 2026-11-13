@@ -140,6 +140,7 @@ export function useRoom() {
     remoteControlHostBusy: roomService.remoteControlHostBusy,
     remoteControlViewerStates: roomService.remoteControlViewerStates,
     remoteCursorStates: roomService.remoteCursorStates,
+    remoteCursorImages: roomService.remoteCursorImages,
     selfPeerId: roomService.getSelfPeerId(),
 
     // Actions

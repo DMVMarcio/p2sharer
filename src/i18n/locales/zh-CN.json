@@ -1659,6 +1659,8 @@
   "remoteControl.keyboardDisabledHint": "键盘已禁用",
   "remoteControl.immersiveMode": "沉浸模式",
   "remoteControl.immersiveHint": "将 Alt+Tab、Windows 键和系统快捷键发送到远程电脑",
+  "remoteControl.mouseLock": "锁定鼠标（游戏）",
+  "remoteControl.mouseLockHint": "为游戏和 3D 视角捕获相对鼠标移动（按 Esc 释放）",
   "remoteControl.exitAction": "停止控制",
   "remoteControl.manageAction": "远程控制",
   "remoteControl.managerTitle": "远程控制",

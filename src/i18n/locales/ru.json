@@ -1659,6 +1659,8 @@
   "remoteControl.keyboardDisabledHint": "Клавиатура отключена",
   "remoteControl.immersiveMode": "Иммерсивный режим",
   "remoteControl.immersiveHint": "Передавать Alt+Tab, клавишу Windows и системные сочетания на удалённый ПК",
+  "remoteControl.mouseLock": "Захват мыши (игры)",
+  "remoteControl.mouseLockHint": "Относительное движение для игр и 3D-камер (Esc освобождает)",
   "remoteControl.exitAction": "Остановить",
   "remoteControl.manageAction": "Удалённое управление",
   "remoteControl.managerTitle": "Удалённое управление",

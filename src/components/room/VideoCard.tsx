@@ -59,6 +59,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     returnToGrid,
     remoteControlViewerStates,
     remoteCursorStates,
+    remoteCursorImages,
     selfPeerId,
     remoteControllers,
   } = useRoom();
@@ -153,12 +154,15 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   };
 
   const videoElementRef = useRef<HTMLVideoElement | null>(null);
+  const remoteCursorSync = remoteCursorStates[slot.peerId];
   const remoteControl = useRemoteControl(
     cardRef,
     videoElementRef,
     slot.peerId,
     isRemoteControlEligible,
     remoteViewerState,
+    remoteCursorSync,
+    remoteCursorImages,
   );
   const openPictureInPicture = () => {
     const request = isTauri() ? pipService.openPip(slot.peerId, slot.senderName, slot.stream)
@@ -543,7 +547,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
       {pointer.toolbar}
 
       {(() => {
-        const cursorSync = remoteCursorStates[slot.peerId];
+        const cursorSync = remoteCursorSync;
         const weAreActivelyDriving =
           remoteControl.active &&
           !remoteControl.hostBusy &&
@@ -561,6 +565,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
             containerRef={cardRef}
             videoRef={videoElementRef}
             cursorSync={cursorSync}
+            cursorImages={remoteCursorImages}
             visible={showRemoteCursor}
             viewKey={`${zoom}:${pan.x}:${pan.y}`}
           />
@@ -576,6 +581,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           onExitRemoteControl={remoteControl.exit}
           immersive={remoteControl.immersive}
           onToggleImmersive={remoteControl.toggleImmersive}
+          mouseLock={remoteControl.mouseLocked}
+          onToggleMouseLock={remoteControl.toggleManualMouseLock}
           hostBusy={remoteControl.hostBusy}
           mouseEnabled={remoteControl.mouseEnabled}
           keyboardEnabled={remoteControl.keyboardEnabled}
@@ -589,6 +596,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           }}
           onToggleMute={handleToggleMute}
           onOverlayHoverChange={remoteControl.setOverlayHovered}
+          onOverlayMenuOpenChange={remoteControl.setOverlayMenuOpen}
           qualityText={`${remoteResolution} ${formatFrameRate(liveFps)} FPS`}
           liveBitrateKbps={liveBitrate}
           configuredBitrateKbps={currentBitrate}

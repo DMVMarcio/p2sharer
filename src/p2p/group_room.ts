@@ -606,6 +606,17 @@ export class GroupRoomManager {
     }
   }
 
+  public getRemoteControlWatchers(mediaId: string): string[] {
+    const watchers = new Set<string>();
+    for (const watcher of this.getStreamWatchers(`local/${mediaId}`)) watchers.add(watcher.peerId);
+    for (const watcher of this.getStreamWatchers('local')) watchers.add(watcher.peerId);
+    return Array.from(watchers).filter(
+      (target) =>
+        this.peerTracker.isVerified(target) &&
+        (!this.authority || (this.localAdmitted && this.isAdmittedPeer(target))),
+    );
+  }
+
   public async sendAppEvent(event: AppWireEvent, target?: string): Promise<void> {
     if (!this.appAction || (this.authority && !this.localAdmitted)) return;
     if (target) {

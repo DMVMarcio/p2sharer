@@ -155,6 +155,7 @@ test('RemoteControlHostManager manages consent, multi-controllers, permissions, 
 test('encodeRemoteControlBinaryInput and decodeRemoteControlBinaryInput roundtrip events and reject malformed frames', () => {
   const samples: RemoteInputEvent[] = [
     { kind: 'mouseMove', x: 0.25, y: 0.75 },
+    { kind: 'mouseDelta', dx: -45, dy: 120 },
     { kind: 'mouseButton', button: 'right', down: true, x: 0.5, y: 0.5 },
     { kind: 'mouseButton', button: 'x1', down: false },
     { kind: 'mouseWheel', deltaX: -12.5, deltaY: 120, x: 0.125, y: 0.875 },
@@ -171,6 +172,10 @@ test('encodeRemoteControlBinaryInput and decodeRemoteControlBinaryInput roundtri
     assert.equal(decoded.mediaId, 'screen-1');
     assert.equal(decoded.seq, index + 1);
     assert.equal(decoded.event.kind, event.kind);
+    if (event.kind === 'mouseDelta' && decoded.event.kind === 'mouseDelta') {
+      assert.equal(decoded.event.dx, -45);
+      assert.equal(decoded.event.dy, 120);
+    }
     if (event.kind === 'key' && decoded.event.kind === 'key') {
       assert.equal(decoded.event.code, 'KeyW');
       assert.equal(decoded.event.vk, 87);
@@ -192,11 +197,26 @@ test('encodeRemoteControlBinaryInput and decodeRemoteControlBinaryInput roundtri
     x: 0.375,
     y: 0.625,
     cursorShape: 'pointer',
+    imageId: '0123456789abcdef',
+    mouseLocked: true,
     hostBusy: false,
     actorPeerId: 'peer-a',
     embeddedInVideo: false,
   };
   assert.equal(validRemoteControlHostPacket(cursorPacket), true);
+  assert.equal(
+    validRemoteControlHostPacket({
+      type: 'cursorImage',
+      mediaId: 'screen-1',
+      imageId: '0123456789abcdef',
+      width: 32,
+      height: 32,
+      hotX: 4,
+      hotY: 2,
+      pngBase64: 'iVBORw0KGgo=',
+    }),
+    true,
+  );
   const encodedCursor = encodeRemoteControlCursorSync(cursorPacket, 42);
   assert.ok(encodedCursor instanceof Uint8Array);
   assert.equal(isRemoteControlBinaryFrame(encodedCursor), true);
@@ -207,5 +227,7 @@ test('encodeRemoteControlBinaryInput and decodeRemoteControlBinaryInput roundtri
   assert.equal(decodedCursor.packet.type, 'cursorSync');
   assert.equal(decodedCursor.packet.actorPeerId, 'peer-a');
   assert.equal(decodedCursor.packet.cursorShape, 'pointer');
+  assert.equal(decodedCursor.packet.imageId, '0123456789abcdef');
+  assert.equal(decodedCursor.packet.mouseLocked, true);
   assert.equal(decodedCursor.packet.embeddedInVideo, false);
 });

@@ -1659,6 +1659,8 @@
   "remoteControl.keyboardDisabledHint": "Tastatur deaktiviert",
   "remoteControl.immersiveMode": "Immersiver Modus",
   "remoteControl.immersiveHint": "Sendet Alt+Tab, Windows-Taste und Systemkürzel an den entfernten PC",
+  "remoteControl.mouseLock": "Gesperrte Maus (Spiele)",
+  "remoteControl.mouseLockHint": "Erfasst relative Bewegungen für Spiele und 3D-Kameras (Esc löst)",
   "remoteControl.exitAction": "Steuerung beenden",
   "remoteControl.manageAction": "Fernsteuerung",
   "remoteControl.managerTitle": "Fernsteuerung",

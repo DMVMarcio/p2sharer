@@ -1659,6 +1659,8 @@
   "remoteControl.keyboardDisabledHint": "已停用鍵盤",
   "remoteControl.immersiveMode": "沉浸模式",
   "remoteControl.immersiveHint": "將 Alt+Tab、Windows 鍵與系統快速鍵傳送到遠端電腦",
+  "remoteControl.mouseLock": "鎖定滑鼠（遊戲）",
+  "remoteControl.mouseLockHint": "為遊戲與 3D 視角擷取相對滑鼠移動（按 Esc 釋放）",
   "remoteControl.exitAction": "停止控制",
   "remoteControl.manageAction": "遠端控制",
   "remoteControl.managerTitle": "遠端控制",

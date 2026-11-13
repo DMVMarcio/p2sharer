@@ -1,11 +1,16 @@
 import { useEffect, useState, type RefObject } from 'react';
-import type { RemoteCursorShape, RemoteCursorSyncState } from '../../core/remote_control';
+import type {
+  RemoteCursorImageAsset,
+  RemoteCursorShape,
+  RemoteCursorSyncState,
+} from '../../core/remote_control';
 import { streamPointerVideoRect } from '../../core/stream_pointer';
 
 interface RemoteCursorOverlayProps {
   containerRef: RefObject<HTMLElement | null>;
   videoRef: RefObject<HTMLVideoElement | null>;
   cursorSync: RemoteCursorSyncState | undefined;
+  cursorImages?: Record<string, RemoteCursorImageAsset>;
   visible: boolean;
   viewKey?: string;
 }
@@ -146,6 +151,7 @@ export function RemoteCursorOverlay({
   containerRef,
   videoRef,
   cursorSync,
+  cursorImages,
   visible,
   viewKey = '',
 }: RemoteCursorOverlayProps) {
@@ -201,7 +207,10 @@ export function RemoteCursorOverlay({
 
   const pxX = bounds.left + cursorSync.x * bounds.width;
   const pxY = bounds.top + cursorSync.y * bounds.height;
-  const [hotX, hotY] = getHotspotOffset(cursorSync.cursorShape);
+  const asset = cursorSync.imageId ? cursorImages?.[cursorSync.imageId] : undefined;
+  const [hotX, hotY] = asset
+    ? [asset.hotX, asset.hotY]
+    : getHotspotOffset(cursorSync.cursorShape);
 
   return (
     <div
@@ -211,7 +220,17 @@ export function RemoteCursorOverlay({
         transform: `translate3d(${pxX - hotX}px, ${pxY - hotY}px, 0)`,
       }}
     >
-      {renderCursorSvg(cursorSync.cursorShape)}
+      {asset ? (
+        <img
+          src={asset.dataUrl}
+          width={asset.width}
+          height={asset.height}
+          alt=""
+          draggable={false}
+        />
+      ) : (
+        renderCursorSvg(cursorSync.cursorShape)
+      )}
     </div>
   );
 }

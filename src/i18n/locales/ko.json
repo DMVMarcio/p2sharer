@@ -1659,6 +1659,8 @@
   "remoteControl.keyboardDisabledHint": "키보드 비활성화됨",
   "remoteControl.immersiveMode": "몰입 모드",
   "remoteControl.immersiveHint": "Alt+Tab, Windows 키 및 시스템 단축키를 원격 PC로 전달합니다",
+  "remoteControl.mouseLock": "마우스 잠금 (게임)",
+  "remoteControl.mouseLockHint": "게임 및 3D 카메라용 상대 이동을 캡처합니다 (Esc로 해제)",
   "remoteControl.exitAction": "제어 종료",
   "remoteControl.manageAction": "원격 제어",
   "remoteControl.managerTitle": "원격 제어",

@@ -2,43 +2,43 @@
   "version": "1.7.0",
   "translations": {
     "en": [
-      "**Remote control.** Share screen control with consent, low-latency input, local hardware cursor option, hold-lock inside the stream, immersive shortcuts, and permissions."
+      "**Remote control.** Share screen control with consent, authentic host cursor, relative locked-mouse mode for games, immersive shortcuts, and per-controller permissions."
     ],
     "pt-BR": [
-      "**Controle remoto.** Controle telas com consentimento, baixa latência, cursor local imediato, trava ao arrastar, overlay arrastável com modo imersivo e permissões."
+      "**Controle remoto.** Controle telas com consentimento, visual original do cursor do host, modo de mouse travado para jogos, atalhos imersivos e permissões."
     ],
     "es": [
-      "**Control remoto.** Comparte control de pantalla con consentimiento, baja latencia, cursor local inmediato, bloqueo al arrastrar, modo inmersivo y permisos por usuario."
+      "**Control remoto.** Comparte control de pantalla con consentimiento, cursor original del anfitrión, ratón bloqueado para juegos, atajos inmersivos y permisos."
     ],
     "fr": [
-      "**Contrôle à distance.** Partagez l'écran sur consentement avec faible latence, curseur local immédiat, maintien au glisser, mode immersif et droits par utilisateur."
+      "**Contrôle à distance.** Partagez l'écran sur consentement avec curseur d'origine de l'hôte, souris verrouillée pour les jeux, mode immersif et droits."
     ],
     "de": [
-      "**Fernsteuerung.** Teile Steuerung mit Zustimmung, geringer Latenz, direktem lokalem Cursor, Haltesperre beim Ziehen, immersivem Modus und Rechten pro Person."
+      "**Fernsteuerung.** Teile Steuerung mit Zustimmung, Originalcursor des Hosts, gesperrter Maus für Spiele, immersivem Modus und Rechten pro Person."
     ],
     "it": [
-      "**Controllo remoto.** Condividi il controllo con consenso, bassa latenza, cursore locale immediato, blocco durante il trascinamento, modalità immersiva e permessi."
+      "**Controllo remoto.** Condividi il controllo con consenso, cursore originale dell'host, mouse bloccato per giochi, modalità immersiva e permessi."
     ],
     "zh-CN": [
-      "**远程控制。** 经同意共享屏幕控制权，支持低延迟输入、零延迟本地光标、拖拽锁定、带沉浸模式的可拖动浮窗及分用户权限管理。"
+      "**远程控制。** 经同意共享屏幕控制权，显示主机原始光标，支持游戏相对锁定鼠标、沉浸快捷键及分用户权限。"
     ],
     "zh-TW": [
-      "**遠端控制。** 經同意即可共享畫面控制權，支援低延遲輸入、零延遲本地游標、拖曳鎖定、支援沉浸模式的可拖曳浮窗與分使用者權限。"
+      "**遠端控制。** 經同意共享畫面控制權，呈現主機原始游標，支援遊戲相對鎖定滑鼠、沉浸快速鍵與分使用者權限。"
     ],
     "ja": [
-      "**リモート操作。** 同意制で低遅延な画面操作を共有でき、即時ローカルカーソル、ドラッグ時の範囲ロック、没入モード、ユーザー別権限に対応しました。"
+      "**リモート操作。** 同意制で画面操作を共有でき、ホスト本来のカーソル表示、ゲーム向け相対マウスロック、没入モード、ユーザー別権限に対応しました。"
     ],
     "ko": [
-      "**원격 제어.** 동의를 통해 저지연 화면 제어를 공유하고, 즉시 반응하는 로컬 커서, 드래그 잠금, 몰입 모드 및 사용자별 권한 관리를 제공합니다."
+      "**원격 제어.** 동의를 통해 화면 제어를 공유하며, 호스트의 원본 커서 표시, 게임용 상대 마우스 잠금, 몰입 모드 및 사용자별 권한 관리를 제공합니다."
     ],
     "hi": [
-      "**रिमोट कंट्रोल।** सहमति से कम-विलंबता स्क्रीन नियंत्रण, त्वरित लोकल कर्सर, ड्रैग लॉक, इमर्सिव शॉर्टकट और उपयोगकर्ता अनुमतियाँ साझा करें।"
+      "**रिमोट कंट्रोल।** सहमति से स्क्रीन नियंत्रण, मूल होस्ट कर्सर, गेम्स के लिए लॉक्ड-माउस मोड, इमर्सिव शॉर्टकट और उपयोगकर्ता अनुमतियाँ साझा करें।"
     ],
     "fi": [
-      "**Etähallinta.** Jaa näytön hallinta luvalla matalalla viiveellä, välittömällä paikallisella osoittimella, vedon lukituksella, immersiotilalla ja käyttäjäluvilla."
+      "**Etähallinta.** Jaa näytön hallinta luvalla, näytä isännän aito osoitin, lukittu hiiri peleille, immersiotila ja käyttäjäkohtaiset luvat."
     ],
     "ru": [
-      "**Удалённое управление.** Передавайте управление с согласия, с минимальной задержкой, мгновенным локальным курсором, захватом при перетаскивании и иммерсивным режимом."
+      "**Удалённое управление.** Передавайте управление с согласия с оригинальным курсором хоста, захватом мыши для игр, иммерсивным режимом и правами."
     ]
   }
 }
