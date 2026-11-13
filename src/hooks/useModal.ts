@@ -14,6 +14,7 @@ export type ModalType =
   | 'roomSecurity'
   | 'externalLink'
   | 'apps'
+  | 'remoteControlManager'
   | 'p2pTest'
   | null;
 

@@ -11,6 +11,7 @@ pub mod chat_files;
 mod chat_file_direct;
 pub mod pip_manager;
 pub mod stream_pointer;
+pub mod remote_control;
 pub mod process_manager;
 pub mod room_vault;
 pub mod screen_sources;
@@ -90,6 +91,7 @@ fn cancel_app_update(window: tauri::Window) -> Result<(), String> {
 
 #[tauri::command]
 fn exit_application(app: tauri::AppHandle) -> Result<(), String> {
+    remote_control::shutdown_remote_control();
     let _ = stop_native_screen_capture();
     let _ = stop_audio_capture();
     chat_files::sweep_chat_clipboard();
@@ -166,6 +168,7 @@ pub fn run() {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 let label = window.label();
                 if label == "main" {
+                    remote_control::shutdown_remote_control();
                     let _ = stop_native_screen_capture();
                     let _ = stop_audio_capture();
                 } else if label.starts_with("pip-") {
@@ -174,6 +177,7 @@ pub fn run() {
                 }
             }
             if matches!(event, tauri::WindowEvent::Destroyed) && window.label() == "main" {
+                remote_control::shutdown_remote_control();
                 let _ = stop_native_screen_capture();
                 let _ = stop_audio_capture();
                 chat_files::sweep_chat_clipboard();
@@ -256,6 +260,10 @@ pub fn run() {
             native_rtc::get_native_video_stats,
             stream_pointer::update_stream_pointer_overlay,
             stream_pointer::get_stream_pointer_visuals,
+            remote_control::set_remote_control_active,
+            remote_control::apply_remote_control_input,
+            remote_control::release_remote_control_inputs,
+            remote_control::set_remote_control_immersive,
             list_audio_processes,
             list_screen_sources,
             start_native_screen_capture,

@@ -1,12 +1,14 @@
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { useRoom } from '../../hooks/useRoom';
+import { RemoteControlToastItems } from './RemoteControlRequests';
 
 export function ChatFileRequests() {
   useLocale();
-  const { fileRequests, answerFileRequest } = useRoom();
-  if (!fileRequests.length) return null;
+  const { fileRequests, answerFileRequest, remoteControlRequests } = useRoom();
+  if (!fileRequests.length && !remoteControlRequests.length) return null;
   return <div className="chat-file-toasts" aria-live="polite">
+    <RemoteControlToastItems />
     {fileRequests.map((request) => <div className="chat-file-toast" key={request.requestId}>
       <p className="chat-file-toast-title"><strong className="chat-file-toast-person">{request.peerName}</strong>
         {' '}{t("message.8f3e00408d22")} {request.preview ? t('files.previewVerb') : t('files.downloadVerb')}{' '}

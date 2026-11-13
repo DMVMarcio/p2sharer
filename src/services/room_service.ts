@@ -4,6 +4,15 @@ import { reconcilePinnedRoomSlot, streamOwner, type MediaKind, type StreamDescri
 import { StreamPointerReceiver } from './stream_pointer_receiver.ts';
 import { generateUserColor } from '../p2p/group_room.ts';
 import { validStreamPointer, validStreamPointerState, type StreamPointerState, type StreamPointerPacket } from '../core/stream_pointer.ts';
+import { RemoteControlHostManager } from './remote_control_receiver.ts';
+import {
+  normalizeCursorShape,
+  type RemoteControlHostPacket,
+  type RemoteControlRequest,
+  type RemoteControlViewerState,
+  type RemoteControllerInfo,
+  type RemoteInputEvent,
+} from '../core/remote_control.ts';
 import { emitTo, listen } from '@tauri-apps/api/event';
 import { streamPointerView } from './stream_pointer_view.ts';
 import { invoke } from '../platform/commands.ts';
@@ -66,6 +75,10 @@ export class RoomService {
   private localSaveIds = new Set<string>();
   private cancelledLocalSaves = new Set<string>();
   public peers: PeerInfo[] = [];
+  public remoteControlRequests: RemoteControlRequest[] = [];
+  public remoteControllers: RemoteControllerInfo[] = [];
+  public remoteControlHostBusy = false;
+  public remoteControlViewerStates: Record<string, RemoteControlViewerState> = {};
   public roomStatusText: string = t("message.e56841de8c6f");
   public connectingOverlay: ConnectingOverlayState = {
     visible: false,
@@ -113,6 +126,11 @@ export class RoomService {
       }).catch(console.warn);
       void listen<{ peerId: string }>('stream-pointer-ready', ({ payload }) => {
         if (payload && (payload.peerId === 'local' || stateStore.subscribedStreams.has(payload.peerId))) this.publishPointerView(payload.peerId, streamPointerView.state(payload.peerId));
+      }).catch(console.warn);
+      void listen<{ hostBusy?: boolean; cursorShape?: string }>('remote-control-host-priority', ({ payload }) => {
+        if (payload) {
+          this.remoteControlHost.setHostPriorityState(Boolean(payload.hostBusy), normalizeCursorShape(payload.cursorShape));
+        }
       }).catch(console.warn);
     }
     this.nativeVideoBridge.onFallbackNeeded = (reason: string, fallbackStream?: MediaStream) => {
@@ -212,6 +230,8 @@ export class RoomService {
     preview?: GroupRoomManager, signal?: AbortSignal): Promise<void> {
     this.joinOutcome = 'connecting';
     this.joinError = '';
+    this.remoteControlHost.clear();
+    this.remoteControlViewerStates = {};
     streamPointerView.clear();
     roomAppsService.reset();
     const parsed = await verifyRoomInvite(code);
@@ -341,6 +361,14 @@ export class RoomService {
         const peer = this.peers.find((p) => p.id === peerId);
         if (peer) this.getPointerReceiver(packet.mediaId).receive(packet, peerId, peer.username, generateUserColor(peer.username));
       },
+      onRemoteControlClient: (packet, peerId) => {
+        if (this.roomManager !== manager) return;
+        this.remoteControlHost.receiveClientPacket(packet, peerId);
+      },
+      onRemoteControlHost: (packet, broadcasterId) => {
+        if (this.roomManager !== manager) return;
+        this.handleRemoteControlHostPacket(packet, broadcasterId);
+      },
       onAppEvent: (event, peerId) => {
         if (this.roomManager === manager) roomAppsService.receive(event, peerId);
       },
@@ -352,6 +380,16 @@ export class RoomService {
         const currentKeys = new Set(slots.map((slot) => slot.peerId));
         for (const key of stateStore.subscribedStreams) if (!currentKeys.has(key)) audioContextManager.detachPeerAudio(key);
         for (const key of stateStore.activePipPeers) if (!currentKeys.has(key)) void pipService.restoreFromPip(key);
+        let viewerStatePruned = false;
+        const nextViewerStates = { ...this.remoteControlViewerStates };
+        for (const key of Object.keys(nextViewerStates)) {
+          const matching = slots.find((slot) => slot.peerId === key);
+          if (!matching || matching.pointerEligible === false || !matching.isStreaming) {
+            delete nextViewerStates[key];
+            viewerStatePruned = true;
+          }
+        }
+        if (viewerStatePruned) this.remoteControlViewerStates = nextViewerStates;
         stateStore.set((s) => {
           s.pinnedPeerId = reconcilePinnedRoomSlot(s.pinnedPeerId, s.roomSlots, slots);
           s.roomSlots = slots;
@@ -408,6 +446,8 @@ export class RoomService {
       onPeerLeft: (_peerId, username) => {
         if (this.roomManager !== manager) return;
         this.fileRequests = this.fileRequests.filter((request) => request.peerId !== _peerId);
+        this.remoteControlHost.forgetPeer(_peerId);
+        this.pruneRemoteControlViewerByOwner(_peerId);
         this.notify();
         roomAppsService.forgetPeer(_peerId);
         this.pointerReceiver.forget(_peerId);
@@ -434,6 +474,12 @@ export class RoomService {
         if (broadcasterPeerId === 'local' || broadcasterPeerId === manager.getLocalPeerId()) this.pointerReceiver.forget(watcherPeerId);
         if (broadcasterPeerId === 'local' || broadcasterPeerId === manager.getLocalPeerId()) {
           for (const receiver of this.pointerReceivers.values()) receiver.forget(watcherPeerId);
+        }
+        const owner = streamOwner(broadcasterPeerId);
+        if (owner === 'local' || owner === manager.getLocalPeerId()) {
+          const slashIdx = broadcasterPeerId.indexOf('/');
+          if (slashIdx >= 0) this.remoteControlHost.revokeController(watcherPeerId, broadcasterPeerId.slice(slashIdx + 1), 'revoked');
+          else this.remoteControlHost.forgetPeer(watcherPeerId);
         }
         soundEffects.playWatchStreamStop();
       },
@@ -530,6 +576,198 @@ export class RoomService {
       this.pointerReceivers.set(mediaId, receiver);
     }
     return receiver;
+  }
+
+  private remoteControlHost = new RemoteControlHostManager({
+    isHostSupported: () => isTauri() && !isMobileDevice(),
+    getScreenStream: (mediaId) => {
+      const entry = this.localCaptures.get(mediaId) ??
+        (mediaId === 'default' ? Array.from(this.localCaptures.values()).find((capture) => capture.kind === 'screen') : undefined);
+      if (!entry || entry.kind !== 'screen') return null;
+      return { sessionId: entry.bridge?.sessionId, cursorCaptured: entry.mouse };
+    },
+    sendToPeer: (peerId, packet) => {
+      this.roomManager?.sendRemoteControlHost(packet, peerId);
+    },
+    setMonitorActive: (active) => {
+      if (!isTauri()) return;
+      return invoke('set_remote_control_active', { active });
+    },
+    applyInput: (controllerId, sessionId, event) => {
+      if (!isTauri()) return Promise.resolve({ accepted: false, hostBusy: false });
+      return invoke<{ accepted: boolean; hostBusy: boolean }>('apply_remote_control_input', {
+        controllerId,
+        sessionId: sessionId ?? null,
+        event,
+      });
+    },
+    releaseInputs: (controllerId) => {
+      if (!isTauri()) return;
+      return invoke('release_remote_control_inputs', { controllerId: controllerId ?? null });
+    },
+    onChange: () => {
+      this.remoteControlRequests = this.remoteControlHost.getRequests();
+      this.remoteControllers = this.remoteControlHost.getControllers();
+      this.remoteControlHostBusy = this.remoteControlHost.isHostBusy();
+      this.notify();
+    },
+  });
+
+  private pruneRemoteControlViewerByOwner(ownerPeerId: string): void {
+    const next = { ...this.remoteControlViewerStates };
+    let changed = false;
+    for (const [key, state] of Object.entries(next)) {
+      if (state.hostPeerId === ownerPeerId) {
+        delete next[key];
+        changed = true;
+      }
+    }
+    if (changed) this.remoteControlViewerStates = next;
+  }
+
+  private handleRemoteControlHostPacket(packet: RemoteControlHostPacket, broadcasterId: string): void {
+    const slot = stateStore.roomSlots.find(
+      (candidate) =>
+        (candidate.ownerPeerId || candidate.peerId) === broadcasterId &&
+        candidate.pointerEligible !== false &&
+        (candidate.mediaId || 'default') === packet.mediaId,
+    );
+    const existingEntry = slot
+      ? [slot.peerId, this.remoteControlViewerStates[slot.peerId]] as const
+      : Object.entries(this.remoteControlViewerStates).find(
+          ([, value]) => value.hostPeerId === broadcasterId && value.mediaId === packet.mediaId,
+        );
+    const slotKey = existingEntry?.[0];
+    const current = existingEntry?.[1];
+    if (!slotKey || !current) return;
+
+    if (packet.type === 'accept') {
+      if (current.status !== 'pending' && current.status !== 'active') return;
+      if (!stateStore.subscribedStreams.has(slotKey)) return;
+      this.remoteControlViewerStates = {
+        ...this.remoteControlViewerStates,
+        [slotKey]: {
+          ...current,
+          status: 'active',
+          mouseEnabled: packet.mouseEnabled,
+          keyboardEnabled: packet.keyboardEnabled,
+          cursorCaptured: packet.cursorCaptured,
+          hostBusy: packet.hostBusy,
+          cursorShape: packet.cursorShape,
+        },
+      };
+      showToast(t('remoteControl.accepted'), 2500, 'success');
+      this.notify();
+      return;
+    }
+
+    if (packet.type === 'state') {
+      if (current.status !== 'active') return;
+      this.remoteControlViewerStates = {
+        ...this.remoteControlViewerStates,
+        [slotKey]: {
+          ...current,
+          mouseEnabled: packet.mouseEnabled,
+          keyboardEnabled: packet.keyboardEnabled,
+          cursorCaptured: packet.cursorCaptured,
+          hostBusy: packet.hostBusy,
+          cursorShape: packet.cursorShape,
+        },
+      };
+      this.notify();
+      return;
+    }
+
+    const next = { ...this.remoteControlViewerStates };
+    delete next[slotKey];
+    this.remoteControlViewerStates = next;
+    if (packet.type === 'decline') {
+      showToast(t('remoteControl.declined'), 3000, 'info');
+    } else if (packet.type === 'revoke') {
+      if (packet.reason === 'unsupported') showToast(t('remoteControl.unsupportedHost'), 3500, 'info');
+      else if (packet.reason !== 'stream-ended') showToast(t('remoteControl.revoked'), 3000, 'info');
+    }
+    this.notify();
+  }
+
+  public toggleRemoteControlRequest(slotPeerId: string): void {
+    const slot = stateStore.roomSlots.find((candidate) => candidate.peerId === slotPeerId);
+    if (!slot || slot.isLocal || slot.pointerEligible === false || !stateStore.subscribedStreams.has(slotPeerId)) return;
+    const current = this.remoteControlViewerStates[slotPeerId];
+    const mediaId = slot.mediaId || 'default';
+    const hostPeerId = streamOwner(slotPeerId);
+    if (current?.status === 'pending') {
+      const next = { ...this.remoteControlViewerStates };
+      delete next[slotPeerId];
+      this.remoteControlViewerStates = next;
+      this.roomManager?.sendRemoteControlClient({ type: 'cancel', mediaId: current.mediaId }, current.hostPeerId);
+      this.notify();
+      return;
+    }
+    if (current?.status === 'active') {
+      this.stopRemoteControlViewer(slotPeerId);
+      return;
+    }
+    if ((slot.platform ?? 'desktop') !== 'desktop') {
+      showToast(t('remoteControl.unsupportedHost'), 3500, 'info');
+      return;
+    }
+    this.remoteControlViewerStates = {
+      ...this.remoteControlViewerStates,
+      [slotPeerId]: {
+        mediaId,
+        hostPeerId,
+        status: 'pending',
+        mouseEnabled: true,
+        keyboardEnabled: true,
+        cursorCaptured: true,
+        hostBusy: false,
+        cursorShape: 'default',
+      },
+    };
+    this.roomManager?.sendRemoteControlClient({ type: 'request', mediaId }, hostPeerId);
+    this.notify();
+  }
+
+  public stopRemoteControlViewer(slotPeerId: string): void {
+    const current = this.remoteControlViewerStates[slotPeerId];
+    if (!current) return;
+    const next = { ...this.remoteControlViewerStates };
+    delete next[slotPeerId];
+    this.remoteControlViewerStates = next;
+    this.roomManager?.sendRemoteControlClient(
+      { type: current.status === 'pending' ? 'cancel' : 'release', mediaId: current.mediaId },
+      current.hostPeerId,
+    );
+    this.notify();
+  }
+
+  public sendRemoteControlInput(slotPeerId: string, event: RemoteInputEvent): void {
+    const current = this.remoteControlViewerStates[slotPeerId];
+    if (!current || current.status !== 'active' || !stateStore.subscribedStreams.has(slotPeerId)) return;
+    if ((event.kind === 'mouseMove' || event.kind === 'mouseButton' || event.kind === 'mouseWheel') && !current.mouseEnabled) {
+      return;
+    }
+    if (event.kind === 'key' && !current.keyboardEnabled) {
+      return;
+    }
+    this.roomManager?.sendRemoteControlClient({ type: 'input', mediaId: current.mediaId, event }, current.hostPeerId);
+  }
+
+  public answerRemoteControlRequest(requestId: string, accept: boolean): void {
+    this.remoteControlHost.answerRequest(requestId, accept);
+  }
+
+  public setRemoteControllerPermissions(
+    peerId: string,
+    mediaId: string,
+    patch: { mouseEnabled?: boolean; keyboardEnabled?: boolean },
+  ): void {
+    this.remoteControlHost.setControllerPermissions(peerId, mediaId, patch);
+  }
+
+  public revokeRemoteController(peerId: string, mediaId: string): void {
+    this.remoteControlHost.revokeController(peerId, mediaId, 'revoked');
   }
 
   public refreshStreamPointerPermissions(): void {
@@ -661,12 +899,16 @@ export class RoomService {
     });
     const screen = Array.from(this.localCaptures.values()).find((entry) => entry.kind === 'screen');
     if (isTauri()) void invoke('select_pointer_capture', { sessionId: screen?.bridge?.sessionId || null }).catch(console.warn);
+    for (const [id, entry] of this.localCaptures) {
+      if (entry.kind === 'screen') this.remoteControlHost.notifyStreamUpdated(id);
+    }
     this.notify();
   }
 
   public stopTransmission(id: string, notifyManager = true) {
     const entry = this.localCaptures.get(id);
     if (!entry) return;
+    this.remoteControlHost.forgetMedia(id);
     this.pointerReceivers.get(id)?.clear();
     this.pointerReceivers.delete(id);
     this.localCaptures.delete(id);
@@ -681,6 +923,7 @@ export class RoomService {
   }
 
   public stopScreenSharing(): void {
+    this.remoteControlHost.clear();
     this.roomManager?.stopStream();
     for (const id of [...this.localCaptures.keys()]) this.stopTransmission(id, false);
     this.pointerReceiver.clear();
@@ -735,6 +978,8 @@ export class RoomService {
     this.joinOutcome = 'idle';
     this.joinError = '';
     this.pointerReceiver.clear();
+    this.remoteControlHost.clear();
+    this.remoteControlViewerStates = {};
     streamPointerView.clear();
     roomAppsService.reset();
     if (this.roomConnectingTimeout) {
@@ -1068,6 +1313,7 @@ export class RoomService {
   }
 
   public stopWatchingStream(peerId: string): void {
+    this.stopRemoteControlViewer(peerId);
     this.publishPointerView(peerId, { kind: 'state', sentAt: Date.now(), visuals: [] });
     audioContextManager.detachPeerAudio(peerId);
     stateStore.set((s) => {

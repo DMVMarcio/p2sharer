@@ -17,6 +17,7 @@ import { SaveInviteModal } from './components/modals/SaveInviteModal';
 import { RoomSecurityModal } from './components/modals/RoomSecurityModal';
 import { ExternalLinkModal } from './components/modals/ExternalLinkModal';
 import { AppsModal } from './components/modals/AppsModal';
+import { RemoteControlManagerModal } from './components/modals/RemoteControlManagerModal';
 import { P2PConnectionTestModal } from './components/modals/P2PConnectionTestModal';
 import { ConnectingOverlay } from './components/modals/ConnectingOverlay';
 import { ToastContainer } from './components/common/ToastContainer';
@@ -114,6 +115,7 @@ const MainApp: React.FC<{ webNavigation?: WebRoomNavigation }> = ({ webNavigatio
       {activeModal === 'roomSecurity' && <RoomSecurityModal />}
       {activeModal === 'externalLink' && <ExternalLinkModal />}
       {activeModal === 'apps' && <AppsModal />}
+      {activeModal === 'remoteControlManager' && <RemoteControlManagerModal />}
       {activeModal === 'p2pTest' && <P2PConnectionTestModal />}
       <ConnectingOverlay />
       <AppUpdateDialog />

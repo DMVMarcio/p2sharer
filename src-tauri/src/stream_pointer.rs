@@ -188,7 +188,7 @@ async fn present_overlay(window: &tauri::WebviewWindow, show: bool) -> Result<()
 }
 
 #[cfg(windows)]
-fn source_bounds(source: &str) -> Option<(i32, i32, u32, u32)> {
+pub(crate) fn source_bounds(source: &str) -> Option<(i32, i32, u32, u32)> {
     use windows::Win32::{
         Foundation::{HWND, RECT},
         Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_EXTENDED_FRAME_BOUNDS},

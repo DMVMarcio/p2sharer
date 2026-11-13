@@ -135,6 +135,10 @@ export function useRoom() {
     isInRoom: roomSlots.length > 0 && Boolean(currentRoomCode),
     isRoomHost: roomService.isRoomHost(),
     isRoomAdmin: roomService.isRoomAdmin(),
+    remoteControlRequests: roomService.remoteControlRequests,
+    remoteControllers: roomService.remoteControllers,
+    remoteControlHostBusy: roomService.remoteControlHostBusy,
+    remoteControlViewerStates: roomService.remoteControlViewerStates,
 
     // Actions
     joinRoom,
@@ -147,6 +151,11 @@ export function useRoom() {
     revealSavedFile: roomService.revealSavedFile.bind(roomService),
     answerFileRequest: roomService.answerFileRequest.bind(roomService),
     cancelFileTransfer: roomService.cancelFileTransfer.bind(roomService),
+    answerRemoteControlRequest: roomService.answerRemoteControlRequest.bind(roomService),
+    setRemoteControllerPermissions: roomService.setRemoteControllerPermissions.bind(roomService),
+    revokeRemoteController: roomService.revokeRemoteController.bind(roomService),
+    toggleRemoteControlRequest: roomService.toggleRemoteControlRequest.bind(roomService),
+    stopRemoteControlViewer: roomService.stopRemoteControlViewer.bind(roomService),
     editChatMessage,
     deleteChatMessage,
     updateRoomPassword,

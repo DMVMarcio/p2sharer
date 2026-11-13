@@ -8,15 +8,17 @@ import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { MoreHorizontal, Shield, Crown, UserX, Play } from 'lucide-react';
+import { MoreHorizontal, Shield, Crown, UserX, Play, MonitorCog, Mouse, Keyboard } from 'lucide-react';
 import { useContextMenu, type ContextMenuAction } from '../common/ContextMenu';
 import { useRoom } from '../../hooks/useRoom';
 import { showToast } from '../../hooks/useToast';
 import { modalManager } from '../../hooks/useModal';
+import { Tooltip } from '../common/Tooltip';
 
 export const ParticipantsPane: React.FC = () => {
   useLocale();
   const { username, peers, roomSlots, isCreator, isRoomHost, isRoomAdmin,
+    remoteControllers, setRemoteControllerPermissions, revokeRemoteController,
     transferOwnership, setAdministrator, kickPeer, requestStream } = useRoom();
   const openContextMenu = useContextMenu();
   const [pendingAction, setPendingAction] = useState<{
@@ -48,6 +50,74 @@ export const ParticipantsPane: React.FC = () => {
   return (
     <div className="sidebar-tab-content active" id="tab-content-participants">
       <div className="participants-list" id="participants-list">
+        {remoteControllers.length > 0 && (
+          <div className="participants-remote-control-panel">
+            <div className="participants-remote-control-header">
+              <span>
+                <MonitorCog size={13} aria-hidden="true" />
+                {t('remoteControl.activeControllersCount', { count: remoteControllers.length })}
+              </span>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => modalManager.open('remoteControlManager')}
+              >
+                {t('remoteControl.manageAction')}
+              </button>
+            </div>
+            {remoteControllers.map((ctrl) => {
+              const peer = peers.find((item) => item.id === ctrl.peerId);
+              const name = peer?.username || ctrl.peerId.slice(0, 6);
+              return (
+                <div className="participants-remote-control-item" key={`${ctrl.peerId}:${ctrl.mediaId}`}>
+                  <span className="participants-remote-control-name">{name}</span>
+                  <div className="participants-remote-control-actions">
+                    <Tooltip content={t('remoteControl.mousePermissionAria', { name })}>
+                      <button
+                        type="button"
+                        className={`btn-stream-pin ${ctrl.mouseEnabled ? 'active' : ''}`}
+                        aria-label={t('remoteControl.mousePermissionAria', { name })}
+                        aria-pressed={ctrl.mouseEnabled}
+                        onClick={() =>
+                          setRemoteControllerPermissions(ctrl.peerId, ctrl.mediaId, {
+                            mouseEnabled: !ctrl.mouseEnabled,
+                          })
+                        }
+                      >
+                        <Mouse size={13} aria-hidden="true" />
+                      </button>
+                    </Tooltip>
+                    <Tooltip content={t('remoteControl.keyboardPermissionAria', { name })}>
+                      <button
+                        type="button"
+                        className={`btn-stream-pin ${ctrl.keyboardEnabled ? 'active' : ''}`}
+                        aria-label={t('remoteControl.keyboardPermissionAria', { name })}
+                        aria-pressed={ctrl.keyboardEnabled}
+                        onClick={() =>
+                          setRemoteControllerPermissions(ctrl.peerId, ctrl.mediaId, {
+                            keyboardEnabled: !ctrl.keyboardEnabled,
+                          })
+                        }
+                      >
+                        <Keyboard size={13} aria-hidden="true" />
+                      </button>
+                    </Tooltip>
+                    <Tooltip content={t('remoteControl.revokeAria', { name })}>
+                      <button
+                        type="button"
+                        className="btn-stream-pin participants-remote-control-revoke"
+                        aria-label={t('remoteControl.revokeAria', { name })}
+                        onClick={() => revokeRemoteController(ctrl.peerId, ctrl.mediaId)}
+                      >
+                        <UserX size={13} aria-hidden="true" />
+                      </button>
+                    </Tooltip>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
         {/* Local user */}
         <div className="participant-item" onContextMenu={event => openContextMenu(event,
           [profileAction({ peerId: 'local', name: username, isLocal: true, color: localColor })])}>

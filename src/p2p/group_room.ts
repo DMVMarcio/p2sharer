@@ -6,6 +6,7 @@ import { profileImages, profileBanners } from '../core/profile_image.ts';
 import { profileStats } from '../core/profile_stats.ts';
 import { validStreamDescriptors, streamSlotKey, streamOwner, type StreamDescriptor } from "../core/media_streams.ts";
 import { validStreamPointer, validStreamPointerState, type StreamPointerState, type StreamPointerPacket } from '../core/stream_pointer.ts';
+import { validRemoteControlClientPacket, validRemoteControlHostPacket, type RemoteControlClientPacket, type RemoteControlHostPacket } from '../core/remote_control.ts';
 import { selfId } from '@trystero-p2p/core';
 import { invoke } from '../platform/commands.ts';
 import type { AppWireEvent } from '../apps/types.ts';
@@ -109,6 +110,8 @@ export interface RoomCallbacks {
   onFileProgress?: (transfer: FileProgress) => void;
   onStreamPointerState?: (state: StreamPointerState, broadcasterId: string) => void;
   onStreamPointer?: (packet: StreamPointerPacket, peerId: string) => void;
+  onRemoteControlClient?: (packet: RemoteControlClientPacket, peerId: string) => void;
+  onRemoteControlHost?: (packet: RemoteControlHostPacket, broadcasterId: string) => void;
   onAppEvent?: (event: AppWireEvent, peerId: string) => void;
   onStreamsUpdate: (streams: ActiveStreamInfo[]) => void;
   onSlotsUpdate: (slots: RoomSlotInfo[]) => void;
@@ -363,6 +366,8 @@ export class GroupRoomManager {
   private pongAction: any = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private pointerAction: any = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private remoteControlAction: any = null;
   private appAction: any = null;
 
   private lastPeerStats: Map<string, { bytesReceived: number; timestamp: number }> = new Map();
@@ -433,6 +438,20 @@ export class GroupRoomManager {
     if (!this.pointerAction || !this.peerTracker.isVerified(target) ||
         (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(target)))) return;
     void Promise.resolve(this.pointerAction.send(packet, { target })).catch(() => {});
+  }
+
+  public sendRemoteControlClient(packet: RemoteControlClientPacket, target: string): void {
+    if (!validRemoteControlClientPacket(packet)) return;
+    if (!this.remoteControlAction || !this.peerTracker.isVerified(target) ||
+        (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(target)))) return;
+    void Promise.resolve(this.remoteControlAction.send(packet, { target })).catch(() => {});
+  }
+
+  public sendRemoteControlHost(packet: RemoteControlHostPacket, target: string): void {
+    if (!validRemoteControlHostPacket(packet)) return;
+    if (!this.remoteControlAction || !this.peerTracker.isVerified(target) ||
+        (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(target)))) return;
+    void Promise.resolve(this.remoteControlAction.send(packet, { target })).catch(() => {});
   }
 
   public async sendAppEvent(event: AppWireEvent, target?: string): Promise<void> {
@@ -1210,6 +1229,17 @@ export class GroupRoomManager {
     const boundRoom = this.room;
 
     this.pointerAction = this.room.makeAction('stream_pointer');
+    this.remoteControlAction = this.room.makeAction('remote_control_v1');
+    this.remoteControlAction.onMessage = (packet: unknown, meta: { peerId: string }) => {
+      if (validRemoteControlClientPacket(packet)) {
+        this.callbacks?.onRemoteControlClient?.(packet, meta.peerId);
+      } else if (validRemoteControlHostPacket(packet)) {
+        const hasScreen = this.remoteDescriptors.get(meta.peerId)?.some(entry => entry.id === packet.mediaId && entry.kind === 'screen') || this.remoteStreams.has(meta.peerId);
+        if (hasScreen || packet.type === 'revoke' || packet.type === 'decline') {
+          this.callbacks?.onRemoteControlHost?.(packet, meta.peerId);
+        }
+      }
+    };
     this.pointerAction.onMessage = (packet: unknown, meta: { peerId: string }) => {
       if (validStreamPointerState(packet)) {
         if (packet.mediaId ? this.remoteDescriptors.get(meta.peerId)?.some(entry => entry.id === packet.mediaId && entry.kind === 'screen') : this.remoteStreams.has(meta.peerId)) this.callbacks?.onStreamPointerState?.(packet, meta.peerId);
@@ -1997,7 +2027,7 @@ export class GroupRoomManager {
       this.pexAction, this.meshRelayAction, this.watchAction,
       this.pingAction, this.pongAction, this.identityAction,
       this.authorityAction, this.admissionAction, this.inviteAction,
-      this.previewAction, this.appAction, this.fileAction, this.pointerAction, this.nativeVideoAction, this.profileAction, this.bannerAction, this.profileStatsAction,
+      this.previewAction, this.appAction, this.fileAction, this.pointerAction, this.remoteControlAction, this.nativeVideoAction, this.profileAction, this.bannerAction, this.profileStatsAction,
     ].forEach((action) => {
       if (!action?.onMessage) return;
       const handler = action.onMessage;

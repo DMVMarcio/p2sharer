@@ -154,7 +154,7 @@ export function useRoomCardGestures(options: Options) {
     const node = id && nodes.current.get(id);
     if (!id || !node) return;
     const edge = event.target.closest<HTMLElement>('[data-room-resize]')?.dataset.roomResize as CardResizeEdge | undefined;
-    if (!edge && (event.target.closest('.is-stream-pointer-active, .stream-overlay') ||
+    if (!edge && (event.target.closest('.is-stream-pointer-active, .is-remote-control-active, .remote-control-floating-overlay, .stream-overlay') ||
       event.target.closest('button:not(.room-app-focus-overlay), input, textarea, a, [role="button"], [role="slider"], [contenteditable="true"], .stream-zoom-bar'))) return;
     if (edge && options.mode !== 'grid' || !edge && options.ids.length < 2) return;
     event.preventDefault();
@@ -171,7 +171,7 @@ export function useRoomCardGestures(options: Options) {
   };
   const onKeyDownCapture = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (!event.altKey || event.ctrlKey || event.metaKey || pending.current || !(event.target instanceof Element) ||
-      event.target.closest('input, textarea, [contenteditable="true"]')) return;
+      event.target.closest('input, textarea, [contenteditable="true"], .is-remote-control-active')) return;
     const data = identity(event.target); const id = data?.sortableId || data?.roomLayoutId;
     if (!id) return;
     const offset = { ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1 }[event.key];

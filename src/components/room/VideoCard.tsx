@@ -12,6 +12,9 @@ import { useModal } from '../../hooks/useModal';
 import { formatFrameRate } from '../../core/media_streams';
 import { useStreamPointer } from '../../hooks/useStreamPointer';
 import { StreamPointerToggle } from './StreamPointerToggle';
+import { useRemoteControl } from '../../hooks/useRemoteControl';
+import { RemoteControlToggle } from './RemoteControlToggle';
+import { RemoteControlFloatingOverlay } from './RemoteControlFloatingOverlay';
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { RoomSlotInfo } from '../../core/types';
 import { useRoom } from '../../hooks/useRoom';
@@ -24,7 +27,7 @@ import { pipService } from '../../services/pip_service';
 import { ZoomControlBar } from './ZoomControlBar';
 import { Tooltip } from '../common/Tooltip';
 import { StreamStatsOverlay } from './StreamStatsOverlay';
-import { Grid2X2, Focus, Eye, EyeOff, Maximize, PanelsTopLeft, PictureInPicture2, RotateCcw, Volume2, VolumeX, Square, MonitorUp } from 'lucide-react';
+import { Grid2X2, Focus, Eye, EyeOff, Maximize, PanelsTopLeft, PictureInPicture2, RotateCcw, Volume2, VolumeX, Square, MonitorUp, MonitorCog } from 'lucide-react';
 import { useContextMenu, type ContextMenuAction } from '../common/ContextMenu';
 import { isTauri } from '@tauri-apps/api/core';
 import { openBrowserPictureInPicture } from '../../platform/picture_in_picture';
@@ -47,7 +50,15 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   isSelectedFeatured = false,
 }) => {
   useLocale();
-  const { togglePin, stopWatchingStream, getPeerPing, layoutMode, returnToGrid } = useRoom();
+  const {
+    togglePin,
+    stopWatchingStream,
+    getPeerPing,
+    layoutMode,
+    returnToGrid,
+    remoteControlViewerStates,
+    remoteControllers,
+  } = useRoom();
   const openContextMenu = useContextMenu();
   const { openModal } = useModal();
   const defaultResolution = useStore((s) => s.currentResolution);
@@ -102,6 +113,16 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     setActiveTooltips((prev) => Math.max(0, prev + (open ? 1 : -1)));
   }, []);
 
+  const remoteViewerState = remoteControlViewerStates[slot.peerId];
+  const isRemoteControlEligible =
+    !slot.isLocal &&
+    slot.pointerEligible !== false &&
+    !inTray &&
+    !isPipActive &&
+    !!slot.stream &&
+    (slot.platform ?? 'desktop') === 'desktop';
+  const isRemoteControlActive = isRemoteControlEligible && remoteViewerState?.status === 'active';
+
   const { ref: cardRef, fullscreen: isFullscreen, toggleFullscreen } = useElementFullscreen<HTMLDivElement>();
   const {
     zoom,
@@ -113,7 +134,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     resetZoom,
     handleMouseDown,
     handleDoubleClick,
-  } = useStreamZoom(cardRef, slot.stream, !inTray);
+  } = useStreamZoom(cardRef, slot.stream, !inTray && !isRemoteControlActive);
 
   const handleToggleFullscreen = (e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -121,6 +142,13 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   };
 
   const videoElementRef = useRef<HTMLVideoElement | null>(null);
+  const remoteControl = useRemoteControl(
+    cardRef,
+    videoElementRef,
+    slot.peerId,
+    isRemoteControlEligible,
+    remoteViewerState,
+  );
   const openPictureInPicture = () => {
     const request = isTauri() ? pipService.openPip(slot.peerId, slot.senderName, slot.stream)
       : openBrowserPictureInPicture(videoElementRef.current);
@@ -129,8 +157,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   const currentStreamRef = useRef(slot.stream);
   currentStreamRef.current = slot.stream;
 
-  const pointer = useStreamPointer(cardRef, videoElementRef, slot.peerId, slot.pointerEligible !== false && !slot.isLocal && !inTray && !isPipActive && !!slot.stream,
-    slot.stream, false, slot.pointerEligible !== false && !isPipActive && !!slot.stream && !(inTray && isSelectedFeatured) && (!slot.isLocal || showLocalPreview));
+  const pointer = useStreamPointer(cardRef, videoElementRef, slot.peerId, slot.pointerEligible !== false && !slot.isLocal && !inTray && !isPipActive && !!slot.stream && !remoteControl.active,
+    slot.stream, false, slot.pointerEligible !== false && !isPipActive && !!slot.stream && !(inTray && isSelectedFeatured) && (!slot.isLocal || showLocalPreview) && !remoteControl.active);
 
 
   const cleanupVideoElement = useCallback((el: HTMLVideoElement | null) => {
@@ -261,7 +289,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   }, [slot.isLocal, slot.peerId, slot.isStreaming, inTray]);
 
   const handleCardClick = () => {
-    if (pointer.enabled) {
+    if (pointer.enabled || remoteControl.active) {
       return;
     }
     if (didDragRef.current) {
@@ -308,8 +336,13 @@ export const VideoCard: React.FC<VideoCardProps> = ({
 
   const watchers = slot.watchers || [];
 
+  const localControllers = slot.isLocal
+    ? remoteControllers.filter((ctrl) => !slot.mediaId || ctrl.mediaId === slot.mediaId)
+    : [];
+
   const layoutActions = useRoomCardLayoutActions();
   const handleContextMenu = (event: React.MouseEvent) => {
+    if (remoteControl.active) return;
     const actions: ContextMenuAction[] = [profileAction({ peerId: slot.ownerPeerId ?? slot.peerId, name: slot.senderName, isLocal: slot.isLocal, color: slot.color })];
     if (layoutMode === 'spotlight' && inTray && !isSelectedFeatured) actions.push({ id: 'overlay', get label() { return t("message.1c2685f76e69"); },
       icon: <PictureInPicture2 size={15} />, onSelect: () => roomService.overlayStream(slot.peerId) });
@@ -352,13 +385,13 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   return (
     <div
       ref={cardRef}
-      className={`stream-card ${isFeatured ? 'featured' : ''} ${inTray ? 'in-tray' : ''} ${isSelectedFeatured ? 'selected-featured' : ''} ${zoom > 1.0 && !inTray ? 'is-zoomed' : ''} ${isDragging && !inTray ? 'is-dragging' : ''} ${!slot.isLocal && !inTray ? 'has-volume-controller' : ''} ${isHudPinned ? 'is-hud-pinned' : ''} ${activeTooltips > 0 || mobileHudVisible ? 'is-hud-active' : ''} ${pointer.enabled ? 'is-stream-pointer-active' : ''} ${isMobile ? 'is-mobile-stream' : ''}`}
+      className={`stream-card ${isFeatured ? 'featured' : ''} ${inTray ? 'in-tray' : ''} ${isSelectedFeatured ? 'selected-featured' : ''} ${zoom > 1.0 && !inTray ? 'is-zoomed' : ''} ${isDragging && !inTray ? 'is-dragging' : ''} ${!slot.isLocal && !inTray ? 'has-volume-controller' : ''} ${isHudPinned ? 'is-hud-pinned' : ''} ${activeTooltips > 0 || mobileHudVisible ? 'is-hud-active' : ''} ${pointer.enabled ? 'is-stream-pointer-active' : ''} ${remoteControl.active ? 'is-remote-control-active' : ''} ${isMobile ? 'is-mobile-stream' : ''}`}
       data-peer-id={slot.peerId}
       onClick={handleCardClick}
       onContextMenu={handleContextMenu}
       tabIndex={0}
-      onMouseDown={!inTray && !pointer.enabled ? handleMouseDown : undefined}
-      onDoubleClick={!inTray && !pointer.enabled ? handleDoubleClick : undefined}
+      onMouseDown={!inTray && !pointer.enabled && !remoteControl.active ? handleMouseDown : undefined}
+      onDoubleClick={!inTray && !pointer.enabled && !remoteControl.active ? handleDoubleClick : undefined}
     >
       <div
         className="stream-video-viewport"
@@ -475,6 +508,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
                 transition: isDragging ? 'none' : 'transform 0.08s ease-out, opacity 0.2s ease-in',
                 willChange: zoom > 1.0 && !inTray ? 'transform' : 'auto',
                 opacity: isVideoReady || slot.isLocal ? 1 : 0,
+                cursor: remoteControl.cursorCss,
               }}
             />
             {!isVideoReady && !slot.isLocal && (
@@ -497,6 +531,29 @@ export const VideoCard: React.FC<VideoCardProps> = ({
       {pointer.indicator}
       {pointer.toolbar}
 
+      {remoteControl.active && !inTray && !isPipActive && (
+        <RemoteControlFloatingOverlay
+          containerRef={cardRef}
+          isFullscreen={isFullscreen}
+          onToggleFullscreen={handleToggleFullscreen}
+          onExitRemoteControl={remoteControl.exit}
+          immersive={remoteControl.immersive}
+          onToggleImmersive={remoteControl.toggleImmersive}
+          hostBusy={remoteControl.hostBusy}
+          mouseEnabled={remoteControl.mouseEnabled}
+          keyboardEnabled={remoteControl.keyboardEnabled}
+          volume={volume}
+          isMuted={isMuted}
+          onVolumeChange={(val) => {
+            setVolume(val);
+            setIsMuted(val === 0);
+            if (val > 0) setLastVolume(val);
+            audioContextManager.setPeerVolume(slot.peerId, val, val === 0);
+          }}
+          onToggleMute={handleToggleMute}
+          onOverlayHoverChange={remoteControl.setOverlayHovered}
+        />
+      )}
 
       {/* Featured badge when in tray */}
       {inTray && isSelectedFeatured && (
@@ -505,8 +562,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
         </span>
       )}
 
-      {/* Stats HUD on top of card - only when not in tray and not in PiP */}
-      {!inTray && !isPipActive && (
+      {/* Stats HUD on top of card - only when not in tray, not in PiP, and not in active remote control */}
+      {!inTray && !isPipActive && !remoteControl.active && (
         <StreamStatsOverlay
           qualityText={slot.isLocal ? `${currentResolution.label} ${formatFrameRate(currentFps)} FPS` : `${remoteResolution} ${formatFrameRate(liveFps)} FPS`}
           liveBitrateKbps={liveBitrate}
@@ -521,7 +578,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     )}
 
       {/* Stream stop actions share the tray control recipe. */}
-      {((!slot.isLocal && !isPipActive) || (slot.isLocal && slot.isStreaming)) && (
+      {!remoteControl.active && ((!slot.isLocal && !isPipActive) || (slot.isLocal && slot.isStreaming)) && (
         <button
           type="button"
           className={`btn btn-sm btn-stop-watch-stream ${slot.isLocal ? 'is-local-stop' : ''}`}
@@ -536,6 +593,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
         </button>
       )}
 
+      {!remoteControl.active && (
       <div className="stream-card-footer">
         {/* User overlay at bottom-left */}
         <div className="stream-card-overlay">
@@ -616,7 +674,40 @@ export const VideoCard: React.FC<VideoCardProps> = ({
               </div>
             )}
 
-            {!slot.isLocal && slot.pointerEligible !== false && <StreamPointerToggle enabled={pointer.enabled} onToggle={pointer.toggle} onTooltipOpenChange={handleTooltipOpenChange} />}
+            {!slot.isLocal && slot.pointerEligible !== false && (
+              <StreamPointerToggle
+                enabled={pointer.enabled}
+                onToggle={pointer.toggle}
+                onTooltipOpenChange={handleTooltipOpenChange}
+              />
+            )}
+
+            {isRemoteControlEligible && (
+              <RemoteControlToggle
+                status={remoteControl.status}
+                onToggle={remoteControl.toggleRequest}
+                onTooltipOpenChange={handleTooltipOpenChange}
+              />
+            )}
+
+            {slot.isLocal && slot.isStreaming && slot.pointerEligible !== false && isTauri() && (
+              <Tooltip content={t('remoteControl.manageAction')} onOpenChange={handleTooltipOpenChange}>
+                <button
+                  type="button"
+                  className={`btn-stream-pin remote-control-manager-trigger ${localControllers.length > 0 ? 'active' : ''}`}
+                  aria-label={t('remoteControl.manageAction')}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    openModal('remoteControlManager');
+                  }}
+                >
+                  <MonitorCog size={14} aria-hidden="true" />
+                  {localControllers.length > 0 && (
+                    <span className="remote-control-manager-count">{localControllers.length}</span>
+                  )}
+                </button>
+              </Tooltip>
+            )}
 
             <Tooltip
               content={
@@ -704,9 +795,10 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           </div>
         )}
       </div>
+      )}
 
-      {/* Precision Zoom Control Bar (visible when zoom > 1.0 and not in tray or PiP) */}
-      {!inTray && !isPipActive && (
+      {/* Precision Zoom Control Bar (visible when zoom > 1.0, not in tray, not in PiP, and not in remote control) */}
+      {!inTray && !isPipActive && !remoteControl.active && (
         <ZoomControlBar
           zoom={zoom}
           onZoomChange={setZoomDirect}
