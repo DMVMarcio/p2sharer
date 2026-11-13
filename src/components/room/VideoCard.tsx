@@ -15,6 +15,7 @@ import { StreamPointerToggle } from './StreamPointerToggle';
 import { useRemoteControl } from '../../hooks/useRemoteControl';
 import { RemoteControlToggle } from './RemoteControlToggle';
 import { RemoteControlFloatingOverlay } from './RemoteControlFloatingOverlay';
+import { RemoteCursorOverlay } from './RemoteCursorOverlay';
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { RoomSlotInfo } from '../../core/types';
 import { useRoom } from '../../hooks/useRoom';
@@ -57,6 +58,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     layoutMode,
     returnToGrid,
     remoteControlViewerStates,
+    remoteCursorStates,
+    selfPeerId,
     remoteControllers,
   } = useRoom();
   const openContextMenu = useContextMenu();
@@ -539,16 +542,40 @@ export const VideoCard: React.FC<VideoCardProps> = ({
       {pointer.indicator}
       {pointer.toolbar}
 
+      {(() => {
+        const cursorSync = remoteCursorStates[slot.peerId];
+        const weAreActivelyDriving =
+          remoteControl.active &&
+          !remoteControl.hostBusy &&
+          Boolean(selfPeerId) &&
+          cursorSync?.actorPeerId === selfPeerId;
+        const showRemoteCursor =
+          !slot.isLocal &&
+          !inTray &&
+          !isPipActive &&
+          isVideoReady &&
+          Boolean(cursorSync?.active && cursorSync.visible && !cursorSync.embeddedInVideo) &&
+          !weAreActivelyDriving;
+        return (
+          <RemoteCursorOverlay
+            containerRef={cardRef}
+            videoRef={videoElementRef}
+            cursorSync={cursorSync}
+            visible={showRemoteCursor}
+            viewKey={`${zoom}:${pan.x}:${pan.y}`}
+          />
+        );
+      })()}
+
       {remoteControl.active && !inTray && !isPipActive && (
         <RemoteControlFloatingOverlay
+          persistKey={`${slot.peerId}:${slot.mediaId || 'default'}`}
           containerRef={cardRef}
           isFullscreen={isFullscreen}
           onToggleFullscreen={handleToggleFullscreen}
           onExitRemoteControl={remoteControl.exit}
           immersive={remoteControl.immersive}
           onToggleImmersive={remoteControl.toggleImmersive}
-          localCursor={remoteControl.localCursor}
-          onToggleLocalCursor={remoteControl.toggleLocalCursor}
           hostBusy={remoteControl.hostBusy}
           mouseEnabled={remoteControl.mouseEnabled}
           keyboardEnabled={remoteControl.keyboardEnabled}

@@ -97,7 +97,33 @@ export type RemoteControlHostPacket =
       cursorCaptured: boolean;
       hostBusy: boolean;
       cursorShape: RemoteCursorShape;
+    }
+  | {
+      type: 'cursorSync';
+      mediaId: string;
+      active: boolean;
+      visible: boolean;
+      x: number;
+      y: number;
+      cursorShape: RemoteCursorShape;
+      hostBusy: boolean;
+      actorPeerId: string;
+      embeddedInVideo: boolean;
     };
+
+export interface RemoteCursorSyncState {
+  mediaId: string;
+  hostPeerId: string;
+  active: boolean;
+  visible: boolean;
+  x: number;
+  y: number;
+  cursorShape: RemoteCursorShape;
+  hostBusy: boolean;
+  actorPeerId: string;
+  embeddedInVideo: boolean;
+  updatedAt: number;
+}
 
 export interface RemoteControlRequest {
   id: string;
@@ -255,6 +281,19 @@ export function validRemoteControlHostPacket(raw: unknown): raw is RemoteControl
         typeof pkt.cursorShape === 'string' &&
         VALID_CURSOR_SHAPES.has(pkt.cursorShape as RemoteCursorShape)
       );
+    case 'cursorSync':
+      return (
+        typeof pkt.active === 'boolean' &&
+        typeof pkt.visible === 'boolean' &&
+        isFiniteCoord(pkt.x) &&
+        isFiniteCoord(pkt.y) &&
+        typeof pkt.cursorShape === 'string' &&
+        VALID_CURSOR_SHAPES.has(pkt.cursorShape as RemoteCursorShape) &&
+        typeof pkt.hostBusy === 'boolean' &&
+        typeof pkt.actorPeerId === 'string' &&
+        pkt.actorPeerId.length <= 96 &&
+        typeof pkt.embeddedInVideo === 'boolean'
+      );
     default:
       return false;
   }
@@ -283,7 +322,22 @@ const OP_MOUSE_BUTTON = 2;
 const OP_MOUSE_WHEEL = 3;
 const OP_KEY = 4;
 const OP_RELEASE_ALL = 5;
+const OP_CURSOR_SYNC = 6;
 const MOUSE_BUTTONS: RemoteMouseButton[] = ['left', 'right', 'middle', 'x1', 'x2'];
+const CURSOR_SHAPES_ORDER: RemoteCursorShape[] = [
+  'default',
+  'pointer',
+  'text',
+  'crosshair',
+  'move',
+  'not-allowed',
+  'wait',
+  'progress',
+  'ns-resize',
+  'ew-resize',
+  'nwse-resize',
+  'nesw-resize',
+];
 const rcTextEncoder = new TextEncoder();
 const rcTextDecoder = new TextDecoder('utf-8', { fatal: true });
 
@@ -486,4 +540,86 @@ export function decodeRemoteControlBinaryInput(frame: Uint8Array): DecodedRemote
   }
 
   return validRemoteInputEvent(event) ? { mediaId, seq, event } : null;
+}
+
+export interface DecodedRemoteControlCursorSync {
+  seq: number;
+  packet: Extract<RemoteControlHostPacket, { type: 'cursorSync' }>;
+}
+
+export function encodeRemoteControlCursorSync(
+  packet: Extract<RemoteControlHostPacket, { type: 'cursorSync' }>,
+  seq = 0,
+): Uint8Array | null {
+  if (!validRemoteControlHostPacket(packet)) return null;
+  const mediaBytes = rcTextEncoder.encode(packet.mediaId);
+  const actorBytes = rcTextEncoder.encode(packet.actorPeerId);
+  if (mediaBytes.length === 0 || mediaBytes.length > 64 || actorBytes.length > 96) return null;
+  const shapeIdx = CURSOR_SHAPES_ORDER.indexOf(packet.cursorShape);
+  if (shapeIdx < 0) return null;
+
+  const headerSize = 9 + mediaBytes.length;
+  const buf = new Uint8Array(headerSize + 11 + actorBytes.length);
+  const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  buf[0] = RC_MAGIC_0;
+  buf[1] = RC_MAGIC_1;
+  buf[2] = RC_VERSION;
+  buf[3] = OP_CURSOR_SYNC;
+  buf[4] = mediaBytes.length;
+  buf.set(mediaBytes, 5);
+  view.setUint32(5 + mediaBytes.length, seq >>> 0);
+
+  const flags =
+    (packet.active ? 1 : 0) |
+    (packet.visible ? 2 : 0) |
+    (packet.hostBusy ? 4 : 0) |
+    (packet.embeddedInVideo ? 8 : 0);
+  buf[headerSize] = flags;
+  buf[headerSize + 1] = shapeIdx;
+  buf[headerSize + 2] = actorBytes.length;
+  view.setFloat32(headerSize + 3, packet.x);
+  view.setFloat32(headerSize + 7, packet.y);
+  buf.set(actorBytes, headerSize + 11);
+  return buf;
+}
+
+export function decodeRemoteControlCursorSync(frame: Uint8Array): DecodedRemoteControlCursorSync | null {
+  if (!isRemoteControlBinaryFrame(frame) || frame[3] !== OP_CURSOR_SYNC) return null;
+  const mediaLen = frame[4];
+  if (mediaLen === 0 || mediaLen > 64 || 9 + mediaLen + 11 > frame.length) return null;
+  let mediaId: string;
+  try {
+    mediaId = rcTextDecoder.decode(frame.subarray(5, 5 + mediaLen));
+  } catch {
+    return null;
+  }
+  if (!isMediaId(mediaId)) return null;
+
+  const view = new DataView(frame.buffer, frame.byteOffset, frame.byteLength);
+  const seq = view.getUint32(5 + mediaLen);
+  const offset = 9 + mediaLen;
+  const flags = frame[offset];
+  const cursorShape = CURSOR_SHAPES_ORDER[frame[offset + 1]];
+  const actorLen = frame[offset + 2];
+  if (!cursorShape || actorLen > 96 || frame.length !== offset + 11 + actorLen) return null;
+  let actorPeerId: string;
+  try {
+    actorPeerId = rcTextDecoder.decode(frame.subarray(offset + 11, offset + 11 + actorLen));
+  } catch {
+    return null;
+  }
+  const readCoord = (v: number) => (Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : -1);
+  const packet: Extract<RemoteControlHostPacket, { type: 'cursorSync' }> = {
+    type: 'cursorSync',
+    mediaId,
+    active: (flags & 1) !== 0,
+    visible: (flags & 2) !== 0,
+    x: readCoord(view.getFloat32(offset + 3)),
+    y: readCoord(view.getFloat32(offset + 7)),
+    cursorShape,
+    hostBusy: (flags & 4) !== 0,
+    actorPeerId,
+    embeddedInVideo: (flags & 8) !== 0,
+  };
+  return validRemoteControlHostPacket(packet) ? { seq, packet } : null;
 }

@@ -1,12 +1,12 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, AtomicIsize, AtomicU32, AtomicU64, Ordering};
-use std::sync::{LazyLock, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter};
 
 const HOST_PRIORITY_MS: u64 = 1500;
-const MONITOR_INTERVAL_MS: u64 = 35;
+const MONITOR_INTERVAL_MS: u64 = 16;
 const P2SHARER_INPUT_TAG: usize = 0x5032_5348;
 const HOST_MOUSE_JITTER_PX: i32 = 5;
 
@@ -61,6 +61,20 @@ struct HostPriorityPayload {
     cursor_shape: String,
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+struct CursorSyncPayload {
+    session_id: String,
+    active: bool,
+    visible: bool,
+    x: f64,
+    y: f64,
+    cursor_shape: String,
+    host_busy: bool,
+    actor_controller_id: String,
+    embedded_in_video: bool,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ImmersiveKeyPayload {
@@ -87,6 +101,8 @@ struct HostControlState {
     host_paused_until: u64,
     was_host_paused: bool,
     last_cursor_shape: String,
+    last_session_id: Option<String>,
+    last_mouse_actor_id: Option<String>,
     held_buttons: HashMap<String, HashSet<String>>,
     held_vks: HashMap<String, HashSet<u16>>,
     held_unicode: HashMap<(String, String), Vec<u16>>,
@@ -109,6 +125,8 @@ impl Default for HostControlState {
             host_paused_until: 0,
             was_host_paused: false,
             last_cursor_shape: "default".to_string(),
+            last_session_id: None,
+            last_mouse_actor_id: None,
             held_buttons: HashMap::new(),
             held_vks: HashMap::new(),
             held_unicode: HashMap::new(),
@@ -124,7 +142,32 @@ impl Default for HostControlState {
 
 struct HookThreadHandle {
     thread_id: u32,
+    stop: Arc<AtomicBool>,
     join: std::thread::JoinHandle<()>,
+}
+
+#[cfg(windows)]
+fn join_hook_thread(handle: HookThreadHandle) {
+    use windows::Win32::Foundation::{LPARAM, WPARAM};
+    use windows::Win32::UI::WindowsAndMessaging::{PostThreadMessageW, WM_QUIT};
+    handle.stop.store(true, Ordering::Release);
+    for _ in 0..25 {
+        unsafe {
+            let _ = PostThreadMessageW(handle.thread_id, WM_QUIT, WPARAM(0), LPARAM(0));
+        }
+        if handle.join.is_finished() {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(8));
+    }
+    if handle.join.is_finished() {
+        let _ = handle.join.join();
+    } else {
+        // Detach instead of blocking IPC locks indefinitely if Windows delays pump exit.
+        std::thread::spawn(move || {
+            let _ = handle.join.join();
+        });
+    }
 }
 
 static HOST_STATE: LazyLock<Mutex<HostControlState>> =
@@ -132,7 +175,8 @@ static HOST_STATE: LazyLock<Mutex<HostControlState>> =
 static HOST_ACTIVE: AtomicBool = AtomicBool::new(false);
 static HOST_PRIORITY_HOOK_ACTIVE: AtomicBool = AtomicBool::new(false);
 static HOST_HARDWARE_INPUT_MS: AtomicU64 = AtomicU64::new(0);
-static HOST_LAST_HW_CURSOR: LazyLock<Mutex<Option<(i32, i32)>>> =
+// Stores (anchor_pt, last_hw_pt) so controller SendInput jumps reset the anchor and only true host movement triggers priority pause.
+static HOST_LAST_HW_CURSOR: LazyLock<Mutex<Option<((i32, i32), (i32, i32))>>> =
     LazyLock::new(|| Mutex::new(None));
 static HOST_PRIORITY_HOOK_JOIN: LazyLock<Mutex<Option<HookThreadHandle>>> =
     LazyLock::new(|| Mutex::new(None));
@@ -149,6 +193,10 @@ static IMMERSIVE_HOOK_JOIN: LazyLock<Mutex<Option<HookThreadHandle>>> =
 static CURSOR_CLIP_ACTIVE: AtomicBool = AtomicBool::new(false);
 
 pub fn is_host_control_active() -> bool {
+    HOST_ACTIVE.load(Ordering::Relaxed)
+}
+
+pub fn should_suppress_captured_cursor() -> bool {
     HOST_ACTIVE.load(Ordering::Relaxed)
 }
 
@@ -665,15 +713,28 @@ unsafe extern "system" fn host_priority_mouse_proc(
             let msg = wparam.0 as u32;
             let triggered = if msg == WM_MOUSEMOVE {
                 if let Ok(mut guard) = HOST_LAST_HW_CURSOR.try_lock() {
-                    let prev = *guard;
-                    *guard = Some((ms.pt.x, ms.pt.y));
-                    match prev {
-                        Some((px, py)) => {
-                            (ms.pt.x - px).abs() > HOST_MOUSE_JITTER_PX
-                                || (ms.pt.y - py).abs() > HOST_MOUSE_JITTER_PX
-                        }
-                        None => false,
-                    }
+                    let os_cur = read_cursor_pos();
+                    let next_pt = (ms.pt.x, ms.pt.y);
+                    let (mut anchor, prev_hw) = guard.unwrap_or_else(|| {
+                        let base = os_cur.unwrap_or(next_pt);
+                        (base, base)
+                    });
+                    // Reset anchor when injected controller SendInput moved the OS cursor between physical packets.
+                    let moved_externally = os_cur
+                        .map(|(cx, cy)| (cx - prev_hw.0).abs() > 1 || (cy - prev_hw.1).abs() > 1)
+                        .unwrap_or(false);
+                    let cur_base = if moved_externally {
+                        let base = os_cur.unwrap_or(next_pt);
+                        anchor = base;
+                        base
+                    } else {
+                        os_cur.unwrap_or(prev_hw)
+                    };
+                    *guard = Some((anchor, next_pt));
+                    (ms.pt.x - cur_base.0).abs() > HOST_MOUSE_JITTER_PX
+                        || (ms.pt.y - cur_base.1).abs() > HOST_MOUSE_JITTER_PX
+                        || (ms.pt.x - anchor.0).abs() > HOST_MOUSE_JITTER_PX
+                        || (ms.pt.y - anchor.1).abs() > HOST_MOUSE_JITTER_PX
                 } else {
                     false
                 }
@@ -723,8 +784,8 @@ unsafe extern "system" fn host_priority_keyboard_proc(
 fn start_host_priority_hooks() {
     use windows::Win32::System::Threading::GetCurrentThreadId;
     use windows::Win32::UI::WindowsAndMessaging::{
-        DispatchMessageW, GetMessageW, SetWindowsHookExW, TranslateMessage, UnhookWindowsHookEx,
-        MSG, WH_KEYBOARD_LL, WH_MOUSE_LL,
+        DispatchMessageW, GetMessageW, PeekMessageW, SetWindowsHookExW, TranslateMessage,
+        UnhookWindowsHookEx, MSG, PM_NOREMOVE, WH_KEYBOARD_LL, WH_MOUSE_LL,
     };
     let Ok(mut guard) = HOST_PRIORITY_HOOK_JOIN.lock() else {
         return;
@@ -733,19 +794,25 @@ fn start_host_priority_hooks() {
         return;
     }
     if let Ok(mut pos) = HOST_LAST_HW_CURSOR.lock() {
-        *pos = read_cursor_pos();
+        *pos = read_cursor_pos().map(|p| (p, p));
     }
+    let stop = Arc::new(AtomicBool::new(false));
+    let thread_stop = Arc::clone(&stop);
     let (ready_tx, ready_rx) = std::sync::mpsc::sync_channel::<(u32, bool)>(1);
     let join = std::thread::spawn(move || unsafe {
         let tid = GetCurrentThreadId();
+        let mut msg = MSG::default();
+        // Force creation of the Win32 thread message queue before signaling readiness.
+        let _ = PeekMessageW(&mut msg, None, 0, 0, PM_NOREMOVE);
         let mouse_hook = SetWindowsHookExW(WH_MOUSE_LL, Some(host_priority_mouse_proc), None, 0);
         let kb_hook = SetWindowsHookExW(WH_KEYBOARD_LL, Some(host_priority_keyboard_proc), None, 0);
         let ok = mouse_hook.is_ok() && kb_hook.is_ok();
-        HOST_PRIORITY_HOOK_ACTIVE.store(ok, Ordering::Release);
-        let _ = ready_tx.send((tid, ok));
-        if ok {
-            let mut msg = MSG::default();
-            while GetMessageW(&mut msg, None, 0, 0).as_bool() {
+        let stay_alive = ok && !thread_stop.load(Ordering::Acquire);
+        HOST_PRIORITY_HOOK_ACTIVE.store(stay_alive, Ordering::Release);
+        let _ = ready_tx.send((tid, stay_alive));
+        if stay_alive {
+            while !thread_stop.load(Ordering::Acquire) && GetMessageW(&mut msg, None, 0, 0).as_bool()
+            {
                 let _ = TranslateMessage(&msg);
                 DispatchMessageW(&msg);
             }
@@ -766,24 +833,21 @@ fn start_host_priority_hooks() {
         );
         *guard = Some(HookThreadHandle {
             thread_id: tid,
+            stop,
             join,
         });
     } else {
+        stop.store(true, Ordering::Release);
         drop(join);
     }
 }
 
 #[cfg(windows)]
 fn stop_host_priority_hooks() {
-    use windows::Win32::Foundation::{LPARAM, WPARAM};
-    use windows::Win32::UI::WindowsAndMessaging::{PostThreadMessageW, WM_QUIT};
     HOST_PRIORITY_HOOK_ACTIVE.store(false, Ordering::Release);
     if let Ok(mut guard) = HOST_PRIORITY_HOOK_JOIN.lock() {
         if let Some(handle) = guard.take() {
-            unsafe {
-                let _ = PostThreadMessageW(handle.thread_id, WM_QUIT, WPARAM(0), LPARAM(0));
-            }
-            let _ = handle.join.join();
+            join_hook_thread(handle);
         }
     }
 }
@@ -832,6 +896,7 @@ fn poll_host_activity_locked(state: &mut HostControlState) -> bool {
     }
 
     if host_touched {
+        state.last_mouse_actor_id = Some("host".to_string());
         release_all_locked(state);
         if !HOST_PRIORITY_HOOK_ACTIVE.load(Ordering::Acquire) {
             if let Some(pos) = read_cursor_pos() {
@@ -850,6 +915,61 @@ fn poll_host_activity_locked(state: &mut HostControlState) -> bool {
     paused
 }
 
+#[cfg(windows)]
+fn sample_cursor_sync(
+    preferred_session_id: Option<&str>,
+    host_busy: bool,
+    cursor_shape: &str,
+    actor_controller_id: Option<&str>,
+) -> Option<CursorSyncPayload> {
+    let (session_id, source, embedded_in_video) =
+        crate::screen_sources::active_cursor_session_info(preferred_session_id)?;
+    let (left, top, width, height) = crate::stream_pointer::source_bounds(&source)?;
+    let (px, py) = read_cursor_pos()?;
+    let visible = width > 1
+        && height > 1
+        && px >= left
+        && px < left + width as i32
+        && py >= top
+        && py < top + height as i32;
+    let x = ((px - left) as f64 / (width.saturating_sub(1).max(1) as f64)).clamp(0.0, 1.0);
+    let y = ((py - top) as f64 / (height.saturating_sub(1).max(1) as f64)).clamp(0.0, 1.0);
+    let actor = if host_busy {
+        "host".to_string()
+    } else {
+        actor_controller_id.unwrap_or("host").to_string()
+    };
+    Some(CursorSyncPayload {
+        session_id,
+        active: true,
+        visible,
+        x,
+        y,
+        cursor_shape: cursor_shape.to_string(),
+        host_busy,
+        actor_controller_id: actor,
+        embedded_in_video,
+    })
+}
+
+fn emit_inactive_cursor_sync(app: &AppHandle) {
+    let _ = app.emit_to(
+        "main",
+        "remote-control-cursor-sync",
+        CursorSyncPayload {
+            session_id: String::new(),
+            active: false,
+            visible: false,
+            x: 0.0,
+            y: 0.0,
+            cursor_shape: "default".to_string(),
+            host_busy: false,
+            actor_controller_id: String::new(),
+            embedded_in_video: true,
+        },
+    );
+}
+
 #[tauri::command]
 pub fn set_remote_control_active(
     app: AppHandle,
@@ -860,6 +980,7 @@ pub fn set_remote_control_active(
         return Err("Only the main window can manage host remote control".into());
     }
     HOST_ACTIVE.store(active, Ordering::Release);
+    crate::screen_sources::refresh_wgc_cursor_for_remote_control();
     #[cfg(windows)]
     {
         if active {
@@ -887,16 +1008,23 @@ pub fn set_remote_control_active(
                 release_all_locked(&mut state);
                 state.host_paused_until = 0;
                 state.was_host_paused = false;
+                state.last_session_id = None;
+                state.last_mouse_actor_id = None;
                 state.mapping_cache = None;
             }
+        }
+        if !active {
+            emit_inactive_cursor_sync(&app);
         }
         if should_spawn {
             std::thread::spawn(move || {
                 let mut prev_paused = false;
                 let mut prev_shape = String::new();
+                let mut prev_cursor_sync: Option<CursorSyncPayload> = None;
+                let mut last_cursor_emit_ms: u64 = 0;
                 loop {
                     std::thread::sleep(std::time::Duration::from_millis(MONITOR_INTERVAL_MS));
-                    let (still_active, paused, shape) = {
+                    let (still_active, paused, shape, preferred_sid, actor) = {
                         let Ok(mut state) = HOST_STATE.lock() else {
                             break;
                         };
@@ -907,7 +1035,13 @@ pub fn set_remote_control_active(
                         let paused = poll_host_activity_locked(&mut state);
                         let shape = read_cursor_shape();
                         state.last_cursor_shape = shape.clone();
-                        (true, paused, shape)
+                        (
+                            true,
+                            paused,
+                            shape,
+                            state.last_session_id.clone(),
+                            state.last_mouse_actor_id.clone(),
+                        )
                     };
                     if !still_active {
                         break;
@@ -920,11 +1054,30 @@ pub fn set_remote_control_active(
                             "remote-control-host-priority",
                             HostPriorityPayload {
                                 host_busy: paused,
-                                cursor_shape: shape,
+                                cursor_shape: shape.clone(),
                             },
                         );
                     }
+                    if let Some(sync_payload) = sample_cursor_sync(
+                        preferred_sid.as_deref(),
+                        paused,
+                        &shape,
+                        actor.as_deref(),
+                    ) {
+                        let now = now_ms();
+                        let changed = prev_cursor_sync.as_ref() != Some(&sync_payload);
+                        if changed || now.saturating_sub(last_cursor_emit_ms) >= 450 {
+                            prev_cursor_sync = Some(sync_payload.clone());
+                            last_cursor_emit_ms = now;
+                            let _ = app.emit_to(
+                                "main",
+                                "remote-control-cursor-sync",
+                                sync_payload,
+                            );
+                        }
+                    }
                 }
+                emit_inactive_cursor_sync(&app);
             });
         }
     }
@@ -975,6 +1128,18 @@ pub fn apply_remote_control_input(
             });
         }
 
+        if let Some(sid) = session_id.as_ref() {
+            state.last_session_id = Some(sid.clone());
+        }
+        let is_mouse_event = matches!(
+            event,
+            RemoteInputEvent::MouseMove { .. }
+                | RemoteInputEvent::MouseButton { .. }
+                | RemoteInputEvent::MouseWheel { .. }
+        );
+        if is_mouse_event {
+            state.last_mouse_actor_id = Some(controller_id.clone());
+        }
         let mut moved_cursor = false;
         match event {
             RemoteInputEvent::MouseMove { x, y } => {
@@ -1341,18 +1506,13 @@ unsafe extern "system" fn immersive_keyboard_proc(
 
 #[cfg(windows)]
 fn join_immersive_hook_locked(guard: &mut Option<HookThreadHandle>) {
-    use windows::Win32::Foundation::{LPARAM, WPARAM};
-    use windows::Win32::UI::WindowsAndMessaging::{PostThreadMessageW, WM_QUIT};
     IMMERSIVE_ENABLED.store(false, Ordering::Release);
     IMMERSIVE_HELD_MASK.store(0, Ordering::Release);
     if let Ok(mut tx_guard) = IMMERSIVE_TX.lock() {
         *tx_guard = None;
     }
     if let Some(handle) = guard.take() {
-        unsafe {
-            let _ = PostThreadMessageW(handle.thread_id, WM_QUIT, WPARAM(0), LPARAM(0));
-        }
-        let _ = handle.join.join();
+        join_hook_thread(handle);
     }
 }
 
@@ -1370,8 +1530,8 @@ pub fn set_remote_control_immersive(
     {
         use windows::Win32::System::Threading::GetCurrentThreadId;
         use windows::Win32::UI::WindowsAndMessaging::{
-            DispatchMessageW, GetMessageW, SetWindowsHookExW, TranslateMessage,
-            UnhookWindowsHookEx, MSG, WH_KEYBOARD_LL,
+            DispatchMessageW, GetMessageW, PeekMessageW, SetWindowsHookExW, TranslateMessage,
+            UnhookWindowsHookEx, MSG, PM_NOREMOVE, WH_KEYBOARD_LL,
         };
         let hwnd = window.hwnd().map_err(|e| e.to_string())?.0 as isize;
         IMMERSIVE_TARGET_HWND.store(hwnd, Ordering::Release);
@@ -1407,22 +1567,29 @@ pub fn set_remote_control_immersive(
                 }
             });
 
+            let stop = Arc::new(AtomicBool::new(false));
+            let thread_stop = Arc::clone(&stop);
             let (ready_tx, ready_rx) = std::sync::mpsc::sync_channel::<(u32, bool)>(1);
             let join = std::thread::spawn(move || unsafe {
                 let tid = GetCurrentThreadId();
+                let mut msg = MSG::default();
+                let _ = PeekMessageW(&mut msg, None, 0, 0, PM_NOREMOVE);
                 let hook = SetWindowsHookExW(
                     WH_KEYBOARD_LL,
                     Some(immersive_keyboard_proc),
                     None,
                     0,
                 );
-                let ok = hook.is_ok();
-                let _ = ready_tx.send((tid, ok));
+                let stay_alive = hook.is_ok() && !thread_stop.load(Ordering::Acquire);
+                let _ = ready_tx.send((tid, stay_alive));
                 if let Ok(h) = hook {
-                    let mut msg = MSG::default();
-                    while GetMessageW(&mut msg, None, 0, 0).as_bool() {
-                        let _ = TranslateMessage(&msg);
-                        DispatchMessageW(&msg);
+                    if stay_alive {
+                        while !thread_stop.load(Ordering::Acquire)
+                            && GetMessageW(&mut msg, None, 0, 0).as_bool()
+                        {
+                            let _ = TranslateMessage(&msg);
+                            DispatchMessageW(&msg);
+                        }
                     }
                     let _ = UnhookWindowsHookEx(h);
                 }
@@ -1439,11 +1606,13 @@ pub fn set_remote_control_immersive(
                 );
                 *hook_guard = Some(HookThreadHandle {
                     thread_id: tid,
+                    stop,
                     join,
                 });
                 IMMERSIVE_HELD_MASK.store(0, Ordering::Release);
                 IMMERSIVE_ENABLED.store(ok, Ordering::Release);
             } else {
+                stop.store(true, Ordering::Release);
                 drop(join);
                 IMMERSIVE_ENABLED.store(false, Ordering::Release);
             }

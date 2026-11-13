@@ -1659,8 +1659,6 @@
   "remoteControl.keyboardDisabledHint": "Keyboard disabled",
   "remoteControl.immersiveMode": "Immersive mode",
   "remoteControl.immersiveHint": "Send Alt+Tab, Windows key, and system shortcuts to the remote PC",
-  "remoteControl.localCursor": "Local cursor (0 ms)",
-  "remoteControl.localCursorHint": "Keep your hardware cursor visible for zero visual lag while matching remote shapes",
   "remoteControl.exitAction": "Stop control",
   "remoteControl.manageAction": "Remote control",
   "remoteControl.managerTitle": "Remote control",

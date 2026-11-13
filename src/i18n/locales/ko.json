@@ -1659,8 +1659,6 @@
   "remoteControl.keyboardDisabledHint": "키보드 비활성화됨",
   "remoteControl.immersiveMode": "몰입 모드",
   "remoteControl.immersiveHint": "Alt+Tab, Windows 키 및 시스템 단축키를 원격 PC로 전달합니다",
-  "remoteControl.localCursor": "로컬 커서 (0 ms)",
-  "remoteControl.localCursorHint": "시각적 지연이 없도록 로컬 하드웨어 커서를 표시하고 원격 커서 모양을 동기화합니다",
   "remoteControl.exitAction": "제어 종료",
   "remoteControl.manageAction": "원격 제어",
   "remoteControl.managerTitle": "원격 제어",

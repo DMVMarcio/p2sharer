@@ -3,7 +3,9 @@ import test from 'node:test';
 import {
   createIdleViewerState,
   decodeRemoteControlBinaryInput,
+  decodeRemoteControlCursorSync,
   encodeRemoteControlBinaryInput,
+  encodeRemoteControlCursorSync,
   isRemoteControlBinaryFrame,
   normalizeCursorShape,
   validRemoteControlClientPacket,
@@ -181,4 +183,29 @@ test('encodeRemoteControlBinaryInput and decodeRemoteControlBinaryInput roundtri
   assert.equal(decodeRemoteControlBinaryInput(new Uint8Array([0x00, 0x05, 0x7b])), null);
   assert.equal(decodeRemoteControlBinaryInput(new Uint8Array([0x52, 0x43, 0x01, 1, 2, 65, 66, 0, 0, 0, 1])), null);
   assert.equal(encodeRemoteControlBinaryInput('', { kind: 'releaseAll' }), null);
+
+  const cursorPacket: Extract<RemoteControlHostPacket, { type: 'cursorSync' }> = {
+    type: 'cursorSync',
+    mediaId: 'screen-1',
+    active: true,
+    visible: true,
+    x: 0.375,
+    y: 0.625,
+    cursorShape: 'pointer',
+    hostBusy: false,
+    actorPeerId: 'peer-a',
+    embeddedInVideo: false,
+  };
+  assert.equal(validRemoteControlHostPacket(cursorPacket), true);
+  const encodedCursor = encodeRemoteControlCursorSync(cursorPacket, 42);
+  assert.ok(encodedCursor instanceof Uint8Array);
+  assert.equal(isRemoteControlBinaryFrame(encodedCursor), true);
+  assert.equal(decodeRemoteControlBinaryInput(encodedCursor), null);
+  const decodedCursor = decodeRemoteControlCursorSync(encodedCursor);
+  assert.ok(decodedCursor);
+  assert.equal(decodedCursor.seq, 42);
+  assert.equal(decodedCursor.packet.type, 'cursorSync');
+  assert.equal(decodedCursor.packet.actorPeerId, 'peer-a');
+  assert.equal(decodedCursor.packet.cursorShape, 'pointer');
+  assert.equal(decodedCursor.packet.embeddedInVideo, false);
 });

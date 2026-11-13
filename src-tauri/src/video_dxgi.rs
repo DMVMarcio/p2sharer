@@ -213,7 +213,11 @@ impl DesktopCapture {
                 self.compositor.set_pointer(&self.device, &shape, &self.pointer_bytes)?;
             }
             let texture = resource.ok_or_else(|| Error::from_hresult(E_POINTER))?.cast::<ID3D11Texture2D>()?;
-            let output = self.compositor.render(&self.device, &self.context, &texture, self.rotation, self.cursor)?;
+            let mut cursor = self.cursor;
+            if !self.capture_mouse || crate::remote_control::should_suppress_captured_cursor() {
+                cursor[2] = 0;
+            }
+            let output = self.compositor.render(&self.device, &self.context, &texture, self.rotation, cursor)?;
             // The acquired surface is unrotated; mode metadata can describe the
             // oriented display. Derive encoder dimensions from the actual output.
             let mut desc = D3D11_TEXTURE2D_DESC::default();

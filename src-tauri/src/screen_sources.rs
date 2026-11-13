@@ -108,6 +108,8 @@ pub fn encoded_capture(id: &str, token: &str) -> Result<EncodedCapture, String> 
 pub struct CaptureMetrics {
     capture_backend: std::sync::atomic::AtomicU8,
     encoder_kind: std::sync::atomic::AtomicU8,
+    cursor_requested: AtomicBool,
+    cursor_embedded: AtomicBool,
     jpeg_errors: std::sync::atomic::AtomicU64,
     #[cfg(feature = "media-diagnostics")]
     last_callback_us: std::sync::atomic::AtomicU64,
@@ -753,7 +755,10 @@ fn start_wgc_capture(source: &str, capture_mouse: bool, flags: CaptureFlags) -> 
     use windows_capture::graphics_capture_api::GraphicsCaptureApi;
     let cursor_supported = GraphicsCaptureApi::is_cursor_settings_supported().unwrap_or(false);
     let border_supported = GraphicsCaptureApi::is_border_settings_supported().unwrap_or(false);
-    let (cursor, border) = capture_visual_settings(capture_mouse, cursor_supported, border_supported);
+    let effective_mouse = capture_mouse && !crate::remote_control::should_suppress_captured_cursor();
+    let (cursor, border) = capture_visual_settings(effective_mouse, cursor_supported, border_supported);
+    let embedded = if cursor_supported { effective_mouse } else { capture_mouse };
+    flags.metrics.cursor_embedded.store(embedded, Ordering::Release);
     crate::logger::log_msg("INFO", "capture.compatibility", &format!(
         "session={} cursor_configurable={cursor_supported} border_configurable={border_supported} cursor={cursor:?} border={border:?}", flags.session_id));
     let (kind, raw) = source.split_once(':').ok_or("Invalid capture source")?;
@@ -1406,6 +1411,8 @@ pub fn start_capture_session(
 
     let sender = if session_id == "default" { get_frame_sender().clone() } else { broadcast::channel(32).0 };
     let metrics = Arc::new(CaptureMetrics::default());
+    metrics.cursor_requested.store(should_draw_mouse, Ordering::Release);
+    metrics.cursor_embedded.store(should_draw_mouse, Ordering::Release);
     let load = Arc::new(crate::video_load::CaptureLoad::new(fps, width, height, feedback_token));
     let try_nvenc = nvenc_requested(encoder_preference.as_deref(), std::env::var("P2SHARER_NATIVE_NVENC").ok().as_deref());
     let try_mf = mf_requested(std::env::var("P2SHARER_NATIVE_MF").ok().as_deref());
@@ -1833,6 +1840,57 @@ pub fn select_pointer_capture(session_id: Option<String>) -> Result<(), String> 
 
 pub fn pointer_capture_source(session_id: &str) -> Option<String> {
     SESSIONS.lock().ok()?.get(session_id).map(|session| session.source.clone())
+}
+
+pub fn active_cursor_session_info(preferred_session_id: Option<&str>) -> Option<(String, String, bool)> {
+    let sessions = SESSIONS.lock().ok()?;
+    let pick = preferred_session_id
+        .and_then(|sid| sessions.get(sid).map(|s| (sid, s)))
+        .filter(|(_, s)| s.active.load(Ordering::Acquire))
+        .or_else(|| {
+            sessions
+                .iter()
+                .find(|(_, s)| {
+                    s.active.load(Ordering::Acquire)
+                        && (s.source.starts_with("screen:") || s.source.starts_with("window:"))
+                })
+                .map(|(k, s)| (k.as_str(), s))
+        })?;
+    let (sid, session) = pick;
+    let requested = session.metrics.cursor_requested.load(Ordering::Acquire);
+    let backend = session.metrics.capture_backend.load(Ordering::Relaxed);
+    let embedded = if backend == 2 {
+        requested && !crate::remote_control::should_suppress_captured_cursor()
+    } else {
+        session.metrics.cursor_embedded.load(Ordering::Acquire)
+    };
+    Some((sid.to_string(), session.source.clone(), embedded))
+}
+
+pub fn refresh_wgc_cursor_for_remote_control() {
+    #[cfg(windows)]
+    {
+        use windows_capture::graphics_capture_api::GraphicsCaptureApi;
+        if !GraphicsCaptureApi::is_cursor_settings_supported().unwrap_or(false) {
+            return;
+        }
+        let suppress = crate::remote_control::should_suppress_captured_cursor();
+        if let Ok(sessions) = SESSIONS.lock() {
+            for session in sessions.values() {
+                if !session.active.load(Ordering::Acquire)
+                    || !session.metrics.cursor_requested.load(Ordering::Acquire)
+                {
+                    continue;
+                }
+                let desired_embedded = !suppress;
+                if let Some(ActiveCaptureControl::Wgc(ref control)) = session.control {
+                    if session.metrics.cursor_embedded.load(Ordering::Acquire) != desired_embedded {
+                        control.halt_handle().store(true, Ordering::SeqCst);
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// Bound capture dimensions without changing the monitor/window aspect ratio or upscaling.

@@ -1659,8 +1659,6 @@
   "remoteControl.keyboardDisabledHint": "Клавиатура отключена",
   "remoteControl.immersiveMode": "Иммерсивный режим",
   "remoteControl.immersiveHint": "Передавать Alt+Tab, клавишу Windows и системные сочетания на удалённый ПК",
-  "remoteControl.localCursor": "Локальный курсор (0 мс)",
-  "remoteControl.localCursorHint": "Отображает аппаратный курсор без визуальной задержки, повторяя форму на экране",
   "remoteControl.exitAction": "Остановить",
   "remoteControl.manageAction": "Удалённое управление",
   "remoteControl.managerTitle": "Удалённое управление",

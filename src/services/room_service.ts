@@ -11,6 +11,7 @@ import {
   type RemoteControlRequest,
   type RemoteControlViewerState,
   type RemoteControllerInfo,
+  type RemoteCursorSyncState,
   type RemoteInputEvent,
 } from '../core/remote_control.ts';
 import { emitTo, listen } from '@tauri-apps/api/event';
@@ -79,6 +80,7 @@ export class RoomService {
   public remoteControllers: RemoteControllerInfo[] = [];
   public remoteControlHostBusy = false;
   public remoteControlViewerStates: Record<string, RemoteControlViewerState> = {};
+  public remoteCursorStates: Record<string, RemoteCursorSyncState> = {};
   public roomStatusText: string = t("message.e56841de8c6f");
   public connectingOverlay: ConnectingOverlayState = {
     visible: false,
@@ -138,6 +140,47 @@ export class RoomService {
       void listen<{ hostBusy?: boolean; cursorShape?: string }>('remote-control-host-priority', ({ payload }) => {
         if (payload) {
           this.remoteControlHost.setHostPriorityState(Boolean(payload.hostBusy), normalizeCursorShape(payload.cursorShape));
+        }
+      }).catch(console.warn);
+      void listen<{
+        sessionId?: string;
+        active?: boolean;
+        visible?: boolean;
+        x?: number;
+        y?: number;
+        cursorShape?: string;
+        hostBusy?: boolean;
+        actorControllerId?: string;
+        embeddedInVideo?: boolean;
+      }>('remote-control-cursor-sync', ({ payload }) => {
+        if (!payload || !this.roomManager) return;
+        const active = Boolean(payload.active);
+        const rawActor = typeof payload.actorControllerId === 'string' ? payload.actorControllerId : '';
+        const shape = normalizeCursorShape(payload.cursorShape);
+        for (const [mediaId, capture] of this.localCaptures) {
+          if (capture.kind !== 'screen') continue;
+          if (active && payload.sessionId && capture.bridge?.sessionId !== payload.sessionId) continue;
+          let actorPeerId = rawActor;
+          if (!rawActor || rawActor === 'host') {
+            actorPeerId = 'host';
+          } else if (rawActor.endsWith(`:${mediaId}`)) {
+            actorPeerId = rawActor.slice(0, -(mediaId.length + 1));
+          } else {
+            const sep = rawActor.lastIndexOf(':');
+            actorPeerId = sep > 0 ? rawActor.slice(0, sep) : rawActor;
+          }
+          this.roomManager.broadcastRemoteControlCursorSync({
+            type: 'cursorSync',
+            mediaId,
+            active,
+            visible: Boolean(payload.visible),
+            x: typeof payload.x === 'number' && Number.isFinite(payload.x) ? Math.max(0, Math.min(1, payload.x)) : 0,
+            y: typeof payload.y === 'number' && Number.isFinite(payload.y) ? Math.max(0, Math.min(1, payload.y)) : 0,
+            cursorShape: shape,
+            hostBusy: Boolean(payload.hostBusy),
+            actorPeerId: actorPeerId.slice(0, 96),
+            embeddedInVideo: Boolean(payload.embeddedInVideo),
+          });
         }
       }).catch(console.warn);
     }
@@ -240,6 +283,7 @@ export class RoomService {
     this.joinError = '';
     this.remoteControlHost.clear();
     this.remoteControlViewerStates = {};
+    this.remoteCursorStates = {};
     streamPointerView.clear();
     roomAppsService.reset();
     const parsed = await verifyRoomInvite(code);
@@ -637,6 +681,9 @@ export class RoomService {
         controllerId,
         sessionId,
         event,
+      }).catch((err) => {
+        console.warn('[RemoteControl] apply_remote_control_input failed:', err);
+        return { accepted: false, hostBusy: false };
       });
     }
 
@@ -654,17 +701,22 @@ export class RoomService {
         controllerId,
         sessionId: nextSessionId,
         event: nextEvent,
-      }).finally(() => {
-        const queued = slot!.pending;
-        slot!.pending = null;
-        if (queued) {
-          void runMove(queued.sessionId, queued.event);
-        } else {
-          slot!.inFlight = false;
-          slot!.promise = undefined;
-          this.remoteControlMoveQueues.delete(controllerId);
-        }
-      });
+      })
+        .catch((err) => {
+          console.warn('[RemoteControl] apply_remote_control_input move failed:', err);
+          return { accepted: false, hostBusy: false };
+        })
+        .finally(() => {
+          const queued = slot!.pending;
+          slot!.pending = null;
+          if (queued) {
+            void runMove(queued.sessionId, queued.event);
+          } else {
+            slot!.inFlight = false;
+            slot!.promise = undefined;
+            this.remoteControlMoveQueues.delete(controllerId);
+          }
+        });
       slot!.promise = req;
       return req;
     };
@@ -683,6 +735,15 @@ export class RoomService {
         changed = true;
       }
     }
+    const nextCursors = { ...this.remoteCursorStates };
+    let cursorChanged = false;
+    for (const [key, state] of Object.entries(nextCursors)) {
+      if (state.hostPeerId === ownerPeerId) {
+        delete nextCursors[key];
+        cursorChanged = true;
+      }
+    }
+    if (cursorChanged) this.remoteCursorStates = nextCursors;
     if (hadActive) this.roomManager?.setRemoteControlLowLatency(ownerPeerId, false);
     if (changed) this.remoteControlViewerStates = next;
   }
@@ -694,6 +755,49 @@ export class RoomService {
         candidate.pointerEligible !== false &&
         (candidate.mediaId || 'default') === packet.mediaId,
     );
+
+    if (packet.type === 'cursorSync') {
+      const targetKey = slot?.peerId;
+      if (!packet.active) {
+        let changed = false;
+        const nextCursors = { ...this.remoteCursorStates };
+        for (const [key, state] of Object.entries(nextCursors)) {
+          if (state.hostPeerId === broadcasterId && state.mediaId === packet.mediaId) {
+            delete nextCursors[key];
+            changed = true;
+          }
+        }
+        if (targetKey && nextCursors[targetKey]) {
+          delete nextCursors[targetKey];
+          changed = true;
+        }
+        if (changed) {
+          this.remoteCursorStates = nextCursors;
+          this.notify();
+        }
+        return;
+      }
+      if (!targetKey || !stateStore.subscribedStreams.has(targetKey)) return;
+      this.remoteCursorStates = {
+        ...this.remoteCursorStates,
+        [targetKey]: {
+          mediaId: packet.mediaId,
+          hostPeerId: broadcasterId,
+          active: true,
+          visible: packet.visible,
+          x: packet.x,
+          y: packet.y,
+          cursorShape: packet.cursorShape,
+          hostBusy: packet.hostBusy,
+          actorPeerId: packet.actorPeerId,
+          embeddedInVideo: packet.embeddedInVideo,
+          updatedAt: Date.now(),
+        },
+      };
+      this.notify();
+      return;
+    }
+
     const existingEntry = slot
       ? [slot.peerId, this.remoteControlViewerStates[slot.peerId]] as const
       : Object.entries(this.remoteControlViewerStates).find(
@@ -1050,6 +1154,7 @@ export class RoomService {
     this.pointerReceiver.clear();
     this.remoteControlHost.clear();
     this.remoteControlViewerStates = {};
+    this.remoteCursorStates = {};
     streamPointerView.clear();
     roomAppsService.reset();
     if (this.roomConnectingTimeout) {
@@ -1384,6 +1489,11 @@ export class RoomService {
 
   public stopWatchingStream(peerId: string): void {
     this.stopRemoteControlViewer(peerId);
+    if (this.remoteCursorStates[peerId]) {
+      const nextCursors = { ...this.remoteCursorStates };
+      delete nextCursors[peerId];
+      this.remoteCursorStates = nextCursors;
+    }
     this.publishPointerView(peerId, { kind: 'state', sentAt: Date.now(), visuals: [] });
     audioContextManager.detachPeerAudio(peerId);
     stateStore.set((s) => {
@@ -1401,6 +1511,10 @@ export class RoomService {
 
   public getPeerPing(peerId: string): number | null | undefined {
     return this.roomManager?.getPeerPing(streamOwner(peerId));
+  }
+
+  public getSelfPeerId(): string {
+    return this.roomManager?.getLocalPeerId() ?? '';
   }
 }
 

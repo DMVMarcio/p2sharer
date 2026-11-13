@@ -1659,8 +1659,6 @@
   "remoteControl.keyboardDisabledHint": "Clavier désactivé",
   "remoteControl.immersiveMode": "Mode immersif",
   "remoteControl.immersiveHint": "Envoie Alt+Tab, la touche Windows et les raccourcis système au PC distant",
-  "remoteControl.localCursor": "Curseur local (0 ms)",
-  "remoteControl.localCursorHint": "Garde votre curseur natif visible sans latence visuelle en suivant la forme distante",
   "remoteControl.exitAction": "Arrêter le contrôle",
   "remoteControl.manageAction": "Contrôle à distance",
   "remoteControl.managerTitle": "Contrôle à distance",

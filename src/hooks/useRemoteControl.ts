@@ -33,13 +33,11 @@ export interface RemoteControlHookState {
   cursorCaptured: boolean;
   cursorShape: RemoteCursorShape;
   immersive: boolean;
-  localCursor: boolean;
   pointerInside: boolean;
   cursorCss: string | undefined;
   toggleRequest: () => void;
   exit: () => void;
   toggleImmersive: () => void;
-  toggleLocalCursor: () => void;
   setOverlayHovered: (hovered: boolean) => void;
 }
 
@@ -92,7 +90,6 @@ export function useRemoteControl(
   const cursorShape: RemoteCursorShape = viewerState?.cursorShape ?? 'default';
 
   const [immersive, setImmersive] = useState(false);
-  const [localCursor, setLocalCursor] = useState(true);
   const [pointerInside, setPointerInside] = useState(false);
   const [overlayHovered, setOverlayHovered] = useState(false);
   const [holdingInput, setHoldingInput] = useState(false);
@@ -216,10 +213,6 @@ export function useRemoteControl(
     });
   }, [containerRef]);
 
-  const toggleLocalCursor = useCallback(() => {
-    setLocalCursor((prev) => !prev);
-  }, []);
-
   // Reset local interactive state when leaving active mode or becoming ineligible.
   useEffect(() => {
     if (!active) {
@@ -243,8 +236,8 @@ export function useRemoteControl(
     }
   }, [active]);
 
-  // Keep OS low-level immersive hook active whenever immersive is enabled and our window is focused.
-  const hookLive = active && !hostBusy && immersive && windowFocused;
+  // Keep OS low-level immersive hook steady while active + immersive + focused; avoid churning on hostBusy transitions.
+  const hookLive = active && immersive && windowFocused;
   useEffect(() => {
     if (!isTauri()) return;
     void invoke('set_remote_control_immersive', { enabled: hookLive }).catch(() => {});
@@ -360,7 +353,17 @@ export function useRemoteControl(
       }
     };
 
+    const syncLiveFocus = () => {
+      const focused = !document.hidden && document.hasFocus();
+      if (focused !== windowFocusedRef.current) {
+        windowFocusedRef.current = focused;
+        setWindowFocused(focused);
+      }
+      return focused;
+    };
+
     const handlePointerDown = (event: PointerEvent) => {
+      syncLiveFocus();
       clearStuckOverlayHover(event.target);
       if (!isVideoInteractionTarget(event.target, container) || overlayHoveredRef.current) return;
       if (!getPos(event.clientX, event.clientY)) return;
@@ -371,6 +374,7 @@ export function useRemoteControl(
     };
 
     const handlePointerMove = (event: PointerEvent) => {
+      const liveFocused = syncLiveFocus();
       const holding = hasActiveHold();
       if (!holding) {
         clearStuckOverlayHover(event.target);
@@ -378,7 +382,7 @@ export function useRemoteControl(
           if (pointerInsideRef.current) setPointerInside(false);
           return;
         }
-      } else if (document.hidden || !windowFocusedRef.current) {
+      } else if (!liveFocused) {
         return;
       }
 
@@ -420,6 +424,7 @@ export function useRemoteControl(
     };
 
     const handleMouseDown = (event: MouseEvent) => {
+      syncLiveFocus();
       clearStuckOverlayHover(event.target);
       if (!isVideoInteractionTarget(event.target, container) || overlayHoveredRef.current) return;
       const pos = getPos(event.clientX, event.clientY);
@@ -445,6 +450,7 @@ export function useRemoteControl(
     };
 
     const handleMouseUp = (event: MouseEvent) => {
+      clearStuckOverlayHover(event.target);
       const button = MOUSE_BUTTON_MAP[event.button];
       const wasHeld = button ? heldButtonsRef.current.delete(button) : false;
       if (wasHeld) {
@@ -484,6 +490,8 @@ export function useRemoteControl(
     };
 
     const handleWheel = (event: WheelEvent) => {
+      syncLiveFocus();
+      clearStuckOverlayHover(event.target);
       if (!isVideoInteractionTarget(event.target, container) || overlayHoveredRef.current) return;
       const pos = getPos(event.clientX, event.clientY);
       if (!pos) return;
@@ -504,13 +512,8 @@ export function useRemoteControl(
     const handleKey = (event: KeyboardEvent, down: boolean) => {
       const codeKey = event.code || event.key;
       const wasHeld = !down && codeKey ? heldKeysRef.current.has(codeKey) : false;
-      if (
-        !keyboardEnabledRef.current ||
-        hostBusyRef.current ||
-        !windowFocusedRef.current ||
-        document.hidden ||
-        !document.hasFocus()
-      ) {
+      const liveFocused = syncLiveFocus();
+      if (!keyboardEnabledRef.current || hostBusyRef.current || !liveFocused) {
         return;
       }
       if (!wasHeld) {
@@ -603,9 +606,7 @@ export function useRemoteControl(
 
   const cursorCss =
     active && !hostBusy && (pointerInside || holdingInput) && !overlayHovered && mouseEnabled
-      ? localCursor || !cursorCaptured
-        ? cursorShape
-        : 'none'
+      ? cursorShape
       : undefined;
 
   return {
@@ -618,13 +619,11 @@ export function useRemoteControl(
     cursorCaptured,
     cursorShape,
     immersive,
-    localCursor,
     pointerInside,
     cursorCss,
     toggleRequest,
     exit,
     toggleImmersive,
-    toggleLocalCursor,
     setOverlayHovered,
   };
 }

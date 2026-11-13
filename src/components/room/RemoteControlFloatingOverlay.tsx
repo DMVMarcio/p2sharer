@@ -1,18 +1,17 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react';
 import { Eye, Keyboard, Maximize2, Minimize2, Mouse, Power, ShieldAlert, Volume1, Volume2, VolumeX } from 'lucide-react';
 import logoUrl from '../../assets/logo.png';
 import { useLocale } from '../../hooks/useLocale';
 import { getLanguage, t } from '../../i18n';
 
 interface RemoteControlFloatingOverlayProps {
+  persistKey?: string;
   containerRef: RefObject<HTMLElement | null>;
   isFullscreen: boolean;
   onToggleFullscreen: () => void;
   onExitRemoteControl: () => void;
   immersive: boolean;
   onToggleImmersive: () => void;
-  localCursor: boolean;
-  onToggleLocalCursor: () => void;
   hostBusy: boolean;
   mouseEnabled: boolean;
   keyboardEnabled: boolean;
@@ -32,25 +31,17 @@ interface RemoteControlFloatingOverlayProps {
 
 const PILL_SIZE = 42;
 const EDGE_MARGIN = 16;
-
-function clampPos(x: number, y: number, width: number, height: number): { x: number; y: number } {
-  const maxX = Math.max(EDGE_MARGIN, width - PILL_SIZE - EDGE_MARGIN);
-  const maxY = Math.max(EDGE_MARGIN, height - PILL_SIZE - EDGE_MARGIN);
-  return {
-    x: Math.max(EDGE_MARGIN, Math.min(maxX, x)),
-    y: Math.max(EDGE_MARGIN, Math.min(maxY, y)),
-  };
-}
+const DEFAULT_ANCHOR = { rx: 1, ry: 0 };
+const persistedOverlayAnchors = new Map<string, { rx: number; ry: number }>();
 
 export function RemoteControlFloatingOverlay({
+  persistKey = 'default',
   containerRef,
   isFullscreen,
   onToggleFullscreen,
   onExitRemoteControl,
   immersive,
   onToggleImmersive,
-  localCursor,
-  onToggleLocalCursor,
   hostBusy,
   mouseEnabled,
   keyboardEnabled,
@@ -75,20 +66,25 @@ export function RemoteControlFloatingOverlay({
   onOverlayHoverChangeRef.current = onOverlayHoverChange;
 
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const [anchor, setAnchor] = useState<{ rx: number; ry: number }>(
+    () => persistedOverlayAnchors.get(persistKey) ?? DEFAULT_ANCHOR,
+  );
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [dragging, setDragging] = useState(false);
+
+  useEffect(() => {
+    setAnchor(persistedOverlayAnchors.get(persistKey) ?? DEFAULT_ANCHOR);
+  }, [persistKey]);
 
   const syncBounds = useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
     const rect = container.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
-    setContainerSize({ width: rect.width, height: rect.height });
-    setPos((prev) =>
-      prev
-        ? clampPos(prev.x, prev.y, rect.width, rect.height)
-        : clampPos(rect.width - PILL_SIZE - EDGE_MARGIN, EDGE_MARGIN, rect.width, rect.height),
+    setContainerSize((prev) =>
+      Math.abs(prev.width - rect.width) < 1 && Math.abs(prev.height - rect.height) < 1
+        ? prev
+        : { width: rect.width, height: rect.height },
     );
   }, [containerRef]);
 
@@ -148,16 +144,13 @@ export function RemoteControlFloatingOverlay({
     const container = containerRef.current;
     if (!container) return;
     const initialRect = container.getBoundingClientRect();
-    const initialPos = pos ?? clampPos(
-      Math.max(EDGE_MARGIN, initialRect.width - PILL_SIZE - EDGE_MARGIN),
-      EDGE_MARGIN,
-      Math.max(PILL_SIZE + EDGE_MARGIN * 2, initialRect.width),
-      Math.max(PILL_SIZE + EDGE_MARGIN * 2, initialRect.height),
-    );
-    if (!pos && initialRect.width && initialRect.height) {
-      setContainerSize({ width: initialRect.width, height: initialRect.height });
-      setPos(initialPos);
-    }
+    const initialAnchor = persistedOverlayAnchors.get(persistKey) ?? anchor;
+    const initAvailX = Math.max(1, initialRect.width - PILL_SIZE - EDGE_MARGIN * 2);
+    const initAvailY = Math.max(1, initialRect.height - PILL_SIZE - EDGE_MARGIN * 2);
+    const initialPos = {
+      x: EDGE_MARGIN + initialAnchor.rx * initAvailX,
+      y: EDGE_MARGIN + initialAnchor.ry * initAvailY,
+    };
 
     const pointerId = event.pointerId;
     const pillEl = event.currentTarget;
@@ -202,8 +195,16 @@ export function RemoteControlFloatingOverlay({
         const width = rect?.width || initialRect.width;
         const height = rect?.height || initialRect.height;
         if (width && height) {
-          setContainerSize({ width, height });
-          setPos(clampPos(initialPos.x + dx, initialPos.y + dy, width, height));
+          const availX = Math.max(1, width - PILL_SIZE - EDGE_MARGIN * 2);
+          const availY = Math.max(1, height - PILL_SIZE - EDGE_MARGIN * 2);
+          const clampedX = Math.max(EDGE_MARGIN, Math.min(EDGE_MARGIN + availX, initialPos.x + dx));
+          const clampedY = Math.max(EDGE_MARGIN, Math.min(EDGE_MARGIN + availY, initialPos.y + dy));
+          const nextAnchor = {
+            rx: Math.max(0, Math.min(1, (clampedX - EDGE_MARGIN) / availX)),
+            ry: Math.max(0, Math.min(1, (clampedY - EDGE_MARGIN) / availY)),
+          };
+          persistedOverlayAnchors.set(persistKey, nextAnchor);
+          setAnchor(nextAnchor);
         }
       }
     };
@@ -231,17 +232,20 @@ export function RemoteControlFloatingOverlay({
     pillEl.addEventListener('lostpointercapture', onCancel);
   };
 
-  const resolvedPos = pos ?? { x: EDGE_MARGIN, y: EDGE_MARGIN };
-  const alignRight = containerSize.width > 0 && resolvedPos.x > containerSize.width / 2;
-  const openUpward = containerSize.height > 0 && resolvedPos.y > containerSize.height / 2;
+  const availX = Math.max(0, containerSize.width - PILL_SIZE - EDGE_MARGIN * 2);
+  const availY = Math.max(0, containerSize.height - PILL_SIZE - EDGE_MARGIN * 2);
+  const resolvedPxX = EDGE_MARGIN + anchor.rx * availX;
+  const resolvedPxY = EDGE_MARGIN + anchor.ry * availY;
+  const alignRight = anchor.rx > 0.5;
+  const openUpward = anchor.ry > 0.5;
   const availableHorizontal = containerSize.width > 0
-    ? (alignRight ? resolvedPos.x + PILL_SIZE - EDGE_MARGIN : containerSize.width - resolvedPos.x - EDGE_MARGIN)
+    ? (alignRight ? resolvedPxX + PILL_SIZE - EDGE_MARGIN : containerSize.width - resolvedPxX - EDGE_MARGIN)
     : undefined;
   const panelInlineMaxWidth = availableHorizontal !== undefined
     ? Math.max(200, Math.min(312, availableHorizontal))
     : undefined;
   const availableVertical = containerSize.height > 0
-    ? (openUpward ? resolvedPos.y - EDGE_MARGIN - 8 : containerSize.height - resolvedPos.y - PILL_SIZE - EDGE_MARGIN - 8)
+    ? (openUpward ? resolvedPxY - EDGE_MARGIN - 8 : containerSize.height - resolvedPxY - PILL_SIZE - EDGE_MARGIN - 8)
     : undefined;
   const panelInlineMaxHeight = availableVertical !== undefined
     ? Math.max(150, availableVertical)
@@ -258,7 +262,7 @@ export function RemoteControlFloatingOverlay({
     <div
       ref={rootRef}
       className={`remote-control-floating-overlay ${dragging ? 'is-dragging' : ''} ${open ? 'is-open' : ''} ${hostBusy ? 'is-host-busy' : ''}`}
-      style={{ transform: `translate3d(${resolvedPos.x}px, ${resolvedPos.y}px, 0)` }}
+      style={{ '--rc-rx': String(anchor.rx), '--rc-ry': String(anchor.ry) } as CSSProperties}
       onPointerEnter={() => onOverlayHoverChange(true)}
       onPointerLeave={() => onOverlayHoverChange(false)}
       onPointerDown={(event) => event.stopPropagation()}
@@ -365,23 +369,6 @@ export function RemoteControlFloatingOverlay({
             </span>
           </label>
 
-          <label className="remote-control-floating-row">
-            <span className="remote-control-floating-row-copy">
-              <strong>{t('remoteControl.localCursor')}</strong>
-              <small>{t('remoteControl.localCursorHint')}</small>
-            </span>
-            <span className="modern-switch">
-              <input
-                type="checkbox"
-                autoComplete="off"
-                checked={localCursor}
-                onChange={onToggleLocalCursor}
-                aria-label={t('remoteControl.localCursor')}
-              />
-              <span className="switch-slider" />
-            </span>
-          </label>
-
           <div className="remote-control-floating-volume">
             <button
               type="button"
@@ -427,6 +414,7 @@ export function RemoteControlFloatingOverlay({
               className="btn btn-danger btn-sm"
               onClick={() => {
                 setOpen(false);
+                persistedOverlayAnchors.delete(persistKey);
                 onExitRemoteControl();
               }}
             >

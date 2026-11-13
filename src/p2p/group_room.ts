@@ -8,7 +8,9 @@ import { validStreamDescriptors, streamSlotKey, streamOwner, type StreamDescript
 import { validStreamPointer, validStreamPointerState, type StreamPointerState, type StreamPointerPacket } from '../core/stream_pointer.ts';
 import {
   decodeRemoteControlBinaryInput,
+  decodeRemoteControlCursorSync,
   encodeRemoteControlBinaryInput,
+  encodeRemoteControlCursorSync,
   isRemoteControlBinaryFrame,
   validRemoteControlClientPacket,
   validRemoteControlHostPacket,
@@ -273,6 +275,8 @@ export class GroupRoomManager {
   private remoteControlLowLatencyPeers = new Set<string>();
   private remoteControlTxSeq = 0;
   private remoteControlRxSeq = new Map<string, number>();
+  private remoteControlCursorTxSeq = 0;
+  private remoteControlCursorRxSeq = new Map<string, number>();
   private remoteControlPerf = {
     datagramSent: 0,
     tunnelSent: 0,
@@ -285,6 +289,20 @@ export class GroupRoomManager {
     (peer, lane, frame) => {
       if (!this.payloadPeerAllowed(peer)) return;
       if ((lane === 'datagram' || lane === 'tunnel') && isRemoteControlBinaryFrame(frame)) {
+        const decodedCursor = decodeRemoteControlCursorSync(frame);
+        if (decodedCursor) {
+          const seqKey = `${peer}:${decodedCursor.packet.mediaId}`;
+          if (lane === 'datagram') {
+            const prevSeq = this.remoteControlCursorRxSeq.get(seqKey) ?? 0;
+            if (((decodedCursor.seq - prevSeq) | 0) <= 0) return;
+            this.remoteControlCursorRxSeq.set(seqKey, decodedCursor.seq);
+          }
+          const hasScreen = this.remoteDescriptors.get(peer)?.some(entry => entry.id === decodedCursor.packet.mediaId && entry.kind === 'screen') || this.remoteStreams.has(peer);
+          if (hasScreen || !decodedCursor.packet.active) {
+            this.callbacks?.onRemoteControlHost?.(decodedCursor.packet, peer);
+          }
+          return;
+        }
         const decodedRc = decodeRemoteControlBinaryInput(frame);
         if (!decodedRc) return;
         const seqKey = `${peer}:${decodedRc.mediaId}`;
@@ -549,7 +567,43 @@ export class GroupRoomManager {
     if (packet.type === 'accept') {
       this.payloadChannels.ensure(target);
     }
+    if (packet.type === 'cursorSync') {
+      this.remoteControlCursorTxSeq = (this.remoteControlCursorTxSeq + 1) >>> 0 || 1;
+      const frame = encodeRemoteControlCursorSync(packet, this.remoteControlCursorTxSeq);
+      if (frame && packet.active) {
+        this.payloadChannels.ensure(target);
+        if (this.payloadChannels.sendFast(target, 'datagram', frame)) {
+          return;
+        }
+      }
+    }
     void Promise.resolve(this.remoteControlAction.send(packet, { target })).catch(() => {});
+  }
+
+  public broadcastRemoteControlCursorSync(
+    packet: Extract<RemoteControlHostPacket, { type: 'cursorSync' }>,
+  ): void {
+    if (!validRemoteControlHostPacket(packet) || !this.remoteControlAction) return;
+    const watchers = new Set<string>();
+    for (const watcher of this.getStreamWatchers(`local/${packet.mediaId}`)) watchers.add(watcher.peerId);
+    for (const watcher of this.getStreamWatchers('local')) watchers.add(watcher.peerId);
+    if (watchers.size === 0) return;
+
+    this.remoteControlCursorTxSeq = (this.remoteControlCursorTxSeq + 1) >>> 0 || 1;
+    const frame = encodeRemoteControlCursorSync(packet, this.remoteControlCursorTxSeq);
+    for (const target of watchers) {
+      if (!this.peerTracker.isVerified(target) ||
+          (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(target)))) {
+        continue;
+      }
+      if (frame && packet.active) {
+        this.payloadChannels.ensure(target);
+        if (this.payloadChannels.sendFast(target, 'datagram', frame)) {
+          continue;
+        }
+      }
+      void Promise.resolve(this.remoteControlAction.send(packet, { target })).catch(() => {});
+    }
   }
 
   public async sendAppEvent(event: AppWireEvent, target?: string): Promise<void> {
@@ -1330,17 +1384,23 @@ export class GroupRoomManager {
     this.remoteControlAction = this.room.makeAction('remote_control_v1');
     this.remoteControlAction.onMessage = (packet: unknown, meta: { peerId: string }) => {
       if (validRemoteControlClientPacket(packet)) {
+        if (packet.type === 'request' || packet.type === 'cancel' || packet.type === 'release') {
+          this.remoteControlRxSeq.delete(`${meta.peerId}:${packet.mediaId}`);
+        }
         if (packet.type === 'request' && packet.fastBinary) {
           this.payloadChannels.ensure(meta.peerId);
         }
         this.callbacks?.onRemoteControlClient?.(packet, meta.peerId);
       } else if (validRemoteControlHostPacket(packet)) {
-        if (packet.type === 'accept' && packet.fastBinary) {
-          this.remoteControlFastPeers.add(meta.peerId);
-          this.payloadChannels.ensure(meta.peerId);
+        if (packet.type === 'accept') {
+          this.remoteControlCursorRxSeq.delete(`${meta.peerId}:${packet.mediaId}`);
+          if (packet.fastBinary) {
+            this.remoteControlFastPeers.add(meta.peerId);
+            this.payloadChannels.ensure(meta.peerId);
+          }
         }
         const hasScreen = this.remoteDescriptors.get(meta.peerId)?.some(entry => entry.id === packet.mediaId && entry.kind === 'screen') || this.remoteStreams.has(meta.peerId);
-        if (hasScreen || packet.type === 'revoke' || packet.type === 'decline') {
+        if (hasScreen || packet.type === 'revoke' || packet.type === 'decline' || (packet.type === 'cursorSync' && !packet.active)) {
           this.callbacks?.onRemoteControlHost?.(packet, meta.peerId);
         }
       }

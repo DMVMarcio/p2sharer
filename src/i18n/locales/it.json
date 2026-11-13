@@ -1659,8 +1659,6 @@
   "remoteControl.keyboardDisabledHint": "Tastiera disattivata",
   "remoteControl.immersiveMode": "Modalità immersiva",
   "remoteControl.immersiveHint": "Invia Alt+Tab, tasto Windows e scorciatoie di sistema al PC remoto",
-  "remoteControl.localCursor": "Cursore locale (0 ms)",
-  "remoteControl.localCursorHint": "Mantiene visibile il cursore locale a zero ritardo sincronizzando la forma remota",
   "remoteControl.exitAction": "Termina controllo",
   "remoteControl.manageAction": "Controllo remoto",
   "remoteControl.managerTitle": "Controllo remoto",

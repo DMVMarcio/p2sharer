@@ -139,6 +139,8 @@ export function useRoom() {
     remoteControllers: roomService.remoteControllers,
     remoteControlHostBusy: roomService.remoteControlHostBusy,
     remoteControlViewerStates: roomService.remoteControlViewerStates,
+    remoteCursorStates: roomService.remoteCursorStates,
+    selfPeerId: roomService.getSelfPeerId(),
 
     // Actions
     joinRoom,
