@@ -1,6 +1,7 @@
 import { getLanguage, t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React from 'react';
+import { PanelsTopLeft } from 'lucide-react';
 import type { StreamWatcher } from '../../core/types';
 import { Tooltip } from '../common/Tooltip';
 import { WatchersTooltipContent } from './WatchersTooltipContent';
@@ -14,6 +15,8 @@ interface StreamStatsOverlayProps {
   pingClass?: 'ping-good' | 'ping-medium' | 'ping-poor';
   transportTag?: string;
   watchers: StreamWatcher[];
+  isHudPinned?: boolean;
+  onTogglePinHud?: () => void;
   onTooltipOpenChange?: (open: boolean) => void;
   className?: string;
 }
@@ -27,6 +30,8 @@ export const StreamStatsOverlay: React.FC<StreamStatsOverlayProps> = ({
   pingClass,
   transportTag = '',
   watchers,
+  isHudPinned = false,
+  onTogglePinHud,
   onTooltipOpenChange,
   className = '',
 }) => {
@@ -131,6 +136,34 @@ export const StreamStatsOverlay: React.FC<StreamStatsOverlayProps> = ({
           </span>
         </button>
       </Tooltip>
+
+      {onTogglePinHud && (
+        <Tooltip
+          content={
+            isHudPinned
+              ? t("message.b9125ff913f7")
+              : t("message.7dcee91def76")
+          }
+          onOpenChange={onTooltipOpenChange}
+        >
+          <button
+            type="button"
+            className={`btn-stream-pin ${isHudPinned ? 'active' : ''}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onTogglePinHud();
+            }}
+            aria-label={
+              isHudPinned
+                ? t("message.a66da920f259")
+                : t("message.1efcef298a4c")
+            }
+            aria-pressed={isHudPinned}
+          >
+            <PanelsTopLeft size={13} aria-hidden="true" />
+          </button>
+        </Tooltip>
+      )}
     </div>
   );
 };

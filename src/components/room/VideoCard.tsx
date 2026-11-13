@@ -625,6 +625,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           pingClass={pingClass}
           transportTag={transportTag}
           watchers={watchers}
+          isHudPinned={isHudPinned}
+          onTogglePinHud={() => setIsHudPinned((p) => !p)}
           onTooltipOpenChange={handleTooltipOpenChange}
         />
     )}
@@ -760,32 +762,6 @@ export const VideoCard: React.FC<VideoCardProps> = ({
                 </button>
               </Tooltip>
             )}
-
-            <Tooltip
-              content={
-                isHudPinned
-                  ? t("message.b9125ff913f7")
-                  : t("message.7dcee91def76")
-              }
-              onOpenChange={handleTooltipOpenChange}
-            >
-              <button
-                type="button"
-                className={`btn-stream-pin ${isHudPinned ? 'active' : ''}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsHudPinned((p) => !p);
-                }}
-                aria-label={
-                  isHudPinned
-                    ? t("message.a66da920f259")
-                    : t("message.1efcef298a4c")
-                }
-                aria-pressed={isHudPinned}
-              >
-                <PanelsTopLeft size={14} aria-hidden="true" />
-              </button>
-            </Tooltip>
 
             <Tooltip
               content={t("message.365c67865e1c")}

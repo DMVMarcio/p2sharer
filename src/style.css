@@ -2001,6 +2001,13 @@ html[data-theme="light"] :is(.stream-card, .pip-window-root) {
   flex-shrink: 0;
 }
 
+.stream-card-stats-hud .btn-stream-pin {
+  width: 26px;
+  height: 26px;
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-md);
+}
+
 .badge-live-watchers {
   position: absolute;
   top: 10px;
