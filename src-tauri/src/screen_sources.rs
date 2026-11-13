@@ -110,6 +110,7 @@ pub struct CaptureMetrics {
     encoder_kind: std::sync::atomic::AtomicU8,
     cursor_requested: AtomicBool,
     cursor_embedded: AtomicBool,
+    cursor_restart: AtomicBool,
     jpeg_errors: std::sync::atomic::AtomicU64,
     #[cfg(feature = "media-diagnostics")]
     last_callback_us: std::sync::atomic::AtomicU64,
@@ -816,7 +817,7 @@ fn start_capture_supervisor(source: String, capture_mouse: bool, mut flags: Capt
         let mut recovery = CaptureRecovery::default();
         let mut paused = false;
         loop {
-            std::thread::sleep(std::time::Duration::from_millis(250));
+            std::thread::sleep(std::time::Duration::from_millis(120));
             if !flags.active_flag.load(Ordering::Acquire) { break; }
             let desktop_available = input_desktop_available();
             if !desktop_available {
@@ -837,11 +838,13 @@ fn start_capture_supervisor(source: String, capture_mouse: bool, mut flags: Capt
                     source.strip_prefix("screen:").and_then(|raw| raw.parse::<usize>().ok())
                         .map_or(false, |index| WgcMonitor::from_index(index + 1).is_ok())
                 };
+            let cursor_restart = flags.metrics.cursor_restart.load(Ordering::Acquire);
             let finished = {
                 let Ok(sessions) = SESSIONS.lock() else { break; };
                 let Some(session) = sessions.get(&flags.session_id) else { break; };
                 if !Arc::ptr_eq(&session.active, &flags.active_flag) { break; }
-                session.control.as_ref().map_or(true, |control| control.is_finished())
+                cursor_restart
+                    || session.control.as_ref().map_or(true, |control| control.is_finished())
                     || flags.lifecycle.closed.load(Ordering::Acquire)
             };
             let now = flags.start_instant.elapsed().as_millis() as u64;
@@ -860,13 +863,14 @@ fn start_capture_supervisor(source: String, capture_mouse: bool, mut flags: Capt
             let previous = {
                 let Ok(mut sessions) = SESSIONS.lock() else { break; };
                 let Some(session) = sessions.get_mut(&flags.session_id) else { break; };
-                if !Arc::ptr_eq(&session.active, &flags.active_flag) { break; }
+                if !Arc::ptr_eq(&session.active, &flags.active_flag) { break; };
                 session.control.take()
             };
             // Allow the retired handler to release its GPU/encoder before rebuilding.
             // Cleanup is bounded and runs off the UI thread.
             if let Some(control) = previous { let _ = safely_stop_capture_control(control).join(); }
             if !flags.active_flag.load(Ordering::Acquire) { break; }
+            flags.metrics.cursor_restart.store(false, Ordering::Release);
             flags.lifecycle = Arc::new(CaptureLifecycle::new());
             flags.nvenc_keyframe.store(true, Ordering::Release);
             match start_gpu_capture(&source, capture_mouse, flags.clone()) {
@@ -877,6 +881,14 @@ fn start_capture_supervisor(source: String, capture_mouse: bool, mut flags: Capt
                         if let Some(session) = sessions.get_mut(&flags.session_id) {
                             if Arc::ptr_eq(&session.active, &flags.active_flag) && session.active.load(Ordering::Acquire) {
                                 session.control = control.take();
+                                if session.metrics.cursor_requested.load(Ordering::Acquire)
+                                    && matches!(session.control, Some(ActiveCaptureControl::Wgc(_)))
+                                {
+                                    let desired_embedded = !crate::remote_control::should_suppress_captured_cursor();
+                                    if session.metrics.cursor_embedded.load(Ordering::Acquire) != desired_embedded {
+                                        session.metrics.cursor_restart.store(true, Ordering::Release);
+                                    }
+                                }
                             }
                         }
                     }
@@ -1883,10 +1895,12 @@ pub fn refresh_wgc_cursor_for_remote_control() {
                     continue;
                 }
                 let desired_embedded = !suppress;
-                if let Some(ActiveCaptureControl::Wgc(ref control)) = session.control {
-                    if session.metrics.cursor_embedded.load(Ordering::Acquire) != desired_embedded {
-                        control.halt_handle().store(true, Ordering::SeqCst);
-                    }
+                let is_wgc = session.metrics.capture_backend.load(Ordering::Relaxed) == 1
+                    || matches!(session.control, Some(ActiveCaptureControl::Wgc(_)));
+                if is_wgc && session.metrics.cursor_embedded.load(Ordering::Acquire) != desired_embedded {
+                    // Request a full supervisor rebuild rather than setting halt_handle alone,
+                    // because GraphicsCaptureApi ignores frames on halt without exiting its message loop.
+                    session.metrics.cursor_restart.store(true, Ordering::Release);
                 }
             }
         }
