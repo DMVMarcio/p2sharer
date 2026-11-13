@@ -35,12 +35,13 @@ void rate_control(NV_ENC_CONFIG& config, uint32_t bitrate, uint32_t fps) {
     // Leave ~8% headroom for RTP/SRTP framing while delivering maximum visual quality.
     const uint32_t payload_bitrate = static_cast<uint32_t>(static_cast<uint64_t>(bitrate) * 92 / 100);
     config.rcParams.averageBitRate = payload_bitrate; config.rcParams.maxBitRate = payload_bitrate;
-    // Bound recovery bursts to ~34 ms (at least 1 frame) for minimal serialization delay.
+    // Allow ~150 ms VBV headroom (at least 5 frames) so full-screen app switches do not starve QP.
     const uint32_t single_frame = payload_bitrate / (fps > 0 ? fps : 60);
-    const uint32_t reservoir = static_cast<uint32_t>(static_cast<uint64_t>(payload_bitrate) * 34 / 1000);
-    config.rcParams.vbvBufferSize = reservoir > single_frame ? reservoir : single_frame;
+    const uint32_t min_frames = single_frame * 5;
+    const uint32_t reservoir = static_cast<uint32_t>(static_cast<uint64_t>(payload_bitrate) * 150 / 1000);
+    config.rcParams.vbvBufferSize = reservoir > min_frames ? reservoir : min_frames;
     config.rcParams.vbvInitialDelay = config.rcParams.vbvBufferSize;
-    config.rcParams.lowDelayKeyFrameScale = 2;
+    config.rcParams.lowDelayKeyFrameScale = 1;
 }
 void configure_h264_quality(NV_ENC_CONFIG& config, bool high_quality) {
     auto& h264 = config.encodeCodecConfig.h264Config;
@@ -48,16 +49,18 @@ void configure_h264_quality(NV_ENC_CONFIG& config, bool high_quality) {
     h264.entropyCodingMode = high_quality
         ? NV_ENC_H264_ENTROPY_CODING_MODE_CABAC
         : NV_ENC_H264_ENTROPY_CODING_MODE_CAVLC;
-    config.rcParams.enableAQ = high_quality ? 1 : 0;
-    config.rcParams.aqStrength = high_quality ? 4 : 0;
+    // Keep Spatial AQ disabled so crisp UI borders and small desktop text do not lose bits to flat areas.
+    config.rcParams.enableAQ = 0;
+    config.rcParams.aqStrength = 0;
+    config.rcParams.enableMaxQP = high_quality ? 1 : 0;
+    if (high_quality) {
+        config.rcParams.maxQP.qpInterP = 38;
+        config.rcParams.maxQP.qpIntra = 36;
+        config.rcParams.maxQP.qpInterB = 40;
+    }
     config.rcParams.multiPass = high_quality ? NV_ENC_TWO_PASS_QUARTER_RESOLUTION : NV_ENC_MULTI_PASS_DISABLED;
-    h264.h264VUIParameters.videoSignalTypePresentFlag = 1;
-    h264.h264VUIParameters.videoFormat = NV_ENC_VUI_VIDEO_FORMAT_UNSPECIFIED;
-    h264.h264VUIParameters.videoFullRangeFlag = 0;
-    h264.h264VUIParameters.colourDescriptionPresentFlag = 1;
-    h264.h264VUIParameters.colourPrimaries = NV_ENC_VUI_COLOR_PRIMARIES_BT709;
-    h264.h264VUIParameters.transferCharacteristics = NV_ENC_VUI_TRANSFER_CHARACTERISTIC_BT709;
-    h264.h264VUIParameters.colourMatrix = NV_ENC_VUI_MATRIX_COEFFS_BT709;
+    // Match NVENC's native ABGR->NV12 conversion without overriding VUI colorimetry.
+    h264.h264VUIParameters = {};
 }
 bool load(Encoder* encoder, char* error, size_t size) {
 #ifdef _WIN64
@@ -120,8 +123,14 @@ bool initialize(Encoder* encoder, ID3D11Device* device, uint32_t w, uint32_t h,
     for (uint32_t i = 0; i < count; i++) if (formats[i] == NV_ENC_BUFFER_FORMAT_ABGR) rgba = true;
     if (!rgba) { error_text(error, size, "NVENC RGBA texture input unsupported"); return false; }
     NV_ENC_PRESET_CONFIG preset{}; preset.version = NV_ENC_PRESET_CONFIG_VER; preset.presetCfg.version = NV_ENC_CONFIG_VER;
-    NV_CHECK(api.nvEncGetEncodePresetConfigEx(session, NV_ENC_CODEC_H264_GUID, NV_ENC_PRESET_P1_GUID,
-        NV_ENC_TUNING_INFO_ULTRA_LOW_LATENCY, &preset), "Query low-latency preset");
+    GUID chosen_preset = NV_ENC_PRESET_P4_GUID;
+    NVENCSTATUS preset_status = api.nvEncGetEncodePresetConfigEx(session, NV_ENC_CODEC_H264_GUID, chosen_preset,
+        NV_ENC_TUNING_INFO_ULTRA_LOW_LATENCY, &preset);
+    if (preset_status != NV_ENC_SUCCESS) {
+        chosen_preset = NV_ENC_PRESET_P1_GUID;
+        NV_CHECK(api.nvEncGetEncodePresetConfigEx(session, NV_ENC_CODEC_H264_GUID, chosen_preset,
+            NV_ENC_TUNING_INFO_ULTRA_LOW_LATENCY, &preset), "Query low-latency preset");
+    }
     auto config = preset.presetCfg;
     // WebRTC requests recovery IDRs explicitly; periodic full-picture refreshes
     // unnecessarily destroy the fine detail accumulated by delta pictures.
@@ -133,13 +142,19 @@ bool initialize(Encoder* encoder, ID3D11Device* device, uint32_t w, uint32_t h,
     config.encodeCodecConfig.h264Config.level = NV_ENC_LEVEL_H264_51;
     configure_h264_quality(config, true);
     NV_ENC_INITIALIZE_PARAMS init{}; init.version = NV_ENC_INITIALIZE_PARAMS_VER;
-    init.encodeGUID = NV_ENC_CODEC_H264_GUID; init.presetGUID = NV_ENC_PRESET_P1_GUID;
+    init.encodeGUID = NV_ENC_CODEC_H264_GUID; init.presetGUID = chosen_preset;
     init.encodeWidth = w; init.encodeHeight = h; init.darWidth = w; init.darHeight = h;
     init.frameRateNum = fps; init.frameRateDen = 1; init.enablePTD = 1;
     init.encodeConfig = &config; init.tuningInfo = NV_ENC_TUNING_INFO_ULTRA_LOW_LATENCY;
     NVENCSTATUS init_status = api.nvEncInitializeEncoder(session, &init);
     if (init_status != NV_ENC_SUCCESS) {
-        // Retry with conservative High/Baseline parameters if an older driver rejects AQ/two-pass.
+        // Retry with conservative High/Baseline parameters on P1 if an older driver rejects P4/two-pass.
+        if (chosen_preset != NV_ENC_PRESET_P1_GUID) {
+            chosen_preset = NV_ENC_PRESET_P1_GUID;
+            init.presetGUID = chosen_preset;
+            api.nvEncGetEncodePresetConfigEx(session, NV_ENC_CODEC_H264_GUID, chosen_preset,
+                NV_ENC_TUNING_INFO_ULTRA_LOW_LATENCY, &preset);
+        }
         config = preset.presetCfg;
         config.gopLength = NVENC_INFINITE_GOPLENGTH; config.frameIntervalP = 1;
         rate_control(config, bitrate, fps);

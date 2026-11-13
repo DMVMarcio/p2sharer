@@ -137,10 +137,10 @@ HRESULT bool_property(ICodecAPI* codec, const GUID& property, bool value) {
     return codec->SetValue(&property, &variant);
 }
 HRESULT rate_control(Encoder& e, uint32_t bitrate) {
-    // H264's HRD size is in BYTES. Leave ~8% RTP framing headroom and cap the
-    // burst reservoir at ~40 ms so bitrate changes and recovery frames stay low-delay.
+    // H264's HRD size is in BYTES. Leave ~8% RTP framing headroom and allow ~150 ms
+    // HRD reservoir so full-screen app switches keep sharp UI text without QP spikes.
     const uint32_t payload = bitrate * 92 / 100;
-    const uint32_t reservoir = payload / 200; // payload * 40 ms / 8 bits per byte
+    const uint32_t reservoir = static_cast<uint32_t>(static_cast<uint64_t>(payload) * 150 / 8000);
     HRESULT hr = uint_property(e.codec.Get(), CODECAPI_AVEncCommonBufferSize, reservoir);
     if (FAILED(hr)) return hr;
     return uint_property(e.codec.Get(), CODECAPI_AVEncCommonMeanBitRate, payload);
@@ -175,7 +175,7 @@ bool configure(Encoder& e, IMFActivate* activation, char* error, size_t size) {
     // that reject the optional B-picture count control before type negotiation.
     MF_CHECK(bool_property(e.codec.Get(), CODECAPI_AVLowLatencyMode, true), "enable low latency");
     uint_property(e.codec.Get(), CODECAPI_AVEncCommonRateControlMode, eAVEncCommonRateControlMode_CBR);
-    uint_property(e.codec.Get(), CODECAPI_AVEncCommonQualityVsSpeed, 0);
+    uint_property(e.codec.Get(), CODECAPI_AVEncCommonQualityVsSpeed, 33);
     uint_property(e.codec.Get(), CODECAPI_AVEncMPVGOPSize, 0xffffffff);
     bool_property(e.codec.Get(), CODECAPI_AVEncCommonRealTime, true);
     MF_CHECK(rate_control(e, e.bitrate), "low-delay hardware rate control");

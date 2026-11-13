@@ -2352,15 +2352,20 @@ unsafe extern "system" fn immersive_keyboard_proc(
 }
 
 #[cfg(windows)]
+fn join_hook_guard(guard: &mut Option<HookThreadHandle>) {
+    if let Some(handle) = guard.take() {
+        join_hook_thread(handle);
+    }
+}
+
+#[cfg(windows)]
 fn join_immersive_hook_locked(guard: &mut Option<HookThreadHandle>) {
     IMMERSIVE_ENABLED.store(false, Ordering::Release);
     IMMERSIVE_HELD_MASK.store(0, Ordering::Release);
     if let Ok(mut tx_guard) = IMMERSIVE_TX.lock() {
         *tx_guard = None;
     }
-    if let Some(handle) = guard.take() {
-        join_hook_thread(handle);
-    }
+    join_hook_guard(guard);
 }
 
 #[tauri::command]
@@ -2391,9 +2396,14 @@ pub fn set_remote_control_immersive(
             .map_err(|_| "Immersive lifecycle lock poisoned")?;
 
         if enabled {
-            if hook_guard.is_some() {
+            let thread_alive = hook_guard.as_ref().is_some_and(|handle| !handle.join.is_finished());
+            let sender_ready = IMMERSIVE_TX.lock().ok().is_some_and(|tx| tx.is_some());
+            if thread_alive && sender_ready {
                 IMMERSIVE_ENABLED.store(true, Ordering::Release);
                 return Ok(());
+            }
+            if hook_guard.is_some() {
+                join_immersive_hook_locked(&mut hook_guard);
             }
 
             let (tx, rx) = std::sync::mpsc::sync_channel::<ImmersiveKeyPayload>(128);
@@ -2472,7 +2482,7 @@ pub fn set_remote_control_immersive(
     Ok(())
 }
 
-const RAW_DELTA_FLUSH_US: u128 = 3000;
+const RAW_DELTA_FLUSH_US: u128 = 2000;
 const RAW_CLIP_CHECK_MS: u64 = 25;
 
 pub(crate) fn compute_centered_clip_trap(
@@ -2650,7 +2660,7 @@ fn stop_raw_mouse_lock() {
     }
     release_cursor_clip_win32();
     if let Ok(mut guard) = RAW_LOCK_JOIN.lock() {
-        join_immersive_hook_locked(&mut guard);
+        join_hook_guard(&mut guard);
     }
 }
 

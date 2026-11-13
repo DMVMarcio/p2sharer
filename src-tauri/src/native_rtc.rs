@@ -170,7 +170,7 @@ fn initial_rate(budget: u32, width: u32, height: u32, fps: u32) -> u32 {
 /// above the encoded bitrate so delta frames flush immediately while large IDRs
 /// avoid overflowing UDP socket buffers.
 fn packet_pacing_ns(payload_bytes: usize, bitrate: u32) -> u64 {
-    let burst_bps = u64::from(bitrate).max(100_000).saturating_mul(3).max(45_000_000);
+    let burst_bps = u64::from(bitrate).max(100_000).saturating_mul(2).clamp(35_000_000, 80_000_000);
     let wire_bits = (payload_bytes as u64).saturating_add(64).saturating_mul(8);
     wire_bits.saturating_mul(1_000_000_000) / burst_bps
 }
@@ -526,7 +526,7 @@ pub async fn create_native_video_offer(
                 if let Some(rr) = p.as_any().downcast_ref::<ReceiverReport>() {
                     #[cfg(feature = "media-diagnostics")]
                     rtcp_value.diagnostics.reports.fetch_add(1, Ordering::Relaxed);
-                    if last_adjust.elapsed() >= Duration::from_millis(500) {
+                    if last_adjust.elapsed() >= Duration::from_millis(1000) {
                         let loss = rr
                             .reports
                             .iter()
@@ -542,7 +542,7 @@ pub async fn create_native_video_offer(
                             baseline_rtt = baseline_rtt.min(rtt);
                         }
                         let queued = rtt.is_some_and(|rtt| {
-                            rtt > baseline_rtt + 0.060 && rtt > baseline_rtt * 1.5
+                            rtt > baseline_rtt + 0.080 && rtt > baseline_rtt * 1.6
                         });
                         #[cfg(feature = "media-diagnostics")]
                         {
@@ -647,7 +647,7 @@ pub async fn create_native_video_offer(
             let mut complete = true;
             let current_bitrate = value.bitrate.load(Ordering::Relaxed);
             // Burst small delta frames directly at socket speed and sleep only when
-            // pacing credit exceeds 1.5 ms during large keyframes to avoid timer-wheel latency.
+            // pacing credit exceeds 1 ms during large keyframes or scene cuts.
             next_packet = next_packet.max(tokio::time::Instant::now());
             for (index, payload) in payloads.into_iter().enumerate() {
                 let now = tokio::time::Instant::now();
@@ -655,7 +655,7 @@ pub async fn create_native_video_offer(
                     complete = false;
                     break;
                 }
-                if next_packet > now + Duration::from_micros(1500) {
+                if next_packet > now + Duration::from_micros(1000) {
                     tokio::time::sleep_until(next_packet).await;
                 }
                 let bytes = payload.len();

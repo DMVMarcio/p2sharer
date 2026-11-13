@@ -378,6 +378,9 @@ pub struct NativeWgcHandler {
     nvenc_enabled: Arc<AtomicBool>,
     nvenc_keyframe: Arc<AtomicBool>,
     nvenc_bitrate: Arc<std::sync::atomic::AtomicU32>,
+    last_encoded: Option<(windows_capture_api::Win32::Graphics::Direct3D11::ID3D11Texture2D, u32, u32)>,
+    refinements_remaining: u8,
+    last_hw_encode: Option<std::time::Instant>,
     delivery: FrameDelivery,
     legacy_pacing: bool,
     load: Arc<crate::video_load::CaptureLoad>,
@@ -416,6 +419,9 @@ impl NativeWgcHandler {
             nvenc_enabled: flags.nvenc_enabled,
             nvenc_keyframe: flags.nvenc_keyframe,
             nvenc_bitrate: flags.nvenc_bitrate,
+            last_encoded: None,
+            refinements_remaining: 0,
+            last_hw_encode: None,
             delivery: flags.delivery,
             legacy_pacing: flags.legacy_pacing,
             load: flags.load,
@@ -519,6 +525,12 @@ impl NativeWgcHandler {
                     if !enqueue_capture_frame(&self.delivery, Arc::new(bytes), self.start_instant.elapsed().as_micros() as u64,
                         self.legacy_pacing, &self.lifecycle.active, &self.sender, &self.metrics) {
                         self.nvenc_keyframe.store(true, Ordering::Relaxed);
+                        self.refinements_remaining = 0;
+                    } else if copy_refine_texture(device, context, scaled.as_ref().unwrap_or(texture), src_width, src_height, &mut self.last_encoded) {
+                        self.last_hw_encode = Some(arrival_time);
+                        self.refinements_remaining = 2;
+                    } else {
+                        self.refinements_remaining = 0;
                     }
                     let processing_us = arrival_time.elapsed().as_micros() as u64;
                     self.metrics.processing_us.fetch_add(processing_us, Ordering::Relaxed);
@@ -529,6 +541,8 @@ impl NativeWgcHandler {
                     self.nvenc_enabled.store(false, Ordering::Relaxed);
                     self.metrics.nvenc_fallbacks.fetch_add(1, Ordering::Relaxed);
                     self.nvenc = None;
+                    self.last_encoded = None;
+                    self.refinements_remaining = 0;
                     crate::logger::log_msg("WARN", "capture.hardware", &format!("session={} hardware encode/init failed output={src_width}x{src_height} fps={} attempt_ms={} elapsed_ms={} fallback=libjpeg-turbo/JPEG error={error}",
                         self.session_id, self.load.fps(), encoder_started.elapsed().as_millis(), self.start_instant.elapsed().as_millis()));
                 }
@@ -640,10 +654,121 @@ impl NativeWgcHandler {
         Ok(())
     }
 
+    fn refine_idle(&mut self, device: &windows_capture_api::Win32::Graphics::Direct3D11::ID3D11Device) -> bool {
+        if self.refinements_remaining == 0
+            || !self.nvenc_enabled.load(Ordering::Relaxed)
+            || !self.lifecycle.active.load(Ordering::Relaxed)
+        {
+            self.refinements_remaining = 0;
+            return false;
+        }
+        let Some(last) = self.last_hw_encode else {
+            self.refinements_remaining = 0;
+            return false;
+        };
+        if last.elapsed() < std::time::Duration::from_millis(55) {
+            return true;
+        }
+        if !self.legacy_pacing && !self.delivery.0.lock().map_or(false, |pacer| pacer.has_encode_capacity()) {
+            if last.elapsed() > std::time::Duration::from_millis(250) {
+                self.refinements_remaining = 0;
+                return false;
+            }
+            return true;
+        }
+        let Some((texture, width, height)) = self.last_encoded.as_ref().map(|(t, w, h)| (t.clone(), *w, *h)) else {
+            self.refinements_remaining = 0;
+            return false;
+        };
+        let Some(encoder) = self.nvenc.as_mut() else {
+            self.refinements_remaining = 0;
+            return false;
+        };
+        match encoder.encode(
+            device,
+            &texture,
+            width,
+            height,
+            self.load.fps(),
+            self.nvenc_bitrate.load(Ordering::Relaxed),
+            self.start_instant.elapsed().as_micros() as u64,
+            false,
+        ) {
+            Ok(bytes) => {
+                if !enqueue_capture_frame(
+                    &self.delivery,
+                    Arc::new(bytes),
+                    self.start_instant.elapsed().as_micros() as u64,
+                    self.legacy_pacing,
+                    &self.lifecycle.active,
+                    &self.sender,
+                    &self.metrics,
+                ) {
+                    self.nvenc_keyframe.store(true, Ordering::Relaxed);
+                    self.refinements_remaining = 0;
+                    return false;
+                }
+                self.metrics.images.fetch_add(1, Ordering::Relaxed);
+                self.metrics.nvenc_images.fetch_add(1, Ordering::Relaxed);
+                self.last_hw_encode = Some(std::time::Instant::now());
+                self.refinements_remaining = self.refinements_remaining.saturating_sub(1);
+                self.refinements_remaining > 0
+            }
+            Err(_) => {
+                self.refinements_remaining = 0;
+                false
+            }
+        }
+    }
+
+}
+
+#[cfg(windows)]
+fn copy_refine_texture(
+    device: &windows_capture_api::Win32::Graphics::Direct3D11::ID3D11Device,
+    context: &windows_capture_api::Win32::Graphics::Direct3D11::ID3D11DeviceContext,
+    source: &windows_capture_api::Win32::Graphics::Direct3D11::ID3D11Texture2D,
+    width: u32,
+    height: u32,
+    cached: &mut Option<(windows_capture_api::Win32::Graphics::Direct3D11::ID3D11Texture2D, u32, u32)>,
+) -> bool {
+    use windows_capture_api::Win32::Graphics::Direct3D11::{D3D11_TEXTURE2D_DESC, D3D11_USAGE_DEFAULT, ID3D11Texture2D};
+    use windows_capture_api::Win32::Graphics::Dxgi::Common::DXGI_SAMPLE_DESC;
+    let mut src_desc = D3D11_TEXTURE2D_DESC::default();
+    unsafe { source.GetDesc(&mut src_desc) };
+    let needs_alloc = cached
+        .as_ref()
+        .is_none_or(|(_, cw, ch)| *cw != width || *ch != height);
+    if needs_alloc {
+        let desc = D3D11_TEXTURE2D_DESC {
+            Width: width,
+            Height: height,
+            MipLevels: 1,
+            ArraySize: 1,
+            Format: src_desc.Format,
+            SampleDesc: DXGI_SAMPLE_DESC { Count: 1, Quality: 0 },
+            Usage: D3D11_USAGE_DEFAULT,
+            ..Default::default()
+        };
+        let mut copy: Option<ID3D11Texture2D> = None;
+        if unsafe { device.CreateTexture2D(&desc, None, Some(&mut copy)) }.is_err() {
+            *cached = None;
+            return false;
+        }
+        *cached = copy.map(|tex| (tex, width, height));
+    }
+    if let Some((dst, _, _)) = cached.as_ref() {
+        unsafe { context.CopyResource(dst, source) };
+        true
+    } else {
+        false
+    }
 }
 
 #[cfg(windows)]
 const WM_APP_UPDATE_CURSOR: u32 = 0x8000 + 0x101;
+#[cfg(windows)]
+const WM_APP_ARM_REFINE: u32 = 0x8000 + 0x102;
 
 #[cfg(windows)]
 struct WgcControl {
@@ -833,8 +958,8 @@ fn start_wgc_capture(source: &str, capture_mouse: bool, flags: CaptureFlags) -> 
     };
     use windows_capture_api::Win32::System::WinRT::Direct3D11::IDirect3DDxgiInterfaceAccess;
     use windows_capture_api::Win32::UI::WindowsAndMessaging::{
-        DispatchMessageW, GetMessageW, MSG, PostQuitMessage, PostThreadMessageW, TranslateMessage,
-        WM_QUIT,
+        DispatchMessageW, GetMessageW, KillTimer, MSG, PostQuitMessage, PostThreadMessageW,
+        SetTimer, TranslateMessage, WM_QUIT, WM_TIMER,
     };
     use windows_capture_api::core::{IInspectable, Interface};
 
@@ -1099,21 +1224,28 @@ fn start_wgc_capture(source: &str, capture_mouse: bool, flags: CaptureFlags) -> 
             let texture: ID3D11Texture2D = unsafe { dxgi_access.GetInterface()? };
             let mut desc = D3D11_TEXTURE2D_DESC::default();
             unsafe { texture.GetDesc(&mut desc) };
-            let result = match handler_fp.lock() {
-                Ok(mut guard) => guard.process_texture(
-                    &d3d_device_fp.0,
-                    &d3d_context_fp.0,
-                    &texture,
-                    desc.Width,
-                    desc.Height,
-                    None,
-                ),
-                Err(_) => Ok(()),
+            let (result, arm_refine) = match handler_fp.lock() {
+                Ok(mut guard) => {
+                    let res = guard.process_texture(
+                        &d3d_device_fp.0,
+                        &d3d_context_fp.0,
+                        &texture,
+                        desc.Width,
+                        desc.Height,
+                        None,
+                    );
+                    (res, guard.refinements_remaining > 0)
+                }
+                Err(_) => (Ok(()), false),
             };
             if result.is_err() {
                 halt_fp.store(true, Ordering::Relaxed);
                 unsafe {
                     let _ = PostThreadMessageW(thread_id, WM_QUIT, WPARAM::default(), LPARAM::default());
+                }
+            } else if arm_refine {
+                unsafe {
+                    let _ = PostThreadMessageW(thread_id, WM_APP_ARM_REFINE, WPARAM::default(), LPARAM::default());
                 }
             }
             Ok(())
@@ -1139,6 +1271,8 @@ fn start_wgc_capture(source: &str, capture_mouse: bool, flags: CaptureFlags) -> 
 
         let _ = ready.try_send(Ok(thread_id));
 
+        let mut refine_timer_id: usize = 0;
+        let mut refine_timer_active = false;
         let mut msg = MSG::default();
         loop {
             match unsafe { GetMessageW(&mut msg, None, 0, 0).0 } {
@@ -1147,6 +1281,19 @@ fn start_wgc_capture(source: &str, capture_mouse: bool, flags: CaptureFlags) -> 
                     if msg.message == WM_APP_UPDATE_CURSOR && cursor_supported {
                         let desired = desired_thread.load(Ordering::Acquire);
                         apply_wgc_cursor_visibility(&session, &metrics, &applied_cursor, desired, &session_id);
+                    } else if msg.message == WM_APP_ARM_REFINE {
+                        if refine_timer_active {
+                            let _ = unsafe { KillTimer(None, refine_timer_id) };
+                        }
+                        refine_timer_id = unsafe { SetTimer(None, 1, 60, None) };
+                        refine_timer_active = refine_timer_id != 0;
+                    } else if msg.message == WM_TIMER && refine_timer_active && msg.wParam.0 == refine_timer_id {
+                        let keep = handler.lock().ok().is_some_and(|mut guard| guard.refine_idle(&d3d_device));
+                        if !keep {
+                            let _ = unsafe { KillTimer(None, refine_timer_id) };
+                            refine_timer_active = false;
+                            refine_timer_id = 0;
+                        }
                     } else {
                         unsafe {
                             let _ = TranslateMessage(&msg);
@@ -1155,6 +1302,9 @@ fn start_wgc_capture(source: &str, capture_mouse: bool, flags: CaptureFlags) -> 
                     }
                 }
             }
+        }
+        if refine_timer_active {
+            let _ = unsafe { KillTimer(None, refine_timer_id) };
         }
 
         if let Ok(action) = controller.ShutdownQueueAsync() {

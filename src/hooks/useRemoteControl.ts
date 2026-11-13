@@ -573,11 +573,20 @@ export function useRemoteControl(
     }
   }, [effectiveMouseLock, hostMouseLocked, manualMouseLock, releasePointerLock, tryAcquirePointerLock, wantPointerLock]);
 
-  // Keep OS low-level immersive hook steady while active + immersive + focused; avoid churning on hostBusy transitions.
+  // Keep OS low-level immersive hook steady while active + immersive + focused; avoid churning on pointer lock or hostBusy transitions.
   const hookLive = active && immersive && windowFocused;
   useEffect(() => {
     if (!isTauri()) return;
     void invoke('set_remote_control_immersive', { enabled: hookLive }).catch(() => {});
+    return () => {
+      if (hookLive) {
+        void invoke('set_remote_control_immersive', { enabled: false }).catch(() => {});
+      }
+    };
+  }, [hookLive]);
+
+  useEffect(() => {
+    if (!isTauri()) return;
     const nav = navigator as Navigator & {
       keyboard?: { lock?: (keys?: string[]) => Promise<void>; unlock?: () => void };
     };
@@ -587,9 +596,6 @@ export function useRemoteControl(
       try { nav.keyboard?.unlock?.(); } catch {}
     }
     return () => {
-      if (hookLive) {
-        void invoke('set_remote_control_immersive', { enabled: false }).catch(() => {});
-      }
       try { nav.keyboard?.unlock?.(); } catch {}
     };
   }, [active, hookLive, pointerLocked, windowFocused]);
