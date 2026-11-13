@@ -553,7 +553,8 @@ pub async fn create_native_video_offer(
             };
             let count = payloads.len();
             let send_started = Instant::now();
-            let deadline = tokio::time::Instant::now() + Duration::from_millis(120);
+            let deadline = tokio::time::Instant::now()
+                + Duration::from_millis(if frame.key { 250 } else { 120 });
             let mut complete = true;
             for (index, payload) in payloads.into_iter().enumerate() {
                 // Preserve the pacing phase across timer jitter, allowing at most 2 ms of credit.

@@ -55,7 +55,8 @@ semver = "1"
 
 
 [target.'cfg(windows)'.dependencies]
-windows-capture-api = { package = "windows", version = "0.62.2", features = ["Win32_Graphics_Direct3D11", "Win32_Graphics_Direct3D_Fxc", "Win32_Graphics_Dxgi_Common", "Win32_Graphics_Dxgi"] }
+windows-capture-api = { package = "windows", version = "0.62.2", features = ["Foundation", "Graphics_Capture", "Graphics_DirectX_Direct3D11", "Win32_Foundation", "Win32_Graphics_Direct3D11", "Win32_Graphics_Direct3D_Fxc", "Win32_Graphics_Dxgi_Common", "Win32_Graphics_Dxgi", "Win32_System_Com", "Win32_System_Threading", "Win32_System_WinRT", "Win32_System_WinRT_Direct3D11", "Win32_UI_WindowsAndMessaging"] }
+windows-future = "0.3.2"
 webview2-com = "0.39.1"
 windows = { version = "0.58", features = [
     "implement",

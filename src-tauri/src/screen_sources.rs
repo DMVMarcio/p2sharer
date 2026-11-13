@@ -17,13 +17,10 @@ type FrameDelivery = Arc<(std::sync::Mutex<FramePacer<Arc<Vec<u8>>>>, std::sync:
 
 #[cfg(windows)]
 use windows_capture::{
-    capture::{CaptureControl, Context, GraphicsCaptureApiHandler},
-    frame::Frame,
-    graphics_capture_api::InternalCaptureControl,
     monitor::Monitor as WgcMonitor,
     settings::{
-        ColorFormat, CursorCaptureSettings, DirtyRegionSettings, DrawBorderSettings,
-        MinimumUpdateIntervalSettings, SecondaryWindowSettings, Settings,
+        CursorCaptureSettings, DrawBorderSettings, GraphicsCaptureItemType,
+        MinimumUpdateIntervalSettings,
     },
     window::Window as WgcWindow,
 };
@@ -110,7 +107,6 @@ pub struct CaptureMetrics {
     encoder_kind: std::sync::atomic::AtomicU8,
     cursor_requested: AtomicBool,
     cursor_embedded: AtomicBool,
-    cursor_restart: AtomicBool,
     jpeg_errors: std::sync::atomic::AtomicU64,
     #[cfg(feature = "media-diagnostics")]
     last_callback_us: std::sync::atomic::AtomicU64,
@@ -389,7 +385,6 @@ pub struct NativeWgcHandler {
     sender: broadcast::Sender<Message>,
     target_width: u32,
     target_height: u32,
-    active_flag: Arc<AtomicBool>,
     raw_buffer: Vec<u8>,
     readback: crate::video_readback::ReusableReadback,
     legacy_readback: bool,
@@ -406,46 +401,12 @@ pub struct NativeWgcHandler {
 }
 
 #[cfg(windows)]
-impl GraphicsCaptureApiHandler for NativeWgcHandler {
-    type Flags = CaptureFlags;
-    type Error = Box<dyn std::error::Error + Send + Sync>;
-
-    fn new(ctx: Context<Self::Flags>) -> Result<Self, Self::Error> {
-        ctx.flags.metrics.capture_backend.store(1, Ordering::Relaxed);
-        Self::from_flags(ctx.flags)
-    }
-
-    fn on_frame_arrived(
-        &mut self,
-        frame: &mut Frame,
-        capture_control: InternalCaptureControl,
-    ) -> Result<(), Self::Error> {
-        if !self.active_flag.load(Ordering::Relaxed) || !self.lifecycle.active.load(Ordering::Relaxed) {
-            capture_control.stop();
-            return Ok(());
-        }
-
-        let device = frame.device().clone();
-        let context = frame.device_context().clone();
-        let texture = frame.as_raw_texture().clone();
-        self.process_texture(&device, &context, &texture, frame.width(), frame.height(), Some(frame))
-    }
-
-    fn on_closed(&mut self) -> Result<(), Self::Error> {
-        crate::logger::log_msg("WARN", "capture.source", &format!("session={} WGC source closed elapsed_ms={}", self.session_id, self.start_instant.elapsed().as_millis()));
-        // A monitor's WGC item can close during a secure desktop transition.
-        // The supervisor confirms source loss or recreates capture after returning.
-        self.lifecycle.closed.store(true, Ordering::Release);
-        Ok(())
-    }
-}
-
-#[cfg(windows)]
 type CaptureError = Box<dyn std::error::Error + Send + Sync>;
 
 #[cfg(windows)]
 impl NativeWgcHandler {
     fn from_flags(flags: CaptureFlags) -> Result<Self, CaptureError> {
+        flags.metrics.capture_backend.store(1, Ordering::Relaxed);
         let fps = flags.target_fps.clamp(15, 120);
         let frame_interval = std::time::Duration::from_nanos(1_000_000_000 / fps as u64);
         Ok(Self {
@@ -462,7 +423,6 @@ impl NativeWgcHandler {
             sender: flags.sender,
             target_width: flags.target_width,
             target_height: flags.target_height,
-            active_flag: flags.active_flag,
             raw_buffer: Vec::new(),
             readback: crate::video_readback::ReusableReadback::default(),
             legacy_readback: std::env::var("P2SHARER_LEGACY_VIDEO_READBACK").as_deref() == Ok("1"),
@@ -479,11 +439,18 @@ impl NativeWgcHandler {
         })
     }
 
+    fn on_closed(&mut self) {
+        crate::logger::log_msg("WARN", "capture.source", &format!("session={} WGC source closed elapsed_ms={}", self.session_id, self.start_instant.elapsed().as_millis()));
+        // A monitor's WGC item can close during a secure desktop transition.
+        // The supervisor confirms source loss or recreates capture after returning.
+        self.lifecycle.closed.store(true, Ordering::Release);
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn process_texture(&mut self, device: &windows_capture_api::Win32::Graphics::Direct3D11::ID3D11Device,
         context: &windows_capture_api::Win32::Graphics::Direct3D11::ID3D11DeviceContext,
         texture: &windows_capture_api::Win32::Graphics::Direct3D11::ID3D11Texture2D,
-        width: u32, height: u32, legacy: Option<&mut Frame<'_>>) -> Result<(), CaptureError> {
+        width: u32, height: u32, legacy: Option<&mut windows_capture::frame::Frame<'_>>) -> Result<(), CaptureError> {
         let legacy_unavailable = legacy.is_none();
         if legacy_unavailable { self.legacy_readback = false; }
         // Keep the target cadence across callback jitter and non-matching refresh rates.
@@ -669,7 +636,36 @@ impl NativeWgcHandler {
 }
 
 #[cfg(windows)]
-type WgcControl = CaptureControl<NativeWgcHandler, CaptureError>;
+const WM_APP_UPDATE_CURSOR: u32 = 0x8000 + 0x101;
+
+#[cfg(windows)]
+struct WgcControl {
+    halt: Arc<AtomicBool>,
+    desired_cursor: Arc<AtomicBool>,
+    thread_id: u32,
+    thread: Option<std::thread::JoinHandle<()>>,
+}
+
+#[cfg(windows)]
+impl WgcControl {
+    fn is_finished(&self) -> bool {
+        self.thread.as_ref().map_or(true, |thread| thread.is_finished())
+    }
+
+    fn set_cursor_visible(&self, visible: bool) {
+        self.desired_cursor.store(visible, Ordering::Release);
+        if self.thread_id != 0 && !self.is_finished() {
+            unsafe {
+                let _ = windows_capture_api::Win32::UI::WindowsAndMessaging::PostThreadMessageW(
+                    self.thread_id,
+                    WM_APP_UPDATE_CURSOR,
+                    windows_capture_api::Win32::Foundation::WPARAM(usize::from(visible)),
+                    windows_capture_api::Win32::Foundation::LPARAM(0),
+                );
+            }
+        }
+    }
+}
 
 #[cfg(windows)]
 enum ActiveCaptureControl {
@@ -752,18 +748,105 @@ fn start_dxgi_capture(source: &str, capture_mouse: bool, flags: CaptureFlags) ->
 }
 
 #[cfg(windows)]
+struct WgcWinRtGuard {
+    cookie: windows_capture_api::Win32::System::Com::CO_MTA_USAGE_COOKIE,
+}
+
+#[cfg(windows)]
+impl WgcWinRtGuard {
+    fn new() -> Result<Self, String> {
+        use windows_capture_api::Win32::{
+            Foundation::S_FALSE,
+            System::{
+                Com::CoIncrementMTAUsage,
+                WinRT::{RO_INIT_MULTITHREADED, RoInitialize},
+            },
+        };
+        let cookie = unsafe { CoIncrementMTAUsage().map_err(|e| e.to_string())? };
+        if let Err(err) = unsafe { RoInitialize(RO_INIT_MULTITHREADED) } {
+            if err.code() != S_FALSE {
+                unsafe {
+                    let _ = windows_capture_api::Win32::System::Com::CoDecrementMTAUsage(cookie);
+                }
+                return Err(err.to_string());
+            }
+        }
+        Ok(Self { cookie })
+    }
+}
+
+#[cfg(windows)]
+impl Drop for WgcWinRtGuard {
+    fn drop(&mut self) {
+        unsafe {
+            windows_capture_api::Win32::System::WinRT::RoUninitialize();
+            let _ = windows_capture_api::Win32::System::Com::CoDecrementMTAUsage(self.cookie);
+        }
+    }
+}
+
+#[cfg(windows)]
+fn apply_wgc_cursor_visibility(
+    session: &windows_capture_api::Graphics::Capture::GraphicsCaptureSession,
+    metrics: &CaptureMetrics,
+    applied: &AtomicBool,
+    desired: bool,
+    session_id: &str,
+) {
+    if applied.load(Ordering::Acquire) == desired {
+        return;
+    }
+    if session.SetIsCursorCaptureEnabled(desired).is_ok() {
+        applied.store(desired, Ordering::Release);
+        metrics.cursor_embedded.store(desired, Ordering::Release);
+        crate::logger::log_msg(
+            "INFO",
+            "capture.cursor",
+            &format!("session={session_id} cursor_embedded={desired} mode=in_place"),
+        );
+    }
+}
+
+#[cfg(windows)]
 fn start_wgc_capture(source: &str, capture_mouse: bool, flags: CaptureFlags) -> Result<WgcControl, String> {
+    use std::sync::atomic::AtomicI32;
+    use windows_capture::d3d11::{SendDirectX, create_d3d_device, create_direct3d_device};
     use windows_capture::graphics_capture_api::GraphicsCaptureApi;
+    use windows_capture_api::Foundation::TypedEventHandler;
+    use windows_capture_api::Graphics::Capture::{
+        Direct3D11CaptureFramePool, GraphicsCaptureItem,
+    };
+    use windows_capture_api::Graphics::DirectX::DirectXPixelFormat;
+    use windows_capture_api::Win32::Foundation::{LPARAM, WPARAM};
+    use windows_capture_api::Win32::Graphics::Direct3D11::{D3D11_TEXTURE2D_DESC, ID3D11Texture2D};
+    use windows_capture_api::Win32::System::Threading::GetCurrentThreadId;
+    use windows_capture_api::Win32::System::WinRT::{
+        CreateDispatcherQueueController, DQTAT_COM_NONE, DQTYPE_THREAD_CURRENT,
+        DispatcherQueueOptions,
+    };
+    use windows_capture_api::Win32::System::WinRT::Direct3D11::IDirect3DDxgiInterfaceAccess;
+    use windows_capture_api::Win32::UI::WindowsAndMessaging::{
+        DispatchMessageW, GetMessageW, MSG, PostQuitMessage, PostThreadMessageW, TranslateMessage,
+        WM_QUIT,
+    };
+    use windows_capture_api::core::{IInspectable, Interface};
+
     let cursor_supported = GraphicsCaptureApi::is_cursor_settings_supported().unwrap_or(false);
     let border_supported = GraphicsCaptureApi::is_border_settings_supported().unwrap_or(false);
+    let interval_supported = GraphicsCaptureApi::is_minimum_update_interval_supported().unwrap_or(false);
     let effective_mouse = capture_mouse && !crate::remote_control::should_suppress_captured_cursor();
     let (cursor, border) = capture_visual_settings(effective_mouse, cursor_supported, border_supported);
     let embedded = if cursor_supported { effective_mouse } else { capture_mouse };
     flags.metrics.cursor_embedded.store(embedded, Ordering::Release);
     crate::logger::log_msg("INFO", "capture.compatibility", &format!(
         "session={} cursor_configurable={cursor_supported} border_configurable={border_supported} cursor={cursor:?} border={border:?}", flags.session_id));
+
     let (kind, raw) = source.split_once(':').ok_or("Invalid capture source")?;
-    if kind == "window" {
+    enum TargetSource {
+        Window(usize),
+        Monitor(usize),
+    }
+    let target = if kind == "window" {
         let hwnd = raw.parse::<usize>().map_err(|e| e.to_string())?;
         let window = WgcWindow::from_raw_hwnd(hwnd as *mut std::ffi::c_void);
         // The picker excludes tool windows; the app-owned browser intentionally uses one.
@@ -773,18 +856,342 @@ fn start_wgc_capture(source: &str, capture_mouse: bool, flags: CaptureFlags) -> 
             windows::Win32::UI::WindowsAndMessaging::GetWindowThreadProcessId(hwnd, Some(&mut pid));
             pid == std::process::id() && windows::Win32::UI::WindowsAndMessaging::IsWindowVisible(hwnd).as_bool()
         };
-        if !window.is_valid() && !browser_source { return Err("Capture window no longer exists".into()); }
-        NativeWgcHandler::start_free_threaded(Settings::new(window, cursor,
-            border, SecondaryWindowSettings::Default,
-            capture_update_interval(), DirtyRegionSettings::Default, ColorFormat::Rgba8, flags))
-            .map_err(|e| e.to_string())
+        if !window.is_valid() && !browser_source {
+            return Err("Capture window no longer exists".into());
+        }
+        TargetSource::Window(hwnd)
     } else {
         let index = raw.parse::<usize>().map_err(|e| e.to_string())?;
-        let monitor = WgcMonitor::from_index(index + 1).map_err(|e| e.to_string())?;
-        NativeWgcHandler::start_free_threaded(Settings::new(monitor, cursor,
-            border, SecondaryWindowSettings::Default,
-            capture_update_interval(), DirtyRegionSettings::Default, ColorFormat::Rgba8, flags))
-            .map_err(|e| e.to_string())
+        let _ = WgcMonitor::from_index(index + 1).map_err(|e| e.to_string())?;
+        TargetSource::Monitor(index)
+    };
+
+    let halt = Arc::new(AtomicBool::new(false));
+    let desired_cursor = Arc::new(AtomicBool::new(embedded));
+    let halt_thread = halt.clone();
+    let desired_thread = desired_cursor.clone();
+    let (ready, started) = std::sync::mpsc::sync_channel::<Result<u32, String>>(1);
+
+    let thread = std::thread::spawn(move || {
+        let _winrt = match WgcWinRtGuard::new() {
+            Ok(guard) => guard,
+            Err(err) => {
+                let _ = ready.try_send(Err(err));
+                return;
+            }
+        };
+
+        let controller = match unsafe {
+            CreateDispatcherQueueController(DispatcherQueueOptions {
+                dwSize: std::mem::size_of::<DispatcherQueueOptions>() as u32,
+                threadType: DQTYPE_THREAD_CURRENT,
+                apartmentType: DQTAT_COM_NONE,
+            })
+        } {
+            Ok(controller) => controller,
+            Err(err) => {
+                let _ = ready.try_send(Err(err.to_string()));
+                return;
+            }
+        };
+
+        let thread_id = unsafe { GetCurrentThreadId() };
+        let (d3d_device, d3d_context) = match create_d3d_device() {
+            Ok(pair) => pair,
+            Err(err) => {
+                let _ = ready.try_send(Err(err.to_string()));
+                return;
+            }
+        };
+        let direct3d_device = match create_direct3d_device(&d3d_device) {
+            Ok(dev) => dev,
+            Err(err) => {
+                let _ = ready.try_send(Err(err.to_string()));
+                return;
+            }
+        };
+
+        let item_type: GraphicsCaptureItemType = match target {
+            TargetSource::Window(hwnd) => {
+                match WgcWindow::from_raw_hwnd(hwnd as *mut std::ffi::c_void).try_into() {
+                    Ok(item) => item,
+                    Err(err) => {
+                        let _ = ready.try_send(Err(format!("{err:?}")));
+                        return;
+                    }
+                }
+            }
+            TargetSource::Monitor(index) => match WgcMonitor::from_index(index + 1) {
+                Ok(mon) => match mon.try_into() {
+                    Ok(item) => item,
+                    Err(err) => {
+                        let _ = ready.try_send(Err(format!("{err:?}")));
+                        return;
+                    }
+                },
+                Err(err) => {
+                    let _ = ready.try_send(Err(err.to_string()));
+                    return;
+                }
+            },
+        };
+        let item = match &item_type {
+            GraphicsCaptureItemType::Window((item, _))
+            | GraphicsCaptureItemType::Monitor((item, _))
+            | GraphicsCaptureItemType::Unknown((item, _)) => item.clone(),
+        };
+
+        let session_id = flags.session_id.clone();
+        let metrics = flags.metrics.clone();
+        let active_flag = flags.active_flag.clone();
+        let lifecycle = flags.lifecycle.clone();
+        let handler = match NativeWgcHandler::from_flags(flags) {
+            Ok(handler) => Arc::new(std::sync::Mutex::new(handler)),
+            Err(err) => {
+                let _ = ready.try_send(Err(err.to_string()));
+                return;
+            }
+        };
+
+        let initial_size = match item.Size() {
+            Ok(size) => size,
+            Err(err) => {
+                let _ = ready.try_send(Err(err.to_string()));
+                return;
+            }
+        };
+        let frame_pool = match Direct3D11CaptureFramePool::Create(
+            &direct3d_device,
+            DirectXPixelFormat::R8G8B8A8UIntNormalized,
+            1,
+            initial_size,
+        ) {
+            Ok(pool) => Arc::new(pool),
+            Err(err) => {
+                let _ = ready.try_send(Err(err.to_string()));
+                return;
+            }
+        };
+        let session = match frame_pool.CreateCaptureSession(&item) {
+            Ok(session) => session,
+            Err(err) => {
+                let _ = frame_pool.Close();
+                let _ = ready.try_send(Err(err.to_string()));
+                return;
+            }
+        };
+
+        if cursor_supported {
+            if let Err(err) = session.SetIsCursorCaptureEnabled(effective_mouse) {
+                let _ = session.Close();
+                let _ = frame_pool.Close();
+                let _ = ready.try_send(Err(err.to_string()));
+                return;
+            }
+        }
+        if border_supported {
+            if let Err(err) = session.SetIsBorderRequired(false) {
+                let _ = session.Close();
+                let _ = frame_pool.Close();
+                let _ = ready.try_send(Err(err.to_string()));
+                return;
+            }
+        }
+        if interval_supported {
+            if let MinimumUpdateIntervalSettings::Custom(duration) = capture_update_interval() {
+                let _ = session.SetMinUpdateInterval(duration.into());
+            }
+        }
+
+        let closed_token = match item.Closed(&TypedEventHandler::<GraphicsCaptureItem, IInspectable>::new({
+            let handler_closed = handler.clone();
+            let halt_closed = halt_thread.clone();
+            move |_, _| {
+                halt_closed.store(true, Ordering::Relaxed);
+                if let Ok(mut guard) = handler_closed.lock() {
+                    guard.on_closed();
+                }
+                unsafe {
+                    let _ = PostThreadMessageW(thread_id, WM_QUIT, WPARAM::default(), LPARAM::default());
+                }
+                Ok(())
+            }
+        })) {
+            Ok(token) => token,
+            Err(err) => {
+                let _ = session.Close();
+                let _ = frame_pool.Close();
+                let _ = ready.try_send(Err(err.to_string()));
+                return;
+            }
+        };
+
+        let applied_cursor = Arc::new(AtomicBool::new(embedded));
+        let last_size = Arc::new((AtomicI32::new(initial_size.Width), AtomicI32::new(initial_size.Height)));
+        let direct3d_recreate = SendDirectX::new(direct3d_device);
+        let frame_pool_recreate = SendDirectX::new(frame_pool.clone());
+        let session_fp = SendDirectX::new(session.clone());
+        let d3d_device_fp = SendDirectX::new(d3d_device.clone());
+        let d3d_context_fp = SendDirectX::new(d3d_context.clone());
+        let halt_fp = halt_thread.clone();
+        let desired_fp = desired_thread.clone();
+        let applied_fp = applied_cursor.clone();
+        let metrics_fp = metrics.clone();
+        let session_id_fp = session_id.clone();
+        let handler_fp = handler.clone();
+
+        let frame_token = match frame_pool.FrameArrived(&TypedEventHandler::<
+            Direct3D11CaptureFramePool,
+            IInspectable,
+        >::new(move |pool, _| {
+            let (direct3d_recreate, frame_pool_recreate, session_fp, d3d_device_fp, d3d_context_fp) = (
+                &direct3d_recreate,
+                &frame_pool_recreate,
+                &session_fp,
+                &d3d_device_fp,
+                &d3d_context_fp,
+            );
+            if halt_fp.load(Ordering::Relaxed)
+                || !active_flag.load(Ordering::Relaxed)
+                || !lifecycle.active.load(Ordering::Relaxed)
+            {
+                halt_fp.store(true, Ordering::Relaxed);
+                unsafe {
+                    let _ = PostThreadMessageW(thread_id, WM_QUIT, WPARAM::default(), LPARAM::default());
+                }
+                return Ok(());
+            }
+            if cursor_supported {
+                let desired = desired_fp.load(Ordering::Acquire);
+                apply_wgc_cursor_visibility(&session_fp.0, &metrics_fp, &applied_fp, desired, &session_id_fp);
+            }
+            let Some(pool) = pool.as_ref() else {
+                return Ok(());
+            };
+            let frame = pool.TryGetNextFrame()?;
+            let content_size = frame.ContentSize()?;
+            if content_size.Width <= 0 || content_size.Height <= 0 {
+                return Ok(());
+            }
+            if content_size.Width != last_size.0.load(Ordering::Relaxed)
+                || content_size.Height != last_size.1.load(Ordering::Relaxed)
+            {
+                drop(frame);
+                frame_pool_recreate.0.Recreate(
+                    &direct3d_recreate.0,
+                    DirectXPixelFormat::R8G8B8A8UIntNormalized,
+                    1,
+                    content_size,
+                )?;
+                last_size.0.store(content_size.Width, Ordering::Relaxed);
+                last_size.1.store(content_size.Height, Ordering::Relaxed);
+                return Ok(());
+            }
+            let surface = frame.Surface()?;
+            let dxgi_access: IDirect3DDxgiInterfaceAccess = surface.cast()?;
+            let texture: ID3D11Texture2D = unsafe { dxgi_access.GetInterface()? };
+            let mut desc = D3D11_TEXTURE2D_DESC::default();
+            unsafe { texture.GetDesc(&mut desc) };
+            let result = match handler_fp.lock() {
+                Ok(mut guard) => guard.process_texture(
+                    &d3d_device_fp.0,
+                    &d3d_context_fp.0,
+                    &texture,
+                    desc.Width,
+                    desc.Height,
+                    None,
+                ),
+                Err(_) => Ok(()),
+            };
+            if result.is_err() {
+                halt_fp.store(true, Ordering::Relaxed);
+                unsafe {
+                    let _ = PostThreadMessageW(thread_id, WM_QUIT, WPARAM::default(), LPARAM::default());
+                }
+            }
+            Ok(())
+        })) {
+            Ok(token) => token,
+            Err(err) => {
+                let _ = item.RemoveClosed(closed_token);
+                let _ = session.Close();
+                let _ = frame_pool.Close();
+                let _ = ready.try_send(Err(err.to_string()));
+                return;
+            }
+        };
+
+        if let Err(err) = session.StartCapture() {
+            let _ = frame_pool.RemoveFrameArrived(frame_token);
+            let _ = item.RemoveClosed(closed_token);
+            let _ = session.Close();
+            let _ = frame_pool.Close();
+            let _ = ready.try_send(Err(err.to_string()));
+            return;
+        }
+
+        let _ = ready.try_send(Ok(thread_id));
+
+        let mut msg = MSG::default();
+        loop {
+            match unsafe { GetMessageW(&mut msg, None, 0, 0).0 } {
+                -1 | 0 => break,
+                _ => {
+                    if msg.message == WM_APP_UPDATE_CURSOR && cursor_supported {
+                        let desired = desired_thread.load(Ordering::Acquire);
+                        apply_wgc_cursor_visibility(&session, &metrics, &applied_cursor, desired, &session_id);
+                    } else {
+                        unsafe {
+                            let _ = TranslateMessage(&msg);
+                            DispatchMessageW(&msg);
+                        }
+                    }
+                }
+            }
+        }
+
+        if let Ok(action) = controller.ShutdownQueueAsync() {
+            if action
+                .SetCompleted(&windows_future::AsyncActionCompletedHandler::new(move |_, _| {
+                    unsafe { PostQuitMessage(0) };
+                    Ok(())
+                }))
+                .is_ok()
+            {
+                loop {
+                    match unsafe { GetMessageW(&mut msg, None, 0, 0).0 } {
+                        -1 | 0 => break,
+                        _ => unsafe {
+                            let _ = TranslateMessage(&msg);
+                            DispatchMessageW(&msg);
+                        },
+                    }
+                }
+            }
+        }
+
+        let _ = frame_pool.RemoveFrameArrived(frame_token);
+        let _ = frame_pool.Close();
+        let _ = session.Close();
+        let _ = item.RemoveClosed(closed_token);
+        drop(handler);
+    });
+
+    match started.recv_timeout(std::time::Duration::from_secs(3)) {
+        Ok(Ok(thread_id)) => Ok(WgcControl {
+            halt,
+            desired_cursor,
+            thread_id,
+            thread: Some(thread),
+        }),
+        Ok(Err(error)) => {
+            let _ = thread.join();
+            Err(error)
+        }
+        Err(_) => {
+            halt.store(true, Ordering::Release);
+            Err("WGC startup timed out".into())
+        }
     }
 }
 
@@ -838,13 +1245,11 @@ fn start_capture_supervisor(source: String, capture_mouse: bool, mut flags: Capt
                     source.strip_prefix("screen:").and_then(|raw| raw.parse::<usize>().ok())
                         .map_or(false, |index| WgcMonitor::from_index(index + 1).is_ok())
                 };
-            let cursor_restart = flags.metrics.cursor_restart.load(Ordering::Acquire);
             let finished = {
                 let Ok(sessions) = SESSIONS.lock() else { break; };
                 let Some(session) = sessions.get(&flags.session_id) else { break; };
                 if !Arc::ptr_eq(&session.active, &flags.active_flag) { break; }
-                cursor_restart
-                    || session.control.as_ref().map_or(true, |control| control.is_finished())
+                session.control.as_ref().map_or(true, |control| control.is_finished())
                     || flags.lifecycle.closed.load(Ordering::Acquire)
             };
             let now = flags.start_instant.elapsed().as_millis() as u64;
@@ -870,7 +1275,6 @@ fn start_capture_supervisor(source: String, capture_mouse: bool, mut flags: Capt
             // Cleanup is bounded and runs off the UI thread.
             if let Some(control) = previous { let _ = safely_stop_capture_control(control).join(); }
             if !flags.active_flag.load(Ordering::Acquire) { break; }
-            flags.metrics.cursor_restart.store(false, Ordering::Release);
             flags.lifecycle = Arc::new(CaptureLifecycle::new());
             flags.nvenc_keyframe.store(true, Ordering::Release);
             match start_gpu_capture(&source, capture_mouse, flags.clone()) {
@@ -881,12 +1285,12 @@ fn start_capture_supervisor(source: String, capture_mouse: bool, mut flags: Capt
                         if let Some(session) = sessions.get_mut(&flags.session_id) {
                             if Arc::ptr_eq(&session.active, &flags.active_flag) && session.active.load(Ordering::Acquire) {
                                 session.control = control.take();
-                                if session.metrics.cursor_requested.load(Ordering::Acquire)
-                                    && matches!(session.control, Some(ActiveCaptureControl::Wgc(_)))
-                                {
-                                    let desired_embedded = !crate::remote_control::should_suppress_captured_cursor();
-                                    if session.metrics.cursor_embedded.load(Ordering::Acquire) != desired_embedded {
-                                        session.metrics.cursor_restart.store(true, Ordering::Release);
+                                if session.metrics.cursor_requested.load(Ordering::Acquire) {
+                                    if let Some(ActiveCaptureControl::Wgc(control)) = session.control.as_ref() {
+                                        let desired_embedded = !crate::remote_control::should_suppress_captured_cursor();
+                                        if session.metrics.cursor_embedded.load(Ordering::Acquire) != desired_embedded {
+                                            control.set_cursor_visible(desired_embedded);
+                                        }
                                     }
                                 }
                             }
@@ -1621,8 +2025,12 @@ pub fn start_capture_session(
                         Ok(mut img) => {
                             consecutive_errors = 0;
                             #[cfg(windows)]
-                            if should_draw_mouse {
-                                draw_authentic_cursor(&mut img, origin_x, origin_y);
+                            {
+                                let draw_cursor = should_draw_mouse && !crate::remote_control::should_suppress_captured_cursor();
+                                metrics.cursor_embedded.store(draw_cursor, Ordering::Release);
+                                if draw_cursor {
+                                    draw_authentic_cursor(&mut img, origin_x, origin_y);
+                                }
                             }
                             Some(img)
                         }
@@ -1666,8 +2074,12 @@ pub fn start_capture_session(
                         Ok(mut img) => {
                             consecutive_errors = 0;
                             #[cfg(windows)]
-                            if should_draw_mouse {
-                                draw_authentic_cursor(&mut img, origin_x, origin_y);
+                            {
+                                let draw_cursor = should_draw_mouse && !crate::remote_control::should_suppress_captured_cursor();
+                                metrics.cursor_embedded.store(draw_cursor, Ordering::Release);
+                                if draw_cursor {
+                                    draw_authentic_cursor(&mut img, origin_x, origin_y);
+                                }
                             }
                             Some(img)
                         }
@@ -1771,32 +2183,31 @@ fn safely_stop_capture_control(control: ActiveCaptureControl) -> std::thread::Jo
     use windows::Win32::System::Threading::GetThreadId;
     use windows::Win32::UI::WindowsAndMessaging::{PostThreadMessageW, WM_QUIT};
 
-    let control = match control {
+    let mut control = match control {
         ActiveCaptureControl::Wgc(control) => control,
         ActiveCaptureControl::Dxgi { halt, thread } => {
             halt.store(true, Ordering::Release);
             return std::thread::spawn(move || { finish_capture_thread(thread); });
         }
     };
-    // 1. Signal halt flag immediately so on_frame_arrived halts without spinning
-    control.halt_handle().store(true, Ordering::SeqCst);
+    // 1. Signal halt flag immediately so FrameArrived stops processing frames.
+    control.halt.store(true, Ordering::SeqCst);
 
-    // 2. Extract thread handle and its raw Win32 thread ID
-    let thread_handle = control.into_thread_handle();
-    let raw_handle = thread_handle.as_raw_handle();
-    let thread_id = unsafe { GetThreadId(HANDLE(raw_handle)) };
+    // 2. Extract thread handle and its raw Win32 thread ID.
+    let Some(thread_handle) = control.thread.take() else {
+        return std::thread::spawn(|| {});
+    };
+    let thread_id = if control.thread_id != 0 {
+        control.thread_id
+    } else {
+        unsafe { GetThreadId(HANDLE(thread_handle.as_raw_handle())) }
+    };
 
     // 3. Spawn a graceful shutdown task that NEVER busy-loops with yield_now()
     std::thread::spawn(move || {
         if thread_id != 0 {
-            // Post WM_QUIT to break Message Loop 1
             let _ = unsafe { PostThreadMessageW(thread_id, WM_QUIT, WPARAM(0), LPARAM(0)) };
-
-            // Wait briefly to allow ShutdownQueueAsync to initiate cleanly
             std::thread::sleep(std::time::Duration::from_millis(30));
-
-            // Post WM_QUIT again to ensure Message Loop 2 unblocks even if WinRT
-            // dispatched AsyncActionCompletedHandler onto a different COM thread
             if !thread_handle.is_finished() {
                 let _ = unsafe { PostThreadMessageW(thread_id, WM_QUIT, WPARAM(0), LPARAM(0)) };
             }
@@ -1887,6 +2298,7 @@ pub fn refresh_wgc_cursor_for_remote_control() {
             return;
         }
         let suppress = crate::remote_control::should_suppress_captured_cursor();
+        let desired_embedded = !suppress;
         if let Ok(sessions) = SESSIONS.lock() {
             for session in sessions.values() {
                 if !session.active.load(Ordering::Acquire)
@@ -1894,13 +2306,10 @@ pub fn refresh_wgc_cursor_for_remote_control() {
                 {
                     continue;
                 }
-                let desired_embedded = !suppress;
-                let is_wgc = session.metrics.capture_backend.load(Ordering::Relaxed) == 1
-                    || matches!(session.control, Some(ActiveCaptureControl::Wgc(_)));
-                if is_wgc && session.metrics.cursor_embedded.load(Ordering::Acquire) != desired_embedded {
-                    // Request a full supervisor rebuild rather than setting halt_handle alone,
-                    // because GraphicsCaptureApi ignores frames on halt without exiting its message loop.
-                    session.metrics.cursor_restart.store(true, Ordering::Release);
+                if let Some(ActiveCaptureControl::Wgc(control)) = session.control.as_ref() {
+                    if session.metrics.cursor_embedded.load(Ordering::Acquire) != desired_embedded {
+                        control.set_cursor_visible(desired_embedded);
+                    }
                 }
             }
         }
