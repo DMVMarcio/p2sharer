@@ -6,7 +6,15 @@ import { profileImages, profileBanners } from '../core/profile_image.ts';
 import { profileStats } from '../core/profile_stats.ts';
 import { validStreamDescriptors, streamSlotKey, streamOwner, type StreamDescriptor } from "../core/media_streams.ts";
 import { validStreamPointer, validStreamPointerState, type StreamPointerState, type StreamPointerPacket } from '../core/stream_pointer.ts';
-import { validRemoteControlClientPacket, validRemoteControlHostPacket, type RemoteControlClientPacket, type RemoteControlHostPacket } from '../core/remote_control.ts';
+import {
+  decodeRemoteControlBinaryInput,
+  encodeRemoteControlBinaryInput,
+  isRemoteControlBinaryFrame,
+  validRemoteControlClientPacket,
+  validRemoteControlHostPacket,
+  type RemoteControlClientPacket,
+  type RemoteControlHostPacket,
+} from '../core/remote_control.ts';
 import { selfId } from '@trystero-p2p/core';
 import { invoke } from '../platform/commands.ts';
 import type { AppWireEvent } from '../apps/types.ts';
@@ -261,10 +269,40 @@ export class GroupRoomManager {
     (peerId, packet) => { void this.handleFileChunkWire(packet, peerId); },
   );
   private binaryPeers = new Set<string>();
+  private remoteControlFastPeers = new Set<string>();
+  private remoteControlLowLatencyPeers = new Set<string>();
+  private remoteControlTxSeq = 0;
+  private remoteControlRxSeq = new Map<string, number>();
+  private remoteControlPerf = {
+    datagramSent: 0,
+    tunnelSent: 0,
+    trysteroSent: 0,
+    oooDropped: 0,
+    lastLogAt: 0,
+  };
   private payloadChannels = new PeerPayloadChannels(
     peer => this.room?.getPeers?.()?.[peer] as RTCPeerConnection | undefined,
     (peer, lane, frame) => {
       if (!this.payloadPeerAllowed(peer)) return;
+      if ((lane === 'datagram' || lane === 'tunnel') && isRemoteControlBinaryFrame(frame)) {
+        const decodedRc = decodeRemoteControlBinaryInput(frame);
+        if (!decodedRc) return;
+        const seqKey = `${peer}:${decodedRc.mediaId}`;
+        if (lane === 'datagram' && decodedRc.event.kind === 'mouseMove') {
+          const prevSeq = this.remoteControlRxSeq.get(seqKey) ?? 0;
+          // Unsigned wraparound-aware comparison
+          if (((decodedRc.seq - prevSeq) | 0) <= 0) {
+            this.remoteControlPerf.oooDropped += 1;
+            return;
+          }
+          this.remoteControlRxSeq.set(seqKey, decodedRc.seq);
+        }
+        this.callbacks?.onRemoteControlClient?.(
+          { type: 'input', mediaId: decodedRc.mediaId, event: decodedRc.event },
+          peer,
+        );
+        return;
+      }
       const decoded = decodePeerPayload(frame);
       if (!decoded) return;
       const { header, bytes } = decoded;
@@ -444,13 +482,73 @@ export class GroupRoomManager {
     if (!validRemoteControlClientPacket(packet)) return;
     if (!this.remoteControlAction || !this.peerTracker.isVerified(target) ||
         (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(target)))) return;
+    if (packet.type === 'request') {
+      this.payloadChannels.ensure(target);
+      void Promise.resolve(this.remoteControlAction.send({ ...packet, fastBinary: true }, { target })).catch(() => {});
+      return;
+    }
+    if (packet.type === 'input' && this.remoteControlFastPeers.has(target)) {
+      this.payloadChannels.ensure(target);
+      this.remoteControlTxSeq = (this.remoteControlTxSeq + 1) >>> 0 || 1;
+      const frame = encodeRemoteControlBinaryInput(packet.mediaId, packet.event, this.remoteControlTxSeq);
+      if (frame) {
+        const lane = packet.event.kind === 'mouseMove' ? 'datagram' : 'tunnel';
+        if (this.payloadChannels.sendFast(target, lane, frame)) {
+          if (lane === 'datagram') this.remoteControlPerf.datagramSent += 1;
+          else this.remoteControlPerf.tunnelSent += 1;
+          this.maybeLogRemoteControlPerf();
+          return;
+        }
+      }
+      this.remoteControlPerf.trysteroSent += 1;
+      this.maybeLogRemoteControlPerf();
+    }
     void Promise.resolve(this.remoteControlAction.send(packet, { target })).catch(() => {});
+  }
+
+  private maybeLogRemoteControlPerf(): void {
+    const now = Date.now();
+    if (now - this.remoteControlPerf.lastLogAt < 10000) return;
+    this.remoteControlPerf.lastLogAt = now;
+    const { datagramSent, tunnelSent, trysteroSent, oooDropped } = this.remoteControlPerf;
+    if (datagramSent + tunnelSent + trysteroSent + oooDropped === 0) return;
+    logDiagnostic('INFO', 'remoteControl.transport', 'Remote control transport summary', {
+      datagramSent, tunnelSent, trysteroSent, oooDropped,
+      fastPeers: this.remoteControlFastPeers.size,
+    });
+    this.remoteControlPerf.datagramSent = 0;
+    this.remoteControlPerf.tunnelSent = 0;
+    this.remoteControlPerf.trysteroSent = 0;
+    this.remoteControlPerf.oooDropped = 0;
+  }
+
+  public setRemoteControlLowLatency(peerId: string, lowLatency: boolean): void {
+    if (lowLatency) this.remoteControlLowLatencyPeers.add(peerId);
+    else this.remoteControlLowLatencyPeers.delete(peerId);
+    try {
+      const peers = this.room?.getPeers?.() || {};
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const peerObj: any = peers[peerId];
+      const pc: RTCPeerConnection | undefined = peerObj?.connection || peerObj?.pc || peerObj;
+      if (pc) {
+        MediaCoordinator.tuneReceiverJitterBuffer(pc, lowLatency);
+      }
+    } catch {}
+    this.nativeVideo?.tunePeerJitterBuffer(peerId, lowLatency);
+    logDiagnostic('INFO', 'remoteControl.lowLatency', 'Updated video receiver jitter buffer for remote control', {
+      peerId,
+      lowLatency,
+      fastBinary: this.remoteControlFastPeers.has(peerId),
+    });
   }
 
   public sendRemoteControlHost(packet: RemoteControlHostPacket, target: string): void {
     if (!validRemoteControlHostPacket(packet)) return;
     if (!this.remoteControlAction || !this.peerTracker.isVerified(target) ||
         (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(target)))) return;
+    if (packet.type === 'accept') {
+      this.payloadChannels.ensure(target);
+    }
     void Promise.resolve(this.remoteControlAction.send(packet, { target })).catch(() => {});
   }
 
@@ -1232,8 +1330,15 @@ export class GroupRoomManager {
     this.remoteControlAction = this.room.makeAction('remote_control_v1');
     this.remoteControlAction.onMessage = (packet: unknown, meta: { peerId: string }) => {
       if (validRemoteControlClientPacket(packet)) {
+        if (packet.type === 'request' && packet.fastBinary) {
+          this.payloadChannels.ensure(meta.peerId);
+        }
         this.callbacks?.onRemoteControlClient?.(packet, meta.peerId);
       } else if (validRemoteControlHostPacket(packet)) {
+        if (packet.type === 'accept' && packet.fastBinary) {
+          this.remoteControlFastPeers.add(meta.peerId);
+          this.payloadChannels.ensure(meta.peerId);
+        }
         const hasScreen = this.remoteDescriptors.get(meta.peerId)?.some(entry => entry.id === packet.mediaId && entry.kind === 'screen') || this.remoteStreams.has(meta.peerId);
         if (hasScreen || packet.type === 'revoke' || packet.type === 'decline') {
           this.callbacks?.onRemoteControlHost?.(packet, meta.peerId);
@@ -2236,7 +2341,7 @@ export class GroupRoomManager {
         const peerObj: any = peers[peerId];
         const pc: RTCPeerConnection = peerObj?.connection || peerObj?.pc || peerObj;
         if (pc) {
-          MediaCoordinator.tuneReceiverJitterBuffer(pc);
+          MediaCoordinator.tuneReceiverJitterBuffer(pc, this.remoteControlLowLatencyPeers.has(peerId));
         }
       } catch {}
 
@@ -2387,6 +2492,10 @@ export class GroupRoomManager {
     this.pendingChallenges.delete(peerId);
     this.fileBulk.close(peerId);
     this.payloadChannels.close(peerId); this.binaryPeers.delete(peerId);
+    this.remoteControlFastPeers.delete(peerId);
+    for (const seqKey of this.remoteControlRxSeq.keys()) {
+      if (seqKey.startsWith(`${peerId}:`)) this.remoteControlRxSeq.delete(seqKey);
+    }
     for (const [requestId, session] of this.fileSessions) {
       if (session.peerId !== peerId) continue;
       this.fileSessions.delete(requestId);
@@ -3974,6 +4083,9 @@ export class GroupRoomManager {
     this.nativeVideo = null;
     this.fileBulk.closeAll();
     this.payloadChannels.closeAll(); this.binaryPeers.clear();
+    this.remoteControlFastPeers.clear();
+    this.remoteControlLowLatencyPeers.clear();
+    this.remoteControlRxSeq.clear();
     const roomToLeave = this.room;
     this.room = null;
     if (roomToLeave) {

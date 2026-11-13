@@ -530,24 +530,25 @@ export class MediaCoordinator {
   /**
    * Tunes receiver jitter buffer and playout delay hint on incoming video receivers,
    * while preserving audio receivers untouched to protect NetEQ packet loss concealment.
+   * When lowLatency is true (e.g. interactive remote control), drops cushion to 0 ms.
    */
-  public static tuneReceiverJitterBuffer(pc: RTCPeerConnection): void {
+  public static tuneReceiverJitterBuffer(pc: RTCPeerConnection, lowLatency = false): void {
     if (!pc || typeof pc.getReceivers !== 'function') return;
+    const playoutSeconds = lowLatency ? 0 : 0.02;
+    const targetMs = lowLatency ? 0 : 20;
     try {
       pc.getReceivers().forEach((receiver) => {
         const isVideo = receiver.track && receiver.track.kind === 'video';
         if (isVideo) {
-          // Set playoutDelayHint to 0.02s (20ms) to provide a 1-frame jitter smoothing cushion,
-          // preventing dropped frames and mouse judder while keeping real-time latency imperceptible.
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           if (typeof (receiver as any).playoutDelayHint !== 'undefined') {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (receiver as any).playoutDelayHint = 0.02;
+            (receiver as any).playoutDelayHint = playoutSeconds;
           }
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           if (typeof (receiver as any).jitterBufferTarget !== 'undefined') {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (receiver as any).jitterBufferTarget = 20;
+            (receiver as any).jitterBufferTarget = targetMs;
           }
         }
       });

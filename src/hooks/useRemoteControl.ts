@@ -9,6 +9,7 @@ import type {
   RemoteMouseButton,
 } from '../core/remote_control.ts';
 import { invoke } from '../platform/commands.ts';
+import { logDiagnostic } from '../core/logger.ts';
 import { roomService } from '../services/room_service.ts';
 
 interface ImmersiveKeyPayload {
@@ -44,7 +45,9 @@ const MOUSE_BUTTON_MAP: Record<number, RemoteMouseButton> = {
   4: 'x2',
 };
 
-const MOVE_THROTTLE_MS = 22;
+// Minimal spacing avoids flooding sub-4ms USB bursts while dispatching initial
+// and per-frame moves with zero artificial 22ms timer hold.
+const MIN_MOVE_INTERVAL_MS = 4;
 
 function isVideoInteractionTarget(target: EventTarget | null, container: HTMLElement | null): boolean {
   if (!(target instanceof Element) || !container) return false;
@@ -82,7 +85,7 @@ export function useRemoteControl(
 
   const lastMoveSentRef = useRef(0);
   const pendingMoveRef = useRef<{ x: number; y: number } | null>(null);
-  const trailingMoveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const trailingMoveRafRef = useRef<number | null>(null);
   const hadActiveInputRef = useRef(false);
   const pointerInsideRef = useRef(false);
   const overlayHoveredRef = useRef(false);
@@ -102,9 +105,9 @@ export function useRemoteControl(
     if (!hadActiveInputRef.current) return;
     hadActiveInputRef.current = false;
     pendingMoveRef.current = null;
-    if (trailingMoveTimerRef.current) {
-      clearTimeout(trailingMoveTimerRef.current);
-      trailingMoveTimerRef.current = null;
+    if (trailingMoveRafRef.current !== null) {
+      cancelAnimationFrame(trailingMoveRafRef.current);
+      trailingMoveRafRef.current = null;
     }
     roomService.sendRemoteControlInput(slotPeerId, { kind: 'releaseAll' });
   }, [slotPeerId]);
@@ -134,9 +137,9 @@ export function useRemoteControl(
       setOverlayHovered(false);
       hadActiveInputRef.current = false;
       pendingMoveRef.current = null;
-      if (trailingMoveTimerRef.current) {
-        clearTimeout(trailingMoveTimerRef.current);
-        trailingMoveTimerRef.current = null;
+      if (trailingMoveRafRef.current !== null) {
+        cancelAnimationFrame(trailingMoveRafRef.current);
+        trailingMoveRafRef.current = null;
       }
     }
   }, [active]);
@@ -203,23 +206,51 @@ export function useRemoteControl(
     const hadTabIndex = container.hasAttribute('tabindex');
     if (!hadTabIndex) container.tabIndex = -1;
 
+    let perfMovesSent = 0;
+    let perfMovesCoalesced = 0;
+    let perfLastLogAt = performance.now();
+
+    const maybeLogInputPerf = (nowPerf: number) => {
+      if (nowPerf - perfLastLogAt < 10000) return;
+      perfLastLogAt = nowPerf;
+      if (perfMovesSent + perfMovesCoalesced === 0) return;
+      logDiagnostic('INFO', 'remoteControl.inputPerf', 'Viewer pointer pacing summary', {
+        slotPeerId,
+        movesSent: perfMovesSent,
+        movesCoalesced: perfMovesCoalesced,
+      });
+      perfMovesSent = 0;
+      perfMovesCoalesced = 0;
+    };
+
     const flushPendingMove = () => {
-      if (trailingMoveTimerRef.current) {
-        clearTimeout(trailingMoveTimerRef.current);
-        trailingMoveTimerRef.current = null;
+      if (trailingMoveRafRef.current !== null) {
+        cancelAnimationFrame(trailingMoveRafRef.current);
+        trailingMoveRafRef.current = null;
       }
       const next = pendingMoveRef.current;
       if (!next) return;
       pendingMoveRef.current = null;
-      lastMoveSentRef.current = Date.now();
+      const now = performance.now();
+      lastMoveSentRef.current = now;
       hadActiveInputRef.current = true;
+      perfMovesSent += 1;
       roomService.sendRemoteControlInput(slotPeerId, { kind: 'mouseMove', x: next.x, y: next.y });
+      maybeLogInputPerf(now);
     };
 
     const getPos = (clientX: number, clientY: number) =>
       streamPointerPosition(video.getBoundingClientRect(), video.videoWidth, video.videoHeight, clientX, clientY);
 
+    const clearStuckOverlayHover = (target: EventTarget | null) => {
+      if (overlayHoveredRef.current && isVideoInteractionTarget(target, container)) {
+        overlayHoveredRef.current = false;
+        setOverlayHovered(false);
+      }
+    };
+
     const handlePointerMove = (event: PointerEvent) => {
+      clearStuckOverlayHover(event.target);
       if (!isVideoInteractionTarget(event.target, container) || document.hidden || overlayHoveredRef.current) {
         if (pointerInsideRef.current) setPointerInside(false);
         return;
@@ -231,21 +262,24 @@ export function useRemoteControl(
       }
       if (!pointerInsideRef.current) setPointerInside(true);
       if (hostBusyRef.current || !mouseEnabledRef.current) return;
-      const now = Date.now();
+      const now = performance.now();
       const elapsed = now - lastMoveSentRef.current;
-      if (elapsed >= MOVE_THROTTLE_MS) {
-        if (trailingMoveTimerRef.current) {
-          clearTimeout(trailingMoveTimerRef.current);
-          trailingMoveTimerRef.current = null;
+      if (elapsed >= MIN_MOVE_INTERVAL_MS) {
+        if (trailingMoveRafRef.current !== null) {
+          cancelAnimationFrame(trailingMoveRafRef.current);
+          trailingMoveRafRef.current = null;
         }
         pendingMoveRef.current = null;
         lastMoveSentRef.current = now;
         hadActiveInputRef.current = true;
+        perfMovesSent += 1;
         roomService.sendRemoteControlInput(slotPeerId, { kind: 'mouseMove', x: pos.x, y: pos.y });
+        maybeLogInputPerf(now);
       } else {
         pendingMoveRef.current = pos;
-        if (!trailingMoveTimerRef.current) {
-          trailingMoveTimerRef.current = setTimeout(flushPendingMove, MOVE_THROTTLE_MS - elapsed);
+        perfMovesCoalesced += 1;
+        if (trailingMoveRafRef.current === null) {
+          trailingMoveRafRef.current = requestAnimationFrame(flushPendingMove);
         }
       }
     };
@@ -256,6 +290,7 @@ export function useRemoteControl(
     };
 
     const handleMouseDown = (event: MouseEvent) => {
+      clearStuckOverlayHover(event.target);
       if (!isVideoInteractionTarget(event.target, container) || overlayHoveredRef.current) return;
       const pos = getPos(event.clientX, event.clientY);
       if (!pos) return;

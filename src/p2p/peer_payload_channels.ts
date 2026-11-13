@@ -37,6 +37,21 @@ export class PeerPayloadChannels {
     const entry = this.peers.get(peer);
     return Boolean(entry && this.connection(peer) === entry.connection && entry.channels[lane].readyState === 'open');
   }
+  /** Zero-microtask synchronous send for time-critical interactive frames when channel is open and unbuffered. */
+  sendFast(peer: string, lane: Lane, frame: Uint8Array): boolean {
+    const entry = this.peers.get(peer);
+    const channel = entry?.channels[lane];
+    if (!entry || !channel || this.connection(peer) !== entry.connection || channel.readyState !== 'open') return false;
+    if (frame.length > (entry.connection.sctp?.maxMessageSize || 65536)) return false;
+    const maxFastBuffer = lane === 'datagram' ? 8192 : 16384;
+    if (channel.bufferedAmount > maxFastBuffer) return false;
+    try {
+      channel.send(frame);
+      return true;
+    } catch {
+      return false;
+    }
+  }
   send(peer: string, lane: Lane, frame: Uint8Array, current: () => boolean, maxBuffer?: number): Promise<boolean> {
     const entry = this.peers.get(peer);
     if (!entry || lane === 'datagram') return this.transmit(peer, lane, frame, current, maxBuffer);

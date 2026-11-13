@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   createIdleViewerState,
+  decodeRemoteControlBinaryInput,
+  encodeRemoteControlBinaryInput,
+  isRemoteControlBinaryFrame,
   normalizeCursorShape,
   validRemoteControlClientPacket,
   validRemoteControlHostPacket,
@@ -145,4 +148,37 @@ test('RemoteControlHostManager manages consent, multi-controllers, permissions, 
   assert.equal(manager.getControllers().length, 0);
   assert.deepEqual(monitorCalls, [true, false]);
   assert.ok(changeCount > 0);
+});
+
+test('encodeRemoteControlBinaryInput and decodeRemoteControlBinaryInput roundtrip events and reject malformed frames', () => {
+  const samples: RemoteInputEvent[] = [
+    { kind: 'mouseMove', x: 0.25, y: 0.75 },
+    { kind: 'mouseButton', button: 'right', down: true, x: 0.5, y: 0.5 },
+    { kind: 'mouseButton', button: 'x1', down: false },
+    { kind: 'mouseWheel', deltaX: -12.5, deltaY: 120, x: 0.125, y: 0.875 },
+    { kind: 'key', code: 'KeyW', key: 'w', down: true, repeat: true, ctrlKey: true, vk: 87 },
+    { kind: 'releaseAll' },
+  ];
+
+  samples.forEach((event, index) => {
+    const encoded = encodeRemoteControlBinaryInput('screen-1', event, index + 1);
+    assert.ok(encoded instanceof Uint8Array);
+    assert.equal(isRemoteControlBinaryFrame(encoded), true);
+    const decoded = decodeRemoteControlBinaryInput(encoded);
+    assert.ok(decoded);
+    assert.equal(decoded.mediaId, 'screen-1');
+    assert.equal(decoded.seq, index + 1);
+    assert.equal(decoded.event.kind, event.kind);
+    if (event.kind === 'key' && decoded.event.kind === 'key') {
+      assert.equal(decoded.event.code, 'KeyW');
+      assert.equal(decoded.event.vk, 87);
+      assert.equal(decoded.event.ctrlKey, true);
+      assert.equal(decoded.event.repeat, true);
+    }
+  });
+
+  // Malformed or truncated buffers are rejected cleanly
+  assert.equal(decodeRemoteControlBinaryInput(new Uint8Array([0x00, 0x05, 0x7b])), null);
+  assert.equal(decodeRemoteControlBinaryInput(new Uint8Array([0x52, 0x43, 0x01, 1, 2, 65, 66, 0, 0, 0, 1])), null);
+  assert.equal(encodeRemoteControlBinaryInput('', { kind: 'releaseAll' }), null);
 });

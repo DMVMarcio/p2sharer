@@ -616,12 +616,15 @@ export class RoomService {
   private pruneRemoteControlViewerByOwner(ownerPeerId: string): void {
     const next = { ...this.remoteControlViewerStates };
     let changed = false;
+    let hadActive = false;
     for (const [key, state] of Object.entries(next)) {
       if (state.hostPeerId === ownerPeerId) {
+        if (state.status === 'active') hadActive = true;
         delete next[key];
         changed = true;
       }
     }
+    if (hadActive) this.roomManager?.setRemoteControlLowLatency(ownerPeerId, false);
     if (changed) this.remoteControlViewerStates = next;
   }
 
@@ -654,8 +657,10 @@ export class RoomService {
           cursorCaptured: packet.cursorCaptured,
           hostBusy: packet.hostBusy,
           cursorShape: packet.cursorShape,
+          fastBinary: Boolean(packet.fastBinary),
         },
       };
+      this.roomManager?.setRemoteControlLowLatency(current.hostPeerId, true);
       showToast(t('remoteControl.accepted'), 2500, 'success');
       this.notify();
       return;
@@ -681,6 +686,9 @@ export class RoomService {
     const next = { ...this.remoteControlViewerStates };
     delete next[slotKey];
     this.remoteControlViewerStates = next;
+    if (current.status === 'active') {
+      this.roomManager?.setRemoteControlLowLatency(current.hostPeerId, false);
+    }
     if (packet.type === 'decline') {
       showToast(t('remoteControl.declined'), 3000, 'info');
     } else if (packet.type === 'revoke') {
@@ -735,6 +743,9 @@ export class RoomService {
     const next = { ...this.remoteControlViewerStates };
     delete next[slotPeerId];
     this.remoteControlViewerStates = next;
+    if (current.status === 'active') {
+      this.roomManager?.setRemoteControlLowLatency(current.hostPeerId, false);
+    }
     this.roomManager?.sendRemoteControlClient(
       { type: current.status === 'pending' ? 'cancel' : 'release', mediaId: current.mediaId },
       current.hostPeerId,

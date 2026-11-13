@@ -7100,7 +7100,9 @@ body:has(.fullscreen-dialog, .chat-image-viewer) .window-titlebar { display: non
 
 .remote-control-floating-panel {
   position: absolute;
-  width: 268px;
+  width: min(312px, calc(100vw - 32px));
+  max-width: calc(100vw - 24px);
+  box-sizing: border-box;
   padding: 12px;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
@@ -7110,6 +7112,20 @@ body:has(.fullscreen-dialog, .chat-image-viewer) .window-titlebar { display: non
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.remote-control-floating-stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+}
+
+.remote-control-floating-stats .stat-badge {
+  background: var(--bg-control);
+  border-color: var(--border-subtle);
+  font-size: 10px;
+  padding: 2px 6px;
 }
 
 .remote-control-floating-panel.open-downward {
@@ -7228,13 +7244,19 @@ body:has(.fullscreen-dialog, .chat-image-viewer) .window-titlebar { display: non
 }
 
 .remote-control-floating-actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(126px, 1fr));
   gap: 8px;
 }
 
 .remote-control-floating-actions .btn {
-  flex: 1;
+  width: 100%;
+  min-width: 0;
   justify-content: center;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.2;
+  padding: 7px 10px;
 }
 
 .participants-remote-control-panel {

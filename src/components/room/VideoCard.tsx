@@ -136,6 +136,14 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     handleDoubleClick,
   } = useStreamZoom(cardRef, slot.stream, !inTray && !isRemoteControlActive);
 
+  const wasRemoteControlActiveRef = useRef(false);
+  useEffect(() => {
+    if (isRemoteControlActive && !wasRemoteControlActiveRef.current) {
+      resetZoom();
+    }
+    wasRemoteControlActiveRef.current = isRemoteControlActive;
+  }, [isRemoteControlActive, resetZoom]);
+
   const handleToggleFullscreen = (e?: React.MouseEvent) => {
     e?.stopPropagation();
     void toggleFullscreen().catch(error => console.warn('[Window] Fullscreen transition failed:', error));
@@ -552,6 +560,13 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           }}
           onToggleMute={handleToggleMute}
           onOverlayHoverChange={remoteControl.setOverlayHovered}
+          qualityText={`${remoteResolution} ${formatFrameRate(liveFps)} FPS`}
+          liveBitrateKbps={liveBitrate}
+          configuredBitrateKbps={currentBitrate}
+          pingText={pingStr}
+          pingClass={pingClass}
+          transportTag={transportTag}
+          watchersCount={watchers.length}
         />
       )}
 

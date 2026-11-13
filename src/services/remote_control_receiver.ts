@@ -303,6 +303,7 @@ export class RemoteControlHostManager {
       cursorCaptured,
       hostBusy: this.hostBusy,
       cursorShape: this.cursorShape,
+      ...(type === 'accept' ? { fastBinary: true } : {}),
     });
   }
 

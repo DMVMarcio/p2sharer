@@ -301,6 +301,13 @@ export class NativeVideoTransport {
     const route = this.incoming.get(this.key(peer, mediaId));
     return route?.verifiedFrames ? route.pc : undefined;
   }
+  public tunePeerJitterBuffer(peer: string, lowLatency: boolean): void {
+    for (const route of this.incoming.values()) {
+      if (route.peer === peer) {
+        MediaCoordinator.tuneReceiverJitterBuffer(route.pc, lowLatency);
+      }
+    }
+  }
   public async senderStats(mediaId: string): Promise<NativeSenderStats[]> {
     // Pending native routes must not hide active browser statistics. Teardown
     // can also finish while an IPC sample is in flight.

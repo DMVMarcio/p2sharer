@@ -53,6 +53,7 @@ export type RemoteControlClientPacket =
   | {
       type: 'request';
       mediaId: string;
+      fastBinary?: boolean;
     }
   | {
       type: 'cancel';
@@ -77,6 +78,7 @@ export type RemoteControlHostPacket =
       cursorCaptured: boolean;
       hostBusy: boolean;
       cursorShape: RemoteCursorShape;
+      fastBinary?: boolean;
     }
   | {
       type: 'decline';
@@ -123,6 +125,7 @@ export interface RemoteControlViewerState {
   cursorCaptured: boolean;
   hostBusy: boolean;
   cursorShape: RemoteCursorShape;
+  fastBinary?: boolean;
 }
 
 const VALID_CURSOR_SHAPES = new Set<RemoteCursorShape>([
@@ -208,6 +211,7 @@ export function validRemoteControlClientPacket(raw: unknown): raw is RemoteContr
   if (!isMediaId(pkt.mediaId)) return false;
   switch (pkt.type) {
     case 'request':
+      return pkt.fastBinary === undefined || typeof pkt.fastBinary === 'boolean';
     case 'cancel':
     case 'release':
       return true;
@@ -233,6 +237,15 @@ export function validRemoteControlHostPacket(raw: unknown): raw is RemoteControl
         pkt.reason === 'unsupported'
       );
     case 'accept':
+      return (
+        typeof pkt.mouseEnabled === 'boolean' &&
+        typeof pkt.keyboardEnabled === 'boolean' &&
+        typeof pkt.cursorCaptured === 'boolean' &&
+        typeof pkt.hostBusy === 'boolean' &&
+        typeof pkt.cursorShape === 'string' &&
+        VALID_CURSOR_SHAPES.has(pkt.cursorShape as RemoteCursorShape) &&
+        (pkt.fastBinary === undefined || typeof pkt.fastBinary === 'boolean')
+      );
     case 'state':
       return (
         typeof pkt.mouseEnabled === 'boolean' &&
@@ -258,4 +271,219 @@ export function createIdleViewerState(mediaId = '', hostPeerId = ''): RemoteCont
     hostBusy: false,
     cursorShape: 'default',
   };
+}
+
+// Binary direct WebRTC DataChannel codec ('R', 'C', version=1).
+// Magic 0x5243 (> 2048) never collides with PeerPayloadChannels JSON length prefixes.
+const RC_MAGIC_0 = 0x52;
+const RC_MAGIC_1 = 0x43;
+const RC_VERSION = 0x01;
+const OP_MOUSE_MOVE = 1;
+const OP_MOUSE_BUTTON = 2;
+const OP_MOUSE_WHEEL = 3;
+const OP_KEY = 4;
+const OP_RELEASE_ALL = 5;
+const MOUSE_BUTTONS: RemoteMouseButton[] = ['left', 'right', 'middle', 'x1', 'x2'];
+const rcTextEncoder = new TextEncoder();
+const rcTextDecoder = new TextDecoder('utf-8', { fatal: true });
+
+export interface DecodedRemoteControlBinaryInput {
+  mediaId: string;
+  seq: number;
+  event: RemoteInputEvent;
+}
+
+export function isRemoteControlBinaryFrame(frame: Uint8Array): boolean {
+  return frame.length >= 9 && frame[0] === RC_MAGIC_0 && frame[1] === RC_MAGIC_1 && frame[2] === RC_VERSION;
+}
+
+export function encodeRemoteControlBinaryInput(
+  mediaId: string,
+  event: RemoteInputEvent,
+  seq = 0,
+): Uint8Array | null {
+  const mediaBytes = rcTextEncoder.encode(mediaId);
+  if (mediaBytes.length === 0 || mediaBytes.length > 64) return null;
+  const headerSize = 9 + mediaBytes.length;
+
+  const alloc = (op: number, extraBytes: number) => {
+    const buf = new Uint8Array(headerSize + extraBytes);
+    const view = new DataView(buf.buffer);
+    buf[0] = RC_MAGIC_0;
+    buf[1] = RC_MAGIC_1;
+    buf[2] = RC_VERSION;
+    buf[3] = op;
+    buf[4] = mediaBytes.length;
+    buf.set(mediaBytes, 5);
+    view.setUint32(5 + mediaBytes.length, seq >>> 0);
+    return { buf, view, offset: headerSize };
+  };
+
+  switch (event.kind) {
+    case 'mouseMove': {
+      const { buf, view, offset } = alloc(OP_MOUSE_MOVE, 8);
+      view.setFloat32(offset, event.x);
+      view.setFloat32(offset + 4, event.y);
+      return buf;
+    }
+    case 'mouseButton': {
+      const btnIdx = MOUSE_BUTTONS.indexOf(event.button);
+      if (btnIdx < 0) return null;
+      const hasCoords = event.x !== undefined && event.y !== undefined;
+      const { buf, view, offset } = alloc(OP_MOUSE_BUTTON, hasCoords ? 10 : 2);
+      buf[offset] = btnIdx;
+      buf[offset + 1] = (event.down ? 1 : 0) | (hasCoords ? 2 : 0);
+      if (hasCoords) {
+        view.setFloat32(offset + 2, event.x!);
+        view.setFloat32(offset + 6, event.y!);
+      }
+      return buf;
+    }
+    case 'mouseWheel': {
+      const hasCoords = event.x !== undefined && event.y !== undefined;
+      const { buf, view, offset } = alloc(OP_MOUSE_WHEEL, hasCoords ? 17 : 9);
+      view.setFloat32(offset, event.deltaX);
+      view.setFloat32(offset + 4, event.deltaY);
+      buf[offset + 8] = hasCoords ? 1 : 0;
+      if (hasCoords) {
+        view.setFloat32(offset + 9, event.x!);
+        view.setFloat32(offset + 13, event.y!);
+      }
+      return buf;
+    }
+    case 'key': {
+      const codeBytes = rcTextEncoder.encode(event.code);
+      const keyBytes = rcTextEncoder.encode(event.key);
+      if (codeBytes.length > 64 || keyBytes.length > 64) return null;
+      const hasVk = event.vk !== undefined;
+      const flags =
+        (event.down ? 1 : 0) |
+        (event.repeat ? 2 : 0) |
+        (event.ctrlKey ? 4 : 0) |
+        (event.altKey ? 8 : 0) |
+        (event.metaKey ? 16 : 0) |
+        (hasVk ? 32 : 0);
+      const { buf, offset } = alloc(OP_KEY, 4 + codeBytes.length + keyBytes.length);
+      buf[offset] = flags;
+      buf[offset + 1] = hasVk ? (event.vk! & 0xff) : 0;
+      buf[offset + 2] = codeBytes.length;
+      buf[offset + 3] = keyBytes.length;
+      buf.set(codeBytes, offset + 4);
+      buf.set(keyBytes, offset + 4 + codeBytes.length);
+      return buf;
+    }
+    case 'releaseAll': {
+      const { buf } = alloc(OP_RELEASE_ALL, 0);
+      return buf;
+    }
+    default:
+      return null;
+  }
+}
+
+export function decodeRemoteControlBinaryInput(frame: Uint8Array): DecodedRemoteControlBinaryInput | null {
+  if (!isRemoteControlBinaryFrame(frame)) return null;
+  const op = frame[3];
+  const mediaLen = frame[4];
+  if (mediaLen === 0 || mediaLen > 64 || 9 + mediaLen > frame.length) return null;
+  let mediaId: string;
+  try {
+    mediaId = rcTextDecoder.decode(frame.subarray(5, 5 + mediaLen));
+  } catch {
+    return null;
+  }
+  if (!isMediaId(mediaId)) return null;
+
+  const view = new DataView(frame.buffer, frame.byteOffset, frame.byteLength);
+  const seq = view.getUint32(5 + mediaLen);
+  const offset = 9 + mediaLen;
+  const readCoord = (v: number) => Math.max(0, Math.min(1, v));
+
+  let event: RemoteInputEvent | null = null;
+  switch (op) {
+    case OP_MOUSE_MOVE: {
+      if (frame.length !== offset + 8) return null;
+      const x = readCoord(view.getFloat32(offset));
+      const y = readCoord(view.getFloat32(offset + 4));
+      event = { kind: 'mouseMove', x, y };
+      break;
+    }
+    case OP_MOUSE_BUTTON: {
+      if (frame.length < offset + 2) return null;
+      const button = MOUSE_BUTTONS[frame[offset]];
+      if (!button) return null;
+      const flags = frame[offset + 1];
+      const down = (flags & 1) !== 0;
+      const hasCoords = (flags & 2) !== 0;
+      if (hasCoords) {
+        if (frame.length !== offset + 10) return null;
+        event = {
+          kind: 'mouseButton',
+          button,
+          down,
+          x: readCoord(view.getFloat32(offset + 2)),
+          y: readCoord(view.getFloat32(offset + 6)),
+        };
+      } else {
+        if (frame.length !== offset + 2) return null;
+        event = { kind: 'mouseButton', button, down };
+      }
+      break;
+    }
+    case OP_MOUSE_WHEEL: {
+      if (frame.length < offset + 9) return null;
+      const deltaX = view.getFloat32(offset);
+      const deltaY = view.getFloat32(offset + 4);
+      const hasCoords = frame[offset + 8] === 1;
+      if (hasCoords) {
+        if (frame.length !== offset + 17) return null;
+        event = {
+          kind: 'mouseWheel',
+          deltaX,
+          deltaY,
+          x: readCoord(view.getFloat32(offset + 9)),
+          y: readCoord(view.getFloat32(offset + 13)),
+        };
+      } else {
+        if (frame.length !== offset + 9) return null;
+        event = { kind: 'mouseWheel', deltaX, deltaY };
+      }
+      break;
+    }
+    case OP_KEY: {
+      if (frame.length < offset + 4) return null;
+      const flags = frame[offset];
+      const vk = (flags & 32) !== 0 ? frame[offset + 1] : undefined;
+      const codeLen = frame[offset + 2];
+      const keyLen = frame[offset + 3];
+      if (codeLen > 64 || keyLen > 64 || frame.length !== offset + 4 + codeLen + keyLen) return null;
+      try {
+        const code = rcTextDecoder.decode(frame.subarray(offset + 4, offset + 4 + codeLen));
+        const key = rcTextDecoder.decode(frame.subarray(offset + 4 + codeLen, offset + 4 + codeLen + keyLen));
+        event = {
+          kind: 'key',
+          code,
+          key,
+          down: (flags & 1) !== 0,
+          ...((flags & 2) !== 0 ? { repeat: true } : {}),
+          ...((flags & 4) !== 0 ? { ctrlKey: true } : {}),
+          ...((flags & 8) !== 0 ? { altKey: true } : {}),
+          ...((flags & 16) !== 0 ? { metaKey: true } : {}),
+          ...(vk !== undefined ? { vk } : {}),
+        };
+      } catch {
+        return null;
+      }
+      break;
+    }
+    case OP_RELEASE_ALL: {
+      if (frame.length !== offset) return null;
+      event = { kind: 'releaseAll' };
+      break;
+    }
+    default:
+      return null;
+  }
+
+  return validRemoteInputEvent(event) ? { mediaId, seq, event } : null;
 }

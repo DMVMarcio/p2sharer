@@ -68,6 +68,14 @@ struct ImmersiveKeyPayload {
     down: bool,
 }
 
+struct CachedDesktopMapping {
+    session_id: String,
+    is_window: bool,
+    source_bounds: (i32, i32, u32, u32),
+    virtual_bounds: (i32, i32, i32, i32),
+    refreshed_at_ms: u64,
+}
+
 struct HostControlState {
     active: bool,
     monitor_running: bool,
@@ -79,6 +87,12 @@ struct HostControlState {
     held_buttons: HashMap<String, HashSet<String>>,
     held_vks: HashMap<String, HashSet<u16>>,
     held_unicode: HashMap<(String, String), Vec<u16>>,
+    mapping_cache: Option<CachedDesktopMapping>,
+    perf_applied: u64,
+    perf_busy_dropped: u64,
+    perf_total_us: u64,
+    perf_max_us: u64,
+    perf_last_log_ms: u64,
 }
 
 impl Default for HostControlState {
@@ -94,6 +108,12 @@ impl Default for HostControlState {
             held_buttons: HashMap::new(),
             held_vks: HashMap::new(),
             held_unicode: HashMap::new(),
+            mapping_cache: None,
+            perf_applied: 0,
+            perf_busy_dropped: 0,
+            perf_total_us: 0,
+            perf_max_us: 0,
+            perf_last_log_ms: 0,
         }
     }
 }
@@ -478,7 +498,8 @@ fn is_punctuation_code(code: &str) -> bool {
 }
 
 #[cfg(windows)]
-fn normalized_to_virtual_desktop(
+fn normalized_to_virtual_desktop_cached(
+    state: &mut HostControlState,
     session_id: Option<&str>,
     x: f64,
     y: f64,
@@ -491,25 +512,48 @@ fn normalized_to_virtual_desktop(
     {
         return None;
     }
-    let source = session_id.and_then(crate::screen_sources::pointer_capture_source)?;
-    let (left, top, width, height) = crate::stream_pointer::source_bounds(&source)?;
+    let sid = session_id?;
+    let now = now_ms();
+    let needs_refresh = match state.mapping_cache.as_ref() {
+        Some(cached) if cached.session_id == sid => {
+            let ttl_ms = if cached.is_window { 120 } else { 500 };
+            now.saturating_sub(cached.refreshed_at_ms) >= ttl_ms
+        }
+        _ => true,
+    };
+    if needs_refresh {
+        let source = crate::screen_sources::pointer_capture_source(sid)?;
+        let source_bounds = crate::stream_pointer::source_bounds(&source)?;
+        let virtual_bounds = unsafe {
+            (
+                GetSystemMetrics(SM_XVIRTUALSCREEN),
+                GetSystemMetrics(SM_YVIRTUALSCREEN),
+                GetSystemMetrics(SM_CXVIRTUALSCREEN).max(2),
+                GetSystemMetrics(SM_CYVIRTUALSCREEN).max(2),
+            )
+        };
+        state.mapping_cache = Some(CachedDesktopMapping {
+            session_id: sid.to_string(),
+            is_window: source.starts_with("window:"),
+            source_bounds,
+            virtual_bounds,
+            refreshed_at_ms: now,
+        });
+    }
+    let cached = state.mapping_cache.as_ref()?;
+    let (left, top, width, height) = cached.source_bounds;
+    let (vx, vy, vw, vh) = cached.virtual_bounds;
     let px = left
         + ((x * (width.saturating_sub(1) as f64)).round() as i32)
             .clamp(0, width.saturating_sub(1) as i32);
     let py = top
         + ((y * (height.saturating_sub(1) as f64)).round() as i32)
             .clamp(0, height.saturating_sub(1) as i32);
-    unsafe {
-        let vx = GetSystemMetrics(SM_XVIRTUALSCREEN);
-        let vy = GetSystemMetrics(SM_YVIRTUALSCREEN);
-        let vw = GetSystemMetrics(SM_CXVIRTUALSCREEN).max(2);
-        let vh = GetSystemMetrics(SM_CYVIRTUALSCREEN).max(2);
-        let abs_x = (((px - vx) as i64 * 65535 + ((vw - 1) as i64 / 2)) / (vw - 1) as i64)
-            .clamp(0, 65535) as i32;
-        let abs_y = (((py - vy) as i64 * 65535 + ((vh - 1) as i64 / 2)) / (vh - 1) as i64)
-            .clamp(0, 65535) as i32;
-        Some((abs_x, abs_y))
-    }
+    let abs_x = (((px - vx) as i64 * 65535 + ((vw - 1) as i64 / 2)) / (vw - 1) as i64)
+        .clamp(0, 65535) as i32;
+    let abs_y = (((py - vy) as i64 * 65535 + ((vh - 1) as i64 / 2)) / (vh - 1) as i64)
+        .clamp(0, 65535) as i32;
+    Some((abs_x, abs_y))
 }
 
 #[cfg(windows)]
@@ -632,6 +676,7 @@ pub fn set_remote_control_active(
                 release_all_locked(&mut state);
                 state.host_paused_until = 0;
                 state.was_host_paused = false;
+                state.mapping_cache = None;
             }
         }
         if should_spawn {
@@ -696,6 +741,7 @@ pub fn apply_remote_control_input(
             INPUT, INPUT_0, INPUT_MOUSE, MOUSEEVENTF_ABSOLUTE, MOUSEEVENTF_HWHEEL,
             MOUSEEVENTF_MOVE, MOUSEEVENTF_VIRTUALDESK, MOUSEEVENTF_WHEEL, MOUSEINPUT,
         };
+        let input_started = std::time::Instant::now();
         let mut state = HOST_STATE.lock().map_err(|_| "Remote control lock poisoned")?;
         if !state.active {
             return Ok(ApplyInputResult {
@@ -711,6 +757,7 @@ pub fn apply_remote_control_input(
             });
         }
         if poll_host_activity_locked(&mut state) {
+            state.perf_busy_dropped += 1;
             return Ok(ApplyInputResult {
                 accepted: false,
                 host_busy: true,
@@ -720,7 +767,8 @@ pub fn apply_remote_control_input(
         let mut moved_cursor = false;
         match event {
             RemoteInputEvent::MouseMove { x, y } => {
-                let Some((dx, dy)) = normalized_to_virtual_desktop(session_id.as_deref(), x, y)
+                let Some((dx, dy)) =
+                    normalized_to_virtual_desktop_cached(&mut state, session_id.as_deref(), x, y)
                 else {
                     return Ok(ApplyInputResult {
                         accepted: false,
@@ -753,7 +801,12 @@ pub fn apply_remote_control_input(
             } => {
                 let abs = match (x, y) {
                     (Some(nx), Some(ny)) => {
-                        let res = normalized_to_virtual_desktop(session_id.as_deref(), nx, ny);
+                        let res = normalized_to_virtual_desktop_cached(
+                            &mut state,
+                            session_id.as_deref(),
+                            nx,
+                            ny,
+                        );
                         if res.is_some() {
                             moved_cursor = true;
                         }
@@ -788,9 +841,12 @@ pub fn apply_remote_control_input(
                 }
                 let mut inputs = Vec::new();
                 if let (Some(nx), Some(ny)) = (x, y) {
-                    if let Some((dx, dy)) =
-                        normalized_to_virtual_desktop(session_id.as_deref(), nx, ny)
-                    {
+                    if let Some((dx, dy)) = normalized_to_virtual_desktop_cached(
+                        &mut state,
+                        session_id.as_deref(),
+                        nx,
+                        ny,
+                    ) {
                         moved_cursor = true;
                         inputs.push(INPUT {
                             r#type: INPUT_MOUSE,
@@ -916,6 +972,32 @@ pub fn apply_remote_control_input(
         if moved_cursor {
             if let Some(pos) = read_cursor_pos() {
                 state.last_self_cursor = Some(pos);
+            }
+        }
+        let elapsed_us = input_started.elapsed().as_micros() as u64;
+        state.perf_applied += 1;
+        state.perf_total_us += elapsed_us;
+        state.perf_max_us = state.perf_max_us.max(elapsed_us);
+        if state.perf_applied >= 250 {
+            let now = now_ms();
+            if now.saturating_sub(state.perf_last_log_ms) >= 5000 {
+                let avg_us = state.perf_total_us / state.perf_applied.max(1);
+                crate::logger::log_msg(
+                    "INFO",
+                    "remote_control.perf",
+                    &format!(
+                        "host_apply count={} busy_dropped={} avg_us={} max_us={}",
+                        state.perf_applied,
+                        state.perf_busy_dropped,
+                        avg_us,
+                        state.perf_max_us
+                    ),
+                );
+                state.perf_applied = 0;
+                state.perf_busy_dropped = 0;
+                state.perf_total_us = 0;
+                state.perf_max_us = 0;
+                state.perf_last_log_ms = now;
             }
         }
 
