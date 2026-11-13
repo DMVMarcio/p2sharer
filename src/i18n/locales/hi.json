@@ -1660,7 +1660,7 @@
   "remoteControl.immersiveMode": "इमर्सिव मोड",
   "remoteControl.immersiveHint": "Alt+Tab, Windows कुंजी और सिस्टम शॉर्टकट दूरस्थ पीसी पर भेजें",
   "remoteControl.mouseLock": "लॉक किया गया माउस (गेम)",
-  "remoteControl.mouseLockHint": "गेम और 3D कैमरे के लिए सापेक्ष गति कैप्चर करें (Esc से मुक्त)",
+  "remoteControl.mouseLockHint": "गेम और 3D कैमरे के लिए सापेक्ष गति कैप्चर करें (Ctrl+Shift+M से मुक्त)",
   "remoteControl.exitAction": "कंट्रोल रोकें",
   "remoteControl.manageAction": "रिमोट कंट्रोल",
   "remoteControl.managerTitle": "रिमोट कंट्रोल",

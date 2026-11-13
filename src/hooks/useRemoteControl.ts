@@ -25,6 +25,11 @@ interface ImmersiveKeyPayload {
   down: boolean;
 }
 
+interface RawMouseDeltaPayload {
+  dx: number;
+  dy: number;
+}
+
 export interface RemoteControlHookState {
   status: RemoteControlStatus;
   pending: boolean;
@@ -123,9 +128,10 @@ export function useRemoteControl(
     effectiveMouseLock;
 
   const lastMoveSentRef = useRef(0);
+  const lastSentPosRef = useRef<{ x: number; y: number } | null>(null);
   const pendingMoveRef = useRef<{ x: number; y: number } | null>(null);
   const pendingDeltaRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-  const trailingMoveRafRef = useRef<number | null>(null);
+  const trailingMoveTimerRef = useRef<number | null>(null);
   const hadActiveInputRef = useRef(false);
   const heldButtonsRef = useRef(new Set<RemoteMouseButton>());
   const heldKeysRef = useRef(new Set<string>());
@@ -145,6 +151,9 @@ export function useRemoteControl(
   const pointerLockedRef = useRef(pointerLocked);
   const programmaticUnlockRef = useRef(false);
   const lockPausedByEscapeRef = useRef(false);
+  const rawLockDesiredRef = useRef(false);
+  const rawLockGenRef = useRef(0);
+  const rawPerfRef = useRef({ sent: 0, lastLogAt: 0 });
 
   pointerInsideRef.current = pointerInside;
   overlayHoveredRef.current = overlayHovered;
@@ -165,14 +174,64 @@ export function useRemoteControl(
     }
   }, [hostMouseLocked, mouseLockOverride]);
 
+  const clearTrailingMoveTimer = useCallback(() => {
+    if (trailingMoveTimerRef.current !== null) {
+      window.clearTimeout(trailingMoveTimerRef.current);
+      trailingMoveTimerRef.current = null;
+    }
+  }, []);
+
+  const isMouseLockedNow = useCallback(() => {
+    if (isTauri()) return pointerLockedRef.current;
+    const container = containerRef.current;
+    return Boolean(container && document.pointerLockElement === container);
+  }, [containerRef]);
+
+  const getVideoClientRect = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return null;
+    const imageRect = streamPointerVideoRect(
+      video.getBoundingClientRect(),
+      video.videoWidth,
+      video.videoHeight,
+    );
+    if (!imageRect || imageRect.width < 2 || imageRect.height < 2) return null;
+    return imageRect;
+  }, [videoRef]);
+
   const tryAcquirePointerLock = useCallback(() => {
     const container = containerRef.current;
-    if (
-      !container ||
-      !wantPointerLockRef.current ||
-      lockPausedByEscapeRef.current ||
-      document.pointerLockElement === container
-    ) {
+    if (!container || !wantPointerLockRef.current) return;
+
+    if (isTauri()) {
+      const imageRect = getVideoClientRect();
+      if (!imageRect) return;
+      const gen = ++rawLockGenRef.current;
+      rawLockDesiredRef.current = true;
+      void invoke<boolean>('set_remote_control_mouse_lock', {
+        enabled: true,
+        rect: imageRect,
+      })
+        .then((acquired) => {
+          if (gen !== rawLockGenRef.current || !rawLockDesiredRef.current) {
+            if (acquired) {
+              void invoke('set_remote_control_mouse_lock', { enabled: false, rect: null }).catch(() => {});
+            }
+            return;
+          }
+          pointerLockedRef.current = acquired;
+          setPointerLocked(acquired);
+          if (acquired) {
+            setPointerInside(true);
+            clipActiveRef.current = false;
+            lastSentPosRef.current = null;
+          }
+        })
+        .catch(() => {});
+      return;
+    }
+
+    if (lockPausedByEscapeRef.current || document.pointerLockElement === container) {
       return;
     }
     try {
@@ -198,9 +257,23 @@ export function useRemoteControl(
         void Promise.resolve(container.requestPointerLock?.()).catch(() => {});
       } catch {}
     }
-  }, [containerRef]);
+  }, [containerRef, getVideoClientRect]);
 
   const releasePointerLock = useCallback(() => {
+    if (isTauri()) {
+      const wasActiveOrDesired = rawLockDesiredRef.current || pointerLockedRef.current;
+      rawLockDesiredRef.current = false;
+      rawLockGenRef.current += 1;
+      if (pointerLockedRef.current) {
+        pointerLockedRef.current = false;
+        setPointerLocked(false);
+      }
+      pendingDeltaRef.current = { x: 0, y: 0 };
+      if (wasActiveOrDesired) {
+        void invoke('set_remote_control_mouse_lock', { enabled: false, rect: null }).catch(() => {});
+      }
+      return;
+    }
     const container = containerRef.current;
     if (!container || document.pointerLockElement !== container) return;
     programmaticUnlockRef.current = true;
@@ -219,12 +292,11 @@ export function useRemoteControl(
   const syncCursorClip = useCallback(
     (forceUnlock = false) => {
       if (!isTauri()) return;
-      const container = containerRef.current;
-      const isPointerLocked = Boolean(container && document.pointerLockElement === container);
+      const isLocked = isMouseLockedNow();
       const shouldClip =
         !forceUnlock &&
         active &&
-        !isPointerLocked &&
+        !isLocked &&
         !hostBusyRef.current &&
         windowFocusedRef.current &&
         !document.hidden &&
@@ -238,18 +310,12 @@ export function useRemoteControl(
         }
         return;
       }
-      const video = videoRef.current;
-      if (!video) return;
-      const imageRect = streamPointerVideoRect(
-        video.getBoundingClientRect(),
-        video.videoWidth,
-        video.videoHeight,
-      );
-      if (!imageRect || imageRect.width < 2 || imageRect.height < 2) return;
+      const imageRect = getVideoClientRect();
+      if (!imageRect) return;
       clipActiveRef.current = true;
       void invoke('set_remote_control_cursor_clip', { rect: imageRect }).catch(() => {});
     },
-    [active, containerRef, videoRef],
+    [active, getVideoClientRect, isMouseLockedNow],
   );
 
   const updateHoldTracking = useCallback(
@@ -277,12 +343,9 @@ export function useRemoteControl(
     if (!hadActiveInputRef.current) return;
     hadActiveInputRef.current = false;
     pendingMoveRef.current = null;
-    if (trailingMoveRafRef.current !== null) {
-      cancelAnimationFrame(trailingMoveRafRef.current);
-      trailingMoveRafRef.current = null;
-    }
+    clearTrailingMoveTimer();
     roomService.sendRemoteControlInput(slotPeerId, { kind: 'releaseAll' });
-  }, [containerRef, slotPeerId, updateHoldTracking]);
+  }, [clearTrailingMoveTimer, containerRef, slotPeerId, updateHoldTracking]);
 
   const toggleRequest = useCallback(() => {
     if (!eligible) return;
@@ -360,19 +423,100 @@ export function useRemoteControl(
       setHoldingInput(false);
       hadActiveInputRef.current = false;
       pendingMoveRef.current = null;
+      lastSentPosRef.current = null;
       pendingDeltaRef.current = { x: 0, y: 0 };
-      if (trailingMoveRafRef.current !== null) {
-        cancelAnimationFrame(trailingMoveRafRef.current);
-        trailingMoveRafRef.current = null;
-      }
+      clearTrailingMoveTimer();
       if (clipActiveRef.current && isTauri()) {
         clipActiveRef.current = false;
         void invoke('set_remote_control_cursor_clip', { rect: null }).catch(() => {});
       }
     }
-  }, [active, releasePointerLock]);
+  }, [active, clearTrailingMoveTimer, releasePointerLock]);
 
   useEffect(() => {
+    if (!isTauri() || !active) return;
+    let disposed = false;
+    let unlistenDelta: (() => void) | undefined;
+    let unlistenLost: (() => void) | undefined;
+
+    void listen<RawMouseDeltaPayload>('remote-control-raw-delta', ({ payload }) => {
+      if (
+        disposed ||
+        !payload ||
+        !pointerLockedRef.current ||
+        hostBusyRef.current ||
+        !mouseEnabledRef.current ||
+        !windowFocusedRef.current ||
+        document.hidden ||
+        overlayHoveredRef.current ||
+        overlayMenuOpenRef.current
+      ) {
+        return;
+      }
+      const dx = Number.isFinite(payload.dx) ? Math.trunc(payload.dx) : 0;
+      const dy = Number.isFinite(payload.dy) ? Math.trunc(payload.dy) : 0;
+      if (dx === 0 && dy === 0) return;
+      hadActiveInputRef.current = true;
+      roomService.sendRemoteControlInput(slotPeerId, { kind: 'mouseDelta', dx, dy });
+      const nowPerf = performance.now();
+      rawPerfRef.current.sent += 1;
+      if (nowPerf - rawPerfRef.current.lastLogAt >= 10000) {
+        rawPerfRef.current.lastLogAt = nowPerf;
+        logDiagnostic('INFO', 'remoteControl.rawDelta', 'Native raw mouse delta summary', {
+          slotPeerId,
+          rawMovesSent: rawPerfRef.current.sent,
+        });
+        rawPerfRef.current.sent = 0;
+      }
+    }).then((fn) => {
+      if (disposed) fn();
+      else unlistenDelta = fn;
+    }).catch(() => {});
+
+    void listen('remote-control-raw-lock-lost', () => {
+      if (disposed) return;
+      rawLockDesiredRef.current = false;
+      rawLockGenRef.current += 1;
+      pointerLockedRef.current = false;
+      setPointerLocked(false);
+      pendingDeltaRef.current = { x: 0, y: 0 };
+      if (!hostMouseLockedRef.current && manualMouseLockRef.current) {
+        manualMouseLockRef.current = false;
+        setMouseLockOverride('auto');
+      }
+      updateHoldTracking(true);
+    }).then((fn) => {
+      if (disposed) fn();
+      else unlistenLost = fn;
+    }).catch(() => {});
+
+    return () => {
+      disposed = true;
+      unlistenDelta?.();
+      unlistenLost?.();
+      releasePointerLock();
+    };
+  }, [active, releasePointerLock, slotPeerId, updateHoldTracking]);
+
+  useEffect(() => {
+    if (!isTauri() || !active || !pointerLocked || !wantPointerLock) return;
+    const syncRect = () => {
+      if (pointerLockedRef.current && wantPointerLockRef.current) {
+        tryAcquirePointerLock();
+      }
+    };
+    const video = videoRef.current;
+    const ro = video && typeof ResizeObserver !== 'undefined' ? new ResizeObserver(syncRect) : null;
+    if (ro && video) ro.observe(video);
+    window.addEventListener('resize', syncRect);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener('resize', syncRect);
+    };
+  }, [active, pointerLocked, tryAcquirePointerLock, videoRef, wantPointerLock]);
+
+  useEffect(() => {
+    if (isTauri()) return;
     const container = containerRef.current;
     if (!active || !container) return;
     const onPointerLockChange = () => {
@@ -418,10 +562,16 @@ export function useRemoteControl(
       releasePointerLock();
       return;
     }
+    if (isTauri()) {
+      if (pointerInsideRef.current || manualMouseLock || effectiveMouseLock) {
+        tryAcquirePointerLock();
+      }
+      return;
+    }
     if (!lockPausedByEscapeRef.current && (pointerInsideRef.current || manualMouseLock)) {
       tryAcquirePointerLock();
     }
-  }, [hostMouseLocked, manualMouseLock, releasePointerLock, tryAcquirePointerLock, wantPointerLock]);
+  }, [effectiveMouseLock, hostMouseLocked, manualMouseLock, releasePointerLock, tryAcquirePointerLock, wantPointerLock]);
 
   // Keep OS low-level immersive hook steady while active + immersive + focused; avoid churning on hostBusy transitions.
   const hookLive = active && immersive && windowFocused;
@@ -431,7 +581,7 @@ export function useRemoteControl(
     const nav = navigator as Navigator & {
       keyboard?: { lock?: (keys?: string[]) => Promise<void>; unlock?: () => void };
     };
-    if (hookLive && document.fullscreenElement) {
+    if ((hookLive || (active && windowFocused && pointerLocked)) && document.fullscreenElement) {
       void nav.keyboard?.lock?.(['Escape']).catch(() => {});
     } else {
       try { nav.keyboard?.unlock?.(); } catch {}
@@ -439,10 +589,10 @@ export function useRemoteControl(
     return () => {
       if (hookLive) {
         void invoke('set_remote_control_immersive', { enabled: false }).catch(() => {});
-        try { nav.keyboard?.unlock?.(); } catch {}
       }
+      try { nav.keyboard?.unlock?.(); } catch {}
     };
-  }, [hookLive]);
+  }, [active, hookLive, pointerLocked, windowFocused]);
 
   useEffect(() => {
     if (!active || !isTauri()) return;
@@ -512,10 +662,7 @@ export function useRemoteControl(
     };
 
     const flushPendingDelta = () => {
-      if (trailingMoveRafRef.current !== null) {
-        cancelAnimationFrame(trailingMoveRafRef.current);
-        trailingMoveRafRef.current = null;
-      }
+      clearTrailingMoveTimer();
       const dx = Math.trunc(pendingDeltaRef.current.x);
       const dy = Math.trunc(pendingDeltaRef.current.y);
       if (dx === 0 && dy === 0) return;
@@ -530,17 +677,15 @@ export function useRemoteControl(
     };
 
     const flushPendingMove = () => {
-      if (trailingMoveRafRef.current !== null) {
-        cancelAnimationFrame(trailingMoveRafRef.current);
-        trailingMoveRafRef.current = null;
-      }
-      if (document.pointerLockElement === container) {
-        flushPendingDelta();
+      clearTrailingMoveTimer();
+      if (isMouseLockedNow()) {
+        if (!isTauri()) flushPendingDelta();
         return;
       }
       const next = pendingMoveRef.current;
       if (!next) return;
       pendingMoveRef.current = null;
+      lastSentPosRef.current = next;
       const now = performance.now();
       lastMoveSentRef.current = now;
       hadActiveInputRef.current = true;
@@ -574,7 +719,7 @@ export function useRemoteControl(
     const handlePointerDown = (event: PointerEvent) => {
       syncLiveFocus();
       clearStuckOverlayHover(event.target);
-      if (document.pointerLockElement === container) {
+      if (isMouseLockedNow()) {
         if (wantPointerLockRef.current) lockPausedByEscapeRef.current = false;
         return;
       }
@@ -583,7 +728,7 @@ export function useRemoteControl(
       if (wantPointerLockRef.current) {
         lockPausedByEscapeRef.current = false;
         tryAcquirePointerLock();
-        if (document.pointerLockElement === container) return;
+        if (isMouseLockedNow()) return;
       }
       activePointerIdRef.current = event.pointerId;
       try {
@@ -593,7 +738,9 @@ export function useRemoteControl(
 
     const handlePointerMove = (event: PointerEvent) => {
       const liveFocused = syncLiveFocus();
-      if (document.pointerLockElement === container) {
+      if (isMouseLockedNow()) {
+        // On Tauri Windows, WM_INPUT delivers hardware raw deltas independently of DOM pointermove.
+        if (isTauri()) return;
         if (!liveFocused || document.hidden) return;
         if (!pointerInsideRef.current) setPointerInside(true);
         if (hostBusyRef.current || !mouseEnabledRef.current || overlayHoveredRef.current) return;
@@ -607,8 +754,11 @@ export function useRemoteControl(
           flushPendingDelta();
         } else {
           perfMovesCoalesced += 1;
-          if (trailingMoveRafRef.current === null) {
-            trailingMoveRafRef.current = requestAnimationFrame(flushPendingDelta);
+          if (trailingMoveTimerRef.current === null) {
+            trailingMoveTimerRef.current = window.setTimeout(
+              flushPendingDelta,
+              MIN_MOVE_INTERVAL_MS,
+            );
           }
         }
         return;
@@ -633,15 +783,20 @@ export function useRemoteControl(
         return;
       }
       if (!pointerInsideRef.current) setPointerInside(true);
+      if (isTauri() && wantPointerLockRef.current) {
+        tryAcquirePointerLock();
+      }
       if (hostBusyRef.current || !mouseEnabledRef.current) return;
+      const lastSent = lastSentPosRef.current;
+      if (lastSent && pos.x === lastSent.x && pos.y === lastSent.y) {
+        return;
+      }
       const now = performance.now();
       const elapsed = now - lastMoveSentRef.current;
       if (elapsed >= MIN_MOVE_INTERVAL_MS) {
-        if (trailingMoveRafRef.current !== null) {
-          cancelAnimationFrame(trailingMoveRafRef.current);
-          trailingMoveRafRef.current = null;
-        }
+        clearTrailingMoveTimer();
         pendingMoveRef.current = null;
+        lastSentPosRef.current = pos;
         lastMoveSentRef.current = now;
         hadActiveInputRef.current = true;
         perfMovesSent += 1;
@@ -650,14 +805,17 @@ export function useRemoteControl(
       } else {
         pendingMoveRef.current = pos;
         perfMovesCoalesced += 1;
-        if (trailingMoveRafRef.current === null) {
-          trailingMoveRafRef.current = requestAnimationFrame(flushPendingMove);
+        if (trailingMoveTimerRef.current === null) {
+          trailingMoveTimerRef.current = window.setTimeout(
+            flushPendingMove,
+            MIN_MOVE_INTERVAL_MS,
+          );
         }
       }
     };
 
     const handlePointerLeave = () => {
-      if (document.pointerLockElement === container || hasActiveHold()) return;
+      if (isMouseLockedNow() || hasActiveHold()) return;
       if (pointerInsideRef.current) setPointerInside(false);
       sendReleaseAll();
     };
@@ -665,7 +823,7 @@ export function useRemoteControl(
     const handleMouseDown = (event: MouseEvent) => {
       syncLiveFocus();
       clearStuckOverlayHover(event.target);
-      const locked = document.pointerLockElement === container;
+      const locked = isMouseLockedNow();
       if (!locked && (!isVideoInteractionTarget(event.target, container) || overlayHoveredRef.current)) return;
       const pos = locked ? null : getPos(event.clientX, event.clientY);
       if (!locked && !pos) return;
@@ -688,13 +846,13 @@ export function useRemoteControl(
         kind: 'mouseButton',
         button,
         down: true,
-        ...(pos && document.pointerLockElement !== container ? { x: pos.x, y: pos.y } : {}),
+        ...(pos && !isMouseLockedNow() ? { x: pos.x, y: pos.y } : {}),
       });
     };
 
     const handleMouseUp = (event: MouseEvent) => {
       clearStuckOverlayHover(event.target);
-      const locked = document.pointerLockElement === container;
+      const locked = isMouseLockedNow();
       const button = MOUSE_BUTTON_MAP[event.button];
       const wasHeld = button ? heldButtonsRef.current.delete(button) : false;
       if (wasHeld) {
@@ -732,7 +890,7 @@ export function useRemoteControl(
     };
 
     const handleContextMenu = (event: MouseEvent) => {
-      const locked = document.pointerLockElement === container;
+      const locked = isMouseLockedNow();
       if (!locked && !isVideoInteractionTarget(event.target, container) && !hasActiveHold()) return;
       if (!locked && overlayHoveredRef.current && !hasActiveHold()) return;
       event.preventDefault();
@@ -742,7 +900,7 @@ export function useRemoteControl(
     const handleWheel = (event: WheelEvent) => {
       syncLiveFocus();
       clearStuckOverlayHover(event.target);
-      const locked = document.pointerLockElement === container;
+      const locked = isMouseLockedNow();
       if (!locked && (!isVideoInteractionTarget(event.target, container) || overlayHoveredRef.current)) return;
       const pos = locked ? null : getPos(event.clientX, event.clientY);
       if (!locked && !pos) return;
@@ -763,13 +921,34 @@ export function useRemoteControl(
       const codeKey = event.code || event.key;
       const wasHeld = !down && codeKey ? heldKeysRef.current.has(codeKey) : false;
       const liveFocused = syncLiveFocus();
+      if (
+        down &&
+        !event.repeat &&
+        event.ctrlKey &&
+        event.shiftKey &&
+        event.code === 'KeyM' &&
+        liveFocused &&
+        !isTextInputElement(event.target) &&
+        (isMouseLockedNow() || pointerInsideRef.current || immersiveRef.current)
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (isMouseLockedNow()) {
+          sendReleaseAll();
+        }
+        toggleManualMouseLock();
+        return;
+      }
       if (!keyboardEnabledRef.current || hostBusyRef.current || !liveFocused) {
         return;
       }
       if (!wasHeld) {
         const allowScope =
-          pointerInsideRef.current || hasActiveHold() || (immersiveRef.current && !isTextInputElement(event.target));
-        if (!allowScope || (overlayHoveredRef.current && !immersiveRef.current && !hasActiveHold())) {
+          isMouseLockedNow() ||
+          pointerInsideRef.current ||
+          hasActiveHold() ||
+          (immersiveRef.current && !isTextInputElement(event.target));
+        if (!allowScope || (overlayHoveredRef.current && !immersiveRef.current && !hasActiveHold() && !isMouseLockedNow())) {
           return;
         }
         if (immersiveRef.current ? isTextInputElement(event.target) : isEditableTarget(event.target)) {
@@ -783,7 +962,7 @@ export function useRemoteControl(
         event.code !== 'Escape' &&
         wantPointerLockRef.current &&
         !lockPausedByEscapeRef.current &&
-        document.pointerLockElement !== container &&
+        !isMouseLockedNow() &&
         !isEditableTarget(event.target)
       ) {
         tryAcquirePointerLock();
@@ -834,6 +1013,7 @@ export function useRemoteControl(
     };
 
     container.addEventListener('pointerdown', handlePointerDown);
+    container.addEventListener('pointerrawupdate', handlePointerMove as EventListener);
     container.addEventListener('pointermove', handlePointerMove);
     container.addEventListener('pointerleave', handlePointerLeave);
     container.addEventListener('mousedown', handleMouseDown, { capture: true });
@@ -847,10 +1027,12 @@ export function useRemoteControl(
     document.addEventListener('visibilitychange', onVisibilityChange);
 
     return () => {
+      clearTrailingMoveTimer();
       container.classList.remove('is-remote-control-active');
       video.classList.remove('is-remote-control-active');
       if (!hadTabIndex) container.removeAttribute('tabindex');
       container.removeEventListener('pointerdown', handlePointerDown);
+      container.removeEventListener('pointerrawupdate', handlePointerMove as EventListener);
       container.removeEventListener('pointermove', handlePointerMove);
       container.removeEventListener('pointerleave', handlePointerLeave);
       container.removeEventListener('mousedown', handleMouseDown, { capture: true });
@@ -865,7 +1047,7 @@ export function useRemoteControl(
       releasePointerLock();
       sendReleaseAll();
     };
-  }, [active, containerRef, hasActiveHold, releasePointerLock, sendReleaseAll, slotPeerId, tryAcquirePointerLock, updateHoldTracking, videoRef]);
+  }, [active, clearTrailingMoveTimer, containerRef, hasActiveHold, isMouseLockedNow, releasePointerLock, sendReleaseAll, slotPeerId, toggleManualMouseLock, tryAcquirePointerLock, updateHoldTracking, videoRef]);
 
   const activeImageId = cursorSync?.imageId || '';
   const activeCursorAsset = activeImageId ? cursorImages?.[activeImageId] : undefined;

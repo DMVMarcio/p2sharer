@@ -1660,7 +1660,7 @@
   "remoteControl.immersiveMode": "Immersive mode",
   "remoteControl.immersiveHint": "Send Alt+Tab, Windows key, and system shortcuts to the remote PC",
   "remoteControl.mouseLock": "Game / locked mouse",
-  "remoteControl.mouseLockHint": "Capture relative cursor movement for games and 3D cameras (Esc releases)",
+  "remoteControl.mouseLockHint": "Capture relative cursor movement for games and 3D cameras (Ctrl+Shift+M unlocks)",
   "remoteControl.exitAction": "Stop control",
   "remoteControl.manageAction": "Remote control",
   "remoteControl.managerTitle": "Remote control",

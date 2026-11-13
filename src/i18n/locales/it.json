@@ -1660,7 +1660,7 @@
   "remoteControl.immersiveMode": "Modalità immersiva",
   "remoteControl.immersiveHint": "Invia Alt+Tab, tasto Windows e scorciatoie di sistema al PC remoto",
   "remoteControl.mouseLock": "Mouse bloccato (giochi)",
-  "remoteControl.mouseLockHint": "Cattura il movimento relativo per giochi e telecamere 3D (Esc rilascia)",
+  "remoteControl.mouseLockHint": "Cattura il movimento relativo per giochi e telecamere 3D (Ctrl+Maiusc+M rilascia)",
   "remoteControl.exitAction": "Termina controllo",
   "remoteControl.manageAction": "Controllo remoto",
   "remoteControl.managerTitle": "Controllo remoto",

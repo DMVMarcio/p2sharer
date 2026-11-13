@@ -697,6 +697,14 @@ export class RoomService {
       this.roomManager?.sendRemoteControlHost(packet, peerId);
     },
     setMonitorActive: (active) => {
+      const targetHint = active ? 'motion' : 'detail';
+      for (const capture of this.localCaptures.values()) {
+        if (capture.kind !== 'screen') continue;
+        const track = capture.stream.getVideoTracks()[0];
+        if (track && 'contentHint' in track) {
+          track.contentHint = targetHint;
+        }
+      }
       if (!isTauri()) return;
       return invoke('set_remote_control_active', { active });
     },
@@ -727,9 +735,14 @@ export class RoomService {
       this.remoteControlMoveQueues.set(controllerId, slot);
     }
 
-    if (event.kind !== 'mouseMove') {
-      // Clear any queued move on explicit clicks/wheels/releaseAll so stale moves never replay afterwards.
-      if (event.kind === 'releaseAll' || event.kind === 'mouseButton' || event.kind === 'mouseWheel') {
+    if (event.kind !== 'mouseMove' && event.kind !== 'mouseDelta') {
+      // Clear queued absolute moves on explicit buttons/wheels/releaseAll, and clear deltas on releaseAll.
+      if (event.kind === 'releaseAll') {
+        slot.pending = null;
+      } else if (
+        (event.kind === 'mouseButton' || event.kind === 'mouseWheel') &&
+        slot.pending?.event.kind === 'mouseMove'
+      ) {
         slot.pending = null;
       }
       return invoke<{ accepted: boolean; hostBusy: boolean }>('apply_remote_control_input', {
@@ -743,7 +756,18 @@ export class RoomService {
     }
 
     if (slot.inFlight) {
-      slot.pending = { sessionId, event };
+      if (event.kind === 'mouseDelta' && slot.pending?.event.kind === 'mouseDelta') {
+        slot.pending = {
+          sessionId,
+          event: {
+            kind: 'mouseDelta',
+            dx: slot.pending.event.dx + event.dx,
+            dy: slot.pending.event.dy + event.dy,
+          },
+        };
+      } else {
+        slot.pending = { sessionId, event };
+      }
       return slot.promise ?? Promise.resolve({ accepted: true, hostBusy: false });
     }
 
@@ -1029,7 +1053,13 @@ export class RoomService {
   public sendRemoteControlInput(slotPeerId: string, event: RemoteInputEvent): void {
     const current = this.remoteControlViewerStates[slotPeerId];
     if (!current || current.status !== 'active' || !stateStore.subscribedStreams.has(slotPeerId)) return;
-    if ((event.kind === 'mouseMove' || event.kind === 'mouseButton' || event.kind === 'mouseWheel') && !current.mouseEnabled) {
+    if (
+      (event.kind === 'mouseMove' ||
+        event.kind === 'mouseDelta' ||
+        event.kind === 'mouseButton' ||
+        event.kind === 'mouseWheel') &&
+      !current.mouseEnabled
+    ) {
       return;
     }
     if (event.kind === 'key' && !current.keyboardEnabled) {

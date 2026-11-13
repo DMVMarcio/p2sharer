@@ -101,6 +101,13 @@ struct ImmersiveKeyPayload {
     down: bool,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RawMouseDeltaPayload {
+    dx: i32,
+    dy: i32,
+}
+
 struct CachedDesktopMapping {
     session_id: String,
     is_window: bool,
@@ -220,6 +227,16 @@ static IMMERSIVE_TX: LazyLock<Mutex<Option<std::sync::mpsc::SyncSender<Immersive
 static IMMERSIVE_HOOK_JOIN: LazyLock<Mutex<Option<HookThreadHandle>>> =
     LazyLock::new(|| Mutex::new(None));
 static CURSOR_CLIP_ACTIVE: AtomicBool = AtomicBool::new(false);
+static RAW_LOCK_ACTIVE: AtomicBool = AtomicBool::new(false);
+static RAW_LOCK_TARGET_HWND: AtomicIsize = AtomicIsize::new(0);
+static RAW_LOCK_DX: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(0);
+static RAW_LOCK_DY: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(0);
+static RAW_LOCK_TRAP_RECT: LazyLock<Mutex<Option<(i32, i32, i32, i32)>>> =
+    LazyLock::new(|| Mutex::new(None));
+static RAW_LOCK_PREV_ABS: LazyLock<Mutex<Option<(i32, i32)>>> =
+    LazyLock::new(|| Mutex::new(None));
+static RAW_LOCK_JOIN: LazyLock<Mutex<Option<HookThreadHandle>>> =
+    LazyLock::new(|| Mutex::new(None));
 
 pub fn is_host_control_active() -> bool {
     HOST_ACTIVE.load(Ordering::Relaxed)
@@ -1336,7 +1353,7 @@ fn is_mouse_locked_win32(
 fn sample_cursor_and_image_locked(
     state: &mut HostControlState,
     host_busy: bool,
-) -> Option<(CursorSyncPayload, Option<CursorImagePayload>)> {
+) -> Option<(CursorSyncPayload, Option<isize>)> {
     let now = now_ms();
     let (session_id, source, embedded_in_video) =
         crate::screen_sources::active_cursor_session_info(state.last_session_id.as_deref())?;
@@ -1361,36 +1378,20 @@ fn sample_cursor_and_image_locked(
         now,
     );
 
-    let (image_id, new_image) = if !cursor_showing || cursor_handle == 0 || mouse_locked {
-        (state.last_cursor_image_id.clone(), None)
+    let capture_handle = if !cursor_showing || cursor_handle == 0 || mouse_locked {
+        None
     } else if cursor_handle != state.last_cursor_handle
         || state.last_cursor_image_id.is_empty()
         || now.saturating_sub(state.last_cursor_capture_ms) >= CURSOR_RESAMPLE_MS
     {
         state.last_cursor_handle = cursor_handle;
         state.last_cursor_capture_ms = now;
-        if let Some(payload) = capture_hcursor_png_win32(cursor_handle) {
-            let id = payload.image_id.clone();
-            state.last_cursor_image_id = id.clone();
-            let already_sent = state.sent_cursor_images.contains_key(&id);
-            if !already_sent && state.sent_cursor_images.len() >= CURSOR_IMAGE_CACHE_LIMIT {
-                if let Some(oldest_key) = state
-                    .sent_cursor_images
-                    .iter()
-                    .min_by_key(|(_, ts)| *ts)
-                    .map(|(k, _)| k.clone())
-                {
-                    state.sent_cursor_images.remove(&oldest_key);
-                }
-            }
-            state.sent_cursor_images.insert(id.clone(), now);
-            (id, if already_sent { None } else { Some(payload) })
-        } else {
-            (state.last_cursor_image_id.clone(), None)
-        }
+        Some(cursor_handle)
     } else {
-        (state.last_cursor_image_id.clone(), None)
+        None
     };
+
+    let image_id = state.last_cursor_image_id.clone();
 
     let inside = width > 1
         && height > 1
@@ -1425,8 +1426,32 @@ fn sample_cursor_and_image_locked(
             actor_controller_id: actor,
             embedded_in_video,
         },
-        new_image,
+        capture_handle,
     ))
+}
+
+#[cfg(windows)]
+fn store_captured_cursor_image(
+    payload: CursorImagePayload,
+) -> (String, Option<CursorImagePayload>) {
+    let id = payload.image_id.clone();
+    let Ok(mut state) = HOST_STATE.lock() else {
+        return (id, None);
+    };
+    state.last_cursor_image_id = id.clone();
+    let already_sent = state.sent_cursor_images.contains_key(&id);
+    if !already_sent && state.sent_cursor_images.len() >= CURSOR_IMAGE_CACHE_LIMIT {
+        if let Some(oldest_key) = state
+            .sent_cursor_images
+            .iter()
+            .min_by_key(|(_, ts)| *ts)
+            .map(|(k, _)| k.clone())
+        {
+            state.sent_cursor_images.remove(&oldest_key);
+        }
+    }
+    state.sent_cursor_images.insert(id.clone(), now_ms());
+    (id, if already_sent { None } else { Some(payload) })
 }
 
 fn emit_inactive_cursor_sync(app: &AppHandle) {
@@ -1540,7 +1565,17 @@ pub fn set_remote_control_active(
                             },
                         );
                     }
-                    if let Some((sync_payload, new_image)) = sync_and_image {
+                    if let Some((mut sync_payload, capture_handle)) = sync_and_image {
+                        // Capture HCURSOR outside HOST_STATE lock so SendInput never blocks on GDI/PNG/SHA256.
+                        let new_image = if let Some(handle) = capture_handle {
+                            capture_hcursor_png_win32(handle).and_then(|img| {
+                                let (image_id, unseen) = store_captured_cursor_image(img);
+                                sync_payload.image_id = image_id;
+                                unseen
+                            })
+                        } else {
+                            None
+                        };
                         if let Some(img) = new_image {
                             let _ = app.emit_to("main", "remote-control-cursor-image", img);
                         }
@@ -2135,6 +2170,87 @@ pub fn set_remote_control_immersive(
     Ok(())
 }
 
+const RAW_DELTA_FLUSH_US: u128 = 3000;
+const RAW_CLIP_CHECK_MS: u64 = 25;
+
+pub(crate) fn compute_centered_clip_trap(
+    left: i32,
+    top: i32,
+    right: i32,
+    bottom: i32,
+) -> (i32, i32, i32, i32) {
+    let w = (right - left).max(2);
+    let h = (bottom - top).max(2);
+    let trap_w = (w / 2).clamp(2, 64);
+    let trap_h = (h / 2).clamp(2, 64);
+    let cx = left + w / 2;
+    let cy = top + h / 2;
+    let t_left = (cx - trap_w / 2).max(left);
+    let t_top = (cy - trap_h / 2).max(top);
+    let t_right = (t_left + trap_w).min(left + w).max(t_left + 2);
+    let t_bottom = (t_top + trap_h).min(top + h).max(t_top + 2);
+    (t_left, t_top, t_right, t_bottom)
+}
+
+#[cfg(windows)]
+fn rect_from_client_payload(
+    window: &tauri::WebviewWindow,
+    hwnd: windows::Win32::Foundation::HWND,
+    r: &CursorClipRectPayload,
+) -> Option<(i32, i32, i32, i32)> {
+    use windows::Win32::Foundation::POINT;
+    use windows::Win32::Graphics::Gdi::ClientToScreen;
+    if !r.left.is_finite()
+        || !r.top.is_finite()
+        || !r.width.is_finite()
+        || !r.height.is_finite()
+        || r.width < 2.0
+        || r.height < 2.0
+    {
+        return None;
+    }
+    let scale = window.scale_factor().unwrap_or(1.0);
+    let mut origin = POINT { x: 0, y: 0 };
+    unsafe {
+        if !ClientToScreen(hwnd, &mut origin).as_bool() {
+            return None;
+        }
+    }
+    let left = origin.x + (r.left * scale).round() as i32;
+    let top = origin.y + (r.top * scale).round() as i32;
+    let right = (origin.x + ((r.left + r.width) * scale).round() as i32).max(left + 2);
+    let bottom = (origin.y + ((r.top + r.height) * scale).round() as i32).max(top + 2);
+    Some((left, top, right, bottom))
+}
+
+#[cfg(windows)]
+fn apply_trap_clip_win32(trap: (i32, i32, i32, i32), recenter_if_outside: bool) {
+    use windows::Win32::Foundation::{POINT, RECT};
+    use windows::Win32::UI::WindowsAndMessaging::{ClipCursor, GetCursorPos, SetCursorPos};
+    let (left, top, right, bottom) = trap;
+    if recenter_if_outside {
+        let mut pt = POINT::default();
+        unsafe {
+            if GetCursorPos(&mut pt).is_ok()
+                && (pt.x < left || pt.x >= right || pt.y < top || pt.y >= bottom)
+            {
+                let _ = SetCursorPos((left + right) / 2, (top + bottom) / 2);
+            }
+        }
+    }
+    let clip_rect = RECT {
+        left,
+        top,
+        right,
+        bottom,
+    };
+    unsafe {
+        if ClipCursor(Some(&clip_rect)).is_ok() {
+            CURSOR_CLIP_ACTIVE.store(true, Ordering::Release);
+        }
+    }
+}
+
 #[cfg(windows)]
 fn release_cursor_clip_win32() {
     use windows::Win32::UI::WindowsAndMessaging::ClipCursor;
@@ -2142,6 +2258,340 @@ fn release_cursor_clip_win32() {
         unsafe {
             let _ = ClipCursor(None);
         }
+    }
+}
+
+#[cfg(windows)]
+unsafe extern "system" fn raw_mouse_wnd_proc(
+    hwnd: windows::Win32::Foundation::HWND,
+    msg: u32,
+    wparam: windows::Win32::Foundation::WPARAM,
+    lparam: windows::Win32::Foundation::LPARAM,
+) -> windows::Win32::Foundation::LRESULT {
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::UI::Input::{
+        GetRawInputData, HRAWINPUT, RAWINPUT, RAWINPUTHEADER, RID_INPUT, RIM_TYPEMOUSE,
+    };
+    use windows::Win32::UI::WindowsAndMessaging::{DefWindowProcW, WM_INPUT};
+    const MOUSE_MOVE_ABSOLUTE_FLAG: u16 = 0x0001;
+
+    if msg == WM_INPUT && RAW_LOCK_ACTIVE.load(Ordering::Acquire) {
+        let target = HWND(RAW_LOCK_TARGET_HWND.load(Ordering::Acquire) as *mut _);
+        if is_window_or_descendant_foreground(target) {
+            let mut raw = std::mem::MaybeUninit::<RAWINPUT>::uninit();
+            let mut size = std::mem::size_of::<RAWINPUT>() as u32;
+            let bytes = GetRawInputData(
+                HRAWINPUT(lparam.0 as *mut _),
+                RID_INPUT,
+                Some(raw.as_mut_ptr().cast()),
+                &mut size,
+                std::mem::size_of::<RAWINPUTHEADER>() as u32,
+            );
+            if bytes != u32::MAX && (bytes as usize) >= std::mem::size_of::<RAWINPUTHEADER>() {
+                let raw = raw.assume_init();
+                if raw.header.dwType == RIM_TYPEMOUSE.0 {
+                    let mouse = raw.data.mouse;
+                    if mouse.ulExtraInformation != (P2SHARER_INPUT_TAG as u32) {
+                        let (dx, dy) = if (mouse.usFlags.0 & MOUSE_MOVE_ABSOLUTE_FLAG) != 0 {
+                            let mut guard = RAW_LOCK_PREV_ABS.lock().ok();
+                            let prev = guard.as_deref_mut().and_then(|opt| {
+                                let p = *opt;
+                                *opt = Some((mouse.lLastX, mouse.lLastY));
+                                p
+                            });
+                            if let Some((px, py)) = prev {
+                                ((mouse.lLastX - px).clamp(-4096, 4096), (mouse.lLastY - py).clamp(-4096, 4096))
+                            } else {
+                                (0, 0)
+                            }
+                        } else {
+                            if let Ok(mut guard) = RAW_LOCK_PREV_ABS.lock() {
+                                *guard = None;
+                            }
+                            (mouse.lLastX, mouse.lLastY)
+                        };
+                        if dx != 0 || dy != 0 {
+                            RAW_LOCK_DX.fetch_add(dx, Ordering::AcqRel);
+                            RAW_LOCK_DY.fetch_add(dy, Ordering::AcqRel);
+                        }
+                    }
+                }
+            }
+        }
+        return DefWindowProcW(hwnd, msg, wparam, lparam);
+    }
+    DefWindowProcW(hwnd, msg, wparam, lparam)
+}
+
+#[cfg(windows)]
+fn flush_raw_mouse_deltas(app: &AppHandle, label: &str) -> bool {
+    let dx = RAW_LOCK_DX.swap(0, Ordering::AcqRel);
+    let dy = RAW_LOCK_DY.swap(0, Ordering::AcqRel);
+    if dx == 0 && dy == 0 {
+        return false;
+    }
+    let _ = app.emit_to(label, "remote-control-raw-delta", RawMouseDeltaPayload { dx, dy });
+    true
+}
+
+#[cfg(windows)]
+fn stop_raw_mouse_lock() {
+    RAW_LOCK_ACTIVE.store(false, Ordering::Release);
+    RAW_LOCK_TARGET_HWND.store(0, Ordering::Release);
+    RAW_LOCK_DX.store(0, Ordering::Release);
+    RAW_LOCK_DY.store(0, Ordering::Release);
+    if let Ok(mut guard) = RAW_LOCK_TRAP_RECT.lock() {
+        *guard = None;
+    }
+    if let Ok(mut guard) = RAW_LOCK_PREV_ABS.lock() {
+        *guard = None;
+    }
+    release_cursor_clip_win32();
+    if let Ok(mut guard) = RAW_LOCK_JOIN.lock() {
+        join_immersive_hook_locked(&mut guard);
+    }
+}
+
+#[tauri::command]
+pub fn set_remote_control_mouse_lock(
+    app: AppHandle,
+    window: tauri::WebviewWindow,
+    enabled: bool,
+    rect: Option<CursorClipRectPayload>,
+) -> Result<bool, String> {
+    let label = window.label().to_string();
+    if label != "main" && !label.starts_with("pip-") {
+        return Err("Only application stream windows can manage mouse lock".into());
+    }
+    #[cfg(windows)]
+    {
+        use windows::core::w;
+        use windows::Win32::Foundation::{HINSTANCE, HWND, RECT};
+        use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+        use windows::Win32::System::Threading::GetCurrentThreadId;
+        use windows::Win32::UI::Input::{
+            RegisterRawInputDevices, RAWINPUTDEVICE, RIDEV_INPUTSINK, RIDEV_REMOVE,
+        };
+        use windows::Win32::UI::WindowsAndMessaging::{
+            CreateWindowExW, DestroyWindow, DispatchMessageW, GetClipCursor,
+            MsgWaitForMultipleObjectsEx, PeekMessageW, RegisterClassW, TranslateMessage,
+            HWND_MESSAGE, MSG, MWMO_INPUTAVAILABLE, PM_REMOVE, QS_ALLINPUT, WM_QUIT, WNDCLASSW,
+            WINDOW_EX_STYLE, WINDOW_STYLE,
+        };
+
+        if !enabled {
+            stop_raw_mouse_lock();
+            return Ok(false);
+        }
+
+        let Some(r) = rect else {
+            stop_raw_mouse_lock();
+            return Ok(false);
+        };
+        let raw_hwnd = window.hwnd().map_err(|e| e.to_string())?;
+        let hwnd = HWND(raw_hwnd.0);
+        if !is_window_or_descendant_foreground(hwnd) {
+            stop_raw_mouse_lock();
+            return Ok(false);
+        }
+        let Some((left, top, right, bottom)) = rect_from_client_payload(&window, hwnd, &r) else {
+            stop_raw_mouse_lock();
+            return Ok(false);
+        };
+        let trap = compute_centered_clip_trap(left, top, right, bottom);
+        let hwnd_isize = raw_hwnd.0 as isize;
+
+        let already_running = RAW_LOCK_ACTIVE.load(Ordering::Acquire)
+            && RAW_LOCK_TARGET_HWND.load(Ordering::Acquire) == hwnd_isize
+            && RAW_LOCK_JOIN
+                .lock()
+                .map(|g| g.as_ref().is_some_and(|h| !h.join.is_finished()))
+                .unwrap_or(false);
+
+        if let Ok(mut guard) = RAW_LOCK_TRAP_RECT.lock() {
+            *guard = Some(trap);
+        }
+        apply_trap_clip_win32(trap, true);
+
+        if already_running {
+            return Ok(true);
+        }
+
+        stop_raw_mouse_lock();
+        if let Ok(mut guard) = RAW_LOCK_TRAP_RECT.lock() {
+            *guard = Some(trap);
+        }
+        RAW_LOCK_TARGET_HWND.store(hwnd_isize, Ordering::Release);
+        RAW_LOCK_DX.store(0, Ordering::Release);
+        RAW_LOCK_DY.store(0, Ordering::Release);
+        RAW_LOCK_ACTIVE.store(true, Ordering::Release);
+        apply_trap_clip_win32(trap, true);
+
+        let (ready_tx, ready_rx) = std::sync::mpsc::sync_channel::<Result<u32, String>>(1);
+        let stop = Arc::new(AtomicBool::new(false));
+        let stop_thread = stop.clone();
+        let app_handle = app.clone();
+        let target_label = label.clone();
+
+        let join = std::thread::spawn(move || unsafe {
+            let tid = GetCurrentThreadId();
+            let instance = match GetModuleHandleW(None) {
+                Ok(m) => HINSTANCE(m.0),
+                Err(err) => {
+                    let _ = ready_tx.send(Err(err.to_string()));
+                    return;
+                }
+            };
+            let class_name = w!("P2SharerRawMouseSink");
+            let wc = WNDCLASSW {
+                lpfnWndProc: Some(raw_mouse_wnd_proc),
+                hInstance: instance,
+                lpszClassName: class_name,
+                ..Default::default()
+            };
+            let _ = RegisterClassW(&wc);
+            let msg_hwnd = match CreateWindowExW(
+                WINDOW_EX_STYLE(0),
+                class_name,
+                None,
+                WINDOW_STYLE(0),
+                0,
+                0,
+                0,
+                0,
+                HWND_MESSAGE,
+                None,
+                instance,
+                None,
+            ) {
+                Ok(h) => h,
+                Err(err) => {
+                    let _ = ready_tx.send(Err(err.to_string()));
+                    return;
+                }
+            };
+
+            let rid = RAWINPUTDEVICE {
+                usUsagePage: 0x01,
+                usUsage: 0x02,
+                dwFlags: RIDEV_INPUTSINK,
+                hwndTarget: msg_hwnd,
+            };
+            if let Err(err) = RegisterRawInputDevices(&[rid], std::mem::size_of::<RAWINPUTDEVICE>() as u32) {
+                let _ = DestroyWindow(msg_hwnd);
+                let _ = ready_tx.send(Err(err.to_string()));
+                return;
+            }
+            let _ = ready_tx.send(Ok(tid));
+
+            let mut last_flush = std::time::Instant::now()
+                .checked_sub(std::time::Duration::from_millis(10))
+                .unwrap_or_else(std::time::Instant::now);
+            let mut last_clip_check = std::time::Instant::now();
+            let mut lost_focus = false;
+
+            while !stop_thread.load(Ordering::Acquire) && RAW_LOCK_ACTIVE.load(Ordering::Acquire) {
+                let mut msg = MSG::default();
+                let mut got_quit = false;
+                while PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE).as_bool() {
+                    if msg.message == WM_QUIT {
+                        got_quit = true;
+                        break;
+                    }
+                    let _ = TranslateMessage(&msg);
+                    DispatchMessageW(&msg);
+                }
+                if got_quit || stop_thread.load(Ordering::Acquire) || !RAW_LOCK_ACTIVE.load(Ordering::Acquire) {
+                    break;
+                }
+
+                let has_pending =
+                    RAW_LOCK_DX.load(Ordering::Acquire) != 0 || RAW_LOCK_DY.load(Ordering::Acquire) != 0;
+                if has_pending && last_flush.elapsed().as_micros() >= RAW_DELTA_FLUSH_US {
+                    if flush_raw_mouse_deltas(&app_handle, &target_label) {
+                        last_flush = std::time::Instant::now();
+                    }
+                }
+
+                if last_clip_check.elapsed().as_millis() >= u128::from(RAW_CLIP_CHECK_MS) {
+                    last_clip_check = std::time::Instant::now();
+                    let target = HWND(RAW_LOCK_TARGET_HWND.load(Ordering::Acquire) as *mut _);
+                    if !is_window_or_descendant_foreground(target) {
+                        lost_focus = true;
+                        break;
+                    }
+                    if let Ok(guard) = RAW_LOCK_TRAP_RECT.lock() {
+                        if let Some((tl, tt, tr, tb)) = *guard {
+                            let mut current_clip = RECT::default();
+                            if GetClipCursor(&mut current_clip).is_err()
+                                || current_clip.left != tl
+                                || current_clip.top != tt
+                                || current_clip.right != tr
+                                || current_clip.bottom != tb
+                            {
+                                apply_trap_clip_win32((tl, tt, tr, tb), false);
+                            }
+                        }
+                    }
+                }
+
+                let pending_after =
+                    RAW_LOCK_DX.load(Ordering::Acquire) != 0 || RAW_LOCK_DY.load(Ordering::Acquire) != 0;
+                let wait_ms = if pending_after { 2 } else { RAW_CLIP_CHECK_MS as u32 };
+                let _ = MsgWaitForMultipleObjectsEx(None, wait_ms, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
+            }
+
+            let remove_rid = RAWINPUTDEVICE {
+                usUsagePage: 0x01,
+                usUsage: 0x02,
+                dwFlags: RIDEV_REMOVE,
+                hwndTarget: HWND::default(),
+            };
+            let _ = RegisterRawInputDevices(
+                &[remove_rid],
+                std::mem::size_of::<RAWINPUTDEVICE>() as u32,
+            );
+            release_cursor_clip_win32();
+            RAW_LOCK_DX.store(0, Ordering::Release);
+            RAW_LOCK_DY.store(0, Ordering::Release);
+            let _ = DestroyWindow(msg_hwnd);
+            if lost_focus && RAW_LOCK_ACTIVE.swap(false, Ordering::AcqRel) {
+                RAW_LOCK_TARGET_HWND.store(0, Ordering::Release);
+                if let Ok(mut guard) = RAW_LOCK_TRAP_RECT.lock() {
+                    *guard = None;
+                }
+                let _ = app_handle.emit_to(&target_label, "remote-control-raw-lock-lost", ());
+            }
+        });
+
+        match ready_rx.recv_timeout(std::time::Duration::from_millis(800)) {
+            Ok(Ok(thread_id)) => {
+                if let Ok(mut guard) = RAW_LOCK_JOIN.lock() {
+                    *guard = Some(HookThreadHandle {
+                        thread_id,
+                        stop,
+                        join,
+                    });
+                }
+                Ok(true)
+            }
+            Ok(Err(err)) => {
+                RAW_LOCK_ACTIVE.store(false, Ordering::Release);
+                release_cursor_clip_win32();
+                let _ = join.join();
+                Err(err)
+            }
+            Err(_) => {
+                RAW_LOCK_ACTIVE.store(false, Ordering::Release);
+                release_cursor_clip_win32();
+                Err("Timed out starting raw mouse lock".into())
+            }
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (app, window, enabled, rect);
+        Ok(false)
     }
 }
 
@@ -2156,46 +2606,33 @@ pub fn set_remote_control_cursor_clip(
     }
     #[cfg(windows)]
     {
-        use windows::Win32::Foundation::{HWND, POINT, RECT};
-        use windows::Win32::Graphics::Gdi::ClientToScreen;
+        use windows::Win32::Foundation::{HWND, RECT};
         use windows::Win32::UI::WindowsAndMessaging::ClipCursor;
 
+        if RAW_LOCK_ACTIVE.load(Ordering::Acquire) {
+            return Ok(());
+        }
         let Some(r) = rect else {
             release_cursor_clip_win32();
             return Ok(());
         };
-        if !r.left.is_finite()
-            || !r.top.is_finite()
-            || !r.width.is_finite()
-            || !r.height.is_finite()
-            || r.width < 2.0
-            || r.height < 2.0
-        {
-            release_cursor_clip_win32();
-            return Ok(());
-        }
         let raw_hwnd = window.hwnd().map_err(|e| e.to_string())?;
         let hwnd = HWND(raw_hwnd.0);
         if !is_window_or_descendant_foreground(hwnd) {
             release_cursor_clip_win32();
             return Ok(());
         }
-        let scale = window.scale_factor().unwrap_or(1.0);
-        let mut origin = POINT { x: 0, y: 0 };
+        let Some((left, top, right, bottom)) = rect_from_client_payload(&window, hwnd, &r) else {
+            release_cursor_clip_win32();
+            return Ok(());
+        };
+        let clip_rect = RECT {
+            left,
+            top,
+            right,
+            bottom,
+        };
         unsafe {
-            if !ClientToScreen(hwnd, &mut origin).as_bool() {
-                return Ok(());
-            }
-            let left = origin.x + (r.left * scale).round() as i32;
-            let top = origin.y + (r.top * scale).round() as i32;
-            let right = (origin.x + ((r.left + r.width) * scale).round() as i32).max(left + 2);
-            let bottom = (origin.y + ((r.top + r.height) * scale).round() as i32).max(top + 2);
-            let clip_rect = RECT {
-                left,
-                top,
-                right,
-                bottom,
-            };
             if ClipCursor(Some(&clip_rect)).is_ok() {
                 CURSOR_CLIP_ACTIVE.store(true, Ordering::Release);
             }
@@ -2219,6 +2656,7 @@ pub fn shutdown_remote_control() {
     stop_immersive_hook();
     #[cfg(windows)]
     {
+        stop_raw_mouse_lock();
         release_cursor_clip_win32();
         stop_host_priority_hooks();
         if let Ok(mut state) = HOST_STATE.lock() {
@@ -2296,5 +2734,16 @@ mod tests {
             RemoteInputEvent::MouseDelta { dx, dy } => assert_eq!((dx, dy), (-18, 42)),
             other => panic!("unexpected variant: {other:?}"),
         }
+    }
+
+    #[test]
+    fn centered_clip_trap_stays_inside_video_bounds() {
+        let trap = compute_centered_clip_trap(100, 200, 1380, 920);
+        assert_eq!(trap, (708, 528, 772, 592));
+        assert!(trap.0 >= 100 && trap.1 >= 200 && trap.2 <= 1380 && trap.3 <= 920);
+
+        let small = compute_centered_clip_trap(10, 20, 18, 28);
+        assert!(small.0 >= 10 && small.1 >= 20 && small.2 <= 18 && small.3 <= 28);
+        assert!(small.2 - small.0 >= 2 && small.3 - small.1 >= 2);
     }
 }

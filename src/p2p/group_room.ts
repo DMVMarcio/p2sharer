@@ -510,7 +510,10 @@ export class GroupRoomManager {
       this.remoteControlTxSeq = (this.remoteControlTxSeq + 1) >>> 0 || 1;
       const frame = encodeRemoteControlBinaryInput(packet.mediaId, packet.event, this.remoteControlTxSeq);
       if (frame) {
-        const lane = packet.event.kind === 'mouseMove' ? 'datagram' : 'tunnel';
+        const lane =
+          packet.event.kind === 'mouseMove' || packet.event.kind === 'mouseDelta'
+            ? 'datagram'
+            : 'tunnel';
         if (this.payloadChannels.sendFast(target, lane, frame)) {
           if (lane === 'datagram') this.remoteControlPerf.datagramSent += 1;
           else this.remoteControlPerf.tunnelSent += 1;
@@ -2414,6 +2417,7 @@ export class GroupRoomManager {
         if (pc) {
           MediaCoordinator.tuneReceiverJitterBuffer(pc, this.remoteControlLowLatencyPeers.has(peerId));
         }
+        this.nativeVideo?.tunePeerJitterBuffer(peerId, this.remoteControlLowLatencyPeers.has(peerId));
       } catch {}
 
       this.notifyStreamsUpdate();

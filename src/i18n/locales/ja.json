@@ -1660,7 +1660,7 @@
   "remoteControl.immersiveMode": "没入モード",
   "remoteControl.immersiveHint": "Alt+Tab や Windows キーなどのシステムショートカットを相手 PC に送信します",
   "remoteControl.mouseLock": "マウスロック（ゲーム）",
-  "remoteControl.mouseLockHint": "ゲームや 3D カメラ用に相対移動を取得します（Esc で解除）",
+  "remoteControl.mouseLockHint": "ゲームや 3D カメラ用に相対移動を取得します（Ctrl+Shift+M で解除）",
   "remoteControl.exitAction": "操作を終了",
   "remoteControl.manageAction": "リモート操作",
   "remoteControl.managerTitle": "リモート操作",

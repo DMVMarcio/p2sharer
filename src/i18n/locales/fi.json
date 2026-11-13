@@ -1660,7 +1660,7 @@
   "remoteControl.immersiveMode": "Immersiivinen tila",
   "remoteControl.immersiveHint": "Lähettää Alt+Tab-, Windows-näppäimen ja järjestelmäpikanäppäimet etäkoneelle",
   "remoteControl.mouseLock": "Lukittu hiiri (pelit)",
-  "remoteControl.mouseLockHint": "Kaappaa suhteellisen liikkeen peleille ja 3D-kameroille (Esc vapauttaa)",
+  "remoteControl.mouseLockHint": "Kaappaa suhteellisen liikkeen peleille ja 3D-kameroille (Ctrl+Shift+M vapauttaa)",
   "remoteControl.exitAction": "Lopeta hallinta",
   "remoteControl.manageAction": "Etähallinta",
   "remoteControl.managerTitle": "Etähallinta",

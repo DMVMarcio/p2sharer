@@ -165,7 +165,7 @@ export class NativeVideoTransport {
       };
       pc.ontrack = ({ track }) => {
         if (this.incoming.get(key) !== incoming || !this.config.permitted(peer,incoming.descriptor)) return;
-        MediaCoordinator.tuneReceiverJitterBuffer(pc);
+        MediaCoordinator.tuneReceiverJitterBuffer(pc, this.lowLatencyPeers.has(peer));
         if (track.kind !== 'video') return;
         incoming.stream = new MediaStream([track]);
         // A muted probe consumes native video without replacing the currently
@@ -301,7 +301,10 @@ export class NativeVideoTransport {
     const route = this.incoming.get(this.key(peer, mediaId));
     return route?.verifiedFrames ? route.pc : undefined;
   }
+  private lowLatencyPeers = new Set<string>();
   public tunePeerJitterBuffer(peer: string, lowLatency: boolean): void {
+    if (lowLatency) this.lowLatencyPeers.add(peer);
+    else this.lowLatencyPeers.delete(peer);
     for (const route of this.incoming.values()) {
       if (route.peer === peer) {
         MediaCoordinator.tuneReceiverJitterBuffer(route.pc, lowLatency);
