@@ -116,6 +116,60 @@ struct CachedDesktopMapping {
     refreshed_at_ms: u64,
 }
 
+struct NativePeerPermission {
+    session_id: Option<String>,
+    mouse_enabled: bool,
+    keyboard_enabled: bool,
+}
+
+#[derive(Default)]
+pub struct NativeInputSeqState {
+    last_move_seq: u32,
+    key_seqs: HashMap<String, u32>,
+    button_seqs: HashMap<String, u32>,
+}
+
+impl NativeInputSeqState {
+    fn is_newer(prev: u32, next: u32) -> bool {
+        (next.wrapping_sub(prev) as i32) > 0
+    }
+
+    pub fn accept(&mut self, lane_is_datagram: bool, seq: u32, event: &RemoteInputEvent) -> bool {
+        if seq == 0 {
+            return true;
+        }
+        if lane_is_datagram {
+            if matches!(event, RemoteInputEvent::MouseMove { .. }) {
+                if self.last_move_seq != 0 && !Self::is_newer(self.last_move_seq, seq) {
+                    return false;
+                }
+                self.last_move_seq = seq;
+            }
+            return true;
+        }
+        match event {
+            RemoteInputEvent::Key { code, .. } => {
+                if let Some(&prev) = self.key_seqs.get(code) {
+                    if !Self::is_newer(prev, seq) {
+                        return false;
+                    }
+                }
+                self.key_seqs.insert(code.clone(), seq);
+            }
+            RemoteInputEvent::MouseButton { button, .. } => {
+                if let Some(&prev) = self.button_seqs.get(button) {
+                    if !Self::is_newer(prev, seq) {
+                        return false;
+                    }
+                }
+                self.button_seqs.insert(button.clone(), seq);
+            }
+            _ => {}
+        }
+        true
+    }
+}
+
 struct HostControlState {
     active: bool,
     monitor_running: bool,
@@ -133,6 +187,7 @@ struct HostControlState {
     controller_moved_while_hidden: bool,
     last_session_id: Option<String>,
     last_mouse_actor_id: Option<String>,
+    authorized_native_peers: HashMap<(String, String), NativePeerPermission>,
     held_buttons: HashMap<String, HashSet<String>>,
     held_vks: HashMap<String, HashSet<u16>>,
     held_unicode: HashMap<(String, String), Vec<u16>>,
@@ -163,6 +218,7 @@ impl Default for HostControlState {
             controller_moved_while_hidden: false,
             last_session_id: None,
             last_mouse_actor_id: None,
+            authorized_native_peers: HashMap::new(),
             held_buttons: HashMap::new(),
             held_vks: HashMap::new(),
             held_unicode: HashMap::new(),
@@ -1516,6 +1572,7 @@ pub fn set_remote_control_active(
                 }
             } else {
                 release_all_locked(&mut state);
+                state.authorized_native_peers.clear();
                 state.host_paused_until = 0;
                 state.was_host_paused = false;
                 state.last_session_id = None;
@@ -1601,6 +1658,552 @@ pub fn set_remote_control_active(
     Ok(())
 }
 
+#[cfg(windows)]
+fn apply_input_locked(
+    state: &mut HostControlState,
+    controller_id: &str,
+    session_id: Option<&str>,
+    event: RemoteInputEvent,
+) -> ApplyInputResult {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{
+        INPUT, INPUT_0, INPUT_MOUSE, MOUSEEVENTF_ABSOLUTE, MOUSEEVENTF_HWHEEL, MOUSEEVENTF_MOVE,
+        MOUSEEVENTF_VIRTUALDESK, MOUSEEVENTF_WHEEL, MOUSEINPUT,
+    };
+    let input_started = std::time::Instant::now();
+    if matches!(event, RemoteInputEvent::ReleaseAll) {
+        release_controller_locked(state, controller_id);
+        return ApplyInputResult {
+            accepted: true,
+            host_busy: state.was_host_paused,
+        };
+    }
+    if poll_host_activity_locked(state) {
+        state.perf_busy_dropped += 1;
+        return ApplyInputResult {
+            accepted: false,
+            host_busy: true,
+        };
+    }
+
+    if let Some(sid) = session_id {
+        state.last_session_id = Some(sid.to_string());
+    }
+    let is_mouse_event = matches!(
+        event,
+        RemoteInputEvent::MouseMove { .. }
+            | RemoteInputEvent::MouseDelta { .. }
+            | RemoteInputEvent::MouseButton { .. }
+            | RemoteInputEvent::MouseWheel { .. }
+    );
+    if is_mouse_event {
+        state.last_mouse_actor_id = Some(controller_id.to_string());
+        if state.cursor_hidden_since_ms.is_some()
+            && matches!(
+                event,
+                RemoteInputEvent::MouseMove { .. } | RemoteInputEvent::MouseDelta { .. }
+            )
+        {
+            state.controller_moved_while_hidden = true;
+        }
+    }
+    let mut moved_cursor = false;
+    match event {
+        RemoteInputEvent::MouseMove { x, y } => {
+            let Some((dx, dy)) = normalized_to_virtual_desktop_cached(state, session_id, x, y)
+            else {
+                return ApplyInputResult {
+                    accepted: false,
+                    host_busy: false,
+                };
+            };
+            let input = INPUT {
+                r#type: INPUT_MOUSE,
+                Anonymous: INPUT_0 {
+                    mi: MOUSEINPUT {
+                        dx,
+                        dy,
+                        mouseData: 0,
+                        dwFlags: MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK,
+                        time: 0,
+                        dwExtraInfo: P2SHARER_INPUT_TAG,
+                    },
+                },
+            };
+            send_win32_inputs(&[input]);
+            moved_cursor = true;
+        }
+        RemoteInputEvent::MouseDelta { dx, dy } => {
+            let clamped_dx = dx.clamp(-10_000, 10_000);
+            let clamped_dy = dy.clamp(-10_000, 10_000);
+            if clamped_dx != 0 || clamped_dy != 0 {
+                let input = INPUT {
+                    r#type: INPUT_MOUSE,
+                    Anonymous: INPUT_0 {
+                        mi: MOUSEINPUT {
+                            dx: clamped_dx,
+                            dy: clamped_dy,
+                            mouseData: 0,
+                            dwFlags: MOUSEEVENTF_MOVE,
+                            time: 0,
+                            dwExtraInfo: P2SHARER_INPUT_TAG,
+                        },
+                    },
+                };
+                send_win32_inputs(&[input]);
+                moved_cursor = true;
+            }
+        }
+        RemoteInputEvent::MouseButton {
+            button,
+            down,
+            x,
+            y,
+        } => {
+            let abs = match (x, y) {
+                (Some(nx), Some(ny)) => {
+                    let res = normalized_to_virtual_desktop_cached(state, session_id, nx, ny);
+                    if res.is_some() {
+                        moved_cursor = true;
+                    }
+                    res
+                }
+                _ => None,
+            };
+            if let Some(input) = make_mouse_button_input(&button, down, abs) {
+                if down {
+                    state
+                        .held_buttons
+                        .entry(controller_id.to_string())
+                        .or_default()
+                        .insert(button);
+                } else if let Some(set) = state.held_buttons.get_mut(controller_id) {
+                    set.remove(&button);
+                }
+                send_win32_inputs(&[input]);
+            }
+        }
+        RemoteInputEvent::MouseWheel {
+            delta_x,
+            delta_y,
+            x,
+            y,
+        } => {
+            if !delta_x.is_finite() || !delta_y.is_finite() {
+                return ApplyInputResult {
+                    accepted: false,
+                    host_busy: false,
+                };
+            }
+            let mut inputs = Vec::new();
+            if let (Some(nx), Some(ny)) = (x, y) {
+                if let Some((dx, dy)) =
+                    normalized_to_virtual_desktop_cached(state, session_id, nx, ny)
+                {
+                    moved_cursor = true;
+                    inputs.push(INPUT {
+                        r#type: INPUT_MOUSE,
+                        Anonymous: INPUT_0 {
+                            mi: MOUSEINPUT {
+                                dx,
+                                dy,
+                                mouseData: 0,
+                                dwFlags: MOUSEEVENTF_MOVE
+                                    | MOUSEEVENTF_ABSOLUTE
+                                    | MOUSEEVENTF_VIRTUALDESK,
+                                time: 0,
+                                dwExtraInfo: P2SHARER_INPUT_TAG,
+                            },
+                        },
+                    });
+                }
+            }
+            let wheel_y = (-delta_y.clamp(-1200.0, 1200.0) * 1.2).round() as i32;
+            if wheel_y != 0 {
+                inputs.push(INPUT {
+                    r#type: INPUT_MOUSE,
+                    Anonymous: INPUT_0 {
+                        mi: MOUSEINPUT {
+                            dx: 0,
+                            dy: 0,
+                            mouseData: wheel_y as u32,
+                            dwFlags: MOUSEEVENTF_WHEEL,
+                            time: 0,
+                            dwExtraInfo: P2SHARER_INPUT_TAG,
+                        },
+                    },
+                });
+            }
+            let wheel_x = (delta_x.clamp(-1200.0, 1200.0) * 1.2).round() as i32;
+            if wheel_x != 0 {
+                inputs.push(INPUT {
+                    r#type: INPUT_MOUSE,
+                    Anonymous: INPUT_0 {
+                        mi: MOUSEINPUT {
+                            dx: 0,
+                            dy: 0,
+                            mouseData: wheel_x as u32,
+                            dwFlags: MOUSEEVENTF_HWHEEL,
+                            time: 0,
+                            dwExtraInfo: P2SHARER_INPUT_TAG,
+                        },
+                    },
+                });
+            }
+            send_win32_inputs(&inputs);
+        }
+        RemoteInputEvent::Key {
+            code,
+            key,
+            down,
+            repeat: _,
+            vk,
+            ctrl_key,
+            alt_key,
+            meta_key,
+        } => {
+            if code.len() > 64 || key.len() > 32 {
+                return ApplyInputResult {
+                    accepted: false,
+                    host_busy: false,
+                };
+            }
+            let modifiers_held =
+                ctrl_key.unwrap_or(false) || alt_key.unwrap_or(false) || meta_key.unwrap_or(false);
+            if !down {
+                if let Some(units) = state
+                    .held_unicode
+                    .remove(&(controller_id.to_string(), code.clone()))
+                {
+                    let inputs = make_unicode_units_inputs(&units, false);
+                    send_win32_inputs(&inputs);
+                    state.last_self_input_tick = read_last_input_tick();
+                    return ApplyInputResult {
+                        accepted: true,
+                        host_busy: false,
+                    };
+                }
+            }
+            let char_count = key.chars().count();
+            let is_non_ascii_printable = char_count == 1 && !key.is_ascii() && key != "Dead";
+            let use_unicode = !modifiers_held
+                && key != "Dead"
+                && char_count == 1
+                && (is_non_ascii_printable
+                    || is_punctuation_code(&code)
+                    || dom_code_to_vk(&code).is_none());
+            if use_unicode {
+                let units: Vec<u16> = key.encode_utf16().collect();
+                if down {
+                    state
+                        .held_unicode
+                        .insert((controller_id.to_string(), code), units);
+                }
+                let inputs = make_unicode_inputs(&key, down);
+                send_win32_inputs(&inputs);
+            } else if let Some((resolved_vk, ext)) = vk
+                .filter(|&v| v > 0 && v <= 0xFE)
+                .map(|v| (v, is_extended_vk(v)))
+                .or_else(|| dom_code_to_vk(&code))
+            {
+                if down {
+                    state
+                        .held_vks
+                        .entry(controller_id.to_string())
+                        .or_default()
+                        .insert(resolved_vk);
+                } else if let Some(set) = state.held_vks.get_mut(controller_id) {
+                    set.remove(&resolved_vk);
+                }
+                let input = make_vk_input(resolved_vk, down, Some(ext));
+                send_win32_inputs(&[input]);
+            }
+        }
+        RemoteInputEvent::ReleaseAll => {}
+    }
+
+    if !HOST_PRIORITY_HOOK_ACTIVE.load(Ordering::Acquire) {
+        state.last_self_input_tick = read_last_input_tick();
+        if moved_cursor {
+            if let Some(pos) = read_cursor_pos() {
+                state.last_self_cursor = Some(pos);
+            }
+        }
+    } else {
+        let _ = moved_cursor;
+    }
+    let elapsed_us = input_started.elapsed().as_micros() as u64;
+    state.perf_applied += 1;
+    state.perf_total_us += elapsed_us;
+    state.perf_max_us = state.perf_max_us.max(elapsed_us);
+    if state.perf_applied >= 250 {
+        let now = now_ms();
+        if now.saturating_sub(state.perf_last_log_ms) >= 5000 {
+            let avg_us = state.perf_total_us / state.perf_applied.max(1);
+            crate::logger::log_msg(
+                "INFO",
+                "remote_control.perf",
+                &format!(
+                    "host_apply count={} busy_dropped={} avg_us={} max_us={}",
+                    state.perf_applied, state.perf_busy_dropped, avg_us, state.perf_max_us
+                ),
+            );
+            state.perf_applied = 0;
+            state.perf_busy_dropped = 0;
+            state.perf_total_us = 0;
+            state.perf_max_us = 0;
+            state.perf_last_log_ms = now;
+        }
+    }
+
+    ApplyInputResult {
+        accepted: true,
+        host_busy: false,
+    }
+}
+
+/// Decodes the `RC\x01` binary remote-control frame emitted by `encodeRemoteControlBinaryInput`.
+pub fn decode_binary_input_frame(frame: &[u8]) -> Option<(String, u32, RemoteInputEvent)> {
+    if frame.len() < 9 || frame[0] != 0x52 || frame[1] != 0x43 || frame[2] != 0x01 {
+        return None;
+    }
+    let op = frame[3];
+    let media_len = usize::from(frame[4]);
+    if media_len == 0 || media_len > 64 || 9 + media_len > frame.len() {
+        return None;
+    }
+    let media_id = std::str::from_utf8(&frame[5..5 + media_len]).ok()?;
+    if !media_id
+        .bytes()
+        .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b':'))
+    {
+        return None;
+    }
+    let seq = u32::from_be_bytes(frame[5 + media_len..9 + media_len].try_into().ok()?);
+    let rest = &frame[9 + media_len..];
+    let read_f32 = |slice: &[u8]| -> Option<f64> {
+        let value = f64::from(f32::from_be_bytes(slice.try_into().ok()?));
+        value.is_finite().then_some(value)
+    };
+    let read_coord = |slice: &[u8]| -> Option<f64> {
+        read_f32(slice).map(|v| v.clamp(0.0, 1.0))
+    };
+
+    let event = match op {
+        1 => {
+            if rest.len() != 8 {
+                return None;
+            }
+            RemoteInputEvent::MouseMove {
+                x: read_coord(&rest[0..4])?,
+                y: read_coord(&rest[4..8])?,
+            }
+        }
+        7 => {
+            if rest.len() != 8 {
+                return None;
+            }
+            RemoteInputEvent::MouseDelta {
+                dx: i32::from_be_bytes(rest[0..4].try_into().ok()?),
+                dy: i32::from_be_bytes(rest[4..8].try_into().ok()?),
+            }
+        }
+        2 => {
+            if rest.len() < 2 {
+                return None;
+            }
+            let button = match rest[0] {
+                0 => "left",
+                1 => "right",
+                2 => "middle",
+                3 => "x1",
+                4 => "x2",
+                _ => return None,
+            }
+            .to_string();
+            let flags = rest[1];
+            let down = (flags & 1) != 0;
+            let has_coords = (flags & 2) != 0;
+            let (x, y) = if has_coords {
+                if rest.len() != 10 {
+                    return None;
+                }
+                (Some(read_coord(&rest[2..6])?), Some(read_coord(&rest[6..10])?))
+            } else {
+                if rest.len() != 2 {
+                    return None;
+                }
+                (None, None)
+            };
+            RemoteInputEvent::MouseButton {
+                button,
+                down,
+                x,
+                y,
+            }
+        }
+        3 => {
+            if rest.len() < 9 {
+                return None;
+            }
+            let delta_x = read_f32(&rest[0..4])?;
+            let delta_y = read_f32(&rest[4..8])?;
+            let has_coords = rest[8] == 1;
+            let (x, y) = if has_coords {
+                if rest.len() != 17 {
+                    return None;
+                }
+                (Some(read_coord(&rest[9..13])?), Some(read_coord(&rest[13..17])?))
+            } else {
+                if rest.len() != 9 {
+                    return None;
+                }
+                (None, None)
+            };
+            RemoteInputEvent::MouseWheel {
+                delta_x,
+                delta_y,
+                x,
+                y,
+            }
+        }
+        4 => {
+            if rest.len() < 4 {
+                return None;
+            }
+            let flags = rest[0];
+            let vk_byte = rest[1];
+            let code_len = usize::from(rest[2]);
+            let key_len = usize::from(rest[3]);
+            if code_len > 64 || key_len > 64 || rest.len() != 4 + code_len + key_len {
+                return None;
+            }
+            let code = std::str::from_utf8(&rest[4..4 + code_len]).ok()?.to_string();
+            let key = std::str::from_utf8(&rest[4 + code_len..4 + code_len + key_len])
+                .ok()?
+                .to_string();
+            RemoteInputEvent::Key {
+                code,
+                key,
+                down: (flags & 1) != 0,
+                repeat: Some((flags & 2) != 0),
+                ctrl_key: Some((flags & 4) != 0),
+                alt_key: Some((flags & 8) != 0),
+                meta_key: Some((flags & 16) != 0),
+                vk: ((flags & 32) != 0).then_some(u16::from(vk_byte)),
+            }
+        }
+        5 => {
+            if !rest.is_empty() {
+                return None;
+            }
+            RemoteInputEvent::ReleaseAll
+        }
+        _ => return None,
+    };
+    Some((media_id.to_string(), seq, event))
+}
+
+#[tauri::command]
+pub fn set_remote_control_native_peer(
+    window: tauri::WebviewWindow,
+    peer_id: String,
+    media_id: String,
+    session_id: Option<String>,
+    authorized: bool,
+    mouse_enabled: bool,
+    keyboard_enabled: bool,
+) -> Result<(), String> {
+    if window.label() != "main" {
+        return Err("Only the main window can manage remote control peers".into());
+    }
+    if peer_id.is_empty() || peer_id.len() > 240 || media_id.len() > 64 {
+        return Err("Invalid remote control peer or media ID".into());
+    }
+    let mut state = HOST_STATE.lock().map_err(|_| "Remote control lock poisoned")?;
+    if authorized && !media_id.is_empty() {
+        state.authorized_native_peers.insert(
+            (peer_id, media_id),
+            NativePeerPermission {
+                session_id,
+                mouse_enabled,
+                keyboard_enabled,
+            },
+        );
+    } else if media_id.is_empty() {
+        state
+            .authorized_native_peers
+            .retain(|(peer, _), _| peer != &peer_id);
+    } else {
+        state.authorized_native_peers.remove(&(peer_id, media_id));
+    }
+    Ok(())
+}
+
+/// Applies an authorized binary input frame arriving on a native WebRTC DataChannel
+/// directly on the Rust transport thread without traversing Host WebView2 IPC.
+pub fn apply_native_datachannel_input(
+    peer_id: &str,
+    expected_media_id: &str,
+    expected_session_id: &str,
+    lane_is_datagram: bool,
+    seq_state: &mut NativeInputSeqState,
+    frame: &[u8],
+) -> bool {
+    let Some((media_id, seq, event)) = decode_binary_input_frame(frame) else {
+        return false;
+    };
+    if media_id != expected_media_id && media_id != "default" {
+        return false;
+    }
+    if !seq_state.accept(lane_is_datagram, seq, &event) {
+        return false;
+    }
+    #[cfg(windows)]
+    {
+        let Ok(mut state) = HOST_STATE.lock() else {
+            return false;
+        };
+        if !state.active {
+            return false;
+        }
+        let perm = state
+            .authorized_native_peers
+            .get(&(peer_id.to_string(), media_id.clone()))
+            .or_else(|| {
+                state
+                    .authorized_native_peers
+                    .get(&(peer_id.to_string(), expected_media_id.to_string()))
+            });
+        let Some(perm) = perm else {
+            return false;
+        };
+        let is_mouse = matches!(
+            event,
+            RemoteInputEvent::MouseMove { .. }
+                | RemoteInputEvent::MouseDelta { .. }
+                | RemoteInputEvent::MouseButton { .. }
+                | RemoteInputEvent::MouseWheel { .. }
+        );
+        if is_mouse && !perm.mouse_enabled {
+            return false;
+        }
+        if matches!(event, RemoteInputEvent::Key { .. }) && !perm.keyboard_enabled {
+            return false;
+        }
+        let session_id = perm
+            .session_id
+            .clone()
+            .unwrap_or_else(|| expected_session_id.to_string());
+        let controller_id = format!("{peer_id}:{media_id}");
+        apply_input_locked(&mut state, &controller_id, Some(&session_id), event).accepted
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (peer_id, expected_session_id);
+        false
+    }
+}
+
 #[tauri::command]
 pub fn apply_remote_control_input(
     window: tauri::WebviewWindow,
@@ -1616,11 +2219,6 @@ pub fn apply_remote_control_input(
     }
     #[cfg(windows)]
     {
-        use windows::Win32::UI::Input::KeyboardAndMouse::{
-            INPUT, INPUT_0, INPUT_MOUSE, MOUSEEVENTF_ABSOLUTE, MOUSEEVENTF_HWHEEL,
-            MOUSEEVENTF_MOVE, MOUSEEVENTF_VIRTUALDESK, MOUSEEVENTF_WHEEL, MOUSEINPUT,
-        };
-        let input_started = std::time::Instant::now();
         let mut state = HOST_STATE.lock().map_err(|_| "Remote control lock poisoned")?;
         if !state.active {
             return Ok(ApplyInputResult {
@@ -1628,308 +2226,12 @@ pub fn apply_remote_control_input(
                 host_busy: false,
             });
         }
-        if matches!(event, RemoteInputEvent::ReleaseAll) {
-            release_controller_locked(&mut state, &controller_id);
-            return Ok(ApplyInputResult {
-                accepted: true,
-                host_busy: state.was_host_paused,
-            });
-        }
-        if poll_host_activity_locked(&mut state) {
-            state.perf_busy_dropped += 1;
-            return Ok(ApplyInputResult {
-                accepted: false,
-                host_busy: true,
-            });
-        }
-
-        if let Some(sid) = session_id.as_ref() {
-            state.last_session_id = Some(sid.clone());
-        }
-        let is_mouse_event = matches!(
+        Ok(apply_input_locked(
+            &mut state,
+            &controller_id,
+            session_id.as_deref(),
             event,
-            RemoteInputEvent::MouseMove { .. }
-                | RemoteInputEvent::MouseDelta { .. }
-                | RemoteInputEvent::MouseButton { .. }
-                | RemoteInputEvent::MouseWheel { .. }
-        );
-        if is_mouse_event {
-            state.last_mouse_actor_id = Some(controller_id.clone());
-            if state.cursor_hidden_since_ms.is_some()
-                && matches!(
-                    event,
-                    RemoteInputEvent::MouseMove { .. } | RemoteInputEvent::MouseDelta { .. }
-                )
-            {
-                state.controller_moved_while_hidden = true;
-            }
-        }
-        let mut moved_cursor = false;
-        match event {
-            RemoteInputEvent::MouseMove { x, y } => {
-                let Some((dx, dy)) =
-                    normalized_to_virtual_desktop_cached(&mut state, session_id.as_deref(), x, y)
-                else {
-                    return Ok(ApplyInputResult {
-                        accepted: false,
-                        host_busy: false,
-                    });
-                };
-                let input = INPUT {
-                    r#type: INPUT_MOUSE,
-                    Anonymous: INPUT_0 {
-                        mi: MOUSEINPUT {
-                            dx,
-                            dy,
-                            mouseData: 0,
-                            dwFlags: MOUSEEVENTF_MOVE
-                                | MOUSEEVENTF_ABSOLUTE
-                                | MOUSEEVENTF_VIRTUALDESK,
-                            time: 0,
-                            dwExtraInfo: P2SHARER_INPUT_TAG,
-                        },
-                    },
-                };
-                send_win32_inputs(&[input]);
-                moved_cursor = true;
-            }
-            RemoteInputEvent::MouseDelta { dx, dy } => {
-                let clamped_dx = dx.clamp(-10_000, 10_000);
-                let clamped_dy = dy.clamp(-10_000, 10_000);
-                if clamped_dx != 0 || clamped_dy != 0 {
-                    let input = INPUT {
-                        r#type: INPUT_MOUSE,
-                        Anonymous: INPUT_0 {
-                            mi: MOUSEINPUT {
-                                dx: clamped_dx,
-                                dy: clamped_dy,
-                                mouseData: 0,
-                                dwFlags: MOUSEEVENTF_MOVE,
-                                time: 0,
-                                dwExtraInfo: P2SHARER_INPUT_TAG,
-                            },
-                        },
-                    };
-                    send_win32_inputs(&[input]);
-                    moved_cursor = true;
-                }
-            }
-            RemoteInputEvent::MouseButton {
-                button,
-                down,
-                x,
-                y,
-            } => {
-                let abs = match (x, y) {
-                    (Some(nx), Some(ny)) => {
-                        let res = normalized_to_virtual_desktop_cached(
-                            &mut state,
-                            session_id.as_deref(),
-                            nx,
-                            ny,
-                        );
-                        if res.is_some() {
-                            moved_cursor = true;
-                        }
-                        res
-                    }
-                    _ => None,
-                };
-                if let Some(input) = make_mouse_button_input(&button, down, abs) {
-                    if down {
-                        state
-                            .held_buttons
-                            .entry(controller_id.clone())
-                            .or_default()
-                            .insert(button);
-                    } else if let Some(set) = state.held_buttons.get_mut(&controller_id) {
-                        set.remove(&button);
-                    }
-                    send_win32_inputs(&[input]);
-                }
-            }
-            RemoteInputEvent::MouseWheel {
-                delta_x,
-                delta_y,
-                x,
-                y,
-            } => {
-                if !delta_x.is_finite() || !delta_y.is_finite() {
-                    return Ok(ApplyInputResult {
-                        accepted: false,
-                        host_busy: false,
-                    });
-                }
-                let mut inputs = Vec::new();
-                if let (Some(nx), Some(ny)) = (x, y) {
-                    if let Some((dx, dy)) = normalized_to_virtual_desktop_cached(
-                        &mut state,
-                        session_id.as_deref(),
-                        nx,
-                        ny,
-                    ) {
-                        moved_cursor = true;
-                        inputs.push(INPUT {
-                            r#type: INPUT_MOUSE,
-                            Anonymous: INPUT_0 {
-                                mi: MOUSEINPUT {
-                                    dx,
-                                    dy,
-                                    mouseData: 0,
-                                    dwFlags: MOUSEEVENTF_MOVE
-                                        | MOUSEEVENTF_ABSOLUTE
-                                        | MOUSEEVENTF_VIRTUALDESK,
-                                    time: 0,
-                                    dwExtraInfo: P2SHARER_INPUT_TAG,
-                                },
-                            },
-                        });
-                    }
-                }
-                let wheel_y = (-delta_y.clamp(-1200.0, 1200.0) * 1.2).round() as i32;
-                if wheel_y != 0 {
-                    inputs.push(INPUT {
-                        r#type: INPUT_MOUSE,
-                        Anonymous: INPUT_0 {
-                            mi: MOUSEINPUT {
-                                dx: 0,
-                                dy: 0,
-                                mouseData: wheel_y as u32,
-                                dwFlags: MOUSEEVENTF_WHEEL,
-                                time: 0,
-                                dwExtraInfo: P2SHARER_INPUT_TAG,
-                            },
-                        },
-                    });
-                }
-                let wheel_x = (delta_x.clamp(-1200.0, 1200.0) * 1.2).round() as i32;
-                if wheel_x != 0 {
-                    inputs.push(INPUT {
-                        r#type: INPUT_MOUSE,
-                        Anonymous: INPUT_0 {
-                            mi: MOUSEINPUT {
-                                dx: 0,
-                                dy: 0,
-                                mouseData: wheel_x as u32,
-                                dwFlags: MOUSEEVENTF_HWHEEL,
-                                time: 0,
-                                dwExtraInfo: P2SHARER_INPUT_TAG,
-                            },
-                        },
-                    });
-                }
-                send_win32_inputs(&inputs);
-            }
-            RemoteInputEvent::Key {
-                code,
-                key,
-                down,
-                repeat: _,
-                vk,
-                ctrl_key,
-                alt_key,
-                meta_key,
-            } => {
-                if code.len() > 64 || key.len() > 32 {
-                    return Ok(ApplyInputResult {
-                        accepted: false,
-                        host_busy: false,
-                    });
-                }
-                let modifiers_held =
-                    ctrl_key.unwrap_or(false) || alt_key.unwrap_or(false) || meta_key.unwrap_or(false);
-                if !down {
-                    if let Some(units) = state
-                        .held_unicode
-                        .remove(&(controller_id.clone(), code.clone()))
-                    {
-                        let inputs = make_unicode_units_inputs(&units, false);
-                        send_win32_inputs(&inputs);
-                        state.last_self_input_tick = read_last_input_tick();
-                        return Ok(ApplyInputResult {
-                            accepted: true,
-                            host_busy: false,
-                        });
-                    }
-                }
-                let char_count = key.chars().count();
-                let is_non_ascii_printable =
-                    char_count == 1 && !key.is_ascii() && key != "Dead";
-                let use_unicode = !modifiers_held
-                    && key != "Dead"
-                    && char_count == 1
-                    && (is_non_ascii_printable || is_punctuation_code(&code) || dom_code_to_vk(&code).is_none());
-                if use_unicode {
-                    let units: Vec<u16> = key.encode_utf16().collect();
-                    if down {
-                        state
-                            .held_unicode
-                            .insert((controller_id.clone(), code.clone()), units.clone());
-                    }
-                    let inputs = make_unicode_inputs(&key, down);
-                    send_win32_inputs(&inputs);
-                } else if let Some((resolved_vk, ext)) = vk
-                    .filter(|&v| v > 0 && v <= 0xFE)
-                    .map(|v| (v, is_extended_vk(v)))
-                    .or_else(|| dom_code_to_vk(&code))
-                {
-                    if down {
-                        state
-                            .held_vks
-                            .entry(controller_id.clone())
-                            .or_default()
-                            .insert(resolved_vk);
-                    } else if let Some(set) = state.held_vks.get_mut(&controller_id) {
-                        set.remove(&resolved_vk);
-                    }
-                    let input = make_vk_input(resolved_vk, down, Some(ext));
-                    send_win32_inputs(&[input]);
-                }
-            }
-            RemoteInputEvent::ReleaseAll => {}
-        }
-
-        if !HOST_PRIORITY_HOOK_ACTIVE.load(Ordering::Acquire) {
-            state.last_self_input_tick = read_last_input_tick();
-            if moved_cursor {
-                if let Some(pos) = read_cursor_pos() {
-                    state.last_self_cursor = Some(pos);
-                }
-            }
-        } else {
-            let _ = moved_cursor;
-        }
-        let elapsed_us = input_started.elapsed().as_micros() as u64;
-        state.perf_applied += 1;
-        state.perf_total_us += elapsed_us;
-        state.perf_max_us = state.perf_max_us.max(elapsed_us);
-        if state.perf_applied >= 250 {
-            let now = now_ms();
-            if now.saturating_sub(state.perf_last_log_ms) >= 5000 {
-                let avg_us = state.perf_total_us / state.perf_applied.max(1);
-                crate::logger::log_msg(
-                    "INFO",
-                    "remote_control.perf",
-                    &format!(
-                        "host_apply count={} busy_dropped={} avg_us={} max_us={}",
-                        state.perf_applied,
-                        state.perf_busy_dropped,
-                        avg_us,
-                        state.perf_max_us
-                    ),
-                );
-                state.perf_applied = 0;
-                state.perf_busy_dropped = 0;
-                state.perf_total_us = 0;
-                state.perf_max_us = 0;
-                state.perf_last_log_ms = now;
-            }
-        }
-
-        Ok(ApplyInputResult {
-            accepted: true,
-            host_busy: false,
-        })
+        ))
     }
     #[cfg(not(windows))]
     {
@@ -2661,6 +2963,7 @@ pub fn shutdown_remote_control() {
         stop_host_priority_hooks();
         if let Ok(mut state) = HOST_STATE.lock() {
             state.active = false;
+            state.authorized_native_peers.clear();
             release_all_locked(&mut state);
         }
     }
@@ -2745,5 +3048,49 @@ mod tests {
         let small = compute_centered_clip_trap(10, 20, 18, 28);
         assert!(small.0 >= 10 && small.1 >= 20 && small.2 <= 18 && small.3 <= 28);
         assert!(small.2 - small.0 >= 2 && small.3 - small.1 >= 2);
+    }
+
+    #[test]
+    fn binary_input_decoder_parses_events_and_rejects_stale_sequences() {
+        let mut frame = vec![0x52, 0x43, 0x01, 4, 6];
+        frame.extend_from_slice(b"screen");
+        frame.extend_from_slice(&42u32.to_be_bytes());
+        frame.extend_from_slice(&[0b0010_0001, 0x57, 4, 1]);
+        frame.extend_from_slice(b"KeyWw");
+
+        let (media_id, seq, event) = decode_binary_input_frame(&frame).expect("valid key frame");
+        assert_eq!(media_id, "screen");
+        assert_eq!(seq, 42);
+        match event.clone() {
+            RemoteInputEvent::Key {
+                code,
+                key,
+                down,
+                vk,
+                ..
+            } => {
+                assert_eq!(code, "KeyW");
+                assert_eq!(key, "w");
+                assert!(down);
+                assert_eq!(vk, Some(0x57));
+            }
+            other => panic!("unexpected event: {other:?}"),
+        }
+
+        let mut tracker = NativeInputSeqState::default();
+        assert!(tracker.accept(false, 42, &event));
+        assert!(!tracker.accept(false, 41, &event));
+        assert!(tracker.accept(false, 43, &event));
+
+        let mut delta = vec![0x52, 0x43, 0x01, 7, 6];
+        delta.extend_from_slice(b"screen");
+        delta.extend_from_slice(&10u32.to_be_bytes());
+        delta.extend_from_slice(&(-15i32).to_be_bytes());
+        delta.extend_from_slice(&25i32.to_be_bytes());
+        let (_, _, delta_ev) = decode_binary_input_frame(&delta).expect("valid delta frame");
+        assert!(matches!(
+            delta_ev,
+            RemoteInputEvent::MouseDelta { dx: -15, dy: 25 }
+        ));
     }
 }

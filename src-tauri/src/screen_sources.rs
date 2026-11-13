@@ -298,7 +298,7 @@ fn enqueue_capture_frame(delivery: &FrameDelivery, frame: Arc<Vec<u8>>, ready_us
         else if frame.starts_with(b"P2NV") {
             if !pacer.enqueue_dependent(frame.clone(), ready_us) { return false; }
         } else { pacer.enqueue(frame.clone(), ready_us); }
-        if !legacy && crate::remote_control::is_host_control_active() {
+        if !legacy && (frame.starts_with(b"P2NV") || crate::remote_control::is_host_control_active()) {
             pacer.deliver_now(ready_us);
         }
     } else { return false; }
@@ -460,7 +460,14 @@ impl NativeWgcHandler {
         self.metrics.callbacks.fetch_add(1, Ordering::Relaxed);
         #[cfg(feature = "media-diagnostics")]
         diagnostic_tick(&self.metrics.last_callback_us, &self.metrics.max_callback_gap_us);
-        if arrival_time < self.next_frame_time {
+        // Allow a 2 ms callback jitter tolerance for native hardware encoding so display VSync
+        // phase skew does not unnecessarily discard nearly on-time frames.
+        let early_margin = if self.nvenc_enabled.load(Ordering::Relaxed) {
+            std::time::Duration::from_millis(2).min(self.frame_interval / 4)
+        } else {
+            std::time::Duration::ZERO
+        };
+        if arrival_time + early_margin < self.next_frame_time {
             self.metrics.gated.fetch_add(1, Ordering::Relaxed);
             return Ok(());
         }

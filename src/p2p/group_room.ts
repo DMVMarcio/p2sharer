@@ -288,7 +288,7 @@ export class GroupRoomManager {
     peer => this.room?.getPeers?.()?.[peer] as RTCPeerConnection | undefined,
     (peer, lane, frame) => {
       if (!this.payloadPeerAllowed(peer)) return;
-      if ((lane === 'datagram' || lane === 'tunnel') && isRemoteControlBinaryFrame(frame)) {
+      if ((lane === 'datagram' || lane === 'tunnel' || lane === 'input') && isRemoteControlBinaryFrame(frame)) {
         const decodedCursor = decodeRemoteControlCursorSync(frame);
         if (decodedCursor) {
           const seqKey = `${peer}:${decodedCursor.packet.mediaId}`;
@@ -314,6 +314,16 @@ export class GroupRoomManager {
             return;
           }
           this.remoteControlRxSeq.set(seqKey, decodedRc.seq);
+        } else if (lane === 'input' && (decodedRc.event.kind === 'key' || decodedRc.event.kind === 'mouseButton')) {
+          const itemKey = decodedRc.event.kind === 'key'
+            ? `${seqKey}:k:${decodedRc.event.code}`
+            : `${seqKey}:b:${decodedRc.event.button}`;
+          const prevSeq = this.remoteControlRxSeq.get(itemKey) ?? 0;
+          if (((decodedRc.seq - prevSeq) | 0) <= 0) {
+            this.remoteControlPerf.oooDropped += 1;
+            return;
+          }
+          this.remoteControlRxSeq.set(itemKey, decodedRc.seq);
         }
         this.callbacks?.onRemoteControlClient?.(
           { type: 'input', mediaId: decodedRc.mediaId, event: decodedRc.event },
@@ -513,10 +523,26 @@ export class GroupRoomManager {
         const lane =
           packet.event.kind === 'mouseMove' || packet.event.kind === 'mouseDelta'
             ? 'datagram'
-            : 'tunnel';
+            : packet.event.kind === 'releaseAll'
+              ? 'tunnel'
+              : 'input';
+        if (
+          (lane === 'datagram' || lane === 'input') &&
+          this.nativeVideo?.sendRemoteControlFrame(target, packet.mediaId, lane, frame)
+        ) {
+          if (lane === 'datagram') this.remoteControlPerf.datagramSent += 1;
+          else this.remoteControlPerf.tunnelSent += 1;
+          this.maybeLogRemoteControlPerf();
+          return;
+        }
         if (this.payloadChannels.sendFast(target, lane, frame)) {
           if (lane === 'datagram') this.remoteControlPerf.datagramSent += 1;
           else this.remoteControlPerf.tunnelSent += 1;
+          this.maybeLogRemoteControlPerf();
+          return;
+        }
+        if (lane === 'input' && this.payloadChannels.sendFast(target, 'tunnel', frame)) {
+          this.remoteControlPerf.tunnelSent += 1;
           this.maybeLogRemoteControlPerf();
           return;
         }

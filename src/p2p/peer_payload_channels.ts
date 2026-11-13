@@ -1,6 +1,6 @@
-type Lane = 'profile' | 'tunnel' | 'datagram';
-const lanes: Lane[] = ['profile', 'tunnel', 'datagram'];
-const limits = { profile: 128 * 1024, tunnel: 64 * 1024, datagram: 16 * 1024 };
+type Lane = 'profile' | 'tunnel' | 'datagram' | 'input';
+const lanes: Lane[] = ['profile', 'tunnel', 'datagram', 'input'];
+const limits = { profile: 128 * 1024, tunnel: 64 * 1024, datagram: 16 * 1024, input: 32 * 1024 };
 interface Entry { connection: RTCPeerConnection; channels: Record<Lane, RTCDataChannel>; queues: Partial<Record<Lane, Promise<unknown>>>; pending: Partial<Record<Lane, number>> }
 
 /** Independent binary lanes keep bulk images out of interactive packet queues. */
@@ -22,8 +22,8 @@ export class PeerPayloadChannels {
     this.peers.set(peer, entry);
     lanes.forEach((lane, index) => {
       const channel = connection.createDataChannel(`peer_${lane}_v1`, {
-        negotiated: true, id: 43 + index, ordered: lane !== 'datagram',
-        ...(lane === 'datagram' ? { maxRetransmits: 0 } : {}),
+        negotiated: true, id: 43 + index, ordered: lane === 'profile' || lane === 'tunnel',
+        ...(lane === 'datagram' ? { maxRetransmits: 0 } : lane === 'input' ? { maxRetransmits: 2 } : {}),
       });
       channels[lane] = channel;
       channel.binaryType = 'arraybuffer'; channel.bufferedAmountLowThreshold = limits[lane] / 2;

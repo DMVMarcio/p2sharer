@@ -45,7 +45,12 @@ impl CaptureLoad {
     pub fn fps(&self) -> u32 { self.effective_fps.load(Ordering::Relaxed) }
     pub fn set_profile(&self, token: &str, fps: u32, width: u32, height: u32) -> Result<(), String> {
         self.validate_token(token)?;
-        if !matches!((width, height), (1280, 720) | (1920, 1080)) || !matches!(fps, 15 | 30 | 60) {
+        let valid_size = (width == 0 && height == 0)
+            || ((320..=3840).contains(&width)
+                && (180..=2160).contains(&height)
+                && width % 2 == 0
+                && height % 2 == 0);
+        if !valid_size || !(15..=120).contains(&fps) {
             return Err("Invalid capture profile".into());
         }
         self.requested_width.store(width, Ordering::Relaxed);
@@ -187,7 +192,11 @@ mod tests {
         load.set_profile("fixture-generation", 15, 1280, 720).unwrap();
         assert_eq!(load.fps(), 15);
         assert_eq!(load.bounds(1920, 1080), (1280, 720));
-        assert!(load.set_profile("fixture-generation", 120, 3840, 2160).is_err());
+        load.set_profile("fixture-generation", 120, 3840, 2160).unwrap();
+        assert_eq!(load.fps(), 120);
+        assert_eq!(load.bounds(3840, 2160), (3840, 2160));
+        assert!(load.set_profile("fixture-generation", 121, 3840, 2160).is_err());
+        assert!(load.set_profile("fixture-generation", 60, 7680, 4320).is_err());
     }
     fn window(controller: &mut LoadController, load: &CaptureLoad, at: u64, cost: u64) {
         for _ in 0..60 { controller.observe(load, at - 1, cost); }

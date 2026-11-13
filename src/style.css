@@ -1590,7 +1590,6 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   align-items: center;
   gap: 8px;
   background-color: var(--stream-hud-bg);
-  backdrop-filter: blur(8px);
   padding: 6px 10px;
   border-radius: var(--radius-md);
   font-size: 12px;
@@ -1750,7 +1749,6 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
   right: 10px;
   z-index: 15;
   background-color: var(--stream-hud-bg);
-  backdrop-filter: blur(8px);
   border: 1px solid var(--border-default);
   color: var(--text-primary);
   font-size: 12px;
@@ -1932,7 +1930,6 @@ html[data-theme="light"] :is(.stream-card, .pip-window-root) {
   align-items: center;
   gap: 5px;
   background-color: var(--stream-hud-bg);
-  backdrop-filter: blur(8px);
   border: 0;
   padding: 6px 8px;
   border-radius: var(--radius-sm);
@@ -2004,7 +2001,6 @@ html[data-theme="light"] :is(.stream-card, .pip-window-root) {
 .stream-card-stats-hud .btn-stream-pin {
   width: 26px;
   height: 26px;
-  backdrop-filter: blur(8px);
   box-shadow: var(--shadow-md);
 }
 
@@ -2358,7 +2354,6 @@ html[data-theme="light"] :is(.stream-card, .pip-window-root) {
   box-sizing: border-box;
   border-radius: var(--radius-full);
   background-color: var(--stream-hud-bg);
-  backdrop-filter: blur(12px);
   border: 1px solid var(--border-default);
   box-shadow: var(--shadow-md);
   pointer-events: none;
@@ -2519,7 +2514,6 @@ html[data-theme="light"] :is(.stream-card, .pip-window-root) {
   align-items: center;
   gap: 6px;
   background-color: var(--stream-hud-bg);
-  backdrop-filter: blur(14px);
   border: 0;
   padding: 4px 8px;
   border-radius: var(--radius-md);
@@ -7084,8 +7078,7 @@ body:has(.fullscreen-dialog, .chat-image-viewer) .window-titlebar { display: non
   padding: 6px;
   border: 1px solid var(--border-default);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--bg-card) 86%, transparent);
-  backdrop-filter: blur(12px);
+  background: color-mix(in srgb, var(--bg-card) 94%, transparent);
   box-shadow: var(--shadow-lg);
   cursor: grab;
   transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
@@ -7136,8 +7129,7 @@ body:has(.fullscreen-dialog, .chat-image-viewer) .window-titlebar { display: non
   padding: 12px;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--bg-card) 94%, transparent);
-  backdrop-filter: blur(16px);
+  background: color-mix(in srgb, var(--bg-card) 97%, transparent);
   box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;

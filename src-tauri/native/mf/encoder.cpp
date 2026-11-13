@@ -137,10 +137,10 @@ HRESULT bool_property(ICodecAPI* codec, const GUID& property, bool value) {
     return codec->SetValue(&property, &variant);
 }
 HRESULT rate_control(Encoder& e, uint32_t bitrate) {
-    // H264's HRD size is in BYTES (unlike MPEG VBV bits). Bound recovery bursts
-    // to 80 ms of elementary stream budget, as in the direct NVENC backend.
-    const uint32_t payload = bitrate * 80 / 100;
-    const uint32_t reservoir = payload / 100; // payload * 80 ms / 8 bits per byte
+    // H264's HRD size is in BYTES. Leave ~8% RTP framing headroom and cap the
+    // burst reservoir at ~40 ms so bitrate changes and recovery frames stay low-delay.
+    const uint32_t payload = bitrate * 92 / 100;
+    const uint32_t reservoir = payload / 200; // payload * 40 ms / 8 bits per byte
     HRESULT hr = uint_property(e.codec.Get(), CODECAPI_AVEncCommonBufferSize, reservoir);
     if (FAILED(hr)) return hr;
     return uint_property(e.codec.Get(), CODECAPI_AVEncCommonMeanBitRate, payload);
@@ -182,9 +182,12 @@ bool configure(Encoder& e, IMFActivate* activation, char* error, size_t size) {
     ComPtr<IMFMediaType> output, input;
     MF_CHECK(MFCreateMediaType(&output), "output media type");
     if (!media_type(output.Get(), MFVideoFormat_H264, e, error, size)) return false;
-    MF_CHECK(output->SetUINT32(MF_MT_AVG_BITRATE, e.bitrate * 80 / 100), "output bitrate");
-    MF_CHECK(output->SetUINT32(MF_MT_MPEG2_PROFILE, eAVEncH264VProfile_Base), "baseline profile");
-    MF_CHECK(e.transform->SetOutputType(0, output.Get(), 0), "H264 output negotiation");
+    MF_CHECK(output->SetUINT32(MF_MT_AVG_BITRATE, e.bitrate * 92 / 100), "output bitrate");
+    MF_CHECK(output->SetUINT32(MF_MT_MPEG2_PROFILE, eAVEncH264VProfile_High), "high profile");
+    if (FAILED(e.transform->SetOutputType(0, output.Get(), 0))) {
+        MF_CHECK(output->SetUINT32(MF_MT_MPEG2_PROFILE, eAVEncH264VProfile_Base), "baseline profile fallback");
+        MF_CHECK(e.transform->SetOutputType(0, output.Get(), 0), "H264 output negotiation");
+    }
     MF_CHECK(MFCreateMediaType(&input), "input media type");
     if (!media_type(input.Get(), MFVideoFormat_NV12, e, error, size)) return false;
     MF_CHECK(e.transform->SetInputType(0, input.Get(), 0), "NV12 input negotiation");

@@ -32,17 +32,32 @@ bool check(NVENCSTATUS status, const char* stage, char* error, size_t size) {
 #define NV_CHECK(call, stage) if (!check(call, stage, error, size)) return false
 void rate_control(NV_ENC_CONFIG& config, uint32_t bitrate, uint32_t fps) {
     config.rcParams.rateControlMode = NV_ENC_PARAMS_RC_CBR;
-    // The caller's budget also paces RTP/SRTP headers. Encoding at that whole
-    // rate accumulates queue delay and creates repeated recovery-keyframe loops.
-    // At low bitrates, partial RTP packets and Windows timer/I/O variance cost
-    // proportionally more than full-size header overhead alone.
-    const uint32_t payload_bitrate = static_cast<uint32_t>(static_cast<uint64_t>(bitrate) * 80 / 100);
+    // Leave ~8% headroom for RTP/SRTP framing while delivering maximum visual quality.
+    const uint32_t payload_bitrate = static_cast<uint32_t>(static_cast<uint64_t>(bitrate) * 92 / 100);
     config.rcParams.averageBitRate = payload_bitrate; config.rcParams.maxBitRate = payload_bitrate;
-    // Allow detailed recovery pictures an 80 ms bit reservoir without delaying
-    // input frames. This remains below the native RTP frame's 120 ms deadline.
-    const uint32_t reservoir = static_cast<uint32_t>(static_cast<uint64_t>(payload_bitrate) * 80 / 1000);
-    config.rcParams.vbvBufferSize = reservoir > payload_bitrate / fps ? reservoir : payload_bitrate / fps;
+    // Bound recovery bursts to ~34 ms (at least 1 frame) for minimal serialization delay.
+    const uint32_t single_frame = payload_bitrate / (fps > 0 ? fps : 60);
+    const uint32_t reservoir = static_cast<uint32_t>(static_cast<uint64_t>(payload_bitrate) * 34 / 1000);
+    config.rcParams.vbvBufferSize = reservoir > single_frame ? reservoir : single_frame;
     config.rcParams.vbvInitialDelay = config.rcParams.vbvBufferSize;
+    config.rcParams.lowDelayKeyFrameScale = 2;
+}
+void configure_h264_quality(NV_ENC_CONFIG& config, bool high_quality) {
+    auto& h264 = config.encodeCodecConfig.h264Config;
+    config.profileGUID = high_quality ? NV_ENC_H264_PROFILE_HIGH_GUID : NV_ENC_H264_PROFILE_BASELINE_GUID;
+    h264.entropyCodingMode = high_quality
+        ? NV_ENC_H264_ENTROPY_CODING_MODE_CABAC
+        : NV_ENC_H264_ENTROPY_CODING_MODE_CAVLC;
+    config.rcParams.enableAQ = high_quality ? 1 : 0;
+    config.rcParams.aqStrength = high_quality ? 4 : 0;
+    config.rcParams.multiPass = high_quality ? NV_ENC_TWO_PASS_QUARTER_RESOLUTION : NV_ENC_MULTI_PASS_DISABLED;
+    h264.h264VUIParameters.videoSignalTypePresentFlag = 1;
+    h264.h264VUIParameters.videoFormat = NV_ENC_VUI_VIDEO_FORMAT_UNSPECIFIED;
+    h264.h264VUIParameters.videoFullRangeFlag = 0;
+    h264.h264VUIParameters.colourDescriptionPresentFlag = 1;
+    h264.h264VUIParameters.colourPrimaries = NV_ENC_VUI_COLOR_PRIMARIES_BT709;
+    h264.h264VUIParameters.transferCharacteristics = NV_ENC_VUI_TRANSFER_CHARACTERISTIC_BT709;
+    h264.h264VUIParameters.colourMatrix = NV_ENC_VUI_MATRIX_COEFFS_BT709;
 }
 bool load(Encoder* encoder, char* error, size_t size) {
 #ifdef _WIN64
@@ -108,7 +123,6 @@ bool initialize(Encoder* encoder, ID3D11Device* device, uint32_t w, uint32_t h,
     NV_CHECK(api.nvEncGetEncodePresetConfigEx(session, NV_ENC_CODEC_H264_GUID, NV_ENC_PRESET_P1_GUID,
         NV_ENC_TUNING_INFO_ULTRA_LOW_LATENCY, &preset), "Query low-latency preset");
     auto config = preset.presetCfg;
-    config.profileGUID = NV_ENC_H264_PROFILE_BASELINE_GUID;
     // WebRTC requests recovery IDRs explicitly; periodic full-picture refreshes
     // unnecessarily destroy the fine detail accumulated by delta pictures.
     config.gopLength = NVENC_INFINITE_GOPLENGTH; config.frameIntervalP = 1;
@@ -117,12 +131,27 @@ bool initialize(Encoder* encoder, ID3D11Device* device, uint32_t w, uint32_t h,
     config.encodeCodecConfig.h264Config.idrPeriod = config.gopLength;
     config.encodeCodecConfig.h264Config.repeatSPSPPS = 1;
     config.encodeCodecConfig.h264Config.level = NV_ENC_LEVEL_H264_51;
+    configure_h264_quality(config, true);
     NV_ENC_INITIALIZE_PARAMS init{}; init.version = NV_ENC_INITIALIZE_PARAMS_VER;
     init.encodeGUID = NV_ENC_CODEC_H264_GUID; init.presetGUID = NV_ENC_PRESET_P1_GUID;
     init.encodeWidth = w; init.encodeHeight = h; init.darWidth = w; init.darHeight = h;
     init.frameRateNum = fps; init.frameRateDen = 1; init.enablePTD = 1;
     init.encodeConfig = &config; init.tuningInfo = NV_ENC_TUNING_INFO_ULTRA_LOW_LATENCY;
-    NV_CHECK(api.nvEncInitializeEncoder(session, &init), "Initialize H264 encoder");
+    NVENCSTATUS init_status = api.nvEncInitializeEncoder(session, &init);
+    if (init_status != NV_ENC_SUCCESS) {
+        // Retry with conservative High/Baseline parameters if an older driver rejects AQ/two-pass.
+        config = preset.presetCfg;
+        config.gopLength = NVENC_INFINITE_GOPLENGTH; config.frameIntervalP = 1;
+        rate_control(config, bitrate, fps);
+        config.rcParams.enableLookahead = 0;
+        config.rcParams.lowDelayKeyFrameScale = 0;
+        config.encodeCodecConfig.h264Config.idrPeriod = config.gopLength;
+        config.encodeCodecConfig.h264Config.repeatSPSPPS = 1;
+        config.encodeCodecConfig.h264Config.level = NV_ENC_LEVEL_H264_51;
+        configure_h264_quality(config, false);
+        init_status = api.nvEncInitializeEncoder(session, &init);
+    }
+    NV_CHECK(init_status, "Initialize H264 encoder");
     encoder->config = config; encoder->init = init; encoder->init.encodeConfig = &encoder->config;
     D3D11_TEXTURE2D_DESC desc{};
     desc.Width = w; desc.Height = h; desc.MipLevels = 1; desc.ArraySize = 1;

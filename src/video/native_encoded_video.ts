@@ -23,6 +23,22 @@ export function parseNativeEncodedPacket(buffer: ArrayBuffer): NativeEncodedPack
     data: new Uint8Array(buffer, 28) };
 }
 
+/** Reads Annex B SPS profile/constraint/level bytes into an RFC 6381 `avc1.PPCCLL` string. */
+export function detectAvcCodecString(data: Uint8Array): string | null {
+  for (let i = 0; i + 7 < data.length; i++) {
+    if (data[i] !== 0 || data[i + 1] !== 0) continue;
+    let headerIndex = -1;
+    if (data[i + 2] === 1) headerIndex = i + 3;
+    else if (data[i + 2] === 0 && data[i + 3] === 1) headerIndex = i + 4;
+    if (headerIndex < 0 || headerIndex + 3 >= data.length) continue;
+    if ((data[headerIndex] & 0x1f) === 7) {
+      const hex = (v: number) => v.toString(16).padStart(2, '0');
+      return `avc1.${hex(data[headerIndex + 1])}${hex(data[headerIndex + 2])}${hex(data[headerIndex + 3])}`;
+    }
+  }
+  return null;
+}
+
 /** Sequential low-delay Annex B decoding, with keyframe recovery after bounded-queue drops. */
 export class NativeEncodedDecoder {
   private decoder: VideoDecoder | null = null;
@@ -30,6 +46,7 @@ export class NativeEncodedDecoder {
   private queued: Array<{ buffer: ArrayBuffer; sequence: number; resolve: (frame: VideoFrame | null) => void; reject: (error: Error) => void }> = [];
   private sequence: number | null = null;
   private geometry = '';
+  private configuredCodec: string | null = null;
   private waitingForKey = true;
   private closed = false;
   private requestingKey = false;
@@ -114,7 +131,8 @@ export class NativeEncodedDecoder {
       }
       this.discardPending(); this.waitingForKey = true; this.requestKey(); return null;
     }
-    if (!this.decoder || packet.key && this.waitingForKey) {
+    const codecString = detectAvcCodecString(packet.data) ?? this.configuredCodec ?? 'avc1.640033';
+    if (!this.decoder || (packet.key && (this.waitingForKey || this.configuredCodec !== codecString))) {
       if (typeof VideoDecoder === 'undefined') throw new Error('WebCodecs decoder unavailable');
       this.discardPending();
       if (this.decoder && this.decoder.state !== 'closed') this.decoder.close();
@@ -139,7 +157,8 @@ export class NativeEncodedDecoder {
       });
       // Hardware decoding produced 83 ms delivery stalls on the measured WebView2 host.
       // Encoding still uses NVENC; prefer low-delay software decoding for this local bridge.
-      this.decoder.configure({ codec: 'avc1.420033', optimizeForLatency: true, hardwareAcceleration: 'prefer-software' });
+      this.configuredCodec = codecString;
+      this.decoder.configure({ codec: codecString, optimizeForLatency: true, hardwareAcceleration: 'prefer-software' });
     }
     this.waitingForKey = false;
     return new Promise<VideoFrame | null>((resolve, reject) => {

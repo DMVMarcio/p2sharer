@@ -716,6 +716,17 @@ export class RoomService {
       if (!isTauri()) return;
       return invoke('release_remote_control_inputs', { controllerId: controllerId ?? null });
     },
+    syncNativePeer: (peerId, mediaId, sessionId, authorized, mouseEnabled, keyboardEnabled) => {
+      if (!isTauri()) return;
+      return invoke('set_remote_control_native_peer', {
+        peerId,
+        mediaId,
+        sessionId: sessionId ?? null,
+        authorized,
+        mouseEnabled,
+        keyboardEnabled,
+      });
+    },
     onChange: () => {
       this.remoteControlRequests = this.remoteControlHost.getRequests();
       this.remoteControllers = this.remoteControlHost.getControllers();

@@ -31,7 +31,10 @@ test('binary payloads preserve metadata, empty UDP datagrams and exact bytes wit
 test('game datagrams avoid retransmission and congestion never queues them behind bulk images', async () => {
   const f = fixture(); const packet = new Uint8Array([1,2]);
   assert.equal(f.options[2].ordered, false); assert.equal(f.options[2].maxRetransmits, 0);
+  assert.equal(f.options[3].ordered, false); assert.equal(f.options[3].maxRetransmits, 2);
   assert.equal(f.options[0].ordered, true); assert.equal(f.options[1].ordered, true);
+  assert.equal(f.manager.sendFast('peer', 'input', packet), true);
+  assert.equal(f.channels[3].sent.length, 1);
   f.channels[0].bufferedAmount = 200000;
   assert.equal(await f.manager.send('peer', 'datagram', packet, () => true), true);
   assert.equal(f.channels[2].sent.length, 1);

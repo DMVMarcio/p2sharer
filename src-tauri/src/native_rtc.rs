@@ -15,6 +15,7 @@ use webrtc::{
     api::{
         interceptor_registry::register_default_interceptors, media_engine::MediaEngine, APIBuilder,
     },
+    data_channel::{data_channel_init::RTCDataChannelInit, data_channel_message::DataChannelMessage},
     ice_transport::{ice_candidate::RTCIceCandidateInit, ice_server::RTCIceServer},
     interceptor::registry::Registry,
     peer_connection::policy::ice_transport_policy::RTCIceTransportPolicy,
@@ -152,12 +153,26 @@ struct SignalEvent {
 }
 
 fn initial_rate(budget: u32, width: u32, height: u32, fps: u32) -> u32 {
-    // Keep the existing 720p/60 probe but scale its starting allowance to the
-    // actual encoded picture. A fixed 2 Mbps can make 1080p recovery pictures
-    // exceed the bounded send deadline before useful receiver feedback arrives.
-    let rate = 2_000_000u64 * u64::from(width) * u64::from(height) * u64::from(fps.clamp(15, 120))
-        / (1280 * 720 * 60);
-    (rate.clamp(2_000_000, 8_000_000) as u32).min(budget)
+    // Start close to the configured user budget while scaling the minimum floor
+    // to picture geometry so text and edges are sharp from the first second.
+    let geometry_floor = if width > 0 && height > 0 {
+        let rate = 4_000_000u64 * u64::from(width) * u64::from(height) * u64::from(fps.clamp(15, 120))
+            / (1280 * 720 * 60);
+        rate.clamp(2_000_000, 16_000_000) as u32
+    } else {
+        2_000_000
+    };
+    let budget_start = (u64::from(budget) * 70 / 100) as u32;
+    geometry_floor.max(budget_start).min(budget)
+}
+
+/// Computes nanosecond wire-pacing credit per RTP packet using a burst multiplier
+/// above the encoded bitrate so delta frames flush immediately while large IDRs
+/// avoid overflowing UDP socket buffers.
+fn packet_pacing_ns(payload_bytes: usize, bitrate: u32) -> u64 {
+    let burst_bps = u64::from(bitrate).max(100_000).saturating_mul(3).max(45_000_000);
+    let wire_bits = (payload_bytes as u64).saturating_add(64).saturating_mul(8);
+    wire_bits.saturating_mul(1_000_000_000) / burst_bps
 }
 
 fn native_candidate_available(ip: std::net::IpAddr) -> bool {
@@ -202,12 +217,65 @@ async fn update_budget(session: &str, token: &str) {
     }
 }
 
+async fn attach_rc_channel(
+    pc: &RTCPeerConnection,
+    label: &str,
+    max_retransmits: u16,
+    lane_is_datagram: bool,
+    peer_id: &str,
+    media_id: &str,
+    session_id: &str,
+    live: Arc<AtomicBool>,
+) -> Result<(), String> {
+    let channel = pc
+        .create_data_channel(
+            label,
+            Some(RTCDataChannelInit {
+                ordered: Some(false),
+                max_retransmits: Some(max_retransmits),
+                ..Default::default()
+            }),
+        )
+        .await
+        .map_err(|e| e.to_string())?;
+    let peer = peer_id.to_string();
+    let media = media_id.to_string();
+    let session = session_id.to_string();
+    let seq_state = Arc::new(std::sync::Mutex::new(
+        crate::remote_control::NativeInputSeqState::default(),
+    ));
+    channel.on_message(Box::new(move |msg: DataChannelMessage| {
+        let active = live.clone();
+        let peer = peer.clone();
+        let media = media.clone();
+        let session = session.clone();
+        let seq_state = seq_state.clone();
+        Box::pin(async move {
+            if !active.load(Ordering::Relaxed) || !crate::remote_control::is_host_control_active() {
+                return;
+            }
+            if let Ok(mut seq) = seq_state.lock() {
+                let _ = crate::remote_control::apply_native_datachannel_input(
+                    &peer,
+                    &media,
+                    &session,
+                    lane_is_datagram,
+                    &mut seq,
+                    &msg.data,
+                );
+            }
+        })
+    }));
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn create_native_video_offer(
     app: tauri::AppHandle,
     id: String,
     session_id: String,
     feedback_token: String,
+    peer_id: Option<String>,
     stream_id: String,
     track_id: String,
     bitrate: u32,
@@ -217,6 +285,7 @@ pub async fn create_native_video_offer(
     if !valid_id(&id)
         || !valid_id(&stream_id)
         || !valid_id(&track_id)
+        || peer_id.as_ref().is_some_and(|p| p.is_empty() || p.len() > 240)
         || !(100_000..=50_000_000).contains(&bitrate)
         || ice_servers.len() > 8
     {
@@ -228,15 +297,26 @@ pub async fn create_native_video_offer(
         return Err("Native route limit reached or ID reused".into());
     }
     let mut engine = MediaEngine::default();
+    let rtcp_feedback = vec![
+        RTCPFeedback {
+            typ: "nack".into(),
+            parameter: String::new(),
+        },
+        RTCPFeedback {
+            typ: "nack".into(),
+            parameter: "pli".into(),
+        },
+        RTCPFeedback {
+            typ: "ccm".into(),
+            parameter: "fir".into(),
+        },
+    ];
     let codec = RTCRtpCodecCapability {
         mime_type: "video/H264".into(),
         clock_rate: 90_000,
-        sdp_fmtp_line: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=420033"
+        sdp_fmtp_line: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=640033"
             .into(),
-        rtcp_feedback: vec![RTCPFeedback {
-            typ: "ccm".into(),
-            parameter: "fir".into(),
-        }],
+        rtcp_feedback,
         ..Default::default()
     };
     engine
@@ -312,6 +392,7 @@ pub async fn create_native_video_offer(
             loss: AtomicU32::new(0), rtt_us: AtomicU64::new(0), baseline_rtt_us: AtomicU64::new(0),
             queued: AtomicBool::new(false), reports: AtomicU64::new(0) },
     });
+    let media_id = stream_id.clone();
     let track = Arc::new(TrackLocalStaticRTP::new(codec, track_id, stream_id));
     let sender = match pc
         .add_track(track.clone() as Arc<dyn TrackLocal + Send + Sync>)
@@ -323,6 +404,14 @@ pub async fn create_native_video_offer(
             return Err(e.to_string());
         }
     };
+    if let Some(ref peer) = peer_id {
+        for (label, retransmits, is_dgram) in [("p2_rc_datagram", 0u16, true), ("p2_rc_input", 2u16, false)] {
+            if let Err(e) = attach_rc_channel(&pc, label, retransmits, is_dgram, peer, &media_id, &session_id, live.clone()).await {
+                let _ = pc.close().await;
+                return Err(e);
+            }
+        }
+    }
     let ice_app = app.clone();
     let ice_id = id.clone();
     pc.on_ice_candidate(Box::new(move |candidate| {
@@ -437,7 +526,7 @@ pub async fn create_native_video_offer(
                 if let Some(rr) = p.as_any().downcast_ref::<ReceiverReport>() {
                     #[cfg(feature = "media-diagnostics")]
                     rtcp_value.diagnostics.reports.fetch_add(1, Ordering::Relaxed);
-                    if last_adjust.elapsed() >= Duration::from_secs(2) {
+                    if last_adjust.elapsed() >= Duration::from_millis(500) {
                         let loss = rr
                             .reports
                             .iter()
@@ -453,7 +542,7 @@ pub async fn create_native_video_offer(
                             baseline_rtt = baseline_rtt.min(rtt);
                         }
                         let queued = rtt.is_some_and(|rtt| {
-                            rtt > baseline_rtt + 0.100 && rtt > baseline_rtt * 1.5
+                            rtt > baseline_rtt + 0.060 && rtt > baseline_rtt * 1.5
                         });
                         #[cfg(feature = "media-diagnostics")]
                         {
@@ -554,17 +643,21 @@ pub async fn create_native_video_offer(
             let count = payloads.len();
             let send_started = Instant::now();
             let deadline = tokio::time::Instant::now()
-                + Duration::from_millis(if frame.key { 250 } else { 120 });
+                + Duration::from_millis(if frame.key { 200 } else { 80 });
             let mut complete = true;
+            let current_bitrate = value.bitrate.load(Ordering::Relaxed);
+            // Burst small delta frames directly at socket speed and sleep only when
+            // pacing credit exceeds 1.5 ms during large keyframes to avoid timer-wheel latency.
+            next_packet = next_packet.max(tokio::time::Instant::now());
             for (index, payload) in payloads.into_iter().enumerate() {
-                // Preserve the pacing phase across timer jitter, allowing at most 2 ms of credit.
-                next_packet =
-                    next_packet.max(tokio::time::Instant::now() - Duration::from_millis(2));
+                let now = tokio::time::Instant::now();
                 if next_packet > deadline {
                     complete = false;
                     break;
                 }
-                tokio::time::sleep_until(next_packet).await;
+                if next_packet > now + Duration::from_micros(1500) {
+                    tokio::time::sleep_until(next_packet).await;
+                }
                 let bytes = payload.len();
                 let packet = Packet {
                     header: Header {
@@ -586,10 +679,7 @@ pub async fn create_native_video_offer(
                     break;
                 }
                 value.bytes.fetch_add(bytes as u64, Ordering::Relaxed);
-                next_packet += Duration::from_secs_f64(
-                    (bytes + 64) as f64 * 8.0
-                        / value.bitrate.load(Ordering::Relaxed).max(100_000) as f64,
-                );
+                next_packet += Duration::from_nanos(packet_pacing_ns(bytes, current_bitrate));
             }
             if !complete {
                 gate.wait_key = true;
@@ -706,7 +796,7 @@ fn adjust_rate(cap: u32, budget: u32, loss: u8) -> u32 {
     let next = if loss >= 13 {
         cap.saturating_mul(80) / 100
     } else if loss <= 2 {
-        cap.saturating_add((cap / 5).max(50_000))
+        cap.saturating_add((cap / 3).max(200_000))
     } else {
         cap
     };
@@ -870,13 +960,13 @@ mod tests {
     }
     #[test]
     fn startup_probe_scales_to_encoded_geometry_without_exceeding_user_budget() {
-        assert_eq!(initial_rate(15_000_000, 1280, 720, 60), 2_000_000);
-        assert_eq!(initial_rate(15_000_000, 1920, 1080, 60), 4_500_000);
-        assert_eq!(initial_rate(15_000_000, 1080, 1920, 60), 4_500_000);
+        assert_eq!(initial_rate(15_000_000, 1280, 720, 60), 10_500_000);
+        assert_eq!(initial_rate(5_000_000, 1920, 1080, 60), 5_000_000);
         assert_eq!(initial_rate(3_000_000, 1920, 1080, 120), 3_000_000);
-        assert_eq!(initial_rate(50_000_000, 3840, 2160, 120), 8_000_000);
+        assert_eq!(initial_rate(50_000_000, 3840, 2160, 120), 35_000_000);
         assert_eq!(initial_rate(800_000, 640, 360, 30), 800_000);
-        assert_eq!(initial_rate(15_000_000, 0, 0, 60), 2_000_000);
+        assert_eq!(initial_rate(15_000_000, 0, 0, 60), 10_500_000);
+        assert!(packet_pacing_ns(1188, 15_000_000) < 300_000);
     }
     #[test]
     fn recovery_age_allows_key_serialization_then_returns_to_normal_bound() {
@@ -923,7 +1013,7 @@ mod tests {
     #[test]
     fn congestion_rate_obeys_user_budget_and_recovers_gradually() {
         assert_eq!(adjust_rate(2_000_000, 15_000_000, 13), 1_600_000);
-        assert_eq!(adjust_rate(2_000_000, 15_000_000, 0), 2_400_000);
+        assert_eq!(adjust_rate(2_000_000, 15_000_000, 0), 2_666_666);
         assert_eq!(adjust_rate(2_000_000, 1_000_000, 0), 1_000_000);
         assert_eq!(adjust_rate(100_000, 1_000_000, 100), 100_000);
     }

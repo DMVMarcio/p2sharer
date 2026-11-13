@@ -18,6 +18,7 @@ interface Outgoing { id: string; peer: string; descriptor: StreamDescriptor; sou
 interface Incoming { id: string; peer: string; descriptor: StreamDescriptor; pc: RTCPeerConnection;
   timer: ReturnType<typeof setInterval>; remoteReady: boolean; candidates: RTCIceCandidateInit[]; started: number; connectedAt?: number;
   verifiedFrames?: boolean;
+  rcDatagram?: RTCDataChannel; rcInput?: RTCDataChannel;
   stream?: MediaStream; probe?: HTMLVideoElement;
   iceSummary?: ReturnType<typeof summarizeIceStats>; sampledAt?: number;
   videoStats?: { bytesReceived: number; framesReceived: number; framesDecoded: number; keyFramesDecoded: number } }
@@ -78,7 +79,7 @@ export class NativeVideoTransport {
       routeId: route.id, mediaId: route.descriptor.id, relayOnly: rtc.iceTransportPolicy === 'relay',
       serverCount: rtc.iceServers?.length ?? 0, elapsedMs: Math.round(performance.now() - route.started) });
     const sdp = await invoke<string>('create_native_video_offer', { id: route.id, ...route.source,
-      streamId: route.descriptor.id, trackId: route.track.id, bitrate: Math.round(route.descriptor.bitrate * 1000),
+      peerId: route.peer, streamId: route.descriptor.id, trackId: route.track.id, bitrate: Math.round(route.descriptor.bitrate * 1000),
       iceServers: (rtc.iceServers ?? []).map(s => ({ urls: Array.isArray(s.urls) ? s.urls : [s.urls],
         username: s.username ?? '', credential: s.credential ?? '' })), relayOnly: rtc.iceTransportPolicy === 'relay' });
     if (!this.current(route)) { await this.closeNative(route); return; }
@@ -162,6 +163,12 @@ export class NativeVideoTransport {
       };
       pc.onicecandidate = ({ candidate }) => {
         if (candidate && this.incoming.get(key) === incoming) this.send(peer, { id: signal.id, mediaId: signal.mediaId, kind: 'ice', candidate: candidate.toJSON() });
+      };
+      pc.ondatachannel = ({ channel }) => {
+        if (this.incoming.get(key) !== incoming) return;
+        channel.binaryType = 'arraybuffer';
+        if (channel.label === 'p2_rc_datagram') incoming.rcDatagram = channel;
+        else if (channel.label === 'p2_rc_input') incoming.rcInput = channel;
       };
       pc.ontrack = ({ track }) => {
         if (this.incoming.get(key) !== incoming || !this.config.permitted(peer,incoming.descriptor)) return;
@@ -278,6 +285,20 @@ export class NativeVideoTransport {
   }
   public sending(peer: string, mediaId: string): boolean { return this.outgoing.get(this.key(peer, mediaId))?.ready === true; }
   public receiving(peer: string, mediaId: string): boolean { return this.incoming.get(this.key(peer, mediaId))?.verifiedFrames === true; }
+  /** Sends binary remote-control frames directly over the native Rust WebRTC connection when open. */
+  public sendRemoteControlFrame(peer: string, mediaId: string, lane: 'datagram' | 'input', frame: Uint8Array): boolean {
+    const route = this.incoming.get(this.key(peer, mediaId));
+    if (!route?.verifiedFrames) return false;
+    const channel = lane === 'datagram' ? route.rcDatagram : route.rcInput;
+    if (!channel || channel.readyState !== 'open') return false;
+    if (channel.bufferedAmount > (lane === 'datagram' ? 8192 : 16384)) return false;
+    try {
+      channel.send(frame);
+      return true;
+    } catch {
+      return false;
+    }
+  }
   public isBlocked(peer: string, mediaId: string): boolean { return this.blocked.has(this.key(peer, mediaId)); }
   public clearBlocked(mediaId?: string, peer?: string): void {
     for (const key of this.blocked) {

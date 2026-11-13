@@ -23,6 +23,14 @@ export interface RemoteControlHostAdapter {
     event: RemoteInputEvent,
   ) => Promise<{ accepted: boolean; hostBusy: boolean }>;
   releaseInputs: (controllerId?: string) => Promise<void> | void;
+  syncNativePeer?: (
+    peerId: string,
+    mediaId: string,
+    sessionId: string | undefined,
+    authorized: boolean,
+    mouseEnabled: boolean,
+    keyboardEnabled: boolean,
+  ) => Promise<void> | void;
   onChange: () => void;
 }
 
@@ -157,6 +165,9 @@ export class RemoteControlHostManager {
       connectedAt: Date.now(),
     };
     this.controllers.set(controllerKey(req.peerId, req.mediaId), info);
+    void Promise.resolve(
+      this.adapter.syncNativePeer?.(req.peerId, req.mediaId, screen.sessionId, true, true, true),
+    ).catch(() => {});
     this.syncMonitor();
     this.sendState(info, 'accept', screen.cursorCaptured);
     this.adapter.onChange();
@@ -179,11 +190,14 @@ export class RemoteControlHostManager {
       keyboardEnabled: nextKeyboard,
     };
     this.controllers.set(key, updated);
+    const screen = this.adapter.getScreenStream(mediaId);
+    void Promise.resolve(
+      this.adapter.syncNativePeer?.(peerId, mediaId, screen?.sessionId, true, nextMouse, nextKeyboard),
+    ).catch(() => {});
     if ((!nextMouse && ctrl.mouseEnabled) || (!nextKeyboard && ctrl.keyboardEnabled)) {
       // Drop any lingering held mouse button or modifier key before disabling input.
       void Promise.resolve(this.adapter.releaseInputs(key)).catch(() => {});
     }
-    const screen = this.adapter.getScreenStream(mediaId);
     if (screen) this.sendState(updated, 'state', screen.cursorCaptured);
     this.adapter.onChange();
   }
@@ -197,6 +211,9 @@ export class RemoteControlHostManager {
     const hadReq = this.requests.delete(key);
     const hadCtrl = this.controllers.delete(key);
     if (hadCtrl) {
+      void Promise.resolve(
+        this.adapter.syncNativePeer?.(peerId, mediaId, undefined, false, false, false),
+      ).catch(() => {});
       void Promise.resolve(this.adapter.releaseInputs(key)).catch(() => {});
       this.adapter.sendToPeer(peerId, { type: 'revoke', mediaId, reason });
       this.syncMonitor();
@@ -243,6 +260,9 @@ export class RemoteControlHostManager {
     for (const [key, ctrl] of this.controllers) {
       if (ctrl.mediaId === mediaId) {
         this.controllers.delete(key);
+        void Promise.resolve(
+          this.adapter.syncNativePeer?.(ctrl.peerId, ctrl.mediaId, undefined, false, false, false),
+        ).catch(() => {});
         void Promise.resolve(this.adapter.releaseInputs(key)).catch(() => {});
         this.adapter.sendToPeer(ctrl.peerId, { type: 'revoke', mediaId, reason: 'stream-ended' });
         changed = true;
@@ -265,6 +285,9 @@ export class RemoteControlHostManager {
     for (const [key, ctrl] of this.controllers) {
       if (ctrl.peerId === peerId) {
         this.controllers.delete(key);
+        void Promise.resolve(
+          this.adapter.syncNativePeer?.(ctrl.peerId, ctrl.mediaId, undefined, false, false, false),
+        ).catch(() => {});
         void Promise.resolve(this.adapter.releaseInputs(key)).catch(() => {});
         changed = true;
       }

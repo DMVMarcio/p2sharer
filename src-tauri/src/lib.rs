@@ -261,6 +261,7 @@ pub fn run() {
             stream_pointer::update_stream_pointer_overlay,
             stream_pointer::get_stream_pointer_visuals,
             remote_control::set_remote_control_active,
+            remote_control::set_remote_control_native_peer,
             remote_control::apply_remote_control_input,
             remote_control::release_remote_control_inputs,
             remote_control::set_remote_control_immersive,
