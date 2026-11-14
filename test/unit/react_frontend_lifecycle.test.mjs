@@ -33,6 +33,7 @@ const fixture = globalThis.frontendLifecycleFixture = {
     sendChatMessage() {}, editChatMessage: async () => true, deleteChatMessage: async () => true,
     offerFile() {}, requestFile() {}, requestFilePreview() {}, cancelFileTransfer() {},
     fileProgress: [], localFilePreviews: {}, imagePreviews: {}, savedDownloads: {}, revealSavedFile() {},
+    remoteControlViewerStates: {}, remoteCursorStates: {}, remoteCursorImages: {}, selfPeerId: 'self-peer', remoteControllers: [],
   },
   store: { subscribedStreams: new Set(), streamOverlays: {}, dismissedAutoOverlays: {},
     currentResolution: { width: 1920, height: 1080, label: '1080p' }, currentFps: 60, currentBitrate: 15000,
@@ -73,7 +74,7 @@ export { WatchersTooltipContent } from './src/components/room/WatchersTooltipCon
 export { Nickname } from './src/components/common/Nickname.tsx';
 export { profileImages, profileBanners } from './src/core/profile_image.ts';
 export { ContextMenuProvider } from './src/components/common/ContextMenu.tsx';`, resolveDir: process.cwd() },
-  bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic', loader: { '.css': 'empty' }, plugins: [{ name: 'fixtures', setup(builder) {
+  bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic', loader: { '.css': 'empty', '.png': 'dataurl' }, plugins: [{ name: 'fixtures', setup(builder) {
     builder.onResolve({ filter: /\/(useRoom|useStore|state_store|room_service|room_apps_service|RoomAppCard|audio_context_manager|pip_service|useStreamPointer|useModal|useToast|useChatFileInput|EmojiComposerInput)$/ }, args => ({
       namespace: 'fixture', path: names[args.path.split('/').at(-1)],
     }));
@@ -200,9 +201,10 @@ test('stream avatars resolve the owner profile rather than the media slot and re
 
 test('stream controls place volume before pointing and distinguish interface visibility from window pinning', async () => {
   await reset([slot('controls')]);
-  const controls = card('controls').querySelector('.stream-controls-group');
+  const streamCard = card('controls');
+  const controls = streamCard.querySelector('.stream-controls-group');
   assert.ok(controls.querySelector('.stream-volume-controller').compareDocumentPosition(controls.querySelector('[aria-label="Apontar na transmissão"]')) & dom.window.Node.DOCUMENT_POSITION_FOLLOWING);
-  assert.ok(controls.querySelector('.btn-stream-pin .lucide-panels-top-left'));
+  assert.ok(streamCard.querySelector('.stream-card-stats-hud .btn-stream-pin .lucide-panels-top-left'));
 });
 
 test('viewer identity badge remains correct when two participants share a username', async () => {

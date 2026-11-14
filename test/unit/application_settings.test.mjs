@@ -41,7 +41,7 @@ const bundle = await build({
       path: args.path.includes('room_service') ? 'room' : args.path.includes('useRoom') ? 'room-hook' : args.path.includes('useModal') ? 'modal' : 'native', namespace: 'settings-fixture',
     }));
     builder.onLoad({ filter: /.*/, namespace: 'settings-fixture' }, args => ({ contents: {
-      room: 'export const roomService = { refreshStreamPointerPermissions() {} };',
+      room: 'export const roomService = { refreshStreamPointerPermissions() {}, setRemoteControlHostPriorityEnabled() {} };',
       'room-hook': 'export const useRoom = () => ({ peers: [] });',
       modal: `export const useModal = () => ({ isClosing: false, closeModal: () => globalThis.settingsClosed++ });
         export const modalManager = { getProfileTarget: () => globalThis.profileTarget,
