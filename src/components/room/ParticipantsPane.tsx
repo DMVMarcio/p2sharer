@@ -8,7 +8,7 @@ import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { MoreHorizontal, Shield, Crown, UserX, Play, MonitorCog, Mouse, Keyboard } from 'lucide-react';
+import { MoreHorizontal, Shield, Crown, UserX, Play, MonitorCog, Mouse, Keyboard, Gamepad2, AlertTriangle } from 'lucide-react';
 import { useContextMenu, type ContextMenuAction } from '../common/ContextMenu';
 import { useRoom } from '../../hooks/useRoom';
 import { showToast } from '../../hooks/useToast';
@@ -18,7 +18,7 @@ import { Tooltip } from '../common/Tooltip';
 export const ParticipantsPane: React.FC = () => {
   useLocale();
   const { username, peers, roomSlots, isCreator, isRoomHost, isRoomAdmin,
-    remoteControllers, setRemoteControllerPermissions, revokeRemoteController,
+    remoteControllers, remoteControlElevationBlocked, setRemoteControllerPermissions, revokeRemoteController,
     transferOwnership, setAdministrator, kickPeer, requestStream } = useRoom();
   const openContextMenu = useContextMenu();
   const [pendingAction, setPendingAction] = useState<{
@@ -65,6 +65,12 @@ export const ParticipantsPane: React.FC = () => {
                 {t('remoteControl.manageAction')}
               </button>
             </div>
+            {remoteControlElevationBlocked && (
+              <div className="remote-control-manager-banner remote-control-manager-banner-danger">
+                <AlertTriangle size={13} aria-hidden="true" />
+                <span>{t('remoteControl.elevationBlockedShort')}</span>
+              </div>
+            )}
             {remoteControllers.map((ctrl) => {
               const peer = peers.find((item) => item.id === ctrl.peerId);
               const name = peer?.username || ctrl.peerId.slice(0, 6);
@@ -100,6 +106,21 @@ export const ParticipantsPane: React.FC = () => {
                         }
                       >
                         <Keyboard size={13} aria-hidden="true" />
+                      </button>
+                    </Tooltip>
+                    <Tooltip content={t('remoteControl.gamepadPermissionAria', { name })}>
+                      <button
+                        type="button"
+                        className={`btn-stream-pin ${ctrl.gamepadEnabled ? 'active' : ''}`}
+                        aria-label={t('remoteControl.gamepadPermissionAria', { name })}
+                        aria-pressed={ctrl.gamepadEnabled}
+                        onClick={() =>
+                          setRemoteControllerPermissions(ctrl.peerId, ctrl.mediaId, {
+                            gamepadEnabled: !ctrl.gamepadEnabled,
+                          })
+                        }
+                      >
+                        <Gamepad2 size={13} aria-hidden="true" />
                       </button>
                     </Tooltip>
                     <Tooltip content={t('remoteControl.revokeAria', { name })}>

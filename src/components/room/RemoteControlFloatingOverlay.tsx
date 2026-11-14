@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react';
-import { Eye, Keyboard, Maximize2, Minimize2, Mouse, Power, ShieldAlert, Volume1, Volume2, VolumeX } from 'lucide-react';
+import { AlertTriangle, Eye, Gamepad2, Keyboard, Maximize2, Minimize2, Mouse, Power, ShieldAlert, Volume1, Volume2, VolumeX } from 'lucide-react';
 import logoUrl from '../../assets/logo.png';
 import { useLocale } from '../../hooks/useLocale';
 import { getLanguage, t } from '../../i18n';
@@ -15,8 +15,10 @@ interface RemoteControlFloatingOverlayProps {
   mouseLock: boolean;
   onToggleMouseLock: () => void;
   hostBusy: boolean;
+  elevationBlocked: boolean;
   mouseEnabled: boolean;
   keyboardEnabled: boolean;
+  gamepadEnabled: boolean;
   volume: number;
   isMuted: boolean;
   onVolumeChange: (volume: number) => void;
@@ -48,8 +50,10 @@ export function RemoteControlFloatingOverlay({
   mouseLock,
   onToggleMouseLock,
   hostBusy,
+  elevationBlocked,
   mouseEnabled,
   keyboardEnabled,
+  gamepadEnabled,
   volume,
   isMuted,
   onVolumeChange,
@@ -295,7 +299,7 @@ export function RemoteControlFloatingOverlay({
       >
         <img src={logoUrl} alt="" className="remote-control-floating-logo" draggable={false} />
         {immersive && <span className="remote-control-floating-dot is-immersive" aria-hidden="true" />}
-        {hostBusy && <span className="remote-control-floating-dot is-busy" aria-hidden="true" />}
+        {(hostBusy || elevationBlocked) && <span className="remote-control-floating-dot is-busy" aria-hidden="true" />}
       </button>
 
       {open && (
@@ -310,11 +314,18 @@ export function RemoteControlFloatingOverlay({
         >
           <div className="remote-control-floating-header">
             <span className="remote-control-floating-title">{t('remoteControl.activeTitle')}</span>
-            {hostBusy && (
+            {elevationBlocked ? (
               <span className="remote-control-floating-badge is-busy">
-                <ShieldAlert size={12} aria-hidden="true" />
-                {t('remoteControl.hostPriorityActive')}
+                <AlertTriangle size={12} aria-hidden="true" />
+                {t('remoteControl.elevationBlockedShort')}
               </span>
+            ) : (
+              hostBusy && (
+                <span className="remote-control-floating-badge is-busy">
+                  <ShieldAlert size={12} aria-hidden="true" />
+                  {t('remoteControl.hostPriorityActive')}
+                </span>
+              )
             )}
           </div>
 
@@ -345,8 +356,14 @@ export function RemoteControlFloatingOverlay({
             )}
           </div>
 
-          {(!mouseEnabled || !keyboardEnabled) && (
+          {(!mouseEnabled || !keyboardEnabled || !gamepadEnabled || elevationBlocked) && (
             <div className="remote-control-floating-restrictions">
+              {elevationBlocked && (
+                <span>
+                  <AlertTriangle size={12} aria-hidden="true" />
+                  {t('remoteControl.elevationBlockedHint')}
+                </span>
+              )}
               {!mouseEnabled && (
                 <span>
                   <Mouse size={12} aria-hidden="true" />
@@ -357,6 +374,12 @@ export function RemoteControlFloatingOverlay({
                 <span>
                   <Keyboard size={12} aria-hidden="true" />
                   {t('remoteControl.keyboardDisabledHint')}
+                </span>
+              )}
+              {!gamepadEnabled && (
+                <span>
+                  <Gamepad2 size={12} aria-hidden="true" />
+                  {t('remoteControl.gamepadDisabledHint')}
                 </span>
               )}
             </div>

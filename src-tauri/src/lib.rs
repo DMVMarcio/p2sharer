@@ -12,6 +12,7 @@ mod chat_file_direct;
 pub mod pip_manager;
 pub mod stream_pointer;
 pub mod remote_control;
+pub mod gamepad;
 pub mod process_manager;
 pub mod room_vault;
 pub mod screen_sources;
@@ -267,6 +268,10 @@ pub fn run() {
             remote_control::set_remote_control_immersive,
             remote_control::set_remote_control_cursor_clip,
             remote_control::set_remote_control_mouse_lock,
+            remote_control::set_remote_control_host_priority_enabled,
+            gamepad::get_remote_control_gamepads,
+            gamepad::recheck_remote_control_gamepad_driver,
+            gamepad::reorder_remote_control_gamepads,
             list_audio_processes,
             list_screen_sources,
             start_native_screen_capture,
@@ -330,6 +335,8 @@ pub fn run() {
         .expect("error while building tauri application")
         .run(|_app_handle, event| {
             if let tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit = event {
+                remote_control::shutdown_remote_control();
+                gamepad::shutdown_gamepads();
                 let _ = stop_native_screen_capture();
                 let _ = stop_audio_capture();
                 std::process::exit(0);

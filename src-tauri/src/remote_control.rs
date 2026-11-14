@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, AtomicIsize, AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
 const HOST_PRIORITY_MS: u64 = 1500;
 const MONITOR_INTERVAL_MS: u64 = 16;
@@ -49,6 +49,27 @@ pub enum RemoteInputEvent {
         meta_key: Option<bool>,
     },
     ReleaseAll,
+    GamepadState {
+        #[serde(rename = "padIndex")]
+        pad_index: u8,
+        buttons: u16,
+        #[serde(rename = "leftTrigger")]
+        left_trigger: u8,
+        #[serde(rename = "rightTrigger")]
+        right_trigger: u8,
+        #[serde(rename = "thumbLx")]
+        thumb_lx: i16,
+        #[serde(rename = "thumbLy")]
+        thumb_ly: i16,
+        #[serde(rename = "thumbRx")]
+        thumb_rx: i16,
+        #[serde(rename = "thumbRy")]
+        thumb_ry: i16,
+    },
+    GamepadDisconnect {
+        #[serde(rename = "padIndex")]
+        pad_index: u8,
+    },
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -56,6 +77,7 @@ pub enum RemoteInputEvent {
 pub struct ApplyInputResult {
     pub accepted: bool,
     pub host_busy: bool,
+    pub elevation_blocked: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -63,6 +85,8 @@ pub struct ApplyInputResult {
 struct HostPriorityPayload {
     host_busy: bool,
     cursor_shape: String,
+    elevation_blocked: bool,
+    host_priority_enabled: bool,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -77,6 +101,7 @@ struct CursorSyncPayload {
     image_id: String,
     mouse_locked: bool,
     host_busy: bool,
+    elevation_blocked: bool,
     actor_controller_id: String,
     embedded_in_video: bool,
 }
@@ -101,6 +126,7 @@ struct ImmersiveKeyPayload {
     down: bool,
     ctrl_key: bool,
     alt_key: bool,
+    shift_key: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -122,6 +148,7 @@ struct NativePeerPermission {
     session_id: Option<String>,
     mouse_enabled: bool,
     keyboard_enabled: bool,
+    gamepad_enabled: bool,
 }
 
 #[derive(Default)]
@@ -129,6 +156,7 @@ pub struct NativeInputSeqState {
     last_move_seq: u32,
     key_seqs: HashMap<String, u32>,
     button_seqs: HashMap<String, u32>,
+    gamepad_seqs: HashMap<u8, u32>,
 }
 
 impl NativeInputSeqState {
@@ -141,11 +169,22 @@ impl NativeInputSeqState {
             return true;
         }
         if lane_is_datagram {
-            if matches!(event, RemoteInputEvent::MouseMove { .. }) {
-                if self.last_move_seq != 0 && !Self::is_newer(self.last_move_seq, seq) {
-                    return false;
+            match event {
+                RemoteInputEvent::MouseMove { .. } => {
+                    if self.last_move_seq != 0 && !Self::is_newer(self.last_move_seq, seq) {
+                        return false;
+                    }
+                    self.last_move_seq = seq;
                 }
-                self.last_move_seq = seq;
+                RemoteInputEvent::GamepadState { pad_index, .. } => {
+                    if let Some(&prev) = self.gamepad_seqs.get(pad_index) {
+                        if !Self::is_newer(prev, seq) {
+                            return false;
+                        }
+                    }
+                    self.gamepad_seqs.insert(*pad_index, seq);
+                }
+                _ => {}
             }
             return true;
         }
@@ -166,6 +205,15 @@ impl NativeInputSeqState {
                 }
                 self.button_seqs.insert(button.clone(), seq);
             }
+            RemoteInputEvent::GamepadState { pad_index, .. }
+            | RemoteInputEvent::GamepadDisconnect { pad_index } => {
+                if let Some(&prev) = self.gamepad_seqs.get(pad_index) {
+                    if !Self::is_newer(prev, seq) {
+                        return false;
+                    }
+                }
+                self.gamepad_seqs.insert(*pad_index, seq);
+            }
             _ => {}
         }
         true
@@ -180,10 +228,16 @@ struct HostControlState {
     last_hw_input_ms: u64,
     host_paused_until: u64,
     was_host_paused: bool,
+    elevation_blocked: bool,
+    last_elevation_check_ms: u64,
     last_cursor_shape: String,
     last_cursor_handle: isize,
     last_cursor_image_id: String,
     last_cursor_capture_ms: u64,
+    cached_cursor_handle: isize,
+    cached_cursor_frames: Vec<CursorImagePayload>,
+    cached_cursor_frame_idx: usize,
+    last_cursor_anim_ms: u64,
     sent_cursor_images: HashMap<String, u64>,
     cursor_hidden_since_ms: Option<u64>,
     controller_moved_while_hidden: bool,
@@ -193,6 +247,8 @@ struct HostControlState {
     held_buttons: HashMap<String, HashSet<String>>,
     held_vks: HashMap<String, HashSet<u16>>,
     held_unicode: HashMap<(String, String), Vec<u16>>,
+    pending_uipi_vk_releases: HashSet<u16>,
+    pending_uipi_button_releases: HashSet<String>,
     mapping_cache: Option<CachedDesktopMapping>,
     perf_applied: u64,
     perf_busy_dropped: u64,
@@ -211,10 +267,16 @@ impl Default for HostControlState {
             last_hw_input_ms: 0,
             host_paused_until: 0,
             was_host_paused: false,
+            elevation_blocked: false,
+            last_elevation_check_ms: 0,
             last_cursor_shape: "default".to_string(),
             last_cursor_handle: 0,
             last_cursor_image_id: String::new(),
             last_cursor_capture_ms: 0,
+            cached_cursor_handle: 0,
+            cached_cursor_frames: Vec::new(),
+            cached_cursor_frame_idx: 0,
+            last_cursor_anim_ms: 0,
             sent_cursor_images: HashMap::new(),
             cursor_hidden_since_ms: None,
             controller_moved_while_hidden: false,
@@ -224,6 +286,8 @@ impl Default for HostControlState {
             held_buttons: HashMap::new(),
             held_vks: HashMap::new(),
             held_unicode: HashMap::new(),
+            pending_uipi_vk_releases: HashSet::new(),
+            pending_uipi_button_releases: HashSet::new(),
             mapping_cache: None,
             perf_applied: 0,
             perf_busy_dropped: 0,
@@ -267,6 +331,7 @@ fn join_hook_thread(handle: HookThreadHandle) {
 static HOST_STATE: LazyLock<Mutex<HostControlState>> =
     LazyLock::new(|| Mutex::new(HostControlState::default()));
 static HOST_ACTIVE: AtomicBool = AtomicBool::new(false);
+static HOST_PRIORITY_ENABLED: AtomicBool = AtomicBool::new(true);
 static HOST_PRIORITY_HOOK_ACTIVE: AtomicBool = AtomicBool::new(false);
 static HOST_HARDWARE_INPUT_MS: AtomicU64 = AtomicU64::new(0);
 // Stores (anchor_pt, last_hw_pt) so controller SendInput jumps reset the anchor and only true host movement triggers priority pause.
@@ -344,8 +409,10 @@ fn read_cursor_pos() -> Option<(i32, i32)> {
 }
 
 const MAX_CURSOR_IMAGE_DIM: u32 = 128;
-const CURSOR_IMAGE_CACHE_LIMIT: usize = 64;
-const CURSOR_RESAMPLE_MS: u64 = 120;
+const CURSOR_IMAGE_CACHE_LIMIT: usize = 128;
+const CURSOR_RESAMPLE_MS: u64 = 1000;
+const CURSOR_ANIM_FRAME_MS: u64 = 75;
+const MAX_CURSOR_ANIM_FRAMES: u32 = 48;
 const LOCKED_CURSOR_HIDDEN_MS: u64 = 350;
 
 fn rgba_from_color_and_mask(
@@ -585,15 +652,68 @@ fn read_cursor_shape() -> String {
         .unwrap_or_else(|| "default".to_string())
 }
 
+/// Reconstructs straight RGBA from two 32bpp DIBs where `DrawIconEx` drew onto
+/// all-black `(0,0,0)` vs all-white `(255,255,255)` backgrounds, recovering
+/// exact partial alpha, opaque black mask pixels (where GDI leaves alpha=0),
+/// and monochrome XOR inversion.
+fn rgba_from_dual_dib_bgra(width: u32, height: u32, black_bgra: &[u8], white_bgra: &[u8]) -> Vec<u8> {
+    let pixel_count = (width as usize).saturating_mul(height as usize);
+    let mut rgba = vec![0u8; pixel_count * 4];
+    if black_bgra.len() < pixel_count * 4 || white_bgra.len() < pixel_count * 4 {
+        return rgba;
+    }
+    for i in 0..pixel_count {
+        let idx = i * 4;
+        let bb = black_bgra[idx];
+        let bg = black_bgra[idx + 1];
+        let br = black_bgra[idx + 2];
+        let wb = white_bgra[idx];
+        let wg = white_bgra[idx + 1];
+        let wr = white_bgra[idx + 2];
+
+        // On an inverted XOR pixel, white-bg output is darker than black-bg output.
+        if wr < br && wg < bg && wb < bb && (br - wr) > 128 {
+            rgba[idx] = 28;
+            rgba[idx + 1] = 28;
+            rgba[idx + 2] = 28;
+            rgba[idx + 3] = 220;
+            continue;
+        }
+
+        let diff_r = i32::from(wr) - i32::from(br);
+        let diff_g = i32::from(wg) - i32::from(bg);
+        let diff_b = i32::from(wb) - i32::from(bb);
+        let alpha_i = (255 - ((diff_r + diff_g + diff_b) / 3)).clamp(0, 255);
+        let a = alpha_i as u8;
+        if a == 0 {
+            continue;
+        }
+        let unpremul = |c: u8| -> u8 {
+            if a == 255 {
+                c
+            } else {
+                ((u16::from(c) * 255 + u16::from(a) / 2) / u16::from(a)).min(255) as u8
+            }
+        };
+        rgba[idx] = unpremul(br);
+        rgba[idx + 1] = unpremul(bg);
+        rgba[idx + 2] = unpremul(bb);
+        rgba[idx + 3] = a;
+    }
+    rgba
+}
+
 #[cfg(windows)]
-fn capture_hcursor_png_win32(hcursor_raw: isize) -> Option<CursorImagePayload> {
+fn capture_hcursor_frames_win32(hcursor_raw: isize) -> Option<Vec<CursorImagePayload>> {
     use std::ffi::c_void;
     use windows::Win32::Graphics::Gdi::{
-        DeleteObject, GetDC, GetDIBits, GetObjectW, ReleaseDC, BITMAP, BITMAPINFO,
-        BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HBITMAP, HGDIOBJ,
+        CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject, GetDC, GetDIBits,
+        GetObjectW, ReleaseDC, SelectObject, BITMAP, BITMAPINFO, BITMAPINFOHEADER, BI_RGB,
+        DIB_RGB_COLORS, HBITMAP, HBRUSH, HDC, HGDIOBJ,
     };
     use windows::Win32::UI::WindowsAndMessaging::{
-        CopyIcon, DestroyIcon, GetIconInfo, HICON, ICONINFO,
+        CopyIcon, DestroyIcon, DrawIconEx, GetIconInfo, GetSystemMetrics, DI_NORMAL, HICON,
+        ICONINFO, SM_CXCURSOR, SM_CYCURSOR,
     };
 
     if hcursor_raw == 0 {
@@ -623,7 +743,7 @@ fn capture_hcursor_png_win32(hcursor_raw: isize) -> Option<CursorImagePayload> {
             }
         }
     }
-    struct ScreenDc(windows::Win32::Graphics::Gdi::HDC);
+    struct ScreenDc(HDC);
     impl Drop for ScreenDc {
         fn drop(&mut self) {
             if !self.0.is_invalid() {
@@ -633,15 +753,43 @@ fn capture_hcursor_png_win32(hcursor_raw: isize) -> Option<CursorImagePayload> {
             }
         }
     }
+    struct OwnedDc(HDC);
+    impl Drop for OwnedDc {
+        fn drop(&mut self) {
+            if !self.0.is_invalid() {
+                unsafe {
+                    let _ = DeleteDC(self.0);
+                }
+            }
+        }
+    }
+    struct OwnedBitmap(HBITMAP);
+    impl Drop for OwnedBitmap {
+        fn drop(&mut self) {
+            if !self.0.is_invalid() {
+                unsafe {
+                    let _ = DeleteObject(HGDIOBJ(self.0.0));
+                }
+            }
+        }
+    }
 
     unsafe {
         let orig = HICON(hcursor_raw as *mut c_void);
-        let copied = CopyIcon(orig).ok().map(OwnedIcon);
-        let icon_handle = copied.as_ref().map(|o| o.0).unwrap_or(orig);
         let mut raw_info = ICONINFO::default();
-        if GetIconInfo(icon_handle, &mut raw_info).is_err() {
-            return None;
-        }
+        let copied = CopyIcon(orig).ok().map(OwnedIcon);
+        let info_handle = if GetIconInfo(orig, &mut raw_info).is_ok() {
+            Some(orig)
+        } else if let Some(ref copy) = copied {
+            if GetIconInfo(copy.0, &mut raw_info).is_ok() {
+                Some(copy.0)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        let _ = info_handle?;
         let guard = IconBitmaps(raw_info);
         let has_color = !guard.0.hbmColor.is_invalid();
         let target_bm: HBITMAP = if has_color {
@@ -649,25 +797,148 @@ fn capture_hcursor_png_win32(hcursor_raw: isize) -> Option<CursorImagePayload> {
         } else {
             guard.0.hbmMask
         };
+        let (raw_w, height) = if !target_bm.is_invalid() {
+            let mut bm = BITMAP::default();
+            if GetObjectW(
+                HGDIOBJ(target_bm.0),
+                std::mem::size_of::<BITMAP>() as i32,
+                Some(&mut bm as *mut BITMAP as *mut c_void),
+            ) != 0
+            {
+                let w = bm.bmWidth.max(0) as u32;
+                let h = bm.bmHeight.unsigned_abs();
+                let logical_h = if has_color { h } else { h / 2 };
+                (w, logical_h)
+            } else {
+                (0, 0)
+            }
+        } else {
+            (0, 0)
+        };
+        let (raw_w, height) = if raw_w == 0 || height == 0 || raw_w > 512 || height > 512 {
+            let cw = GetSystemMetrics(SM_CXCURSOR).clamp(16, 128) as u32;
+            let ch = GetSystemMetrics(SM_CYCURSOR).clamp(16, 128) as u32;
+            (cw, ch)
+        } else {
+            (raw_w, height)
+        };
+
+        let screen_dc = ScreenDc(GetDC(None));
+        if screen_dc.0.is_invalid() {
+            return None;
+        }
+        let mem_dc = OwnedDc(CreateCompatibleDC(screen_dc.0));
+        if mem_dc.0.is_invalid() {
+            return None;
+        }
+
+        let create_dib = |bits_ptr: *mut *mut c_void| -> Option<OwnedBitmap> {
+            let mut bmi = BITMAPINFO::default();
+            bmi.bmiHeader = BITMAPINFOHEADER {
+                biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+                biWidth: raw_w as i32,
+                biHeight: -(height as i32),
+                biPlanes: 1,
+                biBitCount: 32,
+                biCompression: BI_RGB.0,
+                ..Default::default()
+            };
+            let hbm = CreateDIBSection(screen_dc.0, &bmi, DIB_RGB_COLORS, bits_ptr, None, 0).ok()?;
+            if hbm.is_invalid() || (*bits_ptr).is_null() {
+                if !hbm.is_invalid() {
+                    let _ = DeleteObject(HGDIOBJ(hbm.0));
+                }
+                return None;
+            }
+            Some(OwnedBitmap(hbm))
+        };
+
+        let byte_len = (raw_w as usize) * (height as usize) * 4;
+        let mut black_ptr: *mut c_void = std::ptr::null_mut();
+        let mut white_ptr: *mut c_void = std::ptr::null_mut();
+        let dib_pair = create_dib(&mut black_ptr).zip(create_dib(&mut white_ptr));
+
+        if let Some((black_bm, white_bm)) = dib_pair {
+            let mut frames = Vec::new();
+            let draw_step = |step: u32| -> Option<CursorImagePayload> {
+                std::ptr::write_bytes(black_ptr.cast::<u8>(), 0x00, byte_len);
+                let old_black = SelectObject(mem_dc.0, HGDIOBJ(black_bm.0 .0));
+                let ok_black = DrawIconEx(
+                    mem_dc.0,
+                    0,
+                    0,
+                    orig,
+                    raw_w as i32,
+                    height as i32,
+                    step,
+                    HBRUSH::default(),
+                    DI_NORMAL,
+                )
+                .is_ok();
+                SelectObject(mem_dc.0, old_black);
+                if !ok_black {
+                    return None;
+                }
+
+                std::ptr::write_bytes(white_ptr.cast::<u8>(), 0xFF, byte_len);
+                let old_white = SelectObject(mem_dc.0, HGDIOBJ(white_bm.0 .0));
+                let ok_white = DrawIconEx(
+                    mem_dc.0,
+                    0,
+                    0,
+                    orig,
+                    raw_w as i32,
+                    height as i32,
+                    step,
+                    HBRUSH::default(),
+                    DI_NORMAL,
+                )
+                .is_ok();
+                SelectObject(mem_dc.0, old_white);
+                if !ok_white {
+                    return None;
+                }
+
+                let black_slice = std::slice::from_raw_parts(black_ptr.cast::<u8>(), byte_len);
+                let white_slice = std::slice::from_raw_parts(white_ptr.cast::<u8>(), byte_len);
+                let rgba = rgba_from_dual_dib_bgra(raw_w, height, black_slice, white_slice);
+                let (final_w, final_h, hot_x, hot_y, final_rgba) = clamp_cursor_bitmap(
+                    raw_w,
+                    height,
+                    guard.0.xHotspot,
+                    guard.0.yHotspot,
+                    rgba,
+                );
+                encode_cursor_png_with_hash(final_w, final_h, hot_x, hot_y, &final_rgba).ok()
+            };
+
+            if let Some(frame0) = draw_step(0) {
+                let first_id = frame0.image_id.clone();
+                frames.push(frame0);
+                let mut distinct_seen = false;
+                for step in 1..MAX_CURSOR_ANIM_FRAMES {
+                    let Some(frame) = draw_step(step) else {
+                        break;
+                    };
+                    if frame.image_id != first_id {
+                        distinct_seen = true;
+                    } else if !distinct_seen && step >= 3 {
+                        // Static cursors ignore `istepIfAniCur` in DrawIconEx and repeat frame 0 identically.
+                        break;
+                    }
+                    frames.push(frame);
+                }
+                if !distinct_seen {
+                    frames.truncate(1);
+                }
+                if !frames.is_empty() {
+                    return Some(frames);
+                }
+            }
+        }
+
+        // Fallback to single static GetIconInfo DIB extraction if DrawIconEx fails.
         if target_bm.is_invalid() {
-            return None;
-        }
-        let mut bm = BITMAP::default();
-        if GetObjectW(
-            HGDIOBJ(target_bm.0),
-            std::mem::size_of::<BITMAP>() as i32,
-            Some(&mut bm as *mut BITMAP as *mut c_void),
-        ) == 0
-        {
-            return None;
-        }
-        let raw_w = bm.bmWidth.max(0) as u32;
-        let raw_h = bm.bmHeight.unsigned_abs();
-        if raw_w == 0 || raw_h == 0 || raw_w > 512 || raw_h > 1024 {
-            return None;
-        }
-        let dc = ScreenDc(GetDC(None));
-        if dc.0.is_invalid() {
             return None;
         }
         let read_bgra = |hbm: HBITMAP, w: u32, h: u32| -> Option<Vec<u8>> {
@@ -683,7 +954,7 @@ fn capture_hcursor_png_win32(hcursor_raw: isize) -> Option<CursorImagePayload> {
             };
             let mut buf = vec![0u8; (w as usize) * (h as usize) * 4];
             let lines = GetDIBits(
-                dc.0,
+                screen_dc.0,
                 hbm,
                 0,
                 h,
@@ -698,24 +969,17 @@ fn capture_hcursor_png_win32(hcursor_raw: isize) -> Option<CursorImagePayload> {
             }
         };
 
-        let (height, rgba) = if has_color {
-            let color = read_bgra(guard.0.hbmColor, raw_w, raw_h)?;
+        let rgba = if has_color {
+            let color = read_bgra(guard.0.hbmColor, raw_w, height)?;
             let mask = if !guard.0.hbmMask.is_invalid() {
-                read_bgra(guard.0.hbmMask, raw_w, raw_h)
+                read_bgra(guard.0.hbmMask, raw_w, height)
             } else {
                 None
             };
-            (
-                raw_h,
-                rgba_from_color_and_mask(raw_w, raw_h, &color, mask.as_deref()),
-            )
+            rgba_from_color_and_mask(raw_w, height, &color, mask.as_deref())
         } else {
-            let logical_h = raw_h / 2;
-            if logical_h == 0 {
-                return None;
-            }
-            let mask = read_bgra(guard.0.hbmMask, raw_w, raw_h)?;
-            (logical_h, rgba_from_monochrome_mask(raw_w, logical_h, &mask))
+            let mask = read_bgra(guard.0.hbmMask, raw_w, height * 2)?;
+            rgba_from_monochrome_mask(raw_w, height, &mask)
         };
 
         let (final_w, final_h, hot_x, hot_y, final_rgba) = clamp_cursor_bitmap(
@@ -725,19 +989,100 @@ fn capture_hcursor_png_win32(hcursor_raw: isize) -> Option<CursorImagePayload> {
             guard.0.yHotspot,
             rgba,
         );
-        encode_cursor_png_with_hash(final_w, final_h, hot_x, hot_y, &final_rgba).ok()
+        encode_cursor_png_with_hash(final_w, final_h, hot_x, hot_y, &final_rgba)
+            .ok()
+            .map(|frame| vec![frame])
     }
 }
 
 #[cfg(windows)]
-fn send_win32_inputs(inputs: &[windows::Win32::UI::Input::KeyboardAndMouse::INPUT]) {
+fn is_foreground_elevated_win32() -> bool {
+    use std::ffi::c_void;
+    use windows::Win32::Foundation::{CloseHandle, ERROR_ACCESS_DENIED, HANDLE};
+    use windows::Win32::Security::{
+        GetSidSubAuthority, GetSidSubAuthorityCount, GetTokenInformation, TokenIntegrityLevel,
+        TOKEN_MANDATORY_LABEL, TOKEN_QUERY,
+    };
+    use windows::Win32::System::Threading::{
+        OpenProcess, OpenProcessToken, PROCESS_QUERY_LIMITED_INFORMATION,
+    };
+    use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
+
+    const SECURITY_MANDATORY_HIGH_RID: u32 = 0x3000;
+
+    struct OwnedHandle(HANDLE);
+    impl Drop for OwnedHandle {
+        fn drop(&mut self) {
+            if !self.0.is_invalid() {
+                unsafe {
+                    let _ = CloseHandle(self.0);
+                }
+            }
+        }
+    }
+
+    unsafe {
+        let fg = GetForegroundWindow();
+        if fg.0.is_null() {
+            return false;
+        }
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(fg, Some(&mut pid));
+        if pid == 0 || pid == std::process::id() {
+            return false;
+        }
+        let proc_handle = match OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) {
+            Ok(h) => OwnedHandle(h),
+            Err(err) => {
+                // Protected/SYSTEM/UAC processes deny even limited query when P2Sharer runs at Medium IL.
+                return err.code() == ERROR_ACCESS_DENIED.to_hresult();
+            }
+        };
+        let mut token = HANDLE::default();
+        if OpenProcessToken(proc_handle.0, TOKEN_QUERY, &mut token).is_err() {
+            return true;
+        }
+        let token_guard = OwnedHandle(token);
+        let mut len = 0u32;
+        let _ = GetTokenInformation(token_guard.0, TokenIntegrityLevel, None, 0, &mut len);
+        if len == 0 || len > 4096 {
+            return false;
+        }
+        let mut buf = vec![0u8; len as usize];
+        if GetTokenInformation(
+            token_guard.0,
+            TokenIntegrityLevel,
+            Some(buf.as_mut_ptr() as *mut c_void),
+            len,
+            &mut len,
+        )
+        .is_err()
+        {
+            return false;
+        }
+        let label = &*(buf.as_ptr() as *const TOKEN_MANDATORY_LABEL);
+        if label.Label.Sid.is_invalid() {
+            return false;
+        }
+        let count_ptr = GetSidSubAuthorityCount(label.Label.Sid);
+        if count_ptr.is_null() || *count_ptr == 0 {
+            return false;
+        }
+        let rid_ptr = GetSidSubAuthority(label.Label.Sid, u32::from(*count_ptr - 1));
+        if rid_ptr.is_null() {
+            return false;
+        }
+        *rid_ptr >= SECURITY_MANDATORY_HIGH_RID
+    }
+}
+
+#[cfg(windows)]
+fn send_win32_inputs(inputs: &[windows::Win32::UI::Input::KeyboardAndMouse::INPUT]) -> bool {
     use windows::Win32::UI::Input::KeyboardAndMouse::{SendInput, INPUT};
     if inputs.is_empty() {
-        return;
+        return true;
     }
-    unsafe {
-        let _ = SendInput(inputs, std::mem::size_of::<INPUT>() as i32);
-    }
+    unsafe { SendInput(inputs, std::mem::size_of::<INPUT>() as i32) > 0 }
 }
 
 #[cfg(windows)]
@@ -1070,17 +1415,52 @@ fn normalized_to_virtual_desktop_cached(
 }
 
 #[cfg(windows)]
+fn flush_pending_uipi_releases_locked(state: &mut HostControlState) -> bool {
+    if state.pending_uipi_vk_releases.is_empty() && state.pending_uipi_button_releases.is_empty() {
+        return true;
+    }
+    let mut inputs = Vec::new();
+    let vks: Vec<u16> = state.pending_uipi_vk_releases.iter().copied().collect();
+    for vk in &vks {
+        let still_held = state.held_vks.values().any(|set| set.contains(vk));
+        if !still_held {
+            inputs.push(make_vk_input(*vk, false, Some(is_extended_vk(*vk))));
+        }
+    }
+    let btns: Vec<String> = state.pending_uipi_button_releases.iter().cloned().collect();
+    for btn in &btns {
+        let still_held = state.held_buttons.values().any(|set| set.contains(btn));
+        if !still_held {
+            if let Some(input) = make_mouse_button_input(btn, false, None) {
+                inputs.push(input);
+            }
+        }
+    }
+    if inputs.is_empty() || send_win32_inputs(&inputs) {
+        state.pending_uipi_vk_releases.clear();
+        state.pending_uipi_button_releases.clear();
+        true
+    } else {
+        false
+    }
+}
+
+#[cfg(windows)]
 fn release_controller_locked(state: &mut HostControlState, controller_id: &str) {
     let mut inputs = Vec::new();
+    let mut released_btns = Vec::new();
+    let mut released_vks = Vec::new();
     if let Some(buttons) = state.held_buttons.remove(controller_id) {
         for btn in buttons {
             if let Some(input) = make_mouse_button_input(&btn, false, None) {
+                released_btns.push(btn);
                 inputs.push(input);
             }
         }
     }
     if let Some(vks) = state.held_vks.remove(controller_id) {
         for vk in vks {
+            released_vks.push(vk);
             inputs.push(make_vk_input(vk, false, None));
         }
     }
@@ -1096,8 +1476,13 @@ fn release_controller_locked(state: &mut HostControlState, controller_id: &str) 
         }
     }
     if !inputs.is_empty() {
-        send_win32_inputs(&inputs);
-        state.last_self_input_tick = read_last_input_tick();
+        if send_win32_inputs(&inputs) {
+            state.last_self_input_tick = read_last_input_tick();
+        } else {
+            state.elevation_blocked = is_foreground_elevated_win32();
+            state.pending_uipi_button_releases.extend(released_btns);
+            state.pending_uipi_vk_releases.extend(released_vks);
+        }
     }
 }
 
@@ -1323,8 +1708,35 @@ fn stop_host_priority_hooks() {
 }
 
 #[cfg(windows)]
+fn refresh_elevation_state_locked(state: &mut HostControlState, now: u64) -> bool {
+    if state.elevation_blocked || now.saturating_sub(state.last_elevation_check_ms) >= 150 {
+        state.last_elevation_check_ms = now;
+        let elevated = is_foreground_elevated_win32();
+        let was_blocked = state.elevation_blocked;
+        state.elevation_blocked = elevated;
+        if was_blocked && !elevated {
+            let _ = flush_pending_uipi_releases_locked(state);
+        }
+    }
+    state.elevation_blocked
+}
+
+#[cfg(windows)]
 fn poll_host_activity_locked(state: &mut HostControlState) -> bool {
     let now = now_ms();
+    let _ = refresh_elevation_state_locked(state, now);
+
+    if !HOST_PRIORITY_ENABLED.load(Ordering::Acquire) {
+        state.last_hw_input_ms = HOST_HARDWARE_INPUT_MS.load(Ordering::Acquire);
+        state.host_paused_until = 0;
+        if state.was_host_paused {
+            state.was_host_paused = false;
+            state.last_self_input_tick = read_last_input_tick();
+            state.last_self_cursor = read_cursor_pos();
+        }
+        return false;
+    }
+
     let mut host_touched = false;
 
     if HOST_PRIORITY_HOOK_ACTIVE.load(Ordering::Acquire) {
@@ -1441,7 +1853,7 @@ fn is_mouse_locked_win32(
 fn sample_cursor_and_image_locked(
     state: &mut HostControlState,
     host_busy: bool,
-) -> Option<(CursorSyncPayload, Option<isize>)> {
+) -> Option<(CursorSyncPayload, Option<isize>, Option<CursorImagePayload>)> {
     let now = now_ms();
     let (session_id, source, embedded_in_video) =
         crate::screen_sources::active_cursor_session_info(state.last_session_id.as_deref())?;
@@ -1466,18 +1878,39 @@ fn sample_cursor_and_image_locked(
         now,
     );
 
-    let capture_handle = if !cursor_showing || cursor_handle == 0 || mouse_locked {
-        None
-    } else if cursor_handle != state.last_cursor_handle
-        || state.last_cursor_image_id.is_empty()
-        || now.saturating_sub(state.last_cursor_capture_ms) >= CURSOR_RESAMPLE_MS
-    {
-        state.last_cursor_handle = cursor_handle;
-        state.last_cursor_capture_ms = now;
-        Some(cursor_handle)
-    } else {
-        None
-    };
+    let mut capture_handle = None;
+    let mut deferred_frame_emit: Option<CursorImagePayload> = None;
+
+    if cursor_showing && cursor_handle != 0 && !mouse_locked {
+        let handle_changed = cursor_handle != state.last_cursor_handle;
+        if handle_changed {
+            state.last_cursor_handle = cursor_handle;
+            state.cached_cursor_handle = 0;
+            state.cached_cursor_frames.clear();
+            state.cached_cursor_frame_idx = 0;
+            state.last_cursor_capture_ms = now;
+            capture_handle = Some(cursor_handle);
+        } else if state.cached_cursor_handle == cursor_handle && state.cached_cursor_frames.len() > 1 {
+            if now.saturating_sub(state.last_cursor_anim_ms) >= CURSOR_ANIM_FRAME_MS {
+                state.last_cursor_anim_ms = now;
+                let next_idx = (state.cached_cursor_frame_idx + 1) % state.cached_cursor_frames.len();
+                state.cached_cursor_frame_idx = next_idx;
+                let frame = state.cached_cursor_frames[next_idx].clone();
+                let id = frame.image_id.clone();
+                state.last_cursor_image_id = id.clone();
+                let already_sent = state.sent_cursor_images.contains_key(&id);
+                state.sent_cursor_images.insert(id, now);
+                if !already_sent {
+                    deferred_frame_emit = Some(frame);
+                }
+            }
+        } else if state.last_cursor_image_id.is_empty()
+            || now.saturating_sub(state.last_cursor_capture_ms) >= CURSOR_RESAMPLE_MS
+        {
+            state.last_cursor_capture_ms = now;
+            capture_handle = Some(cursor_handle);
+        }
+    }
 
     let image_id = state.last_cursor_image_id.clone();
 
@@ -1511,22 +1944,35 @@ fn sample_cursor_and_image_locked(
             image_id,
             mouse_locked,
             host_busy,
+            elevation_blocked: state.elevation_blocked,
             actor_controller_id: actor,
             embedded_in_video,
         },
         capture_handle,
+        deferred_frame_emit,
     ))
 }
 
 #[cfg(windows)]
-fn store_captured_cursor_image(
-    payload: CursorImagePayload,
+fn store_captured_cursor_frames(
+    hcursor_raw: isize,
+    frames: Vec<CursorImagePayload>,
 ) -> (String, Option<CursorImagePayload>) {
-    let id = payload.image_id.clone();
+    let Some(first) = frames.first().cloned() else {
+        return (String::new(), None);
+    };
+    let id = first.image_id.clone();
     let Ok(mut state) = HOST_STATE.lock() else {
         return (id, None);
     };
     state.last_cursor_image_id = id.clone();
+    let now = now_ms();
+    if state.last_cursor_handle == hcursor_raw {
+        state.cached_cursor_handle = hcursor_raw;
+        state.cached_cursor_frames = frames;
+        state.cached_cursor_frame_idx = 0;
+        state.last_cursor_anim_ms = now;
+    }
     let already_sent = state.sent_cursor_images.contains_key(&id);
     if !already_sent && state.sent_cursor_images.len() >= CURSOR_IMAGE_CACHE_LIMIT {
         if let Some(oldest_key) = state
@@ -1538,8 +1984,8 @@ fn store_captured_cursor_image(
             state.sent_cursor_images.remove(&oldest_key);
         }
     }
-    state.sent_cursor_images.insert(id.clone(), now_ms());
-    (id, if already_sent { None } else { Some(payload) })
+    state.sent_cursor_images.insert(id.clone(), now);
+    (id, if already_sent { None } else { Some(first) })
 }
 
 fn emit_inactive_cursor_sync(app: &AppHandle) {
@@ -1556,10 +2002,48 @@ fn emit_inactive_cursor_sync(app: &AppHandle) {
             image_id: String::new(),
             mouse_locked: false,
             host_busy: false,
+            elevation_blocked: false,
             actor_controller_id: String::new(),
             embedded_in_video: true,
         },
     );
+}
+
+#[tauri::command]
+pub fn set_remote_control_host_priority_enabled(
+    app: AppHandle,
+    window: tauri::WebviewWindow,
+    enabled: bool,
+) -> Result<bool, String> {
+    if window.label() != "main" {
+        return Err("Only the main window can manage remote control priority".into());
+    }
+    HOST_PRIORITY_ENABLED.store(enabled, Ordering::Release);
+    #[cfg(windows)]
+    {
+        if !enabled {
+            let (shape, elevation_blocked) = {
+                let mut state = HOST_STATE.lock().map_err(|_| "Remote control lock poisoned")?;
+                state.host_paused_until = 0;
+                state.was_host_paused = false;
+                state.last_hw_input_ms = HOST_HARDWARE_INPUT_MS.load(Ordering::Acquire);
+                (state.last_cursor_shape.clone(), state.elevation_blocked)
+            };
+            let _ = app.emit_to(
+                "main",
+                "remote-control-host-priority",
+                HostPriorityPayload {
+                    host_busy: false,
+                    cursor_shape: shape,
+                    elevation_blocked,
+                    host_priority_enabled: false,
+                },
+            );
+        }
+    }
+    #[cfg(not(windows))]
+    let _ = app;
+    Ok(enabled)
 }
 
 #[tauri::command]
@@ -1573,6 +2057,9 @@ pub fn set_remote_control_active(
     }
     HOST_ACTIVE.store(active, Ordering::Release);
     crate::screen_sources::refresh_wgc_cursor_for_remote_control();
+    if active {
+        crate::gamepad::set_app_handle(&app);
+    }
     #[cfg(windows)]
     {
         if active {
@@ -1591,8 +2078,16 @@ pub fn set_remote_control_active(
                 state.last_hw_input_ms = 0;
                 state.host_paused_until = 0;
                 state.was_host_paused = false;
+                state.elevation_blocked = false;
+                state.last_elevation_check_ms = 0;
+                state.pending_uipi_vk_releases.clear();
+                state.pending_uipi_button_releases.clear();
                 state.last_cursor_shape = read_cursor_shape();
                 state.last_cursor_handle = 0;
+                state.cached_cursor_handle = 0;
+                state.cached_cursor_frames.clear();
+                state.cached_cursor_frame_idx = 0;
+                state.last_cursor_anim_ms = 0;
                 state.last_cursor_image_id.clear();
                 state.last_cursor_capture_ms = 0;
                 state.sent_cursor_images.clear();
@@ -1607,26 +2102,38 @@ pub fn set_remote_control_active(
                 state.authorized_native_peers.clear();
                 state.host_paused_until = 0;
                 state.was_host_paused = false;
+                state.elevation_blocked = false;
+                state.last_elevation_check_ms = 0;
+                state.pending_uipi_vk_releases.clear();
+                state.pending_uipi_button_releases.clear();
                 state.last_session_id = None;
                 state.last_mouse_actor_id = None;
                 state.mapping_cache = None;
+                state.last_cursor_handle = 0;
+                state.cached_cursor_handle = 0;
+                state.cached_cursor_frames.clear();
+                state.cached_cursor_frame_idx = 0;
+                state.last_cursor_anim_ms = 0;
                 state.sent_cursor_images.clear();
                 state.cursor_hidden_since_ms = None;
                 state.controller_moved_while_hidden = false;
             }
         }
         if !active {
+            crate::gamepad::disconnect_all_gamepads(Some(&app));
             emit_inactive_cursor_sync(&app);
         }
         if should_spawn {
             std::thread::spawn(move || {
                 let mut prev_paused = false;
+                let mut prev_elevation_blocked = false;
+                let mut prev_priority_enabled = HOST_PRIORITY_ENABLED.load(Ordering::Acquire);
                 let mut prev_shape = String::new();
                 let mut prev_cursor_sync: Option<CursorSyncPayload> = None;
                 let mut last_cursor_emit_ms: u64 = 0;
                 loop {
                     std::thread::sleep(std::time::Duration::from_millis(MONITOR_INTERVAL_MS));
-                    let (still_active, paused, shape, sync_and_image) = {
+                    let (still_active, paused, elevation_blocked, priority_enabled, shape, sync_and_image) = {
                         let Ok(mut state) = HOST_STATE.lock() else {
                             break;
                         };
@@ -1637,13 +2144,21 @@ pub fn set_remote_control_active(
                         let paused = poll_host_activity_locked(&mut state);
                         let sampled = sample_cursor_and_image_locked(&mut state, paused);
                         let shape = state.last_cursor_shape.clone();
-                        (true, paused, shape, sampled)
+                        let elev = state.elevation_blocked;
+                        let prio = HOST_PRIORITY_ENABLED.load(Ordering::Acquire);
+                        (true, paused, elev, prio, shape, sampled)
                     };
                     if !still_active {
                         break;
                     }
-                    if paused != prev_paused || shape != prev_shape {
+                    if paused != prev_paused
+                        || elevation_blocked != prev_elevation_blocked
+                        || priority_enabled != prev_priority_enabled
+                        || shape != prev_shape
+                    {
                         prev_paused = paused;
+                        prev_elevation_blocked = elevation_blocked;
+                        prev_priority_enabled = priority_enabled;
                         prev_shape = shape.clone();
                         let _ = app.emit_to(
                             "main",
@@ -1651,19 +2166,22 @@ pub fn set_remote_control_active(
                             HostPriorityPayload {
                                 host_busy: paused,
                                 cursor_shape: shape.clone(),
+                                elevation_blocked,
+                                host_priority_enabled: priority_enabled,
                             },
                         );
                     }
-                    if let Some((mut sync_payload, capture_handle)) = sync_and_image {
+                    if let Some((mut sync_payload, capture_handle, deferred_frame_emit)) = sync_and_image {
                         // Capture HCURSOR outside HOST_STATE lock so SendInput never blocks on GDI/PNG/SHA256.
                         let new_image = if let Some(handle) = capture_handle {
-                            capture_hcursor_png_win32(handle).and_then(|img| {
-                                let (image_id, unseen) = store_captured_cursor_image(img);
+                            capture_hcursor_frames_win32(handle).and_then(|frames| {
+                                let (image_id, unseen) =
+                                    store_captured_cursor_frames(handle, frames);
                                 sync_payload.image_id = image_id;
                                 unseen
                             })
                         } else {
-                            None
+                            deferred_frame_emit
                         };
                         if let Some(img) = new_image {
                             let _ = app.emit_to("main", "remote-control-cursor-image", img);
@@ -1686,8 +2204,20 @@ pub fn set_remote_control_active(
         }
     }
     #[cfg(not(windows))]
-    let _ = (app, active);
+    {
+        if !active {
+            crate::gamepad::disconnect_all_gamepads(Some(&app));
+        }
+    }
     Ok(())
+}
+
+#[cfg(windows)]
+fn split_controller_peer_media(controller_id: &str) -> (&str, &str) {
+    match controller_id.rsplit_once(':') {
+        Some((peer, media)) if !peer.is_empty() && !media.is_empty() => (peer, media),
+        _ => (controller_id, "default"),
+    }
 }
 
 #[cfg(windows)]
@@ -1702,18 +2232,64 @@ fn apply_input_locked(
         MOUSEEVENTF_VIRTUALDESK, MOUSEEVENTF_WHEEL, MOUSEINPUT,
     };
     let input_started = std::time::Instant::now();
-    if matches!(event, RemoteInputEvent::ReleaseAll) {
-        release_controller_locked(state, controller_id);
-        return ApplyInputResult {
-            accepted: true,
-            host_busy: state.was_host_paused,
-        };
+    match &event {
+        RemoteInputEvent::GamepadState {
+            pad_index,
+            buttons,
+            left_trigger,
+            right_trigger,
+            thumb_lx,
+            thumb_ly,
+            thumb_rx,
+            thumb_ry,
+        } => {
+            let (peer_id, media_id) = split_controller_peer_media(controller_id);
+            crate::gamepad::apply_gamepad_state(
+                None,
+                peer_id,
+                media_id,
+                *pad_index,
+                crate::gamepad::GamepadWireState {
+                    buttons: *buttons,
+                    left_trigger: *left_trigger,
+                    right_trigger: *right_trigger,
+                    thumb_lx: *thumb_lx,
+                    thumb_ly: *thumb_ly,
+                    thumb_rx: *thumb_rx,
+                    thumb_ry: *thumb_ry,
+                },
+            );
+            return ApplyInputResult {
+                accepted: true,
+                host_busy: false,
+                elevation_blocked: false,
+            };
+        }
+        RemoteInputEvent::GamepadDisconnect { pad_index } => {
+            let (peer_id, media_id) = split_controller_peer_media(controller_id);
+            crate::gamepad::disconnect_gamepad_pad(None, peer_id, media_id, *pad_index);
+            return ApplyInputResult {
+                accepted: true,
+                host_busy: false,
+                elevation_blocked: false,
+            };
+        }
+        RemoteInputEvent::ReleaseAll => {
+            release_controller_locked(state, controller_id);
+            return ApplyInputResult {
+                accepted: true,
+                host_busy: state.was_host_paused,
+                elevation_blocked: state.elevation_blocked,
+            };
+        }
+        _ => {}
     }
     if poll_host_activity_locked(state) {
         state.perf_busy_dropped += 1;
         return ApplyInputResult {
             accepted: false,
             host_busy: true,
+            elevation_blocked: state.elevation_blocked,
         };
     }
 
@@ -1739,6 +2315,7 @@ fn apply_input_locked(
         }
     }
     let mut moved_cursor = false;
+    let mut input_sent = true;
     match event {
         RemoteInputEvent::MouseMove { x, y } => {
             let Some((dx, dy)) = normalized_to_virtual_desktop_cached(state, session_id, x, y)
@@ -1746,6 +2323,7 @@ fn apply_input_locked(
                 return ApplyInputResult {
                     accepted: false,
                     host_busy: false,
+                    elevation_blocked: state.elevation_blocked,
                 };
             };
             let input = INPUT {
@@ -1761,8 +2339,8 @@ fn apply_input_locked(
                     },
                 },
             };
-            send_win32_inputs(&[input]);
-            moved_cursor = true;
+            input_sent = send_win32_inputs(&[input]);
+            moved_cursor = input_sent;
         }
         RemoteInputEvent::MouseDelta { dx, dy } => {
             let clamped_dx = dx.clamp(-10_000, 10_000);
@@ -1781,8 +2359,8 @@ fn apply_input_locked(
                         },
                     },
                 };
-                send_win32_inputs(&[input]);
-                moved_cursor = true;
+                input_sent = send_win32_inputs(&[input]);
+                moved_cursor = input_sent;
             }
         }
         RemoteInputEvent::MouseButton {
@@ -1792,26 +2370,33 @@ fn apply_input_locked(
             y,
         } => {
             let abs = match (x, y) {
-                (Some(nx), Some(ny)) => {
-                    let res = normalized_to_virtual_desktop_cached(state, session_id, nx, ny);
-                    if res.is_some() {
-                        moved_cursor = true;
-                    }
-                    res
-                }
+                (Some(nx), Some(ny)) => normalized_to_virtual_desktop_cached(state, session_id, nx, ny),
                 _ => None,
             };
             if let Some(input) = make_mouse_button_input(&button, down, abs) {
-                if down {
-                    state
-                        .held_buttons
-                        .entry(controller_id.to_string())
-                        .or_default()
-                        .insert(button);
-                } else if let Some(set) = state.held_buttons.get_mut(controller_id) {
-                    set.remove(&button);
+                input_sent = send_win32_inputs(&[input]);
+                if input_sent && abs.is_some() {
+                    moved_cursor = true;
                 }
-                send_win32_inputs(&[input]);
+                if down {
+                    if input_sent {
+                        state.pending_uipi_button_releases.remove(&button);
+                        state
+                            .held_buttons
+                            .entry(controller_id.to_string())
+                            .or_default()
+                            .insert(button);
+                    } else if let Some(set) = state.held_buttons.get_mut(controller_id) {
+                        set.remove(&button);
+                    }
+                } else {
+                    if let Some(set) = state.held_buttons.get_mut(controller_id) {
+                        set.remove(&button);
+                    }
+                    if !input_sent {
+                        state.pending_uipi_button_releases.insert(button);
+                    }
+                }
             }
         }
         RemoteInputEvent::MouseWheel {
@@ -1824,14 +2409,16 @@ fn apply_input_locked(
                 return ApplyInputResult {
                     accepted: false,
                     host_busy: false,
+                    elevation_blocked: state.elevation_blocked,
                 };
             }
             let mut inputs = Vec::new();
+            let mut had_coords = false;
             if let (Some(nx), Some(ny)) = (x, y) {
                 if let Some((dx, dy)) =
                     normalized_to_virtual_desktop_cached(state, session_id, nx, ny)
                 {
-                    moved_cursor = true;
+                    had_coords = true;
                     inputs.push(INPUT {
                         r#type: INPUT_MOUSE,
                         Anonymous: INPUT_0 {
@@ -1881,7 +2468,8 @@ fn apply_input_locked(
                     },
                 });
             }
-            send_win32_inputs(&inputs);
+            input_sent = send_win32_inputs(&inputs);
+            moved_cursor = input_sent && had_coords;
         }
         RemoteInputEvent::Key {
             code,
@@ -1897,6 +2485,7 @@ fn apply_input_locked(
                 return ApplyInputResult {
                     accepted: false,
                     host_busy: false,
+                    elevation_blocked: state.elevation_blocked,
                 };
             }
             let modifiers_held =
@@ -1907,11 +2496,20 @@ fn apply_input_locked(
                     .remove(&(controller_id.to_string(), code.clone()))
                 {
                     let inputs = make_unicode_units_inputs(&units, false);
-                    send_win32_inputs(&inputs);
+                    input_sent = send_win32_inputs(&inputs);
+                    if !input_sent {
+                        state.elevation_blocked = is_foreground_elevated_win32();
+                        return ApplyInputResult {
+                            accepted: false,
+                            host_busy: false,
+                            elevation_blocked: state.elevation_blocked,
+                        };
+                    }
                     state.last_self_input_tick = read_last_input_tick();
                     return ApplyInputResult {
                         accepted: true,
                         host_busy: false,
+                        elevation_blocked: state.elevation_blocked,
                     };
                 }
             }
@@ -1925,32 +2523,55 @@ fn apply_input_locked(
                     || dom_code_to_vk(&code).is_none());
             if use_unicode {
                 let units: Vec<u16> = key.encode_utf16().collect();
-                if down {
+                let inputs = make_unicode_inputs(&key, down);
+                input_sent = send_win32_inputs(&inputs);
+                if down && input_sent {
                     state
                         .held_unicode
                         .insert((controller_id.to_string(), code), units);
+                } else if !down {
+                    state.held_unicode.remove(&(controller_id.to_string(), code));
                 }
-                let inputs = make_unicode_inputs(&key, down);
-                send_win32_inputs(&inputs);
             } else if let Some((resolved_vk, ext)) = vk
                 .filter(|&v| v > 0 && v <= 0xFE)
                 .map(|v| (v, is_extended_vk(v)))
                 .or_else(|| dom_code_to_vk(&code))
             {
-                if down {
-                    state
-                        .held_vks
-                        .entry(controller_id.to_string())
-                        .or_default()
-                        .insert(resolved_vk);
-                } else if let Some(set) = state.held_vks.get_mut(controller_id) {
-                    set.remove(&resolved_vk);
-                }
                 let input = make_vk_input(resolved_vk, down, Some(ext));
-                send_win32_inputs(&[input]);
+                input_sent = send_win32_inputs(&[input]);
+                if down {
+                    if input_sent {
+                        state.pending_uipi_vk_releases.remove(&resolved_vk);
+                        state
+                            .held_vks
+                            .entry(controller_id.to_string())
+                            .or_default()
+                            .insert(resolved_vk);
+                    } else if let Some(set) = state.held_vks.get_mut(controller_id) {
+                        set.remove(&resolved_vk);
+                    }
+                } else {
+                    if let Some(set) = state.held_vks.get_mut(controller_id) {
+                        set.remove(&resolved_vk);
+                    }
+                    if !input_sent {
+                        state.pending_uipi_vk_releases.insert(resolved_vk);
+                    }
+                }
             }
         }
-        RemoteInputEvent::ReleaseAll => {}
+        RemoteInputEvent::ReleaseAll
+        | RemoteInputEvent::GamepadState { .. }
+        | RemoteInputEvent::GamepadDisconnect { .. } => {}
+    }
+
+    if !input_sent {
+        state.elevation_blocked = is_foreground_elevated_win32();
+        return ApplyInputResult {
+            accepted: false,
+            host_busy: false,
+            elevation_blocked: state.elevation_blocked,
+        };
     }
 
     if !HOST_PRIORITY_HOOK_ACTIVE.load(Ordering::Acquire) {
@@ -1990,6 +2611,7 @@ fn apply_input_locked(
     ApplyInputResult {
         accepted: true,
         host_busy: false,
+        elevation_blocked: state.elevation_blocked,
     }
 }
 
@@ -2130,6 +2752,27 @@ pub fn decode_binary_input_frame(frame: &[u8]) -> Option<(String, u32, RemoteInp
             }
             RemoteInputEvent::ReleaseAll
         }
+        8 => {
+            if rest.len() != 13 {
+                return None;
+            }
+            RemoteInputEvent::GamepadState {
+                pad_index: rest[0],
+                buttons: u16::from_be_bytes(rest[1..3].try_into().ok()?),
+                left_trigger: rest[3],
+                right_trigger: rest[4],
+                thumb_lx: i16::from_be_bytes(rest[5..7].try_into().ok()?),
+                thumb_ly: i16::from_be_bytes(rest[7..9].try_into().ok()?),
+                thumb_rx: i16::from_be_bytes(rest[9..11].try_into().ok()?),
+                thumb_ry: i16::from_be_bytes(rest[11..13].try_into().ok()?),
+            }
+        }
+        9 => {
+            if rest.len() != 1 {
+                return None;
+            }
+            RemoteInputEvent::GamepadDisconnect { pad_index: rest[0] }
+        }
         _ => return None,
     };
     Some((media_id.to_string(), seq, event))
@@ -2144,6 +2787,7 @@ pub fn set_remote_control_native_peer(
     authorized: bool,
     mouse_enabled: bool,
     keyboard_enabled: bool,
+    gamepad_enabled: Option<bool>,
 ) -> Result<(), String> {
     if window.label() != "main" {
         return Err("Only the main window can manage remote control peers".into());
@@ -2151,22 +2795,36 @@ pub fn set_remote_control_native_peer(
     if peer_id.is_empty() || peer_id.len() > 240 || media_id.len() > 64 {
         return Err("Invalid remote control peer or media ID".into());
     }
-    let mut state = HOST_STATE.lock().map_err(|_| "Remote control lock poisoned")?;
-    if authorized && !media_id.is_empty() {
-        state.authorized_native_peers.insert(
-            (peer_id, media_id),
-            NativePeerPermission {
-                session_id,
-                mouse_enabled,
-                keyboard_enabled,
-            },
+    let gamepad_allowed = gamepad_enabled.unwrap_or(true);
+    {
+        let mut state = HOST_STATE.lock().map_err(|_| "Remote control lock poisoned")?;
+        if authorized && !media_id.is_empty() {
+            state.authorized_native_peers.insert(
+                (peer_id.clone(), media_id.clone()),
+                NativePeerPermission {
+                    session_id,
+                    mouse_enabled,
+                    keyboard_enabled,
+                    gamepad_enabled: gamepad_allowed,
+                },
+            );
+        } else if media_id.is_empty() {
+            state
+                .authorized_native_peers
+                .retain(|(peer, _), _| peer != &peer_id);
+        } else {
+            state
+                .authorized_native_peers
+                .remove(&(peer_id.clone(), media_id.clone()));
+        }
+    }
+    if !authorized && media_id.is_empty() {
+        crate::gamepad::disconnect_peer_gamepads(Some(&window.app_handle()), &peer_id);
+    } else if !authorized || !gamepad_allowed {
+        crate::gamepad::disconnect_controller_gamepads(
+            Some(&window.app_handle()),
+            &format!("{peer_id}:{media_id}"),
         );
-    } else if media_id.is_empty() {
-        state
-            .authorized_native_peers
-            .retain(|(peer, _), _| peer != &peer_id);
-    } else {
-        state.authorized_native_peers.remove(&(peer_id, media_id));
     }
     Ok(())
 }
@@ -2222,6 +2880,13 @@ pub fn apply_native_datachannel_input(
         if matches!(event, RemoteInputEvent::Key { .. }) && !perm.keyboard_enabled {
             return false;
         }
+        if matches!(
+            event,
+            RemoteInputEvent::GamepadState { .. } | RemoteInputEvent::GamepadDisconnect { .. }
+        ) && !perm.gamepad_enabled
+        {
+            return false;
+        }
         let session_id = perm
             .session_id
             .clone()
@@ -2256,6 +2921,7 @@ pub fn apply_remote_control_input(
             return Ok(ApplyInputResult {
                 accepted: false,
                 host_busy: false,
+                elevation_blocked: false,
             });
         }
         Ok(apply_input_locked(
@@ -2271,6 +2937,7 @@ pub fn apply_remote_control_input(
         Ok(ApplyInputResult {
             accepted: false,
             host_busy: false,
+            elevation_blocked: false,
         })
     }
 }
@@ -2351,6 +3018,9 @@ unsafe extern "system" fn immersive_keyboard_proc(
             let ctrl_down = (GetAsyncKeyState(0x11) < 0)
                 || (GetAsyncKeyState(0xA2) < 0)
                 || (GetAsyncKeyState(0xA3) < 0);
+            let shift_down = (GetAsyncKeyState(0x10) < 0)
+                || (GetAsyncKeyState(0xA0) < 0)
+                || (GetAsyncKeyState(0xA1) < 0);
 
             if is_up {
                 let held_mask = IMMERSIVE_HELD_MASK.load(Ordering::Acquire);
@@ -2366,6 +3036,7 @@ unsafe extern "system" fn immersive_keyboard_proc(
                                 down: false,
                                 ctrl_key: ctrl_down,
                                 alt_key: false,
+                                shift_key: shift_down,
                             });
                         }
                     }
@@ -2383,6 +3054,7 @@ unsafe extern "system" fn immersive_keyboard_proc(
                                 down: false,
                                 ctrl_key: false,
                                 alt_key: alt_down,
+                                shift_key: shift_down,
                             });
                         }
                     }
@@ -2423,6 +3095,7 @@ unsafe extern "system" fn immersive_keyboard_proc(
                                 down,
                                 ctrl_key: ctrl_down,
                                 alt_key: alt_down,
+                                shift_key: shift_down,
                             });
                         }
                     }
@@ -3058,6 +3731,7 @@ fn stop_immersive_hook() {
 pub fn shutdown_remote_control() {
     HOST_ACTIVE.store(false, Ordering::Release);
     stop_immersive_hook();
+    crate::gamepad::disconnect_all_gamepads(None);
     #[cfg(windows)]
     {
         stop_raw_mouse_lock();
@@ -3194,5 +3868,46 @@ mod tests {
             delta_ev,
             RemoteInputEvent::MouseDelta { dx: -15, dy: 25 }
         ));
+
+        let mut pad_frame = vec![0x52, 0x43, 0x01, 8, 6];
+        pad_frame.extend_from_slice(b"screen");
+        pad_frame.extend_from_slice(&50u32.to_be_bytes());
+        pad_frame.push(1);
+        pad_frame.extend_from_slice(&0x1020u16.to_be_bytes());
+        pad_frame.push(128);
+        pad_frame.push(255);
+        pad_frame.extend_from_slice(&(-12345i16).to_be_bytes());
+        pad_frame.extend_from_slice(&32767i16.to_be_bytes());
+        pad_frame.extend_from_slice(&0i16.to_be_bytes());
+        pad_frame.extend_from_slice(&(-32768i16).to_be_bytes());
+        let (_, _, pad_ev) = decode_binary_input_frame(&pad_frame).expect("valid gamepad frame");
+        assert!(matches!(
+            pad_ev,
+            RemoteInputEvent::GamepadState {
+                pad_index: 1,
+                buttons: 0x1020,
+                left_trigger: 128,
+                right_trigger: 255,
+                thumb_lx: -12345,
+                thumb_ly: 32767,
+                thumb_rx: 0,
+                thumb_ry: -32768,
+            }
+        ));
+        assert!(tracker.accept(true, 50, &pad_ev));
+        assert!(!tracker.accept(true, 49, &pad_ev));
+        assert!(tracker.accept(false, 51, &pad_ev));
+
+        let mut disc = vec![0x52, 0x43, 0x01, 9, 6];
+        disc.extend_from_slice(b"screen");
+        disc.extend_from_slice(&52u32.to_be_bytes());
+        disc.push(1);
+        let (_, _, disc_ev) =
+            decode_binary_input_frame(&disc).expect("valid gamepad disconnect frame");
+        assert!(matches!(
+            disc_ev,
+            RemoteInputEvent::GamepadDisconnect { pad_index: 1 }
+        ));
+        assert!(tracker.accept(false, 52, &disc_ev));
     }
 }

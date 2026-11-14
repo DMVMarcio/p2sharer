@@ -583,8 +583,10 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           mouseLock={remoteControl.mouseLocked}
           onToggleMouseLock={remoteControl.toggleManualMouseLock}
           hostBusy={remoteControl.hostBusy}
+          elevationBlocked={remoteControl.elevationBlocked}
           mouseEnabled={remoteControl.mouseEnabled}
           keyboardEnabled={remoteControl.keyboardEnabled}
+          gamepadEnabled={remoteControl.gamepadEnabled}
           volume={volume}
           isMuted={isMuted}
           onVolumeChange={(val) => {

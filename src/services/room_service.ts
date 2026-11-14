@@ -14,6 +14,7 @@ import {
   type RemoteCursorImageAsset,
   type RemoteCursorSyncState,
   type RemoteInputEvent,
+  type VirtualGamepadSlot,
 } from '../core/remote_control.ts';
 import { emitTo, listen } from '@tauri-apps/api/event';
 import { streamPointerView } from './stream_pointer_view.ts';
@@ -80,6 +81,10 @@ export class RoomService {
   public remoteControlRequests: RemoteControlRequest[] = [];
   public remoteControllers: RemoteControllerInfo[] = [];
   public remoteControlHostBusy = false;
+  public remoteControlHostPriorityEnabled = true;
+  public remoteControlElevationBlocked = false;
+  public remoteControlGamepadDriverAvailable = true;
+  public remoteControlVirtualGamepads: VirtualGamepadSlot[] = [];
   public remoteControlViewerStates: Record<string, RemoteControlViewerState> = {};
   public remoteCursorStates: Record<string, RemoteCursorSyncState> = {};
   public remoteCursorImages: Record<string, RemoteCursorImageAsset> = {};
@@ -104,7 +109,7 @@ export class RoomService {
     {
       inFlight: boolean;
       pending: { sessionId: string | null; event: RemoteInputEvent } | null;
-      promise?: Promise<{ accepted: boolean; hostBusy: boolean }>;
+      promise?: Promise<{ accepted: boolean; hostBusy: boolean; elevationBlocked?: boolean }>;
     }
   >();
 
@@ -144,11 +149,47 @@ export class RoomService {
       void listen<{ peerId: string }>('stream-pointer-ready', ({ payload }) => {
         if (payload && (payload.peerId === 'local' || stateStore.subscribedStreams.has(payload.peerId))) this.publishPointerView(payload.peerId, streamPointerView.state(payload.peerId));
       }).catch(console.warn);
-      void listen<{ hostBusy?: boolean; cursorShape?: string }>('remote-control-host-priority', ({ payload }) => {
-        if (payload) {
-          this.remoteControlHost.setHostPriorityState(Boolean(payload.hostBusy), normalizeCursorShape(payload.cursorShape));
+      void listen<{
+        hostBusy?: boolean;
+        cursorShape?: string;
+        elevationBlocked?: boolean;
+        hostPriorityEnabled?: boolean;
+      }>('remote-control-host-priority', ({ payload }) => {
+        if (!payload) return;
+        let dirty = false;
+        if (typeof payload.hostPriorityEnabled === 'boolean' && payload.hostPriorityEnabled !== this.remoteControlHostPriorityEnabled) {
+          this.remoteControlHostPriorityEnabled = payload.hostPriorityEnabled;
+          dirty = true;
         }
+        const elevBlocked = Boolean(payload.elevationBlocked);
+        if (elevBlocked !== this.remoteControlElevationBlocked) {
+          this.remoteControlElevationBlocked = elevBlocked;
+          dirty = true;
+        }
+        this.remoteControlHost.setHostPriorityState(
+          Boolean(payload.hostBusy),
+          normalizeCursorShape(payload.cursorShape),
+          elevBlocked,
+        );
+        if (dirty) this.notify();
       }).catch(console.warn);
+      void listen<{ driverAvailable?: boolean; gamepads?: VirtualGamepadSlot[] }>(
+        'remote-control-gamepads-changed',
+        ({ payload }) => {
+          if (!payload) return;
+          this.remoteControlGamepadDriverAvailable = Boolean(payload.driverAvailable);
+          this.remoteControlVirtualGamepads = Array.isArray(payload.gamepads) ? payload.gamepads : [];
+          this.notify();
+        },
+      ).catch(console.warn);
+      void invoke<{ driverAvailable: boolean; gamepads: VirtualGamepadSlot[] }>('get_remote_control_gamepads')
+        .then((snap) => {
+          if (!snap) return;
+          this.remoteControlGamepadDriverAvailable = Boolean(snap.driverAvailable);
+          this.remoteControlVirtualGamepads = Array.isArray(snap.gamepads) ? snap.gamepads : [];
+          this.notify();
+        })
+        .catch(() => {});
       void listen<{
         imageId?: string;
         width?: number;
@@ -168,7 +209,7 @@ export class RoomService {
         ) {
           return;
         }
-        if (this.hostCapturedCursorImages.size >= 64 && !this.hostCapturedCursorImages.has(payload.imageId)) {
+        if (this.hostCapturedCursorImages.size >= 128 && !this.hostCapturedCursorImages.has(payload.imageId)) {
           const oldest = this.hostCapturedCursorImages.keys().next().value;
           if (oldest) this.hostCapturedCursorImages.delete(oldest);
         }
@@ -193,6 +234,7 @@ export class RoomService {
         imageId?: string;
         mouseLocked?: boolean;
         hostBusy?: boolean;
+        elevationBlocked?: boolean;
         actorControllerId?: string;
         embeddedInVideo?: boolean;
       }>('remote-control-cursor-sync', ({ payload }) => {
@@ -228,6 +270,7 @@ export class RoomService {
             imageId,
             mouseLocked,
             hostBusy: Boolean(payload.hostBusy),
+            elevationBlocked: Boolean(payload.elevationBlocked),
             actorPeerId: actorPeerId.slice(0, 96),
             embeddedInVideo: Boolean(payload.embeddedInVideo),
           });
@@ -565,11 +608,14 @@ export class RoomService {
       onStreamStarted: () => soundEffects.playScreenShareStart(),
       onStreamStopped: (peerId, _uname, isLocal) => {
         soundEffects.playScreenShareStop();
-        if (!isLocal && stateStore.subscribedStreams.has(peerId)) {
-          stateStore.set((s) => {
-            s.subscribedStreams.delete(peerId);
-          });
-          this.notify();
+        if (!isLocal) {
+          this.stopRemoteControlViewer(peerId);
+          if (stateStore.subscribedStreams.has(peerId)) {
+            stateStore.set((s) => {
+              s.subscribedStreams.delete(peerId);
+            });
+            this.notify();
+          }
         }
       },
       onWatchStarted: () => {
@@ -706,17 +752,22 @@ export class RoomService {
         }
       }
       if (!isTauri()) return;
+      if (active) {
+        void invoke('set_remote_control_host_priority_enabled', {
+          enabled: this.remoteControlHostPriorityEnabled,
+        }).catch(() => {});
+      }
       return invoke('set_remote_control_active', { active });
     },
     applyInput: (controllerId, sessionId, event) => {
-      if (!isTauri()) return Promise.resolve({ accepted: false, hostBusy: false });
+      if (!isTauri()) return Promise.resolve({ accepted: false, hostBusy: false, elevationBlocked: false });
       return this.dispatchCoalescedHostInput(controllerId, sessionId ?? null, event);
     },
     releaseInputs: (controllerId) => {
       if (!isTauri()) return;
       return invoke('release_remote_control_inputs', { controllerId: controllerId ?? null });
     },
-    syncNativePeer: (peerId, mediaId, sessionId, authorized, mouseEnabled, keyboardEnabled) => {
+    syncNativePeer: (peerId, mediaId, sessionId, authorized, mouseEnabled, keyboardEnabled, gamepadEnabled) => {
       if (!isTauri()) return;
       return invoke('set_remote_control_native_peer', {
         peerId,
@@ -725,12 +776,14 @@ export class RoomService {
         authorized,
         mouseEnabled,
         keyboardEnabled,
+        gamepadEnabled,
       });
     },
     onChange: () => {
       this.remoteControlRequests = this.remoteControlHost.getRequests();
       this.remoteControllers = this.remoteControlHost.getControllers();
       this.remoteControlHostBusy = this.remoteControlHost.isHostBusy();
+      this.remoteControlElevationBlocked = this.remoteControlHost.isElevationBlocked();
       this.notify();
     },
   });
@@ -739,7 +792,7 @@ export class RoomService {
     controllerId: string,
     sessionId: string | null,
     event: RemoteInputEvent,
-  ): Promise<{ accepted: boolean; hostBusy: boolean }> {
+  ): Promise<{ accepted: boolean; hostBusy: boolean; elevationBlocked?: boolean }> {
     let slot = this.remoteControlMoveQueues.get(controllerId);
     if (!slot) {
       slot = { inFlight: false, pending: null };
@@ -756,13 +809,13 @@ export class RoomService {
       ) {
         slot.pending = null;
       }
-      return invoke<{ accepted: boolean; hostBusy: boolean }>('apply_remote_control_input', {
+      return invoke<{ accepted: boolean; hostBusy: boolean; elevationBlocked?: boolean }>('apply_remote_control_input', {
         controllerId,
         sessionId,
         event,
       }).catch((err) => {
         console.warn('[RemoteControl] apply_remote_control_input failed:', err);
-        return { accepted: false, hostBusy: false };
+        return { accepted: false, hostBusy: false, elevationBlocked: false };
       });
     }
 
@@ -785,16 +838,16 @@ export class RoomService {
     const runMove = (
       nextSessionId: string | null,
       nextEvent: RemoteInputEvent,
-    ): Promise<{ accepted: boolean; hostBusy: boolean }> => {
+    ): Promise<{ accepted: boolean; hostBusy: boolean; elevationBlocked?: boolean }> => {
       slot!.inFlight = true;
-      const req = invoke<{ accepted: boolean; hostBusy: boolean }>('apply_remote_control_input', {
+      const req = invoke<{ accepted: boolean; hostBusy: boolean; elevationBlocked?: boolean }>('apply_remote_control_input', {
         controllerId,
         sessionId: nextSessionId,
         event: nextEvent,
       })
         .catch((err) => {
           console.warn('[RemoteControl] apply_remote_control_input move failed:', err);
-          return { accepted: false, hostBusy: false };
+          return { accepted: false, hostBusy: false, elevationBlocked: false };
         })
         .finally(() => {
           const queued = slot!.pending;
@@ -883,7 +936,7 @@ export class RoomService {
       if (existing) return;
       const nextImages: Record<string, RemoteCursorImageAsset> = { ...this.remoteCursorImages };
       const keys = Object.keys(nextImages);
-      if (keys.length >= 64) {
+      if (keys.length >= 128) {
         delete nextImages[keys[0]];
       }
       nextImages[packet.imageId] = {
@@ -934,6 +987,7 @@ export class RoomService {
           imageId: packet.imageId ?? '',
           mouseLocked: Boolean(packet.mouseLocked),
           hostBusy: packet.hostBusy,
+          elevationBlocked: Boolean(packet.elevationBlocked),
           actorPeerId: packet.actorPeerId,
           embeddedInVideo: packet.embeddedInVideo,
           updatedAt: Date.now(),
@@ -962,8 +1016,10 @@ export class RoomService {
           status: 'active',
           mouseEnabled: packet.mouseEnabled,
           keyboardEnabled: packet.keyboardEnabled,
+          gamepadEnabled: packet.gamepadEnabled ?? true,
           cursorCaptured: packet.cursorCaptured,
           hostBusy: packet.hostBusy,
+          elevationBlocked: Boolean(packet.elevationBlocked),
           cursorShape: packet.cursorShape,
           fastBinary: Boolean(packet.fastBinary),
         },
@@ -982,8 +1038,10 @@ export class RoomService {
           ...current,
           mouseEnabled: packet.mouseEnabled,
           keyboardEnabled: packet.keyboardEnabled,
+          gamepadEnabled: packet.gamepadEnabled ?? current.gamepadEnabled,
           cursorCaptured: packet.cursorCaptured,
           hostBusy: packet.hostBusy,
+          elevationBlocked: Boolean(packet.elevationBlocked),
           cursorShape: packet.cursorShape,
         },
       };
@@ -1036,8 +1094,10 @@ export class RoomService {
         status: 'pending',
         mouseEnabled: true,
         keyboardEnabled: true,
+        gamepadEnabled: true,
         cursorCaptured: true,
         hostBusy: false,
+        elevationBlocked: false,
         cursorShape: 'default',
       },
     };
@@ -1076,6 +1136,9 @@ export class RoomService {
     if (event.kind === 'key' && !current.keyboardEnabled) {
       return;
     }
+    if ((event.kind === 'gamepadState' || event.kind === 'gamepadDisconnect') && !current.gamepadEnabled) {
+      return;
+    }
     this.roomManager?.sendRemoteControlClient({ type: 'input', mediaId: current.mediaId, event }, current.hostPeerId);
   }
 
@@ -1086,13 +1149,49 @@ export class RoomService {
   public setRemoteControllerPermissions(
     peerId: string,
     mediaId: string,
-    patch: { mouseEnabled?: boolean; keyboardEnabled?: boolean },
+    patch: { mouseEnabled?: boolean; keyboardEnabled?: boolean; gamepadEnabled?: boolean },
   ): void {
     this.remoteControlHost.setControllerPermissions(peerId, mediaId, patch);
   }
 
   public revokeRemoteController(peerId: string, mediaId: string): void {
     this.remoteControlHost.revokeController(peerId, mediaId, 'revoked');
+  }
+
+  public async setRemoteControlHostPriorityEnabled(enabled: boolean): Promise<void> {
+    this.remoteControlHostPriorityEnabled = enabled;
+    this.notify();
+    if (!isTauri()) return;
+    try {
+      await invoke('set_remote_control_host_priority_enabled', { enabled });
+    } catch (err) {
+      console.warn('[RemoteControl] Failed to update host priority setting:', err);
+    }
+  }
+
+  public async recheckRemoteControlGamepadDriver(): Promise<void> {
+    if (!isTauri()) return;
+    try {
+      const snap = await invoke<{ driverAvailable: boolean; gamepads: VirtualGamepadSlot[] }>(
+        'recheck_remote_control_gamepad_driver',
+      );
+      if (snap) {
+        this.remoteControlGamepadDriverAvailable = Boolean(snap.driverAvailable);
+        this.remoteControlVirtualGamepads = Array.isArray(snap.gamepads) ? snap.gamepads : [];
+        this.notify();
+      }
+    } catch (err) {
+      console.warn('[Gamepad] Failed to probe ViGEmBus driver:', err);
+    }
+  }
+
+  public async reorderRemoteControlGamepads(orderedIds: string[]): Promise<void> {
+    if (!isTauri() || orderedIds.length === 0) return;
+    try {
+      await invoke('reorder_remote_control_gamepads', { orderedIds });
+    } catch (err) {
+      console.warn('[Gamepad] Failed to reorder virtual gamepads:', err);
+    }
   }
 
   public refreshStreamPointerPermissions(): void {
@@ -1304,9 +1403,13 @@ export class RoomService {
     }
     this.joinOutcome = 'idle';
     this.joinError = '';
+    for (const viewerSlotPeerId of Object.keys(this.remoteControlViewerStates)) {
+      this.stopRemoteControlViewer(viewerSlotPeerId);
+    }
     this.pointerReceiver.clear();
     this.remoteControlHost.clear();
     this.remoteControlViewerStates = {};
+    this.remoteControlElevationBlocked = false;
     this.remoteCursorStates = {};
     this.remoteCursorImages = {};
     this.hostCapturedCursorImages.clear();

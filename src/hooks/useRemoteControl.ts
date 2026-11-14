@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type RefObject } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { isTauri } from '@tauri-apps/api/core';
 import {
@@ -6,13 +6,16 @@ import {
   streamPointerPosition,
   streamPointerVideoRect,
 } from '../core/stream_pointer.ts';
-import type {
-  RemoteControlStatus,
-  RemoteControlViewerState,
-  RemoteCursorImageAsset,
-  RemoteCursorShape,
-  RemoteCursorSyncState,
-  RemoteMouseButton,
+import {
+  hasMeaningfulGamepadInput,
+  readGamepadSnapshotState,
+  type GamepadSnapshotState,
+  type RemoteControlStatus,
+  type RemoteControlViewerState,
+  type RemoteCursorImageAsset,
+  type RemoteCursorShape,
+  type RemoteCursorSyncState,
+  type RemoteMouseButton,
 } from '../core/remote_control.ts';
 import { invoke } from '../platform/commands.ts';
 import { logDiagnostic } from '../core/logger.ts';
@@ -25,9 +28,13 @@ interface ImmersiveKeyPayload {
   down: boolean;
   ctrlKey?: boolean;
   altKey?: boolean;
+  shiftKey?: boolean;
 }
 
 const persistedImmersiveByPeer = new Map<string, boolean>();
+const immersiveHookClaimants = new Map<string, { hoverActive: boolean }>();
+const activeGamepadsBySlotPeer = new Map<string, Set<number>>();
+let lastImmersiveSync: { enabled: boolean; hoverActive: boolean } | null = null;
 let immersiveSyncQueue: Promise<void> = Promise.resolve();
 
 function queueImmersiveHookSync(enabled: boolean, hoverActive: boolean): void {
@@ -35,6 +42,32 @@ function queueImmersiveHookSync(enabled: boolean, hoverActive: boolean): void {
     .then(() => invoke('set_remote_control_immersive', { enabled, hoverActive }))
     .then(() => undefined)
     .catch(() => {});
+}
+
+function updateImmersiveHookClaimant(
+  claimantId: string,
+  live: boolean,
+  hoverActive: boolean,
+): void {
+  if (live) {
+    immersiveHookClaimants.set(claimantId, { hoverActive });
+  } else {
+    immersiveHookClaimants.delete(claimantId);
+  }
+  let anyEnabled = false;
+  let anyHover = false;
+  for (const entry of immersiveHookClaimants.values()) {
+    anyEnabled = true;
+    if (entry.hoverActive) anyHover = true;
+  }
+  if (
+    !lastImmersiveSync ||
+    lastImmersiveSync.enabled !== anyEnabled ||
+    lastImmersiveSync.hoverActive !== anyHover
+  ) {
+    lastImmersiveSync = { enabled: anyEnabled, hoverActive: anyHover };
+    queueImmersiveHookSync(anyEnabled, anyHover);
+  }
 }
 
 interface RawMouseDeltaPayload {
@@ -47,8 +80,10 @@ export interface RemoteControlHookState {
   pending: boolean;
   active: boolean;
   hostBusy: boolean;
+  elevationBlocked: boolean;
   mouseEnabled: boolean;
   keyboardEnabled: boolean;
+  gamepadEnabled: boolean;
   cursorCaptured: boolean;
   cursorShape: RemoteCursorShape;
   immersive: boolean;
@@ -106,12 +141,15 @@ export function useRemoteControl(
   cursorSync?: RemoteCursorSyncState,
   cursorImages?: Record<string, RemoteCursorImageAsset>,
 ): RemoteControlHookState {
+  const claimantId = useId();
   const status: RemoteControlStatus = eligible && viewerState ? viewerState.status : 'idle';
   const active = status === 'active';
   const pending = status === 'pending';
-  const hostBusy = active && Boolean(viewerState?.hostBusy);
+  const hostBusy = active && Boolean(viewerState?.hostBusy || cursorSync?.hostBusy);
+  const elevationBlocked = active && Boolean(viewerState?.elevationBlocked || cursorSync?.elevationBlocked);
   const mouseEnabled = Boolean(viewerState?.mouseEnabled);
   const keyboardEnabled = Boolean(viewerState?.keyboardEnabled);
+  const gamepadEnabled = Boolean(viewerState?.gamepadEnabled ?? true);
   const cursorCaptured = Boolean(viewerState?.cursorCaptured);
   const cursorShape: RemoteCursorShape = viewerState?.cursorShape ?? 'default';
   const hostMouseLocked = Boolean(cursorSync?.active && cursorSync.mouseLocked);
@@ -123,6 +161,7 @@ export function useRemoteControl(
   const [overlayMenuOpen, setOverlayMenuOpen] = useState(false);
   const [pointerLocked, setPointerLocked] = useState(false);
   const [pointerInside, setPointerInside] = useState(false);
+  const [containerHovered, setContainerHovered] = useState(false);
   const [overlayHovered, setOverlayHovered] = useState(false);
   const [holdingInput, setHoldingInput] = useState(false);
   const [textInputFocused, setTextInputFocused] = useState(() =>
@@ -155,6 +194,7 @@ export function useRemoteControl(
   const clipActiveRef = useRef(false);
   const activePointerIdRef = useRef<number | null>(null);
   const pointerInsideRef = useRef(false);
+  const containerHoveredRef = useRef(false);
   const overlayHoveredRef = useRef(false);
   const overlayMenuOpenRef = useRef(false);
   const immersiveRef = useRef(immersive);
@@ -173,6 +213,7 @@ export function useRemoteControl(
   const rawPerfRef = useRef({ sent: 0, lastLogAt: 0 });
 
   pointerInsideRef.current = pointerInside;
+  containerHoveredRef.current = containerHovered;
   overlayHoveredRef.current = overlayHovered;
   overlayMenuOpenRef.current = overlayMenuOpen;
   immersiveRef.current = immersive;
@@ -608,19 +649,19 @@ export function useRemoteControl(
   }, []);
 
   // Keep OS low-level immersive hook steady while active + immersive + (focused or hovering stream in focus mode).
-  const hoverArmed = pointerInside && !overlayHovered;
+  const hoverArmed = (containerHovered || pointerInside) && !overlayHovered;
   const hookLive = active && immersive && !overlayMenuOpen && !textInputFocused && (windowFocused || hoverArmed);
   useEffect(() => {
     if (!isTauri()) return;
-    queueImmersiveHookSync(hookLive, hookLive && hoverArmed);
-  }, [hookLive, hoverArmed]);
+    updateImmersiveHookClaimant(claimantId, hookLive, hookLive && hoverArmed);
+  }, [claimantId, hookLive, hoverArmed]);
 
   useEffect(() => {
     if (!isTauri()) return;
     return () => {
-      queueImmersiveHookSync(false, false);
+      updateImmersiveHookClaimant(claimantId, false, false);
     };
-  }, []);
+  }, [claimantId]);
 
   useEffect(() => {
     if (!isTauri()) return;
@@ -651,7 +692,7 @@ export function useRemoteControl(
       ) {
         return;
       }
-      if (!immersive && !pointerInside && !hasActiveHold()) {
+      if (!immersive && !pointerInside && !containerHovered && !hasActiveHold()) {
         return;
       }
       if (
@@ -692,6 +733,33 @@ export function useRemoteControl(
           ctrlKey: true,
         });
       }
+      if (
+        payload.down &&
+        payload.shiftKey &&
+        !heldKeysRef.current.has('ShiftLeft') &&
+        !heldKeysRef.current.has('ShiftRight') &&
+        payload.code !== 'ShiftLeft' &&
+        payload.code !== 'ShiftRight'
+      ) {
+        heldKeysRef.current.add('ShiftLeft');
+        updateHoldTracking();
+        roomService.sendRemoteControlInput(slotPeerId, {
+          kind: 'key',
+          vk: 0xa0,
+          code: 'ShiftLeft',
+          key: 'Shift',
+          down: true,
+        });
+      } else if (!payload.shiftKey && heldKeysRef.current.delete('ShiftLeft')) {
+        updateHoldTracking();
+        roomService.sendRemoteControlInput(slotPeerId, {
+          kind: 'key',
+          vk: 0xa0,
+          code: 'ShiftLeft',
+          key: 'Shift',
+          down: false,
+        });
+      }
       const codeKey = payload.code || payload.key;
       if (codeKey) {
         if (payload.down) {
@@ -721,18 +789,131 @@ export function useRemoteControl(
       disposed = true;
       unlisten?.();
     };
-  }, [active, hasActiveHold, hostBusy, immersive, keyboardEnabled, pointerInside, slotPeerId, updateHoldTracking]);
+  }, [active, containerHovered, hasActiveHold, hostBusy, immersive, keyboardEnabled, pointerInside, slotPeerId, updateHoldTracking]);
 
   useEffect(() => {
     if (
       hostBusy ||
       overlayHovered ||
-      (!windowFocused && !(immersive && pointerInside)) ||
-      (!pointerInside && !hasActiveHold())
+      (!windowFocused && !(immersive && hoverArmed)) ||
+      (!pointerInside && !hoverArmed && !hasActiveHold())
     ) {
       sendReleaseAll();
     }
-  }, [hasActiveHold, hostBusy, immersive, overlayHovered, pointerInside, sendReleaseAll, windowFocused]);
+  }, [hasActiveHold, hostBusy, hoverArmed, immersive, overlayHovered, pointerInside, sendReleaseAll, windowFocused]);
+
+  // Gamepad forwarding: independent of host mouse/keyboard priority, lazy-plugged on first real input.
+  useEffect(() => {
+    if (!active || !gamepadEnabled) {
+      const stale = activeGamepadsBySlotPeer.get(slotPeerId);
+      if (stale && stale.size > 0) {
+        for (const padIndex of stale) {
+          roomService.sendRemoteControlInput(slotPeerId, { kind: 'gamepadDisconnect', padIndex });
+        }
+        activeGamepadsBySlotPeer.delete(slotPeerId);
+      }
+      return;
+    }
+
+    let activated = activeGamepadsBySlotPeer.get(slotPeerId);
+    if (!activated) {
+      activated = new Set<number>();
+      activeGamepadsBySlotPeer.set(slotPeerId, activated);
+    }
+
+    const neutralState: GamepadSnapshotState = {
+      buttons: 0,
+      leftTrigger: 0,
+      rightTrigger: 0,
+      thumbLx: 0,
+      thumbLy: 0,
+      thumbRx: 0,
+      thumbRy: 0,
+    };
+
+    const sendNeutralAll = () => {
+      for (const padIndex of activated!) {
+        roomService.sendRemoteControlInput(slotPeerId, {
+          kind: 'gamepadState',
+          padIndex,
+          ...neutralState,
+        });
+      }
+    };
+
+    const handleGamepadDisconnected = (event: GamepadEvent) => {
+      const idx = event.gamepad.index;
+      if (activated!.delete(idx)) {
+        roomService.sendRemoteControlInput(slotPeerId, { kind: 'gamepadDisconnect', padIndex: idx });
+      }
+    };
+    window.addEventListener('gamepaddisconnected', handleGamepadDisconnected);
+
+    if (!windowFocused || textInputFocused || overlayMenuOpen) {
+      sendNeutralAll();
+      return () => {
+        window.removeEventListener('gamepaddisconnected', handleGamepadDisconnected);
+      };
+    }
+
+    const lastSentByPad = new Map<number, GamepadSnapshotState>();
+    let rafId: number | null = null;
+    let disposed = false;
+
+    const poll = () => {
+      if (disposed) return;
+      const pads = typeof navigator !== 'undefined' && typeof navigator.getGamepads === 'function'
+        ? navigator.getGamepads()
+        : [];
+      const presentIndices = new Set<number>();
+      for (let i = 0; i < pads.length; i += 1) {
+        const pad = pads[i];
+        if (!pad || !pad.connected) continue;
+        presentIndices.add(pad.index);
+        if (!activated!.has(pad.index)) {
+          if (!hasMeaningfulGamepadInput(pad)) continue;
+          activated!.add(pad.index);
+        }
+        const snap = readGamepadSnapshotState(pad);
+        const prev = lastSentByPad.get(pad.index);
+        if (
+          !prev ||
+          prev.buttons !== snap.buttons ||
+          prev.leftTrigger !== snap.leftTrigger ||
+          prev.rightTrigger !== snap.rightTrigger ||
+          prev.thumbLx !== snap.thumbLx ||
+          prev.thumbLy !== snap.thumbLy ||
+          prev.thumbRx !== snap.thumbRx ||
+          prev.thumbRy !== snap.thumbRy
+        ) {
+          lastSentByPad.set(pad.index, snap);
+          roomService.sendRemoteControlInput(slotPeerId, {
+            kind: 'gamepadState',
+            padIndex: pad.index,
+            ...snap,
+          });
+        }
+      }
+      for (const knownIdx of [...activated!]) {
+        if (!presentIndices.has(knownIdx)) {
+          activated!.delete(knownIdx);
+          lastSentByPad.delete(knownIdx);
+          roomService.sendRemoteControlInput(slotPeerId, {
+            kind: 'gamepadDisconnect',
+            padIndex: knownIdx,
+          });
+        }
+      }
+      rafId = window.requestAnimationFrame(poll);
+    };
+
+    rafId = window.requestAnimationFrame(poll);
+    return () => {
+      disposed = true;
+      if (rafId !== null) window.cancelAnimationFrame(rafId);
+      window.removeEventListener('gamepaddisconnected', handleGamepadDisconnected);
+    };
+  }, [active, gamepadEnabled, overlayMenuOpen, slotPeerId, textInputFocused, windowFocused]);
 
   // Pointer + keyboard forwarding over the watched video area.
   useEffect(() => {
@@ -839,6 +1020,12 @@ export function useRemoteControl(
 
     const handlePointerMove = (event: PointerEvent) => {
       const liveFocused = syncLiveFocus();
+      const onCard = !document.hidden && isVideoInteractionTarget(event.target, container);
+      const nextCardHovered = onCard && !overlayHoveredRef.current;
+      if (nextCardHovered !== containerHoveredRef.current) {
+        containerHoveredRef.current = nextCardHovered;
+        setContainerHovered(nextCardHovered);
+      }
       if (isMouseLockedNow()) {
         // On Tauri Windows, WM_INPUT delivers hardware raw deltas independently of DOM pointermove.
         if (isTauri()) return;
@@ -916,6 +1103,7 @@ export function useRemoteControl(
     };
 
     const handlePointerLeave = () => {
+      setContainerHovered(false);
       if (isMouseLockedNow() || hasActiveHold()) return;
       if (pointerInsideRef.current) setPointerInside(false);
       sendReleaseAll();
@@ -1096,6 +1284,7 @@ export function useRemoteControl(
 
     const onBlur = () => {
       setWindowFocused(false);
+      setContainerHovered(false);
       setPointerInside(false);
       releasePointerLock();
       sendReleaseAll();
@@ -1107,6 +1296,7 @@ export function useRemoteControl(
       const visible = !document.hidden && document.hasFocus();
       setWindowFocused(visible);
       if (!visible) {
+        setContainerHovered(false);
         setPointerInside(false);
         releasePointerLock();
         sendReleaseAll();
@@ -1129,6 +1319,8 @@ export function useRemoteControl(
 
     return () => {
       clearTrailingMoveTimer();
+      setContainerHovered(false);
+      setPointerInside(false);
       container.classList.remove('is-remote-control-active');
       video.classList.remove('is-remote-control-active');
       if (!hadTabIndex) container.removeAttribute('tabindex');
@@ -1172,8 +1364,10 @@ export function useRemoteControl(
     pending,
     active,
     hostBusy,
+    elevationBlocked,
     mouseEnabled,
     keyboardEnabled,
+    gamepadEnabled,
     cursorCaptured,
     cursorShape: resolvedCursorShape,
     immersive,

@@ -52,6 +52,21 @@ export type RemoteInputEvent =
     }
   | {
       kind: 'releaseAll';
+    }
+  | {
+      kind: 'gamepadState';
+      padIndex: number;
+      buttons: number;
+      leftTrigger: number;
+      rightTrigger: number;
+      thumbLx: number;
+      thumbLy: number;
+      thumbRx: number;
+      thumbRy: number;
+    }
+  | {
+      kind: 'gamepadDisconnect';
+      padIndex: number;
     };
 
 export type RemoteControlClientPacket =
@@ -80,8 +95,10 @@ export type RemoteControlHostPacket =
       mediaId: string;
       mouseEnabled: boolean;
       keyboardEnabled: boolean;
+      gamepadEnabled?: boolean;
       cursorCaptured: boolean;
       hostBusy: boolean;
+      elevationBlocked?: boolean;
       cursorShape: RemoteCursorShape;
       fastBinary?: boolean;
     }
@@ -99,8 +116,10 @@ export type RemoteControlHostPacket =
       mediaId: string;
       mouseEnabled: boolean;
       keyboardEnabled: boolean;
+      gamepadEnabled?: boolean;
       cursorCaptured: boolean;
       hostBusy: boolean;
+      elevationBlocked?: boolean;
       cursorShape: RemoteCursorShape;
     }
   | {
@@ -114,6 +133,7 @@ export type RemoteControlHostPacket =
       imageId?: string;
       mouseLocked?: boolean;
       hostBusy: boolean;
+      elevationBlocked?: boolean;
       actorPeerId: string;
       embeddedInVideo: boolean;
     }
@@ -148,6 +168,7 @@ export interface RemoteCursorSyncState {
   imageId: string;
   mouseLocked: boolean;
   hostBusy: boolean;
+  elevationBlocked: boolean;
   actorPeerId: string;
   embeddedInVideo: boolean;
   updatedAt: number;
@@ -165,7 +186,19 @@ export interface RemoteControllerInfo {
   mediaId: string;
   mouseEnabled: boolean;
   keyboardEnabled: boolean;
+  gamepadEnabled: boolean;
   connectedAt: number;
+}
+
+export interface VirtualGamepadSlot {
+  id: string;
+  controllerId: string;
+  peerId: string;
+  mediaId: string;
+  padIndex: number;
+  order: number;
+  xinputSlot: number | null;
+  connectedAtMs: number;
 }
 
 export type RemoteControlStatus = 'idle' | 'pending' | 'active';
@@ -176,8 +209,10 @@ export interface RemoteControlViewerState {
   status: RemoteControlStatus;
   mouseEnabled: boolean;
   keyboardEnabled: boolean;
+  gamepadEnabled: boolean;
   cursorCaptured: boolean;
   hostBusy: boolean;
+  elevationBlocked: boolean;
   cursorShape: RemoteCursorShape;
   fastBinary?: boolean;
 }
@@ -263,6 +298,48 @@ export function validRemoteInputEvent(raw: unknown): raw is RemoteInputEvent {
       );
     case 'releaseAll':
       return true;
+    case 'gamepadState':
+      return (
+        typeof event.padIndex === 'number' &&
+        Number.isInteger(event.padIndex) &&
+        event.padIndex >= 0 &&
+        event.padIndex <= 255 &&
+        typeof event.buttons === 'number' &&
+        Number.isInteger(event.buttons) &&
+        event.buttons >= 0 &&
+        event.buttons <= 0xffff &&
+        typeof event.leftTrigger === 'number' &&
+        Number.isInteger(event.leftTrigger) &&
+        event.leftTrigger >= 0 &&
+        event.leftTrigger <= 255 &&
+        typeof event.rightTrigger === 'number' &&
+        Number.isInteger(event.rightTrigger) &&
+        event.rightTrigger >= 0 &&
+        event.rightTrigger <= 255 &&
+        typeof event.thumbLx === 'number' &&
+        Number.isInteger(event.thumbLx) &&
+        event.thumbLx >= -32768 &&
+        event.thumbLx <= 32767 &&
+        typeof event.thumbLy === 'number' &&
+        Number.isInteger(event.thumbLy) &&
+        event.thumbLy >= -32768 &&
+        event.thumbLy <= 32767 &&
+        typeof event.thumbRx === 'number' &&
+        Number.isInteger(event.thumbRx) &&
+        event.thumbRx >= -32768 &&
+        event.thumbRx <= 32767 &&
+        typeof event.thumbRy === 'number' &&
+        Number.isInteger(event.thumbRy) &&
+        event.thumbRy >= -32768 &&
+        event.thumbRy <= 32767
+      );
+    case 'gamepadDisconnect':
+      return (
+        typeof event.padIndex === 'number' &&
+        Number.isInteger(event.padIndex) &&
+        event.padIndex >= 0 &&
+        event.padIndex <= 255
+      );
     default:
       return false;
   }
@@ -303,8 +380,10 @@ export function validRemoteControlHostPacket(raw: unknown): raw is RemoteControl
       return (
         typeof pkt.mouseEnabled === 'boolean' &&
         typeof pkt.keyboardEnabled === 'boolean' &&
+        (pkt.gamepadEnabled === undefined || typeof pkt.gamepadEnabled === 'boolean') &&
         typeof pkt.cursorCaptured === 'boolean' &&
         typeof pkt.hostBusy === 'boolean' &&
+        (pkt.elevationBlocked === undefined || typeof pkt.elevationBlocked === 'boolean') &&
         typeof pkt.cursorShape === 'string' &&
         VALID_CURSOR_SHAPES.has(pkt.cursorShape as RemoteCursorShape) &&
         (pkt.fastBinary === undefined || typeof pkt.fastBinary === 'boolean')
@@ -313,8 +392,10 @@ export function validRemoteControlHostPacket(raw: unknown): raw is RemoteControl
       return (
         typeof pkt.mouseEnabled === 'boolean' &&
         typeof pkt.keyboardEnabled === 'boolean' &&
+        (pkt.gamepadEnabled === undefined || typeof pkt.gamepadEnabled === 'boolean') &&
         typeof pkt.cursorCaptured === 'boolean' &&
         typeof pkt.hostBusy === 'boolean' &&
+        (pkt.elevationBlocked === undefined || typeof pkt.elevationBlocked === 'boolean') &&
         typeof pkt.cursorShape === 'string' &&
         VALID_CURSOR_SHAPES.has(pkt.cursorShape as RemoteCursorShape)
       );
@@ -329,6 +410,7 @@ export function validRemoteControlHostPacket(raw: unknown): raw is RemoteControl
         (pkt.imageId === undefined || (typeof pkt.imageId === 'string' && pkt.imageId.length <= 64)) &&
         (pkt.mouseLocked === undefined || typeof pkt.mouseLocked === 'boolean') &&
         typeof pkt.hostBusy === 'boolean' &&
+        (pkt.elevationBlocked === undefined || typeof pkt.elevationBlocked === 'boolean') &&
         typeof pkt.actorPeerId === 'string' &&
         pkt.actorPeerId.length <= 96 &&
         typeof pkt.embeddedInVideo === 'boolean'
@@ -370,8 +452,10 @@ export function createIdleViewerState(mediaId = '', hostPeerId = ''): RemoteCont
     status: 'idle',
     mouseEnabled: true,
     keyboardEnabled: true,
+    gamepadEnabled: true,
     cursorCaptured: true,
     hostBusy: false,
+    elevationBlocked: false,
     cursorShape: 'default',
   };
 }
@@ -388,6 +472,8 @@ const OP_KEY = 4;
 const OP_RELEASE_ALL = 5;
 const OP_CURSOR_SYNC = 6;
 const OP_MOUSE_DELTA = 7;
+const OP_GAMEPAD_STATE = 8;
+const OP_GAMEPAD_DISCONNECT = 9;
 const MOUSE_BUTTONS: RemoteMouseButton[] = ['left', 'right', 'middle', 'x1', 'x2'];
 const CURSOR_SHAPES_ORDER: RemoteCursorShape[] = [
   'default',
@@ -503,6 +589,23 @@ export function encodeRemoteControlBinaryInput(
       const { buf } = alloc(OP_RELEASE_ALL, 0);
       return buf;
     }
+    case 'gamepadState': {
+      const { buf, view, offset } = alloc(OP_GAMEPAD_STATE, 13);
+      buf[offset] = event.padIndex & 0xff;
+      view.setUint16(offset + 1, event.buttons & 0xffff);
+      buf[offset + 3] = event.leftTrigger & 0xff;
+      buf[offset + 4] = event.rightTrigger & 0xff;
+      view.setInt16(offset + 5, Math.max(-32768, Math.min(32767, Math.round(event.thumbLx))));
+      view.setInt16(offset + 7, Math.max(-32768, Math.min(32767, Math.round(event.thumbLy))));
+      view.setInt16(offset + 9, Math.max(-32768, Math.min(32767, Math.round(event.thumbRx))));
+      view.setInt16(offset + 11, Math.max(-32768, Math.min(32767, Math.round(event.thumbRy))));
+      return buf;
+    }
+    case 'gamepadDisconnect': {
+      const { buf, offset } = alloc(OP_GAMEPAD_DISCONNECT, 1);
+      buf[offset] = event.padIndex & 0xff;
+      return buf;
+    }
     default:
       return null;
   }
@@ -615,6 +718,26 @@ export function decodeRemoteControlBinaryInput(frame: Uint8Array): DecodedRemote
       event = { kind: 'releaseAll' };
       break;
     }
+    case OP_GAMEPAD_STATE: {
+      if (frame.length !== offset + 13) return null;
+      event = {
+        kind: 'gamepadState',
+        padIndex: frame[offset],
+        buttons: view.getUint16(offset + 1),
+        leftTrigger: frame[offset + 3],
+        rightTrigger: frame[offset + 4],
+        thumbLx: view.getInt16(offset + 5),
+        thumbLy: view.getInt16(offset + 7),
+        thumbRx: view.getInt16(offset + 9),
+        thumbRy: view.getInt16(offset + 11),
+      };
+      break;
+    }
+    case OP_GAMEPAD_DISCONNECT: {
+      if (frame.length !== offset + 1) return null;
+      event = { kind: 'gamepadDisconnect', padIndex: frame[offset] };
+      break;
+    }
     default:
       return null;
   }
@@ -662,7 +785,8 @@ export function encodeRemoteControlCursorSync(
     (packet.visible ? 2 : 0) |
     (packet.hostBusy ? 4 : 0) |
     (packet.embeddedInVideo ? 8 : 0) |
-    (packet.mouseLocked ? 16 : 0);
+    (packet.mouseLocked ? 16 : 0) |
+    (packet.elevationBlocked ? 32 : 0);
   buf[headerSize] = flags;
   buf[headerSize + 1] = shapeIdx;
   buf[headerSize + 2] = actorBytes.length;
@@ -718,8 +842,92 @@ export function decodeRemoteControlCursorSync(frame: Uint8Array): DecodedRemoteC
     imageId,
     mouseLocked: (flags & 16) !== 0,
     hostBusy: (flags & 4) !== 0,
+    elevationBlocked: (flags & 32) !== 0,
     actorPeerId,
     embeddedInVideo: (flags & 8) !== 0,
   };
   return validRemoteControlHostPacket(packet) ? { seq, packet } : null;
+}
+
+export interface GamepadInputSourceLike {
+  index: number;
+  connected?: boolean;
+  buttons: ReadonlyArray<{ pressed: boolean; value: number }>;
+  axes: ReadonlyArray<number>;
+}
+
+export type GamepadSnapshotState = Omit<
+  Extract<RemoteInputEvent, { kind: 'gamepadState' }>,
+  'kind' | 'padIndex'
+>;
+
+const GAMEPAD_ACTIVATION_AXIS_THRESHOLD = 0.18;
+const GAMEPAD_ACTIVATION_TRIGGER_THRESHOLD = 0.1;
+
+function clampAxisToI16(v: number): number {
+  if (!Number.isFinite(v)) return 0;
+  const clamped = Math.max(-1, Math.min(1, v));
+  return clamped < 0 ? Math.round(clamped * 32768) : Math.round(clamped * 32767);
+}
+
+/** Converts a W3C Gamepad API snapshot into canonical ViGEm/XInput wire fields (Y axes inverted). */
+export function readGamepadSnapshotState(pad: GamepadInputSourceLike): GamepadSnapshotState {
+  const btns = pad.buttons;
+  const pressed = (idx: number) => {
+    const btn = btns[idx];
+    return Boolean(btn && (btn.pressed || btn.value > 0.5));
+  };
+  let buttons = 0;
+  if (pressed(12)) buttons |= 0x0001; // D-pad Up
+  if (pressed(13)) buttons |= 0x0002; // D-pad Down
+  if (pressed(14)) buttons |= 0x0004; // D-pad Left
+  if (pressed(15)) buttons |= 0x0008; // D-pad Right
+  if (pressed(9)) buttons |= 0x0010;  // Start
+  if (pressed(8)) buttons |= 0x0020;  // Back
+  if (pressed(10)) buttons |= 0x0040; // Left Thumb
+  if (pressed(11)) buttons |= 0x0080; // Right Thumb
+  if (pressed(4)) buttons |= 0x0100;  // LB
+  if (pressed(5)) buttons |= 0x0200;  // RB
+  if (pressed(16)) buttons |= 0x0400; // Guide
+  if (pressed(0)) buttons |= 0x1000;  // A
+  if (pressed(1)) buttons |= 0x2000;  // B
+  if (pressed(2)) buttons |= 0x4000;  // X
+  if (pressed(3)) buttons |= 0x8000;  // Y
+
+  const triggerByte = (idx: number) => {
+    const val = btns[idx]?.value ?? (btns[idx]?.pressed ? 1 : 0);
+    if (!Number.isFinite(val)) return 0;
+    return Math.max(0, Math.min(255, Math.round(Math.max(0, Math.min(1, val)) * 255)));
+  };
+
+  return {
+    buttons,
+    leftTrigger: triggerByte(6),
+    rightTrigger: triggerByte(7),
+    thumbLx: clampAxisToI16(pad.axes[0] ?? 0),
+    thumbLy: clampAxisToI16(-(pad.axes[1] ?? 0)),
+    thumbRx: clampAxisToI16(pad.axes[2] ?? 0),
+    thumbRy: clampAxisToI16(-(pad.axes[3] ?? 0)),
+  };
+}
+
+/** Returns true only once a physical gamepad produces real user input above idle drift deadzones. */
+export function hasMeaningfulGamepadInput(pad: GamepadInputSourceLike): boolean {
+  for (let i = 0; i < pad.buttons.length; i += 1) {
+    const btn = pad.buttons[i];
+    if (!btn) continue;
+    if (i === 6 || i === 7) {
+      if (btn.pressed || btn.value >= GAMEPAD_ACTIVATION_TRIGGER_THRESHOLD) return true;
+    } else if (btn.pressed || btn.value > 0.5) {
+      return true;
+    }
+  }
+  const stickAxes = Math.min(4, pad.axes.length);
+  for (let i = 0; i < stickAxes; i += 1) {
+    const v = pad.axes[i];
+    if (Number.isFinite(v) && Math.abs(v) >= GAMEPAD_ACTIVATION_AXIS_THRESHOLD) {
+      return true;
+    }
+  }
+  return false;
 }

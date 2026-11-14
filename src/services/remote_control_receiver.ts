@@ -21,8 +21,10 @@ export interface RemoteControlHostAdapter {
     controllerId: string,
     sessionId: string | undefined,
     event: RemoteInputEvent,
-  ) => Promise<{ accepted: boolean; hostBusy: boolean }>;
+  ) => Promise<{ accepted: boolean; hostBusy: boolean; elevationBlocked?: boolean }>;
   releaseInputs: (controllerId?: string) => Promise<void> | void;
+  disconnectControllerGamepads?: (controllerId: string) => Promise<void> | void;
+  disconnectPeerGamepads?: (peerId: string) => Promise<void> | void;
   syncNativePeer?: (
     peerId: string,
     mediaId: string,
@@ -30,6 +32,7 @@ export interface RemoteControlHostAdapter {
     authorized: boolean,
     mouseEnabled: boolean,
     keyboardEnabled: boolean,
+    gamepadEnabled: boolean,
   ) => Promise<void> | void;
   onChange: () => void;
 }
@@ -44,6 +47,7 @@ export class RemoteControlHostManager {
   private controllers = new Map<string, RemoteControllerInfo>();
   private monitorActive = false;
   private hostBusy = false;
+  private elevationBlocked = false;
   private cursorShape: RemoteCursorShape = 'default';
 
   constructor(adapter: RemoteControlHostAdapter) {
@@ -60,6 +64,10 @@ export class RemoteControlHostManager {
 
   public isHostBusy(): boolean {
     return this.hostBusy;
+  }
+
+  public isElevationBlocked(): boolean {
+    return this.elevationBlocked;
   }
 
   public receiveClientPacket(packet: RemoteControlClientPacket, peerId: string): void {
@@ -100,6 +108,10 @@ export class RemoteControlHostManager {
         const removedReq = this.requests.delete(key);
         const removedCtrl = this.controllers.delete(key);
         if (removedCtrl) {
+          void Promise.resolve(
+            this.adapter.syncNativePeer?.(peerId, packet.mediaId, undefined, false, false, false, false),
+          ).catch(() => {});
+          void Promise.resolve(this.adapter.disconnectControllerGamepads?.(key)).catch(() => {});
           void Promise.resolve(this.adapter.releaseInputs(key)).catch(() => {});
           this.syncMonitor();
         }
@@ -118,7 +130,10 @@ export class RemoteControlHostManager {
         }
         const { event } = packet;
         if (
-          (event.kind === 'mouseMove' || event.kind === 'mouseButton' || event.kind === 'mouseWheel') &&
+          (event.kind === 'mouseMove' ||
+            event.kind === 'mouseDelta' ||
+            event.kind === 'mouseButton' ||
+            event.kind === 'mouseWheel') &&
           !ctrl.mouseEnabled
         ) {
           return;
@@ -126,10 +141,15 @@ export class RemoteControlHostManager {
         if (event.kind === 'key' && !ctrl.keyboardEnabled) {
           return;
         }
+        if ((event.kind === 'gamepadState' || event.kind === 'gamepadDisconnect') && !ctrl.gamepadEnabled) {
+          return;
+        }
         void Promise.resolve(this.adapter.applyInput(key, screen.sessionId, event))
           .then((res) => {
-            if (res && res.hostBusy !== this.hostBusy) {
-              this.setHostPriorityState(res.hostBusy, this.cursorShape);
+            if (!res) return;
+            const nextElevation = res.elevationBlocked ?? this.elevationBlocked;
+            if (res.hostBusy !== this.hostBusy || nextElevation !== this.elevationBlocked) {
+              this.setHostPriorityState(res.hostBusy, this.cursorShape, nextElevation);
             }
           })
           .catch(() => {});
@@ -162,11 +182,12 @@ export class RemoteControlHostManager {
       mediaId: req.mediaId,
       mouseEnabled: true,
       keyboardEnabled: true,
+      gamepadEnabled: true,
       connectedAt: Date.now(),
     };
     this.controllers.set(controllerKey(req.peerId, req.mediaId), info);
     void Promise.resolve(
-      this.adapter.syncNativePeer?.(req.peerId, req.mediaId, screen.sessionId, true, true, true),
+      this.adapter.syncNativePeer?.(req.peerId, req.mediaId, screen.sessionId, true, true, true, true),
     ).catch(() => {});
     this.syncMonitor();
     this.sendState(info, 'accept', screen.cursorCaptured);
@@ -176,27 +197,46 @@ export class RemoteControlHostManager {
   public setControllerPermissions(
     peerId: string,
     mediaId: string,
-    patch: { mouseEnabled?: boolean; keyboardEnabled?: boolean },
+    patch: { mouseEnabled?: boolean; keyboardEnabled?: boolean; gamepadEnabled?: boolean },
   ): void {
     const key = controllerKey(peerId, mediaId);
     const ctrl = this.controllers.get(key);
     if (!ctrl) return;
     const nextMouse = patch.mouseEnabled ?? ctrl.mouseEnabled;
     const nextKeyboard = patch.keyboardEnabled ?? ctrl.keyboardEnabled;
-    if (nextMouse === ctrl.mouseEnabled && nextKeyboard === ctrl.keyboardEnabled) return;
+    const nextGamepad = patch.gamepadEnabled ?? ctrl.gamepadEnabled;
+    if (
+      nextMouse === ctrl.mouseEnabled &&
+      nextKeyboard === ctrl.keyboardEnabled &&
+      nextGamepad === ctrl.gamepadEnabled
+    ) {
+      return;
+    }
     const updated: RemoteControllerInfo = {
       ...ctrl,
       mouseEnabled: nextMouse,
       keyboardEnabled: nextKeyboard,
+      gamepadEnabled: nextGamepad,
     };
     this.controllers.set(key, updated);
     const screen = this.adapter.getScreenStream(mediaId);
     void Promise.resolve(
-      this.adapter.syncNativePeer?.(peerId, mediaId, screen?.sessionId, true, nextMouse, nextKeyboard),
+      this.adapter.syncNativePeer?.(
+        peerId,
+        mediaId,
+        screen?.sessionId,
+        true,
+        nextMouse,
+        nextKeyboard,
+        nextGamepad,
+      ),
     ).catch(() => {});
     if ((!nextMouse && ctrl.mouseEnabled) || (!nextKeyboard && ctrl.keyboardEnabled)) {
       // Drop any lingering held mouse button or modifier key before disabling input.
       void Promise.resolve(this.adapter.releaseInputs(key)).catch(() => {});
+    }
+    if (!nextGamepad && ctrl.gamepadEnabled) {
+      void Promise.resolve(this.adapter.disconnectControllerGamepads?.(key)).catch(() => {});
     }
     if (screen) this.sendState(updated, 'state', screen.cursorCaptured);
     this.adapter.onChange();
@@ -212,8 +252,9 @@ export class RemoteControlHostManager {
     const hadCtrl = this.controllers.delete(key);
     if (hadCtrl) {
       void Promise.resolve(
-        this.adapter.syncNativePeer?.(peerId, mediaId, undefined, false, false, false),
+        this.adapter.syncNativePeer?.(peerId, mediaId, undefined, false, false, false, false),
       ).catch(() => {});
+      void Promise.resolve(this.adapter.disconnectControllerGamepads?.(key)).catch(() => {});
       void Promise.resolve(this.adapter.releaseInputs(key)).catch(() => {});
       this.adapter.sendToPeer(peerId, { type: 'revoke', mediaId, reason });
       this.syncMonitor();
@@ -223,11 +264,25 @@ export class RemoteControlHostManager {
     if (hadReq || hadCtrl) this.adapter.onChange();
   }
 
-  public setHostPriorityState(hostBusy: boolean, cursorShape: RemoteCursorShape): void {
-    if (this.hostBusy === hostBusy && this.cursorShape === cursorShape) return;
+  public setHostPriorityState(
+    hostBusy: boolean,
+    cursorShape: RemoteCursorShape,
+    elevationBlocked = this.elevationBlocked,
+  ): void {
+    if (
+      this.hostBusy === hostBusy &&
+      this.cursorShape === cursorShape &&
+      this.elevationBlocked === elevationBlocked
+    ) {
+      return;
+    }
     this.hostBusy = hostBusy;
     this.cursorShape = cursorShape;
-    if (this.controllers.size === 0) return;
+    this.elevationBlocked = elevationBlocked;
+    if (this.controllers.size === 0) {
+      this.adapter.onChange();
+      return;
+    }
     for (const ctrl of this.controllers.values()) {
       const screen = this.adapter.getScreenStream(ctrl.mediaId);
       if (screen) this.sendState(ctrl, 'state', screen.cursorCaptured);
@@ -261,8 +316,9 @@ export class RemoteControlHostManager {
       if (ctrl.mediaId === mediaId) {
         this.controllers.delete(key);
         void Promise.resolve(
-          this.adapter.syncNativePeer?.(ctrl.peerId, ctrl.mediaId, undefined, false, false, false),
+          this.adapter.syncNativePeer?.(ctrl.peerId, ctrl.mediaId, undefined, false, false, false, false),
         ).catch(() => {});
+        void Promise.resolve(this.adapter.disconnectControllerGamepads?.(key)).catch(() => {});
         void Promise.resolve(this.adapter.releaseInputs(key)).catch(() => {});
         this.adapter.sendToPeer(ctrl.peerId, { type: 'revoke', mediaId, reason: 'stream-ended' });
         changed = true;
@@ -286,13 +342,14 @@ export class RemoteControlHostManager {
       if (ctrl.peerId === peerId) {
         this.controllers.delete(key);
         void Promise.resolve(
-          this.adapter.syncNativePeer?.(ctrl.peerId, ctrl.mediaId, undefined, false, false, false),
+          this.adapter.syncNativePeer?.(ctrl.peerId, ctrl.mediaId, undefined, false, false, false, false),
         ).catch(() => {});
         void Promise.resolve(this.adapter.releaseInputs(key)).catch(() => {});
         changed = true;
       }
     }
     if (changed) {
+      void Promise.resolve(this.adapter.disconnectPeerGamepads?.(peerId)).catch(() => {});
       this.syncMonitor();
       this.adapter.onChange();
     }
@@ -309,6 +366,7 @@ export class RemoteControlHostManager {
     this.requests.clear();
     this.controllers.clear();
     this.hostBusy = false;
+    this.elevationBlocked = false;
     this.cursorShape = 'default';
     if (this.monitorActive) {
       void Promise.resolve(this.adapter.releaseInputs()).catch(() => {});
@@ -323,8 +381,10 @@ export class RemoteControlHostManager {
       mediaId: ctrl.mediaId,
       mouseEnabled: ctrl.mouseEnabled,
       keyboardEnabled: ctrl.keyboardEnabled,
+      gamepadEnabled: ctrl.gamepadEnabled,
       cursorCaptured,
       hostBusy: this.hostBusy,
+      elevationBlocked: this.elevationBlocked,
       cursorShape: this.cursorShape,
       ...(type === 'accept' ? { fastBinary: true } : {}),
     });
@@ -336,6 +396,7 @@ export class RemoteControlHostManager {
     this.monitorActive = nextActive;
     if (!nextActive) {
       this.hostBusy = false;
+      this.elevationBlocked = false;
       this.cursorShape = 'default';
     }
     void Promise.resolve(this.adapter.setMonitorActive(nextActive)).catch(() => {});
