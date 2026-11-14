@@ -528,7 +528,7 @@ impl NativeWgcHandler {
                         self.refinements_remaining = 0;
                     } else if copy_refine_texture(device, context, scaled.as_ref().unwrap_or(texture), src_width, src_height, &mut self.last_encoded) {
                         self.last_hw_encode = Some(arrival_time);
-                        self.refinements_remaining = 2;
+                        self.refinements_remaining = 8;
                     } else {
                         self.refinements_remaining = 0;
                     }
@@ -666,11 +666,11 @@ impl NativeWgcHandler {
             self.refinements_remaining = 0;
             return false;
         };
-        if last.elapsed() < std::time::Duration::from_millis(55) {
+        if last.elapsed() < std::time::Duration::from_millis(35) {
             return true;
         }
         if !self.legacy_pacing && !self.delivery.0.lock().map_or(false, |pacer| pacer.has_encode_capacity()) {
-            if last.elapsed() > std::time::Duration::from_millis(250) {
+            if last.elapsed() > std::time::Duration::from_millis(350) {
                 self.refinements_remaining = 0;
                 return false;
             }
@@ -848,6 +848,8 @@ fn start_dxgi_capture(source: &str, capture_mouse: bool, flags: CaptureFlags) ->
                 if let Some(texture) = capture.next_frame()? {
                     let (width, height) = capture.dimensions();
                     processor.process_texture(capture.device(), capture.context(), &texture, width, height, None)?;
+                } else {
+                    processor.refine_idle(capture.device());
                 }
             }
             Ok(())
@@ -1285,7 +1287,7 @@ fn start_wgc_capture(source: &str, capture_mouse: bool, flags: CaptureFlags) -> 
                         if refine_timer_active {
                             let _ = unsafe { KillTimer(None, refine_timer_id) };
                         }
-                        refine_timer_id = unsafe { SetTimer(None, 1, 60, None) };
+                        refine_timer_id = unsafe { SetTimer(None, 1, 40, None) };
                         refine_timer_active = refine_timer_id != 0;
                     } else if msg.message == WM_TIMER && refine_timer_active && msg.wParam.0 == refine_timer_id {
                         let keep = handler.lock().ok().is_some_and(|mut guard| guard.refine_idle(&d3d_device));

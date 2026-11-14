@@ -31,14 +31,18 @@ bool check(NVENCSTATUS status, const char* stage, char* error, size_t size) {
 }
 #define NV_CHECK(call, stage) if (!check(call, stage, error, size)) return false
 void rate_control(NV_ENC_CONFIG& config, uint32_t bitrate, uint32_t fps) {
-    config.rcParams.rateControlMode = NV_ENC_PARAMS_RC_CBR;
+    // Use constrained low-latency VBR with generous VBV headroom so full-screen
+    // app transitions keep sharp UI text without starving P-frame quantization.
+    config.rcParams.rateControlMode = NV_ENC_PARAMS_RC_VBR;
     // Leave ~8% headroom for RTP/SRTP framing while delivering maximum visual quality.
     const uint32_t payload_bitrate = static_cast<uint32_t>(static_cast<uint64_t>(bitrate) * 92 / 100);
-    config.rcParams.averageBitRate = payload_bitrate; config.rcParams.maxBitRate = payload_bitrate;
-    // Allow ~150 ms VBV headroom (at least 5 frames) so full-screen app switches do not starve QP.
+    const uint64_t peak_scaled = static_cast<uint64_t>(payload_bitrate) * 3 / 2;
+    const uint32_t max_bitrate = peak_scaled > 50000000ULL ? 50000000U : static_cast<uint32_t>(peak_scaled);
+    config.rcParams.averageBitRate = payload_bitrate;
+    config.rcParams.maxBitRate = max_bitrate > payload_bitrate ? max_bitrate : payload_bitrate;
     const uint32_t single_frame = payload_bitrate / (fps > 0 ? fps : 60);
-    const uint32_t min_frames = single_frame * 5;
-    const uint32_t reservoir = static_cast<uint32_t>(static_cast<uint64_t>(payload_bitrate) * 150 / 1000);
+    const uint32_t min_frames = single_frame * 8;
+    const uint32_t reservoir = static_cast<uint32_t>(static_cast<uint64_t>(config.rcParams.maxBitRate) * 300 / 1000);
     config.rcParams.vbvBufferSize = reservoir > min_frames ? reservoir : min_frames;
     config.rcParams.vbvInitialDelay = config.rcParams.vbvBufferSize;
     config.rcParams.lowDelayKeyFrameScale = 1;
@@ -49,16 +53,16 @@ void configure_h264_quality(NV_ENC_CONFIG& config, bool high_quality) {
     h264.entropyCodingMode = high_quality
         ? NV_ENC_H264_ENTROPY_CODING_MODE_CABAC
         : NV_ENC_H264_ENTROPY_CODING_MODE_CAVLC;
-    // Keep Spatial AQ disabled so crisp UI borders and small desktop text do not lose bits to flat areas.
-    config.rcParams.enableAQ = 0;
-    config.rcParams.aqStrength = 0;
+    // Spatial AQ protects dark/flat backgrounds adjacent to crisp text from ringing halos.
+    config.rcParams.enableAQ = high_quality ? 1 : 0;
+    config.rcParams.aqStrength = high_quality ? 6 : 0;
     config.rcParams.enableMaxQP = high_quality ? 1 : 0;
     if (high_quality) {
-        config.rcParams.maxQP.qpInterP = 38;
-        config.rcParams.maxQP.qpIntra = 36;
-        config.rcParams.maxQP.qpInterB = 40;
+        config.rcParams.maxQP.qpInterP = 34;
+        config.rcParams.maxQP.qpIntra = 32;
+        config.rcParams.maxQP.qpInterB = 36;
     }
-    config.rcParams.multiPass = high_quality ? NV_ENC_TWO_PASS_QUARTER_RESOLUTION : NV_ENC_MULTI_PASS_DISABLED;
+    config.rcParams.multiPass = high_quality ? NV_ENC_TWO_PASS_FULL_RESOLUTION : NV_ENC_MULTI_PASS_DISABLED;
     // Match NVENC's native ABGR->NV12 conversion without overriding VUI colorimetry.
     h264.h264VUIParameters = {};
 }

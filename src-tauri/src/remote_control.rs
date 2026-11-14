@@ -99,6 +99,8 @@ struct ImmersiveKeyPayload {
     code: String,
     key: String,
     down: bool,
+    ctrl_key: bool,
+    alt_key: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -274,11 +276,13 @@ static HOST_PRIORITY_HOOK_JOIN: LazyLock<Mutex<Option<HookThreadHandle>>> =
     LazyLock::new(|| Mutex::new(None));
 
 static IMMERSIVE_ENABLED: AtomicBool = AtomicBool::new(false);
+static IMMERSIVE_HOVER_ARMED: AtomicBool = AtomicBool::new(false);
 static IMMERSIVE_TARGET_HWND: AtomicIsize = AtomicIsize::new(0);
 static IMMERSIVE_HELD_MASK: AtomicU32 = AtomicU32::new(0);
+static IMMERSIVE_HOOK_GEN: AtomicU64 = AtomicU64::new(0);
 static IMMERSIVE_TARGET_LABEL: LazyLock<Mutex<String>> =
     LazyLock::new(|| Mutex::new("main".to_string()));
-static IMMERSIVE_TX: LazyLock<Mutex<Option<std::sync::mpsc::SyncSender<ImmersiveKeyPayload>>>> =
+static IMMERSIVE_TX: LazyLock<Mutex<Option<(u64, std::sync::mpsc::SyncSender<ImmersiveKeyPayload>)>>> =
     LazyLock::new(|| Mutex::new(None));
 static IMMERSIVE_HOOK_JOIN: LazyLock<Mutex<Option<HookThreadHandle>>> =
     LazyLock::new(|| Mutex::new(None));
@@ -1130,6 +1134,34 @@ fn is_window_or_descendant_foreground(target: windows::Win32::Foundation::HWND) 
             || IsChild(target, fg).as_bool()
             || GetAncestor(fg, GA_ROOTOWNER) == target
             || GetAncestor(fg, GA_ROOT) == target
+    }
+}
+
+#[cfg(windows)]
+fn is_cursor_over_window_or_descendant(target: windows::Win32::Foundation::HWND) -> bool {
+    use windows::Win32::Foundation::POINT;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GetAncestor, GetCursorPos, IsChild, IsIconic, WindowFromPoint, GA_ROOT, GA_ROOTOWNER,
+    };
+    if target.0.is_null() {
+        return false;
+    }
+    unsafe {
+        if IsIconic(target).as_bool() {
+            return false;
+        }
+        let mut pt = POINT::default();
+        if GetCursorPos(&mut pt).is_err() {
+            return false;
+        }
+        let win = WindowFromPoint(pt);
+        if win.0.is_null() {
+            return false;
+        }
+        win == target
+            || IsChild(target, win).as_bool()
+            || GetAncestor(win, GA_ROOTOWNER) == target
+            || GetAncestor(win, GA_ROOT) == target
     }
 }
 
@@ -2297,28 +2329,71 @@ unsafe extern "system" fn immersive_keyboard_proc(
         CallNextHookEx, KBDLLHOOKSTRUCT, LLKHF_ALTDOWN, LLKHF_INJECTED, WM_KEYDOWN, WM_KEYUP,
         WM_SYSKEYDOWN, WM_SYSKEYUP,
     };
+    const ALT_MOD_BIT: u32 = 1 << 4;
+    const CTRL_MOD_BIT: u32 = 1 << 5;
     if code >= 0 && IMMERSIVE_ENABLED.load(Ordering::Acquire) {
         let target = HWND(IMMERSIVE_TARGET_HWND.load(Ordering::Acquire) as *mut _);
-        if is_window_or_descendant_foreground(target) {
-            let kb = &*(lparam.0 as *const KBDLLHOOKSTRUCT);
-            if (kb.flags.0 & (LLKHF_INJECTED.0 | 0x02)) == 0
-                && kb.dwExtraInfo != P2SHARER_INPUT_TAG
-            {
-                let vk = kb.vkCode as u16;
-                let alt_down = (kb.flags.0 & LLKHF_ALTDOWN.0) != 0
-                    || (GetAsyncKeyState(0x12) < 0)
-                    || (GetAsyncKeyState(0xA4) < 0)
-                    || (GetAsyncKeyState(0xA5) < 0);
-                let ctrl_down = (GetAsyncKeyState(0x11) < 0)
-                    || (GetAsyncKeyState(0xA2) < 0)
-                    || (GetAsyncKeyState(0xA3) < 0);
-                let msg = wparam.0 as u32;
-                let down = msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN;
-                let is_up = msg == WM_KEYUP || msg == WM_SYSKEYUP;
-                let hold_bit = immersive_hold_bit(vk);
-                let was_held_intercepted =
-                    hold_bit != 0 && (IMMERSIVE_HELD_MASK.load(Ordering::Acquire) & hold_bit) != 0;
+        let target_active = is_window_or_descendant_foreground(target)
+            || (IMMERSIVE_HOVER_ARMED.load(Ordering::Acquire)
+                && is_cursor_over_window_or_descendant(target));
+        let kb = &*(lparam.0 as *const KBDLLHOOKSTRUCT);
+        if (kb.flags.0 & (LLKHF_INJECTED.0 | 0x02)) == 0
+            && kb.dwExtraInfo != P2SHARER_INPUT_TAG
+        {
+            let vk = kb.vkCode as u16;
+            let msg = wparam.0 as u32;
+            let down = msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN;
+            let is_up = msg == WM_KEYUP || msg == WM_SYSKEYUP;
+            let alt_down = (kb.flags.0 & LLKHF_ALTDOWN.0) != 0
+                || (GetAsyncKeyState(0x12) < 0)
+                || (GetAsyncKeyState(0xA4) < 0)
+                || (GetAsyncKeyState(0xA5) < 0);
+            let ctrl_down = (GetAsyncKeyState(0x11) < 0)
+                || (GetAsyncKeyState(0xA2) < 0)
+                || (GetAsyncKeyState(0xA3) < 0);
 
+            if is_up {
+                let held_mask = IMMERSIVE_HELD_MASK.load(Ordering::Acquire);
+                if matches!(vk, 0x12 | 0xA4 | 0xA5) && (held_mask & ALT_MOD_BIT) != 0 {
+                    IMMERSIVE_HELD_MASK.fetch_and(!ALT_MOD_BIT, Ordering::AcqRel);
+                    if let Ok(guard) = IMMERSIVE_TX.try_lock() {
+                        if let Some((_, tx)) = guard.as_ref() {
+                            let code_name = if vk == 0xA5 { "AltRight" } else { "AltLeft" };
+                            let _ = tx.try_send(ImmersiveKeyPayload {
+                                vk,
+                                code: code_name.to_string(),
+                                key: "Alt".to_string(),
+                                down: false,
+                                ctrl_key: ctrl_down,
+                                alt_key: false,
+                            });
+                        }
+                    }
+                    return CallNextHookEx(None, code, wparam, lparam);
+                }
+                if matches!(vk, 0x11 | 0xA2 | 0xA3) && (held_mask & CTRL_MOD_BIT) != 0 {
+                    IMMERSIVE_HELD_MASK.fetch_and(!CTRL_MOD_BIT, Ordering::AcqRel);
+                    if let Ok(guard) = IMMERSIVE_TX.try_lock() {
+                        if let Some((_, tx)) = guard.as_ref() {
+                            let code_name = if vk == 0xA3 { "ControlRight" } else { "ControlLeft" };
+                            let _ = tx.try_send(ImmersiveKeyPayload {
+                                vk,
+                                code: code_name.to_string(),
+                                key: "Control".to_string(),
+                                down: false,
+                                ctrl_key: false,
+                                alt_key: alt_down,
+                            });
+                        }
+                    }
+                    return CallNextHookEx(None, code, wparam, lparam);
+                }
+            }
+
+            let hold_bit = immersive_hold_bit(vk);
+            let was_held_intercepted =
+                hold_bit != 0 && (IMMERSIVE_HELD_MASK.load(Ordering::Acquire) & hold_bit) != 0;
+            if target_active || (is_up && was_held_intercepted) {
                 let intercept_shortcut = matches!(vk, 0x5B | 0x5C | 0x5D | 0x2C | 0x1B)
                     || (alt_down && matches!(vk, 0x09 | 0x73 | 0x20 | 0x1B))
                     || (ctrl_down && vk == 0x1B)
@@ -2332,14 +2407,22 @@ unsafe extern "system" fn immersive_keyboard_proc(
                             IMMERSIVE_HELD_MASK.fetch_and(!hold_bit, Ordering::AcqRel);
                         }
                     }
+                    if down && alt_down && !matches!(vk, 0x12 | 0xA4 | 0xA5) {
+                        IMMERSIVE_HELD_MASK.fetch_or(ALT_MOD_BIT, Ordering::AcqRel);
+                    }
+                    if down && ctrl_down && !matches!(vk, 0x11 | 0xA2 | 0xA3) {
+                        IMMERSIVE_HELD_MASK.fetch_or(CTRL_MOD_BIT, Ordering::AcqRel);
+                    }
                     let (dom_code, dom_key) = vk_to_dom_code(vk);
                     if let Ok(guard) = IMMERSIVE_TX.try_lock() {
-                        if let Some(tx) = guard.as_ref() {
+                        if let Some((_, tx)) = guard.as_ref() {
                             let _ = tx.try_send(ImmersiveKeyPayload {
                                 vk,
                                 code: dom_code.to_string(),
                                 key: dom_key.to_string(),
                                 down,
+                                ctrl_key: ctrl_down,
+                                alt_key: alt_down,
                             });
                         }
                     }
@@ -2361,6 +2444,7 @@ fn join_hook_guard(guard: &mut Option<HookThreadHandle>) {
 #[cfg(windows)]
 fn join_immersive_hook_locked(guard: &mut Option<HookThreadHandle>) {
     IMMERSIVE_ENABLED.store(false, Ordering::Release);
+    IMMERSIVE_HOVER_ARMED.store(false, Ordering::Release);
     IMMERSIVE_HELD_MASK.store(0, Ordering::Release);
     if let Ok(mut tx_guard) = IMMERSIVE_TX.lock() {
         *tx_guard = None;
@@ -2373,6 +2457,7 @@ pub fn set_remote_control_immersive(
     app: AppHandle,
     window: tauri::WebviewWindow,
     enabled: bool,
+    hover_active: Option<bool>,
 ) -> Result<(), String> {
     let label = window.label().to_string();
     if label != "main" && !label.starts_with("pip-") {
@@ -2395,6 +2480,8 @@ pub fn set_remote_control_immersive(
             .lock()
             .map_err(|_| "Immersive lifecycle lock poisoned")?;
 
+        IMMERSIVE_HOVER_ARMED.store(enabled && hover_active.unwrap_or(false), Ordering::Release);
+
         if enabled {
             let thread_alive = hook_guard.as_ref().is_some_and(|handle| !handle.join.is_finished());
             let sender_ready = IMMERSIVE_TX.lock().ok().is_some_and(|tx| tx.is_some());
@@ -2406,10 +2493,11 @@ pub fn set_remote_control_immersive(
                 join_immersive_hook_locked(&mut hook_guard);
             }
 
+            let gen = IMMERSIVE_HOOK_GEN.fetch_add(1, Ordering::AcqRel) + 1;
             let (tx, rx) = std::sync::mpsc::sync_channel::<ImmersiveKeyPayload>(128);
             *IMMERSIVE_TX
                 .lock()
-                .map_err(|_| "Immersive sender lock poisoned")? = Some(tx);
+                .map_err(|_| "Immersive sender lock poisoned")? = Some((gen, tx));
 
             let emitter_app = app.clone();
             std::thread::spawn(move || {
@@ -2451,7 +2539,9 @@ pub fn set_remote_control_immersive(
                     let _ = UnhookWindowsHookEx(h);
                 }
                 if let Ok(mut tx_guard) = IMMERSIVE_TX.lock() {
-                    *tx_guard = None;
+                    if tx_guard.as_ref().is_some_and(|(current_gen, _)| *current_gen == gen) {
+                        *tx_guard = None;
+                    }
                 }
             });
 
@@ -2468,17 +2558,19 @@ pub fn set_remote_control_immersive(
                 });
                 IMMERSIVE_HELD_MASK.store(0, Ordering::Release);
                 IMMERSIVE_ENABLED.store(ok, Ordering::Release);
+                IMMERSIVE_HOVER_ARMED.store(ok && hover_active.unwrap_or(false), Ordering::Release);
             } else {
                 stop.store(true, Ordering::Release);
                 drop(join);
                 IMMERSIVE_ENABLED.store(false, Ordering::Release);
+                IMMERSIVE_HOVER_ARMED.store(false, Ordering::Release);
             }
         } else {
             join_immersive_hook_locked(&mut hook_guard);
         }
     }
     #[cfg(not(windows))]
-    let _ = (app, enabled);
+    let _ = (app, enabled, hover_active);
     Ok(())
 }
 

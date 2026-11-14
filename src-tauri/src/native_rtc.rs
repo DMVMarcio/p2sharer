@@ -29,9 +29,21 @@ use webrtc::{
         },
         receiver_report::ReceiverReport,
     },
-    rtp::{codecs::h264::H264Payloader, header::Header, packet::Packet, packetizer::Payloader},
+    rtp::{
+        codecs::h264::H264Payloader,
+        extension::{
+            playout_delay_extension::PlayoutDelayExtension,
+            HeaderExtension,
+        },
+        header::Header,
+        packet::Packet,
+        packetizer::Payloader,
+    },
     rtp_transceiver::{
-        rtp_codec::{RTCRtpCodecCapability, RTCRtpCodecParameters, RTPCodecType},
+        rtp_codec::{
+            RTCRtpCodecCapability, RTCRtpCodecParameters, RTCRtpHeaderExtensionCapability,
+            RTPCodecType,
+        },
         RTCPFeedback,
     },
     track::track_local::{
@@ -170,7 +182,7 @@ fn initial_rate(budget: u32, width: u32, height: u32, fps: u32) -> u32 {
 /// above the encoded bitrate so delta frames flush immediately while large IDRs
 /// avoid overflowing UDP socket buffers.
 fn packet_pacing_ns(payload_bytes: usize, bitrate: u32) -> u64 {
-    let burst_bps = u64::from(bitrate).max(100_000).saturating_mul(2).clamp(35_000_000, 80_000_000);
+    let burst_bps = u64::from(bitrate).max(100_000).saturating_mul(3).clamp(50_000_000, 120_000_000);
     let wire_bits = (payload_bytes as u64).saturating_add(64).saturating_mul(8);
     wire_bits.saturating_mul(1_000_000_000) / burst_bps
 }
@@ -327,6 +339,15 @@ pub async fn create_native_video_offer(
                 ..Default::default()
             },
             RTPCodecType::Video,
+        )
+        .map_err(|e| e.to_string())?;
+    engine
+        .register_header_extension(
+            RTCRtpHeaderExtensionCapability {
+                uri: "http://www.webrtc.org/experiments/rtp-hdrext/playout-delay".into(),
+            },
+            RTPCodecType::Video,
+            None,
         )
         .map_err(|e| e.to_string())?;
     let registry =
@@ -671,10 +692,16 @@ pub async fn create_native_video_offer(
                     payload,
                 };
                 sequence = sequence.wrapping_add(1);
-                if !matches!(
-                    tokio::time::timeout_at(deadline, track.write_rtp(&packet)).await,
-                    Ok(Ok(_))
-                ) {
+                let write_result = if index == 0 {
+                    let ext = [HeaderExtension::PlayoutDelay(PlayoutDelayExtension {
+                        min_delay: 0,
+                        max_delay: 0,
+                    })];
+                    tokio::time::timeout_at(deadline, track.write_rtp_with_extensions(&packet, &ext)).await
+                } else {
+                    tokio::time::timeout_at(deadline, track.write_rtp(&packet)).await
+                };
+                if !matches!(write_result, Ok(Ok(_))) {
                     complete = false;
                     break;
                 }

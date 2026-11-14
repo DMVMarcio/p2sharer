@@ -23,6 +23,18 @@ interface ImmersiveKeyPayload {
   code: string;
   key: string;
   down: boolean;
+  ctrlKey?: boolean;
+  altKey?: boolean;
+}
+
+const persistedImmersiveByPeer = new Map<string, boolean>();
+let immersiveSyncQueue: Promise<void> = Promise.resolve();
+
+function queueImmersiveHookSync(enabled: boolean, hoverActive: boolean): void {
+  immersiveSyncQueue = immersiveSyncQueue
+    .then(() => invoke('set_remote_control_immersive', { enabled, hoverActive }))
+    .then(() => undefined)
+    .catch(() => {});
 }
 
 interface RawMouseDeltaPayload {
@@ -104,13 +116,18 @@ export function useRemoteControl(
   const cursorShape: RemoteCursorShape = viewerState?.cursorShape ?? 'default';
   const hostMouseLocked = Boolean(cursorSync?.active && cursorSync.mouseLocked);
 
-  const [immersive, setImmersive] = useState(false);
+  const [immersive, setImmersive] = useState(() =>
+    status === 'active' ? (persistedImmersiveByPeer.get(slotPeerId) ?? false) : false,
+  );
   const [mouseLockOverride, setMouseLockOverride] = useState<'auto' | 'locked' | 'unlocked'>('auto');
   const [overlayMenuOpen, setOverlayMenuOpen] = useState(false);
   const [pointerLocked, setPointerLocked] = useState(false);
   const [pointerInside, setPointerInside] = useState(false);
   const [overlayHovered, setOverlayHovered] = useState(false);
   const [holdingInput, setHoldingInput] = useState(false);
+  const [textInputFocused, setTextInputFocused] = useState(() =>
+    typeof document === 'undefined' ? false : isTextInputElement(document.activeElement),
+  );
   const [windowFocused, setWindowFocused] = useState(() =>
     typeof document === 'undefined' ? true : document.hasFocus() && !document.hidden,
   );
@@ -355,6 +372,7 @@ export function useRemoteControl(
   const exit = useCallback(() => {
     releasePointerLock();
     sendReleaseAll();
+    persistedImmersiveByPeer.delete(slotPeerId);
     setImmersive(false);
     setMouseLockOverride('auto');
     setOverlayMenuOpen(false);
@@ -367,11 +385,14 @@ export function useRemoteControl(
     setImmersive((prev) => {
       const next = !prev;
       if (next) {
+        persistedImmersiveByPeer.set(slotPeerId, true);
         containerRef.current?.focus({ preventScroll: true });
+      } else {
+        persistedImmersiveByPeer.delete(slotPeerId);
       }
       return next;
     });
-  }, [containerRef]);
+  }, [containerRef, slotPeerId]);
 
   const toggleManualMouseLock = useCallback(() => {
     setMouseLockOverride((prev) => {
@@ -410,6 +431,7 @@ export function useRemoteControl(
   useEffect(() => {
     if (!active) {
       releasePointerLock();
+      persistedImmersiveByPeer.delete(slotPeerId);
       setImmersive(false);
       setMouseLockOverride('auto');
       setOverlayMenuOpen(false);
@@ -573,17 +595,32 @@ export function useRemoteControl(
     }
   }, [effectiveMouseLock, hostMouseLocked, manualMouseLock, releasePointerLock, tryAcquirePointerLock, wantPointerLock]);
 
-  // Keep OS low-level immersive hook steady while active + immersive + focused; avoid churning on pointer lock or hostBusy transitions.
-  const hookLive = active && immersive && windowFocused;
+  useEffect(() => {
+    const syncTextFocus = () => {
+      setTextInputFocused(isTextInputElement(document.activeElement));
+    };
+    document.addEventListener('focusin', syncTextFocus, true);
+    document.addEventListener('focusout', syncTextFocus, true);
+    return () => {
+      document.removeEventListener('focusin', syncTextFocus, true);
+      document.removeEventListener('focusout', syncTextFocus, true);
+    };
+  }, []);
+
+  // Keep OS low-level immersive hook steady while active + immersive + (focused or hovering stream in focus mode).
+  const hoverArmed = pointerInside && !overlayHovered;
+  const hookLive = active && immersive && !overlayMenuOpen && !textInputFocused && (windowFocused || hoverArmed);
   useEffect(() => {
     if (!isTauri()) return;
-    void invoke('set_remote_control_immersive', { enabled: hookLive }).catch(() => {});
+    queueImmersiveHookSync(hookLive, hookLive && hoverArmed);
+  }, [hookLive, hoverArmed]);
+
+  useEffect(() => {
+    if (!isTauri()) return;
     return () => {
-      if (hookLive) {
-        void invoke('set_remote_control_immersive', { enabled: false }).catch(() => {});
-      }
+      queueImmersiveHookSync(false, false);
     };
-  }, [hookLive]);
+  }, []);
 
   useEffect(() => {
     if (!isTauri()) return;
@@ -610,10 +647,61 @@ export function useRemoteControl(
         !payload ||
         !keyboardEnabled ||
         hostBusy ||
-        isTextInputElement(document.activeElement) ||
-        (!pointerInside && !hasActiveHold() && !immersive)
+        isTextInputElement(document.activeElement)
       ) {
         return;
+      }
+      if (!immersive && !pointerInside && !hasActiveHold()) {
+        return;
+      }
+      if (
+        payload.down &&
+        payload.altKey &&
+        !heldKeysRef.current.has('AltLeft') &&
+        !heldKeysRef.current.has('AltRight') &&
+        payload.code !== 'AltLeft' &&
+        payload.code !== 'AltRight'
+      ) {
+        heldKeysRef.current.add('AltLeft');
+        updateHoldTracking();
+        roomService.sendRemoteControlInput(slotPeerId, {
+          kind: 'key',
+          vk: 0xa4,
+          code: 'AltLeft',
+          key: 'Alt',
+          down: true,
+          altKey: true,
+        });
+      }
+      if (
+        payload.down &&
+        payload.ctrlKey &&
+        !heldKeysRef.current.has('ControlLeft') &&
+        !heldKeysRef.current.has('ControlRight') &&
+        payload.code !== 'ControlLeft' &&
+        payload.code !== 'ControlRight'
+      ) {
+        heldKeysRef.current.add('ControlLeft');
+        updateHoldTracking();
+        roomService.sendRemoteControlInput(slotPeerId, {
+          kind: 'key',
+          vk: 0xa2,
+          code: 'ControlLeft',
+          key: 'Control',
+          down: true,
+          ctrlKey: true,
+        });
+      }
+      const codeKey = payload.code || payload.key;
+      if (codeKey) {
+        if (payload.down) {
+          if (!heldKeysRef.current.has(codeKey)) {
+            heldKeysRef.current.add(codeKey);
+            updateHoldTracking();
+          }
+        } else if (heldKeysRef.current.delete(codeKey)) {
+          updateHoldTracking();
+        }
       }
       hadActiveInputRef.current = true;
       roomService.sendRemoteControlInput(slotPeerId, {
@@ -622,6 +710,8 @@ export function useRemoteControl(
         code: payload.code,
         key: payload.key,
         down: payload.down,
+        ctrlKey: payload.ctrlKey,
+        altKey: payload.altKey,
       });
     }).then((fn) => {
       if (disposed) fn();
@@ -631,13 +721,18 @@ export function useRemoteControl(
       disposed = true;
       unlisten?.();
     };
-  }, [active, hasActiveHold, hostBusy, immersive, keyboardEnabled, pointerInside, slotPeerId]);
+  }, [active, hasActiveHold, hostBusy, immersive, keyboardEnabled, pointerInside, slotPeerId, updateHoldTracking]);
 
   useEffect(() => {
-    if (hostBusy || overlayHovered || !windowFocused || (!pointerInside && !hasActiveHold())) {
+    if (
+      hostBusy ||
+      overlayHovered ||
+      (!windowFocused && !(immersive && pointerInside)) ||
+      (!pointerInside && !hasActiveHold())
+    ) {
       sendReleaseAll();
     }
-  }, [hasActiveHold, hostBusy, overlayHovered, pointerInside, sendReleaseAll, windowFocused]);
+  }, [hasActiveHold, hostBusy, immersive, overlayHovered, pointerInside, sendReleaseAll, windowFocused]);
 
   // Pointer + keyboard forwarding over the watched video area.
   useEffect(() => {
