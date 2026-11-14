@@ -6,7 +6,9 @@ import { generateUserColor } from '../p2p/group_room.ts';
 import { validStreamPointer, validStreamPointerState, type StreamPointerState, type StreamPointerPacket } from '../core/stream_pointer.ts';
 import { RemoteControlHostManager } from './remote_control_receiver.ts';
 import {
+  loadRemoteControlHostDefaults,
   normalizeCursorShape,
+  saveRemoteControlHostDefaults,
   type RemoteControlHostPacket,
   type RemoteControlRequest,
   type RemoteControlViewerState,
@@ -81,7 +83,7 @@ export class RoomService {
   public remoteControlRequests: RemoteControlRequest[] = [];
   public remoteControllers: RemoteControllerInfo[] = [];
   public remoteControlHostBusy = false;
-  public remoteControlHostPriorityEnabled = true;
+  public remoteControlHostPriorityEnabled = loadRemoteControlHostDefaults().hostPriorityEnabled;
   public remoteControlElevationBlocked = false;
   public remoteControlGamepadDriverAvailable = true;
   public remoteControlGamepadDriverInstallStage: 'idle' | 'downloading' | 'verifying' | 'installing' = 'idle';
@@ -217,6 +219,9 @@ export class RoomService {
           this.notify();
         })
         .catch(() => {});
+      void invoke('set_remote_control_host_priority_enabled', {
+        enabled: this.remoteControlHostPriorityEnabled,
+      }).catch(() => {});
       void listen<{
         imageId?: string;
         width?: number;
@@ -806,6 +811,14 @@ export class RoomService {
         gamepadEnabled,
       });
     },
+    getDefaultPermissions: () => {
+      const defaults = loadRemoteControlHostDefaults();
+      return {
+        mouseEnabled: defaults.defaultMouseEnabled,
+        keyboardEnabled: defaults.defaultKeyboardEnabled,
+        gamepadEnabled: defaults.defaultGamepadEnabled,
+      };
+    },
     onChange: () => {
       this.remoteControlRequests = this.remoteControlHost.getRequests();
       this.remoteControllers = this.remoteControlHost.getControllers();
@@ -1187,6 +1200,8 @@ export class RoomService {
 
   public async setRemoteControlHostPriorityEnabled(enabled: boolean): Promise<void> {
     this.remoteControlHostPriorityEnabled = enabled;
+    const current = loadRemoteControlHostDefaults();
+    saveRemoteControlHostDefaults({ ...current, hostPriorityEnabled: enabled });
     this.notify();
     if (!isTauri()) return;
     try {

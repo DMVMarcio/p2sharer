@@ -1689,7 +1689,6 @@
   "remoteControl.gamepadDisabledHint": "게임패드 비활성화됨",
   "remoteControl.vigemMissingTitle": "ViGEmBus 드라이버 필요",
   "remoteControl.vigemMissingDesc": "가상 Xbox 360 컨트롤러를 에뮬레이션하려면 호스트 PC에 공식 Nefarius ViGEmBus 드라이버를 설치하세요.",
-  "remoteControl.vigemDownloadAction": "ViGEmBus 다운로드",
   "remoteControl.vigemRecheckAction": "다시 확인",
   "remoteControl.gamepadsHint": "가상 게임패드는 첫 입력 시 연결되며 호스트가 마우스/키보드를 써도 멈추지 않고, 드래그하여 플레이어 순서를 바꿀 수 있습니다.",
   "remoteControl.noGamepads": "아직 연결된 가상 게임패드가 없습니다.",
@@ -1706,5 +1705,13 @@
   "remoteControl.vigemRebootToast": "ViGEmBus가 설치되었습니다. 가상 게임패드를 활성화하려면 Windows를 다시 시작하세요.",
   "remoteControl.vigemInstallCancelledToast": "ViGEmBus 설치가 취소되었습니다.",
   "remoteControl.vigemInstallFailedToast": "ViGEmBus를 자동으로 설치하지 못했습니다. 수동 다운로드를 시도해 주세요.",
-  "remoteControl.vigemNeededToast": "참가자가 게임패드를 사용하려 했으나 ViGEmBus가 없습니다. 원격 제어 -> 게임패드에서 설치할 수 있습니다."
+  "remoteControl.vigemNeededToast": "참가자가 게임패드를 사용하려 했으나 ViGEmBus가 없습니다. 원격 제어 -> 게임패드에서 설치할 수 있습니다.",
+  "remoteControl.vigemExternalLink": "공식 페이지",
+  "remoteControl.vigemReadyTitle": "ViGEmBus 드라이버 활성",
+  "remoteControl.vigemReadyDesc": "가상 Xbox 360 게임패드가 원격 입력을 받을 준비가 되었습니다.",
+  "remoteControl.settingsTab": "원격 제어",
+  "remoteControl.settingsTitle": "원격 제어",
+  "remoteControl.settingsDesc": "스트림을 시작하기 전에 입력 우선순위, 기본 권한 및 가상 게임패드 드라이버를 미리 설정하세요.",
+  "remoteControl.defaultPermissionsTitle": "새 제어자의 기본 권한",
+  "remoteControl.vigemSectionTitle": "가상 게임패드 드라이버"
 }

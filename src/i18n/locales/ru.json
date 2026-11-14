@@ -1689,7 +1689,6 @@
   "remoteControl.gamepadDisabledHint": "Геймпад отключён",
   "remoteControl.vigemMissingTitle": "Требуется драйвер ViGEmBus",
   "remoteControl.vigemMissingDesc": "Установите официальный драйвер Nefarius ViGEmBus на ПК хоста для эмуляции виртуальных геймпадов Xbox 360.",
-  "remoteControl.vigemDownloadAction": "Скачать ViGEmBus",
   "remoteControl.vigemRecheckAction": "Проверить снова",
   "remoteControl.gamepadsHint": "Виртуальные геймпады подключаются при первом нажатии, не прерываются при работе хоста мышью и меняют порядок игроков перетаскиванием.",
   "remoteControl.noGamepads": "Виртуальные геймпады ещё не подключены.",
@@ -1706,5 +1705,13 @@
   "remoteControl.vigemRebootToast": "ViGEmBus установлен. Перезагрузите Windows для активации виртуальных геймпадов.",
   "remoteControl.vigemInstallCancelledToast": "Установка ViGEmBus была отменена.",
   "remoteControl.vigemInstallFailedToast": "Не удалось автоматически установить ViGEmBus. Попробуйте ручную загрузку.",
-  "remoteControl.vigemNeededToast": "Участник попытался использовать геймпад, но ViGEmBus не установлен. Откройте Управление -> Геймпады для установки."
+  "remoteControl.vigemNeededToast": "Участник попытался использовать геймпад, но ViGEmBus не установлен. Откройте Управление -> Геймпады для установки.",
+  "remoteControl.vigemExternalLink": "Официальная страница",
+  "remoteControl.vigemReadyTitle": "Драйвер ViGEmBus активен",
+  "remoteControl.vigemReadyDesc": "Виртуальные геймпады Xbox 360 готовы принимать удалённый ввод.",
+  "remoteControl.settingsTab": "Удалённое управление",
+  "remoteControl.settingsTitle": "Удалённое управление",
+  "remoteControl.settingsDesc": "Настройте приоритет ввода, права по умолчанию и драйвер виртуальных геймпадов ещё до начала трансляции.",
+  "remoteControl.defaultPermissionsTitle": "Права по умолчанию для новых управляющих",
+  "remoteControl.vigemSectionTitle": "Драйвер виртуальных геймпадов"
 }

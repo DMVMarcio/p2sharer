@@ -1689,7 +1689,6 @@
   "remoteControl.gamepadDisabledHint": "Gamepad deaktiviert",
   "remoteControl.vigemMissingTitle": "ViGEmBus-Treiber erforderlich",
   "remoteControl.vigemMissingDesc": "Installiere den offiziellen Nefarius ViGEmBus-Treiber auf dem Host-PC, um virtuelle Xbox-360-Gamepads zu emulieren.",
-  "remoteControl.vigemDownloadAction": "ViGEmBus herunterladen",
   "remoteControl.vigemRecheckAction": "Erneut prüfen",
   "remoteControl.gamepadsHint": "Virtuelle Gamepads verbinden sich beim ersten Tastendruck, laufen unabhängig von Maus/Tastatur weiter und lassen sich per Ziehen umsortieren.",
   "remoteControl.noGamepads": "Noch keine virtuellen Gamepads verbunden.",
@@ -1706,5 +1705,13 @@
   "remoteControl.vigemRebootToast": "ViGEmBus installiert. Starte Windows neu, um virtuelle Gamepads zu aktivieren.",
   "remoteControl.vigemInstallCancelledToast": "ViGEmBus-Installation wurde abgebrochen.",
   "remoteControl.vigemInstallFailedToast": "ViGEmBus konnte nicht automatisch installiert werden. Bitte manuell laden.",
-  "remoteControl.vigemNeededToast": "Ein Teilnehmer wollte ein Gamepad nutzen, aber ViGEmBus fehlt. Öffne Fernsteuerung -> Gamepads zum Installieren."
+  "remoteControl.vigemNeededToast": "Ein Teilnehmer wollte ein Gamepad nutzen, aber ViGEmBus fehlt. Öffne Fernsteuerung -> Gamepads zum Installieren.",
+  "remoteControl.vigemExternalLink": "Offizielle Seite",
+  "remoteControl.vigemReadyTitle": "ViGEmBus-Treiber aktiv",
+  "remoteControl.vigemReadyDesc": "Virtuelle Xbox-360-Gamepads sind bereit für eingehende Eingaben.",
+  "remoteControl.settingsTab": "Fernsteuerung",
+  "remoteControl.settingsTitle": "Fernsteuerung",
+  "remoteControl.settingsDesc": "Lege Eingabepriorität, Standardrechte und den virtuellen Gamepad-Treiber schon vor einer Übertragung fest.",
+  "remoteControl.defaultPermissionsTitle": "Standardberechtigungen für neue Steuernde",
+  "remoteControl.vigemSectionTitle": "Virtueller Gamepad-Treiber"
 }

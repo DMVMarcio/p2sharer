@@ -1689,7 +1689,6 @@
   "remoteControl.gamepadDisabledHint": "गेमपैड अक्षम है",
   "remoteControl.vigemMissingTitle": "ViGEmBus ड्राइवर आवश्यक है",
   "remoteControl.vigemMissingDesc": "वर्चुअल Xbox 360 कंट्रोलर उपयोग करने के लिए होस्ट PC पर आधिकारिक Nefarius ViGEmBus ड्राइवर इंस्टॉल करें।",
-  "remoteControl.vigemDownloadAction": "ViGEmBus डाउनलोड करें",
   "remoteControl.vigemRecheckAction": "फिर से जाँचें",
   "remoteControl.gamepadsHint": "पहला बटन दबाने पर वर्चुअल गेमपैड जुड़ता है, होस्ट द्वारा माउस/कीबोर्ड उपयोग करने पर भी नहीं रुकता, और ड्रैग करके प्लेयर क्रम बदला जा सकता है।",
   "remoteControl.noGamepads": "अभी तक कोई वर्चुअल गेमपैड जुड़ा नहीं है।",
@@ -1706,5 +1705,13 @@
   "remoteControl.vigemRebootToast": "ViGEmBus इंस्टॉल हो गया। वर्चुअल गेमपैड सक्रिय करने के लिए Windows रीस्टार्ट करें।",
   "remoteControl.vigemInstallCancelledToast": "ViGEmBus इंस्टॉलेशन रद्द कर दिया गया।",
   "remoteControl.vigemInstallFailedToast": "ViGEmBus अपने-आप इंस्टॉल नहीं हो सका। कृपया मैन्युअल डाउनलोड आज़माएँ।",
-  "remoteControl.vigemNeededToast": "किसी प्रतिभागी ने गेमपैड उपयोग करने की कोशिश की, लेकिन ViGEmBus इंस्टॉल नहीं है। इंस्टॉल करने के लिए रिमोट कंट्रोल -> गेमपैड खोलें।"
+  "remoteControl.vigemNeededToast": "किसी प्रतिभागी ने गेमपैड उपयोग करने की कोशिश की, लेकिन ViGEmBus इंस्टॉल नहीं है। इंस्टॉल करने के लिए रिमोट कंट्रोल -> गेमपैड खोलें।",
+  "remoteControl.vigemExternalLink": "आधिकारिक पृष्ठ",
+  "remoteControl.vigemReadyTitle": "ViGEmBus ड्राइवर सक्रिय है",
+  "remoteControl.vigemReadyDesc": "वर्चुअल Xbox 360 गेमपैड रिमोट इनपुट प्राप्त करने के लिए तैयार हैं।",
+  "remoteControl.settingsTab": "रिमोट कंट्रोल",
+  "remoteControl.settingsTitle": "रिमोट कंट्रोल",
+  "remoteControl.settingsDesc": "स्ट्रीम शुरू करने से पहले होस्ट इनपुट प्राथमिकता, डिफ़ॉल्ट अनुमतियाँ और वर्चुअल गेमपैड ड्राइवर सेट करें।",
+  "remoteControl.defaultPermissionsTitle": "नए नियंत्रकों के लिए डिफ़ॉल्ट अनुमतियाँ",
+  "remoteControl.vigemSectionTitle": "वर्चुअल गेमपैड ड्राइवर"
 }

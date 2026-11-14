@@ -34,6 +34,11 @@ export interface RemoteControlHostAdapter {
     keyboardEnabled: boolean,
     gamepadEnabled: boolean,
   ) => Promise<void> | void;
+  getDefaultPermissions?: () => {
+    mouseEnabled: boolean;
+    keyboardEnabled: boolean;
+    gamepadEnabled: boolean;
+  };
   onChange: () => void;
 }
 
@@ -177,17 +182,30 @@ export class RemoteControlHostManager {
       this.adapter.onChange();
       return;
     }
-    const info: RemoteControllerInfo = {
-      peerId: req.peerId,
-      mediaId: req.mediaId,
+    const defaults = this.adapter.getDefaultPermissions?.() ?? {
       mouseEnabled: true,
       keyboardEnabled: true,
       gamepadEnabled: true,
+    };
+    const info: RemoteControllerInfo = {
+      peerId: req.peerId,
+      mediaId: req.mediaId,
+      mouseEnabled: defaults.mouseEnabled,
+      keyboardEnabled: defaults.keyboardEnabled,
+      gamepadEnabled: defaults.gamepadEnabled,
       connectedAt: Date.now(),
     };
     this.controllers.set(controllerKey(req.peerId, req.mediaId), info);
     void Promise.resolve(
-      this.adapter.syncNativePeer?.(req.peerId, req.mediaId, screen.sessionId, true, true, true, true),
+      this.adapter.syncNativePeer?.(
+        req.peerId,
+        req.mediaId,
+        screen.sessionId,
+        true,
+        defaults.mouseEnabled,
+        defaults.keyboardEnabled,
+        defaults.gamepadEnabled,
+      ),
     ).catch(() => {});
     this.syncMonitor();
     this.sendState(info, 'accept', screen.cursorCaptured);

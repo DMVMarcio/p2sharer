@@ -34,6 +34,10 @@ import { appUpdates } from '../../services/app_updates';
 import { automaticUpdateChecks, betaUpdateChecks } from '../../core/app_updates';
 import { ApplicationSettings } from './ApplicationSettings';
 import { useAppUpdates } from '../../hooks/useAppUpdates';
+import { MonitorCog } from 'lucide-react';
+import { useRoom } from '../../hooks/useRoom';
+import { VigemDriverBanner } from '../common/VigemDriverBanner';
+import { loadRemoteControlHostDefaults, saveRemoteControlHostDefaults } from '../../core/remote_control';
 
 const SOUND_LABELS: Record<SoundEvent, string> = {
   get appStart() { return t('sound.appStart'); },
@@ -54,8 +58,16 @@ export const SettingsModal: React.FC = () => {
   const { themeMode, accentColor, backgroundColor, setThemeMode, setAccentColor, setBackgroundColor } = useAppTheme();
 
   const [activeTab, setActiveTab] = useState<
-    'profile' | 'application' | 'conversations' | 'appearance' | 'audio' | 'stream' | 'network' | 'diagnostics'
+    'profile' | 'application' | 'conversations' | 'appearance' | 'audio' | 'stream' | 'remoteControl' | 'network' | 'diagnostics'
   >('profile');
+  const {
+    remoteControlGamepadDriverAvailable,
+    remoteControlGamepadDriverInstallStage,
+    remoteControlGamepadDriverNeedsReboot,
+    recheckRemoteControlGamepadDriver,
+    installRemoteControlGamepadDriver,
+  } = useRoom();
+  const [rcDefaults, setRcDefaults] = useState(loadRemoteControlHostDefaults);
 
   // Form states initialized once upon mounting
   useEffect(() => () => { void invoke('discard_profile_image').catch(() => {}); }, []);
@@ -214,6 +226,9 @@ export const SettingsModal: React.FC = () => {
     stateStore.saveTransmissionDefaults({ resolution: defaultRes, fps: Number(defaultFps),
       bitrate: Number(defaultBitrate), quality: Number(defaultQuality), cursor: defaultCursor });
 
+    saveRemoteControlHostDefaults(rcDefaults);
+    void roomService.setRemoteControlHostPriorityEnabled(rcDefaults.hostPriorityEnabled);
+
     // Save TURN
     localStorage.setItem('p2sharer_turn_enabled', turnEnabled ? 'true' : 'false');
     localStorage.setItem('p2sharer_turn_url', turnUrls.join('\n'));
@@ -350,6 +365,17 @@ export const SettingsModal: React.FC = () => {
                 <line x1="12" x2="12" y1="17" y2="21"/>
               </svg>
               <span>{t("message.15589e9e374d")}</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={profileBusy || saving}
+              className={`settings-nav-item ${activeTab === 'remoteControl' ? 'active' : ''}`}
+              onClick={() => setActiveTab('remoteControl')}
+              hidden={!isTauri()}
+            >
+              <MonitorCog size={16} aria-hidden="true" />
+              <span>{t('remoteControl.settingsTab')}</span>
             </button>
 
             <button
@@ -828,6 +854,72 @@ export const SettingsModal: React.FC = () => {
                   </label>
                   </div>}
                 </div>}
+              </div>
+            )}
+
+            {/* TAB: CONTROLE REMOTO */}
+            {panePresence.value === 'remoteControl' && (
+              <div className="settings-tab-pane active" id="settings-pane-remote-control">
+                <div className="settings-pane-header">
+                  <h3 className="settings-pane-title">{t('remoteControl.settingsTitle')}</h3>
+                  <p className="settings-pane-desc">{t('remoteControl.settingsDesc')}</p>
+                </div>
+
+                <label className="settings-switch-row" htmlFor="settings-rc-host-priority">
+                  <div className="settings-switch-label-group">
+                    <span className="settings-switch-title">{t('remoteControl.hostPriorityToggle')}</span>
+                    <span className="settings-switch-subtitle">{t('remoteControl.hostPriorityToggleHint')}</span>
+                  </div>
+                  <div className="modern-switch">
+                    <input
+                      autoComplete="off"
+                      type="checkbox"
+                      id="settings-rc-host-priority"
+                      checked={rcDefaults.hostPriorityEnabled}
+                      onChange={(event) =>
+                        setRcDefaults((prev) => ({ ...prev, hostPriorityEnabled: event.target.checked }))
+                      }
+                    />
+                    <span className="switch-slider" />
+                  </div>
+                </label>
+
+                <div className="settings-row remote-control-settings-section">
+                  <label className="settings-label">{t('remoteControl.defaultPermissionsTitle')}</label>
+                  {([
+                    { id: 'settings-rc-default-mouse', title: t('remoteControl.mousePermission'), key: 'defaultMouseEnabled' },
+                    { id: 'settings-rc-default-keyboard', title: t('remoteControl.keyboardPermission'), key: 'defaultKeyboardEnabled' },
+                    { id: 'settings-rc-default-gamepad', title: t('remoteControl.gamepadPermission'), key: 'defaultGamepadEnabled' },
+                  ] as const).map((item) => (
+                    <label className="settings-switch-row" htmlFor={item.id} key={item.id}>
+                      <span className="settings-switch-title">{item.title}</span>
+                      <div className="modern-switch">
+                        <input
+                          autoComplete="off"
+                          type="checkbox"
+                          id={item.id}
+                          checked={rcDefaults[item.key]}
+                          onChange={(event) =>
+                            setRcDefaults((prev) => ({ ...prev, [item.key]: event.target.checked }))
+                          }
+                        />
+                        <span className="switch-slider" />
+                      </div>
+                    </label>
+                  ))}
+                </div>
+
+                <div className="settings-row remote-control-settings-section">
+                  <label className="settings-label">{t('remoteControl.vigemSectionTitle')}</label>
+                  <VigemDriverBanner
+                    driverAvailable={remoteControlGamepadDriverAvailable}
+                    installStage={remoteControlGamepadDriverInstallStage}
+                    needsReboot={remoteControlGamepadDriverNeedsReboot}
+                    onInstall={installRemoteControlGamepadDriver}
+                    onRecheck={recheckRemoteControlGamepadDriver}
+                    showReadyState
+                  />
+                </div>
               </div>
             )}
 

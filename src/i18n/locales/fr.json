@@ -1689,7 +1689,6 @@
   "remoteControl.gamepadDisabledHint": "Manette désactivée",
   "remoteControl.vigemMissingTitle": "Pilote ViGEmBus requis",
   "remoteControl.vigemMissingDesc": "Installez le pilote officiel Nefarius ViGEmBus sur le PC hôte pour émuler des manettes Xbox 360 virtuelles.",
-  "remoteControl.vigemDownloadAction": "Télécharger ViGEmBus",
   "remoteControl.vigemRecheckAction": "Revérifier",
   "remoteControl.gamepadsHint": "Les manettes virtuelles se branchent à la première touche, fonctionnent pendant que l'hôte utilise souris/clavier et se réorganisent par glisser-déposer.",
   "remoteControl.noGamepads": "Aucune manette virtuelle connectée.",
@@ -1706,5 +1705,13 @@
   "remoteControl.vigemRebootToast": "ViGEmBus installé. Redémarrez Windows pour activer les manettes virtuelles.",
   "remoteControl.vigemInstallCancelledToast": "L'installation de ViGEmBus a été annulée.",
   "remoteControl.vigemInstallFailedToast": "Impossible d'installer ViGEmBus automatiquement. Essayez le téléchargement manuel.",
-  "remoteControl.vigemNeededToast": "Un participant a essayé une manette, mais ViGEmBus manque. Ouvrez Contrôle à distance -> Manettes pour l’installer."
+  "remoteControl.vigemNeededToast": "Un participant a essayé une manette, mais ViGEmBus manque. Ouvrez Contrôle à distance -> Manettes pour l’installer.",
+  "remoteControl.vigemExternalLink": "Page officielle",
+  "remoteControl.vigemReadyTitle": "Pilote ViGEmBus actif",
+  "remoteControl.vigemReadyDesc": "Les manettes virtuelles Xbox 360 sont prêtes à recevoir des commandes.",
+  "remoteControl.settingsTab": "Contrôle à distance",
+  "remoteControl.settingsTitle": "Contrôle à distance",
+  "remoteControl.settingsDesc": "Configurez la priorité d’entrée, les droits par défaut et le pilote de manette avant de lancer un partage.",
+  "remoteControl.defaultPermissionsTitle": "Autorisations par défaut des nouveaux contrôleurs",
+  "remoteControl.vigemSectionTitle": "Pilote de manettes virtuelles"
 }

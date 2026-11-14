@@ -931,3 +931,54 @@ export function hasMeaningfulGamepadInput(pad: GamepadInputSourceLike): boolean 
   }
   return false;
 }
+
+export interface RemoteControlHostDefaults {
+  hostPriorityEnabled: boolean;
+  defaultMouseEnabled: boolean;
+  defaultKeyboardEnabled: boolean;
+  defaultGamepadEnabled: boolean;
+}
+
+const RC_PREF_KEYS = {
+  hostPriority: 'p2sharer_rc_host_priority',
+  defaultMouse: 'p2sharer_rc_default_mouse',
+  defaultKeyboard: 'p2sharer_rc_default_keyboard',
+  defaultGamepad: 'p2sharer_rc_default_gamepad',
+} as const;
+
+function readBoolStorage(key: string, fallback: boolean): boolean {
+  if (typeof localStorage === 'undefined') return fallback;
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw === 'true') return true;
+    if (raw === 'false') return false;
+  } catch {
+    // Ignore storage access failures in constrained environments.
+  }
+  return fallback;
+}
+
+function writeBoolStorage(key: string, value: boolean): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(key, value ? 'true' : 'false');
+  } catch {
+    // Ignore storage access failures in constrained environments.
+  }
+}
+
+export function loadRemoteControlHostDefaults(): RemoteControlHostDefaults {
+  return {
+    hostPriorityEnabled: readBoolStorage(RC_PREF_KEYS.hostPriority, true),
+    defaultMouseEnabled: readBoolStorage(RC_PREF_KEYS.defaultMouse, true),
+    defaultKeyboardEnabled: readBoolStorage(RC_PREF_KEYS.defaultKeyboard, true),
+    defaultGamepadEnabled: readBoolStorage(RC_PREF_KEYS.defaultGamepad, true),
+  };
+}
+
+export function saveRemoteControlHostDefaults(prefs: RemoteControlHostDefaults): void {
+  writeBoolStorage(RC_PREF_KEYS.hostPriority, prefs.hostPriorityEnabled);
+  writeBoolStorage(RC_PREF_KEYS.defaultMouse, prefs.defaultMouseEnabled);
+  writeBoolStorage(RC_PREF_KEYS.defaultKeyboard, prefs.defaultKeyboardEnabled);
+  writeBoolStorage(RC_PREF_KEYS.defaultGamepad, prefs.defaultGamepadEnabled);
+}

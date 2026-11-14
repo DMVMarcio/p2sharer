@@ -1,16 +1,13 @@
 import React, { useState } from 'react';
-import { openUrl } from '@tauri-apps/plugin-opener';
 import {
   AlertTriangle,
   ArrowDown,
   ArrowUp,
-  Download,
   Gamepad2,
   GripVertical,
   Keyboard,
   MonitorCog,
   Mouse,
-  RefreshCw,
   UserX,
 } from 'lucide-react';
 import { moveOrderedItem } from '../../core/ordered_items';
@@ -19,14 +16,12 @@ import { useLocale } from '../../hooks/useLocale';
 import { useModal } from '../../hooks/useModal';
 import { useRoom } from '../../hooks/useRoom';
 import { useSortableGrid } from '../../hooks/useSortableGrid';
-import { showToast } from '../../hooks/useToast';
 import { t } from '../../i18n';
 import { ModalDialog } from '../common/ModalDialog';
 import { Nickname } from '../common/Nickname';
 import { ProfileAvatar } from '../common/ProfileAvatar';
 import { Tooltip } from '../common/Tooltip';
-
-const VIGEMBUS_RELEASES_URL = 'https://github.com/nefarius/ViGEmBus/releases/latest';
+import { VigemDriverBanner } from '../common/VigemDriverBanner';
 
 export const RemoteControlManagerModal: React.FC = () => {
   useLocale();
@@ -51,17 +46,6 @@ export const RemoteControlManagerModal: React.FC = () => {
   } = useRoom();
 
   const [activeTab, setActiveTab] = useState<'controllers' | 'gamepads'>('controllers');
-  const [probingDriver, setProbingDriver] = useState(false);
-  const installingDriver = remoteControlGamepadDriverInstallStage !== 'idle';
-
-  const installStageLabel =
-    remoteControlGamepadDriverInstallStage === 'downloading'
-      ? t('remoteControl.vigemStageDownloading')
-      : remoteControlGamepadDriverInstallStage === 'verifying'
-        ? t('remoteControl.vigemStageVerifying')
-        : remoteControlGamepadDriverInstallStage === 'installing'
-          ? t('remoteControl.vigemStageInstalling')
-          : t('remoteControl.vigemInstallAction');
 
   const sortedGamepadIds = [...remoteControlVirtualGamepads]
     .sort((a, b) => a.order - b.order)
@@ -79,21 +63,6 @@ export const RemoteControlManagerModal: React.FC = () => {
   for (const slot of remoteControlVirtualGamepads) {
     if (!sortable.order.includes(slot.id)) orderedGamepads.push(slot);
   }
-
-  const handleRecheckDriver = async () => {
-    setProbingDriver(true);
-    try {
-      await recheckRemoteControlGamepadDriver();
-    } finally {
-      setProbingDriver(false);
-    }
-  };
-
-  const handleDownloadDriver = () => {
-    void openUrl(VIGEMBUS_RELEASES_URL).catch(() =>
-      showToast(t('message.3c3c85fd6b50'), 3500, 'error'),
-    );
-  };
 
   return (
     <ModalDialog
@@ -275,65 +244,28 @@ export const RemoteControlManagerModal: React.FC = () => {
               </div>
             )}
           </>
+        ) : !remoteControlGamepadDriverAvailable ? (
+          <VigemDriverBanner
+            driverAvailable={remoteControlGamepadDriverAvailable}
+            installStage={remoteControlGamepadDriverInstallStage}
+            needsReboot={remoteControlGamepadDriverNeedsReboot}
+            onInstall={installRemoteControlGamepadDriver}
+            onRecheck={recheckRemoteControlGamepadDriver}
+          />
         ) : (
           <>
-            {!remoteControlGamepadDriverAvailable && (
-              <div className="remote-control-manager-banner remote-control-manager-banner-driver">
-                <div className="remote-control-driver-copy">
-                  <strong>{t('remoteControl.vigemMissingTitle')}</strong>
-                  <p>
-                    {remoteControlGamepadDriverNeedsReboot
-                      ? t('remoteControl.vigemRebootToast')
-                      : t('remoteControl.vigemMissingDesc')}
-                  </p>
-                </div>
-                <div className="remote-control-driver-actions">
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm"
-                    disabled={installingDriver || probingDriver}
-                    onClick={() => {
-                      void installRemoteControlGamepadDriver();
-                    }}
-                  >
-                    <Download size={14} aria-hidden="true" />
-                    <span>{installStageLabel}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm"
-                    disabled={probingDriver || installingDriver}
-                    onClick={() => {
-                      void handleRecheckDriver();
-                    }}
-                  >
-                    <RefreshCw size={14} aria-hidden="true" />
-                    <span>{t('remoteControl.vigemRecheckAction')}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm"
-                    disabled={installingDriver}
-                    onClick={handleDownloadDriver}
-                  >
-                    <span>{t('remoteControl.vigemDownloadAction')}</span>
-                  </button>
-                </div>
-              </div>
-            )}
+                <p className="remote-control-gamepads-hint">{t('remoteControl.gamepadsHint')}</p>
 
-            <p className="remote-control-gamepads-hint">{t('remoteControl.gamepadsHint')}</p>
-
-            {orderedGamepads.length === 0 ? (
-              <div className="remote-control-manager-empty">
-                <Gamepad2 size={28} strokeWidth={1.5} aria-hidden="true" />
-                <p>{t('remoteControl.noGamepads')}</p>
-              </div>
-            ) : (
-              <div
-                className={`remote-control-gamepad-list ${sortable.draggingId ? 'is-sorting' : ''}`}
-                ref={sortable.gridRef}
-              >
+                {orderedGamepads.length === 0 ? (
+                  <div className="remote-control-manager-empty">
+                    <Gamepad2 size={28} strokeWidth={1.5} aria-hidden="true" />
+                    <p>{t('remoteControl.noGamepads')}</p>
+                  </div>
+                ) : (
+                  <div
+                    className={`remote-control-gamepad-list ${sortable.draggingId ? 'is-sorting' : ''}`}
+                    ref={sortable.gridRef}
+                  >
                 {orderedGamepads.map((slot, index) => {
                   const peer = peers.find((item) => item.id === slot.peerId);
                   const name = peer?.username || slot.peerId.slice(0, 6);

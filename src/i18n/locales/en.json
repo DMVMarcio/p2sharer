@@ -1689,7 +1689,6 @@
   "remoteControl.gamepadDisabledHint": "Gamepad disabled",
   "remoteControl.vigemMissingTitle": "ViGEmBus driver required",
   "remoteControl.vigemMissingDesc": "Install the official Nefarius ViGEmBus driver on the host PC to emulate virtual Xbox 360 gamepads.",
-  "remoteControl.vigemDownloadAction": "Download ViGEmBus",
   "remoteControl.vigemRecheckAction": "Check again",
   "remoteControl.gamepadsHint": "Virtual gamepads appear when a controller presses a button or moves a stick, keep working while the host uses mouse or keyboard, and can be dragged to change player slots.",
   "remoteControl.noGamepads": "No virtual gamepads plugged in yet.",
@@ -1706,5 +1705,13 @@
   "remoteControl.vigemRebootToast": "ViGEmBus installed. Restart Windows to activate virtual gamepads.",
   "remoteControl.vigemInstallCancelledToast": "ViGEmBus installation was cancelled.",
   "remoteControl.vigemInstallFailedToast": "Could not install ViGEmBus automatically. Try manual download.",
-  "remoteControl.vigemNeededToast": "A participant tried using a gamepad, but ViGEmBus is not installed. Open Remote Control -> Gamepads to install it."
+  "remoteControl.vigemNeededToast": "A participant tried using a gamepad, but ViGEmBus is not installed. Open Remote Control -> Gamepads to install it.",
+  "remoteControl.vigemExternalLink": "Official page",
+  "remoteControl.vigemReadyTitle": "ViGEmBus driver active",
+  "remoteControl.vigemReadyDesc": "Virtual Xbox 360 gamepads are ready for incoming controller inputs.",
+  "remoteControl.settingsTab": "Remote Control",
+  "remoteControl.settingsTitle": "Remote Control",
+  "remoteControl.settingsDesc": "Configure host input behavior, default permissions, and the virtual gamepad driver before starting a stream.",
+  "remoteControl.defaultPermissionsTitle": "Default permissions for new controllers",
+  "remoteControl.vigemSectionTitle": "Virtual gamepad driver"
 }

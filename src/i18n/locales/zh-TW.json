@@ -1689,7 +1689,6 @@
   "remoteControl.gamepadDisabledHint": "手把已停用",
   "remoteControl.vigemMissingTitle": "需要 ViGEmBus 驅動程式",
   "remoteControl.vigemMissingDesc": "請在主機電腦安裝官方 Nefarius ViGEmBus 驅動程式以模擬虛擬 Xbox 360 手把。",
-  "remoteControl.vigemDownloadAction": "下載 ViGEmBus",
   "remoteControl.vigemRecheckAction": "重新檢查",
   "remoteControl.gamepadsHint": "虛擬手把會在第一次按下按鈕或推動搖桿時接入，不受主機鍵鼠操作影響，並可拖曳調整玩家順序。",
   "remoteControl.noGamepads": "尚未接上任何虛擬手把。",
@@ -1706,5 +1705,13 @@
   "remoteControl.vigemRebootToast": "ViGEmBus 已安裝，請重新啟動 Windows 以啟用虛擬手把。",
   "remoteControl.vigemInstallCancelledToast": "已取消安裝 ViGEmBus。",
   "remoteControl.vigemInstallFailedToast": "無法自動安裝 ViGEmBus，請嘗試手動下載安裝。",
-  "remoteControl.vigemNeededToast": "有成員嘗試使用手把，但主機尚未安裝 ViGEmBus。請開啟遠端控制 -> 手把進行安裝。"
+  "remoteControl.vigemNeededToast": "有成員嘗試使用手把，但主機尚未安裝 ViGEmBus。請開啟遠端控制 -> 手把進行安裝。",
+  "remoteControl.vigemExternalLink": "官方頁面",
+  "remoteControl.vigemReadyTitle": "ViGEmBus 驅動已就緒",
+  "remoteControl.vigemReadyDesc": "虛擬 Xbox 360 手把已準備好接收遠端輸入。",
+  "remoteControl.settingsTab": "遠端控制",
+  "remoteControl.settingsTitle": "遠端控制",
+  "remoteControl.settingsDesc": "無需先開始分享即可預先設定輸入優先權、預設權限與虛擬手把驅動。",
+  "remoteControl.defaultPermissionsTitle": "新控制者的預設權限",
+  "remoteControl.vigemSectionTitle": "虛擬手把驅動程式"
 }

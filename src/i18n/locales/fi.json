@@ -1689,7 +1689,6 @@
   "remoteControl.gamepadDisabledHint": "Peliohjain estetty",
   "remoteControl.vigemMissingTitle": "ViGEmBus-ajuri vaaditaan",
   "remoteControl.vigemMissingDesc": "Asenna virallinen Nefarius ViGEmBus -ajuri isäntäkoneelle virtuaalisten Xbox 360 -ohjainten emulointia varten.",
-  "remoteControl.vigemDownloadAction": "Lataa ViGEmBus",
   "remoteControl.vigemRecheckAction": "Tarkista uudelleen",
   "remoteControl.gamepadsHint": "Virtuaaliohjaimet liitetään ensimmäisestä painalluksesta, toimivat myös isännän käyttäessä hiirtä tai näppäimistöä, ja pelaajajärjestystä voi muuttaa vetämällä.",
   "remoteControl.noGamepads": "Ei vielä yhdistettyjä virtuaalisia peliohjaimia.",
@@ -1706,5 +1705,13 @@
   "remoteControl.vigemRebootToast": "ViGEmBus asennettu. Käynnistä Windows uudelleen virtuaaliohjainten aktivoimiseksi.",
   "remoteControl.vigemInstallCancelledToast": "ViGEmBus-asennus peruutettiin.",
   "remoteControl.vigemInstallFailedToast": "ViGEmBus-asennus epäonnistui automaattisesti. Kokeile manuaalista latausta.",
-  "remoteControl.vigemNeededToast": "Osallistuja yritti käyttää peliohjainta, mutta ViGEmBus puuttuu. Avaa Etähallinta -> Peliohjaimet asentaaksesi sen."
+  "remoteControl.vigemNeededToast": "Osallistuja yritti käyttää peliohjainta, mutta ViGEmBus puuttuu. Avaa Etähallinta -> Peliohjaimet asentaaksesi sen.",
+  "remoteControl.vigemExternalLink": "Virallinen sivu",
+  "remoteControl.vigemReadyTitle": "ViGEmBus-ajuri käytössä",
+  "remoteControl.vigemReadyDesc": "Virtuaaliset Xbox 360 -peliohjaimet ovat valmiina syötteitä varten.",
+  "remoteControl.settingsTab": "Etähallinta",
+  "remoteControl.settingsTitle": "Etähallinta",
+  "remoteControl.settingsDesc": "Määritä syötteen etusija, oletusoikeudet ja virtuaaliohjainajuri ennen lähetyksen aloittamista.",
+  "remoteControl.defaultPermissionsTitle": "Uusien ohjaajien oletusoikeudet",
+  "remoteControl.vigemSectionTitle": "Virtuaalisen peliohjaimen ajuri"
 }

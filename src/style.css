@@ -7587,3 +7587,36 @@ body:has(.fullscreen-dialog, .chat-image-viewer) .window-titlebar { display: non
   align-items: center;
   gap: 4px;
 }
+
+.remote-control-driver-actions {
+  align-items: center;
+}
+
+.btn.btn-sm.remote-control-driver-external-btn {
+  padding: 4px 8px;
+  font-size: 11px;
+  gap: 5px;
+  color: var(--text-secondary);
+}
+
+.btn.btn-sm.remote-control-driver-external-btn:hover:not(:disabled) {
+  color: var(--text-primary);
+}
+
+.remote-control-driver-ready-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.remote-control-driver-ready-title {
+  display: flex !important;
+  align-items: center;
+  gap: 6px;
+  color: var(--success-text, #34d399);
+}
+
+.remote-control-settings-section {
+  margin-top: 6px;
+}

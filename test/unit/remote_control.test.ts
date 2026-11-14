@@ -404,4 +404,28 @@ test('RemoteControlHostManager enforces gamepadEnabled, syncs native peer permis
   assert.equal(manager.getControllers().length, 0);
   assert.equal(nativeSyncs.at(-1)?.authorized, false);
   assert.equal(released.includes('peer-a:screen-1'), true);
+
+  // Configured default permissions apply to newly accepted controllers
+  let defaults = { mouseEnabled: false, keyboardEnabled: true, gamepadEnabled: false };
+  const managerWithDefaults = new RemoteControlHostManager({
+    isHostSupported: () => true,
+    getScreenStream: (mediaId) =>
+      mediaId === 'screen-1' ? { sessionId: 'sess-1', cursorCaptured: true } : null,
+    sendToPeer: () => {},
+    setMonitorActive: () => {},
+    applyInput: async () => ({ accepted: true, hostBusy: false }),
+    releaseInputs: () => {},
+    getDefaultPermissions: () => defaults,
+    onChange: () => {},
+  });
+  managerWithDefaults.receiveClientPacket({ type: 'request', mediaId: 'screen-1' }, 'peer-z');
+  managerWithDefaults.answerRequest('peer-z:screen-1', true);
+  assert.deepEqual(
+    managerWithDefaults.getControllers().map((c) => ({
+      mouseEnabled: c.mouseEnabled,
+      keyboardEnabled: c.keyboardEnabled,
+      gamepadEnabled: c.gamepadEnabled,
+    })),
+    [defaults],
+  );
 });
