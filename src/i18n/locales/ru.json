@@ -1697,5 +1697,14 @@
   "remoteControl.gamepadSlotSub": "Геймпад #{{index}}",
   "remoteControl.gamepadDragAria": "Изменить порядок геймпада {{name}} (Игрок {{index}})",
   "remoteControl.gamepadMoveUp": "Поднять игрока",
-  "remoteControl.gamepadMoveDown": "Опустить игрока"
+  "remoteControl.gamepadMoveDown": "Опустить игрока",
+  "remoteControl.vigemInstallAction": "Установить ViGEmBus",
+  "remoteControl.vigemStageDownloading": "Загрузка драйвера...",
+  "remoteControl.vigemStageVerifying": "Проверка подписи...",
+  "remoteControl.vigemStageInstalling": "Установка (подтвердите UAC)...",
+  "remoteControl.vigemInstalledToast": "Драйвер ViGEmBus установлен и готов к работе с виртуальными геймпадами.",
+  "remoteControl.vigemRebootToast": "ViGEmBus установлен. Перезагрузите Windows для активации виртуальных геймпадов.",
+  "remoteControl.vigemInstallCancelledToast": "Установка ViGEmBus была отменена.",
+  "remoteControl.vigemInstallFailedToast": "Не удалось автоматически установить ViGEmBus. Попробуйте ручную загрузку.",
+  "remoteControl.vigemNeededToast": "Участник попытался использовать геймпад, но ViGEmBus не установлен. Откройте Управление -> Геймпады для установки."
 }

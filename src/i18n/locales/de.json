@@ -1697,5 +1697,14 @@
   "remoteControl.gamepadSlotSub": "Gamepad #{{index}}",
   "remoteControl.gamepadDragAria": "Gamepad von {{name}} (Spieler {{index}}) umsortieren",
   "remoteControl.gamepadMoveUp": "Spieler nach oben",
-  "remoteControl.gamepadMoveDown": "Spieler nach unten"
+  "remoteControl.gamepadMoveDown": "Spieler nach unten",
+  "remoteControl.vigemInstallAction": "ViGEmBus installieren",
+  "remoteControl.vigemStageDownloading": "Treiber wird geladen...",
+  "remoteControl.vigemStageVerifying": "Signatur wird geprüft...",
+  "remoteControl.vigemStageInstalling": "Installiere (UAC bestätigen)...",
+  "remoteControl.vigemInstalledToast": "ViGEmBus-Treiber installiert und für virtuelle Gamepads bereit.",
+  "remoteControl.vigemRebootToast": "ViGEmBus installiert. Starte Windows neu, um virtuelle Gamepads zu aktivieren.",
+  "remoteControl.vigemInstallCancelledToast": "ViGEmBus-Installation wurde abgebrochen.",
+  "remoteControl.vigemInstallFailedToast": "ViGEmBus konnte nicht automatisch installiert werden. Bitte manuell laden.",
+  "remoteControl.vigemNeededToast": "Ein Teilnehmer wollte ein Gamepad nutzen, aber ViGEmBus fehlt. Öffne Fernsteuerung -> Gamepads zum Installieren."
 }

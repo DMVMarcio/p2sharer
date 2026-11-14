@@ -1697,5 +1697,14 @@
   "remoteControl.gamepadSlotSub": "Manette #{{index}}",
   "remoteControl.gamepadDragAria": "Réorganiser la manette de {{name}} (Joueur {{index}})",
   "remoteControl.gamepadMoveUp": "Monter le joueur",
-  "remoteControl.gamepadMoveDown": "Descendre le joueur"
+  "remoteControl.gamepadMoveDown": "Descendre le joueur",
+  "remoteControl.vigemInstallAction": "Installer ViGEmBus",
+  "remoteControl.vigemStageDownloading": "Téléchargement du pilote...",
+  "remoteControl.vigemStageVerifying": "Vérification en cours...",
+  "remoteControl.vigemStageInstalling": "Installation (validez UAC)...",
+  "remoteControl.vigemInstalledToast": "Pilote ViGEmBus installé et prêt pour les manettes virtuelles.",
+  "remoteControl.vigemRebootToast": "ViGEmBus installé. Redémarrez Windows pour activer les manettes virtuelles.",
+  "remoteControl.vigemInstallCancelledToast": "L'installation de ViGEmBus a été annulée.",
+  "remoteControl.vigemInstallFailedToast": "Impossible d'installer ViGEmBus automatiquement. Essayez le téléchargement manuel.",
+  "remoteControl.vigemNeededToast": "Un participant a essayé une manette, mais ViGEmBus manque. Ouvrez Contrôle à distance -> Manettes pour l’installer."
 }

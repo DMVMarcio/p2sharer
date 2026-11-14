@@ -1697,5 +1697,14 @@
   "remoteControl.gamepadSlotSub": "Mando #{{index}}",
   "remoteControl.gamepadDragAria": "Reordenar mando de {{name}} (Jugador {{index}})",
   "remoteControl.gamepadMoveUp": "Subir jugador",
-  "remoteControl.gamepadMoveDown": "Bajar jugador"
+  "remoteControl.gamepadMoveDown": "Bajar jugador",
+  "remoteControl.vigemInstallAction": "Instalar ViGEmBus",
+  "remoteControl.vigemStageDownloading": "Descargando controlador...",
+  "remoteControl.vigemStageVerifying": "Verificando integridad...",
+  "remoteControl.vigemStageInstalling": "Instalando (acepta UAC)...",
+  "remoteControl.vigemInstalledToast": "Controlador ViGEmBus instalado y listo para mandos virtuales.",
+  "remoteControl.vigemRebootToast": "ViGEmBus instalado. Reinicia Windows para activar los mandos virtuales.",
+  "remoteControl.vigemInstallCancelledToast": "Se canceló la instalación de ViGEmBus.",
+  "remoteControl.vigemInstallFailedToast": "No se pudo instalar ViGEmBus automáticamente. Prueba la descarga manual.",
+  "remoteControl.vigemNeededToast": "Alguien intentó usar un mando, pero falta ViGEmBus. Abre Control remoto -> Mandos para instalarlo."
 }

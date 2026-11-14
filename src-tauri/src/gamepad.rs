@@ -1,6 +1,86 @@
 use serde::Serialize;
-use std::sync::{Arc, LazyLock, Mutex};
+use sha2::{Digest, Sha256};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc, LazyLock, Mutex,
+};
 use tauri::{AppHandle, Emitter};
+
+const VIGEMBUS_INSTALLER_URL: &str =
+    "https://github.com/nefarius/ViGEmBus/releases/download/v1.22.0/ViGEmBus_1.22.0_x64_x86_arm64.exe";
+const VIGEMBUS_INSTALLER_FILENAME: &str = "ViGEmBus_1.22.0_x64_x86_arm64.exe";
+const VIGEMBUS_INSTALLER_SHA256: &str =
+    "89220a7865076b342892f98865f3499fb7c4cfd673159e89d352c360fd014c6a";
+const VIGEMBUS_MAX_DOWNLOAD_BYTES: usize = 32 * 1024 * 1024;
+const MISSING_DRIVER_NOTIFY_INTERVAL_MS: u64 = 30_000;
+
+static DRIVER_INSTALL_ACTIVE: AtomicBool = AtomicBool::new(false);
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GamepadDriverInstallStagePayload {
+    pub stage: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GamepadDriverInstallResult {
+    pub status: String,
+    pub driver_available: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum InstallerExitOutcome {
+    Success,
+    RebootRequired,
+    Cancelled,
+}
+
+pub fn verify_sha256_hex(bytes: &[u8], expected_hex: &str) -> Result<(), String> {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    let actual_hex: String = hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    if actual_hex.eq_ignore_ascii_case(expected_hex) {
+        Ok(())
+    } else {
+        Err(format!(
+            "Downloaded installer checksum mismatch (expected {expected_hex}, got {actual_hex})"
+        ))
+    }
+}
+
+fn classify_installer_exit_code(exit_code: u32) -> Result<InstallerExitOutcome, String> {
+    match exit_code {
+        0 => Ok(InstallerExitOutcome::Success),
+        1641 | 3010 => Ok(InstallerExitOutcome::RebootRequired),
+        1223 | 1602 => Ok(InstallerExitOutcome::Cancelled),
+        other => Err(format!(
+            "ViGEmBus installer exited with Windows installer code {other}"
+        )),
+    }
+}
+
+fn emit_driver_install_stage(app: &AppHandle, stage: &str) {
+    let _ = app.emit_to(
+        "main",
+        "remote-control-gamepad-driver-install",
+        GamepadDriverInstallStagePayload {
+            stage: stage.to_string(),
+        },
+    );
+}
+
+fn emit_missing_driver_needed() {
+    if let Ok(guard) = APP_HANDLE_CELL.lock() {
+        if let Some(app) = guard.as_ref() {
+            let _ = app.emit_to("main", "remote-control-gamepad-driver-needed", ());
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct GamepadWireState {
@@ -176,6 +256,7 @@ mod win_impl {
         driver_available: bool,
         slots: Vec<ActiveVirtualSlot>,
         last_driver_probe_ms: u64,
+        last_missing_driver_notify_ms: u64,
     }
 
     impl WorkerState {
@@ -187,12 +268,14 @@ mod win_impl {
                 driver_available,
                 slots: Vec::new(),
                 last_driver_probe_ms: now_ms(),
+                last_missing_driver_notify_ms: 0,
             }
         }
 
         fn ensure_client(&mut self, force_probe: bool) -> Option<Arc<Client>> {
             if let Some(client) = &self.client {
                 self.driver_available = true;
+                self.last_missing_driver_notify_ms = 0;
                 return Some(Arc::clone(client));
             }
             let now = now_ms();
@@ -205,6 +288,7 @@ mod win_impl {
                     let arc = Arc::new(client);
                     self.client = Some(Arc::clone(&arc));
                     self.driver_available = true;
+                    self.last_missing_driver_notify_ms = 0;
                     crate::logger::log_msg(
                         "INFO",
                         "gamepad",
@@ -276,6 +360,13 @@ mod win_impl {
             }
             let Some(client) = self.ensure_client(false) else {
                 emit_snapshot(None, self.snapshot());
+                let now = now_ms();
+                if now.saturating_sub(self.last_missing_driver_notify_ms)
+                    >= MISSING_DRIVER_NOTIFY_INTERVAL_MS
+                {
+                    self.last_missing_driver_notify_ms = now;
+                    emit_missing_driver_needed();
+                }
                 return;
             };
 
@@ -651,6 +742,227 @@ pub fn reorder_remote_control_gamepads(
     Ok(get_gamepads_state())
 }
 
+#[cfg(windows)]
+fn run_elevated_vigem_installer(installer_path: &std::path::Path) -> Result<InstallerExitOutcome, String> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows::{
+        core::{w, HRESULT, PCWSTR},
+        Win32::{
+            Foundation::{CloseHandle, ERROR_CANCELLED, WAIT_OBJECT_0},
+            System::{
+                Com::{CoInitializeEx, CoUninitialize, COINIT_APARTMENTTHREADED},
+                Threading::{GetExitCodeProcess, WaitForSingleObject},
+            },
+            UI::{
+                Shell::{
+                    ShellExecuteExW, SEE_MASK_FLAG_NO_UI, SEE_MASK_NOASYNC, SEE_MASK_NOCLOSEPROCESS,
+                    SHELLEXECUTEINFOW,
+                },
+                WindowsAndMessaging::SW_HIDE,
+            },
+        },
+    };
+
+    struct ComGuard(bool);
+    impl Drop for ComGuard {
+        fn drop(&mut self) {
+            if self.0 {
+                unsafe { CoUninitialize() };
+            }
+        }
+    }
+
+    let hr = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) };
+    let _com = ComGuard(hr.is_ok());
+
+    let file_wide: Vec<u16> = installer_path
+        .as_os_str()
+        .encode_wide()
+        .chain(Some(0))
+        .collect();
+    let params_wide: Vec<u16> = "/exenoui /qn /norestart"
+        .encode_utf16()
+        .chain(Some(0))
+        .collect();
+
+    let mut info = SHELLEXECUTEINFOW {
+        cbSize: std::mem::size_of::<SHELLEXECUTEINFOW>() as u32,
+        fMask: SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC | SEE_MASK_FLAG_NO_UI,
+        lpVerb: w!("runas"),
+        lpFile: PCWSTR(file_wide.as_ptr()),
+        lpParameters: PCWSTR(params_wide.as_ptr()),
+        nShow: SW_HIDE.0,
+        ..Default::default()
+    };
+
+    if let Err(err) = unsafe { ShellExecuteExW(&mut info) } {
+        if err.code() == HRESULT::from_win32(ERROR_CANCELLED.0) {
+            return Ok(InstallerExitOutcome::Cancelled);
+        }
+        return Err(format!("Failed to launch ViGEmBus installer: {err}"));
+    }
+
+    if info.hProcess.is_invalid() {
+        return Err("Windows did not return a process handle for ViGEmBus installer".into());
+    }
+
+    struct ProcessHandleGuard(windows::Win32::Foundation::HANDLE);
+    impl Drop for ProcessHandleGuard {
+        fn drop(&mut self) {
+            unsafe {
+                let _ = CloseHandle(self.0);
+            }
+        }
+    }
+    let handle = ProcessHandleGuard(info.hProcess);
+
+    let wait_res = unsafe { WaitForSingleObject(handle.0, 180_000) };
+    if wait_res != WAIT_OBJECT_0 {
+        return Err("Timed out waiting for the ViGEmBus installer to finish".into());
+    }
+
+    let mut exit_code: u32 = 0;
+    unsafe { GetExitCodeProcess(handle.0, &mut exit_code) }
+        .map_err(|e| format!("Failed to read ViGEmBus installer exit status: {e}"))?;
+
+    classify_installer_exit_code(exit_code)
+}
+
+#[tauri::command]
+pub async fn install_remote_control_gamepad_driver(
+    app: AppHandle,
+    window: tauri::WebviewWindow,
+) -> Result<GamepadDriverInstallResult, String> {
+    if window.label() != "main" {
+        return Err("Only the main window can install the ViGEmBus driver".into());
+    }
+    set_app_handle(&app);
+
+    #[cfg(not(windows))]
+    {
+        return Err("ViGEmBus is only supported on Windows".into());
+    }
+
+    #[cfg(windows)]
+    {
+        if DRIVER_INSTALL_ACTIVE.swap(true, Ordering::SeqCst) {
+            return Err("ViGEmBus installation is already in progress".into());
+        }
+
+        struct InstallActiveGuard<'a>(&'a AppHandle);
+        impl Drop for InstallActiveGuard<'_> {
+            fn drop(&mut self) {
+                DRIVER_INSTALL_ACTIVE.store(false, Ordering::SeqCst);
+                emit_driver_install_stage(self.0, "idle");
+            }
+        }
+        let _active_guard = InstallActiveGuard(&app);
+
+        let initial = probe_driver();
+        if initial.driver_available {
+            return Ok(GamepadDriverInstallResult {
+                status: "already_installed".into(),
+                driver_available: true,
+            });
+        }
+
+        emit_driver_install_stage(&app, "downloading");
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(90))
+            .user_agent("P2Sharer")
+            .build()
+            .map_err(|e| format!("Failed to initialize HTTPS client: {e}"))?;
+
+        let response = client
+            .get(VIGEMBUS_INSTALLER_URL)
+            .send()
+            .await
+            .map_err(|e| format!("Failed to download ViGEmBus installer: {e}"))?;
+
+        if !response.status().is_success() {
+            return Err(format!(
+                "ViGEmBus download failed with HTTP status {}",
+                response.status()
+            ));
+        }
+
+        if let Some(len) = response.content_length() {
+            if len as usize > VIGEMBUS_MAX_DOWNLOAD_BYTES {
+                return Err("ViGEmBus installer payload exceeded size limit".into());
+            }
+        }
+
+        let bytes = response
+            .bytes()
+            .await
+            .map_err(|e| format!("Failed to read ViGEmBus installer download: {e}"))?;
+
+        if bytes.len() > VIGEMBUS_MAX_DOWNLOAD_BYTES || !bytes.starts_with(b"MZ") {
+            return Err("Downloaded ViGEmBus file is invalid".into());
+        }
+
+        emit_driver_install_stage(&app, "verifying");
+        verify_sha256_hex(&bytes, VIGEMBUS_INSTALLER_SHA256)?;
+
+        let mut token_bytes = [0u8; 8];
+        getrandom::getrandom(&mut token_bytes).map_err(|e| e.to_string())?;
+        let token: String = token_bytes.iter().map(|b| format!("{b:02x}")).collect();
+        let stage_dir = std::env::temp_dir().join(format!("p2sharer-vigem-{token}"));
+        std::fs::create_dir_all(&stage_dir)
+            .map_err(|e| format!("Failed to prepare ViGEmBus temp folder: {e}"))?;
+
+        struct StageDirGuard(std::path::PathBuf);
+        impl Drop for StageDirGuard {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_dir_all(&self.0);
+            }
+        }
+        let _stage_guard = StageDirGuard(stage_dir.clone());
+
+        let installer_path = stage_dir.join(VIGEMBUS_INSTALLER_FILENAME);
+        {
+            use std::io::Write;
+            let mut file = std::fs::File::create(&installer_path)
+                .map_err(|e| format!("Failed to write ViGEmBus installer: {e}"))?;
+            file.write_all(&bytes)
+                .map_err(|e| format!("Failed to write ViGEmBus installer bytes: {e}"))?;
+            file.sync_all()
+                .map_err(|e| format!("Failed to flush ViGEmBus installer file: {e}"))?;
+        }
+
+        emit_driver_install_stage(&app, "installing");
+        let exec_path = installer_path.clone();
+        let outcome = tauri::async_runtime::spawn_blocking(move || run_elevated_vigem_installer(&exec_path))
+            .await
+            .map_err(|e| format!("Installer task panicked: {e}"))??;
+
+        if outcome == InstallerExitOutcome::Cancelled {
+            return Ok(GamepadDriverInstallResult {
+                status: "cancelled".into(),
+                driver_available: false,
+            });
+        }
+
+        let mut probed = probe_driver();
+        if !probed.driver_available && outcome == InstallerExitOutcome::Success {
+            tokio::time::sleep(std::time::Duration::from_millis(450)).await;
+            probed = probe_driver();
+        }
+
+        if probed.driver_available {
+            return Ok(GamepadDriverInstallResult {
+                status: "installed".into(),
+                driver_available: true,
+            });
+        }
+
+        Ok(GamepadDriverInstallResult {
+            status: "reboot_required".into(),
+            driver_available: false,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -671,5 +983,35 @@ mod tests {
             "peer-c:screen-1:0".to_string(),
         ];
         assert_eq!(compute_reordered_positions(&current, &requested), vec![2, 0, 1]);
+    }
+
+    #[test]
+    fn sha256_verification_and_installer_exit_codes_behave_safely() {
+        let hello_hash = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824";
+        assert!(verify_sha256_hex(b"hello", hello_hash).is_ok());
+        assert!(verify_sha256_hex(b"hello", &hello_hash.to_uppercase()).is_ok());
+        assert!(verify_sha256_hex(b"tampered", hello_hash).is_err());
+
+        assert_eq!(
+            classify_installer_exit_code(0).unwrap(),
+            InstallerExitOutcome::Success
+        );
+        assert_eq!(
+            classify_installer_exit_code(3010).unwrap(),
+            InstallerExitOutcome::RebootRequired
+        );
+        assert_eq!(
+            classify_installer_exit_code(1641).unwrap(),
+            InstallerExitOutcome::RebootRequired
+        );
+        assert_eq!(
+            classify_installer_exit_code(1223).unwrap(),
+            InstallerExitOutcome::Cancelled
+        );
+        assert_eq!(
+            classify_installer_exit_code(1602).unwrap(),
+            InstallerExitOutcome::Cancelled
+        );
+        assert!(classify_installer_exit_code(1603).is_err());
     }
 }

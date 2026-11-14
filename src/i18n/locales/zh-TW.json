@@ -1697,5 +1697,14 @@
   "remoteControl.gamepadSlotSub": "手把 #{{index}}",
   "remoteControl.gamepadDragAria": "調整 {{name}} 第 {{index}} 位玩家的手把順序",
   "remoteControl.gamepadMoveUp": "上移玩家",
-  "remoteControl.gamepadMoveDown": "下移玩家"
+  "remoteControl.gamepadMoveDown": "下移玩家",
+  "remoteControl.vigemInstallAction": "安裝 ViGEmBus",
+  "remoteControl.vigemStageDownloading": "正在下載驅動...",
+  "remoteControl.vigemStageVerifying": "正在驗證檔案...",
+  "remoteControl.vigemStageInstalling": "正在安裝（請允許 UAC）...",
+  "remoteControl.vigemInstalledToast": "ViGEmBus 驅動已安裝，可立即使用虛擬手把。",
+  "remoteControl.vigemRebootToast": "ViGEmBus 已安裝，請重新啟動 Windows 以啟用虛擬手把。",
+  "remoteControl.vigemInstallCancelledToast": "已取消安裝 ViGEmBus。",
+  "remoteControl.vigemInstallFailedToast": "無法自動安裝 ViGEmBus，請嘗試手動下載安裝。",
+  "remoteControl.vigemNeededToast": "有成員嘗試使用手把，但主機尚未安裝 ViGEmBus。請開啟遠端控制 -> 手把進行安裝。"
 }

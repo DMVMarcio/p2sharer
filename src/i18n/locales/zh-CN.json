@@ -1697,5 +1697,14 @@
   "remoteControl.gamepadSlotSub": "手柄 #{{index}}",
   "remoteControl.gamepadDragAria": "调整 {{name}} 的 {{index}} 号玩家手柄顺序",
   "remoteControl.gamepadMoveUp": "上移玩家",
-  "remoteControl.gamepadMoveDown": "下移玩家"
+  "remoteControl.gamepadMoveDown": "下移玩家",
+  "remoteControl.vigemInstallAction": "安装 ViGEmBus",
+  "remoteControl.vigemStageDownloading": "正在下载驱动...",
+  "remoteControl.vigemStageVerifying": "正在校验文件...",
+  "remoteControl.vigemStageInstalling": "正在安装（请允许 UAC）...",
+  "remoteControl.vigemInstalledToast": "ViGEmBus 驱动已安装，可立即使用虚拟手柄。",
+  "remoteControl.vigemRebootToast": "ViGEmBus 已安装，请重启 Windows 以启用虚拟手柄。",
+  "remoteControl.vigemInstallCancelledToast": "已取消安装 ViGEmBus。",
+  "remoteControl.vigemInstallFailedToast": "无法自动安装 ViGEmBus，请尝试手动下载安装。",
+  "remoteControl.vigemNeededToast": "有成员尝试使用手柄，但主机尚未安装 ViGEmBus。请打开远程控制 -> 手柄进行安装。"
 }

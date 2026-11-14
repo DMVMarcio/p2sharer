@@ -37,6 +37,8 @@ export const RemoteControlManagerModal: React.FC = () => {
     remoteControlHostPriorityEnabled,
     remoteControlElevationBlocked,
     remoteControlGamepadDriverAvailable,
+    remoteControlGamepadDriverInstallStage,
+    remoteControlGamepadDriverNeedsReboot,
     remoteControlVirtualGamepads,
     peers,
     roomSlots,
@@ -44,11 +46,22 @@ export const RemoteControlManagerModal: React.FC = () => {
     revokeRemoteController,
     setRemoteControlHostPriorityEnabled,
     recheckRemoteControlGamepadDriver,
+    installRemoteControlGamepadDriver,
     reorderRemoteControlGamepads,
   } = useRoom();
 
   const [activeTab, setActiveTab] = useState<'controllers' | 'gamepads'>('controllers');
   const [probingDriver, setProbingDriver] = useState(false);
+  const installingDriver = remoteControlGamepadDriverInstallStage !== 'idle';
+
+  const installStageLabel =
+    remoteControlGamepadDriverInstallStage === 'downloading'
+      ? t('remoteControl.vigemStageDownloading')
+      : remoteControlGamepadDriverInstallStage === 'verifying'
+        ? t('remoteControl.vigemStageVerifying')
+        : remoteControlGamepadDriverInstallStage === 'installing'
+          ? t('remoteControl.vigemStageInstalling')
+          : t('remoteControl.vigemInstallAction');
 
   const sortedGamepadIds = [...remoteControlVirtualGamepads]
     .sort((a, b) => a.order - b.order)
@@ -268,27 +281,42 @@ export const RemoteControlManagerModal: React.FC = () => {
               <div className="remote-control-manager-banner remote-control-manager-banner-driver">
                 <div className="remote-control-driver-copy">
                   <strong>{t('remoteControl.vigemMissingTitle')}</strong>
-                  <p>{t('remoteControl.vigemMissingDesc')}</p>
+                  <p>
+                    {remoteControlGamepadDriverNeedsReboot
+                      ? t('remoteControl.vigemRebootToast')
+                      : t('remoteControl.vigemMissingDesc')}
+                  </p>
                 </div>
                 <div className="remote-control-driver-actions">
                   <button
                     type="button"
                     className="btn btn-primary btn-sm"
-                    onClick={handleDownloadDriver}
+                    disabled={installingDriver || probingDriver}
+                    onClick={() => {
+                      void installRemoteControlGamepadDriver();
+                    }}
                   >
                     <Download size={14} aria-hidden="true" />
-                    <span>{t('remoteControl.vigemDownloadAction')}</span>
+                    <span>{installStageLabel}</span>
                   </button>
                   <button
                     type="button"
                     className="btn btn-secondary btn-sm"
-                    disabled={probingDriver}
+                    disabled={probingDriver || installingDriver}
                     onClick={() => {
                       void handleRecheckDriver();
                     }}
                   >
                     <RefreshCw size={14} aria-hidden="true" />
                     <span>{t('remoteControl.vigemRecheckAction')}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    disabled={installingDriver}
+                    onClick={handleDownloadDriver}
+                  >
+                    <span>{t('remoteControl.vigemDownloadAction')}</span>
                   </button>
                 </div>
               </div>

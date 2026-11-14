@@ -1697,5 +1697,14 @@
   "remoteControl.gamepadSlotSub": "गेमपैड #{{index}}",
   "remoteControl.gamepadDragAria": "{{name}} खिलाड़ी {{index}} गेमपैड का क्रम बदलें",
   "remoteControl.gamepadMoveUp": "खिलाड़ी को ऊपर ले जाएँ",
-  "remoteControl.gamepadMoveDown": "खिलाड़ी को नीचे ले जाएँ"
+  "remoteControl.gamepadMoveDown": "खिलाड़ी को नीचे ले जाएँ",
+  "remoteControl.vigemInstallAction": "ViGEmBus इंस्टॉल करें",
+  "remoteControl.vigemStageDownloading": "ड्राइवर डाउनलोड हो रहा है...",
+  "remoteControl.vigemStageVerifying": "फ़ाइल की जाँच हो रही है...",
+  "remoteControl.vigemStageInstalling": "इंस्टॉल हो रहा है (UAC स्वीकार करें)...",
+  "remoteControl.vigemInstalledToast": "ViGEmBus ड्राइवर इंस्टॉल हो गया और वर्चुअल गेमपैड के लिए तैयार है।",
+  "remoteControl.vigemRebootToast": "ViGEmBus इंस्टॉल हो गया। वर्चुअल गेमपैड सक्रिय करने के लिए Windows रीस्टार्ट करें।",
+  "remoteControl.vigemInstallCancelledToast": "ViGEmBus इंस्टॉलेशन रद्द कर दिया गया।",
+  "remoteControl.vigemInstallFailedToast": "ViGEmBus अपने-आप इंस्टॉल नहीं हो सका। कृपया मैन्युअल डाउनलोड आज़माएँ।",
+  "remoteControl.vigemNeededToast": "किसी प्रतिभागी ने गेमपैड उपयोग करने की कोशिश की, लेकिन ViGEmBus इंस्टॉल नहीं है। इंस्टॉल करने के लिए रिमोट कंट्रोल -> गेमपैड खोलें।"
 }

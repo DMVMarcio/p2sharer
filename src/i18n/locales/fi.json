@@ -1697,5 +1697,14 @@
   "remoteControl.gamepadSlotSub": "Ohjain #{{index}}",
   "remoteControl.gamepadDragAria": "Järjestä käyttäjän {{name}} pelaajan {{index}} ohjain",
   "remoteControl.gamepadMoveUp": "Siirrä pelaaja ylös",
-  "remoteControl.gamepadMoveDown": "Siirrä pelaaja alas"
+  "remoteControl.gamepadMoveDown": "Siirrä pelaaja alas",
+  "remoteControl.vigemInstallAction": "Asenna ViGEmBus",
+  "remoteControl.vigemStageDownloading": "Ladataan ajuria...",
+  "remoteControl.vigemStageVerifying": "Tarkistetaan tiedostoa...",
+  "remoteControl.vigemStageInstalling": "Asennetaan (hyväksy UAC)...",
+  "remoteControl.vigemInstalledToast": "ViGEmBus-ajuri asennettu ja valmis virtuaaliohjaimille.",
+  "remoteControl.vigemRebootToast": "ViGEmBus asennettu. Käynnistä Windows uudelleen virtuaaliohjainten aktivoimiseksi.",
+  "remoteControl.vigemInstallCancelledToast": "ViGEmBus-asennus peruutettiin.",
+  "remoteControl.vigemInstallFailedToast": "ViGEmBus-asennus epäonnistui automaattisesti. Kokeile manuaalista latausta.",
+  "remoteControl.vigemNeededToast": "Osallistuja yritti käyttää peliohjainta, mutta ViGEmBus puuttuu. Avaa Etähallinta -> Peliohjaimet asentaaksesi sen."
 }

@@ -1697,5 +1697,14 @@
   "remoteControl.gamepadSlotSub": "ゲームパッド #{{index}}",
   "remoteControl.gamepadDragAria": "{{name}}（プレイヤー {{index}}）のゲームパッド順を変更",
   "remoteControl.gamepadMoveUp": "プレイヤーを上に移動",
-  "remoteControl.gamepadMoveDown": "プレイヤーを下に移動"
+  "remoteControl.gamepadMoveDown": "プレイヤーを下に移動",
+  "remoteControl.vigemInstallAction": "ViGEmBus をインストール",
+  "remoteControl.vigemStageDownloading": "ドライバを取得中...",
+  "remoteControl.vigemStageVerifying": "整合性を確認中...",
+  "remoteControl.vigemStageInstalling": "インストール中 (UAC承認)...",
+  "remoteControl.vigemInstalledToast": "ViGEmBus ドライバをインストールしました。仮想ゲームパッドを利用できます。",
+  "remoteControl.vigemRebootToast": "ViGEmBus をインストールしました。仮想ゲームパッドを有効にするには Windows を再起動してください。",
+  "remoteControl.vigemInstallCancelledToast": "ViGEmBus のインストールはキャンセルされました。",
+  "remoteControl.vigemInstallFailedToast": "ViGEmBus を自動インストールできませんでした。手動ダウンロードをお試しください。",
+  "remoteControl.vigemNeededToast": "参加者がゲームパッドを使用しようとしましたが ViGEmBus が未導入です。「リモート操作 -> ゲームパッド」から導入できます。"
 }

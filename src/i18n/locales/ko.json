@@ -1697,5 +1697,14 @@
   "remoteControl.gamepadSlotSub": "게임패드 #{{index}}",
   "remoteControl.gamepadDragAria": "{{name}} 플레이어 {{index}} 게임패드 순서 변경",
   "remoteControl.gamepadMoveUp": "플레이어 위로 이동",
-  "remoteControl.gamepadMoveDown": "플레이어 아래로 이동"
+  "remoteControl.gamepadMoveDown": "플레이어 아래로 이동",
+  "remoteControl.vigemInstallAction": "ViGEmBus 설치",
+  "remoteControl.vigemStageDownloading": "드라이버 다운로드 중...",
+  "remoteControl.vigemStageVerifying": "무결성 확인 중...",
+  "remoteControl.vigemStageInstalling": "설치 중 (UAC 승인 필요)...",
+  "remoteControl.vigemInstalledToast": "ViGEmBus 드라이버가 설치되어 가상 게임패드를 바로 사용할 수 있습니다.",
+  "remoteControl.vigemRebootToast": "ViGEmBus가 설치되었습니다. 가상 게임패드를 활성화하려면 Windows를 다시 시작하세요.",
+  "remoteControl.vigemInstallCancelledToast": "ViGEmBus 설치가 취소되었습니다.",
+  "remoteControl.vigemInstallFailedToast": "ViGEmBus를 자동으로 설치하지 못했습니다. 수동 다운로드를 시도해 주세요.",
+  "remoteControl.vigemNeededToast": "참가자가 게임패드를 사용하려 했으나 ViGEmBus가 없습니다. 원격 제어 -> 게임패드에서 설치할 수 있습니다."
 }

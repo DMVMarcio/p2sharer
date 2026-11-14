@@ -84,6 +84,8 @@ export class RoomService {
   public remoteControlHostPriorityEnabled = true;
   public remoteControlElevationBlocked = false;
   public remoteControlGamepadDriverAvailable = true;
+  public remoteControlGamepadDriverInstallStage: 'idle' | 'downloading' | 'verifying' | 'installing' = 'idle';
+  public remoteControlGamepadDriverNeedsReboot = false;
   public remoteControlVirtualGamepads: VirtualGamepadSlot[] = [];
   public remoteControlViewerStates: Record<string, RemoteControlViewerState> = {};
   public remoteCursorStates: Record<string, RemoteCursorSyncState> = {};
@@ -178,10 +180,35 @@ export class RoomService {
         ({ payload }) => {
           if (!payload) return;
           this.remoteControlGamepadDriverAvailable = Boolean(payload.driverAvailable);
+          if (this.remoteControlGamepadDriverAvailable) {
+            this.remoteControlGamepadDriverNeedsReboot = false;
+          }
           this.remoteControlVirtualGamepads = Array.isArray(payload.gamepads) ? payload.gamepads : [];
           this.notify();
         },
       ).catch(console.warn);
+      void listen<{ stage?: string }>(
+        'remote-control-gamepad-driver-install',
+        ({ payload }) => {
+          const stage = payload?.stage;
+          if (
+            stage === 'idle' ||
+            stage === 'downloading' ||
+            stage === 'verifying' ||
+            stage === 'installing'
+          ) {
+            if (this.remoteControlGamepadDriverInstallStage !== stage) {
+              this.remoteControlGamepadDriverInstallStage = stage;
+              this.notify();
+            }
+          }
+        },
+      ).catch(console.warn);
+      void listen('remote-control-gamepad-driver-needed', () => {
+        if (!this.remoteControlGamepadDriverAvailable && this.remoteControlGamepadDriverInstallStage === 'idle') {
+          showToast(t('remoteControl.vigemNeededToast'), 5000, 'info');
+        }
+      }).catch(console.warn);
       void invoke<{ driverAvailable: boolean; gamepads: VirtualGamepadSlot[] }>('get_remote_control_gamepads')
         .then((snap) => {
           if (!snap) return;
@@ -1177,11 +1204,44 @@ export class RoomService {
       );
       if (snap) {
         this.remoteControlGamepadDriverAvailable = Boolean(snap.driverAvailable);
+        if (this.remoteControlGamepadDriverAvailable) {
+          this.remoteControlGamepadDriverNeedsReboot = false;
+        }
         this.remoteControlVirtualGamepads = Array.isArray(snap.gamepads) ? snap.gamepads : [];
         this.notify();
       }
     } catch (err) {
       console.warn('[Gamepad] Failed to probe ViGEmBus driver:', err);
+    }
+  }
+
+  public async installRemoteControlGamepadDriver(): Promise<void> {
+    if (!isTauri() || this.remoteControlGamepadDriverInstallStage !== 'idle') return;
+    this.remoteControlGamepadDriverInstallStage = 'downloading';
+    this.remoteControlGamepadDriverNeedsReboot = false;
+    this.notify();
+    try {
+      const result = await invoke<{ status: string; driverAvailable: boolean }>(
+        'install_remote_control_gamepad_driver',
+      );
+      if (result) {
+        this.remoteControlGamepadDriverAvailable = Boolean(result.driverAvailable);
+        if (result.status === 'installed' || result.status === 'already_installed') {
+          this.remoteControlGamepadDriverNeedsReboot = false;
+          showToast(t('remoteControl.vigemInstalledToast'), 3500, 'success');
+        } else if (result.status === 'reboot_required') {
+          this.remoteControlGamepadDriverNeedsReboot = true;
+          showToast(t('remoteControl.vigemRebootToast'), 6000, 'info');
+        } else if (result.status === 'cancelled') {
+          showToast(t('remoteControl.vigemInstallCancelledToast'), 3500, 'info');
+        }
+      }
+    } catch (err) {
+      console.warn('[Gamepad] Failed to install ViGEmBus driver:', err);
+      showToast(t('remoteControl.vigemInstallFailedToast'), 5000, 'error');
+    } finally {
+      this.remoteControlGamepadDriverInstallStage = 'idle';
+      this.notify();
     }
   }
 
