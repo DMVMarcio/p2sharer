@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   AlertTriangle,
   ArrowDown,
@@ -15,6 +15,7 @@ import { useLocale } from '../../hooks/useLocale';
 import { useModal } from '../../hooks/useModal';
 import { useRoom } from '../../hooks/useRoom';
 import { useSortableGrid } from '../../hooks/useSortableGrid';
+import { roomService } from '../../services/room_service';
 import { t } from '../../i18n';
 import { ModalDialog } from '../common/ModalDialog';
 import { Nickname } from '../common/Nickname';
@@ -47,6 +48,12 @@ export const RemoteControlManagerModal: React.FC = () => {
   } = useRoom();
 
   const [activeTab, setActiveTab] = useState<'controllers' | 'gamepads'>('controllers');
+  const [, setActivityTick] = useState(0);
+
+  useEffect(
+    () => roomService.subscribeRemoteControlActivity?.(() => setActivityTick((n) => n + 1)),
+    [],
+  );
 
   const sortedGamepadIds = [...remoteControlVirtualGamepads]
     .sort((a, b) => a.order - b.order)
@@ -176,6 +183,7 @@ export const RemoteControlManagerModal: React.FC = () => {
                           mouseEnabled={ctrl.mouseEnabled}
                           keyboardEnabled={ctrl.keyboardEnabled}
                           gamepadEnabled={ctrl.gamepadEnabled}
+                          activity={roomService.getControllerInputActivity?.(ctrl.peerId, ctrl.mediaId)}
                           subjectName={name}
                           onToggle={(key, nextVal) =>
                             setRemoteControllerPermissions(ctrl.peerId, ctrl.mediaId, {
@@ -228,13 +236,17 @@ export const RemoteControlManagerModal: React.FC = () => {
                   const color = generateUserColor(name);
                   const playerNumber = (slot.xinputSlot ?? index) + 1;
                   const ids = orderedGamepads.map((entry) => entry.id);
+                  const padActivity = roomService.getGamepadInputActivity?.(slot.id);
+                  const padFlashClass = padActivity?.active
+                    ? `is-input-active ${padActivity.seq % 2 === 0 ? 'flash-a' : 'flash-b'}`
+                    : '';
 
                   return (
                     <div
                       key={slot.id}
                       ref={sortable.cardRef(slot.id)}
                       data-sortable-id={slot.id}
-                      className={`remote-control-gamepad-row ${sortable.draggingId === slot.id ? 'is-dragging' : ''}`}
+                      className={`remote-control-gamepad-row ${sortable.draggingId === slot.id ? 'is-dragging' : ''} ${padFlashClass}`.trim()}
                     >
                       <button
                         type="button"
@@ -246,8 +258,9 @@ export const RemoteControlManagerModal: React.FC = () => {
                         <GripVertical size={16} aria-hidden="true" />
                       </button>
 
-                      <span className="remote-control-player-badge">
-                        {t('remoteControl.gamepadPlayerBadge', { num: playerNumber })}
+                      <span className={`remote-control-player-badge ${padFlashClass}`.trim()}>
+                        <Gamepad2 size={12} className="rc-gamepad-activity-icon" aria-hidden="true" />
+                        <span>{t('remoteControl.gamepadPlayerBadge', { num: playerNumber })}</span>
                       </span>
 
                       <div className="remote-control-controller-identity remote-control-gamepad-owner">

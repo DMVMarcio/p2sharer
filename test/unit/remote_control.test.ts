@@ -23,6 +23,7 @@ import {
   resolveKeyRemapping,
 } from '../../src/core/input_bindings.ts';
 import { ToastManager } from '../../src/core/toast_manager.ts';
+import { RemoteControlActivityTracker } from '../../src/core/remote_control_activity.ts';
 
 test('validRemoteControlClientPacket and validRemoteControlHostPacket validate bounds and schemas', () => {
   assert.equal(validRemoteControlClientPacket({ type: 'request', mediaId: 'screen-1' }), true);
@@ -560,4 +561,76 @@ test('custom input bindings remap keys, shortcuts, non-standard gamepad axes, an
   assert.equal(triggered, 1);
   tm.remove(list[0].id);
   unsub();
+});
+
+test('RemoteControlActivityTracker records accepted per-device and per-gamepad blinks and ignores blocked inputs', () => {
+  const tracker = new RemoteControlActivityTracker();
+  const manager = new RemoteControlHostManager({
+    isHostSupported: () => true,
+    getScreenStream: (mediaId) =>
+      mediaId === 'screen-1' ? { sessionId: 'sess-1', cursorCaptured: true } : null,
+    sendToPeer: () => {},
+    setMonitorActive: () => {},
+    applyInput: async () => ({ accepted: true, hostBusy: false }),
+    releaseInputs: () => {},
+    onInputActivity: (peerId, mediaId, event) => tracker.recordEvent(peerId, mediaId, event, 1000),
+    onActivityCleared: ({ controllerKey, peerId, mediaId }) => {
+      if (controllerKey) tracker.clearController(controllerKey);
+      else if (peerId) tracker.clearPeer(peerId);
+      else if (mediaId) tracker.clearMedia(mediaId);
+      else tracker.clear();
+    },
+    onChange: () => {},
+  });
+
+  manager.receiveClientPacket({ type: 'request', mediaId: 'screen-1' }, 'peer-a');
+  manager.answerRequest('peer-a:screen-1', true, {
+    mouseEnabled: false,
+    keyboardEnabled: true,
+    gamepadEnabled: true,
+  });
+
+  // Blocked mouse input does not trigger mouse flash
+  manager.receiveClientPacket(
+    { type: 'input', mediaId: 'screen-1', event: { kind: 'mouseMove', x: 0.5, y: 0.5 } },
+    'peer-a',
+  );
+  assert.equal(tracker.getControllerActivity('peer-a:screen-1', 1050).mouseActive, false);
+
+  // Keyboard and non-neutral gamepad inputs light up controller and specific virtual gamepad slot
+  manager.receiveClientPacket(
+    { type: 'input', mediaId: 'screen-1', event: { kind: 'key', code: 'KeyW', key: 'w', down: true } },
+    'peer-a',
+  );
+  manager.receiveClientPacket(
+    {
+      type: 'input',
+      mediaId: 'screen-1',
+      event: {
+        kind: 'gamepadState',
+        padIndex: 1,
+        buttons: 0x1000,
+        leftTrigger: 0,
+        rightTrigger: 0,
+        thumbLx: 0,
+        thumbLy: 0,
+        thumbRx: 0,
+        thumbRy: 0,
+      },
+    },
+    'peer-a',
+  );
+
+  const act = tracker.getControllerActivity('peer-a:screen-1', 1100);
+  assert.equal(act.keyboardActive, true);
+  assert.equal(act.keyboardSeq, 1);
+  assert.equal(act.gamepadActive, true);
+  assert.equal(act.gamepadSeq, 1);
+  assert.equal(tracker.getGamepadActivity('peer-a:screen-1:1', 1100).active, true);
+  assert.equal(tracker.getGamepadActivity('peer-a:screen-1:0', 1100).active, false);
+
+  // Activity decays cleanly after hold window and clears immediately on revoke
+  assert.equal(tracker.getControllerActivity('peer-a:screen-1', 2000).keyboardActive, false);
+  manager.revokeController('peer-a', 'screen-1');
+  assert.equal(tracker.getGamepadActivity('peer-a:screen-1:1', 1100).active, false);
 });

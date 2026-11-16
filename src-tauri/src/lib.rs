@@ -261,6 +261,8 @@ pub fn run() {
             native_rtc::get_native_video_stats,
             stream_pointer::update_stream_pointer_overlay,
             stream_pointer::get_stream_pointer_visuals,
+            stream_pointer::update_remote_control_overlay,
+            stream_pointer::get_remote_control_overlay,
             remote_control::set_remote_control_active,
             remote_control::set_remote_control_native_peer,
             remote_control::apply_remote_control_input,

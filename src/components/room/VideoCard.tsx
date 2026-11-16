@@ -16,6 +16,7 @@ import { useRemoteControl } from '../../hooks/useRemoteControl';
 import { RemoteControlToggle } from './RemoteControlToggle';
 import { RemoteControlFloatingOverlay } from './RemoteControlFloatingOverlay';
 import { RemoteCursorOverlay } from './RemoteCursorOverlay';
+import { RemoteControlOverlayHud } from './RemoteControlOverlayHud';
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { RoomSlotInfo } from '../../core/types';
 import { useRoom } from '../../hooks/useRoom';
@@ -354,6 +355,12 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   const localControllers = slot.isLocal
     ? remoteControllers.filter((ctrl) => !slot.mediaId || ctrl.mediaId === slot.mediaId)
     : [];
+  const [, setLocalActivityTick] = useState(0);
+
+  useEffect(() => {
+    if (localControllers.length === 0) return;
+    return roomService.subscribeRemoteControlActivity?.(() => setLocalActivityTick((n) => n + 1));
+  }, [localControllers.length]);
 
   const layoutActions = useRoomCardLayoutActions();
   const handleContextMenu = (event: React.MouseEvent) => {
@@ -631,6 +638,13 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           onTooltipOpenChange={handleTooltipOpenChange}
         />
     )}
+
+      {slot.isLocal && slot.isStreaming && showLocalPreview && localControllers.length > 0 && !inTray && !isPipActive && (
+        <RemoteControlOverlayHud
+          compact
+          items={roomService.getRemoteControlOverlayItemsForMedia?.(slot.mediaId || 'default') ?? []}
+        />
+      )}
 
       {/* Stream stop actions share the tray control recipe. */}
       {!remoteControl.active && ((!slot.isLocal && !isPipActive) || (slot.isLocal && slot.isStreaming)) && (

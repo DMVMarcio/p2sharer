@@ -1,5 +1,6 @@
 import React from 'react';
 import { Gamepad2, Keyboard, Mouse } from 'lucide-react';
+import type { ControllerInputActivity } from '../../core/remote_control_activity';
 import { t } from '../../i18n';
 import { Tooltip } from './Tooltip';
 
@@ -10,6 +11,7 @@ interface RemoteControlPermissionBadgesProps {
   keyboardEnabled: boolean;
   gamepadEnabled: boolean;
   onToggle: (key: RemoteControlPermissionKey, next: boolean) => void;
+  activity?: ControllerInputActivity;
   subjectName?: string;
   compact?: boolean;
   disabled?: boolean;
@@ -21,6 +23,7 @@ export const RemoteControlPermissionBadges: React.FC<RemoteControlPermissionBadg
   keyboardEnabled,
   gamepadEnabled,
   onToggle,
+  activity,
   subjectName,
   compact = false,
   disabled = false,
@@ -29,6 +32,8 @@ export const RemoteControlPermissionBadges: React.FC<RemoteControlPermissionBadg
   const items: ReadonlyArray<{
     key: RemoteControlPermissionKey;
     enabled: boolean;
+    activeInput: boolean;
+    seq: number;
     label: string;
     ariaLabel: string;
     Icon: typeof Mouse;
@@ -36,6 +41,8 @@ export const RemoteControlPermissionBadges: React.FC<RemoteControlPermissionBadg
     {
       key: 'mouseEnabled',
       enabled: mouseEnabled,
+      activeInput: Boolean(mouseEnabled && activity?.mouseActive),
+      seq: activity?.mouseSeq ?? 0,
       label: t('remoteControl.mousePermission'),
       ariaLabel: subjectName
         ? t('remoteControl.mousePermissionAria', { name: subjectName })
@@ -45,6 +52,8 @@ export const RemoteControlPermissionBadges: React.FC<RemoteControlPermissionBadg
     {
       key: 'keyboardEnabled',
       enabled: keyboardEnabled,
+      activeInput: Boolean(keyboardEnabled && activity?.keyboardActive),
+      seq: activity?.keyboardSeq ?? 0,
       label: t('remoteControl.keyboardPermission'),
       ariaLabel: subjectName
         ? t('remoteControl.keyboardPermissionAria', { name: subjectName })
@@ -54,6 +63,8 @@ export const RemoteControlPermissionBadges: React.FC<RemoteControlPermissionBadg
     {
       key: 'gamepadEnabled',
       enabled: gamepadEnabled,
+      activeInput: Boolean(gamepadEnabled && activity?.gamepadActive),
+      seq: activity?.gamepadSeq ?? 0,
       label: t('remoteControl.gamepadPermission'),
       ariaLabel: subjectName
         ? t('remoteControl.gamepadPermissionAria', { name: subjectName })
@@ -68,7 +79,8 @@ export const RemoteControlPermissionBadges: React.FC<RemoteControlPermissionBadg
       role="group"
       aria-label={t('remoteControl.permissionsGroupLabel')}
     >
-      {items.map(({ key, enabled, label, ariaLabel, Icon }) => {
+      {items.map(({ key, enabled, activeInput, seq, label, ariaLabel, Icon }) => {
+        const flashClass = activeInput ? `is-input-active ${seq % 2 === 0 ? 'flash-a' : 'flash-b'}` : '';
         const button = (
           <button
             key={key}
@@ -76,13 +88,13 @@ export const RemoteControlPermissionBadges: React.FC<RemoteControlPermissionBadg
             disabled={disabled}
             aria-pressed={enabled}
             aria-label={ariaLabel}
-            className={`rc-perm-badge ${enabled ? 'is-enabled' : 'is-disabled'} ${compact ? 'is-compact' : ''}`}
+            className={`rc-perm-badge ${enabled ? 'is-enabled' : 'is-disabled'} ${compact ? 'is-compact' : ''} ${flashClass}`.trim()}
             onClick={(event) => {
               event.stopPropagation();
               onToggle(key, !enabled);
             }}
           >
-            <Icon size={compact ? 13 : 14} aria-hidden="true" />
+            <Icon size={compact ? 13 : 14} className="rc-perm-badge-icon" aria-hidden="true" />
             {!compact && <span>{label}</span>}
           </button>
         );

@@ -39,6 +39,8 @@ export interface RemoteControlHostAdapter {
     keyboardEnabled: boolean;
     gamepadEnabled: boolean;
   };
+  onInputActivity?: (peerId: string, mediaId: string, event: RemoteInputEvent) => void;
+  onActivityCleared?: (scope: { peerId?: string; mediaId?: string; controllerKey?: string }) => void;
   onChange: () => void;
 }
 
@@ -118,6 +120,7 @@ export class RemoteControlHostManager {
           ).catch(() => {});
           void Promise.resolve(this.adapter.disconnectControllerGamepads?.(key)).catch(() => {});
           void Promise.resolve(this.adapter.releaseInputs(key)).catch(() => {});
+          this.adapter.onActivityCleared?.({ controllerKey: key });
           this.syncMonitor();
         }
         if (removedReq || removedCtrl) {
@@ -149,6 +152,7 @@ export class RemoteControlHostManager {
         if ((event.kind === 'gamepadState' || event.kind === 'gamepadDisconnect') && !ctrl.gamepadEnabled) {
           return;
         }
+        this.adapter.onInputActivity?.(peerId, packet.mediaId, event);
         void Promise.resolve(this.adapter.applyInput(key, screen.sessionId, event))
           .then((res) => {
             if (!res) return;
@@ -281,6 +285,7 @@ export class RemoteControlHostManager {
       ).catch(() => {});
       void Promise.resolve(this.adapter.disconnectControllerGamepads?.(key)).catch(() => {});
       void Promise.resolve(this.adapter.releaseInputs(key)).catch(() => {});
+      this.adapter.onActivityCleared?.({ controllerKey: key });
       this.adapter.sendToPeer(peerId, { type: 'revoke', mediaId, reason });
       this.syncMonitor();
     } else if (hadReq) {
@@ -350,6 +355,7 @@ export class RemoteControlHostManager {
       }
     }
     if (changed) {
+      this.adapter.onActivityCleared?.({ mediaId });
       this.syncMonitor();
       this.adapter.onChange();
     }
@@ -375,6 +381,7 @@ export class RemoteControlHostManager {
     }
     if (changed) {
       void Promise.resolve(this.adapter.disconnectPeerGamepads?.(peerId)).catch(() => {});
+      this.adapter.onActivityCleared?.({ peerId });
       this.syncMonitor();
       this.adapter.onChange();
     }
@@ -396,6 +403,7 @@ export class RemoteControlHostManager {
     if (this.monitorActive) {
       void Promise.resolve(this.adapter.releaseInputs()).catch(() => {});
     }
+    this.adapter.onActivityCleared?.({});
     this.syncMonitor();
     if (hadAny) this.adapter.onChange();
   }
