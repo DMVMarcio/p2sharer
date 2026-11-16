@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { ToastManager, type ToastItem, type ToastType } from '../core/toast_manager.ts';
-export type { ToastItem, ToastType } from '../core/toast_manager.ts';
+import { ToastManager, type ToastItem, type ToastShowOptions, type ToastType } from '../core/toast_manager.ts';
+export type { ToastAction, ToastItem, ToastShowOptions, ToastType } from '../core/toast_manager.ts';
 export const toastManager = new ToastManager();
-export function showToast(message: string, durationMs = 3500, type: ToastType = 'info'): void {
-  toastManager.show(message, durationMs, type);
+export function showToast(message: string, durationMs = 3500, type: ToastType = 'info', options?: ToastShowOptions): void {
+  toastManager.show(message, durationMs, type, options);
 }
 export function useToast() {
   const [toasts, setToasts] = useState<ToastItem[]>([]);

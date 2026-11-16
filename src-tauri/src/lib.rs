@@ -272,6 +272,7 @@ pub fn run() {
             gamepad::get_remote_control_gamepads,
             gamepad::recheck_remote_control_gamepad_driver,
             gamepad::reorder_remote_control_gamepads,
+            gamepad::disconnect_remote_control_gamepad,
             gamepad::install_remote_control_gamepad_driver,
             list_audio_processes,
             list_screen_sources,

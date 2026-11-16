@@ -5,9 +5,8 @@ import {
   ArrowUp,
   Gamepad2,
   GripVertical,
-  Keyboard,
   MonitorCog,
-  Mouse,
+  Trash2,
   UserX,
 } from 'lucide-react';
 import { moveOrderedItem } from '../../core/ordered_items';
@@ -20,6 +19,7 @@ import { t } from '../../i18n';
 import { ModalDialog } from '../common/ModalDialog';
 import { Nickname } from '../common/Nickname';
 import { ProfileAvatar } from '../common/ProfileAvatar';
+import { RemoteControlPermissionBadges } from '../common/RemoteControlPermissionBadges';
 import { Tooltip } from '../common/Tooltip';
 import { VigemDriverBanner } from '../common/VigemDriverBanner';
 
@@ -43,6 +43,7 @@ export const RemoteControlManagerModal: React.FC = () => {
     recheckRemoteControlGamepadDriver,
     installRemoteControlGamepadDriver,
     reorderRemoteControlGamepads,
+    disconnectRemoteControlGamepad,
   } = useRoom();
 
   const [activeTab, setActiveTab] = useState<'controllers' | 'gamepads'>('controllers');
@@ -171,62 +172,17 @@ export const RemoteControlManagerModal: React.FC = () => {
                       </div>
 
                       <div className="remote-control-controller-controls">
-                        <label className="remote-control-perm-toggle">
-                          <Mouse size={14} aria-hidden="true" />
-                          <span>{t('remoteControl.mousePermission')}</span>
-                          <span className="modern-switch">
-                            <input
-                              type="checkbox"
-                              autoComplete="off"
-                              checked={ctrl.mouseEnabled}
-                              aria-label={t('remoteControl.mousePermissionAria', { name })}
-                              onChange={(event) =>
-                                setRemoteControllerPermissions(ctrl.peerId, ctrl.mediaId, {
-                                  mouseEnabled: event.target.checked,
-                                })
-                              }
-                            />
-                            <span className="switch-slider" />
-                          </span>
-                        </label>
-
-                        <label className="remote-control-perm-toggle">
-                          <Keyboard size={14} aria-hidden="true" />
-                          <span>{t('remoteControl.keyboardPermission')}</span>
-                          <span className="modern-switch">
-                            <input
-                              type="checkbox"
-                              autoComplete="off"
-                              checked={ctrl.keyboardEnabled}
-                              aria-label={t('remoteControl.keyboardPermissionAria', { name })}
-                              onChange={(event) =>
-                                setRemoteControllerPermissions(ctrl.peerId, ctrl.mediaId, {
-                                  keyboardEnabled: event.target.checked,
-                                })
-                              }
-                            />
-                            <span className="switch-slider" />
-                          </span>
-                        </label>
-
-                        <label className="remote-control-perm-toggle">
-                          <Gamepad2 size={14} aria-hidden="true" />
-                          <span>{t('remoteControl.gamepadPermission')}</span>
-                          <span className="modern-switch">
-                            <input
-                              type="checkbox"
-                              autoComplete="off"
-                              checked={ctrl.gamepadEnabled}
-                              aria-label={t('remoteControl.gamepadPermissionAria', { name })}
-                              onChange={(event) =>
-                                setRemoteControllerPermissions(ctrl.peerId, ctrl.mediaId, {
-                                  gamepadEnabled: event.target.checked,
-                                })
-                              }
-                            />
-                            <span className="switch-slider" />
-                          </span>
-                        </label>
+                        <RemoteControlPermissionBadges
+                          mouseEnabled={ctrl.mouseEnabled}
+                          keyboardEnabled={ctrl.keyboardEnabled}
+                          gamepadEnabled={ctrl.gamepadEnabled}
+                          subjectName={name}
+                          onToggle={(key, nextVal) =>
+                            setRemoteControllerPermissions(ctrl.peerId, ctrl.mediaId, {
+                              [key]: nextVal,
+                            })
+                          }
+                        />
 
                         <button
                           type="button"
@@ -306,38 +262,55 @@ export const RemoteControlManagerModal: React.FC = () => {
                         </div>
                       </div>
 
-                      {orderedGamepads.length > 1 && (
-                        <div className="remote-control-gamepad-step-actions">
-                          <Tooltip content={t('remoteControl.gamepadMoveUp')}>
-                            <button
-                              type="button"
-                              className="btn-stream-pin"
-                              disabled={index === 0}
-                              aria-label={t('remoteControl.gamepadMoveUp')}
-                              onClick={() => {
-                                const nextIds = moveOrderedItem(ids, slot.id, index - 1);
-                                void reorderRemoteControlGamepads(nextIds);
-                              }}
-                            >
-                              <ArrowUp size={13} aria-hidden="true" />
-                            </button>
-                          </Tooltip>
-                          <Tooltip content={t('remoteControl.gamepadMoveDown')}>
-                            <button
-                              type="button"
-                              className="btn-stream-pin"
-                              disabled={index === orderedGamepads.length - 1}
-                              aria-label={t('remoteControl.gamepadMoveDown')}
-                              onClick={() => {
-                                const nextIds = moveOrderedItem(ids, slot.id, index + 1);
-                                void reorderRemoteControlGamepads(nextIds);
-                              }}
-                            >
-                              <ArrowDown size={13} aria-hidden="true" />
-                            </button>
-                          </Tooltip>
-                        </div>
-                      )}
+                      <div className="remote-control-gamepad-step-actions">
+                        {orderedGamepads.length > 1 && (
+                          <>
+                            <Tooltip content={t('remoteControl.gamepadMoveUp')}>
+                              <button
+                                type="button"
+                                className="btn-stream-pin"
+                                disabled={index === 0}
+                                aria-label={t('remoteControl.gamepadMoveUp')}
+                                onClick={() => {
+                                  const nextIds = moveOrderedItem(ids, slot.id, index - 1);
+                                  void reorderRemoteControlGamepads(nextIds);
+                                }}
+                              >
+                                <ArrowUp size={13} aria-hidden="true" />
+                              </button>
+                            </Tooltip>
+                            <Tooltip content={t('remoteControl.gamepadMoveDown')}>
+                              <button
+                                type="button"
+                                className="btn-stream-pin"
+                                disabled={index === orderedGamepads.length - 1}
+                                aria-label={t('remoteControl.gamepadMoveDown')}
+                                onClick={() => {
+                                  const nextIds = moveOrderedItem(ids, slot.id, index + 1);
+                                  void reorderRemoteControlGamepads(nextIds);
+                                }}
+                              >
+                                <ArrowDown size={13} aria-hidden="true" />
+                              </button>
+                            </Tooltip>
+                          </>
+                        )}
+                        <Tooltip content={t('remoteControl.gamepadDisconnect')}>
+                          <button
+                            type="button"
+                            className="btn-stream-pin participants-remote-control-revoke"
+                            aria-label={t('remoteControl.gamepadDisconnectAria', {
+                              name,
+                              index: slot.padIndex + 1,
+                            })}
+                            onClick={() => {
+                              void disconnectRemoteControlGamepad(slot);
+                            }}
+                          >
+                            <Trash2 size={13} aria-hidden="true" />
+                          </button>
+                        </Tooltip>
+                      </div>
                     </div>
                   );
                 })}

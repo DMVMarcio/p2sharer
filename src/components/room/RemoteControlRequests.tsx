@@ -1,12 +1,62 @@
+import { useEffect, useState } from 'react';
+import { loadRemoteControlHostDefaults } from '../../core/remote_control';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { useRoom } from '../../hooks/useRoom';
-import { roomService } from '../../services/room_service';
+import {
+  RemoteControlPermissionBadges,
+  type RemoteControlPermissionKey,
+} from '../common/RemoteControlPermissionBadges';
+
+type RequestPermDraft = {
+  mouseEnabled: boolean;
+  keyboardEnabled: boolean;
+  gamepadEnabled: boolean;
+};
 
 export function RemoteControlToastItems() {
   useLocale();
   const { remoteControlRequests, peers, answerRemoteControlRequest } = useRoom();
+  const [drafts, setDrafts] = useState<Record<string, RequestPermDraft>>({});
+
+  useEffect(() => {
+    const activeIds = new Set(remoteControlRequests.map((req) => req.id));
+    setDrafts((prev) => {
+      let changed = false;
+      const next: Record<string, RequestPermDraft> = {};
+      for (const id of Object.keys(prev)) {
+        if (activeIds.has(id)) {
+          next[id] = prev[id];
+        } else {
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [remoteControlRequests]);
+
   if (!remoteControlRequests.length) return null;
+
+  const resolveDraft = (requestId: string): RequestPermDraft => {
+    const existing = drafts[requestId];
+    if (existing) return existing;
+    const defaults = loadRemoteControlHostDefaults();
+    return {
+      mouseEnabled: defaults.defaultMouseEnabled,
+      keyboardEnabled: defaults.defaultKeyboardEnabled,
+      gamepadEnabled: defaults.defaultGamepadEnabled,
+    };
+  };
+
+  const togglePerm = (requestId: string, key: RemoteControlPermissionKey, nextVal: boolean) => {
+    setDrafts((prev) => {
+      const base = prev[requestId] ?? resolveDraft(requestId);
+      return {
+        ...prev,
+        [requestId]: { ...base, [key]: nextVal },
+      };
+    });
+  };
 
   return (
     <>
@@ -14,11 +64,7 @@ export function RemoteControlToastItems() {
         const peerName =
           peers.find((peer) => peer.id === request.peerId)?.username ||
           request.peerId.slice(0, 6);
-        const capture = roomService.localCaptures.get(request.mediaId);
-        const targetLabel = capture?.sourceId
-          ? undefined
-          : undefined;
-        void targetLabel;
+        const perms = resolveDraft(request.id);
         return (
           <div className="chat-file-toast" key={`rc-${request.id}`}>
             <p className="chat-file-toast-title">
@@ -26,6 +72,14 @@ export function RemoteControlToastItems() {
               {t('remoteControl.requestPrompt')}
             </p>
             <span>{t('remoteControl.requestHint')}</span>
+            <RemoteControlPermissionBadges
+              className="rc-request-toast-perms"
+              mouseEnabled={perms.mouseEnabled}
+              keyboardEnabled={perms.keyboardEnabled}
+              gamepadEnabled={perms.gamepadEnabled}
+              subjectName={peerName}
+              onToggle={(key, nextVal) => togglePerm(request.id, key, nextVal)}
+            />
             <div>
               <button
                 type="button"
@@ -36,7 +90,7 @@ export function RemoteControlToastItems() {
               <button
                 type="button"
                 className="btn-primary"
-                onClick={() => answerRemoteControlRequest(request.id, true)}
+                onClick={() => answerRemoteControlRequest(request.id, true, perms)}
               >
                 {t('remoteControl.accept')}
               </button>

@@ -167,6 +167,7 @@ export function useRoom() {
     recheckRemoteControlGamepadDriver: roomService.recheckRemoteControlGamepadDriver.bind(roomService),
     installRemoteControlGamepadDriver: roomService.installRemoteControlGamepadDriver.bind(roomService),
     reorderRemoteControlGamepads: roomService.reorderRemoteControlGamepads.bind(roomService),
+    disconnectRemoteControlGamepad: roomService.disconnectRemoteControlGamepad.bind(roomService),
     toggleRemoteControlRequest: roomService.toggleRemoteControlRequest.bind(roomService),
     stopRemoteControlViewer: roomService.stopRemoteControlViewer.bind(roomService),
     editChatMessage,

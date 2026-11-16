@@ -208,7 +208,15 @@ export class RoomService {
       ).catch(console.warn);
       void listen('remote-control-gamepad-driver-needed', () => {
         if (!this.remoteControlGamepadDriverAvailable && this.remoteControlGamepadDriverInstallStage === 'idle') {
-          showToast(t('remoteControl.vigemNeededToast'), 5000, 'info');
+          showToast(t('remoteControl.vigemNeededToast'), 9000, 'warning', {
+            dedupeKey: 'vigem-driver-needed',
+            action: {
+              label: t('remoteControl.vigemInstallAction'),
+              onAction: () => {
+                void this.installRemoteControlGamepadDriver();
+              },
+            },
+          });
         }
       }).catch(console.warn);
       void invoke<{ driverAvailable: boolean; gamepads: VirtualGamepadSlot[] }>('get_remote_control_gamepads')
@@ -1089,6 +1097,17 @@ export class RoomService {
       return;
     }
 
+    if (packet.type === 'gamepadRemoved') {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('p2sharer:remote-gamepad-removed', {
+            detail: { slotPeerId: slotKey, padIndex: packet.padIndex },
+          }),
+        );
+      }
+      return;
+    }
+
     const next = { ...this.remoteControlViewerStates };
     delete next[slotKey];
     this.remoteControlViewerStates = next;
@@ -1182,8 +1201,12 @@ export class RoomService {
     this.roomManager?.sendRemoteControlClient({ type: 'input', mediaId: current.mediaId, event }, current.hostPeerId);
   }
 
-  public answerRemoteControlRequest(requestId: string, accept: boolean): void {
-    this.remoteControlHost.answerRequest(requestId, accept);
+  public answerRemoteControlRequest(
+    requestId: string,
+    accept: boolean,
+    permissions?: { mouseEnabled?: boolean; keyboardEnabled?: boolean; gamepadEnabled?: boolean },
+  ): void {
+    this.remoteControlHost.answerRequest(requestId, accept, permissions);
   }
 
   public setRemoteControllerPermissions(
@@ -1266,6 +1289,24 @@ export class RoomService {
       await invoke('reorder_remote_control_gamepads', { orderedIds });
     } catch (err) {
       console.warn('[Gamepad] Failed to reorder virtual gamepads:', err);
+    }
+  }
+
+  public async disconnectRemoteControlGamepad(slot: {
+    id: string;
+    peerId: string;
+    mediaId: string;
+    padIndex: number;
+  }): Promise<void> {
+    if (!isTauri()) return;
+    try {
+      await invoke('disconnect_remote_control_gamepad', { id: slot.id });
+      this.roomManager?.sendRemoteControlHost(
+        { type: 'gamepadRemoved', mediaId: slot.mediaId, padIndex: slot.padIndex },
+        slot.peerId,
+      );
+    } catch (err) {
+      console.warn('[Gamepad] Failed to disconnect virtual gamepad:', err);
     }
   }
 

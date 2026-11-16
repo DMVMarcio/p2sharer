@@ -34,10 +34,13 @@ import { appUpdates } from '../../services/app_updates';
 import { automaticUpdateChecks, betaUpdateChecks } from '../../core/app_updates';
 import { ApplicationSettings } from './ApplicationSettings';
 import { useAppUpdates } from '../../hooks/useAppUpdates';
-import { MonitorCog } from 'lucide-react';
+import { Keyboard, MonitorCog } from 'lucide-react';
 import { useRoom } from '../../hooks/useRoom';
 import { VigemDriverBanner } from '../common/VigemDriverBanner';
+import { RemoteControlPermissionBadges } from '../common/RemoteControlPermissionBadges';
 import { loadRemoteControlHostDefaults, saveRemoteControlHostDefaults } from '../../core/remote_control';
+import { loadInputBindings, saveInputBindings } from '../../core/input_bindings';
+import { KeybindingsSettingsPane } from './KeybindingsSettingsPane';
 
 const SOUND_LABELS: Record<SoundEvent, string> = {
   get appStart() { return t('sound.appStart'); },
@@ -58,8 +61,10 @@ export const SettingsModal: React.FC = () => {
   const { themeMode, accentColor, backgroundColor, setThemeMode, setAccentColor, setBackgroundColor } = useAppTheme();
 
   const [activeTab, setActiveTab] = useState<
-    'profile' | 'application' | 'conversations' | 'appearance' | 'audio' | 'stream' | 'remoteControl' | 'network' | 'diagnostics'
+    'profile' | 'application' | 'conversations' | 'appearance' | 'audio' | 'stream' | 'remoteControl' | 'inputBindings' | 'network' | 'diagnostics'
   >('profile');
+  const [inputBindingsDraft, setInputBindingsDraft] = useState(loadInputBindings);
+  const [inputBindingsSubTab, setInputBindingsSubTab] = useState<'keyboard' | 'gamepad'>('keyboard');
   const {
     remoteControlGamepadDriverAvailable,
     remoteControlGamepadDriverInstallStage,
@@ -228,6 +233,7 @@ export const SettingsModal: React.FC = () => {
 
     saveRemoteControlHostDefaults(rcDefaults);
     void roomService.setRemoteControlHostPriorityEnabled(rcDefaults.hostPriorityEnabled);
+    saveInputBindings(inputBindingsDraft);
 
     // Save TURN
     localStorage.setItem('p2sharer_turn_enabled', turnEnabled ? 'true' : 'false');
@@ -376,6 +382,16 @@ export const SettingsModal: React.FC = () => {
             >
               <MonitorCog size={16} aria-hidden="true" />
               <span>{t('remoteControl.settingsTab')}</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={profileBusy || saving}
+              className={`settings-nav-item ${activeTab === 'inputBindings' ? 'active' : ''}`}
+              onClick={() => setActiveTab('inputBindings')}
+            >
+              <Keyboard size={16} aria-hidden="true" />
+              <span>{t('inputBindings.tabLabel')}</span>
             </button>
 
             <button
@@ -886,27 +902,20 @@ export const SettingsModal: React.FC = () => {
 
                 <div className="settings-row remote-control-settings-section">
                   <label className="settings-label">{t('remoteControl.defaultPermissionsTitle')}</label>
-                  {([
-                    { id: 'settings-rc-default-mouse', title: t('remoteControl.mousePermission'), key: 'defaultMouseEnabled' },
-                    { id: 'settings-rc-default-keyboard', title: t('remoteControl.keyboardPermission'), key: 'defaultKeyboardEnabled' },
-                    { id: 'settings-rc-default-gamepad', title: t('remoteControl.gamepadPermission'), key: 'defaultGamepadEnabled' },
-                  ] as const).map((item) => (
-                    <label className="settings-switch-row" htmlFor={item.id} key={item.id}>
-                      <span className="settings-switch-title">{item.title}</span>
-                      <div className="modern-switch">
-                        <input
-                          autoComplete="off"
-                          type="checkbox"
-                          id={item.id}
-                          checked={rcDefaults[item.key]}
-                          onChange={(event) =>
-                            setRcDefaults((prev) => ({ ...prev, [item.key]: event.target.checked }))
-                          }
-                        />
-                        <span className="switch-slider" />
-                      </div>
-                    </label>
-                  ))}
+                  <RemoteControlPermissionBadges
+                    mouseEnabled={rcDefaults.defaultMouseEnabled}
+                    keyboardEnabled={rcDefaults.defaultKeyboardEnabled}
+                    gamepadEnabled={rcDefaults.defaultGamepadEnabled}
+                    onToggle={(key, nextVal) => {
+                      const field =
+                        key === 'mouseEnabled'
+                          ? 'defaultMouseEnabled'
+                          : key === 'keyboardEnabled'
+                            ? 'defaultKeyboardEnabled'
+                            : 'defaultGamepadEnabled';
+                      setRcDefaults((prev) => ({ ...prev, [field]: nextVal }));
+                    }}
+                  />
                 </div>
 
                 <div className="settings-row remote-control-settings-section">
@@ -921,6 +930,16 @@ export const SettingsModal: React.FC = () => {
                   />
                 </div>
               </div>
+            )}
+
+            {/* TAB: ATALHOS E GAMEPAD */}
+            {panePresence.value === 'inputBindings' && (
+              <KeybindingsSettingsPane
+                value={inputBindingsDraft}
+                onChange={setInputBindingsDraft}
+                subTab={inputBindingsSubTab}
+                onSubTabChange={setInputBindingsSubTab}
+              />
             )}
 
             {/* TAB 5: REDE & TURN */}

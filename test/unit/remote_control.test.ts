@@ -16,6 +16,13 @@ import {
   type RemoteInputEvent,
 } from '../../src/core/remote_control.ts';
 import { RemoteControlHostManager } from '../../src/services/remote_control_receiver.ts';
+import {
+  createDefaultGamepadProfile,
+  detectGamepadCapture,
+  matchesShortcut,
+  resolveKeyRemapping,
+} from '../../src/core/input_bindings.ts';
+import { ToastManager } from '../../src/core/toast_manager.ts';
 
 test('validRemoteControlClientPacket and validRemoteControlHostPacket validate bounds and schemas', () => {
   assert.equal(validRemoteControlClientPacket({ type: 'request', mediaId: 'screen-1' }), true);
@@ -428,4 +435,129 @@ test('RemoteControlHostManager enforces gamepadEnabled, syncs native peer permis
     })),
     [defaults],
   );
+
+  // Explicit per-request permission overrides selected in the consent toast take precedence
+  managerWithDefaults.receiveClientPacket({ type: 'request', mediaId: 'screen-1' }, 'peer-override');
+  managerWithDefaults.answerRequest('peer-override:screen-1', true, {
+    mouseEnabled: false,
+    keyboardEnabled: true,
+    gamepadEnabled: true,
+  });
+  const overridden = managerWithDefaults.getControllers().find((c) => c.peerId === 'peer-override');
+  assert.ok(overridden);
+  assert.equal(overridden.mouseEnabled, false);
+  assert.equal(overridden.keyboardEnabled, true);
+  assert.equal(overridden.gamepadEnabled, true);
+
+  assert.equal(
+    validRemoteControlHostPacket({ type: 'gamepadRemoved', mediaId: 'screen-1', padIndex: 1 }),
+    true,
+  );
+  assert.equal(
+    validRemoteControlHostPacket({ type: 'gamepadRemoved', mediaId: 'screen-1', padIndex: 16 }),
+    false,
+  );
+});
+
+test('custom input bindings remap keys, shortcuts, non-standard gamepad axes, and toast actions', () => {
+  const rules = [
+    { id: '1', fromCode: 'CapsLock', toCode: 'ControlLeft' },
+    { id: '2', fromCode: 'KeyA', toCode: 'KeyB' },
+    { id: '3', fromCode: 'KeyB', toCode: 'KeyA' },
+  ];
+  assert.deepEqual(resolveKeyRemapping(rules, 'CapsLock', 'CapsLock', 20), {
+    code: 'ControlLeft',
+    key: 'Control',
+    vk: undefined,
+    remapped: true,
+  });
+  // Swapped keys map in a single pass without chaining back to KeyA
+  assert.equal(resolveKeyRemapping(rules, 'KeyA', 'a').code, 'KeyB');
+  assert.equal(resolveKeyRemapping(rules, 'KeyB', 'b').code, 'KeyA');
+
+  assert.equal(
+    matchesShortcut(
+      { code: 'KeyM', ctrlKey: true, shiftKey: true, altKey: false },
+      { code: 'KeyM', ctrlKey: true, shiftKey: true, altKey: false },
+    ),
+    true,
+  );
+  assert.equal(
+    matchesShortcut(
+      { code: 'KeyM', ctrlKey: false, shiftKey: true, altKey: false },
+      { code: 'KeyM', ctrlKey: true, shiftKey: true, altKey: false },
+    ),
+    false,
+  );
+
+  // Remap non-standard controller: right stick vertical on axis[5], trigger on axis[4] (-1..+1), swapped R2/Start
+  const profile = createDefaultGamepadProfile('custom-pad', 'Custom Pad');
+  profile.deadzone = 0.1;
+  profile.bindings.ryPos = { kind: 'axis', index: 5, dir: -1, rest: 0 };
+  profile.bindings.ryNeg = { kind: 'axis', index: 5, dir: 1, rest: 0 };
+  profile.bindings.leftTrigger = { kind: 'axis', index: 4, dir: 1, rest: -1 };
+  profile.bindings.rightTrigger = { kind: 'button', index: 9 };
+  profile.bindings.start = { kind: 'button', index: 7 };
+
+  const customPad = {
+    index: 0,
+    id: 'custom-pad',
+    buttons: Array.from({ length: 17 }, (_, idx) =>
+      idx === 9 || idx === 7 ? { pressed: true, value: 1 } : { pressed: false, value: 0 },
+    ),
+    // axes[3] is dead/unwired; vertical input arrives on axes[5]; trigger on axis[4] is at halfway (0)
+    axes: [0, 0, 0.5, 0, 0, -1],
+  };
+
+  assert.equal(hasMeaningfulGamepadInput(customPad, profile), true);
+  const mapped = readGamepadSnapshotState(customPad, profile);
+  assert.equal(mapped.thumbRy, 32767);
+  assert.equal(mapped.rightTrigger, 255);
+  assert.equal(mapped.leftTrigger, 128);
+  assert.equal(mapped.buttons & 0x0010, 0x0010); // Start bound to button 7
+
+  // Capture ignores resting -1 axis and detects axis[5] movement
+  const captured = detectGamepadCapture(
+    Array(17).fill(0),
+    [0, 0, 0, 0, -1, 0],
+    {
+      index: 0,
+      buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })),
+      axes: [0, 0, 0, 0, -1, -0.85],
+    },
+  );
+  assert.deepEqual(captured, { kind: 'axis', index: 5, dir: -1, rest: 0 });
+
+  const capturedRestNegOne = detectGamepadCapture(
+    Array(17).fill(0),
+    [0, 0, 0, 0, -1, 0],
+    {
+      index: 0,
+      buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })),
+      axes: [0, 0, 0, 0, 0.9, 0],
+    },
+  );
+  assert.deepEqual(capturedRestNegOne, { kind: 'axis', index: 4, dir: 1, rest: -1 });
+
+  // Deduplicated action toast preserves single instance and action callback
+  const tm = new ToastManager();
+  let triggered = 0;
+  tm.show('Driver missing', 5000, 'warning', {
+    dedupeKey: 'vigem',
+    action: { label: 'Install', onAction: () => { triggered++; } },
+  });
+  tm.show('Driver still missing', 5000, 'warning', {
+    dedupeKey: 'vigem',
+    action: { label: 'Install', onAction: () => { triggered++; } },
+  });
+  let list: Array<{ id: string; message: string; action?: { onAction: () => void | Promise<void> } }> = [];
+  const unsub = tm.subscribe((items) => {
+    list = items;
+  });
+  assert.equal(list.length, 1);
+  assert.equal(list[0].message, 'Driver still missing');
+  void list[0].action?.onAction();
+  assert.equal(triggered, 1);
+  tm.remove(list[0].id);
+  unsub();
 });

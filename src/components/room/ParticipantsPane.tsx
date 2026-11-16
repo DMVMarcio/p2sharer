@@ -8,7 +8,8 @@ import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { MoreHorizontal, Shield, Crown, UserX, Play, MonitorCog, Mouse, Keyboard, Gamepad2, AlertTriangle } from 'lucide-react';
+import { MoreHorizontal, Shield, Crown, UserX, Play, MonitorCog, AlertTriangle } from 'lucide-react';
+import { RemoteControlPermissionBadges } from '../common/RemoteControlPermissionBadges';
 import { useContextMenu, type ContextMenuAction } from '../common/ContextMenu';
 import { useRoom } from '../../hooks/useRoom';
 import { showToast } from '../../hooks/useToast';
@@ -78,51 +79,18 @@ export const ParticipantsPane: React.FC = () => {
                 <div className="participants-remote-control-item" key={`${ctrl.peerId}:${ctrl.mediaId}`}>
                   <span className="participants-remote-control-name">{name}</span>
                   <div className="participants-remote-control-actions">
-                    <Tooltip content={t('remoteControl.mousePermissionAria', { name })}>
-                      <button
-                        type="button"
-                        className={`btn-stream-pin ${ctrl.mouseEnabled ? 'active' : ''}`}
-                        aria-label={t('remoteControl.mousePermissionAria', { name })}
-                        aria-pressed={ctrl.mouseEnabled}
-                        onClick={() =>
-                          setRemoteControllerPermissions(ctrl.peerId, ctrl.mediaId, {
-                            mouseEnabled: !ctrl.mouseEnabled,
-                          })
-                        }
-                      >
-                        <Mouse size={13} aria-hidden="true" />
-                      </button>
-                    </Tooltip>
-                    <Tooltip content={t('remoteControl.keyboardPermissionAria', { name })}>
-                      <button
-                        type="button"
-                        className={`btn-stream-pin ${ctrl.keyboardEnabled ? 'active' : ''}`}
-                        aria-label={t('remoteControl.keyboardPermissionAria', { name })}
-                        aria-pressed={ctrl.keyboardEnabled}
-                        onClick={() =>
-                          setRemoteControllerPermissions(ctrl.peerId, ctrl.mediaId, {
-                            keyboardEnabled: !ctrl.keyboardEnabled,
-                          })
-                        }
-                      >
-                        <Keyboard size={13} aria-hidden="true" />
-                      </button>
-                    </Tooltip>
-                    <Tooltip content={t('remoteControl.gamepadPermissionAria', { name })}>
-                      <button
-                        type="button"
-                        className={`btn-stream-pin ${ctrl.gamepadEnabled ? 'active' : ''}`}
-                        aria-label={t('remoteControl.gamepadPermissionAria', { name })}
-                        aria-pressed={ctrl.gamepadEnabled}
-                        onClick={() =>
-                          setRemoteControllerPermissions(ctrl.peerId, ctrl.mediaId, {
-                            gamepadEnabled: !ctrl.gamepadEnabled,
-                          })
-                        }
-                      >
-                        <Gamepad2 size={13} aria-hidden="true" />
-                      </button>
-                    </Tooltip>
+                    <RemoteControlPermissionBadges
+                      compact
+                      mouseEnabled={ctrl.mouseEnabled}
+                      keyboardEnabled={ctrl.keyboardEnabled}
+                      gamepadEnabled={ctrl.gamepadEnabled}
+                      subjectName={name}
+                      onToggle={(key, nextVal) =>
+                        setRemoteControllerPermissions(ctrl.peerId, ctrl.mediaId, {
+                          [key]: nextVal,
+                        })
+                      }
+                    />
                     <Tooltip content={t('remoteControl.revokeAria', { name })}>
                       <button
                         type="button"

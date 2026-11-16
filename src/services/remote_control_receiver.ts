@@ -163,7 +163,11 @@ export class RemoteControlHostManager {
     }
   }
 
-  public answerRequest(requestId: string, accept: boolean): void {
+  public answerRequest(
+    requestId: string,
+    accept: boolean,
+    permissions?: { mouseEnabled?: boolean; keyboardEnabled?: boolean; gamepadEnabled?: boolean },
+  ): void {
     const req = this.requests.get(requestId);
     if (!req) return;
     this.requests.delete(requestId);
@@ -187,12 +191,15 @@ export class RemoteControlHostManager {
       keyboardEnabled: true,
       gamepadEnabled: true,
     };
+    const mouseEnabled = permissions?.mouseEnabled ?? defaults.mouseEnabled;
+    const keyboardEnabled = permissions?.keyboardEnabled ?? defaults.keyboardEnabled;
+    const gamepadEnabled = permissions?.gamepadEnabled ?? defaults.gamepadEnabled;
     const info: RemoteControllerInfo = {
       peerId: req.peerId,
       mediaId: req.mediaId,
-      mouseEnabled: defaults.mouseEnabled,
-      keyboardEnabled: defaults.keyboardEnabled,
-      gamepadEnabled: defaults.gamepadEnabled,
+      mouseEnabled,
+      keyboardEnabled,
+      gamepadEnabled,
       connectedAt: Date.now(),
     };
     this.controllers.set(controllerKey(req.peerId, req.mediaId), info);
@@ -202,9 +209,9 @@ export class RemoteControlHostManager {
         req.mediaId,
         screen.sessionId,
         true,
-        defaults.mouseEnabled,
-        defaults.keyboardEnabled,
-        defaults.gamepadEnabled,
+        mouseEnabled,
+        keyboardEnabled,
+        gamepadEnabled,
       ),
     ).catch(() => {});
     this.syncMonitor();

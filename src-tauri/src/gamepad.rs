@@ -156,6 +156,16 @@ pub fn make_slot_id(peer_id: &str, media_id: &str, pad_index: u8) -> String {
     format!("{peer_id}:{media_id}:{pad_index}")
 }
 
+pub fn is_meaningful_wire_state(state: GamepadWireState) -> bool {
+    state.buttons != 0
+        || state.left_trigger >= 25
+        || state.right_trigger >= 25
+        || state.thumb_lx.unsigned_abs() >= 5800
+        || state.thumb_ly.unsigned_abs() >= 5800
+        || state.thumb_rx.unsigned_abs() >= 5800
+        || state.thumb_ry.unsigned_abs() >= 5800
+}
+
 /// Computes a sanitized ordered permutation matching the requested ID list, appending any active
 /// slots not named in `ordered_ids` in their original relative order.
 pub fn compute_reordered_positions(current_ids: &[String], ordered_ids: &[String]) -> Vec<usize> {
@@ -198,6 +208,10 @@ mod win_impl {
             peer_id: String,
             media_id: String,
             pad_index: u8,
+        },
+        DisconnectId {
+            id: String,
+            reply: Sender<VirtualGamepadsStatePayload>,
         },
         DisconnectController {
             controller_id: String,
@@ -355,7 +369,7 @@ mod win_impl {
                 return;
             }
 
-            if self.slots.len() >= MAX_VIRTUAL_GAMEPADS {
+            if self.slots.len() >= MAX_VIRTUAL_GAMEPADS || !is_meaningful_wire_state(wire_state) {
                 return;
             }
             let Some(client) = self.ensure_client(false) else {
@@ -535,6 +549,10 @@ mod win_impl {
                             let target_id = make_slot_id(&peer_id, &media_id, pad_index);
                             state.remove_matching(|s| s.id == target_id);
                         }
+                        WorkerCmd::DisconnectId { id, reply } => {
+                            state.remove_matching(|s| s.id == id);
+                            let _ = reply.send(state.snapshot());
+                        }
                         WorkerCmd::DisconnectController { controller_id } => {
                             state.remove_matching(|s| s.controller_id == controller_id);
                         }
@@ -633,6 +651,22 @@ mod win_impl {
         let _ = WORKER_TX.send(WorkerCmd::Reorder { ordered_ids });
     }
 
+    pub fn disconnect_gamepad_by_id(id: &str) -> VirtualGamepadsStatePayload {
+        let (tx, rx) = mpsc::channel();
+        if WORKER_TX
+            .send(WorkerCmd::DisconnectId {
+                id: id.to_string(),
+                reply: tx,
+            })
+            .is_ok()
+        {
+            if let Ok(state) = rx.recv_timeout(std::time::Duration::from_millis(600)) {
+                return state;
+            }
+        }
+        get_gamepads_state()
+    }
+
     pub fn get_gamepads_state() -> VirtualGamepadsStatePayload {
         let (tx, rx) = mpsc::channel();
         if WORKER_TX.send(WorkerCmd::GetState { reply: tx }).is_ok() {
@@ -696,6 +730,10 @@ mod win_impl {
 
     pub fn reorder_gamepads(_ordered_ids: Vec<String>) {}
 
+    pub fn disconnect_gamepad_by_id(_id: &str) -> VirtualGamepadsStatePayload {
+        get_gamepads_state()
+    }
+
     pub fn get_gamepads_state() -> VirtualGamepadsStatePayload {
         VirtualGamepadsStatePayload {
             driver_available: false,
@@ -712,8 +750,8 @@ mod win_impl {
 
 pub use win_impl::{
     apply_gamepad_state, disconnect_all_gamepads, disconnect_controller_gamepads,
-    disconnect_gamepad_pad, disconnect_peer_gamepads, get_gamepads_state, probe_driver,
-    reorder_gamepads, shutdown_gamepads,
+    disconnect_gamepad_by_id, disconnect_gamepad_pad, disconnect_peer_gamepads, get_gamepads_state,
+    probe_driver, reorder_gamepads, shutdown_gamepads,
 };
 
 #[tauri::command]
@@ -740,6 +778,19 @@ pub fn reorder_remote_control_gamepads(
     set_app_handle(&app);
     reorder_gamepads(ordered_ids);
     Ok(get_gamepads_state())
+}
+
+#[tauri::command]
+pub fn disconnect_remote_control_gamepad(
+    app: AppHandle,
+    window: tauri::WebviewWindow,
+    id: String,
+) -> Result<VirtualGamepadsStatePayload, String> {
+    if window.label() != "main" {
+        return Err("Only the main window can disconnect virtual gamepads".into());
+    }
+    set_app_handle(&app);
+    Ok(disconnect_gamepad_by_id(&id))
 }
 
 #[cfg(windows)]
@@ -1013,5 +1064,29 @@ mod tests {
             InstallerExitOutcome::Cancelled
         );
         assert!(classify_installer_exit_code(1603).is_err());
+    }
+
+    #[test]
+    fn meaningful_wire_state_rejects_idle_noise_and_accepts_extreme_min() {
+        let idle = GamepadWireState::default();
+        assert!(!is_meaningful_wire_state(idle));
+        let slight_drift = GamepadWireState {
+            thumb_lx: 4000,
+            thumb_ly: -4000,
+            left_trigger: 10,
+            ..Default::default()
+        };
+        assert!(!is_meaningful_wire_state(slight_drift));
+
+        let min_stick = GamepadWireState {
+            thumb_ly: i16::MIN,
+            ..Default::default()
+        };
+        assert!(is_meaningful_wire_state(min_stick));
+        let pressed = GamepadWireState {
+            buttons: 0x1000,
+            ..Default::default()
+        };
+        assert!(is_meaningful_wire_state(pressed));
     }
 }

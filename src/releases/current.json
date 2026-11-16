@@ -1,83 +1,57 @@
 {
-  "version": "1.7.0",
+  "version": "1.7.1",
   "translations": {
     "en": [
-      "**Remote control.** Share screen control with consent, authentic host cursor, relative locked-mouse mode for games, immersive shortcuts, and per-controller permissions.",
-      "**Sharper low-delay screen sharing.** Clearer small text and fine UI details, smoother motion, and faster video startup and quality recovery.",
-      "**More responsive remote control.** Noticeably lower mouse and keyboard input delay during desktop control and games, even when the host screen is busy.",
-      "**Virtual gamepads & shared control.** Connect multiple Xbox 360 gamepads on first input, reorder players, share keyboard control, and see animated cursors."
+      "**Easier remote control & gamepad setup.** Choose mouse, keyboard, and gamepad permissions before accepting, install ViGEmBus from alerts, and unplug individual gamepads.",
+      "**Custom shortcuts, keys & gamepad mapping.** Reassign remote shortcuts and individual keys, and remap gamepad buttons, triggers, and analog stick directions in Settings."
     ],
     "pt-BR": [
-      "**Controle remoto.** Controle telas com consentimento, visual original do cursor do host, modo de mouse travado para jogos, atalhos imersivos e permissões.",
-      "**Compartilhamento mais nítido e fluido.** Textos pequenos e detalhes da tela mais claros, menos atraso visual e recuperação rápida de qualidade.",
-      "**Controle remoto mais responsivo.** Menos atraso de mouse e teclado ao controlar a área de trabalho ou jogar, mesmo com a tela do host ocupada.",
-      "**Gamepads virtuais e controle compartilhado.** Conecte vários controles Xbox 360 no primeiro toque, reordene jogadores, veja cursores animados e compartilhe teclado."
+      "**Permissões e controles mais práticos.** Escolha mouse, teclado e gamepad antes de aceitar, instale o ViGEmBus direto do alerta e remova gamepads individualmente.",
+      "**Atalhos, teclas e gamepads personalizáveis.** Altere atalhos e teclas individuais e remapeie botões, gatilhos e direções dos analógicos nas configurações."
     ],
     "es": [
-      "**Control remoto.** Comparte control de pantalla con consentimiento, cursor original del anfitrión, ratón bloqueado para juegos, atajos inmersivos y permisos.",
-      "**Pantalla más nítida y fluida.** Textos pequeños y detalles más claros, menor latencia visual y recuperación más rápida de la calidad de imagen.",
-      "**Control remoto más reactivo.** Menor retraso de ratón y teclado al controlar el escritorio o jugar, incluso cuando la pantalla del anfitrión está ocupada.",
-      "**Mandos virtuales y control compartido.** Conecta varios mandos Xbox 360 al primer toque, reordena jugadores, ve cursores animados y comparte el teclado."
+      "**Control y mandos más prácticos.** Elige permisos de ratón, teclado y mando antes de aceptar, instala ViGEmBus desde la alerta y desconecta mandos individualmente.",
+      "**Atajos, teclas y mandos a medida.** Reasigna atajos y teclas individuales, y calibra botones, gatillos y direcciones de los sticks del mando en Ajustes."
     ],
     "fr": [
-      "**Contrôle à distance.** Partagez l'écran sur consentement avec curseur d'origine de l'hôte, souris verrouillée pour les jeux, mode immersif et droits.",
-      "**Partage d'écran plus net et fluide.** Petits textes et détails plus lisibles, latence visuelle réduite et reprise rapide de la qualité d'image.",
-      "**Contrôle à distance plus réactif.** Délai réduit pour la souris et le clavier sur le bureau et en jeu, même lorsque l'écran de l'hôte est sollicité.",
-      "**Manettes virtuelles et contrôle partagé.** Connectez plusieurs manettes Xbox 360 au premier appui, réordonnez les joueurs, curseurs animés et clavier partagé."
+      "**Contrôle et manettes simplifiés.** Choisissez souris, clavier et manette avant d'accepter, installez ViGEmBus depuis l'alerte et déconnectez chaque manette.",
+      "**Raccourcis, touches et manettes sur mesure.** Personnalisez raccourcis et touches individuelles, et remappez boutons, gâchettes et directions des sticks."
     ],
     "de": [
-      "**Fernsteuerung.** Teile Steuerung mit Zustimmung, Originalcursor des Hosts, gesperrter Maus für Spiele, immersivem Modus und Rechten pro Person.",
-      "**Schärferes, flüssigeres Teilen.** Klarere kleine Schrift und feine Details, geringere Bildverzögerung sowie schnellerer Qualitätsaufbau.",
-      "**Reaktionsschnellere Fernsteuerung.** Spürbar geringere Maus- und Tastaturverzögerung am Desktop und in Spielen, selbst bei hoher Auslastung beim Host.",
-      "**Virtuelle Gamepads & geteilte Steuerung.** Verbinde mehrere Xbox-360-Gamepads beim ersten Druck, sortiere Spieler, sieh animierte Cursor und teile die Tastatur."
+      "**Einfachere Rechte & Gamepad-Verwaltung.** Wähle Maus, Tastatur und Gamepad vor der Freigabe, installiere ViGEmBus direkt aus der Meldung und trenne einzelne Gamepads.",
+      "**Eigene Kürzel, Tasten & Gamepad-Belegung.** Ändere Kürzel und einzelne Tasten und belege Gamepad-Tasten, Trigger und Stick-Richtungen in den Einstellungen neu."
     ],
     "it": [
-      "**Controllo remoto.** Condividi il controllo con consenso, cursore originale dell'host, mouse bloccato per giochi, modalità immersiva e permessi.",
-      "**Condivisione più nitida e fluida.** Testi piccoli e dettagli più leggibili, minore ritardo video e ripristino rapido della qualità visiva.",
-      "**Controllo remoto più reattivo.** Ritardo di mouse e tastiera sensibilmente ridotto su desktop e nei giochi, anche quando lo schermo dell'host è intenso.",
-      "**Gamepad virtuali e controllo condiviso.** Collega più gamepad Xbox 360 al primo input, riordina i giocatori, visualizza cursori animati e condividi la tastiera."
+      "**Controllo e gamepad più pratici.** Scegli mouse, tastiera e gamepad prima di accettare, installa ViGEmBus dall'avviso e scollega i singoli gamepad.",
+      "**Scorciatoie, tasti e gamepad su misura.** Riassegna scorciatoie e tasti singoli e rimappa pulsanti, grilletti e direzioni degli stick nelle impostazioni."
     ],
     "zh-CN": [
-      "**远程控制。** 经同意共享屏幕控制权，显示主机原始光标，支持游戏相对锁定鼠标、沉浸快捷键及分用户权限。",
-      "**更清晰低延迟的屏幕共享。** 小号文字与界面细节更清晰，画面更流畅，启动更快且画质恢复更迅速。",
-      "**更灵敏的远程控制。** 显著降低桌面操作和游戏中的鼠标与键盘输入延迟，即使主机画面繁忙也能保持跟手。",
-      "**虚拟手柄与共享控制。** 首次按键即接入多个 Xbox 360 手柄、拖拽调整玩家顺序、支持动画光标与管理员窗口提示，并可共享键盘。"
+      "**更便捷的权限与手柄管理。** 同意控制前即可选择鼠标、键盘与手柄权限，从提示框直接安装 ViGEmBus，并可单独断开手柄。",
+      "**自定义快捷键、按键与手柄映射。** 在设置中更改远程快捷键与单个按键，并重新映射手柄按键、扳机及摇杆各方向。"
     ],
     "zh-TW": [
-      "**遠端控制。** 經同意共享畫面控制權，呈現主機原始游標，支援遊戲相對鎖定滑鼠、沉浸快速鍵與分使用者權限。",
-      "**更清晰低延遲的螢幕分享。** 小字與介面細節更清晰，畫面更流暢，啟動更快且畫質恢復更迅速。",
-      "**更靈敏的遠端控制。** 顯著降低桌面操作與遊戲中的滑鼠與鍵盤輸入延遲，即使主機畫面繁忙也能保持即時跟手。",
-      "**虛擬手把與共享控制。** 首次按鍵即接入多個 Xbox 360 手把、拖曳調整玩家順序、支援動畫游標與系統管理員視窗提示，並可共享鍵盤。"
+      "**更便利的權限與手把管理。** 同意控制前即可選擇滑鼠、鍵盤與手把權限，從提示訊息直接安裝 ViGEmBus，並可個別中斷手把。",
+      "**自訂快速鍵、按鍵與手把對應。** 在設定中重新指定遠端快速鍵與個別按鍵，並調整手把按鍵、板機與搖桿各方向。"
     ],
     "ja": [
-      "**リモート操作。** 同意制で画面操作を共有でき、ホスト本来のカーソル表示、ゲーム向け相対マウスロック、没入モード、ユーザー別権限に対応しました。",
-      "**より鮮明で低遅延な画面共有。** 小さな文字や細部がくっきり表示され、動きが滑らかになり、起動や画質回復も高速化しました。",
-      "**より機敏なリモート操作。** ホスト画面の負荷が高い状態でも、デスクトップ操作やゲーム中のマウス・キーボード入力遅延を大幅に抑えました。",
-      "**仮想ゲームパッドと共同操作。** 初回入力で複数の Xbox 360 パッドを接続し、ドラッグで順番変更、アニメーションカーソル表示、キーボード併用に対応しました。"
+      "**操作権限とパッド管理を改善。** 許可前にマウス・キーボード・パッドの権限を選択でき、通知から直接 ViGEmBus を導入したり個別のパッドを取り外せます。",
+      "**ショートカット・キー・パッドの自由な割り当て。** 設定から操作ショートカットや個別キーを変更でき、ゲームパッドのボタンやスティック方向も再設定できます。"
     ],
     "ko": [
-      "**원격 제어.** 동의를 통해 화면 제어를 공유하며, 호스트의 원본 커서 표시, 게임용 상대 마우스 잠금, 몰입 모드 및 사용자별 권한 관리를 제공합니다.",
-      "**더 선명한 저지연 화면 공유.** 작은 글씨와 세부 요소가 또렷해지고 움직임이 부드러워졌으며, 시작 및 화질 회복이 빨라졌습니다.",
-      "**더 즉각적인 원격 제어.** 호스트 화면이 바쁠 때도 데스크톱 작업과 게임에서 마우스·키보드 입력 지연을 크게 줄였습니다.",
-      "**가상 게임패드 및 공동 제어.** 첫 입력으로 여러 Xbox 360 패드를 연결하고 드래그로 플레이어 순서를 바꾸며, 애니메이션 커서와 키보드 동시 사용을 지원합니다."
+      "**더 간편한 권한 및 게임패드 관리.** 수락 전 마우스·키보드·게임패드 권한을 고르고, 알림에서 바로 ViGEmBus를 설치하며, 개별 게임패드를 해제할 수 있습니다.",
+      "**단축키·키·게임패드 맞춤 매핑.** 설정에서 원격 단축키와 개별 키를 바꾸고 게임패드 버튼, 트리거, 아날로그 스틱 방향까지 직접 재할당할 수 있습니다."
     ],
     "hi": [
-      "**रिमोट कंट्रोल।** सहमति से स्क्रीन नियंत्रण, मूल होस्ट कर्सर, गेम्स के लिए लॉक्ड-माउस मोड, इमर्सिव शॉर्टकट और उपयोगकर्ता अनुमतियाँ साझा करें।",
-      "**साफ़ और कम देरी वाली स्क्रीन शेयरिंग।** छोटे अक्षर और बारीक विवरण अधिक स्पष्ट दिखते हैं, गति स्मूद रहती है और क्वालिटी तेज़ी से सुधरती है।",
-      "**तेज़ रिस्पॉन्स वाला रिमोट कंट्रोल।** डेस्कटॉप और गेम्स में माउस व कीबोर्ड का इनपुट विलंब कम हुआ, भले ही होस्ट स्क्रीन व्यस्त हो।",
-      "**वर्चुअल गेमपैड और साझा नियंत्रण।** पहले बटन पर कई Xbox 360 गेमपैड जोड़ें, खिलाड़ियों का क्रम बदलें, एनिमेटेड कर्सर देखें और कीबोर्ड साझा करें।"
+      "**आसान अनुमति व गेमपैड प्रबंधन।** स्वीकारने से पहले माउस, कीबोर्ड व गेमपैड चुनें, सूचना से सीधे ViGEmBus इंस्टॉल करें और अलग-अलग गेमपैड हटाएँ।",
+      "**कस्टम शॉर्टकट, कुंजी व गेमपैड मैपिंग।** सेटिंग्स में रिमोट शॉर्टकट व व्यक्तिगत कुंजियाँ बदलें और गेमपैड बटन, ट्रिगर व स्टिक दिशाएँ रीमैप करें।"
     ],
     "fi": [
-      "**Etähallinta.** Jaa näytön hallinta luvalla, näytä isännän aito osoitin, lukittu hiiri peleille, immersiotila ja käyttäjäkohtaiset luvat.",
-      "**Tarkempi ja viiveettömämpi näytönjako.** Pienet tekstit ja yksityiskohdat näkyvät selkeämmin, liike on sulavampaa ja laatu palautuu nopeasti.",
-      "**Herkempi etähallinta.** Selvästi pienempi hiiren ja näppäimistön syöteviive työpöydällä ja peleissä, myös silloin kun isännän ruutu on kuormittunut.",
-      "**Virtuaaliset peliohjaimet ja jaettu hallinta.** Yhdistä useita Xbox 360 -ohjaimia ensipainalluksella, järjestä pelaajat vetämällä ja jaa näppäimistö."
+      "**Helppokäyttöisemmät luvat ja ohjaimet.** Valitse hiiri, näppäimistö ja peliohjain ennen hyväksyntää, asenna ViGEmBus suoraan ilmoituksesta ja irrota yksittäisiä ohjaimia.",
+      "**Mukautetut pikakomennot, näppäimet ja peliohjaimet.** Muuta etähallinnan pikakomentoja ja yksittäisiä näppäimiä sekä määritä ohjaimen painikkeet ja tattien suunnat."
     ],
     "ru": [
-      "**Удалённое управление.** Передавайте управление с согласия с оригинальным курсором хоста, захватом мыши для игр, иммерсивным режимом и правами.",
-      "**Чёткая трансляция без задержек.** Мелкий текст и детали видны яснее, движение стало плавнее, а качество быстрее восстанавливается.",
-      "**Более отзывчивое управление.** Заметно снижена задержка мыши и клавиатуры на рабочем столе и в играх, даже при активной нагрузке у хоста.",
-      "**Виртуальные геймпады и совместный ввод.** Подключайте несколько геймпадов Xbox 360 при первом нажатии, меняйте порядок игроков и делитесь клавиатурой."
+      "**Удобные права и управление геймпадами.** Выбирайте мышь, клавиатуру и геймпад до принятия, ставьте ViGEmBus из уведомления и отключайте отдельные геймпады.",
+      "**Свои клавиши, сочетания и настройка геймпада.** Переназначайте сочетания и отдельные клавиши, а также кнопки, триггеры и направления стиков в настройках."
     ]
   }
 }

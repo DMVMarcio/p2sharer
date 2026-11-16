@@ -26,7 +26,25 @@ export const ToastContainer: React.FC = () => {
             onFocus={() => toastManager.pause(toast.id)}
             onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget) && !event.currentTarget.matches(':hover')) toastManager.resume(toast.id); }}>
             <span className="toast-icon" aria-hidden="true">{toast.type === 'success' ? <Check size={20} /> : toast.type === 'error' ? <CircleX size={20} /> : toast.type === 'warning' ? <TriangleAlert size={20} /> : <Info size={20} />}</span>
-            <span className="toast-message">{localizeText(toast.message)}</span>
+            <div className="toast-body">
+              <span className="toast-message">{localizeText(toast.message)}</span>
+              {toast.action && (
+                <div className="toast-actions">
+                  <button
+                    type="button"
+                    disabled={toast.exiting}
+                    className="btn btn-primary btn-sm toast-action-btn"
+                    onClick={() => {
+                      const action = toast.action;
+                      removeToast(toast.id);
+                      void action?.onAction();
+                    }}
+                  >
+                    {toast.action.label}
+                  </button>
+                </div>
+              )}
+            </div>
             <TooltipButton disabled={toast.exiting} className="btn-close toast-close" tooltip={t('message.0f2bd88ef0ac')}
               onClick={() => removeToast(toast.id)}><X size={16} aria-hidden="true" /></TooltipButton>
             <span className="toast-progress" aria-hidden="true" style={{ animationDuration: `${toast.durationMs}ms`, animationPlayState: toast.paused ? 'paused' : 'running' }} />

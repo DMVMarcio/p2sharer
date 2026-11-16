@@ -17,6 +17,13 @@ import {
   type RemoteCursorSyncState,
   type RemoteMouseButton,
 } from '../core/remote_control.ts';
+import {
+  loadInputBindings,
+  matchesShortcut,
+  resolveGamepadProfile,
+  resolveKeyRemapping,
+  subscribeInputBindings,
+} from '../core/input_bindings.ts';
 import { invoke } from '../platform/commands.ts';
 import { logDiagnostic } from '../core/logger.ts';
 import { roomService } from '../services/room_service.ts';
@@ -211,6 +218,14 @@ export function useRemoteControl(
   const rawLockDesiredRef = useRef(false);
   const rawLockGenRef = useRef(0);
   const rawPerfRef = useRef({ sent: 0, lastLogAt: 0 });
+  const inputBindingsRef = useRef(loadInputBindings());
+
+  useEffect(() => {
+    inputBindingsRef.current = loadInputBindings();
+    return subscribeInputBindings((cfg) => {
+      inputBindingsRef.current = cfg;
+    });
+  }, []);
 
   pointerInsideRef.current = pointerInside;
   containerHoveredRef.current = containerHovered;
@@ -435,6 +450,11 @@ export function useRemoteControl(
     });
   }, [containerRef, slotPeerId]);
 
+  const toggleImmersiveRef = useRef(toggleImmersive);
+  toggleImmersiveRef.current = toggleImmersive;
+  const exitRef = useRef(exit);
+  exitRef.current = exit;
+
   const toggleManualMouseLock = useCallback(() => {
     setMouseLockOverride((prev) => {
       const currentlyEnabled =
@@ -467,6 +487,9 @@ export function useRemoteControl(
       return nextMode;
     });
   }, [active, containerRef, releasePointerLock, tryAcquirePointerLock]);
+
+  const toggleManualMouseLockRef = useRef(toggleManualMouseLock);
+  toggleManualMouseLockRef.current = toggleManualMouseLock;
 
   // Reset local interactive state when leaving active mode or becoming ineligible.
   useEffect(() => {
@@ -695,6 +718,22 @@ export function useRemoteControl(
       if (!immersive && !pointerInside && !containerHovered && !hasActiveHold()) {
         return;
       }
+      if (payload.down && !isTextInputElement(document.activeElement)) {
+        const shortcuts = inputBindingsRef.current.shortcuts;
+        if (matchesShortcut(payload, shortcuts.toggleMouseLock)) {
+          if (isMouseLockedNow()) sendReleaseAll();
+          toggleManualMouseLockRef.current();
+          return;
+        }
+        if (matchesShortcut(payload, shortcuts.toggleImmersive)) {
+          toggleImmersiveRef.current();
+          return;
+        }
+        if (matchesShortcut(payload, shortcuts.exitRemoteControl)) {
+          exitRef.current();
+          return;
+        }
+      }
       if (
         payload.down &&
         payload.altKey &&
@@ -760,7 +799,13 @@ export function useRemoteControl(
           down: false,
         });
       }
-      const codeKey = payload.code || payload.key;
+      const mapped = resolveKeyRemapping(
+        inputBindingsRef.current.keyRemaps,
+        payload.code,
+        payload.key,
+        payload.vk,
+      );
+      const codeKey = mapped.code || mapped.key;
       if (codeKey) {
         if (payload.down) {
           if (!heldKeysRef.current.has(codeKey)) {
@@ -774,9 +819,9 @@ export function useRemoteControl(
       hadActiveInputRef.current = true;
       roomService.sendRemoteControlInput(slotPeerId, {
         kind: 'key',
-        vk: payload.vk,
-        code: payload.code,
-        key: payload.key,
+        vk: mapped.vk,
+        code: mapped.code,
+        key: mapped.key,
         down: payload.down,
         ctrlKey: payload.ctrlKey,
         altKey: payload.altKey,
@@ -857,6 +902,15 @@ export function useRemoteControl(
     }
 
     const lastSentByPad = new Map<number, GamepadSnapshotState>();
+    const handleRemoteGamepadRemoved = (event: Event) => {
+      const detail = (event as CustomEvent<{ slotPeerId?: string; padIndex?: number }>).detail;
+      if (!detail || detail.slotPeerId !== slotPeerId || typeof detail.padIndex !== 'number') {
+        return;
+      }
+      activated!.delete(detail.padIndex);
+      lastSentByPad.delete(detail.padIndex);
+    };
+    window.addEventListener('p2sharer:remote-gamepad-removed', handleRemoteGamepadRemoved);
     let rafId: number | null = null;
     let disposed = false;
 
@@ -865,16 +919,18 @@ export function useRemoteControl(
       const pads = typeof navigator !== 'undefined' && typeof navigator.getGamepads === 'function'
         ? navigator.getGamepads()
         : [];
+      const bindingsConfig = inputBindingsRef.current;
       const presentIndices = new Set<number>();
       for (let i = 0; i < pads.length; i += 1) {
         const pad = pads[i];
         if (!pad || !pad.connected) continue;
         presentIndices.add(pad.index);
+        const profile = resolveGamepadProfile(bindingsConfig, pad.id);
         if (!activated!.has(pad.index)) {
-          if (!hasMeaningfulGamepadInput(pad)) continue;
+          if (!hasMeaningfulGamepadInput(pad, profile)) continue;
           activated!.add(pad.index);
         }
-        const snap = readGamepadSnapshotState(pad);
+        const snap = readGamepadSnapshotState(pad, profile);
         const prev = lastSentByPad.get(pad.index);
         if (
           !prev ||
@@ -912,6 +968,7 @@ export function useRemoteControl(
       disposed = true;
       if (rafId !== null) window.cancelAnimationFrame(rafId);
       window.removeEventListener('gamepaddisconnected', handleGamepadDisconnected);
+      window.removeEventListener('p2sharer:remote-gamepad-removed', handleRemoteGamepadRemoved);
     };
   }, [active, gamepadEnabled, overlayMenuOpen, slotPeerId, textInputFocused, windowFocused]);
 
@@ -1207,26 +1264,40 @@ export function useRemoteControl(
     };
 
     const handleKey = (event: KeyboardEvent, down: boolean) => {
-      const codeKey = event.code || event.key;
+      const bindingsConfig = inputBindingsRef.current;
+      const mapped = resolveKeyRemapping(bindingsConfig.keyRemaps, event.code, event.key);
+      const codeKey = mapped.code || mapped.key;
       const wasHeld = !down && codeKey ? heldKeysRef.current.has(codeKey) : false;
       const liveFocused = syncLiveFocus();
       if (
         down &&
         !event.repeat &&
-        event.ctrlKey &&
-        event.shiftKey &&
-        event.code === 'KeyM' &&
         liveFocused &&
         !isTextInputElement(event.target) &&
         (isMouseLockedNow() || pointerInsideRef.current || immersiveRef.current)
       ) {
-        event.preventDefault();
-        event.stopPropagation();
-        if (isMouseLockedNow()) {
-          sendReleaseAll();
+        const shortcuts = bindingsConfig.shortcuts;
+        if (matchesShortcut(event, shortcuts.toggleMouseLock)) {
+          event.preventDefault();
+          event.stopPropagation();
+          if (isMouseLockedNow()) {
+            sendReleaseAll();
+          }
+          toggleManualMouseLock();
+          return;
         }
-        toggleManualMouseLock();
-        return;
+        if (matchesShortcut(event, shortcuts.toggleImmersive)) {
+          event.preventDefault();
+          event.stopPropagation();
+          toggleImmersiveRef.current();
+          return;
+        }
+        if (matchesShortcut(event, shortcuts.exitRemoteControl)) {
+          event.preventDefault();
+          event.stopPropagation();
+          exitRef.current();
+          return;
+        }
       }
       if (!keyboardEnabledRef.current || hostBusyRef.current || !liveFocused) {
         return;
@@ -1248,7 +1319,7 @@ export function useRemoteControl(
       event.stopPropagation();
       if (
         down &&
-        event.code !== 'Escape' &&
+        mapped.code !== 'Escape' &&
         wantPointerLockRef.current &&
         !lockPausedByEscapeRef.current &&
         !isMouseLockedNow() &&
@@ -1269,8 +1340,8 @@ export function useRemoteControl(
       hadActiveInputRef.current = true;
       roomService.sendRemoteControlInput(slotPeerId, {
         kind: 'key',
-        code: event.code,
-        key: event.key,
+        code: mapped.code,
+        key: mapped.key,
         down,
         repeat: event.repeat,
         ctrlKey: event.ctrlKey,

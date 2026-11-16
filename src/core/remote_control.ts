@@ -1,3 +1,12 @@
+import {
+  GAMEPAD_DIGITAL_TARGETS,
+  getBindingForTarget,
+  isGamepadSourcePressed,
+  readGamepadSourceValue,
+  type GamepadInputSourceLike,
+  type GamepadMappingProfile,
+} from './input_bindings.ts';
+
 export type RemoteCursorShape =
   | 'default'
   | 'pointer'
@@ -146,6 +155,11 @@ export type RemoteControlHostPacket =
       hotX: number;
       hotY: number;
       pngBase64: string;
+    }
+  | {
+      type: 'gamepadRemoved';
+      mediaId: string;
+      padIndex: number;
     };
 
 export interface RemoteCursorImageAsset {
@@ -439,6 +453,13 @@ export function validRemoteControlHostPacket(raw: unknown): raw is RemoteControl
         typeof pkt.pngBase64 === 'string' &&
         pkt.pngBase64.length > 0 &&
         pkt.pngBase64.length <= 65536
+      );
+    case 'gamepadRemoved':
+      return (
+        typeof pkt.padIndex === 'number' &&
+        Number.isInteger(pkt.padIndex) &&
+        pkt.padIndex >= 0 &&
+        pkt.padIndex <= 15
       );
     default:
       return false;
@@ -849,12 +870,7 @@ export function decodeRemoteControlCursorSync(frame: Uint8Array): DecodedRemoteC
   return validRemoteControlHostPacket(packet) ? { seq, packet } : null;
 }
 
-export interface GamepadInputSourceLike {
-  index: number;
-  connected?: boolean;
-  buttons: ReadonlyArray<{ pressed: boolean; value: number }>;
-  axes: ReadonlyArray<number>;
-}
+export type { GamepadInputSourceLike } from './input_bindings.ts';
 
 export type GamepadSnapshotState = Omit<
   Extract<RemoteInputEvent, { kind: 'gamepadState' }>,
@@ -870,49 +886,70 @@ function clampAxisToI16(v: number): number {
   return clamped < 0 ? Math.round(clamped * 32768) : Math.round(clamped * 32767);
 }
 
-/** Converts a W3C Gamepad API snapshot into canonical ViGEm/XInput wire fields (Y axes inverted). */
-export function readGamepadSnapshotState(pad: GamepadInputSourceLike): GamepadSnapshotState {
-  const btns = pad.buttons;
-  const pressed = (idx: number) => {
-    const btn = btns[idx];
-    return Boolean(btn && (btn.pressed || btn.value > 0.5));
-  };
+/** Converts a W3C Gamepad API snapshot into canonical ViGEm/XInput wire fields using an optional remapping profile. */
+export function readGamepadSnapshotState(
+  pad: GamepadInputSourceLike,
+  profile?: GamepadMappingProfile | null,
+): GamepadSnapshotState {
+  const deadzone = profile?.deadzone ?? 0;
   let buttons = 0;
-  if (pressed(12)) buttons |= 0x0001; // D-pad Up
-  if (pressed(13)) buttons |= 0x0002; // D-pad Down
-  if (pressed(14)) buttons |= 0x0004; // D-pad Left
-  if (pressed(15)) buttons |= 0x0008; // D-pad Right
-  if (pressed(9)) buttons |= 0x0010;  // Start
-  if (pressed(8)) buttons |= 0x0020;  // Back
-  if (pressed(10)) buttons |= 0x0040; // Left Thumb
-  if (pressed(11)) buttons |= 0x0080; // Right Thumb
-  if (pressed(4)) buttons |= 0x0100;  // LB
-  if (pressed(5)) buttons |= 0x0200;  // RB
-  if (pressed(16)) buttons |= 0x0400; // Guide
-  if (pressed(0)) buttons |= 0x1000;  // A
-  if (pressed(1)) buttons |= 0x2000;  // B
-  if (pressed(2)) buttons |= 0x4000;  // X
-  if (pressed(3)) buttons |= 0x8000;  // Y
+  for (const entry of GAMEPAD_DIGITAL_TARGETS) {
+    const binding = getBindingForTarget(profile, entry.control);
+    if (isGamepadSourcePressed(pad, binding)) {
+      buttons |= entry.bit;
+    }
+  }
 
-  const triggerByte = (idx: number) => {
-    const val = btns[idx]?.value ?? (btns[idx]?.pressed ? 1 : 0);
+  const triggerByte = (target: 'leftTrigger' | 'rightTrigger') => {
+    const binding = getBindingForTarget(profile, target);
+    const val = readGamepadSourceValue(pad, binding, deadzone, false);
     if (!Number.isFinite(val)) return 0;
     return Math.max(0, Math.min(255, Math.round(Math.max(0, Math.min(1, val)) * 255)));
   };
 
+  const stickDir = (
+    target: 'lxNeg' | 'lxPos' | 'lyPos' | 'lyNeg' | 'rxNeg' | 'rxPos' | 'ryPos' | 'ryNeg',
+  ) => readGamepadSourceValue(pad, getBindingForTarget(profile, target), deadzone, true);
+
   return {
     buttons,
-    leftTrigger: triggerByte(6),
-    rightTrigger: triggerByte(7),
-    thumbLx: clampAxisToI16(pad.axes[0] ?? 0),
-    thumbLy: clampAxisToI16(-(pad.axes[1] ?? 0)),
-    thumbRx: clampAxisToI16(pad.axes[2] ?? 0),
-    thumbRy: clampAxisToI16(-(pad.axes[3] ?? 0)),
+    leftTrigger: triggerByte('leftTrigger'),
+    rightTrigger: triggerByte('rightTrigger'),
+    thumbLx: clampAxisToI16(stickDir('lxPos') - stickDir('lxNeg')),
+    thumbLy: clampAxisToI16(stickDir('lyPos') - stickDir('lyNeg')),
+    thumbRx: clampAxisToI16(stickDir('rxPos') - stickDir('rxNeg')),
+    thumbRy: clampAxisToI16(stickDir('ryPos') - stickDir('ryNeg')),
   };
 }
 
 /** Returns true only once a physical gamepad produces real user input above idle drift deadzones. */
-export function hasMeaningfulGamepadInput(pad: GamepadInputSourceLike): boolean {
+export function hasMeaningfulGamepadInput(
+  pad: GamepadInputSourceLike,
+  profile?: GamepadMappingProfile | null,
+): boolean {
+  if (profile) {
+    for (const entry of GAMEPAD_DIGITAL_TARGETS) {
+      if (isGamepadSourcePressed(pad, getBindingForTarget(profile, entry.control))) {
+        return true;
+      }
+    }
+    const deadzone = Math.max(GAMEPAD_ACTIVATION_AXIS_THRESHOLD, profile.deadzone);
+    for (const target of ['leftTrigger', 'rightTrigger'] as const) {
+      if (
+        readGamepadSourceValue(pad, getBindingForTarget(profile, target), 0, false) >=
+        GAMEPAD_ACTIVATION_TRIGGER_THRESHOLD
+      ) {
+        return true;
+      }
+    }
+    for (const target of ['lxNeg', 'lxPos', 'lyPos', 'lyNeg', 'rxNeg', 'rxPos', 'ryPos', 'ryNeg'] as const) {
+      if (readGamepadSourceValue(pad, getBindingForTarget(profile, target), 0, false) >= deadzone) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   for (let i = 0; i < pad.buttons.length; i += 1) {
     const btn = pad.buttons[i];
     if (!btn) continue;
