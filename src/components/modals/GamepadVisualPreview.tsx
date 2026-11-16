@@ -288,28 +288,28 @@ export const GamepadVisualPreview: React.FC<GamepadVisualPreviewProps> = ({
 
       <svg
         className="gp-visual-svg"
-        viewBox="0 0 360 212"
+        viewBox="0 0 360 236"
         role="img"
         aria-label={t('inputBindings.gamepadPreviewLabel')}
       >
-        {/* Shoulder Bumpers (LB / RB) */}
+        {/* Shoulder Bumpers (LB / RB) tucked inward inside the top shoulders */}
         <path
-          d="M52 28 C58 14, 96 12, 118 18 L112 31 L50 34 Z"
+          d="M68 30 C72 17, 98 15, 118 19 L114 31 L66 33 Z"
           className={`gp-svg-bumper ${btn(0x0100) ? 'is-pressed' : ''} ${isTarget('lb') ? 'is-target' : ''}`}
           style={{ '--gp-active': GAMEPAD_CONTROL_COLORS.bumper } as React.CSSProperties}
         />
-        <text x="84" y="27" textAnchor="middle" className="gp-svg-mini-label">LB</text>
+        <text x="93" y="27" textAnchor="middle" className="gp-svg-mini-label">LB</text>
 
         <path
-          d="M308 28 C302 14, 264 12, 242 18 L248 31 L310 34 Z"
+          d="M292 30 C288 17, 262 15, 242 19 L246 31 L294 33 Z"
           className={`gp-svg-bumper ${btn(0x0200) ? 'is-pressed' : ''} ${isTarget('rb') ? 'is-target' : ''}`}
           style={{ '--gp-active': GAMEPAD_CONTROL_COLORS.bumper } as React.CSSProperties}
         />
-        <text x="276" y="27" textAnchor="middle" className="gp-svg-mini-label">RB</text>
+        <text x="267" y="27" textAnchor="middle" className="gp-svg-mini-label">RB</text>
 
-        {/* Main Controller Shell */}
+        {/* Main Controller Shell with generous bottom clearance */}
         <path
-          d="M78 30 C112 24, 248 24, 282 30 C316 36, 338 82, 344 138 C349 182, 326 204, 302 198 C282 193, 268 164, 246 150 L114 150 C92 164, 78 193, 58 198 C34 204, 11 182, 16 138 C22 82, 44 36, 78 30 Z"
+          d="M76 30 C112 23, 248 23, 284 30 C318 36, 340 86, 346 152 C351 200, 326 224, 300 218 C278 212, 264 190, 246 180 L114 180 C96 190, 82 212, 60 218 C34 224, 9 200, 14 152 C20 86, 42 36, 76 30 Z"
           className="gp-svg-body"
         />
 
@@ -318,24 +318,24 @@ export const GamepadVisualPreview: React.FC<GamepadVisualPreviewProps> = ({
           className={`gp-svg-btn ${btn(0x0400) ? 'is-pressed' : ''} ${isTarget('guide') ? 'is-target' : ''}`}
           style={{ '--gp-active': GAMEPAD_CONTROL_COLORS.guide } as React.CSSProperties}
         >
-          <circle cx="180" cy="60" r="14" className="gp-svg-pad" />
-          <path d="M174 54l12 12M186 54l-12 12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+          <circle cx="180" cy="62" r="13" className="gp-svg-pad" />
+          <path d="M174 56l12 12M186 56l-12 12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
         </g>
 
         <g
           className={`gp-svg-btn ${btn(0x0020) ? 'is-pressed' : ''} ${isTarget('back') ? 'is-target' : ''}`}
           style={{ '--gp-active': GAMEPAD_CONTROL_COLORS.bumper } as React.CSSProperties}
         >
-          <circle cx="146" cy="84" r="9" className="gp-svg-pad" />
-          <rect x="142" y="80" width="8" height="8" rx="1.2" fill="none" stroke="currentColor" strokeWidth="1.4" />
+          <circle cx="148" cy="86" r="9" className="gp-svg-pad" />
+          <rect x="144" y="82" width="8" height="8" rx="1.2" fill="none" stroke="currentColor" strokeWidth="1.4" />
         </g>
 
         <g
           className={`gp-svg-btn ${btn(0x0010) ? 'is-pressed' : ''} ${isTarget('start') ? 'is-target' : ''}`}
           style={{ '--gp-active': GAMEPAD_CONTROL_COLORS.bumper } as React.CSSProperties}
         >
-          <circle cx="214" cy="84" r="9" className="gp-svg-pad" />
-          <path d="M210 81h8M210 84h8M210 87h8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+          <circle cx="212" cy="86" r="9" className="gp-svg-pad" />
+          <path d="M208 83h8M208 86h8M208 89h8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
         </g>
 
         {/* Left Thumbstick (LS) */}
@@ -344,54 +344,54 @@ export const GamepadVisualPreview: React.FC<GamepadVisualPreviewProps> = ({
           style={{ '--gp-active': GAMEPAD_CONTROL_COLORS.leftStick } as React.CSSProperties}
         >
           <circle
-            cx="94"
-            cy="78"
-            r="27"
+            cx="90"
+            cy="80"
+            r="26"
             className={`gp-svg-stick-well ${btn(0x0040) ? 'is-pressed' : ''} ${anyLeftStickTarget ? 'is-target' : ''}`}
           />
-          {isTarget('lyPos') && <path d="M94 50L99 58H89Z" fill={GAMEPAD_CONTROL_COLORS.leftStick} />}
-          {isTarget('lyNeg') && <path d="M94 106L99 98H89Z" fill={GAMEPAD_CONTROL_COLORS.leftStick} />}
-          {isTarget('lxNeg') && <path d="M66 78L74 73V83Z" fill={GAMEPAD_CONTROL_COLORS.leftStick} />}
-          {isTarget('lxPos') && <path d="M122 78L114 73V83Z" fill={GAMEPAD_CONTROL_COLORS.leftStick} />}
+          {isTarget('lyPos') && <path d="M90 53L95 61H85Z" fill={GAMEPAD_CONTROL_COLORS.leftStick} />}
+          {isTarget('lyNeg') && <path d="M90 107L95 99H85Z" fill={GAMEPAD_CONTROL_COLORS.leftStick} />}
+          {isTarget('lxNeg') && <path d="M63 80L71 75V85Z" fill={GAMEPAD_CONTROL_COLORS.leftStick} />}
+          {isTarget('lxPos') && <path d="M117 80L109 75V85Z" fill={GAMEPAD_CONTROL_COLORS.leftStick} />}
           <circle
-            cx={94 + lxOffset}
-            cy={78 + lyOffset}
+            cx={90 + lxOffset}
+            cy={80 + lyOffset}
             r="14"
             className={`gp-svg-stick-cap ${btn(0x0040) ? 'is-pressed' : ''}`}
             style={{ '--gp-active': GAMEPAD_CONTROL_COLORS.leftStick } as React.CSSProperties}
           />
         </g>
 
-        {/* D-Pad (4 directions) */}
+        {/* D-Pad (4 directions) with clean bottom margin */}
         <g style={{ '--gp-active': GAMEPAD_CONTROL_COLORS.dpad } as React.CSSProperties}>
-          <rect x="122" y="114" width="16" height="16" className="gp-svg-dpad-center" />
+          <rect x="124" y="126" width="16" height="16" className="gp-svg-dpad-center" />
           <rect
-            x="122"
-            y="96"
+            x="124"
+            y="108"
             width="16"
             height="19"
             rx="3"
             className={`gp-svg-dpad-arm ${btn(0x0001) ? 'is-pressed' : ''} ${isTarget('dpadUp') ? 'is-target' : ''}`}
           />
           <rect
-            x="122"
-            y="129"
+            x="124"
+            y="141"
             width="16"
             height="19"
             rx="3"
             className={`gp-svg-dpad-arm ${btn(0x0002) ? 'is-pressed' : ''} ${isTarget('dpadDown') ? 'is-target' : ''}`}
           />
           <rect
-            x="104"
-            y="114"
+            x="106"
+            y="126"
             width="19"
             height="16"
             rx="3"
             className={`gp-svg-dpad-arm ${btn(0x0004) ? 'is-pressed' : ''} ${isTarget('dpadLeft') ? 'is-target' : ''}`}
           />
           <rect
-            x="137"
-            y="114"
+            x="139"
+            y="126"
             width="19"
             height="16"
             rx="3"
@@ -399,25 +399,25 @@ export const GamepadVisualPreview: React.FC<GamepadVisualPreviewProps> = ({
           />
         </g>
 
-        {/* Right Thumbstick (RS) */}
+        {/* Right Thumbstick (RS) spaced cleanly below face buttons and above bottom rim */}
         <g
           className={`${anyRightStickTarget ? 'is-target' : ''}`}
           style={{ '--gp-active': GAMEPAD_CONTROL_COLORS.rightStick } as React.CSSProperties}
         >
           <circle
-            cx="228"
-            cy="124"
-            r="27"
+            cx="226"
+            cy="138"
+            r="25"
             className={`gp-svg-stick-well ${btn(0x0080) ? 'is-pressed' : ''} ${anyRightStickTarget ? 'is-target' : ''}`}
           />
-          {isTarget('ryPos') && <path d="M228 96L233 104H223Z" fill={GAMEPAD_CONTROL_COLORS.rightStick} />}
-          {isTarget('ryNeg') && <path d="M228 152L233 144H223Z" fill={GAMEPAD_CONTROL_COLORS.rightStick} />}
-          {isTarget('rxNeg') && <path d="M200 124L208 119V129Z" fill={GAMEPAD_CONTROL_COLORS.rightStick} />}
-          {isTarget('rxPos') && <path d="M256 124L248 119V129Z" fill={GAMEPAD_CONTROL_COLORS.rightStick} />}
+          {isTarget('ryPos') && <path d="M226 112L231 120H221Z" fill={GAMEPAD_CONTROL_COLORS.rightStick} />}
+          {isTarget('ryNeg') && <path d="M226 164L231 156H221Z" fill={GAMEPAD_CONTROL_COLORS.rightStick} />}
+          {isTarget('rxNeg') && <path d="M200 138L208 133V143Z" fill={GAMEPAD_CONTROL_COLORS.rightStick} />}
+          {isTarget('rxPos') && <path d="M252 138L244 133V143Z" fill={GAMEPAD_CONTROL_COLORS.rightStick} />}
           <circle
-            cx={228 + rxOffset}
-            cy={124 + ryOffset}
-            r="14"
+            cx={226 + rxOffset}
+            cy={138 + ryOffset}
+            r="13.5"
             className={`gp-svg-stick-cap ${btn(0x0080) ? 'is-pressed' : ''}`}
             style={{ '--gp-active': GAMEPAD_CONTROL_COLORS.rightStick } as React.CSSProperties}
           />
@@ -426,10 +426,10 @@ export const GamepadVisualPreview: React.FC<GamepadVisualPreviewProps> = ({
         {/* Face Buttons: Y (top), X (left), B (right), A (bottom) */}
         {(
           [
-            { key: 'y', label: 'Y', cx: 268, cy: 56, mask: 0x8000, color: GAMEPAD_CONTROL_COLORS.y },
-            { key: 'x', label: 'X', cx: 244, cy: 79, mask: 0x4000, color: GAMEPAD_CONTROL_COLORS.x },
-            { key: 'b', label: 'B', cx: 292, cy: 79, mask: 0x2000, color: GAMEPAD_CONTROL_COLORS.b },
-            { key: 'a', label: 'A', cx: 268, cy: 102, mask: 0x1000, color: GAMEPAD_CONTROL_COLORS.a },
+            { key: 'y', label: 'Y', cx: 270, cy: 54, mask: 0x8000, color: GAMEPAD_CONTROL_COLORS.y },
+            { key: 'x', label: 'X', cx: 246, cy: 77, mask: 0x4000, color: GAMEPAD_CONTROL_COLORS.x },
+            { key: 'b', label: 'B', cx: 294, cy: 77, mask: 0x2000, color: GAMEPAD_CONTROL_COLORS.b },
+            { key: 'a', label: 'A', cx: 270, cy: 100, mask: 0x1000, color: GAMEPAD_CONTROL_COLORS.a },
           ] as const
         ).map((face) => (
           <g

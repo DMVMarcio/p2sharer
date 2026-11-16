@@ -7811,18 +7811,20 @@ body:has(.fullscreen-dialog, .chat-image-viewer) .window-titlebar { display: non
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 
 .input-bindings-profile-select-wrap {
   flex: 1;
-  min-width: 180px;
+  min-width: 0;
 }
 
 .btn.input-bindings-profile-reset-btn {
+  width: auto;
   flex: none;
   height: 38px;
   min-height: 38px;
-  padding: 0 12px;
+  padding: 0 14px;
   font-size: 12px;
 }
 
