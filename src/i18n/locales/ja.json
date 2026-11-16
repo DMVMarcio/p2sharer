@@ -1769,5 +1769,12 @@
   "inputBindings.dpadRight": "十字キー 右",
   "inputBindings.btnLeftStick": "左スティック押し込み (LS)",
   "inputBindings.btnRightStick": "右スティック押し込み (RS)",
-  "inputBindings.resetAllBindings": "すべてのショートカットと割り当てを初期化"
+  "inputBindings.resetAllBindings": "すべてのショートカットと割り当てを初期化",
+  "inputBindings.previewPausedForAssign": "割り当て中はプレビューを一時停止しています",
+  "inputBindings.gamepadPreviewLabel": "コントローラーのビジュアルプレビュー",
+  "inputBindings.confirmResetTitle": "初期設定に戻しますか？",
+  "inputBindings.confirmResetAction": "初期設定に戻す",
+  "inputBindings.confirmResetShortcutsDesc": "リモート操作のキーボードショートカットをすべて初期設定に戻します。",
+  "inputBindings.confirmResetProfileDesc": "選択中のコントローラーのボタン・トリガー・スティック割り当てをすべて初期化します。",
+  "inputBindings.confirmResetAllDesc": "すべてのショートカット、個別キー、およびコントローラー設定を初期状態に戻します。"
 }

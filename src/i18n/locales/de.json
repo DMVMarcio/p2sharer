@@ -1769,5 +1769,12 @@
   "inputBindings.dpadRight": "D-Pad Rechts",
   "inputBindings.btnLeftStick": "Linker Stick-Klick (LS)",
   "inputBindings.btnRightStick": "Rechter Stick-Klick (RS)",
-  "inputBindings.resetAllBindings": "Alle Kürzel und Belegungen zurücksetzen"
+  "inputBindings.resetAllBindings": "Alle Kürzel und Belegungen zurücksetzen",
+  "inputBindings.previewPausedForAssign": "Vorschau während der Zuweisung pausiert",
+  "inputBindings.gamepadPreviewLabel": "Visuelle Controller-Vorschau",
+  "inputBindings.confirmResetTitle": "Standardwerte wiederherstellen?",
+  "inputBindings.confirmResetAction": "Zurücksetzen",
+  "inputBindings.confirmResetShortcutsDesc": "Dadurch werden alle Tastenkürzel für die Fernsteuerung auf die Standardwerte zurückgesetzt.",
+  "inputBindings.confirmResetProfileDesc": "Dadurch werden alle Tasten, Trigger und Stick-Zuweisungen des gewählten Profils zurückgesetzt.",
+  "inputBindings.confirmResetAllDesc": "Dadurch werden alle Kürzel, Tasten-Neubelegungen und Controller-Profile auf Standardwerte zurückgesetzt."
 }

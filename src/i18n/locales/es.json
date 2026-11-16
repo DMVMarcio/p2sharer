@@ -1769,5 +1769,12 @@
   "inputBindings.dpadRight": "D-Pad Derecha",
   "inputBindings.btnLeftStick": "Clic Stick Izq. (LS)",
   "inputBindings.btnRightStick": "Clic Stick Der. (RS)",
-  "inputBindings.resetAllBindings": "Restaurar todos los atajos y asignaciones"
+  "inputBindings.resetAllBindings": "Restaurar todos los atajos y asignaciones",
+  "inputBindings.previewPausedForAssign": "Vista previa pausada durante la asignación",
+  "inputBindings.gamepadPreviewLabel": "Vista previa visual del mando",
+  "inputBindings.confirmResetTitle": "¿Restaurar valores predeterminados?",
+  "inputBindings.confirmResetAction": "Restaurar valores",
+  "inputBindings.confirmResetShortcutsDesc": "Esto restablecerá todos los atajos de teclado del control remoto a los valores predeterminados.",
+  "inputBindings.confirmResetProfileDesc": "Esto restaurará todos los botones, gatillos y ejes de sticks del perfil seleccionado.",
+  "inputBindings.confirmResetAllDesc": "Esto restablecerá todos los atajos, reasignaciones de teclas y perfiles de mando a los valores de fábrica."
 }

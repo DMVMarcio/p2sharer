@@ -1769,5 +1769,12 @@
   "inputBindings.dpadRight": "D-Pad Direita",
   "inputBindings.btnLeftStick": "Clique Analógico Esq. (LS)",
   "inputBindings.btnRightStick": "Clique Analógico Dir. (RS)",
-  "inputBindings.resetAllBindings": "Restaurar todos os atalhos e mapeamentos"
+  "inputBindings.resetAllBindings": "Restaurar todos os atalhos e mapeamentos",
+  "inputBindings.previewPausedForAssign": "Pré-visualização pausada durante a atribuição",
+  "inputBindings.gamepadPreviewLabel": "Pré-visualização visual do controle",
+  "inputBindings.confirmResetTitle": "Restaurar padrões?",
+  "inputBindings.confirmResetAction": "Restaurar padrões",
+  "inputBindings.confirmResetShortcutsDesc": "Isso restaurará todos os atalhos de teclado do controle remoto para os valores padrão.",
+  "inputBindings.confirmResetProfileDesc": "Isso restaurará todos os botões, gatilhos e direções dos analógicos do perfil selecionado para os valores padrão.",
+  "inputBindings.confirmResetAllDesc": "Isso apagará todos os atalhos, remapeamentos de teclado e perfis de gamepad personalizados."
 }

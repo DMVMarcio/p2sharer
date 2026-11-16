@@ -1769,5 +1769,12 @@
   "inputBindings.dpadRight": "D-Pad Destra",
   "inputBindings.btnLeftStick": "Clic Stick Sinistro (LS)",
   "inputBindings.btnRightStick": "Clic Stick Destro (RS)",
-  "inputBindings.resetAllBindings": "Ripristina tutte le scorciatoie e mappature"
+  "inputBindings.resetAllBindings": "Ripristina tutte le scorciatoie e mappature",
+  "inputBindings.previewPausedForAssign": "Anteprima in pausa durante l’assegnazione",
+  "inputBindings.gamepadPreviewLabel": "Anteprima visiva del controller",
+  "inputBindings.confirmResetTitle": "Ripristinare i valori predefiniti?",
+  "inputBindings.confirmResetAction": "Ripristina",
+  "inputBindings.confirmResetShortcutsDesc": "Tutti i tasti di scelta rapida del controllo remoto torneranno ai valori predefiniti.",
+  "inputBindings.confirmResetProfileDesc": "Tutti i pulsanti, i grilletti e gli stick analogici del profilo selezionato torneranno predefiniti.",
+  "inputBindings.confirmResetAllDesc": "Tutte le scorciatoie, le rimappature dei tasti e i profili controller verranno reimpostati."
 }

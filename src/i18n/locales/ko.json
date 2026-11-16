@@ -1769,5 +1769,12 @@
   "inputBindings.dpadRight": "방향 패드 오른쪽",
   "inputBindings.btnLeftStick": "왼쪽 스틱 클릭 (LS)",
   "inputBindings.btnRightStick": "오른쪽 스틱 클릭 (RS)",
-  "inputBindings.resetAllBindings": "모든 단축키 및 매핑 초기화"
+  "inputBindings.resetAllBindings": "모든 단축키 및 매핑 초기화",
+  "inputBindings.previewPausedForAssign": "키 할당 중에는 미리 보기가 일시 중지됩니다",
+  "inputBindings.gamepadPreviewLabel": "컨트롤러 시각적 미리 보기",
+  "inputBindings.confirmResetTitle": "기본값으로 복원할까요?",
+  "inputBindings.confirmResetAction": "기본값 복원",
+  "inputBindings.confirmResetShortcutsDesc": "원격 제어 키보드 단축키가 모두 기본값으로 초기화됩니다.",
+  "inputBindings.confirmResetProfileDesc": "선택한 컨트롤러 프로필의 모든 버튼, 트리거, 아날로그 스틱 매핑이 기본값으로 복원됩니다.",
+  "inputBindings.confirmResetAllDesc": "모든 단축키, 개별 키 재매핑, 컨트롤러 프로필이 기본값으로 초기화됩니다."
 }

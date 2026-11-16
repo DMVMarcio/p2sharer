@@ -1769,5 +1769,12 @@
   "inputBindings.dpadRight": "D-Pad Droite",
   "inputBindings.btnLeftStick": "Clic Stick Gauche (LS)",
   "inputBindings.btnRightStick": "Clic Stick Droit (RS)",
-  "inputBindings.resetAllBindings": "Tout réinitialiser"
+  "inputBindings.resetAllBindings": "Tout réinitialiser",
+  "inputBindings.previewPausedForAssign": "Aperçu en pause pendant l’attribution",
+  "inputBindings.gamepadPreviewLabel": "Aperçu visuel de la manette",
+  "inputBindings.confirmResetTitle": "Rétablir les valeurs par défaut ?",
+  "inputBindings.confirmResetAction": "Réinitialiser",
+  "inputBindings.confirmResetShortcutsDesc": "Cette action réinitialisera tous les raccourcis clavier du contrôle à distance.",
+  "inputBindings.confirmResetProfileDesc": "Cette action rétablira tous les boutons, gâchettes et sticks du profil de manette sélectionné.",
+  "inputBindings.confirmResetAllDesc": "Cette action réinitialisera tous les raccourcis, touches remappées et profils de manette."
 }

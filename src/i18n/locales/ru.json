@@ -1769,5 +1769,12 @@
   "inputBindings.dpadRight": "Крестовина Вправо",
   "inputBindings.btnLeftStick": "Нажатие левого стика (LS)",
   "inputBindings.btnRightStick": "Нажатие правого стика (RS)",
-  "inputBindings.resetAllBindings": "Сбросить все сочетания и назначения"
+  "inputBindings.resetAllBindings": "Сбросить все сочетания и назначения",
+  "inputBindings.previewPausedForAssign": "Предпросмотр приостановлен на время назначения",
+  "inputBindings.gamepadPreviewLabel": "Визуальный предпросмотр геймпада",
+  "inputBindings.confirmResetTitle": "Сбросить настройки по умолчанию?",
+  "inputBindings.confirmResetAction": "Сбросить",
+  "inputBindings.confirmResetShortcutsDesc": "Все сочетания клавиш удалённого управления будут сброшены к значениям по умолчанию.",
+  "inputBindings.confirmResetProfileDesc": "Все кнопки, триггеры и направления стиков для выбранного профиля вернутся к значениям по умолчанию.",
+  "inputBindings.confirmResetAllDesc": "Все сочетания, переназначения клавиш и профили геймпадов будут сброшены к заводским настройкам."
 }

@@ -1769,5 +1769,12 @@
   "inputBindings.dpadRight": "D-Pad Oikea",
   "inputBindings.btnLeftStick": "Vasemman tatin napsautus (LS)",
   "inputBindings.btnRightStick": "Oikean tatin napsautus (RS)",
-  "inputBindings.resetAllBindings": "Palauta kaikki pikakomennot ja määritykset"
+  "inputBindings.resetAllBindings": "Palauta kaikki pikakomennot ja määritykset",
+  "inputBindings.previewPausedForAssign": "Esikatselu keskeytetty määrityksen ajaksi",
+  "inputBindings.gamepadPreviewLabel": "Ohjaimen visuaalinen esikatselu",
+  "inputBindings.confirmResetTitle": "Palautetaanko oletusasetukset?",
+  "inputBindings.confirmResetAction": "Palauta oletukset",
+  "inputBindings.confirmResetShortcutsDesc": "Tämä palauttaa kaikki etähallinnan pikanäppäimet oletusarvoihin.",
+  "inputBindings.confirmResetProfileDesc": "Tämä palauttaa valitun ohjaimen kaikki painikkeet, liipaisimet ja tattien suunnat oletuksiin.",
+  "inputBindings.confirmResetAllDesc": "Tämä nollaa kaikki pikanäppäimet, näppäinmääritykset ja ohjainprofiilit tehdasasetuksiin."
 }

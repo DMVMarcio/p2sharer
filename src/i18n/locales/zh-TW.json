@@ -1769,5 +1769,12 @@
   "inputBindings.dpadRight": "方向鍵 右",
   "inputBindings.btnLeftStick": "左搖桿下壓 (LS)",
   "inputBindings.btnRightStick": "右搖桿下壓 (RS)",
-  "inputBindings.resetAllBindings": "重設所有快速鍵與對應"
+  "inputBindings.resetAllBindings": "重設所有快速鍵與對應",
+  "inputBindings.previewPausedForAssign": "指派按鍵期間暫停預覽",
+  "inputBindings.gamepadPreviewLabel": "手把即時視覺預覽",
+  "inputBindings.confirmResetTitle": "恢復預設值？",
+  "inputBindings.confirmResetAction": "恢復預設",
+  "inputBindings.confirmResetShortcutsDesc": "這會將遠端控制的所有鍵盤快速鍵重設為預設值。",
+  "inputBindings.confirmResetProfileDesc": "這會將所選手把設定檔的按鍵、板機與類比搖桿對應全部恢復預設。",
+  "inputBindings.confirmResetAllDesc": "這會將所有快速鍵、個別按鍵對應與手把設定檔重設為原廠預設。"
 }

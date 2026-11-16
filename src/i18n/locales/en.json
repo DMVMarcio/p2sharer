@@ -1769,5 +1769,12 @@
   "inputBindings.dpadRight": "D-Pad Right",
   "inputBindings.btnLeftStick": "Left Stick Click (LS)",
   "inputBindings.btnRightStick": "Right Stick Click (RS)",
-  "inputBindings.resetAllBindings": "Reset all shortcuts and bindings"
+  "inputBindings.resetAllBindings": "Reset all shortcuts and bindings",
+  "inputBindings.previewPausedForAssign": "Preview paused while assigning input",
+  "inputBindings.gamepadPreviewLabel": "Interactive controller preview",
+  "inputBindings.confirmResetTitle": "Restore default bindings?",
+  "inputBindings.confirmResetAction": "Restore defaults",
+  "inputBindings.confirmResetShortcutsDesc": "This will reset your remote control keyboard shortcuts back to the defaults.",
+  "inputBindings.confirmResetProfileDesc": "This will restore all buttons, triggers, and analog stick mappings for the selected controller profile back to defaults.",
+  "inputBindings.confirmResetAllDesc": "This will reset all keyboard shortcuts, key remappings, and controller profiles back to factory defaults."
 }

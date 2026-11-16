@@ -1769,5 +1769,12 @@
   "inputBindings.dpadRight": "डी-पैड दाएँ",
   "inputBindings.btnLeftStick": "बायाँ स्टिक क्लिक (LS)",
   "inputBindings.btnRightStick": "दायाँ स्टिक क्लिक (RS)",
-  "inputBindings.resetAllBindings": "सभी शॉर्टकट और मैपिंग रीसेट करें"
+  "inputBindings.resetAllBindings": "सभी शॉर्टकट और मैपिंग रीसेट करें",
+  "inputBindings.previewPausedForAssign": "बटन असाइन करते समय पूर्वावलोकन रुका हुआ है",
+  "inputBindings.gamepadPreviewLabel": "कंट्रोलर का विज़ुअल पूर्वावलोकन",
+  "inputBindings.confirmResetTitle": "डिफ़ॉल्ट सेटिंग्स पुनर्स्थापित करें?",
+  "inputBindings.confirmResetAction": "डिफ़ॉल्ट पर रीसेट करें",
+  "inputBindings.confirmResetShortcutsDesc": "यह रिमोट कंट्रोल के सभी कीबोर्ड शॉर्टकट को डिफ़ॉल्ट पर रीसेट कर देगा।",
+  "inputBindings.confirmResetProfileDesc": "यह चयनित कंट्रोलर प्रोफ़ाइल के सभी बटन, ट्रिगर और स्टिक मैपिंग को डिफ़ॉल्ट पर रीसेट कर देगा।",
+  "inputBindings.confirmResetAllDesc": "यह सभी शॉर्टकट, कुंजी रीमैपिंग और कंट्रोलर प्रोफ़ाइल को फ़ैक्टरी डिफ़ॉल्ट पर रीसेट कर देगा।"
 }

@@ -20,8 +20,10 @@ import {
 } from '../../core/input_bindings';
 import { readGamepadSnapshotState } from '../../core/remote_control';
 import { t } from '../../i18n';
+import { ModalDialog } from '../common/ModalDialog';
 import { Select } from '../common/Select';
 import { Tooltip } from '../common/Tooltip';
+import { GamepadTargetGlyph, GamepadVisualPreview } from './GamepadVisualPreview';
 
 interface KeybindingsSettingsPaneProps {
   value: InputBindingsConfig;
@@ -36,6 +38,10 @@ interface DetectedGamepadInfo {
   buttons: ReadonlyArray<{ pressed: boolean; value: number }>;
   axes: ReadonlyArray<number>;
 }
+
+type ConfirmResetScope = 'shortcuts' | 'gamepadProfile' | 'allBindings';
+
+const PREVIEW_COOLDOWN_MS = 350;
 
 function formatGamepadBindingLabel(binding: GamepadSourceBinding | null): string {
   if (!binding) return t('inputBindings.unbound');
@@ -84,6 +90,9 @@ export const KeybindingsSettingsPane: React.FC<KeybindingsSettingsPaneProps> = (
     target: GamepadTargetControl;
     baselines: Record<number, { buttons: number[]; axes: number[] }>;
   } | null>(null);
+  const [previewCooldownActive, setPreviewCooldownActive] = useState(false);
+  const previewCooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [confirmReset, setConfirmReset] = useState<ConfirmResetScope | null>(null);
 
   const capturingPadRef = useRef(capturingPadTarget);
   capturingPadRef.current = capturingPadTarget;
@@ -92,11 +101,27 @@ export const KeybindingsSettingsPane: React.FC<KeybindingsSettingsPaneProps> = (
   const valueRef = useRef(value);
   valueRef.current = value;
 
-  // Cancel active capture cleanly when leaving tabs
+  const armPreviewCooldown = () => {
+    setPreviewCooldownActive(true);
+    if (previewCooldownTimerRef.current) clearTimeout(previewCooldownTimerRef.current);
+    previewCooldownTimerRef.current = setTimeout(() => {
+      previewCooldownTimerRef.current = null;
+      setPreviewCooldownActive(false);
+    }, PREVIEW_COOLDOWN_MS);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (previewCooldownTimerRef.current) clearTimeout(previewCooldownTimerRef.current);
+    };
+  }, []);
+
+  // Cancel active capture cleanly when switching subtabs
   useEffect(() => {
     setCapturingShortcut(null);
     setCapturingKeyField(null);
     setCapturingPadTarget(null);
+    setPreviewCooldownActive(false);
   }, [subTab]);
 
   // Capture keyboard shortcut combos or individual key remaps (intercepts Escape before ModalDialog)
@@ -162,6 +187,7 @@ export const KeybindingsSettingsPane: React.FC<KeybindingsSettingsPaneProps> = (
       event.stopPropagation();
       event.stopImmediatePropagation?.();
       setCapturingPadTarget(null);
+      armPreviewCooldown();
     };
     window.addEventListener('keydown', handleEscape, { capture: true });
     return () => {
@@ -223,6 +249,7 @@ export const KeybindingsSettingsPane: React.FC<KeybindingsSettingsPaneProps> = (
               },
             });
             setCapturingPadTarget(null);
+            armPreviewCooldown();
             break;
           }
         }
@@ -278,9 +305,11 @@ export const KeybindingsSettingsPane: React.FC<KeybindingsSettingsPaneProps> = (
     return connectedPads[0] ?? null;
   }, [connectedPads, selectedProfileId]);
 
+  const previewPaused = Boolean(capturingPadTarget) || previewCooldownActive;
+
   const previewSnapshot = useMemo(
-    () => (previewPad ? readGamepadSnapshotState(previewPad, activeProfile) : null),
-    [activeProfile, previewPad],
+    () => (previewPad && !previewPaused ? readGamepadSnapshotState(previewPad, activeProfile) : null),
+    [activeProfile, previewPad, previewPaused],
   );
 
   const updateActiveProfile = (updater: (prev: GamepadMappingProfile) => GamepadMappingProfile) => {
@@ -297,6 +326,7 @@ export const KeybindingsSettingsPane: React.FC<KeybindingsSettingsPaneProps> = (
   const startPadCapture = (target: GamepadTargetControl) => {
     if (capturingPadTarget?.target === target) {
       setCapturingPadTarget(null);
+      armPreviewCooldown();
       return;
     }
     const baselines: Record<number, { buttons: number[]; axes: number[] }> = {};
@@ -307,6 +337,30 @@ export const KeybindingsSettingsPane: React.FC<KeybindingsSettingsPaneProps> = (
       };
     }
     setCapturingPadTarget({ target, baselines });
+  };
+
+  const executeConfirmedReset = () => {
+    if (confirmReset === 'shortcuts') {
+      onChange({
+        ...value,
+        shortcuts: {
+          toggleMouseLock: DEFAULT_SHORTCUTS.toggleMouseLock
+            ? { ...DEFAULT_SHORTCUTS.toggleMouseLock }
+            : null,
+          toggleImmersive: null,
+          exitRemoteControl: null,
+        },
+      });
+    } else if (confirmReset === 'gamepadProfile') {
+      updateActiveProfile((prev) => ({
+        ...prev,
+        deadzone: 0,
+        bindings: { ...DEFAULT_GAMEPAD_BINDINGS },
+      }));
+    } else if (confirmReset === 'allBindings') {
+      onChange(createDefaultInputBindings());
+    }
+    setConfirmReset(null);
   };
 
   const handleAddKeyRemap = () => {
@@ -348,19 +402,19 @@ export const KeybindingsSettingsPane: React.FC<KeybindingsSettingsPaneProps> = (
     {
       title: t('inputBindings.groupLeftStick'),
       targets: [
-        { target: 'lyPos', label: t('inputBindings.dirUp') },
-        { target: 'lyNeg', label: t('inputBindings.dirDown') },
-        { target: 'lxNeg', label: t('inputBindings.dirLeft') },
-        { target: 'lxPos', label: t('inputBindings.dirRight') },
+        { target: 'lyPos', label: `${t('inputBindings.groupLeftStick')} · ${t('inputBindings.dirUp')}` },
+        { target: 'lyNeg', label: `${t('inputBindings.groupLeftStick')} · ${t('inputBindings.dirDown')}` },
+        { target: 'lxNeg', label: `${t('inputBindings.groupLeftStick')} · ${t('inputBindings.dirLeft')}` },
+        { target: 'lxPos', label: `${t('inputBindings.groupLeftStick')} · ${t('inputBindings.dirRight')}` },
       ],
     },
     {
       title: t('inputBindings.groupRightStick'),
       targets: [
-        { target: 'ryPos', label: t('inputBindings.dirUp') },
-        { target: 'ryNeg', label: t('inputBindings.dirDown') },
-        { target: 'rxNeg', label: t('inputBindings.dirLeft') },
-        { target: 'rxPos', label: t('inputBindings.dirRight') },
+        { target: 'ryPos', label: `${t('inputBindings.groupRightStick')} · ${t('inputBindings.dirUp')}` },
+        { target: 'ryNeg', label: `${t('inputBindings.groupRightStick')} · ${t('inputBindings.dirDown')}` },
+        { target: 'rxNeg', label: `${t('inputBindings.groupRightStick')} · ${t('inputBindings.dirLeft')}` },
+        { target: 'rxPos', label: `${t('inputBindings.groupRightStick')} · ${t('inputBindings.dirRight')}` },
       ],
     },
     {
@@ -398,7 +452,9 @@ export const KeybindingsSettingsPane: React.FC<KeybindingsSettingsPaneProps> = (
   ];
 
   const activeRawSummary = useMemo(() => {
-    if (!previewPad) return { buttons: [] as number[], axes: [] as Array<{ idx: number; val: number }> };
+    if (!previewPad || previewPaused) {
+      return { buttons: [] as number[], axes: [] as Array<{ idx: number; val: number }> };
+    }
     const buttons: number[] = [];
     previewPad.buttons.forEach((b, idx) => {
       if (b.pressed || b.value > 0.35) buttons.push(idx);
@@ -408,7 +464,14 @@ export const KeybindingsSettingsPane: React.FC<KeybindingsSettingsPaneProps> = (
       if (Number.isFinite(v) && Math.abs(v) > 0.12) axes.push({ idx, val: v });
     });
     return { buttons, axes };
-  }, [previewPad]);
+  }, [previewPad, previewPaused]);
+
+  const confirmMessage =
+    confirmReset === 'shortcuts'
+      ? t('inputBindings.confirmResetShortcutsDesc')
+      : confirmReset === 'gamepadProfile'
+        ? t('inputBindings.confirmResetProfileDesc')
+        : t('inputBindings.confirmResetAllDesc');
 
   return (
     <div className="settings-tab-pane active" id="settings-pane-input-bindings">
@@ -462,18 +525,7 @@ export const KeybindingsSettingsPane: React.FC<KeybindingsSettingsPaneProps> = (
               <button
                 type="button"
                 className="btn btn-secondary btn-sm"
-                onClick={() =>
-                  onChange({
-                    ...value,
-                    shortcuts: {
-                      toggleMouseLock: DEFAULT_SHORTCUTS.toggleMouseLock
-                        ? { ...DEFAULT_SHORTCUTS.toggleMouseLock }
-                        : null,
-                      toggleImmersive: null,
-                      exitRemoteControl: null,
-                    },
-                  })
-                }
+                onClick={() => setConfirmReset('shortcuts')}
               >
                 <RotateCcw size={13} aria-hidden="true" />
                 <span>{t('inputBindings.resetDefaults')}</span>
@@ -620,11 +672,11 @@ export const KeybindingsSettingsPane: React.FC<KeybindingsSettingsPaneProps> = (
       ) : (
         <div className="input-bindings-section-stack" role="tabpanel" aria-labelledby="input-bindings-tab-gamepad">
           <div className="settings-row">
-            <div className="input-bindings-section-head">
+            <label className="settings-label" htmlFor="settings-gamepad-profile">
+              {t('inputBindings.gamepadProfileLabel')}
+            </label>
+            <div className="input-bindings-profile-row">
               <div className="input-bindings-profile-select-wrap">
-                <label className="settings-label" htmlFor="settings-gamepad-profile">
-                  {t('inputBindings.gamepadProfileLabel')}
-                </label>
                 <Select
                   id="settings-gamepad-profile"
                   className="select-input-sm"
@@ -635,89 +687,41 @@ export const KeybindingsSettingsPane: React.FC<KeybindingsSettingsPaneProps> = (
               </div>
               <button
                 type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={() =>
-                  updateActiveProfile((prev) => ({
-                    ...prev,
-                    deadzone: 0,
-                    bindings: { ...DEFAULT_GAMEPAD_BINDINGS },
-                  }))
-                }
+                className="btn btn-secondary input-bindings-profile-reset-btn"
+                onClick={() => setConfirmReset('gamepadProfile')}
               >
-                <RotateCcw size={13} aria-hidden="true" />
+                <RotateCcw size={14} aria-hidden="true" />
                 <span>{t('inputBindings.resetDefaults')}</span>
               </button>
             </div>
           </div>
 
           <div className="input-bindings-gamepad-monitor">
-            {!previewPad ? (
-              <div className="input-bindings-gamepad-disconnected">
-                {t('inputBindings.noPhysicalGamepad')}
+            <GamepadVisualPreview
+              snapshot={previewSnapshot}
+              connected={Boolean(previewPad)}
+              previewPaused={previewPaused}
+              highlightedTarget={capturingPadTarget?.target ?? null}
+            />
+            {previewPad && (
+              <div className="input-bindings-raw-telemetry">
+                <strong>{t('inputBindings.rawTelemetryLabel')}:</strong>{' '}
+                {previewPaused ? (
+                  <span>{t('inputBindings.previewPausedForAssign')}</span>
+                ) : activeRawSummary.buttons.length === 0 && activeRawSummary.axes.length === 0 ? (
+                  <span>{t('inputBindings.rawTelemetryIdle')}</span>
+                ) : (
+                  <span>
+                    {activeRawSummary.buttons
+                      .map((idx) => t('inputBindings.rawButton', { index: idx }))
+                      .join(', ')}
+                    {activeRawSummary.buttons.length > 0 && activeRawSummary.axes.length > 0 ? ' · ' : ''}
+                    {activeRawSummary.axes
+                      .map((axis) => `E${axis.idx}: ${axis.val >= 0 ? '+' : ''}${axis.val.toFixed(2)}`)
+                      .join(', ')}
+                  </span>
+                )}
               </div>
-            ) : (
-              <>
-                <div className="input-bindings-monitor-grid">
-                  <div className="input-bindings-stick-box">
-                    <span>LS</span>
-                    <div className="input-bindings-stick-pad">
-                      <span
-                        className="input-bindings-stick-dot"
-                        style={{
-                          transform: `translate(${((previewSnapshot?.thumbLx ?? 0) / 32768) * 18}px, ${-((previewSnapshot?.thumbLy ?? 0) / 32768) * 18}px)`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <div className="input-bindings-stick-box">
-                    <span>RS</span>
-                    <div className="input-bindings-stick-pad">
-                      <span
-                        className="input-bindings-stick-dot"
-                        style={{
-                          transform: `translate(${((previewSnapshot?.thumbRx ?? 0) / 32768) * 18}px, ${-((previewSnapshot?.thumbRy ?? 0) / 32768) * 18}px)`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <div className="input-bindings-trigger-bars">
-                    <div className="input-bindings-trigger-bar">
-                      <span>LT</span>
-                      <div className="input-bindings-trigger-track">
-                        <div
-                          className="input-bindings-trigger-fill"
-                          style={{ width: `${Math.round(((previewSnapshot?.leftTrigger ?? 0) / 255) * 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                    <div className="input-bindings-trigger-bar">
-                      <span>RT</span>
-                      <div className="input-bindings-trigger-track">
-                        <div
-                          className="input-bindings-trigger-fill"
-                          style={{ width: `${Math.round(((previewSnapshot?.rightTrigger ?? 0) / 255) * 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="input-bindings-raw-telemetry">
-                  <strong>{t('inputBindings.rawTelemetryLabel')}:</strong>{' '}
-                  {activeRawSummary.buttons.length === 0 && activeRawSummary.axes.length === 0 ? (
-                    <span>{t('inputBindings.rawTelemetryIdle')}</span>
-                  ) : (
-                    <span>
-                      {activeRawSummary.buttons
-                        .map((idx) => t('inputBindings.rawButton', { index: idx }))
-                        .join(', ')}
-                      {activeRawSummary.buttons.length > 0 && activeRawSummary.axes.length > 0 ? ' · ' : ''}
-                      {activeRawSummary.axes
-                        .map((axis) => `E${axis.idx}: ${axis.val >= 0 ? '+' : ''}${axis.val.toFixed(2)}`)
-                        .join(', ')}
-                    </span>
-                  )}
-                </div>
-              </>
             )}
           </div>
 
@@ -757,10 +761,15 @@ export const KeybindingsSettingsPane: React.FC<KeybindingsSettingsPaneProps> = (
                     const isListening = capturingPadTarget?.target === target;
                     return (
                       <div className="input-binding-row input-binding-pad-row" key={target}>
-                        <span className="input-binding-pad-target">{label}</span>
+                        <Tooltip content={label}>
+                          <span className="input-binding-pad-target">
+                            <GamepadTargetGlyph target={target} label={label} />
+                          </span>
+                        </Tooltip>
                         <div className="input-binding-actions">
                           <button
                             type="button"
+                            aria-label={`${label}: ${isListening ? t('inputBindings.moveGamepadPrompt') : formatGamepadBindingLabel(binding)}`}
                             className={`btn btn-sm input-binding-capture-btn ${isListening ? 'is-listening' : ''}`}
                             disabled={connectedPads.length === 0 && !isListening}
                             onClick={() => startPadCapture(target)}
@@ -799,13 +808,40 @@ export const KeybindingsSettingsPane: React.FC<KeybindingsSettingsPaneProps> = (
             <button
               type="button"
               className="btn btn-secondary btn-sm"
-              onClick={() => onChange(createDefaultInputBindings())}
+              onClick={() => setConfirmReset('allBindings')}
             >
               <RotateCcw size={13} aria-hidden="true" />
               <span>{t('inputBindings.resetAllBindings')}</span>
             </button>
           </div>
         </div>
+      )}
+
+      {confirmReset && (
+        <ModalDialog
+          title={t('inputBindings.confirmResetTitle')}
+          icon={<RotateCcw size={18} aria-hidden="true" />}
+          onClose={() => setConfirmReset(null)}
+          footer={(close) => (
+            <>
+              <button type="button" className="btn btn-secondary" onClick={close}>
+                {t('tunnels.cancel')}
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={() => {
+                  executeConfirmedReset();
+                  close();
+                }}
+              >
+                {t('inputBindings.confirmResetAction')}
+              </button>
+            </>
+          )}
+        >
+          <p className="confirm-dialog-message">{confirmMessage}</p>
+        </ModalDialog>
       )}
     </div>
   );

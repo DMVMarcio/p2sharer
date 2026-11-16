@@ -1769,5 +1769,12 @@
   "inputBindings.dpadRight": "十字键 右",
   "inputBindings.btnLeftStick": "左摇杆按下 (LS)",
   "inputBindings.btnRightStick": "右摇杆按下 (RS)",
-  "inputBindings.resetAllBindings": "重置所有快捷键和映射"
+  "inputBindings.resetAllBindings": "重置所有快捷键和映射",
+  "inputBindings.previewPausedForAssign": "正在分配按键，预览已暂停",
+  "inputBindings.gamepadPreviewLabel": "手柄实时可视化预览",
+  "inputBindings.confirmResetTitle": "恢复默认设置？",
+  "inputBindings.confirmResetAction": "恢复默认",
+  "inputBindings.confirmResetShortcutsDesc": "这会将远程控制的快捷键全部重置为默认值。",
+  "inputBindings.confirmResetProfileDesc": "这会将所选控制器的所有按键、扳机与摇杆方向映射恢复为默认设置。",
+  "inputBindings.confirmResetAllDesc": "这会将所有快捷键、按键重映射及手柄配置全部恢复为出厂默认值。"
 }
