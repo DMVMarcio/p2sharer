@@ -105,9 +105,6 @@ export class RoomService {
   >();
   private peerSeenCursorImageIds = new Map<string, Set<string>>();
   public readonly remoteControlActivity = new RemoteControlActivityTracker();
-  private activeOverlayHudSessions = new Set<string>();
-  private lastOverlayHudPayload = new Map<string, string>();
-  private compactAvatarCache = new Map<string, { sourceUrl: string; dataUrl: string | null }>();
   public roomStatusText: string = t("message.e56841de8c6f");
   public connectingOverlay: ConnectingOverlayState = {
     visible: false,
@@ -137,16 +134,6 @@ export class RoomService {
 
   constructor() {
     this.initFallbackHandler();
-    this.remoteControlActivity.subscribe(() => {
-      if (this.remoteControllers.length > 0 || this.activeOverlayHudSessions.size > 0) {
-        this.syncRemoteControlOverlayHud();
-      }
-    });
-    profileImages.subscribe(() => {
-      if (this.remoteControllers.length > 0) {
-        this.syncRemoteControlOverlayHud();
-      }
-    });
   }
 
   public subscribe(listener: Listener): () => void {
@@ -862,7 +849,6 @@ export class RoomService {
       this.remoteControllers = this.remoteControlHost.getControllers();
       this.remoteControlHostBusy = this.remoteControlHost.isHostBusy();
       this.remoteControlElevationBlocked = this.remoteControlHost.isElevationBlocked();
-      this.syncRemoteControlOverlayHud();
       this.notify();
     },
   });
@@ -1335,46 +1321,6 @@ export class RoomService {
     return this.remoteControlActivity.getGamepadActivity(slotId);
   }
 
-  private resolveCompactAvatarDataUrl(peerId: string): string | null {
-    const rawUrl = profileImages.url(peerId);
-    if (!rawUrl) {
-      this.compactAvatarCache.delete(peerId);
-      return null;
-    }
-    if (rawUrl.startsWith('data:image/') && rawUrl.length <= 65536) {
-      return rawUrl;
-    }
-    const cached = this.compactAvatarCache.get(peerId);
-    if (cached && cached.sourceUrl === rawUrl) {
-      return cached.dataUrl;
-    }
-    if (typeof document === 'undefined' || typeof Image === 'undefined') {
-      return null;
-    }
-    this.compactAvatarCache.set(peerId, { sourceUrl: rawUrl, dataUrl: cached?.dataUrl ?? null });
-    const img = new Image();
-    img.onload = () => {
-      try {
-        const size = 48;
-        const canvas = document.createElement('canvas');
-        canvas.width = size;
-        canvas.height = size;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-        ctx.drawImage(img, 0, 0, size, size);
-        const compactUrl = canvas.toDataURL('image/png');
-        if (compactUrl.length <= 65536) {
-          this.compactAvatarCache.set(peerId, { sourceUrl: rawUrl, dataUrl: compactUrl });
-          this.syncRemoteControlOverlayHud();
-        }
-      } catch {
-        // Ignore offscreen image encoding failures.
-      }
-    };
-    img.src = rawUrl;
-    return cached?.dataUrl ?? null;
-  }
-
   private buildOverlayItemForController(ctrl: RemoteControllerInfo, now: number): RemoteControllerOverlayItem {
     const peer = this.peers.find((item) => item.id === ctrl.peerId);
     const name = peer?.username || ctrl.peerId.slice(0, 6);
@@ -1384,7 +1330,7 @@ export class RoomService {
       peerId: ctrl.peerId,
       name,
       color,
-      avatarDataUrl: this.resolveCompactAvatarDataUrl(ctrl.peerId),
+      avatarDataUrl: profileImages.url(ctrl.peerId) ?? null,
       mouseEnabled: ctrl.mouseEnabled,
       keyboardEnabled: ctrl.keyboardEnabled,
       gamepadEnabled: ctrl.gamepadEnabled,
@@ -1400,45 +1346,8 @@ export class RoomService {
   public getRemoteControlOverlayItemsForMedia(mediaId: string): RemoteControllerOverlayItem[] {
     const now = Date.now();
     return this.remoteControllers
-      .filter((ctrl) => ctrl.mediaId === mediaId)
+      .filter((ctrl) => ctrl.mediaId === mediaId || ctrl.mediaId === 'default' || mediaId === 'default')
       .map((ctrl) => this.buildOverlayItemForController(ctrl, now));
-  }
-
-  private syncRemoteControlOverlayHud(): void {
-    if (!isTauri()) return;
-    const now = Date.now();
-    const bySession = new Map<string, RemoteControllerOverlayItem[]>();
-    for (const ctrl of this.remoteControllers) {
-      const capture =
-        this.localCaptures.get(ctrl.mediaId) ??
-        (ctrl.mediaId === 'default'
-          ? Array.from(this.localCaptures.values()).find((c) => c.kind === 'screen')
-          : undefined);
-      const sessionId = capture?.kind === 'screen' ? capture.bridge?.sessionId : undefined;
-      if (!sessionId) continue;
-      let list = bySession.get(sessionId);
-      if (!list) {
-        list = [];
-        bySession.set(sessionId, list);
-      }
-      list.push(this.buildOverlayItemForController(ctrl, now));
-    }
-
-    const sessionsToUpdate = new Set<string>([...this.activeOverlayHudSessions, ...bySession.keys()]);
-    for (const sessionId of sessionsToUpdate) {
-      const items = bySession.get(sessionId) ?? [];
-      const serialized = JSON.stringify(items);
-      if (this.lastOverlayHudPayload.get(sessionId) === serialized) {
-        continue;
-      }
-      this.lastOverlayHudPayload.set(sessionId, serialized);
-      if (items.length === 0) {
-        this.activeOverlayHudSessions.delete(sessionId);
-      } else {
-        this.activeOverlayHudSessions.add(sessionId);
-      }
-      void invoke('update_remote_control_overlay', { sessionId, items }).catch(() => {});
-    }
   }
 
   public async disconnectRemoteControlGamepad(slot: {

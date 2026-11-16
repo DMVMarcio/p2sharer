@@ -54,10 +54,11 @@ html.stream-pointer-desktop, .stream-pointer-desktop body, .stream-pointer-deskt
 
 .rc-host-overlay-hud.is-compact {
   position: absolute;
-  top: 46px;
+  top: 48px;
   right: 12px;
-  z-index: 9;
+  z-index: 12;
   gap: 4px;
+  max-width: calc(100% - 24px);
 }
 
 .rc-hud-pill {
@@ -145,9 +146,9 @@ html.stream-pointer-desktop, .stream-pointer-desktop body, .stream-pointer-deskt
 }
 
 .rc-hud-device.is-input-active {
-  background: rgba(34, 197, 94, 0.28);
-  color: #4ade80;
-  box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.55);
+  background: #22c55e;
+  color: #052e16;
+  box-shadow: 0 0 0 1px rgba(134, 239, 172, 0.9), 0 0 10px rgba(34, 197, 94, 0.78);
 }
 
 .rc-hud-device.is-input-active.flash-a {
@@ -159,12 +160,12 @@ html.stream-pointer-desktop, .stream-pointer-desktop body, .stream-pointer-deskt
 }
 
 @keyframes rcHudFlashA {
-  0% { transform: scale(1.26); background: rgba(74, 222, 128, 0.52); color: #ffffff; }
+  0% { transform: scale(1.28); background: #86efac; color: #052e16; }
   100% { transform: scale(1); }
 }
 
 @keyframes rcHudFlashB {
-  0% { transform: scale(1.26); background: rgba(74, 222, 128, 0.52); color: #ffffff; }
+  0% { transform: scale(1.28); background: #86efac; color: #052e16; }
   100% { transform: scale(1); }
 }
 

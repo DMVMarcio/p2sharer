@@ -634,3 +634,40 @@ test('RemoteControlActivityTracker records accepted per-device and per-gamepad b
   manager.revokeController('peer-a', 'screen-1');
   assert.equal(tracker.getGamepadActivity('peer-a:screen-1:1', 1100).active, false);
 });
+
+test('Chromium POV HAT switch axes[9] captures and decodes individual D-Pad directions without misfiring at rest', () => {
+  const restAxes = [0, 0, 0, 0, 0, 0, 0, 0, 0, 1.2857];
+  const emptyBtns: number[] = Array(12).fill(0);
+  const makePad = (hatVal: number) => ({
+    buttons: emptyBtns.map(() => ({ pressed: false, value: 0 })),
+    axes: [0, 0, 0, 0, 0, 0, 0, 0, 0, hatVal],
+  });
+
+  // Resting at > 1.08 must never capture any HAT or axis binding
+  assert.equal(detectGamepadCapture(emptyBtns, restAxes, makePad(1.2857), 'dpadUp'), null);
+
+  const capUp = detectGamepadCapture(emptyBtns, restAxes, makePad(-1.0), 'dpadUp');
+  const capRight = detectGamepadCapture(emptyBtns, restAxes, makePad(-0.4286), 'dpadRight');
+  const capDown = detectGamepadCapture(emptyBtns, restAxes, makePad(0.1429), 'dpadDown');
+  const capLeft = detectGamepadCapture(emptyBtns, restAxes, makePad(0.7143), 'dpadLeft');
+
+  assert.deepEqual(capUp, { kind: 'hat', index: 9, dir: 'up' });
+  assert.deepEqual(capRight, { kind: 'hat', index: 9, dir: 'right' });
+  assert.deepEqual(capDown, { kind: 'hat', index: 9, dir: 'down' });
+  assert.deepEqual(capLeft, { kind: 'hat', index: 9, dir: 'left' });
+
+  const profile = createDefaultGamepadProfile('hat-pad', 'HAT Pad');
+  profile.bindings.dpadUp = capUp;
+  profile.bindings.dpadRight = capRight;
+  profile.bindings.dpadDown = capDown;
+  profile.bindings.dpadLeft = capLeft;
+
+  // Released HAT (+1.2857) must activate zero D-Pad bits
+  assert.equal(readGamepadSnapshotState(makePad(1.2857), profile).buttons & 0x000f, 0);
+  assert.equal(readGamepadSnapshotState(makePad(-1.0), profile).buttons & 0x000f, 0x0001);
+  assert.equal(readGamepadSnapshotState(makePad(0.1429), profile).buttons & 0x000f, 0x0002);
+  assert.equal(readGamepadSnapshotState(makePad(0.7143), profile).buttons & 0x000f, 0x0004);
+  assert.equal(readGamepadSnapshotState(makePad(-0.4286), profile).buttons & 0x000f, 0x0008);
+  // Diagonal Down+Left (sector 5 -> ~0.4286) activates both Down and Left
+  assert.equal(readGamepadSnapshotState(makePad(0.4286), profile).buttons & 0x000f, 0x0002 | 0x0004);
+});

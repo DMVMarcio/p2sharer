@@ -353,7 +353,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   const watchers = slot.watchers || [];
 
   const localControllers = slot.isLocal
-    ? remoteControllers.filter((ctrl) => !slot.mediaId || ctrl.mediaId === slot.mediaId)
+    ? remoteControllers.filter((ctrl) => !slot.mediaId || ctrl.mediaId === slot.mediaId || ctrl.mediaId === 'default')
     : [];
   const [, setLocalActivityTick] = useState(0);
 
@@ -639,7 +639,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
         />
     )}
 
-      {slot.isLocal && slot.isStreaming && showLocalPreview && localControllers.length > 0 && !inTray && !isPipActive && (
+      {slot.isLocal && slot.isStreaming && localControllers.length > 0 && !inTray && !isPipActive && (
         <RemoteControlOverlayHud
           compact
           items={roomService.getRemoteControlOverlayItemsForMedia?.(slot.mediaId || 'default') ?? []}

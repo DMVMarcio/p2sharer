@@ -43,9 +43,12 @@ export type GamepadTargetControl =
   | 'ls'
   | 'rs';
 
+export type GamepadHatDirection = 'up' | 'down' | 'left' | 'right';
+
 export type GamepadSourceBinding =
   | { kind: 'button'; index: number }
-  | { kind: 'axis'; index: number; dir: 1 | -1; rest?: number };
+  | { kind: 'axis'; index: number; dir: 1 | -1; rest?: number }
+  | { kind: 'hat'; index: number; dir: GamepadHatDirection };
 
 export interface GamepadMappingProfile {
   id: string;
@@ -229,6 +232,16 @@ function sanitizeGamepadSource(raw: unknown): GamepadSourceBinding | null | unde
         : 0;
     return { kind: 'axis', index: obj.index, dir: obj.dir, rest };
   }
+  if (
+    obj.kind === 'hat' &&
+    typeof obj.index === 'number' &&
+    Number.isInteger(obj.index) &&
+    obj.index >= 0 &&
+    obj.index <= 32 &&
+    (obj.dir === 'up' || obj.dir === 'down' || obj.dir === 'left' || obj.dir === 'right')
+  ) {
+    return { kind: 'hat', index: obj.index, dir: obj.dir };
+  }
   return undefined;
 }
 
@@ -382,6 +395,58 @@ export function evalGamepadAxisDeflection(
   return clamp01((mag - dz) / (1 - dz));
 }
 
+export function detectHatSector(rawValue: number): number | null {
+  if (!Number.isFinite(rawValue) || rawValue < -1.08 || rawValue > 1.08) return null;
+  const sector = Math.round(((rawValue + 1) * 7) / 2);
+  return sector >= 0 && sector <= 7 ? sector : null;
+}
+
+export function evalHatDirection(rawValue: number, dir: GamepadHatDirection): boolean {
+  const sector = detectHatSector(rawValue);
+  if (sector === null) return false;
+  switch (dir) {
+    case 'up':
+      return sector === 7 || sector === 0 || sector === 1;
+    case 'right':
+      return sector === 1 || sector === 2 || sector === 3;
+    case 'down':
+      return sector === 3 || sector === 4 || sector === 5;
+    case 'left':
+      return sector === 5 || sector === 6 || sector === 7;
+  }
+}
+
+function hatSectorToDirection(
+  sector: number,
+  targetHint?: GamepadTargetControl,
+): GamepadHatDirection {
+  if (sector === 0) return 'up';
+  if (sector === 2) return 'right';
+  if (sector === 4) return 'down';
+  if (sector === 6) return 'left';
+  const candidates: readonly [GamepadHatDirection, GamepadHatDirection] =
+    sector === 1
+      ? ['up', 'right']
+      : sector === 3
+        ? ['down', 'right']
+        : sector === 5
+          ? ['down', 'left']
+          : ['up', 'left'];
+  if (targetHint === 'dpadDown' || targetHint === 'lyNeg' || targetHint === 'ryNeg') {
+    if (candidates.includes('down')) return 'down';
+  }
+  if (targetHint === 'dpadUp' || targetHint === 'lyPos' || targetHint === 'ryPos') {
+    if (candidates.includes('up')) return 'up';
+  }
+  if (targetHint === 'dpadLeft' || targetHint === 'lxNeg' || targetHint === 'rxNeg') {
+    if (candidates.includes('left')) return 'left';
+  }
+  if (targetHint === 'dpadRight' || targetHint === 'lxPos' || targetHint === 'rxPos') {
+    if (candidates.includes('right')) return 'right';
+  }
+  return candidates[0];
+}
+
 export function readGamepadSourceValue(
   pad: GamepadInputSourceLike,
   binding: GamepadSourceBinding | null,
@@ -397,6 +462,9 @@ export function readGamepadSourceValue(
   }
   const raw = pad.axes[binding.index];
   if (!Number.isFinite(raw)) return 0;
+  if (binding.kind === 'hat') {
+    return evalHatDirection(raw, binding.dir) ? 1 : 0;
+  }
   return evalGamepadAxisDeflection(raw, binding.dir, binding.rest ?? 0, applyDeadzone ? deadzone : 0);
 }
 
@@ -409,6 +477,10 @@ export function isGamepadSourcePressed(
     const btn = pad.buttons[binding.index];
     return Boolean(btn && (btn.pressed || btn.value > 0.5));
   }
+  if (binding.kind === 'hat') {
+    const raw = pad.axes[binding.index];
+    return Number.isFinite(raw) && evalHatDirection(raw, binding.dir);
+  }
   return readGamepadSourceValue(pad, binding, 0, false) > 0.5;
 }
 
@@ -416,6 +488,7 @@ export function detectGamepadCapture(
   baselineButtons: ReadonlyArray<number>,
   baselineAxes: ReadonlyArray<number>,
   pad: GamepadInputSourceLike,
+  targetHint?: GamepadTargetControl,
 ): GamepadSourceBinding | null {
   let bestButtonIdx = -1;
   let bestButtonDelta = 0;
@@ -434,6 +507,19 @@ export function detectGamepadCapture(
     return { kind: 'button', index: bestButtonIdx };
   }
 
+  for (let i = 0; i < pad.axes.length; i += 1) {
+    const val = pad.axes[i];
+    if (!Number.isFinite(val)) continue;
+    const base = baselineAxes[i] ?? 0;
+    // DirectInput / HID POV HAT switches rest outside [-1.05, +1.05] (typically +1.2857 or +3.2857)
+    if (Math.abs(base) > 1.08) {
+      const sector = detectHatSector(val);
+      if (sector !== null) {
+        return { kind: 'hat', index: i, dir: hatSectorToDirection(sector, targetHint) };
+      }
+    }
+  }
+
   let bestAxisIdx = -1;
   let bestAxisDelta = 0;
   let bestAxisVal = 0;
@@ -442,6 +528,7 @@ export function detectGamepadCapture(
     const val = pad.axes[i];
     if (!Number.isFinite(val)) continue;
     const base = baselineAxes[i] ?? 0;
+    if (Math.abs(base) > 1.08) continue;
     const delta = Math.abs(val - base);
     if (delta >= 0.42 && delta > bestAxisDelta) {
       bestAxisDelta = delta;

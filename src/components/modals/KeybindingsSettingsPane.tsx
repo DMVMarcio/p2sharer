@@ -48,8 +48,27 @@ function formatGamepadBindingLabel(binding: GamepadSourceBinding | null): string
   if (binding.kind === 'button') {
     return t('inputBindings.rawButton', { index: binding.index });
   }
+  if (binding.kind === 'hat') {
+    const arrow =
+      binding.dir === 'up' ? '↑' : binding.dir === 'down' ? '↓' : binding.dir === 'left' ? '←' : '→';
+    return t('inputBindings.rawHat', { index: binding.index, dir: arrow });
+  }
   const dirLabel = binding.dir > 0 ? '+' : '-';
   return t('inputBindings.rawAxis', { index: binding.index, dir: dirLabel });
+}
+
+function isSameGamepadBinding(
+  a: GamepadSourceBinding | null,
+  b: GamepadSourceBinding | null,
+): boolean {
+  if (a === b) return true;
+  if (!a || !b || a.kind !== b.kind || a.index !== b.index) return false;
+  if (a.kind === 'button') return true;
+  if (a.kind === 'hat' && b.kind === 'hat') return a.dir === b.dir;
+  if (a.kind === 'axis' && b.kind === 'axis') {
+    return a.dir === b.dir && (a.rest ?? 0) === (b.rest ?? 0);
+  }
+  return false;
 }
 
 function readConnectedGamepads(): DetectedGamepadInfo[] {
@@ -223,7 +242,7 @@ export const KeybindingsSettingsPane: React.FC<KeybindingsSettingsPaneProps> = (
             };
             continue;
           }
-          const matched = detectGamepadCapture(base.buttons, base.axes, pad);
+          const matched = detectGamepadCapture(base.buttons, base.axes, pad, activeCapture.target);
           if (matched) {
             const cfg = valueRef.current;
             const existingProfile =
@@ -461,7 +480,7 @@ export const KeybindingsSettingsPane: React.FC<KeybindingsSettingsPaneProps> = (
     });
     const axes: Array<{ idx: number; val: number }> = [];
     previewPad.axes.forEach((v, idx) => {
-      if (Number.isFinite(v) && Math.abs(v) > 0.12) axes.push({ idx, val: v });
+      if (Number.isFinite(v) && Math.abs(v) <= 1.08 && Math.abs(v) > 0.12) axes.push({ idx, val: v });
     });
     return { buttons, axes };
   }, [previewPad, previewPaused]);
@@ -702,6 +721,7 @@ export const KeybindingsSettingsPane: React.FC<KeybindingsSettingsPaneProps> = (
               connected={Boolean(previewPad)}
               previewPaused={previewPaused}
               highlightedTarget={capturingPadTarget?.target ?? null}
+              deadzone={activeProfile.deadzone}
             />
             {previewPad && (
               <div className="input-bindings-raw-telemetry">
@@ -759,6 +779,7 @@ export const KeybindingsSettingsPane: React.FC<KeybindingsSettingsPaneProps> = (
                   {group.targets.map(({ target, label }) => {
                     const binding = getBindingForTarget(activeProfile, target);
                     const isListening = capturingPadTarget?.target === target;
+                    const isDefaultBinding = isSameGamepadBinding(binding, DEFAULT_GAMEPAD_BINDINGS[target]);
                     return (
                       <div className="input-binding-row input-binding-pad-row" key={target}>
                         <Tooltip content={label}>
@@ -778,6 +799,22 @@ export const KeybindingsSettingsPane: React.FC<KeybindingsSettingsPaneProps> = (
                               ? t('inputBindings.moveGamepadPrompt')
                               : formatGamepadBindingLabel(binding)}
                           </button>
+                          <Tooltip content={t('inputBindings.resetSingleBinding')}>
+                            <button
+                              type="button"
+                              className="btn-stream-pin"
+                              disabled={isDefaultBinding}
+                              aria-label={`${t('inputBindings.resetSingleBinding')}: ${label}`}
+                              onClick={() =>
+                                updateActiveProfile((prev) => ({
+                                  ...prev,
+                                  bindings: { ...prev.bindings, [target]: DEFAULT_GAMEPAD_BINDINGS[target] },
+                                }))
+                              }
+                            >
+                              <RotateCcw size={13} aria-hidden="true" />
+                            </button>
+                          </Tooltip>
                           {binding !== null && (
                             <Tooltip content={t('inputBindings.clearAction')}>
                               <button

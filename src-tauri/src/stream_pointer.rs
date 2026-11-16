@@ -13,8 +13,6 @@ static EXCLUSION_WARNED: LazyLock<Mutex<HashSet<String>>> =
 static SOURCE: Mutex<Option<String>> = Mutex::new(None);
 static VISUALS: LazyLock<Mutex<HashMap<String, Vec<PointerVisual>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
-static REMOTE_CONTROL_HUD: LazyLock<Mutex<HashMap<String, Vec<RemoteControllerOverlayItem>>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 #[cfg(windows)]
 static CAPTURE_EXCLUSION_SUPPORTED: LazyLock<bool> = LazyLock::new(|| {
@@ -93,43 +91,9 @@ struct PointerFrame {
     drawings_included: bool,
 }
 
-#[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct RemoteControllerOverlayItem {
-    pub peer_id: String,
-    pub name: String,
-    pub color: String,
-    pub avatar_data_url: Option<String>,
-    pub mouse_enabled: bool,
-    pub keyboard_enabled: bool,
-    pub gamepad_enabled: bool,
-    pub mouse_active: bool,
-    pub keyboard_active: bool,
-    pub gamepad_active: bool,
-    pub mouse_seq: u32,
-    pub keyboard_seq: u32,
-    pub gamepad_seq: u32,
-}
-
 pub fn set_source(source: Option<String>) {
     *SOURCE.lock().unwrap() = source;
     VISUALS.lock().unwrap().remove("stream-pointer");
-    REMOTE_CONTROL_HUD.lock().unwrap().remove("stream-pointer");
-}
-
-#[tauri::command]
-pub async fn get_remote_control_overlay(
-    window: tauri::WebviewWindow,
-) -> Result<Vec<RemoteControllerOverlayItem>, String> {
-    if !window.label().starts_with("stream-pointer") {
-        return Err("Only pointer overlays can request remote control overlay items".into());
-    }
-    Ok(REMOTE_CONTROL_HUD
-        .lock()
-        .unwrap()
-        .get(window.label())
-        .cloned()
-        .unwrap_or_default())
 }
 
 #[tauri::command]
@@ -279,118 +243,6 @@ pub(crate) fn source_bounds(source: &str) -> Option<(i32, i32, u32, u32)> {
     }
 }
 
-async fn ensure_and_present_overlay(
-    app: &AppHandle,
-    label: &str,
-    source: Option<String>,
-    emit_visuals: Option<PointerFrame>,
-    emit_hud: Option<Vec<RemoteControllerOverlayItem>>,
-) -> Result<(), String> {
-    let has_visuals = !VISUALS
-        .lock()
-        .unwrap()
-        .get(label)
-        .map_or(true, |v| v.is_empty());
-    let has_hud = !REMOTE_CONTROL_HUD
-        .lock()
-        .unwrap()
-        .get(label)
-        .map_or(true, |v| v.is_empty());
-
-    if source.is_none() {
-        READY.lock().unwrap().remove(label);
-        PREPARED.lock().unwrap().remove(label);
-        EXCLUSION_WARNED.lock().unwrap().remove(label);
-        VISUALS.lock().unwrap().remove(label);
-        REMOTE_CONTROL_HUD.lock().unwrap().remove(label);
-        if let Some(win) = app.get_webview_window(label) {
-            let _ = win.emit("stream-pointer-visuals", Vec::<PointerVisual>::new());
-            let _ = win.emit("remote-control-hud", Vec::<RemoteControllerOverlayItem>::new());
-            win.close().map_err(|e| e.to_string())?;
-        }
-        return Ok(());
-    }
-
-    if !has_visuals && !has_hud {
-        if let Some(win) = app.get_webview_window(label) {
-            if let Some(frame) = emit_visuals {
-                win.emit("stream-pointer-visuals", frame)
-                    .map_err(|e| e.to_string())?;
-            }
-            if let Some(hud) = emit_hud {
-                win.emit("remote-control-hud", hud)
-                    .map_err(|e| e.to_string())?;
-            }
-        }
-        // Keep the transparent surface alive until capture stops; do not churn DWM surfaces.
-        return Ok(());
-    }
-
-    #[cfg(windows)]
-    if let Some((x, y, width, height)) = source_bounds(source.as_deref().unwrap()) {
-        let win = if let Some(win) = app.get_webview_window(label) {
-            win
-        } else {
-            let win = WebviewWindowBuilder::new(
-                app,
-                label,
-                WebviewUrl::App("index.html?pointerOverlay=1".into()),
-            )
-            .title("P2Sharer pointers")
-            .background_color(tauri::window::Color(0, 0, 0, 0))
-            .transparent(true)
-            // Use DirectComposition rather than Tao's legacy blur-behind surface.
-            // The latter interacts poorly with layered click-through windows on Windows 10.
-            .no_redirection_bitmap(true)
-            // Earlier Windows maps exclusion to a blank captured surface. Preserve
-            // the feature without applying that incompatible affinity fallback.
-            .content_protected(*CAPTURE_EXCLUSION_SUPPORTED)
-            .decorations(false)
-            .shadow(false)
-            .always_on_top(true)
-            .skip_taskbar(true)
-            .resizable(false)
-            .focused(false)
-            .focusable(false)
-            .visible(false)
-            .build()
-            .map_err(|e| e.to_string())?;
-            win
-        };
-        let position = PhysicalPosition::new(x, y);
-        let size = PhysicalSize::new(width, height);
-        if win.outer_position().ok() != Some(position) {
-            win.set_position(position).map_err(|e| e.to_string())?;
-        }
-        if win.inner_size().ok() != Some(size) {
-            win.set_size(size).map_err(|e| e.to_string())?;
-        }
-        if let Some(frame) = emit_visuals {
-            win.emit("stream-pointer-visuals", frame)
-                .map_err(|e| e.to_string())?;
-        }
-        if let Some(hud) = emit_hud {
-            win.emit("remote-control-hud", hud)
-                .map_err(|e| e.to_string())?;
-        }
-        let ready = READY.lock().unwrap().contains(label);
-        present_overlay(&win, ready).await?;
-        PREPARED.lock().unwrap().insert(label.to_string());
-    } else if let Some(win) = app.get_webview_window(label) {
-        PREPARED.lock().unwrap().remove(label);
-        if let Some(frame) = emit_visuals {
-            win.emit("stream-pointer-visuals", frame)
-                .map_err(|e| e.to_string())?;
-        }
-        if let Some(hud) = emit_hud {
-            win.emit("remote-control-hud", hud)
-                .map_err(|e| e.to_string())?;
-        }
-        win.hide().map_err(|e| e.to_string())?;
-    }
-    Ok(())
-}
-
 #[tauri::command]
 pub async fn update_stream_pointer_overlay(
     app: AppHandle,
@@ -461,63 +313,80 @@ pub async fn update_stream_pointer_overlay(
             );
         }
     }
+    if source.is_none() {
+        READY.lock().unwrap().remove(&label);
+        PREPARED.lock().unwrap().remove(&label);
+        EXCLUSION_WARNED.lock().unwrap().remove(&label);
+        VISUALS.lock().unwrap().remove(&label);
+        if let Some(win) = app.get_webview_window(&label) {
+            win.emit("stream-pointer-visuals", Vec::<PointerVisual>::new())
+                .map_err(|e| e.to_string())?;
+            win.close().map_err(|e| e.to_string())?;
+        }
+        return Ok(());
+    }
     if visuals.is_empty() {
         VISUALS.lock().unwrap().remove(&label);
-    } else {
-        VISUALS.lock().unwrap().insert(label.clone(), visuals);
-    }
-    ensure_and_present_overlay(&app, &label, source, Some(frame), None).await
-}
-
-#[tauri::command]
-pub async fn update_remote_control_overlay(
-    app: AppHandle,
-    window: tauri::WebviewWindow,
-    session_id: String,
-    items: Vec<RemoteControllerOverlayItem>,
-) -> Result<(), String> {
-    if window.label() != "main" {
-        return Err("Only the main window can update remote control overlay".into());
-    }
-    let source = crate::screen_sources::pointer_capture_source(&session_id);
-    let label = format!("stream-pointer-{session_id}");
-    let sanitized: Vec<_> = items
-        .into_iter()
-        .take(16)
-        .filter_map(|mut item| {
-            if item.peer_id.is_empty() || item.peer_id.len() > 96 {
-                return None;
-            }
-            if item.name.len() > 120 {
-                item.name = item.name.chars().take(120).collect();
-            }
-            if item.color.len() > 32 {
-                item.color = "#06b6d4".to_string();
-            }
-            item.avatar_data_url = item.avatar_data_url.filter(|url| {
-                url.starts_with("data:image/") && url.len() <= 65536
-            });
-            Some(item)
-        })
-        .collect();
-
-    {
-        let mut map = REMOTE_CONTROL_HUD.lock().unwrap();
-        let unchanged = map
-            .get(&label)
-            .map(|prev| *prev == sanitized)
-            .unwrap_or_else(|| sanitized.is_empty());
-        if unchanged && source.is_some() {
-            return Ok(());
+        if let Some(win) = app.get_webview_window(&label) {
+            win.emit("stream-pointer-visuals", Vec::<PointerVisual>::new())
+                .map_err(|e| e.to_string())?;
         }
-        if sanitized.is_empty() {
-            map.remove(&label);
+        // Keep the transparent surface alive until capture stops; do not churn DWM surfaces.
+        return Ok(());
+    }
+    // Cache changes even while a shared window is minimized; its next cursor-only frame must retain them.
+    VISUALS.lock().unwrap().insert(label.clone(), visuals);
+    #[cfg(windows)]
+    if let Some((x, y, width, height)) = source_bounds(source.as_deref().unwrap()) {
+        let win = if let Some(win) = app.get_webview_window(&label) {
+            win
         } else {
-            map.insert(label.clone(), sanitized.clone());
+            let win = WebviewWindowBuilder::new(
+                &app,
+                &label,
+                WebviewUrl::App("index.html?pointerOverlay=1".into()),
+            )
+            .title("P2Sharer pointers")
+            .background_color(tauri::window::Color(0, 0, 0, 0))
+            .transparent(true)
+            // Use DirectComposition rather than Tao's legacy blur-behind surface.
+            // The latter interacts poorly with layered click-through windows on Windows 10.
+            .no_redirection_bitmap(true)
+            // Earlier Windows maps exclusion to a blank captured surface. Preserve
+            // the feature without applying that incompatible affinity fallback.
+            .content_protected(*CAPTURE_EXCLUSION_SUPPORTED)
+            .decorations(false)
+            .shadow(false)
+            .always_on_top(true)
+            .skip_taskbar(true)
+            .resizable(false)
+            .focused(false)
+            .focusable(false)
+            .visible(false)
+            .build()
+            .map_err(|e| e.to_string())?;
+            win
+        };
+        let position = PhysicalPosition::new(x, y);
+        let size = PhysicalSize::new(width, height);
+        if win.outer_position().ok() != Some(position) {
+            win.set_position(position).map_err(|e| e.to_string())?;
         }
+        if win.inner_size().ok() != Some(size) {
+            win.set_size(size).map_err(|e| e.to_string())?;
+        }
+        win.emit("stream-pointer-visuals", frame)
+            .map_err(|e| e.to_string())?;
+        let ready = READY.lock().unwrap().contains(&label);
+        present_overlay(&win, ready).await?;
+        PREPARED.lock().unwrap().insert(label.clone());
+    } else if let Some(win) = app.get_webview_window(&label) {
+        PREPARED.lock().unwrap().remove(&label);
+        win.emit("stream-pointer-visuals", frame)
+            .map_err(|e| e.to_string())?;
+        win.hide().map_err(|e| e.to_string())?;
     }
-
-    ensure_and_present_overlay(&app, &label, source, None, Some(sanitized)).await
+    Ok(())
 }
 
 #[cfg(test)]

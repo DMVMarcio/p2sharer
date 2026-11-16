@@ -215,6 +215,7 @@ interface GamepadVisualPreviewProps {
   connected: boolean;
   previewPaused: boolean;
   highlightedTarget: GamepadTargetControl | null;
+  deadzone?: number;
 }
 
 const NEUTRAL_SNAPSHOT: GamepadSnapshotState = {
@@ -232,6 +233,7 @@ export const GamepadVisualPreview: React.FC<GamepadVisualPreviewProps> = ({
   connected,
   previewPaused,
   highlightedTarget,
+  deadzone = 0,
 }) => {
   if (!connected) {
     return (
@@ -250,6 +252,9 @@ export const GamepadVisualPreview: React.FC<GamepadVisualPreviewProps> = ({
   const lyOffset = -(active.thumbLy / 32768) * 12;
   const rxOffset = (active.thumbRx / 32768) * 12;
   const ryOffset = -(active.thumbRy / 32768) * 12;
+  const clampedDeadzone = Math.max(0, Math.min(1, deadzone));
+  const leftDeadzoneR = clampedDeadzone * 26;
+  const rightDeadzoneR = clampedDeadzone * 25;
 
   const isTarget = (tKey: GamepadTargetControl) => highlightedTarget === tKey;
   const anyLeftStickTarget =
@@ -360,6 +365,9 @@ export const GamepadVisualPreview: React.FC<GamepadVisualPreviewProps> = ({
             className={`gp-svg-stick-cap ${btn(0x0040) ? 'is-pressed' : ''}`}
             style={{ '--gp-active': GAMEPAD_CONTROL_COLORS.leftStick } as React.CSSProperties}
           />
+          {leftDeadzoneR > 0 && (
+            <circle cx="90" cy="80" r={leftDeadzoneR} className="gp-svg-deadzone" />
+          )}
         </g>
 
         {/* D-Pad (4 directions) with clean bottom margin */}
@@ -421,6 +429,9 @@ export const GamepadVisualPreview: React.FC<GamepadVisualPreviewProps> = ({
             className={`gp-svg-stick-cap ${btn(0x0080) ? 'is-pressed' : ''}`}
             style={{ '--gp-active': GAMEPAD_CONTROL_COLORS.rightStick } as React.CSSProperties}
           />
+          {rightDeadzoneR > 0 && (
+            <circle cx="226" cy="138" r={rightDeadzoneR} className="gp-svg-deadzone" />
+          )}
         </g>
 
         {/* Face Buttons: Y (top), X (left), B (right), A (bottom) */}
