@@ -1841,5 +1841,9 @@
   "games.statusWinnerNamed": "{{name}} a gagné !",
   "games.statusWinnerSide": "{{side}} a gagné !",
   "games.statusResignedWinner": "{{name}} gagne par abandon",
-  "games.statusDraw": "Match nul !"
+  "games.statusDraw": "Match nul !",
+  "games.confirmDeleteRoom": "Fermer « {{name}} » ? La partie en cours dans ce salon sera terminée.",
+  "games.confirmResign": "Voulez-vous vraiment abandonner la partie en cours ?",
+  "games.confirmNewMatch": "Lancer une nouvelle partie et réinitialiser le plateau actuel ?",
+  "games.confirmResetScores": "Réinitialiser le score et commencer une nouvelle partie ?"
 }

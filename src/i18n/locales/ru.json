@@ -1841,5 +1841,9 @@
   "games.statusWinnerNamed": "{{name}} победил(а)!",
   "games.statusWinnerSide": "{{side}} победили!",
   "games.statusResignedWinner": "{{name}} победил(а) после сдачи",
-  "games.statusDraw": "Ничья!"
+  "games.statusDraw": "Ничья!",
+  "games.confirmDeleteRoom": "Закрыть «{{name}}»? Текущая партия в этой комнате будет завершена.",
+  "games.confirmResign": "Вы уверены, что хотите сдаться в текущей партии?",
+  "games.confirmNewMatch": "Начать новую партию и сбросить текущую доску?",
+  "games.confirmResetScores": "Сбросить счёт и начать новую партию?"
 }

@@ -1841,5 +1841,9 @@
   "games.statusWinnerNamed": "{{name}} जीते!",
   "games.statusWinnerSide": "{{side}} जीते!",
   "games.statusResignedWinner": "त्याग द्वारा {{name}} जीते",
-  "games.statusDraw": "मैच ड्रॉ!"
+  "games.statusDraw": "मैच ड्रॉ!",
+  "games.confirmDeleteRoom": "क्या “{{name}}” को बंद करें? इस कमरे में चल रहा मैच समाप्त हो जाएगा।",
+  "games.confirmResign": "क्या आप वाकई वर्तमान मैच में हार मानना चाहते हैं?",
+  "games.confirmNewMatch": "क्या वर्तमान बोर्ड को रीसेट करके नया मैच शुरू करें?",
+  "games.confirmResetScores": "क्या स्कोरबोर्ड रीसेट करके नया मैच शुरू करें?"
 }

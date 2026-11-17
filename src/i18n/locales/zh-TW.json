@@ -1841,5 +1841,9 @@
   "games.statusWinnerNamed": "{{name}} 獲勝！",
   "games.statusWinnerSide": "{{side}} 獲勝！",
   "games.statusResignedWinner": "{{name}} 因對方認輸獲勝",
-  "games.statusDraw": "和局！"
+  "games.statusDraw": "和局！",
+  "games.confirmDeleteRoom": "確定關閉「{{name}}」嗎？該房間正在進行的對局將結束。",
+  "games.confirmResign": "確定要在目前對局中認輸嗎？",
+  "games.confirmNewMatch": "確定開始新對局並重設目前棋盤嗎？",
+  "games.confirmResetScores": "確定重設比分並開始新對局嗎？"
 }

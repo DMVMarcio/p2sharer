@@ -1841,5 +1841,9 @@
   "games.statusWinnerNamed": "{{name}} 获胜！",
   "games.statusWinnerSide": "{{side}} 获胜！",
   "games.statusResignedWinner": "{{name}} 因对方认输获胜",
-  "games.statusDraw": "平局！"
+  "games.statusDraw": "平局！",
+  "games.confirmDeleteRoom": "确定关闭“{{name}}”吗？该房间正在进行的对局将结束。",
+  "games.confirmResign": "确定要在当前对局中认输吗？",
+  "games.confirmNewMatch": "确定开始新对局并重置当前棋盘吗？",
+  "games.confirmResetScores": "确定重置比分并开始新对局吗？"
 }

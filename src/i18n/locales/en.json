@@ -1841,5 +1841,9 @@
   "games.statusWinnerNamed": "{{name}} won!",
   "games.statusWinnerSide": "{{side}} won!",
   "games.statusResignedWinner": "{{name}} won by resignation",
-  "games.statusDraw": "Draw!"
+  "games.statusDraw": "Draw!",
+  "games.confirmDeleteRoom": "Close “{{name}}”? Any ongoing match at this table will end.",
+  "games.confirmResign": "Are you sure you want to resign the current match?",
+  "games.confirmNewMatch": "Start a new match and replace the current board?",
+  "games.confirmResetScores": "Reset the scoreboard and start a fresh match?"
 }

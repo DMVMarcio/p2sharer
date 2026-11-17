@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Crown, FlipVertical, ShieldAlert, Trophy } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Crown, ShieldAlert, Trophy } from 'lucide-react';
 import { t } from '../i18n/index.ts';
 import { useLocale } from '../hooks/useLocale.ts';
 import { roomAppsService } from './room_apps_service.ts';
@@ -13,6 +13,7 @@ import {
   squareName,
   type ChessCandidateMove,
   type ChessColor,
+  type ChessPieceType,
   type ChessPromotionPiece,
 } from './chess_engine.ts';
 import {
@@ -22,7 +23,14 @@ import {
   useBoardGamePlayers,
 } from './BoardGameLobbyView.tsx';
 import { ModalDialog } from '../components/common/ModalDialog.tsx';
-import { TooltipButton } from '../components/common/TooltipButton.tsx';
+
+interface DraggingPieceState {
+  from: number;
+  piece: { color: ChessColor; type: ChessPieceType };
+  clientX: number;
+  clientY: number;
+  hoverSquare: number | null;
+}
 
 export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = false }) => {
   useLocale();
@@ -31,7 +39,8 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [selectedSquare, setSelectedSquare] = useState<number | null>(null);
   const [pendingPromotion, setPendingPromotion] = useState<{ from: number; to: number; color: ChessColor } | null>(null);
-  const [flipOverride, setFlipOverride] = useState<boolean | null>(null);
+  const [dragging, setDragging] = useState<DraggingPieceState | null>(null);
+  const boardGridRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     return roomAppsService.subscribe(() => setTick((n) => n + 1));
@@ -45,6 +54,7 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
       setActiveRoomId(null);
       setSelectedSquare(null);
       setPendingPromotion(null);
+      setDragging(null);
     }
   }, [activeRoomId, model]);
 
@@ -55,7 +65,7 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
     setActiveRoomId(nextId);
     setSelectedSquare(null);
     setPendingPromotion(null);
-    setFlipOverride(null);
+    setDragging(null);
   };
 
   const describeRoomStatus = (room: ChessRoomState): string => {
@@ -125,10 +135,11 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
               ? 'b'
               : null;
         const isMyTurn = game.status === 'playing' && myColor !== null && game.turn === myColor;
-        const flipped = flipOverride !== null ? flipOverride : myColor === 'b';
+        const flipped = myColor === 'b';
 
+        const activeOrigin = dragging ? dragging.from : selectedSquare;
         const legalMoves: ChessCandidateMove[] =
-          isMyTurn && selectedSquare !== null ? getLegalChessMovesForSquare(game, selectedSquare) : [];
+          isMyTurn && activeOrigin !== null ? getLegalChessMovesForSquare(game, activeOrigin) : [];
         const legalTargets = new Map<number, ChessCandidateMove[]>();
         for (const m of legalMoves) {
           const existing = legalTargets.get(m.to) ?? [];
@@ -138,25 +149,84 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
 
         const checkedKingSquare = game.inCheck ? findKingSquare(game.board, game.turn) : -1;
 
-        const handleSquareClick = (sqIndex: number) => {
-          if (!isMyTurn) return;
-          const matches = legalTargets.get(sqIndex);
-          if (selectedSquare !== null && matches && matches.length > 0) {
-            if (matches.some((m) => m.promotion)) {
-              setPendingPromotion({ from: selectedSquare, to: sqIndex, color: myColor });
-            } else {
-              model.makeMove(room.id, selectedSquare, sqIndex);
-              setSelectedSquare(null);
-            }
+        const commitMoveOrPromotion = (from: number, to: number) => {
+          if (!isMyTurn || !myColor) return false;
+          const movesFromOrigin = getLegalChessMovesForSquare(game, from);
+          const matches = movesFromOrigin.filter((m) => m.to === to);
+          if (matches.length === 0) return false;
+
+          if (matches.some((m) => m.promotion)) {
+            setPendingPromotion({ from, to, color: myColor });
+          } else {
+            model.makeMove(room.id, from, to);
+            setSelectedSquare(null);
+          }
+          return true;
+        };
+
+        const resolveSquareAtClientPoint = (clientX: number, clientY: number): number | null => {
+          const el = document.elementFromPoint(clientX, clientY);
+          const sqButton = el?.closest<HTMLElement>('[data-board-square]');
+          if (!sqButton) return null;
+          const raw = Number(sqButton.dataset.boardSquare);
+          return Number.isInteger(raw) && raw >= 0 && raw < 64 ? raw : null;
+        };
+
+        const handleSquarePointerDown = (event: React.PointerEvent<HTMLButtonElement>, sqIndex: number) => {
+          if (event.button !== 0 || !isMyTurn || !myColor) return;
+          const clickedPiece = game.board[sqIndex];
+
+          if (selectedSquare !== null && legalTargets.has(sqIndex)) {
+            event.preventDefault();
+            commitMoveOrPromotion(selectedSquare, sqIndex);
             return;
           }
 
-          const clickedPiece = game.board[sqIndex];
-          if (clickedPiece && clickedPiece.color === myColor) {
-            setSelectedSquare(selectedSquare === sqIndex ? null : sqIndex);
-          } else {
+          if (!clickedPiece || clickedPiece.color !== myColor) {
             setSelectedSquare(null);
+            return;
           }
+
+          event.preventDefault();
+          setSelectedSquare(sqIndex);
+          const startX = event.clientX;
+          const startY = event.clientY;
+          let dragStarted = false;
+
+          const onPointerMove = (moveEvent: PointerEvent) => {
+            const dx = moveEvent.clientX - startX;
+            const dy = moveEvent.clientY - startY;
+            if (!dragStarted && Math.hypot(dx, dy) > 4) {
+              dragStarted = true;
+            }
+            if (dragStarted) {
+              const hovered = resolveSquareAtClientPoint(moveEvent.clientX, moveEvent.clientY);
+              setDragging({
+                from: sqIndex,
+                piece: clickedPiece,
+                clientX: moveEvent.clientX,
+                clientY: moveEvent.clientY,
+                hoverSquare: hovered,
+              });
+            }
+          };
+
+          const onPointerUp = (upEvent: PointerEvent) => {
+            window.removeEventListener('pointermove', onPointerMove);
+            window.removeEventListener('pointerup', onPointerUp);
+            window.removeEventListener('pointercancel', onPointerUp);
+            if (dragStarted) {
+              const targetSq = resolveSquareAtClientPoint(upEvent.clientX, upEvent.clientY);
+              setDragging(null);
+              if (targetSq !== null && targetSq !== sqIndex) {
+                commitMoveOrPromotion(sqIndex, targetSq);
+              }
+            }
+          };
+
+          window.addEventListener('pointermove', onPointerMove);
+          window.addEventListener('pointerup', onPointerUp);
+          window.addEventListener('pointercancel', onPointerUp);
         };
 
         const displaySquares: number[] = [];
@@ -171,63 +241,76 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
         return (
           <div className="cozy-match-layout">
             <div className="cozy-board-stage">
-              <div className="cozy-board-hud-row">
-                {game.status !== 'playing' ? (
-                  <div className="cozy-match-banner" role="status">
-                    <Trophy size={16} aria-hidden="true" />
-                    <span>{describeRoomStatus(room)}</span>
-                  </div>
-                ) : game.inCheck ? (
-                  <div className="cozy-match-banner is-warning" role="status">
-                    <ShieldAlert size={16} aria-hidden="true" />
-                    <span>{t('chess.checkAlert')}</span>
-                  </div>
-                ) : (
-                  <div />
-                )}
-
-                <TooltipButton
-                  tooltip={t('games.flipBoard')}
-                  aria-label={t('games.flipBoard')}
-                  className="btn btn-sm btn-secondary cozy-flip-btn"
-                  onClick={() => setFlipOverride(!flipped)}
-                >
-                  <FlipVertical size={14} />
-                  <span>{t('games.flipBoard')}</span>
-                </TooltipButton>
-              </div>
+              {(game.status !== 'playing' || game.inCheck) && (
+                <div className="cozy-board-hud-row">
+                  {game.status !== 'playing' ? (
+                    <div className="cozy-match-banner" role="status">
+                      <Trophy size={16} aria-hidden="true" />
+                      <span>{describeRoomStatus(room)}</span>
+                    </div>
+                  ) : (
+                    <div className="cozy-match-banner is-warning" role="status">
+                      <ShieldAlert size={16} aria-hidden="true" />
+                      <span>{t('chess.checkAlert')}</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="wood-board-frame chess-wood-frame">
-                <div className="wood-board-8x8" role="grid" aria-label={t('chess.title')}>
+                <span className="wood-frame-stud stud-tl" aria-hidden="true" />
+                <span className="wood-frame-stud stud-tr" aria-hidden="true" />
+                <span className="wood-frame-stud stud-bl" aria-hidden="true" />
+                <span className="wood-frame-stud stud-br" aria-hidden="true" />
+
+                <div ref={boardGridRef} className="wood-board-8x8" role="grid" aria-label={t('chess.title')}>
                   {displaySquares.map((sqIndex, visualIdx) => {
                     const r = rowOf(sqIndex);
                     const c = colOf(sqIndex);
                     const isDark = (r + c) % 2 === 1;
                     const piece = game.board[sqIndex];
-                    const isSelected = selectedSquare === sqIndex;
+                    const isSelected = activeOrigin === sqIndex;
                     const isLegalDest = legalTargets.has(sqIndex);
+                    const isDragHover = dragging?.hoverSquare === sqIndex && isLegalDest;
+                    const isBeingDragged = dragging?.from === sqIndex;
                     const isLastMove =
                       game.lastMove?.from === sqIndex || game.lastMove?.to === sqIndex;
                     const isKingCheck = checkedKingSquare === sqIndex;
                     const showRank = visualIdx % 8 === 0;
                     const showFile = visualIdx >= 56;
+                    const isDraggablePiece = Boolean(isMyTurn && piece && piece.color === myColor);
 
                     return (
                       <button
                         key={sqIndex}
                         type="button"
                         role="gridcell"
+                        data-board-square={sqIndex}
                         aria-label={`${squareName(sqIndex)}${piece ? ` ${piece.color} ${piece.type}` : ''}`}
                         className={`wood-square ${isDark ? 'dark' : 'light'} ${
                           isSelected ? 'is-selected' : ''
                         } ${isLegalDest ? 'is-legal' : ''} ${
-                          isLastMove ? 'is-last-move' : ''
-                        } ${isKingCheck ? 'is-king-check' : ''}`}
-                        onClick={() => handleSquareClick(sqIndex)}
+                          isDragHover ? 'is-drag-hover' : ''
+                        } ${isLastMove ? 'is-last-move' : ''} ${
+                          isKingCheck ? 'is-king-check' : ''
+                        } ${isDraggablePiece ? 'is-draggable' : ''} ${
+                          isBeingDragged ? 'is-dragging-source' : ''
+                        }`}
+                        onPointerDown={(e) => handleSquarePointerDown(e, sqIndex)}
+                        onClick={() => {
+                          // Keyboard accessibility fallback
+                          if (!dragging && isMyTurn) {
+                            if (selectedSquare !== null && legalTargets.has(sqIndex)) {
+                              commitMoveOrPromotion(selectedSquare, sqIndex);
+                            } else if (piece && piece.color === myColor) {
+                              setSelectedSquare( sqIndex);
+                            }
+                          }
+                        }}
                       >
                         {showRank && <span className="wood-coord-rank">{8 - r}</span>}
                         {showFile && <span className="wood-coord-file">{String.fromCharCode(97 + c)}</span>}
-                        {piece && <ChessPieceSvg type={piece.type} color={piece.color} size={42} />}
+                        {piece && <ChessPieceSvg type={piece.type} color={piece.color} size={48} />}
                         {isLegalDest && (
                           <span className={`wood-move-dot ${piece ? 'is-capture' : ''}`} aria-hidden="true" />
                         )}
@@ -237,6 +320,16 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
                 </div>
               </div>
             </div>
+
+            {dragging && (
+              <div
+                className="board-drag-ghost"
+                style={{ left: `${dragging.clientX}px`, top: `${dragging.clientY}px` }}
+                aria-hidden="true"
+              >
+                <ChessPieceSvg type={dragging.piece.type} color={dragging.piece.color} size={62} />
+              </div>
+            )}
 
             <CozyRoomSidePanel
               room={room}

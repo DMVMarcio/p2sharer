@@ -1841,5 +1841,9 @@
   "games.statusWinnerNamed": "{{name}} の勝利！",
   "games.statusWinnerSide": "{{side}} の勝利！",
   "games.statusResignedWinner": "投了により {{name}} の勝利",
-  "games.statusDraw": "引き分け！"
+  "games.statusDraw": "引き分け！",
+  "games.confirmDeleteRoom": "「{{name}}」を閉じますか？進行中の対局は終了します。",
+  "games.confirmResign": "現在の対局を投了してもよろしいですか？",
+  "games.confirmNewMatch": "盤面をリセットして新しい対局を始めますか？",
+  "games.confirmResetScores": "スコアをリセットして新しい対局を始めますか？"
 }

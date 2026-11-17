@@ -3,11 +3,11 @@ import {
   ArrowLeft,
   Crown,
   Eye,
+  Flag,
+  Grid3x3,
   Plus,
   RotateCcw,
-  Sparkles,
   Trash2,
-  Trees,
   Users,
   UserCheck,
   UserPlus,
@@ -19,7 +19,6 @@ import { ProfileAvatar } from '../components/common/ProfileAvatar.tsx';
 import { Tooltip } from '../components/common/Tooltip.tsx';
 import { TooltipButton } from '../components/common/TooltipButton.tsx';
 import { ModalDialog } from '../components/common/ModalDialog.tsx';
-import { Select } from '../components/common/Select.tsx';
 import type { BoardGameKind, BoardGameLobbyModel, BoardGameRoomState } from './board_game_model.ts';
 import type { ChessColor, ChessPieceType } from './chess_engine.ts';
 
@@ -34,8 +33,8 @@ export function ChessPieceSvg({
 }) {
   const isWhite = color === 'w';
   const fill = isWhite ? 'url(#wood-piece-light)' : 'url(#wood-piece-dark)';
-  const stroke = isWhite ? '#7c5329' : '#1c1108';
-  const highlight = isWhite ? 'rgba(255,255,255,0.65)' : 'rgba(255,220,175,0.22)';
+  const stroke = isWhite ? '#744b23' : '#1b0f06';
+  const highlight = isWhite ? 'rgba(255,255,255,0.75)' : 'rgba(255,222,179,0.26)';
 
   return (
     <svg
@@ -47,14 +46,14 @@ export function ChessPieceSvg({
     >
       <defs>
         <linearGradient id="wood-piece-light" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#fff8eb" />
-          <stop offset="55%" stopColor="#f3dfb9" />
-          <stop offset="100%" stopColor="#d9b47c" />
+          <stop offset="0%" stopColor="#fffaf0" />
+          <stop offset="50%" stopColor="#f5e1bc" />
+          <stop offset="100%" stopColor="#d8af72" />
         </linearGradient>
         <linearGradient id="wood-piece-dark" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#6b442a" />
-          <stop offset="55%" stopColor="#462916" />
-          <stop offset="100%" stopColor="#29160a" />
+          <stop offset="0%" stopColor="#72482c" />
+          <stop offset="52%" stopColor="#492a15" />
+          <stop offset="100%" stopColor="#261408" />
         </linearGradient>
       </defs>
       {type === 'p' && (
@@ -184,6 +183,12 @@ export function useBoardGamePlayers() {
   };
 }
 
+function GameKindCrest({ kind }: { kind: BoardGameKind }) {
+  if (kind === 'chess') return <ChessPieceSvg type="n" color="w" size={32} />;
+  if (kind === 'checkers') return <CheckersPieceSvg color="w" king size={30} />;
+  return <Grid3x3 size={26} strokeWidth={2} />;
+}
+
 interface LobbyViewProps<TGame> {
   kind: BoardGameKind;
   title: string;
@@ -213,26 +218,24 @@ export function CozyBoardGameShell<TGame>({
 }: LobbyViewProps<TGame>) {
   useLocale();
   const resolveActor = useBoardGamePlayers();
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [roomNameDraft, setRoomNameDraft] = useState('');
-  const [initialRoleDraft, setInitialRoleDraft] = useState<'seat1' | 'seat2' | 'spectator'>('seat1');
+  const [deletingRoom, setDeletingRoom] = useState<BoardGameRoomState<TGame> | null>(null);
 
   const rooms = model.rooms;
   const activeRoom = activeRoomId ? model.getRoom(activeRoomId) : undefined;
 
-  const openCreateModal = () => {
-    const nextNumber = rooms.length + 1;
-    setRoomNameDraft(t('games.defaultRoomName', { number: nextNumber }));
-    setInitialRoleDraft('seat1');
-    setCreateDialogOpen(true);
-  };
+  const createTableImmediately = () => {
+    // Pick the next available sequential table number
+    const usedNumbers = new Set<number>();
+    for (const r of rooms) {
+      const match = r.name.match(/(\d+)/);
+      if (match) usedNumbers.add(Number(match[1]));
+    }
+    let nextNumber = 1;
+    while (usedNumbers.has(nextNumber)) nextNumber++;
 
-  const handleCreateRoom = (event: React.FormEvent) => {
-    event.preventDefault();
-    const fallbackName = t('games.defaultRoomName', { number: rooms.length + 1 });
-    const createdId = model.createRoom(roomNameDraft.trim() || fallbackName, initialRoleDraft);
+    const tableName = t('games.defaultRoomName', { number: nextNumber });
+    const createdId = model.createRoom(tableName, 'seat1');
     if (createdId) {
-      setCreateDialogOpen(false);
       onSelectRoom(createdId);
     }
   };
@@ -242,7 +245,7 @@ export function CozyBoardGameShell<TGame>({
     if (preferred) {
       model.joinRole(room.id, preferred);
     } else if (room.players.seat1 === actor || room.players.seat2 === actor || room.spectators.includes(actor)) {
-      // Already in room, keep role
+      // Already seated or spectating in this room
     } else if (!room.players.seat1) {
       model.joinRole(room.id, 'seat1');
     } else if (!room.players.seat2) {
@@ -264,11 +267,11 @@ export function CozyBoardGameShell<TGame>({
           : 'spectator';
 
     return (
-      <div className={`cozy-game-root kind-${kind}`}>
-        <div className="cozy-garden-backdrop" aria-hidden="true">
-          <span className="cozy-leaf leaf-1" />
-          <span className="cozy-leaf leaf-2" />
-          <span className="cozy-leaf leaf-3" />
+      <div className={`cozy-game-root is-match kind-${kind}`}>
+        <div className="cozy-garden-scenery" aria-hidden="true">
+          <span className="cozy-grass-vignette" />
+          <span className="cozy-sunbeam beam-1" />
+          <span className="cozy-sunbeam beam-2" />
         </div>
 
         <header className="cozy-room-topbar">
@@ -281,10 +284,11 @@ export function CozyBoardGameShell<TGame>({
               <ArrowLeft size={14} />
               <span>{t('games.backToLobbies')}</span>
             </button>
-            <div className="cozy-room-title-pill">
-              <Trees size={15} className="cozy-garden-icon" aria-hidden="true" />
+            <div className="cozy-room-title-plaque">
+              <span className="cozy-plaque-rivet" aria-hidden="true" />
               <strong>{activeRoom.name}</strong>
               <span className="cozy-room-status-tag">{describeRoomStatus(activeRoom)}</span>
+              <span className="cozy-plaque-rivet" aria-hidden="true" />
             </div>
           </div>
 
@@ -330,37 +334,51 @@ export function CozyBoardGameShell<TGame>({
 
   return (
     <div className={`cozy-game-root is-lobby kind-${kind}`}>
-      <div className="cozy-garden-backdrop" aria-hidden="true">
-        <span className="cozy-leaf leaf-1" />
-        <span className="cozy-leaf leaf-2" />
-        <span className="cozy-leaf leaf-3" />
+      <div className="cozy-garden-scenery" aria-hidden="true">
+        <span className="cozy-grass-vignette" />
+        <span className="cozy-sunbeam beam-1" />
+        <span className="cozy-sunbeam beam-2" />
       </div>
 
       <div className="cozy-lobby-container">
-        <header className="cozy-lobby-header">
-          <div className="cozy-lobby-heading">
-            <div className="cozy-lobby-badge">
-              <Trees size={18} aria-hidden="true" />
-              <span>{t('games.gardenLounge')}</span>
+        <header className="cozy-wood-signboard">
+          <div className="cozy-signboard-nail nail-tl" aria-hidden="true" />
+          <div className="cozy-signboard-nail nail-tr" aria-hidden="true" />
+          <div className="cozy-signboard-nail nail-bl" aria-hidden="true" />
+          <div className="cozy-signboard-nail nail-br" aria-hidden="true" />
+
+          <div className="cozy-signboard-identity">
+            <div className="cozy-signboard-crest" aria-hidden="true">
+              <GameKindCrest kind={kind} />
             </div>
-            <h2>{title}</h2>
-            <p>{subtitle}</p>
+            <div className="cozy-lobby-heading">
+              <h2>{title}</h2>
+              <p>{subtitle}</p>
+            </div>
           </div>
-          <button type="button" className="btn btn-primary cozy-create-room-btn" onClick={openCreateModal}>
-            <Plus size={16} />
+
+          <button type="button" className="cozy-wood-cta-btn" onClick={createTableImmediately}>
+            <Plus size={16} strokeWidth={2.4} />
             <span>{t('games.createRoom')}</span>
           </button>
         </header>
 
         {rooms.length === 0 ? (
           <div className="cozy-lobby-empty">
-            <div className="cozy-lobby-empty-emblem">
-              <Sparkles size={26} />
+            <div className="cozy-empty-board-illustration" aria-hidden="true">
+              <div className="cozy-mini-checkerboard">
+                {Array.from({ length: 16 }).map((_, idx) => (
+                  <span key={idx} className={(Math.floor(idx / 4) + (idx % 4)) % 2 === 1 ? 'dark' : 'light'} />
+                ))}
+              </div>
+              <div className="cozy-empty-crest-overlay">
+                <GameKindCrest kind={kind} />
+              </div>
             </div>
             <h3>{t('games.noRoomsTitle')}</h3>
             <p>{t('games.noRoomsDescription')}</p>
-            <button type="button" className="btn btn-primary" onClick={openCreateModal}>
-              <Plus size={16} />
+            <button type="button" className="cozy-wood-cta-btn" onClick={createTableImmediately}>
+              <Plus size={16} strokeWidth={2.4} />
               <span>{t('games.createFirstRoom')}</span>
             </button>
           </div>
@@ -377,7 +395,10 @@ export function CozyBoardGameShell<TGame>({
                 (!room.players.seat1 && !room.players.seat2 && room.spectators.length === 0);
 
               return (
-                <article key={room.id} className="cozy-lobby-card">
+                <article key={room.id} className="cozy-table-card">
+                  <div className="cozy-table-card-stud stud-l" aria-hidden="true" />
+                  <div className="cozy-table-card-stud stud-r" aria-hidden="true" />
+
                   <div className="cozy-lobby-card-top">
                     <div className="cozy-lobby-card-titles">
                       <h3>{room.name}</h3>
@@ -393,7 +414,7 @@ export function CozyBoardGameShell<TGame>({
                         tooltip={t('games.deleteRoom')}
                         aria-label={t('games.deleteRoom')}
                         className="cozy-icon-btn danger"
-                        onClick={() => model.deleteRoom(room.id)}
+                        onClick={() => setDeletingRoom(room)}
                       >
                         <Trash2 size={14} />
                       </TooltipButton>
@@ -455,9 +476,7 @@ export function CozyBoardGameShell<TGame>({
                   <div className="cozy-lobby-card-footer">
                     <div className="cozy-lobby-spectators">
                       <Eye size={13} />
-                      <span>
-                        {t('games.spectatorsCount', { count: spectators.length })}
-                      </span>
+                      <span>{t('games.spectatorsCount', { count: spectators.length })}</span>
                       {spectators.slice(0, 4).map((spec) => (
                         <Tooltip key={spec.id} content={spec.name}>
                           <ProfileAvatar
@@ -482,7 +501,7 @@ export function CozyBoardGameShell<TGame>({
                       </button>
                       <button
                         type="button"
-                        className="btn btn-sm btn-primary"
+                        className="cozy-wood-join-btn"
                         onClick={() => quickJoinRoom(room)}
                       >
                         {!p1 || !p2 || p1.isLocal || p2.isLocal ? <UserCheck size={14} /> : <Users size={14} />}
@@ -497,50 +516,29 @@ export function CozyBoardGameShell<TGame>({
         )}
       </div>
 
-      {createDialogOpen && (
+      {deletingRoom && (
         <ModalDialog
-          title={t('games.createRoom')}
-          subtitle={t('games.createRoomSubtitle')}
-          icon={<Trees size={20} />}
-          onClose={() => setCreateDialogOpen(false)}
+          title={t('games.deleteRoom')}
+          onClose={() => setDeletingRoom(null)}
           footer={(close) => (
             <>
               <button type="button" className="btn btn-secondary" onClick={close}>
                 {t('tunnels.cancel')}
               </button>
-              <button type="submit" form="cozy-create-room-form" className="btn btn-primary">
-                {t('games.createRoom')}
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={() => {
+                  model.deleteRoom(deletingRoom.id);
+                  setDeletingRoom(null);
+                }}
+              >
+                {t('games.deleteRoom')}
               </button>
             </>
           )}
         >
-          <form id="cozy-create-room-form" className="tunnel-form" autoComplete="off" onSubmit={handleCreateRoom}>
-            <label>
-              {t('games.roomName')}
-              <input
-                type="text"
-                className="text-input"
-                autoComplete="off"
-                autoFocus
-                maxLength={48}
-                value={roomNameDraft}
-                onChange={(e) => setRoomNameDraft(e.target.value)}
-                placeholder={t('games.roomNamePlaceholder')}
-              />
-            </label>
-            <label>
-              {t('games.initialSeat')}
-              <Select
-                value={initialRoleDraft}
-                onValueChange={(val) => setInitialRoleDraft(val as 'seat1' | 'seat2' | 'spectator')}
-                options={[
-                  { value: 'seat1', label: `${t('games.player1')} (${seat1Label})` },
-                  { value: 'seat2', label: `${t('games.player2')} (${seat2Label})` },
-                  { value: 'spectator', label: t('games.spectator') },
-                ]}
-              />
-            </label>
-          </form>
+          <p>{t('games.confirmDeleteRoom', { name: deletingRoom.name })}</p>
         </ModalDialog>
       )}
     </div>
@@ -580,6 +578,8 @@ export function CozyRoomSidePanel<TGame>({
 }) {
   useLocale();
   const resolveActor = useBoardGamePlayers();
+  const [confirmAction, setConfirmAction] = useState<'newMatch' | 'resetScores' | 'resign' | null>(null);
+
   const p1 = resolveActor(room.players.seat1, model.localActor);
   const p2 = resolveActor(room.players.seat2, model.localActor);
   const spectators = room.spectators
@@ -591,6 +591,8 @@ export function CozyRoomSidePanel<TGame>({
     room.players.seat2 === model.localActor ||
     room.createdBy === model.localActor ||
     (!room.players.seat1 && !room.players.seat2);
+
+  const isGameOngoing = turnSide !== null;
 
   return (
     <aside className="cozy-side-panel">
@@ -646,7 +648,9 @@ export function CozyRoomSidePanel<TGame>({
         </div>
 
         <div className="cozy-scoreboard-summary">
-          <span>{t('games.draws')}: <strong>{drawsScore}</strong></span>
+          <span>
+            {t('games.draws')}: <strong>{drawsScore}</strong>
+          </span>
         </div>
       </div>
 
@@ -673,7 +677,11 @@ export function CozyRoomSidePanel<TGame>({
 
       {isPlayerOrOwner && (
         <div className="cozy-room-controls">
-          <button type="button" className="btn btn-sm btn-primary" onClick={onNewMatch}>
+          <button
+            type="button"
+            className="btn btn-sm btn-primary"
+            onClick={() => (isGameOngoing ? setConfirmAction('newMatch') : onNewMatch())}
+          >
             <RotateCcw size={14} />
             <span>{t('games.newMatch')}</span>
           </button>
@@ -684,16 +692,62 @@ export function CozyRoomSidePanel<TGame>({
             </button>
           )}
           {canResign && onResign && (
-            <button type="button" className="btn btn-sm btn-danger" onClick={onResign}>
+            <button type="button" className="btn btn-sm btn-danger" onClick={() => setConfirmAction('resign')}>
+              <Flag size={13} />
               <span>{t('games.resign')}</span>
             </button>
           )}
           {onResetScores && (
-            <button type="button" className="btn btn-sm btn-secondary" onClick={onResetScores}>
+            <button type="button" className="btn btn-sm btn-secondary" onClick={() => setConfirmAction('resetScores')}>
               <span>{t('games.resetScores')}</span>
             </button>
           )}
         </div>
+      )}
+
+      {confirmAction && (
+        <ModalDialog
+          title={
+            confirmAction === 'resign'
+              ? t('games.resign')
+              : confirmAction === 'resetScores'
+                ? t('games.resetScores')
+                : t('games.newMatch')
+          }
+          onClose={() => setConfirmAction(null)}
+          footer={(close) => (
+            <>
+              <button type="button" className="btn btn-secondary" onClick={close}>
+                {t('tunnels.cancel')}
+              </button>
+              <button
+                type="button"
+                className={confirmAction === 'resign' ? 'btn btn-danger' : 'btn btn-primary'}
+                onClick={() => {
+                  const action = confirmAction;
+                  setConfirmAction(null);
+                  if (action === 'resign') onResign?.();
+                  else if (action === 'resetScores') onResetScores?.();
+                  else onNewMatch();
+                }}
+              >
+                {confirmAction === 'resign'
+                  ? t('games.resign')
+                  : confirmAction === 'resetScores'
+                    ? t('games.resetScores')
+                    : t('games.newMatch')}
+              </button>
+            </>
+          )}
+        >
+          <p>
+            {confirmAction === 'resign'
+              ? t('games.confirmResign')
+              : confirmAction === 'resetScores'
+                ? t('games.confirmResetScores')
+                : t('games.confirmNewMatch')}
+          </p>
+        </ModalDialog>
       )}
     </aside>
   );

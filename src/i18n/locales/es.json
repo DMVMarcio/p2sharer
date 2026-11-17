@@ -1841,5 +1841,9 @@
   "games.statusWinnerNamed": "¡{{name}} ganó!",
   "games.statusWinnerSide": "¡{{side}} ganó!",
   "games.statusResignedWinner": "{{name}} ganó por rendición",
-  "games.statusDraw": "¡Empate!"
+  "games.statusDraw": "¡Empate!",
+  "games.confirmDeleteRoom": "¿Cerrar “{{name}}”? La partida en curso en esta sala terminará.",
+  "games.confirmResign": "¿Seguro que quieres rendirte en la partida actual?",
+  "games.confirmNewMatch": "¿Iniciar una nueva partida y reiniciar el tablero actual?",
+  "games.confirmResetScores": "¿Reiniciar el marcador y comenzar una nueva partida?"
 }
