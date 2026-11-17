@@ -3,6 +3,7 @@
 @import './browser.css';
 @import './whiteboard.css';
 @import './twitch.css';
+@import './games.css';
 
 /* Room App library */
 .modal-card.apps-library-modal { max-width: 800px; }

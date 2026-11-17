@@ -4,67 +4,80 @@
     "en": [
       "**Easier remote control & gamepad setup.** Choose mouse, keyboard, and gamepad permissions before accepting, install ViGEmBus from alerts, and unplug individual gamepads.",
       "**Custom shortcuts, keys & gamepad mapping.** Reassign remote shortcuts and individual keys, and remap gamepad buttons, triggers, and analog stick directions in Settings.",
-      "**Live remote input indicators.** See stacked controller avatars with blinking mouse, keyboard, and gamepad indicators over your shared screen and in controls."
+      "**Live remote input indicators.** See stacked controller avatars with blinking mouse, keyboard, and gamepad indicators over your shared screen and in controls.",
+      "**Cozy board game apps.** Play Tic-Tac-Toe, Chess, and Checkers on warm wooden boards with multiple tables and instant player/spectator switching."
     ],
     "pt-BR": [
       "**Permissões e controles mais práticos.** Escolha mouse, teclado e gamepad antes de aceitar, instale o ViGEmBus direto do alerta e remova gamepads individualmente.",
       "**Atalhos, teclas e gamepads personalizáveis.** Altere atalhos e teclas individuais e remapeie botões, gatilhos e direções dos analógicos nas configurações.",
-      "**Indicadores de entrada ao vivo.** Veja avatares empilhados com piscadinha nos ícones de mouse, teclado e gamepad ativos sobre sua transmissão e nos controles."
+      "**Indicadores de entrada ao vivo.** Veja avatares empilhados com piscadinha nos ícones de mouse, teclado e gamepad ativos sobre sua transmissão e nos controles.",
+      "**Novos jogos de tabuleiro aconchegantes.** Jogue Jogo da Velha, Xadrez e Damas em tabuleiros de madeira com várias salas e troca livre entre jogador e espectador."
     ],
     "es": [
       "**Control y mandos más prácticos.** Elige permisos de ratón, teclado y mando antes de aceptar, instala ViGEmBus desde la alerta y desconecta mandos individualmente.",
       "**Atajos, teclas y mandos a medida.** Reasigna atajos y teclas individuales, y calibra botones, gatillos y direcciones de los sticks del mando en Ajustes.",
-      "**Indicadores de entrada en vivo.** Visualiza avatares apilados con destellos en los iconos de ratón, teclado y mando activos sobre tu pantalla y en los controles."
+      "**Indicadores de entrada en vivo.** Visualiza avatares apilados con destellos en los iconos de ratón, teclado y mando activos sobre tu pantalla y en los controles.",
+      "**Nuevos juegos de mesa acogedores.** Juega Tres en Raya, Ajedrez y Damas en tableros de madera con múltiples salas y cambio libre entre jugador y espectador."
     ],
     "fr": [
       "**Contrôle et manettes simplifiés.** Choisissez souris, clavier et manette avant d'accepter, installez ViGEmBus depuis l'alerte et déconnectez chaque manette.",
       "**Raccourcis, touches et manettes sur mesure.** Personnalisez raccourcis et touches individuelles, et remappez boutons, gâchettes et directions des sticks.",
-      "**Indicateurs d'entrée en direct.** Affichez les avatars empilés avec clignotement souris, clavier et manette sur l'écran partagé et dans les contrôles."
+      "**Indicateurs d'entrée en direct.** Affichez les avatars empilés avec clignotement souris, clavier et manette sur l'écran partagé et dans les contrôles.",
+      "**Jeux de plateau chaleureux.** Jouez au Morpion, aux Échecs et aux Dames sur des plateaux en bois avec plusieurs salons et changement libre joueur/spectateur."
     ],
     "de": [
       "**Einfachere Rechte & Gamepad-Verwaltung.** Wähle Maus, Tastatur und Gamepad vor der Freigabe, installiere ViGEmBus direkt aus der Meldung und trenne einzelne Gamepads.",
       "**Eigene Kürzel, Tasten & Gamepad-Belegung.** Ändere Kürzel und einzelne Tasten und belege Gamepad-Tasten, Trigger und Stick-Richtungen in den Einstellungen neu.",
-      "**Live-Eingabeanzeigen.** Sieh gestapelte Nutzer-Avatare mit blinkenden Maus-, Tastatur- und Gamepad-Symbolen auf dem geteilten Bildschirm und in der Steuerung."
+      "**Live-Eingabeanzeigen.** Sieh gestapelte Nutzer-Avatare mit blinkenden Maus-, Tastatur- und Gamepad-Symbolen auf dem geteilten Bildschirm und in der Steuerung.",
+      "**Gemütliche Brettspiel-Apps.** Spiele Tic-Tac-Toe, Schach und Dame auf Holzbrettern mit mehreren Räumen und freiem Wechsel zwischen Spieler und Zuschauer."
     ],
     "it": [
       "**Controllo e gamepad più pratici.** Scegli mouse, tastiera e gamepad prima di accettare, installa ViGEmBus dall'avviso e scollega i singoli gamepad.",
       "**Scorciatoie, tasti e gamepad su misura.** Riassegna scorciatoie e tasti singoli e rimappa pulsanti, grilletti e direzioni degli stick nelle impostazioni.",
-      "**Indicatori di input dal vivo.** Visualizza avatar impilati con lampeggio su mouse, tastiera e gamepad attivi in sovraimpressione sullo schermo e nei controlli."
+      "**Indicatori di input dal vivo.** Visualizza avatar impilati con lampeggio su mouse, tastiera e gamepad attivi in sovraimpressione sullo schermo e nei controlli.",
+      "**Nuovi giochi da tavolo accoglienti.** Gioca a Tris, Scacchi e Dama su tavoli in legno con più stanze simultanee e cambio libero tra giocatore e spettatore."
     ],
     "zh-CN": [
       "**更便捷的权限与手柄管理。** 同意控制前即可选择鼠标、键盘与手柄权限，从提示框直接安装 ViGEmBus，并可单独断开手柄。",
       "**自定义快捷键、按键与手柄映射。** 在设置中更改远程快捷键与单个按键，并重新映射手柄按键、扳机及摇杆各方向。",
-      "**实时远程输入指示。** 在共享画面叠加层与控制面板中显示堆叠的控制者头像，并闪烁提示正在活动的鼠标、键盘或手柄。"
+      "**实时远程输入指示。** 在共享画面叠加层与控制面板中显示堆叠的控制者头像，并闪烁提示正在活动的鼠标、键盘或手柄。",
+      "**温馨木制棋盘游戏。** 畅玩井字棋、国际象棋与跳棋，支持同应用内开设多个房间，并随时切换对局玩家与观众身份。"
     ],
     "zh-TW": [
       "**更便利的權限與手把管理。** 同意控制前即可選擇滑鼠、鍵盤與手把權限，從提示訊息直接安裝 ViGEmBus，並可個別中斷手把。",
       "**自訂快速鍵、按鍵與手把對應。** 在設定中重新指定遠端快速鍵與個別按鍵，並調整手把按鍵、板機與搖桿各方向。",
-      "**即時遠端輸入指示。** 在分享畫面覆蓋層與控制清單中顯示堆疊的控制者頭像，並閃爍提示使用中的滑鼠、鍵盤或手把。"
+      "**即時遠端輸入指示。** 在分享畫面覆蓋層與控制清單中顯示堆疊的控制者頭像，並閃爍提示使用中的滑鼠、鍵盤或手把。",
+      "**溫馨木製棋盤遊戲。** 暢玩井字遊戲、西洋棋與西洋跳棋，支援同時開設多個房間，並可隨時切換玩家與觀眾身分。"
     ],
     "ja": [
       "**操作権限とパッド管理を改善。** 許可前にマウス・キーボード・パッドの権限を選択でき、通知から直接 ViGEmBus を導入したり個別のパッドを取り外せます。",
       "**ショートカット・キー・パッドの自由な割り当て。** 設定から操作ショートカットや個別キーを変更でき、ゲームパッドのボタンやスティック方向も再設定できます。",
-      "**入力中のデバイス表示。** 共有画面オーバーレイや管理画面で、操作中のユーザーのアイコンと点滅するマウス・キーボード・パッド表示を確認できます。"
+      "**入力中のデバイス表示。** 共有画面オーバーレイや管理画面で、操作中のユーザーのアイコンと点滅するマウス・キーボード・パッド表示を確認できます。",
+      "**温かみのあるボードゲームアプリ。** 三目並べ・チェス・チェッカーを木製ボードで楽しめ、複数ルームの同時進行やプレイヤー・観戦の切り替えに対応します。"
     ],
     "ko": [
       "**더 간편한 권한 및 게임패드 관리.** 수락 전 마우스·키보드·게임패드 권한을 고르고, 알림에서 바로 ViGEmBus를 설치하며, 개별 게임패드를 해제할 수 있습니다.",
       "**단축키·키·게임패드 맞춤 매핑.** 설정에서 원격 단축키와 개별 키를 바꾸고 게임패드 버튼, 트리거, 아날로그 스틱 방향까지 직접 재할당할 수 있습니다.",
-      "**실시간 입력 상태 표시.** 공유 화면 오버레이와 제어 목록에 제어 중인 사용자 아바타를 겹쳐 쌓아 보여주고, 마우스·키보드·게임패드 입력을 깜박임으로 알립니다."
+      "**실시간 입력 상태 표시.** 공유 화면 오버레이와 제어 목록에 제어 중인 사용자 아바타를 겹쳐 쌓아 보여주고, 마우스·키보드·게임패드 입력을 깜박임으로 알립니다.",
+      "**포근한 보드게임 앱 추가.** 따뜻한 원목 보드에서 틱택토, 체스, 체커를 즐기며 여러 방을 동시에 열고 플레이어와 관전자를 자유롭게 전환하세요."
     ],
     "hi": [
       "**आसान अनुमति व गेमपैड प्रबंधन।** स्वीकारने से पहले माउस, कीबोर्ड व गेमपैड चुनें, सूचना से सीधे ViGEmBus इंस्टॉल करें और अलग-अलग गेमपैड हटाएँ।",
       "**कस्टम शॉर्टकट, कुंजी व गेमपैड मैपिंग।** सेटिंग्स में रिमोट शॉर्टकट व व्यक्तिगत कुंजियाँ बदलें और गेमपैड बटन, ट्रिगर व स्टिक दिशाएँ रीमैप करें।",
-      "**लाइव इनपुट संकेतक।** साझा स्क्रीन ओवरले और नियंत्रण सूची में सक्रिय उपयोगकर्ताओं के अवतार के साथ माउस, कीबोर्ड व गेमपैड की चमकती स्थिति देखें।"
+      "**लाइव इनपुट संकेतक।** साझा स्क्रीन ओवरले और नियंत्रण सूची में सक्रिय उपयोगकर्ताओं के अवतार के साथ माउस, कीबोर्ड व गेमपैड की चमकती स्थिति देखें।",
+      "**आरामदायक बोर्ड गेम ऐप्स।** कई कमरों और खिलाड़ी व दर्शक के बीच आसान बदलाव के साथ लकड़ी के बोर्ड पर टिक-टैक-टो, शतरंज और चेकर्स खेलें।"
     ],
     "fi": [
       "**Helppokäyttöisemmät luvat ja ohjaimet.** Valitse hiiri, näppäimistö ja peliohjain ennen hyväksyntää, asenna ViGEmBus suoraan ilmoituksesta ja irrota yksittäisiä ohjaimia.",
       "**Mukautetut pikakomennot, näppäimet ja peliohjaimet.** Muuta etähallinnan pikakomentoja ja yksittäisiä näppäimiä sekä määritä ohjaimen painikkeet ja tattien suunnat.",
-      "**Reaaliaikaiset syöteilmaisimet.** Näe pinotut hallitsijoiden profiilikuvat sekä vilkkuvat hiiri-, näppäimistö- ja ohjainkuvakkeet jaetun näytön päällä ja hallinnassa."
+      "**Reaaliaikaiset syöteilmaisimet.** Näe pinotut hallitsijoiden profiilikuvat sekä vilkkuvat hiiri-, näppäimistö- ja ohjainkuvakkeet jaetun näytön päällä ja hallinnassa.",
+      "**Kodikkaat lautapelisovellukset.** Pelaa ristinollaa, shakkia ja tammea puulaudoilla useissa huoneissa ja vaihda vapaasti pelaajan ja katsojan välillä."
     ],
     "ru": [
       "**Удобные права и управление геймпадами.** Выбирайте мышь, клавиатуру и геймпад до принятия, ставьте ViGEmBus из уведомления и отключайте отдельные геймпады.",
       "**Свои клавиши, сочетания и настройка геймпада.** Переназначайте сочетания и отдельные клавиши, а также кнопки, триггеры и направления стиков в настройках.",
-      "**Индикация активного ввода.** Видите в углу оверлея и в списке управления мигающие значки мыши, клавиатуры и геймпада рядом с аватаром каждого игрока."
+      "**Индикация активного ввода.** Видите в углу оверлея и в списке управления мигающие значки мыши, клавиатуры и геймпада рядом с аватаром каждого игрока.",
+      "**Уютные настольные игры.** Играйте в крестики-нолики, шахматы и шашки на деревянных досках с несколькими комнатами и сменой роли игрока и зрителя."
     ]
   }
 }

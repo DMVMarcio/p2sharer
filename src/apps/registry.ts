@@ -1,12 +1,13 @@
 import { t } from '../i18n/index.ts';
 import protocolLabels from '../i18n/protocol.json' with { type: 'json' };
 import type React from 'react';
-import { FileText, Network, Globe, Palette } from 'lucide-react';
+import { FileText, Network, Globe, Palette, Grid3x3, Crown, CircleDot } from 'lucide-react';
 import { WhiteboardModel } from './whiteboard_model.ts';
 import { SiYoutube, SiTwitch } from 'react-icons/si';
 import { NotepadModel, YouTubeModel, TwitchModel, type RoomAppModel, type RoomAppModelContext } from './models.ts';
 import { TunnelModel } from './tunnel_model.ts';
 import { BrowserModel } from './browser_model.ts';
+import { TicTacToeModel, ChessModel, CheckersModel } from './board_game_model.ts';
 
 export interface RoomAppViewProps { instanceId: string; compact?: boolean }
 export interface RoomAppDefinition {
@@ -71,3 +72,18 @@ registerRoomApp({ kind: 'whiteboard', protocolLabel: 'Whiteboard', get label() {
   get description() { return t('whiteboard.description'); }, icon: Palette, bannerClass: 'whiteboard',
   createModel: context => new WhiteboardModel(context),
   loadView: () => import('./WhiteboardApp').then(module => ({ default: module.WhiteboardApp })) });
+
+registerRoomApp({ kind: 'tictactoe', protocolLabel: 'Tic-Tac-Toe', get label() { return t('tictactoe.title'); },
+  get description() { return t('tictactoe.description'); }, icon: Grid3x3, bannerClass: 'tictactoe',
+  createModel: context => new TicTacToeModel(context),
+  loadView: () => import('./TicTacToeApp').then(module => ({ default: module.TicTacToeApp })) });
+
+registerRoomApp({ kind: 'chess', protocolLabel: 'Chess', get label() { return t('chess.title'); },
+  get description() { return t('chess.description'); }, icon: Crown, bannerClass: 'chess',
+  createModel: context => new ChessModel(context),
+  loadView: () => import('./ChessApp').then(module => ({ default: module.ChessApp })) });
+
+registerRoomApp({ kind: 'checkers', protocolLabel: 'Checkers', get label() { return t('checkers.title'); },
+  get description() { return t('checkers.description'); }, icon: CircleDot, bannerClass: 'checkers',
+  createModel: context => new CheckersModel(context),
+  loadView: () => import('./CheckersApp').then(module => ({ default: module.CheckersApp })) });
