@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { CircleDot, Trophy } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { CircleDot } from 'lucide-react';
 import { t } from '../i18n/index.ts';
 import { useLocale } from '../hooks/useLocale.ts';
 import { roomAppsService } from './room_apps_service.ts';
@@ -17,13 +18,19 @@ import {
   CozyBoardGameShell,
   CozyRoomSidePanel,
   useBoardGamePlayers,
+  type CozyStatusTone,
 } from './BoardGameLobbyView.tsx';
+import { BoardPlanningOverlay, useBoardPlanning } from './BoardPlanningOverlay.tsx';
+import { boardGameSounds } from './board_game_sounds.ts';
 
 interface DraggingCheckersState {
   from: number;
   piece: CheckersPiece;
   clientX: number;
   clientY: number;
+  offsetX: number;
+  offsetY: number;
+  pieceSize: number;
   hoverSquare: number | null;
 }
 
@@ -34,6 +41,14 @@ export const CheckersApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = 
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [selectedSquare, setSelectedSquare] = useState<number | null>(null);
   const [dragging, setDragging] = useState<DraggingCheckersState | null>(null);
+  const suppressClickRef = useRef(false);
+  const lastSoundSnapshotRef = useRef<{
+    roomId: string;
+    moves: number;
+    status: string;
+  } | null>(null);
+
+  const { arrows, highlights, draftArrow, clearPlanning, startRightPlanning } = useBoardPlanning(8);
 
   useEffect(() => {
     return roomAppsService.subscribe(() => setTick((n) => n + 1));
@@ -47,8 +62,53 @@ export const CheckersApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = 
       setActiveRoomId(null);
       setSelectedSquare(null);
       setDragging(null);
+      clearPlanning();
     }
-  }, [activeRoomId, model]);
+  }, [activeRoomId, model, clearPlanning]);
+
+  const currentRoom = activeRoomId ? model.getRoom(activeRoomId) : undefined;
+  useEffect(() => {
+    if (!currentRoom) {
+      lastSoundSnapshotRef.current = null;
+      return;
+    }
+    const { game } = currentRoom;
+    const prev = lastSoundSnapshotRef.current;
+    if (!prev || prev.roomId !== currentRoom.id) {
+      lastSoundSnapshotRef.current = {
+        roomId: currentRoom.id,
+        moves: game.moveHistory.length,
+        status: game.status,
+      };
+      return;
+    }
+
+    const movesIncreased = game.moveHistory.length > prev.moves;
+    const statusChanged = game.status !== prev.status;
+
+    if (movesIncreased || statusChanged) {
+      const lastRecord = game.moveHistory[game.moveHistory.length - 1];
+      if (game.status === 'finished' || game.status === 'resigned') {
+        boardGameSounds.playVictory();
+      } else if (game.status === 'draw') {
+        boardGameSounds.playDraw();
+      } else if (movesIncreased) {
+        if (lastRecord?.promoted) {
+          boardGameSounds.playPromote();
+        } else if (lastRecord?.captured !== undefined) {
+          boardGameSounds.playCapture();
+        } else {
+          boardGameSounds.playMove();
+        }
+      }
+    }
+
+    lastSoundSnapshotRef.current = {
+      roomId: currentRoom.id,
+      moves: game.moveHistory.length,
+      status: game.status,
+    };
+  }, [currentRoom?.id, currentRoom?.game.moveHistory.length, currentRoom?.game.status]);
 
   const handleSelectRoom = (nextId: string | null) => {
     if (activeRoomId && nextId === null) {
@@ -57,6 +117,7 @@ export const CheckersApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = 
     setActiveRoomId(nextId);
     setSelectedSquare(null);
     setDragging(null);
+    clearPlanning();
   };
 
   const describeRoomStatus = (room: CheckersRoomState): string => {
@@ -148,10 +209,19 @@ export const CheckersApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = 
         };
 
         const handleSquarePointerDown = (event: React.PointerEvent<HTMLButtonElement>, sqIndex: number) => {
-          if (event.button !== 0 || !isMyTurn || !myColor) return;
+          if (event.button === 2) {
+            startRightPlanning(event, sqIndex);
+            return;
+          }
+          if (event.button !== 0) return;
+
+          clearPlanning();
+
+          if (!isMyTurn || !myColor) return;
 
           if (effectiveSelected !== null && legalTargets.has(sqIndex)) {
             event.preventDefault();
+            suppressClickRef.current = true;
             model.makeMove(room.id, effectiveSelected, sqIndex);
             setSelectedSquare(null);
             return;
@@ -166,6 +236,14 @@ export const CheckersApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = 
           }
 
           event.preventDefault();
+          const pieceEl = event.currentTarget.querySelector<HTMLElement>('.checkers-wood-token');
+          const pieceRect = pieceEl?.getBoundingClientRect() ?? event.currentTarget.getBoundingClientRect();
+          const centerX = pieceRect.left + pieceRect.width / 2;
+          const centerY = pieceRect.top + pieceRect.height / 2;
+          const offsetX = event.clientX - centerX;
+          const offsetY = event.clientY - centerY;
+          const pieceSize = Math.max(24, Math.round(pieceRect.width));
+
           setSelectedSquare(sqIndex);
           const startX = event.clientX;
           const startY = event.clientY;
@@ -184,6 +262,9 @@ export const CheckersApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = 
                 piece: clickedPiece,
                 clientX: moveEvent.clientX,
                 clientY: moveEvent.clientY,
+                offsetX,
+                offsetY,
+                pieceSize,
                 hoverSquare: hovered,
               });
             }
@@ -194,6 +275,7 @@ export const CheckersApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = 
             window.removeEventListener('pointerup', onPointerUp);
             window.removeEventListener('pointercancel', onPointerUp);
             if (dragStarted) {
+              suppressClickRef.current = true;
               const targetSq = resolveSquareAtClientPoint(upEvent.clientX, upEvent.clientY);
               setDragging(null);
               if (targetSq !== null && targetSq !== sqIndex) {
@@ -220,31 +302,38 @@ export const CheckersApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = 
           }
         }
 
+        const statusTone: CozyStatusTone =
+          game.status !== 'playing'
+            ? 'victory'
+            : game.mustContinueFrom !== null
+              ? 'highlight'
+              : isMyTurn
+                ? 'turn'
+                : 'waiting';
+
+        const statusText =
+          game.status === 'playing' && game.mustContinueFrom !== null
+            ? t('checkers.continueCapture')
+            : describeRoomStatus(room);
+
         return (
           <div className="cozy-match-layout">
             <div className="cozy-board-stage">
-              {(game.status !== 'playing' || game.mustContinueFrom !== null) && (
-                <div className="cozy-board-hud-row">
-                  {game.status !== 'playing' ? (
-                    <div className="cozy-match-banner" role="status">
-                      <Trophy size={16} aria-hidden="true" />
-                      <span>{describeRoomStatus(room)}</span>
-                    </div>
-                  ) : (
-                    <div className="cozy-match-banner is-highlight" role="status">
-                      <span>{t('checkers.continueCapture')}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
               <div className="wood-board-frame checkers-wood-frame">
                 <span className="wood-frame-stud stud-tl" aria-hidden="true" />
                 <span className="wood-frame-stud stud-tr" aria-hidden="true" />
                 <span className="wood-frame-stud stud-bl" aria-hidden="true" />
                 <span className="wood-frame-stud stud-br" aria-hidden="true" />
 
-                <div className="wood-board-8x8" role="grid" aria-label={t('checkers.title')}>
+                <div
+                  className="wood-board-8x8"
+                  role="grid"
+                  aria-label={t('checkers.title')}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                >
                   {displaySquares.map((sqIndex, visualIdx) => {
                     const r = Math.floor(sqIndex / 8);
                     const c = sqIndex % 8;
@@ -261,7 +350,9 @@ export const CheckersApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = 
                       isMyTurn &&
                       selectableOrigins.has(sqIndex) &&
                       allLegal.some((m) => m.captured !== undefined);
-                    const isDraggablePiece = Boolean(isMyTurn && piece && piece.color === myColor && selectableOrigins.has(sqIndex));
+                    const isDraggablePiece = Boolean(
+                      isMyTurn && piece && piece.color === myColor && selectableOrigins.has(sqIndex),
+                    );
                     const showRank = visualIdx % 8 === 0;
                     const showFile = visualIdx >= 56;
                     const sqLabel = `${String.fromCharCode(97 + c)}${8 - r}`;
@@ -284,12 +375,16 @@ export const CheckersApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = 
                         }`}
                         onPointerDown={(e) => handleSquarePointerDown(e, sqIndex)}
                         onClick={() => {
-                          if (!dragging && isMyTurn) {
+                          if (suppressClickRef.current) {
+                            suppressClickRef.current = false;
+                            return;
+                          }
+                          if (isMyTurn) {
                             if (effectiveSelected !== null && legalTargets.has(sqIndex)) {
                               model.makeMove(room.id, effectiveSelected, sqIndex);
                               setSelectedSquare(null);
                             } else if (piece && piece.color === myColor && selectableOrigins.has(sqIndex)) {
-                              setSelectedSquare(sqIndex);
+                              setSelectedSquare(selectedSquare === sqIndex ? null : sqIndex);
                             }
                           }
                         }}
@@ -306,19 +401,38 @@ export const CheckersApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = 
                       </button>
                     );
                   })}
+
+                  <BoardPlanningOverlay
+                    gridSize={8}
+                    flipped={flipped}
+                    arrows={arrows}
+                    highlights={highlights}
+                    draftArrow={draftArrow}
+                  />
                 </div>
               </div>
             </div>
 
-            {dragging && (
-              <div
-                className="board-drag-ghost"
-                style={{ left: `${dragging.clientX}px`, top: `${dragging.clientY}px` }}
-                aria-hidden="true"
-              >
-                <CheckersPieceSvg color={dragging.piece.color} king={dragging.piece.king} size={54} />
-              </div>
-            )}
+            {dragging &&
+              createPortal(
+                <div
+                  className="board-drag-ghost"
+                  style={{
+                    left: `${dragging.clientX - dragging.offsetX}px`,
+                    top: `${dragging.clientY - dragging.offsetY}px`,
+                    width: `${dragging.pieceSize}px`,
+                    height: `${dragging.pieceSize}px`,
+                  }}
+                  aria-hidden="true"
+                >
+                  <CheckersPieceSvg
+                    color={dragging.piece.color}
+                    king={dragging.piece.king}
+                    size={dragging.pieceSize}
+                  />
+                </div>,
+                document.body,
+              )}
 
             <CozyRoomSidePanel
               room={room}
@@ -329,19 +443,26 @@ export const CheckersApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = 
               seat2Score={game.scores.b}
               drawsScore={game.scores.draws}
               turnSide={game.status !== 'playing' ? null : game.turn === 'w' ? 'seat1' : 'seat2'}
+              statusText={statusText}
+              statusTone={statusTone}
               onNewMatch={() => {
                 model.newGame(room.id, false);
                 setSelectedSquare(null);
+                clearPlanning();
               }}
               onResetScores={() => {
                 model.newGame(room.id, true);
                 setSelectedSquare(null);
+                clearPlanning();
               }}
-              onSwapSeats={() => model.swapSides(room.id)}
+              onSwapSeats={() => {
+                model.swapSides(room.id);
+                clearPlanning();
+              }}
               canResign={game.status === 'playing' && myColor !== null}
               onResign={() => model.resign(room.id)}
               extraContent={
-                <div className="cozy-history-card">
+                <div className="cozy-panel-card cozy-history-card">
                   <div className="cozy-captured-strip">
                     <div className="cozy-captured-row">
                       <span>{t('games.lightPieces')}:</span>
@@ -359,7 +480,7 @@ export const CheckersApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = 
                       <p className="cozy-muted-note">{t('games.noMovesYet')}</p>
                     ) : (
                       <div className="cozy-moves-list">
-                        {game.moveHistory.slice(-24).map((m, idx) => (
+                        {game.moveHistory.slice(-28).map((m, idx) => (
                           <span key={idx} className={`cozy-move-pill is-${m.color}`}>
                             {m.notation}
                           </span>

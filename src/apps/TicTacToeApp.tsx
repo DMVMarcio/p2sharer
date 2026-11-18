@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { Grid3x3, Trophy } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Grid3x3 } from 'lucide-react';
 import { t } from '../i18n/index.ts';
 import { useLocale } from '../hooks/useLocale.ts';
 import { roomAppsService } from './room_apps_service.ts';
@@ -11,7 +12,10 @@ import {
   CozyRoomSidePanel,
   TicTacToePieceSvg,
   useBoardGamePlayers,
+  type CozyStatusTone,
 } from './BoardGameLobbyView.tsx';
+import { BoardPlanningOverlay, useBoardPlanning } from './BoardPlanningOverlay.tsx';
+import { boardGameSounds } from './board_game_sounds.ts';
 
 export const TicTacToeApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = false }) => {
   useLocale();
@@ -22,8 +26,19 @@ export const TicTacToeApp: React.FC<RoomAppViewProps> = ({ instanceId, compact =
     side: TicTacToeSide;
     clientX: number;
     clientY: number;
+    offsetX: number;
+    offsetY: number;
+    pieceSize: number;
     hoverCell: number | null;
   } | null>(null);
+
+  const lastSoundSnapshotRef = useRef<{
+    roomId: string;
+    moves: number;
+    winner: string | null;
+  } | null>(null);
+
+  const { arrows, highlights, draftArrow, clearPlanning, startRightPlanning } = useBoardPlanning(3);
 
   useEffect(() => {
     return roomAppsService.subscribe(() => setTick((n) => n + 1));
@@ -36,8 +51,43 @@ export const TicTacToeApp: React.FC<RoomAppViewProps> = ({ instanceId, compact =
     if (activeRoomId && !model.getRoom(activeRoomId)) {
       setActiveRoomId(null);
       setDraggingToken(null);
+      clearPlanning();
     }
-  }, [activeRoomId, model]);
+  }, [activeRoomId, model, clearPlanning]);
+
+  const currentRoom = activeRoomId ? model.getRoom(activeRoomId) : undefined;
+  useEffect(() => {
+    if (!currentRoom) {
+      lastSoundSnapshotRef.current = null;
+      return;
+    }
+    const { game } = currentRoom;
+    const prev = lastSoundSnapshotRef.current;
+    if (!prev || prev.roomId !== currentRoom.id) {
+      lastSoundSnapshotRef.current = {
+        roomId: currentRoom.id,
+        moves: game.moveCount,
+        winner: game.winner,
+      };
+      return;
+    }
+
+    if (game.moveCount > prev.moves || game.winner !== prev.winner) {
+      if (game.winner === 'X' || game.winner === 'O') {
+        boardGameSounds.playVictory();
+      } else if (game.winner === 'draw') {
+        boardGameSounds.playDraw();
+      } else if (game.moveCount > prev.moves) {
+        boardGameSounds.playMove();
+      }
+    }
+
+    lastSoundSnapshotRef.current = {
+      roomId: currentRoom.id,
+      moves: game.moveCount,
+      winner: game.winner,
+    };
+  }, [currentRoom?.id, currentRoom?.game.moveCount, currentRoom?.game.winner]);
 
   const handleSelectRoom = (nextId: string | null) => {
     if (activeRoomId && nextId === null) {
@@ -45,6 +95,7 @@ export const TicTacToeApp: React.FC<RoomAppViewProps> = ({ instanceId, compact =
     }
     setActiveRoomId(nextId);
     setDraggingToken(null);
+    clearPlanning();
   };
 
   const describeRoomStatus = (room: TicTacToeRoomState): string => {
@@ -117,10 +168,21 @@ export const TicTacToeApp: React.FC<RoomAppViewProps> = ({ instanceId, compact =
           if (event.button !== 0 || !myTurn || !mySide) return;
           event.preventDefault();
           const side = mySide;
+          const pieceEl = event.currentTarget.querySelector<HTMLElement>('.ttt-svg-piece');
+          const pieceRect = pieceEl?.getBoundingClientRect() ?? event.currentTarget.getBoundingClientRect();
+          const centerX = pieceRect.left + pieceRect.width / 2;
+          const centerY = pieceRect.top + pieceRect.height / 2;
+          const offsetX = event.clientX - centerX;
+          const offsetY = event.clientY - centerY;
+          const pieceSize = Math.max(32, Math.round(pieceRect.width));
+
           setDraggingToken({
             side,
             clientX: event.clientX,
             clientY: event.clientY,
+            offsetX,
+            offsetY,
+            pieceSize,
             hoverCell: resolveCellAtPoint(event.clientX, event.clientY),
           });
 
@@ -129,6 +191,9 @@ export const TicTacToeApp: React.FC<RoomAppViewProps> = ({ instanceId, compact =
               side,
               clientX: moveEvent.clientX,
               clientY: moveEvent.clientY,
+              offsetX,
+              offsetY,
+              pieceSize,
               hoverCell: resolveCellAtPoint(moveEvent.clientX, moveEvent.clientY),
             });
           };
@@ -149,25 +214,27 @@ export const TicTacToeApp: React.FC<RoomAppViewProps> = ({ instanceId, compact =
           window.addEventListener('pointercancel', onPointerUp);
         };
 
+        const statusTone: CozyStatusTone =
+          game.winner !== null ? 'victory' : myTurn ? 'turn' : 'waiting';
+
         return (
           <div className="cozy-match-layout">
             <div className="cozy-board-stage">
-              {game.winner && (
-                <div className="cozy-board-hud-row">
-                  <div className="cozy-match-banner" role="status">
-                    <Trophy size={16} aria-hidden="true" />
-                    <span>{describeRoomStatus(room)}</span>
-                  </div>
-                </div>
-              )}
-
               <div className="wood-board-frame ttt-wood-frame">
                 <span className="wood-frame-stud stud-tl" aria-hidden="true" />
                 <span className="wood-frame-stud stud-tr" aria-hidden="true" />
                 <span className="wood-frame-stud stud-bl" aria-hidden="true" />
                 <span className="wood-frame-stud stud-br" aria-hidden="true" />
 
-                <div className="ttt-wood-grid" role="grid" aria-label={t('tictactoe.title')}>
+                <div
+                  className="ttt-wood-grid"
+                  role="grid"
+                  aria-label={t('tictactoe.title')}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                >
                   {game.board.map((cell, index) => {
                     const isWinning = winSet.has(index);
                     const isLast = game.lastMove === index;
@@ -180,30 +247,58 @@ export const TicTacToeApp: React.FC<RoomAppViewProps> = ({ instanceId, compact =
                         type="button"
                         role="gridcell"
                         data-ttt-cell={index}
+                        data-board-square={index}
                         aria-label={`${t('games.cell')} ${index + 1}${cell ? `: ${cell}` : ''}`}
-                        disabled={!canClick}
+                        aria-disabled={!canClick}
                         className={`ttt-wood-cell ${cell ? 'occupied' : ''} ${canClick ? 'playable' : ''} ${
                           isWinning ? 'is-winning' : ''
                         } ${isLast ? 'is-last-move' : ''} ${isDragHover ? 'is-drag-hover' : ''}`}
-                        onClick={() => model.makeMove(room.id, index)}
+                        onPointerDown={(e) => {
+                          if (e.button === 2) {
+                            startRightPlanning(e, index);
+                          } else if (e.button === 0) {
+                            clearPlanning();
+                          }
+                        }}
+                        onClick={() => {
+                          if (canClick) {
+                            model.makeMove(room.id, index);
+                            clearPlanning();
+                          }
+                        }}
                       >
                         {cell && <TicTacToePieceSvg side={cell} size={64} />}
                       </button>
                     );
                   })}
+
+                  <BoardPlanningOverlay
+                    gridSize={3}
+                    flipped={false}
+                    arrows={arrows}
+                    highlights={highlights}
+                    draftArrow={draftArrow}
+                  />
                 </div>
               </div>
             </div>
 
-            {draggingToken && (
-              <div
-                className="board-drag-ghost"
-                style={{ left: `${draggingToken.clientX}px`, top: `${draggingToken.clientY}px` }}
-                aria-hidden="true"
-              >
-                <TicTacToePieceSvg side={draggingToken.side} size={58} />
-              </div>
-            )}
+            {draggingToken &&
+              createPortal(
+                <div
+                  className="board-drag-ghost"
+                  style={{
+                    left: `${draggingToken.clientX - draggingToken.offsetX}px`,
+                    top: `${draggingToken.clientY - draggingToken.offsetY}px`,
+                    width: `${draggingToken.pieceSize}px`,
+                    height: `${draggingToken.pieceSize}px`,
+                  }}
+                  aria-hidden="true"
+                >
+                  <TicTacToePieceSvg side={draggingToken.side} size={draggingToken.pieceSize} />
+                </div>,
+                document.body,
+              )}
 
             <CozyRoomSidePanel
               room={room}
@@ -214,11 +309,13 @@ export const TicTacToeApp: React.FC<RoomAppViewProps> = ({ instanceId, compact =
               seat2Score={game.scores.O}
               drawsScore={game.scores.draws}
               turnSide={game.winner ? null : game.turn === 'X' ? 'seat1' : 'seat2'}
+              statusText={describeRoomStatus(room)}
+              statusTone={statusTone}
               onNewMatch={() => model.newRound(room.id, false)}
               onResetScores={() => model.newRound(room.id, true)}
               extraContent={
                 mySide && (
-                  <div className="cozy-history-card ttt-token-tray-card">
+                  <div className="cozy-panel-card ttt-token-tray-card">
                     <div
                       className={`ttt-draggable-token-well ${myTurn ? 'is-ready' : 'is-waiting'}`}
                       onPointerDown={startTokenDrag}
