@@ -507,23 +507,30 @@
 
 .cozy-seat-badge,
 .cozy-seat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   align-self: flex-start;
-  padding: 2px 8px;
+  padding: 3px 9px;
   border-radius: 999px;
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 750;
+}
+.cozy-seat-badge .cozy-seat-orb {
+  width: 11px;
+  height: 11px;
 }
 .cozy-seat-badge.seat-1,
 .cozy-seat-chip.seat-1 {
-  background: rgba(245, 225, 188, 0.24);
-  color: #fff0d1;
-  border: 1px solid rgba(245, 225, 188, 0.35);
+  background: rgba(245, 225, 188, 0.22);
+  color: #fff2d8;
+  border: 1px solid rgba(245, 225, 188, 0.34);
 }
 .cozy-seat-badge.seat-2,
 .cozy-seat-chip.seat-2 {
-  background: rgba(134, 198, 124, 0.24);
-  color: #d0f4c8;
-  border: 1px solid rgba(134, 198, 124, 0.35);
+  background: rgba(28, 16, 8, 0.42);
+  color: #f3e2c4;
+  border: 1px solid rgba(214, 171, 118, 0.32);
 }
 
 .cozy-seat-player {

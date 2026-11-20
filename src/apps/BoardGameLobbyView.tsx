@@ -443,7 +443,7 @@ export function CozyBoardGameShell<TGame>({
                             ) : (
                               <button
                                 type="button"
-                                className="cozy-seat-join-link"
+                                className="cozy-seat-play-btn"
                                 onClick={() => quickJoinRoom(room, 'seat1')}
                               >
                                 <Play size={12} />
@@ -471,7 +471,7 @@ export function CozyBoardGameShell<TGame>({
                             ) : (
                               <button
                                 type="button"
-                                className="cozy-seat-join-link"
+                                className="cozy-seat-play-btn"
                                 onClick={() => quickJoinRoom(room, 'seat2')}
                               >
                                 <Play size={12} />
