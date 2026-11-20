@@ -7,9 +7,10 @@ import { GroupRoomManager } from '../p2p/group_room.ts';
 import { roomService } from './room_service.ts';
 
 export const HOME_ROOM_PRESENCE_INTERVAL_MS = 5 * 60 * 1000;
-const PROBE_MAX_MS = 7000;
-const PROBE_RETRY_MS = 2200;
-const PROBE_SETTLE_AFTER_RESPONSE_MS = 1200;
+const PROBE_CONCURRENCY = 4;
+const PROBE_MAX_MS = 11000;
+const PROBE_RETRY_MS = 1200;
+const PROBE_SETTLE_AFTER_RESPONSE_MS = 900;
 
 export type ProbeRoomFn = (room: SavedRoom, signal: AbortSignal,
   onUpdate: (participants: RoomPreviewParticipant[]) => void) => Promise<RoomPreviewParticipant[]>;
@@ -61,14 +62,14 @@ export function createHomeRoomPresenceService(probeFn?: ProbeRoomFn) {
     let settled = false;
     let resolveDone: (() => void) | null = null;
     let maxTimer: ReturnType<typeof setTimeout> | null = null;
-    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let retryTimer: ReturnType<typeof setInterval> | null = null;
     let settleTimer: ReturnType<typeof setTimeout> | null = null;
 
     const finish = () => {
       if (settled) return;
       settled = true;
       if (maxTimer) clearTimeout(maxTimer);
-      if (retryTimer) clearTimeout(retryTimer);
+      if (retryTimer) clearInterval(retryTimer);
       if (settleTimer) clearTimeout(settleTimer);
       resolveDone?.();
     };
@@ -81,7 +82,7 @@ export function createHomeRoomPresenceService(probeFn?: ProbeRoomFn) {
 
     try {
       maxTimer = setTimeout(finish, PROBE_MAX_MS);
-      retryTimer = setTimeout(() => {
+      retryTimer = setInterval(() => {
         if (!settled && !signal.aborted && !preview) {
           manager.requestPreview();
         }
@@ -115,7 +116,7 @@ export function createHomeRoomPresenceService(probeFn?: ProbeRoomFn) {
     } finally {
       signal.removeEventListener('abort', onAbort);
       if (maxTimer) clearTimeout(maxTimer);
-      if (retryTimer) clearTimeout(retryTimer);
+      if (retryTimer) clearInterval(retryTimer);
       if (settleTimer) clearTimeout(settleTimer);
       await manager.leave().catch(() => {});
     }
@@ -169,21 +170,28 @@ export function createHomeRoomPresenceService(probeFn?: ProbeRoomFn) {
         const savedIds = new Set(records.map((room) => room.roomId));
         pruneDeletedRooms(savedIds);
         const now = Date.now();
-        for (const room of records) {
-          if (controller.signal.aborted || !canPoll() || activeConsumers === 0) break;
-          const last = lastCheckedAt.get(room.roomId) ?? 0;
-          if (!force && now - last < HOME_ROOM_PRESENCE_INTERVAL_MS) continue;
-          lastCheckedAt.set(room.roomId, Date.now());
-          const result = await runProbe(room, controller.signal, (liveList) => {
-            if (controller.signal.aborted || !canPoll()) return;
-            participantsByRoom = { ...participantsByRoom, [room.roomId]: liveList };
-            notify();
-          });
-          if (!controller.signal.aborted && canPoll()) {
-            participantsByRoom = { ...participantsByRoom, [room.roomId]: result };
-            notify();
+        const dueRooms = records.filter((room) =>
+          force || now - (lastCheckedAt.get(room.roomId) ?? 0) >= HOME_ROOM_PRESENCE_INTERVAL_MS);
+        let cursor = 0;
+        const workerCount = Math.min(PROBE_CONCURRENCY, dueRooms.length);
+        const workers = Array.from({ length: workerCount }, async () => {
+          while (cursor < dueRooms.length) {
+            if (controller.signal.aborted || !canPoll() || activeConsumers === 0) break;
+            const room = dueRooms[cursor++]!;
+            const result = await runProbe(room, controller.signal, (liveList) => {
+              if (controller.signal.aborted || !canPoll()) return;
+              lastCheckedAt.set(room.roomId, Date.now());
+              participantsByRoom = { ...participantsByRoom, [room.roomId]: liveList };
+              notify();
+            });
+            if (!controller.signal.aborted && canPoll()) {
+              lastCheckedAt.set(room.roomId, Date.now());
+              participantsByRoom = { ...participantsByRoom, [room.roomId]: result };
+              notify();
+            }
           }
-        }
+        });
+        await Promise.all(workers);
       } finally {
         if (currentAbort === controller) currentAbort = null;
       }

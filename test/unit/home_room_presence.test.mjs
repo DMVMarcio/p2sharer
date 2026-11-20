@@ -45,6 +45,30 @@ test('home room presence polls saved rooms on a 5-minute interval and clears imm
   });
 
   stateStore.savePrivacyPreferences({ homeRoomPresencePolling: true });
+  const createdTwo = await createAuthenticatedInvite('Second polling room');
+  const inviteTwo = parseRoomInvite(createdTwo.invite);
+  await savedRooms.put({
+    roomId: inviteTwo.roomId,
+    invite: createdTwo.invite,
+    name: 'Second polling room',
+    saved: true,
+    owned: false,
+  });
+  let inFlight = 0;
+  let maxConcurrent = 0;
+  const serviceConcurrent = createHomeRoomPresenceService(async (room, _signal) => {
+    inFlight++;
+    maxConcurrent = Math.max(maxConcurrent, inFlight);
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    inFlight--;
+    return [{ id: `peer-${room.roomId}`, name: room.name, color: '#06b6d4' }];
+  });
+  const stopConcurrent = serviceConcurrent.start();
+  await new Promise((resolve) => setTimeout(resolve, 60));
+  assert.equal(maxConcurrent, 2, 'probes multiple saved rooms concurrently');
+  stopConcurrent();
+  await savedRooms.remove(inviteTwo.roomId);
+
   const stop = service.start();
   try {
     await new Promise((resolve) => setTimeout(resolve, 20));

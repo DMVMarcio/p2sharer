@@ -718,14 +718,7 @@ export const SettingsModal: React.FC = () => {
                           <span className="switch-slider" />
                         </div>
                       </label>
-                      <button type="button" disabled={profileBusy || saving}
-              className={`settings-nav-item ${activeTab === 'privacy' ? 'active' : ''}`}
-              onClick={() => setActiveTab('privacy')}>
-              <ShieldCheck size={16} aria-hidden="true" />
-              <span>{t('privacy.tabLabel')}</span>
-            </button>
-
-            <button type="button" className="btn btn-sm btn-outline"
+<button type="button" className="btn btn-sm btn-outline"
                         aria-label={t("message.a93982492cdc", { v0: SOUND_LABELS[event] })}
                         onClick={() => soundEffects.preview(event, sfxVolume / 100)}>{t("message.76a30e43448f")}</button>
                     </div>

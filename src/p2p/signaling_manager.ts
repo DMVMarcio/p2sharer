@@ -353,6 +353,9 @@ export class SignalingManager {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public joinRoom(config: any, topic: string, callbacks?: any): any {
     if (callbacks?.backgroundProbe && !this.lanRoom) {
+      if (!this.activeRoom && !this.isFailingOver) {
+        this.roomPreferences = loadRendezvousPreferences();
+      }
       const probeRoom = this.createRoomForTransport(this.activeTransport, config, topic, callbacks, true);
       if (probeRoom && typeof probeRoom === 'object') {
         this.isolatedProbeRooms.add(probeRoom);
