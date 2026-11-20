@@ -1848,5 +1848,19 @@
   "games.confirmNewMatch": "盤面をリセットして新しい対局を始めますか？",
   "games.confirmResetScores": "スコアをリセットして新しい対局を始めますか？",
   "games.turnActive": "対局中",
-  "games.waitingTurn": "待機中"
+  "games.waitingTurn": "待機中",
+  "privacy.tabLabel": "セキュリティとプライバシー",
+  "privacy.title": "セキュリティとプライバシー",
+  "privacy.subtitle": "ホーム画面でのバックグラウンド照会やP2P接続時のネットワーク公開を管理します。",
+  "privacy.homeRoomPresenceTitle": "ホーム画面にオンラインメンバーを表示",
+  "privacy.homeRoomPresenceDesc": "5分ごとに保存済みルームをバックグラウンドで確認しメンバーのアバターを表示します。オフにすると入室するまで接続しません。",
+  "privacy.roomTrustNotice": "未保存のルームでは、データ読み込みやP2PでのIPアドレス交換の前に必ず信頼確認を行います。",
+  "join.trustTitle": "このルームを信頼しますか？",
+  "join.trustIpNotice": "ルームの確認や入室を行うと直接P2P接続が確立され、ルーム内の参加者にIPアドレスが開示されます。",
+  "join.trustQuestion": "このルームを信頼して続行しますか？",
+  "join.trustRoomLabel": "招待状のルーム名",
+  "join.trustShortLabel": "短縮ルームコード",
+  "join.trustConfirm": "信頼して続行",
+  "join.saveRoom": "このルームを保存",
+  "savedRooms.onlineMembers": "参加中のメンバー ({{count}})"
 }

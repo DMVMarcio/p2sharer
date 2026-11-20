@@ -1848,5 +1848,19 @@
   "games.confirmNewMatch": "¿Iniciar una nueva partida y reiniciar el tablero actual?",
   "games.confirmResetScores": "¿Reiniciar el marcador y comenzar una nueva partida?",
   "games.turnActive": "Jugando ahora",
-  "games.waitingTurn": "Esperando"
+  "games.waitingTurn": "Esperando",
+  "privacy.tabLabel": "Seguridad y privacidad",
+  "privacy.title": "Seguridad y privacidad",
+  "privacy.subtitle": "Controla las consultas en segundo plano y la exposición de red en conexiones P2P.",
+  "privacy.homeRoomPresenceTitle": "Mostrar miembros activos en inicio",
+  "privacy.homeRoomPresenceDesc": "Consulta tus salas guardadas cada 5 minutos en segundo plano para mostrar los avatares de los miembros. Desactívalo para no conectarte hasta entrar.",
+  "privacy.roomTrustNotice": "Las salas no guardadas siempre solicitan confirmación antes de cargar datos o intercambiar direcciones IP punto a punto.",
+  "join.trustTitle": "¿Confías en esta sala?",
+  "join.trustIpNotice": "Comprobar o entrar en una sala establece conexiones P2P directas, lo que expone tu dirección IP a los participantes de la sala.",
+  "join.trustQuestion": "¿Confías en esta sala y deseas continuar?",
+  "join.trustRoomLabel": "Sala de la invitación",
+  "join.trustShortLabel": "Código corto de sala",
+  "join.trustConfirm": "Confiar y continuar",
+  "join.saveRoom": "Guardar esta sala",
+  "savedRooms.onlineMembers": "Participantes activos ({{count}})"
 }

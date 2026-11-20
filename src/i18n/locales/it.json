@@ -1848,5 +1848,19 @@
   "games.confirmNewMatch": "Iniziare una nuova partita e reimpostare la scacchiera attuale?",
   "games.confirmResetScores": "Azzerare il punteggio e iniziare una nuova partita?",
   "games.turnActive": "Sta giocando",
-  "games.waitingTurn": "In attesa"
+  "games.waitingTurn": "In attesa",
+  "privacy.tabLabel": "Sicurezza e privacy",
+  "privacy.title": "Sicurezza e privacy",
+  "privacy.subtitle": "Controlla le verifiche in background delle stanze e l’esposizione di rete P2P.",
+  "privacy.homeRoomPresenceTitle": "Mostra membri attivi nella schermata iniziale",
+  "privacy.homeRoomPresenceDesc": "Controlla le stanze salvate ogni 5 minuti in background per mostrare gli avatar dei membri. Disattiva per evitare connessioni fino all’ingresso.",
+  "privacy.roomTrustNotice": "Le stanze non salvate chiedono sempre conferma prima di caricare i dati o scambiare indirizzi IP peer-to-peer.",
+  "join.trustTitle": "Ti fidi di questa stanza?",
+  "join.trustIpNotice": "Verificare o entrare in una stanza stabilisce connessioni dirette P2P, esponendo il tuo indirizzo IP ai partecipanti presenti.",
+  "join.trustQuestion": "Ti fidi di questa stanza e vuoi continuare?",
+  "join.trustRoomLabel": "Stanza dall’invito",
+  "join.trustShortLabel": "Codice breve stanza",
+  "join.trustConfirm": "Fidati e continua",
+  "join.saveRoom": "Salva questa stanza",
+  "savedRooms.onlineMembers": "Partecipanti attivi ({{count}})"
 }

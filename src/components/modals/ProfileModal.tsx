@@ -42,10 +42,10 @@ export function ProfileModal() {
     </div>
     <div className="profile-view-content">
       <div className="profile-view-identity">
-        <ProfileAvatar peerId={target.peerId} isLocal={target.isLocal} name={name} color={target.color} className="profile-view-avatar" />
+        <ProfileAvatar peerId={target.peerId} isLocal={target.isLocal} name={name} color={target.color} imageUrl={target.imageUrl} className="profile-view-avatar" />
         <h3><Nickname name={name} peerId={target.peerId} isLocal={target.isLocal} /></h3>
       </div>
-      {stats !== null && <>
+      {!target.hideStats && stats !== null && <>
         <h4>{t('profile.stats.title')}</h4>
         {stats ? <dl className="profile-stats-grid">{tiles.map(({ label, value, icon: Icon }) => <div key={label}>
           <dt><Icon size={16} aria-hidden="true" />{t(label)}</dt><dd>{value}</dd>

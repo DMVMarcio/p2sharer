@@ -1848,5 +1848,19 @@
   "games.confirmNewMatch": "确定开始新对局并重置当前棋盘吗？",
   "games.confirmResetScores": "确定重置比分并开始新对局吗？",
   "games.turnActive": "思考中",
-  "games.waitingTurn": "等待中"
+  "games.waitingTurn": "等待中",
+  "privacy.tabLabel": "安全与隐私",
+  "privacy.title": "安全与隐私",
+  "privacy.subtitle": "控制后台房间成员查询和点对点连接的网络暴露。",
+  "privacy.homeRoomPresenceTitle": "在主界面显示房间活跃成员",
+  "privacy.homeRoomPresenceDesc": "每 5 分钟在后台检查已保存的房间以显示成员头像。关闭后在您主动加入前不会连接任何房间中继。",
+  "privacy.roomTrustNotice": "进入未保存的房间前始终会先请求您的信任确认，然后再加载房间信息或交换 P2P IP 地址。",
+  "join.trustTitle": "是否信任此房间？",
+  "join.trustIpNotice": "检查或加入房间会建立点对点 (P2P) 直连，从而将您的 IP 地址暴露给房间内的参与者。",
+  "join.trustQuestion": "您是否信任此房间并继续？",
+  "join.trustRoomLabel": "邀请中的房间",
+  "join.trustShortLabel": "房间短代码",
+  "join.trustConfirm": "信任并继续",
+  "join.saveRoom": "保存此房间",
+  "savedRooms.onlineMembers": "当前在线成员 ({{count}})"
 }

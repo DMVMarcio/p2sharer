@@ -34,7 +34,8 @@ import { appUpdates } from '../../services/app_updates';
 import { automaticUpdateChecks, betaUpdateChecks } from '../../core/app_updates';
 import { ApplicationSettings } from './ApplicationSettings';
 import { useAppUpdates } from '../../hooks/useAppUpdates';
-import { Keyboard, MonitorCog } from 'lucide-react';
+import { Keyboard, MonitorCog, ShieldCheck } from 'lucide-react';
+import { StatusNotice } from '../common/StatusNotice';
 import { useRoom } from '../../hooks/useRoom';
 import { VigemDriverBanner } from '../common/VigemDriverBanner';
 import { RemoteControlPermissionBadges } from '../common/RemoteControlPermissionBadges';
@@ -61,8 +62,9 @@ export const SettingsModal: React.FC = () => {
   const { themeMode, accentColor, backgroundColor, setThemeMode, setAccentColor, setBackgroundColor } = useAppTheme();
 
   const [activeTab, setActiveTab] = useState<
-    'profile' | 'application' | 'conversations' | 'appearance' | 'audio' | 'stream' | 'remoteControl' | 'inputBindings' | 'network' | 'diagnostics'
+    'profile' | 'application' | 'privacy' | 'conversations' | 'appearance' | 'audio' | 'stream' | 'remoteControl' | 'inputBindings' | 'network' | 'diagnostics'
   >('profile');
+  const [homeRoomPresencePolling, setHomeRoomPresencePolling] = useState(() => stateStore.homeRoomPresencePolling);
   const [inputBindingsDraft, setInputBindingsDraft] = useState(loadInputBindings);
   const [inputBindingsSubTab, setInputBindingsSubTab] = useState<'keyboard' | 'gamepad'>('keyboard');
   const {
@@ -212,6 +214,7 @@ export const SettingsModal: React.FC = () => {
     saveEmojiPack(emojiPack);
     saveTransferSpeedUnit(transferSpeedUnit);
     appUpdates.setPreferences(autoUpdates, betaUpdates);
+    stateStore.savePrivacyPreferences({ homeRoomPresencePolling });
     soundEffects.setEnabled(sfxEnabled);
     soundEffects.setEventPreferences(soundEvents);
     soundEffects.setVolume(sfxVolume / 100);
@@ -424,6 +427,13 @@ export const SettingsModal: React.FC = () => {
               <span>{t("message.2a5815044d04")}</span>
             </button>
 
+            <button type="button" disabled={profileBusy || saving}
+              className={`settings-nav-item ${activeTab === 'privacy' ? 'active' : ''}`}
+              onClick={() => setActiveTab('privacy')}>
+              <ShieldCheck size={16} aria-hidden="true" />
+              <span>{t('privacy.tabLabel')}</span>
+            </button>
+
             <button type="button"
               disabled={profileBusy || saving}
               className={`settings-nav-item ${activeTab === 'application' ? 'active' : ''}`}
@@ -463,6 +473,29 @@ export const SettingsModal: React.FC = () => {
 
             {panePresence.value === 'application' && <ApplicationSettings language={language} onLanguageChange={setLanguageDraft} automatic={autoUpdates}
               includePrereleases={betaUpdates} onAutomaticChange={setAutoUpdates} onPrereleasesChange={setBetaUpdates} />}
+            {panePresence.value === 'privacy' && (
+              <div className="settings-tab-pane active" id="settings-pane-privacy">
+                <div className="settings-pane-header">
+                  <h3 className="settings-pane-title">{t('privacy.title')}</h3>
+                  <p className="settings-pane-desc">{t('privacy.subtitle')}</p>
+                </div>
+                <div className="settings-row">
+                  <label className="settings-switch-row" htmlFor="settings-home-room-presence">
+                    <div className="settings-switch-label-group">
+                      <span className="settings-switch-title">{t('privacy.homeRoomPresenceTitle')}</span>
+                      <span className="settings-switch-subtitle">{t('privacy.homeRoomPresenceDesc')}</span>
+                    </div>
+                    <div className="modern-switch">
+                      <input autoComplete="off" type="checkbox" id="settings-home-room-presence"
+                        checked={homeRoomPresencePolling} disabled={saving || profileBusy}
+                        onChange={(event) => setHomeRoomPresencePolling(event.target.checked)} />
+                      <span className="switch-slider" />
+                    </div>
+                  </label>
+                </div>
+                <StatusNotice>{t('privacy.roomTrustNotice')}</StatusNotice>
+              </div>
+            )}
 
             {panePresence.value === 'conversations' && (
               <div className="settings-tab-pane active" id="settings-pane-conversations">
@@ -685,7 +718,14 @@ export const SettingsModal: React.FC = () => {
                           <span className="switch-slider" />
                         </div>
                       </label>
-                      <button type="button" className="btn btn-sm btn-outline"
+                      <button type="button" disabled={profileBusy || saving}
+              className={`settings-nav-item ${activeTab === 'privacy' ? 'active' : ''}`}
+              onClick={() => setActiveTab('privacy')}>
+              <ShieldCheck size={16} aria-hidden="true" />
+              <span>{t('privacy.tabLabel')}</span>
+            </button>
+
+            <button type="button" className="btn btn-sm btn-outline"
                         aria-label={t("message.a93982492cdc", { v0: SOUND_LABELS[event] })}
                         onClick={() => soundEffects.preview(event, sfxVolume / 100)}>{t("message.76a30e43448f")}</button>
                     </div>

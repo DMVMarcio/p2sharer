@@ -36,6 +36,7 @@ import { stateStore } from '../core/state_store.ts';
 import { shouldNotifyChat, shouldPlayChatSound } from '../core/chat_notifications.ts';
 import { mergeChatHistory, nextChatOrder } from '../core/chat_history.ts';
 import { CHAT_FILE_CHUNK_BYTES, MAX_IMAGE_PREVIEW_BYTES } from '../core/chat_file_limits.ts';
+import { compareRoomInvites, parseRoomInvite } from '../core/room_invite.ts';
 import { verifyRoomInvite } from '../core/room_invite_validation.ts';
 import { savedRooms } from '../core/saved_rooms.ts';
 import type { ChatMessage, PeerInfo, RoomSlotInfo } from '../core/types.ts';
@@ -388,13 +389,17 @@ export class RoomService {
   }
 
   public async joinRoom(code: string, pass: string, isCreator: boolean,
-    options: { waitForAdmission?: boolean; preview?: GroupRoomManager; signal?: AbortSignal } = {}): Promise<void> {
+    options: { waitForAdmission?: boolean; preview?: GroupRoomManager; signal?: AbortSignal; saveOnJoin?: boolean } = {}): Promise<void> {
     const transition = this.roomTransition.then(() => options.signal?.aborted ? undefined :
-      this.joinRoomNow(code, pass, isCreator, options.waitForAdmission !== false, options.preview, options.signal));
+      this.joinRoomNow(code, pass, isCreator, options.waitForAdmission !== false, options.preview, options.signal, options.saveOnJoin === true));
     this.roomTransition = transition.catch((err) => {
       console.error('[RoomService] Room transition failed:', err);
     });
     return transition;
+  }
+
+  public hasActiveRoomPreview(): boolean {
+    return Boolean(this.roomPreview);
   }
 
   public startRoomPreview(manager: GroupRoomManager, callbacks: RoomCallbacks, signal: AbortSignal): Promise<void> {
@@ -419,7 +424,7 @@ export class RoomService {
   }
 
   private async joinRoomNow(code: string, pass: string, isCreator: boolean, waitForAdmission: boolean,
-    preview?: GroupRoomManager, signal?: AbortSignal): Promise<void> {
+    preview?: GroupRoomManager, signal?: AbortSignal, saveOnJoin = false): Promise<void> {
     this.joinOutcome = 'connecting';
     this.joinError = '';
     this.remoteControlHost.clear();
@@ -532,6 +537,33 @@ export class RoomService {
 
     const abort = () => { this.hideConnecting(); void manager.leave(); };
     signal?.addEventListener('abort', abort, { once: true });
+    let pendingSaveOnAdmit = saveOnJoin;
+    const persistSavedOnAdmission = () => {
+      if (!pendingSaveOnAdmit || this.roomManager !== manager || !manager.hasAdmission()) return;
+      pendingSaveOnAdmit = false;
+      const currentInvite = manager.getInvite() || stateStore.currentRoomInvite || code;
+      const currentParsed = parseRoomInvite(currentInvite) ?? parsed;
+      void (async () => {
+        const existing = await savedRooms.get(currentParsed.roomId);
+        const existingInvite = existing ? parseRoomInvite(existing.invite) : null;
+        if (existingInvite && existingInvite.rootKey !== currentParsed.rootKey) return;
+        const versionOrder = existingInvite ? compareRoomInvites(currentParsed, existingInvite) : 1;
+        const retainExistingInvite = versionOrder <= 0;
+        const resolvedInviteText = retainExistingInvite ? existing!.invite : currentInvite;
+        const resolvedParsed = parseRoomInvite(resolvedInviteText) ?? currentParsed;
+        await savedRooms.put({
+          ...existing,
+          roomId: currentParsed.roomId,
+          invite: resolvedInviteText,
+          name: resolvedParsed.version !== 3 ? resolvedParsed.name : existing?.name ?? currentParsed.roomId.slice(0, 8),
+          customName: existing?.customName,
+          saved: true,
+          owned: isCreator || Boolean(existing?.owned),
+          protected: Boolean(pass || existing?.protected),
+          password: pass || existing?.password,
+        });
+      })().catch((error) => console.warn('[Rooms] Failed to save room on entry:', error));
+    };
     await manager.join({
       onFileRequestCancelled: (requestId) => {
         if (this.roomManager !== manager) return;
@@ -630,7 +662,10 @@ export class RoomService {
         profileStats.setInCall(manager.hasAdmission());
         this.peers = peers;
         stateStore.set(s => { s.peerNicknameStyles = Object.fromEntries(peers.filter(peer => peer.nicknameStyle).map(peer => [peer.id, peer.nicknameStyle!])); });
-        if (manager.hasAdmission() && (isCreator || peers.some((peer) => peer.connectionState === 'connected'))) this.hideConnecting();
+        if (manager.hasAdmission()) {
+          persistSavedOnAdmission();
+          if (isCreator || peers.some((peer) => peer.connectionState === 'connected')) this.hideConnecting();
+        }
         this.notify();
       },
       onPeerJoined: (peer, isInitial) => {
@@ -692,7 +727,10 @@ export class RoomService {
         profileStats.setInCall(manager.hasAdmission());
         const wasWaiting = this.joinOutcome === 'waiting';
         this.roomStatusText = status;
-        if (manager.hasAdmission()) this.joinOutcome = 'admitted';
+        if (manager.hasAdmission()) {
+          this.joinOutcome = 'admitted';
+          persistSavedOnAdmission();
+        }
         if (manager.hasAdmission() && (
           status.includes('Conectado') ||
           status === 'Sala Ativa' ||
@@ -746,7 +784,10 @@ export class RoomService {
     signal?.removeEventListener('abort', abort);
     if (signal?.aborted) return;
 
-    if (this.roomManager === manager) profileStats.setInCall(manager.hasAdmission());
+    if (this.roomManager === manager) {
+      profileStats.setInCall(manager.hasAdmission());
+      if (manager.hasAdmission()) persistSavedOnAdmission();
+    }
 
     if (!waitForAdmission && this.roomManager === manager && this.joinOutcome === 'connecting') {
       this.joinOutcome = 'waiting';

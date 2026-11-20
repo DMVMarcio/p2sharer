@@ -1848,5 +1848,19 @@
   "games.confirmNewMatch": "현재 보드를 초기화하고 새 대국을 시작하시겠습니까?",
   "games.confirmResetScores": "점수를 초기화하고 새 대국을 시작하시겠습니까?",
   "games.turnActive": "차례 진행 중",
-  "games.waitingTurn": "대기 중"
+  "games.waitingTurn": "대기 중",
+  "privacy.tabLabel": "보안 및 개인정보",
+  "privacy.title": "보안 및 개인정보",
+  "privacy.subtitle": "홈 화면 백그라운드 방 조회와 P2P 연결 시 네트워크 노출을 제어합니다.",
+  "privacy.homeRoomPresenceTitle": "홈 화면에 활성 멤버 표시",
+  "privacy.homeRoomPresenceDesc": "5분마다 백그라운드에서 저장된 방을 확인해 멤버 아바타를 표시합니다. 끄면 직접 입장하기 전까지 연결하지 않습니다.",
+  "privacy.roomTrustNotice": "저장되지 않은 방은 데이터를 불러오거나 P2P IP 주소를 교환하기 전에 항상 신뢰 확인을 요청합니다.",
+  "join.trustTitle": "이 방을 신뢰하시나요?",
+  "join.trustIpNotice": "방을 확인하거나 입장하면 직접 P2P 연결이 설정되어 방 안의 참여자에게 내 IP 주소가 노출됩니다.",
+  "join.trustQuestion": "이 방을 신뢰하고 계속하시겠습니까?",
+  "join.trustRoomLabel": "초대장에 포함된 방",
+  "join.trustShortLabel": "짧은 방 코드",
+  "join.trustConfirm": "신뢰하고 계속",
+  "join.saveRoom": "이 방 저장하기",
+  "savedRooms.onlineMembers": "현재 참여자 ({{count}})"
 }

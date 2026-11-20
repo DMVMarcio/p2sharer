@@ -1,12 +1,15 @@
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import { ArrowRight, BookmarkPlus, GripVertical, LockKeyhole, Pencil, Trash2 } from 'lucide-react';
 import { savedRooms, type SavedRoom } from '../../core/saved_rooms';
-import { useModal } from '../../hooks/useModal';
+import { modalManager, useModal } from '../../hooks/useModal';
 import { useRoom } from '../../hooks/useRoom';
+import { useStore } from '../../hooks/useStore';
 import { showToast } from '../../hooks/useToast';
+import { homeRoomPresence } from '../../services/home_room_presence';
 import { roomService } from '../../services/room_service';
+import { ActivityParticipants } from '../common/ActivityParticipants';
 import { useContextMenu } from '../common/ContextMenu';
 import { EditSavedRoomDialog } from '../modals/EditSavedRoomDialog';
 import { orderSavedRooms } from '../../core/saved_room_order';
@@ -22,6 +25,16 @@ export const SavedRoomsSection: React.FC = () => {
   const [removingRoom, setRemovingRoom] = useState<SavedRoom | null>(null);
   const { openModal } = useModal();
   const { username } = useRoom();
+  const homeRoomPresencePolling = useStore((s) => s.homeRoomPresencePolling);
+  useSyncExternalStore(homeRoomPresence.subscribe, homeRoomPresence.snapshot);
+
+  useEffect(() => {
+    if (!homeRoomPresencePolling) {
+      homeRoomPresence.clear();
+      return;
+    }
+    return homeRoomPresence.start();
+  }, [homeRoomPresencePolling]);
   const sortable = useSortableGrid(rooms.map((room) => room.roomId), (ids) => {
     try {
       savedRooms.reorder(ids);
@@ -105,6 +118,28 @@ export const SavedRoomsSection: React.FC = () => {
                     {room.password !== undefined && <LockKeyhole size={12} aria-label={t("message.3ef5534f852c")} />}
                   </div>
                 </div>
+                {homeRoomPresencePolling && (() => {
+                  const onlinePeople = homeRoomPresence.getParticipants(room.roomId);
+                  if (onlinePeople.length === 0) return null;
+                  return <ActivityParticipants
+                    className="saved-room-participants"
+                    maxVisible={4}
+                    ariaLabel={t('savedRooms.onlineMembers', { count: onlinePeople.length })}
+                    people={onlinePeople.map((person) => ({
+                      id: person.id,
+                      name: person.name,
+                      color: person.color,
+                      imageUrl: person.avatar,
+                    }))}
+                    onSelectParticipant={(person) => modalManager.openProfile({
+                      peerId: person.id,
+                      name: person.name,
+                      color: person.color,
+                      imageUrl: person.imageUrl,
+                      hideStats: true,
+                    })}
+                  />;
+                })()}
               </div>
               <div className="saved-room-actions">
                 <button className="btn btn-secondary saved-room-enter" onClick={() => openSaved(room)}>

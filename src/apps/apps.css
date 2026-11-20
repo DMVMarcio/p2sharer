@@ -133,6 +133,10 @@
 .room-app-card-body { position: relative; box-sizing: border-box; display: flex; flex: 1 1 0; min-width: 0; min-height: 0;
   overflow: hidden; container: room-app / inline-size; }
 .room-app-participants { display: flex; align-items: center; flex-shrink: 0; padding-left: 5px; }
+.room-app-participant-trigger { display: inline-flex; align-items: center; justify-content: center; margin-left: -5px;
+  padding: 0; border: 0; border-radius: 50%; background: transparent; cursor: pointer; }
+.room-app-participant-trigger .room-app-participant { margin-left: 0; }
+.room-app-participant-trigger:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 2px; z-index: 2; }
 .room-app-participant, .room-app-participant-extra { display: grid; place-items: center; width: 24px; height: 24px;
   margin-left: -5px; border: 2px solid var(--bg-elevated); border-radius: 50%; color: #fff;
   font-size: 10px; font-weight: 700; }

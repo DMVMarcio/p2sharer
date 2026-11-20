@@ -166,6 +166,7 @@ export class GroupRoomManager {
   private previewOnly = false;
   private shortLookupReady = false;
   private readonly shortLookup: boolean;
+  private readonly backgroundProbe: boolean;
   private bootstrapPending = false;
   private previewAction: any = null;
   private previewNonce = crypto.randomUUID();
@@ -474,8 +475,9 @@ export class GroupRoomManager {
   private rtcConfig: RTCConfiguration | null = null;
 
   constructor(username: string, roomId: string, password = '', isCreator = false, turnConfig?: TurnConfig,
-    shortLookup = false) {
+    shortLookup = false, backgroundProbe = false) {
     this.shortLookup = shortLookup;
+    this.backgroundProbe = backgroundProbe;
     this.username = username;
     const parsedInvite = parseRoomInvite(roomId);
     this.roomId = parsedInvite?.roomId ?? roomId.trim();
@@ -487,16 +489,18 @@ export class GroupRoomManager {
     this.myJoinedAt = Date.now();
     this.turnConfig = turnConfig || null;
 
-    // Register signaling manager failover handler
-    signalingManager.setRoomReconnectionHandler(async (newTransport, previousTransport) => {
-      console.log(
-        `[GroupRoomManager] Handling signaling failover: ${previousTransport} -> ${newTransport}`
-      );
-      if (this.callbacks) {
-        this.callbacks.onStatusChange(`Sinalização alternada para ${newTransport.toUpperCase()}`);
-      }
-      await this.reconnectOnNewTransport();
-    });
+    if (!this.backgroundProbe) {
+      // Register signaling manager failover handler
+      signalingManager.setRoomReconnectionHandler(async (newTransport, previousTransport) => {
+        console.log(
+          `[GroupRoomManager] Handling signaling failover: ${previousTransport} -> ${newTransport}`
+        );
+        if (this.callbacks) {
+          this.callbacks.onStatusChange(`Sinalização alternada para ${newTransport.toUpperCase()}`);
+        }
+        await this.reconnectOnNewTransport();
+      });
+    }
   }
 
   public getDisplayRoomId(): string {
@@ -927,9 +931,11 @@ export class GroupRoomManager {
 
     this.rtcConfig = buildRtcConfiguration(this.turnConfig);
 
-    signalingManager.setRoomReconnectionHandler(async () => {
-      await this.reconnectOnNewTransport();
-    });
+    if (!this.backgroundProbe) {
+      signalingManager.setRoomReconnectionHandler(async () => {
+        await this.reconnectOnNewTransport();
+      });
+    }
 
     try {
       let saved: SavedRoom | undefined;
@@ -1030,6 +1036,7 @@ export class GroupRoomManager {
     const joinCallbacks = {
       onJoinError: joinErrorHandler,
       previewOnly: this.previewOnly,
+      backgroundProbe: this.backgroundProbe,
     };
     this.roomJoinOptions = { config: joinConfig, topic: this.signalingTopic, callbacks: joinCallbacks };
 
@@ -2342,7 +2349,7 @@ export class GroupRoomManager {
       this.peerTracker.receivePeerExchange(peerId, true);
       this.payloadChannels.ensure(peerId);
       this.rumorIntermediaries.delete(peerId);
-      signalingManager.setPeerConnected(peerId);
+      if (!this.backgroundProbe) signalingManager.setPeerConnected(peerId);
 
       // Instantly acknowledge peer on signaling broker to ensure both directions are open
       if (this.signalingTopic) {
@@ -2686,7 +2693,7 @@ export class GroupRoomManager {
     this.existingAtJoinIds.delete(peerId);
     this.peerTracker.removePeer(peerId);
 
-    signalingManager.setPeerDisconnected(peerId);
+    if (!this.backgroundProbe) signalingManager.setPeerDisconnected(peerId);
 
     if (this.remoteStreams.has(peerId)) {
       this.remoteStreams.delete(peerId);
@@ -4255,7 +4262,8 @@ export class GroupRoomManager {
     this.bannerTransfer?.close();
     this.bannerTransfer = null;
     this.stopStream();
-    if (this.room) {
+    const shouldNotifyLeave = !this.previewOnly && !this.backgroundProbe;
+    if (this.room && shouldNotifyLeave) {
       await this.sendSystemMessage(`${this.username} saiu`, 'leave', this.username);
     }
     if (this.heartbeatTimer) {
@@ -4263,12 +4271,12 @@ export class GroupRoomManager {
       this.heartbeatTimer = null;
     }
 
-    if (this.leaveAction) {
+    if (shouldNotifyLeave && this.leaveAction) {
       try {
         this.sendRoomAction(this.leaveAction, { peerId: selfId, username: this.username });
       } catch {}
     }
-    if (this.meshRelayAction) {
+    if (shouldNotifyLeave && this.meshRelayAction) {
       try {
         this.sendRoomAction(this.meshRelayAction, {
           target: 'all',
@@ -4279,8 +4287,10 @@ export class GroupRoomManager {
       } catch {}
     }
 
-    // Allow a brief flush window for socket buffers before tearing down WebRTC
-    await new Promise((resolve) => setTimeout(resolve, 60));
+    if (shouldNotifyLeave) {
+      // Allow a brief flush window for socket buffers before tearing down WebRTC
+      await new Promise((resolve) => setTimeout(resolve, 60));
+    }
 
     this.nativeVideo?.close();
     this.nativeVideo = null;
@@ -4292,7 +4302,7 @@ export class GroupRoomManager {
     const roomToLeave = this.room;
     this.room = null;
     if (roomToLeave) {
-      signalingManager.setRoomReconnectionHandler(null);
+      if (!this.backgroundProbe) signalingManager.setRoomReconnectionHandler(null);
       await signalingManager.leaveRoom(roomToLeave);
     }
 

@@ -69,6 +69,7 @@ export class SignalingManager {
 
   // Watchdog state
   private isolatedPreviewRooms = new WeakSet<object>();
+  private isolatedProbeRooms = new WeakSet<object>();
   private watchdogTimer: ReturnType<typeof setInterval> | null = null;
   private consecutiveStalls = 0;
   private maxConsecutiveStalls = 2; // 2 intervals @ 1.5s = 3.0s stall threshold
@@ -346,6 +347,13 @@ export class SignalingManager {
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public joinRoom(config: any, topic: string, callbacks?: any): any {
+    if (callbacks?.backgroundProbe && !this.lanRoom) {
+      const probeRoom = this.createRoomForTransport(this.activeTransport, config, topic, callbacks, true);
+      if (probeRoom && typeof probeRoom === 'object') {
+        this.isolatedProbeRooms.add(probeRoom);
+      }
+      return probeRoom;
+    }
     const isPreviewWithActiveRoom = Boolean(callbacks?.previewOnly && this.activeRoom && !this.lanRoom);
     if (isPreviewWithActiveRoom) {
       const previewRoom = this.createRoomForTransport(this.activeTransport, config, topic, callbacks, true);
@@ -408,6 +416,13 @@ export class SignalingManager {
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public async leaveRoom(targetRoom?: any): Promise<void> {
+    if (targetRoom && typeof targetRoom === 'object' && this.isolatedProbeRooms.has(targetRoom)) {
+      this.isolatedProbeRooms.delete(targetRoom);
+      try {
+        await Promise.resolve(targetRoom.leave()).catch(() => {});
+      } catch {}
+      return;
+    }
     if (targetRoom && this.activeRoom && this.activeRoom !== targetRoom) {
       console.log('[SignalingManager] Ignoring stale leaveRoom call for inactive room instance');
       try {

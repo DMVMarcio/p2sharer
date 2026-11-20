@@ -32,6 +32,7 @@ globalThis.previewUi = {
       previewUi.signal = signal;
     }, async leaveRoom() { left++; } },
   store: { username: 'Viewer', getTurnConfig: () => undefined },
+  savedRooms: { fixture: { roomId: 'fixture', saved: true, invite: 'saved-fixture', name: 'Fixture room' } },
   subscribe: fn => { listeners.add(fn); return () => listeners.delete(fn); }, snapshot: () => revision,
   close: () => closed++,
   discover: callbacks => { discovery = callbacks; return ready; }, release: () => left++,
@@ -46,8 +47,8 @@ const bundle = await build({ stdin: { contents: "export { JoinRoomModal } from '
       args.path.endsWith('room_service') ? 'export const roomService = globalThis.previewUi.roomService;' :
       args.path.endsWith('state_store') ? 'export const stateStore = globalThis.previewUi.store;' :
       args.path.endsWith('group_room') ? 'export class GroupRoomManager { join(callbacks) { return globalThis.previewUi.discover(callbacks); } getInvite() { return globalThis.previewUi.resolvedInvite; } requestPreview() {} async leave() { globalThis.previewUi.release(); } }' :
-      args.path.endsWith('saved_rooms') ? 'export const savedRooms = { get: async () => undefined };' :
-      "export const verifyRoomInvite = async () => ({ version: 4, roomId: 'fixture', name: 'Fixture room' });",
+      args.path.endsWith('saved_rooms') ? 'export const savedRooms = { get: async (id) => globalThis.previewUi.savedRooms?.[id] };' :
+      "export const verifyRoomInvite = async (code) => code.startsWith('unsaved-') ? { version: 4, roomId: code, name: 'Signed Unsaved Room' } : { version: 4, roomId: 'fixture', name: 'Fixture room' };",
     }));
     builder.onResolve({ filter: /^[^./]/ }, args => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
   } }],
@@ -180,6 +181,8 @@ test('short invitation cannot enter without an online response and times out bac
   const before = joined.length;
   const released = left;
   await act(async () => root.render(React.createElement(JoinRoomModal, { key: 'short-empty' })));
+  assert.ok(document.querySelector('.join-room-trust'), 'unsaved short code prompts for trust before discovery');
+  await submit();
   assert.equal(document.querySelector('button[type="submit"]').disabled, true);
   await submit();
   assert.equal(joined.length, before);
@@ -197,10 +200,36 @@ test('short invitation promotes the resolved signed invitation only after a memb
   previewUi.resolvedInvite = 'resolved-signed-fixture';
   const before = joined.length;
   await act(async () => root.render(React.createElement(JoinRoomModal, { key: 'short-online' })));
+  await submit(); // confirm trust
   await submit();
   assert.equal(joined.length, before);
   await act(async () => discovery.onPreview({ name: 'Online room', protected: false, participants: [] }));
   await submit();
   assert.deepEqual(joined.at(-1), ['resolved-signed-fixture', '', false, { waitForAdmission: true }]);
+  await act(async () => root.render(null));
+});
+
+
+test('unsaved room asks trust with signed room name before connecting and honors save-room checkbox', async () => {
+  let discoveriesBeforeTrust = 0;
+  const originalDiscover = previewUi.discover;
+  previewUi.discover = (callbacks) => { discoveriesBeforeTrust++; return originalDiscover(callbacks); };
+  Object.assign(previewUi.roomService, { pendingJoinInvite: 'unsaved-room-1', pendingJoinPassword: '',
+    pendingJoinAsOwner: false, pendingJoinError: '', joinOutcome: 'idle' });
+  await act(async () => root.render(React.createElement(JoinRoomModal, { key: 'unsaved-trust' })));
+  assert.equal(discoveriesBeforeTrust, 0, 'must not start P2P discovery before user confirms trust');
+  assert.ok(document.querySelector('.join-room-trust-target')?.textContent.includes('Signed Unsaved Room'));
+  await submit();
+  assert.equal(discoveriesBeforeTrust, 1);
+  await act(async () => discovery.onPreview({ name: 'Signed Unsaved Room', protected: false,
+    participants: [{ id: 'host', name: 'Host', color: '#06b6d4' }] }));
+  const checkbox = document.getElementById('join-save-room');
+  assert.ok(checkbox, 'first-time room entry renders save-room checkbox');
+  assert.equal(checkbox.checked, false);
+  await act(async () => { checkbox.click(); });
+  assert.equal(checkbox.checked, true);
+  await submit();
+  assert.deepEqual(joined.at(-1), ['unsaved-room-1', '', false, { waitForAdmission: true, saveOnJoin: true }]);
+  previewUi.discover = originalDiscover;
   await act(async () => root.render(null));
 });

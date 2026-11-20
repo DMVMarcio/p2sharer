@@ -771,6 +771,10 @@ html[data-theme="light"] .saved-room-card.is-owned { --room-role-text: #74430d; 
 .saved-room-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--text-muted); }
 .saved-room-role.badge-host { color: var(--room-role-text); font-size: 11px; font-weight: 500; letter-spacing: 0; line-height: 1.5; }
 .saved-room-id { color: var(--text-muted); font: 10px var(--font-mono); }
+.saved-room-participants { margin-left: auto; align-self: flex-start; }
+.saved-room-card-heading .room-app-participant,
+.saved-room-card-heading .room-app-participant-extra { border-color: var(--bg-card); }
+.saved-room-card-heading .room-app-participant-trigger:hover .room-app-participant { transform: translateY(-1px); transition: transform var(--transition-fast); }
 .saved-room-actions { display: flex; align-items: center; gap: 8px; }
 .saved-room-actions .btn { min-height: 40px; border-radius: var(--radius-md); font-size: 13px; }
 .saved-room-actions .saved-room-enter { width: auto; flex: 1;
@@ -6156,6 +6160,15 @@ html[data-theme="light"] :is(.stream-card, .pip-window-root) {
 .join-room-participants .profile-avatar { width: 30px; height: 30px; flex-shrink: 0; }
 .join-room-loading { display: flex; justify-content: center; padding: 16px; }
 .join-room-error { color: var(--danger-text); margin-top: 12px; }
+.join-room-trust { display: flex; flex-direction: column; gap: 6px; }
+.join-room-trust-target { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 12px;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--bg-elevated); }
+.join-room-trust-label { font-size: 11px; color: var(--text-muted); width: 100%; }
+.join-room-trust-target strong { font-size: 14px; color: var(--text-primary); overflow-wrap: anywhere; }
+.join-save-room-option { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding: 10px 12px;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--bg-elevated);
+  color: var(--text-primary); font-size: 13px; cursor: pointer; user-select: none; }
+.join-save-room-option input[type="checkbox"] { width: 16px; height: 16px; margin: 0; accent-color: var(--accent-color); cursor: pointer; flex-shrink: 0; }
 /* Shared nickname presentation across profile, room, chat and native PiP. */
 .nickname { display: inline; }
 .nickname-motion, .nickname-ink { display: inline-block; max-width: 100%; }

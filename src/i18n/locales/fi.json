@@ -1848,5 +1848,19 @@
   "games.confirmNewMatch": "Aloitetaanko uusi peli ja nollataanko nykyinen pelilauta?",
   "games.confirmResetScores": "Nollataanko pisteet ja aloitetaanko uusi peli?",
   "games.turnActive": "Pelaa nyt",
-  "games.waitingTurn": "Odottaa"
+  "games.waitingTurn": "Odottaa",
+  "privacy.tabLabel": "Turvallisuus ja yksityisyys",
+  "privacy.title": "Turvallisuus ja yksityisyys",
+  "privacy.subtitle": "Hallitse taustakyselyitä ja vertaisverkkoyhteyksien osoitetietojen jakamista.",
+  "privacy.homeRoomPresenceTitle": "Näytä aktiiviset jäsenet aloitusnäytössä",
+  "privacy.homeRoomPresenceDesc": "Tarkistaa tallennetut huoneet 5 minuutin välein taustalla jäsenavatarit näyttääkseen. Poista käytöstä, jotta yhteyksiä ei avata ennen liittymistä.",
+  "privacy.roomTrustNotice": "Tallentamattomat huoneet pyytävät aina vahvistuksesi ennen huonetietojen lataamista tai P2P-IP-osoitteiden vaihtoa.",
+  "join.trustTitle": "Luotatko tähän huoneeseen?",
+  "join.trustIpNotice": "Huoneen tarkistaminen tai siihen liittyminen luo suoran P2P-yhteyden, mikä paljastaa IP-osoitteesi huoneessa oleville osallistujille.",
+  "join.trustQuestion": "Luotatko tähän huoneeseen ja haluatko jatkaa?",
+  "join.trustRoomLabel": "Huone kutsusta",
+  "join.trustShortLabel": "Lyhyt huonekoodi",
+  "join.trustConfirm": "Luota ja jatka",
+  "join.saveRoom": "Tallenna tämä huone",
+  "savedRooms.onlineMembers": "Aktiiviset osallistujat ({{count}})"
 }

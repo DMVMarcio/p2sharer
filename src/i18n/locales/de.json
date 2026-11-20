@@ -1848,5 +1848,19 @@
   "games.confirmNewMatch": "Eine neue Partie starten und das aktuelle Brett zurücksetzen?",
   "games.confirmResetScores": "Punktestand zurücksetzen und eine neue Partie starten?",
   "games.turnActive": "Am Zug",
-  "games.waitingTurn": "Wartet"
+  "games.waitingTurn": "Wartet",
+  "privacy.tabLabel": "Sicherheit & Datenschutz",
+  "privacy.title": "Sicherheit & Datenschutz",
+  "privacy.subtitle": "Steuere Hintergrundabfragen von Räumen und die Netzwerk-Offenlegung bei P2P-Verbindungen.",
+  "privacy.homeRoomPresenceTitle": "Aktive Mitglieder auf der Startseite zeigen",
+  "privacy.homeRoomPresenceDesc": "Fragt gespeicherte Räume alle 5 Minuten im Hintergrund ab, um Mitglieder-Avatare anzuzeigen. Deaktiviere dies, um Verbindungen bis zum Beitritt zu vermeiden.",
+  "privacy.roomTrustNotice": "Nicht gespeicherte Räume fragen vor dem Laden von Raumdaten oder dem P2P-IP-Austausch immer nach deiner Bestätigung.",
+  "join.trustTitle": "Diesem Raum vertrauen?",
+  "join.trustIpNotice": "Beim Prüfen oder Betreten eines Raums werden direkte P2P-Verbindungen aufgebaut, wodurch deine IP-Adresse für Teilnehmer sichtbar wird.",
+  "join.trustQuestion": "Vertraust du diesem Raum und möchtest fortfahren?",
+  "join.trustRoomLabel": "Raum aus Einladung",
+  "join.trustShortLabel": "Kurzer Raumcode",
+  "join.trustConfirm": "Vertrauen und fortfahren",
+  "join.saveRoom": "Diesen Raum speichern",
+  "savedRooms.onlineMembers": "Aktive Teilnehmer ({{count}})"
 }

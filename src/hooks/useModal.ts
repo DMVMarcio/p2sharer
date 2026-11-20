@@ -18,7 +18,7 @@ export type ModalType =
   | 'p2pTest'
   | null;
 
-export interface ProfileTarget { peerId: string; name: string; isLocal?: boolean; color?: string }
+export interface ProfileTarget { peerId: string; name: string; isLocal?: boolean; color?: string; imageUrl?: string; hideStats?: boolean }
 
 class ModalManager {
   private activeModal: ModalType = null;

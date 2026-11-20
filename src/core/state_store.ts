@@ -59,6 +59,7 @@ export class StateStore {
   public currentBackgroundColor: string = 'graphite';
   public animationsEnabled: boolean = true;
   public visualEffectsEnabled: boolean = true;
+  public homeRoomPresencePolling: boolean = typeof localStorage === 'undefined' || localStorage.getItem('p2sharer_home_room_presence_polling') !== 'false';
 
   public currentFps: number = INITIAL_TRANSMISSION_DEFAULTS.fps;
   public currentBitrate: number = this.getDefaultBitrateForResolution(INITIAL_TRANSMISSION_DEFAULTS.resolution);
@@ -284,6 +285,15 @@ export class StateStore {
       state.visualEffectsEnabled = prefs.visualEffects;
     });
     applyAppearanceAttributes(prefs.animations, prefs.visualEffects);
+  }
+
+  public savePrivacyPreferences(prefs: { homeRoomPresencePolling: boolean }): void {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('p2sharer_home_room_presence_polling', String(prefs.homeRoomPresencePolling));
+    }
+    this.set((state) => {
+      state.homeRoomPresencePolling = prefs.homeRoomPresencePolling;
+    });
   }
 
   public getDefaultBitrateForResolution(resLabel: string): number {

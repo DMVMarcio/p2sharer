@@ -1848,5 +1848,19 @@
   "games.confirmNewMatch": "Lancer une nouvelle partie et réinitialiser le plateau actuel ?",
   "games.confirmResetScores": "Réinitialiser le score et commencer une nouvelle partie ?",
   "games.turnActive": "En train de jouer",
-  "games.waitingTurn": "En attente"
+  "games.waitingTurn": "En attente",
+  "privacy.tabLabel": "Sécurité et confidentialité",
+  "privacy.title": "Sécurité et confidentialité",
+  "privacy.subtitle": "Contrôlez les vérifications en arrière-plan et l’exposition réseau des connexions pair-à-pair.",
+  "privacy.homeRoomPresenceTitle": "Afficher les membres actifs à l’accueil",
+  "privacy.homeRoomPresenceDesc": "Interroge vos salons enregistrés toutes les 5 minutes en arrière-plan pour afficher les avatars. Désactivez cette option pour éviter toute connexion avant l’entrée.",
+  "privacy.roomTrustNotice": "Les salons non enregistrés demandent toujours confirmation avant de charger les données ou d’échanger des adresses IP pair-à-pair.",
+  "join.trustTitle": "Faites-vous confiance à ce salon ?",
+  "join.trustIpNotice": "Vérifier ou rejoindre un salon établit des connexions directes pair-à-pair (P2P), ce qui expose votre adresse IP aux membres du salon.",
+  "join.trustQuestion": "Faites-vous confiance à ce salon et souhaitez-vous continuer ?",
+  "join.trustRoomLabel": "Salon de l’invitation",
+  "join.trustShortLabel": "Code court du salon",
+  "join.trustConfirm": "Faire confiance et continuer",
+  "join.saveRoom": "Enregistrer ce salon",
+  "savedRooms.onlineMembers": "Participants actifs ({{count}})"
 }

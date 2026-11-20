@@ -1848,5 +1848,19 @@
   "games.confirmNewMatch": "確定開始新對局並重設目前棋盤嗎？",
   "games.confirmResetScores": "確定重設比分並開始新對局嗎？",
   "games.turnActive": "思考中",
-  "games.waitingTurn": "等待中"
+  "games.waitingTurn": "等待中",
+  "privacy.tabLabel": "安全與隱私",
+  "privacy.title": "安全與隱私",
+  "privacy.subtitle": "控制背景房間成員查詢與點對點連線的網路揭露。",
+  "privacy.homeRoomPresenceTitle": "在主畫面顯示房間活躍成員",
+  "privacy.homeRoomPresenceDesc": "每 5 分鐘在背景檢查已儲存的房間以顯示成員頭像。關閉後在您主動加入前不會連線至房間中繼。",
+  "privacy.roomTrustNotice": "進入未儲存的房間前始終會先請您確認信任，再載入房間資訊或交換 P2P IP 位址。",
+  "join.trustTitle": "是否信任此房間？",
+  "join.trustIpNotice": "檢查或加入房間會建立點對點 (P2P) 直接連線，這會將您的 IP 位址揭露給房間內的參與者。",
+  "join.trustQuestion": "您確定信任此房間並繼續嗎？",
+  "join.trustRoomLabel": "邀請中的房間",
+  "join.trustShortLabel": "房間短代碼",
+  "join.trustConfirm": "信任並繼續",
+  "join.saveRoom": "儲存此房間",
+  "savedRooms.onlineMembers": "目前線上成員 ({{count}})"
 }

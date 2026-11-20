@@ -1848,5 +1848,19 @@
   "games.confirmNewMatch": "क्या वर्तमान बोर्ड को रीसेट करके नया मैच शुरू करें?",
   "games.confirmResetScores": "क्या स्कोरबोर्ड रीसेट करके नया मैच शुरू करें?",
   "games.turnActive": "अभी खेल रहे हैं",
-  "games.waitingTurn": "प्रतीक्षा में"
+  "games.waitingTurn": "प्रतीक्षा में",
+  "privacy.tabLabel": "सुरक्षा और गोपनीयता",
+  "privacy.title": "सुरक्षा और गोपनीयता",
+  "privacy.subtitle": "होम स्क्रीन पर पृष्ठभूमि रूम जांच और P2P कनेक्शन नेटवर्क एक्सपोज़र नियंत्रित करें।",
+  "privacy.homeRoomPresenceTitle": "होम स्क्रीन पर सक्रिय सदस्य दिखाएँ",
+  "privacy.homeRoomPresenceDesc": "सदस्य अवतार दिखाने के लिए हर 5 मिनट में सहेजे गए रूम की पृष्ठभूमि में जांच करता है। प्रवेश करने से पहले कनेक्ट न होने के लिए इसे बंद करें।",
+  "privacy.roomTrustNotice": "बिना सहेजे गए रूम डेटा लोड करने या P2P IP पते साझा करने से पहले हमेशा आपकी पुष्टि मांगते हैं।",
+  "join.trustTitle": "क्या आप इस रूम पर भरोसा करते हैं?",
+  "join.trustIpNotice": "रूम जांचने या शामिल होने से सीधे पीयर-टू-पीयर (P2P) कनेक्शन बनते हैं, जिससे रूम के अन्य सदस्यों को आपका IP पता दिखता है।",
+  "join.trustQuestion": "क्या आप इस रूम पर भरोसा करते हैं और आगे बढ़ना चाहते हैं?",
+  "join.trustRoomLabel": "निमंत्रण से रूम का नाम",
+  "join.trustShortLabel": "छोटा रूम कोड",
+  "join.trustConfirm": "भरोसा करें और आगे बढ़ें",
+  "join.saveRoom": "इस रूम को सहेजें",
+  "savedRooms.onlineMembers": "सक्रिय सदस्य ({{count}})"
 }

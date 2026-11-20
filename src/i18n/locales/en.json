@@ -1848,5 +1848,19 @@
   "games.confirmNewMatch": "Start a new match and replace the current board?",
   "games.confirmResetScores": "Reset the scoreboard and start a fresh match?",
   "games.turnActive": "Playing now",
-  "games.waitingTurn": "Waiting"
+  "games.waitingTurn": "Waiting",
+  "privacy.tabLabel": "Security & Privacy",
+  "privacy.title": "Security & Privacy",
+  "privacy.subtitle": "Control background room lookups and peer-to-peer connection exposure.",
+  "privacy.homeRoomPresenceTitle": "Show active members on Home screen",
+  "privacy.homeRoomPresenceDesc": "Check saved rooms every 5 minutes in the background to display member avatars. Turn off to avoid connecting to room relays until you join.",
+  "privacy.roomTrustNotice": "Unsaved rooms always ask for your confirmation before loading room data or exchanging peer-to-peer network addresses.",
+  "join.trustTitle": "Trust this room?",
+  "join.trustIpNotice": "Checking or joining a room establishes direct peer-to-peer (P2P) connections, which exposes your IP address to participants inside the room.",
+  "join.trustQuestion": "Do you trust this room and want to continue?",
+  "join.trustRoomLabel": "Room from invitation",
+  "join.trustShortLabel": "Short room code",
+  "join.trustConfirm": "Trust and continue",
+  "join.saveRoom": "Save this room",
+  "savedRooms.onlineMembers": "Active participants ({{count}})"
 }
