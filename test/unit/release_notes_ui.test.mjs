@@ -17,8 +17,9 @@ test('unread notes wait for other dialogs, survive interrupted viewing and ackno
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   localStorage.setItem('p2sharer_username', 'Existing profile');
   const fixture = globalThis.releaseNotesFixture = {
-    notes: new ReleaseNotesController('1.4.1', localStorage), active: 'username',
+    notes: new ReleaseNotesController('1.4.1', localStorage, ['1.4.0', '1.4.1']), active: 'username',
     update: new AppUpdateController({ check: async () => null, prepareInstall: async () => {}, restart: async () => {} }),
+    sections: null,
   };
   let root;
   try {
@@ -29,8 +30,16 @@ test('unread notes wait for other dialogs, survive interrupted viewing and ackno
       plugins: [{ name: 'notes-boundaries', setup(builder) {
         builder.onResolve({ filter: /services\/release_notes$|services\/app_updates$|hooks\/useModal$/ }, args => ({ path: args.path.split('/').at(-1), namespace: 'fixture' }));
         builder.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: {
-          release_notes: `export const releaseNotes = globalThis.releaseNotesFixture.notes;
-            export const installedReleaseNotes = () => ['**Files** with *improvements* and ~~old behavior~~.\\n\\n## Highlights\\n\\n- Paste images\\n- Share files\\n\\n<img src="https://example.invalid/image">\\n\\n![Image](https://example.invalid/image) [Details](https://example.invalid/notes) <script>alert(1)</script>'];`,
+          release_notes: `export const releaseNotes = {
+              subscribe: (...args) => globalThis.releaseNotesFixture.notes.subscribe(...args),
+              getSnapshot: () => globalThis.releaseNotesFixture.notes.getSnapshot(),
+              openPending: () => globalThis.releaseNotesFixture.notes.openPending(),
+              open: () => globalThis.releaseNotesFixture.notes.open(),
+              close: () => globalThis.releaseNotesFixture.notes.close(),
+              getVisibleVersions: () => globalThis.releaseNotesFixture.notes.getVisibleVersions(),
+            };
+            export const installedReleaseNotes = () => ['**Files** with *improvements* and ~~old behavior~~.\\n\\n## Highlights\\n\\n- Paste images\\n- Share files\\n\\n<img src="https://example.invalid/image">\\n\\n![Image](https://example.invalid/image) [Details](https://example.invalid/notes) <script>alert(1)</script>'];
+            export const releaseNotesSections = (language, versions) => globalThis.releaseNotesFixture.sections?.(language, versions) ?? [{ version: '1.4.1', items: installedReleaseNotes(language) }];`,
           app_updates: 'export const appUpdates = globalThis.releaseNotesFixture.update;',
           useModal: 'export const useModal = () => ({ activeModal: globalThis.releaseNotesFixture.active });',
         }[args.path] }));
@@ -65,6 +74,12 @@ test('unread notes wait for other dialogs, survive interrupted viewing and ackno
     await act(async () => new Promise(resolve => setTimeout(resolve, 260)));
     assert.equal(document.querySelector('[role="dialog"]'), null);
     assert.equal(new ReleaseNotesController('1.4.1', localStorage).getSnapshot().pending, false);
+
+    fixture.notes = new ReleaseNotesController('1.7.2', localStorage, ['1.4.1', '1.7.0', '1.7.1', '1.7.2']);
+    fixture.sections = (_lang, versions) => versions.map(v => ({ version: v, items: [`Note for ${v}`] }));
+    await act(async () => root.render(React.createElement(ReleaseNotesDialog, { key: 'timeline' })));
+    assert.ok(document.querySelector('.release-notes-timeline.is-multi'));
+    assert.deepEqual([...document.querySelectorAll('.release-notes-version')].map(el => el.textContent), ['v1.7.2', 'v1.7.1', 'v1.7.0']);
   } finally {
     if (root) await act(async () => root.unmount());
     delete globalThis.releaseNotesFixture;

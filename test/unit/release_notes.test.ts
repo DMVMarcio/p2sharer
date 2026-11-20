@@ -63,3 +63,18 @@ test('corrupt storage migrates safely and failed persistence retains session ack
   notes.open();
   assert.equal(changes, 2);
 });
+
+test('skipping versions collects all missed releases newest-first and marks them read together', () => {
+  const catalog = ['1.4.1', '1.5.0', '1.6.5', '1.7.0', '1.7.1', '1.7.2', '1.8.0'];
+  const saved = storage();
+  new ReleaseNotesController('1.5.0', saved, catalog);
+  const upgraded = new ReleaseNotesController('1.7.2', saved, catalog);
+  assert.equal(upgraded.getSnapshot().pending, true);
+  assert.deepEqual(upgraded.getVisibleVersions(), ['1.7.2', '1.7.1', '1.7.0', '1.6.5']);
+  const restarted = new ReleaseNotesController('1.7.2', saved, catalog);
+  assert.deepEqual(restarted.getVisibleVersions(), ['1.7.2', '1.7.1', '1.7.0', '1.6.5']);
+  restarted.close();
+  const afterClose = new ReleaseNotesController('1.7.2', saved, catalog);
+  assert.equal(afterClose.getSnapshot().pending, false);
+  assert.deepEqual(afterClose.getVisibleVersions(), ['1.7.2', '1.7.1', '1.7.0', '1.6.5', '1.5.0', '1.4.1']);
+});

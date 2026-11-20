@@ -1408,6 +1408,8 @@
   "documents.deleteHint": "Удалить сохранённый документ «{{name}}»? Открытое содержимое будет сохранено. При следующем сохранении потребуется указать имя.",
   "releaseNotes.title": "Что нового",
   "releaseNotes.subtitle": "Узнайте, что изменилось в этой версии.",
+  "releaseNotes.timelineSubtitle": "Узнайте, что изменилось в этих версиях.",
+  "releaseNotes.currentBadge": "Текущая",
   "releaseNotes.done": "Понятно",
   "releaseNotes.view": "Примечания к выпуску",
   "notepad.image": "Изображение",

@@ -9,7 +9,8 @@ import { usePanelSize } from '../../hooks/usePanelSize';
 import { PanelResizeHandle } from '../common/PanelResizeHandle';
 import { useRoom } from '../../hooks/useRoom';
 import { useStore } from '../../hooks/useStore';
-import { VideoCard } from './VideoCard';
+import { PersistentVideoCards } from './PersistentVideoCards';
+import { VideoSlot } from './VideoSlot';
 import { StreamOverlay } from './StreamOverlay';
 import { roomService } from '../../services/room_service';
 import { ParticipantCard } from './ParticipantCard';
@@ -90,12 +91,18 @@ export const RoomVideoContainer: React.FC = () => {
     if (element) appSlotsRef.current.set(key, element);
     else appSlotsRef.current.delete(key);
   }, []);
+  const videoSlotsRef = useRef(new Map<string, HTMLDivElement>());
+  const registerVideoSlot = useCallback((key: string, element: HTMLDivElement | null) => {
+    if (element) videoSlotsRef.current.set(key, element);
+    else videoSlotsRef.current.delete(key);
+  }, []);
   const shouldRenderVideo = (slot: RoomSlotInfo): boolean => {
     return Boolean(
       (slot.isLocal && slot.isStreaming && slot.stream) ||
       (!slot.isLocal && slot.isStreaming && subscribedStreams.has(slot.peerId) && slot.stream)
     );
   };
+  const persistentVideoSlots = roomSlots.filter(shouldRenderVideo);
 
   const filteredSlots = useMemo(() => {
     return roomSlots.filter((slot) => {
@@ -187,16 +194,13 @@ export const RoomVideoContainer: React.FC = () => {
       role={inTray ? 'tray' : isFeatured ? 'featured' : 'grid'} selected={isSelectedFeatured} />;
     if (shouldRenderVideo(slot)) {
       return (
-        <VideoCard
+        <VideoSlot
           key={slot.peerId}
           slot={slot}
-          isFeatured={isFeatured}
-          inTray={inTray}
-          isSelectedFeatured={isSelectedFeatured}
-        >
-          {isFeatured && featuredMedia && overlays.map((overlay, index) => <StreamOverlay key={overlay.peerId}
-            slot={overlay} target={featuredMedia.peerId} index={index} />)}
-        </VideoCard>
+          role={inTray ? 'tray' : isFeatured ? 'featured' : 'grid'}
+          selected={isSelectedFeatured}
+          registerSlot={registerVideoSlot}
+        />
       );
     }
     return (
@@ -310,6 +314,19 @@ export const RoomVideoContainer: React.FC = () => {
           </>
         )}
       </div>
+      <PersistentVideoCards
+        slots={persistentVideoSlots}
+        layoutMode={layoutMode}
+        featuredId={layoutMode === 'spotlight' && featuredSlot ? entryId(featuredSlot) : undefined}
+        layoutKey={layoutKey}
+        draggingId={gestures.draggingId}
+        draggableCount={ids.length}
+        rootRef={videoContainerRef}
+        slotsRef={videoSlotsRef}
+        overlays={featuredMedia ? overlays.map((overlay, index) => (
+          <StreamOverlay key={overlay.peerId} slot={overlay} target={featuredMedia.peerId} index={index} />
+        )) : null}
+      />
       <PersistentRoomApps instances={appInstances} layoutMode={layoutMode}
         featuredId={layoutMode === 'spotlight' && featuredSlot ? entryId(featuredSlot) : undefined}
         layoutKey={layoutKey} draggingId={gestures.draggingId}

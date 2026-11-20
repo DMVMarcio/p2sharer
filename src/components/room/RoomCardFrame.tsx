@@ -2,7 +2,7 @@ import React from 'react';
 import { t } from '../../i18n';
 import type { CardResizeEdge } from '../../core/room_card_layout';
 
-const EDGES: CardResizeEdge[] = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'];
+export const CARD_RESIZE_EDGES: CardResizeEdge[] = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'];
 
 interface Props {
   id: string;
@@ -18,7 +18,7 @@ export function RoomCardFrame({ id, cardRef, style, dragging, resizable, childre
   return <div ref={cardRef} data-sortable-id={id} tabIndex={0} aria-label={t('room.cards.gestures')}
     className={`room-card-frame ${dragging ? 'is-dragging' : ''}`} style={style}>
     {children}
-    {resizable && EDGES.map(edge => <span key={edge} aria-hidden="true" className={`room-card-edge room-card-edge-${edge}`}
+    {resizable && CARD_RESIZE_EDGES.map(edge => <span key={edge} aria-hidden="true" className={`room-card-edge room-card-edge-${edge}`}
       data-room-resize={edge} />)}
   </div>;
 }

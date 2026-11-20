@@ -1408,6 +1408,8 @@
   "documents.deleteHint": "¿Eliminar el documento guardado «{{name}}»? El contenido abierto se conservará. Al volver a guardar se pedirá un nombre.",
   "releaseNotes.title": "Novedades de la versión",
   "releaseNotes.subtitle": "Descubre los cambios de esta versión.",
+  "releaseNotes.timelineSubtitle": "Descubre qué cambió en estas versiones.",
+  "releaseNotes.currentBadge": "Actual",
   "releaseNotes.done": "Entendido",
   "releaseNotes.view": "Ver notas de la versión",
   "notepad.image": "Imagen",

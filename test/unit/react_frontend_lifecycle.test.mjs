@@ -257,15 +257,21 @@ test('stream replacement updates the existing video and unsubscription releases 
   assert.equal(video('second'), unaffected);
 });
 
-test('only the active layout owns videos, the selected tray uses a placeholder, and teardown releases all nodes', async () => {
+test('persistent video cards keep one video per stream across grid and spotlight, keep the tray placeholder, and teardown releases all nodes', async () => {
   await reset([slot('first'), slot('second')]);
+  const firstVideo = video('first'), secondVideo = video('second');
   for (let i = 0; i < 10; i++) {
     fixture.room.layoutMode = 'spotlight'; fixture.room.pinnedPeerId = 'first'; await render();
     assert.equal(document.querySelectorAll('video').length, 2);
+    assert.equal(video('first'), firstVideo); assert.equal(video('second'), secondVideo);
+    assert.equal(pauses.get(firstVideo), undefined); assert.equal(loads.get(firstVideo), undefined);
     assert.equal(document.querySelector('.streams-grid-wrapper').children.length, 0);
-    assert.equal(document.querySelector('.spotlight-tray-strip [data-peer-id="first"] video'), null);
+    assert.equal(document.querySelector('.spotlight-tray-strip .tray-featured-placeholder') !== null, true);
+    assert.equal(document.querySelector('.spotlight-tray-strip video'), null);
     fixture.room.layoutMode = 'grid'; await render();
     assert.equal(document.querySelectorAll('video').length, 2);
+    assert.equal(video('first'), firstVideo); assert.equal(video('second'), secondVideo);
+    assert.equal(pauses.get(firstVideo), undefined); assert.equal(loads.get(firstVideo), undefined);
     assert.equal(document.querySelector('.spotlight-stage').children.length, 0);
   }
   const nodes = [...document.querySelectorAll('video')]; await clear();

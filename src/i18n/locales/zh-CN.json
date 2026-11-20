@@ -1408,6 +1408,8 @@
   "documents.deleteHint": "删除已保存的文档“{{name}}”？打开的内容将保留。再次保存时将要求输入名称。",
   "releaseNotes.title": "版本新内容",
   "releaseNotes.subtitle": "查看此版本的更新内容。",
+  "releaseNotes.timelineSubtitle": "查看这些版本的更新内容。",
+  "releaseNotes.currentBadge": "当前版本",
   "releaseNotes.done": "知道了",
   "releaseNotes.view": "查看版本说明",
   "notepad.image": "图片",

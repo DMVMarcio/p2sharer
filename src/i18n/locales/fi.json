@@ -1408,6 +1408,8 @@
   "documents.deleteHint": "Poistetaanko tallennettu asiakirja ”{{name}}”? Avoin sisältö säilytetään. Seuraavalla tallennuskerralla kysytään nimeä.",
   "releaseNotes.title": "Version uutuudet",
   "releaseNotes.subtitle": "Katso tämän julkaisun muutokset.",
+  "releaseNotes.timelineSubtitle": "Katso näiden julkaisujen muutokset.",
+  "releaseNotes.currentBadge": "Nykyinen",
   "releaseNotes.done": "Selvä",
   "releaseNotes.view": "Näytä julkaisutiedot",
   "notepad.image": "Kuva",

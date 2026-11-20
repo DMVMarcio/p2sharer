@@ -113,7 +113,7 @@ test('local stop is available on the featured stream and does not change the sel
   try {
     stateStore.set(state => { state.roomSlots = [{ ...screen, isLocal: true }, other]; });
     await render('spotlight', screen.peerId);
-    const featured = document.querySelector('.spotlight-featured-area .stream-card');
+    const featured = document.querySelector('.room-video-layer .stream-card.featured');
     const stop = featured.querySelector('.btn-stop-watch-stream');
     assert.ok(stop);
     await act(async () => stop.click());
@@ -138,7 +138,7 @@ test('room cards share order across modes, retain independent sizes, and preserv
     stateStore.set(state => { state.roomSlots = [screen, camera, other]; state.subscribedStreams = new Set(ids); });
     await render('spotlight');
     await render('grid');
-    const video = document.querySelector(`[data-sortable-id="${screen.peerId}"] video`);
+    const video = document.querySelector(`.room-video-layer [data-peer-id="${screen.peerId}"] video`);
     const otherWidth = width(other.peerId);
     const initialWidth = width(screen.peerId);
     await act(async () => frames()[0].dispatchEvent(
@@ -150,9 +150,10 @@ test('room cards share order across modes, retain independent sizes, and preserv
     handle.focus();
     await act(async () => handle.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'ArrowRight', altKey: true, bubbles: true })));
     assert.deepEqual(frames().map(frame => frame.dataset.sortableId), [camera.peerId, screen.peerId, other.peerId]);
-    assert.equal(document.querySelector(`[data-sortable-id="${screen.peerId}"] video`), video);
+    assert.equal(document.querySelector(`.room-video-layer [data-peer-id="${screen.peerId}"] video`), video);
     assert.equal(document.activeElement, handle);
     await render('spotlight');
+    assert.equal(document.querySelector(`.room-video-layer [data-peer-id="${screen.peerId}"] video`), video);
     assert.deepEqual([...document.querySelectorAll('.spotlight-tray-strip [data-sortable-id]')].map(frame => frame.dataset.sortableId),
       [camera.peerId, screen.peerId, other.peerId]);
     await act(async () => document.querySelector('.spotlight-tray-strip [data-sortable-id]').dispatchEvent(
@@ -160,7 +161,8 @@ test('room cards share order across modes, retain independent sizes, and preserv
     await render('grid');
     assert.deepEqual(frames().map(frame => frame.dataset.sortableId), ids);
     assert.equal(width(screen.peerId), resizedWidth);
-    await act(async () => frames()[0].querySelector('.stream-card').dispatchEvent(
+    assert.equal(document.querySelector(`.room-video-layer [data-peer-id="${screen.peerId}"] video`), video);
+    await act(async () => document.querySelector(`.room-video-layer .stream-card[data-peer-id="${screen.peerId}"]`).dispatchEvent(
       new window.MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 80, clientY: 80 })));
     await act(async () => [...document.querySelectorAll('[role="menuitem"]')].find(item => item.textContent === 'Restaurar layout automático').click());
     assert.equal(width(screen.peerId), initialWidth);
@@ -205,13 +207,14 @@ test('body drag previews an empty destination, preserves one player, cancels cle
     target.dispatchEvent(event);
   };
   const frame = id => document.querySelector(`[data-sortable-id="${id}"]`);
-  const videoCount = () => document.querySelectorAll('.streams-grid-wrapper video').length;
+  const streamCard = id => document.querySelector(`.room-video-layer .stream-card[data-peer-id="${id}"]`);
+  const videoCount = () => document.querySelectorAll('.room-video-layer video').length;
   const appId = '00000000-0000-4000-8000-000000000017';
   try {
     stateStore.set(state => { state.currentRoomCode = 'gesture-fixture'; state.roomSlots = [screen, camera, other]; state.subscribedStreams = new Set([screen.peerId, camera.peerId, other.peerId]); });
     await render('grid');
     const active = frame(screen.peerId);
-    const video = active.querySelector('video');
+    const video = streamCard(screen.peerId).querySelector('video');
     const original = active.getBoundingClientRect();
     const target = frame(camera.peerId).getBoundingClientRect();
     const startX = original.left + original.width / 2, startY = original.top + original.height / 2;
@@ -223,7 +226,7 @@ test('body drag previews an empty destination, preserves one player, cancels cle
     assert.ok(placeholder);
     assert.equal(placeholder.children.length, 0);
     assert.equal(videoCount(), 3);
-    assert.equal(active.querySelector('video'), video);
+    assert.equal(streamCard(screen.peerId).querySelector('video'), video);
     assert.notEqual(active.style.left, `${original.left}px`);
     assert.equal(frames.size, 0);
     await act(async () => window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', cancelable: true })));
@@ -240,13 +243,13 @@ test('body drag previews an empty destination, preserves one player, cancels cle
     await act(async () => pointer('pointerup', window, 600, 799));
     assert.equal(frames.size, 0);
     assert.equal(active.style.top, destinationTop);
-    assert.equal(active.querySelector('video'), video);
+    assert.equal(streamCard(screen.peerId).querySelector('video'), video);
     assert.equal(videoCount(), 3);
     await act(async () => video.click());
     assert.equal(stateStore.layoutMode, 'grid');
     const before = parseFloat(active.style.width);
     const rect = active.getBoundingClientRect();
-    await act(async () => pointer('pointerdown', active.querySelector('[data-room-resize="s"]'), rect.left + rect.width / 2, rect.bottom));
+    await act(async () => pointer('pointerdown', streamCard(screen.peerId).querySelector('[data-room-resize="s"]'), rect.left + rect.width / 2, rect.bottom));
     await act(async () => pointer('pointermove', window, rect.left + rect.width / 2, rect.bottom + 40));
     assert.ok(parseFloat(active.style.width) > before);
     await act(async () => pointer('pointercancel', window, 0, 0));
@@ -255,7 +258,7 @@ test('body drag previews an empty destination, preserves one player, cancels cle
     await act(async () => pointer('pointermove', window, 600, 400));
     await act(async () => stateStore.set(state => { state.roomSlots = [camera, other]; }));
     assert.equal(document.querySelector('.room-card-placeholder'), null);
-    assert.equal(document.querySelectorAll('.streams-grid-wrapper video').length, 2);
+    assert.equal(document.querySelectorAll('.room-video-layer video').length, 2);
     // Persistent app content receives the same body gesture without a second rendered app.
     await act(async () => roomAppsService.initializeLocalView({ id: appId, kind: 'notepad', createdBy: 'fixture', createdAt: 0 }));
     const app = document.querySelector(`.room-app-card[data-peer-id="app:${appId}"]`);
@@ -300,7 +303,7 @@ test('spotlight automatically subscribes the owner camera and grid mounts no ove
   stateStore.set((state) => { state.roomSlots = [screen, camera, other]; state.subscribedStreams = new Set([screen.peerId, other.peerId]); });
   await render();
   assert.ok(stateStore.subscribedStreams.has(camera.peerId));
-  assert.equal(document.querySelectorAll('.spotlight-featured-area .stream-overlay').length, 1);
+  assert.equal(document.querySelectorAll('.room-video-layer .stream-card.featured .stream-overlay').length, 1);
   assert.match(document.querySelector('.stream-overlay').getAttribute('aria-label'), /owner/);
   await render('grid');
   assert.equal(document.querySelectorAll('.stream-overlay').length, 0);
@@ -308,7 +311,7 @@ test('spotlight automatically subscribes the owner camera and grid mounts no ove
 
 test('tray context action layers another screen and removing an automatic camera stays dismissed', async () => {
   await render();
-  const trayCard = document.querySelector(`.spotlight-tray-strip [data-peer-id="${other.peerId}"]`);
+  const trayCard = document.querySelector(`.room-video-layer .stream-card.in-tray[data-peer-id="${other.peerId}"]`);
   await act(async () => trayCard.dispatchEvent(new window.MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 80, clientY: 80 })));
   const overlayAction = [...document.querySelectorAll('[role="menuitem"]')].find((item) => item.textContent.includes('Sobrepor na transmissão atual'));
   assert.ok(overlayAction);

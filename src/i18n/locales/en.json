@@ -1408,6 +1408,8 @@
   "documents.deleteHint": "Delete the saved document “{{name}}”? Open content will be kept. Saving it again will ask for a name.",
   "releaseNotes.title": "What's new",
   "releaseNotes.subtitle": "See what changed in this release.",
+  "releaseNotes.timelineSubtitle": "See what changed across these releases.",
+  "releaseNotes.currentBadge": "Current",
   "releaseNotes.done": "Got it",
   "releaseNotes.view": "View release notes",
   "notepad.image": "Image",

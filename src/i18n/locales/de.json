@@ -1408,6 +1408,8 @@
   "documents.deleteHint": "Das gespeicherte Dokument „{{name}}“ löschen? Geöffneter Inhalt bleibt erhalten. Beim erneuten Speichern wird nach einem Namen gefragt.",
   "releaseNotes.title": "Neu in dieser Version",
   "releaseNotes.subtitle": "Erfahre, was sich in dieser Version geändert hat.",
+  "releaseNotes.timelineSubtitle": "Sieh dir die Änderungen dieser Versionen an.",
+  "releaseNotes.currentBadge": "Aktuell",
   "releaseNotes.done": "Verstanden",
   "releaseNotes.view": "Versionshinweise anzeigen",
   "notepad.image": "Bild",

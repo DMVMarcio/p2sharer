@@ -4,6 +4,7 @@ import { PlatformBadge } from '../common/PlatformBadge';
 import { getLocalPlatform } from '../../core/platform';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { profileAction } from '../common/profile_actions';
+import { CARD_RESIZE_EDGES } from './RoomCardFrame';
 import { useRoomCardLayoutActions } from './RoomCardLayoutContext';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
@@ -42,6 +43,10 @@ interface VideoCardProps {
   isFeatured?: boolean;
   inTray?: boolean;
   isSelectedFeatured?: boolean;
+  style?: React.CSSProperties;
+  layoutDraggable?: boolean;
+  resizable?: boolean;
+  hidden?: boolean;
 }
 
 export const VideoCard: React.FC<VideoCardProps> = ({
@@ -50,6 +55,10 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   isFeatured = false,
   inTray = false,
   isSelectedFeatured = false,
+  style,
+  layoutDraggable = false,
+  resizable = false,
+  hidden = false,
 }) => {
   useLocale();
   const {
@@ -245,7 +254,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
       ready: () => setIsVideoReady(true),
       recover: () => roomService.roomManager?.requestStream(slot.peerId),
     });
-  }, [slot.stream, slot.isLocal, slot.peerId, inTray, isPipActive]);
+  }, [slot.stream, slot.isLocal, slot.peerId, isPipActive]);
 
   useEffect(() => {
     return () => {
@@ -408,10 +417,14 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     <div
       ref={cardRef}
       className={`stream-card ${isFeatured ? 'featured' : ''} ${inTray ? 'in-tray' : ''} ${isSelectedFeatured ? 'selected-featured' : ''} ${zoom > 1.0 && !inTray ? 'is-zoomed' : ''} ${isDragging && !inTray ? 'is-dragging' : ''} ${!slot.isLocal && !inTray ? 'has-volume-controller' : ''} ${isHudPinned ? 'is-hud-pinned' : ''} ${activeTooltips > 0 || mobileHudVisible ? 'is-hud-active' : ''} ${pointer.enabled ? 'is-stream-pointer-active' : ''} ${remoteControl.active ? 'is-remote-control-active' : ''} ${isMobile ? 'is-mobile-stream' : ''}`}
+      style={style}
       data-peer-id={slot.peerId}
+      data-room-layout-id={layoutDraggable ? slot.peerId : undefined}
       onClick={handleCardClick}
       onContextMenu={handleContextMenu}
-      tabIndex={0}
+      tabIndex={hidden ? -1 : 0}
+      aria-hidden={hidden || undefined}
+      inert={hidden || undefined}
       onMouseDown={!inTray && !pointer.enabled && !remoteControl.active ? handleMouseDown : undefined}
       onDoubleClick={!inTray && !pointer.enabled && !remoteControl.active ? handleDoubleClick : undefined}
     >
@@ -850,6 +863,9 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           hasVolumeControl={!slot.isLocal}
         />
       )}
+      {resizable && !isMobile && !isFullscreen && CARD_RESIZE_EDGES.map(edge => (
+        <span key={edge} aria-hidden="true" className={`room-card-edge room-card-edge-${edge}`} data-room-resize={edge} />
+      ))}
       {children}
     </div>
   );
