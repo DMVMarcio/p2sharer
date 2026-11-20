@@ -1,5 +1,5 @@
 import React from 'react';
-import { Gamepad2, Keyboard, Mouse } from 'lucide-react';
+import { Gamepad2, Keyboard, Mouse, Shield } from 'lucide-react';
 import type { ControllerInputActivity } from '../../core/remote_control_activity';
 import { t } from '../../i18n';
 import { Tooltip } from './Tooltip';
@@ -11,6 +11,9 @@ interface RemoteControlPermissionBadgesProps {
   keyboardEnabled: boolean;
   gamepadEnabled: boolean;
   onToggle: (key: RemoteControlPermissionKey, next: boolean) => void;
+  adminEnabled?: boolean;
+  onToggleAdmin?: (next: boolean) => void;
+  adminDisabled?: boolean;
   activity?: ControllerInputActivity;
   subjectName?: string;
   compact?: boolean;
@@ -23,6 +26,9 @@ export const RemoteControlPermissionBadges: React.FC<RemoteControlPermissionBadg
   keyboardEnabled,
   gamepadEnabled,
   onToggle,
+  adminEnabled = false,
+  onToggleAdmin,
+  adminDisabled = false,
   activity,
   subjectName,
   compact = false,
@@ -106,6 +112,39 @@ export const RemoteControlPermissionBadges: React.FC<RemoteControlPermissionBadg
           button
         );
       })}
+      {onToggleAdmin && (() => {
+        const label = t('remoteControl.adminPermission');
+        const ariaLabel = subjectName
+          ? t('remoteControl.adminPermissionAria', { name: subjectName })
+          : label;
+        const button = (
+          <button
+            key="adminEnabled"
+            type="button"
+            disabled={disabled || adminDisabled}
+            aria-pressed={adminEnabled}
+            aria-label={ariaLabel}
+            className={`rc-perm-badge ${adminEnabled ? 'is-enabled is-admin-enabled' : 'is-disabled'} ${compact ? 'is-compact' : ''}`.trim()}
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggleAdmin(!adminEnabled);
+            }}
+          >
+            <Shield size={compact ? 13 : 14} className="rc-perm-badge-icon" aria-hidden="true" />
+            {!compact && <span>{label}</span>}
+          </button>
+        );
+        return compact ? (
+          <Tooltip
+            key="adminEnabled"
+            content={`${label}: ${adminEnabled ? t('remoteControl.permActive') : t('remoteControl.permBlocked')}`}
+          >
+            {button}
+          </Tooltip>
+        ) : (
+          button
+        );
+      })()}
     </div>
   );
 };

@@ -4,6 +4,7 @@
 fn main() {
     if p2sharer_lib::portable_update::run_helper_if_requested() { return; }
     if p2sharer_lib::virtual_network::run_helper_if_requested() { return; }
+    if p2sharer_lib::remote_control_helper::run_helper_if_requested() { return; }
     p2sharer_lib::run()
 }
 

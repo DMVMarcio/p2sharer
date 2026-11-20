@@ -93,6 +93,14 @@ export type RemoteControlClientPacket =
       mediaId: string;
     }
   | {
+      type: 'requestElevation';
+      mediaId: string;
+    }
+  | {
+      type: 'cancelElevation';
+      mediaId: string;
+    }
+  | {
       type: 'input';
       mediaId: string;
       event: RemoteInputEvent;
@@ -105,6 +113,7 @@ export type RemoteControlHostPacket =
       mouseEnabled: boolean;
       keyboardEnabled: boolean;
       gamepadEnabled?: boolean;
+      adminEnabled?: boolean;
       cursorCaptured: boolean;
       hostBusy: boolean;
       elevationBlocked?: boolean;
@@ -114,6 +123,11 @@ export type RemoteControlHostPacket =
   | {
       type: 'decline';
       mediaId: string;
+    }
+  | {
+      type: 'elevationDecline';
+      mediaId: string;
+      reason?: 'declined' | 'unsupported';
     }
   | {
       type: 'revoke';
@@ -126,6 +140,7 @@ export type RemoteControlHostPacket =
       mouseEnabled: boolean;
       keyboardEnabled: boolean;
       gamepadEnabled?: boolean;
+      adminEnabled?: boolean;
       cursorCaptured: boolean;
       hostBusy: boolean;
       elevationBlocked?: boolean;
@@ -201,6 +216,7 @@ export interface RemoteControllerInfo {
   mouseEnabled: boolean;
   keyboardEnabled: boolean;
   gamepadEnabled: boolean;
+  adminEnabled?: boolean;
   connectedAt: number;
 }
 
@@ -224,6 +240,8 @@ export interface RemoteControlViewerState {
   mouseEnabled: boolean;
   keyboardEnabled: boolean;
   gamepadEnabled: boolean;
+  adminEnabled?: boolean;
+  adminRequestPending?: boolean;
   cursorCaptured: boolean;
   hostBusy: boolean;
   elevationBlocked: boolean;
@@ -368,6 +386,8 @@ export function validRemoteControlClientPacket(raw: unknown): raw is RemoteContr
       return pkt.fastBinary === undefined || typeof pkt.fastBinary === 'boolean';
     case 'cancel':
     case 'release':
+    case 'requestElevation':
+    case 'cancelElevation':
       return true;
     case 'input':
       return validRemoteInputEvent(pkt.event);
@@ -383,6 +403,12 @@ export function validRemoteControlHostPacket(raw: unknown): raw is RemoteControl
   switch (pkt.type) {
     case 'decline':
       return true;
+    case 'elevationDecline':
+      return (
+        pkt.reason === undefined ||
+        pkt.reason === 'declined' ||
+        pkt.reason === 'unsupported'
+      );
     case 'revoke':
       return (
         pkt.reason === undefined ||
@@ -395,6 +421,7 @@ export function validRemoteControlHostPacket(raw: unknown): raw is RemoteControl
         typeof pkt.mouseEnabled === 'boolean' &&
         typeof pkt.keyboardEnabled === 'boolean' &&
         (pkt.gamepadEnabled === undefined || typeof pkt.gamepadEnabled === 'boolean') &&
+        (pkt.adminEnabled === undefined || typeof pkt.adminEnabled === 'boolean') &&
         typeof pkt.cursorCaptured === 'boolean' &&
         typeof pkt.hostBusy === 'boolean' &&
         (pkt.elevationBlocked === undefined || typeof pkt.elevationBlocked === 'boolean') &&
@@ -407,6 +434,7 @@ export function validRemoteControlHostPacket(raw: unknown): raw is RemoteControl
         typeof pkt.mouseEnabled === 'boolean' &&
         typeof pkt.keyboardEnabled === 'boolean' &&
         (pkt.gamepadEnabled === undefined || typeof pkt.gamepadEnabled === 'boolean') &&
+        (pkt.adminEnabled === undefined || typeof pkt.adminEnabled === 'boolean') &&
         typeof pkt.cursorCaptured === 'boolean' &&
         typeof pkt.hostBusy === 'boolean' &&
         (pkt.elevationBlocked === undefined || typeof pkt.elevationBlocked === 'boolean') &&
@@ -474,6 +502,8 @@ export function createIdleViewerState(mediaId = '', hostPeerId = ''): RemoteCont
     mouseEnabled: true,
     keyboardEnabled: true,
     gamepadEnabled: true,
+    adminEnabled: false,
+    adminRequestPending: false,
     cursorCaptured: true,
     hostBusy: false,
     elevationBlocked: false,

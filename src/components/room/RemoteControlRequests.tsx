@@ -16,8 +16,16 @@ type RequestPermDraft = {
 
 export function RemoteControlToastItems() {
   useLocale();
-  const { remoteControlRequests, peers, answerRemoteControlRequest } = useRoom();
+  const {
+    remoteControlRequests,
+    remoteControlElevationRequests,
+    remoteControlElevationReady,
+    peers,
+    answerRemoteControlRequest,
+    answerRemoteControlElevation,
+  } = useRoom();
   const [drafts, setDrafts] = useState<Record<string, RequestPermDraft>>({});
+  const [resolvingElevationIds, setResolvingElevationIds] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const activeIds = new Set(remoteControlRequests.map((req) => req.id));
@@ -35,7 +43,23 @@ export function RemoteControlToastItems() {
     });
   }, [remoteControlRequests]);
 
-  if (!remoteControlRequests.length) return null;
+  useEffect(() => {
+    const activeIds = new Set(remoteControlElevationRequests.map((req) => req.id));
+    setResolvingElevationIds((prev) => {
+      let changed = false;
+      const next: Record<string, boolean> = {};
+      for (const id of Object.keys(prev)) {
+        if (activeIds.has(id)) {
+          next[id] = prev[id];
+        } else {
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [remoteControlElevationRequests]);
+
+  if (!remoteControlRequests.length && !remoteControlElevationRequests.length) return null;
 
   const resolveDraft = (requestId: string): RequestPermDraft => {
     const existing = drafts[requestId];
@@ -91,6 +115,53 @@ export function RemoteControlToastItems() {
                 type="button"
                 className="btn-primary"
                 onClick={() => answerRemoteControlRequest(request.id, true, perms)}
+              >
+                {t('remoteControl.accept')}
+              </button>
+            </div>
+          </div>
+        );
+      })}
+      {remoteControlElevationRequests.map((request) => {
+        const peerName =
+          peers.find((peer) => peer.id === request.peerId)?.username ||
+          request.peerId.slice(0, 6);
+        const busy = Boolean(resolvingElevationIds[request.id]);
+        return (
+          <div className="chat-file-toast" key={`rc-elev-${request.id}`}>
+            <p className="chat-file-toast-title">
+              <strong className="chat-file-toast-person">{peerName}</strong>{' '}
+              {t('remoteControl.adminRequestPrompt')}
+            </p>
+            <span>
+              {t(
+                remoteControlElevationReady
+                  ? 'remoteControl.adminRequestHintReady'
+                  : 'remoteControl.adminRequestHintUac',
+              )}
+            </span>
+            <div>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void answerRemoteControlElevation(request.id, false)}
+              >
+                {t('remoteControl.decline')}
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={busy}
+                onClick={() => {
+                  setResolvingElevationIds((prev) => ({ ...prev, [request.id]: true }));
+                  void answerRemoteControlElevation(request.id, true).finally(() => {
+                    setResolvingElevationIds((prev) => {
+                      const next = { ...prev };
+                      delete next[request.id];
+                      return next;
+                    });
+                  });
+                }}
               >
                 {t('remoteControl.accept')}
               </button>

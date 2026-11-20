@@ -671,3 +671,115 @@ test('Chromium POV HAT switch axes[9] captures and decodes individual D-Pad dire
   // Diagonal Down+Left (sector 5 -> ~0.4286) activates both Down and Left
   assert.equal(readGamepadSnapshotState(makePad(0.4286), profile).buttons & 0x000f, 0x0002 | 0x0004);
 });
+
+test('Remote control administrator elevation requires explicit host consent and UAC readiness', async () => {
+  assert.equal(validRemoteControlClientPacket({ type: 'requestElevation', mediaId: 'screen-1' }), true);
+  assert.equal(validRemoteControlClientPacket({ type: 'cancelElevation', mediaId: 'screen-1' }), true);
+  assert.equal(
+    validRemoteControlHostPacket({ type: 'elevationDecline', mediaId: 'screen-1', reason: 'declined' }),
+    true,
+  );
+  assert.equal(
+    validRemoteControlHostPacket({
+      type: 'state',
+      mediaId: 'screen-1',
+      mouseEnabled: true,
+      keyboardEnabled: true,
+      gamepadEnabled: true,
+      adminEnabled: true,
+      cursorCaptured: true,
+      hostBusy: false,
+      elevationBlocked: false,
+      cursorShape: 'default',
+    }),
+    true,
+  );
+
+  const sent: Array<{ peerId: string; packet: RemoteControlHostPacket }> = [];
+  const nativeElevationCalls: Array<{ peerId: string; mediaId: string; enabled: boolean }> = [];
+  let uacConsentResult = false;
+  let uacChecks = 0;
+
+  const manager = new RemoteControlHostManager({
+    isHostSupported: () => true,
+    getScreenStream: (mediaId) =>
+      mediaId === 'screen-1' ? { sessionId: 'sess-1', cursorCaptured: true } : null,
+    sendToPeer: (peerId, packet) => sent.push({ peerId, packet }),
+    setMonitorActive: () => {},
+    applyInput: async () => ({ accepted: false, hostBusy: false, elevationBlocked: true }),
+    releaseInputs: () => {},
+    ensureElevationReady: async () => {
+      uacChecks += 1;
+      return uacConsentResult;
+    },
+    setNativeControllerElevation: (peerId, mediaId, enabled) => {
+      nativeElevationCalls.push({ peerId, mediaId, enabled });
+    },
+    onChange: () => {},
+  });
+
+  // Normal accept never grants admin permission automatically
+  manager.receiveClientPacket({ type: 'request', mediaId: 'screen-1' }, 'peer-a');
+  manager.answerRequest('peer-a:screen-1', true);
+  assert.equal(manager.getControllers()[0]?.adminEnabled, false);
+  const acceptPkt = sent.find((item) => item.packet.type === 'accept')?.packet;
+  assert.equal(acceptPkt?.type === 'accept' && acceptPkt.adminEnabled, false);
+
+  // Blocked input marks elevationBlocked
+  manager.receiveClientPacket(
+    { type: 'input', mediaId: 'screen-1', event: { kind: 'mouseMove', x: 0.5, y: 0.5 } },
+    'peer-a',
+  );
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(manager.isElevationBlocked(), true);
+
+  // Viewer can request and cancel admin request while keeping session active
+  manager.receiveClientPacket({ type: 'requestElevation', mediaId: 'screen-1' }, 'peer-a');
+  assert.equal(manager.getElevationRequests().length, 1);
+  manager.receiveClientPacket({ type: 'cancelElevation', mediaId: 'screen-1' }, 'peer-a');
+  assert.equal(manager.getElevationRequests().length, 0);
+  assert.equal(manager.getControllers().length, 1);
+
+  // Host decline clears pending request and notifies viewer without revoking session
+  manager.receiveClientPacket({ type: 'requestElevation', mediaId: 'screen-1' }, 'peer-a');
+  const declinedOk = await manager.answerElevationRequest('peer-a:screen-1', false);
+  assert.equal(declinedOk, false);
+  assert.equal(manager.getControllers()[0]?.adminEnabled, false);
+  assert.equal(sent.some((item) => item.packet.type === 'elevationDecline'), true);
+
+  // Host approves but UAC prompt is cancelled -> still no admin access, emits elevationDecline
+  sent.length = 0;
+  uacConsentResult = false;
+  manager.receiveClientPacket({ type: 'requestElevation', mediaId: 'screen-1' }, 'peer-a');
+  const canceledUacOk = await manager.answerElevationRequest('peer-a:screen-1', true);
+  assert.equal(canceledUacOk, false);
+  assert.equal(uacChecks, 1);
+  assert.equal(manager.getControllers()[0]?.adminEnabled, false);
+  assert.equal(sent.some((item) => item.packet.type === 'elevationDecline'), true);
+
+  // Host approves and UAC succeeds -> adminEnabled granted and native elevation synced
+  sent.length = 0;
+  uacConsentResult = true;
+  manager.receiveClientPacket({ type: 'requestElevation', mediaId: 'screen-1' }, 'peer-a');
+  const grantedOk = await manager.answerElevationRequest('peer-a:screen-1', true);
+  assert.equal(grantedOk, true);
+  assert.equal(uacChecks, 2);
+  assert.equal(manager.getControllers()[0]?.adminEnabled, true);
+  assert.equal(manager.isElevationBlocked(), false);
+  assert.deepEqual(nativeElevationCalls.at(-1), {
+    peerId: 'peer-a',
+    mediaId: 'screen-1',
+    enabled: true,
+  });
+  const grantedState = sent.find((item) => item.packet.type === 'state')?.packet;
+  assert.equal(grantedState?.type === 'state' && grantedState.adminEnabled, true);
+  assert.equal(grantedState?.type === 'state' && grantedState.elevationBlocked, false);
+
+  // Revoking controller resets native elevation
+  manager.revokeController('peer-a', 'screen-1');
+  assert.deepEqual(nativeElevationCalls.at(-1), {
+    peerId: 'peer-a',
+    mediaId: 'screen-1',
+    enabled: false,
+  });
+});

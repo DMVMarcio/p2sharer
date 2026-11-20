@@ -1,8 +1,94 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react';
-import { AlertTriangle, Eye, Gamepad2, Keyboard, Maximize2, Minimize2, Mouse, Power, ShieldAlert, Volume1, Volume2, VolumeX } from 'lucide-react';
+import { AlertTriangle, Eye, Gamepad2, Keyboard, Maximize2, Minimize2, Mouse, Power, ShieldAlert, ShieldCheck, Volume1, Volume2, VolumeX } from 'lucide-react';
 import logoUrl from '../../assets/logo.png';
 import { useLocale } from '../../hooks/useLocale';
 import { getLanguage, t } from '../../i18n';
+
+interface RemoteControlElevationBannerProps {
+  elevationBlocked: boolean;
+  adminEnabled: boolean;
+  adminRequestPending: boolean;
+  onRequestAdmin: () => void;
+  onCancelAdmin: () => void;
+  onOverlayHoverChange: (hovered: boolean) => void;
+}
+
+export function RemoteControlElevationBanner({
+  elevationBlocked,
+  adminEnabled,
+  adminRequestPending,
+  onRequestAdmin,
+  onCancelAdmin,
+  onOverlayHoverChange,
+}: RemoteControlElevationBannerProps) {
+  const hoveredRef = useRef(false);
+  const visible = !adminEnabled && (elevationBlocked || adminRequestPending);
+
+  useEffect(() => {
+    if (!visible && hoveredRef.current) {
+      hoveredRef.current = false;
+      onOverlayHoverChange(false);
+    }
+  }, [onOverlayHoverChange, visible]);
+
+  useEffect(() => {
+    return () => {
+      if (hoveredRef.current) {
+        hoveredRef.current = false;
+        onOverlayHoverChange(false);
+      }
+    };
+  }, [onOverlayHoverChange]);
+
+  if (!visible) return null;
+
+  return (
+    <div
+      className={`remote-control-elevation-banner ${adminRequestPending ? 'is-pending' : 'is-blocked'}`}
+      role="status"
+      aria-live="polite"
+      onPointerEnter={() => {
+        hoveredRef.current = true;
+        onOverlayHoverChange(true);
+      }}
+      onPointerLeave={() => {
+        hoveredRef.current = false;
+        onOverlayHoverChange(false);
+      }}
+      onPointerDown={(event) => event.stopPropagation()}
+      onPointerMove={(event) => event.stopPropagation()}
+      onPointerUp={(event) => event.stopPropagation()}
+      onPointerCancel={(event) => event.stopPropagation()}
+      onMouseDown={(event) => event.stopPropagation()}
+      onMouseUp={(event) => event.stopPropagation()}
+      onClick={(event) => event.stopPropagation()}
+      onDoubleClick={(event) => event.stopPropagation()}
+      onContextMenu={(event) => event.stopPropagation()}
+    >
+      <span className="remote-control-elevation-banner-copy">
+        <ShieldAlert size={15} aria-hidden="true" />
+        <span>
+          {adminRequestPending
+            ? t('remoteControl.adminPendingNotice')
+            : t('remoteControl.elevationBlockedBannerNotice')}
+        </span>
+      </span>
+      <button
+        type="button"
+        className={`btn btn-sm ${adminRequestPending ? 'btn-secondary' : 'btn-primary'}`}
+        onClick={(event) => {
+          event.stopPropagation();
+          if (adminRequestPending) onCancelAdmin();
+          else onRequestAdmin();
+        }}
+      >
+        {adminRequestPending
+          ? t('remoteControl.cancelAdminAction')
+          : t('remoteControl.requestAdminAction')}
+      </button>
+    </div>
+  );
+}
 
 interface RemoteControlFloatingOverlayProps {
   persistKey?: string;
@@ -16,6 +102,10 @@ interface RemoteControlFloatingOverlayProps {
   onToggleMouseLock: () => void;
   hostBusy: boolean;
   elevationBlocked: boolean;
+  adminEnabled?: boolean;
+  adminRequestPending?: boolean;
+  onRequestAdmin?: () => void;
+  onCancelAdmin?: () => void;
   mouseEnabled: boolean;
   keyboardEnabled: boolean;
   gamepadEnabled: boolean;
@@ -51,6 +141,10 @@ export function RemoteControlFloatingOverlay({
   onToggleMouseLock,
   hostBusy,
   elevationBlocked,
+  adminEnabled = false,
+  adminRequestPending = false,
+  onRequestAdmin,
+  onCancelAdmin,
   mouseEnabled,
   keyboardEnabled,
   gamepadEnabled,
@@ -314,19 +408,22 @@ export function RemoteControlFloatingOverlay({
         >
           <div className="remote-control-floating-header">
             <span className="remote-control-floating-title">{t('remoteControl.activeTitle')}</span>
-            {elevationBlocked ? (
+            {elevationBlocked && !adminEnabled ? (
               <span className="remote-control-floating-badge is-busy">
                 <AlertTriangle size={12} aria-hidden="true" />
                 {t('remoteControl.elevationBlockedShort')}
               </span>
-            ) : (
-              hostBusy && (
-                <span className="remote-control-floating-badge is-busy">
-                  <ShieldAlert size={12} aria-hidden="true" />
-                  {t('remoteControl.hostPriorityActive')}
-                </span>
-              )
-            )}
+            ) : hostBusy ? (
+              <span className="remote-control-floating-badge is-busy">
+                <ShieldAlert size={12} aria-hidden="true" />
+                {t('remoteControl.hostPriorityActive')}
+              </span>
+            ) : adminEnabled ? (
+              <span className="remote-control-floating-badge is-admin">
+                <ShieldCheck size={12} aria-hidden="true" />
+                {t('remoteControl.adminActiveLabel')}
+              </span>
+            ) : null}
           </div>
 
           <div className="remote-control-floating-stats">
@@ -382,6 +479,31 @@ export function RemoteControlFloatingOverlay({
                   {t('remoteControl.gamepadDisabledHint')}
                 </span>
               )}
+            </div>
+          )}
+
+          {!adminEnabled && (elevationBlocked || adminRequestPending) && (onRequestAdmin || onCancelAdmin) && (
+            <div className="remote-control-floating-row remote-control-admin-row">
+              <span className="remote-control-floating-row-copy">
+                <strong>{t('remoteControl.adminPermissionLabel')}</strong>
+                <small>
+                  {adminRequestPending
+                    ? t('remoteControl.adminPendingNotice')
+                    : t('remoteControl.adminRequestHint')}
+                </small>
+              </span>
+              <button
+                type="button"
+                className={`btn btn-sm ${adminRequestPending ? 'btn-secondary' : 'btn-primary'}`}
+                onClick={() => {
+                  if (adminRequestPending) onCancelAdmin?.();
+                  else onRequestAdmin?.();
+                }}
+              >
+                {adminRequestPending
+                  ? t('remoteControl.cancelAdminAction')
+                  : t('remoteControl.requestAdminAction')}
+              </button>
             </div>
           )}
 

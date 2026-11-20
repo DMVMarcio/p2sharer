@@ -34,6 +34,12 @@ export interface RemoteControlHostAdapter {
     keyboardEnabled: boolean,
     gamepadEnabled: boolean,
   ) => Promise<void> | void;
+  ensureElevationReady?: () => Promise<boolean>;
+  setNativeControllerElevation?: (
+    peerId: string,
+    mediaId: string,
+    enabled: boolean,
+  ) => Promise<void> | void;
   getDefaultPermissions?: () => {
     mouseEnabled: boolean;
     keyboardEnabled: boolean;
@@ -51,6 +57,7 @@ function controllerKey(peerId: string, mediaId: string): string {
 export class RemoteControlHostManager {
   private readonly adapter: RemoteControlHostAdapter;
   private requests = new Map<string, RemoteControlRequest>();
+  private elevationRequests = new Map<string, RemoteControlRequest>();
   private controllers = new Map<string, RemoteControllerInfo>();
   private monitorActive = false;
   private hostBusy = false;
@@ -63,6 +70,10 @@ export class RemoteControlHostManager {
 
   public getRequests(): RemoteControlRequest[] {
     return Array.from(this.requests.values());
+  }
+
+  public getElevationRequests(): RemoteControlRequest[] {
+    return Array.from(this.elevationRequests.values());
   }
 
   public getControllers(): RemoteControllerInfo[] {
@@ -113,8 +124,12 @@ export class RemoteControlHostManager {
       }
       case 'release': {
         const removedReq = this.requests.delete(key);
+        const removedElev = this.elevationRequests.delete(key);
         const removedCtrl = this.controllers.delete(key);
         if (removedCtrl) {
+          void Promise.resolve(this.adapter.setNativeControllerElevation?.(peerId, packet.mediaId, false)).catch(
+            () => {},
+          );
           void Promise.resolve(
             this.adapter.syncNativePeer?.(peerId, packet.mediaId, undefined, false, false, false, false),
           ).catch(() => {});
@@ -123,7 +138,46 @@ export class RemoteControlHostManager {
           this.adapter.onActivityCleared?.({ controllerKey: key });
           this.syncMonitor();
         }
-        if (removedReq || removedCtrl) {
+        if (removedReq || removedElev || removedCtrl) {
+          this.adapter.onChange();
+        }
+        break;
+      }
+      case 'requestElevation': {
+        const ctrl = this.controllers.get(key);
+        if (!ctrl) {
+          this.adapter.sendToPeer(peerId, {
+            type: 'elevationDecline',
+            mediaId: packet.mediaId,
+            reason: 'declined',
+          });
+          return;
+        }
+        const screen = this.adapter.getScreenStream(packet.mediaId);
+        if (!screen || !this.adapter.isHostSupported()) {
+          this.adapter.sendToPeer(peerId, {
+            type: 'elevationDecline',
+            mediaId: packet.mediaId,
+            reason: 'unsupported',
+          });
+          return;
+        }
+        if (ctrl.adminEnabled) {
+          this.sendState(ctrl, 'state', screen.cursorCaptured);
+          return;
+        }
+        if (this.elevationRequests.has(key)) return;
+        this.elevationRequests.set(key, {
+          id: key,
+          peerId,
+          mediaId: packet.mediaId,
+          createdAt: Date.now(),
+        });
+        this.adapter.onChange();
+        break;
+      }
+      case 'cancelElevation': {
+        if (this.elevationRequests.delete(key)) {
           this.adapter.onChange();
         }
         break;
@@ -204,6 +258,7 @@ export class RemoteControlHostManager {
       mouseEnabled,
       keyboardEnabled,
       gamepadEnabled,
+      adminEnabled: false,
       connectedAt: Date.now(),
     };
     this.controllers.set(controllerKey(req.peerId, req.mediaId), info);
@@ -221,6 +276,75 @@ export class RemoteControlHostManager {
     this.syncMonitor();
     this.sendState(info, 'accept', screen.cursorCaptured);
     this.adapter.onChange();
+  }
+
+  public async answerElevationRequest(requestId: string, accept: boolean): Promise<boolean> {
+    const req = this.elevationRequests.get(requestId);
+    if (!req) return false;
+    this.elevationRequests.delete(requestId);
+    if (!accept) {
+      this.adapter.sendToPeer(req.peerId, {
+        type: 'elevationDecline',
+        mediaId: req.mediaId,
+        reason: 'declined',
+      });
+      this.adapter.onChange();
+      return false;
+    }
+    const ctrl = this.controllers.get(requestId);
+    const screen = this.adapter.getScreenStream(req.mediaId);
+    if (!ctrl || !screen || !this.adapter.isHostSupported()) {
+      this.adapter.sendToPeer(req.peerId, {
+        type: 'elevationDecline',
+        mediaId: req.mediaId,
+        reason: screen ? 'unsupported' : 'declined',
+      });
+      this.adapter.onChange();
+      return false;
+    }
+    this.adapter.onChange();
+    const granted = await this.setControllerAdminPermission(req.peerId, req.mediaId, true);
+    if (!granted && this.controllers.has(requestId)) {
+      this.adapter.sendToPeer(req.peerId, {
+        type: 'elevationDecline',
+        mediaId: req.mediaId,
+        reason: 'declined',
+      });
+    }
+    return granted;
+  }
+
+  public async setControllerAdminPermission(peerId: string, mediaId: string, enabled: boolean): Promise<boolean> {
+    const key = controllerKey(peerId, mediaId);
+    let ctrl = this.controllers.get(key);
+    if (!ctrl) return false;
+    if (Boolean(ctrl.adminEnabled) === enabled) {
+      return enabled;
+    }
+    if (enabled) {
+      if (!this.adapter.isHostSupported()) return false;
+      if (this.adapter.ensureElevationReady) {
+        const ready = await this.adapter.ensureElevationReady();
+        ctrl = this.controllers.get(key);
+        if (!ctrl || !ready) {
+          return false;
+        }
+      }
+      this.elevationRequests.delete(key);
+    }
+    const updated: RemoteControllerInfo = {
+      ...ctrl,
+      adminEnabled: enabled,
+    };
+    this.controllers.set(key, updated);
+    await Promise.resolve(this.adapter.setNativeControllerElevation?.(peerId, mediaId, enabled)).catch(() => {});
+    if (enabled && this.elevationBlocked) {
+      this.elevationBlocked = false;
+    }
+    const screen = this.adapter.getScreenStream(mediaId);
+    if (screen) this.sendState(updated, 'state', screen.cursorCaptured);
+    this.adapter.onChange();
+    return true;
   }
 
   public setControllerPermissions(
@@ -278,8 +402,10 @@ export class RemoteControlHostManager {
   ): void {
     const key = controllerKey(peerId, mediaId);
     const hadReq = this.requests.delete(key);
+    const hadElev = this.elevationRequests.delete(key);
     const hadCtrl = this.controllers.delete(key);
     if (hadCtrl) {
+      void Promise.resolve(this.adapter.setNativeControllerElevation?.(peerId, mediaId, false)).catch(() => {});
       void Promise.resolve(
         this.adapter.syncNativePeer?.(peerId, mediaId, undefined, false, false, false, false),
       ).catch(() => {});
@@ -290,8 +416,10 @@ export class RemoteControlHostManager {
       this.syncMonitor();
     } else if (hadReq) {
       this.adapter.sendToPeer(peerId, { type: 'decline', mediaId });
+    } else if (hadElev) {
+      this.adapter.sendToPeer(peerId, { type: 'elevationDecline', mediaId, reason: 'declined' });
     }
-    if (hadReq || hadCtrl) this.adapter.onChange();
+    if (hadReq || hadElev || hadCtrl) this.adapter.onChange();
   }
 
   public setHostPriorityState(
@@ -342,9 +470,18 @@ export class RemoteControlHostManager {
         changed = true;
       }
     }
+    for (const [key, req] of this.elevationRequests) {
+      if (req.mediaId === mediaId) {
+        this.elevationRequests.delete(key);
+        changed = true;
+      }
+    }
     for (const [key, ctrl] of this.controllers) {
       if (ctrl.mediaId === mediaId) {
         this.controllers.delete(key);
+        void Promise.resolve(this.adapter.setNativeControllerElevation?.(ctrl.peerId, ctrl.mediaId, false)).catch(
+          () => {},
+        );
         void Promise.resolve(
           this.adapter.syncNativePeer?.(ctrl.peerId, ctrl.mediaId, undefined, false, false, false, false),
         ).catch(() => {});
@@ -369,9 +506,18 @@ export class RemoteControlHostManager {
         changed = true;
       }
     }
+    for (const [key, req] of this.elevationRequests) {
+      if (req.peerId === peerId) {
+        this.elevationRequests.delete(key);
+        changed = true;
+      }
+    }
     for (const [key, ctrl] of this.controllers) {
       if (ctrl.peerId === peerId) {
         this.controllers.delete(key);
+        void Promise.resolve(this.adapter.setNativeControllerElevation?.(ctrl.peerId, ctrl.mediaId, false)).catch(
+          () => {},
+        );
         void Promise.resolve(
           this.adapter.syncNativePeer?.(ctrl.peerId, ctrl.mediaId, undefined, false, false, false, false),
         ).catch(() => {});
@@ -388,14 +534,18 @@ export class RemoteControlHostManager {
   }
 
   public clear(): void {
-    const hadAny = this.requests.size > 0 || this.controllers.size > 0;
+    const hadAny = this.requests.size > 0 || this.elevationRequests.size > 0 || this.controllers.size > 0;
     for (const req of this.requests.values()) {
       this.adapter.sendToPeer(req.peerId, { type: 'decline', mediaId: req.mediaId });
     }
     for (const ctrl of this.controllers.values()) {
+      void Promise.resolve(this.adapter.setNativeControllerElevation?.(ctrl.peerId, ctrl.mediaId, false)).catch(
+        () => {},
+      );
       this.adapter.sendToPeer(ctrl.peerId, { type: 'revoke', mediaId: ctrl.mediaId, reason: 'stream-ended' });
     }
     this.requests.clear();
+    this.elevationRequests.clear();
     this.controllers.clear();
     this.hostBusy = false;
     this.elevationBlocked = false;
@@ -409,15 +559,17 @@ export class RemoteControlHostManager {
   }
 
   private sendState(ctrl: RemoteControllerInfo, type: 'accept' | 'state', cursorCaptured: boolean): void {
+    const adminEnabled = Boolean(ctrl.adminEnabled);
     this.adapter.sendToPeer(ctrl.peerId, {
       type,
       mediaId: ctrl.mediaId,
       mouseEnabled: ctrl.mouseEnabled,
       keyboardEnabled: ctrl.keyboardEnabled,
       gamepadEnabled: ctrl.gamepadEnabled,
+      adminEnabled,
       cursorCaptured,
       hostBusy: this.hostBusy,
-      elevationBlocked: this.elevationBlocked,
+      elevationBlocked: adminEnabled ? false : this.elevationBlocked,
       cursorShape: this.cursorShape,
       ...(type === 'accept' ? { fastBinary: true } : {}),
     });

@@ -88,6 +88,8 @@ export interface RemoteControlHookState {
   active: boolean;
   hostBusy: boolean;
   elevationBlocked: boolean;
+  adminEnabled: boolean;
+  adminRequestPending: boolean;
   mouseEnabled: boolean;
   keyboardEnabled: boolean;
   gamepadEnabled: boolean;
@@ -100,6 +102,8 @@ export interface RemoteControlHookState {
   pointerInside: boolean;
   cursorCss: string | undefined;
   toggleRequest: () => void;
+  requestAdmin: () => void;
+  cancelAdmin: () => void;
   exit: () => void;
   toggleImmersive: () => void;
   toggleManualMouseLock: () => void;
@@ -122,12 +126,18 @@ const MIN_MOVE_INTERVAL_MS = 4;
 function isVideoInteractionTarget(target: EventTarget | null, container: HTMLElement | null): boolean {
   if (!(target instanceof Element) || !container) return false;
   if (!container.contains(target)) return false;
-  return !target.closest('.remote-control-floating-overlay, .modal-backdrop, .chat-file-toasts');
+  return !target.closest(
+    '.remote-control-floating-overlay, .remote-control-elevation-banner, .modal-backdrop, .chat-file-toasts',
+  );
 }
 
 function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof Element)) return false;
-  return Boolean(target.closest('input, textarea, select, [contenteditable="true"], .remote-control-floating-overlay'));
+  return Boolean(
+    target.closest(
+      'input, textarea, select, [contenteditable="true"], .remote-control-floating-overlay, .remote-control-elevation-banner',
+    ),
+  );
 }
 
 function isTextInputElement(target: EventTarget | null): boolean {
@@ -152,8 +162,11 @@ export function useRemoteControl(
   const status: RemoteControlStatus = eligible && viewerState ? viewerState.status : 'idle';
   const active = status === 'active';
   const pending = status === 'pending';
+  const adminEnabled = active && Boolean(viewerState?.adminEnabled);
+  const adminRequestPending = active && !adminEnabled && Boolean(viewerState?.adminRequestPending);
   const hostBusy = active && Boolean(viewerState?.hostBusy || cursorSync?.hostBusy);
-  const elevationBlocked = active && Boolean(viewerState?.elevationBlocked || cursorSync?.elevationBlocked);
+  const elevationBlocked =
+    active && !adminEnabled && Boolean(viewerState?.elevationBlocked || cursorSync?.elevationBlocked);
   const mouseEnabled = Boolean(viewerState?.mouseEnabled);
   const keyboardEnabled = Boolean(viewerState?.keyboardEnabled);
   const gamepadEnabled = Boolean(viewerState?.gamepadEnabled ?? true);
@@ -424,6 +437,16 @@ export function useRemoteControl(
     if (!eligible) return;
     roomService.toggleRemoteControlRequest(slotPeerId);
   }, [eligible, slotPeerId]);
+
+  const requestAdmin = useCallback(() => {
+    if (!active) return;
+    roomService.requestRemoteControlElevation(slotPeerId);
+  }, [active, slotPeerId]);
+
+  const cancelAdmin = useCallback(() => {
+    if (!active) return;
+    roomService.cancelRemoteControlElevation(slotPeerId);
+  }, [active, slotPeerId]);
 
   const exit = useCallback(() => {
     releasePointerLock();
@@ -1436,6 +1459,8 @@ export function useRemoteControl(
     active,
     hostBusy,
     elevationBlocked,
+    adminEnabled,
+    adminRequestPending,
     mouseEnabled,
     keyboardEnabled,
     gamepadEnabled,
@@ -1448,6 +1473,8 @@ export function useRemoteControl(
     pointerInside,
     cursorCss,
     toggleRequest,
+    requestAdmin,
+    cancelAdmin,
     exit,
     toggleImmersive,
     toggleManualMouseLock,

@@ -244,6 +244,7 @@ struct HostControlState {
     last_session_id: Option<String>,
     last_mouse_actor_id: Option<String>,
     authorized_native_peers: HashMap<(String, String), NativePeerPermission>,
+    elevated_controllers: HashSet<String>,
     held_buttons: HashMap<String, HashSet<String>>,
     held_vks: HashMap<String, HashSet<u16>>,
     held_unicode: HashMap<(String, String), Vec<u16>>,
@@ -283,6 +284,7 @@ impl Default for HostControlState {
             last_session_id: None,
             last_mouse_actor_id: None,
             authorized_native_peers: HashMap::new(),
+            elevated_controllers: HashSet::new(),
             held_buttons: HashMap::new(),
             held_vks: HashMap::new(),
             held_unicode: HashMap::new(),
@@ -1086,6 +1088,22 @@ fn send_win32_inputs(inputs: &[windows::Win32::UI::Input::KeyboardAndMouse::INPU
 }
 
 #[cfg(windows)]
+fn send_win32_inputs_for_controller(
+    use_elevated: bool,
+    inputs: &[windows::Win32::UI::Input::KeyboardAndMouse::INPUT],
+) -> bool {
+    if inputs.is_empty() {
+        return true;
+    }
+    if use_elevated && !crate::remote_control_helper::is_current_process_elevated() {
+        if let Some(sent) = crate::remote_control_helper::send_inputs_via_helper(inputs) {
+            return sent;
+        }
+    }
+    send_win32_inputs(inputs)
+}
+
+#[cfg(windows)]
 fn make_mouse_button_input(
     button: &str,
     down: bool,
@@ -1440,6 +1458,12 @@ fn flush_pending_uipi_releases_locked(state: &mut HostControlState) -> bool {
         state.pending_uipi_vk_releases.clear();
         state.pending_uipi_button_releases.clear();
         true
+    } else if !state.elevated_controllers.is_empty()
+        && send_win32_inputs_for_controller(true, &inputs)
+    {
+        state.pending_uipi_vk_releases.clear();
+        state.pending_uipi_button_releases.clear();
+        true
     } else {
         false
     }
@@ -1475,8 +1499,9 @@ fn release_controller_locked(state: &mut HostControlState, controller_id: &str) 
             inputs.extend(make_unicode_units_inputs(&units, false));
         }
     }
+    let use_elevated = state.elevated_controllers.contains(controller_id);
     if !inputs.is_empty() {
-        if send_win32_inputs(&inputs) {
+        if send_win32_inputs_for_controller(use_elevated, &inputs) {
             state.last_self_input_tick = read_last_input_tick();
         } else {
             state.elevation_blocked = is_foreground_elevated_win32();
@@ -2284,12 +2309,19 @@ fn apply_input_locked(
         }
         _ => {}
     }
+    let use_elevated = state.elevated_controllers.contains(controller_id)
+        && crate::remote_control_helper::is_elevation_ready();
+    let controller_elevation_blocked = if use_elevated {
+        false
+    } else {
+        state.elevation_blocked
+    };
     if poll_host_activity_locked(state) {
         state.perf_busy_dropped += 1;
         return ApplyInputResult {
             accepted: false,
             host_busy: true,
-            elevation_blocked: state.elevation_blocked,
+            elevation_blocked: controller_elevation_blocked,
         };
     }
 
@@ -2323,7 +2355,7 @@ fn apply_input_locked(
                 return ApplyInputResult {
                     accepted: false,
                     host_busy: false,
-                    elevation_blocked: state.elevation_blocked,
+                    elevation_blocked: controller_elevation_blocked,
                 };
             };
             let input = INPUT {
@@ -2339,7 +2371,7 @@ fn apply_input_locked(
                     },
                 },
             };
-            input_sent = send_win32_inputs(&[input]);
+            input_sent = send_win32_inputs_for_controller(use_elevated, &[input]);
             moved_cursor = input_sent;
         }
         RemoteInputEvent::MouseDelta { dx, dy } => {
@@ -2359,7 +2391,7 @@ fn apply_input_locked(
                         },
                     },
                 };
-                input_sent = send_win32_inputs(&[input]);
+                input_sent = send_win32_inputs_for_controller(use_elevated, &[input]);
                 moved_cursor = input_sent;
             }
         }
@@ -2374,7 +2406,7 @@ fn apply_input_locked(
                 _ => None,
             };
             if let Some(input) = make_mouse_button_input(&button, down, abs) {
-                input_sent = send_win32_inputs(&[input]);
+                input_sent = send_win32_inputs_for_controller(use_elevated, &[input]);
                 if input_sent && abs.is_some() {
                     moved_cursor = true;
                 }
@@ -2468,7 +2500,7 @@ fn apply_input_locked(
                     },
                 });
             }
-            input_sent = send_win32_inputs(&inputs);
+            input_sent = send_win32_inputs_for_controller(use_elevated, &inputs);
             moved_cursor = input_sent && had_coords;
         }
         RemoteInputEvent::Key {
@@ -2496,20 +2528,23 @@ fn apply_input_locked(
                     .remove(&(controller_id.to_string(), code.clone()))
                 {
                     let inputs = make_unicode_units_inputs(&units, false);
-                    input_sent = send_win32_inputs(&inputs);
+                    input_sent = send_win32_inputs_for_controller(use_elevated, &inputs);
                     if !input_sent {
-                        state.elevation_blocked = is_foreground_elevated_win32();
+                        let blocked = is_foreground_elevated_win32();
+                        if !use_elevated {
+                            state.elevation_blocked = blocked;
+                        }
                         return ApplyInputResult {
                             accepted: false,
                             host_busy: false,
-                            elevation_blocked: state.elevation_blocked,
+                            elevation_blocked: if use_elevated { false } else { blocked },
                         };
                     }
                     state.last_self_input_tick = read_last_input_tick();
                     return ApplyInputResult {
                         accepted: true,
                         host_busy: false,
-                        elevation_blocked: state.elevation_blocked,
+                        elevation_blocked: controller_elevation_blocked,
                     };
                 }
             }
@@ -2524,7 +2559,7 @@ fn apply_input_locked(
             if use_unicode {
                 let units: Vec<u16> = key.encode_utf16().collect();
                 let inputs = make_unicode_inputs(&key, down);
-                input_sent = send_win32_inputs(&inputs);
+                input_sent = send_win32_inputs_for_controller(use_elevated, &inputs);
                 if down && input_sent {
                     state
                         .held_unicode
@@ -2538,7 +2573,7 @@ fn apply_input_locked(
                 .or_else(|| dom_code_to_vk(&code))
             {
                 let input = make_vk_input(resolved_vk, down, Some(ext));
-                input_sent = send_win32_inputs(&[input]);
+                input_sent = send_win32_inputs_for_controller(use_elevated, &[input]);
                 if down {
                     if input_sent {
                         state.pending_uipi_vk_releases.remove(&resolved_vk);
@@ -2566,11 +2601,14 @@ fn apply_input_locked(
     }
 
     if !input_sent {
-        state.elevation_blocked = is_foreground_elevated_win32();
+        let blocked = is_foreground_elevated_win32();
+        if !use_elevated {
+            state.elevation_blocked = blocked;
+        }
         return ApplyInputResult {
             accepted: false,
             host_busy: false,
-            elevation_blocked: state.elevation_blocked,
+            elevation_blocked: if use_elevated { false } else { blocked },
         };
     }
 
@@ -2611,7 +2649,7 @@ fn apply_input_locked(
     ApplyInputResult {
         accepted: true,
         host_busy: false,
-        elevation_blocked: state.elevation_blocked,
+        elevation_blocked: controller_elevation_blocked,
     }
 }
 
@@ -2809,13 +2847,20 @@ pub fn set_remote_control_native_peer(
                 },
             );
         } else if media_id.is_empty() {
+            let prefix = format!("{peer_id}:");
             state
                 .authorized_native_peers
                 .retain(|(peer, _), _| peer != &peer_id);
+            state
+                .elevated_controllers
+                .retain(|cid| !cid.starts_with(&prefix));
         } else {
             state
                 .authorized_native_peers
                 .remove(&(peer_id.clone(), media_id.clone()));
+            state
+                .elevated_controllers
+                .remove(&format!("{peer_id}:{media_id}"));
         }
     }
     if !authorized && media_id.is_empty() {
@@ -3728,6 +3773,54 @@ fn stop_immersive_hook() {
     }
 }
 
+
+#[tauri::command]
+pub async fn enable_remote_control_elevation(window: tauri::WebviewWindow) -> Result<bool, String> {
+    if window.label() != "main" {
+        return Err("Only the main window can enable administrator remote control".into());
+    }
+    crate::remote_control_helper::ensure_elevation_ready().await
+}
+
+#[tauri::command]
+pub fn is_remote_control_elevation_ready(window: tauri::WebviewWindow) -> Result<bool, String> {
+    if window.label() != "main" {
+        return Err("Only the main window can inspect administrator remote control".into());
+    }
+    Ok(crate::remote_control_helper::is_elevation_ready())
+}
+
+#[tauri::command]
+pub fn set_remote_control_controller_elevation(
+    window: tauri::WebviewWindow,
+    controller_id: String,
+    enabled: bool,
+) -> Result<(), String> {
+    if window.label() != "main" {
+        return Err("Only the main window can manage administrator remote control".into());
+    }
+    if controller_id.is_empty() || controller_id.len() > 240 {
+        return Err("Invalid controller ID".into());
+    }
+    #[cfg(windows)]
+    {
+        if enabled && !crate::remote_control_helper::is_elevation_ready() {
+            return Err("Windows administrator consent is required first".into());
+        }
+        let mut state = HOST_STATE
+            .lock()
+            .map_err(|_| "Remote control lock poisoned")?;
+        if enabled {
+            state.elevated_controllers.insert(controller_id);
+        } else {
+            state.elevated_controllers.remove(&controller_id);
+        }
+    }
+    #[cfg(not(windows))]
+    let _ = (controller_id, enabled);
+    Ok(())
+}
+
 pub fn shutdown_remote_control() {
     HOST_ACTIVE.store(false, Ordering::Release);
     stop_immersive_hook();
@@ -3740,8 +3833,10 @@ pub fn shutdown_remote_control() {
         if let Ok(mut state) = HOST_STATE.lock() {
             state.active = false;
             state.authorized_native_peers.clear();
+            state.elevated_controllers.clear();
             release_all_locked(&mut state);
         }
+        crate::remote_control_helper::shutdown_helper();
     }
 }
 
@@ -3909,5 +4004,25 @@ mod tests {
             RemoteInputEvent::GamepadDisconnect { pad_index: 1 }
         ));
         assert!(tracker.accept(false, 52, &disc_ev));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn host_control_state_tracks_and_clears_elevated_controllers() {
+        let mut state = HostControlState::default();
+        assert!(state.elevated_controllers.is_empty());
+
+        state.elevated_controllers.insert("peer-a:screen-1".to_string());
+        state.elevated_controllers.insert("peer-a:screen-2".to_string());
+        state.elevated_controllers.insert("peer-b:screen-1".to_string());
+
+        let prefix = "peer-a:".to_string();
+        state.elevated_controllers.retain(|cid| !cid.starts_with(&prefix));
+        assert!(!state.elevated_controllers.contains("peer-a:screen-1"));
+        assert!(!state.elevated_controllers.contains("peer-a:screen-2"));
+        assert!(state.elevated_controllers.contains("peer-b:screen-1"));
+
+        state.elevated_controllers.clear();
+        assert!(state.elevated_controllers.is_empty());
     }
 }

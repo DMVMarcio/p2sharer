@@ -8,7 +8,8 @@
       "**Smoother hardware screen sharing.** Graphics encoding recovers from brief hiccups and supports more display sizes, avoiding freezes and stuck loading screens on slower PCs.",
       "**Room privacy and home previews.** See active avatars on saved rooms (with a Privacy toggle), confirm trust before unsaved rooms load, and choose to save on first entry.",
       "**Seamless view switch & release timeline.** Switching Grid and Spotlight keeps streams live without reloading, and skipped updates show all missed release notes.",
-      "**Saved stream volumes & chat filters.** Screen share volumes are remembered per participant and display across sessions, and you can filter notices inside room chat."
+      "**Saved stream volumes & chat filters.** Screen share volumes are remembered per participant and display across sessions, and you can filter notices inside room chat.",
+      "**Optional administrator remote control.** Request permission with a click when a Windows admin window blocks control, requiring host approval and a one-time UAC prompt."
     ],
     "pt-BR": [
       "**Novos jogos de tabuleiro aconchegantes.** Jogue Jogo da Velha, Xadrez e Damas em tabuleiros de madeira com várias salas e troca instantânea entre jogador e espectador.",
@@ -17,7 +18,8 @@
       "**Transmissão por GPU mais fluida.** A codificação gráfica se recupera de pausas breves e aceita mais telas, evitando congelamentos e carregamento preso em PCs fracos.",
       "**Privacidade e membros na tela inicial.** Veja avatares ativos nas salas salvas (com opção na aba Privacidade), confirme confiança em salas novas e salve logo ao entrar.",
       "**Troca de modo sem recarregar e linha do tempo.** Alternar Grade e Destaque mantém vídeos ativos, e atualizações acumulam notas das versões puladas em ordem.",
-      "**Volume salvo por tela e filtros no chat.** O volume das transmissões é lembrado por participante e tela entre sessões, e o chat ganhou filtros de mensagens e avisos."
+      "**Volume salvo por tela e filtros no chat.** O volume das transmissões é lembrado por participante e tela entre sessões, e o chat ganhou filtros de mensagens e avisos.",
+      "**Controle remoto de administrador opcional.** Ao ser bloqueado por uma janela elevada do Windows, solicite ou cancele permissão na tela com aprovação do host e UAC."
     ],
     "es": [
       "**Nuevos juegos de mesa acogedores.** Juega Tres en Raya, Ajedrez y Damas en tableros de madera con varias salas y cambio instantáneo entre jugador y espectador.",
@@ -26,7 +28,8 @@
       "**Pantalla compartida por GPU más fluida.** La codificación gráfica se recupera de pausas breves y admite más pantallas, evitando bloqueos y cargas infinitas en PCs lentos.",
       "**Privacidad y miembros al inicio.** Ve avatares activos en salas guardadas (ajustable en Privacidad), confirma confianza antes de salas nuevas y guárdalas al entrar.",
       "**Cambio de vista sin recargar y cronología.** Alternar Cuadrícula y Destacado mantiene los videos vivos, y al saltar versiones ves todas sus notas juntas.",
-      "**Volumen guardado por pantalla y filtros de chat.** El volumen se recuerda por persona y pantalla entre sesiones, y puedes filtrar avisos dentro del chat."
+      "**Volumen guardado por pantalla y filtros de chat.** El volumen se recuerda por persona y pantalla entre sesiones, y puedes filtrar avisos dentro del chat.",
+      "**Control remoto de administrador opcional.** Cuando una ventana elevada bloquee el control, solicita o cancela permiso en pantalla con aprobación del anfitrión y UAC."
     ],
     "fr": [
       "**Jeux de plateau chaleureux.** Jouez au Morpion, aux Échecs et aux Dames sur des plateaux en bois avec plusieurs salons et changement rapide entre joueur et spectateur.",
@@ -35,7 +38,8 @@
       "**Partage d'écran GPU plus fluide.** L'encodage graphique récupère après un court blocage et gère plus d'écrans, évitant gels et écrans de chargement sur PC lents.",
       "**Confidentialité et salons à l'accueil.** Voyez les avatars actifs (réglable en Confidentialité), confirmez la confiance avant un nouveau salon et enregistrez à l'entrée.",
       "**Changement de vue fluide et chronologie.** Passer entre Grille et Mise en avant garde les vidéos actives, et les sauts de version affichent toutes les notes.",
-      "**Volume mémorisé par écran et filtres de chat.** Le volume reste enregistré par participant et écran d'une session à l'autre, avec des filtres d'avis dans le chat."
+      "**Volume mémorisé par écran et filtres de chat.** Le volume reste enregistré par participant et écran d'une session à l'autre, avec des filtres d'avis dans le chat.",
+      "**Contrôle à distance administrateur.** Lorsqu'une fenêtre élevée bloque l'accès, demandez ou annulez l'autorisation à l'écran avec accord de l'hôte et confirmation UAC."
     ],
     "de": [
       "**Gemütliche Brettspiel-Apps.** Spiele Tic-Tac-Toe, Schach und Dame auf Holzbrettern mit mehreren Räumen und schnellem Wechsel zwischen Spieler und Zuschauer.",
@@ -44,7 +48,8 @@
       "**Flüssigere GPU-Bildschirmfreigabe.** Hardware-Encoding fängt kurze Aussetzer ab, unterstützt mehr Größen und verhindert Hänger oder Endlos-Laden auf schwachen PCs.",
       "**Privatsphäre und Raumvorschau.** Sieh aktive Avatare in gespeicherten Räumen (unter Datenschutz steuerbar), bestätige neue Räume vorab und speichere direkt beim Beitritt.",
       "**Nahtloser Layoutwechsel & Versionsverlauf.** Raster- und Fokusansicht wechseln ohne Videoneustart, und übersprungene Updates zeigen alle verpassten Hinweise.",
-      "**Gespeicherte Stream-Lautstärke & Chatfilter.** Die Lautstärke wird pro Person und Bildschirm dauerhaft gemerkt, und Hinweise lassen sich im Chat ausblenden."
+      "**Gespeicherte Stream-Lautstärke & Chatfilter.** Die Lautstärke wird pro Person und Bildschirm dauerhaft gemerkt, und Hinweise lassen sich im Chat ausblenden.",
+      "**Optionale Admin-Fernsteuerung.** Blockiert ein erhöhtes Windows-Fenster, kannst du per Klick Admin-Rechte anfordern oder abbrechen — nach Host-Freigabe und UAC."
     ],
     "it": [
       "**Nuovi giochi da tavolo accoglienti.** Gioca a Tris, Scacchi e Dama su tavoli in legno con più stanze e passaggio immediato tra giocatore e spettatore.",
@@ -53,7 +58,8 @@
       "**Condivisione schermo GPU più fluida.** La codifica grafica recupera brevi blocchi e supporta più schermi, evitando freeze e caricamenti infiniti sui PC più lenti.",
       "**Privacy e membri nella schermata iniziale.** Vedi gli avatar attivi (gestibile in Privacy), conferma la fiducia prima di nuove stanze e salvale subito all'ingresso.",
       "**Cambio vista fluido e cronologia note.** Passare tra Griglia e In evidenza mantiene i video attivi e mostra insieme le note di tutte le versioni saltate.",
-      "**Volume salvato per schermo e filtri in chat.** Il volume resta memorizzato per persona e schermo tra le sessioni, con filtri dedicati per messaggi e avvisi in chat."
+      "**Volume salvato per schermo e filtri in chat.** Il volume resta memorizzato per persona e schermo tra le sessioni, con filtri dedicati per messaggi e avvisi in chat.",
+      "**Controllo remoto amministratore.** Se una finestra elevata blocca il controllo, richiedi o annulla il permesso sullo schermo previa conferma di host e UAC Windows."
     ],
     "zh-CN": [
       "**温馨木制棋盘游戏。** 畅玩井字棋、国际象棋与跳棋，支持同应用内开设多个房间，并可随时在玩家与观众之间切换。",
@@ -62,7 +68,8 @@
       "**更流畅的显卡硬件共享。** 显卡编码可从短暂卡顿中恢复并支持更多屏幕尺寸，大幅减少低配电脑上的画面冻结和一直加载问题。",
       "**房间隐私与主页成员展示。** 在已保存房间卡片显示在线成员头像（可在安全与隐私关闭），进入未保存房间前确认信任，并可在首次加入时勾选保存房间。",
       "**无重载切换视图与版本时间线。** 在网格和聚焦间切换可保持视频不黑屏重载，跳过多个版本升级时将汇总展示所有错过的更新日志。",
-      "**记住屏幕音量与聊天筛选。** 可跨会话按分享者和屏幕记忆音量大小，并在房间聊天中按消息、应用、共享等类别自由筛选显示内容。"
+      "**记住屏幕音量与聊天筛选。** 可跨会话按分享者和屏幕记忆音量大小，并在房间聊天中按消息、应用、共享等类别自由筛选显示内容。",
+      "**可选管理员远程控制。** 当管理员窗口阻止操作时，可在画面提示中申请或取消管理员权限，经房主同意并通过一次 Windows UAC 确认即可交互。"
     ],
     "zh-TW": [
       "**溫馨木製棋盤遊戲。** 暢玩井字遊戲、西洋棋與西洋跳棋，支援同時開設多個房間，並可隨時在玩家與觀眾之間切換。",
@@ -71,7 +78,8 @@
       "**更流暢的顯示卡硬體分享。** 顯示卡編碼可從短暫卡頓中恢復並支援更多螢幕尺寸，大幅減少低配備電腦上的畫面凍結與一直載入問題。",
       "**房間隱私與主畫面成員顯示。** 在已儲存房間卡片顯示線上成員頭像（可在安全與隱私關閉），進入未儲存房間前確認信任，並可在首次加入時勾選儲存房間。",
       "**無重載切換檢視與版本時間線。** 在網格與聚焦間切換可保持影片不黑屏重載，跳過多個版本升級時將彙總顯示所有錯過的更新日誌。",
-      "**記住螢幕音量與聊天篩選。** 可跨工作階段依分享者與螢幕記憶音量大小，並在房間聊天中依訊息、應用程式、分享等類別篩選顯示內容。"
+      "**記住螢幕音量與聊天篩選。** 可跨工作階段依分享者與螢幕記憶音量大小，並在房間聊天中依訊息、應用程式、分享等類別篩選顯示內容。",
+      "**選用系統管理員遠端控制。** 當系統管理員視窗阻擋操作時，可在畫面提示中申請或取消權限，經主機同意並完成一次 Windows UAC 確認即可操作。"
     ],
     "ja": [
       "**温かみのあるボードゲームアプリ。** 三目並べ・チェス・チェッカーを木製ボードで楽しめ、複数ルームの同時進行やプレイヤー・観戦の切り替えに対応します。",
@@ -80,7 +88,8 @@
       "**GPU画面共有の安定性向上。** 一時的な負荷によるエンコード停止から自動復帰し、多様な画面サイズに対応して低スペックPCでのフリーズや読み込み停止を防ぎます。",
       "**プライバシー保護と在室メンバー表示。** 保存済みルームにオンラインメンバーのアバターを表示し（プライバシー設定で切替可）、未保存ルーム入室前の信頼確認と同時保存に対応しました。",
       "**映像を再読込しない表示切替と更新履歴。** グリッドと注目表示を切り替えても映像を維持し、複数バージョンを飛ばした更新時も履歴をまとめて表示します。",
-      "**画面ごとの音量記憶とチャット絞り込み。** 配信者と画面ごとに音量を永続保存し、チャットではメッセージやアプリ通知・入退室を絞り込んで表示できます。"
+      "**画面ごとの音量記憶とチャット絞り込み。** 配信者と画面ごとに音量を永続保存し、チャットではメッセージやアプリ通知・入退室を絞り込んで表示できます。",
+      "**管理者ウィンドウ対応のリモート操作。** 管理者画面で操作が制限された際、画面上の案内から権限の申請や取消ができ、ホスト承認とUAC確認で操作可能になります。"
     ],
     "ko": [
       "**포근한 보드게임 앱 추가.** 따뜻한 원목 보드에서 틱택토, 체스, 체커를 즐기며 여러 방을 동시에 열고 플레이어와 관전자를 자유롭게 전환하세요.",
@@ -89,7 +98,8 @@
       "**부드러운 GPU 화면 공유.** 일시적 멈춤 시 그래픽 인코딩이 복구되고 더 다양한 화면 크기를 지원해 사양이 낮은 PC의 화면 멈춤과 무한 로딩을 줄입니다.",
       "**방 개인정보 보호 및 홈 멤버 표시.** 저장된 방 카드에 접속 중인 멤버 아바타가 표시되며(개인정보 탭에서 전환), 미저장 방 입장 전 신뢰 확인과 바로 저장을 지원합니다.",
       "**재로딩 없는 화면 전환과 릴리스 타임라인.** 격자와 집중 보기를 바꿔도 영상이 끊기지 않으며, 여러 버전을 건너뛴 업데이트도 노트를 모아 보여줍니다.",
-      "**화면별 볼륨 저장 및 채팅 필터.** 공유자와 화면별로 볼륨이 계속 기억되며, 방 채팅에서 메시지·앱·공유·입퇴장 알림을 원하는 대로 필터링할 수 있습니다."
+      "**화면별 볼륨 저장 및 채팅 필터.** 공유자와 화면별로 볼륨이 계속 기억되며, 방 채팅에서 메시지·앱·공유·입퇴장 알림을 원하는 대로 필터링할 수 있습니다.",
+      "**선택적 관리자 원격 제어.** 관리자 창으로 제어가 막히면 화면 안내에서 바로 권한을 요청·취소할 수 있으며, 호스트 승인과 1회 UAC 확인 후 제어됩니다."
     ],
     "hi": [
       "**आरामदायक बोर्ड गेम ऐप्स।** कई कमरों और खिलाड़ी व दर्शक के बीच तुरंत बदलाव के साथ लकड़ी के बोर्ड पर टिक-टैक-टो, शतरंज और चेकर्स खेलें।",
@@ -98,7 +108,8 @@
       "**बेहतर GPU स्क्रीन शेयरिंग।** ग्राफ़िक्स एन्कोडिंग छोटे अवरोधों से उबरती है और अधिक स्क्रीन आकार सपोर्ट करती है, जिससे धीमे PC पर अटकने की समस्या कम होती है।",
       "**रूम गोपनीयता और होम प्रीव्यू।** सहेजे गए रूम में सक्रिय सदस्य अवतार देखें (गोपनीयता सेटिंग से नियंत्रित), नए रूम से पहले भरोसा जांचें और प्रवेश पर सहेजें।",
       "**बिना रीलोड दृश्य बदलें व संस्करण समयरेखा।** ग्रिड और स्पॉटलाइट बदलने पर वीडियो सक्रिय रहता है, और छूटे अपडेट्स के सभी नोट्स समयरेखा में साथ दिखते हैं।",
-      "**स्क्रीन वॉल्यूम याद व चैट फ़िल्टर।** साझा की गई स्क्रीन का वॉल्यूम प्रति प्रतिभागी याद रहता है, और आप चैट में संदेश, ऐप या स्ट्रीम सूचनाएँ फ़िल्टर कर सकते हैं।"
+      "**स्क्रीन वॉल्यूम याद व चैट फ़िल्टर।** साझा की गई स्क्रीन का वॉल्यूम प्रति प्रतिभागी याद रहता है, और आप चैट में संदेश, ऐप या स्ट्रीम सूचनाएँ फ़िल्टर कर सकते हैं।",
+      "**वैकल्पिक व्यवस्थापक रिमोट कंट्रोल।** व्यवस्थापक विंडो से नियंत्रण रुकने पर स्क्रीन पर ही अनुमति मांगें या रद्द करें, जो होस्ट और एक बार UAC पुष्टि के बाद मिलती है।"
     ],
     "fi": [
       "**Kodikkaat lautapelisovellukset.** Pelaa ristinollaa, shakkia ja tammea puulaudoilla useissa huoneissa ja vaihda vaivatta pelaajan ja katsojan välillä.",
@@ -107,7 +118,8 @@
       "**Sujuvampi GPU-näytönjako.** Näytönohjainpakkaus palautuu lyhyistä häiriöistä ja tukee useampia tarkkuuksia estäen jumiutumista ja latausruutuja hitaammilla koneilla.",
       "**Huoneiden yksityisyys ja jäsenet.** Näe aktiiviset jäsenet tallennetuissa huoneissa (hallittavissa yksityisyysasetuksissa), vahvista uudet huoneet ja tallenna liittyessä.",
       "**Saumaton näkymän vaihto ja aikajana.** Ruudukon ja korostuksen vaihto pitää videot käynnissä ilman uudelleenlatausta ja näyttää väliin jääneet julkaisutiedot.",
-      "**Tallennettu ruudun äänenvoimakkuus ja chat-suodattimet.** Lähetysten voimakkuus muistetaan henkilön ja näytön mukaan, ja chatissa voi suodattaa ilmoituksia."
+      "**Tallennettu ruudun äänenvoimakkuus ja chat-suodattimet.** Lähetysten voimakkuus muistetaan henkilön ja näytön mukaan, ja chatissa voi suodattaa ilmoituksia.",
+      "**Valinnainen järjestelmänvalvojan etähallinta.** Jos suojattu ikkuna estää ohjauksen, pyydä tai peru lupa ruudulta isännän hyväksynnällä ja UAC-vahvistuksella."
     ],
     "ru": [
       "**Уютные настольные игры.** Играйте в крестики-нолики, шахматы и шашки на деревянных досках с несколькими комнатами и быстрой сменой роли игрока и зрителя.",
@@ -116,7 +128,8 @@
       "**Плавная демонстрация экрана.** Графическое кодирование восстанавливается после кратких сбоев и поддерживает больше разрешений без зависаний и вечной загрузки.",
       "**Приватность и участники на главном экране.** Показываются аватары в сохранённых комнатах (отключается в настройках), запрос доверия для новых и сохранение при входе.",
       "**Плавная смена вида и лента версий.** Переключение сетки и акцента больше не перезагружает видео, а при пропуске версий все заметки выводятся вместе.",
-      "**Память громкости и фильтры чата.** Громкость трансляции запоминается для участника и экрана между сеансами, а в чате можно скрывать системные уведомления."
+      "**Память громкости и фильтры чата.** Громкость трансляции запоминается для участника и экрана между сеансами, а в чате можно скрывать системные уведомления.",
+      "**Права администратора в удалённом управлении.** При блокировке окном с высокими правами можно запросить или отменить доступ прямо на экране после согласия и UAC."
     ]
   }
 }

@@ -5,8 +5,8 @@ import { RemoteControlToastItems } from './RemoteControlRequests';
 
 export function ChatFileRequests() {
   useLocale();
-  const { fileRequests, answerFileRequest, remoteControlRequests } = useRoom();
-  if (!fileRequests.length && !remoteControlRequests.length) return null;
+  const { fileRequests, answerFileRequest, remoteControlRequests, remoteControlElevationRequests } = useRoom();
+  if (!fileRequests.length && !remoteControlRequests.length && !remoteControlElevationRequests.length) return null;
   return <div className="chat-file-toasts" aria-live="polite">
     <RemoteControlToastItems />
     {fileRequests.map((request) => <div className="chat-file-toast" key={request.requestId}>

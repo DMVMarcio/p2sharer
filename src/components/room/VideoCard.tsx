@@ -15,7 +15,7 @@ import { useStreamPointer } from '../../hooks/useStreamPointer';
 import { StreamPointerToggle } from './StreamPointerToggle';
 import { useRemoteControl } from '../../hooks/useRemoteControl';
 import { RemoteControlToggle } from './RemoteControlToggle';
-import { RemoteControlFloatingOverlay } from './RemoteControlFloatingOverlay';
+import { RemoteControlFloatingOverlay, RemoteControlElevationBanner } from './RemoteControlFloatingOverlay';
 import { RemoteCursorOverlay } from './RemoteCursorOverlay';
 import { RemoteControlOverlayHud } from './RemoteControlOverlayHud';
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -595,40 +595,54 @@ export const VideoCard: React.FC<VideoCardProps> = ({
       })()}
 
       {remoteControl.active && !inTray && !isPipActive && (
-        <RemoteControlFloatingOverlay
-          persistKey={`${slot.peerId}:${slot.mediaId || 'default'}`}
-          containerRef={cardRef}
-          isFullscreen={isFullscreen}
-          onToggleFullscreen={handleToggleFullscreen}
-          onExitRemoteControl={remoteControl.exit}
-          immersive={remoteControl.immersive}
-          onToggleImmersive={remoteControl.toggleImmersive}
-          mouseLock={remoteControl.mouseLocked}
-          onToggleMouseLock={remoteControl.toggleManualMouseLock}
-          hostBusy={remoteControl.hostBusy}
-          elevationBlocked={remoteControl.elevationBlocked}
-          mouseEnabled={remoteControl.mouseEnabled}
-          keyboardEnabled={remoteControl.keyboardEnabled}
-          gamepadEnabled={remoteControl.gamepadEnabled}
-          volume={volume}
-          isMuted={isMuted}
-          onVolumeChange={(val) => {
-            setVolume(val);
-            setIsMuted(val === 0);
-            if (val > 0) setLastVolume(val);
-            audioContextManager.setPeerVolume(slot.peerId, val, val === 0, volumePrefKey);
-          }}
-          onToggleMute={handleToggleMute}
-          onOverlayHoverChange={remoteControl.setOverlayHovered}
-          onOverlayMenuOpenChange={remoteControl.setOverlayMenuOpen}
-          qualityText={`${remoteResolution} ${formatFrameRate(liveFps)} FPS`}
-          liveBitrateKbps={liveBitrate}
-          configuredBitrateKbps={currentBitrate}
-          pingText={pingStr}
-          pingClass={pingClass}
-          transportTag={transportTag}
-          watchersCount={watchers.length}
-        />
+        <>
+          <RemoteControlElevationBanner
+            elevationBlocked={remoteControl.elevationBlocked}
+            adminEnabled={remoteControl.adminEnabled}
+            adminRequestPending={remoteControl.adminRequestPending}
+            onRequestAdmin={remoteControl.requestAdmin}
+            onCancelAdmin={remoteControl.cancelAdmin}
+            onOverlayHoverChange={remoteControl.setOverlayHovered}
+          />
+          <RemoteControlFloatingOverlay
+            persistKey={`${slot.peerId}:${slot.mediaId || 'default'}`}
+            containerRef={cardRef}
+            isFullscreen={isFullscreen}
+            onToggleFullscreen={handleToggleFullscreen}
+            onExitRemoteControl={remoteControl.exit}
+            immersive={remoteControl.immersive}
+            onToggleImmersive={remoteControl.toggleImmersive}
+            mouseLock={remoteControl.mouseLocked}
+            onToggleMouseLock={remoteControl.toggleManualMouseLock}
+            hostBusy={remoteControl.hostBusy}
+            elevationBlocked={remoteControl.elevationBlocked}
+            adminEnabled={remoteControl.adminEnabled}
+            adminRequestPending={remoteControl.adminRequestPending}
+            onRequestAdmin={remoteControl.requestAdmin}
+            onCancelAdmin={remoteControl.cancelAdmin}
+            mouseEnabled={remoteControl.mouseEnabled}
+            keyboardEnabled={remoteControl.keyboardEnabled}
+            gamepadEnabled={remoteControl.gamepadEnabled}
+            volume={volume}
+            isMuted={isMuted}
+            onVolumeChange={(val) => {
+              setVolume(val);
+              setIsMuted(val === 0);
+              if (val > 0) setLastVolume(val);
+              audioContextManager.setPeerVolume(slot.peerId, val, val === 0, volumePrefKey);
+            }}
+            onToggleMute={handleToggleMute}
+            onOverlayHoverChange={remoteControl.setOverlayHovered}
+            onOverlayMenuOpenChange={remoteControl.setOverlayMenuOpen}
+            qualityText={`${remoteResolution} ${formatFrameRate(liveFps)} FPS`}
+            liveBitrateKbps={liveBitrate}
+            configuredBitrateKbps={currentBitrate}
+            pingText={pingStr}
+            pingClass={pingClass}
+            transportTag={transportTag}
+            watchersCount={watchers.length}
+          />
+        </>
       )}
 
       {/* Featured badge when in tray */}

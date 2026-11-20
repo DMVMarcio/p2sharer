@@ -12,6 +12,7 @@ mod chat_file_direct;
 pub mod pip_manager;
 pub mod stream_pointer;
 pub mod remote_control;
+pub mod remote_control_helper;
 pub mod gamepad;
 pub mod process_manager;
 pub mod room_vault;
@@ -269,6 +270,9 @@ pub fn run() {
             remote_control::set_remote_control_cursor_clip,
             remote_control::set_remote_control_mouse_lock,
             remote_control::set_remote_control_host_priority_enabled,
+            remote_control::enable_remote_control_elevation,
+            remote_control::is_remote_control_elevation_ready,
+            remote_control::set_remote_control_controller_elevation,
             gamepad::get_remote_control_gamepads,
             gamepad::recheck_remote_control_gamepad_driver,
             gamepad::reorder_remote_control_gamepads,

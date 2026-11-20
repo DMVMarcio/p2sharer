@@ -19,8 +19,12 @@ import { Tooltip } from '../common/Tooltip';
 export const ParticipantsPane: React.FC = () => {
   useLocale();
   const { username, peers, roomSlots, isCreator, isRoomHost, isRoomAdmin,
-    remoteControllers, remoteControlElevationBlocked, setRemoteControllerPermissions, revokeRemoteController,
+    remoteControllers, remoteControlElevationBlocked, setRemoteControllerPermissions,
+    setRemoteControllerAdminPermission, revokeRemoteController,
     transferOwnership, setAdministrator, kickPeer, requestStream } = useRoom();
+  const [adminPendingKeys, setAdminPendingKeys] = useState<Record<string, boolean>>({});
+  const showElevationBanner =
+    remoteControlElevationBlocked && remoteControllers.some((ctrl) => !ctrl.adminEnabled);
   const openContextMenu = useContextMenu();
   const [pendingAction, setPendingAction] = useState<{
     kind: 'kick' | 'transfer' | 'admin' | 'revoke-admin'; id: string; name: string;
@@ -66,7 +70,7 @@ export const ParticipantsPane: React.FC = () => {
                 {t('remoteControl.manageAction')}
               </button>
             </div>
-            {remoteControlElevationBlocked && (
+            {showElevationBanner && (
               <div className="remote-control-manager-banner remote-control-manager-banner-danger">
                 <AlertTriangle size={13} aria-hidden="true" />
                 <span>{t('remoteControl.elevationBlockedShort')}</span>
@@ -84,12 +88,25 @@ export const ParticipantsPane: React.FC = () => {
                       mouseEnabled={ctrl.mouseEnabled}
                       keyboardEnabled={ctrl.keyboardEnabled}
                       gamepadEnabled={ctrl.gamepadEnabled}
+                      adminEnabled={Boolean(ctrl.adminEnabled)}
+                      adminDisabled={Boolean(adminPendingKeys[`${ctrl.peerId}:${ctrl.mediaId}`])}
                       subjectName={name}
                       onToggle={(key, nextVal) =>
                         setRemoteControllerPermissions(ctrl.peerId, ctrl.mediaId, {
                           [key]: nextVal,
                         })
                       }
+                      onToggleAdmin={(nextVal) => {
+                        const ctrlKey = `${ctrl.peerId}:${ctrl.mediaId}`;
+                        setAdminPendingKeys((prev) => ({ ...prev, [ctrlKey]: true }));
+                        void setRemoteControllerAdminPermission(ctrl.peerId, ctrl.mediaId, nextVal).finally(() => {
+                          setAdminPendingKeys((prev) => {
+                            const next = { ...prev };
+                            delete next[ctrlKey];
+                            return next;
+                          });
+                        });
+                      }}
                     />
                     <Tooltip content={t('remoteControl.revokeAria', { name })}>
                       <button

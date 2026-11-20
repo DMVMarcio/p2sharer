@@ -89,10 +89,12 @@ export class RoomService {
   private cancelledLocalSaves = new Set<string>();
   public peers: PeerInfo[] = [];
   public remoteControlRequests: RemoteControlRequest[] = [];
+  public remoteControlElevationRequests: RemoteControlRequest[] = [];
   public remoteControllers: RemoteControllerInfo[] = [];
   public remoteControlHostBusy = false;
   public remoteControlHostPriorityEnabled = loadRemoteControlHostDefaults().hostPriorityEnabled;
   public remoteControlElevationBlocked = false;
+  public remoteControlElevationReady = false;
   public remoteControlGamepadDriverAvailable = true;
   public remoteControlGamepadDriverInstallStage: 'idle' | 'downloading' | 'verifying' | 'installing' = 'idle';
   public remoteControlGamepadDriverNeedsReboot = false;
@@ -884,6 +886,26 @@ export class RoomService {
         gamepadEnabled,
       });
     },
+    ensureElevationReady: async () => {
+      if (!isTauri()) return false;
+      try {
+        const ready = await invoke<boolean>('enable_remote_control_elevation');
+        this.remoteControlElevationReady = Boolean(ready);
+        this.notify();
+        return Boolean(ready);
+      } catch (err) {
+        console.warn('[RemoteControl] enable_remote_control_elevation failed:', err);
+        return false;
+      }
+    },
+    setNativeControllerElevation: (peerId, mediaId, enabled) => {
+      if (!isTauri()) return;
+      return invoke('set_remote_control_controller_elevation', {
+        peerId,
+        mediaId,
+        enabled,
+      });
+    },
     getDefaultPermissions: () => {
       const defaults = loadRemoteControlHostDefaults();
       return {
@@ -903,9 +925,13 @@ export class RoomService {
     },
     onChange: () => {
       this.remoteControlRequests = this.remoteControlHost.getRequests();
+      this.remoteControlElevationRequests = this.remoteControlHost.getElevationRequests();
       this.remoteControllers = this.remoteControlHost.getControllers();
       this.remoteControlHostBusy = this.remoteControlHost.isHostBusy();
       this.remoteControlElevationBlocked = this.remoteControlHost.isElevationBlocked();
+      if (isTauri() && (this.remoteControlElevationRequests.length > 0 || this.remoteControllers.length > 0)) {
+        void this.refreshRemoteControlElevationReady();
+      }
       this.notify();
     },
   });
@@ -1109,7 +1135,7 @@ export class RoomService {
           imageId: packet.imageId ?? '',
           mouseLocked: Boolean(packet.mouseLocked),
           hostBusy: packet.hostBusy,
-          elevationBlocked: Boolean(packet.elevationBlocked),
+          elevationBlocked: Boolean(packet.elevationBlocked) && !this.remoteControlViewerStates[targetKey]?.adminEnabled,
           actorPeerId: packet.actorPeerId,
           embeddedInVideo: packet.embeddedInVideo,
           updatedAt: Date.now(),
@@ -1131,6 +1157,7 @@ export class RoomService {
     if (packet.type === 'accept') {
       if (current.status !== 'pending' && current.status !== 'active') return;
       if (!stateStore.subscribedStreams.has(slotKey)) return;
+      const adminEnabled = Boolean(packet.adminEnabled);
       this.remoteControlViewerStates = {
         ...this.remoteControlViewerStates,
         [slotKey]: {
@@ -1139,9 +1166,11 @@ export class RoomService {
           mouseEnabled: packet.mouseEnabled,
           keyboardEnabled: packet.keyboardEnabled,
           gamepadEnabled: packet.gamepadEnabled ?? true,
+          adminEnabled,
+          adminRequestPending: false,
           cursorCaptured: packet.cursorCaptured,
           hostBusy: packet.hostBusy,
-          elevationBlocked: Boolean(packet.elevationBlocked),
+          elevationBlocked: adminEnabled ? false : Boolean(packet.elevationBlocked),
           cursorShape: packet.cursorShape,
           fastBinary: Boolean(packet.fastBinary),
         },
@@ -1154,6 +1183,7 @@ export class RoomService {
 
     if (packet.type === 'state') {
       if (current.status !== 'active') return;
+      const adminEnabled = Boolean(packet.adminEnabled);
       this.remoteControlViewerStates = {
         ...this.remoteControlViewerStates,
         [slotKey]: {
@@ -1161,12 +1191,33 @@ export class RoomService {
           mouseEnabled: packet.mouseEnabled,
           keyboardEnabled: packet.keyboardEnabled,
           gamepadEnabled: packet.gamepadEnabled ?? current.gamepadEnabled,
+          adminEnabled,
+          adminRequestPending: adminEnabled ? false : current.adminRequestPending,
           cursorCaptured: packet.cursorCaptured,
           hostBusy: packet.hostBusy,
-          elevationBlocked: Boolean(packet.elevationBlocked),
+          elevationBlocked: adminEnabled ? false : Boolean(packet.elevationBlocked),
           cursorShape: packet.cursorShape,
         },
       };
+      this.notify();
+      return;
+    }
+
+    if (packet.type === 'elevationDecline') {
+      if (current.status !== 'active') return;
+      this.remoteControlViewerStates = {
+        ...this.remoteControlViewerStates,
+        [slotKey]: {
+          ...current,
+          adminEnabled: false,
+          adminRequestPending: false,
+        },
+      };
+      showToast(
+        packet.reason === 'unsupported' ? t('remoteControl.unsupportedHost') : t('remoteControl.adminDeclined'),
+        3000,
+        'info',
+      );
       this.notify();
       return;
     }
@@ -1228,6 +1279,8 @@ export class RoomService {
         mouseEnabled: true,
         keyboardEnabled: true,
         gamepadEnabled: true,
+        adminEnabled: false,
+        adminRequestPending: false,
         cursorCaptured: true,
         hostBusy: false,
         elevationBlocked: false,
@@ -1275,12 +1328,67 @@ export class RoomService {
     this.roomManager?.sendRemoteControlClient({ type: 'input', mediaId: current.mediaId, event }, current.hostPeerId);
   }
 
+  public requestRemoteControlElevation(slotPeerId: string): void {
+    const current = this.remoteControlViewerStates[slotPeerId];
+    if (!current || current.status !== 'active' || current.adminEnabled || current.adminRequestPending) return;
+    if (!stateStore.subscribedStreams.has(slotPeerId)) return;
+    this.remoteControlViewerStates = {
+      ...this.remoteControlViewerStates,
+      [slotPeerId]: {
+        ...current,
+        adminRequestPending: true,
+      },
+    };
+    this.roomManager?.sendRemoteControlClient({ type: 'requestElevation', mediaId: current.mediaId }, current.hostPeerId);
+    this.notify();
+  }
+
+  public cancelRemoteControlElevation(slotPeerId: string): void {
+    const current = this.remoteControlViewerStates[slotPeerId];
+    if (!current || current.status !== 'active' || !current.adminRequestPending) return;
+    this.remoteControlViewerStates = {
+      ...this.remoteControlViewerStates,
+      [slotPeerId]: {
+        ...current,
+        adminRequestPending: false,
+      },
+    };
+    this.roomManager?.sendRemoteControlClient({ type: 'cancelElevation', mediaId: current.mediaId }, current.hostPeerId);
+    this.notify();
+  }
+
   public answerRemoteControlRequest(
     requestId: string,
     accept: boolean,
     permissions?: { mouseEnabled?: boolean; keyboardEnabled?: boolean; gamepadEnabled?: boolean },
   ): void {
     this.remoteControlHost.answerRequest(requestId, accept, permissions);
+  }
+
+  public async answerRemoteControlElevation(requestId: string, accept: boolean): Promise<boolean> {
+    return this.remoteControlHost.answerElevationRequest(requestId, accept);
+  }
+
+  public async setRemoteControllerAdminPermission(
+    peerId: string,
+    mediaId: string,
+    enabled: boolean,
+  ): Promise<boolean> {
+    return this.remoteControlHost.setControllerAdminPermission(peerId, mediaId, enabled);
+  }
+
+  public async refreshRemoteControlElevationReady(): Promise<boolean> {
+    if (!isTauri()) return false;
+    try {
+      const ready = await invoke<boolean>('is_remote_control_elevation_ready');
+      if (ready !== this.remoteControlElevationReady) {
+        this.remoteControlElevationReady = Boolean(ready);
+        this.notify();
+      }
+      return Boolean(ready);
+    } catch {
+      return this.remoteControlElevationReady;
+    }
   }
 
   public setRemoteControllerPermissions(
