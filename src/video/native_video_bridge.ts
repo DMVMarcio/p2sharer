@@ -57,12 +57,23 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     });
   }
 
+  private isWebRtcConsumerId(consumerId: string): boolean {
+    return consumerId === 'webrtc-peer' || consumerId.startsWith('webrtc-');
+  }
+
+  private hasWebRtcConsumer(): boolean {
+    for (const id of this.consumers) {
+      if (this.isWebRtcConsumerId(id)) return true;
+    }
+    return false;
+  }
+
   public setConsumerActive(consumerId: string, active: boolean): void {
     this.managedConsumers = true;
     if (active) {
       const wasEmpty = this.consumers.size === 0;
       this.consumers.add(consumerId);
-      if (consumerId === 'webrtc-peer' && this.previewEncoderFailed && this.isCapturingNative() && this.encoderFeedbackToken) {
+      if (this.isWebRtcConsumerId(consumerId) && this.previewEncoderFailed && this.isCapturingNative() && this.encoderFeedbackToken) {
         void invoke('control_capture_encoder', {
           sessionId: this.sessionId,
           feedbackToken: this.encoderFeedbackToken,
@@ -389,15 +400,15 @@ export class NativeVideoBridge implements VideoCaptureBridge {
         const VideoFrameClass = (globalThis as any).VideoFrame;
         if (this.trackWriter && typeof VideoFrameClass === 'function') {
           try {
+            // Keep only the newest pending JPEG while the encoder consumes this frame.
+            // Check backpressure before copying decoded YUV planes on the main thread.
+            const writer = this.trackWriter;
+            if (writer.desiredSize !== null && writer.desiredSize <= 0) return;
             const frameInit = this.frameClock.next(performance.now(), this.effectiveFps);
             const videoFrame = bitmap === this.latestJpegFrame && 'displayWidth' in bitmap
               ? await jpegDecoder.createTrackFrame(bitmap, frameInit)
               : new VideoFrameClass(bitmap, frameInit);
             try {
-              // Keep only the newest pending JPEG while the encoder consumes this frame.
-              // Unawaited writes build an unbounded queue on slower GPU encoders.
-              const writer = this.trackWriter;
-              if (writer.desiredSize !== null && writer.desiredSize <= 0) return;
               await writer.ready;
               if (this.isCapturing && generation === this.captureGeneration) {
                 await writer.write(videoFrame);
@@ -533,7 +544,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
             if (isMediaDiagnosticsActive() && pressurePercent !== undefined) this.diagnosticPressure = pressurePercent;
             // Only forward bridge preview pressure when the browser WebRTC path consumes
             // decoded preview frames; local SW preview load must never downscale NativeVideoTransport.
-            const reportPressure = (!nativeEncoded || this.consumers.has('webrtc-peer'))
+            const reportPressure = (!nativeEncoded || this.hasWebRtcConsumer())
               ? pressurePercent
               : (pressurePercent !== undefined ? 0 : undefined);
             if (reportPressure !== undefined && !feedbackPending && generation === this.captureGeneration) {
@@ -577,7 +588,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
                 console.warn('[NativeVideoBridge] Local H264 preview decoder failed; keeping native H264 encoder for direct P2P unless browser consumer activates:', {
                   sessionId: this.sessionId, sourceId, error, elapsedMs: Math.round(performance.now() - captureStarted),
                 });
-                if (this.consumers.has('webrtc-peer')) {
+                if (this.hasWebRtcConsumer()) {
                   void invoke('control_capture_encoder', { sessionId: this.sessionId, feedbackToken, disable: true }).catch(() => {});
                 } else {
                   onFirstFrame?.();
@@ -671,7 +682,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
             nativeEncodingFailed = true;
             this.previewEncoderFailed = true;
             encodedDecoder.close();
-            if (this.consumers.has('webrtc-peer')) {
+            if (this.hasWebRtcConsumer()) {
               logDiagnostic('WARN', 'capture.preview', 'Native H264 preview did not decode within 3000ms; falling back to JPEG for browser WebRTC consumer', {
                 sessionId: this.sessionId, sourceId, elapsedMs: Math.round(performance.now() - captureStarted)
               });

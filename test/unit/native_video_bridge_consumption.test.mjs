@@ -70,14 +70,17 @@ test('native video bridge gates decoding by active consumers and drops frames wh
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(frames.length, 2, 'Frame must be dropped without decoding when no consumers are active');
 
-    // Reactivating consumer resumes frame decoding
-    bridge.setConsumerActive('webrtc-peer', true);
+    // Reactivating consumer resumes frame decoding (including peer-scoped webrtc-<peerId> consumers)
+    bridge.setConsumerActive('webrtc-peer-1', true);
     assert.equal(bridge.hasActiveConsumers(), true);
     socket.onmessage({ data: new ArrayBuffer(8) });
     await new Promise(resolve => setImmediate(resolve));
-    assert.equal(frames.length, 3, 'Frame decoding resumes when a consumer reattaches');
+    assert.equal(frames.length, 3, 'Frame decoding resumes when a peer-scoped webrtc consumer attaches');
+    bridge.setConsumerActive('webrtc-peer-1', false);
+    assert.equal(bridge.hasActiveConsumers(), false);
 
-    // Backpressured queue drops frames to prevent unbounded memory growth
+    // Backpressured queue drops frames when consumer is active
+    bridge.setConsumerActive('webrtc-peer', true);
     desiredSize = 0;
     socket.onmessage({ data: new ArrayBuffer(8) });
     await new Promise(resolve => setImmediate(resolve));

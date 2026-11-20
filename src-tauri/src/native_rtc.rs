@@ -361,8 +361,8 @@ pub async fn create_native_video_offer(
     // addresses that can actually own a local socket, including usable LAN/VPNs.
     setting.set_ip_filter(Box::new(native_candidate_available));
     setting.set_ice_timeouts(
-        Some(Duration::from_secs(3)),
-        Some(Duration::from_secs(8)),
+        Some(Duration::from_secs(6)),
+        Some(Duration::from_secs(18)),
         Some(Duration::from_secs(2)),
     );
     let api = APIBuilder::new()

@@ -21,6 +21,7 @@ export interface StreamDescriptor {
   videoTrackId: string;
   fps: number;
   bitrate: number;
+  hasAudio?: boolean;
 }
 
 export function validStreamDescriptors(value: unknown): value is StreamDescriptor[] {
@@ -29,7 +30,8 @@ export function validStreamDescriptors(value: unknown): value is StreamDescripto
     (s.kind === 'screen' || s.kind === 'camera') && typeof s.label === 'string' && s.label.length <= 200 &&
     typeof s.videoTrackId === 'string' && s.videoTrackId.length <= 100 &&
     Number.isFinite(s.fps) && s.fps >= 1 && s.fps <= MAX_MEDIA_FPS &&
-    Number.isFinite(s.bitrate) && s.bitrate >= 100 && s.bitrate <= 50000);
+    Number.isFinite(s.bitrate) && s.bitrate >= 100 && s.bitrate <= 50000 &&
+    (s.hasAudio === undefined || typeof s.hasAudio === 'boolean'));
 }
 
 export function streamOwner(key: string): string {

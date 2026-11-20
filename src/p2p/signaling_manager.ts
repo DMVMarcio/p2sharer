@@ -68,6 +68,7 @@ export class SignalingManager {
   public failoverHistory: Array<{ from: SignalingTransport; to: SignalingTransport; timestamp: number }> = [];
 
   // Watchdog state
+  private isolatedPreviewRooms = new WeakSet<object>();
   private watchdogTimer: ReturnType<typeof setInterval> | null = null;
   private consecutiveStalls = 0;
   private maxConsecutiveStalls = 2; // 2 intervals @ 1.5s = 3.0s stall threshold
@@ -317,7 +318,7 @@ export class SignalingManager {
    * Internal room instantiation delegator for active transport.
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  protected createRoomForTransport(transport: SignalingTransport, config: any, topic: string, callbacks?: any): any {
+  protected createRoomForTransport(transport: SignalingTransport, config: any, topic: string, callbacks?: any, preserveMonitoring = false): any {
     const urls = enabledRendezvousUrls(this.roomPreferences, transport);
     const redundancy = transport === 'mqtt' ? urls.length : Math.min(urls.length, transport === 'nostr' ? 5 : 3);
     const relayConfig = { ...config.relayConfig, urls, redundancy };
@@ -326,16 +327,16 @@ export class SignalingManager {
         ...config,
         relayConfig,
       };
-      this.startMqttRelayMonitoring();
+      if (!preserveMonitoring) this.startMqttRelayMonitoring();
       return joinMqttRoom(mqttConfig, topic, callbacks);
     } else if (transport === 'nostr') {
-      this.stopMqttRelayMonitoring();
+      if (!preserveMonitoring) this.stopMqttRelayMonitoring();
       return joinNostrRoom({ ...config, relayConfig }, topic, callbacks);
     } else if (transport === 'torrent') {
-      this.stopMqttRelayMonitoring();
+      if (!preserveMonitoring) this.stopMqttRelayMonitoring();
       return joinTorrentRoom({ ...config, relayConfig }, topic, callbacks);
     } else {
-      this.startMqttRelayMonitoring();
+      if (!preserveMonitoring) this.startMqttRelayMonitoring();
       return joinMqttRoom({ ...config, relayConfig }, topic, callbacks);
     }
   }
@@ -345,6 +346,14 @@ export class SignalingManager {
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public joinRoom(config: any, topic: string, callbacks?: any): any {
+    const isPreviewWithActiveRoom = Boolean(callbacks?.previewOnly && this.activeRoom && !this.lanRoom);
+    if (isPreviewWithActiveRoom) {
+      const previewRoom = this.createRoomForTransport(this.activeTransport, config, topic, callbacks, true);
+      if (previewRoom && typeof previewRoom === 'object') {
+        this.isolatedPreviewRooms.add(previewRoom);
+      }
+      return previewRoom;
+    }
     if (this.lanRoom) {
       this.activeTransport = 'lan';
       this.availableTransports = ['lan'];
@@ -373,6 +382,24 @@ export class SignalingManager {
     if (!this.lanRoom) this.startWatchdog();
     this.notifyStatusChange();
     return room;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  public promotePreviewRoom(room: any, config: any, topic: string, callbacks?: any): void {
+    if (!room || this.activeRoom === room || this.lanRoom || !this.isolatedPreviewRooms.has(room)) return;
+    this.isolatedPreviewRooms.delete(room);
+    if (this.activeRoom) {
+      const oldRoom = this.activeRoom;
+      try {
+        Promise.resolve(oldRoom.leave()).catch(() => {});
+      } catch {}
+    }
+    this.activeRoom = room;
+    this.lastRoomParams = { config, topic, callbacks };
+    this.roomJoinedTimestamp = Date.now();
+    this.consecutiveStalls = 0;
+    this.startWatchdog();
+    this.notifyStatusChange();
   }
 
   /**
@@ -608,6 +635,14 @@ export class SignalingManager {
     if (this.activeTransport === 'mqtt' && (relay.connected > 0 ||
         [...this.mqttSocketStatuses.values()].some((status) => status.connected))) {
       this.consecutiveStalls = 0;
+      return;
+    }
+
+    // Wait for slow MQTT TLS/WebSocket handshakes up to the 7s connectTimeout
+    // (plus 1s margin) before counting stalls on weak PCs or slow networks.
+    if (this.activeTransport === 'mqtt' && now - this.roomJoinedTimestamp < 8000 &&
+        this.monitoredMqttSockets.size > 0 &&
+        [...this.mqttSocketStatuses.values()].some((status) => status.readyState === 0)) {
       return;
     }
 

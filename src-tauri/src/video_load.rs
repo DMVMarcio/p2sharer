@@ -64,8 +64,9 @@ impl CaptureLoad {
         let (width, height) = crate::screen_sources::fit_capture_dimensions(
             source_width, source_height, self.requested_width.load(Ordering::Relaxed), self.requested_height.load(Ordering::Relaxed));
         let scale = SCALES[self.level.load(Ordering::Relaxed) as usize];
-        ((width as u64 * scale as u64 / 100).max(1) as u32,
-         (height as u64 * scale as u64 / 100).max(1) as u32)
+        let even = |v: u32| if v >= 2 { v & !1 } else { v };
+        (even((width as u64 * scale as u64 / 100).max(1) as u32),
+         even((height as u64 * scale as u64 / 100).max(1) as u32))
     }
 
     pub fn output(&self, width: u32, height: u32) {
@@ -280,6 +281,20 @@ mod tests {
             for at in (2000..=40_000).step_by(2000) { window(&mut controller, &load, at, 100_000); }
             assert_eq!(controller.level, max_level);
             assert_eq!(load.snapshot().adjustments, u64::from(max_level));
+        }
+    }
+
+    #[test]
+    fn scaled_bounds_stay_even_for_odd_display_resolutions() {
+        for (source_w, source_h) in [(1366, 768), (1600, 900), (1201, 721)] {
+            let load = CaptureLoad::new(60, source_w, source_h, None);
+            let mut controller = LoadController::default();
+            for at in (2000..=20_000).step_by(2000) {
+                window(&mut controller, &load, at, 50_000);
+                let (w, h) = load.bounds(source_w, source_h);
+                assert_eq!(w % 2, 0, "expected even width for {source_w}x{source_h}, got {w}");
+                assert_eq!(h % 2, 0, "expected even height for {source_w}x{source_h}, got {h}");
+            }
         }
     }
 }

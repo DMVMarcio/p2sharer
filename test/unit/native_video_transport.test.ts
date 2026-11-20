@@ -79,16 +79,16 @@ test('native receiver gives negotiation its own deadline and checks first video 
   f.at(4000); await f.internal.checkReceiver(f.route);
   assert.equal(f.messages.length, 0, 'ICE connected does not mean DTLS and media are ready');
   f.at(12000); f.pc.connectionState = 'connected'; await f.internal.checkReceiver(f.route);
-  f.at(15000); await f.internal.checkReceiver(f.route);
+  f.at(17500); await f.internal.checkReceiver(f.route);
   assert.equal(f.messages.length, 0, 'First-video grace starts at the completed connection');
-  f.at(15500); await f.internal.checkReceiver(f.route);
+  f.at(18000); await f.internal.checkReceiver(f.route);
   assert.equal(f.messages[0]?.kind, 'reject');
   assert.equal(f.pc.connectionState, 'closed');
 });
 
 test('native receiver still falls back when setup never completes', async context => {
   const f = receiverFixture(context);
-  f.at(15000); await f.internal.checkReceiver(f.route);
+  f.at(18000); await f.internal.checkReceiver(f.route);
   assert.equal(f.messages[0]?.kind, 'reject');
   assert.equal(f.pc.connectionState, 'closed');
 });
@@ -98,7 +98,7 @@ test('native receiver falls back for received but undecodable packets', async co
   f.pc.connectionState = 'connected';
   f.pc.getStats = async () => new Map([['video', { type: 'inbound-rtp', kind: 'video', framesReceived: 5, framesDecoded: 0 }]]);
   await f.internal.checkReceiver(f.route);
-  f.at(3500);
+  f.at(6000);
   await f.internal.checkReceiver(f.route);
   assert.equal(f.messages[0]?.reason, 'no_video_before_receiver_deadline');
   assert.equal(f.pc.connectionState, 'closed');

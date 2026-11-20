@@ -374,10 +374,14 @@ impl CaptureLifecycle {
 pub struct NativeWgcHandler {
     lifecycle: Arc<CaptureLifecycle>,
     session_id: String,
+    try_nvenc: bool,
+    try_mf: bool,
+    nvenc_sequence: Arc<std::sync::atomic::AtomicU32>,
     nvenc: Option<crate::video_hardware::GpuEncoder>,
     nvenc_enabled: Arc<AtomicBool>,
     nvenc_keyframe: Arc<AtomicBool>,
     nvenc_bitrate: Arc<std::sync::atomic::AtomicU32>,
+    consecutive_hw_timeouts: u8,
     last_encoded: Option<(windows_capture_api::Win32::Graphics::Direct3D11::ID3D11Texture2D, u32, u32)>,
     refinements_remaining: u8,
     last_hw_encode: Option<std::time::Instant>,
@@ -415,10 +419,14 @@ impl NativeWgcHandler {
         Ok(Self {
             lifecycle: flags.lifecycle,
             session_id: flags.session_id,
+            try_nvenc: flags.try_nvenc,
+            try_mf: flags.try_mf,
+            nvenc_sequence: flags.nvenc_sequence.clone(),
             nvenc: Some(crate::video_hardware::GpuEncoder::new(flags.try_nvenc, flags.try_mf, flags.nvenc_sequence)),
             nvenc_enabled: flags.nvenc_enabled,
             nvenc_keyframe: flags.nvenc_keyframe,
             nvenc_bitrate: flags.nvenc_bitrate,
+            consecutive_hw_timeouts: 0,
             last_encoded: None,
             refinements_remaining: 0,
             last_hw_encode: None,
@@ -486,10 +494,20 @@ impl NativeWgcHandler {
 
         (self.target_width, self.target_height) = self.load.bounds(src_width, src_height);
 
+        let hw_encode_enabled = self.nvenc_enabled.load(Ordering::Relaxed);
         let scaled = if !self.legacy_readback && !self.gpu_scaling_disabled
             && self.target_width > 0 && self.target_height > 0
-            && (src_width > self.target_width || src_height > self.target_height) {
-            let (width, height) = fit_capture_dimensions(src_width, src_height, self.target_width, self.target_height);
+            && (src_width > self.target_width || src_height > self.target_height
+                || (hw_encode_enabled && src_width >= 2 && src_height >= 2 && (src_width % 2 != 0 || src_height % 2 != 0))) {
+            let (mut width, mut height) = if src_width > self.target_width || src_height > self.target_height {
+                fit_capture_dimensions(src_width, src_height, self.target_width, self.target_height)
+            } else {
+                (src_width, src_height)
+            };
+            if hw_encode_enabled && width >= 2 && height >= 2 {
+                width &= !1;
+                height &= !1;
+            }
             match self.gpu_scaler.resize(device, context, texture, width, height) {
                 Ok(texture) => { src_width = width; src_height = height; Some(texture) },
                 Err(error) => {
@@ -499,7 +517,7 @@ impl NativeWgcHandler {
                 }
             }
         } else { None };
-        if self.nvenc_enabled.load(Ordering::Relaxed) && (scaled.is_some() || (src_width <= self.target_width && src_height <= self.target_height)) {
+        if hw_encode_enabled && (scaled.is_some() || (src_width <= self.target_width && src_height <= self.target_height)) {
             // There is only one producer per capture. Check admission before
             // NVENC advances its reference chain; the delivery thread only removes.
             if !self.legacy_pacing && !self.delivery.0.lock().map_or(false, |pacer| pacer.has_encode_capacity()) {
@@ -513,6 +531,7 @@ impl NativeWgcHandler {
             self.metrics.nvenc_us.fetch_add(encoder_started.elapsed().as_micros() as u64, Ordering::Relaxed);
             match result {
                 Ok(bytes) => {
+                    self.consecutive_hw_timeouts = 0;
                     log_selected_encoder(&self.metrics, &self.session_id, self.nvenc.as_ref().unwrap().backend(), src_width, src_height, self.load.fps(), self.start_instant.elapsed().as_millis());
                     self.next_frame_time += self.frame_interval;
                     if arrival_time.saturating_duration_since(self.next_frame_time) >= self.frame_interval {
@@ -538,6 +557,18 @@ impl NativeWgcHandler {
                     return Ok(());
                 }
                 Err(error) => {
+                    let is_timeout = error.contains("timeout") || error.contains("WAIT_TIMEOUT");
+                    if is_timeout && self.consecutive_hw_timeouts < 2 {
+                        self.consecutive_hw_timeouts += 1;
+                        self.nvenc = Some(crate::video_hardware::GpuEncoder::new(self.try_nvenc, self.try_mf, self.nvenc_sequence.clone()));
+                        self.nvenc_keyframe.store(true, Ordering::Relaxed);
+                        self.last_encoded = None;
+                        self.refinements_remaining = 0;
+                        crate::logger::log_msg("WARN", "capture.hardware", &format!(
+                            "session={} transient hardware encode timeout ({}/3) output={src_width}x{src_height} fps={} attempt_ms={} retrying_hw error={error}",
+                            self.session_id, self.consecutive_hw_timeouts, self.load.fps(), encoder_started.elapsed().as_millis()));
+                        return Ok(());
+                    }
                     self.nvenc_enabled.store(false, Ordering::Relaxed);
                     self.metrics.nvenc_fallbacks.fetch_add(1, Ordering::Relaxed);
                     self.nvenc = None;

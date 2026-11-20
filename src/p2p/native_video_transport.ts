@@ -6,8 +6,8 @@ import { MediaCoordinator } from './media_coordinator.ts';
 import { logDiagnostic } from '../core/logger.ts';
 import { summarizeIceDescription, summarizeIceStats } from './ice_config.ts';
 
-const SETUP_TIMEOUT_MS = 15_000;
-const FIRST_VIDEO_TIMEOUT_MS = 3_500;
+const SETUP_TIMEOUT_MS = 18_000;
+const FIRST_VIDEO_TIMEOUT_MS = 6_000;
 
 type Signal = { id: string; kind: 'offer' | 'answer' | 'ice' | 'reject' | 'stop' | 'ready'; mediaId: string;
   sdp?: string; candidate?: RTCIceCandidateInit; descriptor?: StreamDescriptor; reason?: string };

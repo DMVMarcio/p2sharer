@@ -263,3 +263,76 @@ test('promoting a guest keeps discovery and admission retries alive until signed
     signalingManager.reannounce = original.announce;
   }
 });
+
+test('hostless waiting joiner shows verified preview participants and buffers early admin admission until key pinning', async () => {
+  const created = await createAuthenticatedInvite('Hostless waiting room');
+  const invite = parseRoomInvite(created.invite)!;
+  const actions = new Map<string, any>();
+  const sent: Array<{ action: string; data: any }> = [];
+  const room = { makeAction(name: string) {
+    const action = { send: async (data: any) => { sent.push({ action: name, data }); } };
+    actions.set(name, action); return action;
+  }, getPeers: () => ({ member: {} }), onPeerJoin: (_id: string) => {}, onPeerLeave: (_id: string) => {} };
+  const original = { join: signalingManager.joinRoom, leave: signalingManager.leaveRoom, announce: signalingManager.reannounce };
+  signalingManager.joinRoom = () => room;
+  signalingManager.leaveRoom = async () => {};
+  signalingManager.reannounce = async () => {};
+  let latestPeers: Array<{ id: string; username: string }> = [];
+  const manager = new GroupRoomManager('Guest', created.invite, '', false);
+  const callbacks = {
+    onStreamsUpdate: () => {}, onSlotsUpdate: () => {}, onChat: () => {},
+    onChatHistory: () => {},
+    onPeersUpdate: (peers: Array<{ id: string; username: string }>) => { latestPeers = peers; },
+    onStatusChange: () => {},
+  };
+  try {
+    await manager.join(callbacks, false);
+    assert.equal(manager.hasAdmission(), false);
+    assert.equal(manager.hasAdmitterOnline(), false);
+
+    room.onPeerJoin('member');
+    const hostAuth = await PeerAuthenticator.create(invite.roomId, 'host', created.identity);
+    const memberAuth = await PeerAuthenticator.create(invite.roomId, 'member');
+    const authority = new RoomAuthority(invite.roomId, invite.rootKey, hostAuth);
+    const membership = await authority.makeCommand('admit', { targetPeerId: 'member', targetKey: memberAuth.publicKey });
+
+    const challengeNonce = sent.findLast(packet => packet.action === 'peer_identity' && packet.data.kind === 'challenge')!.data.nonce;
+    await actions.get('peer_identity').onMessage({ kind: 'proof', nonce: challengeNonce, key: memberAuth.publicKey,
+      signature: await memberAuth.signControl('identity', [invite.roomId, 'member', challengeNonce]) }, { peerId: 'member' });
+
+    const previewNonce = (manager as any).previewNonce;
+    const preview = { name: 'Hostless waiting room', protected: false,
+      participants: [{ id: 'member', name: 'ExistingMember', color: '#06b6d4' }] };
+    await actions.get('room_preview_v1').onMessage({ kind: 'response', nonce: previewNonce, preview,
+      signature: await memberAuth.signControl('room-preview', [previewNonce, preview]), membership }, { peerId: 'member' });
+
+    assert.equal(manager.hasVerifiedPreviewMembers(), true);
+    assert.equal(manager.hasAdmitterOnline(), false);
+    assert.ok(latestPeers.some(p => p.id === 'member' && p.username === 'ExistingMember'),
+      'waiting guest sees verified preview members even while host is offline');
+    assert.equal(manager.hasAdmission(), false, 'preview response alone must not admit the guest');
+
+    // Now an admin joins and sends admin-admit before its peer_identity proof finishes
+    room.onPeerJoin('admin');
+    const adminAuth = await PeerAuthenticator.create(invite.roomId, 'admin');
+    const grantCmd = await authority.makeCommand('admin', { targetPeerId: 'admin', targetKey: adminAuth.publicKey });
+    const adminAuthority = new RoomAuthority(invite.roomId, invite.rootKey, adminAuth);
+    const adminAdmission = await adminAuthority.signAdminAdmission(
+      manager.getLocalPeerId(),
+      (manager as any).chatAuth.publicKey,
+      grantCmd,
+    );
+    await actions.get('room_admission').onMessage({ kind: 'admin-admit', admission: adminAdmission }, { peerId: 'admin' });
+    assert.equal(manager.hasAdmission(), false, 'unauthenticated admin-admit must wait until key pinning');
+
+    const adminNonce = sent.findLast(packet => packet.action === 'peer_identity' && packet.data.kind === 'challenge')!.data.nonce;
+    await actions.get('peer_identity').onMessage({ kind: 'proof', nonce: adminNonce, key: adminAuth.publicKey,
+      signature: await adminAuth.signControl('identity', [invite.roomId, 'admin', adminNonce]) }, { peerId: 'admin' });
+    assert.equal(manager.hasAdmission(), true, 'buffered admin-admit replays once sender identity proof completes');
+  } finally {
+    await manager.leave();
+    signalingManager.joinRoom = original.join;
+    signalingManager.leaveRoom = original.leave;
+    signalingManager.reannounce = original.announce;
+  }
+});

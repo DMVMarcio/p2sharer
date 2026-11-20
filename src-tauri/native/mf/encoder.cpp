@@ -315,7 +315,7 @@ bool encode(Encoder& e, ID3D11Texture2D* source, uint64_t timestamp, bool key, u
         MF_CHECK(rate_control(e, bitrate),"live hardware bitrate/burst budget");
         e.bitrate=bitrate;
     }
-    if(!wait_event(e,true,150,error,size)) return false;
+    if(!wait_event(e,true,350,error,size)) return false;
     ComPtr<IMFSample> sample;
     MF_CHECK(e.allocator->AllocateSample(&sample),"bounded NV12 sample allocation");
     ComPtr<IMFMediaBuffer> buffer; ComPtr<IMFDXGIBuffer> dxgi; ComPtr<ID3D11Texture2D> texture;
@@ -336,7 +336,7 @@ bool encode(Encoder& e, ID3D11Texture2D* source, uint64_t timestamp, bool key, u
     MF_CHECK(e.transform->ProcessInput(0,sample.Get(),0),"submit GPU frame"); ++e.pending;
     // Require single-frame low-latency output. A driver that buffers unexpectedly
     // must fall back, rather than increasing the streaming queue indefinitely.
-    if(!wait_event(e,false,150,error,size)) return false;
+    if(!wait_event(e,false,350,error,size)) return false;
     MFT_OUTPUT_STREAM_INFO info{};
     MF_CHECK(e.transform->GetOutputStreamInfo(0,&info),"H264 output allocation model");
     ComPtr<IMFSample> supplied;

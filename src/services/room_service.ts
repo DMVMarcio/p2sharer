@@ -484,8 +484,11 @@ export class RoomService {
     // Dismiss the overlay, but keep searching and describe the actual state.
     this.roomConnectingTimeout = setTimeout(() => {
       if (!isCreator && this.joinOutcome === 'connecting') {
-        this.roomStatusText = t("message.5ea38d33d5af");
-        if (this.joinOutcome === 'connecting') {
+        if (this.roomManager && !this.roomManager.hasAdmission() && !this.roomManager.isAdmissionDenied?.()) {
+          this.joinOutcome = 'waiting';
+          this.roomStatusText = t('join.waiting');
+        } else {
+          this.roomStatusText = t("message.5ea38d33d5af");
           this.joinOutcome = 'error';
           this.joinError = t('join.timeout');
         }
@@ -749,6 +752,19 @@ export class RoomService {
       this.joinOutcome = 'waiting';
       this.roomStatusText = t('join.waiting');
       this.hideConnecting();
+    } else if (waitForAdmission && !isCreator && this.roomManager === manager && this.joinOutcome === 'connecting' &&
+        !manager.hasAdmission() && !manager.isAdmissionDenied?.() &&
+        manager.hasVerifiedPreviewMembers?.() && !manager.hasAdmitterOnline?.()) {
+      if (this.roomConnectingTimeout) clearTimeout(this.roomConnectingTimeout);
+      this.roomConnectingTimeout = setTimeout(() => {
+        if (this.roomManager === manager && this.joinOutcome === 'connecting' &&
+            !manager.hasAdmission() && !manager.isAdmissionDenied?.()) {
+          this.joinOutcome = 'waiting';
+          this.roomStatusText = t('join.waiting');
+          this.hideConnecting();
+          this.notify();
+        }
+      }, 2500);
     }
     this.notify();
   }
@@ -1439,8 +1455,19 @@ export class RoomService {
         // Live replacement mutates only the latter; disposing the old bridge must not stop the new track.
         if (!previous) stream = new MediaStream(stream.getTracks());
         track.contentHint = kind === 'camera' ? 'motion' : 'detail';
+        const hasAudioTrack = kind === 'screen' && isTauri() &&
+          !Array.from(this.localCaptures.values()).some((entry) => entry.kind === 'screen');
+        let acquiredAudio: MediaStreamTrack | null = null;
+        if (!previous && hasAudioTrack) {
+          acquiredAudio = await this.audioBridge.startCapture(stateStore.isAudioFilterFullAudio ? 'full' : stateStore.selectedFilterMode,
+            stateStore.isAudioFilterFullAudio ? [] : stateStore.getActiveFilterPids(),
+            stateStore.isAudioFilterFullAudio ? [] : stateStore.getActiveFilterNames(),
+            stateStore.isAudioFilterFullAudio ? [] : stateStore.getActiveFilterSubKeys());
+          if (acquiredAudio) stream.addTrack(acquiredAudio);
+        }
         const descriptor: StreamDescriptor = { id, kind, get label() { return (label || (kind === 'camera' ? t("message.dafb61aca12d") :
-          sourceId.startsWith('window:') ? t("message.28014ef35252") : t("message.2d31efc9c2ed"))).slice(0, 200); }, videoTrackId: track.id, fps, bitrate };
+          sourceId.startsWith('window:') ? t("message.28014ef35252") : t("message.2d31efc9c2ed"))).slice(0, 200); }, videoTrackId: track.id, fps, bitrate,
+          hasAudio: previous ? previous.stream.getAudioTracks().length > 0 : Boolean(acquiredAudio || stream.getAudioTracks().length > 0) };
         if (previous) {
           await manager.replaceMediaTrack(id, track, descriptor);
           this.pointerReceivers.get(id)?.clear();
@@ -1449,13 +1476,6 @@ export class RoomService {
           const slot = stateStore.roomSlots.find((slot) => slot.isLocal && slot.mediaId === id);
           if (slot) pipService.updateStream(slot.peerId, stream);
         } else {
-          if (isTauri() && kind === 'screen' && !Array.from(this.localCaptures.values()).some((entry) => entry.kind === 'screen')) {
-            const audio = await this.audioBridge.startCapture(stateStore.isAudioFilterFullAudio ? 'full' : stateStore.selectedFilterMode,
-              stateStore.isAudioFilterFullAudio ? [] : stateStore.getActiveFilterPids(),
-              stateStore.isAudioFilterFullAudio ? [] : stateStore.getActiveFilterNames(),
-              stateStore.isAudioFilterFullAudio ? [] : stateStore.getActiveFilterSubKeys());
-            if (audio) stream.addTrack(audio);
-          }
           manager.shareStream(stream, bitrate * 1000, fps, descriptor);
         }
         const capture = { sourceId, kind, stream, bridge, fps, resolution: res, mouse, quality, bitrate };

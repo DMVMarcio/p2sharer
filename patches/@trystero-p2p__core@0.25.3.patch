@@ -1,7 +1,16 @@
 diff --git a/dist/action-wire.mjs b/dist/action-wire.mjs
-index 992caaaef5e9f1e0bcfb5e348bc9138667f8242b..43f142909ad420f48144ba974553834a0bbf4f3e 100644
+index 992caaaef5e9f1e0bcfb5e348bc9138667f8242b..944fcd910e44956be3e4b0e95471bd5bea76f0cc 100644
 --- a/dist/action-wire.mjs
 +++ b/dist/action-wire.mjs
+@@ -13,7 +13,7 @@ const twoByteMax = 65535;
+ const buffLowEvent = "bufferedamountlow";
+ const channelCloseEvent = "close";
+ const channelErrorEvent = "error";
+-const backpressureWaitTimeoutMs = 1e4;
++const backpressureWaitTimeoutMs = 15e3;
+ const toByteArray = (value) => value instanceof ArrayBuffer ? new Uint8Array(value) : new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+ const waitForBufferedAmountLow = (channel, timeoutMs = backpressureWaitTimeoutMs) => {
+ 	if (channel.readyState !== "open" || channel.bufferedAmount <= channel.bufferedAmountLowThreshold) return Promise.resolve(channel.readyState === "open");
 @@ -116,10 +116,11 @@ const createActionWireManager = ({ getPeer, getPeerIds, canReceiveFromPeer, thro
  						throwIfAborted(signal);
  						const chunk = chunks[chunkN];
@@ -150,10 +159,18 @@ index 7340a4f4bd7192c2c9f064d40311433436effc0f..76076fb6d1649100358ca3c7d12b51bb
  	makeOffer;
  	pool = [];
 diff --git a/dist/peer.mjs b/dist/peer.mjs
-index 8003df9196a808650bc233f9243be5eae14b4a1d..44579d8fbe661690578c96572f343f9e3197a1a8 100644
+index 8003df9196a808650bc233f9243be5eae14b4a1d..07725b7c5240f374398dba209416afc7a95f3984 100644
 --- a/dist/peer.mjs
 +++ b/dist/peer.mjs
-@@ -8,6 +8,12 @@ const offerType = "offer";
+@@ -1,13 +1,19 @@
+ import { all, alloc, candidateType, resetTimer, toError } from "./utils.mjs";
+ //#region src/peer.ts
+ const iceTimeout = 15e3;
+-const disconnectedCloseDelayMs = 5e3;
++const disconnectedCloseDelayMs = 25e3;
+ const iceStateEvent = "icegatheringstatechange";
+ const iceConnectionStateEvent = "iceconnectionstatechange";
+ const offerType = "offer";
  const answerType = "answer";
  const outOfRangePattern = /out of range/i;
  const rewriteMdnsCandidatesToLoopback = (sdp) => sdp.replace(/ (\S+\.local) (\d+) typ host/g, " 127.0.0.1 $2 typ host");
@@ -166,6 +183,15 @@ index 8003df9196a808650bc233f9243be5eae14b4a1d..44579d8fbe661690578c96572f343f9e
  var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig, _test_only_mdnsHostFallbackToLoopback }) => {
  	const pc = new (rtcPolyfill ?? RTCPeerConnection)({
  		iceServers: defaultIceServers.concat(turnConfig ?? []),
+@@ -185,7 +191,7 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
+ 		if (pc.connectionState === "disconnected" || pc.iceConnectionState === "disconnected") {
+ 			if (!disconnectedCloseTimer) disconnectedCloseTimer = setTimeout(() => {
+ 				disconnectedCloseTimer = null;
+-				if (pc.connectionState === "disconnected" || pc.iceConnectionState === "disconnected") emitClose();
++				if ((pc.connectionState === "disconnected" || pc.iceConnectionState === "disconnected") && pc.connectionState !== "connected" && pc.iceConnectionState !== "connected" && pc.iceConnectionState !== "completed") emitClose();
+ 			}, disconnectedCloseDelayMs);
+ 			return;
+ 		}
 @@ -224,9 +230,9 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
  		},
  		getOffer: async (restartIce = false) => {
@@ -192,9 +218,18 @@ index 8003df9196a808650bc233f9243be5eae14b4a1d..44579d8fbe661690578c96572f343f9e
  			const sender = pc.getSenders().find((s) => s.track === track);
  			if (sender) pc.removeTrack(sender);
 diff --git a/dist/room.mjs b/dist/room.mjs
-index a09d8b9c6425b41e08fe4cf421a974d94d627a6c..006863b7a7529138010c54ae7f5ec98ce7986d52 100644
+index a09d8b9c6425b41e08fe4cf421a974d94d627a6c..7b54b51dd623b16f907563cb08add02afbac65b6 100644
 --- a/dist/room.mjs
 +++ b/dist/room.mjs
+@@ -4,7 +4,7 @@ import { createActionManager } from "./actions.mjs";
+ import { createMediaManager } from "./media.mjs";
+ //#region src/room.ts
+ const unloadEvent = "beforeunload";
+-const defaultHandshakeTimeoutMs = 1e4;
++const defaultHandshakeTimeoutMs = 2e4;
+ const internalNs = (ns) => "@_" + ns;
+ const beforeUnloadRoomCleanups = /* @__PURE__ */ new Set();
+ const cleanupActiveRoomsOnBeforeUnload = () => beforeUnloadRoomCleanups.forEach((cleanup) => cleanup());
 @@ -50,12 +50,12 @@ var room_default = (onPeer, onPeerLeave, onSelfLeave, { onPeerHandshake, onHands
  	const clearPeerState = (id, reason = mkErr("peer disconnected")) => {
  		const err = toError(reason, "peer disconnected");
@@ -301,6 +336,19 @@ index 5fca48a89e823ad3a5665d121f390b505ecf9345..cbf9c24b922270bc3afb0defd5afb999
  	}
  	getSignalBinding(shared) {
  		if (shared.controlRoomId) {
+diff --git a/dist/signal-handler.mjs b/dist/signal-handler.mjs
+index cf12b0b808d11b85878e2a038138e8a64b5c40ba..bf5ab30db118736c30499e48cab33208197e3275 100644
+--- a/dist/signal-handler.mjs
++++ b/dist/signal-handler.mjs
+@@ -5,7 +5,7 @@ import { getConnectedPeerHealth } from "./shared-peer.mjs";
+ //#region src/signal-handler.ts
+ const offerPostAnswerTtlMs = 23333;
+ const offerIdSize = 12;
+-const disconnectedPeerGraceMs = 7533;
++const disconnectedPeerGraceMs = 25e3;
+ const answeringTtlMs = 23333;
+ const legacyCandidateKey = "__legacy__";
+ const offerRelayPlaceholder = "offer-placeholder";
 diff --git a/dist/strategy.mjs b/dist/strategy.mjs
 index a75dfcfddd14b2174d9acee37ecb84cd3c16c0eb..d42c6ee6c3d1b7b8b9b2f67d95c43ece18dd546a 100644
 --- a/dist/strategy.mjs
