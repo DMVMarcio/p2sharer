@@ -38,10 +38,10 @@ export { ChatFileAttachment } from './src/components/room/ChatFileAttachment.tsx
 export { ChatTransferCenter } from './src/components/room/ChatTransferCenter.tsx';
 export { SavedRoomsSection } from './src/components/home/SavedRoomsSection.tsx';`, resolveDir: process.cwd() },
   bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic', plugins: [{ name: 'fixture', setup(builder) {
-    builder.onResolve({ filter: /saved_rooms$|useRoom$|room_service$|ContextMenu$|EditSavedRoomDialog$|useSortableGrid$|useToast$/ }, args => ({
-      namespace: 'fixture', path: args.path.endsWith('saved_rooms') ? 'rooms' : args.path.endsWith('useRoom') ? 'useRoom' :
-        args.path.endsWith('room_service') ? 'service' : args.path.endsWith('ContextMenu') ? 'menu' :
-        args.path.endsWith('EditSavedRoomDialog') ? 'editing' : args.path.endsWith('useSortableGrid') ? 'sorting' : 'toast',
+    builder.onResolve({ filter: /\/(saved_rooms|useRoom|room_service|ContextMenu|EditSavedRoomDialog|useSortableGrid|useToast)$/ }, args => ({
+      namespace: 'fixture', path: args.path.endsWith('/saved_rooms') ? 'rooms' : args.path.endsWith('/useRoom') ? 'useRoom' :
+        args.path.endsWith('/room_service') ? 'service' : args.path.endsWith('/ContextMenu') ? 'menu' :
+        args.path.endsWith('/EditSavedRoomDialog') ? 'editing' : args.path.endsWith('/useSortableGrid') ? 'sorting' : 'toast',
     }));
     builder.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: mocks[args.path] }));
     builder.onResolve({ filter: /^[^./]/ }, args => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
