@@ -951,14 +951,31 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  min-height: 52px;
+  height: 52px;
   padding: 8px 12px;
   border-radius: 10px;
   background: rgba(24, 13, 5, 0.42);
   border: 1.5px dashed rgba(224, 184, 132, 0.38);
   font-size: 12px;
   font-weight: 700;
+  color: #f9efdc;
+  box-sizing: border-box;
   user-select: none;
   touch-action: none;
+}
+.ttt-draggable-token-well .ttt-svg-piece {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+}
+.ttt-draggable-token-well span {
+  min-width: 0;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .ttt-draggable-token-well.is-ready {
   cursor: grab;
