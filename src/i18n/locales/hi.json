@@ -1845,5 +1845,7 @@
   "games.confirmDeleteRoom": "क्या “{{name}}” को बंद करें? इस कमरे में चल रहा मैच समाप्त हो जाएगा।",
   "games.confirmResign": "क्या आप वाकई वर्तमान मैच में हार मानना चाहते हैं?",
   "games.confirmNewMatch": "क्या वर्तमान बोर्ड को रीसेट करके नया मैच शुरू करें?",
-  "games.confirmResetScores": "क्या स्कोरबोर्ड रीसेट करके नया मैच शुरू करें?"
+  "games.confirmResetScores": "क्या स्कोरबोर्ड रीसेट करके नया मैच शुरू करें?",
+  "games.turnActive": "अभी खेल रहे हैं",
+  "games.waitingTurn": "प्रतीक्षा में"
 }

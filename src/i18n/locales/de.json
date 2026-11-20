@@ -1845,5 +1845,7 @@
   "games.confirmDeleteRoom": "„{{name}}“ schließen? Die laufende Partie in diesem Raum wird beendet.",
   "games.confirmResign": "Möchtest du die aktuelle Partie wirklich aufgeben?",
   "games.confirmNewMatch": "Eine neue Partie starten und das aktuelle Brett zurücksetzen?",
-  "games.confirmResetScores": "Punktestand zurücksetzen und eine neue Partie starten?"
+  "games.confirmResetScores": "Punktestand zurücksetzen und eine neue Partie starten?",
+  "games.turnActive": "Am Zug",
+  "games.waitingTurn": "Wartet"
 }

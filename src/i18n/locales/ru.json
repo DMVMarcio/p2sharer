@@ -1845,5 +1845,7 @@
   "games.confirmDeleteRoom": "Закрыть «{{name}}»? Текущая партия в этой комнате будет завершена.",
   "games.confirmResign": "Вы уверены, что хотите сдаться в текущей партии?",
   "games.confirmNewMatch": "Начать новую партию и сбросить текущую доску?",
-  "games.confirmResetScores": "Сбросить счёт и начать новую партию?"
+  "games.confirmResetScores": "Сбросить счёт и начать новую партию?",
+  "games.turnActive": "Сейчас ходит",
+  "games.waitingTurn": "Ожидает"
 }

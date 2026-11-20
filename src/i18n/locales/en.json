@@ -1845,5 +1845,7 @@
   "games.confirmDeleteRoom": "Close “{{name}}”? Any ongoing match at this table will end.",
   "games.confirmResign": "Are you sure you want to resign the current match?",
   "games.confirmNewMatch": "Start a new match and replace the current board?",
-  "games.confirmResetScores": "Reset the scoreboard and start a fresh match?"
+  "games.confirmResetScores": "Reset the scoreboard and start a fresh match?",
+  "games.turnActive": "Playing now",
+  "games.waitingTurn": "Waiting"
 }

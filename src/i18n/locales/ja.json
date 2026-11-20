@@ -1845,5 +1845,7 @@
   "games.confirmDeleteRoom": "「{{name}}」を閉じますか？進行中の対局は終了します。",
   "games.confirmResign": "現在の対局を投了してもよろしいですか？",
   "games.confirmNewMatch": "盤面をリセットして新しい対局を始めますか？",
-  "games.confirmResetScores": "スコアをリセットして新しい対局を始めますか？"
+  "games.confirmResetScores": "スコアをリセットして新しい対局を始めますか？",
+  "games.turnActive": "対局中",
+  "games.waitingTurn": "待機中"
 }

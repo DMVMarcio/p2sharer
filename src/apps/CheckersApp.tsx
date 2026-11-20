@@ -41,8 +41,15 @@ export const CheckersApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = 
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [selectedSquare, setSelectedSquare] = useState<number | null>(null);
   const [dragging, setDragging] = useState<DraggingCheckersState | null>(null);
+  const [enteringBoard, setEnteringBoard] = useState(false);
+  const [boardAnimKey, setBoardAnimKey] = useState(0);
   const suppressClickRef = useRef(false);
   const lastSoundSnapshotRef = useRef<{
+    roomId: string;
+    moves: number;
+    status: string;
+  } | null>(null);
+  const lastAnimSnapshotRef = useRef<{
     roomId: string;
     moves: number;
     status: string;
@@ -108,6 +115,29 @@ export const CheckersApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = 
       moves: game.moveHistory.length,
       status: game.status,
     };
+  }, [currentRoom?.id, currentRoom?.game.moveHistory.length, currentRoom?.game.status]);
+
+  useEffect(() => {
+    if (!currentRoom) {
+      lastAnimSnapshotRef.current = null;
+      setEnteringBoard(false);
+      return;
+    }
+    const moves = currentRoom.game.moveHistory.length;
+    const status = currentRoom.game.status;
+    const prev = lastAnimSnapshotRef.current;
+    const shouldAnimate =
+      !prev || prev.roomId !== currentRoom.id
+        ? moves === 0 && status === 'playing'
+        : (prev.moves > 0 && moves === 0) || (prev.status !== 'playing' && status === 'playing' && moves === 0);
+
+    lastAnimSnapshotRef.current = { roomId: currentRoom.id, moves, status };
+
+    if (!shouldAnimate) return;
+    setEnteringBoard(true);
+    setBoardAnimKey((k) => k + 1);
+    const timer = window.setTimeout(() => setEnteringBoard(false), 660);
+    return () => window.clearTimeout(timer);
   }, [currentRoom?.id, currentRoom?.game.moveHistory.length, currentRoom?.game.status]);
 
   const handleSelectRoom = (nextId: string | null) => {
@@ -391,7 +421,24 @@ export const CheckersApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = 
                       >
                         {showRank && <span className="wood-coord-rank">{8 - r}</span>}
                         {showFile && <span className="wood-coord-file">{String.fromCharCode(97 + c)}</span>}
-                        {piece && <CheckersPieceSvg color={piece.color} king={piece.king} size={42} />}
+                        {piece && (
+                          <span
+                            key={enteringBoard ? `enter-${boardAnimKey}-${sqIndex}` : `piece-${sqIndex}`}
+                            className={enteringBoard ? 'cozy-piece-slot is-entering' : 'cozy-piece-slot'}
+                            style={
+                              enteringBoard
+                                ? ({
+                                    '--piece-delay': `${
+                                      (piece.color === 'w' ? c : 7 - c) * 24 + (r % 3) * 34
+                                    }ms`,
+                                    '--piece-slide-x': piece.color === 'w' ? '-42px' : '42px',
+                                  } as React.CSSProperties)
+                                : undefined
+                            }
+                          >
+                            <CheckersPieceSvg color={piece.color} king={piece.king} size={42} />
+                          </span>
+                        )}
                         {isLegalDest && (
                           <span
                             className={`wood-move-dot ${legalMatch?.captured !== undefined ? 'is-capture' : ''}`}
@@ -465,12 +512,46 @@ export const CheckersApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = 
                 <div className="cozy-panel-card cozy-history-card">
                   <div className="cozy-captured-strip">
                     <div className="cozy-captured-row">
-                      <span>{t('games.lightPieces')}:</span>
-                      <strong>{t('checkers.capturedCount', { count: game.capturedByWhite })}</strong>
+                      <span className="cozy-captured-label">
+                        <span className="cozy-seat-orb tone-light" aria-hidden="true" />
+                        <span>{t('games.lightPieces')}</span>
+                        <span className="cozy-captured-count">{game.capturedByWhite}</span>
+                      </span>
+                      <div
+                        className="cozy-captured-tray"
+                        aria-label={t('checkers.capturedCount', { count: game.capturedByWhite })}
+                      >
+                        {game.capturedByWhite === 0 ? (
+                          <span className="cozy-captured-empty">—</span>
+                        ) : (
+                          Array.from({ length: game.capturedByWhite }).map((_, idx) => (
+                            <span key={idx} className="cozy-captured-piece is-checker">
+                              <CheckersPieceSvg color="b" king={false} size={20} />
+                            </span>
+                          ))
+                        )}
+                      </div>
                     </div>
                     <div className="cozy-captured-row">
-                      <span>{t('games.darkPieces')}:</span>
-                      <strong>{t('checkers.capturedCount', { count: game.capturedByBlack })}</strong>
+                      <span className="cozy-captured-label">
+                        <span className="cozy-seat-orb tone-dark" aria-hidden="true" />
+                        <span>{t('games.darkPieces')}</span>
+                        <span className="cozy-captured-count">{game.capturedByBlack}</span>
+                      </span>
+                      <div
+                        className="cozy-captured-tray"
+                        aria-label={t('checkers.capturedCount', { count: game.capturedByBlack })}
+                      >
+                        {game.capturedByBlack === 0 ? (
+                          <span className="cozy-captured-empty">—</span>
+                        ) : (
+                          Array.from({ length: game.capturedByBlack }).map((_, idx) => (
+                            <span key={idx} className="cozy-captured-piece is-checker">
+                              <CheckersPieceSvg color="w" king={false} size={20} />
+                            </span>
+                          ))
+                        )}
+                      </div>
                     </div>
                   </div>
 

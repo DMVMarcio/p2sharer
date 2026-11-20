@@ -3,9 +3,8 @@ import React, { useCallback, useState } from 'react';
 export type PlanningColor = 'green' | 'amber' | 'sky' | 'rose';
 
 export interface PlanningArrow {
-  from: number;
-  to: number;
-  via?: number | null;
+  /** Sequence of logical square indices: [from, ...cornerTiles, to] */
+  waypoints: number[];
   color: PlanningColor;
 }
 
@@ -21,11 +20,68 @@ const COLOR_STROKE: Record<PlanningColor, string> = {
   rose: 'rgba(235, 92, 92, 0.88)',
 };
 
-function colorFromModifiers(event: { shiftKey: boolean; altKey: boolean; ctrlKey: boolean; metaKey: boolean }): PlanningColor {
+function colorFromModifiers(event: {
+  shiftKey: boolean;
+  altKey: boolean;
+  ctrlKey: boolean;
+  metaKey: boolean;
+}): PlanningColor {
   if (event.shiftKey) return 'amber';
   if (event.altKey) return 'sky';
   if (event.ctrlKey || event.metaKey) return 'rose';
   return 'green';
+}
+
+function squareCenterUnit(sq: number, gridSize: number): { x: number; y: number } {
+  const r = Math.floor(sq / gridSize);
+  const c = sq % gridSize;
+  return { x: c + 0.5, y: r + 0.5 };
+}
+
+/**
+ * Simplifies a dragged tile path into straight-line waypoints using Ramer-Douglas-Peucker.
+ * Threshold 0.76 tile units keeps orthogonal and diagonal drags as single straight arrows
+ * while preserving intentional tile corners (e.g. L-turns and multi-leg plans).
+ */
+function simplifyTilePath(visited: number[], gridSize: number, epsilon = 0.76): number[] {
+  if (visited.length <= 2) return [...visited];
+
+  const first = visited[0];
+  const last = visited[visited.length - 1];
+  const a = squareCenterUnit(first, gridSize);
+  const b = squareCenterUnit(last, gridSize);
+  const vx = b.x - a.x;
+  const vy = b.y - a.y;
+  const len = Math.hypot(vx, vy);
+
+  let maxDist = -1;
+  let maxIndex = -1;
+
+  for (let i = 1; i < visited.length - 1; i++) {
+    const p = squareCenterUnit(visited[i], gridSize);
+    let dist: number;
+    if (len < 0.001) {
+      dist = Math.hypot(p.x - a.x, p.y - a.y);
+    } else {
+      dist = Math.abs((p.x - a.x) * vy - (p.y - a.y) * vx) / len;
+    }
+    if (dist > maxDist) {
+      maxDist = dist;
+      maxIndex = i;
+    }
+  }
+
+  if (maxDist > epsilon && maxIndex > 0) {
+    const left = simplifyTilePath(visited.slice(0, maxIndex + 1), gridSize, epsilon);
+    const right = simplifyTilePath(visited.slice(maxIndex), gridSize, epsilon);
+    return [...left.slice(0, -1), ...right];
+  }
+
+  return [first, last];
+}
+
+function waypointsKey(waypoints: number[]): string {
+  return waypoints.join('-');
 }
 
 export function useBoardPlanning(gridSize = 8) {
@@ -39,47 +95,6 @@ export function useBoardPlanning(gridSize = 8) {
     setDraftArrow(null);
   }, []);
 
-  const squareCenter = useCallback(
-    (sq: number) => {
-      const r = Math.floor(sq / gridSize);
-      const c = sq % gridSize;
-      return { x: c + 0.5, y: r + 0.5 };
-    },
-    [gridSize],
-  );
-
-  const pickBestVia = useCallback(
-    (from: number, to: number, visited: number[]): number | null => {
-      if (from === to) return null;
-      const a = squareCenter(from);
-      const b = squareCenter(to);
-      const vx = b.x - a.x;
-      const vy = b.y - a.y;
-      const len = Math.hypot(vx, vy);
-      if (len < 0.01) return null;
-
-      let bestSq: number | null = null;
-      let bestDist = 0.55; // Threshold so straight-line drags don't accidentally curve
-
-      for (const sq of visited) {
-        if (sq === from || sq === to) continue;
-        const p = squareCenter(sq);
-        // Perpendicular distance from p to line segment a->b
-        const t = ((p.x - a.x) * vx + (p.y - a.y) * vy) / (len * len);
-        if (t <= 0.05 || t >= 0.95) continue;
-        const projX = a.x + t * vx;
-        const projY = a.y + t * vy;
-        const dist = Math.hypot(p.x - projX, p.y - projY);
-        if (dist > bestDist) {
-          bestDist = dist;
-          bestSq = sq;
-        }
-      }
-      return bestSq;
-    },
-    [squareCenter],
-  );
-
   const resolveSquareFromPoint = (clientX: number, clientY: number): number | null => {
     const el = document.elementFromPoint(clientX, clientY);
     const cell = el?.closest<HTMLElement>('[data-board-square]');
@@ -87,6 +102,28 @@ export function useBoardPlanning(gridSize = 8) {
     const idx = Number(cell.dataset.boardSquare);
     return Number.isInteger(idx) && idx >= 0 && idx < gridSize * gridSize ? idx : null;
   };
+
+  const buildWaypoints = useCallback(
+    (visited: number[], endSq: number): number[] => {
+      const startSq = visited[0];
+      if (endSq === startSq) return [startSq];
+      // Trim trailing backtracks to endSq if user returned onto a square
+      const path = [...visited];
+      if (path[path.length - 1] !== endSq) {
+        path.push(endSq);
+      }
+      const simplified = simplifyTilePath(path, gridSize);
+      // Ensure adjacent duplicates are collapsed
+      const deduped: number[] = [];
+      for (const sq of simplified) {
+        if (deduped[deduped.length - 1] !== sq) {
+          deduped.push(sq);
+        }
+      }
+      return deduped;
+    },
+    [gridSize],
+  );
 
   const startRightPlanning = useCallback(
     (event: React.PointerEvent<HTMLElement>, startSq: number) => {
@@ -96,16 +133,20 @@ export function useBoardPlanning(gridSize = 8) {
 
       const color = colorFromModifiers(event);
       const visited: number[] = [startSq];
-      setDraftArrow({ from: startSq, to: startSq, via: null, color });
+      setDraftArrow({ waypoints: [startSq], color });
 
       const onMove = (moveEvent: PointerEvent) => {
         const hovered = resolveSquareFromPoint(moveEvent.clientX, moveEvent.clientY);
         if (hovered === null) return;
         if (visited[visited.length - 1] !== hovered) {
-          visited.push(hovered);
+          // If the user drags back to the previous tile, pop the tip so correcting direction feels natural
+          if (visited.length >= 2 && visited[visited.length - 2] === hovered) {
+            visited.pop();
+          } else {
+            visited.push(hovered);
+          }
         }
-        const via = pickBestVia(startSq, hovered, visited);
-        setDraftArrow({ from: startSq, to: hovered, via, color });
+        setDraftArrow({ waypoints: buildWaypoints(visited, hovered), color });
       };
 
       const onUp = (upEvent: PointerEvent) => {
@@ -125,19 +166,20 @@ export function useBoardPlanning(gridSize = 8) {
           return;
         }
 
-        const via = pickBestVia(startSq, endSq, visited);
+        const waypoints = buildWaypoints(visited, endSq);
+        if (waypoints.length < 2) return;
+
+        const targetKey = waypointsKey(waypoints);
         setArrows((prev) => {
-          const exists = prev.some(
-            (a) => a.from === startSq && a.to === endSq && (a.via ?? null) === (via ?? null) && a.color === color,
-          );
-          if (exists) {
-            return prev.filter(
-              (a) => !(a.from === startSq && a.to === endSq && (a.via ?? null) === (via ?? null) && a.color === color),
-            );
+          const exactSame = prev.some((a) => waypointsKey(a.waypoints) === targetKey && a.color === color);
+          if (exactSame) {
+            return prev.filter((a) => !(waypointsKey(a.waypoints) === targetKey && a.color === color));
           }
           return [
-            ...prev.filter((a) => !(a.from === startSq && a.to === endSq)),
-            { from: startSq, to: endSq, via, color },
+            ...prev.filter(
+              (a) => !(a.waypoints[0] === waypoints[0] && a.waypoints[a.waypoints.length - 1] === endSq),
+            ),
+            { waypoints, color },
           ];
         });
       };
@@ -146,7 +188,7 @@ export function useBoardPlanning(gridSize = 8) {
       window.addEventListener('pointerup', onUp);
       window.addEventListener('pointercancel', onUp);
     },
-    [gridSize, pickBestVia],
+    [buildWaypoints, gridSize],
   );
 
   return {
@@ -165,77 +207,45 @@ function renderArrowShape(
   isDraft: boolean,
   key: string,
 ) {
-  if (arrow.from === arrow.to) return null;
+  const { waypoints } = arrow;
+  if (waypoints.length < 2) return null;
+  if (waypoints[0] === waypoints[waypoints.length - 1] && waypoints.length === 2) return null;
 
   const toVisualCenter = (sq: number) => {
     const r = Math.floor(sq / gridSize);
     const c = sq % gridSize;
     const vr = flipped ? gridSize - 1 - r : r;
     const vc = flipped ? gridSize - 1 - c : c;
-    return { x: vc * 100 + 50, y: vr * 100 + 50, r: vr, c: vc };
+    return { x: vc * 100 + 50, y: vr * 100 + 50 };
   };
 
-  const start = toVisualCenter(arrow.from);
-  const end = toVisualCenter(arrow.to);
+  const points = waypoints.map(toVisualCenter);
   const stroke = COLOR_STROKE[arrow.color];
 
-  const dr = Math.abs(end.r - start.r);
-  const dc = Math.abs(end.c - start.c);
-  const isKnightJump = gridSize === 8 && ((dr === 2 && dc === 1) || (dr === 1 && dc === 2));
+  const headLen = 30;
+  const headHalfWidth = 23;
 
-  let pathD = '';
-  let tipAngle = Math.atan2(end.y - start.y, end.x - start.x);
-  const headLen = 28;
-  const headHalfWidth = 22;
+  const first = points[0];
+  const second = points[1];
+  const startAngle = Math.atan2(second.y - first.y, second.x - first.x);
+  const sx = first.x + Math.cos(startAngle) * 18;
+  const sy = first.y + Math.sin(startAngle) * 18;
 
-  if (arrow.via !== null && arrow.via !== undefined && arrow.via !== arrow.from && arrow.via !== arrow.to) {
-    // Smooth user-drawn curved arrow passing near `via`
-    const mid = toVisualCenter(arrow.via);
-    const ctrlX = 2 * mid.x - 0.5 * (start.x + end.x);
-    const ctrlY = 2 * mid.y - 0.5 * (start.y + end.y);
+  const prevLast = points[points.length - 2];
+  const last = points[points.length - 1];
+  const tipAngle = Math.atan2(last.y - prevLast.y, last.x - prevLast.x);
+  const ex = last.x - Math.cos(tipAngle) * (headLen * 0.8);
+  const ey = last.y - Math.sin(tipAngle) * (headLen * 0.8);
 
-    const startDirAngle = Math.atan2(ctrlY - start.y, ctrlX - start.x);
-    const sx = start.x + Math.cos(startDirAngle) * 18;
-    const sy = start.y + Math.sin(startDirAngle) * 18;
-
-    tipAngle = Math.atan2(end.y - ctrlY, end.x - ctrlX);
-    const ex = end.x - Math.cos(tipAngle) * (headLen * 0.72);
-    const ey = end.y - Math.sin(tipAngle) * (headLen * 0.72);
-
-    pathD = `M ${sx} ${sy} Q ${ctrlX} ${ctrlY} ${ex} ${ey}`;
-  } else if (isKnightJump) {
-    // Classic L-shaped curved knight arrow
-    const elbowX = dr === 2 ? start.x : end.x;
-    const elbowY = dr === 2 ? end.y : start.y;
-
-    const firstAngle = Math.atan2(elbowY - start.y, elbowX - start.x);
-    const secondAngle = Math.atan2(end.y - elbowY, end.x - elbowX);
-    tipAngle = secondAngle;
-
-    const sx = start.x + Math.cos(firstAngle) * 18;
-    const sy = start.y + Math.sin(firstAngle) * 18;
-    const ex = end.x - Math.cos(secondAngle) * (headLen * 0.72);
-    const ey = end.y - Math.sin(secondAngle) * (headLen * 0.72);
-
-    const cornerRadius = 24;
-    const preX = elbowX - Math.cos(firstAngle) * cornerRadius;
-    const preY = elbowY - Math.sin(firstAngle) * cornerRadius;
-    const postX = elbowX + Math.cos(secondAngle) * cornerRadius;
-    const postY = elbowY + Math.sin(secondAngle) * cornerRadius;
-
-    pathD = `M ${sx} ${sy} L ${preX} ${preY} Q ${elbowX} ${elbowY} ${postX} ${postY} L ${ex} ${ey}`;
-  } else {
-    // Straight arrow
-    const sx = start.x + Math.cos(tipAngle) * 18;
-    const sy = start.y + Math.sin(tipAngle) * 18;
-    const ex = end.x - Math.cos(tipAngle) * (headLen * 0.72);
-    const ey = end.y - Math.sin(tipAngle) * (headLen * 0.72);
-    pathD = `M ${sx} ${sy} L ${ex} ${ey}`;
+  const segments: string[] = [`M ${sx} ${sy}`];
+  for (let i = 1; i < points.length - 1; i++) {
+    segments.push(`L ${points[i].x} ${points[i].y}`);
   }
+  segments.push(`L ${ex} ${ey}`);
+  const pathD = segments.join(' ');
 
-  // Arrowhead triangle anchored neatly at `end`
-  const tipX = end.x;
-  const tipY = end.y;
+  const tipX = last.x;
+  const tipY = last.y;
   const baseLeftX = tipX - Math.cos(tipAngle) * headLen + Math.sin(tipAngle) * headHalfWidth;
   const baseLeftY = tipY - Math.sin(tipAngle) * headLen - Math.cos(tipAngle) * headHalfWidth;
   const baseRightX = tipX - Math.cos(tipAngle) * headLen - Math.sin(tipAngle) * headHalfWidth;
@@ -271,11 +281,7 @@ export const BoardPlanningOverlay: React.FC<{
   const size = gridSize * 100;
 
   return (
-    <svg
-      className="board-planning-overlay"
-      viewBox={`0 0 ${size} ${size}`}
-      aria-hidden="true"
-    >
+    <svg className="board-planning-overlay" viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
       {highlights.map((h) => {
         const r = Math.floor(h.square / gridSize);
         const c = h.square % gridSize;
@@ -293,7 +299,7 @@ export const BoardPlanningOverlay: React.FC<{
           />
         );
       })}
-      {arrows.map((a) => renderArrowShape(a, gridSize, flipped, false, `arr-${a.from}-${a.to}-${a.via ?? 's'}`))}
+      {arrows.map((a) => renderArrowShape(a, gridSize, flipped, false, `arr-${waypointsKey(a.waypoints)}-${a.color}`))}
       {draftArrow && renderArrowShape(draftArrow, gridSize, flipped, true, 'draft-arrow')}
     </svg>
   );

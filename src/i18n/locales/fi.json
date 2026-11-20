@@ -1845,5 +1845,7 @@
   "games.confirmDeleteRoom": "Suljetaanko ”{{name}}”? Käynnissä oleva peli tässä huoneessa päättyy.",
   "games.confirmResign": "Haluatko varmasti luovuttaa nykyisen pelin?",
   "games.confirmNewMatch": "Aloitetaanko uusi peli ja nollataanko nykyinen pelilauta?",
-  "games.confirmResetScores": "Nollataanko pisteet ja aloitetaanko uusi peli?"
+  "games.confirmResetScores": "Nollataanko pisteet ja aloitetaanko uusi peli?",
+  "games.turnActive": "Pelaa nyt",
+  "games.waitingTurn": "Odottaa"
 }

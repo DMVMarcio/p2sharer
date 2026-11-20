@@ -1845,5 +1845,7 @@
   "games.confirmDeleteRoom": "“{{name}}” 방을 닫으시겠습니까? 진행 중인 대국이 종료됩니다.",
   "games.confirmResign": "현재 대국을 기권하시겠습니까?",
   "games.confirmNewMatch": "현재 보드를 초기화하고 새 대국을 시작하시겠습니까?",
-  "games.confirmResetScores": "점수를 초기화하고 새 대국을 시작하시겠습니까?"
+  "games.confirmResetScores": "점수를 초기화하고 새 대국을 시작하시겠습니까?",
+  "games.turnActive": "차례 진행 중",
+  "games.waitingTurn": "대기 중"
 }

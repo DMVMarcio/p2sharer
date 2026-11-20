@@ -31,11 +31,16 @@ export const TicTacToeApp: React.FC<RoomAppViewProps> = ({ instanceId, compact =
     pieceSize: number;
     hoverCell: number | null;
   } | null>(null);
+  const [resettingTiles, setResettingTiles] = useState(false);
 
   const lastSoundSnapshotRef = useRef<{
     roomId: string;
     moves: number;
     winner: string | null;
+  } | null>(null);
+  const lastTileAnimRef = useRef<{
+    roomId: string;
+    moves: number;
   } | null>(null);
 
   const { arrows, highlights, draftArrow, clearPlanning, startRightPlanning } = useBoardPlanning(3);
@@ -88,6 +93,23 @@ export const TicTacToeApp: React.FC<RoomAppViewProps> = ({ instanceId, compact =
       winner: game.winner,
     };
   }, [currentRoom?.id, currentRoom?.game.moveCount, currentRoom?.game.winner]);
+
+  useEffect(() => {
+    if (!currentRoom) {
+      lastTileAnimRef.current = null;
+      setResettingTiles(false);
+      return;
+    }
+    const moves = currentRoom.game.moveCount;
+    const prev = lastTileAnimRef.current;
+    const shouldResetAnim = Boolean(prev && prev.roomId === currentRoom.id && prev.moves > 0 && moves === 0);
+    lastTileAnimRef.current = { roomId: currentRoom.id, moves };
+
+    if (!shouldResetAnim) return;
+    setResettingTiles(true);
+    const timer = window.setTimeout(() => setResettingTiles(false), 480);
+    return () => window.clearTimeout(timer);
+  }, [currentRoom?.id, currentRoom?.game.moveCount]);
 
   const handleSelectRoom = (nextId: string | null) => {
     if (activeRoomId && nextId === null) {
@@ -252,7 +274,16 @@ export const TicTacToeApp: React.FC<RoomAppViewProps> = ({ instanceId, compact =
                         aria-disabled={!canClick}
                         className={`ttt-wood-cell ${cell ? 'occupied' : ''} ${canClick ? 'playable' : ''} ${
                           isWinning ? 'is-winning' : ''
-                        } ${isLast ? 'is-last-move' : ''} ${isDragHover ? 'is-drag-hover' : ''}`}
+                        } ${isLast ? 'is-last-move' : ''} ${isDragHover ? 'is-drag-hover' : ''} ${
+                          resettingTiles ? 'is-resetting' : ''
+                        }`}
+                        style={
+                          resettingTiles
+                            ? ({
+                                '--tile-delay': `${(Math.floor(index / 3) + (index % 3)) * 45}ms`,
+                              } as React.CSSProperties)
+                            : undefined
+                        }
                         onPointerDown={(e) => {
                           if (e.button === 2) {
                             startRightPlanning(e, index);
@@ -305,6 +336,8 @@ export const TicTacToeApp: React.FC<RoomAppViewProps> = ({ instanceId, compact =
               model={model}
               seat1Label="X"
               seat2Label="O"
+              seat1OrbTone="x"
+              seat2OrbTone="o"
               seat1Score={game.scores.X}
               seat2Score={game.scores.O}
               drawsScore={game.scores.draws}

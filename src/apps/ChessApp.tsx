@@ -39,6 +39,15 @@ interface DraggingPieceState {
   hoverSquare: number | null;
 }
 
+const CHESS_CAPTURE_ORDER: Record<ChessPieceType, number> = {
+  q: 0,
+  r: 1,
+  b: 2,
+  n: 3,
+  p: 4,
+  k: 5,
+};
+
 export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = false }) => {
   useLocale();
   const resolveActor = useBoardGamePlayers();
@@ -47,12 +56,19 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
   const [selectedSquare, setSelectedSquare] = useState<number | null>(null);
   const [pendingPromotion, setPendingPromotion] = useState<{ from: number; to: number; color: ChessColor } | null>(null);
   const [dragging, setDragging] = useState<DraggingPieceState | null>(null);
+  const [enteringBoard, setEnteringBoard] = useState(false);
+  const [boardAnimKey, setBoardAnimKey] = useState(0);
   const suppressClickRef = useRef(false);
   const lastSoundSnapshotRef = useRef<{
     roomId: string;
     moves: number;
     status: string;
     inCheck: boolean;
+  } | null>(null);
+  const lastAnimSnapshotRef = useRef<{
+    roomId: string;
+    moves: number;
+    status: string;
   } | null>(null);
 
   const { arrows, highlights, draftArrow, clearPlanning, startRightPlanning } = useBoardPlanning(8);
@@ -126,6 +142,29 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
     currentRoom?.game.status,
     currentRoom?.game.inCheck,
   ]);
+
+  useEffect(() => {
+    if (!currentRoom) {
+      lastAnimSnapshotRef.current = null;
+      setEnteringBoard(false);
+      return;
+    }
+    const moves = currentRoom.game.moveHistory.length;
+    const status = currentRoom.game.status;
+    const prev = lastAnimSnapshotRef.current;
+    const shouldAnimate =
+      !prev || prev.roomId !== currentRoom.id
+        ? moves === 0 && status === 'playing'
+        : (prev.moves > 0 && moves === 0) || (prev.status !== 'playing' && status === 'playing' && moves === 0);
+
+    lastAnimSnapshotRef.current = { roomId: currentRoom.id, moves, status };
+
+    if (!shouldAnimate) return;
+    setEnteringBoard(true);
+    setBoardAnimKey((k) => k + 1);
+    const timer = window.setTimeout(() => setEnteringBoard(false), 660);
+    return () => window.clearTimeout(timer);
+  }, [currentRoom?.id, currentRoom?.game.moveHistory.length, currentRoom?.game.status]);
 
   const handleSelectRoom = (nextId: string | null) => {
     if (activeRoomId && nextId === null) {
@@ -412,7 +451,25 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
                       >
                         {showRank && <span className="wood-coord-rank">{8 - r}</span>}
                         {showFile && <span className="wood-coord-file">{String.fromCharCode(97 + c)}</span>}
-                        {piece && <ChessPieceSvg type={piece.type} color={piece.color} size={48} />}
+                        {piece && (
+                          <span
+                            key={enteringBoard ? `enter-${boardAnimKey}-${sqIndex}` : `piece-${sqIndex}`}
+                            className={enteringBoard ? 'cozy-piece-slot is-entering' : 'cozy-piece-slot'}
+                            style={
+                              enteringBoard
+                                ? ({
+                                    '--piece-delay': `${
+                                      (piece.color === 'w' ? c : 7 - c) * 26 +
+                                      ((piece.color === 'w' ? (flipped ? r : 7 - r) : (flipped ? 7 - r : r)) % 2) * 55
+                                    }ms`,
+                                    '--piece-slide-x': piece.color === 'w' ? '-42px' : '42px',
+                                  } as React.CSSProperties)
+                                : undefined
+                            }
+                          >
+                            <ChessPieceSvg type={piece.type} color={piece.color} size={48} />
+                          </span>
+                        )}
                         {isLegalDest && (
                           <span className={`wood-move-dot ${piece ? 'is-capture' : ''}`} aria-hidden="true" />
                         )}
@@ -483,19 +540,41 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
                 <div className="cozy-panel-card cozy-history-card">
                   <div className="cozy-captured-strip">
                     <div className="cozy-captured-row">
-                      <span>{t('games.white')}:</span>
-                      <div className="cozy-captured-icons">
-                        {game.capturedByWhite.map((type, idx) => (
-                          <ChessPieceSvg key={idx} type={type} color="b" size={18} />
-                        ))}
+                      <span className="cozy-captured-label">
+                        <span className="cozy-seat-orb tone-light" aria-hidden="true" />
+                        <span>{t('games.white')}</span>
+                      </span>
+                      <div className="cozy-captured-tray">
+                        {game.capturedByWhite.length === 0 ? (
+                          <span className="cozy-captured-empty">—</span>
+                        ) : (
+                          [...game.capturedByWhite]
+                            .sort((a, b) => CHESS_CAPTURE_ORDER[a] - CHESS_CAPTURE_ORDER[b])
+                            .map((type, idx) => (
+                              <span key={idx} className="cozy-captured-piece">
+                                <ChessPieceSvg type={type} color="b" size={26} />
+                              </span>
+                            ))
+                        )}
                       </div>
                     </div>
                     <div className="cozy-captured-row">
-                      <span>{t('games.black')}:</span>
-                      <div className="cozy-captured-icons">
-                        {game.capturedByBlack.map((type, idx) => (
-                          <ChessPieceSvg key={idx} type={type} color="w" size={18} />
-                        ))}
+                      <span className="cozy-captured-label">
+                        <span className="cozy-seat-orb tone-dark" aria-hidden="true" />
+                        <span>{t('games.black')}</span>
+                      </span>
+                      <div className="cozy-captured-tray">
+                        {game.capturedByBlack.length === 0 ? (
+                          <span className="cozy-captured-empty">—</span>
+                        ) : (
+                          [...game.capturedByBlack]
+                            .sort((a, b) => CHESS_CAPTURE_ORDER[a] - CHESS_CAPTURE_ORDER[b])
+                            .map((type, idx) => (
+                              <span key={idx} className="cozy-captured-piece">
+                                <ChessPieceSvg type={type} color="w" size={26} />
+                              </span>
+                            ))
+                        )}
                       </div>
                     </div>
                   </div>

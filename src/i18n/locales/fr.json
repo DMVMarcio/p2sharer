@@ -1845,5 +1845,7 @@
   "games.confirmDeleteRoom": "Fermer « {{name}} » ? La partie en cours dans ce salon sera terminée.",
   "games.confirmResign": "Voulez-vous vraiment abandonner la partie en cours ?",
   "games.confirmNewMatch": "Lancer une nouvelle partie et réinitialiser le plateau actuel ?",
-  "games.confirmResetScores": "Réinitialiser le score et commencer une nouvelle partie ?"
+  "games.confirmResetScores": "Réinitialiser le score et commencer une nouvelle partie ?",
+  "games.turnActive": "En train de jouer",
+  "games.waitingTurn": "En attente"
 }

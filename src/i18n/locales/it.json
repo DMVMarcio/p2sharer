@@ -1845,5 +1845,7 @@
   "games.confirmDeleteRoom": "Chiudere “{{name}}”? La partita in corso in questa stanza terminerà.",
   "games.confirmResign": "Sei sicuro di voler abbandonare la partita attuale?",
   "games.confirmNewMatch": "Iniziare una nuova partita e reimpostare la scacchiera attuale?",
-  "games.confirmResetScores": "Azzerare il punteggio e iniziare una nuova partita?"
+  "games.confirmResetScores": "Azzerare il punteggio e iniziare una nuova partita?",
+  "games.turnActive": "Sta giocando",
+  "games.waitingTurn": "In attesa"
 }

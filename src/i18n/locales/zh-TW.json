@@ -1845,5 +1845,7 @@
   "games.confirmDeleteRoom": "確定關閉「{{name}}」嗎？該房間正在進行的對局將結束。",
   "games.confirmResign": "確定要在目前對局中認輸嗎？",
   "games.confirmNewMatch": "確定開始新對局並重設目前棋盤嗎？",
-  "games.confirmResetScores": "確定重設比分並開始新對局嗎？"
+  "games.confirmResetScores": "確定重設比分並開始新對局嗎？",
+  "games.turnActive": "思考中",
+  "games.waitingTurn": "等待中"
 }

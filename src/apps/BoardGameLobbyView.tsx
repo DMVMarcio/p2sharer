@@ -8,6 +8,7 @@ import {
   Eye,
   Flag,
   Grid3x3,
+  Play,
   Plus,
   RotateCcw,
   ShieldAlert,
@@ -16,7 +17,6 @@ import {
   Trophy,
   Users,
   UserCheck,
-  UserPlus,
 } from 'lucide-react';
 import { t } from '../i18n/index.ts';
 import { useLocale } from '../hooks/useLocale.ts';
@@ -438,8 +438,11 @@ export function CozyBoardGameShell<TGame>({
                         </div>
 
                         <div className="cozy-lobby-seats">
-                          <div className={`cozy-seat-slot ${p1 ? 'occupied' : 'empty'}`}>
-                            <span className="cozy-seat-badge seat-1">{seat1Label}</span>
+                          <div className={`cozy-seat-slot is-seat-1 ${p1 ? 'occupied' : 'empty'}`}>
+                            <span className="cozy-seat-badge seat-1">
+                              <span className={`cozy-seat-orb ${kind === 'tictactoe' ? 'tone-x' : 'tone-light'}`} aria-hidden="true" />
+                              <span>{seat1Label}</span>
+                            </span>
                             {p1 ? (
                               <div className="cozy-seat-player">
                                 <ProfileAvatar
@@ -457,14 +460,17 @@ export function CozyBoardGameShell<TGame>({
                                 className="cozy-seat-join-link"
                                 onClick={() => quickJoinRoom(room, 'seat1')}
                               >
-                                <UserPlus size={13} />
-                                <span>{t('games.sitHere')}</span>
+                                <Play size={12} />
+                                <span>{t('games.play')}</span>
                               </button>
                             )}
                           </div>
 
-                          <div className={`cozy-seat-slot ${p2 ? 'occupied' : 'empty'}`}>
-                            <span className="cozy-seat-badge seat-2">{seat2Label}</span>
+                          <div className={`cozy-seat-slot is-seat-2 ${p2 ? 'occupied' : 'empty'}`}>
+                            <span className="cozy-seat-badge seat-2">
+                              <span className={`cozy-seat-orb ${kind === 'tictactoe' ? 'tone-o' : 'tone-dark'}`} aria-hidden="true" />
+                              <span>{seat2Label}</span>
+                            </span>
                             {p2 ? (
                               <div className="cozy-seat-player">
                                 <ProfileAvatar
@@ -482,8 +488,8 @@ export function CozyBoardGameShell<TGame>({
                                 className="cozy-seat-join-link"
                                 onClick={() => quickJoinRoom(room, 'seat2')}
                               >
-                                <UserPlus size={13} />
-                                <span>{t('games.sitHere')}</span>
+                                <Play size={12} />
+                                <span>{t('games.play')}</span>
                               </button>
                             )}
                           </div>
@@ -577,6 +583,8 @@ export function CozyRoomSidePanel<TGame>({
   turnSide,
   statusText,
   statusTone = 'waiting',
+  seat1OrbTone = 'light',
+  seat2OrbTone = 'dark',
   onNewMatch,
   onResetScores,
   onSwapSeats,
@@ -594,6 +602,8 @@ export function CozyRoomSidePanel<TGame>({
   turnSide: 'seat1' | 'seat2' | null;
   statusText: string;
   statusTone?: CozyStatusTone;
+  seat1OrbTone?: 'light' | 'x';
+  seat2OrbTone?: 'dark' | 'o';
   onNewMatch: () => void;
   onResetScores?: () => void;
   onSwapSeats?: () => void;
@@ -628,9 +638,68 @@ export function CozyRoomSidePanel<TGame>({
           ? Sparkles
           : Clock;
 
+  const renderSeatCard = (
+    seat: 'seat1' | 'seat2',
+    label: string,
+    orbTone: 'light' | 'dark' | 'x' | 'o',
+    player: ReturnType<typeof resolveActor>,
+    score: number,
+  ) => {
+    const isTurn = turnSide === seat;
+    const seatSublabel = isTurn
+      ? player?.isLocal
+        ? t('games.currentTurn')
+        : t('games.turnActive')
+      : player
+        ? t('games.waitingTurn')
+        : t('games.openSeat');
+
+    return (
+      <div className={`cozy-seat-card is-${seat} ${isTurn ? 'is-turn' : ''} ${player ? 'is-occupied' : 'is-open'}`}>
+        <div className="cozy-seat-card-header">
+          <div className="cozy-seat-card-side">
+            <span className={`cozy-seat-orb tone-${orbTone}`} aria-hidden="true" />
+            <span className="cozy-seat-side-name">{label}</span>
+          </div>
+          <span className="cozy-score-pill">{score}</span>
+        </div>
+
+        <div className="cozy-seat-card-body">
+          {player ? (
+            <>
+              <ProfileAvatar
+                peerId={player.id}
+                name={player.name}
+                color={player.color}
+                isLocal={player.isLocal}
+                className="cozy-seat-avatar"
+              />
+              <div className="cozy-player-meta">
+                <strong>{player.name}</strong>
+                <span className={`cozy-seat-status-line ${isTurn ? 'is-active' : ''}`}>{seatSublabel}</span>
+              </div>
+            </>
+          ) : (
+            <div className="cozy-seat-open-row">
+              <span className="cozy-seat-open-label">{t('games.openSeat')}</span>
+              <button
+                type="button"
+                className="cozy-wood-seat-btn"
+                onClick={() => model.joinRole(room.id, seat)}
+              >
+                <Play size={11} />
+                <span>{t('games.play')}</span>
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <aside className="cozy-side-panel">
-      {/* Unified Match Status Plaque (lives here so the board never shifts or clips!) */}
+      {/* Unified Fixed-Height Match Status Plaque */}
       <div className={`cozy-status-plaque tone-${statusTone}`} role="status">
         <span className="cozy-status-plaque-icon" aria-hidden="true">
           <StatusIcon size={16} />
@@ -638,74 +707,13 @@ export function CozyRoomSidePanel<TGame>({
         <span className="cozy-status-plaque-text">{statusText}</span>
       </div>
 
-      {/* Players & Scoreboard Card */}
-      <div className="cozy-panel-card cozy-players-card">
-        <div className={`cozy-player-row ${turnSide === 'seat1' ? 'is-turn' : ''}`}>
-          <div className="cozy-player-identity">
-            <span className="cozy-seat-chip seat-1">{seat1Label}</span>
-            {p1 ? (
-              <>
-                <ProfileAvatar
-                  peerId={p1.id}
-                  name={p1.name}
-                  color={p1.color}
-                  isLocal={p1.isLocal}
-                  className="cozy-seat-avatar"
-                />
-                <div className="cozy-player-meta">
-                  <strong>{p1.name}</strong>
-                  {turnSide === 'seat1' && <span className="cozy-turn-indicator">{t('games.currentTurn')}</span>}
-                </div>
-              </>
-            ) : (
-              <button
-                type="button"
-                className="cozy-wood-seat-btn"
-                onClick={() => model.joinRole(room.id, 'seat1')}
-              >
-                <UserPlus size={12} />
-                <span>{t('games.sitHere')}</span>
-              </button>
-            )}
-          </div>
-          <span className="cozy-score-pill">{seat1Score}</span>
-        </div>
-
-        <div className={`cozy-player-row ${turnSide === 'seat2' ? 'is-turn' : ''}`}>
-          <div className="cozy-player-identity">
-            <span className="cozy-seat-chip seat-2">{seat2Label}</span>
-            {p2 ? (
-              <>
-                <ProfileAvatar
-                  peerId={p2.id}
-                  name={p2.name}
-                  color={p2.color}
-                  isLocal={p2.isLocal}
-                  className="cozy-seat-avatar"
-                />
-                <div className="cozy-player-meta">
-                  <strong>{p2.name}</strong>
-                  {turnSide === 'seat2' && <span className="cozy-turn-indicator">{t('games.currentTurn')}</span>}
-                </div>
-              </>
-            ) : (
-              <button
-                type="button"
-                className="cozy-wood-seat-btn"
-                onClick={() => model.joinRole(room.id, 'seat2')}
-              >
-                <UserPlus size={12} />
-                <span>{t('games.sitHere')}</span>
-              </button>
-            )}
-          </div>
-          <span className="cozy-score-pill">{seat2Score}</span>
-        </div>
-
-        <div className="cozy-scoreboard-summary">
-          <span>
-            {t('games.draws')}: <strong>{drawsScore}</strong>
-          </span>
+      {/* Distinct Highlighted Seat Cards */}
+      <div className="cozy-seats-stack">
+        {renderSeatCard('seat1', seat1Label, seat1OrbTone, p1, seat1Score)}
+        {renderSeatCard('seat2', seat2Label, seat2OrbTone, p2, seat2Score)}
+        <div className="cozy-draws-bar">
+          <span>{t('games.draws')}</span>
+          <strong>{drawsScore}</strong>
         </div>
       </div>
 

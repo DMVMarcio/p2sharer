@@ -1845,5 +1845,7 @@
   "games.confirmDeleteRoom": "Fechar “{{name}}”? A partida em andamento nesta sala será encerrada.",
   "games.confirmResign": "Tem certeza de que deseja desistir da partida atual?",
   "games.confirmNewMatch": "Iniciar uma nova partida e reiniciar o tabuleiro atual?",
-  "games.confirmResetScores": "Zerar o placar e começar uma nova partida?"
+  "games.confirmResetScores": "Zerar o placar e começar uma nova partida?",
+  "games.turnActive": "Jogando agora",
+  "games.waitingTurn": "Aguardando"
 }
