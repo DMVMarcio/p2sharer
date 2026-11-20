@@ -1,5 +1,6 @@
 import { parseRoomInvite } from '../core/room_invite.ts';
 import { stabilizeRoomPreview, type RoomPreview, type RoomPreviewParticipant } from '../core/room_preview.ts';
+import { orderSavedRooms } from '../core/saved_room_order.ts';
 import { savedRooms, type SavedRoom } from '../core/saved_rooms.ts';
 import { stateStore } from '../core/state_store.ts';
 import { modalManager } from '../hooks/useModal.ts';
@@ -7,7 +8,8 @@ import { GroupRoomManager } from '../p2p/group_room.ts';
 import { roomService } from './room_service.ts';
 
 export const HOME_ROOM_PRESENCE_INTERVAL_MS = 5 * 60 * 1000;
-const PROBE_CONCURRENCY = 4;
+const PROBE_CONCURRENCY = 8;
+const PROBE_EMPTY_MS = 5500;
 const PROBE_MAX_MS = 11000;
 const PROBE_RETRY_MS = 1200;
 const PROBE_SETTLE_AFTER_RESPONSE_MS = 900;
@@ -62,6 +64,7 @@ export function createHomeRoomPresenceService(probeFn?: ProbeRoomFn) {
     let settled = false;
     let resolveDone: (() => void) | null = null;
     let maxTimer: ReturnType<typeof setTimeout> | null = null;
+    let emptyTimer: ReturnType<typeof setTimeout> | null = null;
     let retryTimer: ReturnType<typeof setInterval> | null = null;
     let settleTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -69,6 +72,7 @@ export function createHomeRoomPresenceService(probeFn?: ProbeRoomFn) {
       if (settled) return;
       settled = true;
       if (maxTimer) clearTimeout(maxTimer);
+      if (emptyTimer) clearTimeout(emptyTimer);
       if (retryTimer) clearInterval(retryTimer);
       if (settleTimer) clearTimeout(settleTimer);
       resolveDone?.();
@@ -82,6 +86,11 @@ export function createHomeRoomPresenceService(probeFn?: ProbeRoomFn) {
 
     try {
       maxTimer = setTimeout(finish, PROBE_MAX_MS);
+      emptyTimer = setTimeout(() => {
+        if (!settled && !signal.aborted && !preview && !manager.hasDirectPeers()) {
+          finish();
+        }
+      }, PROBE_EMPTY_MS);
       retryTimer = setInterval(() => {
         if (!settled && !signal.aborted && !preview) {
           manager.requestPreview();
@@ -116,6 +125,7 @@ export function createHomeRoomPresenceService(probeFn?: ProbeRoomFn) {
     } finally {
       signal.removeEventListener('abort', onAbort);
       if (maxTimer) clearTimeout(maxTimer);
+      if (emptyTimer) clearTimeout(emptyTimer);
       if (retryTimer) clearInterval(retryTimer);
       if (settleTimer) clearTimeout(settleTimer);
       await manager.leave().catch(() => {});
@@ -166,7 +176,7 @@ export function createHomeRoomPresenceService(probeFn?: ProbeRoomFn) {
     currentAbort = controller;
     const run = (async () => {
       try {
-        const records = (await savedRooms.list()).filter((room) => room.saved);
+        const records = orderSavedRooms((await savedRooms.list()).filter((room) => room.saved));
         const savedIds = new Set(records.map((room) => room.roomId));
         pruneDeletedRooms(savedIds);
         const now = Date.now();

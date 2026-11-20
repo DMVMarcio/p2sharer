@@ -182,6 +182,7 @@ export class GroupRoomManager {
 
   public hasAdmission(): boolean { return this.localAdmitted && !this.previewOnly; }
   public isAdmissionDenied(): boolean { return this.admissionDenied; }
+  public hasDirectPeers(): boolean { return this.peerTracker.directConnectedPeers.size > 0; }
   public hasVerifiedPreviewMembers(): boolean { return this.verifiedPreviewByResponder.size > 0; }
   public hasAdmitterOnline(): boolean {
     if (!this.authority) return true;
