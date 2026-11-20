@@ -160,7 +160,7 @@ export function BrowserApp({ instanceId, compact = false }: { instanceId: string
     return () => { document.removeEventListener('keydown', key, true); document.removeEventListener('keyup', key, true); };
   }, [fullscreen]);
   const minimized = compact && !fullscreen;
-  const { muted, volume, changeVolume, toggleMute } = useMediaVolume();
+  const { muted, volume, changeVolume, toggleMute } = useMediaVolume(1, `browser:${instanceId}`);
   const [activity, setActivity] = useState<BrowserModel['activity']>(null);
   useEffect(() => {
     if (!model?.activity) { setActivity(null); return; }

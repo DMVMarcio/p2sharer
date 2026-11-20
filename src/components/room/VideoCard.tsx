@@ -25,6 +25,7 @@ import { useStore } from '../../hooks/useStore';
 import { useElementFullscreen } from '../../hooks/useElementFullscreen';
 import { useStreamZoom } from '../../hooks/useStreamZoom';
 import { audioContextManager } from '../../audio/audio_context_manager';
+import { getStreamVolumePreferenceKey } from '../../core/stream_volume_preferences';
 import { roomService } from '../../services/room_service';
 import { pipService } from '../../services/pip_service';
 import { ZoomControlBar } from './ZoomControlBar';
@@ -265,15 +266,17 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     };
   }, [cleanupVideoElement]);
 
+  const volumePrefKey = !slot.isLocal ? getStreamVolumePreferenceKey(slot) : undefined;
+
   useEffect(() => {
     if (!slot.isLocal && slot.stream) {
-      audioContextManager.attachPeerAudio(slot.peerId, slot.stream);
+      audioContextManager.attachPeerAudio(slot.peerId, slot.stream, volumePrefKey);
       const st = audioContextManager.getPeerVolumeState(slot.peerId);
       setVolume(st.volume);
       setIsMuted(st.isMuted);
       if (st.volume > 0) setLastVolume(st.volume);
     }
-  }, [slot.isLocal, slot.peerId, slot.stream, audioTracksKey, isPipActive]);
+  }, [slot.isLocal, slot.peerId, slot.stream, audioTracksKey, isPipActive, volumePrefKey]);
 
   useEffect(() => {
     if (isPipActive) {
@@ -341,7 +344,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     setVolume(val);
     setIsMuted(val === 0);
     if (val > 0) setLastVolume(val);
-    audioContextManager.setPeerVolume(slot.peerId, val, val === 0);
+    audioContextManager.setPeerVolume(slot.peerId, val, val === 0, volumePrefKey);
   };
 
   const handleToggleMute = (e?: React.MouseEvent) => {
@@ -350,12 +353,12 @@ export const VideoCard: React.FC<VideoCardProps> = ({
       const targetVol = lastVolume || 100;
       setVolume(targetVol);
       setIsMuted(false);
-      audioContextManager.setPeerVolume(slot.peerId, targetVol, false);
+      audioContextManager.setPeerVolume(slot.peerId, targetVol, false, volumePrefKey);
     } else {
       setLastVolume(volume || 100);
       setVolume(0);
       setIsMuted(true);
-      audioContextManager.setPeerVolume(slot.peerId, 0, true);
+      audioContextManager.setPeerVolume(slot.peerId, 0, true, volumePrefKey);
     }
   };
 
@@ -613,7 +616,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
             setVolume(val);
             setIsMuted(val === 0);
             if (val > 0) setLastVolume(val);
-            audioContextManager.setPeerVolume(slot.peerId, val, val === 0);
+            audioContextManager.setPeerVolume(slot.peerId, val, val === 0, volumePrefKey);
           }}
           onToggleMute={handleToggleMute}
           onOverlayHoverChange={remoteControl.setOverlayHovered}

@@ -1864,5 +1864,13 @@
   "join.trustShortLabel": "短縮ルームコード",
   "join.trustConfirm": "信頼して続行",
   "join.saveRoom": "このルームを保存",
-  "savedRooms.onlineMembers": "参加中のメンバー ({{count}})"
+  "savedRooms.onlineMembers": "参加中のメンバー ({{count}})",
+  "chat.filter.label": "チャットを絞り込む",
+  "chat.filter.messages": "メッセージ",
+  "chat.filter.streams": "画面共有",
+  "chat.filter.apps": "アプリ",
+  "chat.filter.presence": "入室と退室",
+  "chat.filter.events": "ルームイベント",
+  "chat.filter.showAll": "すべて表示",
+  "chat.filter.empty": "現在のフィルターに一致するメッセージがありません。"
 }

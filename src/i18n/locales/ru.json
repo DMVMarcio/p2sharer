@@ -1864,5 +1864,13 @@
   "join.trustShortLabel": "Короткий код комнаты",
   "join.trustConfirm": "Доверять и продолжить",
   "join.saveRoom": "Сохранить эту комнату",
-  "savedRooms.onlineMembers": "Участники в комнате ({{count}})"
+  "savedRooms.onlineMembers": "Участники в комнате ({{count}})",
+  "chat.filter.label": "Фильтр чата",
+  "chat.filter.messages": "Сообщения",
+  "chat.filter.streams": "Трансляции",
+  "chat.filter.apps": "Приложения",
+  "chat.filter.presence": "Входы и выходы",
+  "chat.filter.events": "События комнаты",
+  "chat.filter.showAll": "Показать все",
+  "chat.filter.empty": "Нет сообщений для текущих фильтров."
 }

@@ -3155,6 +3155,7 @@ export class GroupRoomManager {
       const isBroadcasting = isDirect && (this.peerTracker.isStreaming(peerId) || Boolean(stream));
       list.push({
         peerId,
+        ownerPublicKey: this.chatAuth?.getKnownKey(peerId),
         senderName: uname,
         stream,
         isStreaming: isBroadcasting,

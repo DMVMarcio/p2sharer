@@ -4,6 +4,7 @@ import { useElementFullscreen } from '../hooks/useElementFullscreen';
 import { showToast } from '../hooks/useToast';
 import React, { useEffect, useRef, useState } from 'react';
 import { invoke, isTauri } from '@tauri-apps/api/core';
+import { getSessionAppVolume, saveSessionAppVolume } from '../core/stream_volume_preferences';
 import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { ArrowDown, ArrowLeft, ArrowUp, ExternalLink, Expand, ListMinus, ListVideo,
@@ -57,12 +58,15 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
   const [mobilePanel, setMobilePanel] = useState<'watch' | 'discover'>('watch');
   const [resolvedTitles, setResolvedTitles] = useState<Record<string, string>>({});
   const [savedQueuesOpen, setSavedQueuesOpen] = useState(false);
+  const sessionVolumeKey = `youtube:${instanceId}`;
   const [volume, setVolume] = useState(() => {
+    const session = getSessionAppVolume(sessionVolumeKey);
+    if (session) return session.volume;
     const stored = localStorage.getItem(VOLUME_STORAGE);
     const saved = stored === null ? NaN : Number(stored);
     return Number.isFinite(saved) && saved >= 0 && saved <= 100 ? saved : 80;
   });
-  const [muted, setMuted] = useState(false);
+  const [muted, setMuted] = useState(() => getSessionAppVolume(sessionVolumeKey)?.isMuted ?? false);
   const [captions, setCaptions] = useState(() => localStorage.getItem(CAPTIONS_STORAGE) === 'true');
   const mountRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YouTubePlayer | null>(null);
@@ -137,6 +141,7 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
           captionsRef.current = nextCaptions;
           setVolume(nextVolume);
           setMuted(nextMuted);
+          saveSessionAppVolume(sessionVolumeKey, nextVolume, nextMuted);
           setCaptions(nextCaptions);
           localStorage.setItem(VOLUME_STORAGE, String(nextVolume));
           localStorage.setItem(CAPTIONS_STORAGE, String(nextCaptions));
@@ -398,6 +403,8 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
   const setLocalVolume = (next: number) => {
     volumeRef.current = next;
     setVolume(next);
+    const nextMuted = next > 0 && muted ? false : muted;
+    saveSessionAppVolume(sessionVolumeKey, next, nextMuted);
     localStorage.setItem(VOLUME_STORAGE, String(next));
     playerRef.current?.setVolume(next);
     if (next > 0 && muted) { playerRef.current?.unMute(); setMuted(false); mutedRef.current = false; }
@@ -407,6 +414,7 @@ export const YouTubeApp: React.FC<Props> = ({ instanceId, compact = false }) => 
   const toggleMute = () => {
     const next = !muted;
     mutedRef.current = next;
+    saveSessionAppVolume(sessionVolumeKey, volumeRef.current, next);
     if (next) playerRef.current?.mute();
     else playerRef.current?.unMute();
     setMuted(next);

@@ -1864,5 +1864,13 @@
   "join.trustShortLabel": "Kurzer Raumcode",
   "join.trustConfirm": "Vertrauen und fortfahren",
   "join.saveRoom": "Diesen Raum speichern",
-  "savedRooms.onlineMembers": "Aktive Teilnehmer ({{count}})"
+  "savedRooms.onlineMembers": "Aktive Teilnehmer ({{count}})",
+  "chat.filter.label": "Chat filtern",
+  "chat.filter.messages": "Nachrichten",
+  "chat.filter.streams": "Übertragungen",
+  "chat.filter.apps": "Apps",
+  "chat.filter.presence": "Beitritte & Verlassen",
+  "chat.filter.events": "Raumereignisse",
+  "chat.filter.showAll": "Alle anzeigen",
+  "chat.filter.empty": "Keine Nachrichten für die aktuellen Filter sichtbar."
 }

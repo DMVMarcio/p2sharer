@@ -7,6 +7,7 @@ import type { StreamWatcher } from '../core/types.ts';
 import { roomService } from './room_service.ts';
 import { buildIceServers } from '../p2p/ice_config.ts';
 import { audioContextManager } from '../audio/audio_context_manager.ts';
+import { getStreamVolumePreferenceKey } from '../core/stream_volume_preferences.ts';
 import { validPipAudioSettings } from './pip_audio.ts';
 
 interface PipSession {
@@ -83,8 +84,10 @@ export class PipService {
     if (streamOwner(peerId) === 'local' && activeStream) {
       roomService.setCaptureConsumer(activeStream, 'pip', true);
     }
+    const slotPref = streamOwner(peerId) !== 'local' ? stateStore.roomSlots.find((s) => s.peerId === peerId) : undefined;
+    const volumePrefKey = slotPref ? getStreamVolumePreferenceKey(slotPref) : undefined;
     if (streamOwner(peerId) !== 'local' && activeStream?.getAudioTracks().length) {
-      audioContextManager.attachPeerAudio(peerId, activeStream);
+      audioContextManager.attachPeerAudio(peerId, activeStream, volumePrefKey);
     }
 
     const channelName = `p2sharer-pip-${peerId}`;
@@ -252,7 +255,7 @@ export class PipService {
         }
         case 'audio-settings': {
           if (streamOwner(peerId) !== 'local' && validPipAudioSettings(data)) {
-            audioContextManager.setPeerVolume(peerId, data.volume, data.muted);
+            audioContextManager.setPeerVolume(peerId, data.volume, data.muted, volumePrefKey);
           }
           break;
         }

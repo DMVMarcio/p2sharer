@@ -1864,5 +1864,13 @@
   "join.trustShortLabel": "Short room code",
   "join.trustConfirm": "Trust and continue",
   "join.saveRoom": "Save this room",
-  "savedRooms.onlineMembers": "Active participants ({{count}})"
+  "savedRooms.onlineMembers": "Active participants ({{count}})",
+  "chat.filter.label": "Filter chat",
+  "chat.filter.messages": "Messages",
+  "chat.filter.streams": "Streams",
+  "chat.filter.apps": "Apps",
+  "chat.filter.presence": "Joins & leaves",
+  "chat.filter.events": "Room events",
+  "chat.filter.showAll": "Show all",
+  "chat.filter.empty": "No messages match the current filters."
 }

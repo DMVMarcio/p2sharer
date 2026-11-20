@@ -1864,5 +1864,13 @@
   "join.trustShortLabel": "房間短代碼",
   "join.trustConfirm": "信任並繼續",
   "join.saveRoom": "儲存此房間",
-  "savedRooms.onlineMembers": "目前線上成員 ({{count}})"
+  "savedRooms.onlineMembers": "目前線上成員 ({{count}})",
+  "chat.filter.label": "篩選聊天",
+  "chat.filter.messages": "訊息",
+  "chat.filter.streams": "畫面分享",
+  "chat.filter.apps": "應用程式",
+  "chat.filter.presence": "加入與離開",
+  "chat.filter.events": "房間事件",
+  "chat.filter.showAll": "顯示全部",
+  "chat.filter.empty": "目前篩選條件下沒有可顯示的訊息。"
 }

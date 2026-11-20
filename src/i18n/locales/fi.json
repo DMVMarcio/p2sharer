@@ -1864,5 +1864,13 @@
   "join.trustShortLabel": "Lyhyt huonekoodi",
   "join.trustConfirm": "Luota ja jatka",
   "join.saveRoom": "Tallenna tämä huone",
-  "savedRooms.onlineMembers": "Aktiiviset osallistujat ({{count}})"
+  "savedRooms.onlineMembers": "Aktiiviset osallistujat ({{count}})",
+  "chat.filter.label": "Suodata keskustelua",
+  "chat.filter.messages": "Viestit",
+  "chat.filter.streams": "Jaetut näytöt",
+  "chat.filter.apps": "Sovellukset",
+  "chat.filter.presence": "Liittymiset ja poistumiset",
+  "chat.filter.events": "Huoneen tapahtumat",
+  "chat.filter.showAll": "Näytä kaikki",
+  "chat.filter.empty": "Nykyisillä suodattimilla ei näy viestejä."
 }

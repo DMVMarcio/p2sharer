@@ -1,4 +1,5 @@
 import { logDiagnostic } from '../core/logger.ts';
+import { getSavedStreamVolume, saveStreamVolume } from '../core/stream_volume_preferences.ts';
 import { AudioContextRecovery } from './audio_context_recovery.ts';
 import type { PeerAudioSinkState } from '../core/types.ts';
 
@@ -8,6 +9,8 @@ export class AudioContextManager {
   private peerSinks: Map<string, PeerAudioSinkState> = new Map();
   private peerAudioTracks = new Map<string, MediaStreamTrack[]>();
   private peerPullElements = new Map<string, HTMLAudioElement>();
+  private peerPreferenceKeys = new Map<string, string>();
+  private peerManuallyAdjusted = new Set<string>();
   private recovery: AudioContextRecovery | undefined;
 
   public static getInstance(): AudioContextManager {
@@ -37,23 +40,36 @@ export class AudioContextManager {
     void element.play()?.catch(() => {});
   }
 
-  public attachPeerAudio(peerId: string, stream: MediaStream): PeerAudioSinkState {
+  public attachPeerAudio(peerId: string, stream: MediaStream, preferenceKey?: string): PeerAudioSinkState {
     const ctx = this.getAudioContext();
+    const prevKey = this.peerPreferenceKeys.get(peerId);
+    if (preferenceKey) this.peerPreferenceKeys.set(peerId, preferenceKey);
+    const activeKey = preferenceKey || prevKey;
     let state = this.peerSinks.get(peerId);
 
     if (!state) {
+      const saved = getSavedStreamVolume(activeKey);
+      const initialVolume = saved ? saved.volume : 100;
+      const initialMuted = saved ? saved.isMuted : false;
       const gainNode = ctx.createGain();
-      gainNode.gain.value = 1.0;
+      gainNode.gain.value = initialMuted ? 0 : initialVolume / 100;
       gainNode.connect(ctx.destination);
       state = {
         audioCtx: ctx,
         source: null,
         gainNode,
         streamId: '',
-        volume: 100,
-        isMuted: false,
+        volume: initialVolume,
+        isMuted: initialMuted,
       };
       this.peerSinks.set(peerId, state);
+    } else if (preferenceKey && preferenceKey !== prevKey && !this.peerManuallyAdjusted.has(peerId)) {
+      const saved = getSavedStreamVolume(preferenceKey);
+      if (saved) {
+        state.volume = saved.volume;
+        state.isMuted = saved.isMuted;
+        state.gainNode.gain.value = state.isMuted ? 0 : state.volume / 100;
+      }
     }
 
     const tracks = stream.getAudioTracks().filter(track => track.readyState !== 'ended');
@@ -112,6 +128,8 @@ export class AudioContextManager {
       this.peerPullElements.delete(peerId);
     }
     this.peerAudioTracks.delete(peerId);
+    this.peerPreferenceKeys.delete(peerId);
+    this.peerManuallyAdjusted.delete(peerId);
     const state = this.peerSinks.get(peerId);
     if (state) {
       if (state.source) {
@@ -126,10 +144,14 @@ export class AudioContextManager {
     }
   }
 
-  public setPeerVolume(peerId: string, volume: number, isMuted?: boolean): void {
+  public setPeerVolume(peerId: string, volume: number, isMuted?: boolean, preferenceKey?: string): void {
+    if (preferenceKey) this.peerPreferenceKeys.set(peerId, preferenceKey);
+    this.peerManuallyAdjusted.add(peerId);
+    const clamped = Math.max(0, Math.min(100, volume));
+    const resolvedMuted = isMuted ?? false;
     const state = this.peerSinks.get(peerId);
     if (state) {
-      state.volume = Math.max(0, Math.min(100, volume));
+      state.volume = clamped;
       if (isMuted !== undefined) {
         state.isMuted = isMuted;
       }
@@ -142,6 +164,8 @@ export class AudioContextManager {
         this.safePlayPullElement(pullElement);
       }
     }
+    const persistKey = preferenceKey || this.peerPreferenceKeys.get(peerId);
+    saveStreamVolume(persistKey, state ? state.volume : clamped, state ? state.isMuted : resolvedMuted);
   }
 
   public getPeerVolumeState(peerId: string): { volume: number; isMuted: boolean } {

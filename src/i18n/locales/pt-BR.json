@@ -1864,5 +1864,13 @@
   "join.trustShortLabel": "Código curto da sala",
   "join.trustConfirm": "Confiar e continuar",
   "join.saveRoom": "Salvar esta sala",
-  "savedRooms.onlineMembers": "Participantes ativos ({{count}})"
+  "savedRooms.onlineMembers": "Participantes ativos ({{count}})",
+  "chat.filter.label": "Filtrar chat",
+  "chat.filter.messages": "Mensagens",
+  "chat.filter.streams": "Transmissões",
+  "chat.filter.apps": "Apps",
+  "chat.filter.presence": "Entradas e saídas",
+  "chat.filter.events": "Eventos da sala",
+  "chat.filter.showAll": "Mostrar tudo",
+  "chat.filter.empty": "Nenhuma mensagem visível com os filtros atuais."
 }

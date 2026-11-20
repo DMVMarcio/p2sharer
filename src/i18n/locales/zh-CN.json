@@ -1864,5 +1864,13 @@
   "join.trustShortLabel": "房间短代码",
   "join.trustConfirm": "信任并继续",
   "join.saveRoom": "保存此房间",
-  "savedRooms.onlineMembers": "当前在线成员 ({{count}})"
+  "savedRooms.onlineMembers": "当前在线成员 ({{count}})",
+  "chat.filter.label": "筛选聊天",
+  "chat.filter.messages": "消息",
+  "chat.filter.streams": "屏幕共享",
+  "chat.filter.apps": "应用",
+  "chat.filter.presence": "加入与离开",
+  "chat.filter.events": "房间事件",
+  "chat.filter.showAll": "显示全部",
+  "chat.filter.empty": "当前筛选下没有可显示的消息。"
 }

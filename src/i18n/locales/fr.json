@@ -1864,5 +1864,13 @@
   "join.trustShortLabel": "Code court du salon",
   "join.trustConfirm": "Faire confiance et continuer",
   "join.saveRoom": "Enregistrer ce salon",
-  "savedRooms.onlineMembers": "Participants actifs ({{count}})"
+  "savedRooms.onlineMembers": "Participants actifs ({{count}})",
+  "chat.filter.label": "Filtrer le chat",
+  "chat.filter.messages": "Messages",
+  "chat.filter.streams": "Diffusions",
+  "chat.filter.apps": "Apps",
+  "chat.filter.presence": "Arrivées et départs",
+  "chat.filter.events": "Événements du salon",
+  "chat.filter.showAll": "Tout afficher",
+  "chat.filter.empty": "Aucun message ne correspond aux filtres actuels."
 }

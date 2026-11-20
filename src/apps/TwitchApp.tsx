@@ -3,6 +3,7 @@ import { useLocale } from '../hooks/useLocale';
 import { useElementFullscreen } from '../hooks/useElementFullscreen';
 import React, { useEffect, useRef, useState } from 'react';
 import { invoke, isTauri } from '@tauri-apps/api/core';
+import { getSessionAppVolume, saveSessionAppVolume } from '../core/stream_volume_preferences';
 import { emit, listen } from '@tauri-apps/api/event';
 import { SiTwitch } from 'react-icons/si';
 import {
@@ -72,12 +73,15 @@ export const TwitchApp: React.FC<Props> = ({ instanceId, compact = false }) => {
     const saved = localStorage.getItem(CHAT_STORAGE);
     return saved === null ? true : saved === 'true';
   });
+  const sessionKey = `twitch:${instanceId}`;
   const [volume, setVolume] = useState(() => {
+    const session = getSessionAppVolume(sessionKey);
+    if (session) return session.volume;
     const stored = localStorage.getItem(VOLUME_STORAGE);
     const saved = stored === null ? NaN : Number(stored);
     return Number.isFinite(saved) && saved >= 0 && saved <= 100 ? saved : 80;
   });
-  const [muted, setMuted] = useState(false);
+  const [muted, setMuted] = useState(() => getSessionAppVolume(sessionKey)?.isMuted ?? false);
   const [isLive, setIsLive] = useState(false);
   const [playerReady, setPlayerReady] = useState(false);
   const [playerLoadFailed, setPlayerLoadFailed] = useState(false);
@@ -205,6 +209,7 @@ export const TwitchApp: React.FC<Props> = ({ instanceId, compact = false }) => {
           const { volume: nextVolume, muted: nextMuted } = message.settings;
           setVolume(nextVolume);
           setMuted(nextMuted);
+          saveSessionAppVolume(sessionKey, nextVolume, nextMuted);
           localStorage.setItem(VOLUME_STORAGE, String(nextVolume));
           return;
         }
@@ -364,6 +369,7 @@ export const TwitchApp: React.FC<Props> = ({ instanceId, compact = false }) => {
   function handleVolumeChange(nextVolume: number) {
     setVolume(nextVolume);
     setMuted(false);
+    saveSessionAppVolume(sessionKey, nextVolume, false);
     localStorage.setItem(VOLUME_STORAGE, String(nextVolume));
     if (playerRef.current) {
       playerRef.current.setMuted(false);
@@ -374,6 +380,7 @@ export const TwitchApp: React.FC<Props> = ({ instanceId, compact = false }) => {
   function handleToggleMute() {
     const nextMuted = !muted;
     setMuted(nextMuted);
+    saveSessionAppVolume(sessionKey, volume, nextMuted);
     if (playerRef.current) {
       playerRef.current.setMuted(nextMuted);
       if (!nextMuted) playerRef.current.setVolume(volume / 100);

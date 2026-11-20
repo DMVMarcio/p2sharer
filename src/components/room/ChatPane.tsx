@@ -31,6 +31,8 @@ import { selfId } from '@trystero-p2p/core';
 import { showToast } from '../../hooks/useToast';
 import { copyImageToClipboard } from '../../core/image_clipboard';
 import { ChatMentionSuggestions, type MentionCandidate } from './ChatMentionSuggestions';
+import { ChatFilterMenu } from './ChatFilterMenu';
+import { getChatFilters, matchesChatFilter, resetChatFilters, subscribeChatFilters } from '../../core/chat_filters';
 
 let lastChatScrollTop: number | null = null;
 let lastChatWasAtBottom = true;
@@ -57,6 +59,7 @@ export const ChatPane: React.FC = () => {
   const [mentionDismissed, setMentionDismissed] = useState(false);
   const emojiPack = useSyncExternalStore(subscribeEmojiPack, getEmojiPack);
   const transferSpeedUnit = useSyncExternalStore(subscribeTransferSpeedUnit, getTransferSpeedUnit);
+  const chatFilters = useSyncExternalStore(subscribeChatFilters, getChatFilters);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isInitialMount = useRef(true);
@@ -149,7 +152,8 @@ export const ChatPane: React.FC = () => {
     return false;
   }, [filteredMentionCandidates, mentionIndex, handleMentionSelect]);
 
-  const visibleMessages = chatMessages.filter((message) => !message.deletedAt);
+  const nonDeletedMessages = chatMessages.filter((message) => !message.deletedAt);
+  const visibleMessages = nonDeletedMessages.filter((message) => matchesChatFilter(message, chatFilters));
   const latestMessageId = chatMessages[chatMessages.length - 1]?.id;
   const replyMessage = chatMessages.find((message) => message.id === replyToId && !message.deletedAt);
 
@@ -263,6 +267,14 @@ export const ChatPane: React.FC = () => {
         ref={messagesContainerRef}
         onScroll={handleMessagesScroll}
       >
+        {visibleMessages.length === 0 && nonDeletedMessages.length > 0 && (
+          <div className="chat-filter-empty">
+            <span>{t('chat.filter.empty')}</span>
+            <button type="button" className="btn btn-sm btn-outline" onClick={() => resetChatFilters()}>
+              {t('chat.filter.showAll')}
+            </button>
+          </div>
+        )}
         {visibleMessages.map((msg, index) => {
           const timeStr = new Date(msg.timestamp).toLocaleTimeString(getLanguage(), {
             hour: '2-digit',
@@ -388,6 +400,7 @@ export const ChatPane: React.FC = () => {
               </svg>
             </button>
             <button type="button" className="btn-chat-emoji" aria-label={t("message.0176661d7e81")} onClick={() => void pickFile()}><Paperclip size={18} /></button>
+            <ChatFilterMenu filters={chatFilters} />
           </div>
           <ChatTransferCenter />
           <button type="submit" className="btn-chat-send" aria-label={t("message.c45497103c0e")}>

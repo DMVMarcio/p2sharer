@@ -66,6 +66,7 @@ export interface StreamWatcher {
 
 export interface RoomSlotInfo {
   ownerPeerId?: string;
+  ownerPublicKey?: string;
   mediaId?: string;
   mediaKind?: import("./media_streams").MediaKind;
   mediaLabel?: string;

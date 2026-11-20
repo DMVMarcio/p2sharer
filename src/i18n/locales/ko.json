@@ -1864,5 +1864,13 @@
   "join.trustShortLabel": "짧은 방 코드",
   "join.trustConfirm": "신뢰하고 계속",
   "join.saveRoom": "이 방 저장하기",
-  "savedRooms.onlineMembers": "현재 참여자 ({{count}})"
+  "savedRooms.onlineMembers": "현재 참여자 ({{count}})",
+  "chat.filter.label": "채팅 필터",
+  "chat.filter.messages": "메시지",
+  "chat.filter.streams": "화면 공유",
+  "chat.filter.apps": "앱",
+  "chat.filter.presence": "입장 및 퇴장",
+  "chat.filter.events": "방 이벤트",
+  "chat.filter.showAll": "모두 보기",
+  "chat.filter.empty": "현재 필터와 일치하는 메시지가 없습니다."
 }

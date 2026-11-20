@@ -1864,5 +1864,13 @@
   "join.trustShortLabel": "छोटा रूम कोड",
   "join.trustConfirm": "भरोसा करें और आगे बढ़ें",
   "join.saveRoom": "इस रूम को सहेजें",
-  "savedRooms.onlineMembers": "सक्रिय सदस्य ({{count}})"
+  "savedRooms.onlineMembers": "सक्रिय सदस्य ({{count}})",
+  "chat.filter.label": "चैट फ़िल्टर करें",
+  "chat.filter.messages": "संदेश",
+  "chat.filter.streams": "स्ट्रीम",
+  "chat.filter.apps": "ऐप्स",
+  "chat.filter.presence": "आना और जाना",
+  "chat.filter.events": "रूम इवेंट",
+  "chat.filter.showAll": "सभी दिखाएँ",
+  "chat.filter.empty": "मौजूदा फ़िल्टर के अनुसार कोई संदेश नहीं है।"
 }
