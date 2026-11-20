@@ -2901,15 +2901,17 @@ pub fn apply_native_datachannel_input(
         if !state.active {
             return false;
         }
-        let perm = state
+        let (matched_media_id, perm) = if let Some(perm) = state
             .authorized_native_peers
             .get(&(peer_id.to_string(), media_id.clone()))
-            .or_else(|| {
-                state
-                    .authorized_native_peers
-                    .get(&(peer_id.to_string(), expected_media_id.to_string()))
-            });
-        let Some(perm) = perm else {
+        {
+            (media_id.as_str(), perm)
+        } else if let Some(perm) = state
+            .authorized_native_peers
+            .get(&(peer_id.to_string(), expected_media_id.to_string()))
+        {
+            (expected_media_id, perm)
+        } else {
             return false;
         };
         let is_mouse = matches!(
@@ -2936,7 +2938,7 @@ pub fn apply_native_datachannel_input(
             .session_id
             .clone()
             .unwrap_or_else(|| expected_session_id.to_string());
-        let controller_id = format!("{peer_id}:{media_id}");
+        let controller_id = format!("{peer_id}:{matched_media_id}");
         apply_input_locked(&mut state, &controller_id, Some(&session_id), event).accepted
     }
     #[cfg(not(windows))]
@@ -3811,10 +3813,15 @@ pub fn set_remote_control_controller_elevation(
             .lock()
             .map_err(|_| "Remote control lock poisoned")?;
         if enabled {
-            state.elevated_controllers.insert(controller_id);
+            state.elevated_controllers.insert(controller_id.clone());
         } else {
             state.elevated_controllers.remove(&controller_id);
         }
+        crate::logger::log_msg(
+            "INFO",
+            "remote_control",
+            &format!("controller elevation controller_id={controller_id} enabled={enabled}"),
+        );
     }
     #[cfg(not(windows))]
     let _ = (controller_id, enabled);

@@ -901,8 +901,7 @@ export class RoomService {
     setNativeControllerElevation: (peerId, mediaId, enabled) => {
       if (!isTauri()) return;
       return invoke('set_remote_control_controller_elevation', {
-        peerId,
-        mediaId,
+        controllerId: `${peerId}:${mediaId}`,
         enabled,
       });
     },

@@ -332,12 +332,20 @@ export class RemoteControlHostManager {
       }
       this.elevationRequests.delete(key);
     }
+    try {
+      await Promise.resolve(this.adapter.setNativeControllerElevation?.(peerId, mediaId, enabled));
+    } catch {
+      if (enabled) {
+        return false;
+      }
+    }
+    ctrl = this.controllers.get(key);
+    if (!ctrl) return false;
     const updated: RemoteControllerInfo = {
       ...ctrl,
       adminEnabled: enabled,
     };
     this.controllers.set(key, updated);
-    await Promise.resolve(this.adapter.setNativeControllerElevation?.(peerId, mediaId, enabled)).catch(() => {});
     if (enabled && this.elevationBlocked) {
       this.elevationBlocked = false;
     }

@@ -782,4 +782,27 @@ test('Remote control administrator elevation requires explicit host consent and 
     mediaId: 'screen-1',
     enabled: false,
   });
+
+  // Failing native controller registration refuses to falsely enable adminEnabled
+  const failingManager = new RemoteControlHostManager({
+    isHostSupported: () => true,
+    getScreenStream: () => ({ sessionId: 'sess-1', cursorCaptured: true }),
+    sendToPeer: (peerId, packet) => sent.push({ peerId, packet }),
+    setMonitorActive: () => {},
+    applyInput: async () => ({ accepted: false, hostBusy: false, elevationBlocked: true }),
+    releaseInputs: () => {},
+    ensureElevationReady: async () => true,
+    setNativeControllerElevation: async (_peerId, _mediaId, enabled) => {
+      if (enabled) throw new Error('missing controllerId');
+    },
+    onChange: () => {},
+  });
+  sent.length = 0;
+  failingManager.receiveClientPacket({ type: 'request', mediaId: 'screen-1' }, 'peer-b');
+  failingManager.answerRequest('peer-b:screen-1', true);
+  failingManager.receiveClientPacket({ type: 'requestElevation', mediaId: 'screen-1' }, 'peer-b');
+  const nativeFailOk = await failingManager.answerElevationRequest('peer-b:screen-1', true);
+  assert.equal(nativeFailOk, false);
+  assert.equal(failingManager.getControllers()[0]?.adminEnabled, false);
+  assert.equal(sent.some((item) => item.packet.type === 'elevationDecline'), true);
 });
