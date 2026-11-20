@@ -1808,6 +1808,7 @@
   "games.player1": "Giocatore 1",
   "games.player2": "Giocatore 2",
   "games.spectator": "Spettatore",
+  "games.spectators": "Spettatori",
   "games.spectatorsCount": "Spettatori ({{count}})",
   "games.noSpectators": "Nessuno spettatore al momento.",
   "games.noRoomsTitle": "Nessuna stanza attiva",

@@ -1808,6 +1808,7 @@
   "games.player1": "プレイヤー 1",
   "games.player2": "プレイヤー 2",
   "games.spectator": "観戦者",
+  "games.spectators": "観戦者",
   "games.spectatorsCount": "観戦者 ({{count}})",
   "games.noSpectators": "現在観戦者はいません。",
   "games.noRoomsTitle": "アクティブなルームがありません",

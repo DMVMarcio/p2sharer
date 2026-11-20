@@ -287,14 +287,9 @@ export function CozyBoardGameShell<TGame>({
           const roomObj = isRoomView ? model.getRoom(currentScreen.slice(5)) : undefined;
 
           if (isRoomView && roomObj && children) {
-            const p1 = resolveActor(roomObj.players.seat1, model.localActor);
-            const p2 = resolveActor(roomObj.players.seat2, model.localActor);
-            const myRole =
-              roomObj.players.seat1 === model.localActor
-                ? 'seat1'
-                : roomObj.players.seat2 === model.localActor
-                  ? 'seat2'
-                  : 'spectator';
+            const roomSpectators = roomObj.spectators
+              .map((id) => resolveActor(id, model.localActor))
+              .filter((item): item is NonNullable<typeof item> => Boolean(item));
 
             return (
               <div className="cozy-screen-inner">
@@ -315,38 +310,29 @@ export function CozyBoardGameShell<TGame>({
                     </div>
                   </div>
 
-                  <div className="cozy-role-switcher" role="group" aria-label={t('games.switchRole')}>
-                    <button
-                      type="button"
-                      className={`cozy-role-pill ${myRole === 'seat1' ? 'active' : ''}`}
-                      disabled={Boolean(roomObj.players.seat1 && roomObj.players.seat1 !== model.localActor)}
-                      onClick={() => model.joinRole(roomObj.id, 'seat1')}
-                    >
-                      <span className="cozy-role-dot seat-1" />
-                      <span>{seat1Label}:</span>
-                      <strong>{p1 ? p1.name : t('games.openSeat')}</strong>
-                    </button>
-
-                    <button
-                      type="button"
-                      className={`cozy-role-pill ${myRole === 'seat2' ? 'active' : ''}`}
-                      disabled={Boolean(roomObj.players.seat2 && roomObj.players.seat2 !== model.localActor)}
-                      onClick={() => model.joinRole(roomObj.id, 'seat2')}
-                    >
-                      <span className="cozy-role-dot seat-2" />
-                      <span>{seat2Label}:</span>
-                      <strong>{p2 ? p2.name : t('games.openSeat')}</strong>
-                    </button>
-
-                    <button
-                      type="button"
-                      className={`cozy-role-pill spectator ${myRole === 'spectator' ? 'active' : ''}`}
-                      onClick={() => model.joinRole(roomObj.id, 'spectator')}
-                    >
-                      <Eye size={13} />
-                      <span>{t('games.spectator')}</span>
-                      <span className="cozy-spectator-count">{roomObj.spectators.length}</span>
-                    </button>
+                  <div className="cozy-header-spectators" aria-label={t('games.spectators')}>
+                    <span className="cozy-header-spectators-label">
+                      <Eye size={13} aria-hidden="true" />
+                      <span>{t('games.spectators')}</span>
+                    </span>
+                    <div className="cozy-header-spectators-list">
+                      {roomSpectators.length === 0 ? (
+                        <span className="cozy-header-spectators-empty">—</span>
+                      ) : (
+                        roomSpectators.map((spec) => (
+                          <Tooltip key={spec.id} content={spec.name} placement="bottom">
+                            <ProfileAvatar
+                              peerId={spec.id}
+                              name={spec.name}
+                              color={spec.color}
+                              isLocal={spec.isLocal}
+                              tabIndex={0}
+                              className="cozy-header-spectator-avatar"
+                            />
+                          </Tooltip>
+                        ))
+                      )}
+                    </div>
                   </div>
                 </header>
 
@@ -617,9 +603,6 @@ export function CozyRoomSidePanel<TGame>({
 
   const p1 = resolveActor(room.players.seat1, model.localActor);
   const p2 = resolveActor(room.players.seat2, model.localActor);
-  const spectators = room.spectators
-    .map((id) => resolveActor(id, model.localActor))
-    .filter((item): item is NonNullable<typeof item> => Boolean(item));
 
   const isPlayerOrOwner =
     room.players.seat1 === model.localActor ||
@@ -666,19 +649,19 @@ export function CozyRoomSidePanel<TGame>({
 
         <div className="cozy-seat-card-body">
           {player ? (
-            <>
-              <ProfileAvatar
-                peerId={player.id}
-                name={player.name}
-                color={player.color}
-                isLocal={player.isLocal}
-                className="cozy-seat-avatar"
-              />
-              <div className="cozy-player-meta">
+            <div className="cozy-seat-occupied-row">
+              <div className="cozy-seat-player">
+                <ProfileAvatar
+                  peerId={player.id}
+                  name={player.name}
+                  color={player.color}
+                  isLocal={player.isLocal}
+                  className="cozy-seat-avatar"
+                />
                 <strong>{player.name}</strong>
-                <span className={`cozy-seat-status-line ${isTurn ? 'is-active' : ''}`}>{seatSublabel}</span>
               </div>
-            </>
+              <span className={`cozy-seat-status-tag ${isTurn ? 'is-active' : ''}`}>{seatSublabel}</span>
+            </div>
           ) : (
             <div className="cozy-seat-open-row">
               <span className="cozy-seat-open-label">{t('games.openSeat')}</span>
@@ -718,32 +701,6 @@ export function CozyRoomSidePanel<TGame>({
       </div>
 
       {extraContent}
-
-      {/* Spectators Strip */}
-      <div className="cozy-panel-card cozy-spectators-card">
-        <div className="cozy-card-subtitle">
-          <Eye size={13} />
-          <span>{t('games.spectatorsCount', { count: spectators.length })}</span>
-        </div>
-        {spectators.length === 0 ? (
-          <p className="cozy-muted-note">{t('games.noSpectators')}</p>
-        ) : (
-          <div className="cozy-spectator-chips">
-            {spectators.map((spec) => (
-              <span key={spec.id} className="cozy-spectator-chip">
-                <ProfileAvatar
-                  peerId={spec.id}
-                  name={spec.name}
-                  color={spec.color}
-                  isLocal={spec.isLocal}
-                  className="cozy-mini-avatar"
-                />
-                <span>{spec.name}</span>
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
 
       {/* Handcrafted Wooden Control Deck */}
       {isPlayerOrOwner && (

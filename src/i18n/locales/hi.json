@@ -1808,6 +1808,7 @@
   "games.player1": "खिलाड़ी 1",
   "games.player2": "खिलाड़ी 2",
   "games.spectator": "दर्शक",
+  "games.spectators": "दर्शक",
   "games.spectatorsCount": "दर्शक ({{count}})",
   "games.noSpectators": "अभी कोई दर्शक नहीं देख रहा है।",
   "games.noRoomsTitle": "अभी कोई सक्रिय कमरा नहीं है",

@@ -1808,6 +1808,7 @@
   "games.player1": "Pelaaja 1",
   "games.player2": "Pelaaja 2",
   "games.spectator": "Katsoja",
+  "games.spectators": "Katsojat",
   "games.spectatorsCount": "Katsojat ({{count}})",
   "games.noSpectators": "Ei katsojia tällä hetkellä.",
   "games.noRoomsTitle": "Ei aktiivisia huoneita",

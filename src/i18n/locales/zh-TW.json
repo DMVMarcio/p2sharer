@@ -1808,6 +1808,7 @@
   "games.player1": "玩家 1",
   "games.player2": "玩家 2",
   "games.spectator": "觀眾",
+  "games.spectators": "觀眾",
   "games.spectatorsCount": "觀眾 ({{count}})",
   "games.noSpectators": "目前沒有觀眾旁觀。",
   "games.noRoomsTitle": "尚無進行中的房間",

@@ -22,6 +22,7 @@ import {
 } from './BoardGameLobbyView.tsx';
 import { BoardPlanningOverlay, useBoardPlanning } from './BoardPlanningOverlay.tsx';
 import { boardGameSounds } from './board_game_sounds.ts';
+import { useBoardReturnAnimation } from './useBoardReturnAnimation.ts';
 
 interface DraggingCheckersState {
   from: number;
@@ -41,15 +42,8 @@ export const CheckersApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = 
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [selectedSquare, setSelectedSquare] = useState<number | null>(null);
   const [dragging, setDragging] = useState<DraggingCheckersState | null>(null);
-  const [enteringBoard, setEnteringBoard] = useState(false);
-  const [boardAnimKey, setBoardAnimKey] = useState(0);
   const suppressClickRef = useRef(false);
   const lastSoundSnapshotRef = useRef<{
-    roomId: string;
-    moves: number;
-    status: string;
-  } | null>(null);
-  const lastAnimSnapshotRef = useRef<{
     roomId: string;
     moves: number;
     status: string;
@@ -117,28 +111,16 @@ export const CheckersApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = 
     };
   }, [currentRoom?.id, currentRoom?.game.moveHistory.length, currentRoom?.game.status]);
 
-  useEffect(() => {
-    if (!currentRoom) {
-      lastAnimSnapshotRef.current = null;
-      setEnteringBoard(false);
-      return;
-    }
-    const moves = currentRoom.game.moveHistory.length;
-    const status = currentRoom.game.status;
-    const prev = lastAnimSnapshotRef.current;
-    const shouldAnimate =
-      !prev || prev.roomId !== currentRoom.id
-        ? moves === 0 && status === 'playing'
-        : (prev.moves > 0 && moves === 0) || (prev.status !== 'playing' && status === 'playing' && moves === 0);
-
-    lastAnimSnapshotRef.current = { roomId: currentRoom.id, moves, status };
-
-    if (!shouldAnimate) return;
-    setEnteringBoard(true);
-    setBoardAnimKey((k) => k + 1);
-    const timer = window.setTimeout(() => setEnteringBoard(false), 660);
-    return () => window.clearTimeout(timer);
-  }, [currentRoom?.id, currentRoom?.game.moveHistory.length, currentRoom?.game.status]);
+  const { animKey: boardAnimKey, activeTransforms } = useBoardReturnAnimation({
+    roomId: currentRoom?.id,
+    board: currentRoom?.game.board,
+    moveCount: currentRoom?.game.moveHistory.length ?? 0,
+    status: currentRoom?.game.status ?? 'playing',
+    flipped: currentRoom?.players.seat2 === model.localActor,
+    getPieceSignature: (p) => p.color,
+    isPreferentialMatch: (src, target) => src.king === target.king,
+    onPieceSettle: (idx) => boardGameSounds.playSettle(idx),
+  });
 
   const handleSelectRoom = (nextId: string | null) => {
     if (activeRoomId && nextId === null) {
@@ -421,24 +403,31 @@ export const CheckersApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = 
                       >
                         {showRank && <span className="wood-coord-rank">{8 - r}</span>}
                         {showFile && <span className="wood-coord-file">{String.fromCharCode(97 + c)}</span>}
-                        {piece && (
-                          <span
-                            key={enteringBoard ? `enter-${boardAnimKey}-${sqIndex}` : `piece-${sqIndex}`}
-                            className={enteringBoard ? 'cozy-piece-slot is-entering' : 'cozy-piece-slot'}
-                            style={
-                              enteringBoard
-                                ? ({
-                                    '--piece-delay': `${
-                                      (piece.color === 'w' ? c : 7 - c) * 24 + (r % 3) * 34
-                                    }ms`,
-                                    '--piece-slide-x': piece.color === 'w' ? '-42px' : '42px',
-                                  } as React.CSSProperties)
-                                : undefined
-                            }
-                          >
-                            <CheckersPieceSvg color={piece.color} king={piece.king} size={42} />
-                          </span>
-                        )}
+                        {piece && (() => {
+                          const returnTransform = activeTransforms?.get(sqIndex);
+                          return (
+                            <span
+                              key={returnTransform ? `return-${boardAnimKey}-${sqIndex}` : `piece-${sqIndex}`}
+                              className={
+                                returnTransform
+                                  ? `cozy-piece-slot is-returning ${returnTransform.fromOutside ? 'is-from-outside' : ''}`
+                                  : 'cozy-piece-slot'
+                              }
+                              style={
+                                returnTransform
+                                  ? ({
+                                      '--piece-from-x': `${returnTransform.dxPercent}%`,
+                                      '--piece-from-y': `${returnTransform.dyPercent}%`,
+                                      '--piece-delay': `${returnTransform.delayMs}ms`,
+                                      '--piece-duration': `${returnTransform.durationMs}ms`,
+                                    } as React.CSSProperties)
+                                  : undefined
+                              }
+                            >
+                              <CheckersPieceSvg color={piece.color} king={piece.king} size={42} />
+                            </span>
+                          );
+                        })()}
                         {isLegalDest && (
                           <span
                             className={`wood-move-dot ${legalMatch?.captured !== undefined ? 'is-capture' : ''}`}

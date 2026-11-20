@@ -1808,6 +1808,7 @@
   "games.player1": "플레이어 1",
   "games.player2": "플레이어 2",
   "games.spectator": "관전자",
+  "games.spectators": "관전자",
   "games.spectatorsCount": "관전자 ({{count}})",
   "games.noSpectators": "현재 관전자가 없습니다.",
   "games.noRoomsTitle": "진행 중인 방이 없습니다",

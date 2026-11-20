@@ -102,6 +102,22 @@ class BoardGameSounds {
     this.playWoodTap(ctx, 0, 220, 92, 0.055, this.gainLevel(0.24));
   }
 
+  playSettle(index = 0): void {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const semitoneOffsets = [0, 2, 4, 1, 5, 3, -1, 2];
+    const offset = semitoneOffsets[index % semitoneOffsets.length];
+    const pitchFactor = Math.pow(2, offset / 24);
+    this.playWoodTap(
+      ctx,
+      0,
+      Math.round(235 * pitchFactor),
+      Math.round(98 * pitchFactor),
+      0.044,
+      this.gainLevel(0.145),
+    );
+  }
+
   playCapture(): void {
     const ctx = this.getContext();
     if (!ctx) return;

@@ -1808,6 +1808,7 @@
   "games.player1": "Игрок 1",
   "games.player2": "Игрок 2",
   "games.spectator": "Зритель",
+  "games.spectators": "Зрители",
   "games.spectatorsCount": "Зрители ({{count}})",
   "games.noSpectators": "Сейчас нет зрителей.",
   "games.noRoomsTitle": "Пока нет активных комнат",
