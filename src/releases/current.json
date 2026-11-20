@@ -4,91 +4,91 @@
     "en": [
       "**Cozy board game apps.** Play Tic-Tac-Toe, Chess, and Checkers on warm wooden boards with multiple rooms and instant switching between players and spectators.",
       "**Smooth tactile matches.** Drag and drop pieces, draw private planning arrows with right-click, enjoy sound effects, entrance animations, and clear captured-piece trays.",
-      "**More resilient room connections.** Participants no longer drop out during brief CPU or disk spikes, and rooms without an online host show existing members and admit reliably.",
+      "**Faster, more resilient room connections.** Streamlined rendezvous servers speed up discovery, sessions survive CPU spikes, and hostless rooms show members reliably.",
       "**Smoother hardware screen sharing.** Graphics encoding recovers from brief hiccups and supports more display sizes, avoiding freezes and stuck loading screens on slower PCs.",
       "**Room privacy and home previews.** See active avatars on saved rooms (with a Privacy toggle), confirm trust before unsaved rooms load, and choose to save on first entry."
     ],
     "pt-BR": [
       "**Novos jogos de tabuleiro aconchegantes.** Jogue Jogo da Velha, Xadrez e Damas em tabuleiros de madeira com várias salas e troca instantânea entre jogador e espectador.",
       "**Partidas táteis e fluidas.** Arraste e solte peças, trace setas de planejamento com o botão direito, curta efeitos sonoros, animações de início e peças capturadas bem visíveis.",
-      "**Conexões de sala mais estáveis.** Participantes não somem durante picos de CPU ou disco, e salas sem host mostram membros ativos e concluem a entrada com segurança.",
+      "**Conexões mais rápidas e estáveis.** Servidores de encontro enxutos agilizam consultas, sessões resistem a picos de CPU e salas sem host exibem membros com segurança.",
       "**Transmissão por GPU mais fluida.** A codificação gráfica se recupera de pausas breves e aceita mais telas, evitando congelamentos e carregamento preso em PCs fracos.",
       "**Privacidade e membros na tela inicial.** Veja avatares ativos nas salas salvas (com opção na aba Privacidade), confirme confiança em salas novas e salve logo ao entrar."
     ],
     "es": [
       "**Nuevos juegos de mesa acogedores.** Juega Tres en Raya, Ajedrez y Damas en tableros de madera con varias salas y cambio instantáneo entre jugador y espectador.",
       "**Partidas táctiles y fluidas.** Arrastra y suelta piezas, traza flechas de plan con clic derecho, disfruta sonidos, animaciones de entrada y bandejas claras de capturas.",
-      "**Conexiones de sala más estables.** Los participantes no desaparecen ante picos de CPU o disco, y las salas sin anfitrión muestran miembros y permiten entrar sin fallos.",
+      "**Conexiones más rápidas y estables.** Servidores optimizados aceleran consultas, los pares no desaparecen ante picos de CPU y las salas sin anfitrión muestran miembros.",
       "**Pantalla compartida por GPU más fluida.** La codificación gráfica se recupera de pausas breves y admite más pantallas, evitando bloqueos y cargas infinitas en PCs lentos.",
       "**Privacidad y miembros al inicio.** Ve avatares activos en salas guardadas (ajustable en Privacidad), confirma confianza antes de salas nuevas y guárdalas al entrar."
     ],
     "fr": [
       "**Jeux de plateau chaleureux.** Jouez au Morpion, aux Échecs et aux Dames sur des plateaux en bois avec plusieurs salons et changement rapide entre joueur et spectateur.",
       "**Parties tactiles et fluides.** Glissez-déposez les pièces, tracez des flèches privées au clic droit, profitez des sons, des animations d'entrée et des captures bien visibles.",
-      "**Connexions plus stables.** Les participants ne disparaissent plus lors de pics CPU ou disque, et les salons sans hôte affichent les membres et admettent avec fiabilité.",
+      "**Connexions plus rapides et stables.** Les serveurs de rencontre allégés accélèrent l'accès, les pics CPU ne déconnectent plus et les salons sans hôte affichent les membres.",
       "**Partage d'écran GPU plus fluide.** L'encodage graphique récupère après un court blocage et gère plus d'écrans, évitant gels et écrans de chargement sur PC lents.",
       "**Confidentialité et salons à l'accueil.** Voyez les avatars actifs (réglable en Confidentialité), confirmez la confiance avant un nouveau salon et enregistrez à l'entrée."
     ],
     "de": [
       "**Gemütliche Brettspiel-Apps.** Spiele Tic-Tac-Toe, Schach und Dame auf Holzbrettern mit mehreren Räumen und schnellem Wechsel zwischen Spieler und Zuschauer.",
       "**Flüssiges, taktiles Spielgefühl.** Ziehe Figuren per Drag-and-drop, zeichne Planungs-Pfeile per Rechtsklick und genieße Sounds, Start-Animationen sowie klare Schlag-Ablagen.",
-      "**Stabilere Raumverbindungen.** Teilnehmer verschwinden bei CPU- oder Festplattenspitzen nicht mehr, und Räume ohne Host zeigen Mitglieder und nehmen zuverlässig auf.",
+      "**Schnellere, stabilere Verbindungen.** Schlankere Vermittlungsserver beschleunigen die Suche, CPU-Spitzen trennen keine Nutzer mehr und Räume ohne Host zeigen Mitglieder.",
       "**Flüssigere GPU-Bildschirmfreigabe.** Hardware-Encoding fängt kurze Aussetzer ab, unterstützt mehr Größen und verhindert Hänger oder Endlos-Laden auf schwachen PCs.",
       "**Privatsphäre und Raumvorschau.** Sieh aktive Avatare in gespeicherten Räumen (unter Datenschutz steuerbar), bestätige neue Räume vorab und speichere direkt beim Beitritt."
     ],
     "it": [
       "**Nuovi giochi da tavolo accoglienti.** Gioca a Tris, Scacchi e Dama su tavoli in legno con più stanze e passaggio immediato tra giocatore e spettatore.",
       "**Partite tattili e fluide.** Trascina e rilascia i pezzi, traccia frecce private con il tasto destro, goditi suoni, animazioni iniziali e vassoi chiari per le catture.",
-      "**Connessioni più stabili.** I partecipanti non spariscono durante picchi di CPU o disco, e le stanze senza host mostrano i membri e ammettono in modo affidabile.",
+      "**Connessioni più rapide e stabili.** Server essenziali velocizzano la ricerca, i picchi di CPU non fanno sparire i membri e le stanze senza host mostrano chi è dentro.",
       "**Condivisione schermo GPU più fluida.** La codifica grafica recupera brevi blocchi e supporta più schermi, evitando freeze e caricamenti infiniti sui PC più lenti.",
       "**Privacy e membri nella schermata iniziale.** Vedi gli avatar attivi (gestibile in Privacy), conferma la fiducia prima di nuove stanze e salvale subito all'ingresso."
     ],
     "zh-CN": [
       "**温馨木制棋盘游戏。** 畅玩井字棋、国际象棋与跳棋，支持同应用内开设多个房间，并可随时在玩家与观众之间切换。",
       "**流畅触感对局体验。** 支持拖拽落子、右键绘制私人规划箭头，配有音效、开局棋子入场动画与清晰易辨的吃子托盘。",
-      "**更稳固的房间连接。** 在 CPU 或磁盘负载飙升时成员不再频繁掉线重连，房主离线时也能显示当前成员并稳定完成准入。",
+      "**更快更稳的房间连接。** 精简优选相遇服务器以加快查询速度，高 CPU 负载不再掉线重连，房主离线时也能显示当前成员。",
       "**更流畅的显卡硬件共享。** 显卡编码可从短暂卡顿中恢复并支持更多屏幕尺寸，大幅减少低配电脑上的画面冻结和一直加载问题。",
       "**房间隐私与主页成员展示。** 在已保存房间卡片显示在线成员头像（可在安全与隐私关闭），进入未保存房间前确认信任，并可在首次加入时勾选保存房间。"
     ],
     "zh-TW": [
       "**溫馨木製棋盤遊戲。** 暢玩井字遊戲、西洋棋與西洋跳棋，支援同時開設多個房間，並可隨時在玩家與觀眾之間切換。",
       "**流暢觸感對局體驗。** 支援拖放落子、右鍵繪製私人規劃箭頭，具備音效、開局棋子進場動畫與清晰易辨的吃子托盤。",
-      "**更穩固的房間連線。** 在 CPU 或磁碟負載飆升時成員不再頻繁斷線重連，房主離線時也能顯示目前成員並穩定完成準入。",
+      "**更快更穩的房間連線。** 精簡優選配對伺服器以加速查詢，高 CPU 負載不再斷線重連，房主離線時也能顯示目前成員。",
       "**更流暢的顯示卡硬體分享。** 顯示卡編碼可從短暫卡頓中恢復並支援更多螢幕尺寸，大幅減少低配備電腦上的畫面凍結與一直載入問題。",
       "**房間隱私與主畫面成員顯示。** 在已儲存房間卡片顯示線上成員頭像（可在安全與隱私關閉），進入未儲存房間前確認信任，並可在首次加入時勾選儲存房間。"
     ],
     "ja": [
       "**温かみのあるボードゲームアプリ。** 三目並べ・チェス・チェッカーを木製ボードで楽しめ、複数ルームの同時進行やプレイヤー・観戦の切り替えに対応します。",
       "**滑らかで心地よい対局体験。** ドラッグ＆ドロップ操作、右クリックの作戦矢印、効果音、開始アニメーション、見やすい持ち駒トレイを備えています。",
-      "**より安定したルーム接続。** CPUやディスクの急激な負荷でも参加者が消えにくくなり、ホスト不在時でも在室メンバーの表示と入室承認が安定しました。",
+      "**より高速で安定した接続。** 厳選したサーバーで検索を高速化し、高負荷時でも切断されにくく、ホスト不在時も在室メンバー表示が安定しました。",
       "**GPU画面共有の安定性向上。** 一時的な負荷によるエンコード停止から自動復帰し、多様な画面サイズに対応して低スペックPCでのフリーズや読み込み停止を防ぎます。",
       "**プライバシー保護と在室メンバー表示。** 保存済みルームにオンラインメンバーのアバターを表示し（プライバシー設定で切替可）、未保存ルーム入室前の信頼確認と同時保存に対応しました。"
     ],
     "ko": [
       "**포근한 보드게임 앱 추가.** 따뜻한 원목 보드에서 틱택토, 체스, 체커를 즐기며 여러 방을 동시에 열고 플레이어와 관전자를 자유롭게 전환하세요.",
       "**부드러운 손맛의 대국 경험.** 말 드래그 앤 드롭, 우클릭 전략 화살표, 효과음, 시작 애니메이션, 한눈에 들어오는 잡은 말 보관함을 지원합니다.",
-      "**더 안정적인 방 연결.** CPU나 디스크 부하가 급증해도 참여자가 사라지지 않으며, 호스트가 오프라인일 때도 현재 멤버를 표시하고 안정적으로 입장을 승인합니다.",
+      "**더 빠르고 안정적인 방 연결.** 핵심 릴레이 서버만 우선 연결해 조회 속도를 높이고, CPU 급증에도 끊기지 않으며 호스트가 없어도 멤버가 표시됩니다.",
       "**부드러운 GPU 화면 공유.** 일시적 멈춤 시 그래픽 인코딩이 복구되고 더 다양한 화면 크기를 지원해 사양이 낮은 PC의 화면 멈춤과 무한 로딩을 줄입니다.",
       "**방 개인정보 보호 및 홈 멤버 표시.** 저장된 방 카드에 접속 중인 멤버 아바타가 표시되며(개인정보 탭에서 전환), 미저장 방 입장 전 신뢰 확인과 바로 저장을 지원합니다."
     ],
     "hi": [
       "**आरामदायक बोर्ड गेम ऐप्स।** कई कमरों और खिलाड़ी व दर्शक के बीच तुरंत बदलाव के साथ लकड़ी के बोर्ड पर टिक-टैक-टो, शतरंज और चेकर्स खेलें।",
       "**सुगम व जीवंत खेल अनुभव।** मोहरे ड्रैग और ड्रॉप करें, राइट-क्लिक से निजी योजना तीर बनाएँ, ध्वनि प्रभाव, प्रारंभिक एनीमेशन और साफ़ कैप्चर ट्रे पाएँ।",
-      "**अधिक स्थिर रूम कनेक्शन।** CPU या डिस्क लोड बढ़ने पर सदस्य बार-बार गायब नहीं होंगे, और होस्ट के बिना भी मौजूद सदस्य दिखेंगे व प्रवेश सुचारू होगा।",
+      "**तेज़ और अधिक स्थिर रूम कनेक्शन।** चुनिंदा सर्वर खोज को तेज़ बनाते हैं, CPU लोड पर भी सदस्य नहीं कटते, और होस्ट के बिना भी सदस्य दिखते हैं।",
       "**बेहतर GPU स्क्रीन शेयरिंग।** ग्राफ़िक्स एन्कोडिंग छोटे अवरोधों से उबरती है और अधिक स्क्रीन आकार सपोर्ट करती है, जिससे धीमे PC पर अटकने की समस्या कम होती है।",
       "**रूम गोपनीयता और होम प्रीव्यू।** सहेजे गए रूम में सक्रिय सदस्य अवतार देखें (गोपनीयता सेटिंग से नियंत्रित), नए रूम से पहले भरोसा जांचें और प्रवेश पर सहेजें।"
     ],
     "fi": [
       "**Kodikkaat lautapelisovellukset.** Pelaa ristinollaa, shakkia ja tammea puulaudoilla useissa huoneissa ja vaihda vaivatta pelaajan ja katsojan välillä.",
       "**Sujuva ja eläväinen pelituntuma.** Vedä ja pudota nappulat, piirrä omia nuolia oikealla painikkeella sekä nauti äänistä, aloitusanimaatioista ja selkeistä syöntilokeroista.",
-      "**Vakaammat huoneyhteydet.** Osallistujat eivät katoile suoritin- tai levypiikkien vuoksi, ja huoneet ilman isäntää näyttävät jäsenet sekä hyväksyvät sisään.",
+      "**Nopeammat ja vakaammat yhteydet.** Karsiutut palvelimet nopeuttavat hakua, kuormapiikit eivät enää pudota yhteyksiä ja jäsenet näkyvät myös ilman isäntää.",
       "**Sujuvampi GPU-näytönjako.** Näytönohjainpakkaus palautuu lyhyistä häiriöistä ja tukee useampia tarkkuuksia estäen jumiutumista ja latausruutuja hitaammilla koneilla.",
       "**Huoneiden yksityisyys ja jäsenet.** Näe aktiiviset jäsenet tallennetuissa huoneissa (hallittavissa yksityisyysasetuksissa), vahvista uudet huoneet ja tallenna liittyessä."
     ],
     "ru": [
       "**Уютные настольные игры.** Играйте в крестики-нолики, шахматы и шашки на деревянных досках с несколькими комнатами и быстрой сменой роли игрока и зрителя.",
       "**Плавные и тактильные партии.** Перетаскивайте фигуры, рисуйте стрелки планирования правой кнопкой, наслаждайтесь звуками, анимацией старта и чёткими лотками взятых фигур.",
-      "**Устойчивые подключения.** Участники не пропадают при скачках нагрузки на CPU или диск, а в комнатах без хоста видны люди и стабильно работает вход.",
+      "**Быстрые и устойчивые подключения.** Оптимальный набор серверов ускоряет поиск, участники не пропадают при нагрузке на CPU и видны без хоста.",
       "**Плавная демонстрация экрана.** Графическое кодирование восстанавливается после кратких сбоев и поддерживает больше разрешений без зависаний и вечной загрузки.",
       "**Приватность и участники на главном экране.** Показываются аватары в сохранённых комнатах (отключается в настройках), запрос доверия для новых и сохранение при входе."
     ]

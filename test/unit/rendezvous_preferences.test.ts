@@ -101,3 +101,28 @@ it('uses first-party signaling in the web browser and removes retired saved endp
     assert.ok(!Object.values(migrated).flat().some(entry => ['broker-cn.emqx.io', 'rapi.acrop.net', 'public.cloud.shiftr.io'].includes(new URL(entry.url).hostname)));
   } finally { globalThis.window = oldWindow; globalThis.localStorage = oldStorage; }
 });
+
+it('limits default desktop rendezvous relays to 3-4 prioritized servers and migrates bloated Nostr lists independently', () => {
+  const oldStorage = globalThis.localStorage;
+  const values = new Map<string, string>();
+  globalThis.localStorage = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); } } as Storage;
+  try {
+    const defaults = defaultRendezvousPreferences();
+    for (const transport of ['mqtt', 'nostr', 'torrent'] as const) {
+      assert.ok(defaults[transport].length >= 3 && defaults[transport].length <= 4, `${transport} count: ${defaults[transport].length}`);
+    }
+    assert.equal(defaults.nostr.some(s => s.url.includes('nos.today')), false);
+    assert.equal(defaults.torrent.some(s => s.url.includes('btorrent.xyz')), false);
+
+    // Bloated 47-relay legacy Nostr list migrates even when user customized MQTT
+    values.set('p2sharer_rendezvous_servers_v1', JSON.stringify({
+      mqtt: [{ url: 'wss://custom-broker.example/mqtt', enabled: true }],
+      nostr: nostrDefaults.map(url => ({ url, enabled: true })),
+      torrent: torrentDefaults.map(url => ({ url, enabled: true })),
+    }));
+    const upgraded = loadRendezvousPreferences();
+    assert.deepEqual(upgraded.mqtt, [{ url: 'wss://custom-broker.example/mqtt', enabled: true }]);
+    assert.equal(upgraded.nostr.length, defaults.nostr.length);
+    assert.equal(upgraded.torrent.length, defaults.torrent.length);
+  } finally { globalThis.localStorage = oldStorage; }
+});

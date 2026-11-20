@@ -17,7 +17,12 @@ import type {
   SignalingTransport,
   TransportStatusInfo,
 } from '../core/types.ts';
-import { enabledRendezvousUrls, loadRendezvousPreferences, type RendezvousPreferences } from './relay_preferences.ts';
+import {
+  enabledRendezvousUrls,
+  loadRendezvousPreferences,
+  MAX_RENDEZVOUS_SERVERS_PER_TRANSPORT,
+  type RendezvousPreferences,
+} from './relay_preferences.ts';
 import type { LanRoomConnection } from '../core/lan_room.ts';
 import { prepareLanSignaling, type LanSignalingRoom } from './lan_signaling.ts';
 export { DEFAULT_MQTT_RELAY_URLS } from './relay_preferences.ts';
@@ -321,7 +326,7 @@ export class SignalingManager {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   protected createRoomForTransport(transport: SignalingTransport, config: any, topic: string, callbacks?: any, preserveMonitoring = false): any {
     const urls = enabledRendezvousUrls(this.roomPreferences, transport);
-    const redundancy = transport === 'mqtt' ? urls.length : Math.min(urls.length, transport === 'nostr' ? 5 : 3);
+    const redundancy = Math.min(urls.length, MAX_RENDEZVOUS_SERVERS_PER_TRANSPORT);
     const relayConfig = { ...config.relayConfig, urls, redundancy };
     if (transport === 'mqtt') {
       const mqttConfig = {
