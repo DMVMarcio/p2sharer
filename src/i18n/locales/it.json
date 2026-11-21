@@ -1989,5 +1989,9 @@
   "web.remotePoint1": "Più giocatori contemporaneamente, ognuno nel proprio slot gamepad che puoi riordinare.",
   "web.remotePoint2": "Zona morta degli stick e rimappatura di pulsanti, grilletti e stick, con profili per controller.",
   "web.remotePoint3": "Scegli i permessi di mouse, tastiera e gamepad per ogni persona e revocali quando vuoi.",
-  "web.remoteRemap": "Rimappatura dei pulsanti"
+  "web.remoteRemap": "Rimappatura dei pulsanti",
+  "web.specStreamDesc": "Cattura fluida fino a 50 Mbps di bitrate, codifica hardware e isolamento audio per singola applicazione.",
+  "web.specFilesDesc": "Trasferimenti diretti di file di qualsiasi dimensione tra peer, salvati su disco con verifica SHA-256.",
+  "web.specSecurityDesc": "Canali WebRTC (DTLS/SRTP), inviti firmati con Ed25519 e controllo degli accessi da parte dell’host.",
+  "web.specCostDesc": "Nessun abbonamento, nessuna funzione bloccata da paywall e nessuna registrazione richiesta."
 }

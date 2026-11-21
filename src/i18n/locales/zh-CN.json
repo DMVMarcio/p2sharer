@@ -1989,5 +1989,9 @@
   "web.remotePoint1": "多名玩家同时游玩，每人拥有可重新排序的独立手柄槽位。",
   "web.remotePoint2": "摇杆死区，以及按键、扳机和摇杆重映射，并支持按手柄保存配置。",
   "web.remotePoint3": "为每个人分别设置鼠标、键盘和手柄权限，并可随时撤销。",
-  "web.remoteRemap": "按键重映射"
+  "web.remoteRemap": "按键重映射",
+  "web.specStreamDesc": "支持高达 50 Mbps 码率、硬件编码加速以及按应用程序隔离捕获音频。",
+  "web.specFilesDesc": "点对点直传任意大小的文件，流式写入本地磁盘并通过 SHA-256 哈希校验。",
+  "web.specSecurityDesc": "WebRTC (DTLS/SRTP) 加密音视频与数据通道、Ed25519 签名邀请及房主准入控制。",
+  "web.specCostDesc": "无订阅制、无付费墙锁死高画质，且无需注册任何账号。"
 }

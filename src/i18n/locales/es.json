@@ -1989,5 +1989,9 @@
   "web.remotePoint1": "Varios jugadores a la vez, cada uno en su propia ranura de mando que puedes reordenar.",
   "web.remotePoint2": "Zona muerta de los sticks y reasignación de botones, gatillos y sticks, con perfiles por mando.",
   "web.remotePoint3": "Elige permisos de ratón, teclado y mando para cada persona y revócalos cuando quieras.",
-  "web.remoteRemap": "Reasignación de botones"
+  "web.remoteRemap": "Reasignación de botones",
+  "web.specStreamDesc": "Captura fluida hasta 50 Mbps de bitrate, codificación por hardware y aislamiento de audio por aplicación.",
+  "web.specFilesDesc": "Envío directo de archivos de cualquier tamaño entre pares, guardados en disco con verificación SHA-256.",
+  "web.specSecurityDesc": "Canales WebRTC (DTLS/SRTP), invitaciones firmadas con Ed25519 y control de admisión del anfitrión.",
+  "web.specCostDesc": "Sin suscripciones, sin funciones bloqueadas tras muros de pago y sin necesidad de crear una cuenta."
 }

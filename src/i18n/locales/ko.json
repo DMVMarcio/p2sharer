@@ -1989,5 +1989,9 @@
   "web.remotePoint1": "여러 플레이어가 동시에 참여하며, 각자의 게임패드 슬롯은 순서를 바꿀 수 있습니다.",
   "web.remotePoint2": "스틱 데드존과 버튼, 트리거, 스틱 리매핑, 컨트롤러별 프로필을 지원합니다.",
   "web.remotePoint3": "사람마다 마우스, 키보드, 게임패드 권한을 정하고 언제든지 회수하세요.",
-  "web.remoteRemap": "버튼 리매핑"
+  "web.remoteRemap": "버튼 리매핑",
+  "web.specStreamDesc": "최대 50Mbps 비트레이트, 하드웨어 인코딩, 애플리케이션별 오디오 분리 캡처 지원.",
+  "web.specFilesDesc": "크기에 상관없이 피어 간 파일을 직접 전송하며 SHA-256 검증과 함께 디스크에 바로 저장.",
+  "web.specSecurityDesc": "WebRTC (DTLS/SRTP) 미디어·데이터 채널, Ed25519 서명 초대장 및 호스트 입장 승인.",
+  "web.specCostDesc": "구독료 없음, 유료 요금제로 잠긴 화질 제한 없음, 계정 가입도 필요하지 않습니다."
 }

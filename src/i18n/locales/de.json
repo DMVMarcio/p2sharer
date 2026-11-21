@@ -1989,5 +1989,9 @@
   "web.remotePoint1": "Mehrere Spieler gleichzeitig, jeder auf einem eigenen Gamepad-Platz, den du umsortieren kannst.",
   "web.remotePoint2": "Stick-Totzone sowie Neubelegung von Tasten, Triggern und Sticks, mit Profilen pro Controller.",
   "web.remotePoint3": "Lege Maus-, Tastatur- und Gamepad-Rechte pro Person fest und entziehe sie jederzeit.",
-  "web.remoteRemap": "Tastenbelegung"
+  "web.remoteRemap": "Tastenbelegung",
+  "web.specStreamDesc": "Flüssige Aufnahme mit bis zu 50 Mbit/s Bitrate, Hardware-Encoding und Audio-Isolierung pro App.",
+  "web.specFilesDesc": "Direkte Peer-to-Peer-Dateiübertragungen jeder Größe, direkt auf die Festplatte gestreamt mit SHA-256-Prüfung.",
+  "web.specSecurityDesc": "WebRTC-Kanäle (DTLS/SRTP), Ed25519-signierte Einladungen und Einlasskontrolle durch den Host.",
+  "web.specCostDesc": "Keine Abos, keine hinter Paywalls gesperrten Funktionen und keine Kontoregistrierung erforderlich."
 }

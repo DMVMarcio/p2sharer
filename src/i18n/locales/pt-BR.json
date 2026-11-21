@@ -1989,5 +1989,9 @@
   "web.remotePoint1": "Vários jogadores ao mesmo tempo, cada um no seu slot de gamepad, que você pode reordenar.",
   "web.remotePoint2": "Zona morta dos analógicos e remapeamento de botões, gatilhos e analógicos, com perfis por controle.",
   "web.remotePoint3": "Escolha permissões de mouse, teclado e gamepad para cada pessoa e revogue quando quiser.",
-  "web.remoteRemap": "Remapeamento de botões"
+  "web.remoteRemap": "Remapeamento de botões",
+  "web.specStreamDesc": "Captura fluida com até 50 Mbps de bitrate, codificação por hardware e áudio isolado por aplicativo.",
+  "web.specFilesDesc": "Envio direto de arquivos de qualquer tamanho entre pares, gravados direto no disco com hash SHA-256.",
+  "web.specSecurityDesc": "Mídia e dados via WebRTC (DTLS/SRTP), convites assinados com Ed25519 e aprovação de entrada.",
+  "web.specCostDesc": "Sem mensalidades, sem recursos trancados em planos pagos e sem necessidade de criar conta."
 }

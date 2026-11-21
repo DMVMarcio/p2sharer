@@ -30,11 +30,11 @@ import './landing/landing.css';
 
 export { DownloadsPage } from './DownloadsPage';
 
-const specs: { metric: string; value: string; tone: Tone }[] = [
-  { metric: '4K / 120 FPS', value: 'web.specStreamValue', tone: 'violet' },
-  { metric: '∞ P2P', value: 'web.specFilesValue', tone: 'emerald' },
-  { metric: 'DTLS-SRTP', value: 'web.specSecurityValue', tone: 'sky' },
-  { metric: '$0 • MIT', value: 'web.specCostValue', tone: 'amber' },
+const specs: { metric: string; value: string; description: string; tone: Tone }[] = [
+  { metric: '4K / 120 FPS', value: 'web.specStreamValue', description: 'web.specStreamDesc', tone: 'violet' },
+  { metric: '∞ P2P', value: 'web.specFilesValue', description: 'web.specFilesDesc', tone: 'emerald' },
+  { metric: 'DTLS-SRTP', value: 'web.specSecurityValue', description: 'web.specSecurityDesc', tone: 'sky' },
+  { metric: '$0 • MIT', value: 'web.specCostValue', description: 'web.specCostDesc', tone: 'amber' },
 ];
 
 const platformItems = {
@@ -124,7 +124,6 @@ export function LandingPage() {
       <section className="site-hero">
         <div className="site-hero-content">
           <div className="site-eyebrow">
-            <span className="site-eyebrow-dot" aria-hidden="true" />
             <span>{t('web.heroTag')}</span>
           </div>
           <h1>{t('web.heroTitle')}</h1>
@@ -151,6 +150,7 @@ export function LandingPage() {
           <div key={spec.value} className={`site-spec-item tone-${spec.tone}`} data-reveal="" style={{ '--reveal-order': index } as CSSProperties}>
             <span className="site-spec-metric">{spec.metric}</span>
             <strong>{t(spec.value)}</strong>
+            <p>{t(spec.description)}</p>
           </div>
         ))}
       </section>

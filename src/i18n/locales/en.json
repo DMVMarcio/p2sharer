@@ -1989,5 +1989,9 @@
   "web.remotePoint1": "Several players at once, each on their own gamepad slot that you can reorder.",
   "web.remotePoint2": "Stick deadzone plus button, trigger and stick remapping, with per-controller profiles.",
   "web.remotePoint3": "Choose mouse, keyboard and gamepad permissions per person and revoke them anytime.",
-  "web.remoteRemap": "Button remapping"
+  "web.remoteRemap": "Button remapping",
+  "web.specStreamDesc": "Fluid capture up to 50 Mbps bitrate, hardware encoding, and per-application audio isolation.",
+  "web.specFilesDesc": "Direct peer-to-peer file transfers of any size, streamed straight to disk with SHA-256 verification.",
+  "web.specSecurityDesc": "WebRTC (DTLS/SRTP) media and data channels, Ed25519 signed invitations, and host admission control.",
+  "web.specCostDesc": "No subscriptions, no features locked behind paywalls, and no account registration required."
 }

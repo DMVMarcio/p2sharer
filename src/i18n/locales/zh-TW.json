@@ -1989,5 +1989,9 @@
   "web.remotePoint1": "多名玩家同時遊玩，每人擁有可重新排序的獨立手把槽位。",
   "web.remotePoint2": "搖桿死區，以及按鍵、扳機和搖桿重新對應，並支援依手把儲存設定檔。",
   "web.remotePoint3": "為每個人分別設定滑鼠、鍵盤和手把權限，並可隨時撤銷。",
-  "web.remoteRemap": "按鍵重新對應"
+  "web.remoteRemap": "按鍵重新對應",
+  "web.specStreamDesc": "支援高達 50 Mbps 位元率、硬體編碼加速以及依應用程式隔離擷取音訊。",
+  "web.specFilesDesc": "點對點直傳任意大小的檔案，串流寫入本機磁碟並透過 SHA-256 雜湊驗證。",
+  "web.specSecurityDesc": "WebRTC (DTLS/SRTP) 加密影音與資料通道、Ed25519 簽章邀請及房主准入控制。",
+  "web.specCostDesc": "無訂閱制、無付費牆鎖住高畫質，且無需註冊任何帳號。"
 }

@@ -1989,5 +1989,9 @@
   "web.remotePoint1": "Plusieurs joueurs à la fois, chacun sur son propre emplacement de manette, réorganisable.",
   "web.remotePoint2": "Zone morte des sticks et réaffectation des boutons, gâchettes et sticks, avec des profils par manette.",
   "web.remotePoint3": "Choisissez les autorisations souris, clavier et manette pour chaque personne et révoquez-les à tout moment.",
-  "web.remoteRemap": "Réaffectation des boutons"
+  "web.remoteRemap": "Réaffectation des boutons",
+  "web.specStreamDesc": "Capture fluide jusqu’à 50 Mbps, encodage matériel et isolation audio par application.",
+  "web.specFilesDesc": "Transferts directs de fichiers de toute taille entre pairs, écrits sur disque avec vérification SHA-256.",
+  "web.specSecurityDesc": "Canaux WebRTC (DTLS/SRTP), invitations signées Ed25519 et contrôle d’admission par l’hôte.",
+  "web.specCostDesc": "Aucun abonnement, aucune fonction bloquée par un paywall et aucune création de compte requise."
 }

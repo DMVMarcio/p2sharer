@@ -1989,5 +1989,9 @@
   "web.remotePoint1": "Useita pelaajia yhtä aikaa, jokaisella oma ohjainpaikka, jonka järjestystä voit muuttaa.",
   "web.remotePoint2": "Tikkujen kuollut alue sekä painikkeiden, liipaisimien ja tikkujen uudelleenmääritys ohjainkohtaisilla profiileilla.",
   "web.remotePoint3": "Valitse hiiren, näppäimistön ja peliohjaimen oikeudet henkilökohtaisesti ja peru ne milloin tahansa.",
-  "web.remoteRemap": "Painikkeiden uudelleenmääritys"
+  "web.remoteRemap": "Painikkeiden uudelleenmääritys",
+  "web.specStreamDesc": "Sujuva kaappaus jopa 50 Mbps bittivirralla, laitteistopakkauksella ja sovelluskohtaisella äänieristyksellä.",
+  "web.specFilesDesc": "Minkä tahansa kokoisten tiedostojen suora P2P-siirto suoraan levylle SHA-256-tarkistuksella.",
+  "web.specSecurityDesc": "WebRTC (DTLS/SRTP) -kanavat, Ed25519-allekirjoitetut kutsut ja isännän sisäänpääsyn hallinta.",
+  "web.specCostDesc": "Ei tilausmaksuja, ei maksumuurin taakse lukittuja ominaisuuksia eikä tilin rekisteröintiä."
 }
