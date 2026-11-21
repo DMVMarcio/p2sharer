@@ -29,15 +29,13 @@ interface ShowcaseProps {
   icon: ReactNode;
   tag: string;
   title: string;
-  description: string;
   points: readonly string[];
-  hint?: string;
   reverse?: boolean;
   children: ReactNode;
 }
 
 /** Split feature section: an illustrative demo on one side and its explanation on the other. */
-export function Showcase({ id, tone, icon, tag, title, description, points, hint, reverse, children }: ShowcaseProps) {
+export function Showcase({ id, tone, icon, tag, title, points, reverse, children }: ShowcaseProps) {
   const ref = useRef<HTMLElement>(null);
   const active = useInView(ref);
   return (
@@ -51,7 +49,6 @@ export function Showcase({ id, tone, icon, tag, title, description, points, hint
       <div className="lp-showcase-copy" data-reveal="">
         <span className="lp-tag"><span className="lp-tag-icon">{icon}</span>{t(tag)}</span>
         <h2 id={`${tone}-showcase-title`}>{t(title)}</h2>
-        <p>{t(description)}</p>
         <ul>
           {points.map(point => (
             <li key={point}><span className="lp-check"><Check size={13} aria-hidden="true" /></span>{t(point)}</li>
@@ -61,7 +58,6 @@ export function Showcase({ id, tone, icon, tag, title, description, points, hint
       <div className="lp-showcase-visual" data-reveal="" style={{ '--reveal-order': 1 } as CSSProperties}>
         <div className="lp-showcase-glow" aria-hidden="true" />
         {children}
-        {hint && <p className="lp-hint">{t(hint)}</p>}
       </div>
     </section>
   );

@@ -130,7 +130,7 @@ const APPS: { id: string; tone: string; icon: typeof Play; title: string; descri
   { id: 'tunnels', tone: '#14b8a6', icon: Network, title: 'web.appTunnelsTitle', description: 'web.appTunnelsDesc', badge: 'web.appBadgeDesktop', scene: TunnelScene },
 ];
 
-const CYCLE_MS = 5200;
+const CYCLE_MS = 3600;
 
 /** Interactive dock of room apps; rotates automatically and restarts its timer when the visitor picks one. */
 export function AppDock() {

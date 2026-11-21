@@ -113,34 +113,38 @@ export function useAutoCycle(count: number, interval: number, active: boolean) {
   return { index, select, running, cycle, focusHandlers };
 }
 
-/** Applies a subtle pointer-driven 3D tilt through CSS custom properties on fine pointers. */
-export function usePointerTilt(ref: RefObject<HTMLElement | null>, strength = 6): void {
+/**
+ * Applies a subtle 3D tilt that follows the pointer anywhere in the window, relative to the
+ * element's center, through CSS custom properties. Fine pointers only.
+ */
+export function usePointerTilt(ref: RefObject<HTMLElement | null>, strength = 10): void {
   const reduced = useReducedMotion();
   useEffect(() => {
     const element = ref.current;
     if (!element || reduced || !window.matchMedia?.('(pointer: fine)').matches) return;
     let frame = 0;
-    const move = (event: PointerEvent) => {
-      const bounds = element.getBoundingClientRect();
-      const x = (event.clientX - bounds.left) / bounds.width - 0.5;
-      const y = (event.clientY - bounds.top) / bounds.height - 0.5;
+    const clamp = (value: number) => Math.max(-0.5, Math.min(0.5, value));
+    const apply = (x: number, y: number) => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         element.style.setProperty('--tilt-x', `${(-y * strength).toFixed(2)}deg`);
         element.style.setProperty('--tilt-y', `${(x * strength).toFixed(2)}deg`);
       });
     };
-    const leave = () => {
-      cancelAnimationFrame(frame);
-      element.style.setProperty('--tilt-x', '0deg');
-      element.style.setProperty('--tilt-y', '0deg');
+    const move = (event: PointerEvent) => {
+      const bounds = element.getBoundingClientRect();
+      if (bounds.bottom < 0 || bounds.top > window.innerHeight) return;
+      const x = clamp((event.clientX - (bounds.left + bounds.width / 2)) / window.innerWidth);
+      const y = clamp((event.clientY - (bounds.top + bounds.height / 2)) / window.innerHeight);
+      apply(x, y);
     };
-    element.addEventListener('pointermove', move);
-    element.addEventListener('pointerleave', leave);
+    const leave = () => apply(0, 0);
+    window.addEventListener('pointermove', move, { passive: true });
+    document.documentElement.addEventListener('pointerleave', leave);
     return () => {
       cancelAnimationFrame(frame);
-      element.removeEventListener('pointermove', move);
-      element.removeEventListener('pointerleave', leave);
+      window.removeEventListener('pointermove', move);
+      document.documentElement.removeEventListener('pointerleave', leave);
     };
   }, [ref, reduced, strength]);
 }

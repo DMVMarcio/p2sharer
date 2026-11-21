@@ -30,11 +30,11 @@ import './landing/landing.css';
 
 export { DownloadsPage } from './DownloadsPage';
 
-const specs: { metric: string; value: string; description: string; tone: Tone }[] = [
-  { metric: '4K / 120 FPS', value: 'web.specStreamValue', description: 'web.specStreamDesc', tone: 'violet' },
-  { metric: '∞ P2P', value: 'web.specFilesValue', description: 'web.specFilesDesc', tone: 'emerald' },
-  { metric: 'DTLS-SRTP', value: 'web.specSecurityValue', description: 'web.specSecurityDesc', tone: 'sky' },
-  { metric: '$0 • MIT', value: 'web.specCostValue', description: 'web.specCostDesc', tone: 'amber' },
+const specs: { metric: string; value: string; tone: Tone }[] = [
+  { metric: '4K / 120 FPS', value: 'web.specStreamValue', tone: 'violet' },
+  { metric: '∞ P2P', value: 'web.specFilesValue', tone: 'emerald' },
+  { metric: 'DTLS-SRTP', value: 'web.specSecurityValue', tone: 'sky' },
+  { metric: '$0 • MIT', value: 'web.specCostValue', tone: 'amber' },
 ];
 
 const platformItems = {
@@ -151,7 +151,6 @@ export function LandingPage() {
           <div key={spec.value} className={`site-spec-item tone-${spec.tone}`} data-reveal="" style={{ '--reveal-order': index } as CSSProperties}>
             <span className="site-spec-metric">{spec.metric}</span>
             <strong>{t(spec.value)}</strong>
-            <p>{t(spec.description)}</p>
           </div>
         ))}
       </section>
@@ -163,9 +162,7 @@ export function LandingPage() {
           icon={<Monitor size={13} />}
           tag="web.featStreamTag"
           title="web.featStreamTitle"
-          description="web.featStreamDesc"
           points={['web.splitStreamItem1', 'web.splitStreamItem2', 'web.splitStreamItem3']}
-          hint="web.tryStream"
         >
           <StreamDemo />
         </Showcase>
@@ -174,9 +171,7 @@ export function LandingPage() {
           icon={<Gamepad2 size={13} />}
           tag="web.remoteTag"
           title="web.remoteTitle"
-          description="web.remoteDesc"
           points={['web.remotePoint1', 'web.remotePoint2', 'web.remotePoint3']}
-          hint="web.tryRemote"
           reverse
         >
           <RemoteDemo />
@@ -186,9 +181,7 @@ export function LandingPage() {
           icon={<Tv size={13} />}
           tag="web.featWatchTag"
           title="web.featWatchTitle"
-          description="web.featWatchDesc"
           points={['web.splitWatchItem1', 'web.splitWatchItem2', 'web.splitWatchItem3']}
-          hint="web.tryWatch"
         >
           <WatchDemo />
         </Showcase>
@@ -197,7 +190,6 @@ export function LandingPage() {
           icon={<FolderUp size={13} />}
           tag="web.featFilesTag"
           title="web.featFilesTitle"
-          description="web.featFilesDesc"
           points={['web.splitFilesItem1', 'web.filesPoint2', 'web.filesPoint3']}
           reverse
         >
@@ -208,7 +200,6 @@ export function LandingPage() {
           icon={<Crown size={13} />}
           tag="web.playCreateTag"
           title="web.playCreateTitle"
-          description="web.playCreateDesc"
           points={['web.splitGamesItem1', 'web.splitFilesItem2', 'web.splitFilesItem3']}
         >
           <PlayCreateDemo />
