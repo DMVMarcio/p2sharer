@@ -90,7 +90,31 @@ html.web-landing, .web-landing body, .web-landing #root { height: auto; min-heig
 .site-download-intro h1 { font-size: 30px; margin: 0; letter-spacing: -.03em; }
 .site-download-intro p { grid-column: 1; color: var(--text-secondary); line-height: 1.7; margin: 0; }
 .site-download-intro > .btn { align-self: flex-start; }
-.site-download > .download-panel { min-width: 0; background: var(--bg-card); border-radius: var(--radius-lg); padding: 28px; }
+.site-download-main { display: grid; gap: 16px; min-width: 0; }
+.site-download-main > .download-panel { min-width: 0; background: var(--bg-card); border-radius: var(--radius-lg); padding: 28px; }
+.site-download-notice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 16px 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+}
+.site-download-notice-icon { color: var(--accent-color); margin-top: 2px; }
+.site-download-notice-copy { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; }
+.site-download-notice-copy h2 { font-size: 14px; font-weight: 600; margin: 0; color: var(--text-primary); }
+.site-download-notice-copy p { margin: 0; font-size: 13px; line-height: 1.65; color: var(--text-secondary); }
+.site-download-notice-copy a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--accent-color);
+}
+.site-download-notice-copy a:hover { text-decoration: underline; }
 .web-app body { min-width: 0; }
 .web-app [hidden] { display: none !important; }
 @media (max-width: 800px) {

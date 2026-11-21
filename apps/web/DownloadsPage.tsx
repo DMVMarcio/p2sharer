@@ -1,8 +1,10 @@
 import { WebsiteLink } from '../../src/components/common/WebsiteLink';
 import { DownloadPanel } from '../../src/components/common/DownloadPanel';
-import { ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight, ShieldAlert } from 'lucide-react';
 import { useLocale } from '../../src/hooks/useLocale';
 import { t } from '../../src/i18n';
+
+const CODE_SIGNING_POLICY_URL = 'https://github.com/DMVMarcio/p2sharer#code-signing-policy';
 
 export function DownloadsPage() {
   useLocale();
@@ -16,7 +18,20 @@ export function DownloadsPage() {
           <ArrowUpRight size={16} aria-hidden="true" />
         </WebsiteLink>
       </div>
-      <DownloadPanel />
+      <div className="site-download-main">
+        <DownloadPanel />
+        <aside className="site-download-notice" aria-labelledby="download-signing-heading">
+          <ShieldAlert size={18} className="site-download-notice-icon" aria-hidden="true" />
+          <div className="site-download-notice-copy">
+            <h2 id="download-signing-heading">{t('downloads.signingNoticeTitle')}</h2>
+            <p>{t('downloads.signingNoticeBody')}</p>
+            <WebsiteLink href={CODE_SIGNING_POLICY_URL} target="_blank" rel="noopener noreferrer">
+              {t('downloads.signingPolicyLink')}
+              <ArrowUpRight size={14} aria-hidden="true" />
+            </WebsiteLink>
+          </div>
+        </aside>
+      </div>
     </section>
   );
 }

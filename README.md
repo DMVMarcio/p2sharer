@@ -8,6 +8,8 @@ Share screens, application audio and cameras; chat and exchange files; browse th
 
 Windows installers will be available on GitHub Releases as versions are published. Choose the `.exe` setup or `.msi` installer from the release's **Assets** section; the source-code archives are for development.
 
+> **Windows security notice:** While SignPath Foundation code-signing approval is pending, Windows builds are unsigned. Windows SmartScreen may warn about an unverified publisher, and Windows 11 Smart App Control (when turned **On**) may block launching `p2sharer.exe`. See the [Code signing policy](#code-signing-policy) below.
+
 ## What you can do
 
 - Create rooms, share invitations, save rooms for later and manage participant access.
