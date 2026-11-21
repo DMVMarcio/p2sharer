@@ -3,9 +3,11 @@ import { DownloadPanel } from '../../src/components/common/DownloadPanel';
 import { ArrowUpRight } from 'lucide-react';
 import { useLocale } from '../../src/hooks/useLocale';
 import { t } from '../../src/i18n';
+import { usePageMetadata } from './pageMetadata';
 
 export function DownloadsPage() {
   useLocale();
+  usePageMetadata(`${t('downloads.title')} — P2Sharer`, t('downloads.intro'), '/download');
   return (
     <section className="site-download">
       <div className="site-download-intro">

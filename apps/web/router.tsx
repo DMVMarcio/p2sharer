@@ -34,12 +34,14 @@ function WebLayout() {
 export function webRoutes(
   loadApp = () => import('./AppPage'),
   loadDownloads = () => import('./DownloadsPage'),
+  loadPrivacy = () => import('./PrivacyPage'),
 ): RouteObject[] {
   return [{ Component: WebLayout, HydrateFallback: () => null, ErrorBoundary: RouteError, children: [
     { Component: SiteLayout, children: [
       { index: true, Component: LandingPage },
       { path: 'download', lazy: async () => { const m = await loadDownloads(); return { Component: m.DownloadsPage }; } },
       { path: 'downloads', element: <Navigate to="/download" replace /> },
+      { path: 'privacy', lazy: async () => { const m = await loadPrivacy(); return { Component: m.PrivacyPage }; } },
     ] },
     { path: 'app/*', lazy: async () => { await waitForNavigationPaint(); return loadApp(); } },
     { path: '*', element: <Navigate to="/" replace /> },

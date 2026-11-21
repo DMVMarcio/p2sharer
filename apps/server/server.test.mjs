@@ -13,6 +13,8 @@ test('production host serves landing/app, public API and immutable assets withou
   await writeFile(join(root, 'index.html'), '<div id="root"></div>');
   await writeFile(join(root, 'assets', 'fixture.js'), 'export const ready = true;');
   await writeFile(join(root, 'favicon.ico'), Buffer.from([0, 0, 1, 0]));
+  await writeFile(join(root, 'robots.txt'), 'User-agent: *');
+  await writeFile(join(root, 'sitemap.xml'), '<urlset />');
   const catalog = releaseDownloads(null);
   const server = await createWebServer({ root, downloads: async () => catalog });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -21,7 +23,7 @@ test('production host serves landing/app, public API and immutable assets withou
     request(base + path, response => { response.resume(); response.on('end', () => resolve(response.statusCode)); }).on('error', reject).end();
   });
   try {
-    for (const path of ['/', '/app', '/app/', '/download', '/downloads', '/app/' + 'a'.repeat(32)]) {
+    for (const path of ['/', '/app', '/app/', '/download', '/downloads', '/privacy', '/app/' + 'a'.repeat(32)]) {
       const response = await fetch(base + path);
       assert.equal(response.status, 200); assert.match(await response.text(), /id="root"/);
       assert.match(response.headers.get('content-security-policy'), /object-src 'none'/);
@@ -33,6 +35,11 @@ test('production host serves landing/app, public API and immutable assets withou
     assert.equal(favicon.status, 200);
     assert.match(favicon.headers.get('content-type'), /image\/x-icon/);
     assert.deepEqual(Buffer.from(await favicon.arrayBuffer()), Buffer.from([0, 0, 1, 0]));
+    for (const [path, type] of [['/robots.txt', /text\/plain/], ['/sitemap.xml', /application\/xml/]]) {
+      const crawler = await fetch(base + path);
+      assert.equal(crawler.status, 200);
+      assert.match(crawler.headers.get('content-type'), type);
+    }
     assert.deepEqual(await (await fetch(base + '/api/health')).json(), { status: 'ok' });
     const config = await (await fetch(base + '/api/config')).json();
     assert.equal(config.runtime, 'web'); assert.match(config.downloadsUrl, /^https:\/\/github.com\//);

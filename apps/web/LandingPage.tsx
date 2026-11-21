@@ -26,6 +26,7 @@ import { FilesDemo, PlayCreateDemo, RemoteDemo, Showcase, StreamDemo, WatchDemo,
 import { P2PJourney } from './landing/P2PJourney';
 import { AppDock } from './landing/AppDock';
 import { useScrollReveal } from './landing/motion';
+import { usePageMetadata } from './pageMetadata';
 import './landing/landing.css';
 
 export { DownloadsPage } from './DownloadsPage';
@@ -111,6 +112,7 @@ function SectionHeader({ id, eyebrow, title, lead }: { id: string; eyebrow: stri
 
 export function LandingPage() {
   useLocale();
+  usePageMetadata(`P2Sharer — ${t('web.metaTitle')}`, t('web.heroSubtitle'), '/');
   const ref = useRef<HTMLDivElement>(null);
   useScrollReveal(ref);
   return (
