@@ -1,0 +1,77 @@
+PRIVACY POLICY
+P2Sharer — https://p2sharer.com
+Last updated: November 21, 2026
+
+P2Sharer is built so that what you share in a room goes directly to the other
+participants. This policy explains what stays on your device, what other people and
+services can see, and the choices you have. It covers the website, the web version and
+the Windows app.
+
+IN SHORT
+- No account, email or phone number is required.
+- No analytics, advertising, tracking cookies or telemetry.
+- Messages, media and files travel directly between participants, encrypted end to end.
+- Your profile, settings and saved rooms stay on your own device.
+
+1. DATA STORED ON YOUR DEVICE
+P2Sharer keeps the following locally, in your browser storage or in the app folder on
+Windows. We have no access to it.
+- Your display name, avatar, banner and nickname style.
+- Saved rooms, invitations and the cryptographic keys that sign them.
+- Settings, language, shortcuts, saved video queues and other preferences.
+- On Windows, the shared browser profile (cookies, history and extensions) and the files
+  you choose to save.
+
+2. WHAT OTHER PARTICIPANTS RECEIVE
+When you join a room, participants receive your profile and whatever you choose to
+share: messages, files, screen, camera, audio and app activity. Files are only
+transferred after the recipient accepts them. As with any direct WebRTC connection,
+participants can see the network addresses used to reach you. Share invitations only
+with people you trust; rooms can require a password and host approval.
+
+3. P2SHARER SERVERS
+Our server at p2sharer.com hosts the website and a signaling broker that helps devices
+find each other. It only relays short connection messages under hashed room topics and
+never stores messages, media or files. Your IP address is kept in memory only while you
+are connected, to limit abuse, and is not written to logs. The downloads page reads
+release information from GitHub through our server. P2Sharer sets no cookies of its own,
+and our hosting provider may keep standard technical logs.
+
+4. THIRD-PARTY SERVICES
+Some features rely on external services. They receive your IP address and the data they
+need to work, under their own privacy policies:
+- Public discovery relays (MQTT brokers, Nostr relays and WebTorrent trackers) that the
+  Windows app uses to find peers through hashed room topics. You can change them in
+  settings.
+- Google and Cloudflare STUN servers, used to discover a direct connection route, and
+  any TURN server you configure.
+- YouTube and Twitch players, YouTube title lookups, public Invidious instances for
+  search and playlists, and Twitch sign-in if you choose to use it. Embedded players may
+  set their own cookies.
+- Websites opened in the shared browser, Google as its start page, and the Chrome Web
+  Store or Edge Add-ons when you install extensions.
+- GitHub, for downloads and for update checks in the Windows app.
+
+5. WINDOWS APP PERMISSIONS
+Your screen, audio and camera are captured only after you start sharing. Remote control,
+virtual gamepads and the virtual network require your explicit consent, and
+administrator features also ask for Windows confirmation. The app checks GitHub for
+updates automatically; you can turn this off in settings, and updates are installed only
+when you choose.
+
+6. YOUR CHOICES
+You can edit your profile, remove saved rooms, clear shared browser data, revoke remote
+control at any time and change discovery services in settings. Clearing this site's data
+in your browser or uninstalling the app removes everything stored locally.
+
+7. CHILDREN
+P2Sharer is not directed at children under 13, and we do not knowingly receive their
+personal data.
+
+8. CHANGES AND CONTACT
+We will update this page whenever the way P2Sharer handles data changes. For questions,
+open an issue on GitHub. Report security concerns privately through GitHub security
+advisories.
+
+GitHub Issues: https://github.com/DMVMarcio/p2sharer/issues
+Report a security issue: https://github.com/DMVMarcio/p2sharer/security/advisories/new

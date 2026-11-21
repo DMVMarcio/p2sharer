@@ -1,0 +1,81 @@
+POLÍTICA DE PRIVACIDADE
+P2Sharer — https://p2sharer.com
+Última atualização: 21 de novembro de 2026
+
+O P2Sharer foi feito para que o que você compartilha em uma sala vá direto para os
+outros participantes. Esta política explica o que fica no seu dispositivo, o que outras
+pessoas e serviços podem ver e quais escolhas você tem. Ela vale para o site, a versão
+web e o aplicativo para Windows.
+
+EM RESUMO
+- Nenhuma conta, e-mail ou número de telefone é necessário.
+- Sem análises, publicidade, cookies de rastreamento ou telemetria.
+- Mensagens, mídia e arquivos trafegam diretamente entre os participantes, com
+  criptografia de ponta a ponta.
+- Seu perfil, suas configurações e suas salas salvas ficam no seu próprio dispositivo.
+
+1. DADOS ARMAZENADOS NO SEU DISPOSITIVO
+O P2Sharer guarda o seguinte localmente, no armazenamento do navegador ou na pasta do
+aplicativo no Windows. Nós não temos acesso a esses dados.
+- Seu nome de exibição, avatar, banner e estilo de apelido.
+- Salas salvas, convites e as chaves criptográficas que os assinam.
+- Configurações, idioma, atalhos, filas de vídeo salvas e outras preferências.
+- No Windows, o perfil do navegador compartilhado (cookies, histórico e extensões) e os
+  arquivos que você escolher salvar.
+
+2. O QUE OS OUTROS PARTICIPANTES RECEBEM
+Ao entrar em uma sala, os participantes recebem seu perfil e o que você escolher
+compartilhar: mensagens, arquivos, tela, câmera, áudio e atividade nos apps. Arquivos só
+são transferidos depois que o destinatário aceita. Como em qualquer conexão WebRTC
+direta, os participantes podem ver os endereços de rede usados para chegar até você.
+Compartilhe convites apenas com pessoas de confiança; salas podem exigir senha e
+aprovação do anfitrião.
+
+3. SERVIDORES DO P2SHARER
+Nosso servidor em p2sharer.com hospeda o site e um broker de sinalização que ajuda os
+dispositivos a se encontrarem. Ele apenas repassa mensagens curtas de conexão em tópicos
+de sala com hash e nunca armazena mensagens, mídia ou arquivos. Seu endereço IP fica em
+memória apenas enquanto você está conectado, para limitar abusos, e não é gravado em
+logs. A página de downloads lê informações das versões no GitHub por meio do nosso
+servidor. O P2Sharer não define cookies próprios, e nosso provedor de hospedagem pode
+manter logs técnicos padrão.
+
+4. SERVIÇOS DE TERCEIROS
+Alguns recursos dependem de serviços externos. Eles recebem seu endereço IP e os dados
+necessários para funcionar, conforme suas próprias políticas de privacidade:
+- Relays públicos de descoberta (brokers MQTT, relays Nostr e trackers WebTorrent) que o
+  aplicativo para Windows usa para encontrar participantes por tópicos de sala com hash.
+  Você pode alterá-los nas configurações.
+- Servidores STUN do Google e da Cloudflare, usados para descobrir uma rota de conexão
+  direta, e qualquer servidor TURN que você configurar.
+- Players do YouTube e da Twitch, consultas de títulos do YouTube, instâncias públicas
+  do Invidious para busca e playlists, e o login da Twitch se você optar por usá-lo.
+  Players incorporados podem definir seus próprios cookies.
+- Sites abertos no navegador compartilhado, o Google como página inicial e a Chrome Web
+  Store ou os Complementos do Edge ao instalar extensões.
+- GitHub, para downloads e verificação de atualizações no aplicativo para Windows.
+
+5. PERMISSÕES DO APLICATIVO PARA WINDOWS
+Sua tela, áudio e câmera só são capturados depois que você começa a compartilhar.
+Controle remoto, gamepads virtuais e a rede virtual exigem seu consentimento explícito,
+e recursos de administrador também pedem confirmação do Windows. O aplicativo verifica
+atualizações no GitHub automaticamente; você pode desativar isso nas configurações, e as
+atualizações só são instaladas quando você escolhe.
+
+6. SUAS ESCOLHAS
+Você pode editar seu perfil, remover salas salvas, limpar os dados do navegador
+compartilhado, revogar o controle remoto a qualquer momento e alterar os serviços de
+descoberta nas configurações. Limpar os dados deste site no navegador ou desinstalar o
+aplicativo remove tudo o que está armazenado localmente.
+
+7. CRIANÇAS
+O P2Sharer não é direcionado a crianças menores de 13 anos, e não recebemos
+intencionalmente dados pessoais delas.
+
+8. ALTERAÇÕES E CONTATO
+Atualizaremos esta página sempre que a forma como o P2Sharer trata dados mudar. Para
+dúvidas, abra uma issue no GitHub. Relate questões de segurança de forma privada pelos
+alertas de segurança do GitHub.
+
+GitHub Issues: https://github.com/DMVMarcio/p2sharer/issues
+Relatar um problema de segurança: https://github.com/DMVMarcio/p2sharer/security/advisories/new
