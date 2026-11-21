@@ -76,4 +76,17 @@ Use `pnpm add <package>`, `pnpm add -D <package>` and `pnpm exec <tool>`. Commit
 
 Keep the Trystero dependency patches and installation-script permissions in `pnpm-workspace.yaml` aligned with dependency updates. Use `pnpm patch` and `pnpm patch-commit` when updating patches, and commit the patch, workspace configuration and lockfile together.
 
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://signpath.io/), certificate by [SignPath Foundation](https://signpath.org/) *(application pending; until approved, Windows releases remain unsigned)*.
+
+- **Build & artifact scope:** Official Windows binaries (`p2sharer.exe`, NSIS/MSI installers, and portable executables) are built exclusively from this public source repository via the automated [release workflow](.github/workflows/release.yml) on GitHub Actions. Bundled third-party components (such as Wintun) remain covered by their respective upstream licenses.
+- **Team roles:** Author, Reviewer, and Approver: `@DMVMarcio` (maintainer, with multi-factor authentication enabled on GitHub).
+- **Privacy & network behavior:** P2Sharer collects no telemetry or analytics. Rooms communicate over peer-to-peer WebRTC using public discovery relays (or local discovery in LAN/VPN mode), optional update checks fetch signed release metadata from GitHub Releases, and privileged Windows features (virtual network adapter or remote-control elevation) require explicit in-app consent and Windows UAC confirmation.
+- **Reporting security issues:** Report suspected security issues or release discrepancies privately via [GitHub Security Advisories](https://github.com/DMVMarcio/p2sharer/security/advisories).
+
+## License
+
+P2Sharer is open-source software licensed under the [MIT License](LICENSE).
+
 > **Development note:** P2Sharer is built entirely with AI, with careful human orchestration, review, analysis and manual testing throughout development.
