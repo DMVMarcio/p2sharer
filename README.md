@@ -8,8 +8,6 @@ Share screens, application audio and cameras; chat and exchange files; browse th
 
 Windows installers will be available on GitHub Releases as versions are published. Choose the `.exe` setup or `.msi` installer from the release's **Assets** section; the source-code archives are for development.
 
-> **Windows security notice:** While SignPath Foundation code-signing approval is pending, Windows builds are unsigned. Windows SmartScreen may warn about an unverified publisher, and Windows 11 Smart App Control (when turned **On**) may block launching `p2sharer.exe`. See the [Code signing policy](#code-signing-policy) below.
-
 ## What you can do
 
 - Create rooms, share invitations, save rooms for later and manage participant access.
@@ -77,15 +75,6 @@ See [releases and application updates](docs/releases.md) for version commands, s
 Use `pnpm add <package>`, `pnpm add -D <package>` and `pnpm exec <tool>`. Commit `pnpm-lock.yaml` after dependency changes. Pass script options directly, for example `pnpm run tauri:dev --release --no-watch`.
 
 Keep the Trystero dependency patches and installation-script permissions in `pnpm-workspace.yaml` aligned with dependency updates. Use `pnpm patch` and `pnpm patch-commit` when updating patches, and commit the patch, workspace configuration and lockfile together.
-
-## Code signing policy
-
-Free code signing provided by [SignPath.io](https://signpath.io/), certificate by [SignPath Foundation](https://signpath.org/) *(application pending; until approved, Windows releases remain unsigned)*.
-
-- **Build & artifact scope:** Official Windows binaries (`p2sharer.exe`, NSIS/MSI installers, and portable executables) are built exclusively from this public source repository via the automated [release workflow](.github/workflows/release.yml) on GitHub Actions. Bundled third-party components (such as Wintun) remain covered by their respective upstream licenses.
-- **Team roles:** Author, Reviewer, and Approver: `@DMVMarcio` (maintainer, with multi-factor authentication enabled on GitHub).
-- **Privacy & network behavior:** P2Sharer collects no telemetry or analytics. Rooms communicate over peer-to-peer WebRTC using public discovery relays (or local discovery in LAN/VPN mode), optional update checks fetch signed release metadata from GitHub Releases, and privileged Windows features (virtual network adapter or remote-control elevation) require explicit in-app consent and Windows UAC confirmation.
-- **Reporting security issues:** Report suspected security issues or release discrepancies privately via [GitHub Security Advisories](https://github.com/DMVMarcio/p2sharer/security/advisories).
 
 ## License
 
