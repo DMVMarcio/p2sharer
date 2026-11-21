@@ -25,4 +25,4 @@ You will receive an acknowledgment as soon as the maintainer (`@DMVMarcio`) revi
 
 - **Peer-to-peer rooms:** Connections occur directly over WebRTC between room participants after peer discovery; rooms can require a password and unsaved rooms prompt for user confirmation before loading.
 - **Privileged Windows capabilities:** Optional features requiring administrator privileges (such as the Wintun virtual network interface, ViGEmBus driver setup, or elevated remote control helper) require explicit host consent in the app and Windows UAC confirmation.
-- **Release verification:** Desktop updates use signed updater metadata verified against the application's public key before user-confirmed installation. See the [Code signing policy](README.md#code-signing-policy) for current Windows Authenticode status.
+- **Release verification:** Desktop updates use signed updater metadata verified against the application's public key before user-confirmed installation.

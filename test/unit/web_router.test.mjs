@@ -11,7 +11,7 @@ import { RouterProvider } from 'react-router/dom';
 const fixture = globalThis.webRouterFixture = { state: { roomSlots: [], currentRoomInvite: '' }, allow: false, exits: 0, leaves: 0, mounts: 0 };
 const require = createRequire(import.meta.url);
 const mocks = {
-  appearance_preferences: 'export const isReducedMotion = () => false;',
+  appearance_preferences: 'export const isReducedMotion = () => false; export const useReducedMotion = () => false;',
   useAppTheme: 'export const useAppTheme = () => {};',
   useLocale: 'export const useLocale = () => {};',
   i18n: 'export const t = key => key; export const getLanguage = () => "en"; export const setLanguage = () => {};',
