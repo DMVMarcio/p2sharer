@@ -5,6 +5,7 @@ import { resolve, extname, sep, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { attachSignalingBroker } from './signaling.mjs';
 import { latestDownloads, releasesUrl } from './downloads.mjs';
+import { createTurnCredentialHandler } from './turn.mjs';
 
 const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../web/dist');
 const contentTypes = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
@@ -14,7 +15,8 @@ const contentTypes = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascr
 const releases = releasesUrl;
 
 /** Same-origin API and production asset host. Room content stays on the P2P mesh. */
-export async function createWebServer({ root = webRoot, downloads = latestDownloads, signaling = {}, apiAllowedOrigins = ['https://p2sharer.com'] } = {}) {
+export async function createWebServer({ root = webRoot, downloads = latestDownloads, signaling = {}, turn = {}, apiAllowedOrigins = ['https://p2sharer.com'] } = {}) {
+  const issueTurnCredentials = createTurnCredentialHandler(turn);
   const server = createServer(async (request, response) => {
     response.setHeader('X-Content-Type-Options', 'nosniff');
     response.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -35,7 +37,7 @@ export async function createWebServer({ root = webRoot, downloads = latestDownlo
       if (request.method === 'OPTIONS') {
         if (!origin) return send(403, JSON.stringify({ error: 'Origin required' }));
         response.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-        response.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+        response.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-P2Sharer-Client');
         return send(204, '');
       }
     }
@@ -50,7 +52,11 @@ export async function createWebServer({ root = webRoot, downloads = latestDownlo
         return send(400, JSON.stringify({ error: 'Invalid path' }));
       }
       if (path === '/api/health') return send(200, JSON.stringify({ status: 'ok' }));
-      if (path === '/api/config') return send(200, JSON.stringify({ runtime: 'web', downloadsUrl: releases }));
+      if (path === '/api/config') return send(200, JSON.stringify({ runtime: 'web', downloadsUrl: releases, turnFallback: Boolean(turn.secret && turn.urls?.length) }));
+      if (path === '/api/turn') {
+        const result = issueTurnCredentials(request);
+        return send(result.status, JSON.stringify(result.body));
+      }
       if (path === '/api/downloads') {
         try { return send(200, JSON.stringify(await downloads())); }
         catch { return send(503, JSON.stringify({ error: 'Downloads temporarily unavailable' })); }
@@ -87,7 +93,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const mode = modeIndex >= 0 ? process.argv[modeIndex + 1] : process.env.NODE_ENV || 'production';
   const settings = deploymentSettings(loadWorkspaceEnvironment(mode), mode);
   const server = await createWebServer({ apiAllowedOrigins: settings.apiAllowedOrigins,
-    signaling: { trustProxy: settings.trustProxy, allowedOrigins: settings.brokerAllowedOrigins } });
+    signaling: { trustProxy: settings.trustProxy, allowedOrigins: settings.brokerAllowedOrigins },
+    turn: { secret: settings.turnSecret, urls: settings.turnUrls, ttl: settings.turnTtl, maxPerIp: settings.turnMaxPerIp, trustProxy: settings.trustProxy } });
   server.listen(settings.backendPort, settings.host, () => console.info(`P2Sharer web server ready on port ${settings.backendPort}`));
   for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => server.close());
 }

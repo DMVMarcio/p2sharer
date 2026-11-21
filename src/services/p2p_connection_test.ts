@@ -1,5 +1,6 @@
 import { joinRoom as joinMqttRoom } from '@trystero-p2p/mqtt';
-import { DEFAULT_STUN_SERVERS } from '../p2p/ice_config.ts';
+import { buildRtcConfiguration, resolveTurnConfig } from '../p2p/ice_config.ts';
+import { stateStore } from '../core/state_store.ts';
 import { enabledRendezvousUrls, loadRendezvousPreferences } from '../p2p/relay_preferences.ts';
 import { selectedIcePair, type IceStat } from '../core/ice_route.ts';
 
@@ -60,6 +61,7 @@ export class P2PConnectionTester {
   private timeoutTimer: any = null;
   private pingTimer: any = null;
   private destroyed = false;
+  private startSeq = 0;
 
   constructor() {
     this.state = this.initialState('');
@@ -115,8 +117,9 @@ export class P2PConnectionTester {
     this.notify();
   }
 
-  public start(code: string, isHost: boolean) {
+  public async start(code: string, isHost: boolean) {
     this.cleanup();
+    const sessionToken = ++this.startSeq;
     const cleanCode = code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (!cleanCode) return;
 
@@ -126,6 +129,9 @@ export class P2PConnectionTester {
     this.state.stepSignaling = 'running';
     this.addLog(`Starting P2P connectivity test (${isHost ? 'Host' : 'Connector'}). Code: ${cleanCode}`);
     this.notify();
+
+    const turnConfig = await resolveTurnConfig(stateStore.getTurnConfig());
+    if (this.destroyed || sessionToken !== this.startSeq) return;
 
     const topic = `p2s-diag-${cleanCode.toLowerCase()}`;
     const prefs = loadRendezvousPreferences();
@@ -138,9 +144,7 @@ export class P2PConnectionTester {
         {
           appId: 'p2sharer-diagnostics-v1',
           relayConfig,
-          rtcConfig: {
-            iceServers: [{ urls: DEFAULT_STUN_SERVERS }],
-          },
+          rtcConfig: buildRtcConfiguration(turnConfig),
         },
         topic
       );

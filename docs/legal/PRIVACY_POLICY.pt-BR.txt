@@ -10,8 +10,9 @@ web e o aplicativo para Windows.
 EM RESUMO
 - Nenhuma conta, e-mail ou número de telefone é necessário.
 - Sem análises, publicidade, cookies de rastreamento ou telemetria.
-- Mensagens, mídia e arquivos trafegam diretamente entre os participantes, com
-  criptografia de ponta a ponta.
+- Mensagens, mídia e arquivos usam criptografia de ponta a ponta (DTLS/SRTP) e trafegam
+  diretamente entre os participantes sempre que possível, ou via nosso relay TURN apenas
+  como fallback quando rotas diretas falham.
 - Seu perfil, suas configurações e suas salas salvas ficam no seu próprio dispositivo.
 
 1. DADOS ARMAZENADOS NO SEU DISPOSITIVO
@@ -32,11 +33,14 @@ Compartilhe convites apenas com pessoas de confiança; salas podem exigir senha 
 aprovação do anfitrião.
 
 3. SERVIDORES DO P2SHARER
-Nosso servidor em p2sharer.com hospeda o site e um broker de sinalização que ajuda os
-dispositivos a se encontrarem. Ele apenas repassa mensagens curtas de conexão em tópicos
-de sala com hash e nunca armazena mensagens, mídia ou arquivos. Seu endereço IP fica em
-memória apenas enquanto você está conectado, para limitar abusos, e não é gravado em
-logs. A página de downloads lê informações das versões no GitHub por meio do nosso
+Nosso servidor em p2sharer.com hospeda o site, um broker de sinalização e um relay TURN
+opcional de fallback para redes em que NAT estrito ou falta de IPv6 impede conexões
+diretas. O broker apenas repassa mensagens curtas de conexão em tópicos de sala com hash,
+e o relay TURN apenas encaminha pacotes DTLS/SRTP criptografados com credenciais
+temporárias e limites de uso justo de banda e alocações — nunca descriptografando nem
+armazenando mensagens, mídia ou arquivos. Seu endereço IP fica em memória apenas enquanto
+você está conectado ou solicita credenciais do relay, para limitar abusos, e não é gravado
+em logs. A página de downloads lê informações das versões no GitHub por meio do nosso
 servidor. O P2Sharer não define cookies próprios, e nosso provedor de hospedagem pode
 manter logs técnicos padrão.
 
@@ -64,9 +68,10 @@ atualizações só são instaladas quando você escolhe.
 
 6. SUAS ESCOLHAS
 Você pode editar seu perfil, remover salas salvas, limpar os dados do navegador
-compartilhado, revogar o controle remoto a qualquer momento e alterar os serviços de
-descoberta nas configurações. Limpar os dados deste site no navegador ou desinstalar o
-aplicativo remove tudo o que está armazenado localmente.
+compartilhado, revogar o controle remoto a qualquer momento, desativar o relay TURN
+automático de fallback e alterar os serviços de descoberta nas configurações. Limpar os
+dados deste site no navegador ou desinstalar o aplicativo remove tudo o que está
+armazenado localmente.
 
 7. CRIANÇAS
 O P2Sharer não é direcionado a crianças menores de 13 anos, e não recebemos

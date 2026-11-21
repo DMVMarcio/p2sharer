@@ -1,44 +1,44 @@
 {
-  "version": "1.7.3",
+  "version": "1.7.4",
   "translations": {
     "en": [
-      "**Microsoft Store edition.** Install P2Sharer from the Microsoft Store and receive updates automatically through the Store, without a separate installer."
+      "**Automatic relay fallback.** Rooms now connect through a P2Sharer relay when strict networks or missing IPv6 block direct paths, with an option to turn it off."
     ],
     "pt-BR": [
-      "**Edição da Microsoft Store.** Instale o P2Sharer pela Microsoft Store e receba atualizações automaticamente pela própria loja, sem instalador separado."
+      "**Fallback automático de conexão.** Salas agora usam um relay do P2Sharer quando redes restritas ou falta de IPv6 bloqueiam a rota direta, com opção de desativar."
     ],
     "es": [
-      "**Edición de Microsoft Store.** Instala P2Sharer desde Microsoft Store y recibe las actualizaciones automáticamente a través de la tienda, sin instalador aparte."
+      "**Respaldo automático de conexión.** Las salas usan un relay de P2Sharer si redes estrictas o falta de IPv6 impiden la ruta directa, con opción de desactivarlo."
     ],
     "fr": [
-      "**Édition Microsoft Store.** Installez P2Sharer depuis le Microsoft Store et recevez les mises à jour automatiquement via le Store, sans installateur séparé."
+      "**Relais de secours automatique.** Les salons passent par un relais P2Sharer si un réseau strict ou l'absence d'IPv6 bloque le direct, avec option de désactivation."
     ],
     "de": [
-      "**Microsoft-Store-Edition.** Installiere P2Sharer aus dem Microsoft Store und erhalte Updates automatisch über den Store, ohne separates Installationsprogramm."
+      "**Automatischer Verbindungs-Fallback.** Räume nutzen ein P2Sharer-Relay, wenn strenges NAT oder fehlendes IPv6 direkte Wege blockieren — auf Wunsch abschaltbar."
     ],
     "it": [
-      "**Edizione Microsoft Store.** Installa P2Sharer dal Microsoft Store e ricevi gli aggiornamenti automaticamente tramite lo Store, senza un programma di installazione separato."
+      "**Relay automatico di emergenza.** Le stanze usano un relay P2Sharer se reti restrittive o assenza di IPv6 bloccano la rotta diretta, disattivabile nelle opzioni."
     ],
     "zh-CN": [
-      "**Microsoft Store 版本。** 可从 Microsoft Store 安装 P2Sharer，并通过应用商店自动获取更新，无需单独的安装程序。"
+      "**自动中继备用连接。** 当受限网络或缺少 IPv6 阻碍直连时，房间会自动通过 P2Sharer 中继保持连通，并支持在设置中关闭。"
     ],
     "zh-TW": [
-      "**Microsoft Store 版本。** 可從 Microsoft Store 安裝 P2Sharer，並透過市集自動取得更新，不需要另外的安裝程式。"
+      "**自動中繼備援連線。** 當受限網路或缺少 IPv6 阻礙直連時，房間會自動透過 P2Sharer 中繼維持連線，並支援在設定中關閉。"
     ],
     "ja": [
-      "**Microsoft Store 版。** Microsoft Store から P2Sharer をインストールでき、更新はストア経由で自動的に届きます。別途インストーラーは不要です。"
+      "**自動リレーフォールバック。** 制限付きネットワークや IPv6 未対応環境で直接接続できない場合も P2Sharer リレー経由で接続でき、設定で無効化も可能です。"
     ],
     "ko": [
-      "**Microsoft Store 에디션.** Microsoft Store에서 P2Sharer를 설치하고, 별도 설치 프로그램 없이 스토어를 통해 업데이트를 자동으로 받으세요."
+      "**자동 릴레이 대체 연결.** 제한된 네트워크나 IPv6 미지원 환경에서 직접 연결이 막힐 때 P2Sharer 릴레이로 자동 연결되며, 설정에서 끌 수 있습니다."
     ],
     "hi": [
-      "**Microsoft Store संस्करण।** P2Sharer को Microsoft Store से इंस्टॉल करें और अलग इंस्टॉलर के बिना स्टोर के ज़रिए अपडेट अपने-आप पाएँ।"
+      "**स्वचालित रिले फ़ॉलबैक।** सख्त नेटवर्क या IPv6 न होने पर कमरे सीधे रास्ते के बजाय P2Sharer रिले से जुड़ते हैं, और आप इसे सेटिंग्स में बंद भी कर सकते हैं।"
     ],
     "fi": [
-      "**Microsoft Store -versio.** Asenna P2Sharer Microsoft Storesta ja saat päivitykset automaattisesti Storen kautta ilman erillistä asennusohjelmaa."
+      "**Automaattinen välitysyhteys.** Huoneet käyttävät P2Sharer-välityspalvelinta, jos tiukka verkko tai puuttuva IPv6 estää suoran yhteyden; valittavissa asetuksissa."
     ],
     "ru": [
-      "**Версия для Microsoft Store.** Устанавливайте P2Sharer из Microsoft Store и получайте обновления автоматически через магазин, без отдельного установщика."
+      "**Резервное реле подключения.** Комнаты автоматически используют реле P2Sharer, если строгий NAT или отсутствие IPv6 мешают прямому пути; можно отключить в настройках."
     ]
   }
 }

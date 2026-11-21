@@ -32,6 +32,20 @@ function brokerAddress(value) {
   if ((url.protocol !== 'wss:' && !(url.protocol === 'ws:' && local)) || url.username || url.password || url.search || url.hash) throw new Error('Invalid VITE_PUBLIC_BROKER_URL');
   return url.href;
 }
+function integerInRange(value, fallback, min, max, name) {
+  if (value === undefined || value === null || String(value).trim() === '') return fallback;
+  const number = Number(value);
+  if (!Number.isInteger(number) || number < min || number > max) throw new Error(`Invalid ${name}`);
+  return number;
+}
+function turnAddress(value) {
+  const trimmed = value.trim();
+  const normalized = trimmed.startsWith('turn:') || trimmed.startsWith('turns:') ? trimmed : `turn:${trimmed}`;
+  if (!/^turns?:(?:\[[0-9a-f:.]+\]|[a-z0-9.-]+)(?::\d{1,5})?(?:\?transport=(?:udp|tcp))?$/i.test(normalized)) {
+    throw new Error('Invalid TURN_URLS');
+  }
+  return normalized;
+}
 const desktopOrigins = ['http://tauri.localhost', 'https://tauri.localhost', 'tauri://localhost'];
 
 /** Public addresses are compiled into clients; listening addresses remain server-only. */
@@ -47,10 +61,21 @@ export function deploymentSettings(env, mode) {
   const host = env.BACKEND_HOST || env.HOST || '127.0.0.1';
   if (!host.trim() || /[\s/]/.test(host)) throw new Error('Invalid BACKEND_HOST');
   if (env.BROKER_TRUST_PROXY && !['0', '1'].includes(env.BROKER_TRUST_PROXY)) throw new Error('Invalid BROKER_TRUST_PROXY');
+  const turnSecret = (env.TURN_SHARED_SECRET || '').trim();
+  const rawTurnUrls = env.TURN_URLS ? env.TURN_URLS.split(/[\n,]+/).map(item => item.trim()).filter(Boolean) : [];
+  const apiHost = new URL(apiUrl).hostname;
+  const turnUrls = rawTurnUrls.length
+    ? [...new Set(rawTurnUrls.map(turnAddress))]
+    : turnSecret
+      ? [`turn:${apiHost}:3478?transport=udp`, `turn:${apiHost}:3478?transport=tcp`]
+      : [];
+  const turnTtl = integerInRange(env.TURN_CREDENTIAL_TTL, 21600, 60, 86400, 'TURN_CREDENTIAL_TTL');
+  const turnMaxPerIp = integerInRange(env.TURN_MAX_PER_IP, 24, 1, 1000, 'TURN_MAX_PER_IP');
   return { backendPort, webPort, host, siteUrl, apiUrl, brokerUrl,
     apiAllowedOrigins: list(env.API_ALLOWED_ORIGINS, origins),
     brokerAllowedOrigins: list(env.BROKER_ALLOWED_ORIGINS, origins),
-    trustProxy: env.BROKER_TRUST_PROXY === '1' };
+    trustProxy: env.BROKER_TRUST_PROXY === '1',
+    turnSecret, turnUrls, turnTtl, turnMaxPerIp };
 }
 
 export function publicEnvironment(settings) {

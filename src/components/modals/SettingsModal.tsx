@@ -29,7 +29,7 @@ import { EmojiGlyph } from '../common/EmojiGlyph';
 import { RendezvousServerEditor } from '../common/RendezvousServerEditor';
 import { NetworkDiagnosticsPanel } from '../common/NetworkDiagnosticsPanel';
 import { loadRendezvousPreferences, saveRendezvousPreferences, validateRendezvousPreferences } from '../../p2p/relay_preferences.ts';
-import { isValidTurnUrl, parseTurnUrls } from '../../p2p/ice_config.ts';
+import { clearTurnFallbackCache, isValidTurnUrl, parseTurnUrls } from '../../p2p/ice_config.ts';
 import { appUpdates } from '../../services/app_updates';
 import { automaticUpdateChecks, betaUpdateChecks } from '../../core/app_updates';
 import { ApplicationSettings } from './ApplicationSettings';
@@ -65,6 +65,7 @@ export const SettingsModal: React.FC = () => {
     'profile' | 'application' | 'privacy' | 'conversations' | 'appearance' | 'audio' | 'stream' | 'remoteControl' | 'inputBindings' | 'network' | 'diagnostics'
   >('profile');
   const [homeRoomPresencePolling, setHomeRoomPresencePolling] = useState(() => stateStore.homeRoomPresencePolling);
+  const [turnFallbackEnabled, setTurnFallbackEnabled] = useState(() => stateStore.turnFallbackEnabled);
   const [inputBindingsDraft, setInputBindingsDraft] = useState(loadInputBindings);
   const [inputBindingsSubTab, setInputBindingsSubTab] = useState<'keyboard' | 'gamepad'>('keyboard');
   const {
@@ -214,7 +215,8 @@ export const SettingsModal: React.FC = () => {
     saveEmojiPack(emojiPack);
     saveTransferSpeedUnit(transferSpeedUnit);
     appUpdates.setPreferences(autoUpdates, betaUpdates);
-    stateStore.savePrivacyPreferences({ homeRoomPresencePolling });
+    stateStore.savePrivacyPreferences({ homeRoomPresencePolling, turnFallbackEnabled });
+    if (!turnFallbackEnabled) clearTurnFallbackCache();
     soundEffects.setEnabled(sfxEnabled);
     soundEffects.setEventPreferences(soundEvents);
     soundEffects.setVolume(sfxVolume / 100);
@@ -489,6 +491,18 @@ export const SettingsModal: React.FC = () => {
                       <input autoComplete="off" type="checkbox" id="settings-home-room-presence"
                         checked={homeRoomPresencePolling} disabled={saving || profileBusy}
                         onChange={(event) => setHomeRoomPresencePolling(event.target.checked)} />
+                      <span className="switch-slider" />
+                    </div>
+                  </label>
+                  <label className="settings-switch-row" htmlFor="settings-privacy-turn-fallback">
+                    <div className="settings-switch-label-group">
+                      <span className="settings-switch-title">{t('privacy.turnFallbackTitle')}</span>
+                      <span className="settings-switch-subtitle">{t('privacy.turnFallbackDesc')}</span>
+                    </div>
+                    <div className="modern-switch">
+                      <input autoComplete="off" type="checkbox" id="settings-privacy-turn-fallback"
+                        checked={turnFallbackEnabled} disabled={saving || profileBusy}
+                        onChange={(event) => setTurnFallbackEnabled(event.target.checked)} />
                       <span className="switch-slider" />
                     </div>
                   </label>
@@ -982,6 +996,21 @@ export const SettingsModal: React.FC = () => {
                   <h3 className="settings-pane-title">{t("message.da60254327a5")}</h3>
                   <p className="settings-pane-desc">
                     {t("message.56c0bef18e07")}</p>
+                </div>
+
+                <div className="settings-row">
+                  <label className="settings-switch-row" htmlFor="settings-network-turn-fallback">
+                    <div className="settings-switch-label-group">
+                      <span className="settings-switch-title">{t('privacy.turnFallbackTitle')}</span>
+                      <span className="settings-switch-subtitle">{t('privacy.turnFallbackDesc')}</span>
+                    </div>
+                    <div className="modern-switch">
+                      <input autoComplete="off" type="checkbox" id="settings-network-turn-fallback"
+                        checked={turnFallbackEnabled} disabled={saving || profileBusy}
+                        onChange={(event) => setTurnFallbackEnabled(event.target.checked)} />
+                      <span className="switch-slider" />
+                    </div>
+                  </label>
                 </div>
 
                 <div className="settings-row">

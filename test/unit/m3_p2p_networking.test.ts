@@ -8,6 +8,8 @@ import {
   buildIceServers,
   buildRtcConfiguration,
   formatJoinError,
+  resolveTurnConfig,
+  clearTurnFallbackCache,
   DEFAULT_STUN_SERVERS,
 } from '../../src/p2p/ice_config.ts';
 import {
@@ -354,6 +356,49 @@ describe('M3 Unit Tests: Robust P2P Networking & Signaling Failover', () => {
       assert.ok(timeoutMsg.includes('Tempo esgotado'));
       assert.ok(timeoutMsg.includes('não identifica a causa'));
       assert.ok(!timeoutMsg.includes('NAT Simétrico'));
+    });
+
+    it('resolveTurnConfig respects custom TURN, opt-out toggle, and caches first-party fallback credentials', async () => {
+      clearTurnFallbackCache();
+      let fetchCalls = 0;
+      const mockFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+        fetchCalls++;
+        assert.ok(String(input).endsWith('/api/turn'));
+        const headers = new Headers(init?.headers);
+        assert.equal(headers.get('X-P2Sharer-Client'), '1');
+        return new Response(JSON.stringify({
+          enabled: true,
+          urls: ['turn:relay.example:3478?transport=udp', 'turn:relay.example:3478?transport=tcp'],
+          username: '1700000000:p2s-deadbeef',
+          credential: 'signed-hmac-value',
+          ttl: 3600,
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }) as typeof globalThis.fetch;
+
+      try {
+        const custom = { enabled: true, url: 'turn:custom.example:3478', username: 'u', credential: 'p' };
+        assert.deepEqual(await resolveTurnConfig(custom, { fetch: mockFetch }), custom);
+        assert.equal(fetchCalls, 0);
+
+        const optedOut = await resolveTurnConfig({ enabled: false, fallbackEnabled: false }, { fetch: mockFetch });
+        assert.deepEqual(optedOut, { enabled: false, forceRelay: false, fallbackEnabled: false });
+        assert.equal(fetchCalls, 0);
+
+        const first = await resolveTurnConfig(undefined, { fetch: mockFetch });
+        assert.equal(fetchCalls, 1);
+        assert.equal(first.enabled, true);
+        assert.equal(first.forceRelay, false);
+        assert.equal(first.fallbackEnabled, true);
+        assert.equal(first.url, 'turn:relay.example:3478?transport=udp\nturn:relay.example:3478?transport=tcp');
+        assert.equal(first.username, '1700000000:p2s-deadbeef');
+        assert.equal(first.credential, 'signed-hmac-value');
+
+        const cached = await resolveTurnConfig(undefined, { fetch: mockFetch });
+        assert.equal(fetchCalls, 1);
+        assert.deepEqual(cached, first);
+      } finally {
+        clearTurnFallbackCache();
+      }
     });
   });
 });

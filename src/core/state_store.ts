@@ -60,6 +60,7 @@ export class StateStore {
   public animationsEnabled: boolean = true;
   public visualEffectsEnabled: boolean = true;
   public homeRoomPresencePolling: boolean = typeof localStorage === 'undefined' || localStorage.getItem('p2sharer_home_room_presence_polling') !== 'false';
+  public turnFallbackEnabled: boolean = typeof localStorage === 'undefined' || localStorage.getItem('p2sharer_turn_fallback') !== 'false';
 
   public currentFps: number = INITIAL_TRANSMISSION_DEFAULTS.fps;
   public currentBitrate: number = this.getDefaultBitrateForResolution(INITIAL_TRANSMISSION_DEFAULTS.resolution);
@@ -138,6 +139,8 @@ export class StateStore {
     this.allowParticipantDrawings = localStorage.getItem('p2sharer_participant_drawings') !== 'false';
     this.allowParticipantPings = localStorage.getItem('p2sharer_participant_pings') !== 'false';
     this.username = localStorage.getItem('p2sharer_username') || '';
+    this.homeRoomPresencePolling = localStorage.getItem('p2sharer_home_room_presence_polling') !== 'false';
+    this.turnFallbackEnabled = localStorage.getItem('p2sharer_turn_fallback') !== 'false';
     this.currentThemeMode = (localStorage.getItem('p2sharer_theme_mode') as ThemeMode) || 'dark';
     this.currentAccentColor = localStorage.getItem('p2sharer_accent_color') || 'cyan';
     this.currentBackgroundColor = normalizeBackground(localStorage.getItem('p2sharer_background_color') || 'graphite');
@@ -287,12 +290,18 @@ export class StateStore {
     applyAppearanceAttributes(prefs.animations, prefs.visualEffects);
   }
 
-  public savePrivacyPreferences(prefs: { homeRoomPresencePolling: boolean }): void {
+  public savePrivacyPreferences(prefs: { homeRoomPresencePolling: boolean; turnFallbackEnabled?: boolean }): void {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('p2sharer_home_room_presence_polling', String(prefs.homeRoomPresencePolling));
+      if (typeof prefs.turnFallbackEnabled === 'boolean') {
+        localStorage.setItem('p2sharer_turn_fallback', String(prefs.turnFallbackEnabled));
+      }
     }
     this.set((state) => {
       state.homeRoomPresencePolling = prefs.homeRoomPresencePolling;
+      if (typeof prefs.turnFallbackEnabled === 'boolean') {
+        state.turnFallbackEnabled = prefs.turnFallbackEnabled;
+      }
     });
   }
 
@@ -351,8 +360,9 @@ export class StateStore {
   }
 
   public getTurnConfig(): TurnConfig {
+    const fallbackEnabled = typeof localStorage === 'undefined' || localStorage.getItem('p2sharer_turn_fallback') !== 'false';
     if (typeof localStorage === 'undefined') {
-      return { enabled: false, forceRelay: false };
+      return { enabled: false, forceRelay: false, fallbackEnabled };
     }
     const isTurnEnabled = localStorage.getItem('p2sharer_turn_enabled') === 'true';
     const rawTurnUrl = parseTurnUrls(localStorage.getItem('p2sharer_turn_url') || '').join('\n');
@@ -363,6 +373,7 @@ export class StateStore {
       username: isTurnEnabled ? (localStorage.getItem('p2sharer_turn_user') || undefined) : undefined,
       credential: isTurnEnabled ? (localStorage.getItem('p2sharer_turn_cred') || undefined) : undefined,
       forceRelay: isTurnEnabled && localStorage.getItem('p2sharer_turn_force_relay') === 'true',
+      fallbackEnabled,
     };
   }
 }

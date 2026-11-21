@@ -1,0 +1,44 @@
+{
+  "version": "1.7.3",
+  "translations": {
+    "en": [
+      "**Microsoft Store edition.** Install P2Sharer from the Microsoft Store and receive updates automatically through the Store, without a separate installer."
+    ],
+    "pt-BR": [
+      "**Edição da Microsoft Store.** Instale o P2Sharer pela Microsoft Store e receba atualizações automaticamente pela própria loja, sem instalador separado."
+    ],
+    "es": [
+      "**Edición de Microsoft Store.** Instala P2Sharer desde Microsoft Store y recibe las actualizaciones automáticamente a través de la tienda, sin instalador aparte."
+    ],
+    "fr": [
+      "**Édition Microsoft Store.** Installez P2Sharer depuis le Microsoft Store et recevez les mises à jour automatiquement via le Store, sans installateur séparé."
+    ],
+    "de": [
+      "**Microsoft-Store-Edition.** Installiere P2Sharer aus dem Microsoft Store und erhalte Updates automatisch über den Store, ohne separates Installationsprogramm."
+    ],
+    "it": [
+      "**Edizione Microsoft Store.** Installa P2Sharer dal Microsoft Store e ricevi gli aggiornamenti automaticamente tramite lo Store, senza un programma di installazione separato."
+    ],
+    "zh-CN": [
+      "**Microsoft Store 版本。** 可从 Microsoft Store 安装 P2Sharer，并通过应用商店自动获取更新，无需单独的安装程序。"
+    ],
+    "zh-TW": [
+      "**Microsoft Store 版本。** 可從 Microsoft Store 安裝 P2Sharer，並透過市集自動取得更新，不需要另外的安裝程式。"
+    ],
+    "ja": [
+      "**Microsoft Store 版。** Microsoft Store から P2Sharer をインストールでき、更新はストア経由で自動的に届きます。別途インストーラーは不要です。"
+    ],
+    "ko": [
+      "**Microsoft Store 에디션.** Microsoft Store에서 P2Sharer를 설치하고, 별도 설치 프로그램 없이 스토어를 통해 업데이트를 자동으로 받으세요."
+    ],
+    "hi": [
+      "**Microsoft Store संस्करण।** P2Sharer को Microsoft Store से इंस्टॉल करें और अलग इंस्टॉलर के बिना स्टोर के ज़रिए अपडेट अपने-आप पाएँ।"
+    ],
+    "fi": [
+      "**Microsoft Store -versio.** Asenna P2Sharer Microsoft Storesta ja saat päivitykset automaattisesti Storen kautta ilman erillistä asennusohjelmaa."
+    ],
+    "ru": [
+      "**Версия для Microsoft Store.** Устанавливайте P2Sharer из Microsoft Store и получайте обновления автоматически через магазин, без отдельного установщика."
+    ]
+  }
+}

@@ -28,6 +28,10 @@ Files load in this order: `.env`, `.env.local`, `.env.<mode>`, `.env.<mode>.loca
 | `API_ALLOWED_ORIGINS` | Optional replacement HTTP origin allowlist; defaults include configured site/API and Tauri origins |
 | `BROKER_ALLOWED_ORIGINS` | Optional replacement WebSocket origin allowlist; defaults include configured site/API and Tauri origins |
 | `BROKER_TRUST_PROXY` | `0` by default; use `1` only behind a trusted proxy that overwrites `X-Forwarded-For` |
+| `TURN_SHARED_SECRET` | Optional server-only Coturn `static-auth-secret` for issuing ephemeral fallback credentials |
+| `TURN_URLS` | Optional comma-separated `turn:` / `turns:` URLs; derived from `VITE_PUBLIC_API_URL` port `3478` (UDP/TCP) when blank |
+| `TURN_CREDENTIAL_TTL` | Ephemeral TURN credential lifetime in seconds (`60`–`86400`; default `21600`) |
+| `TURN_MAX_PER_IP` | Maximum `/api/turn` credential requests per source IP per 10-minute window (`1`–`1000`; default `24`) |
 
 Blank public URLs select automatic development/production defaults. Changing only `BACKEND_PORT` changes the local API, broker and Vite proxy destinations together. An explicit public URL overrides automatic derivation. Allowlists are comma-separated. `VITE_*` values are public; server-only credentials must not use that prefix. Custom server lists saved through app settings still override factory defaults.
 
@@ -134,13 +138,14 @@ passphrase so the workflow can use it noninteractively.
 | Endpoint | Result |
 | --- | --- |
 | `GET /api/health` | Health response |
-| `GET /api/config` | Public runtime metadata and official release-page URL |
+| `GET /api/config` | Public runtime metadata, official release-page URL and `turnFallback` availability |
+| `GET /api/turn` | Short-lived HMAC-SHA1 TURN fallback credentials (requires `X-P2Sharer-Client: 1`; rate-limited per IP) |
 | `GET /api/download` | Redirect to official Windows releases |
 | `GET /api/downloads` | Latest stable release's available installer, MSI and portable downloads |
 
 Download links on the landing page and web app header open `/download`; the app header uses a new tab to preserve the current room. The page offers two steps: enabled system buttons, then a flat package list with direct download actions. Unavailable systems and packages remain disabled. The page uses `/api/downloads`. The backend coalesces GitHub requests, caches successful results for five minutes and only advertises official, published assets that actually exist. macOS and Linux remain unavailable until packaging support is added. Temporary GitHub failures return an error with a retry option rather than fabricated download URLs.
 
-The HTTP API does not accept room messages, profile data, invitations or file uploads. Room admission, signatures, public multi-transport discovery and WebRTC media/data channels remain shared with the desktop application. The first-party MQTT broker provides rendezvous signaling; it is not an account service, room database or media relay. Existing TURN configuration remains available in settings for networks that require a relay; hosting this HTTP backend alone does not provide TURN. Custom discovery services and content sources must permit browser requests and comply with HTTPS/CORS rules.
+The HTTP API does not accept room messages, profile data, invitations or file uploads. Room admission, signatures, public multi-transport discovery and WebRTC media/data channels remain shared with the desktop application. The first-party MQTT broker provides rendezvous signaling; it is not an account service or room database. When `TURN_SHARED_SECRET` is configured, `/api/turn` issues time-limited Coturn credentials so participants behind strict NAT or without IPv6 can fall back automatically to the first-party TURN relay unless they disable fallback in settings or configure a custom TURN server. Custom discovery services and content sources must permit browser requests and comply with HTTPS/CORS rules.
 
 The production host restricts methods, rejects traversal and hidden-file requests, sets a content security policy and serves only the web distribution directory. Only hashed build assets receive immutable caching. App HTML and API responses are not cached. `/app` and `/app/` load the same entry; unknown asset/API paths return errors instead of HTML.
 
@@ -171,6 +176,51 @@ The broker accepts clean sessions, QoS 0 and the exact alphanumeric topic format
 `BROKER_ALLOWED_ORIGINS` replaces the derived origin allowlist; same-host requests and originless MQTT clients remain supported. The defaults include configured site/API origins, Tauri origins and local development origins when appropriate. `BROKER_TRUST_PROXY=1` enables per-IP limits using `X-Forwarded-For`; enable it only behind a trusted reverse proxy that overwrites that header and prevents direct access to the Node listener. Otherwise limits use the socket peer address.
 
 The broker replaces public rendezvous endpoints, not STUN/TURN or external content services. No deployment or antivirus reputation guarantee follows from using a first-party hostname.
+
+## First-party TURN fallback relay (Coturn)
+
+When `TURN_SHARED_SECRET` is configured in `.env.production`, the Node backend serves `GET /api/turn` to issue short-lived Coturn REST API credentials (`HMAC-SHA1` over `<unix-expiry>:p2s-<hex>`). Clients enforce `X-P2Sharer-Client: 1` and in-memory per-IP and global rate limits, cache credentials locally, and use `iceTransportPolicy: 'all'` so direct P2P routes (LAN, IPv6, STUN) always take priority and the VPS relay is used only as fallback when direct routes fail. Users can disable this automatic fallback in **Settings > Security & Privacy** or **Settings > Network**.
+
+Install Coturn on Ubuntu 24.04 LTS:
+
+```sh
+sudo apt update && sudo apt install -y coturn
+```
+
+Enable `/etc/default/coturn` (`TURNSERVER_ENABLED=1`) and configure `/etc/turnserver.conf` with fair-use limits, REST authentication matching `TURN_SHARED_SECRET`, and internal-network blocking (replace `198.51.100.10` with your VPS public IPv4 address):
+
+```ini
+listening-port=3478
+listening-ip=0.0.0.0
+external-ip=198.51.100.10
+realm=api.p2sharer.com
+
+use-auth-secret
+static-auth-secret=REPLACE_WITH_LONG_RANDOM_SECRET
+
+fingerprint
+no-cli
+no-tlsv1
+no-tlsv1_1
+stale-nonce=600
+
+# Fair-use caps per allocation and global server capacity
+max-bps=3000000
+user-quota=16
+total-quota=240
+max-allocate-lifetime=21600
+
+# Prevent SSRF / internal network proxying
+no-loopback-peers
+no-multicast-peers
+# Also add denied-peer-ip blocks on your VPS for RFC 1918 private networks,
+# RFC 6598 CGNAT space, IPv4 link-local, and IPv6 ULA/link-local ranges.
+
+min-port=49152
+max-port=65535
+```
+
+Open firewall ports `3478/tcp`, `3478/udp`, and `49152:65535/udp` on the VPS, then restart Coturn (`sudo systemctl enable --now coturn`). Keep `TURN_SHARED_SECRET` identical to `static-auth-secret` in `.env.production` and restart the Node server.
 
 ### Client routing
 

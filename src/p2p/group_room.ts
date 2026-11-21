@@ -54,6 +54,7 @@ import { getLocalPlatform } from '../core/platform.ts';
 import {
   buildRtcConfiguration,
   createJoinErrorHandler,
+  resolveTurnConfig,
 } from './ice_config.ts';
 import { createFileOptimizedPeerConnection, type FileOptimizedConnection } from './file_data_channel.ts';
 import { FileBulkChannelManager } from './file_bulk_channel.ts';
@@ -930,6 +931,12 @@ export class GroupRoomManager {
       } (Self ID: ${selfId})`
     );
 
+    const parsedInviteForTurn = this.invite ? parseRoomInvite(this.invite) : null;
+    if (!this.backgroundProbe && !this.snapshot?.connection && !(parsedInviteForTurn && 'connection' in parsedInviteForTurn && parsedInviteForTurn.connection)) {
+      this.turnConfig = await resolveTurnConfig(this.turnConfig ?? stateStore.getTurnConfig());
+      if (this.leavePromise) return;
+    }
+
     this.rtcConfig = buildRtcConfiguration(this.turnConfig);
 
     if (!this.backgroundProbe) {
@@ -1067,6 +1074,9 @@ export class GroupRoomManager {
   private async reconnectOnNewTransport(): Promise<void> {
     if (!this.callbacks || !this.signalingTopic) return;
 
+    if (!this.snapshot?.connection && !this.backgroundProbe) {
+      this.turnConfig = await resolveTurnConfig(stateStore.getTurnConfig());
+    }
     const baseRtcConfig: RTCConfiguration = this.snapshot?.connection
       ? { iceServers: [], iceTransportPolicy: 'all', iceCandidatePoolSize: 0 }
       : buildRtcConfiguration(this.turnConfig);
@@ -2271,7 +2281,7 @@ export class GroupRoomManager {
     this.nativeVideo?.close();
     this.nativeVideoAction = this.room.makeAction('native_video_v1');
     this.nativeVideo = new NativeVideoTransport({
-      rtc: () => buildRtcConfiguration(this.turnConfig),
+      rtc: () => this.getRtcConfiguration(),
       send: (peerId, signal) => this.nativeVideoAction?.send(signal, { target: peerId }),
       permitted: (peerId, descriptor) => this.room === boundRoom && this.peerTracker.isVerified(peerId) &&
         (!this.authority || this.localAdmitted && this.isAdmittedPeer(peerId)) &&

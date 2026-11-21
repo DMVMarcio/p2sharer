@@ -10,7 +10,9 @@ the Windows app.
 IN SHORT
 - No account, email or phone number is required.
 - No analytics, advertising, tracking cookies or telemetry.
-- Messages, media and files travel directly between participants, encrypted end to end.
+- Messages, media and files are encrypted end to end (DTLS/SRTP) and travel directly
+  between participants whenever possible, or through our TURN relay only as fallback when
+  direct routes fail.
 - Your profile, settings and saved rooms stay on your own device.
 
 1. DATA STORED ON YOUR DEVICE
@@ -30,12 +32,15 @@ participants can see the network addresses used to reach you. Share invitations 
 with people you trust; rooms can require a password and host approval.
 
 3. P2SHARER SERVERS
-Our server at p2sharer.com hosts the website and a signaling broker that helps devices
-find each other. It only relays short connection messages under hashed room topics and
-never stores messages, media or files. Your IP address is kept in memory only while you
-are connected, to limit abuse, and is not written to logs. The downloads page reads
-release information from GitHub through our server. P2Sharer sets no cookies of its own,
-and our hosting provider may keep standard technical logs.
+Our server at p2sharer.com hosts the website, a signaling broker, and an optional TURN
+fallback relay for networks where strict NAT or missing IPv6 prevents direct
+connections. The broker only relays short connection messages under hashed room topics,
+and the TURN relay only forwards encrypted DTLS/SRTP packets under short-lived
+credentials with fair-use bandwidth and allocation limits—never decrypting or storing
+messages, media or files. Your IP address is kept in memory only while connected or
+requesting relay access, to limit abuse, and is not written to logs. The downloads page
+reads release information from GitHub through our server. P2Sharer sets no cookies of
+its own, and our hosting provider may keep standard technical logs.
 
 4. THIRD-PARTY SERVICES
 Some features rely on external services. They receive your IP address and the data they
@@ -61,8 +66,9 @@ when you choose.
 
 6. YOUR CHOICES
 You can edit your profile, remove saved rooms, clear shared browser data, revoke remote
-control at any time and change discovery services in settings. Clearing this site's data
-in your browser or uninstalling the app removes everything stored locally.
+control at any time, disable the automatic TURN fallback relay, and change discovery
+services in settings. Clearing this site's data in your browser or uninstalling the app
+removes everything stored locally.
 
 7. CHILDREN
 P2Sharer is not directed at children under 13, and we do not knowingly receive their

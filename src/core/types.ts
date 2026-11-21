@@ -132,6 +132,7 @@ export interface TurnConfig {
   username?: string;
   credential?: string;
   forceRelay?: boolean;
+  fallbackEnabled?: boolean;
 }
 
 export interface ResolutionConfig {

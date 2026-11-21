@@ -3,6 +3,7 @@ import { t } from '../i18n/index.ts';
 import { selectedIcePair } from '../core/ice_route.ts';
 import { diagnosticOpaqueId } from '../core/diagnostic_id.ts';
 import { classifyIceAddress, fingerprintIceAddress } from '../core/ice_address_diagnostics.ts';
+import { apiUrl } from '../platform/website.ts';
 
 export const DEFAULT_STUN_SERVERS = [
   'stun:stun.cloudflare.com:3478',
@@ -133,6 +134,119 @@ export function parseTurnUrls(rawUrls: string): string[] {
 
 export function isValidTurnUrl(url: string): boolean {
   return /^turns?:(?:\[[0-9a-f:.]+\]|[a-z0-9.-]+)(?::\d{1,5})?(?:\?transport=(?:udp|tcp))?$/i.test(url);
+}
+
+let cachedFallbackTurn: { config: TurnConfig; expiresAt: number } | null = null;
+let inFlightFallbackTurn: Promise<TurnConfig> | null = null;
+let fallbackEpoch = 0;
+
+/** Clears cached first-party TURN fallback credentials. */
+export function clearTurnFallbackCache(): void {
+  fallbackEpoch++;
+  cachedFallbackTurn = null;
+  inFlightFallbackTurn = null;
+}
+
+/** Resolves explicit user TURN settings or fetches short-lived first-party fallback credentials. */
+export async function resolveTurnConfig(
+  turnConfig?: TurnConfig | null,
+  options?: { fetch?: typeof globalThis.fetch; forceRefresh?: boolean },
+): Promise<TurnConfig> {
+  if (turnConfig?.enabled && turnConfig.url && parseTurnUrls(turnConfig.url).some(isValidTurnUrl)) {
+    return turnConfig;
+  }
+
+  const fallbackEnabled =
+    turnConfig?.fallbackEnabled ??
+    (typeof localStorage === 'undefined' || localStorage.getItem('p2sharer_turn_fallback') !== 'false');
+
+  if (!fallbackEnabled) {
+    return { enabled: false, forceRelay: false, fallbackEnabled: false };
+  }
+
+  if (!options?.forceRefresh && cachedFallbackTurn && Date.now() < cachedFallbackTurn.expiresAt) {
+    return { ...cachedFallbackTurn.config };
+  }
+
+  if (typeof process !== 'undefined' && Boolean(process?.versions?.node) && !options?.fetch) {
+    return { enabled: false, forceRelay: false, fallbackEnabled: true };
+  }
+
+  const fetchImpl = options?.fetch ?? (typeof globalThis.fetch === 'function' ? globalThis.fetch.bind(globalThis) : null);
+  if (!fetchImpl) {
+    return { enabled: false, forceRelay: false, fallbackEnabled: true };
+  }
+
+  if (!options?.forceRefresh && inFlightFallbackTurn) {
+    return inFlightFallbackTurn.then((resolved) => ({ ...resolved }));
+  }
+
+  const requestEpoch = ++fallbackEpoch;
+  const task: Promise<TurnConfig> = (async () => {
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timeoutId = controller ? setTimeout(() => controller.abort(), 2500) : undefined;
+    const cacheResult = (config: TurnConfig, ttlMs: number) => {
+      if (fallbackEpoch === requestEpoch) {
+        cachedFallbackTurn = { config, expiresAt: Date.now() + ttlMs };
+      }
+      return config;
+    };
+    try {
+      const response = await fetchImpl(apiUrl('/api/turn'), {
+        headers: { 'X-P2Sharer-Client': '1' },
+        ...(controller ? { signal: controller.signal } : {}),
+      });
+      if (!response.ok) {
+        return cacheResult({ enabled: false, forceRelay: false, fallbackEnabled: true }, 30_000);
+      }
+      const data = await response.json() as {
+        enabled?: unknown;
+        urls?: unknown;
+        username?: unknown;
+        credential?: unknown;
+        ttl?: unknown;
+      } | null;
+      if (
+        data?.enabled === true &&
+        Array.isArray(data.urls) &&
+        typeof data.username === 'string' &&
+        data.username.length > 0 &&
+        typeof data.credential === 'string' &&
+        data.credential.length > 0
+      ) {
+        const urls = data.urls
+          .filter((item): item is string => typeof item === 'string')
+          .map(sanitizeTurnUrl)
+          .filter(isValidTurnUrl);
+        if (urls.length > 0) {
+          const ttlSeconds = typeof data.ttl === 'number' && Number.isFinite(data.ttl) && data.ttl > 60
+            ? data.ttl
+            : 21600;
+          const resolved: TurnConfig = {
+            enabled: true,
+            url: [...new Set(urls)].join('\n'),
+            username: data.username,
+            credential: data.credential,
+            forceRelay: false,
+            fallbackEnabled: true,
+          };
+          return cacheResult(resolved, Math.max(30_000, (ttlSeconds - 300) * 1000));
+        }
+      }
+      return cacheResult({ enabled: false, forceRelay: false, fallbackEnabled: true }, 30_000);
+    } catch {
+      return cacheResult({ enabled: false, forceRelay: false, fallbackEnabled: true }, 30_000);
+    } finally {
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+      if (fallbackEpoch === requestEpoch) {
+        inFlightFallbackTurn = null;
+      }
+    }
+  })();
+
+  inFlightFallbackTurn = task;
+  const resolved = await task;
+  return { ...resolved };
 }
 
 export function buildIceServers(turnConfig?: TurnConfig | null): RTCIceServer[] {

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHmac } from 'node:crypto';
 import { test } from 'node:test';
 import { mkdtemp, writeFile, mkdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -88,5 +89,43 @@ test('API supports the configured website origin, preflight and origin isolation
     assert.match(preflight.headers.get('access-control-allow-methods'), /GET/);
     const denied = await fetch(url, { headers: { Origin: 'https://untrusted.example' } });
     assert.equal(denied.status, 403); assert.equal(denied.headers.get('access-control-allow-origin'), null);
+  } finally { await new Promise(resolve => server.close(resolve)); }
+});
+
+test('TURN credential endpoint enforces client verification, issues HMAC-SHA1 credentials and rate-limits by IP', async () => {
+  const unconfigured = await createWebServer();
+  await new Promise(resolve => unconfigured.listen(0, '127.0.0.1', resolve));
+  const unconfiguredBase = `http://127.0.0.1:${unconfigured.address().port}`;
+  try {
+    assert.equal((await fetch(`${unconfiguredBase}/api/turn`)).status, 403);
+    const disabledResponse = await fetch(`${unconfiguredBase}/api/turn`, { headers: { 'X-P2Sharer-Client': '1' } });
+    assert.equal(disabledResponse.status, 200);
+    assert.deepEqual(await disabledResponse.json(), { enabled: false, urls: [] });
+  } finally { await new Promise(resolve => unconfigured.close(resolve)); }
+
+  const secret = 'fixture-turn-shared-secret';
+  const urls = ['turn:relay.example:3478?transport=udp', 'turn:relay.example:3478?transport=tcp'];
+  const server = await createWebServer({ turn: { secret, urls, ttl: 600, maxPerIp: 2 } });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    const config = await (await fetch(`${base}/api/config`)).json();
+    assert.equal(config.turnFallback, true);
+    assert.equal((await fetch(`${base}/api/turn`)).status, 403);
+
+    const first = await fetch(`${base}/api/turn`, { headers: { 'X-P2Sharer-Client': '1' } });
+    assert.equal(first.status, 200);
+    const body = await first.json();
+    assert.equal(body.enabled, true);
+    assert.deepEqual(body.urls, urls);
+    assert.equal(body.ttl, 600);
+    assert.match(body.username, /^\d+:p2s-[0-9a-f]{8}$/);
+    const expectedCredential = createHmac('sha1', secret).update(body.username).digest('base64');
+    assert.equal(body.credential, expectedCredential);
+
+    const second = await fetch(`${base}/api/turn`, { headers: { 'X-P2Sharer-Client': '1' } });
+    assert.equal(second.status, 200);
+    const limited = await fetch(`${base}/api/turn`, { headers: { 'X-P2Sharer-Client': '1' } });
+    assert.equal(limited.status, 429);
   } finally { await new Promise(resolve => server.close(resolve)); }
 });
