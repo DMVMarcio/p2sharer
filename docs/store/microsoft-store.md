@@ -9,6 +9,12 @@ P2Sharer ships to the Microsoft Store as an MSIX package. The Store signs the pa
 - At runtime `app_distribution.rs` detects MSIX package identity. Inside the Store package the built-in updater never checks GitHub and Application settings explains that the Store delivers updates.
 - Wintun is extracted to the per-user cache, which works inside the package. The WebView2 Runtime must already be present (it is part of Windows 11 and installed on up-to-date Windows 10 PCs); MSIX cannot run the WebView2 bootstrapper.
 
+## Store product
+
+- Store ID: `9PHRC9K73GXX`
+- Listing: https://apps.microsoft.com/detail/9PHRC9K73GXX
+- Package family name: `iMarcioo.P2Sharer_eqg631kf5zgz0`
+
 ## One-time Partner Center setup
 
 1. Partner Center → Apps and games → New product → **MSIX or PWA app**, reserve the name `P2Sharer`.
