@@ -83,6 +83,10 @@ Turning beta updates off and saving immediately checks the stable endpoint, even
 
 To retry an unpublished draft after fixing the workflow, push the fix to `main`, then use **Actions > Build release draft > Run workflow**, select branch **main** and supply the existing tag (for example, `v1.0.0`). **Re-run jobs** on an old run uses its original workflow revision and will repeat an already-fixed workflow error. The application is still checked out from the requested tag; shared build setup comes from the selected workflow revision. The job refuses to rebuild a published release. Never delete or recreate a public tag to replace its binaries.
 
+## Microsoft Store
+
+The Store channel ships an unsigned MSIX that Microsoft signs during certification; Store installs receive updates from the Store and keep the built-in updater inactive. See [Microsoft Store packaging](store/microsoft-store.md).
+
 ## Build caches
 
 The [main-branch workflow](../.github/workflows/validate.yml) runs on pushes to `main` and can be dispatched manually on that branch. It runs repository checks, frontend tests and compilation, and native tests, then warms dependency caches without generating installers or creating a release. Native tests compile Rust dependencies in the release profile so they remain reusable by release builds. Installer generation and packaging validation run in the release workflow; packaging failures are therefore discovered when preparing a release. Both workflows use the same [build setup](../.github/actions/setup-build/action.yml).

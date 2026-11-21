@@ -2029,5 +2029,6 @@
   "privacyPolicy.childrenText": "P2Sharer richtet sich nicht an Kinder unter 13 Jahren, und wir erhalten wissentlich keine personenbezogenen Daten von ihnen.",
   "privacyPolicy.changesTitle": "Änderungen und Kontakt",
   "privacyPolicy.changesText": "Wir aktualisieren diese Seite, sobald sich ändert, wie P2Sharer mit Daten umgeht. Bei Fragen eröffne ein Issue auf GitHub. Sicherheitsprobleme meldest du vertraulich über die GitHub-Sicherheitshinweise.",
-  "privacyPolicy.securityLink": "Sicherheitsproblem melden"
+  "privacyPolicy.securityLink": "Sicherheitsproblem melden",
+  "updates.storeManaged": "Updates für diese Microsoft-Store-Installation werden vom Microsoft Store bereitgestellt."
 }

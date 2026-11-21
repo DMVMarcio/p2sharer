@@ -91,6 +91,9 @@ pub async fn check_app_update(
     if webview.label() != "main" {
         return Err("Only the main window can check updates".into());
     }
+    if crate::app_distribution::is_store_package() {
+        return Ok(None);
+    }
     let updater = if include_prereleases {
         preview_updater(&webview).await?
     } else {

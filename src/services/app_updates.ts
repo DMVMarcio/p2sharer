@@ -40,7 +40,23 @@ export const appUpdates = new AppUpdateController({
   cancelInstall: () => invoke('cancel_app_update'),
 });
 
+let storeManaged: Promise<boolean> | null = null;
+
+/** Microsoft Store (MSIX) installs are updated by the Store, not by the built-in updater. */
+export function storeManagedUpdates(): Promise<boolean> {
+  storeManaged ??= isTauri() ? invoke<boolean>('store_managed_updates').catch(() => false) : Promise.resolve(false);
+  return storeManaged;
+}
+
 export function startAutomaticUpdateChecks(): () => void {
   if (!isTauri()) return () => {};
-  return appUpdates.startAutomaticChecks();
+  let cancelled = false;
+  let stop: (() => void) | null = null;
+  void storeManagedUpdates().then(managed => {
+    if (!managed && !cancelled) stop = appUpdates.startAutomaticChecks();
+  });
+  return () => {
+    cancelled = true;
+    stop?.();
+  };
 }

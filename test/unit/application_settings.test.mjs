@@ -54,7 +54,7 @@ const bundle = await build({
     }[args.path] }));
     builder.onResolve({ filter: /services\/app_updates/ }, () => ({ path: 'updater', namespace: 'fixture' }));
     builder.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({
-      contents: 'export const appUpdates = globalThis.applicationSettingsController;',
+      contents: 'export const appUpdates = globalThis.applicationSettingsController; export const storeManagedUpdates = async () => false;',
     }));
     builder.onResolve({ filter: /^[^./]/ }, args => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
   } }],

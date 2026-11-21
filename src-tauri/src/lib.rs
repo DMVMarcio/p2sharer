@@ -42,6 +42,7 @@ mod localization;
 mod app_data_migration;
 mod invitation_routing;
 mod app_updates;
+mod app_distribution;
 pub mod portable_update;
 pub mod lan_signaling;
 mod interface_stun;
@@ -239,6 +240,7 @@ pub fn run() {
             lan_signaling::send_lan_signaling,
             lan_signaling::disconnect_lan_signaling,
             app_updates::check_app_update,
+            app_distribution::store_managed_updates,
             twitch_auth::open_twitch_auth,
             portable_update::download_portable_update,
             portable_update::install_portable_update,

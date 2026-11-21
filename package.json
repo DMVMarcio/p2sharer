@@ -1,7 +1,7 @@
 {
   "name": "tauri-app",
   "private": true,
-  "version": "1.7.2",
+  "version": "1.7.3",
   "type": "module",
   "scripts": {
     "release:version": "node tools/release.mjs version",
@@ -18,6 +18,8 @@
     "tauri": "node tools/tauri.mjs",
     "tauri:dev": "node tools/tauri.mjs dev",
     "tauri:build": "node tools/tauri.mjs build",
+    "store:msix": "node tools/tauri.mjs build --no-bundle && node tools/msix.mjs",
+    "store:msix:local": "node tools/tauri.mjs build --no-bundle && node tools/msix.mjs --local",
     "test": "node tools/test.mjs",
     "test:native": "node tools/test.mjs --native",
     "web:dev": "pnpm --filter @p2sharer/web dev",

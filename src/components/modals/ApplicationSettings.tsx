@@ -1,9 +1,10 @@
 import { isTauri } from '@tauri-apps/api/core';
+import { useEffect, useState } from 'react';
 import { t } from '../../i18n';
 import { LANGUAGE_OPTIONS, isAppLanguage, type AppLanguage } from '../../i18n/language';
 import { useLocale } from '../../hooks/useLocale';
 import { useAppUpdates } from '../../hooks/useAppUpdates';
-import { appUpdates } from '../../services/app_updates';
+import { appUpdates, storeManagedUpdates } from '../../services/app_updates';
 import { Select } from '../common/Select';
 import { AppVersion } from '../common/AppVersion';
 import { releaseNotes } from '../../services/release_notes';
@@ -22,6 +23,12 @@ export function ApplicationSettings({ language, onLanguageChange, automatic, inc
   const update = useAppUpdates();
   const busy = ['downloading', 'installing'].includes(update.status);
   const channelChanged = includePrereleases !== update.includePrereleases;
+  const [storeManaged, setStoreManaged] = useState(false);
+  useEffect(() => {
+    let active = true;
+    void storeManagedUpdates().then(managed => { if (active) setStoreManaged(managed); });
+    return () => { active = false; };
+  }, []);
   return <div className="settings-tab-pane active" id="settings-pane-application">
     <div className="settings-pane-header">
       <h3 className="settings-pane-title">{t("message.82929ebe1446")}</h3>
@@ -38,7 +45,8 @@ export function ApplicationSettings({ language, onLanguageChange, automatic, inc
     <p className="field-info-text"><AppVersion /></p>
     <button type="button" className="btn btn-secondary btn-sm" onClick={releaseNotes.open}>
       {t('releaseNotes.view')}</button>
-    {isTauri() && <><label className="settings-switch-row" htmlFor="settings-auto-updates">
+    {isTauri() && storeManaged && <p className="field-info-text">{t('updates.storeManaged')}</p>}
+    {isTauri() && !storeManaged && <><label className="settings-switch-row" htmlFor="settings-auto-updates">
       <div className="settings-switch-label-group">
         <span className="settings-switch-title">{t("message.d8a908a0e8ab")}</span>
       </div>

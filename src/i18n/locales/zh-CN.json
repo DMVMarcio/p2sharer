@@ -2029,5 +2029,6 @@
   "privacyPolicy.childrenText": "P2Sharer 并非面向 13 岁以下儿童，我们也不会在知情的情况下接收他们的个人数据。",
   "privacyPolicy.changesTitle": "变更与联系",
   "privacyPolicy.changesText": "当 P2Sharer 处理数据的方式发生变化时，我们会更新本页面。如有疑问，请在 GitHub 上提交 issue。安全问题请通过 GitHub 安全公告私下报告。",
-  "privacyPolicy.securityLink": "报告安全问题"
+  "privacyPolicy.securityLink": "报告安全问题",
+  "updates.storeManaged": "此 Microsoft Store 安装版本的更新由 Microsoft Store 提供。"
 }
