@@ -1,0 +1,48 @@
+name: Bug Report
+description: Report a bug in P2Sharer (Desktop or Web)
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug! Please avoid sharing private room codes, passwords, personal tokens, or unredacted network addresses.
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the issue clearly, including what you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Step-by-step actions to reproduce the problem.
+      placeholder: |
+        1. Open P2Sharer and join a room...
+        2. Start screen sharing / open app...
+        3. Observe error...
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Windows Desktop (Tauri)
+        - Web App (Browser)
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      placeholder: e.g. 1.7.2
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or screenshots (redacted)
+      description: Optional. Remove any personal room codes, usernames, or IP addresses before attaching.
