@@ -1,9 +1,9 @@
-import { useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
-import { Crown, FileText, Globe, MessageSquare, Network, Palette, Play, Tv, ArrowRight, Paperclip } from 'lucide-react';
+import { useId, useRef, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
+import { ArrowRight, Check, Crown, FileText, FileVideo, Globe, MessageSquare, Network, Palette, Play, Tv } from 'lucide-react';
 import { t } from '../../../src/i18n';
-import { useReducedMotion } from '../../../src/core/appearance_preferences';
 import { LiveCursor, MiniChessBoard, PEERS, PeerAvatar, WhiteboardSketch } from './scenes';
-import { useInView } from './motion';
+import { useAutoCycle, useInView, useLoopStep } from './motion';
+import { CycleTimer } from './CycleTimer';
 
 function YoutubeScene() {
   return (
@@ -46,12 +46,37 @@ function NotepadScene() {
 }
 
 function ChatScene() {
+  const ref = useRef<HTMLDivElement>(null);
+  const step = useLoopStep(5, 700, useInView(ref), 4);
+  const messages = [
+    { peer: PEERS[0], text: 'web.mockChat1' },
+    { peer: PEERS[3], text: 'web.mockChat3', own: true, file: true },
+    { peer: PEERS[1], text: 'web.mockChat2', reactions: true },
+  ];
   return (
-    <div className="lp-scene lp-scene-chat">
-      {PEERS.slice(0, 3).map((peer, index) => (
-        <div key={peer.name} className={`lp-bubble${index === 1 ? ' is-own' : ''}`} style={{ '--i': index, '--peer': peer.color } as CSSProperties}>
-          <PeerAvatar peer={peer} size={22} />
-          <span><i style={{ '--w': `${60 + index * 12}%` } as CSSProperties} />{index === 2 && <em><Paperclip size={11} />trip.mov · 6.1 GB</em>}</span>
+    <div ref={ref} className="lp-scene lp-scene-chat">
+      {messages.map((message, index) => (
+        <div
+          key={message.text}
+          className={`lp-bubble${message.own ? ' is-own' : ''}`}
+          data-shown={step > index || undefined}
+          style={{ '--peer': message.peer.color } as CSSProperties}
+        >
+          <PeerAvatar peer={message.peer} size={26} />
+          <div className="lp-bubble-body">
+            <b>{message.peer.name}</b>
+            <p>{t(message.text)}</p>
+            {message.file && (
+              <span className="lp-bubble-file" data-done={step > 3 || undefined}>
+                <FileVideo size={15} />
+                <span><strong>trip.mov</strong><small>6.1 GB</small><i><em /></i></span>
+                <Check size={13} />
+              </span>
+            )}
+            {message.reactions && (
+              <span className="lp-bubble-reactions"><span>🔥 3</span><span>😂 2</span></span>
+            )}
+          </div>
         </div>
       ))}
     </div>
@@ -105,48 +130,29 @@ const APPS: { id: string; tone: string; icon: typeof Play; title: string; descri
   { id: 'tunnels', tone: '#14b8a6', icon: Network, title: 'web.appTunnelsTitle', description: 'web.appTunnelsDesc', badge: 'web.appBadgeDesktop', scene: TunnelScene },
 ];
 
-/** Interactive dock of room apps; cycles automatically until the visitor picks one. */
+const CYCLE_MS = 5200;
+
+/** Interactive dock of room apps; rotates automatically and restarts its timer when the visitor picks one. */
 export function AppDock() {
   const ref = useRef<HTMLDivElement>(null);
   const tabs = useRef<(HTMLButtonElement | null)[]>([]);
   const id = useId();
   const active = useInView(ref);
-  const reduced = useReducedMotion();
-  const [index, setIndex] = useState(0);
-  const [manual, setManual] = useState(false);
-  const [hovering, setHovering] = useState(false);
-  const cycling = active && !manual && !reduced && !hovering;
-
-  useEffect(() => {
-    if (!cycling) return;
-    const timer = window.setInterval(() => setIndex(current => (current + 1) % APPS.length), 4600);
-    return () => window.clearInterval(timer);
-  }, [cycling]);
-
-  const select = (next: number, focus = false) => {
-    setManual(true);
-    setIndex(next);
-    if (focus) tabs.current[next]?.focus();
-  };
+  const { index, select, running, cycle, focusHandlers } = useAutoCycle(APPS.length, CYCLE_MS, active);
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const keys: Record<string, number> = { ArrowRight: index + 1, ArrowDown: index + 1, ArrowLeft: index - 1, ArrowUp: index - 1, Home: 0, End: APPS.length - 1 };
     if (!(event.key in keys)) return;
     event.preventDefault();
-    select((keys[event.key] + APPS.length) % APPS.length, true);
+    const next = (keys[event.key] + APPS.length) % APPS.length;
+    select(next);
+    tabs.current[next]?.focus();
   };
 
   const app = APPS[index];
   const Scene = app.scene;
   return (
-    <div
-      ref={ref}
-      className="lp-dock"
-      data-active={active || undefined}
-      style={{ '--tone': app.tone } as CSSProperties}
-      onPointerEnter={() => setHovering(true)}
-      onPointerLeave={() => setHovering(false)}
-    >
+    <div ref={ref} className="lp-dock" data-active={active || undefined} style={{ '--tone': app.tone } as CSSProperties} {...focusHandlers}>
       <div className="lp-dock-tabs" role="tablist" aria-label={t('web.navApps')} aria-orientation="vertical" onKeyDown={onKeyDown}>
         {APPS.map((item, itemIndex) => {
           const Icon = item.icon;
@@ -167,7 +173,7 @@ export function AppDock() {
             >
               <span className="lp-dock-icon" aria-hidden="true"><Icon size={17} /></span>
               <span className="lp-dock-label">{t(item.title)}</span>
-              {selected && cycling && <span className="lp-dock-timer" aria-hidden="true" />}
+              {selected && <CycleTimer running={running} cycle={cycle} duration={CYCLE_MS} />}
             </button>
           );
         })}

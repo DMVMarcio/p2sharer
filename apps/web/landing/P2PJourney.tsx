@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useRef, type CSSProperties } from 'react';
 import { KeyRound, Lock, Radio, Server } from 'lucide-react';
 import { t } from '../../../src/i18n';
-import { useReducedMotion } from '../../../src/core/appearance_preferences';
 import { PEERS, PeerAvatar } from './scenes';
-import { useInView } from './motion';
+import { useAutoCycle, useInView } from './motion';
+import { CycleTimer } from './CycleTimer';
+
+const CYCLE_MS = 5200;
 
 const STEPS = [
   { icon: KeyRound, title: 'web.step1Title', description: 'web.step1Desc' },
@@ -20,22 +22,14 @@ const NODES = [
 ] as const;
 const LINKS = NODES.flatMap((from, i) => NODES.slice(i + 1).map(to => ({ from, to })));
 
-/** Interactive walkthrough of how a room connects: local keys, discovery, then a direct encrypted mesh. */
+/** Interactive, auto-advancing walkthrough of how a room connects: local keys, discovery, then a direct encrypted mesh. */
 export function P2PJourney() {
   const ref = useRef<HTMLDivElement>(null);
   const active = useInView(ref);
-  const reduced = useReducedMotion();
-  const [phase, setPhase] = useState(0);
-  const [manual, setManual] = useState(false);
-
-  useEffect(() => {
-    if (!active || manual || reduced) return;
-    const timer = window.setInterval(() => setPhase(current => (current + 1) % STEPS.length), 4200);
-    return () => window.clearInterval(timer);
-  }, [active, manual, reduced]);
+  const { index: phase, select, running, cycle, focusHandlers } = useAutoCycle(STEPS.length, CYCLE_MS, active);
 
   return (
-    <div ref={ref} className="lp-journey" data-phase={phase} data-active={active || undefined}>
+    <div ref={ref} className="lp-journey" data-phase={phase} data-active={active || undefined} {...focusHandlers}>
       <ol className="lp-journey-steps">
         {STEPS.map(({ icon: Icon, title, description }, index) => (
           <li key={title}>
@@ -43,7 +37,7 @@ export function P2PJourney() {
               type="button"
               className="lp-journey-step"
               aria-pressed={phase === index}
-              onClick={() => { setManual(true); setPhase(index); }}
+              onClick={() => select(index)}
             >
               <span className="lp-journey-index" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
               <span className="lp-journey-icon" aria-hidden="true"><Icon size={17} /></span>
@@ -51,7 +45,7 @@ export function P2PJourney() {
                 <strong>{t(title)}</strong>
                 <span>{t(description)}</span>
               </span>
-              {phase === index && !manual && !reduced && <span className="lp-journey-timer" aria-hidden="true" />}
+              {phase === index && <CycleTimer running={running} cycle={cycle} duration={CYCLE_MS} />}
             </button>
           </li>
         ))}

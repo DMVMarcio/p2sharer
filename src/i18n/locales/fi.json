@@ -1992,5 +1992,14 @@
   "web.filesPoint3": "Mitään ei ladata palvelimelle: ei tallennuskiintiöitä eikä vanhenevia linkkejä.",
   "web.playCreateTag": "SHAKKI • VALKOTAULU • JAETUT MUISTIINPANOT",
   "web.playCreateTitle": "Pelaa ja luo poistumatta huoneesta",
-  "web.playCreateDesc": "Aloita shakki-, tammi- tai ristinollapeli, luonnostelkaa ideoita jaetulla valkotaululla tai kirjoittakaa muistiinpanoja yhdessä. Kaikki näkevät jokaisen siirron heti."
+  "web.playCreateDesc": "Aloita shakki-, tammi- tai ristinollapeli, luonnostelkaa ideoita jaetulla valkotaululla tai kirjoittakaa muistiinpanoja yhdessä. Kaikki näkevät jokaisen siirron heti.",
+  "web.mockChat3": "Lähetän sulle klipin!",
+  "web.remoteTag": "HIIRI • NÄPPÄIMISTÖ • XBOX-PELIOHJAIMET",
+  "web.remoteTitle": "Etäohjaus yhdessä pelaamiseen",
+  "web.remoteDesc": "Anna kavereiden ottaa Windows-tietokoneesi hiiri, näppäimistö tai peliohjain yhdellä luvalla. Syötteet kulkevat suoraan P2P-yhteyttä pitkin, joten ohjaus tuntuu nopealta, ja jokainen pelaaja saa oman virtuaalisen Xbox 360 -ohjaimen.",
+  "web.remotePoint1": "Useita pelaajia yhtä aikaa, jokaisella oma ohjainpaikka, jonka järjestystä voit muuttaa.",
+  "web.remotePoint2": "Tikkujen kuollut alue sekä painikkeiden, liipaisimien ja tikkujen uudelleenmääritys ohjainkohtaisilla profiileilla.",
+  "web.remotePoint3": "Valitse hiiren, näppäimistön ja peliohjaimen oikeudet henkilökohtaisesti ja peru ne milloin tahansa.",
+  "web.tryRemote": "Kokeile: paina ohjaimen painikkeita.",
+  "web.remoteRemap": "Painikkeiden uudelleenmääritys"
 }

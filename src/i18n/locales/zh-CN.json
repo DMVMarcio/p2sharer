@@ -1992,5 +1992,14 @@
   "web.filesPoint3": "不会上传到任何服务器：没有存储配额，也没有会过期的链接。",
   "web.playCreateTag": "国际象棋 • 白板 • 共享笔记",
   "web.playCreateTitle": "不离开房间，一起玩、一起创作",
-  "web.playCreateDesc": "开一局国际象棋、跳棋或井字棋，在共享白板上勾勒想法，或一起写笔记。每个人都能实时看到每一步。"
+  "web.playCreateDesc": "开一局国际象棋、跳棋或井字棋，在共享白板上勾勒想法，或一起写笔记。每个人都能实时看到每一步。",
+  "web.mockChat3": "这就把片段发给你！",
+  "web.remoteTag": "鼠标 • 键盘 • XBOX 手柄",
+  "web.remoteTitle": "专为一起游戏打造的远程控制",
+  "web.remoteDesc": "只需一次授权，就能让朋友接管你 Windows 电脑上的鼠标、键盘或手柄。输入直接通过 P2P 连接传输，响应灵敏，每位玩家都有自己的虚拟 Xbox 360 手柄。",
+  "web.remotePoint1": "多名玩家同时游玩，每人拥有可重新排序的独立手柄槽位。",
+  "web.remotePoint2": "摇杆死区，以及按键、扳机和摇杆重映射，并支持按手柄保存配置。",
+  "web.remotePoint3": "为每个人分别设置鼠标、键盘和手柄权限，并可随时撤销。",
+  "web.tryRemote": "试试看：按下手柄按键。",
+  "web.remoteRemap": "按键重映射"
 }

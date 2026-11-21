@@ -1992,5 +1992,14 @@
   "web.filesPoint3": "Nothing is uploaded to a server: no storage quotas, no expiring links.",
   "web.playCreateTag": "CHESS • WHITEBOARD • SHARED NOTES",
   "web.playCreateTitle": "Play and create without leaving the room",
-  "web.playCreateDesc": "Start a match of Chess, Checkers or Tic-Tac-Toe, sketch ideas on a shared whiteboard or write notes together. Everyone sees every move as it happens."
+  "web.playCreateDesc": "Start a match of Chess, Checkers or Tic-Tac-Toe, sketch ideas on a shared whiteboard or write notes together. Everyone sees every move as it happens.",
+  "web.mockChat3": "Sending you the clip!",
+  "web.remoteTag": "MOUSE • KEYBOARD • XBOX GAMEPADS",
+  "web.remoteTitle": "Remote control made for playing together",
+  "web.remoteDesc": "Let friends take the mouse, keyboard or a gamepad on your Windows PC with a single consent prompt. Inputs travel straight over the P2P connection for a responsive feel, and every player gets their own virtual Xbox 360 controller.",
+  "web.remotePoint1": "Several players at once, each on their own gamepad slot that you can reorder.",
+  "web.remotePoint2": "Stick deadzone plus button, trigger and stick remapping, with per-controller profiles.",
+  "web.remotePoint3": "Choose mouse, keyboard and gamepad permissions per person and revoke them anytime.",
+  "web.tryRemote": "Try it: press the controller buttons.",
+  "web.remoteRemap": "Button remapping"
 }

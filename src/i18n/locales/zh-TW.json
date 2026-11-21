@@ -1992,5 +1992,14 @@
   "web.filesPoint3": "不會上傳到任何伺服器：沒有儲存配額，也沒有會過期的連結。",
   "web.playCreateTag": "西洋棋 • 白板 • 共享筆記",
   "web.playCreateTitle": "不離開房間，一起玩、一起創作",
-  "web.playCreateDesc": "開一局西洋棋、西洋跳棋或井字遊戲，在共享白板上勾勒想法，或一起寫筆記。每個人都能即時看到每一步。"
+  "web.playCreateDesc": "開一局西洋棋、西洋跳棋或井字遊戲，在共享白板上勾勒想法，或一起寫筆記。每個人都能即時看到每一步。",
+  "web.mockChat3": "這就把片段傳給你！",
+  "web.remoteTag": "滑鼠 • 鍵盤 • XBOX 手把",
+  "web.remoteTitle": "專為一起遊戲打造的遠端控制",
+  "web.remoteDesc": "只需一次授權，就能讓朋友接管你 Windows 電腦上的滑鼠、鍵盤或手把。輸入直接透過 P2P 連線傳輸，反應靈敏，每位玩家都有自己的虛擬 Xbox 360 手把。",
+  "web.remotePoint1": "多名玩家同時遊玩，每人擁有可重新排序的獨立手把槽位。",
+  "web.remotePoint2": "搖桿死區，以及按鍵、扳機和搖桿重新對應，並支援依手把儲存設定檔。",
+  "web.remotePoint3": "為每個人分別設定滑鼠、鍵盤和手把權限，並可隨時撤銷。",
+  "web.tryRemote": "試試看：按下手把按鍵。",
+  "web.remoteRemap": "按鍵重新對應"
 }

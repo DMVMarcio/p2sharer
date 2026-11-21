@@ -1992,5 +1992,14 @@
   "web.filesPoint3": "Rien n'est envoyé sur un serveur : pas de quota de stockage, pas de liens qui expirent.",
   "web.playCreateTag": "ÉCHECS • TABLEAU BLANC • NOTES PARTAGÉES",
   "web.playCreateTitle": "Jouez et créez sans quitter le salon",
-  "web.playCreateDesc": "Lancez une partie d'Échecs, de Dames ou de Morpion, esquissez des idées sur un tableau blanc partagé ou rédigez des notes ensemble. Chacun voit chaque coup en direct."
+  "web.playCreateDesc": "Lancez une partie d'Échecs, de Dames ou de Morpion, esquissez des idées sur un tableau blanc partagé ou rédigez des notes ensemble. Chacun voit chaque coup en direct.",
+  "web.mockChat3": "Je t'envoie le clip !",
+  "web.remoteTag": "SOURIS • CLAVIER • MANETTES XBOX",
+  "web.remoteTitle": "Un contrôle à distance pensé pour jouer ensemble",
+  "web.remoteDesc": "Laissez vos amis prendre la souris, le clavier ou une manette sur votre PC Windows avec une seule demande d'autorisation. Les commandes passent directement par la connexion P2P pour une réponse vive, et chaque joueur obtient sa propre manette Xbox 360 virtuelle.",
+  "web.remotePoint1": "Plusieurs joueurs à la fois, chacun sur son propre emplacement de manette, réorganisable.",
+  "web.remotePoint2": "Zone morte des sticks et réaffectation des boutons, gâchettes et sticks, avec des profils par manette.",
+  "web.remotePoint3": "Choisissez les autorisations souris, clavier et manette pour chaque personne et révoquez-les à tout moment.",
+  "web.tryRemote": "Essayez : appuyez sur les boutons de la manette.",
+  "web.remoteRemap": "Réaffectation des boutons"
 }

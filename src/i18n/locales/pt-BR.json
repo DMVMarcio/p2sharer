@@ -1992,5 +1992,14 @@
   "web.filesPoint3": "Nada é enviado para um servidor: sem cota de armazenamento, sem links que expiram.",
   "web.playCreateTag": "XADREZ • QUADRO BRANCO • NOTAS COMPARTILHADAS",
   "web.playCreateTitle": "Jogue e crie sem sair da sala",
-  "web.playCreateDesc": "Comece uma partida de Xadrez, Damas ou Jogo da Velha, rascunhe ideias em um quadro branco compartilhado ou escrevam notas juntos. Todos veem cada movimento na hora."
+  "web.playCreateDesc": "Comece uma partida de Xadrez, Damas ou Jogo da Velha, rascunhe ideias em um quadro branco compartilhado ou escrevam notas juntos. Todos veem cada movimento na hora.",
+  "web.mockChat3": "Te mandando o clipe!",
+  "web.remoteTag": "MOUSE • TECLADO • GAMEPADS XBOX",
+  "web.remoteTitle": "Controle remoto feito para jogar junto",
+  "web.remoteDesc": "Deixe os amigos assumirem o mouse, o teclado ou um gamepad no seu PC com Windows com um único pedido de permissão. Os comandos vão direto pela conexão P2P, com resposta ágil, e cada jogador ganha o próprio controle virtual de Xbox 360.",
+  "web.remotePoint1": "Vários jogadores ao mesmo tempo, cada um no seu slot de gamepad, que você pode reordenar.",
+  "web.remotePoint2": "Zona morta dos analógicos e remapeamento de botões, gatilhos e analógicos, com perfis por controle.",
+  "web.remotePoint3": "Escolha permissões de mouse, teclado e gamepad para cada pessoa e revogue quando quiser.",
+  "web.tryRemote": "Experimente: aperte os botões do controle.",
+  "web.remoteRemap": "Remapeamento de botões"
 }

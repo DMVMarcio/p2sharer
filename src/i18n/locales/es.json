@@ -1992,5 +1992,14 @@
   "web.filesPoint3": "Nada se sube a un servidor: sin cuotas de almacenamiento ni enlaces que caducan.",
   "web.playCreateTag": "AJEDREZ • PIZARRA • NOTAS COMPARTIDAS",
   "web.playCreateTitle": "Juega y crea sin salir de la sala",
-  "web.playCreateDesc": "Empieza una partida de Ajedrez, Damas o Tres en Raya, esboza ideas en una pizarra compartida o escriban notas juntos. Todos ven cada movimiento al instante."
+  "web.playCreateDesc": "Empieza una partida de Ajedrez, Damas o Tres en Raya, esboza ideas en una pizarra compartida o escriban notas juntos. Todos ven cada movimiento al instante.",
+  "web.mockChat3": "¡Te envío el clip!",
+  "web.remoteTag": "RATÓN • TECLADO • MANDOS XBOX",
+  "web.remoteTitle": "Control remoto pensado para jugar juntos",
+  "web.remoteDesc": "Deja que tus amigos tomen el ratón, el teclado o un mando en tu PC con Windows con una sola solicitud de permiso. Las entradas viajan directamente por la conexión P2P para una respuesta ágil, y cada jugador recibe su propio mando virtual de Xbox 360.",
+  "web.remotePoint1": "Varios jugadores a la vez, cada uno en su propia ranura de mando que puedes reordenar.",
+  "web.remotePoint2": "Zona muerta de los sticks y reasignación de botones, gatillos y sticks, con perfiles por mando.",
+  "web.remotePoint3": "Elige permisos de ratón, teclado y mando para cada persona y revócalos cuando quieras.",
+  "web.tryRemote": "Pruébalo: pulsa los botones del mando.",
+  "web.remoteRemap": "Reasignación de botones"
 }

@@ -1,9 +1,11 @@
-import { useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import {
   Check,
   CloudOff,
   FileArchive,
   Gamepad2,
+  Keyboard,
+  MousePointer2,
   Globe,
   Laptop,
   Monitor,
@@ -210,6 +212,101 @@ export function PlayCreateDemo() {
       <div className="lp-play-card">
         <div className="lp-play-head"><span>{t('whiteboard.title')}</span></div>
         <WhiteboardSketch />
+      </div>
+    </div>
+  );
+}
+
+const FACE_BUTTONS = [
+  { id: 'y', label: 'Y', color: '#facc15' },
+  { id: 'x', label: 'X', color: '#38bdf8' },
+  { id: 'b', label: 'B', color: '#f87171' },
+  { id: 'a', label: 'A', color: '#4ade80' },
+] as const;
+
+const REMAPS = [['LB', 'RB'], ['Y', 'X'], ['RT', 'A']] as const;
+
+/** Remote control with virtual gamepads: the face buttons fire inside the shared game. */
+export function RemoteDemo() {
+  const [shots, setShots] = useState<{ id: number; color: string }[]>([]);
+  const [pressed, setPressed] = useState<string | null>(null);
+  const counter = useRef(0);
+
+  useEffect(() => {
+    if (!pressed) return;
+    const timer = window.setTimeout(() => setPressed(null), 180);
+    return () => window.clearTimeout(timer);
+  }, [pressed]);
+
+  const press = (id: string, color: string) => {
+    counter.current += 1;
+    const shot = { id: counter.current, color };
+    setPressed(id);
+    setShots(current => [...current.slice(-4), shot]);
+  };
+
+  return (
+    <div className="lp-demo lp-remote-demo">
+      <div className="lp-screen is-large" aria-hidden="true">
+        <GameScene />
+        {shots.map(shot => (
+          <span
+            key={shot.id}
+            className="lp-shot"
+            style={{ '--shot': shot.color } as CSSProperties}
+            onAnimationEnd={() => setShots(current => current.filter(item => item.id !== shot.id))}
+          />
+        ))}
+        <div className="lp-remote-hud">
+          {[PEERS[1], PEERS[2]].map((peer, index) => (
+            <span key={peer.name} className={`lp-remote-player${index === 0 && pressed ? ' is-input' : ''}`}>
+              <PeerAvatar peer={peer} size={20} />
+              <Gamepad2 size={12} />
+              P{index + 1}
+            </span>
+          ))}
+          <span className="lp-remote-player is-idle"><PeerAvatar peer={PEERS[0]} size={20} /><MousePointer2 size={12} /><Keyboard size={12} /></span>
+        </div>
+        <span className="lp-chip is-glass is-mono lp-screen-label">Xbox 360 × 2</span>
+      </div>
+      <div className="lp-remote-panel">
+        <div className="lp-pad">
+          <span className="lp-pad-stick is-left" aria-hidden="true"><i /></span>
+          <span className="lp-pad-dpad" aria-hidden="true"><i /><i /></span>
+          <span className="lp-pad-stick is-right" aria-hidden="true"><i /></span>
+          <div className="lp-pad-face" role="group" aria-label={t('remoteControl.gamepadPermission')}>
+            {FACE_BUTTONS.map(button => (
+              <button
+                key={button.id}
+                type="button"
+                className={`lp-pad-button is-${button.id}${pressed === button.id ? ' is-pressed' : ''}`}
+                style={{ '--btn': button.color } as CSSProperties}
+                onClick={() => press(button.id, button.color)}
+              >
+                {button.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="lp-remote-settings" aria-hidden="true">
+          <div className="lp-deadzone">
+            <span className="lp-remote-label">{t('inputBindings.deadzoneLabel')}</span>
+            <div className="lp-deadzone-body">
+              <svg viewBox="0 0 64 64">
+                <circle className="lp-deadzone-outer" cx="32" cy="32" r="29" />
+                <circle className="lp-deadzone-inner" cx="32" cy="32" r="9" />
+                <circle className="lp-deadzone-dot" cx="32" cy="32" r="3.6" />
+              </svg>
+              <strong>12%</strong>
+            </div>
+          </div>
+          <div className="lp-remap">
+            <span className="lp-remote-label">{t('web.remoteRemap')}</span>
+            {REMAPS.map(([from, to]) => (
+              <span key={from} className="lp-remap-row"><b>{from}</b><i>→</i><b>{to}</b></span>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );

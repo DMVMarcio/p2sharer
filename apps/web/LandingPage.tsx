@@ -8,12 +8,12 @@ import {
   Check,
   Crown,
   FolderUp,
+  Gamepad2,
   Globe,
   Monitor,
   ShieldCheck,
   Tv,
   UserCheck,
-  Zap,
 } from 'lucide-react';
 import { useAppTheme } from '../../src/hooks/useAppTheme';
 import { useLocale } from '../../src/hooks/useLocale';
@@ -22,7 +22,7 @@ import { LANGUAGE_OPTIONS } from '../../src/i18n/language';
 import { Select } from '../../src/components/common/Select';
 import logo from '../../src/assets/logo.png';
 import { HeroRoomPreview } from './landing/HeroRoomPreview';
-import { FilesDemo, PlayCreateDemo, Showcase, StreamDemo, WatchDemo, type Tone } from './landing/Showcase';
+import { FilesDemo, PlayCreateDemo, RemoteDemo, Showcase, StreamDemo, WatchDemo, type Tone } from './landing/Showcase';
 import { P2PJourney } from './landing/P2PJourney';
 import { AppDock } from './landing/AppDock';
 import { useScrollReveal } from './landing/motion';
@@ -170,6 +170,18 @@ export function LandingPage() {
           <StreamDemo />
         </Showcase>
         <Showcase
+          tone="sky"
+          icon={<Gamepad2 size={13} />}
+          tag="web.remoteTag"
+          title="web.remoteTitle"
+          description="web.remoteDesc"
+          points={['web.remotePoint1', 'web.remotePoint2', 'web.remotePoint3']}
+          hint="web.tryRemote"
+          reverse
+        >
+          <RemoteDemo />
+        </Showcase>
+        <Showcase
           tone="rose"
           icon={<Tv size={13} />}
           tag="web.featWatchTag"
@@ -177,7 +189,6 @@ export function LandingPage() {
           description="web.featWatchDesc"
           points={['web.splitWatchItem1', 'web.splitWatchItem2', 'web.splitWatchItem3']}
           hint="web.tryWatch"
-          reverse
         >
           <WatchDemo />
         </Showcase>
@@ -188,6 +199,7 @@ export function LandingPage() {
           title="web.featFilesTitle"
           description="web.featFilesDesc"
           points={['web.splitFilesItem1', 'web.filesPoint2', 'web.filesPoint3']}
+          reverse
         >
           <FilesDemo />
         </Showcase>
@@ -198,7 +210,6 @@ export function LandingPage() {
           title="web.playCreateTitle"
           description="web.playCreateDesc"
           points={['web.splitGamesItem1', 'web.splitFilesItem2', 'web.splitFilesItem3']}
-          reverse
         >
           <PlayCreateDemo />
         </Showcase>
@@ -221,10 +232,22 @@ export function LandingPage() {
       <section id="platforms" className="site-section" aria-labelledby="platforms-heading">
         <SectionHeader id="platforms-heading" eyebrow="web.platformsEyebrow" title="web.platformsHeading" lead="web.platformsLead" />
         <div className="site-platforms-grid">
-          <article className="site-platform-card tone-sky" data-reveal="">
+          <article className="site-platform-card is-featured" data-reveal="">
             <div className="site-platform-head">
-              <span className="site-platform-icon" aria-hidden="true"><Globe size={22} /></span>
-              <span className="site-mono-tag">{t('web.platformWebTag')}</span>
+              <span className="site-platform-tag"><Monitor size={14} aria-hidden="true" />{t('web.platformDesktopTag')}</span>
+              <h3>{t('web.platformDesktopTitle')}</h3>
+              <p>{t('web.platformDesktopDesc')}</p>
+            </div>
+            <ul className="site-platform-list is-columns">
+              {platformItems.desktop.map(item => <li key={item}><Check size={16} aria-hidden="true" /><span>{t(item)}</span></li>)}
+            </ul>
+            <div className="site-platform-actions">
+              <DownloadButton variant="primary" />
+            </div>
+          </article>
+          <article className="site-platform-card" data-reveal="" style={{ '--reveal-order': 1 } as CSSProperties}>
+            <div className="site-platform-head">
+              <span className="site-platform-tag"><Globe size={14} aria-hidden="true" />{t('web.platformWebTag')}</span>
               <h3>{t('web.platformWebTitle')}</h3>
               <p>{t('web.platformWebDesc')}</p>
             </div>
@@ -238,27 +261,10 @@ export function LandingPage() {
               </WebsiteLink>
             </div>
           </article>
-          <article className="site-platform-card tone-violet is-featured" data-reveal="" style={{ '--reveal-order': 1 } as CSSProperties}>
-            <div className="site-platform-head">
-              <span className="site-platform-icon" aria-hidden="true"><Zap size={22} /></span>
-              <span className="site-mono-tag">{t('web.platformDesktopTag')}</span>
-              <h3>{t('web.platformDesktopTitle')}</h3>
-              <p>{t('web.platformDesktopDesc')}</p>
-            </div>
-            <ul className="site-platform-list">
-              {platformItems.desktop.map(item => <li key={item}><Check size={16} aria-hidden="true" /><span>{t(item)}</span></li>)}
-            </ul>
-            <div className="site-platform-actions">
-              <DownloadButton />
-            </div>
-          </article>
         </div>
       </section>
 
       <section className="site-cta" aria-labelledby="cta-heading" data-reveal="">
-        <div className="lp-cta-mesh" aria-hidden="true">
-          {Array.from({ length: 14 }, (_, index) => <i key={index} style={{ '--i': index } as CSSProperties} />)}
-        </div>
         <div className="site-cta-copy">
           <h2 id="cta-heading">{t('web.ctaHeading')}</h2>
           <p>{t('web.ctaText')}</p>

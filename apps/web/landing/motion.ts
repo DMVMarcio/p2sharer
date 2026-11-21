@@ -1,4 +1,4 @@
-import { useEffect, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useState, type FocusEvent, type RefObject } from 'react';
 import { useReducedMotion } from '../../../src/core/appearance_preferences';
 
 const hasObserver = () => typeof window !== 'undefined' && 'IntersectionObserver' in window;
@@ -69,6 +69,48 @@ export function useLoopStep(count: number, interval: number, active: boolean, ho
     return () => window.clearInterval(timer);
   }, [active, count, holdLast, interval, reduced]);
   return reduced ? count - 1 : step;
+}
+
+/**
+ * Auto-advancing selection with a restartable timer. Choosing an item restarts the countdown
+ * instead of stopping the rotation; keyboard focus inside the group pauses it.
+ */
+export function useAutoCycle(count: number, interval: number, active: boolean) {
+  const reduced = useReducedMotion();
+  const [index, setIndex] = useState(0);
+  const [cycle, setCycle] = useState(0);
+  const [focused, setFocused] = useState(false);
+  const running = active && !reduced && !focused;
+
+  // Resuming restarts the countdown so the visible timer and the advance stay aligned.
+  useEffect(() => {
+    if (running) setCycle(current => current + 1);
+  }, [running]);
+
+  useEffect(() => {
+    if (!running) return;
+    const timer = window.setTimeout(() => {
+      setIndex(current => (current + 1) % count);
+      setCycle(current => current + 1);
+    }, interval);
+    return () => window.clearTimeout(timer);
+  }, [count, cycle, interval, running]);
+
+  const select = useCallback((next: number) => {
+    setIndex(next);
+    setCycle(current => current + 1);
+  }, []);
+
+  const focusHandlers = useMemo(() => ({
+    onFocus: (event: FocusEvent) => {
+      if ((event.target as Element).matches?.(':focus-visible')) setFocused(true);
+    },
+    onBlur: (event: FocusEvent) => {
+      if (!(event.currentTarget as Element).contains(event.relatedTarget as Node | null)) setFocused(false);
+    },
+  }), []);
+
+  return { index, select, running, cycle, focusHandlers };
 }
 
 /** Applies a subtle pointer-driven 3D tilt through CSS custom properties on fine pointers. */

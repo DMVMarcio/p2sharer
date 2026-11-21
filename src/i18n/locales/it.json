@@ -1992,5 +1992,14 @@
   "web.filesPoint3": "Nulla viene caricato su un server: nessuna quota di archiviazione, nessun link che scade.",
   "web.playCreateTag": "SCACCHI • LAVAGNA • NOTE CONDIVISE",
   "web.playCreateTitle": "Gioca e crea senza uscire dalla stanza",
-  "web.playCreateDesc": "Inizia una partita a Scacchi, Dama o Tris, abbozza idee su una lavagna condivisa o scrivete note insieme. Tutti vedono ogni mossa in tempo reale."
+  "web.playCreateDesc": "Inizia una partita a Scacchi, Dama o Tris, abbozza idee su una lavagna condivisa o scrivete note insieme. Tutti vedono ogni mossa in tempo reale.",
+  "web.mockChat3": "Ti mando la clip!",
+  "web.remoteTag": "MOUSE • TASTIERA • GAMEPAD XBOX",
+  "web.remoteTitle": "Controllo remoto pensato per giocare insieme",
+  "web.remoteDesc": "Lascia che gli amici prendano mouse, tastiera o un gamepad sul tuo PC Windows con un'unica richiesta di consenso. I comandi viaggiano direttamente sulla connessione P2P per una risposta reattiva e ogni giocatore riceve il proprio controller Xbox 360 virtuale.",
+  "web.remotePoint1": "Più giocatori contemporaneamente, ognuno nel proprio slot gamepad che puoi riordinare.",
+  "web.remotePoint2": "Zona morta degli stick e rimappatura di pulsanti, grilletti e stick, con profili per controller.",
+  "web.remotePoint3": "Scegli i permessi di mouse, tastiera e gamepad per ogni persona e revocali quando vuoi.",
+  "web.tryRemote": "Provalo: premi i pulsanti del controller.",
+  "web.remoteRemap": "Rimappatura dei pulsanti"
 }

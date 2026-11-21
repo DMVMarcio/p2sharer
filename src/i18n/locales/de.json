@@ -1992,5 +1992,14 @@
   "web.filesPoint3": "Nichts wird auf einen Server hochgeladen: keine Speicherkontingente, keine ablaufenden Links.",
   "web.playCreateTag": "SCHACH • WHITEBOARD • GEMEINSAME NOTIZEN",
   "web.playCreateTitle": "Spielen und gestalten, ohne den Raum zu verlassen",
-  "web.playCreateDesc": "Starte eine Partie Schach, Dame oder Tic-Tac-Toe, skizziert Ideen auf einem gemeinsamen Whiteboard oder schreibt zusammen Notizen. Alle sehen jeden Zug sofort."
+  "web.playCreateDesc": "Starte eine Partie Schach, Dame oder Tic-Tac-Toe, skizziert Ideen auf einem gemeinsamen Whiteboard oder schreibt zusammen Notizen. Alle sehen jeden Zug sofort.",
+  "web.mockChat3": "Ich schick dir den Clip!",
+  "web.remoteTag": "MAUS • TASTATUR • XBOX-GAMEPADS",
+  "web.remoteTitle": "Fernsteuerung für gemeinsames Spielen",
+  "web.remoteDesc": "Lass Freunde mit einer einzigen Zustimmung Maus, Tastatur oder ein Gamepad auf deinem Windows-PC übernehmen. Eingaben laufen direkt über die P2P-Verbindung und reagieren flott, und jeder Spieler bekommt seinen eigenen virtuellen Xbox-360-Controller.",
+  "web.remotePoint1": "Mehrere Spieler gleichzeitig, jeder auf einem eigenen Gamepad-Platz, den du umsortieren kannst.",
+  "web.remotePoint2": "Stick-Totzone sowie Neubelegung von Tasten, Triggern und Sticks, mit Profilen pro Controller.",
+  "web.remotePoint3": "Lege Maus-, Tastatur- und Gamepad-Rechte pro Person fest und entziehe sie jederzeit.",
+  "web.tryRemote": "Probier es aus: Drück die Controller-Tasten.",
+  "web.remoteRemap": "Tastenbelegung"
 }
