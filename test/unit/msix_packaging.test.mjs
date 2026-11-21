@@ -10,7 +10,13 @@ test('Store packages use four-part stable versions and reject prereleases', () =
 });
 
 test('Store identity must come from Partner Center unless building a local test layout', () => {
-  const placeholder = JSON.parse(readFileSync(new URL('../../src-tauri/windows/msix/store.json', import.meta.url), 'utf8'));
+  const configured = JSON.parse(readFileSync(new URL('../../src-tauri/windows/msix/store.json', import.meta.url), 'utf8'));
+  assert.deepEqual(storeIdentity(configured, false), configured);
+  const placeholder = {
+    identityName: 'REPLACE_WITH_PARTNER_CENTER_PACKAGE_IDENTITY_NAME',
+    publisher: 'CN=REPLACE_WITH_PARTNER_CENTER_PUBLISHER_ID',
+    publisherDisplayName: 'REPLACE_WITH_PARTNER_CENTER_PUBLISHER_DISPLAY_NAME',
+  };
   assert.throws(() => storeIdentity(placeholder, false), /Partner Center/);
   assert.throws(() => storeIdentity({ identityName: 'A.B', publisher: 'Someone', publisherDisplayName: 'A' }, false), /CN=/);
   assert.equal(storeIdentity(placeholder, true).identityName, 'P2Sharer.LocalTest');
