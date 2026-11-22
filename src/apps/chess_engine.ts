@@ -1,3 +1,16 @@
+import {
+  advanceBoardClockOnMove,
+  createBoardClock,
+  getElapsedTurnMs,
+  pauseBoardClock,
+  restoreBoardClockOnUndo,
+  timeoutBoardClock,
+  validBoardClockState,
+  validBoardUndoRequest,
+  type BoardClockState,
+  type BoardUndoRequest,
+} from './board_game_timing.ts';
+
 export type ChessColor = 'w' | 'b';
 export type ChessPieceType = 'p' | 'n' | 'b' | 'r' | 'q' | 'k';
 export type ChessPromotionPiece = 'q' | 'r' | 'b' | 'n';
@@ -14,6 +27,14 @@ export interface ChessCastlingRights {
   bQ: boolean;
 }
 
+export interface ChessMoveUndoMeta {
+  castling: ChessCastlingRights;
+  enPassantTarget: number | null;
+  halfMoveClock: number;
+  lastMove: { from: number; to: number } | null;
+  remainingMs?: { w: number; b: number };
+}
+
 export interface ChessMoveRecord {
   from: number;
   to: number;
@@ -24,6 +45,7 @@ export interface ChessMoveRecord {
   castling?: 'K' | 'Q';
   enPassant?: boolean;
   san: string;
+  prev?: ChessMoveUndoMeta;
 }
 
 export interface ChessGameState {
@@ -34,13 +56,15 @@ export interface ChessGameState {
   halfMoveClock: number;
   fullMoveNumber: number;
   inCheck: boolean;
-  status: 'playing' | 'checkmate' | 'stalemate' | 'draw_fifty' | 'resigned';
+  status: 'playing' | 'checkmate' | 'stalemate' | 'draw_fifty' | 'resigned' | 'timeout';
   winner: ChessColor | 'draw' | null;
   lastMove: { from: number; to: number } | null;
   capturedByWhite: ChessPieceType[];
   capturedByBlack: ChessPieceType[];
   moveHistory: ChessMoveRecord[];
   scores: { w: number; b: number; draws: number };
+  clock?: BoardClockState | null;
+  undoRequest?: BoardUndoRequest | null;
 }
 
 export interface ChessCandidateMove {
@@ -85,7 +109,11 @@ export function createInitialChessBoard(): (ChessPiece | null)[] {
   return board;
 }
 
-export function createInitialChessState(scores = { w: 0, b: 0, draws: 0 }): ChessGameState {
+export function createInitialChessState(
+  scores = { w: 0, b: 0, draws: 0 },
+  limitMs: number | null = null,
+  syncSeq = 0,
+): ChessGameState {
   return {
     board: createInitialChessBoard(),
     turn: 'w',
@@ -101,7 +129,34 @@ export function createInitialChessState(scores = { w: 0, b: 0, draws: 0 }): Ches
     capturedByBlack: [],
     moveHistory: [],
     scores: { ...scores },
+    clock: limitMs && limitMs > 0 ? createBoardClock(limitMs, syncSeq) : null,
+    undoRequest: null,
   };
+}
+
+function validChessCastling(castling: unknown): castling is ChessCastlingRights {
+  if (!castling || typeof castling !== 'object') return false;
+  const c = castling as ChessCastlingRights;
+  return (
+    typeof c.wK === 'boolean' &&
+    typeof c.wQ === 'boolean' &&
+    typeof c.bK === 'boolean' &&
+    typeof c.bQ === 'boolean'
+  );
+}
+
+function validSquarePair(pair: unknown): pair is { from: number; to: number } | null {
+  if (pair === null) return true;
+  if (!pair || typeof pair !== 'object') return false;
+  const p = pair as { from: number; to: number };
+  return (
+    Number.isInteger(p.from) &&
+    p.from >= 0 &&
+    p.from < 64 &&
+    Number.isInteger(p.to) &&
+    p.to >= 0 &&
+    p.to < 64
+  );
 }
 
 export function validChessState(value: unknown): value is ChessGameState {
@@ -121,37 +176,16 @@ export function validChessState(value: unknown): value is ChessGameState {
     }
   }
   if (s.turn !== 'w' && s.turn !== 'b') return false;
-  if (
-    !s.castling ||
-    typeof s.castling !== 'object' ||
-    typeof s.castling.wK !== 'boolean' ||
-    typeof s.castling.wQ !== 'boolean' ||
-    typeof s.castling.bK !== 'boolean' ||
-    typeof s.castling.bQ !== 'boolean'
-  ) {
-    return false;
-  }
+  if (!validChessCastling(s.castling)) return false;
   if (s.enPassantTarget !== null && (!Number.isInteger(s.enPassantTarget) || s.enPassantTarget < 0 || s.enPassantTarget >= 64)) {
     return false;
   }
   if (!Number.isSafeInteger(s.halfMoveClock) || s.halfMoveClock < 0) return false;
   if (!Number.isSafeInteger(s.fullMoveNumber) || s.fullMoveNumber < 1) return false;
   if (typeof s.inCheck !== 'boolean') return false;
-  if (!['playing', 'checkmate', 'stalemate', 'draw_fifty', 'resigned'].includes(s.status)) return false;
+  if (!['playing', 'checkmate', 'stalemate', 'draw_fifty', 'resigned', 'timeout'].includes(s.status)) return false;
   if (s.winner !== null && s.winner !== 'w' && s.winner !== 'b' && s.winner !== 'draw') return false;
-  if (
-    s.lastMove !== null &&
-    (!s.lastMove ||
-      typeof s.lastMove !== 'object' ||
-      !Number.isInteger(s.lastMove.from) ||
-      s.lastMove.from < 0 ||
-      s.lastMove.from >= 64 ||
-      !Number.isInteger(s.lastMove.to) ||
-      s.lastMove.to < 0 ||
-      s.lastMove.to >= 64)
-  ) {
-    return false;
-  }
+  if (!validSquarePair(s.lastMove)) return false;
   if (
     !Array.isArray(s.capturedByWhite) ||
     s.capturedByWhite.length > 32 ||
@@ -184,6 +218,20 @@ export function validChessState(value: unknown): value is ChessGameState {
     ) {
       return false;
     }
+    if (m.prev !== undefined) {
+      if (
+        !m.prev ||
+        typeof m.prev !== 'object' ||
+        !validChessCastling(m.prev.castling) ||
+        (m.prev.enPassantTarget !== null &&
+          (!Number.isInteger(m.prev.enPassantTarget) || m.prev.enPassantTarget < 0 || m.prev.enPassantTarget >= 64)) ||
+        !Number.isSafeInteger(m.prev.halfMoveClock) ||
+        m.prev.halfMoveClock < 0 ||
+        !validSquarePair(m.prev.lastMove)
+      ) {
+        return false;
+      }
+    }
   }
   if (
     !s.scores ||
@@ -197,6 +245,8 @@ export function validChessState(value: unknown): value is ChessGameState {
   ) {
     return false;
   }
+  if (!validBoardClockState(s.clock)) return false;
+  if (!validBoardUndoRequest(s.undoRequest)) return false;
   return true;
 }
 
@@ -524,8 +574,16 @@ export function applyChessMove(
   from: number,
   to: number,
   promotion?: ChessPromotionPiece,
+  timing?: { now?: number; elapsedMs?: number },
 ): ChessGameState | null {
   if (state.status !== 'playing') return null;
+  const now = timing?.now ?? Date.now();
+  if (state.clock && state.moveHistory.length > 0) {
+    const spent = getElapsedTurnMs(state.clock, now, timing?.elapsedMs);
+    if (state.clock.remainingMs[state.turn] - spent <= 0) {
+      return null;
+    }
+  }
   const legalMoves = getLegalChessMovesForSquare(state, from);
   const matched = legalMoves.find(
     (m) => m.to === to && (m.promotion === undefined || m.promotion === (promotion ?? 'q')),
@@ -607,6 +665,15 @@ export function applyChessMove(
     draftState.scores.draws += 1;
   }
 
+  const nextClock = advanceBoardClockOnMove(
+    state.clock,
+    movingPiece.color,
+    state.moveHistory.length,
+    status,
+    now,
+    timing?.elapsedMs,
+  );
+
   const san = buildSan(movingPiece, matched, nextInCheck, status === 'checkmate');
   const record: ChessMoveRecord = {
     from,
@@ -618,6 +685,13 @@ export function applyChessMove(
     ...(matched.castling ? { castling: matched.castling } : {}),
     ...(matched.enPassant ? { enPassant: true } : {}),
     san,
+    prev: {
+      castling: { ...state.castling },
+      enPassantTarget: state.enPassantTarget,
+      halfMoveClock: state.halfMoveClock,
+      lastMove: state.lastMove ? { ...state.lastMove } : null,
+      ...(nextClock ? { remainingMs: { ...nextClock.remainingMs } } : {}),
+    },
   };
 
   return {
@@ -625,10 +699,76 @@ export function applyChessMove(
     status,
     winner,
     moveHistory: [...state.moveHistory.slice(-599), record],
+    clock: nextClock,
+    undoRequest: null,
   };
 }
 
-export function resignChessGame(state: ChessGameState, resigningColor: ChessColor): ChessGameState {
+export function undoLastChessMove(state: ChessGameState, now = Date.now()): ChessGameState | null {
+  if (state.status !== 'playing' || state.moveHistory.length === 0) return null;
+  const last = state.moveHistory[state.moveHistory.length - 1];
+  const nextBoard = state.board.map((cell) => (cell ? { ...cell } : null));
+  const enemy: ChessColor = last.color === 'w' ? 'b' : 'w';
+
+  nextBoard[last.from] = {
+    color: last.color,
+    type: last.promotion ? 'p' : last.piece,
+  };
+
+  if (last.enPassant) {
+    nextBoard[last.to] = null;
+    nextBoard[indexOf(rowOf(last.from), colOf(last.to))] = { color: enemy, type: 'p' };
+  } else {
+    nextBoard[last.to] = last.captured ? { color: enemy, type: last.captured } : null;
+  }
+
+  if (last.castling === 'K') {
+    const row = rowOf(last.from);
+    nextBoard[indexOf(row, 7)] = nextBoard[indexOf(row, 5)];
+    nextBoard[indexOf(row, 5)] = null;
+  } else if (last.castling === 'Q') {
+    const row = rowOf(last.from);
+    nextBoard[indexOf(row, 0)] = nextBoard[indexOf(row, 3)];
+    nextBoard[indexOf(row, 3)] = null;
+  }
+
+  const capturedByWhite = [...state.capturedByWhite];
+  const capturedByBlack = [...state.capturedByBlack];
+  if (last.captured) {
+    if (last.color === 'w' && capturedByWhite.length > 0) capturedByWhite.pop();
+    else if (last.color === 'b' && capturedByBlack.length > 0) capturedByBlack.pop();
+  }
+
+  const nextHistory = state.moveHistory.slice(0, -1);
+  const prevRecord = nextHistory[nextHistory.length - 1];
+  const prevMeta = last.prev;
+
+  return {
+    board: nextBoard,
+    turn: last.color,
+    castling: prevMeta ? { ...prevMeta.castling } : { ...state.castling },
+    enPassantTarget: prevMeta ? prevMeta.enPassantTarget : null,
+    halfMoveClock: prevMeta ? prevMeta.halfMoveClock : Math.max(0, state.halfMoveClock - 1),
+    fullMoveNumber: last.color === 'b' ? Math.max(1, state.fullMoveNumber - 1) : state.fullMoveNumber,
+    inCheck: isKingInCheck(nextBoard, last.color),
+    status: 'playing',
+    winner: null,
+    lastMove: prevMeta ? prevMeta.lastMove : prevRecord ? { from: prevRecord.from, to: prevRecord.to } : null,
+    capturedByWhite,
+    capturedByBlack,
+    moveHistory: nextHistory,
+    scores: { ...state.scores },
+    clock: restoreBoardClockOnUndo(state.clock, last.color, nextHistory.length, now, prevMeta?.remainingMs),
+    undoRequest: null,
+  };
+}
+
+export function resignChessGame(
+  state: ChessGameState,
+  resigningColor: ChessColor,
+  now = Date.now(),
+  elapsedMs?: number,
+): ChessGameState {
   if (state.status !== 'playing') return state;
   const winner: ChessColor = resigningColor === 'w' ? 'b' : 'w';
   const nextScores = { ...state.scores };
@@ -638,5 +778,22 @@ export function resignChessGame(state: ChessGameState, resigningColor: ChessColo
     status: 'resigned',
     winner,
     scores: nextScores,
+    clock: pauseBoardClock(state.clock, state.turn, state.moveHistory.length, now, elapsedMs),
+    undoRequest: null,
+  };
+}
+
+export function timeoutChessGame(state: ChessGameState, losingColor: ChessColor): ChessGameState {
+  if (state.status !== 'playing') return state;
+  const winner: ChessColor = losingColor === 'w' ? 'b' : 'w';
+  const nextScores = { ...state.scores };
+  nextScores[winner] += 1;
+  return {
+    ...state,
+    status: 'timeout',
+    winner,
+    scores: nextScores,
+    clock: timeoutBoardClock(state.clock, losingColor),
+    undoRequest: null,
   };
 }

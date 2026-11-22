@@ -2032,5 +2032,17 @@
   "privacyPolicy.changesTitle": "Änderungen und Kontakt",
   "privacyPolicy.changesText": "Wir aktualisieren diese Seite, sobald sich ändert, wie P2Sharer mit Daten umgeht. Bei Fragen eröffne ein Issue auf GitHub. Sicherheitsprobleme meldest du vertraulich über die GitHub-Sicherheitshinweise.",
   "privacyPolicy.securityLink": "Sicherheitsproblem melden",
-  "updates.storeManaged": "Updates für diese Microsoft-Store-Installation werden vom Microsoft Store bereitgestellt."
+  "updates.storeManaged": "Updates für diese Microsoft-Store-Installation werden vom Microsoft Store bereitgestellt.",
+  "games.timePerPlayer": "Zeitlimit",
+  "games.timeNoLimit": "Kein Limit",
+  "games.timeMinutes": "{{count}} Min.",
+  "games.statusTimeoutWinner": "{{name}} gewinnt auf Zeit",
+  "games.statusTimeoutSide": "{{side}} gewinnt auf Zeit",
+  "games.undoMove": "Zug zurücknehmen",
+  "games.undoPending": "Anfrage gesendet...",
+  "games.undoRequestTitle": "Rücknahme-Anfrage",
+  "games.undoRequestPrompt": "{{name}} möchte den letzten Zug zurücknehmen.",
+  "games.accept": "Akzeptieren",
+  "games.decline": "Ablehnen",
+  "games.opponent": "Gegner"
 }

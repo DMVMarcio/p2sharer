@@ -11,6 +11,8 @@ import {
   applyChessMove,
   createInitialChessState,
   resignChessGame,
+  timeoutChessGame,
+  undoLastChessMove,
   validChessState,
   type ChessGameState,
   type ChessPromotionPiece,
@@ -19,9 +21,19 @@ import {
   applyCheckersMove,
   createInitialCheckersState,
   resignCheckersGame,
+  timeoutCheckersGame,
+  undoLastCheckersMove,
   validCheckersState,
   type CheckersGameState,
 } from './checkers_engine.ts';
+import {
+  createBoardClock,
+  MAX_BOARD_CLOCK_MS,
+  MIN_BOARD_CLOCK_MS,
+  type BoardClockState,
+  type BoardPlayerColor,
+  type BoardUndoRequest,
+} from './board_game_timing.ts';
 
 export type BoardGameKind = 'tictactoe' | 'chess' | 'checkers';
 
@@ -332,26 +344,300 @@ export class TicTacToeModel extends BoardGameLobbyModel<TicTacToeGameState> {
   }
 }
 
-export class ChessModel extends BoardGameLobbyModel<ChessGameState> {
-  constructor(context: RoomAppModelContext) {
-    super('chess', context, () => createInitialChessState(), validChessState);
+export interface TimedBoardGameState {
+  turn: BoardPlayerColor;
+  status: string;
+  moveHistory: { color: BoardPlayerColor }[];
+  scores: { w: number; b: number; draws: number };
+  clock?: BoardClockState | null;
+  undoRequest?: BoardUndoRequest | null;
+}
+
+interface TimedGameHooks<TGame extends TimedBoardGameState> {
+  createInitial: (scores: { w: number; b: number; draws: number }, limitMs: number | null, syncSeq: number) => TGame;
+  resign: (game: TGame, color: BoardPlayerColor, now: number, elapsedMs?: number) => TGame;
+  undo: (game: TGame, now: number) => TGame | null;
+  timeout: (game: TGame, losingColor: BoardPlayerColor) => TGame;
+}
+
+export class TimedBoardGameModel<TGame extends TimedBoardGameState> extends BoardGameLobbyModel<TGame> {
+  private hooks: TimedGameHooks<TGame>;
+  private clockAnchors = new Map<string, { syncSeq: number; turn: BoardPlayerColor; anchoredAt: number }>();
+  private seenRoomSyncs = new Map<string, number>();
+
+  constructor(
+    kind: BoardGameKind,
+    context: RoomAppModelContext,
+    createInitialGame: () => TGame,
+    validGame: (game: unknown) => game is TGame,
+    hooks: TimedGameHooks<TGame>,
+  ) {
+    super(kind, context, createInitialGame, validGame);
+    this.hooks = hooks;
   }
 
-  makeMove(roomId: string, from: number, to: number, promotion?: ChessPromotionPiece): boolean {
+  protected override writeRoom(room: BoardGameRoomState<TGame>): void {
+    super.writeRoom(room);
+    this.refreshClockAnchors();
+  }
+
+  override apply(payload: unknown): void {
+    super.apply(payload);
+    this.refreshClockAnchors();
+  }
+
+  override joinRole(roomId: string, role: 'seat1' | 'seat2' | 'spectator'): boolean {
+    const before = this.getRoom(roomId);
+    const changed = super.joinRole(roomId, role);
+    if (changed && before?.game.undoRequest) {
+      const after = this.getRoom(roomId);
+      if (
+        after &&
+        (after.players.seat1 !== before.players.seat1 || after.players.seat2 !== before.players.seat2)
+      ) {
+        this.clearUndoRequest(roomId);
+      }
+    }
+    return changed;
+  }
+
+  override leaveRoom(roomId: string): void {
+    const before = this.getRoom(roomId);
+    super.leaveRoom(roomId);
+    if (before?.game.undoRequest) {
+      const after = this.getRoom(roomId);
+      if (
+        after &&
+        (after.players.seat1 !== before.players.seat1 || after.players.seat2 !== before.players.seat2)
+      ) {
+        this.clearUndoRequest(roomId);
+      }
+    }
+  }
+
+  override setParticipants(participants: string[]): void {
+    super.setParticipants(participants);
+    for (const room of this.rooms) {
+      if (room.game.undoRequest && (!room.players.seat1 || !room.players.seat2)) {
+        this.clearUndoRequest(room.id);
+      }
+    }
+    this.refreshClockAnchors();
+  }
+
+  private clearUndoRequest(roomId: string): void {
+    this.updateGame(roomId, (room) => {
+      if (!room.game.undoRequest) return null;
+      return { ...room.game, undoRequest: null };
+    });
+  }
+
+  private refreshClockAnchors(now = Date.now()): void {
+    const activeIds = new Set<string>();
+    for (const room of this.rooms) {
+      activeIds.add(room.id);
+      const { clock } = room.game;
+      if (
+        !clock ||
+        room.game.status !== 'playing' ||
+        room.game.moveHistory.length === 0 ||
+        clock.turnStartedAt === null
+      ) {
+        this.clockAnchors.delete(room.id);
+        this.seenRoomSyncs.set(room.id, clock?.syncSeq ?? -1);
+        continue;
+      }
+
+      const prevAnchor = this.clockAnchors.get(room.id);
+      if (prevAnchor && prevAnchor.syncSeq === clock.syncSeq && prevAnchor.turn === room.game.turn) {
+        continue;
+      }
+
+      const prevSeenSync = this.seenRoomSyncs.get(room.id);
+      const anchoredAt =
+        prevSeenSync !== undefined && prevSeenSync !== clock.syncSeq
+          ? now
+          : Math.min(now, clock.turnStartedAt);
+
+      this.clockAnchors.set(room.id, {
+        syncSeq: clock.syncSeq,
+        turn: room.game.turn,
+        anchoredAt,
+      });
+      this.seenRoomSyncs.set(room.id, clock.syncSeq);
+    }
+
+    for (const roomId of [...this.clockAnchors.keys()]) {
+      if (!activeIds.has(roomId)) {
+        this.clockAnchors.delete(roomId);
+        this.seenRoomSyncs.delete(roomId);
+      }
+    }
+  }
+
+  protected getElapsedMsForTurn(room: BoardGameRoomState<TGame>, now = Date.now()): number | undefined {
+    const { clock } = room.game;
+    if (!clock || room.game.status !== 'playing' || room.game.moveHistory.length === 0 || clock.turnStartedAt === null) {
+      return undefined;
+    }
+    const anchor = this.clockAnchors.get(room.id);
+    if (anchor && anchor.syncSeq === clock.syncSeq && anchor.turn === room.game.turn) {
+      return Math.max(0, Math.round(now - anchor.anchoredAt));
+    }
+    return Math.max(0, Math.round(now - Math.min(now, clock.turnStartedAt)));
+  }
+
+  getRemainingTimeMs(roomId: string, color: BoardPlayerColor, now = Date.now()): number | null {
+    const room = this.getRoom(roomId);
+    if (!room) return null;
+    return this.getRemainingTimeMsForRoom(room, color, now);
+  }
+
+  getRemainingTimeMsForRoom(
+    room: BoardGameRoomState<TGame>,
+    color: BoardPlayerColor,
+    now = Date.now(),
+  ): number | null {
+    const { clock } = room.game;
+    if (!clock) return null;
+    if (
+      room.game.status !== 'playing' ||
+      room.game.moveHistory.length === 0 ||
+      clock.turnStartedAt === null ||
+      room.game.turn !== color
+    ) {
+      return clock.remainingMs[color];
+    }
+    const elapsed = this.getElapsedMsForTurn(room, now) ?? 0;
+    return Math.max(0, clock.remainingMs[color] - elapsed);
+  }
+
+  setTimeLimit(roomId: string, limitMs: number | null): boolean {
+    const actor = this.localActor;
+    return this.updateGame(roomId, (room) => {
+      if (!actor) return null;
+      const isPlayerOrOwner =
+        room.players.seat1 === actor ||
+        room.players.seat2 === actor ||
+        room.createdBy === actor ||
+        (!room.players.seat1 && !room.players.seat2);
+      if (!isPlayerOrOwner) return null;
+      if (room.game.status !== 'playing' || room.game.moveHistory.length > 0) return null;
+
+      if (limitMs === null || limitMs === 0) {
+        if (!room.game.clock) return null;
+        return { ...room.game, clock: null };
+      }
+
+      if (!Number.isSafeInteger(limitMs) || limitMs < MIN_BOARD_CLOCK_MS || limitMs > MAX_BOARD_CLOCK_MS) {
+        return null;
+      }
+
+      const nextSeq = (room.game.clock?.syncSeq ?? 0) + 1;
+      return {
+        ...room.game,
+        clock: createBoardClock(limitMs, nextSeq),
+      };
+    });
+  }
+
+  syncClock(roomId: string, now = Date.now()): boolean {
     const actor = this.localActor;
     return this.updateGame(roomId, (room) => {
       const expectedActor = room.game.turn === 'w' ? room.players.seat1 : room.players.seat2;
       if (!actor || expectedActor !== actor) return null;
-      return applyChessMove(room.game, from, to, promotion);
+      const { clock } = room.game;
+      if (!clock || room.game.status !== 'playing' || room.game.moveHistory.length === 0) return null;
+
+      const elapsed = this.getElapsedMsForTurn(room, now) ?? 0;
+      const nextRemaining = Math.max(0, clock.remainingMs[room.game.turn] - elapsed);
+      if (nextRemaining <= 0) {
+        return this.hooks.timeout(room.game, room.game.turn);
+      }
+
+      return {
+        ...room.game,
+        clock: {
+          limitMs: clock.limitMs,
+          remainingMs: {
+            ...clock.remainingMs,
+            [room.game.turn]: nextRemaining,
+          },
+          turnStartedAt: now,
+          syncSeq: clock.syncSeq + 1,
+        },
+      };
     });
   }
 
-  resign(roomId: string): boolean {
+  claimTimeout(roomId: string, now = Date.now()): boolean {
+    const actor = this.localActor;
+    return this.updateGame(roomId, (room) => {
+      if (!actor || room.game.status !== 'playing' || !room.game.clock || room.game.moveHistory.length === 0) {
+        return null;
+      }
+      const isPlayer =
+        room.players.seat1 === actor ||
+        room.players.seat2 === actor ||
+        (room.createdBy === actor && (!room.players.seat1 || !room.players.seat2));
+      if (!isPlayer) return null;
+
+      const remaining = this.getRemainingTimeMsForRoom(room, room.game.turn, now);
+      if (remaining === null || remaining > 0) return null;
+
+      return this.hooks.timeout(room.game, room.game.turn);
+    });
+  }
+
+  requestUndo(roomId: string): boolean {
+    const actor = this.localActor;
+    return this.updateGame(roomId, (room) => {
+      if (!actor || room.game.status !== 'playing' || room.game.moveHistory.length === 0) return null;
+      if (!room.players.seat1 || !room.players.seat2) return null;
+      const myColor: BoardPlayerColor | null =
+        room.players.seat1 === actor ? 'w' : room.players.seat2 === actor ? 'b' : null;
+      if (!myColor) return null;
+      const lastMove = room.game.moveHistory[room.game.moveHistory.length - 1];
+      if (!lastMove || lastMove.color !== myColor) return null;
+      if (room.game.undoRequest) return null;
+
+      return {
+        ...room.game,
+        undoRequest: {
+          requester: myColor,
+          moveCount: room.game.moveHistory.length,
+        },
+      };
+    });
+  }
+
+  respondUndo(roomId: string, accept: boolean, now = Date.now()): boolean {
     const actor = this.localActor;
     return this.updateGame(roomId, (room) => {
       if (!actor || room.game.status !== 'playing') return null;
-      if (room.players.seat1 === actor) return resignChessGame(room.game, 'w');
-      if (room.players.seat2 === actor) return resignChessGame(room.game, 'b');
+      const req = room.game.undoRequest;
+      if (!req || req.moveCount !== room.game.moveHistory.length) return null;
+      const myColor: BoardPlayerColor | null =
+        room.players.seat1 === actor ? 'w' : room.players.seat2 === actor ? 'b' : null;
+      if (!myColor || myColor === req.requester) return null;
+
+      if (!accept) {
+        return {
+          ...room.game,
+          undoRequest: null,
+        };
+      }
+      return this.hooks.undo(room.game, now);
+    });
+  }
+
+  resign(roomId: string, now = Date.now()): boolean {
+    const actor = this.localActor;
+    return this.updateGame(roomId, (room) => {
+      if (!actor || room.game.status !== 'playing') return null;
+      const elapsed = this.getElapsedMsForTurn(room, now);
+      if (room.players.seat1 === actor) return this.hooks.resign(room.game, 'w', now, elapsed);
+      if (room.players.seat2 === actor) return this.hooks.resign(room.game, 'b', now, elapsed);
       return null;
     });
   }
@@ -362,7 +648,13 @@ export class ChessModel extends BoardGameLobbyModel<ChessGameState> {
       if (!actor) return null;
       const isPlayer = room.players.seat1 === actor || room.players.seat2 === actor || room.createdBy === actor;
       if (!isPlayer && room.players.seat1 && room.players.seat2) return null;
-      return createInitialChessState(resetScores ? { w: 0, b: 0, draws: 0 } : room.game.scores);
+      const limitMs = room.game.clock?.limitMs ?? null;
+      const nextSeq = (room.game.clock?.syncSeq ?? 0) + 1;
+      return this.hooks.createInitial(
+        resetScores ? { w: 0, b: 0, draws: 0 } : room.game.scores,
+        limitMs,
+        nextSeq,
+      );
     });
   }
 
@@ -378,60 +670,57 @@ export class ChessModel extends BoardGameLobbyModel<ChessGameState> {
         seat1: room.players.seat2,
         seat2: room.players.seat1,
       },
+      game: room.game.undoRequest ? { ...room.game, undoRequest: null } : room.game,
       updatedAt: Date.now(),
     });
     return true;
   }
 }
 
-export class CheckersModel extends BoardGameLobbyModel<CheckersGameState> {
+export class ChessModel extends TimedBoardGameModel<ChessGameState> {
   constructor(context: RoomAppModelContext) {
-    super('checkers', context, () => createInitialCheckersState(), validCheckersState);
+    super('chess', context, () => createInitialChessState(), validChessState, {
+      createInitial: createInitialChessState,
+      resign: resignChessGame,
+      undo: undoLastChessMove,
+      timeout: timeoutChessGame,
+    });
   }
 
-  makeMove(roomId: string, from: number, to: number): boolean {
+  makeMove(
+    roomId: string,
+    from: number,
+    to: number,
+    promotion?: ChessPromotionPiece,
+    now = Date.now(),
+  ): boolean {
     const actor = this.localActor;
     return this.updateGame(roomId, (room) => {
       const expectedActor = room.game.turn === 'w' ? room.players.seat1 : room.players.seat2;
       if (!actor || expectedActor !== actor) return null;
-      return applyCheckersMove(room.game, from, to);
+      const elapsedMs = this.getElapsedMsForTurn(room, now);
+      return applyChessMove(room.game, from, to, promotion, { now, elapsedMs });
+    });
+  }
+}
+
+export class CheckersModel extends TimedBoardGameModel<CheckersGameState> {
+  constructor(context: RoomAppModelContext) {
+    super('checkers', context, () => createInitialCheckersState(), validCheckersState, {
+      createInitial: createInitialCheckersState,
+      resign: resignCheckersGame,
+      undo: undoLastCheckersMove,
+      timeout: timeoutCheckersGame,
     });
   }
 
-  resign(roomId: string): boolean {
+  makeMove(roomId: string, from: number, to: number, now = Date.now()): boolean {
     const actor = this.localActor;
     return this.updateGame(roomId, (room) => {
-      if (!actor || room.game.status !== 'playing') return null;
-      if (room.players.seat1 === actor) return resignCheckersGame(room.game, 'w');
-      if (room.players.seat2 === actor) return resignCheckersGame(room.game, 'b');
-      return null;
+      const expectedActor = room.game.turn === 'w' ? room.players.seat1 : room.players.seat2;
+      if (!actor || expectedActor !== actor) return null;
+      const elapsedMs = this.getElapsedMsForTurn(room, now);
+      return applyCheckersMove(room.game, from, to, { now, elapsedMs });
     });
-  }
-
-  newGame(roomId: string, resetScores = false): boolean {
-    const actor = this.localActor;
-    return this.updateGame(roomId, (room) => {
-      if (!actor) return null;
-      const isPlayer = room.players.seat1 === actor || room.players.seat2 === actor || room.createdBy === actor;
-      if (!isPlayer && room.players.seat1 && room.players.seat2) return null;
-      return createInitialCheckersState(resetScores ? { w: 0, b: 0, draws: 0 } : room.game.scores);
-    });
-  }
-
-  swapSides(roomId: string): boolean {
-    const room = this.getRoom(roomId);
-    const actor = this.localActor;
-    if (!room || !actor) return false;
-    const isPlayer = room.players.seat1 === actor || room.players.seat2 === actor || room.createdBy === actor;
-    if (!isPlayer && room.players.seat1 && room.players.seat2) return false;
-    this.writeRoom({
-      ...room,
-      players: {
-        seat1: room.players.seat2,
-        seat2: room.players.seat1,
-      },
-      updatedAt: Date.now(),
-    });
-    return true;
   }
 }

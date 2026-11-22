@@ -616,6 +616,7 @@
 }
 
 .cozy-screen-inner {
+  position: relative;
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -1475,6 +1476,48 @@
   transform: translateY(-1px);
 }
 
+.cozy-seat-header-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.cozy-clock-pill {
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(20, 10, 3, 0.56);
+  border: 1px solid rgba(224, 184, 132, 0.28);
+  color: #f6e4c1;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, box-shadow 140ms ease;
+}
+.cozy-clock-pill.is-running {
+  background: rgba(92, 152, 74, 0.42);
+  border-color: #a9df9e;
+  color: #f3ffe9;
+  box-shadow: 0 0 8px rgba(138, 212, 118, 0.24);
+}
+.cozy-clock-pill.is-low {
+  background: rgba(180, 108, 22, 0.54);
+  border-color: #f6c453;
+  color: #fff3c4;
+}
+.cozy-clock-pill.is-critical,
+.cozy-clock-pill.is-expired {
+  background: rgba(158, 42, 34, 0.72);
+  border-color: #fca5a5;
+  color: #ffe8e6;
+}
+
 .cozy-score-pill {
   min-width: 24px;
   height: 22px;
@@ -1622,6 +1665,38 @@
   color: #f9f1e2;
 }
 
+.cozy-time-control-card {
+  padding: 9px 11px;
+}
+
+.cozy-time-control-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cozy-time-select.app-select {
+  width: auto;
+  min-width: 112px;
+  max-width: 138px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(24, 12, 4, 0.52);
+  border: 1px solid rgba(214, 171, 118, 0.42);
+  color: #fff3dc;
+}
+.cozy-time-select.app-select:hover:not(:disabled) {
+  background: rgba(74, 45, 20, 0.72);
+  border-color: rgba(235, 198, 146, 0.62);
+}
+.cozy-time-select.app-select .app-select-chevron {
+  color: rgba(249, 241, 226, 0.78);
+}
+
 /* Tactile Carved Wood Control Deck */
 .cozy-control-deck {
   gap: 7px;
@@ -1651,12 +1726,17 @@
 .cozy-wood-btn.is-full {
   width: 100%;
 }
-.cozy-wood-btn:hover {
+.cozy-wood-btn:hover:not(:disabled) {
   transform: translateY(-1px);
   filter: brightness(1.07);
 }
-.cozy-wood-btn:active {
+.cozy-wood-btn:active:not(:disabled) {
   transform: translateY(0);
+}
+.cozy-wood-btn:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 .cozy-wood-btn.is-primary {
   border: 1.5px solid #a2dc96;
@@ -1730,10 +1810,105 @@
   }
 }
 
+/* Bottom-left in-game Undo Move consent notification */
+.cozy-undo-toast {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 25;
+  width: min(296px, calc(100% - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 11px 12px;
+  border-radius: 12px;
+  background:
+    var(--wood-grain-fine),
+    linear-gradient(155deg, rgba(78, 48, 23, 0.97), rgba(44, 25, 11, 0.98));
+  border: 1.5px solid #c9975b;
+  box-shadow:
+    0 12px 28px rgba(0, 0, 0, 0.52),
+    inset 0 1px 2px rgba(255, 235, 200, 0.24);
+  color: #fff6e6;
+  animation: cozyUndoToastIn var(--dropdown-enter-duration, 320ms) cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.cozy-undo-toast.is-closing {
+  pointer-events: none;
+  animation: cozyUndoToastOut var(--dropdown-exit-duration, 260ms) cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+@keyframes cozyUndoToastIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes cozyUndoToastOut {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+}
+
+.cozy-undo-toast-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+}
+
+.cozy-undo-toast-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(24, 12, 4, 0.52);
+  border: 1px solid rgba(232, 192, 132, 0.38);
+  color: #f6d58e;
+}
+
+.cozy-undo-toast-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.cozy-undo-toast-copy strong {
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff6e6;
+}
+.cozy-undo-toast-copy span {
+  font-size: 11px;
+  line-height: 1.35;
+  color: rgba(249, 238, 218, 0.86);
+  overflow-wrap: anywhere;
+}
+
+.cozy-undo-toast-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .cozy-piece-slot.is-returning,
   .cozy-piece-slot.is-returning.is-from-outside,
-  .ttt-wood-cell.is-resetting {
+  .ttt-wood-cell.is-resetting,
+  .cozy-undo-toast,
+  .cozy-undo-toast.is-closing {
     animation: none;
   }
+}
+:root[data-reduced-motion="true"] .cozy-undo-toast,
+:root[data-reduced-motion="true"] .cozy-undo-toast.is-closing {
+  animation: none;
 }

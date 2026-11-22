@@ -2032,5 +2032,17 @@
   "privacyPolicy.changesTitle": "변경 및 문의",
   "privacyPolicy.changesText": "P2Sharer가 데이터를 처리하는 방식이 바뀌면 이 페이지를 업데이트합니다. 문의 사항은 GitHub에 이슈를 등록해 주세요. 보안 문제는 GitHub 보안 권고를 통해 비공개로 신고해 주세요.",
   "privacyPolicy.securityLink": "보안 문제 신고",
-  "updates.storeManaged": "이 Microsoft Store 설치본의 업데이트는 Microsoft Store에서 제공됩니다."
+  "updates.storeManaged": "이 Microsoft Store 설치본의 업데이트는 Microsoft Store에서 제공됩니다.",
+  "games.timePerPlayer": "제한 시간",
+  "games.timeNoLimit": "제한 없음",
+  "games.timeMinutes": "{{count}}분",
+  "games.statusTimeoutWinner": "{{name}} 시간승",
+  "games.statusTimeoutSide": "{{side}} 시간승",
+  "games.undoMove": "무르기",
+  "games.undoPending": "상대 응답 대기 중...",
+  "games.undoRequestTitle": "무르기 요청",
+  "games.undoRequestPrompt": "{{name}}님이 마지막 수를 무르기를 요청했습니다.",
+  "games.accept": "수락",
+  "games.decline": "거절",
+  "games.opponent": "상대방"
 }

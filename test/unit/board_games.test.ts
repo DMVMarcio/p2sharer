@@ -136,3 +136,130 @@ test('checkers model enforces mandatory captures and multi-jump chains', () => {
     p2.reset();
   }
 });
+
+test('chess and checkers support pre-match per-player timers, synchronization, and timeout victory', () => {
+  const whitePeer = new RoomAppsService();
+  const blackPeer = new RoomAppsService();
+  whitePeer.attach((e) => blackPeer.receive(e, 'white'), 'white');
+  blackPeer.attach((e) => whitePeer.receive(e, 'black'), 'black');
+
+  try {
+    const id = whitePeer.start('chess');
+    const wModel = whitePeer.getModel<ChessModel>(id)!;
+    const bModel = blackPeer.getModel<ChessModel>(id)!;
+
+    const roomId = wModel.createRoom('Timed Chess', 'seat1')!;
+    bModel.joinRole(roomId, 'seat2');
+
+    // Configure 10 minutes per player before the match starts
+    assert.equal(wModel.setTimeLimit(roomId, 600_000), true);
+    assert.equal(bModel.getRoom(roomId)?.game.clock?.limitMs, 600_000);
+    assert.deepEqual(bModel.getRoom(roomId)?.game.clock?.remainingMs, { w: 600_000, b: 600_000 });
+    assert.equal(bModel.getRoom(roomId)?.game.clock?.turnStartedAt, null);
+
+    // Move 1 by White starts Black's clock without deducting White's pre-start time
+    const t0 = Date.now();
+    assert.equal(wModel.makeMove(roomId, indexOf(6, 4), indexOf(4, 4), undefined, t0), true); // e2->e4
+    assert.equal(bModel.getRoom(roomId)?.game.clock?.remainingMs.w, 600_000);
+    assert.notEqual(bModel.getRoom(roomId)?.game.clock?.turnStartedAt, null);
+
+    // Time limit cannot be changed once moves have been played
+    assert.equal(wModel.setTimeLimit(roomId, 300_000), false);
+
+    // Black thinks and plays move 1 after 2.5s -> Black's clock decreases, White's clock starts
+    assert.equal(bModel.makeMove(roomId, indexOf(1, 4), indexOf(3, 4), undefined, t0 + 2500), true);
+    const afterBlack = wModel.getRoom(roomId)!.game.clock!;
+    assert.ok(afterBlack.remainingMs.b <= 597_600 && afterBlack.remainingMs.b >= 596_500);
+    assert.equal(afterBlack.remainingMs.w, 600_000);
+
+    // Periodic clock sync updates remaining time mid-turn
+    const beforeSyncW = wModel.getRoom(roomId)!.game.clock!.remainingMs.w;
+    assert.equal(wModel.syncClock(roomId, t0 + 12_500), true);
+    assert.ok(bModel.getRoom(roomId)!.game.clock!.remainingMs.w < beforeSyncW);
+
+    // Cannot claim timeout prematurely
+    assert.equal(bModel.claimTimeout(roomId, t0 + 12_500), false);
+
+    // Once active turn's remaining time hits 0, opponent can claim timeout victory
+    assert.equal(bModel.claimTimeout(roomId, t0 + 700_000), true);
+    const timedOut = wModel.getRoom(roomId)!;
+    assert.equal(timedOut.game.status, 'timeout');
+    assert.equal(timedOut.game.winner, 'b');
+    assert.equal(timedOut.game.scores.b, 1);
+    assert.equal(timedOut.game.clock?.remainingMs.w, 0);
+
+    // Starting a new match preserves the configured 10-minute timer and resets both clocks
+    assert.equal(wModel.newGame(roomId, false), true);
+    const fresh = bModel.getRoom(roomId)!;
+    assert.equal(fresh.game.status, 'playing');
+    assert.equal(fresh.game.clock?.limitMs, 600_000);
+    assert.deepEqual(fresh.game.clock?.remainingMs, { w: 600_000, b: 600_000 });
+    assert.equal(fresh.game.clock?.turnStartedAt, null);
+  } finally {
+    whitePeer.reset();
+    blackPeer.reset();
+  }
+});
+
+test('undo move requests require opponent consent and accurately revert chess and checkers moves', () => {
+  const p1 = new RoomAppsService();
+  const p2 = new RoomAppsService();
+  p1.attach((e) => p2.receive(e, 'p1'), 'p1');
+  p2.attach((e) => p1.receive(e, 'p2'), 'p2');
+
+  try {
+    // Chess undo consent flow (accept & decline)
+    const chessId = p1.start('chess');
+    const c1 = p1.getModel<ChessModel>(chessId)!;
+    const c2 = p2.getModel<ChessModel>(chessId)!;
+    const chessRoom = c1.createRoom('Undo Chess', 'seat1')!;
+    c2.joinRole(chessRoom, 'seat2');
+    c1.setTimeLimit(chessRoom, 300_000);
+
+    assert.equal(c1.makeMove(chessRoom, indexOf(6, 4), indexOf(4, 4)), true); // e2->e4
+    // Only the mover (White) can request undo; opponent cannot request for White, and White cannot accept own request
+    assert.equal(c2.requestUndo(chessRoom), false);
+    assert.equal(c1.requestUndo(chessRoom), true);
+    assert.equal(c1.respondUndo(chessRoom, true), false);
+
+    // Opponent declines -> request clears, board unchanged, still Black's turn
+    assert.equal(c2.respondUndo(chessRoom, false), true);
+    assert.equal(c1.getRoom(chessRoom)?.game.undoRequest, null);
+    assert.equal(c1.getRoom(chessRoom)?.game.turn, 'b');
+    assert.equal(c1.getRoom(chessRoom)?.game.moveHistory.length, 1);
+
+    // White requests again, Black accepts -> board reverts and turn returns to White
+    assert.equal(c1.requestUndo(chessRoom), true);
+    assert.equal(c2.respondUndo(chessRoom, true), true);
+    const revertedChess = c1.getRoom(chessRoom)!;
+    assert.equal(revertedChess.game.turn, 'w');
+    assert.equal(revertedChess.game.moveHistory.length, 0);
+    assert.equal(revertedChess.game.board[indexOf(6, 4)]?.type, 'p');
+    assert.equal(revertedChess.game.board[indexOf(4, 4)], null);
+    assert.equal(revertedChess.game.clock?.turnStartedAt, null);
+
+    // Checkers undo consent flow (reverts capture and restores captured piece)
+    const checkersId = p1.start('checkers');
+    const d1 = p1.getModel<CheckersModel>(checkersId)!;
+    const d2 = p2.getModel<CheckersModel>(checkersId)!;
+    const checkersRoom = d1.createRoom('Undo Checkers', 'seat1')!;
+    d2.joinRole(checkersRoom, 'seat2');
+
+    assert.equal(d1.makeMove(checkersRoom, 5 * 8 + 2, 4 * 8 + 3), true); // c3-d4
+    assert.equal(d2.makeMove(checkersRoom, 2 * 8 + 1, 3 * 8 + 2), true); // b6-c5
+    assert.equal(d1.makeMove(checkersRoom, 4 * 8 + 3, 2 * 8 + 1), true); // d4xb6 capture
+    assert.equal(d2.getRoom(checkersRoom)?.game.capturedByWhite, 1);
+
+    assert.equal(d1.requestUndo(checkersRoom), true);
+    assert.equal(d2.respondUndo(checkersRoom, true), true);
+    const revertedCheckers = d2.getRoom(checkersRoom)!;
+    assert.equal(revertedCheckers.game.turn, 'w');
+    assert.equal(revertedCheckers.game.capturedByWhite, 0);
+    assert.equal(revertedCheckers.game.board[4 * 8 + 3]?.color, 'w');
+    assert.equal(revertedCheckers.game.board[3 * 8 + 2]?.color, 'b');
+    assert.equal(revertedCheckers.game.board[2 * 8 + 1], null);
+  } finally {
+    p1.reset();
+    p2.reset();
+  }
+});

@@ -1,8 +1,28 @@
+import {
+  advanceBoardClockOnMove,
+  createBoardClock,
+  getElapsedTurnMs,
+  pauseBoardClock,
+  restoreBoardClockOnUndo,
+  timeoutBoardClock,
+  validBoardClockState,
+  validBoardUndoRequest,
+  type BoardClockState,
+  type BoardUndoRequest,
+} from './board_game_timing.ts';
+
 export type CheckersColor = 'w' | 'b';
 
 export interface CheckersPiece {
   color: CheckersColor;
   king: boolean;
+}
+
+export interface CheckersMoveUndoMeta {
+  capturedKing?: boolean;
+  mustContinueFrom: number | null;
+  lastMove: { from: number; to: number } | null;
+  remainingMs?: { w: number; b: number };
 }
 
 export interface CheckersMoveRecord {
@@ -12,19 +32,22 @@ export interface CheckersMoveRecord {
   captured?: number;
   promoted?: boolean;
   notation: string;
+  prev?: CheckersMoveUndoMeta;
 }
 
 export interface CheckersGameState {
   board: (CheckersPiece | null)[];
   turn: CheckersColor;
   mustContinueFrom: number | null;
-  status: 'playing' | 'finished' | 'draw' | 'resigned';
+  status: 'playing' | 'finished' | 'draw' | 'resigned' | 'timeout';
   winner: CheckersColor | 'draw' | null;
   lastMove: { from: number; to: number } | null;
   capturedByWhite: number;
   capturedByBlack: number;
   moveHistory: CheckersMoveRecord[];
   scores: { w: number; b: number; draws: number };
+  clock?: BoardClockState | null;
+  undoRequest?: BoardUndoRequest | null;
 }
 
 export interface CheckersCandidateMove {
@@ -73,7 +96,11 @@ export function createInitialCheckersBoard(): (CheckersPiece | null)[] {
   return board;
 }
 
-export function createInitialCheckersState(scores = { w: 0, b: 0, draws: 0 }): CheckersGameState {
+export function createInitialCheckersState(
+  scores = { w: 0, b: 0, draws: 0 },
+  limitMs: number | null = null,
+  syncSeq = 0,
+): CheckersGameState {
   return {
     board: createInitialCheckersBoard(),
     turn: 'w',
@@ -85,7 +112,23 @@ export function createInitialCheckersState(scores = { w: 0, b: 0, draws: 0 }): C
     capturedByBlack: 0,
     moveHistory: [],
     scores: { ...scores },
+    clock: limitMs && limitMs > 0 ? createBoardClock(limitMs, syncSeq) : null,
+    undoRequest: null,
   };
+}
+
+function validSquarePair(pair: unknown): pair is { from: number; to: number } | null {
+  if (pair === null) return true;
+  if (!pair || typeof pair !== 'object') return false;
+  const p = pair as { from: number; to: number };
+  return (
+    Number.isInteger(p.from) &&
+    p.from >= 0 &&
+    p.from < 64 &&
+    Number.isInteger(p.to) &&
+    p.to >= 0 &&
+    p.to < 64
+  );
 }
 
 export function validCheckersState(value: unknown): value is CheckersGameState {
@@ -111,21 +154,9 @@ export function validCheckersState(value: unknown): value is CheckersGameState {
   ) {
     return false;
   }
-  if (!['playing', 'finished', 'draw', 'resigned'].includes(s.status)) return false;
+  if (!['playing', 'finished', 'draw', 'resigned', 'timeout'].includes(s.status)) return false;
   if (s.winner !== null && s.winner !== 'w' && s.winner !== 'b' && s.winner !== 'draw') return false;
-  if (
-    s.lastMove !== null &&
-    (!s.lastMove ||
-      typeof s.lastMove !== 'object' ||
-      !Number.isInteger(s.lastMove.from) ||
-      s.lastMove.from < 0 ||
-      s.lastMove.from >= 64 ||
-      !Number.isInteger(s.lastMove.to) ||
-      s.lastMove.to < 0 ||
-      s.lastMove.to >= 64)
-  ) {
-    return false;
-  }
+  if (!validSquarePair(s.lastMove)) return false;
   if (!Number.isSafeInteger(s.capturedByWhite) || s.capturedByWhite < 0 || s.capturedByWhite > 12) return false;
   if (!Number.isSafeInteger(s.capturedByBlack) || s.capturedByBlack < 0 || s.capturedByBlack > 12) return false;
   if (!Array.isArray(s.moveHistory) || s.moveHistory.length > 600) return false;
@@ -145,6 +176,17 @@ export function validCheckersState(value: unknown): value is CheckersGameState {
     ) {
       return false;
     }
+    if (m.prev !== undefined) {
+      if (
+        !m.prev ||
+        typeof m.prev !== 'object' ||
+        (m.prev.mustContinueFrom !== null &&
+          (!Number.isInteger(m.prev.mustContinueFrom) || m.prev.mustContinueFrom < 0 || m.prev.mustContinueFrom >= 64)) ||
+        !validSquarePair(m.prev.lastMove)
+      ) {
+        return false;
+      }
+    }
   }
   if (
     !s.scores ||
@@ -158,6 +200,8 @@ export function validCheckersState(value: unknown): value is CheckersGameState {
   ) {
     return false;
   }
+  if (!validBoardClockState(s.clock)) return false;
+  if (!validBoardUndoRequest(s.undoRequest)) return false;
   return true;
 }
 
@@ -317,14 +361,23 @@ export function applyCheckersMove(
   state: CheckersGameState,
   from: number,
   to: number,
+  timing?: { now?: number; elapsedMs?: number },
 ): CheckersGameState | null {
   if (state.status !== 'playing') return null;
+  const now = timing?.now ?? Date.now();
+  if (state.clock && state.moveHistory.length > 0) {
+    const spent = getElapsedTurnMs(state.clock, now, timing?.elapsedMs);
+    if (state.clock.remainingMs[state.turn] - spent <= 0) {
+      return null;
+    }
+  }
   const legal = getLegalCheckersMovesForSquare(state, from);
   const matched = legal.find((m) => m.to === to);
   if (!matched) return null;
 
   const nextBoard = state.board.map((cell) => (cell ? { ...cell } : null));
   const piece = nextBoard[from]!;
+  const capturedPiece = matched.captured !== undefined ? nextBoard[matched.captured] : null;
   nextBoard[from] = null;
 
   if (matched.captured !== undefined) {
@@ -359,15 +412,6 @@ export function applyCheckersMove(
   const nextTurn: CheckersColor = nextMustContinue !== null ? state.turn : state.turn === 'w' ? 'b' : 'w';
   const notation = `${squareNotation(from)}${matched.captured !== undefined ? 'x' : '-'}${squareNotation(to)}${promoted ? 'K' : ''}`;
 
-  const record: CheckersMoveRecord = {
-    from,
-    to,
-    color: piece.color,
-    ...(matched.captured !== undefined ? { captured: matched.captured } : {}),
-    ...(promoted ? { promoted: true } : {}),
-    notation,
-  };
-
   const draft: CheckersGameState = {
     board: nextBoard,
     turn: nextTurn,
@@ -377,7 +421,7 @@ export function applyCheckersMove(
     lastMove: { from, to },
     capturedByWhite,
     capturedByBlack,
-    moveHistory: [...state.moveHistory.slice(-599), record],
+    moveHistory: state.moveHistory,
     scores: { ...state.scores },
   };
 
@@ -390,10 +434,93 @@ export function applyCheckersMove(
     }
   }
 
-  return draft;
+  const nextClock = advanceBoardClockOnMove(
+    state.clock,
+    piece.color,
+    state.moveHistory.length,
+    draft.status,
+    now,
+    timing?.elapsedMs,
+  );
+
+  const record: CheckersMoveRecord = {
+    from,
+    to,
+    color: piece.color,
+    ...(matched.captured !== undefined ? { captured: matched.captured } : {}),
+    ...(promoted ? { promoted: true } : {}),
+    notation,
+    prev: {
+      ...(capturedPiece?.king ? { capturedKing: true } : {}),
+      mustContinueFrom: state.mustContinueFrom,
+      lastMove: state.lastMove ? { ...state.lastMove } : null,
+      ...(nextClock ? { remainingMs: { ...nextClock.remainingMs } } : {}),
+    },
+  };
+
+  return {
+    ...draft,
+    moveHistory: [...state.moveHistory.slice(-599), record],
+    clock: nextClock,
+    undoRequest: null,
+  };
 }
 
-export function resignCheckersGame(state: CheckersGameState, resigningColor: CheckersColor): CheckersGameState {
+export function undoLastCheckersMove(state: CheckersGameState, now = Date.now()): CheckersGameState | null {
+  if (state.status !== 'playing' || state.moveHistory.length === 0) return null;
+  const last = state.moveHistory[state.moveHistory.length - 1];
+  const nextBoard = state.board.map((cell) => (cell ? { ...cell } : null));
+  const movedPiece = nextBoard[last.to];
+  const enemy: CheckersColor = last.color === 'w' ? 'b' : 'w';
+
+  nextBoard[last.from] = {
+    color: last.color,
+    king: last.promoted ? false : Boolean(movedPiece?.king),
+  };
+  nextBoard[last.to] = null;
+
+  if (last.captured !== undefined) {
+    nextBoard[last.captured] = {
+      color: enemy,
+      king: Boolean(last.prev?.capturedKing),
+    };
+  }
+
+  const capturedByWhite =
+    last.captured !== undefined && last.color === 'w'
+      ? Math.max(0, state.capturedByWhite - 1)
+      : state.capturedByWhite;
+  const capturedByBlack =
+    last.captured !== undefined && last.color === 'b'
+      ? Math.max(0, state.capturedByBlack - 1)
+      : state.capturedByBlack;
+
+  const nextHistory = state.moveHistory.slice(0, -1);
+  const prevRecord = nextHistory[nextHistory.length - 1];
+  const prevMeta = last.prev;
+
+  return {
+    board: nextBoard,
+    turn: last.color,
+    mustContinueFrom: prevMeta ? prevMeta.mustContinueFrom : null,
+    status: 'playing',
+    winner: null,
+    lastMove: prevMeta ? prevMeta.lastMove : prevRecord ? { from: prevRecord.from, to: prevRecord.to } : null,
+    capturedByWhite,
+    capturedByBlack,
+    moveHistory: nextHistory,
+    scores: { ...state.scores },
+    clock: restoreBoardClockOnUndo(state.clock, last.color, nextHistory.length, now, prevMeta?.remainingMs),
+    undoRequest: null,
+  };
+}
+
+export function resignCheckersGame(
+  state: CheckersGameState,
+  resigningColor: CheckersColor,
+  now = Date.now(),
+  elapsedMs?: number,
+): CheckersGameState {
   if (state.status !== 'playing') return state;
   const winner: CheckersColor = resigningColor === 'w' ? 'b' : 'w';
   const nextScores = { ...state.scores };
@@ -404,5 +531,23 @@ export function resignCheckersGame(state: CheckersGameState, resigningColor: Che
     winner,
     mustContinueFrom: null,
     scores: nextScores,
+    clock: pauseBoardClock(state.clock, state.turn, state.moveHistory.length, now, elapsedMs),
+    undoRequest: null,
+  };
+}
+
+export function timeoutCheckersGame(state: CheckersGameState, losingColor: CheckersColor): CheckersGameState {
+  if (state.status !== 'playing') return state;
+  const winner: CheckersColor = losingColor === 'w' ? 'b' : 'w';
+  const nextScores = { ...state.scores };
+  nextScores[winner] += 1;
+  return {
+    ...state,
+    status: 'timeout',
+    winner,
+    mustContinueFrom: null,
+    scores: nextScores,
+    clock: timeoutBoardClock(state.clock, losingColor),
+    undoRequest: null,
   };
 }

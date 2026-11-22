@@ -2032,5 +2032,17 @@
   "privacyPolicy.changesTitle": "変更とお問い合わせ",
   "privacyPolicy.changesText": "P2Sharer のデータの扱い方が変わった場合は、このページを更新します。ご質問は GitHub で issue を作成してください。セキュリティ上の問題は、GitHub のセキュリティアドバイザリーから非公開で報告してください。",
   "privacyPolicy.securityLink": "セキュリティの問題を報告",
-  "updates.storeManaged": "この Microsoft Store 版の更新は Microsoft Store から配信されます。"
+  "updates.storeManaged": "この Microsoft Store 版の更新は Microsoft Store から配信されます。",
+  "games.timePerPlayer": "持ち時間",
+  "games.timeNoLimit": "無制限",
+  "games.timeMinutes": "{{count}}分",
+  "games.statusTimeoutWinner": "時間切れにより {{name}} の勝利",
+  "games.statusTimeoutSide": "時間切れにより {{side}} の勝利",
+  "games.undoMove": "待った",
+  "games.undoPending": "相手の返答待ち...",
+  "games.undoRequestTitle": "待ったのリクエスト",
+  "games.undoRequestPrompt": "{{name}} が直前の手の取り消しを求めています。",
+  "games.accept": "承認",
+  "games.decline": "拒否",
+  "games.opponent": "対戦相手"
 }

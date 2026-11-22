@@ -2032,5 +2032,17 @@
   "privacyPolicy.changesTitle": "Изменения и связь",
   "privacyPolicy.changesText": "Мы обновим эту страницу, если изменится то, как P2Sharer обращается с данными. С вопросами создайте issue на GitHub. О проблемах безопасности сообщайте конфиденциально через рекомендации по безопасности GitHub.",
   "privacyPolicy.securityLink": "Сообщить о проблеме безопасности",
-  "updates.storeManaged": "Обновления для этой установки из Microsoft Store поставляет Microsoft Store."
+  "updates.storeManaged": "Обновления для этой установки из Microsoft Store поставляет Microsoft Store.",
+  "games.timePerPlayer": "Лимит времени",
+  "games.timeNoLimit": "Без лимита",
+  "games.timeMinutes": "{{count}} мин",
+  "games.statusTimeoutWinner": "{{name}} победил(а) по времени",
+  "games.statusTimeoutSide": "{{side}} победили по времени",
+  "games.undoMove": "Отменить ход",
+  "games.undoPending": "Ожидание ответа...",
+  "games.undoRequestTitle": "Запрос на отмену хода",
+  "games.undoRequestPrompt": "{{name}} просит отменить последний ход.",
+  "games.accept": "Принять",
+  "games.decline": "Отклонить",
+  "games.opponent": "Соперник"
 }

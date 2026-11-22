@@ -2032,5 +2032,17 @@
   "privacyPolicy.changesTitle": "變更與聯絡",
   "privacyPolicy.changesText": "當 P2Sharer 處理資料的方式改變時，我們會更新本頁面。如有疑問，請在 GitHub 上提交 issue。安全性問題請透過 GitHub 安全性公告私下回報。",
   "privacyPolicy.securityLink": "回報安全性問題",
-  "updates.storeManaged": "此 Microsoft Store 安裝版本的更新由 Microsoft Store 提供。"
+  "updates.storeManaged": "此 Microsoft Store 安裝版本的更新由 Microsoft Store 提供。",
+  "games.timePerPlayer": "時間限制",
+  "games.timeNoLimit": "不限時",
+  "games.timeMinutes": "{{count}} 分鐘",
+  "games.statusTimeoutWinner": "{{name}} 因對方超時獲勝",
+  "games.statusTimeoutSide": "{{side}} 因對方超時獲勝",
+  "games.undoMove": "悔棋",
+  "games.undoPending": "等待對方回應...",
+  "games.undoRequestTitle": "悔棋請求",
+  "games.undoRequestPrompt": "{{name}} 請求撤回上一步棋。",
+  "games.accept": "接受",
+  "games.decline": "拒絕",
+  "games.opponent": "對手"
 }

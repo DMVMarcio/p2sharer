@@ -18,6 +18,7 @@ import {
   type ChessPromotionPiece,
 } from './chess_engine.ts';
 import {
+  BoardUndoConsentNotification,
   ChessPieceSvg,
   CozyBoardGameShell,
   CozyRoomSidePanel,
@@ -27,6 +28,7 @@ import {
 import { BoardPlanningOverlay, useBoardPlanning } from './BoardPlanningOverlay.tsx';
 import { boardGameSounds } from './board_game_sounds.ts';
 import { useBoardReturnAnimation } from './useBoardReturnAnimation.ts';
+import { useTimedBoardMatch } from './useTimedBoardMatch.ts';
 import { ModalDialog } from '../components/common/ModalDialog.tsx';
 
 interface DraggingPieceState {
@@ -85,6 +87,16 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
   }, [activeRoomId, model, clearPlanning]);
 
   const currentRoom = activeRoomId ? model.getRoom(activeRoomId) : undefined;
+  const { seat1ClockMs, seat2ClockMs, isClockRunning } = useTimedBoardMatch(model, currentRoom);
+
+  useEffect(() => {
+    if (currentRoom && currentRoom.game.status !== 'playing') {
+      setPendingPromotion(null);
+      setSelectedSquare(null);
+      setDragging(null);
+    }
+  }, [currentRoom?.id, currentRoom?.game.status]);
+
   useEffect(() => {
     if (!currentRoom) {
       lastSoundSnapshotRef.current = null;
@@ -103,14 +115,19 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
     }
 
     const movesIncreased = game.moveHistory.length > prev.moves;
+    const movesDecreased = game.moveHistory.length < prev.moves;
     const statusChanged = game.status !== prev.status;
 
-    if (movesIncreased || statusChanged) {
+    if (movesIncreased || movesDecreased || statusChanged) {
       const lastRecord = game.moveHistory[game.moveHistory.length - 1];
-      if (game.status === 'checkmate' || game.status === 'resigned') {
+      if (game.status === 'checkmate' || game.status === 'resigned' || game.status === 'timeout') {
         boardGameSounds.playVictory();
       } else if (game.status === 'stalemate' || game.status === 'draw_fifty') {
         boardGameSounds.playDraw();
+      } else if (movesDecreased) {
+        if (game.moveHistory.length > 0) {
+          boardGameSounds.playMove();
+        }
       } else if (movesIncreased) {
         if (game.inCheck) {
           boardGameSounds.playCheck();
@@ -177,6 +194,13 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
         ? t('games.statusResignedWinner', { name: person.name })
         : t('games.statusWinnerSide', { side: game.winner === 'w' ? t('games.white') : t('games.black') });
     }
+    if (game.status === 'timeout' && (game.winner === 'w' || game.winner === 'b')) {
+      const winnerId = game.winner === 'w' ? room.players.seat1 : room.players.seat2;
+      const person = resolveActor(winnerId, model.localActor);
+      return person
+        ? t('games.statusTimeoutWinner', { name: person.name })
+        : t('games.statusTimeoutSide', { side: game.winner === 'w' ? t('games.white') : t('games.black') });
+    }
     if (!room.players.seat1 || !room.players.seat2) {
       return t('games.statusWaitingPlayers');
     }
@@ -214,6 +238,19 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
           <ChessPieceSvg type="n" color={room.game.turn} size={24} />
           <span>{room.game.moveHistory.length}</span>
         </div>
+      )}
+      renderRoomOverlay={(room) => (
+        <BoardUndoConsentNotification
+          room={room}
+          model={model}
+          undoRequest={room.game.undoRequest}
+          isPlaying={room.game.status === 'playing'}
+          onRespond={(accept) => {
+            model.respondUndo(room.id, accept);
+            setSelectedSquare(null);
+            clearPlanning();
+          }}
+        />
       )}
     >
       {(room) => {
@@ -365,6 +402,19 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
             ? `${t('chess.checkAlert')} · ${describeRoomStatus(room)}`
             : describeRoomStatus(room);
 
+        const lastMoveRecord = game.moveHistory[game.moveHistory.length - 1];
+        const canRequestUndo = Boolean(
+          game.status === 'playing' &&
+            myColor !== null &&
+            room.players.seat1 &&
+            room.players.seat2 &&
+            lastMoveRecord?.color === myColor &&
+            !game.undoRequest,
+        );
+        const isUndoPending = Boolean(
+          game.status === 'playing' && myColor !== null && game.undoRequest?.requester === myColor,
+        );
+
         return (
           <div className="cozy-match-layout">
             <div className="cozy-board-stage">
@@ -507,6 +557,21 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
               turnSide={game.status !== 'playing' ? null : game.turn === 'w' ? 'seat1' : 'seat2'}
               statusText={statusText}
               statusTone={statusTone}
+              seat1ClockMs={seat1ClockMs}
+              seat2ClockMs={seat2ClockMs}
+              isClockRunning={isClockRunning}
+              timeLimitMs={game.clock?.limitMs ?? null}
+              canConfigureTimeLimit={game.status === 'playing' && game.moveHistory.length === 0}
+              onChangeTimeLimit={(limitMs) => model.setTimeLimit(room.id, limitMs)}
+              undoState={
+                myColor !== null
+                  ? {
+                      canRequest: canRequestUndo,
+                      isPending: isUndoPending,
+                      onRequest: () => model.requestUndo(room.id),
+                    }
+                  : undefined
+              }
               onNewMatch={() => {
                 model.newGame(room.id, false);
                 setSelectedSquare(null);

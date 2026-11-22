@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   ArrowLeft,
   ArrowLeftRight,
+  Check,
   Clock,
   Crown,
   Eraser,
@@ -15,18 +16,27 @@ import {
   Sparkles,
   Trash2,
   Trophy,
+  Undo2,
   Users,
   UserCheck,
+  X,
 } from 'lucide-react';
 import { t } from '../i18n/index.ts';
 import { useLocale } from '../hooks/useLocale.ts';
 import { useRoom } from '../hooks/useRoom.ts';
+import { useDropdownPresence } from '../hooks/useDropdownPresence.ts';
 import { ProfileAvatar } from '../components/common/ProfileAvatar.tsx';
+import { Select, type SelectOption } from '../components/common/Select.tsx';
 import { Tooltip } from '../components/common/Tooltip.tsx';
 import { TooltipButton } from '../components/common/TooltipButton.tsx';
 import { ModalDialog } from '../components/common/ModalDialog.tsx';
 import { ContentTransition } from '../components/common/ContentTransition.tsx';
 import { boardGameSounds } from './board_game_sounds.ts';
+import {
+  formatBoardClockTime,
+  TIME_LIMIT_OPTIONS_MINUTES,
+  type BoardUndoRequest,
+} from './board_game_timing.ts';
 import type { BoardGameKind, BoardGameLobbyModel, BoardGameRoomState } from './board_game_model.ts';
 import type { ChessColor, ChessPieceType } from './chess_engine.ts';
 
@@ -208,6 +218,7 @@ interface LobbyViewProps<TGame> {
   onSelectRoom: (roomId: string | null) => void;
   describeRoomStatus: (room: BoardGameRoomState<TGame>) => string;
   renderRoomMiniPreview?: (room: BoardGameRoomState<TGame>) => React.ReactNode;
+  renderRoomOverlay?: (room: BoardGameRoomState<TGame>) => React.ReactNode;
   children?: (room: BoardGameRoomState<TGame>) => React.ReactNode;
 }
 
@@ -222,6 +233,7 @@ export function CozyBoardGameShell<TGame>({
   onSelectRoom,
   describeRoomStatus,
   renderRoomMiniPreview,
+  renderRoomOverlay,
   children,
 }: LobbyViewProps<TGame>) {
   useLocale();
@@ -337,6 +349,7 @@ export function CozyBoardGameShell<TGame>({
                 </header>
 
                 <div className="cozy-room-stage">{children(roomObj)}</div>
+                {renderRoomOverlay?.(roomObj)}
               </div>
             );
           }
@@ -556,6 +569,91 @@ export function CozyBoardGameShell<TGame>({
   );
 }
 
+export function BoardUndoConsentNotification<TGame>({
+  room,
+  model,
+  undoRequest,
+  isPlaying,
+  onRespond,
+}: {
+  room: BoardGameRoomState<TGame>;
+  model: BoardGameLobbyModel<TGame>;
+  undoRequest: BoardUndoRequest | null | undefined;
+  isPlaying: boolean;
+  onRespond: (accept: boolean) => void;
+}) {
+  useLocale();
+  const resolveActor = useBoardGamePlayers();
+  const myColor =
+    room.players.seat1 === model.localActor
+      ? 'w'
+      : room.players.seat2 === model.localActor
+        ? 'b'
+        : null;
+  const isForMe = Boolean(isPlaying && myColor && undoRequest && undoRequest.requester !== myColor);
+  const requesterId =
+    undoRequest?.requester === 'w'
+      ? room.players.seat1
+      : undoRequest?.requester === 'b'
+        ? room.players.seat2
+        : null;
+  const requester = resolveActor(requesterId, model.localActor);
+  const activeKey =
+    isForMe && undoRequest
+      ? `${room.id}:${undoRequest.moveCount}:${undoRequest.requester}`
+      : null;
+  const presence = useDropdownPresence(activeKey);
+  const lastNameRef = useRef('');
+  if (isForMe) {
+    lastNameRef.current = requester?.name || t('games.opponent');
+  }
+
+  if (!presence.value) return null;
+
+  const requesterName = lastNameRef.current || t('games.opponent');
+
+  return (
+    <div
+      className={`cozy-undo-toast ${presence.closing ? 'is-closing' : ''}`}
+      role="status"
+      aria-live="polite"
+      aria-label={t('games.undoRequestTitle')}
+      inert={presence.closing}
+      aria-hidden={presence.closing || undefined}
+    >
+      <div className="cozy-undo-toast-body">
+        <span className="cozy-undo-toast-icon" aria-hidden="true">
+          <Undo2 size={15} />
+        </span>
+        <div className="cozy-undo-toast-copy">
+          <strong>{t('games.undoRequestTitle')}</strong>
+          <span>{t('games.undoRequestPrompt', { name: requesterName })}</span>
+        </div>
+      </div>
+      <div className="cozy-undo-toast-actions">
+        <button
+          type="button"
+          disabled={presence.closing}
+          className="cozy-wood-btn is-primary"
+          onClick={() => onRespond(true)}
+        >
+          <Check size={13} aria-hidden="true" />
+          <span>{t('games.accept')}</span>
+        </button>
+        <button
+          type="button"
+          disabled={presence.closing}
+          className="cozy-wood-btn is-danger"
+          onClick={() => onRespond(false)}
+        >
+          <X size={13} aria-hidden="true" />
+          <span>{t('games.decline')}</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export type CozyStatusTone = 'victory' | 'warning' | 'highlight' | 'turn' | 'waiting';
 
 export function CozyRoomSidePanel<TGame>({
@@ -571,6 +669,13 @@ export function CozyRoomSidePanel<TGame>({
   statusTone = 'waiting',
   seat1OrbTone = 'light',
   seat2OrbTone = 'dark',
+  seat1ClockMs,
+  seat2ClockMs,
+  isClockRunning = false,
+  timeLimitMs,
+  canConfigureTimeLimit = false,
+  onChangeTimeLimit,
+  undoState,
   onNewMatch,
   onResetScores,
   onSwapSeats,
@@ -590,6 +695,17 @@ export function CozyRoomSidePanel<TGame>({
   statusTone?: CozyStatusTone;
   seat1OrbTone?: 'light' | 'x';
   seat2OrbTone?: 'dark' | 'o';
+  seat1ClockMs?: number | null;
+  seat2ClockMs?: number | null;
+  isClockRunning?: boolean;
+  timeLimitMs?: number | null;
+  canConfigureTimeLimit?: boolean;
+  onChangeTimeLimit?: (limitMs: number | null) => void;
+  undoState?: {
+    canRequest: boolean;
+    isPending: boolean;
+    onRequest: () => void;
+  };
   onNewMatch: () => void;
   onResetScores?: () => void;
   onSwapSeats?: () => void;
@@ -612,6 +728,13 @@ export function CozyRoomSidePanel<TGame>({
 
   const isGameOngoing = turnSide !== null;
 
+  const selectedMinutes =
+    timeLimitMs && timeLimitMs > 0 ? Math.round(timeLimitMs / 60_000) : 0;
+  const timeLimitOptions: SelectOption[] = TIME_LIMIT_OPTIONS_MINUTES.map((minutes) => ({
+    value: String(minutes),
+    label: minutes === 0 ? t('games.timeNoLimit') : t('games.timeMinutes', { count: minutes }),
+  }));
+
   const StatusIcon =
     statusTone === 'victory'
       ? Trophy
@@ -627,8 +750,14 @@ export function CozyRoomSidePanel<TGame>({
     orbTone: 'light' | 'dark' | 'x' | 'o',
     player: ReturnType<typeof resolveActor>,
     score: number,
+    clockMs: number | null | undefined,
   ) => {
     const isTurn = turnSide === seat;
+    const clockActive = isTurn && isClockRunning;
+    const clockExpired = clockMs !== null && clockMs !== undefined && clockMs <= 0;
+    const clockCritical = clockMs !== null && clockMs !== undefined && clockMs > 0 && clockMs <= 10_000;
+    const clockLow = clockMs !== null && clockMs !== undefined && clockMs > 10_000 && clockMs <= 30_000;
+
     const seatSublabel = isTurn
       ? player?.isLocal
         ? t('games.currentTurn')
@@ -644,7 +773,20 @@ export function CozyRoomSidePanel<TGame>({
             <span className={`cozy-seat-orb tone-${orbTone}`} aria-hidden="true" />
             <span className="cozy-seat-side-name">{label}</span>
           </div>
-          <span className="cozy-score-pill">{score}</span>
+          <div className="cozy-seat-header-badges">
+            {clockMs !== null && clockMs !== undefined && (
+              <span
+                className={`cozy-clock-pill ${clockActive ? 'is-running' : ''} ${
+                  clockExpired ? 'is-expired' : clockCritical ? 'is-critical' : clockLow ? 'is-low' : ''
+                }`}
+                aria-label={`${label}: ${formatBoardClockTime(clockMs)}`}
+              >
+                <Clock size={11} aria-hidden="true" />
+                <span>{formatBoardClockTime(clockMs)}</span>
+              </span>
+            )}
+            <span className="cozy-score-pill">{score}</span>
+          </div>
         </div>
 
         <div className="cozy-seat-card-body">
@@ -692,13 +834,35 @@ export function CozyRoomSidePanel<TGame>({
 
       {/* Distinct Highlighted Seat Cards */}
       <div className="cozy-seats-stack">
-        {renderSeatCard('seat1', seat1Label, seat1OrbTone, p1, seat1Score)}
-        {renderSeatCard('seat2', seat2Label, seat2OrbTone, p2, seat2Score)}
+        {renderSeatCard('seat1', seat1Label, seat1OrbTone, p1, seat1Score, seat1ClockMs)}
+        {renderSeatCard('seat2', seat2Label, seat2OrbTone, p2, seat2Score, seat2ClockMs)}
         <div className="cozy-draws-bar">
           <span>{t('games.draws')}</span>
           <strong>{drawsScore}</strong>
         </div>
       </div>
+
+      {onChangeTimeLimit && (
+        <div className="cozy-panel-card cozy-time-control-card">
+          <div className="cozy-time-control-row">
+            <span className="cozy-card-subtitle">
+              <Clock size={12} aria-hidden="true" />
+              <span>{t('games.timePerPlayer')}</span>
+            </span>
+            <Select
+              value={String(selectedMinutes)}
+              options={timeLimitOptions}
+              disabled={!isPlayerOrOwner || !canConfigureTimeLimit}
+              aria-label={t('games.timePerPlayer')}
+              className="cozy-time-select"
+              onValueChange={(value) => {
+                const minutes = Number(value);
+                onChangeTimeLimit(minutes > 0 ? minutes * 60_000 : null);
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {extraContent}
 
@@ -713,6 +877,18 @@ export function CozyRoomSidePanel<TGame>({
             <RotateCcw size={14} />
             <span>{t('games.newMatch')}</span>
           </button>
+
+          {undoState && (
+            <button
+              type="button"
+              className="cozy-wood-btn is-secondary is-full"
+              disabled={!undoState.canRequest}
+              onClick={undoState.onRequest}
+            >
+              <Undo2 size={14} />
+              <span>{undoState.isPending ? t('games.undoPending') : t('games.undoMove')}</span>
+            </button>
+          )}
 
           <div className="cozy-control-deck-row">
             {onSwapSeats && (
