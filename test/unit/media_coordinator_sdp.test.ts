@@ -279,4 +279,34 @@ describe('MediaCoordinator SDP Munging and WebRTC Bandwidth Allocation', () => {
     await MediaCoordinator.requestKeyFrame(null as unknown as RTCPeerConnection);
     await MediaCoordinator.requestKeyFrame({} as unknown as RTCPeerConnection);
   });
+
+  it('rejects parameterless setLocalDescription when signalingState shifts during glare instead of generating wrong SDP', async () => {
+    let fallbackCalls = 0;
+    class GlareMockConnection {
+      signalingState: string = 'stable';
+      async createOffer() {
+        this.signalingState = 'have-remote-offer';
+        return { type: 'offer', sdp: sampleSdp };
+      }
+      async createAnswer() {
+        return { type: 'answer', sdp: sampleSdp };
+      }
+      async setLocalDescription(desc?: any) {
+        if (!desc) fallbackCalls++;
+      }
+    }
+
+    const previous = Object.getOwnPropertyDescriptor(globalThis, 'RTCPeerConnection');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (globalThis as any).RTCPeerConnection = GlareMockConnection;
+    MediaCoordinator.initGlobalWebRtcMunging();
+    try {
+      const pc = new GlareMockConnection();
+      await assert.rejects(() => pc.setLocalDescription(), (err: any) => err?.name === 'InvalidStateError');
+      assert.equal(fallbackCalls, 0);
+    } finally {
+      if (previous) Object.defineProperty(globalThis, 'RTCPeerConnection', previous);
+      else delete (globalThis as any).RTCPeerConnection;
+    }
+  });
 });

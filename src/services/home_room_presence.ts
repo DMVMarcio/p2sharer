@@ -139,6 +139,13 @@ export function createHomeRoomPresenceService(probeFn?: ProbeRoomFn) {
     currentAbort = null;
   };
 
+  const abortAndWait = async (): Promise<void> => {
+    abortCurrent();
+    if (activeCycle) {
+      await activeCycle.catch(() => {});
+    }
+  };
+
   const clear = () => {
     abortCurrent();
     lastCheckedAt.clear();
@@ -262,6 +269,7 @@ export function createHomeRoomPresenceService(probeFn?: ProbeRoomFn) {
   return {
     start,
     clear,
+    abortAndWait,
     refreshNow: (force = true) => refreshDueRooms(force),
     getParticipants: (roomId: string): RoomPreviewParticipant[] => participantsByRoom[roomId] ?? [],
     snapshot: () => version,
@@ -273,3 +281,4 @@ export function createHomeRoomPresenceService(probeFn?: ProbeRoomFn) {
 }
 
 export const homeRoomPresence = createHomeRoomPresenceService();
+roomService?.registerBeforeRoomJoin?.(() => homeRoomPresence.abortAndWait());

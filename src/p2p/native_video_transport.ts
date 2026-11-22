@@ -15,7 +15,7 @@ interface Outgoing { id: string; peer: string; descriptor: StreamDescriptor; sou
   started: number;
   offer?: Signal; retryTimer?: ReturnType<typeof setTimeout>; answering?: boolean; ready?: boolean;
   timer: ReturnType<typeof setTimeout>; offered: boolean; answered: boolean; candidates: RTCIceCandidateInit[]; localCandidates: RTCIceCandidateInit[] }
-interface Incoming { id: string; peer: string; descriptor: StreamDescriptor; pc: RTCPeerConnection;
+interface Incoming { id: string; peer: string; descriptor: StreamDescriptor; pc?: RTCPeerConnection;
   timer: ReturnType<typeof setInterval>; remoteReady: boolean; candidates: RTCIceCandidateInit[]; started: number; connectedAt?: number;
   verifiedFrames?: boolean;
   rcDatagram?: RTCDataChannel; rcInput?: RTCDataChannel;
@@ -23,7 +23,7 @@ interface Incoming { id: string; peer: string; descriptor: StreamDescriptor; pc:
   iceSummary?: ReturnType<typeof summarizeIceStats>; sampledAt?: number;
   videoStats?: { bytesReceived: number; framesReceived: number; framesDecoded: number; keyFramesDecoded: number } }
 interface TransportConfig {
-  rtc: () => RTCConfiguration;
+  rtc: () => RTCConfiguration | Promise<RTCConfiguration>;
   send: (peer: string, signal: Signal) => void;
   permitted: (peer: string, descriptor?: StreamDescriptor) => boolean;
   receive: (peer: string, stream: MediaStream, descriptor: StreamDescriptor) => void;
@@ -53,14 +53,15 @@ export class NativeVideoTransport {
         if (route.localCandidates.length < 64) route.localCandidates.push(payload.candidate);
         if (route.offered) this.send(route.peer, { id: route.id, mediaId: route.descriptor.id, kind: 'ice', candidate: payload.candidate });
       }
-    }).then(unlisten => { if (this.closed) unlisten(); else this.unlisten = unlisten; });
+    }).then(unlisten => { if (this.closed) unlisten(); else this.unlisten = unlisten; })
+      .catch((err) => { this.listening = undefined; throw err; });
   }
-  public dispatch(peer: string, stream: MediaStream, descriptor: StreamDescriptor): boolean {
+  public dispatch(peer: string, stream: MediaStream, descriptor: StreamDescriptor, forceRestart = false): boolean {
     const track = stream.getVideoTracks()[0]; const source = nativeSenderSource(track);
     const key = this.key(peer, descriptor.id);
     if (this.closed || !source || this.blocked.has(key) || !this.config.permitted(peer)) return false;
     const existing = this.outgoing.get(key);
-    if (existing?.track === track) return true;
+    if (existing?.track === track && !forceRestart) return true;
     if (existing) this.closeOutgoing(existing, true);
     const route: Outgoing = { id: crypto.randomUUID(), peer, descriptor, source, track, offered: false, answered: false, started: performance.now(),
       candidates: [], localCandidates: [], timer: setTimeout(() => this.fail(route, 'setup_timeout'), SETUP_TIMEOUT_MS) };
@@ -74,7 +75,8 @@ export class NativeVideoTransport {
   private async open(route: Outgoing): Promise<void> {
     await this.ensureListener();
     if (!this.current(route)) return;
-    const rtc = this.config.rtc();
+    const rtc = await this.config.rtc();
+    if (!this.current(route)) return;
     logDiagnostic('INFO', 'transmission.native.ice', 'Creating native sender offer', {
       routeId: route.id, mediaId: route.descriptor.id, relayOnly: rtc.iceTransportPolicy === 'relay',
       serverCount: rtc.iceServers?.length ?? 0, elapsedMs: Math.round(performance.now() - route.started) });
@@ -144,48 +146,54 @@ export class NativeVideoTransport {
       }
       const old = this.incoming.get(key);
       if (old?.id === signal.id) {
-        const answer = old.pc.localDescription;
+        const answer = old.pc?.localDescription;
         if (answer?.type === 'answer') this.send(peer, { id: old.id, mediaId: signal.mediaId, kind: 'answer', sdp: answer.sdp });
         if (old.verifiedFrames) this.send(peer, { id: old.id, mediaId: signal.mediaId, kind: 'ready' });
         return;
       }
       if (old) this.closeIncoming(old);
-      const pc = new RTCPeerConnection(this.config.rtc());
-      const incoming: Incoming = { id: signal.id, peer, descriptor: signal.descriptor, pc, candidates: [], remoteReady: false,
+      const incoming: Incoming = { id: signal.id, peer, descriptor: signal.descriptor, candidates: [], remoteReady: false,
         started: performance.now(), timer: setInterval(() => { void this.checkReceiver(incoming); }, 500) };
       this.incoming.set(key, incoming);
-      pc.onconnectionstatechange = () => {
-        logDiagnostic('INFO', 'transmission.native', 'Native receiver connection state changed', {
-          routeId: incoming.id, mediaId: incoming.descriptor.id, connectionState: pc.connectionState,
-          iceState: pc.iceConnectionState, elapsedMs: Math.round(performance.now() - incoming.started) });
-        if (pc.connectionState === 'connected') incoming.connectedAt ??= performance.now();
-        if (pc.connectionState === 'failed') this.reject(incoming, 'connection_failed');
-      };
-      pc.onicecandidate = ({ candidate }) => {
-        if (candidate && this.incoming.get(key) === incoming) this.send(peer, { id: signal.id, mediaId: signal.mediaId, kind: 'ice', candidate: candidate.toJSON() });
-      };
-      pc.ondatachannel = ({ channel }) => {
-        if (this.incoming.get(key) !== incoming) return;
-        channel.binaryType = 'arraybuffer';
-        if (channel.label === 'p2_rc_datagram') incoming.rcDatagram = channel;
-        else if (channel.label === 'p2_rc_input') incoming.rcInput = channel;
-      };
-      pc.ontrack = ({ track }) => {
-        if (this.incoming.get(key) !== incoming || !this.config.permitted(peer,incoming.descriptor)) return;
-        MediaCoordinator.tuneReceiverJitterBuffer(pc, this.lowLatencyPeers.has(peer));
-        if (track.kind !== 'video') return;
-        incoming.stream = new MediaStream([track]);
-        // A muted probe consumes native video without replacing the currently
-        // playing browser route. Handoff requires real decoded frames.
-        const probe = document.createElement('video');
-        probe.muted = true; probe.autoplay = true; probe.playsInline = true;
-        probe.srcObject = incoming.stream;
-        incoming.probe = probe;
-        void probe.play().catch(error => {
-          if (this.incoming.get(key) === incoming) this.reject(incoming, 'receiver_play_failed', error);
-        });
-      };
       try {
+        const rtc = await this.config.rtc();
+        if (this.closed || this.incoming.get(key) !== incoming || !this.config.permitted(peer, signal.descriptor)) return;
+        const pc = new RTCPeerConnection(rtc);
+        incoming.pc = pc;
+        pc.onconnectionstatechange = () => {
+          logDiagnostic('INFO', 'transmission.native', 'Native receiver connection state changed', {
+            routeId: incoming.id, mediaId: incoming.descriptor.id, connectionState: pc.connectionState,
+            iceState: pc.iceConnectionState, elapsedMs: Math.round(performance.now() - incoming.started) });
+          if (pc.connectionState === 'connected') incoming.connectedAt ??= performance.now();
+          if (pc.connectionState === 'failed' || pc.iceConnectionState === 'failed') this.reject(incoming, 'connection_failed');
+        };
+        pc.oniceconnectionstatechange = () => {
+          if (pc.iceConnectionState === 'failed') this.reject(incoming, 'connection_failed');
+        };
+        pc.onicecandidate = ({ candidate }) => {
+          if (candidate && this.incoming.get(key) === incoming) this.send(peer, { id: signal.id, mediaId: signal.mediaId, kind: 'ice', candidate: candidate.toJSON() });
+        };
+        pc.ondatachannel = ({ channel }) => {
+          if (this.incoming.get(key) !== incoming) return;
+          channel.binaryType = 'arraybuffer';
+          if (channel.label === 'p2_rc_datagram') incoming.rcDatagram = channel;
+          else if (channel.label === 'p2_rc_input') incoming.rcInput = channel;
+        };
+        pc.ontrack = ({ track }) => {
+          if (this.incoming.get(key) !== incoming || !this.config.permitted(peer,incoming.descriptor)) return;
+          MediaCoordinator.tuneReceiverJitterBuffer(pc, this.lowLatencyPeers.has(peer));
+          if (track.kind !== 'video') return;
+          incoming.stream = new MediaStream([track]);
+          // A muted probe consumes native video without replacing the currently
+          // playing browser route. Handoff requires real decoded frames.
+          const probe = document.createElement('video');
+          probe.muted = true; probe.autoplay = true; probe.playsInline = true;
+          probe.srcObject = incoming.stream;
+          incoming.probe = probe;
+          void probe.play().catch(error => {
+            if (this.incoming.get(key) === incoming) this.reject(incoming, 'receiver_play_failed', error);
+          });
+        };
         await pc.setRemoteDescription({ type: 'offer', sdp: signal.sdp });
         if (this.incoming.get(key) !== incoming) return;
         incoming.remoteReady = true;
@@ -203,7 +211,7 @@ export class NativeVideoTransport {
     if (signal.kind === 'stop') { this.closeIncoming(incoming); return; }
     if (signal.kind === 'ice' && signal.candidate) {
       try {
-        if (incoming.remoteReady) await incoming.pc.addIceCandidate(signal.candidate);
+        if (incoming.remoteReady && incoming.pc) await incoming.pc.addIceCandidate(signal.candidate);
         else if (incoming.candidates.length < 64) incoming.candidates.push(signal.candidate);
       } catch (error) { this.reject(incoming, 'receiver_ice_failed', error); }
     }
@@ -212,11 +220,15 @@ export class NativeVideoTransport {
     if (this.incoming.get(this.key(r.peer,r.descriptor.id)) !== r) return;
     if (r.verifiedFrames) return;
     if (!this.config.permitted(r.peer,r.descriptor)) { this.closeIncoming(r); return; }
-    if (r.pc.connectionState === 'failed') {
+    const elapsed = performance.now() - r.started;
+    if (!r.pc) {
+      if (elapsed >= SETUP_TIMEOUT_MS) this.reject(r, 'receiver_setup_timeout');
+      return;
+    }
+    if (r.pc.connectionState === 'failed' || r.pc.iceConnectionState === 'failed') {
       this.reject(r, 'connection_failed');
       return;
     }
-    const elapsed = performance.now() - r.started;
     if (r.pc.connectionState === 'connected') r.connectedAt ??= performance.now();
     const stats = await r.pc.getStats().catch(() => undefined);
     if (this.incoming.get(this.key(r.peer,r.descriptor.id)) !== r || r.verifiedFrames) return;
@@ -248,8 +260,8 @@ export class NativeVideoTransport {
     if (this.incoming.get(this.key(r.peer,r.descriptor.id)) !== r) return;
     this.blocked.add(this.key(r.peer, r.descriptor.id));
     logDiagnostic('WARN', 'transmission.native', 'Rejecting native video; requesting browser WebRTC fallback', {
-      routeId: r.id, mediaId: r.descriptor.id, reason, error, connectionState: r.pc.connectionState,
-      iceState: r.pc.iceConnectionState, videoStats: r.videoStats, elapsedMs: Math.round(performance.now() - r.started) });
+      routeId: r.id, mediaId: r.descriptor.id, reason, error, connectionState: r.pc?.connectionState,
+      iceState: r.pc?.iceConnectionState, videoStats: r.videoStats, elapsedMs: Math.round(performance.now() - r.started) });
     this.send(r.peer,{id:r.id,mediaId:r.descriptor.id,kind:'reject',reason}); this.closeIncoming(r);
   }
   private nativeIce(r: Outgoing, candidate: RTCIceCandidateInit): Promise<void> {
@@ -272,12 +284,12 @@ export class NativeVideoTransport {
   private closeIncoming(r: Incoming): void {
     logDiagnostic('INFO', 'transmission.native.ice', 'Native receiver route retired', {
       routeId: r.id, mediaId: r.descriptor.id, elapsedMs: Math.round(performance.now() - r.started),
-      connection: r.pc.connectionState, ice: r.pc.iceConnectionState, gathering: r.pc.iceGatheringState,
+      connection: r.pc?.connectionState, ice: r.pc?.iceConnectionState, gathering: r.pc?.iceGatheringState,
       decoded: r.verifiedFrames === true, video: r.videoStats,
       sampleAgeMs: r.sampledAt === undefined ? null : Math.round(performance.now() - r.sampledAt),
       routes: r.iceSummary ?? { status: 'not_sampled' },
     });
-    this.incoming.delete(this.key(r.peer,r.descriptor.id)); clearInterval(r.timer); this.releaseProbe(r); r.pc.close();
+    this.incoming.delete(this.key(r.peer,r.descriptor.id)); clearInterval(r.timer); this.releaseProbe(r); r.pc?.close();
   }
   private releaseProbe(r: Incoming): void {
     if (!r.probe) return;
@@ -327,7 +339,7 @@ export class NativeVideoTransport {
     if (lowLatency) this.lowLatencyPeers.add(peer);
     else this.lowLatencyPeers.delete(peer);
     for (const route of this.incoming.values()) {
-      if (route.peer === peer) {
+      if (route.peer === peer && route.pc) {
         MediaCoordinator.tuneReceiverJitterBuffer(route.pc, lowLatency);
       }
     }

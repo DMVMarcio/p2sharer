@@ -163,3 +163,38 @@ test('saved room cards show overlapping participant avatars at top-right and ope
     delete globalThis.homeUiFixture;
   }
 });
+
+test('abortAndWait waits for in-flight probe cleanup before resolving', async () => {
+  const created = await createAuthenticatedInvite('Abort wait room');
+  const invite = parseRoomInvite(created.invite);
+  await savedRooms.put({
+    roomId: invite.roomId,
+    invite: created.invite,
+    name: 'Abort wait room',
+    saved: true,
+    owned: false,
+  });
+  let cleanedUp = false;
+  let probeStarted;
+  const startedPromise = new Promise((resolve) => { probeStarted = resolve; });
+  const service = createHomeRoomPresenceService(async (_room, signal) => {
+    probeStarted();
+    await new Promise((resolve) => {
+      if (signal.aborted) resolve(undefined);
+      else signal.addEventListener('abort', resolve, { once: true });
+    });
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    cleanedUp = true;
+    return [];
+  });
+  stateStore.savePrivacyPreferences({ homeRoomPresencePolling: true });
+  const stop = service.start();
+  try {
+    await startedPromise;
+    await service.abortAndWait();
+    assert.equal(cleanedUp, true);
+  } finally {
+    stop();
+    await savedRooms.remove(invite.roomId);
+  }
+});

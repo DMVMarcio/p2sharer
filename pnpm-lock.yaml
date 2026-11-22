@@ -6,7 +6,7 @@ settings:
 
 patchedDependencies:
   '@trystero-p2p/core@0.25.3':
-    hash: 39307eb1002f6bc6b913be72b194f2daa378abd00fb2a6bcf1cf72c48140f2e6
+    hash: b0569614aa4b61a353a2976d837ac81ddcc7aa1d2064c6c7ebabfdbddef20cbb
     path: patches/@trystero-p2p__core@0.25.3.patch
 
 importers:
@@ -90,7 +90,7 @@ importers:
         version: 3.31.3
       '@trystero-p2p/core':
         specifier: 0.25.3
-        version: 0.25.3(patch_hash=39307eb1002f6bc6b913be72b194f2daa378abd00fb2a6bcf1cf72c48140f2e6)
+        version: 0.25.3(patch_hash=b0569614aa4b61a353a2976d837ac81ddcc7aa1d2064c6c7ebabfdbddef20cbb)
       '@trystero-p2p/mqtt':
         specifier: ^0.25.3
         version: 0.25.3
@@ -2780,11 +2780,11 @@ snapshots:
       y-protocols: 1.0.7(yjs@13.6.33)
       yjs: 13.6.33
 
-  '@trystero-p2p/core@0.25.3(patch_hash=39307eb1002f6bc6b913be72b194f2daa378abd00fb2a6bcf1cf72c48140f2e6)': {}
+  '@trystero-p2p/core@0.25.3(patch_hash=b0569614aa4b61a353a2976d837ac81ddcc7aa1d2064c6c7ebabfdbddef20cbb)': {}
 
   '@trystero-p2p/mqtt@0.25.3':
     dependencies:
-      '@trystero-p2p/core': 0.25.3(patch_hash=39307eb1002f6bc6b913be72b194f2daa378abd00fb2a6bcf1cf72c48140f2e6)
+      '@trystero-p2p/core': 0.25.3(patch_hash=b0569614aa4b61a353a2976d837ac81ddcc7aa1d2064c6c7ebabfdbddef20cbb)
       mqtt: 5.15.2
     transitivePeerDependencies:
       - bufferutil
@@ -2794,11 +2794,11 @@ snapshots:
   '@trystero-p2p/nostr@0.25.3':
     dependencies:
       '@noble/secp256k1': 3.1.0
-      '@trystero-p2p/core': 0.25.3(patch_hash=39307eb1002f6bc6b913be72b194f2daa378abd00fb2a6bcf1cf72c48140f2e6)
+      '@trystero-p2p/core': 0.25.3(patch_hash=b0569614aa4b61a353a2976d837ac81ddcc7aa1d2064c6c7ebabfdbddef20cbb)
 
   '@trystero-p2p/torrent@0.25.3':
     dependencies:
-      '@trystero-p2p/core': 0.25.3(patch_hash=39307eb1002f6bc6b913be72b194f2daa378abd00fb2a6bcf1cf72c48140f2e6)
+      '@trystero-p2p/core': 0.25.3(patch_hash=b0569614aa4b61a353a2976d837ac81ddcc7aa1d2064c6c7ebabfdbddef20cbb)
 
   '@types/babel__core@7.20.5':
     dependencies:

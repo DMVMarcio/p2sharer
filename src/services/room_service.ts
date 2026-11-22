@@ -117,6 +117,7 @@ export class RoomService {
   };
 
   private listeners: Set<Listener> = new Set();
+  private beforeRoomJoinHooks = new Set<() => Promise<void>>();
   private roomConnectingTimeout: ReturnType<typeof setTimeout> | null = null;
   private roomTransition: Promise<void> = Promise.resolve();
   private remoteControlMoveQueues = new Map<
@@ -143,6 +144,13 @@ export class RoomService {
     this.listeners.add(listener);
     return () => {
       this.listeners.delete(listener);
+    };
+  }
+
+  public registerBeforeRoomJoin(hook: () => Promise<void>): () => void {
+    this.beforeRoomJoinHooks.add(hook);
+    return () => {
+      this.beforeRoomJoinHooks.delete(hook);
     };
   }
 
@@ -407,6 +415,8 @@ export class RoomService {
   public startRoomPreview(manager: GroupRoomManager, callbacks: RoomCallbacks, signal: AbortSignal): Promise<void> {
     const transition = this.roomTransition.then(async () => {
       if (signal.aborted) return;
+      await Promise.allSettled([...this.beforeRoomJoinHooks].map((hook) => hook()));
+      if (signal.aborted) return;
       if (this.roomPreview) await this.roomPreview.leave();
       if (signal.aborted) return;
       this.roomPreview = manager;
@@ -427,6 +437,8 @@ export class RoomService {
 
   private async joinRoomNow(code: string, pass: string, isCreator: boolean, waitForAdmission: boolean,
     preview?: GroupRoomManager, signal?: AbortSignal, saveOnJoin = false): Promise<void> {
+    await Promise.allSettled([...this.beforeRoomJoinHooks].map((hook) => hook()));
+    if (signal?.aborted) return;
     this.joinOutcome = 'connecting';
     this.joinError = '';
     this.remoteControlHost.clear();
@@ -1589,6 +1601,7 @@ export class RoomService {
       const bridge = prepared?.bridge || (isTauri() && kind === 'screen' ? new NativeVideoBridge(crypto.randomUUID()) : undefined);
       if (prepared?.bridge) prepared.bridge.setConsumerActive('modal-preview', false);
       let stream: MediaStream | undefined;
+      let acquiredAudio: MediaStreamTrack | null = null;
       try {
         if (!this.localCaptures.size) await MediaCoordinator.prepareCodecPreferences(res.width, res.height, fps, bitrate * 1000);
         stream = prepared?.stream || (bridge ? await bridge.startCapture(sourceId, fps, res, mouse, quality) :
@@ -1605,7 +1618,6 @@ export class RoomService {
         track.contentHint = kind === 'camera' ? 'motion' : 'detail';
         const hasAudioTrack = kind === 'screen' && isTauri() &&
           !Array.from(this.localCaptures.values()).some((entry) => entry.kind === 'screen');
-        let acquiredAudio: MediaStreamTrack | null = null;
         if (!previous && hasAudioTrack) {
           acquiredAudio = await this.audioBridge.startCapture(stateStore.isAudioFilterFullAudio ? 'full' : stateStore.selectedFilterMode,
             stateStore.isAudioFilterFullAudio ? [] : stateStore.getActiveFilterPids(),
@@ -1616,31 +1628,50 @@ export class RoomService {
         const descriptor: StreamDescriptor = { id, kind, get label() { return (label || (kind === 'camera' ? t("message.dafb61aca12d") :
           sourceId.startsWith('window:') ? t("message.28014ef35252") : t("message.2d31efc9c2ed"))).slice(0, 200); }, videoTrackId: track.id, fps, bitrate,
           hasAudio: previous ? previous.stream.getAudioTracks().length > 0 : Boolean(acquiredAudio || stream.getAudioTracks().length > 0) };
-        if (previous) {
-          await manager.replaceMediaTrack(id, track, descriptor);
-          this.pointerReceivers.get(id)?.clear();
-          this.pointerReceivers.delete(id);
-          stream = previous.stream;
-          const slot = stateStore.roomSlots.find((slot) => slot.isLocal && slot.mediaId === id);
-          if (slot) pipService.updateStream(slot.peerId, stream);
-        } else {
-          manager.shareStream(stream, bitrate * 1000, fps, descriptor);
-        }
-        const capture = { sourceId, kind, stream, bridge, fps, resolution: res, mouse, quality, bitrate };
-        this.localCaptures.set(id, capture);
         const initialPreview = Boolean(stateStore.localPreviewStreams[id] ?? stateStore.localPreviewStreams['local'] ?? (kind === 'camera'));
-        bridge?.setConsumerActive('local-preview', initialPreview);
-        track.onended = () => { if (this.localCaptures.get(id) === capture) this.stopTransmission(id); };
-        if (bridge) bridge.onFallbackNeeded = () => {
-          if (this.localCaptures.get(id) === capture) { showToast(t("message.e018f7492e19")); this.stopTransmission(id); }
-        };
-        if (previous?.bridge) await previous.bridge.stopCapture();
-        if (previous && !previous.bridge) previous.stream.getVideoTracks().filter((item) => item !== track).forEach((item) => item.stop());
-        this.syncCaptureState();
-        console.info('[RoomService] Capture published', { sourceId, mediaId: id, kind,
-          nativeSession: bridge?.sessionId, settings: track.getSettings(), elapsedMs: Math.round(performance.now() - captureStarted) });
-        showToast(previous ? t("message.d1943a972148") : t("message.3c3d7ea79d61"));
+        let capture: { sourceId: string; kind: MediaKind; stream: MediaStream;
+          bridge?: NativeVideoBridge; fps: number; resolution: { width: number; height: number }; mouse: boolean; quality: number; bitrate: number } | undefined;
+        try {
+          if (previous) {
+            await manager.replaceMediaTrack(id, track, descriptor);
+            this.pointerReceivers.get(id)?.clear();
+            this.pointerReceivers.delete(id);
+            stream = previous.stream;
+            capture = { sourceId, kind, stream, bridge, fps, resolution: res, mouse, quality, bitrate };
+            this.localCaptures.set(id, capture);
+            bridge?.setConsumerActive('local-preview', initialPreview);
+            manager.syncCaptureConsumers(id);
+            const slot = stateStore.roomSlots.find((slot) => slot.isLocal && slot.mediaId === id);
+            if (slot) pipService.updateStream(slot.peerId, stream);
+          } else {
+            capture = { sourceId, kind, stream, bridge, fps, resolution: res, mouse, quality, bitrate };
+            this.localCaptures.set(id, capture);
+            bridge?.setConsumerActive('local-preview', initialPreview);
+            manager.shareStream(stream, bitrate * 1000, fps, descriptor);
+          }
+          track.onended = () => { if (this.localCaptures.get(id) === capture) this.stopTransmission(id); };
+          if (bridge) bridge.onFallbackNeeded = () => {
+            if (this.localCaptures.get(id) === capture) { showToast(t("message.e018f7492e19")); this.stopTransmission(id); }
+          };
+          if (previous?.bridge) await previous.bridge.stopCapture();
+          if (previous && !previous.bridge) previous.stream.getVideoTracks().filter((item) => item !== track).forEach((item) => item.stop());
+          this.syncCaptureState();
+          console.info('[RoomService] Capture published', { sourceId, mediaId: id, kind,
+            nativeSession: bridge?.sessionId, settings: track.getSettings(), elapsedMs: Math.round(performance.now() - captureStarted) });
+          showToast(previous ? t("message.d1943a972148") : t("message.3c3d7ea79d61"));
+        } catch (innerError) {
+          if (!previous && capture && this.localCaptures.get(id) === capture) {
+            this.localCaptures.delete(id);
+          }
+          throw innerError;
+        }
       } catch (error) {
+        if (!previous) {
+          acquiredAudio?.stop();
+          if (!Array.from(this.localCaptures.values()).some((entry) => entry.kind === 'screen')) {
+            this.audioBridge.stop();
+          }
+        }
         if (bridge) await bridge.stopCapture();
         else if (stream && stream !== previous?.stream) stream.getTracks().forEach((track) => track.stop());
         showToast(t("message.5a1156df731c", { v0: localizeError(error) }), 3500, 'error');

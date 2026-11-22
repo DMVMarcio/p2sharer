@@ -247,3 +247,76 @@ test('native negotiation probes privately and hands off only after a decoded fra
   assert.equal(probes[0].srcObject, null);
   assert.equal(paused, 1);
 });
+
+test('forceRestart dispatches a fresh native route while respecting blocked peers and async rtc config', async context => {
+  const previousWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  const previousPc = Object.getOwnPropertyDescriptor(globalThis, 'RTCPeerConnection');
+  const offerIceCounts: number[] = [];
+  let closedIds: string[] = [];
+  let createdOfferCount = 0;
+  Object.defineProperty(globalThis, 'window', {
+    configurable: true,
+    value: {
+      __TAURI_INTERNALS__: {
+        invoke: async (command: string, args: any) => {
+          if (command === 'create_native_video_offer') {
+            createdOfferCount++;
+            offerIceCounts.push(args.iceServers?.length ?? 0);
+            return 'v=0';
+          }
+          if (command === 'close_native_video') {
+            closedIds.push(args.id);
+          }
+          return undefined;
+        },
+        transformCallback: () => 0,
+      },
+    },
+  });
+  let rtcCalls = 0;
+  const messages: any[] = [];
+  const native = new NativeVideoTransport({
+    rtc: async () => {
+      rtcCalls++;
+      return { iceServers: [{ urls: `stun:example-${rtcCalls}.invalid:3478` }] };
+    },
+    send: (_peer, signal) => messages.push(signal),
+    permitted: () => true,
+    receive: () => {},
+    fallback: () => {},
+  });
+  (native as any).listening = Promise.resolve();
+  context.after(() => {
+    native.close();
+    if (previousWindow) Object.defineProperty(globalThis, 'window', previousWindow);
+    else delete (globalThis as any).window;
+    if (previousPc) Object.defineProperty(globalThis, 'RTCPeerConnection', previousPc);
+    else delete (globalThis as any).RTCPeerConnection;
+  });
+
+  const track = { id: 'track-1', readyState: 'live', kind: 'video' } as MediaStreamTrack;
+  registerNativeSenderSource(track, { sessionId: 'capture-1', feedbackToken: 'tok-1' });
+  const stream = { getVideoTracks: () => [track] } as unknown as MediaStream;
+  const desc = { id: 'screen', kind: 'screen' as const, label: 'Screen', videoTrackId: 'track-1', fps: 60, bitrate: 8000 };
+
+  assert.equal(native.dispatch('peer', stream, desc), true);
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  const firstId = (native as any).outgoing.get('peer/screen').id;
+  assert.equal(createdOfferCount, 1);
+  assert.deepEqual(offerIceCounts, [1]);
+
+  // Same track without forceRestart reuses existing route; with forceRestart replaces it.
+  assert.equal(native.dispatch('peer', stream, desc), true);
+  assert.equal((native as any).outgoing.get('peer/screen').id, firstId);
+  assert.equal(native.dispatch('peer', stream, desc, true), true);
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  const secondId = (native as any).outgoing.get('peer/screen').id;
+  assert.notEqual(secondId, firstId);
+  assert.equal(closedIds.includes(firstId), true);
+  assert.equal(createdOfferCount, 2);
+  assert.equal(rtcCalls, 2);
+
+  // Blocked routes remain blocked even when forceRestart is true.
+  (native as any).blocked.add('peer/screen');
+  assert.equal(native.dispatch('peer', stream, desc, true), false);
+});

@@ -113,20 +113,18 @@ export class MediaCoordinator {
     return [...hardware, ...software, ...unsupported, ...otherCodecs];
   }
 
-  private static globalMungingInitialized = false;
-
   /**
    * Installs global monkey-patches on RTCPeerConnection.prototype to ensure
    * all SDP offers and answers (including parameterless setLocalDescription() used by Trystero)
    * advertise stereo Opus and robust video bitrate floor/ceiling.
    */
   public static initGlobalWebRtcMunging(): void {
-    if (MediaCoordinator.globalMungingInitialized) return;
     if (typeof RTCPeerConnection === 'undefined' || !RTCPeerConnection.prototype) return;
-    MediaCoordinator.globalMungingInitialized = true;
-
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const proto = RTCPeerConnection.prototype as any;
+    if (proto.__sdp_munged) return;
+    proto.__sdp_munged = true;
+
     const origCreateOffer = proto.createOffer;
     const origCreateAnswer = proto.createAnswer;
     const origSetLocalDescription = proto.setLocalDescription;
@@ -161,22 +159,31 @@ export class MediaCoordinator {
         MediaCoordinator.configureCodecPreferences(this);
         // Parameterless setLocalDescription() as invoked by modern WebRTC / Trystero:
         // Automatically generate offer or answer, munge SDP with high-bitrate floor/ceiling, and apply it.
+        const expectsAnswer =
+          this.signalingState === 'have-remote-offer' || this.signalingState === 'have-local-pranswer';
+        const stateMatches = () =>
+          !this.signalingState ||
+          (expectsAnswer
+            ? this.signalingState === 'have-remote-offer' || this.signalingState === 'have-local-pranswer'
+            : this.signalingState === 'stable');
         try {
-          if (this.signalingState === 'have-remote-offer' || this.signalingState === 'have-local-pranswer') {
-            const answer = await origCreateAnswer.call(this);
-            if (answer && answer.sdp) {
-              answer.sdp = MediaCoordinator.mungeSdpBitrates(answer.sdp);
-            }
-            return await origSetLocalDescription.call(this, answer);
-          } else {
-            const offer = await origCreateOffer.call(this);
-            if (offer && offer.sdp) {
-              offer.sdp = MediaCoordinator.mungeSdpBitrates(offer.sdp);
-            }
-            return await origSetLocalDescription.call(this, offer);
+          const generated = expectsAnswer
+            ? await origCreateAnswer.call(this)
+            : await origCreateOffer.call(this);
+          if (!stateMatches()) {
+            throw typeof DOMException === 'function'
+              ? new DOMException('Signaling state changed while creating local description', 'InvalidStateError')
+              : Object.assign(new Error('Signaling state changed while creating local description'), { name: 'InvalidStateError' });
           }
-        } catch {
-          return origSetLocalDescription.call(this);
+          if (generated && generated.sdp) {
+            generated.sdp = MediaCoordinator.mungeSdpBitrates(generated.sdp);
+          }
+          return await origSetLocalDescription.call(this, generated);
+        } catch (err) {
+          if (stateMatches()) {
+            return origSetLocalDescription.call(this);
+          }
+          throw err;
         }
       } else {
         if (description && description.sdp) {
@@ -299,6 +306,14 @@ export class MediaCoordinator {
     if (!pc || (pc as any).__sdp_munged) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (pc as any).__sdp_munged = true;
+    if (
+      typeof RTCPeerConnection !== 'undefined' &&
+      pc instanceof RTCPeerConnection &&
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (RTCPeerConnection.prototype as any).__sdp_munged
+    ) {
+      return;
+    }
 
     const originalSetLocalDescription = pc.setLocalDescription.bind(pc);
     const originalCreateOffer = pc.createOffer ? pc.createOffer.bind(pc) : null;
@@ -307,25 +322,43 @@ export class MediaCoordinator {
     pc.setLocalDescription = async function (description?: RTCLocalSessionDescriptionInit) {
       if (!description) {
         MediaCoordinator.configureCodecPreferences(pc);
+        const expectsAnswer =
+          pc.signalingState === 'have-remote-offer' || pc.signalingState === 'have-local-pranswer';
+        const stateMatches = () =>
+          !pc.signalingState ||
+          (expectsAnswer
+            ? pc.signalingState === 'have-remote-offer' || pc.signalingState === 'have-local-pranswer'
+            : pc.signalingState === 'stable');
         try {
-          if (
-            (pc.signalingState === 'have-remote-offer' || pc.signalingState === 'have-local-pranswer') &&
-            originalCreateAnswer
-          ) {
+          if (expectsAnswer && originalCreateAnswer) {
             const answer = await originalCreateAnswer();
+            if (!stateMatches()) {
+              throw typeof DOMException === 'function'
+                ? new DOMException('Signaling state changed while creating local description', 'InvalidStateError')
+                : Object.assign(new Error('Signaling state changed while creating local description'), { name: 'InvalidStateError' });
+            }
             if (answer && answer.sdp) {
               answer.sdp = MediaCoordinator.mungeSdpBitrates(answer.sdp);
             }
             return await originalSetLocalDescription(answer);
-          } else if (originalCreateOffer) {
+          } else if (!expectsAnswer && originalCreateOffer) {
             const offer = await originalCreateOffer();
+            if (!stateMatches()) {
+              throw typeof DOMException === 'function'
+                ? new DOMException('Signaling state changed while creating local description', 'InvalidStateError')
+                : Object.assign(new Error('Signaling state changed while creating local description'), { name: 'InvalidStateError' });
+            }
             if (offer && offer.sdp) {
               offer.sdp = MediaCoordinator.mungeSdpBitrates(offer.sdp);
             }
             return await originalSetLocalDescription(offer);
           }
-        } catch {
           return originalSetLocalDescription();
+        } catch (err) {
+          if (stateMatches()) {
+            return originalSetLocalDescription();
+          }
+          throw err;
         }
       } else {
         if (description && description.sdp) {

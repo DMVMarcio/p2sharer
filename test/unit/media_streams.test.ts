@@ -384,3 +384,54 @@ test('remote screen and camera streams reconcile without fake participants or st
     (signalingManager as any).reannounce = originalReannounce;
   }
 });
+
+test('stopStream removes addTrack-owned tracks and stream recovery requests renegotiation', async () => {
+  const originalJoin = signalingManager.joinRoom;
+  const originalLeave = signalingManager.leaveRoom;
+  const originalReannounce = signalingManager.reannounce;
+  const removedTracks: any[] = [];
+  const addedTracks: any[] = [];
+  const renegotiatedPeers: string[] = [];
+  const actions = new Map<string, any>();
+  const room: any = {
+    makeAction(name: string) {
+      const action = { send: async () => {} };
+      actions.set(name, action);
+      return action;
+    },
+    getPeers: () => ({ viewer: { getSenders: () => [] } }),
+    addTrack: (track: any) => { addedTracks.push(track); return [Promise.resolve()]; },
+    removeTrack: (track: any) => { removedTracks.push(track); },
+    addStream: () => [Promise.resolve()],
+    removeStream: () => {},
+    renegotiate: (peerId: string) => { renegotiatedPeers.push(peerId); return [Promise.resolve()]; },
+    leave: async () => {},
+    onPeerJoin: () => {},
+    onPeerLeave: () => {},
+    onPeerStream: () => {},
+  };
+  (signalingManager as any).joinRoom = () => room;
+  (signalingManager as any).leaveRoom = async () => {};
+  (signalingManager as any).reannounce = async () => {};
+  const manager = new GroupRoomManager('Broadcaster', 'stop-renegotiate-test', '', true);
+  try {
+    await manager.join({ onStreamsUpdate: () => {}, onSlotsUpdate: () => {}, onPeersUpdate: () => {}, onStatusChange: () => {}, onChat: () => {} });
+    room.onPeerJoin('viewer');
+    const stream = fakeStream('screen');
+    const videoTrack = stream.getVideoTracks()[0];
+    manager.shareStream(stream, 8_000_000, 60, descriptor('screen'));
+    assert.equal(addedTracks.includes(videoTrack), true);
+
+    manager.sendStreamToPeer('viewer', true);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.deepEqual(renegotiatedPeers, ['viewer']);
+
+    manager.stopStream('screen');
+    assert.equal(removedTracks.includes(videoTrack), true);
+  } finally {
+    await manager.leave();
+    (signalingManager as any).joinRoom = originalJoin;
+    (signalingManager as any).leaveRoom = originalLeave;
+    (signalingManager as any).reannounce = originalReannounce;
+  }
+});

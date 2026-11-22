@@ -103,3 +103,34 @@ test('room reentry can redeliver the same track and container objects retained b
   manager.receiveRemoteTrack('owner', track, stream);
   assert.deepEqual(events, [track, track]);
 });
+
+test('inactive transceiver receivers never shadow replacement tracks on metadata replay', () => {
+  const oldTrack = { id: 'video-old', readyState: 'live' };
+  const oldStream = streamFixture('screen-stream', [oldTrack]);
+  let transceivers = [{ receiver: { track: oldTrack }, currentDirection: 'recvonly', direction: 'recvonly', stopped: false }];
+  const peer = {
+    __trysteroMedia: createMediaIdentityCache(),
+    connection: {
+      getReceivers: () => transceivers.map((t) => t.receiver),
+      getTransceivers: () => transceivers,
+    },
+  };
+  const manager = createMediaManager({ iterate: () => [], isActive: () => true, getSharedMediaPeer: () => peer });
+  const events = [];
+  manager.onPeerStream = (stream, _owner, meta) => events.push({ stream, meta });
+  manager.receiveStreamMeta(metadata('screen'), 'owner');
+  manager.receiveRemoteStream('owner', oldStream);
+  assert.equal(events.length, 1);
+
+  // Stopping the track remotely sets transceiver inactive even if readyState has not flipped yet.
+  transceivers = [{ receiver: { track: oldTrack }, currentDirection: 'inactive', direction: 'inactive', stopped: false }];
+  manager.receiveStreamMeta(metadata('screen'), 'owner');
+  assert.equal(events.length, 1, 'Inactive transceiver must not re-emit retired cached stream');
+
+  const replacementTrack = { id: 'video-new', readyState: 'live' };
+  const replacementStream = streamFixture('screen-stream', [replacementTrack]);
+  transceivers = [{ receiver: { track: replacementTrack }, currentDirection: 'recvonly', direction: 'recvonly', stopped: false }];
+  manager.receiveRemoteStream('owner', replacementStream);
+  assert.equal(events.length, 2);
+  assert.equal(events.at(-1).stream, replacementStream);
+});

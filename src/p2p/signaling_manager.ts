@@ -388,7 +388,7 @@ export class SignalingManager {
     const room = this.lanRoom ? this.lanRoom.join(config, topic, callbacks) :
       this.createRoomForTransport(this.activeTransport, config, topic, callbacks);
 
-    if (this.activeRoom) {
+    if (this.activeRoom && this.activeRoom !== room) {
       const oldRoom = this.activeRoom;
       try {
         Promise.resolve(oldRoom.leave()).catch(() => {});
@@ -404,7 +404,7 @@ export class SignalingManager {
   public promotePreviewRoom(room: any, config: any, topic: string, callbacks?: any): void {
     if (!room || this.activeRoom === room || this.lanRoom || !this.isolatedPreviewRooms.has(room)) return;
     this.isolatedPreviewRooms.delete(room);
-    if (this.activeRoom) {
+    if (this.activeRoom && this.activeRoom !== room) {
       const oldRoom = this.activeRoom;
       try {
         Promise.resolve(oldRoom.leave()).catch(() => {});

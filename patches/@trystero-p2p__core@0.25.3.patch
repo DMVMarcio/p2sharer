@@ -26,7 +26,7 @@ index 992caaaef5e9f1e0bcfb5e348bc9138667f8242b..944fcd910e44956be3e4b0e95471bd5b
  						const currentPeer = getPeer(id, normalizedOptions.sendToPending);
  						if (!currentPeer || currentPeer !== peer) break;
 diff --git a/dist/media.mjs b/dist/media.mjs
-index 2fd4906e80aefbef3f6b9f523a77ebf58562c3af..499cc2df7ad0fb6b0817e8bd80b39d45fae789a4 100644
+index 2fd4906e80aefbef3f6b9f523a77ebf58562c3af..d9e650d02b8f469315d563a27ca2f216f2d05f0b 100644
 --- a/dist/media.mjs
 +++ b/dist/media.mjs
 @@ -53,6 +53,10 @@ const createMediaIdentityCache = () => {
@@ -54,7 +54,7 @@ index 2fd4906e80aefbef3f6b9f523a77ebf58562c3af..499cc2df7ad0fb6b0817e8bd80b39d45
  		getSharedMediaPeer(id)?.__trysteroMedia?.rememberRemoteTrack(key, track, stream, typeof track.id === "string" ? track.id : void 0, typeof stream.id === "string" ? stream.id : void 0);
  		listeners.onPeerTrack?.(track, stream, id, metadata);
  	};
-@@ -76,7 +82,7 @@ const createMediaManager = ({ iterate, isActive, getSharedMediaPeer }) => {
+@@ -76,9 +82,21 @@ const createMediaManager = ({ iterate, isActive, getSharedMediaPeer }) => {
  		};
  		return iterate(targets, async (id, peer) => {
  			await sendMeta(payload, id);
@@ -62,8 +62,22 @@ index 2fd4906e80aefbef3f6b9f523a77ebf58562c3af..499cc2df7ad0fb6b0817e8bd80b39d45
 +			return op(peer);
  		});
  	};
++	const isReceiverActive = (peerObj, track) => {
++		if (!track || track.readyState === "ended") return false;
++		const conn = peerObj?.connection;
++		const liveReceivers = conn?.getReceivers?.();
++		if (liveReceivers && !liveReceivers.some((r) => r.track === track)) return false;
++		const transceivers = conn?.getTransceivers?.();
++		if (transceivers) {
++			const matching = transceivers.find((t) => t.receiver?.track === track);
++			if (matching && (matching.stopped || matching.currentDirection === "inactive" || matching.currentDirection === "stopped" || matching.currentDirection == null && matching.direction === "inactive")) return false;
++		}
++		return true;
++	};
  	return {
-@@ -96,39 +102,73 @@ const createMediaManager = ({ iterate, isActive, getSharedMediaPeer }) => {
+ 		addStream: (stream, options, sendMeta) => applyMediaOp(options.target, localMedia.getStreamKey(stream), options.metadata, sendMeta, (peer) => peer.addStream(stream), { s: stream.id }),
+ 		removeStream: (stream, target) => {
+@@ -96,39 +114,69 @@ const createMediaManager = ({ iterate, isActive, getSharedMediaPeer }) => {
  			if (!isActive(id)) return;
  			const parsed = toPendingMediaMeta(meta);
  			if (!parsed) return;
@@ -73,10 +87,8 @@ index 2fd4906e80aefbef3f6b9f523a77ebf58562c3af..499cc2df7ad0fb6b0817e8bd80b39d45
 +			const cached = peerObj?.__trysteroMedia?.getRemoteStream(parsed.key, parsed.streamId);
 +			pendingStreamMetas[id] = (pendingStreamMetas[id] ?? []).filter(meta => meta.key !== parsed.key);
 +			pendingStreamMetas[id].push(parsed);
-+			const liveReceivers = peerObj?.connection?.getReceivers?.();
 +			const cachedTracks = cached?.getTracks() ?? [];
-+			const isStreamLive = !liveReceivers || cachedTracks.some(track => track.readyState !== "ended" && liveReceivers.some(r => r.track === track));
-+			if (cached && isStreamLive && cachedTracks.some(track => track.readyState !== "ended")) {
++			if (cached && cachedTracks.some(track => isReceiverActive(peerObj, track))) {
  				emitStream(id, parsed.key, cached, parsed.metadata);
  				return;
  			}
@@ -97,9 +109,7 @@ index 2fd4906e80aefbef3f6b9f523a77ebf58562c3af..499cc2df7ad0fb6b0817e8bd80b39d45
 +			const cached = peerObj?.__trysteroMedia?.getRemoteTrack(parsed.key, parsed.trackId);
 +			pendingTrackMetas[id] = (pendingTrackMetas[id] ?? []).filter(meta => meta.key !== parsed.key);
 +			pendingTrackMetas[id].push(parsed);
-+			const liveReceivers = peerObj?.connection?.getReceivers?.();
-+			const isReceiverLive = !liveReceivers || liveReceivers.some(r => r.track === cached?.track);
-+			if (cached && isReceiverLive && cached.track.readyState !== "ended" && cached.stream.getTracks().includes(cached.track)) {
++			if (cached && isReceiverActive(peerObj, cached.track) && cached.stream.getTracks().includes(cached.track)) {
  				emitTrack(id, parsed.key, cached.track, cached.stream, parsed.metadata);
  				return;
  			}
@@ -159,7 +169,7 @@ index 7340a4f4bd7192c2c9f064d40311433436effc0f..76076fb6d1649100358ca3c7d12b51bb
  	makeOffer;
  	pool = [];
 diff --git a/dist/peer.mjs b/dist/peer.mjs
-index 8003df9196a808650bc233f9243be5eae14b4a1d..07725b7c5240f374398dba209416afc7a95f3984 100644
+index 8003df9196a808650bc233f9243be5eae14b4a1d..73600f3d073481e7820c001f470a352df0205a3a 100644
 --- a/dist/peer.mjs
 +++ b/dist/peer.mjs
 @@ -1,13 +1,19 @@
@@ -183,7 +193,72 @@ index 8003df9196a808650bc233f9243be5eae14b4a1d..07725b7c5240f374398dba209416afc7
  var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig, _test_only_mdnsHostFallbackToLoopback }) => {
  	const pc = new (rtcPolyfill ?? RTCPeerConnection)({
  		iceServers: defaultIceServers.concat(turnConfig ?? []),
-@@ -185,7 +191,7 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
+@@ -19,8 +25,17 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
+ 	const shouldTrickleIce = trickleIce !== false;
+ 	const pendingRemoteCandidates = [];
+ 	const pendingTracks = [];
++	const staleOfferTimeoutMs = 8e3;
+ 	let makingOffer = false;
+ 	let isSettingRemoteAnswerPending = false;
++	let localOfferCreatedAt = null;
++	let needsRenegotiation = false;
++	let signalQueue = Promise.resolve();
++	const enqueueSignal = (fn) => {
++		const task = signalQueue.then(fn, fn);
++		signalQueue = task.catch(() => {});
++		return task;
++	};
+ 	let dataChannel = null;
+ 	let disconnectedCloseTimer = null;
+ 	let didEmitClose = false;
+@@ -143,22 +158,44 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
+ 		dataChannel = channel;
+ 		setupDataChannel(channel);
+ 	};
+-	const createOffer = async (restartIce = false) => {
++	const createOfferDirect = async (restartIce = false) => {
+ 		if (pc.connectionState === "closed") return;
+ 		try {
++			if (!restartIce && pc.signalingState !== "stable") {
++				if (pc.signalingState === "have-local-offer" && localOfferCreatedAt !== null && Date.now() - localOfferCreatedAt > staleOfferTimeoutMs) {
++					await pc.setLocalDescription({ type: "rollback" });
++					localOfferCreatedAt = null;
++				} else {
++					needsRenegotiation = true;
++					return;
++				}
++			}
+ 			makingOffer = true;
+ 			if (restartIce) {
+-				if (pc.signalingState !== "stable" && pc.signalingState !== "closed" && pc.localDescription?.type === offerType) await pc.setLocalDescription({ type: "rollback" });
++				if (pc.signalingState !== "stable" && pc.signalingState !== "closed" && pc.localDescription?.type === offerType) {
++					await pc.setLocalDescription({ type: "rollback" });
++					localOfferCreatedAt = null;
++				}
+ 				if (typeof pc.restartIce === "function") pc.restartIce();
+ 			}
+ 			await pc.setLocalDescription(restartIce ? await pc.createOffer({ iceRestart: true }) : void 0);
++			localOfferCreatedAt = Date.now();
+ 			return await emitLocalDescriptionSignal();
+ 		} catch (err) {
++			if (dataChannel?.readyState === "open" && pc.connectionState !== "failed" && pc.connectionState !== "closed") {
++				console.warn("trystero: createOffer failed on open peer, recovering:", err);
++				if (pc.signalingState === "have-local-offer") {
++					await pc.setLocalDescription({ type: "rollback" }).catch(() => {});
++					localOfferCreatedAt = null;
++				}
++				return;
++			}
+ 			handlers.error?.(toError(err, "failed to create local offer"));
+ 		} finally {
+ 			makingOffer = false;
+ 		}
+ 	};
++	const createOffer = (restartIce = false) => enqueueSignal(() => createOfferDirect(restartIce));
+ 	pc.onnegotiationneeded = async () => createOffer(false);
+ 	pc.onicecandidate = ({ candidate }) => {
+ 		if (!shouldTrickleIce || !candidate) return;
+@@ -185,7 +222,7 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
  		if (pc.connectionState === "disconnected" || pc.iceConnectionState === "disconnected") {
  			if (!disconnectedCloseTimer) disconnectedCloseTimer = setTimeout(() => {
  				disconnectedCloseTimer = null;
@@ -192,7 +267,7 @@ index 8003df9196a808650bc233f9243be5eae14b4a1d..07725b7c5240f374398dba209416afc7
  			}, disconnectedCloseDelayMs);
  			return;
  		}
-@@ -224,9 +230,9 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
+@@ -224,9 +261,9 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
  		},
  		getOffer: async (restartIce = false) => {
  			if (!initiator) return;
@@ -205,7 +280,126 @@ index 8003df9196a808650bc233f9243be5eae14b4a1d..07725b7c5240f374398dba209416afc7
  		},
  		async signal(sdp) {
  			if (sdp.type === "candidate") {
-@@ -286,9 +292,9 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
+@@ -238,34 +275,87 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
+ 				}
+ 				return;
+ 			}
+-			if (dataChannel?.readyState === "open" && !sdp.sdp?.includes("a=rtpmap")) return;
+-			try {
+-				const rtcSdp = {
+-					...sdp,
+-					sdp: normalizeSdp(sdp.sdp)
+-				};
+-				if (sdp.type === offerType) {
+-					if (makingOffer || pc.signalingState !== "stable" && !isSettingRemoteAnswerPending) {
+-						if (initiator) return;
+-						await all([pc.setLocalDescription({ type: "rollback" }), pc.setRemoteDescription(rtcSdp)]);
+-					} else await pc.setRemoteDescription(rtcSdp);
+-					await flushPendingRemoteCandidates();
+-					await pc.setLocalDescription();
+-					return await emitLocalDescriptionSignal();
++			return enqueueSignal(async () => {
++				if (pc.connectionState === "closed") return;
++				if (sdp.type === answerType && pc.signalingState !== "have-local-offer") return;
++				if (sdp.type === offerType && dataChannel?.readyState === "open" && !sdp.sdp?.includes("a=rtpmap")) {
++					const remoteUfrag = getRemoteUfrag();
++					const incomingUfrag = sdp.sdp?.match(/a=ice-ufrag:([^\s]+)/)?.[1] ?? null;
++					if (!/^m=(?:audio|video) /m.test(sdp.sdp ?? "") && remoteUfrag && incomingUfrag === remoteUfrag) return;
+ 				}
+-				if (sdp.type === answerType) {
+-					isSettingRemoteAnswerPending = true;
+-					try {
++				try {
++					const rtcSdp = {
++						...sdp,
++						sdp: normalizeSdp(sdp.sdp)
++					};
++					if (sdp.type === offerType) {
++						const offerCollision = makingOffer || pc.signalingState !== "stable";
++						if (offerCollision) {
++							if (initiator) {
++								if (pc.signalingState === "have-local-offer" && localOfferCreatedAt !== null && Date.now() - localOfferCreatedAt > staleOfferTimeoutMs) {
++									await pc.setLocalDescription({ type: "rollback" });
++									localOfferCreatedAt = null;
++									needsRenegotiation = true;
++								} else return;
++							} else if (pc.signalingState !== "stable") {
++								await pc.setLocalDescription({ type: "rollback" });
++								localOfferCreatedAt = null;
++								needsRenegotiation = true;
++							}
++						}
+ 						await pc.setRemoteDescription(rtcSdp);
+ 						await flushPendingRemoteCandidates();
+-					} finally {
+-						isSettingRemoteAnswerPending = false;
++						await pc.setLocalDescription();
++						const signalOut = await emitLocalDescriptionSignal();
++						if (needsRenegotiation && pc.signalingState === "stable" && pc.connectionState !== "closed") {
++							needsRenegotiation = false;
++							queueMicrotask(() => {
++								if (pc.signalingState === "stable" && pc.connectionState !== "closed") void createOffer(false);
++							});
++						}
++						return signalOut;
++					}
++					if (sdp.type === answerType) {
++						isSettingRemoteAnswerPending = true;
++						try {
++							await pc.setRemoteDescription(rtcSdp);
++							localOfferCreatedAt = null;
++							await flushPendingRemoteCandidates();
++						} finally {
++							isSettingRemoteAnswerPending = false;
++						}
++						if (needsRenegotiation && pc.signalingState === "stable" && pc.connectionState !== "closed") {
++							needsRenegotiation = false;
++							queueMicrotask(() => {
++								if (pc.signalingState === "stable" && pc.connectionState !== "closed") void createOffer(false);
++							});
++						}
+ 					}
++				} catch (err) {
++					if (dataChannel?.readyState === "open" && pc.connectionState !== "failed" && pc.connectionState !== "closed") {
++						console.warn("trystero: signal failed on open peer, recovering:", err);
++						if (pc.signalingState !== "stable") {
++							await pc.setLocalDescription({ type: "rollback" }).catch(() => {});
++							localOfferCreatedAt = null;
++						}
++						return;
++					}
++					handlers.error?.(toError(err, "failed to apply remote signal"));
+ 				}
+-			} catch (err) {
+-				handlers.error?.(toError(err, "failed to apply remote signal"));
+-			}
++			});
+ 		},
++		renegotiate: () => enqueueSignal(async () => {
++			if (pc.connectionState === "closed") return;
++			if (pc.signalingState === "have-local-offer") {
++				if (localOfferCreatedAt !== null && Date.now() - localOfferCreatedAt > staleOfferTimeoutMs) {
++					await pc.setLocalDescription({ type: "rollback" }).catch(() => {});
++					localOfferCreatedAt = null;
++				} else if (pc.localDescription?.type === offerType) {
++					return await emitLocalDescriptionSignal();
++				}
++			}
++			return await createOfferDirect(false);
++		}),
+ 		sendData: (data) => dataChannel?.send(data),
+ 		destroy: () => {
+ 			clearDisconnectedCloseTimer();
+@@ -273,6 +363,8 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
+ 			pc.close();
+ 			makingOffer = false;
+ 			isSettingRemoteAnswerPending = false;
++			localOfferCreatedAt = null;
++			needsRenegotiation = false;
+ 			emitClose();
+ 		},
+ 		setHandlers: (newHandlers) => {
+@@ -286,9 +378,9 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
  			});
  		},
  		offerPromise,
@@ -218,7 +412,7 @@ index 8003df9196a808650bc233f9243be5eae14b4a1d..07725b7c5240f374398dba209416afc7
  			const sender = pc.getSenders().find((s) => s.track === track);
  			if (sender) pc.removeTrack(sender);
 diff --git a/dist/room.mjs b/dist/room.mjs
-index a09d8b9c6425b41e08fe4cf421a974d94d627a6c..7b54b51dd623b16f907563cb08add02afbac65b6 100644
+index a09d8b9c6425b41e08fe4cf421a974d94d627a6c..9ce9935607b45b3435898f82dd303fefa641ea23 100644
 --- a/dist/room.mjs
 +++ b/dist/room.mjs
 @@ -4,7 +4,7 @@ import { createActionManager } from "./actions.mjs";
@@ -273,10 +467,27 @@ index a09d8b9c6425b41e08fe4cf421a974d94d627a6c..7b54b51dd623b16f907563cb08add02a
  				signalAction.send(sdp, id);
  			},
  			close: () => exitPeer(id, peer, mkErr("peer disconnected")),
+@@ -188,6 +189,7 @@ var room_default = (onPeer, onPeerLeave, onSelfLeave, { onPeerHandshake, onHands
+ 			mediaManager.removeTrack(track, options.target);
+ 		},
+ 		replaceTrack: (oldTrack, newTrack, options = {}) => mediaManager.replaceTrack(oldTrack, newTrack, options, trackMetaAction.send),
++		renegotiate: (target) => iterate(target, (_, peer) => peer.renegotiate?.()),
+ 		get onPeerJoin() {
+ 			return listeners.onPeerJoin;
+ 		},
 diff --git a/dist/shared-peer.mjs b/dist/shared-peer.mjs
-index 5fca48a89e823ad3a5665d121f390b505ecf9345..cbf9c24b922270bc3afb0defd5afb999e1d749d7 100644
+index 5fca48a89e823ad3a5665d121f390b505ecf9345..f692fd4dc6ac4ec1092b82d4a87380dbe4e66701 100644
 --- a/dist/shared-peer.mjs
 +++ b/dist/shared-peer.mjs
+@@ -134,7 +134,7 @@ var SharedPeerManager = class {
+ 			close: () => this.clear(appId, peerId, { destroyPeer: false }),
+ 			error: (err) => {
+ 				console.error(`${libName} peer error:`, err);
+-				this.clear(appId, peerId, { destroyPeer: false });
++				this.clear(appId, peerId, { destroyPeer: true });
+ 			},
+ 			track: (track, stream) => this.dispatchTrack(shared, track, stream)
+ 		});
 @@ -162,7 +162,7 @@ var SharedPeerManager = class {
  			proxy: {}
  		};
@@ -286,7 +497,15 @@ index 5fca48a89e823ad3a5665d121f390b505ecf9345..cbf9c24b922270bc3afb0defd5afb999
  			this.pruneRoomOwnership(shared, roomId);
  			delete shared.bindings[roomId];
  			if (binding.roomToken && shared.bindingsByToken[binding.roomToken] === binding) delete shared.bindingsByToken[binding.roomToken];
-@@ -199,13 +199,14 @@ var SharedPeerManager = class {
+@@ -182,6 +182,7 @@ var SharedPeerManager = class {
+ 				return shared.peer.isDead;
+ 			},
+ 			getOffer: (restartIce) => shared.peer.getOffer(restartIce),
++			renegotiate: () => shared.bindings[roomId] === binding ? shared.peer.renegotiate?.() : void 0,
+ 			signal: (sdp) => shared.peer.signal(sdp),
+ 			sendData: (data) => {
+ 				if (!binding.roomToken) {
+@@ -199,13 +200,14 @@ var SharedPeerManager = class {
  			},
  			offerPromise: shared.peer.offerPromise,
  			addStream: (stream) => {
@@ -303,7 +522,7 @@ index 5fca48a89e823ad3a5665d121f390b505ecf9345..cbf9c24b922270bc3afb0defd5afb999
  				const owners = shared.streamOwners.get(stream);
  				if (!owners) return;
  				owners.delete(roomId);
-@@ -215,6 +216,7 @@ var SharedPeerManager = class {
+@@ -215,6 +217,7 @@ var SharedPeerManager = class {
  				}
  			},
  			addTrack: (track, stream) => {
@@ -311,7 +530,7 @@ index 5fca48a89e823ad3a5665d121f390b505ecf9345..cbf9c24b922270bc3afb0defd5afb999
  				const entry = shared.trackOwners.get(track) ?? {
  					stream,
  					rooms: /* @__PURE__ */ new Set()
-@@ -227,6 +229,7 @@ var SharedPeerManager = class {
+@@ -227,6 +230,7 @@ var SharedPeerManager = class {
  				return shared.peer.connection.getSenders().find((s) => s.track === track) ?? shared.peer.addTrack(track, stream);
  			},
  			removeTrack: (track) => {
@@ -319,7 +538,7 @@ index 5fca48a89e823ad3a5665d121f390b505ecf9345..cbf9c24b922270bc3afb0defd5afb999
  				const entry = shared.trackOwners.get(track);
  				if (!entry) return;
  				entry.rooms.delete(roomId);
-@@ -236,6 +239,7 @@ var SharedPeerManager = class {
+@@ -236,6 +240,7 @@ var SharedPeerManager = class {
  				}
  			},
  			replaceTrack: (oldTrack, newTrack) => {
@@ -327,7 +546,7 @@ index 5fca48a89e823ad3a5665d121f390b505ecf9345..cbf9c24b922270bc3afb0defd5afb999
  				const oldEntry = shared.trackOwners.get(oldTrack);
  				if (oldEntry) {
  					shared.trackOwners.delete(oldTrack);
-@@ -295,7 +299,7 @@ var SharedPeerManager = class {
+@@ -295,7 +300,7 @@ var SharedPeerManager = class {
  			const current = this.byApp[shared.appId]?.[shared.peerId];
  			if (!current || keys(current.bindings).length > 0) return;
  			this.clear(shared.appId, shared.peerId, { destroyPeer: true });

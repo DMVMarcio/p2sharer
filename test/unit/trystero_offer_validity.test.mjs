@@ -80,3 +80,113 @@ test('repeated invalid fresh offers fail after one bounded retry instead of publ
     assert.equal(created, 2);
   } finally { pool.destroy(); }
 });
+
+function createRenegotiationConnection(initialState = 'stable') {
+  let offerCounter = 0;
+  class RenegotiationConnection extends EventTarget {
+    connectionState = 'connected';
+    signalingState = initialState;
+    iceGatheringState = 'complete';
+    localDescription = null;
+    remoteDescription = { type: 'offer', sdp: `${validSdp}a=ice-ufrag:remote0\r\n` };
+    channel = { readyState: 'open', bufferedAmountLowThreshold: 0, close() { this.readyState = 'closed'; }, send() {} };
+    rollbackCount = 0;
+    setRemoteCount = 0;
+    createDataChannel() { return this.channel; }
+    async createOffer() { return { type: 'offer', sdp: `${validSdp}a=ice-ufrag:local${++offerCounter}\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\n` }; }
+    async createAnswer() { return { type: 'answer', sdp: `${validSdp}a=ice-ufrag:ans${offerCounter}\r\n` }; }
+    async setLocalDescription(description) {
+      if (description?.type === 'rollback') {
+        this.rollbackCount++;
+        this.localDescription = null;
+        this.signalingState = 'stable';
+        return;
+      }
+      if (!description) {
+        if (this.signalingState === 'have-remote-offer') {
+          this.localDescription = await this.createAnswer();
+          this.signalingState = 'stable';
+        } else {
+          this.localDescription = await this.createOffer();
+          this.signalingState = 'have-local-offer';
+        }
+        return;
+      }
+      this.localDescription = description;
+      this.signalingState = description.type === 'offer' ? 'have-local-offer' : 'stable';
+    }
+    async setRemoteDescription(desc) {
+      this.setRemoteCount++;
+      this.remoteDescription = desc;
+      this.signalingState = desc.type === 'offer' ? 'have-remote-offer' : 'stable';
+    }
+    async addIceCandidate() {}
+    getSenders() { return []; }
+    close() { this.connectionState = 'closed'; }
+  }
+  return new RenegotiationConnection();
+}
+
+test('renegotiation offers without a=rtpmap on open DataChannel are answered instead of dropped', async () => {
+  const conn = createRenegotiationConnection('stable');
+  const peer = createPeer(false, { rtcPolyfill: class { constructor() { return conn; } }, trickleIce: true });
+  const signals = [];
+  let errors = 0;
+  peer.setHandlers({ signal: (s) => signals.push(s), error: () => errors++ });
+  conn.ondatachannel({ channel: conn.channel });
+  try {
+    const mediaRemovalOffer = { type: 'offer', sdp: `${validSdp}m=video 9 UDP/TLS/RTP/SAVPF 96\r\na=inactive\r\n` };
+    await peer.signal(mediaRemovalOffer);
+    assert.equal(errors, 0);
+    assert.equal(signals.at(-1)?.type, 'answer');
+    assert.equal(conn.signalingState, 'stable');
+  } finally { peer.destroy(); }
+});
+
+test('stale answers arriving in stable state never raise a fatal peer error', async () => {
+  const conn = createRenegotiationConnection('stable');
+  const peer = createPeer(true, { rtcPolyfill: class { constructor() { return conn; } }, trickleIce: true });
+  let errors = 0;
+  peer.setHandlers({ signal: () => {}, error: () => errors++ });
+  try {
+    await peer.signal({ type: 'answer', sdp: `${validSdp}a=ice-ufrag:stale\r\n` });
+    assert.equal(errors, 0);
+    assert.equal(conn.isDead, undefined);
+    assert.equal(peer.isDead, false);
+  } finally { peer.destroy(); }
+});
+
+test('polite peer rolls back glare offer, answers remote offer, and queues follow-up renegotiation', async () => {
+  const conn = createRenegotiationConnection('stable');
+  const peer = createPeer(false, { rtcPolyfill: class { constructor() { return conn; } }, trickleIce: true });
+  const signals = [];
+  let errors = 0;
+  peer.setHandlers({ signal: (s) => signals.push(s), error: () => errors++ });
+  conn.ondatachannel({ channel: conn.channel });
+  try {
+    await peer.renegotiate();
+    assert.equal(conn.signalingState, 'have-local-offer');
+    await peer.signal({ type: 'offer', sdp: `${validSdp}a=ice-ufrag:remote1\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\n` });
+    assert.equal(conn.rollbackCount, 1);
+    assert.equal(errors, 0);
+    assert.equal(signals.some((s) => s.type === 'answer'), true);
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(signals.filter((s) => s.type === 'offer').length >= 2, true, 'queued renegotiation emits fresh offer after glare');
+  } finally { peer.destroy(); }
+});
+
+test('renegotiate recovers a stale unanswered have-local-offer after timeout', async (context) => {
+  context.mock.timers.enable({ apis: ['Date'] });
+  const conn = createRenegotiationConnection('stable');
+  const peer = createPeer(true, { rtcPolyfill: class { constructor() { return conn; } }, trickleIce: true });
+  const signals = [];
+  peer.setHandlers({ signal: (s) => signals.push(s) });
+  try {
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(conn.signalingState, 'have-local-offer');
+    context.mock.timers.tick(9000);
+    await peer.renegotiate();
+    assert.equal(conn.rollbackCount, 1);
+    assert.equal(signals.filter((s) => s.type === 'offer').length >= 2, true);
+  } finally { peer.destroy(); }
+});
