@@ -57,13 +57,13 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     });
   }
 
-  private isWebRtcConsumerId(consumerId: string): boolean {
-    return consumerId === 'webrtc-peer' || consumerId.startsWith('webrtc-');
+  private isRequiredBrowserWebRtcConsumerId(consumerId: string): boolean {
+    return consumerId === 'webrtc-peer' || (consumerId.startsWith('webrtc-') && !consumerId.startsWith('webrtc-probing-'));
   }
 
-  private hasWebRtcConsumer(): boolean {
+  private hasRequiredBrowserWebRtcConsumer(): boolean {
     for (const id of this.consumers) {
-      if (this.isWebRtcConsumerId(id)) return true;
+      if (this.isRequiredBrowserWebRtcConsumerId(id)) return true;
     }
     return false;
   }
@@ -73,7 +73,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     if (active) {
       const wasEmpty = this.consumers.size === 0;
       this.consumers.add(consumerId);
-      if (this.isWebRtcConsumerId(consumerId) && this.previewEncoderFailed && this.isCapturingNative() && this.encoderFeedbackToken) {
+      if (this.isRequiredBrowserWebRtcConsumerId(consumerId) && this.previewEncoderFailed && this.isCapturingNative() && this.encoderFeedbackToken) {
         void invoke('control_capture_encoder', {
           sessionId: this.sessionId,
           feedbackToken: this.encoderFeedbackToken,
@@ -301,9 +301,9 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     this.consumers.clear();
 
     // 2. Start native Rust capture thread
+    let encoderPreference = getEncoderPreference();
     try {
-      const requestedEncoder = getEncoderPreference();
-      let encoderPreference = requestedEncoder;
+      const requestedEncoder = encoderPreference;
       logDiagnostic('INFO', 'capture.bridge', 'Native capture requested', { sessionId: this.sessionId, sourceId,
         resolution, fps, captureMouse, quality, encoderPreference, output: this.trackGenerator ? 'MediaStreamTrackGenerator' : 'canvas' });
       if (encoderPreference === 'nvenc') {
@@ -544,7 +544,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
             if (isMediaDiagnosticsActive() && pressurePercent !== undefined) this.diagnosticPressure = pressurePercent;
             // Only forward bridge preview pressure when the browser WebRTC path consumes
             // decoded preview frames; local SW preview load must never downscale NativeVideoTransport.
-            const reportPressure = (!nativeEncoded || this.hasWebRtcConsumer())
+            const reportPressure = (!nativeEncoded || this.hasRequiredBrowserWebRtcConsumer())
               ? pressurePercent
               : (pressurePercent !== undefined ? 0 : undefined);
             if (reportPressure !== undefined && !feedbackPending && generation === this.captureGeneration) {
@@ -588,7 +588,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
                 console.warn('[NativeVideoBridge] Local H264 preview decoder failed; keeping native H264 encoder for direct P2P unless browser consumer activates:', {
                   sessionId: this.sessionId, sourceId, error, elapsedMs: Math.round(performance.now() - captureStarted),
                 });
-                if (this.hasWebRtcConsumer()) {
+                if (this.hasRequiredBrowserWebRtcConsumer()) {
                   void invoke('control_capture_encoder', { sessionId: this.sessionId, feedbackToken, disable: true }).catch(() => {});
                 } else {
                   onFirstFrame?.();
@@ -641,6 +641,9 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     }
     // A window can exist without a compositor surface while minimized. Publish its
     // live track now; the same bridge consumes frames when the window renders again.
+    if (encoderPreference === 'nvenc' && stream.getVideoTracks()[0]) {
+      registerNativeSenderSource(stream.getVideoTracks()[0], { sessionId: this.sessionId, feedbackToken });
+    }
     if (sourceId.startsWith('window:')) return stream;
     try {
       await new Promise<void>((resolve, reject) => {
@@ -682,7 +685,7 @@ export class NativeVideoBridge implements VideoCaptureBridge {
             nativeEncodingFailed = true;
             this.previewEncoderFailed = true;
             encodedDecoder.close();
-            if (this.hasWebRtcConsumer()) {
+            if (this.hasRequiredBrowserWebRtcConsumer()) {
               logDiagnostic('WARN', 'capture.preview', 'Native H264 preview did not decode within 3000ms; falling back to JPEG for browser WebRTC consumer', {
                 sessionId: this.sessionId, sourceId, elapsedMs: Math.round(performance.now() - captureStarted)
               });

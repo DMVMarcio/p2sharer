@@ -157,3 +157,45 @@ test('decoder rejects pending frames when stalled before producing its first out
     Object.assign(globalThis, { VideoDecoder: originalDecoder, EncodedVideoChunk: originalChunk });
   }
 });
+
+test('decoder recovers from transient timeout after first output via keyframe request', async (context) => {
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  const previous = {
+    VideoDecoder: globalThis.VideoDecoder,
+    EncodedVideoChunk: globalThis.EncodedVideoChunk,
+    window: globalThis.window,
+  };
+  let requests = 0;
+  let stallNext = false;
+  class RecoveringDecoder {
+    state = 'configured';
+    output: (frame: unknown) => void;
+    constructor(callbacks: { output: (frame: unknown) => void }) { this.output = callbacks.output; }
+    configure() {}
+    decode(chunk: { timestamp: number }) {
+      if (!stallNext) queueMicrotask(() => this.output({ ...chunk, close() {} }));
+    }
+    close() { this.state = 'closed'; }
+  }
+  Object.assign(globalThis, {
+    window: { __TAURI_INTERNALS__: { invoke: async (cmd: string) => { if (cmd === 'control_capture_encoder') requests++; } } },
+    VideoDecoder: RecoveringDecoder,
+    EncodedVideoChunk: class { timestamp: number; constructor(init: { timestamp: number }) { this.timestamp = init.timestamp; } },
+  });
+  const decoder = new NativeEncodedDecoder('recover-test', 'token');
+  try {
+    (await decoder.decode(packet(1, true)))!.close();
+    stallNext = true;
+    const stalled = decoder.decode(packet(2, false));
+    context.mock.timers.tick(3100);
+    assert.equal(await stalled, null);
+    assert.equal(requests, 1, 'Transient timeout after first output requests a recovery keyframe');
+    stallNext = false;
+    const recovered = await decoder.decode(packet(3, true));
+    assert.ok(recovered, 'Subsequent keyframe decodes cleanly after transient timeout');
+    recovered!.close();
+  } finally {
+    decoder.close();
+    Object.assign(globalThis, previous);
+  }
+});

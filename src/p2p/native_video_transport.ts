@@ -188,7 +188,20 @@ export class NativeVideoTransport {
           // playing browser route. Handoff requires real decoded frames.
           const probe = document.createElement('video');
           probe.muted = true; probe.autoplay = true; probe.playsInline = true;
+          if (probe.style) {
+            probe.style.position = 'fixed';
+            probe.style.left = '-9999px';
+            probe.style.top = '-9999px';
+            probe.style.width = '1px';
+            probe.style.height = '1px';
+            probe.style.opacity = '0';
+            probe.style.pointerEvents = 'none';
+          }
+          probe.setAttribute?.('aria-hidden', 'true');
           probe.srcObject = incoming.stream;
+          if (typeof document !== 'undefined' && document.body?.appendChild) {
+            document.body.appendChild(probe);
+          }
           incoming.probe = probe;
           void probe.play().catch(error => {
             if (this.incoming.get(key) === incoming) this.reject(incoming, 'receiver_play_failed', error);
@@ -251,6 +264,10 @@ export class NativeVideoTransport {
       return;
     }
     if (r.connectedAt !== undefined && performance.now() - r.connectedAt >= FIRST_VIDEO_TIMEOUT_MS) {
+      if (typeof document !== 'undefined' && document.hidden && (video?.framesReceived ?? 0) > 0) {
+        r.connectedAt = performance.now();
+        return;
+      }
       this.reject(r, 'no_video_before_receiver_deadline');
     } else if (r.connectedAt === undefined && elapsed >= SETUP_TIMEOUT_MS) {
       this.reject(r, 'receiver_setup_timeout');
@@ -293,8 +310,9 @@ export class NativeVideoTransport {
   }
   private releaseProbe(r: Incoming): void {
     if (!r.probe) return;
-    r.probe.pause(); r.probe.srcObject = null; r.probe = undefined;
+    r.probe.pause(); r.probe.srcObject = null; r.probe.remove?.(); r.probe = undefined;
   }
+  public hasOutgoing(peer: string, mediaId: string): boolean { return this.outgoing.has(this.key(peer, mediaId)); }
   public sending(peer: string, mediaId: string): boolean { return this.outgoing.get(this.key(peer, mediaId))?.ready === true; }
   public receiving(peer: string, mediaId: string): boolean { return this.incoming.get(this.key(peer, mediaId))?.verifiedFrames === true; }
   /** Sends binary remote-control frames directly over the native Rust WebRTC connection when open. */

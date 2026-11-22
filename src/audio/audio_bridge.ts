@@ -13,6 +13,7 @@ export class AudioBridge {
   private unlisten: UnlistenFn | null = null;
   private onLevelCallback: ((level: number) => void) | null = null;
   private isCapturing = false;
+  private prepared = false;
   private listenerGeneration = 0;
   private nextPlayTime = 0;
   private lastAudioTimestampUs = 0;
@@ -32,19 +33,40 @@ export class AudioBridge {
     }
   }
 
+  private createAudioGraph(): void {
+    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    this.audioCtx = new AudioContextClass({ sampleRate: 48000 });
+    this.recovery?.dispose();
+    this.recovery = new AudioContextRecovery(this.audioCtx, undefined, 'capture');
+    this.destNode = this.audioCtx.createMediaStreamDestination();
+  }
+
+  /** Primes the capture AudioContext synchronously during user interaction before async capture delays. */
+  public prepare(): void {
+    if (this.audioCtx && this.audioCtx.state !== 'closed' && this.destNode) {
+      this.recovery?.resume(true);
+      return;
+    }
+    try {
+      this.createAudioGraph();
+      this.prepared = true;
+    } catch (e) {
+      console.warn('Web Audio API not initialized:', e);
+    }
+  }
+
   public init(onLevel?: (level: number) => void): MediaStreamTrack | null {
-    if (this.audioCtx) this.stop();
+    const reusePrepared = this.prepared && !this.isCapturing && !!this.audioCtx && this.audioCtx.state !== 'closed' && !!this.destNode;
+    if (!reusePrepared && this.audioCtx) this.stop();
+    this.prepared = false;
     this.onLevelCallback = onLevel || null;
     try {
-      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      this.audioCtx = new AudioContextClass({ sampleRate: 48000 });
-      this.recovery?.dispose();
-      this.recovery = new AudioContextRecovery(this.audioCtx, undefined, 'capture');
-      this.destNode = this.audioCtx.createMediaStreamDestination();
+      if (!reusePrepared) this.createAudioGraph();
+      else this.recovery?.resume();
       this.nextPlayTime = 0;
       this.targetLead = 0.05;
       this.stableChunks = 0;
-      return this.destNode.stream.getAudioTracks()[0] || null;
+      return this.destNode?.stream.getAudioTracks()[0] || null;
     } catch (e) {
       console.warn('Web Audio API not initialized:', e);
       return null;
@@ -195,6 +217,7 @@ export class AudioBridge {
     this.recovery?.dispose();
     this.recovery = undefined;
     this.isCapturing = false;
+    this.prepared = false;
     this.listenerGeneration++;
     this.nextPlayTime = 0;
     this.targetLead = 0.05;

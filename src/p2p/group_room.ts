@@ -2307,7 +2307,7 @@ export class GroupRoomManager {
         if (entry && this.room === boundRoom) {
           logDiagnostic('INFO', 'transmission.fallback', 'Publishing browser video after native route failure', { mediaId });
 
-          this.callbacks?.onSenderConsumerChange?.(entry.descriptor.id, `webrtc-${peerId}`, true);
+          this.setSenderConsumer(entry.descriptor.id, peerId, 'required');
       this.dispatchBrowserMediaToPeer(peerId, entry);
         }
       },
@@ -2696,7 +2696,7 @@ export class GroupRoomManager {
     this.remoteWatchRevisions.delete(peerId);
     this.nativeVideo?.stop(undefined, peerId);
     for (const entry of this.localMedia.values()) {
-      this.callbacks?.onSenderConsumerChange?.(entry.descriptor.id, `webrtc-${peerId}`, false);
+      this.setSenderConsumer(entry.descriptor.id, peerId, 'off');
     }
     this.pendingChallenges.delete(peerId);
     this.fileBulk.close(peerId);
@@ -3005,13 +3005,13 @@ export class GroupRoomManager {
       if (mediaId !== undefined && entry.descriptor.id !== mediaId) continue;
       if (recovery && pc) void MediaCoordinator.requestKeyFrame(pc);
       if (this.nativeVideo?.isBlocked?.(peerId, entry.descriptor.id)) {
-        this.callbacks?.onSenderConsumerChange?.(entry.descriptor.id, `webrtc-${peerId}`, true);
+        this.setSenderConsumer(entry.descriptor.id, peerId, 'required');
         this.dispatchBrowserMediaToPeer(peerId, entry, recovery);
         continue;
       }
       if (this.nativeVideo?.dispatch(peerId, entry.stream, entry.descriptor, recovery && this.nativeVideo.sending(peerId, entry.descriptor.id))) {
         const nativeReady = this.nativeVideo.sending(peerId, entry.descriptor.id);
-        this.callbacks?.onSenderConsumerChange?.(entry.descriptor.id, `webrtc-${peerId}`, !nativeReady);
+        this.setSenderConsumer(entry.descriptor.id, peerId, nativeReady ? 'off' : 'probing');
         if (nativeReady && typeof room.removeTrack === 'function') {
           for (const video of entry.stream.getVideoTracks()) room.removeTrack(video, { target: peerId });
         }
@@ -3037,16 +3037,28 @@ export class GroupRoomManager {
         }
         continue;
       }
-      this.callbacks?.onSenderConsumerChange?.(entry.descriptor.id, `webrtc-${peerId}`, true);
+      this.setSenderConsumer(entry.descriptor.id, peerId, 'required');
       this.dispatchBrowserMediaToPeer(peerId, entry, recovery);
     }
+  }
+
+  private setSenderConsumer(mediaId: string, peerId: string, mode: 'off' | 'probing' | 'required'): void {
+    this.callbacks?.onSenderConsumerChange?.(mediaId, `webrtc-${peerId}`, mode === 'required');
+    this.callbacks?.onSenderConsumerChange?.(mediaId, `webrtc-probing-${peerId}`, mode === 'probing');
   }
 
   public syncCaptureConsumers(mediaId: string): void {
     if (!this.room || !this.localMedia.has(mediaId)) return;
     for (const peerId of this.peerTracker.directConnectedPeers) {
       if (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(peerId))) continue;
-      this.callbacks?.onSenderConsumerChange?.(mediaId, `webrtc-${peerId}`, !this.nativeVideo?.sending(peerId, mediaId));
+      const mode = this.nativeVideo?.sending(peerId, mediaId)
+        ? 'off'
+        : this.nativeVideo?.isBlocked?.(peerId, mediaId)
+          ? 'required'
+          : this.nativeVideo?.hasOutgoing?.(peerId, mediaId)
+            ? 'probing'
+            : 'required';
+      this.setSenderConsumer(mediaId, peerId, mode);
     }
   }
 
@@ -3163,7 +3175,7 @@ export class GroupRoomManager {
       }
       this.nativeVideo?.stop(entry.descriptor.id);
       for (const peerId of this.peerTracker.directConnectedPeers) {
-        this.callbacks?.onSenderConsumerChange?.(entry.descriptor.id, `webrtc-${peerId}`, false);
+        this.setSenderConsumer(entry.descriptor.id, peerId, 'off');
       }
       for (const track of entry.stream.getTracks()) this.room?.removeTrack?.(track);
       this.room?.removeStream(entry.stream);

@@ -52,6 +52,7 @@ export class NativeEncodedDecoder {
   private requestingKey = false;
   private hasFirstOutput = false;
   private lastKeyRequest = -Infinity;
+  private consecutiveTimeouts = 0;
   private sessionId: string;
   private feedbackToken: string;
   constructor(sessionId: string, feedbackToken: string) { this.sessionId = sessionId; this.feedbackToken = feedbackToken; }
@@ -139,6 +140,7 @@ export class NativeEncodedDecoder {
       this.decoder = new VideoDecoder({
         output: frame => {
           this.hasFirstOutput = true;
+          this.consecutiveTimeouts = 0;
           let pending = this.pending.get(frame.timestamp);
           if (!pending && this.pending.size > 0) {
             const oldestKey = this.pending.keys().next().value;
@@ -162,7 +164,21 @@ export class NativeEncodedDecoder {
     }
     this.waitingForKey = false;
     return new Promise<VideoFrame | null>((resolve, reject) => {
-      const timer = setTimeout(() => this.rejectPending(new Error('Native H264 decoding timed out')), 1500);
+      const timer = setTimeout(() => {
+        if (this.closed) return;
+        if (this.hasFirstOutput && this.consecutiveTimeouts < 2) {
+          this.consecutiveTimeouts++;
+          this.discardPending();
+          for (const queued of this.queued) queued.resolve(null);
+          this.queued = [];
+          this.waitingForKey = true;
+          if (this.decoder && this.decoder.state !== 'closed') this.decoder.close();
+          this.decoder = null;
+          this.requestKey();
+          return;
+        }
+        this.rejectPending(new Error('Native H264 decoding timed out'));
+      }, 3000);
       this.pending.set(packet.timestamp, { resolve, reject, timer });
       try {
         this.decoder!.decode(new EncodedVideoChunk({ type: packet.key ? 'key' : 'delta', timestamp: packet.timestamp, data: packet.data }));

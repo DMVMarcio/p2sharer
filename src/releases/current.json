@@ -3,55 +3,55 @@
   "translations": {
     "en": [
       "**Automatic relay fallback.** Rooms now connect through a P2Sharer relay when strict networks or missing IPv6 block direct paths, with an option to turn it off.",
-      "**Reliable screen sharing.** Fixed an issue where screen shares could stay stuck connecting for viewers on repeated attempts until restarting the app."
+      "**Reliable screen sharing.** Fixed stalls when starting, retrying, minimizing, or switching windows so screen shares connect smoothly without restarting."
     ],
     "pt-BR": [
       "**Fallback automático de conexão.** Salas agora usam um relay do P2Sharer quando redes restritas ou falta de IPv6 bloqueiam a rota direta, com opção de desativar.",
-      "**Compartilhamento de tela mais confiável.** Corrigimos travamentos ao conectar transmissões em novas tentativas, sem precisar reiniciar o aplicativo."
+      "**Compartilhamento de tela mais confiável.** Corrigimos travamentos ao iniciar, tentar novamente, minimizar ou alternar janelas, sem reiniciar o app."
     ],
     "es": [
       "**Respaldo automático de conexión.** Las salas usan un relay de P2Sharer si redes estrictas o falta de IPv6 impiden la ruta directa, con opción de desactivarlo.",
-      "**Pantalla compartida más fiable.** Se corrigió un fallo que dejaba la transmisión conectando en nuevos intentos hasta reiniciar la aplicación."
+      "**Pantalla compartida más fiable.** Se corrigieron bloqueos al iniciar, reintentar, minimizar o cambiar de ventana sin tener que reiniciar la app."
     ],
     "fr": [
       "**Relais de secours automatique.** Les salons passent par un relais P2Sharer si un réseau strict ou l'absence d'IPv6 bloque le direct, avec option de désactivation.",
-      "**Partage d'écran plus fiable.** Correction d'un blocage qui laissait la diffusion en attente de connexion après plusieurs essais sans redémarrer."
+      "**Partage d'écran plus fiable.** Correction des blocages au lancement, aux nouvelles tentatives, en réduisant ou en changeant de fenêtre sans redémarrer."
     ],
     "de": [
       "**Automatischer Verbindungs-Fallback.** Räume nutzen ein P2Sharer-Relay, wenn strenges NAT oder fehlendes IPv6 direkte Wege blockieren — auf Wunsch abschaltbar.",
-      "**Zuverlässigere Bildschirmfreigabe.** Ein Fehler wurde behoben, bei dem Streams nach erneuten Versuchen hängen blieben, bis die App neu gestartet wurde."
+      "**Zuverlässigere Bildschirmfreigabe.** Hänger beim Starten, erneuten Versuchen, Minimieren oder Fensterwechsel behoben — ohne App-Neustart."
     ],
     "it": [
       "**Relay automatico di emergenza.** Le stanze usano un relay P2Sharer se reti restrittive o assenza di IPv6 bloccano la rotta diretta, disattivabile nelle opzioni.",
-      "**Condivisione schermo più affidabile.** Risolto un blocco che lasciava lo stream in connessione dopo vari tentativi finché non si riavviava l'app."
+      "**Condivisione schermo più affidabile.** Risolti i blocchi all'avvio, ai nuovi tentativi, minimizzando o cambiando finestra senza riavviare l'app."
     ],
     "zh-CN": [
       "**自动中继备用连接。** 当受限网络或缺少 IPv6 阻碍直连时，房间会自动通过 P2Sharer 中继保持连通，并支持在设置中关闭。",
-      "**更稳定的屏幕共享。** 修复了多次尝试共享屏幕时观众端一直卡在连接中、必须重启应用才能恢复的问题。"
+      "**更稳定的屏幕共享。** 修复了开始、重试、最小化或切换窗口时画面连接卡住且必须重启应用的问题。"
     ],
     "zh-TW": [
       "**自動中繼備援連線。** 當受限網路或缺少 IPv6 阻礙直連時，房間會自動透過 P2Sharer 中繼維持連線，並支援在設定中關閉。",
-      "**更穩定的螢幕分享。** 修復了多次嘗試分享螢幕時觀眾端一直卡在連線中、必須重開應用程式才能恢復的問題。"
+      "**更穩定的螢幕分享。** 修復了開始、重試、最小化或切換視窗時畫面連線卡住且必須重開應用程式的問題。"
     ],
     "ja": [
       "**自動リレーフォールバック。** 制限付きネットワークや IPv6 未対応環境で直接接続できない場合も P2Sharer リレー経由で接続でき、設定で無効化も可能です。",
-      "**画面共有の接続性を改善。** 画面共有をやり直した際に接続中のまま進まず、アプリの再起動が必要になる不具合を修正しました。"
+      "**画面共有の接続性を改善。** 開始時や再試行時、最小化やウィンドウ切り替えで接続が止まり再起動が必要になる不具合を修正しました。"
     ],
     "ko": [
       "**자동 릴레이 대체 연결.** 제한된 네트워크나 IPv6 미지원 환경에서 직접 연결이 막힐 때 P2Sharer 릴레이로 자동 연결되며, 설정에서 끌 수 있습니다.",
-      "**더 안정적인 화면 공유.** 화면 공유를 다시 시도할 때 연결 중 상태에서 멈춰 앱을 재시작해야 하던 문제를 수정했습니다."
+      "**더 안정적인 화면 공유.** 시작, 재시도, 창 최소화 또는 창 전환 시 연결이 멈춰 앱을 재시작해야 하던 문제를 수정했습니다."
     ],
     "hi": [
       "**स्वचालित रिले फ़ॉलबैक।** सख्त नेटवर्क या IPv6 न होने पर कमरे सीधे रास्ते के बजाय P2Sharer रिले से जुड़ते हैं, और आप इसे सेटिंग्स में बंद भी कर सकते हैं।",
-      "**अधिक विश्वसनीय स्क्रीन शेयरिंग.** दोबारा प्रयास करने पर स्क्रीन शेयर के कनेक्ट होते समय अटकने और ऐप रीस्टार्ट करने की समस्या को ठीक किया गया।"
+      "**अधिक विश्वसनीय स्क्रीन शेयरिंग.** शुरू करने, दोबारा प्रयास करने, मिनिमाइज़ करने या विंडो बदलने पर स्क्रीन शेयर अटकने की समस्या ठीक की गई।"
     ],
     "fi": [
       "**Automaattinen välitysyhteys.** Huoneet käyttävät P2Sharer-välityspalvelinta, jos tiukka verkko tai puuttuva IPv6 estää suoran yhteyden; valittavissa asetuksissa.",
-      "**Luotettavampi näytönjako.** Korjattiin ongelma, jossa jako jäi yhdistämään uusilla yrityksillä, kunnes sovellus käynnistettiin uudelleen."
+      "**Luotettavampi näytönjako.** Korjattiin ongelmat, joissa jako juuttui käynnistettäessä, yritettäessä uudelleen, pienennettäessä tai ikkunaa vaihdettaessa."
     ],
     "ru": [
       "**Резервное реле подключения.** Комнаты автоматически используют реле P2Sharer, если строгий NAT или отсутствие IPv6 мешают прямому пути; можно отключить в настройках.",
-      "**Надёжная трансляция экрана.** Исправлено зависание на этапе подключения при повторных попытках показа экрана, требовавшее перезапуска приложения."
+      "**Надёжная трансляция экрана.** Исправлены зависания при запуске, повторах, сворачивании или переключении окон без перезапуска приложения."
     ]
   }
 }

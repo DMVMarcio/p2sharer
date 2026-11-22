@@ -167,6 +167,7 @@ export function useScreenPicker(onClose?: () => void, isClosing = false) {
       const chosen = selectedSourceId || fallbackId;
       const label = monitors.find((source) => source.id === chosen)?.name || windows.find((source) => source.id === chosen)?.title ||
         cameras.find((source) => `camera:${source.deviceId}` === chosen)?.label;
+      if (!editingId && !chosen.startsWith('camera:')) roomService.prepareCaptureAudio();
       const prepared = await preview.take(chosen.startsWith('window:'));
       await roomService.startCapture(chosen, fps, { width: resConfig.width, height: resConfig.height }, showCursor, quality, label, prepared, bitrate);
       if (!chosen.startsWith('camera:')) stateStore.set((s) => {
@@ -185,6 +186,7 @@ export function useScreenPicker(onClose?: () => void, isClosing = false) {
       }
       if (onClose) onClose();
     } catch (err) {
+      roomService.releaseUnusedCaptureAudio();
       logDiagnostic('ERROR', 'capture.start', 'Transmission confirmation failed', { sourceId: selectedSourceId, editingId, resolution: resConfig, fps, bitrate, error: err });
       setError(t("message.11b6606b6f25", { v0: localizeError(err) }));
       preview.retry();

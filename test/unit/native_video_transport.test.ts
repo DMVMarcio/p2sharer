@@ -320,3 +320,32 @@ test('forceRestart dispatches a fresh native route while respecting blocked peer
   (native as any).blocked.add('peer/screen');
   assert.equal(native.dispatch('peer', stream, desc, true), false);
 });
+
+test('native receiver extends deadline while document is hidden and hands off after decoded frame', async context => {
+  const f = receiverFixture(context);
+  const previousDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  let hidden = true;
+  let decoded = 0;
+  Object.defineProperty(globalThis, 'document', {
+    configurable: true,
+    value: { hidden: true },
+  });
+  Object.defineProperty(globalThis.document, 'hidden', { get: () => hidden });
+  context.after(() => {
+    if (previousDocument) Object.defineProperty(globalThis, 'document', previousDocument);
+    else delete (globalThis as any).document;
+  });
+
+  f.pc.connectionState = 'connected';
+  f.pc.getStats = async () => new Map([['video', { type: 'inbound-rtp', kind: 'video', framesReceived: 12, framesDecoded: decoded }]]);
+  await f.internal.checkReceiver(f.route);
+  f.at(7000);
+  await f.internal.checkReceiver(f.route);
+  assert.equal(f.messages.length, 0, 'Hidden window receiving RTP frames defers probe rejection');
+  assert.equal(f.pc.connectionState, 'connected');
+
+  hidden = false;
+  decoded = 1;
+  await f.internal.checkReceiver(f.route);
+  assert.equal(f.messages[0]?.kind, 'ready');
+});

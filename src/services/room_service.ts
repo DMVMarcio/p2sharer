@@ -1570,6 +1570,18 @@ export class RoomService {
     }
   }
 
+  public prepareCaptureAudio(): void {
+    if (!isTauri()) return;
+    if (Array.from(this.localCaptures.values()).some((entry) => entry.kind === 'screen')) return;
+    this.audioBridge.prepare();
+  }
+
+  public releaseUnusedCaptureAudio(): void {
+    if (!isTauri()) return;
+    if (Array.from(this.localCaptures.values()).some((entry) => entry.kind === 'screen')) return;
+    this.audioBridge.stop();
+  }
+
   public startCapture(sourceId: string, fps: number, res: { width: number; height: number },
     mouse: boolean, quality = 90, label?: string,
     prepared?: { sourceId: string; stream: MediaStream; bridge?: NativeVideoBridge },
