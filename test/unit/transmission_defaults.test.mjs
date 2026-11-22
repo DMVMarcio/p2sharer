@@ -23,7 +23,7 @@ globalThis.transmissionDefaultsFixture = {
   },
 };
 const mocks = {
-  room: 'export const roomService = { localCaptures: globalThis.transmissionDefaultsFixture.localCaptures, startCapture: (...args) => globalThis.transmissionDefaultsFixture.startCapture(...args) };',
+  room: 'export const roomService = { localCaptures: globalThis.transmissionDefaultsFixture.localCaptures, prepareCaptureAudio: () => {}, releaseUnusedCaptureAudio: () => {}, startCapture: (...args) => globalThis.transmissionDefaultsFixture.startCapture(...args) };',
   preview: `const take = async () => undefined;
     const retry = () => { globalThis.transmissionDefaultsFixture.retries = (globalThis.transmissionDefaultsFixture.retries || 0) + 1; };
     export const useCapturePreview = (_source, _res, _fps, _cursor, _quality, _closing, modes, rates) => {
