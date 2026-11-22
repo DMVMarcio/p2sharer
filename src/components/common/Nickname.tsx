@@ -44,15 +44,6 @@ function ensureHonkPalette(style: NicknameStyle, overrideColor?: string): string
       style.secondaryColor,
       mixHex(style.secondaryColor, '#000000', 0.2),
     ];
-  } else if (style.effect === 'shine') {
-    stops = [
-      mixHex(style.color, style.shineColor, 0.65),
-      style.shineColor,
-      style.color,
-      mixHex(style.color, '#000000', 0.15),
-      style.color,
-      mixHex(style.color, style.shineColor, 0.35),
-    ];
   } else if (style.effect === 'rainbow') {
     stops = ['#f87171', '#fb923c', '#facc15', '#4ade80', '#38bdf8', '#a78bfa'];
   } else {
@@ -88,10 +79,12 @@ export function Nickname({ name, peerId, isLocal = false, appearance, className 
   const letters = style.effect === 'letters' || style.animation === 'wave';
   const graphemes = letters ? [...segmenter.segment(name.slice(0, 80))] : [];
   const count = Math.max(1, graphemes.length);
+  const honkShine = style.font === 'honk' && style.effect === 'shine';
   return <span className={`nickname ${className}`} data-font={style.font} style={{ ...variables, '--nickname-count': count } as CSSProperties}
     role={letters ? 'img' : undefined} aria-label={letters ? name : undefined}>
     <span className={`nickname-motion nickname-animation-${style.animation}`}>
-      <span className={letters ? 'nickname-letters' : `nickname-ink nickname-effect-${style.effect}`}>
+      <span className={letters ? 'nickname-letters' : `nickname-ink nickname-effect-${style.effect}`}
+        data-text={!letters && honkShine ? name : undefined}>
         {letters ? graphemes.map(({ segment }, index) => {
           const letterColor = style.effect === 'letters' ? palette[index % palette.length] : undefined;
           const letterPalette = letterColor ? ensureHonkPalette(style, letterColor) : honkPalette;
@@ -104,7 +97,8 @@ export function Nickname({ name, peerId, isLocal = false, appearance, className 
             '--nickname-rainbow-end': `${((2 * count + index) / (2 * count - 1)) * 100}%`,
             color: letterColor,
             fontPalette: letterPalette,
-          } as CSSProperties}><span className={`nickname-ink nickname-effect-${style.effect}`}>{segment}</span></span>;
+          } as CSSProperties}><span className={`nickname-ink nickname-effect-${style.effect}`}
+            data-text={honkShine ? segment : undefined}>{segment}</span></span>;
         }) : name}
       </span>
     </span>

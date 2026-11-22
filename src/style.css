@@ -6353,6 +6353,22 @@ html[data-theme="light"] :is(.stream-card, .pip-window-root) {
   color: inherit;
   animation: none;
 }
+.nickname[data-font="honk"] .nickname-effect-shine {
+  position: relative;
+}
+.nickname[data-font="honk"] .nickname-effect-shine::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(110deg, transparent 38%, var(--nickname-shine) 50%, transparent 62%);
+  background-size: calc(var(--nickname-count, 1) * 300%) 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  opacity: 0.75;
+  animation: nickname-shine 3.6s ease-in-out infinite;
+}
 .nickname-animation-float { animation: nickname-float 3s ease-in-out infinite; }
 .nickname-animation-pulse { animation: nickname-pulse 2.5s ease-in-out infinite; }
 .nickname-animation-wave .nickname-letter {
@@ -6377,10 +6393,12 @@ html[data-theme="light"] :is(.stream-card, .pip-window-root) {
 .nickname-colors { display: flex; align-items: center; gap: 8px; }
 .nickname-editor > .btn { justify-self: start; }
 @media (prefers-reduced-motion: reduce) {
-  .nickname-motion, .nickname-ink, .nickname-letter { animation: none !important; }
+  .nickname-motion, .nickname-ink, .nickname-ink::after, .nickname-letter { animation: none !important; }
+  .nickname[data-font="honk"] .nickname-effect-shine::after { display: none; }
 }
 @media (forced-colors: active) {
   .nickname-ink, .nickname-letter { color: CanvasText !important; background: none; text-shadow: none; }
+  .nickname-ink::after { display: none; }
 }
 
 .nickname-field { display: flex; align-items: stretch; gap: 8px; min-width: 0; }
