@@ -1,6 +1,6 @@
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { autoUpdate, computePosition, flip, offset, shift, size } from '@floating-ui/dom';
 import { Check, ChevronDown } from 'lucide-react';
@@ -11,6 +11,7 @@ export interface SelectOption {
   label: string;
   /** Decorative content shared by the option and selected value; labels stay plain text for typeahead. */
   icon?: ReactNode;
+  labelStyle?: CSSProperties;
   disabled?: boolean;
 }
 
@@ -148,7 +149,7 @@ export function Select({ value, options, onValueChange, placeholder = t("message
       onClick={(event) => { event.stopPropagation(); if (open) close(); else show(); }}>
       <span className="app-select-label">
         {options[selectedIndex]?.icon && <span className="app-select-icon" aria-hidden="true">{options[selectedIndex].icon}</span>}
-        <span className="app-select-value">{options[selectedIndex]?.label ?? placeholder}</span>
+        <span className="app-select-value" style={options[selectedIndex]?.labelStyle}>{options[selectedIndex]?.label ?? placeholder}</span>
       </span>
       <ChevronDown className="app-select-chevron" size={14} aria-hidden="true" />
     </button>
@@ -167,7 +168,7 @@ export function Select({ value, options, onValueChange, placeholder = t("message
         onClick={(event) => { event.stopPropagation(); choose(index); }}>
         <span className="app-select-label">
           {option.icon && <span className="app-select-icon" aria-hidden="true">{option.icon}</span>}
-          <span>{option.label}</span>
+          <span style={option.labelStyle}>{option.label}</span>
         </span>{index === selectedIndex && <Check size={14} aria-hidden="true" />}
       </div>)}
     </div>, document.fullscreenElement ?? document.body)}

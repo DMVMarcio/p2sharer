@@ -1,5 +1,33 @@
 /** Only registry identifiers and hexadecimal colors cross the presence boundary. */
-export const NICKNAME_FONTS = { default: 'inherit' } as const;
+export const NICKNAME_FONTS = {
+  default: 'inherit',
+  boogaloo: "'Boogaloo', sans-serif",
+  'jacquard-24': "'Jacquard 24', serif",
+  honk: "'Honk', sans-serif",
+  'faster-one': "'Faster One', sans-serif",
+  exile: "'Exile', sans-serif",
+  nunito: "'Nunito', sans-serif",
+  pacifico: "'Pacifico', cursive",
+  syne: "'Syne', sans-serif",
+  'permanent-marker': "'Permanent Marker', cursive",
+  bangers: "'Bangers', cursive",
+  silkscreen: "'Silkscreen', monospace",
+  cinzel: "'Cinzel', serif",
+} as const;
+export const NICKNAME_FONT_LABELS: Record<Exclude<keyof typeof NICKNAME_FONTS, 'default'>, string> = {
+  boogaloo: 'Boogaloo',
+  'jacquard-24': 'Jacquard 24',
+  honk: 'Honk',
+  'faster-one': 'Faster One',
+  exile: 'Exile',
+  nunito: 'Nunito',
+  pacifico: 'Pacifico',
+  syne: 'Syne',
+  'permanent-marker': 'Permanent Marker',
+  bangers: 'Bangers',
+  silkscreen: 'Silkscreen',
+  cinzel: 'Cinzel',
+};
 export const NICKNAME_EFFECTS = ['none', 'solid', 'gradient', 'letters', 'rainbow', 'glow', 'shine'] as const;
 export const NICKNAME_ANIMATIONS = ['none', 'float', 'pulse', 'wave'] as const;
 export interface NicknameStyle {

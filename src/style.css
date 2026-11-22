@@ -6340,6 +6340,15 @@ html[data-theme="light"] :is(.stream-card, .pip-window-root) {
   background-size: 250% 100%;
   animation: nickname-shine 4s ease-in-out infinite;
 }
+.nickname[data-font="honk"] .nickname-effect-gradient,
+.nickname[data-font="honk"] .nickname-effect-rainbow,
+.nickname[data-font="honk"] .nickname-effect-shine {
+  background-image: none;
+  background-clip: border-box;
+  -webkit-background-clip: border-box;
+  color: inherit;
+  animation: none;
+}
 .nickname-animation-float { animation: nickname-float 3s ease-in-out infinite; }
 .nickname-animation-pulse { animation: nickname-pulse 2.5s ease-in-out infinite; }
 .nickname-animation-wave .nickname-letter {

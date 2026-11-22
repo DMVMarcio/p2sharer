@@ -22,6 +22,42 @@ importers:
       '@fontsource-variable/plus-jakarta-sans':
         specifier: ^5.3.0
         version: 5.3.0
+      '@fontsource/bangers':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource/boogaloo':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource/cinzel':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource/exile':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource/faster-one':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource/honk':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource/jacquard-24':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource/nunito':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource/pacifico':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource/permanent-marker':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource/silkscreen':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource/syne':
+        specifier: ^5.3.0
+        version: 5.3.0
       '@tauri-apps/api':
         specifier: ^2.12.1
         version: 2.12.1
@@ -520,6 +556,42 @@ packages:
 
   '@fontsource-variable/plus-jakarta-sans@5.3.0':
     resolution: {integrity: sha512-/l/4r0yyWK9JzAlmA0LiYgGgmJe/Gswt4jTJEzr5QhJfwMbvJZDmYWyW0M4X7yCK69BajMVlV/Lx8g7WDc1+sw==}
+
+  '@fontsource/bangers@5.3.0':
+    resolution: {integrity: sha512-tSRpmWwkqrO9PCqo9wjA/99/5sLOIWm5cf51G3ooEHd8qZus8sVSSJoWp/7EvM5rIgZMjKRG6XtY9yeisKxE7g==}
+
+  '@fontsource/boogaloo@5.3.0':
+    resolution: {integrity: sha512-nFnL1AvihH7+QOpOF0KsJdwsyzVJnJfFwy0XberXHpuc3bJ5tH66fkZOp8ZhJEeLJ22VFFktXq6xWmXnt4atzw==}
+
+  '@fontsource/cinzel@5.3.0':
+    resolution: {integrity: sha512-KEOYTsrRppW0uRIPWBDPrQgunCS6f8u4nzZxYRBfo9SCknKojLYjK7B0ZoVmJhyVLefz271ZQRF9EOpHZlfhRw==}
+
+  '@fontsource/exile@5.3.0':
+    resolution: {integrity: sha512-ik/KEHSl1Eg7MkQyEvves8ywQ8hPagmSJtRDmGf6lmXZ8wpBo38Rqy1Bvbgr+qP8nkJRYjXIHF/tHBOjnq+DjQ==}
+
+  '@fontsource/faster-one@5.3.0':
+    resolution: {integrity: sha512-AG7vzKG4+OvXm64giAt3lZ3IQRhAcblxmVuRGvXyAXNjuAyn+PE7QK2y3cG5wTBTWS/1vRY3EPLHfr3GF57QKg==}
+
+  '@fontsource/honk@5.3.0':
+    resolution: {integrity: sha512-vXvnp01dJ9YFjnhvFZx7HvPaqlBXIx602MK5afctjfOWO2G1TN3u3GSU5ZsicfK5mZzKEMYhbucAeggpKrJing==}
+
+  '@fontsource/jacquard-24@5.3.0':
+    resolution: {integrity: sha512-oCWI8QHMueJt2HcdBbQPOUZ3ghLC1xZk8lG1cMYJN3Ds3pghVlVQrTdKJ+v1V6Otihtj4Iov20IfUJTg7HBdXQ==}
+
+  '@fontsource/nunito@5.3.0':
+    resolution: {integrity: sha512-vw9TaTQJ/zpEpKrsODuPmOvaVjXgdda6B+xXA4YqjrdeJ62MLgVoDerdRXFQHyBnSCt2yQ2nHKCHPP/Pv7Xq4Q==}
+
+  '@fontsource/pacifico@5.3.0':
+    resolution: {integrity: sha512-bWv0fHR1n36p7scRn+maaEaVeQCOq9yvfVfjyAeUzKrK4Y/3qiRAEj4hJgfxj/sjgZZGkeHyKPrbWdDaZtpCVw==}
+
+  '@fontsource/permanent-marker@5.3.0':
+    resolution: {integrity: sha512-ZO/NtYW4SCc/iY8N3dmjWyDITcXJ/vhWZFgnwRcvzwCKKnScMrM/a2/6VHlsjCVuIgmPzNrCFbedEYhv+/jJBg==}
+
+  '@fontsource/silkscreen@5.3.0':
+    resolution: {integrity: sha512-M1NQ3LQH0LFNvyFPd/piHEGMImPPtpLglNnLC6Vdcq9kL0jNIOtTQmksAWCc4enbDnw1OnIpZtjNEfRqYm/QmA==}
+
+  '@fontsource/syne@5.3.0':
+    resolution: {integrity: sha512-kRWNVsrdYw+08I4EM1SYPe2JovdTzUI0kMVALVRsKmjRdkrVoun1qddSlDAglz5J9LbgUpJSkWmw6BYnmKdGuw==}
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
@@ -2333,6 +2405,30 @@ snapshots:
   '@fontsource-variable/jetbrains-mono@5.3.0': {}
 
   '@fontsource-variable/plus-jakarta-sans@5.3.0': {}
+
+  '@fontsource/bangers@5.3.0': {}
+
+  '@fontsource/boogaloo@5.3.0': {}
+
+  '@fontsource/cinzel@5.3.0': {}
+
+  '@fontsource/exile@5.3.0': {}
+
+  '@fontsource/faster-one@5.3.0': {}
+
+  '@fontsource/honk@5.3.0': {}
+
+  '@fontsource/jacquard-24@5.3.0': {}
+
+  '@fontsource/nunito@5.3.0': {}
+
+  '@fontsource/pacifico@5.3.0': {}
+
+  '@fontsource/permanent-marker@5.3.0': {}
+
+  '@fontsource/silkscreen@5.3.0': {}
+
+  '@fontsource/syne@5.3.0': {}
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:

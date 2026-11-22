@@ -1,7 +1,7 @@
 import { useId } from 'react';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
-import { DEFAULT_NICKNAME_STYLE, NICKNAME_ANIMATIONS, NICKNAME_EFFECTS, NICKNAME_FONTS, normalizeNicknameStyle, type NicknameStyle } from '../../core/nickname_style';
+import { DEFAULT_NICKNAME_STYLE, NICKNAME_ANIMATIONS, NICKNAME_EFFECTS, NICKNAME_FONTS, NICKNAME_FONT_LABELS, normalizeNicknameStyle, type NicknameStyle } from '../../core/nickname_style';
 import { Nickname } from './Nickname';
 import { ColorPicker } from './ColorPicker';
 import { Select } from './Select';
@@ -18,10 +18,13 @@ export function NicknameStyleEditor({ name, value, onChange, disabled = false }:
     </div>
     <div className="nickname-editor-fields">
       <label className="settings-label" htmlFor={`${id}-font`}>{t('nickname.font')}</label>
-      <Select id={`${id}-font`} value={value.font} disabled={disabled || Object.keys(NICKNAME_FONTS).length === 1}
-        options={Object.keys(NICKNAME_FONTS).map(font => ({ value: font, label: t(`nickname.font.${font}`) }))}
+      <Select id={`${id}-font`} value={value.font} disabled={disabled}
+        options={(Object.keys(NICKNAME_FONTS) as Array<NicknameStyle['font']>).map(font => ({
+          value: font,
+          label: font === 'default' ? t('nickname.font.default') : NICKNAME_FONT_LABELS[font],
+          labelStyle: font === 'default' ? undefined : { fontFamily: NICKNAME_FONTS[font], fontSize: '1rem', lineHeight: 1.25 },
+        }))}
         onValueChange={font => change({ font: font as NicknameStyle['font'] })} />
-      {Object.keys(NICKNAME_FONTS).length === 1 && <p className="text-muted">{t('nickname.fontPending')}</p>}
       <label className="settings-label" htmlFor={`${id}-effect`}>{t('nickname.effect')}</label>
       <Select id={`${id}-effect`} value={value.effect} disabled={disabled}
         options={NICKNAME_EFFECTS.map(effect => ({ value: effect, label: t(`nickname.effect.${effect}`) }))}

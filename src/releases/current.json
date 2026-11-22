@@ -3,55 +3,68 @@
   "translations": {
     "en": [
       "**Automatic relay fallback.** Rooms now connect through a P2Sharer relay when strict networks or missing IPv6 block direct paths, with an option to turn it off.",
-      "**Reliable screen sharing.** Fixed stalls when starting, retrying, minimizing, or switching windows so screen shares connect smoothly without restarting."
+      "**Reliable screen sharing.** Fixed stalls when starting, retrying, minimizing, or switching windows so screen shares connect smoothly without restarting.",
+      "**Username fonts.** Added 12 bundled fonts with live preview in the selector, plus customizable colors for the Honk font."
     ],
     "pt-BR": [
       "**Fallback automático de conexão.** Salas agora usam um relay do P2Sharer quando redes restritas ou falta de IPv6 bloqueiam a rota direta, com opção de desativar.",
-      "**Compartilhamento de tela mais confiável.** Corrigimos travamentos ao iniciar, tentar novamente, minimizar ou alternar janelas, sem reiniciar o app."
+      "**Compartilhamento de tela mais confiável.** Corrigimos travamentos ao iniciar, tentar novamente, minimizar ou alternar janelas, sem reiniciar o app.",
+      "**Fontes para nome de usuário.** Adicionadas 12 fontes integradas com prévia no seletor e suporte a cores personalizadas na fonte Honk."
     ],
     "es": [
       "**Respaldo automático de conexión.** Las salas usan un relay de P2Sharer si redes estrictas o falta de IPv6 impiden la ruta directa, con opción de desactivarlo.",
-      "**Pantalla compartida más fiable.** Se corrigieron bloqueos al iniciar, reintentar, minimizar o cambiar de ventana sin tener que reiniciar la app."
+      "**Pantalla compartida más fiable.** Se corrigieron bloqueos al iniciar, reintentar, minimizar o cambiar de ventana sin tener que reiniciar la app.",
+      "**Fuentes para nombres de usuario.** Se añadieron 12 fuentes integradas con vista previa en el selector y colores personalizados para la fuente Honk."
     ],
     "fr": [
       "**Relais de secours automatique.** Les salons passent par un relais P2Sharer si un réseau strict ou l'absence d'IPv6 bloque le direct, avec option de désactivation.",
-      "**Partage d'écran plus fiable.** Correction des blocages au lancement, aux nouvelles tentatives, en réduisant ou en changeant de fenêtre sans redémarrer."
+      "**Partage d'écran plus fiable.** Correction des blocages au lancement, aux nouvelles tentatives, en réduisant ou en changeant de fenêtre sans redémarrer.",
+      "**Polices de nom d'utilisateur.** Ajout de 12 polices intégrées avec aperçu dans le sélecteur et personnalisation des couleurs pour la police Honk."
     ],
     "de": [
       "**Automatischer Verbindungs-Fallback.** Räume nutzen ein P2Sharer-Relay, wenn strenges NAT oder fehlendes IPv6 direkte Wege blockieren — auf Wunsch abschaltbar.",
-      "**Zuverlässigere Bildschirmfreigabe.** Hänger beim Starten, erneuten Versuchen, Minimieren oder Fensterwechsel behoben — ohne App-Neustart."
+      "**Zuverlässigere Bildschirmfreigabe.** Hänger beim Starten, erneuten Versuchen, Minimieren oder Fensterwechsel behoben — ohne App-Neustart.",
+      "**Schriftarten für Benutzernamen.** 12 integrierte Schriftarten mit Live-Vorschau im Auswahlfeld sowie Farbanpassung für die Schriftart Honk hinzugefügt."
     ],
     "it": [
       "**Relay automatico di emergenza.** Le stanze usano un relay P2Sharer se reti restrittive o assenza di IPv6 bloccano la rotta diretta, disattivabile nelle opzioni.",
-      "**Condivisione schermo più affidabile.** Risolti i blocchi all'avvio, ai nuovi tentativi, minimizzando o cambiando finestra senza riavviare l'app."
+      "**Condivisione schermo più affidabile.** Risolti i blocchi all'avvio, ai nuovi tentativi, minimizzando o cambiando finestra senza riavviare l'app.",
+      "**Caratteri per il nome utente.** Aggiunti 12 caratteri integrati con anteprima nel selettore e colori personalizzabili per il carattere Honk."
     ],
     "zh-CN": [
       "**自动中继备用连接。** 当受限网络或缺少 IPv6 阻碍直连时，房间会自动通过 P2Sharer 中继保持连通，并支持在设置中关闭。",
-      "**更稳定的屏幕共享。** 修复了开始、重试、最小化或切换窗口时画面连接卡住且必须重启应用的问题。"
+      "**更稳定的屏幕共享。** 修复了开始、重试、最小化或切换窗口时画面连接卡住且必须重启应用的问题。",
+      "**用户名字体。** 新增 12 款内置字体，支持在选择器中直接预览效果，并可自定义 Honk 字体的配色。"
     ],
     "zh-TW": [
       "**自動中繼備援連線。** 當受限網路或缺少 IPv6 阻礙直連時，房間會自動透過 P2Sharer 中繼維持連線，並支援在設定中關閉。",
-      "**更穩定的螢幕分享。** 修復了開始、重試、最小化或切換視窗時畫面連線卡住且必須重開應用程式的問題。"
+      "**更穩定的螢幕分享。** 修復了開始、重試、最小化或切換視窗時畫面連線卡住且必須重開應用程式的問題。",
+      "**使用者名稱字體。** 新增 12 款內建字體，支援在選擇器中即時預覽效果，並可自訂 Honk 字體的配色。"
     ],
     "ja": [
       "**自動リレーフォールバック。** 制限付きネットワークや IPv6 未対応環境で直接接続できない場合も P2Sharer リレー経由で接続でき、設定で無効化も可能です。",
-      "**画面共有の接続性を改善。** 開始時や再試行時、最小化やウィンドウ切り替えで接続が止まり再起動が必要になる不具合を修正しました。"
+      "**画面共有の接続性を改善。** 開始時や再試行時、最小化やウィンドウ切り替えで接続が止まり再起動が必要になる不具合を修正しました。",
+      "**ユーザー名のフォント。** 一覧でプレビューできる12種類の内蔵フォントを追加し、Honkフォントの色カスタマイズにも対応しました。"
     ],
     "ko": [
       "**자동 릴레이 대체 연결.** 제한된 네트워크나 IPv6 미지원 환경에서 직접 연결이 막힐 때 P2Sharer 릴레이로 자동 연결되며, 설정에서 끌 수 있습니다.",
-      "**더 안정적인 화면 공유.** 시작, 재시도, 창 최소화 또는 창 전환 시 연결이 멈춰 앱을 재시작해야 하던 문제를 수정했습니다."
+      "**더 안정적인 화면 공유.** 시작, 재시도, 창 최소화 또는 창 전환 시 연결이 멈춰 앱을 재시작해야 하던 문제를 수정했습니다.",
+      "**사용자 이름 글꼴.** 목록에서 바로 미리 볼 수 있는 12종의 내장 글꼴을 추가하고 Honk 글꼴의 색상 변경을 지원합니다."
     ],
     "hi": [
       "**स्वचालित रिले फ़ॉलबैक।** सख्त नेटवर्क या IPv6 न होने पर कमरे सीधे रास्ते के बजाय P2Sharer रिले से जुड़ते हैं, और आप इसे सेटिंग्स में बंद भी कर सकते हैं।",
-      "**अधिक विश्वसनीय स्क्रीन शेयरिंग.** शुरू करने, दोबारा प्रयास करने, मिनिमाइज़ करने या विंडो बदलने पर स्क्रीन शेयर अटकने की समस्या ठीक की गई।"
+      "**अधिक विश्वसनीय स्क्रीन शेयरिंग.** शुरू करने, दोबारा प्रयास करने, मिनिमाइज़ करने या विंडो बदलने पर स्क्रीन शेयर अटकने की समस्या ठीक की गई।",
+      "**यूज़रनेम फ़ॉन्ट।** सूची में लाइव प्रीव्यू के साथ 12 इनबिल्ट फ़ॉन्ट जोड़े गए हैं, साथ ही Honk फ़ॉन्ट के रंग बदलने की सुविधा भी है।"
     ],
     "fi": [
       "**Automaattinen välitysyhteys.** Huoneet käyttävät P2Sharer-välityspalvelinta, jos tiukka verkko tai puuttuva IPv6 estää suoran yhteyden; valittavissa asetuksissa.",
-      "**Luotettavampi näytönjako.** Korjattiin ongelmat, joissa jako juuttui käynnistettäessä, yritettäessä uudelleen, pienennettäessä tai ikkunaa vaihdettaessa."
+      "**Luotettavampi näytönjako.** Korjattiin ongelmat, joissa jako juuttui käynnistettäessä, yritettäessä uudelleen, pienennettäessä tai ikkunaa vaihdettaessa.",
+      "**Käyttäjänimen fontit.** Lisätty 12 sisäänrakennettua fonttia esikatselulla valitsimessa sekä värimuokkaus Honk-fontille."
     ],
     "ru": [
       "**Резервное реле подключения.** Комнаты автоматически используют реле P2Sharer, если строгий NAT или отсутствие IPv6 мешают прямому пути; можно отключить в настройках.",
-      "**Надёжная трансляция экрана.** Исправлены зависания при запуске, повторах, сворачивании или переключении окон без перезапуска приложения."
+      "**Надёжная трансляция экрана.** Исправлены зависания при запуске, повторах, сворачивании или переключении окон без перезапуска приложения.",
+      "**Шрифты имени пользователя.** Добавлены 12 встроенных шрифтов с предпросмотром в списке и настройкой цветов для шрифта Honk."
     ]
   }
 }
