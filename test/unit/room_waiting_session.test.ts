@@ -77,10 +77,12 @@ test('cancelled discovery finishes cleanup before another preview and admission 
     sound: soundEffects.playUserJoin };
   soundEffects.playUserJoin = () => {};
   const calls: string[] = [];
+  let markStarted!: () => void;
+  const started = new Promise<void>(resolve => { markStarted = resolve; });
   let finish!: () => void;
   const ready = new Promise<void>(resolve => { finish = resolve; });
   GroupRoomManager.prototype.join = async function (callbacks, previewOnly, password) {
-    if (this === first) { calls.push('first-start'); await ready; calls.push('first-ready'); }
+    if (this === first) { calls.push('first-start'); markStarted(); await ready; calls.push('first-ready'); }
     else calls.push(previewOnly ? 'next-preview' : `next-admit:${password}`);
     callbacks.onStatusChange('Procurando Participantes...');
   };
@@ -89,12 +91,15 @@ test('cancelled discovery finishes cleanup before another preview and admission 
     onChatHistory: () => {}, onPeersUpdate: () => {}, onStatusChange: () => {} };
   const cancelled = new AbortController();
   const active = new AbortController();
+  const pending: Promise<void>[] = [];
   try {
     const initial = service.startRoomPreview(first, callbacks, cancelled.signal);
-    await Promise.resolve();
+    pending.push(initial);
+    await started;
     cancelled.abort();
     const cleanup = service.stopRoomPreview(first);
     const fresh = service.startRoomPreview(next, callbacks, active.signal);
+    pending.push(cleanup, fresh);
     assert.deepEqual(calls, ['first-start']);
     finish();
     await Promise.all([initial, cleanup, fresh]);
@@ -106,6 +111,8 @@ test('cancelled discovery finishes cleanup before another preview and admission 
     assert.equal(calls.at(-1), 'next-admit:fixture-password');
     assert.equal(calls.includes('next-left'), false, 'promotion must not tear down the healthy discovery transport');
   } finally {
+    finish();
+    await Promise.allSettled(pending);
     service.hideConnecting(); service.roomManager = null;
     stateStore.set(state => { state.roomSlots = []; state.currentRoomInvite = ''; });
     GroupRoomManager.prototype.join = original.join;
