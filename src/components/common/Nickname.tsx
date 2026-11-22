@@ -86,14 +86,24 @@ export function Nickname({ name, peerId, isLocal = false, appearance, className 
     fontFamily: NICKNAME_FONTS[style.font],
     fontPalette: honkPalette } as CSSProperties;
   const letters = style.effect === 'letters' || style.animation === 'wave';
-  return <span className={`nickname ${className}`} data-font={style.font} style={variables} role={letters ? 'img' : undefined} aria-label={letters ? name : undefined}>
+  const graphemes = letters ? [...segmenter.segment(name.slice(0, 80))] : [];
+  const count = Math.max(1, graphemes.length);
+  return <span className={`nickname ${className}`} data-font={style.font} style={{ ...variables, '--nickname-count': count } as CSSProperties}
+    role={letters ? 'img' : undefined} aria-label={letters ? name : undefined}>
     <span className={`nickname-motion nickname-animation-${style.animation}`}>
       <span className={letters ? 'nickname-letters' : `nickname-ink nickname-effect-${style.effect}`}>
-        {letters ? [...segmenter.segment(name.slice(0, 80))].map(({ segment }, index) => {
+        {letters ? graphemes.map(({ segment }, index) => {
           const letterColor = style.effect === 'letters' ? palette[index % palette.length] : undefined;
           const letterPalette = letterColor ? ensureHonkPalette(style, letterColor) : honkPalette;
           return <span key={index} aria-hidden="true" className="nickname-letter" style={{
-            '--nickname-index': index, color: letterColor, fontPalette: letterPalette,
+            '--nickname-index': index,
+            '--nickname-grad-pos': count > 1 ? `${(index / (count - 1)) * 100}%` : '0%',
+            '--nickname-shine-start': `${((2 * count + index) / (3 * count - 1)) * 100}%`,
+            '--nickname-shine-end': `${(index / (3 * count - 1)) * 100}%`,
+            '--nickname-rainbow-start': `${(index / (2 * count - 1)) * 100}%`,
+            '--nickname-rainbow-end': `${((2 * count + index) / (2 * count - 1)) * 100}%`,
+            color: letterColor,
+            fontPalette: letterPalette,
           } as CSSProperties}><span className={`nickname-ink nickname-effect-${style.effect}`}>{segment}</span></span>;
         }) : name}
       </span>

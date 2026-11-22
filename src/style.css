@@ -6328,17 +6328,21 @@ html[data-theme="light"] :is(.stream-card, .pip-window-root) {
   -webkit-background-clip: text;
   color: transparent;
 }
-.nickname-effect-gradient { background-image: linear-gradient(100deg, var(--nickname-color), var(--nickname-secondary)); }
+.nickname-effect-gradient {
+  background-image: linear-gradient(100deg, var(--nickname-color), var(--nickname-secondary));
+  background-size: calc(var(--nickname-count, 1) * 100%) 100%;
+  background-position: var(--nickname-grad-pos, 0%) 50%;
+}
 .nickname-effect-rainbow {
   background-image: linear-gradient(90deg, #f87171, #facc15, #4ade80, #38bdf8, #a78bfa, #f87171);
-  background-size: 200% 100%;
+  background-size: calc(var(--nickname-count, 1) * 200%) 100%;
   animation: nickname-rainbow 5s linear infinite;
 }
 .nickname-effect-glow { animation: nickname-glow 3s ease-in-out infinite; }
 .nickname-effect-shine {
-  background-image: linear-gradient(110deg, var(--nickname-color) 35%, var(--nickname-shine) 50%, var(--nickname-color) 65%);
-  background-size: 250% 100%;
-  animation: nickname-shine 4s ease-in-out infinite;
+  background-image: linear-gradient(110deg, var(--nickname-color) 38%, var(--nickname-shine) 50%, var(--nickname-color) 62%);
+  background-size: calc(var(--nickname-count, 1) * 300%) 100%;
+  animation: nickname-shine 3.6s ease-in-out infinite;
 }
 .nickname[data-font="honk"] .nickname-effect-gradient,
 .nickname[data-font="honk"] .nickname-effect-rainbow,
@@ -6358,8 +6362,14 @@ html[data-theme="light"] :is(.stream-card, .pip-window-root) {
 @keyframes nickname-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-0.12em); } }
 @keyframes nickname-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.65; } }
 @keyframes nickname-glow { 0%, 100% { text-shadow: 0 0 0.12em var(--nickname-color); } 50% { text-shadow: 0 0 0.5em var(--nickname-color); } }
-@keyframes nickname-rainbow { from { background-position: 0% 50%; } to { background-position: 200% 50%; } }
-@keyframes nickname-shine { 0%, 15% { background-position: 100% 50%; } 75%, 100% { background-position: 0% 50%; } }
+@keyframes nickname-rainbow {
+  from { background-position: var(--nickname-rainbow-start, 0%) 50%; }
+  to { background-position: var(--nickname-rainbow-end, 200%) 50%; }
+}
+@keyframes nickname-shine {
+  0%, 15% { background-position: var(--nickname-shine-start, 100%) 50%; }
+  85%, 100% { background-position: var(--nickname-shine-end, 0%) 50%; }
+}
 .nickname-editor { display: grid; gap: 12px; margin-top: 16px; }
 .nickname-preview { padding: 20px; text-align: center; font-size: 1.4rem; font-weight: 700; background: var(--bg-input); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); }
 .nickname-editor-fields { display: grid; gap: 8px; }
