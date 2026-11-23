@@ -2567,7 +2567,7 @@ export class GroupRoomManager {
       try {
         this.voiceAction?.send(this.localVoiceState, { target: peerId });
       } catch {}
-      if (this.remoteVoiceStates.get(peerId)?.inVoice && this.localVoiceStream) {
+      if (this.localVoiceStream) {
         this.sendVoiceStreamToPeer(peerId);
       }
     }
@@ -2642,9 +2642,7 @@ export class GroupRoomManager {
       this.sendRoomAction(this.voiceAction, this.localVoiceState);
       if (this.localVoiceState.inVoice && this.localVoiceStream) {
         for (const peerId of this.admittedTargets()) {
-          if (this.remoteVoiceStates.get(peerId)?.inVoice) {
-            this.sendVoiceStreamToPeer(peerId);
-          }
+          this.sendVoiceStreamToPeer(peerId);
         }
       }
     }

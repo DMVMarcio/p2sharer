@@ -2045,8 +2045,6 @@
   "games.accept": "Akzeptieren",
   "games.decline": "Ablehnen",
   "games.opponent": "Gegner",
-  "sound.voiceJoin": "Sprachanruf beigetreten",
-  "sound.voiceLeave": "Sprachanruf verlassen",
   "sound.voiceMute": "Mikrofon stummgeschaltet",
   "sound.voiceUnmute": "Mikrofon aktiviert",
   "sound.voiceDeafen": "Audio stummgeschaltet",
@@ -2055,9 +2053,6 @@
   "voice.settingsTitle": "Sprache & Kommunikation",
   "voice.settingsDesc": "Konfiguriere Mikrofon, Ausgabegerät, Lautstärkeanhebung, Rauschunterdrückung und Empfindlichkeit.",
   "voice.controlsGroupAria": "Sprachanruf-Steuerung",
-  "voice.joinCall": "Sprache beitreten",
-  "voice.joinCallTooltip": "Dem Sprachanruf des Raums beitreten",
-  "voice.leaveCall": "Sprachanruf verlassen",
   "voice.muteMic": "Mikrofon stummschalten",
   "voice.unmuteMic": "Mikrofon aktivieren",
   "voice.deafen": "Taub stellen",
@@ -2103,11 +2098,6 @@
   "voice.statusLocallyMuted": "Für dich stumm",
   "voice.micPermissionError": "Mikrofonzugriff verweigert. Prüfe die Systemberechtigungen und versuche es erneut.",
   "voice.micUnavailableError": "Mikrofon konnte nicht geöffnet werden.",
-  "voice.mobileJoin": "Sprache",
   "voice.mobileMic": "Mikro an",
-  "voice.mobileMuted": "Stumm",
-  "voice.inVoiceCount_one": "{{count}} Person im Sprachanruf",
-  "voice.inVoiceCount_few": "{{count}} Personen im Sprachanruf",
-  "voice.inVoiceCount_many": "{{count}} Personen im Sprachanruf",
-  "voice.inVoiceCount_other": "{{count}} Personen im Sprachanruf"
+  "voice.mobileMuted": "Stumm"
 }

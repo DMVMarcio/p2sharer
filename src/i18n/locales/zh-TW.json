@@ -2045,8 +2045,6 @@
   "games.accept": "接受",
   "games.decline": "拒絕",
   "games.opponent": "對手",
-  "sound.voiceJoin": "已加入語音通話",
-  "sound.voiceLeave": "已離開語音通話",
   "sound.voiceMute": "麥克風已靜音",
   "sound.voiceUnmute": "麥克風已開啟",
   "sound.voiceDeafen": "已關閉聽筒聲音",
@@ -2055,9 +2053,6 @@
   "voice.settingsTitle": "語音與通訊",
   "voice.settingsDesc": "設定麥克風、輸出裝置、音量增益、降噪與輸入靈敏度。",
   "voice.controlsGroupAria": "語音通話控制",
-  "voice.joinCall": "加入語音",
-  "voice.joinCallTooltip": "加入房間語音通話",
-  "voice.leaveCall": "離開語音",
   "voice.muteMic": "靜音麥克風",
   "voice.unmuteMic": "取消靜音",
   "voice.deafen": "關閉聲音（耳機靜音）",
@@ -2103,11 +2098,6 @@
   "voice.statusLocallyMuted": "已對您靜音",
   "voice.micPermissionError": "麥克風存取被拒絕，請檢查系統權限後再試一次。",
   "voice.micUnavailableError": "無法開啟麥克風。",
-  "voice.mobileJoin": "語音",
   "voice.mobileMic": "麥克風開",
-  "voice.mobileMuted": "已靜音",
-  "voice.inVoiceCount_one": "{{count}} 人在語音中",
-  "voice.inVoiceCount_few": "{{count}} 人在語音中",
-  "voice.inVoiceCount_many": "{{count}} 人在語音中",
-  "voice.inVoiceCount_other": "{{count}} 人在語音中"
+  "voice.mobileMuted": "已靜音"
 }

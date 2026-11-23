@@ -2045,8 +2045,6 @@
   "games.accept": "Принять",
   "games.decline": "Отклонить",
   "games.opponent": "Соперник",
-  "sound.voiceJoin": "Подключение к голосовому чату",
-  "sound.voiceLeave": "Выход из голосового чата",
   "sound.voiceMute": "Микрофон выключен",
   "sound.voiceUnmute": "Микрофон включён",
   "sound.voiceDeafen": "Звук выключен",
@@ -2055,9 +2053,6 @@
   "voice.settingsTitle": "Голос и связь",
   "voice.settingsDesc": "Настройте микрофон, устройство вывода, усиление громкости, шумоподавление и чувствительность.",
   "voice.controlsGroupAria": "Управление голосовым вызовом",
-  "voice.joinCall": "Войти в голос",
-  "voice.joinCallTooltip": "Присоединиться к голосовому вызову комнаты",
-  "voice.leaveCall": "Выйти из голоса",
   "voice.muteMic": "Выключить микрофон",
   "voice.unmuteMic": "Включить микрофон",
   "voice.deafen": "Отключить звук (оглушение)",
@@ -2103,11 +2098,6 @@
   "voice.statusLocallyMuted": "Заглушён для вас",
   "voice.micPermissionError": "Доступ к микрофону отклонён. Проверьте системные разрешения и повторите попытку.",
   "voice.micUnavailableError": "Не удалось открыть микрофон.",
-  "voice.mobileJoin": "Голос",
   "voice.mobileMic": "Микр. вкл.",
-  "voice.mobileMuted": "Без звука",
-  "voice.inVoiceCount_one": "{{count}} участник в голосе",
-  "voice.inVoiceCount_few": "{{count}} участника в голосе",
-  "voice.inVoiceCount_many": "{{count}} участников в голосе",
-  "voice.inVoiceCount_other": "{{count}} участников в голосе"
+  "voice.mobileMuted": "Без звука"
 }

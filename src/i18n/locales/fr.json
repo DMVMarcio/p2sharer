@@ -2045,8 +2045,6 @@
   "games.accept": "Accepter",
   "games.decline": "Refuser",
   "games.opponent": "Adversaire",
-  "sound.voiceJoin": "Appel vocal rejoint",
-  "sound.voiceLeave": "Appel vocal quitté",
   "sound.voiceMute": "Microphone coupé",
   "sound.voiceUnmute": "Microphone réactivé",
   "sound.voiceDeafen": "Audio mis en sourdine",
@@ -2055,9 +2053,6 @@
   "voice.settingsTitle": "Voix et Communication",
   "voice.settingsDesc": "Configurez votre microphone, périphérique de sortie, amplification, suppression du bruit et sensibilité.",
   "voice.controlsGroupAria": "Contrôles de l'appel vocal",
-  "voice.joinCall": "Rejoindre la voix",
-  "voice.joinCallTooltip": "Rejoindre l'appel vocal du salon",
-  "voice.leaveCall": "Quitter l'appel vocal",
   "voice.muteMic": "Couper le micro",
   "voice.unmuteMic": "Réactiver le micro",
   "voice.deafen": "Couper le son (sourdine)",
@@ -2103,11 +2098,6 @@
   "voice.statusLocallyMuted": "Coupé pour vous",
   "voice.micPermissionError": "L'accès au microphone a été refusé. Vérifiez les autorisations système et réessayez.",
   "voice.micUnavailableError": "Impossible d'ouvrir le microphone.",
-  "voice.mobileJoin": "Voix",
   "voice.mobileMic": "Micro actif",
-  "voice.mobileMuted": "Coupé",
-  "voice.inVoiceCount_one": "{{count}} personne en vocal",
-  "voice.inVoiceCount_few": "{{count}} personnes en vocal",
-  "voice.inVoiceCount_many": "{{count}} personnes en vocal",
-  "voice.inVoiceCount_other": "{{count}} personnes en vocal"
+  "voice.mobileMuted": "Coupé"
 }

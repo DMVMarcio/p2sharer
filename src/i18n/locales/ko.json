@@ -2045,8 +2045,6 @@
   "games.accept": "수락",
   "games.decline": "거절",
   "games.opponent": "상대방",
-  "sound.voiceJoin": "음성 통화 참여",
-  "sound.voiceLeave": "음성 통화 종료",
   "sound.voiceMute": "마이크 음소거",
   "sound.voiceUnmute": "마이크 음소거 해제",
   "sound.voiceDeafen": "소리 끄기",
@@ -2055,9 +2053,6 @@
   "voice.settingsTitle": "음성 및 커뮤니케이션",
   "voice.settingsDesc": "마이크, 출력 장치, 볼륨 증폭, 노이즈 제거 및 입력 감도를 설정합니다.",
   "voice.controlsGroupAria": "음성 통화 제어",
-  "voice.joinCall": "음성 참여",
-  "voice.joinCallTooltip": "방 음성 통화에 참여",
-  "voice.leaveCall": "음성 나가기",
   "voice.muteMic": "마이크 음소거",
   "voice.unmuteMic": "마이크 음소거 해제",
   "voice.deafen": "소리 끄기",
@@ -2103,11 +2098,6 @@
   "voice.statusLocallyMuted": "나에게 음소거됨",
   "voice.micPermissionError": "마이크 접근이 거부되었습니다. 시스템 권한을 확인하고 다시 시도하세요.",
   "voice.micUnavailableError": "마이크를 열 수 없습니다.",
-  "voice.mobileJoin": "음성",
   "voice.mobileMic": "마이크 켜짐",
-  "voice.mobileMuted": "음소거됨",
-  "voice.inVoiceCount_one": "{{count}}명 음성 참여 중",
-  "voice.inVoiceCount_few": "{{count}}명 음성 참여 중",
-  "voice.inVoiceCount_many": "{{count}}명 음성 참여 중",
-  "voice.inVoiceCount_other": "{{count}}명 음성 참여 중"
+  "voice.mobileMuted": "음소거됨"
 }

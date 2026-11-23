@@ -584,6 +584,9 @@ export class RoomService {
     if (this.roomPreview === manager) this.roomPreview = null;
     if (signal?.aborted) { await manager.leave(); return; }
     this.roomManager = manager;
+    voiceManager.enterRoomMuted();
+    manager.setLocalVoiceState({ inVoice: true, muted: true, deafened: false }, null);
+    this.syncVoiceSnapshot();
     roomAppsService.attach((event, target) => manager.sendAppEvent(event, target), manager.getLocalPeerId(),
       (action, instance) => {
         void manager.sendAppLifecycleNotice(action, instance.kind).catch((error) =>
@@ -2248,37 +2251,61 @@ export class RoomService {
   }
 
   public async joinVoice(): Promise<void> {
-    if (this.voiceJoinPromise) return this.voiceJoinPromise;
     if (voiceManager.inVoice) return;
+    voiceManager.enterRoomMuted();
+    this.roomManager?.setLocalVoiceState({ inVoice: true, muted: true, deafened: false }, null);
+    this.syncVoiceSnapshot();
+    this.notify();
+  }
+
+  public leaveVoice(_silent = false): void {
+    this.voiceJoinPromise = null;
+    this.roomManager?.setLocalVoiceState({ inVoice: false, muted: false, deafened: false }, null);
+    voiceManager.leaveVoice();
+    this.syncVoiceSnapshot();
+    this.notify();
+  }
+
+  public toggleVoiceMute(): Promise<void> {
+    if (!voiceManager.inVoice) return Promise.resolve();
+    if (!voiceManager.micMuted) {
+      const res = voiceManager.toggleMicMute();
+      soundEffects.playVoiceMute();
+      this.roomManager?.setLocalVoiceState({
+        inVoice: true,
+        muted: res.micMuted,
+        deafened: res.deafened,
+      });
+      this.syncVoiceSnapshot();
+      this.notify();
+      return Promise.resolve();
+    }
+
+    if (this.voiceJoinPromise) return this.voiceJoinPromise;
     const manager = this.roomManager;
     const task = (async () => {
       try {
-        const outbound = await voiceManager.joinVoice();
+        const res = await voiceManager.activateMicAndUnmute();
         if (this.roomManager !== manager) {
           voiceManager.leaveVoice();
           return;
         }
-        manager?.setLocalVoiceState(
-          { inVoice: true, muted: voiceManager.micMuted, deafened: voiceManager.deafened },
-          outbound,
-        );
-        const existingStreams = manager?.getRemoteVoiceStreams?.();
-        if (existingStreams) {
-          existingStreams.forEach((stream, peerId) => {
-            const peer = this.peers.find((p) => p.id === peerId);
-            voiceManager.attachRemoteVoice(peerId, stream, peer?.publicKey, peer?.username);
-          });
+        if (res.autoUndeafened) {
+          soundEffects.playVoiceUndeafen();
+        } else {
+          soundEffects.playVoiceUnmute();
         }
-        soundEffects.playVoiceJoin();
+        manager?.setLocalVoiceState(
+          { inVoice: true, muted: res.micMuted, deafened: res.deafened },
+          res.stream,
+        );
       } catch (err) {
-        voiceManager.leaveVoice();
-        manager?.setLocalVoiceState({ inVoice: false, muted: false, deafened: false }, null);
         const name = err instanceof DOMException ? err.name : '';
         const msg = name === 'NotAllowedError' || name === 'PermissionDeniedError'
           ? t('voice.micPermissionError')
           : t('voice.micUnavailableError');
         showToast(msg, 4500, 'error');
-        logDiagnostic('ERROR', 'voice.join', 'Failed to join room voice call', {
+        logDiagnostic('ERROR', 'voice.mic', 'Failed to activate microphone on unmute', {
           error: err instanceof Error ? err.message : String(err),
         });
       } finally {
@@ -2289,36 +2316,6 @@ export class RoomService {
     })();
     this.voiceJoinPromise = task;
     return task;
-  }
-
-  public leaveVoice(silent = false): void {
-    const wasInVoice = voiceManager.inVoice;
-    this.roomManager?.setLocalVoiceState({ inVoice: false, muted: false, deafened: false }, null);
-    voiceManager.leaveVoice();
-    if (!silent && wasInVoice) {
-      soundEffects.playVoiceLeave();
-    }
-    this.syncVoiceSnapshot();
-    this.notify();
-  }
-
-  public toggleVoiceMute(): void {
-    if (!voiceManager.inVoice) return;
-    const res = voiceManager.toggleMicMute();
-    if (res.autoUndeafened) {
-      soundEffects.playVoiceUndeafen();
-    } else if (res.micMuted) {
-      soundEffects.playVoiceMute();
-    } else {
-      soundEffects.playVoiceUnmute();
-    }
-    this.roomManager?.setLocalVoiceState({
-      inVoice: true,
-      muted: res.micMuted,
-      deafened: res.deafened,
-    });
-    this.syncVoiceSnapshot();
-    this.notify();
   }
 
   public toggleVoiceDeafen(): void {

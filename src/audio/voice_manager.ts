@@ -589,6 +589,58 @@ export class VoiceManager {
     }
   }
 
+  public enterRoomMuted(): void {
+    this.ensureDeviceListener();
+    this.inVoice = true;
+    this.micMuted = true;
+    this.deafened = false;
+    this.micMutedBeforeDeafen = true;
+    this.isLocalSpeaking = false;
+    this.syncProcessorParameters(this.getActiveInputPrefs());
+    this.syncMasterOutputGain(this.getActiveOutputPrefs());
+    this.notify();
+  }
+
+  public async ensureMicActive(): Promise<MediaStream> {
+    this.ensureDeviceListener();
+    if (this.outboundDestination && this.micStream) {
+      return this.outboundDestination.stream;
+    }
+    return this.ensureInputPipeline(this.getActiveInputPrefs());
+  }
+
+  public async activateMicAndUnmute(): Promise<{
+    stream: MediaStream;
+    micMuted: boolean;
+    deafened: boolean;
+    autoUndeafened: boolean;
+  }> {
+    const stream = await this.ensureMicActive();
+    const wasDeafened = this.deafened;
+    const next = computeNextVoiceMuteDeafen(
+      {
+        micMuted: this.micMuted,
+        deafened: this.deafened,
+        micMutedBeforeDeafen: this.micMutedBeforeDeafen,
+      },
+      'setMuted',
+      false,
+    );
+    this.inVoice = true;
+    this.micMuted = next.micMuted;
+    this.deafened = next.deafened;
+    this.micMutedBeforeDeafen = next.micMutedBeforeDeafen;
+    this.syncProcessorParameters(this.getActiveInputPrefs());
+    this.syncMasterOutputGain(this.getActiveOutputPrefs());
+    this.notify();
+    return {
+      stream,
+      micMuted: this.micMuted,
+      deafened: this.deafened,
+      autoUndeafened: wasDeafened && !this.deafened,
+    };
+  }
+
   public async joinVoice(): Promise<MediaStream> {
     this.ensureDeviceListener();
     this.ensureOutputPipeline(this.getActiveOutputPrefs());

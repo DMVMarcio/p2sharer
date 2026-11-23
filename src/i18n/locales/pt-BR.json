@@ -2045,8 +2045,6 @@
   "games.accept": "Aceitar",
   "games.decline": "Recusar",
   "games.opponent": "Oponente",
-  "sound.voiceJoin": "Entrou na chamada de voz",
-  "sound.voiceLeave": "Saiu da chamada de voz",
   "sound.voiceMute": "Microfone silenciado",
   "sound.voiceUnmute": "Microfone ativado",
   "sound.voiceDeafen": "Áudio ensurdecido",
@@ -2055,9 +2053,6 @@
   "voice.settingsTitle": "Voz e Comunicação",
   "voice.settingsDesc": "Configure seu microfone, dispositivo de saída, ganho de volume, supressão de ruído e sensibilidade.",
   "voice.controlsGroupAria": "Controles da chamada de voz",
-  "voice.joinCall": "Entrar na voz",
-  "voice.joinCallTooltip": "Entrar na chamada de voz da sala",
-  "voice.leaveCall": "Sair da chamada de voz",
   "voice.muteMic": "Silenciar microfone",
   "voice.unmuteMic": "Ativar microfone",
   "voice.deafen": "Desativar áudio (ensurdecer)",
@@ -2103,11 +2098,6 @@
   "voice.statusLocallyMuted": "Silenciado para você",
   "voice.micPermissionError": "O acesso ao microfone foi negado. Verifique as permissões do sistema e tente novamente.",
   "voice.micUnavailableError": "Não foi possível abrir o microfone.",
-  "voice.mobileJoin": "Voz",
   "voice.mobileMic": "Mic ativo",
-  "voice.mobileMuted": "Mutado",
-  "voice.inVoiceCount_one": "{{count}} pessoa na chamada de voz",
-  "voice.inVoiceCount_few": "{{count}} pessoas na chamada de voz",
-  "voice.inVoiceCount_many": "{{count}} pessoas na chamada de voz",
-  "voice.inVoiceCount_other": "{{count}} pessoas na chamada de voz"
+  "voice.mobileMuted": "Mutado"
 }

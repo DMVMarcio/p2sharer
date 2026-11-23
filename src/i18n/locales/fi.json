@@ -2045,8 +2045,6 @@
   "games.accept": "Hyväksy",
   "games.decline": "Hylkää",
   "games.opponent": "Vastustaja",
-  "sound.voiceJoin": "Liittyi äänipuheluun",
-  "sound.voiceLeave": "Poistui äänipuhelusta",
   "sound.voiceMute": "Mikrofoni mykistetty",
   "sound.voiceUnmute": "Mikrofoni käytössä",
   "sound.voiceDeafen": "Kuulokkeet mykistetty",
@@ -2055,9 +2053,6 @@
   "voice.settingsTitle": "Puhe ja viestintä",
   "voice.settingsDesc": "Määritä mikrofoni, ulostulolaite, äänenvoimakkuuden tehostus, kohinanvaimennus ja herkkyys.",
   "voice.controlsGroupAria": "Äänipuhelun hallinta",
-  "voice.joinCall": "Liity puheeseen",
-  "voice.joinCallTooltip": "Liity huoneen äänipuheluun",
-  "voice.leaveCall": "Poistu puheesta",
   "voice.muteMic": "Mykistä mikrofoni",
   "voice.unmuteMic": "Poista mikrofonin mykistys",
   "voice.deafen": "Mykistä ääni",
@@ -2103,11 +2098,6 @@
   "voice.statusLocallyMuted": "Mykistetty sinulta",
   "voice.micPermissionError": "Mikrofonin käyttö estettiin. Tarkista järjestelmän käyttöoikeudet ja yritä uudelleen.",
   "voice.micUnavailableError": "Mikrofonin avaaminen epäonnistui.",
-  "voice.mobileJoin": "Puhe",
   "voice.mobileMic": "Mikro päällä",
-  "voice.mobileMuted": "Mykistetty",
-  "voice.inVoiceCount_one": "{{count}} henkilö puhelussa",
-  "voice.inVoiceCount_few": "{{count}} henkilöä puhelussa",
-  "voice.inVoiceCount_many": "{{count}} henkilöä puhelussa",
-  "voice.inVoiceCount_other": "{{count}} henkilöä puhelussa"
+  "voice.mobileMuted": "Mykistetty"
 }

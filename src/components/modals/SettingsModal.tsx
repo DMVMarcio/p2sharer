@@ -55,8 +55,6 @@ const SOUND_LABELS: Record<SoundEvent, string> = {
   get screenShareStop() { return t("message.89eca8829730"); },
   get watchStreamStart() { return t("message.06e5a94f9aec"); },
   get watchStreamStop() { return t("message.470b862fbd07"); },
-  get voiceJoin() { return t('sound.voiceJoin'); },
-  get voiceLeave() { return t('sound.voiceLeave'); },
   get voiceMute() { return t('sound.voiceMute'); },
   get voiceUnmute() { return t('sound.voiceUnmute'); },
   get voiceDeafen() { return t('sound.voiceDeafen'); },

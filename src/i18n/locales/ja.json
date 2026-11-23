@@ -2045,8 +2045,6 @@
   "games.accept": "承認",
   "games.decline": "拒否",
   "games.opponent": "対戦相手",
-  "sound.voiceJoin": "ボイス通話に参加",
-  "sound.voiceLeave": "ボイス通話から退出",
   "sound.voiceMute": "マイクをミュート",
   "sound.voiceUnmute": "マイクのミュートを解除",
   "sound.voiceDeafen": "スピーカーをミュート",
@@ -2055,9 +2053,6 @@
   "voice.settingsTitle": "音声と通話",
   "voice.settingsDesc": "マイク、出力デバイス、音量ブースト、ノイズ抑制、入力感度を設定します。",
   "voice.controlsGroupAria": "ボイス通話コントロール",
-  "voice.joinCall": "ボイスに参加",
-  "voice.joinCallTooltip": "ルームのボイス通話に参加",
-  "voice.leaveCall": "ボイスから退出",
   "voice.muteMic": "マイクをミュート",
   "voice.unmuteMic": "ミュートを解除",
   "voice.deafen": "スピーカーをミュート",
@@ -2103,11 +2098,6 @@
   "voice.statusLocallyMuted": "自分に対してミュート中",
   "voice.micPermissionError": "マイクへのアクセスが拒否されました。システムの権限を確認して再試行してください。",
   "voice.micUnavailableError": "マイクを開けませんでした。",
-  "voice.mobileJoin": "ボイス",
   "voice.mobileMic": "マイクオン",
-  "voice.mobileMuted": "ミュート",
-  "voice.inVoiceCount_one": "{{count}} 人が通話中",
-  "voice.inVoiceCount_few": "{{count}} 人が通話中",
-  "voice.inVoiceCount_many": "{{count}} 人が通話中",
-  "voice.inVoiceCount_other": "{{count}} 人が通話中"
+  "voice.mobileMuted": "ミュート"
 }

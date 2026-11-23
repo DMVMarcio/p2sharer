@@ -1,7 +1,7 @@
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React from 'react';
-import { MessageSquare, Users, AppWindow, Monitor, Square, Settings2, Mic, MicOff, PhoneCall } from 'lucide-react';
+import { MessageSquare, Users, AppWindow, Monitor, Square, Settings2, Mic, MicOff } from 'lucide-react';
 import { stateStore } from '../../core/state_store';
 import { useRoom } from '../../hooks/useRoom';
 import { useModal } from '../../hooks/useModal';
@@ -16,7 +16,6 @@ export const MobileRoomDock: React.FC = () => {
     isSidebarCollapsed,
     sidebarTab,
     unreadChatMessages,
-    inVoice,
     voiceMicMuted,
   } = useRoom();
   const { openModal } = useModal();
@@ -97,24 +96,15 @@ export const MobileRoomDock: React.FC = () => {
 
       <button
         type="button"
-        className={`mobile-dock-btn ${inVoice ? (voiceMicMuted ? 'is-voice-muted' : 'active') : ''}`}
-        onClick={() => {
-          if (!inVoice) void roomService.joinVoice?.();
-          else roomService.toggleVoiceMute?.();
-        }}
-        aria-label={!inVoice ? t('voice.joinCall') : voiceMicMuted ? t('voice.unmuteMic') : t('voice.muteMic')}
+        className={`mobile-dock-btn ${(voiceMicMuted ?? true) ? 'is-voice-muted' : 'active'}`}
+        onClick={() => void roomService.toggleVoiceMute?.()}
+        aria-label={(voiceMicMuted ?? true) ? t('voice.unmuteMic') : t('voice.muteMic')}
       >
         <span className="mobile-dock-icon-wrapper">
-          {!inVoice ? (
-            <PhoneCall size={19} aria-hidden="true" />
-          ) : voiceMicMuted ? (
-            <MicOff size={19} aria-hidden="true" />
-          ) : (
-            <Mic size={19} aria-hidden="true" />
-          )}
+          {(voiceMicMuted ?? true) ? <MicOff size={19} aria-hidden="true" /> : <Mic size={19} aria-hidden="true" />}
         </span>
         <span className="mobile-dock-label">
-          {!inVoice ? t('voice.mobileJoin') : voiceMicMuted ? t('voice.mobileMuted') : t('voice.mobileMic')}
+          {(voiceMicMuted ?? true) ? t('voice.mobileMuted') : t('voice.mobileMic')}
         </span>
       </button>
 

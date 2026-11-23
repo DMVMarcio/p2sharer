@@ -86,8 +86,6 @@ export class SoundEffectsManager {
   public playScreenShareStop() { this.play('screenShareStop'); }
   public playWatchStreamStart() { this.play('watchStreamStart'); }
   public playWatchStreamStop() { this.play('watchStreamStop'); }
-  public playVoiceJoin() { this.play('voiceJoin'); }
-  public playVoiceLeave() { this.play('voiceLeave'); }
   public playVoiceMute() { this.play('voiceMute'); }
   public playVoiceUnmute() { this.play('voiceUnmute'); }
   public playVoiceDeafen() { this.play('voiceDeafen'); }

@@ -2045,8 +2045,6 @@
   "games.accept": "Accept",
   "games.decline": "Decline",
   "games.opponent": "Opponent",
-  "sound.voiceJoin": "Joined voice call",
-  "sound.voiceLeave": "Left voice call",
   "sound.voiceMute": "Microphone muted",
   "sound.voiceUnmute": "Microphone unmuted",
   "sound.voiceDeafen": "Audio deafened",
@@ -2055,9 +2053,6 @@
   "voice.settingsTitle": "Voice & Communication",
   "voice.settingsDesc": "Configure your microphone, output device, volume boost, noise suppression, and input sensitivity.",
   "voice.controlsGroupAria": "Voice call controls",
-  "voice.joinCall": "Join Voice",
-  "voice.joinCallTooltip": "Join the room voice call",
-  "voice.leaveCall": "Leave voice call",
   "voice.muteMic": "Mute microphone",
   "voice.unmuteMic": "Unmute microphone",
   "voice.deafen": "Deafen audio",
@@ -2103,11 +2098,6 @@
   "voice.statusLocallyMuted": "Muted for you",
   "voice.micPermissionError": "Microphone access was denied. Check system permissions and try again.",
   "voice.micUnavailableError": "Could not open the microphone.",
-  "voice.mobileJoin": "Voice",
   "voice.mobileMic": "Mic on",
-  "voice.mobileMuted": "Muted",
-  "voice.inVoiceCount_one": "{{count}} person in voice",
-  "voice.inVoiceCount_few": "{{count}} people in voice",
-  "voice.inVoiceCount_many": "{{count}} people in voice",
-  "voice.inVoiceCount_other": "{{count}} people in voice"
+  "voice.mobileMuted": "Muted"
 }

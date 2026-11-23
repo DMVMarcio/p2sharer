@@ -4670,7 +4670,7 @@ html[data-theme="light"] :is(.stream-card, .pip-window-root) {
 }
 
 .settings-row-grid-2col {
-  grid-template-columns: repeat(2, 1fr) !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
 }
 
 @media (max-width: 580px) {
@@ -4696,6 +4696,7 @@ html[data-theme="light"] :is(.stream-card, .pip-window-root) {
   display: flex;
   flex-direction: column;
   gap: 5px;
+  min-width: 0;
 }
 
 .settings-label {

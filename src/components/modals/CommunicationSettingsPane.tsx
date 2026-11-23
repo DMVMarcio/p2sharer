@@ -104,7 +104,7 @@ export const CommunicationSettingsPane: React.FC<CommunicationSettingsPaneProps>
       </div>
 
       {/* Devices & 0-200% Volumes */}
-      <div className="settings-row-grid">
+      <div className="settings-row-grid settings-row-grid-2col">
         <div className="settings-col">
           <label className="settings-label" htmlFor="settings-voice-input-device">
             <Mic size={13} aria-hidden="true" style={{ marginRight: 5, verticalAlign: '-2px' }} />
@@ -136,7 +136,7 @@ export const CommunicationSettingsPane: React.FC<CommunicationSettingsPaneProps>
         </div>
       </div>
 
-      <div className="settings-row-grid">
+      <div className="settings-row-grid settings-row-grid-2col">
         <div className="settings-col">
           <div className="voice-slider-header">
             <label className="settings-label" htmlFor="settings-voice-input-volume">

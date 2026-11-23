@@ -2045,8 +2045,6 @@
   "games.accept": "स्वीकार करें",
   "games.decline": "अस्वीकार करें",
   "games.opponent": "प्रतिद्वंद्वी",
-  "sound.voiceJoin": "वॉइस कॉल में शामिल हुए",
-  "sound.voiceLeave": "वॉइस कॉल छोड़ी",
   "sound.voiceMute": "माइक्रोफ़ोन म्यूट हुआ",
   "sound.voiceUnmute": "माइक्रोफ़ोन चालू हुआ",
   "sound.voiceDeafen": "ऑडियो बंद (डेफ़न)",
@@ -2055,9 +2053,6 @@
   "voice.settingsTitle": "वॉइस और संचार",
   "voice.settingsDesc": "अपना माइक्रोफ़ोन, आउटपुट डिवाइस, वॉल्यूम बूस्ट, शोर दमन और संवेदनशीलता कॉन्फ़िगर करें।",
   "voice.controlsGroupAria": "वॉइस कॉल नियंत्रण",
-  "voice.joinCall": "वॉइस में जुड़ें",
-  "voice.joinCallTooltip": "रूम वॉइस कॉल में शामिल हों",
-  "voice.leaveCall": "वॉइस कॉल छोड़ें",
   "voice.muteMic": "माइक्रोफ़ोन म्यूट करें",
   "voice.unmuteMic": "माइक्रोफ़ोन अनम्यूट करें",
   "voice.deafen": "ऑडियो बंद करें (डेफ़न)",
@@ -2103,11 +2098,6 @@
   "voice.statusLocallyMuted": "आपके लिए म्यूट",
   "voice.micPermissionError": "माइक्रोफ़ोन एक्सेस अस्वीकार किया गया। सिस्टम अनुमतियां जांचें और पुनः प्रयास करें।",
   "voice.micUnavailableError": "माइक्रोफ़ोन नहीं खोला जा सका।",
-  "voice.mobileJoin": "वॉइस",
   "voice.mobileMic": "माइक चालू",
-  "voice.mobileMuted": "म्यूट",
-  "voice.inVoiceCount_one": "{{count}} व्यक्ति वॉइस में",
-  "voice.inVoiceCount_few": "{{count}} लोग वॉइस में",
-  "voice.inVoiceCount_many": "{{count}} लोग वॉइस में",
-  "voice.inVoiceCount_other": "{{count}} लोग वॉइस में"
+  "voice.mobileMuted": "म्यूट"
 }
