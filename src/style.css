@@ -6320,7 +6320,7 @@ html[data-theme="light"] :is(.stream-card, .pip-window-root) {
   color: var(--text-primary); font-size: 13px; cursor: pointer; user-select: none; }
 .join-save-room-option input[type="checkbox"] { width: 16px; height: 16px; margin: 0; accent-color: var(--accent-color); cursor: pointer; flex-shrink: 0; }
 /* Shared nickname presentation across profile, room, chat and native PiP. */
-.nickname { display: inline; }
+.nickname { display: inline; line-height: 1.15; }
 .nickname-motion, .nickname-ink { display: inline-block; max-width: 100%; }
 .nickname-letter { display: inline-block; white-space: pre; }
 .nickname-effect-solid, .nickname-effect-glow { color: var(--nickname-color); }

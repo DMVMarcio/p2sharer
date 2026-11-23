@@ -28,6 +28,22 @@ export const NICKNAME_FONT_LABELS: Record<Exclude<keyof typeof NICKNAME_FONTS, '
   silkscreen: 'Silkscreen',
   cinzel: 'Cinzel',
 };
+/** Visual size multipliers so fonts with small cap/x-height match Silkscreen, Exile and Permanent Marker. */
+export const NICKNAME_FONT_SCALES: Record<keyof typeof NICKNAME_FONTS, number> = {
+  default: 1,
+  boogaloo: 1.18,
+  'jacquard-24': 1.42,
+  honk: 1.32,
+  'faster-one': 1.08,
+  exile: 1,
+  nunito: 1.08,
+  pacifico: 1.16,
+  syne: 1.1,
+  'permanent-marker': 1,
+  bangers: 1.12,
+  silkscreen: 1,
+  cinzel: 1.04,
+};
 export const NICKNAME_EFFECTS = ['none', 'solid', 'gradient', 'letters', 'rainbow', 'glow', 'shine'] as const;
 export const NICKNAME_ANIMATIONS = ['none', 'float', 'pulse', 'wave'] as const;
 export interface NicknameStyle {

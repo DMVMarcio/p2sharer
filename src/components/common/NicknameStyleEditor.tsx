@@ -1,7 +1,7 @@
 import { useId } from 'react';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
-import { DEFAULT_NICKNAME_STYLE, NICKNAME_ANIMATIONS, NICKNAME_EFFECTS, NICKNAME_FONTS, NICKNAME_FONT_LABELS, normalizeNicknameStyle, type NicknameStyle } from '../../core/nickname_style';
+import { DEFAULT_NICKNAME_STYLE, NICKNAME_ANIMATIONS, NICKNAME_EFFECTS, NICKNAME_FONTS, NICKNAME_FONT_LABELS, NICKNAME_FONT_SCALES, normalizeNicknameStyle, type NicknameStyle } from '../../core/nickname_style';
 import { Nickname } from './Nickname';
 import { ColorPicker } from './ColorPicker';
 import { Select } from './Select';
@@ -22,7 +22,7 @@ export function NicknameStyleEditor({ name, value, onChange, disabled = false }:
         options={(Object.keys(NICKNAME_FONTS) as Array<NicknameStyle['font']>).map(font => ({
           value: font,
           label: font === 'default' ? t('nickname.font.default') : NICKNAME_FONT_LABELS[font],
-          labelStyle: font === 'default' ? undefined : { fontFamily: NICKNAME_FONTS[font], fontSize: '1rem', lineHeight: 1.25 },
+          labelStyle: font === 'default' ? undefined : { fontFamily: NICKNAME_FONTS[font], fontSize: `${NICKNAME_FONT_SCALES[font]}rem`, lineHeight: 1.2 },
         }))}
         onValueChange={font => change({ font: font as NicknameStyle['font'] })} />
       <label className="settings-label" htmlFor={`${id}-effect`}>{t('nickname.effect')}</label>
