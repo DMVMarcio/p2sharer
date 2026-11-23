@@ -124,6 +124,8 @@ export interface RoomCallbacks {
   onRemoteControlClient?: (packet: RemoteControlClientPacket, peerId: string) => void;
   onRemoteControlHost?: (packet: RemoteControlHostPacket, broadcasterId: string) => void;
   onAppEvent?: (event: AppWireEvent, peerId: string) => void;
+  onVoiceStateUpdate?: (states: Record<string, { inVoice: boolean; muted: boolean; deafened: boolean }>) => void;
+  onRemoteVoiceStream?: (peerId: string, stream: MediaStream | null) => void;
   onStreamsUpdate: (streams: ActiveStreamInfo[]) => void;
   onSlotsUpdate: (slots: RoomSlotInfo[]) => void;
   onChat: (msg: ChatMessage) => void;
@@ -152,6 +154,15 @@ type FileSession = { messageId: string; peerId: string; peerName?: string; sourc
 
 function newFileTimings(): FileTimings {
   return { readMs: 0, prepareMs: 0, wireMs: 0, verifyMs: 0, writeMs: 0, ackMs: 0 };
+}
+
+function isVoiceStreamMetadata(meta: unknown): boolean {
+  return Boolean(
+    meta &&
+      typeof meta === 'object' &&
+      (meta as Record<string, unknown>).kind === 'voice' &&
+      (meta as Record<string, unknown>).id === 'voice',
+  );
 }
 
 interface PeerExchangeItem {
@@ -259,6 +270,17 @@ export class GroupRoomManager {
   private profileStatsAction: any = null;
   private unsubscribeProfileStats: (() => void) | undefined;
   private profileStatsTimer: ReturnType<typeof setTimeout> | undefined;
+  private voiceAction: any = null;
+  private localVoiceStream: MediaStream | null = null;
+  private localVoiceState: { inVoice: boolean; muted: boolean; deafened: boolean } = {
+    inVoice: false,
+    muted: false,
+    deafened: false,
+  };
+  private remoteVoiceStates = new Map<string, { inVoice: boolean; muted: boolean; deafened: boolean }>();
+  private remoteVoiceStreams = new Map<string, MediaStream>();
+  private voiceDispatches = new Map<string, { room: unknown; stream: MediaStream }>();
+  private observedVoiceStreams = new WeakSet<MediaStream>();
 
   private buildPresencePayload() {
     return {
@@ -1208,6 +1230,7 @@ export class GroupRoomManager {
     this.historyAction?.send({ history: this.chatHistory }, { target: peerId });
     this.historyAction?.send({ request: true }, { target: peerId });
     if (this.localStream) this.sendStreamToPeer(peerId);
+    this.syncVoiceWithPeer(peerId);
   }
 
   private applyAdmittedPeer(peerId: string, key: string, batch = false): void {
@@ -1531,6 +1554,38 @@ export class GroupRoomManager {
     this.appAction.onMessage = (event: AppWireEvent, meta: { peerId: string }) => {
       if (!event || typeof event !== 'object' || JSON.stringify(event).length > 4_000_000) return;
       this.callbacks?.onAppEvent?.(event, meta.peerId);
+    };
+
+    this.voiceAction = this.room.makeAction('voice_state_v1');
+    this.voiceAction.onMessage = (data: unknown, meta: { peerId: string }) => {
+      if (!data || typeof data !== 'object') return;
+      const payload = data as Record<string, unknown>;
+      if (
+        typeof payload.inVoice !== 'boolean' ||
+        typeof payload.muted !== 'boolean' ||
+        typeof payload.deafened !== 'boolean'
+      ) {
+        return;
+      }
+      const peerId = meta.peerId;
+      const state = {
+        inVoice: payload.inVoice,
+        muted: payload.muted,
+        deafened: payload.deafened,
+      };
+      this.remoteVoiceStates.set(peerId, state);
+      if (state.inVoice) {
+        if (this.localVoiceState.inVoice && this.localVoiceStream) {
+          this.sendVoiceStreamToPeer(peerId);
+        }
+      } else {
+        if (this.remoteVoiceStreams.has(peerId)) {
+          this.remoteVoiceStreams.delete(peerId);
+          this.callbacks?.onRemoteVoiceStream?.(peerId, null);
+        }
+        this.removeVoiceDispatchFromPeer(peerId);
+      }
+      this.notifyVoiceStatesUpdate();
     };
 
     this.inviteAction = this.room.makeAction('room_invite_sync');
@@ -2339,7 +2394,7 @@ export class GroupRoomManager {
       this.pexAction, this.meshRelayAction, this.watchAction,
       this.pingAction, this.pongAction, this.identityAction,
       this.authorityAction, this.admissionAction, this.inviteAction,
-      this.previewAction, this.appAction, this.fileAction, this.pointerAction, this.remoteControlAction, this.nativeVideoAction, this.profileAction, this.bannerAction, this.profileStatsAction,
+      this.previewAction, this.appAction, this.voiceAction, this.fileAction, this.pointerAction, this.remoteControlAction, this.nativeVideoAction, this.profileAction, this.bannerAction, this.profileStatsAction,
     ].forEach((action) => {
       if (!action?.onMessage) return;
       const handler = action.onMessage;
@@ -2424,6 +2479,7 @@ export class GroupRoomManager {
       if (this.localStream) {
         this.sendStreamToPeer(peerId);
       }
+      this.syncVoiceWithPeer(peerId);
 
       this.notifyPeersUpdate();
       this.notifyStreamsUpdate();
@@ -2443,16 +2499,159 @@ export class GroupRoomManager {
 
     // 10. Incoming Stream Listener
     this.room.onPeerTrack = (_track: MediaStreamTrack, stream: MediaStream, peerId: string, metadata?: StreamDescriptor) => {
-      if (this.room !== boundRoom || !metadata || !validStreamDescriptors([metadata])) return;
+      if (this.room !== boundRoom) return;
+      if (isVoiceStreamMetadata(metadata)) {
+        this.receiveVoiceStream(stream, peerId);
+        return;
+      }
+      if (!metadata || !validStreamDescriptors([metadata])) return;
       // Keep the browser's container: fallback video may arrive after audio,
       // without another metadata event. Its addtrack observer must survive.
       this.receiveBrowserStream(stream, peerId, metadata);
     };
     this.room.onPeerStream = (stream: MediaStream, peerId: string, metadata?: StreamDescriptor) => {
       if (this.room !== boundRoom) return;
+      if (isVoiceStreamMetadata(metadata)) {
+        this.receiveVoiceStream(stream, peerId);
+        return;
+      }
       this.receiveBrowserStream(stream, peerId, metadata);
     };
 
+  }
+
+  private receiveVoiceStream(stream: MediaStream, peerId: string): void {
+    if (this.previewOnly) return;
+    if (!this.peerTracker.isVerified(peerId)) return;
+    if (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(peerId))) return;
+    this.peerTracker.touchPeer(peerId);
+    if (!this.observedVoiceStreams.has(stream)) {
+      this.observedVoiceStreams.add(stream);
+      stream.addEventListener?.('addtrack', () => {
+        this.receiveVoiceStream(stream, peerId);
+      });
+    }
+    const audioTracks = stream.getAudioTracks().filter((track) => track.readyState === 'live');
+    if (audioTracks.length === 0) return;
+
+    this.remoteVoiceStreams.set(peerId, stream);
+    this.callbacks?.onRemoteVoiceStream?.(peerId, stream);
+
+    audioTracks.forEach((track) => {
+      track.addEventListener('ended', () => {
+        const current = this.remoteVoiceStreams.get(peerId);
+        if (current !== stream) return;
+        const stillLive = stream.getAudioTracks().some((t) => t.readyState === 'live');
+        if (!stillLive) {
+          this.remoteVoiceStreams.delete(peerId);
+          this.callbacks?.onRemoteVoiceStream?.(peerId, null);
+        }
+      });
+    });
+  }
+
+  private notifyVoiceStatesUpdate(): void {
+    if (!this.callbacks?.onVoiceStateUpdate) return;
+    const snapshot: Record<string, { inVoice: boolean; muted: boolean; deafened: boolean }> = {};
+    this.remoteVoiceStates.forEach((state, peerId) => {
+      snapshot[peerId] = { ...state };
+    });
+    this.callbacks.onVoiceStateUpdate(snapshot);
+  }
+
+  private syncVoiceWithPeer(peerId: string): void {
+    if (!this.room || this.previewOnly) return;
+    if (!this.peerTracker.isVerified(peerId)) return;
+    if (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(peerId))) return;
+    if (this.localVoiceState.inVoice) {
+      try {
+        this.voiceAction?.send(this.localVoiceState, { target: peerId });
+      } catch {}
+      if (this.remoteVoiceStates.get(peerId)?.inVoice && this.localVoiceStream) {
+        this.sendVoiceStreamToPeer(peerId);
+      }
+    }
+  }
+
+  private removeVoiceDispatchFromPeer(peerId: string): void {
+    const dispatched = this.voiceDispatches.get(peerId);
+    if (!dispatched) return;
+    this.voiceDispatches.delete(peerId);
+    if (this.room === dispatched.room) {
+      try {
+        this.room.removeStream?.(dispatched.stream, { target: peerId });
+        for (const track of dispatched.stream.getTracks()) {
+          this.room.removeTrack?.(track, { target: peerId });
+        }
+      } catch {}
+    }
+  }
+
+  private sendVoiceStreamToPeer(peerId: string): void {
+    const room = this.room;
+    const stream = this.localVoiceStream;
+    if (!room || !stream || !this.localVoiceState.inVoice) return;
+    if (!this.peerTracker.isVerified(peerId)) return;
+    if (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(peerId))) return;
+    const existing = this.voiceDispatches.get(peerId);
+    if (existing && existing.room === room && existing.stream === stream) return;
+    this.voiceDispatches.set(peerId, { room, stream });
+    const metadata = { kind: 'voice', id: 'voice' };
+    try {
+      if (typeof room.addTrack === 'function') {
+        for (const track of stream.getAudioTracks()) {
+          for (const op of room.addTrack(track, stream, { target: peerId, metadata }) || []) {
+            void Promise.resolve(op).catch(() => {});
+          }
+        }
+      }
+      if (typeof room.addStream === 'function') {
+        for (const op of room.addStream(stream, { target: peerId, metadata }) || []) {
+          void Promise.resolve(op).catch(() => {});
+        }
+      }
+    } catch (err) {
+      console.warn('[Voice] Failed to dispatch voice stream to peer:', peerId, err);
+    }
+  }
+
+  public setLocalVoiceState(
+    state: { inVoice: boolean; muted: boolean; deafened: boolean },
+    stream?: MediaStream | null,
+  ): void {
+    const previousStream = this.localVoiceStream;
+    this.localVoiceState = {
+      inVoice: Boolean(state.inVoice),
+      muted: Boolean(state.muted),
+      deafened: Boolean(state.deafened),
+    };
+    if (stream !== undefined) {
+      this.localVoiceStream = stream;
+    }
+    if (!this.localVoiceState.inVoice) {
+      this.localVoiceStream = null;
+    }
+
+    if (previousStream && (!this.localVoiceStream || previousStream !== this.localVoiceStream)) {
+      for (const peerId of Array.from(this.voiceDispatches.keys())) {
+        this.removeVoiceDispatchFromPeer(peerId);
+      }
+    }
+
+    if (this.room && !this.previewOnly) {
+      this.sendRoomAction(this.voiceAction, this.localVoiceState);
+      if (this.localVoiceState.inVoice && this.localVoiceStream) {
+        for (const peerId of this.admittedTargets()) {
+          if (this.remoteVoiceStates.get(peerId)?.inVoice) {
+            this.sendVoiceStreamToPeer(peerId);
+          }
+        }
+      }
+    }
+  }
+
+  public getRemoteVoiceStreams(): ReadonlyMap<string, MediaStream> {
+    return this.remoteVoiceStreams;
   }
 
   private receiveBrowserStream(stream: MediaStream, peerId: string, metadata?: StreamDescriptor): void {
@@ -2700,6 +2899,14 @@ export class GroupRoomManager {
 
   private removePeer(peerId: string) {
     this.clearMediaDispatch(peerId);
+    this.removeVoiceDispatchFromPeer(peerId);
+    if (this.remoteVoiceStreams.has(peerId)) {
+      this.remoteVoiceStreams.delete(peerId);
+      this.callbacks?.onRemoteVoiceStream?.(peerId, null);
+    }
+    if (this.remoteVoiceStates.delete(peerId)) {
+      this.notifyVoiceStatesUpdate();
+    }
     this.admissionRequests.delete(peerId);
     this.pendingAdminAdmissions.delete(peerId);
     this.verifiedPreviewByResponder.delete(peerId);
@@ -4208,6 +4415,7 @@ export class GroupRoomManager {
         if (this.isAdmittedPeer(peer.id) && this.announcedPeerNames.has(peer.id)) {
           waitingPeers.set(peer.id, {
             ...peer,
+            publicKey: this.chatAuth?.getKnownKey(peer.id),
             nicknameStyle: this.peerNicknameStyles.get(peer.id),
             isAdmin: this.isPeerAdmin(peer.id),
           });
@@ -4218,6 +4426,7 @@ export class GroupRoomManager {
           if (person.id === selfId || waitingPeers.has(person.id)) continue;
           waitingPeers.set(person.id, {
             id: person.id,
+            publicKey: this.chatAuth?.getKnownKey(person.id),
             username: person.username,
             connectionState: this.peerTracker.isVerified(person.id) ? 'connected' : 'connecting',
             joinedAt: this.peerTracker.getJoinedAt(person.id) || Date.now(),
@@ -4231,7 +4440,12 @@ export class GroupRoomManager {
     }
     return this.peerTracker.getAllRoomPeers().filter((peer) =>
       !this.authority || (this.isAdmittedPeer(peer.id) && this.announcedPeerNames.has(peer.id)))
-      .map((peer) => ({ ...peer, nicknameStyle: this.peerNicknameStyles.get(peer.id), isAdmin: this.isPeerAdmin(peer.id) }));
+      .map((peer) => ({
+        ...peer,
+        publicKey: this.chatAuth?.getKnownKey(peer.id),
+        nicknameStyle: this.peerNicknameStyles.get(peer.id),
+        isAdmin: this.isPeerAdmin(peer.id),
+      }));
   }
 
   private notifyPeersUpdate() {
@@ -4351,6 +4565,10 @@ export class GroupRoomManager {
     this.profileTransfer = null;
     this.bannerTransfer?.close();
     this.bannerTransfer = null;
+    this.setLocalVoiceState({ inVoice: false, muted: false, deafened: false }, null);
+    this.remoteVoiceStates.clear();
+    this.remoteVoiceStreams.clear();
+    this.voiceDispatches.clear();
     this.stopStream();
     const shouldNotifyLeave = !this.previewOnly && !this.backgroundProbe;
     if (this.room && shouldNotifyLeave) {

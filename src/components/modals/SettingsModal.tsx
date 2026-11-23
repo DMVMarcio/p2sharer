@@ -14,7 +14,7 @@ import { formatFrameRate } from '../../core/media_streams';
 import { Select } from '../common/Select';
 import React, { useState, useEffect, useRef } from 'react';
 import { invoke } from '../../platform/commands.ts';
-import { useModal } from '../../hooks/useModal';
+import { useModal, modalManager } from '../../hooks/useModal';
 import { useAppTheme, ACCENT_COLORS } from '../../hooks/useAppTheme';
 import { ColorPalette } from '../common/ColorPalette';
 import { BACKGROUND_PRESETS } from '../../core/background_color';
@@ -34,7 +34,7 @@ import { appUpdates } from '../../services/app_updates';
 import { automaticUpdateChecks, betaUpdateChecks } from '../../core/app_updates';
 import { ApplicationSettings } from './ApplicationSettings';
 import { useAppUpdates } from '../../hooks/useAppUpdates';
-import { Keyboard, MonitorCog, ShieldCheck } from 'lucide-react';
+import { Keyboard, Mic, MonitorCog, ShieldCheck } from 'lucide-react';
 import { StatusNotice } from '../common/StatusNotice';
 import { useRoom } from '../../hooks/useRoom';
 import { VigemDriverBanner } from '../common/VigemDriverBanner';
@@ -42,6 +42,8 @@ import { RemoteControlPermissionBadges } from '../common/RemoteControlPermission
 import { loadRemoteControlHostDefaults, saveRemoteControlHostDefaults } from '../../core/remote_control';
 import { loadInputBindings, saveInputBindings } from '../../core/input_bindings';
 import { KeybindingsSettingsPane } from './KeybindingsSettingsPane';
+import { CommunicationSettingsPane } from './CommunicationSettingsPane';
+import { loadVoicePreferences, saveVoicePreferences, type VoicePreferences } from '../../core/voice_preferences';
 
 const SOUND_LABELS: Record<SoundEvent, string> = {
   get appStart() { return t('sound.appStart'); },
@@ -53,7 +55,42 @@ const SOUND_LABELS: Record<SoundEvent, string> = {
   get screenShareStop() { return t("message.89eca8829730"); },
   get watchStreamStart() { return t("message.06e5a94f9aec"); },
   get watchStreamStop() { return t("message.470b862fbd07"); },
+  get voiceJoin() { return t('sound.voiceJoin'); },
+  get voiceLeave() { return t('sound.voiceLeave'); },
+  get voiceMute() { return t('sound.voiceMute'); },
+  get voiceUnmute() { return t('sound.voiceUnmute'); },
+  get voiceDeafen() { return t('sound.voiceDeafen'); },
+  get voiceUndeafen() { return t('sound.voiceUndeafen'); },
 };
+
+type SettingsTabId =
+  | 'profile'
+  | 'application'
+  | 'privacy'
+  | 'conversations'
+  | 'appearance'
+  | 'audio'
+  | 'communication'
+  | 'stream'
+  | 'remoteControl'
+  | 'inputBindings'
+  | 'network'
+  | 'diagnostics';
+
+const VALID_SETTINGS_TABS = new Set<SettingsTabId>([
+  'profile',
+  'application',
+  'privacy',
+  'conversations',
+  'appearance',
+  'audio',
+  'communication',
+  'stream',
+  'remoteControl',
+  'inputBindings',
+  'network',
+  'diagnostics',
+]);
 
 export const SettingsModal: React.FC = () => {
   useLocale();
@@ -62,8 +99,9 @@ export const SettingsModal: React.FC = () => {
   const { themeMode, accentColor, backgroundColor, setThemeMode, setAccentColor, setBackgroundColor } = useAppTheme();
 
   const [activeTab, setActiveTab] = useState<
-    'profile' | 'application' | 'privacy' | 'conversations' | 'appearance' | 'audio' | 'stream' | 'remoteControl' | 'inputBindings' | 'network' | 'diagnostics'
-  >('profile');
+    'profile' | 'application' | 'privacy' | 'conversations' | 'appearance' | 'audio' | 'communication' | 'stream' | 'remoteControl' | 'inputBindings' | 'network' | 'diagnostics'
+  >(() => { const requested = modalManager?.getSettingsInitialTab?.() as SettingsTabId | null | undefined; return requested && VALID_SETTINGS_TABS.has(requested) ? requested : 'profile'; });
+  const [voicePrefsDraft, setVoicePrefsDraft] = useState<VoicePreferences>(() => loadVoicePreferences());
   const [homeRoomPresencePolling, setHomeRoomPresencePolling] = useState(() => stateStore.homeRoomPresencePolling);
   const [turnFallbackEnabled, setTurnFallbackEnabled] = useState(() => stateStore.turnFallbackEnabled);
   const [inputBindingsDraft, setInputBindingsDraft] = useState(loadInputBindings);
@@ -220,6 +258,8 @@ export const SettingsModal: React.FC = () => {
     soundEffects.setEnabled(sfxEnabled);
     soundEffects.setEventPreferences(soundEvents);
     soundEffects.setVolume(sfxVolume / 100);
+    const savedVoicePrefs = saveVoicePreferences(voicePrefsDraft);
+    void roomService.applyVoicePreferences?.(savedVoicePrefs, true);
 
     localStorage.setItem('p2sharer_participant_cursors', String(participantCursors));
     localStorage.setItem('p2sharer_drawing_limit', String(streamDrawingLimit(drawingLimit)));
@@ -362,6 +402,16 @@ export const SettingsModal: React.FC = () => {
                 <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
               </svg>
               <span>{t("message.a11f1b879793")}</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={profileBusy || saving}
+              className={`settings-nav-item ${activeTab === 'communication' ? 'active' : ''}`}
+              onClick={() => setActiveTab('communication')}
+            >
+              <Mic size={16} aria-hidden="true" />
+              <span>{t('voice.settingsTab')}</span>
             </button>
 
             <button
@@ -741,7 +791,16 @@ export const SettingsModal: React.FC = () => {
               </div>
             )}
 
-            {/* TAB 4: TRANSMISSÃO */}
+            {/* TAB 4: COMUNICAÇÃO */}
+            {panePresence.value === 'communication' && (
+              <CommunicationSettingsPane
+                value={voicePrefsDraft}
+                onChange={setVoicePrefsDraft}
+                disabled={saving || profileBusy}
+              />
+            )}
+
+            {/* TAB 5: TRANSMISSÃO */}
             {panePresence.value === 'stream' && (
               <div className="settings-tab-pane active" id="settings-pane-stream">
                 <div className="settings-pane-header">

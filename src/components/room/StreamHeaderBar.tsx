@@ -14,6 +14,7 @@ import { AppWindow, Square, ChevronDown, Camera, Monitor, Plus, Pencil } from 'l
 import { useContextMenu, type ContextMenuAction } from '../common/ContextMenu';
 import { roomService } from '../../services/room_service';
 import { UnreadChatBadge } from './UnreadChatBadge';
+import { VoiceControlsBar } from './VoiceControlsBar';
 
 export const StreamHeaderBar: React.FC = () => {
   useLocale();
@@ -186,6 +187,8 @@ export const StreamHeaderBar: React.FC = () => {
             <span className="btn-text">{peers.length + 1}</span>
           </button>
         </div>
+
+        <VoiceControlsBar />
 
         <Tooltip content={t("message.88aff1752712")}>
           <button className="btn btn-sm btn-outline btn-compact" aria-label={t("message.7679ca8f8a85")}

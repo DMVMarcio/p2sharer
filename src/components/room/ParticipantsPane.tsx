@@ -8,20 +8,23 @@ import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { MoreHorizontal, Shield, Crown, UserX, Play, MonitorCog, AlertTriangle } from 'lucide-react';
+import { MoreHorizontal, Shield, Crown, UserX, Play, MonitorCog, AlertTriangle, Mic, MicOff, HeadphoneOff, VolumeX } from 'lucide-react';
 import { RemoteControlPermissionBadges } from '../common/RemoteControlPermissionBadges';
 import { useContextMenu, type ContextMenuAction } from '../common/ContextMenu';
 import { useRoom } from '../../hooks/useRoom';
 import { showToast } from '../../hooks/useToast';
 import { modalManager } from '../../hooks/useModal';
 import { Tooltip } from '../common/Tooltip';
+import { roomService } from '../../services/room_service';
+import { getUserVoiceActions } from './voice_user_actions';
 
 export const ParticipantsPane: React.FC = () => {
   useLocale();
   const { username, peers, roomSlots, isCreator, isRoomHost, isRoomAdmin,
     remoteControllers, remoteControlElevationBlocked, setRemoteControllerPermissions,
     setRemoteControllerAdminPermission, revokeRemoteController,
-    transferOwnership, setAdministrator, kickPeer, requestStream } = useRoom();
+    transferOwnership, setAdministrator, kickPeer, requestStream,
+    inVoice, voiceMicMuted, voiceDeafened, isLocalSpeaking, voicePeers } = useRoom();
   const [adminPendingKeys, setAdminPendingKeys] = useState<Record<string, boolean>>({});
   const showElevationBanner =
     remoteControlElevationBlocked && remoteControllers.some((ctrl) => !ctrl.adminEnabled);
@@ -125,7 +128,7 @@ export const ParticipantsPane: React.FC = () => {
           </div>
         )}
         {/* Local user */}
-        <div className="participant-item" onContextMenu={event => openContextMenu(event,
+        <div className={`participant-item${inVoice && isLocalSpeaking ? ' is-voice-speaking' : ''}`} onContextMenu={event => openContextMenu(event,
           [profileAction({ peerId: 'local', name: username, isLocal: true, color: localColor })])}>
           <button type="button" className="participant-item-identity profile-identity-button" aria-label={t('profile.viewName', { name: username })}
             onClick={() => modalManager.openProfile({ peerId: 'local', name: username, isLocal: true, color: localColor })}>
@@ -138,7 +141,32 @@ export const ParticipantsPane: React.FC = () => {
               {isRoomAdmin && !isCreator && <span className="badge-host">{t("common.adminBadge")}</span>}
             </span>
           </button>
-          <span className="user-status-dot online"></span>
+          <div className="participant-end-actions">
+            {inVoice && (
+              <span className={`participant-item-voice-status${isLocalSpeaking ? ' is-speaking' : ''}`}>
+                {voiceDeafened ? (
+                  <Tooltip content={t('voice.statusDeafened')}>
+                    <span className="participant-voice-badge is-deafened" aria-label={t('voice.statusDeafened')}>
+                      <HeadphoneOff size={12} aria-hidden="true" />
+                    </span>
+                  </Tooltip>
+                ) : voiceMicMuted ? (
+                  <Tooltip content={t('voice.statusMuted')}>
+                    <span className="participant-voice-badge is-muted" aria-label={t('voice.statusMuted')}>
+                      <MicOff size={12} aria-hidden="true" />
+                    </span>
+                  </Tooltip>
+                ) : (
+                  <Tooltip content={isLocalSpeaking ? t('voice.statusSpeaking') : t('voice.statusInVoice')}>
+                    <span className={`participant-voice-badge${isLocalSpeaking ? ' is-speaking' : ''}`} aria-label={isLocalSpeaking ? t('voice.statusSpeaking') : t('voice.statusInVoice')}>
+                      <Mic size={12} aria-hidden="true" />
+                    </span>
+                  </Tooltip>
+                )}
+              </span>
+            )}
+            <span className="user-status-dot online"></span>
+          </div>
         </div>
 
         {/* Remote peers */}
@@ -146,7 +174,14 @@ export const ParticipantsPane: React.FC = () => {
           const color = getSlotColor(p.id, false);
           const slot = roomSlots.find((s) => s.peerId === p.id);
           const isStreaming = slot?.isStreaming;
-          const actions: ContextMenuAction[] = [profileAction({ peerId: p.id, name: p.username, color })];
+          const vp = (voicePeers ?? {})[p.id];
+          const remoteInVoice = Boolean(vp?.inVoice);
+          const remoteSpeaking = Boolean(vp?.speaking);
+          const remoteLocallyMuted = Boolean(roomService.getPeerVoiceVolume?.(p.id, p.publicKey, p.username)?.muted);
+          const actions: ContextMenuAction[] = [
+            profileAction({ peerId: p.id, name: p.username, color }),
+            ...getUserVoiceActions({ peerId: p.id, publicKey: p.publicKey, username: p.username }),
+          ];
           if (isStreaming) actions.push({ id: 'watch', get label() { return t("message.5a49c69bab6b"); }, icon: <Play size={15} />, onSelect: () => requestStream(p.id) });
           if (isRoomHost && p.connectionState === 'connected' && !p.isCreator) actions.push(
             { id: 'admin', get label() { return p.isAdmin ? t("message.a1073128f2dc") : t("message.1c6f1047e43c"); }, icon: <Shield size={15} />,
@@ -158,7 +193,7 @@ export const ParticipantsPane: React.FC = () => {
           );
 
           return (
-            <div key={p.id} className="participant-item" onContextMenu={(event) => openContextMenu(event, actions)}>
+            <div key={p.id} className={`participant-item${remoteSpeaking ? ' is-voice-speaking' : ''}`} onContextMenu={(event) => openContextMenu(event, actions)}>
               <button type="button" className="participant-item-identity profile-identity-button" aria-label={t('profile.viewName', { name: p.username })}
                 onClick={() => modalManager.openProfile({ peerId: p.id, name: p.username, color })}>
                 <ProfileAvatar peerId={p.id} name={p.username} color={color} className="participant-item-avatar" />
@@ -171,6 +206,36 @@ export const ParticipantsPane: React.FC = () => {
                 </span>
               </button>
               <div className="participant-end-actions">
+                {remoteInVoice && (
+                  <span className={`participant-item-voice-status${remoteSpeaking ? ' is-speaking' : ''}`}>
+                    {remoteLocallyMuted && (
+                      <Tooltip content={t('voice.statusLocallyMuted')}>
+                        <span className="participant-voice-badge is-muted" aria-label={t('voice.statusLocallyMuted')}>
+                          <VolumeX size={12} aria-hidden="true" />
+                        </span>
+                      </Tooltip>
+                    )}
+                    {vp?.deafened ? (
+                      <Tooltip content={t('voice.statusDeafened')}>
+                        <span className="participant-voice-badge is-deafened" aria-label={t('voice.statusDeafened')}>
+                          <HeadphoneOff size={12} aria-hidden="true" />
+                        </span>
+                      </Tooltip>
+                    ) : vp?.muted ? (
+                      <Tooltip content={t('voice.statusMuted')}>
+                        <span className="participant-voice-badge is-muted" aria-label={t('voice.statusMuted')}>
+                          <MicOff size={12} aria-hidden="true" />
+                        </span>
+                      </Tooltip>
+                    ) : (
+                      <Tooltip content={remoteSpeaking ? t('voice.statusSpeaking') : t('voice.statusInVoice')}>
+                        <span className={`participant-voice-badge${remoteSpeaking ? ' is-speaking' : ''}`} aria-label={remoteSpeaking ? t('voice.statusSpeaking') : t('voice.statusInVoice')}>
+                          <Mic size={12} aria-hidden="true" />
+                        </span>
+                      </Tooltip>
+                    )}
+                  </span>
+                )}
                 <span className={`user-status-dot ${p.connectionState === 'connected' ? 'online' : 'connecting'}`}></span>
                 {actions.length > 0 && <button className="participant-menu-trigger" aria-label={t("message.b52de8210f9a", { v0: p.username })}
                   aria-haspopup="menu" onClick={(event) => {

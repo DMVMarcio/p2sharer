@@ -9,6 +9,16 @@ import { captureTextEditing, TEXT_EDITOR_SELECTOR } from '../../core/text_editin
 import { getTextEditingActions } from './text_editing_actions';
 import { Tooltip } from './Tooltip';
 
+export interface ContextMenuSlider {
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  defaultValue?: number;
+  formatValue?: (value: number) => string;
+  onChange: (value: number) => void;
+}
+
 export interface ContextMenuAction {
   id: string;
   label: string;
@@ -24,6 +34,7 @@ export interface ContextMenuAction {
   onSelect?: () => void | Promise<unknown>;
   submenu?: ContextMenuAction[];
   secondary?: Pick<ContextMenuAction, 'label' | 'icon' | 'disabled' | 'danger' | 'onSelect'>;
+  slider?: ContextMenuSlider;
 }
 
 interface MenuState {
@@ -51,16 +62,27 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
 }) {
   useLocale();
   const [menu, setMenu] = useState<MenuState | null>(null);
+  const [sliderValues, setSliderValues] = useState<Record<string, number>>({});
   const [activeSubmenu, setActiveSubmenu] = useState<{ id: string; actions: ContextMenuAction[]; parentRect: DOMRect } | null>(null);
   const [submenuPosition, setSubmenuPosition] = useState({ x: 0, y: 0 });
   const presence = useDropdownPresence(menu);
   const menuRef = useRef<HTMLDivElement>(null);
   const submenuRef = useRef<HTMLDivElement>(null);
   const buttonRefs = useRef(new Map<string, HTMLButtonElement>());
+  const sliderRefs = useRef(new Map<string, HTMLInputElement>());
   const submenuButtonRefs = useRef(new Map<string, HTMLButtonElement>());
   const enabledButtons = (actions: ContextMenuAction[], map = buttonRefs.current) => actions.flatMap(action =>
     [map.get(action.id), map.get(`${action.id}:secondary`)]
   ).filter((button): button is HTMLButtonElement => Boolean(button && !button.disabled));
+  const enabledControls = (actions: ContextMenuAction[]): Array<HTMLButtonElement | HTMLInputElement> =>
+    actions.flatMap<HTMLButtonElement | HTMLInputElement>((action) => {
+      if (action.slider) {
+        const input = sliderRefs.current.get(action.id);
+        return input && !input.disabled ? [input] : [];
+      }
+      return [buttonRefs.current.get(action.id), buttonRefs.current.get(`${action.id}:secondary`)]
+        .filter((button): button is HTMLButtonElement => Boolean(button && !button.disabled));
+    });
   const currentRef = useRef(menu);
   const actionsRef = useRef(getActions);
   currentRef.current = menu;
@@ -77,6 +99,11 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
     setActiveSubmenu(null);
     const source = event.currentTarget instanceof HTMLElement ? event.currentTarget : document.body;
     if (options?.toggle && currentRef.current?.source === source) { close(true); return; }
+    const initialSliders: Record<string, number> = {};
+    for (const action of actions) {
+      if (action.slider) initialSliders[action.id] = action.slider.value;
+    }
+    setSliderValues(initialSliders);
     const bounds = source.getBoundingClientRect();
     setMenu(actions.length ? { actions, source, toggle: options?.toggle, layout: options?.layout, placement: options?.placement,
       x: event.clientX || bounds.left + Math.min(bounds.width / 2, 24),
@@ -157,7 +184,7 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
     const left = Math.max(8, Math.min(x, window.innerWidth - offsetWidth - 8));
     setPosition({ x: left, y: Math.max(8, Math.min(y, window.innerHeight - offsetHeight - 8)),
       arrow: Math.max(10, Math.min(offsetWidth - 10, source.left + source.width / 2 - left)) });
-    enabledButtons(menu.actions)[0]?.focus({ preventScroll: true });
+    enabledControls(menu.actions)[0]?.focus({ preventScroll: true });
   }, [menu]);
 
   useLayoutEffect(() => {
@@ -224,14 +251,22 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
         }
       }
 
+      if (
+        document.activeElement instanceof HTMLInputElement &&
+        document.activeElement.type === 'range' &&
+        (event.key === 'ArrowLeft' || event.key === 'ArrowRight')
+      ) {
+        return;
+      }
+
       if (!['ArrowDown', 'ArrowUp', 'Home', 'End', ...(menu.layout === 'grid' ? ['ArrowLeft', 'ArrowRight'] : [])].includes(event.key)) return;
       event.preventDefault();
       setActiveSubmenu(null);
-      const buttons = enabledButtons(menu.actions);
-      const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
-      const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1
-        : (index + (event.key === 'ArrowDown' || event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length;
-      buttons[next]?.focus();
+      const controls = enabledControls(menu.actions);
+      const index = controls.indexOf(document.activeElement as HTMLButtonElement | HTMLInputElement);
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? controls.length - 1
+        : (index + (event.key === 'ArrowDown' || event.key === 'ArrowRight' ? 1 : -1) + controls.length) % controls.length;
+      controls[next]?.focus();
     };
     document.addEventListener('keydown', key, true);
     // Drop stale actions if their originating surface unmounts.
@@ -256,6 +291,54 @@ export function ContextMenuProvider({ children, getActions = () => [] }: {
       onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); }}
       onClick={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()}>
       {retained.actions.map((action) => {
+        if (action.slider) {
+          const slider = action.slider;
+          const currentVal = sliderValues[action.id] ?? slider.value;
+          const sliderText = slider.formatValue ? slider.formatValue(currentVal) : `${currentVal}%`;
+          return (
+            <div
+              key={action.id}
+              role="none"
+              className={`context-menu-slider-item ${action.separator ? 'context-menu-separated' : ''}`}
+            >
+              <div className="context-menu-slider-header">
+                <span className="context-menu-slider-title">
+                  {action.icon && <span className="context-menu-icon" aria-hidden="true">{action.icon}</span>}
+                  <span className="context-menu-label">{action.label}</span>
+                </span>
+                <span className="context-menu-slider-value">{sliderText}</span>
+              </div>
+              <input
+                autoComplete="off"
+                type="range"
+                ref={(element) => {
+                  if (element) sliderRefs.current.set(action.id, element);
+                  else sliderRefs.current.delete(action.id);
+                }}
+                className="settings-slider-input context-menu-slider-input"
+                aria-label={action.label}
+                disabled={action.disabled}
+                min={slider.min}
+                max={slider.max}
+                step={slider.step ?? 1}
+                value={currentVal}
+                onClick={(event) => event.stopPropagation()}
+                onMouseDown={(event) => event.stopPropagation()}
+                onChange={(event) => {
+                  const nextVal = Number(event.target.value);
+                  setSliderValues((prev) => ({ ...prev, [action.id]: nextVal }));
+                  slider.onChange(nextVal);
+                }}
+                onDoubleClick={() => {
+                  if (action.disabled) return;
+                  const resetVal = Math.max(slider.min, Math.min(slider.max, slider.defaultValue ?? 100));
+                  setSliderValues((prev) => ({ ...prev, [action.id]: resetVal }));
+                  slider.onChange(resetVal);
+                }}
+              />
+            </div>
+          );
+        }
         const hasSubmenu = Boolean(action.submenu?.length);
         const trailingIcon = action.trailingIcon || (hasSubmenu ? <ChevronRight size={13} /> : undefined);
         const tooltipText = action.tooltip ?? (action.iconOnly ? action.label : undefined);

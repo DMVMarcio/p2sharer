@@ -28,8 +28,11 @@ class ModalManager {
   private externalLinkUrl: string | null = null;
   private revision = 0;
   private profileTarget: ProfileTarget | null = null;
+  private settingsInitialTab: string | null = null;
   public getProfileTarget() { return this.profileTarget; }
+  public getSettingsInitialTab() { return this.settingsInitialTab; }
   public openProfile(target: ProfileTarget) { this.profileTarget = { ...target }; this.open('profile'); }
+  public openSettings(tab?: string) { this.settingsInitialTab = tab ?? null; this.open('settings'); }
 
   public getRevision(): number { return this.revision; }
 
@@ -55,6 +58,7 @@ class ModalManager {
   public open(modal: ModalType): void {
     this.revision++;
     if (modal !== 'profile') this.profileTarget = null;
+    if (modal !== 'settings') this.settingsInitialTab = null;
     if (modal !== 'externalLink') this.externalLinkUrl = null;
     if (this.closeTimer) {
       clearTimeout(this.closeTimer);
@@ -74,6 +78,7 @@ class ModalManager {
       if (this.activeModal === 'screenPicker') stateStore.set((state) => { state.editingStreamId = null; });
       this.activeModal = null;
       this.externalLinkUrl = null;
+      this.settingsInitialTab = null;
       this.isClosing = false;
       this.closeTimer = null;
       this.notify();

@@ -49,6 +49,7 @@ export type AppPlatform = 'desktop' | 'web' | 'mobile';
 export interface PeerInfo {
   nicknameStyle?: import("./nickname_style").NicknameStyle;
   id: string;
+  publicKey?: string;
   username: string;
   connectionState: 'connected' | 'connecting' | 'disconnected';
   joinedAt: number;

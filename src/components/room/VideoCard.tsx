@@ -31,8 +31,9 @@ import { pipService } from '../../services/pip_service';
 import { ZoomControlBar } from './ZoomControlBar';
 import { Tooltip } from '../common/Tooltip';
 import { StreamStatsOverlay } from './StreamStatsOverlay';
-import { Grid2X2, Focus, Eye, EyeOff, Maximize, PanelsTopLeft, PictureInPicture2, RotateCcw, Volume2, VolumeX, Square, MonitorUp, MonitorCog } from 'lucide-react';
+import { Grid2X2, Focus, Eye, EyeOff, Maximize, PanelsTopLeft, PictureInPicture2, RotateCcw, Volume2, VolumeX, Square, MonitorUp, MonitorCog, Mic, MicOff, HeadphoneOff } from 'lucide-react';
 import { useContextMenu, type ContextMenuAction } from '../common/ContextMenu';
+import { getUserVoiceActions } from './voice_user_actions';
 import { isTauri } from '@tauri-apps/api/core';
 import { openBrowserPictureInPicture } from '../../platform/picture_in_picture';
 import { showToast } from '../../hooks/useToast';
@@ -73,7 +74,21 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     remoteCursorImages,
     selfPeerId,
     remoteControllers,
+    inVoice,
+    voiceMicMuted,
+    voiceDeafened,
+    isLocalSpeaking,
+    voicePeers,
   } = useRoom();
+  const ownerPeerId = slot.ownerPeerId ?? slot.peerId;
+  const remoteVoice = !slot.isLocal ? (voicePeers ?? {})[ownerPeerId] : undefined;
+  const userInVoice = slot.isLocal ? Boolean(inVoice) : Boolean(remoteVoice?.inVoice);
+  const userSpeaking = slot.isLocal ? Boolean(inVoice && isLocalSpeaking) : Boolean(remoteVoice?.speaking);
+  const userMuted = slot.isLocal ? Boolean(inVoice && voiceMicMuted) : Boolean(remoteVoice?.muted);
+  const userDeafened = slot.isLocal ? Boolean(inVoice && voiceDeafened) : Boolean(remoteVoice?.deafened);
+  const userLocallyMuted = !slot.isLocal
+    ? Boolean(roomService.getPeerVoiceVolume?.(ownerPeerId, slot.ownerPublicKey, slot.senderName)?.muted)
+    : false;
   const openContextMenu = useContextMenu();
   const { openModal } = useModal();
   const defaultResolution = useStore((s) => s.currentResolution);
@@ -393,7 +408,10 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   const layoutActions = useRoomCardLayoutActions();
   const handleContextMenu = (event: React.MouseEvent) => {
     if (remoteControl.active) return;
-    const actions: ContextMenuAction[] = [profileAction({ peerId: slot.ownerPeerId ?? slot.peerId, name: slot.senderName, isLocal: slot.isLocal, color: slot.color })];
+    const actions: ContextMenuAction[] = [profileAction({ peerId: ownerPeerId, name: slot.senderName, isLocal: slot.isLocal, color: slot.color })];
+    if (!slot.isLocal) {
+      actions.push(...getUserVoiceActions({ peerId: ownerPeerId, publicKey: slot.ownerPublicKey, username: slot.senderName }));
+    }
     if (layoutMode === 'spotlight' && inTray && !isSelectedFeatured) actions.push({ id: 'overlay', get label() { return t("message.1c2685f76e69"); },
       icon: <PictureInPicture2 size={15} />, onSelect: () => roomService.overlayStream(slot.peerId) });
     if (slot.isLocal && slot.mediaId) actions.push({ id: 'edit', get label() { return t("message.eb9fb0e94a23"); }, icon: <MonitorUp size={15} />,
@@ -435,7 +453,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   return (
     <div
       ref={cardRef}
-      className={`stream-card ${isFeatured ? 'featured' : ''} ${inTray ? 'in-tray' : ''} ${isSelectedFeatured ? 'selected-featured' : ''} ${zoom > 1.0 && !inTray ? 'is-zoomed' : ''} ${isDragging && !inTray ? 'is-dragging' : ''} ${!slot.isLocal && !inTray ? 'has-volume-controller' : ''} ${isHudPinned ? 'is-hud-pinned' : ''} ${activeTooltips > 0 || mobileHudVisible ? 'is-hud-active' : ''} ${pointer.enabled ? 'is-stream-pointer-active' : ''} ${remoteControl.active ? 'is-remote-control-active' : ''} ${isMobile ? 'is-mobile-stream' : ''}`}
+      className={`stream-card ${isFeatured ? 'featured' : ''} ${inTray ? 'in-tray' : ''} ${isSelectedFeatured ? 'selected-featured' : ''} ${zoom > 1.0 && !inTray ? 'is-zoomed' : ''} ${isDragging && !inTray ? 'is-dragging' : ''} ${!slot.isLocal && !inTray ? 'has-volume-controller' : ''} ${isHudPinned ? 'is-hud-pinned' : ''} ${activeTooltips > 0 || mobileHudVisible ? 'is-hud-active' : ''} ${pointer.enabled ? 'is-stream-pointer-active' : ''} ${remoteControl.active ? 'is-remote-control-active' : ''} ${isMobile ? 'is-mobile-stream' : ''} ${userSpeaking ? 'is-voice-speaking' : ''}`}
       style={style}
       data-peer-id={slot.peerId}
       data-room-layout-id={layoutDraggable ? slot.peerId : undefined}
@@ -717,6 +735,36 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           <span className="stream-user-name"><Nickname name={slot.senderName} peerId={slot.ownerPeerId ?? slot.peerId} isLocal={slot.isLocal} />{slot.mediaLabel ? ` · ${slot.mediaLabel}` : ""}</span>
           <PlatformBadge platform={slot.platform ?? (slot.isLocal ? getLocalPlatform() : 'desktop')} size={11} />
           {slot.isLocal && <span className="badge-you">{t("message.a03099f135b1")}</span>}
+          {userInVoice && (
+            <span className={`participant-voice-badges${userSpeaking ? ' is-speaking' : ''}`}>
+              {userLocallyMuted && (
+                <Tooltip content={t('voice.statusLocallyMuted')} onOpenChange={handleTooltipOpenChange}>
+                  <span className="participant-voice-badge is-muted" aria-label={t('voice.statusLocallyMuted')}>
+                    <VolumeX size={11} aria-hidden="true" />
+                  </span>
+                </Tooltip>
+              )}
+              {userDeafened ? (
+                <Tooltip content={t('voice.statusDeafened')} onOpenChange={handleTooltipOpenChange}>
+                  <span className="participant-voice-badge is-deafened" aria-label={t('voice.statusDeafened')}>
+                    <HeadphoneOff size={11} aria-hidden="true" />
+                  </span>
+                </Tooltip>
+              ) : userMuted ? (
+                <Tooltip content={t('voice.statusMuted')} onOpenChange={handleTooltipOpenChange}>
+                  <span className="participant-voice-badge is-muted" aria-label={t('voice.statusMuted')}>
+                    <MicOff size={11} aria-hidden="true" />
+                  </span>
+                </Tooltip>
+              ) : (
+                <Tooltip content={userSpeaking ? t('voice.statusSpeaking') : t('voice.statusInVoice')} onOpenChange={handleTooltipOpenChange}>
+                  <span className={`participant-voice-badge${userSpeaking ? ' is-speaking' : ''}`} aria-label={userSpeaking ? t('voice.statusSpeaking') : t('voice.statusInVoice')}>
+                    <Mic size={11} aria-hidden="true" />
+                  </span>
+                </Tooltip>
+              )}
+            </span>
+          )}
         </div>
 
         {/* Bottom-right stream controls: Volume (remote only) + PiP + Fullscreen */}

@@ -1,5 +1,21 @@
 /** Original, softly voiced notification cues; no external recordings or playback dependencies. */
-export const SOUND_EVENTS = ['message', 'userJoin', 'userLeave', 'screenShareStart', 'screenShareStop', 'watchStreamStart', 'watchStreamStop', 'appStart', 'appStop'] as const;
+export const SOUND_EVENTS = [
+  'message',
+  'userJoin',
+  'userLeave',
+  'screenShareStart',
+  'screenShareStop',
+  'watchStreamStart',
+  'watchStreamStop',
+  'appStart',
+  'appStop',
+  'voiceJoin',
+  'voiceLeave',
+  'voiceMute',
+  'voiceUnmute',
+  'voiceDeafen',
+  'voiceUndeafen',
+] as const;
 export type SoundEvent = typeof SOUND_EVENTS[number];
 export type SoundPreferences = Record<SoundEvent, boolean>;
 
@@ -15,6 +31,12 @@ const CUES: Record<SoundEvent, readonly Note[]> = {
   screenShareStop: [note(440, 0, 0.28, 0.065), note(293.66, 0.09, 0.32, 0.075)],
   watchStreamStart: [note(329.63, 0, 0.20, 0.065), note(392, 0.055, 0.23, 0.045)],
   watchStreamStop: [note(392, 0, 0.19, 0.05), note(329.63, 0.065, 0.23, 0.06)],
+  voiceJoin: [note(261.63, 0, 0.18, 0.065), note(392.0, 0.07, 0.22, 0.06)],
+  voiceLeave: [note(392.0, 0, 0.18, 0.06), note(261.63, 0.07, 0.23, 0.065)],
+  voiceMute: [note(349.23, 0, 0.15, 0.065), note(261.63, 0.05, 0.18, 0.06)],
+  voiceUnmute: [note(261.63, 0, 0.15, 0.06), note(349.23, 0.05, 0.18, 0.065)],
+  voiceDeafen: [note(311.13, 0, 0.16, 0.065), note(220.0, 0.06, 0.20, 0.065)],
+  voiceUndeafen: [note(220.0, 0, 0.16, 0.06), note(311.13, 0.06, 0.20, 0.065)],
 };
 
 /** Render the actual playback waveform at the context's sample rate, with silent boundaries. */

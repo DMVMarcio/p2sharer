@@ -1,4 +1,4 @@
-//! Camera consent belongs to the trusted desktop host, not embedded third-party pages.
+//! Camera and microphone consent belongs to the trusted desktop host, not embedded third-party pages.
 #[cfg(windows)]
 pub fn install(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     use tauri::Manager;
@@ -15,8 +15,8 @@ pub fn configure_webview(app_handle: &tauri::AppHandle, window: &tauri::WebviewW
     };
     use webview2_com::Microsoft::Web::WebView2::Win32::{
         COREWEBVIEW2_PERMISSION_KIND, COREWEBVIEW2_PERMISSION_KIND_CAMERA,
-        COREWEBVIEW2_PERMISSION_STATE_ALLOW, ICoreWebView2_4,
-        ICoreWebView2NavigationStartingEventArgs2,
+        COREWEBVIEW2_PERMISSION_KIND_MICROPHONE, COREWEBVIEW2_PERMISSION_STATE_ALLOW,
+        ICoreWebView2_4, ICoreWebView2NavigationStartingEventArgs2,
     };
     use windows_capture_api::core::{HSTRING, Interface, PCWSTR};
     let app_handle = app_handle.clone();
@@ -27,11 +27,13 @@ pub fn configure_webview(app_handle: &tauri::AppHandle, window: &tauri::WebviewW
                 if let Some(args) = args {
                     let mut kind = COREWEBVIEW2_PERMISSION_KIND::default();
                     args.PermissionKind(&mut kind)?;
-                    if kind == COREWEBVIEW2_PERMISSION_KIND_CAMERA {
+                    if kind == COREWEBVIEW2_PERMISSION_KIND_CAMERA
+                        || kind == COREWEBVIEW2_PERMISSION_KIND_MICROPHONE
+                    {
                         let mut uri = Default::default();
                         args.Uri(&mut uri)?;
                         let uri = CoTaskMemPWSTR::from(uri).to_string();
-                        if trusted_camera_origin(&uri) {
+                        if trusted_media_origin(&uri) {
                             args.SetState(COREWEBVIEW2_PERMISSION_STATE_ALLOW)?;
                         }
                     }
@@ -98,7 +100,7 @@ pub fn configure_webview(app_handle: &tauri::AppHandle, window: &tauri::WebviewW
     Ok(())
 }
 
-fn trusted_camera_origin(uri: &str) -> bool {
+fn trusted_media_origin(uri: &str) -> bool {
     let Ok(url) = tauri::Url::parse(uri) else { return false; };
     let packaged = (url.scheme() == "http" || url.scheme() == "https") && url.host_str() == Some("tauri.localhost") && url.port().is_none();
     let development = cfg!(debug_assertions) && url.origin().ascii_serialization() == "http://localhost:1420";
@@ -116,11 +118,11 @@ mod tests {
     use super::*;
     #[test]
     fn permission_is_scoped_to_app_origin() {
-        assert!(trusted_camera_origin("http://tauri.localhost/index.html"));
-        assert!(trusted_camera_origin("https://tauri.localhost/index.html"));
+        assert!(trusted_media_origin("http://tauri.localhost/index.html"));
+        assert!(trusted_media_origin("https://tauri.localhost/index.html"));
         for uri in ["https://youtube.com", "http://tauri.localhost.evil.com", "http://tauri.localhost:1234", "data:text/html,camera", "file:///camera.html"] {
-            assert!(!trusted_camera_origin(uri), "{uri}");
+            assert!(!trusted_media_origin(uri), "{uri}");
         }
-        assert_eq!(trusted_camera_origin("http://localhost:1420"), cfg!(debug_assertions));
+        assert_eq!(trusted_media_origin("http://localhost:1420"), cfg!(debug_assertions));
     }
 }

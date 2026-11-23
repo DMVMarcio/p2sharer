@@ -1,4 +1,5 @@
 import { isMobileDevice } from '../core/platform.ts';
+import { logDiagnostic } from '../core/logger.ts';
 import { localizeError, t } from '../i18n/index.ts';
 import { reconcilePinnedRoomSlot, streamOwner, streamSlotKey, type MediaKind, type StreamDescriptor } from "../core/media_streams.ts";
 import { StreamPointerReceiver } from './stream_pointer_receiver.ts';
@@ -32,6 +33,8 @@ import { isTauri } from '@tauri-apps/api/core';
 import { roomAppsService } from '../apps/room_apps_service.ts';
 import { AudioBridge } from '../audio/audio_bridge.ts';
 import { audioContextManager } from '../audio/audio_context_manager.ts';
+import { voiceManager } from '../audio/voice_manager.ts';
+import type { UserVoiceVolumePreference, VoicePeerState, VoicePreferences } from '../core/voice_preferences.ts';
 import { stateStore } from '../core/state_store.ts';
 import { shouldNotifyChat, shouldPlayChatSound } from '../core/chat_notifications.ts';
 import { mergeChatHistory, nextChatOrder } from '../core/chat_history.ts';
@@ -88,6 +91,18 @@ export class RoomService {
   private localSaveIds = new Set<string>();
   private cancelledLocalSaves = new Set<string>();
   public peers: PeerInfo[] = [];
+  public inVoice = false;
+  public voiceMicMuted = false;
+  public voiceDeafened = false;
+  public isLocalSpeaking = false;
+  public voiceInputLevelDb = -100;
+  public voiceThresholdDb = -50;
+  public voiceMicTestActive = false;
+  public voiceTestGateOpen = false;
+  public voicePreferences: VoicePreferences = voiceManager.getPreferences();
+  public voicePeers: Record<string, VoicePeerState> = {};
+  private remoteVoiceStates: Record<string, { inVoice: boolean; muted: boolean; deafened: boolean }> = {};
+  private voiceJoinPromise: Promise<void> | null = null;
   public remoteControlRequests: RemoteControlRequest[] = [];
   public remoteControlElevationRequests: RemoteControlRequest[] = [];
   public remoteControllers: RemoteControllerInfo[] = [];
@@ -138,6 +153,35 @@ export class RoomService {
 
   constructor() {
     this.initFallbackHandler();
+    this.syncVoiceSnapshot();
+    voiceManager.subscribe(() => {
+      this.syncVoiceSnapshot();
+      this.notify();
+    });
+  }
+
+  private syncVoiceSnapshot(): void {
+    const snap = voiceManager.getSnapshot();
+    this.inVoice = snap.inVoice;
+    this.voiceMicMuted = snap.micMuted;
+    this.voiceDeafened = snap.deafened;
+    this.isLocalSpeaking = snap.isLocalSpeaking;
+    this.voiceInputLevelDb = snap.inputLevelDb;
+    this.voiceThresholdDb = snap.effectiveThresholdDb;
+    this.voiceMicTestActive = snap.micTestActive;
+    this.voiceTestGateOpen = snap.isTestGateOpen;
+    this.voicePreferences = snap.preferences;
+    const nextPeers: Record<string, VoicePeerState> = {};
+    for (const [peerId, state] of Object.entries(this.remoteVoiceStates)) {
+      nextPeers[peerId] = {
+        peerId,
+        inVoice: state.inVoice,
+        muted: state.muted,
+        deafened: state.deafened,
+        speaking: Boolean(state.inVoice && !state.muted && !state.deafened && snap.remoteSpeaking[peerId]),
+      };
+    }
+    this.voicePeers = nextPeers;
   }
 
   public subscribe(listener: Listener): () => void {
@@ -675,12 +719,32 @@ export class RoomService {
         if (this.roomManager !== manager) return;
         profileStats.setInCall(manager.hasAdmission());
         this.peers = peers;
+        for (const peer of peers) {
+          if (peer.publicKey) {
+            voiceManager.refreshRemotePeerIdentity(peer.id, peer.publicKey, peer.username);
+          }
+        }
         stateStore.set(s => { s.peerNicknameStyles = Object.fromEntries(peers.filter(peer => peer.nicknameStyle).map(peer => [peer.id, peer.nicknameStyle!])); });
         if (manager.hasAdmission()) {
           persistSavedOnAdmission();
           if (isCreator || peers.some((peer) => peer.connectionState === 'connected')) this.hideConnecting();
         }
         this.notify();
+      },
+      onVoiceStateUpdate: (states) => {
+        if (this.roomManager !== manager) return;
+        this.remoteVoiceStates = states;
+        this.syncVoiceSnapshot();
+        this.notify();
+      },
+      onRemoteVoiceStream: (peerId, stream) => {
+        if (this.roomManager !== manager) return;
+        if (!stream || !voiceManager.inVoice) {
+          voiceManager.detachRemoteVoice(peerId);
+          return;
+        }
+        const peer = this.peers.find((p) => p.id === peerId);
+        voiceManager.attachRemoteVoice(peerId, stream, peer?.publicKey, peer?.username);
       },
       onPeerJoined: (peer, isInitial) => {
         if (this.roomManager !== manager) return;
@@ -693,6 +757,13 @@ export class RoomService {
       },
       onPeerLeft: (_peerId, username) => {
         if (this.roomManager !== manager) return;
+        voiceManager.detachRemoteVoice(_peerId);
+        if (this.remoteVoiceStates[_peerId]) {
+          const next = { ...this.remoteVoiceStates };
+          delete next[_peerId];
+          this.remoteVoiceStates = next;
+          this.syncVoiceSnapshot();
+        }
         this.fileRequests = this.fileRequests.filter((request) => request.peerId !== _peerId);
         this.remoteControlHost.forgetPeer(_peerId);
         this.peerSeenCursorImageIds.delete(_peerId);
@@ -1819,6 +1890,10 @@ export class RoomService {
 
     soundEffects.playUserLeave();
 
+    this.leaveVoice(true);
+    this.remoteVoiceStates = {};
+    this.voicePeers = {};
+
     this.stopScreenSharing();
 
     if (this.roomManager) {
@@ -2170,6 +2245,136 @@ export class RoomService {
 
   public getSelfPeerId(): string {
     return this.roomManager?.getLocalPeerId() ?? '';
+  }
+
+  public async joinVoice(): Promise<void> {
+    if (this.voiceJoinPromise) return this.voiceJoinPromise;
+    if (voiceManager.inVoice) return;
+    const manager = this.roomManager;
+    const task = (async () => {
+      try {
+        const outbound = await voiceManager.joinVoice();
+        if (this.roomManager !== manager) {
+          voiceManager.leaveVoice();
+          return;
+        }
+        manager?.setLocalVoiceState(
+          { inVoice: true, muted: voiceManager.micMuted, deafened: voiceManager.deafened },
+          outbound,
+        );
+        const existingStreams = manager?.getRemoteVoiceStreams?.();
+        if (existingStreams) {
+          existingStreams.forEach((stream, peerId) => {
+            const peer = this.peers.find((p) => p.id === peerId);
+            voiceManager.attachRemoteVoice(peerId, stream, peer?.publicKey, peer?.username);
+          });
+        }
+        soundEffects.playVoiceJoin();
+      } catch (err) {
+        voiceManager.leaveVoice();
+        manager?.setLocalVoiceState({ inVoice: false, muted: false, deafened: false }, null);
+        const name = err instanceof DOMException ? err.name : '';
+        const msg = name === 'NotAllowedError' || name === 'PermissionDeniedError'
+          ? t('voice.micPermissionError')
+          : t('voice.micUnavailableError');
+        showToast(msg, 4500, 'error');
+        logDiagnostic('ERROR', 'voice.join', 'Failed to join room voice call', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      } finally {
+        this.voiceJoinPromise = null;
+        this.syncVoiceSnapshot();
+        this.notify();
+      }
+    })();
+    this.voiceJoinPromise = task;
+    return task;
+  }
+
+  public leaveVoice(silent = false): void {
+    const wasInVoice = voiceManager.inVoice;
+    this.roomManager?.setLocalVoiceState({ inVoice: false, muted: false, deafened: false }, null);
+    voiceManager.leaveVoice();
+    if (!silent && wasInVoice) {
+      soundEffects.playVoiceLeave();
+    }
+    this.syncVoiceSnapshot();
+    this.notify();
+  }
+
+  public toggleVoiceMute(): void {
+    if (!voiceManager.inVoice) return;
+    const res = voiceManager.toggleMicMute();
+    if (res.autoUndeafened) {
+      soundEffects.playVoiceUndeafen();
+    } else if (res.micMuted) {
+      soundEffects.playVoiceMute();
+    } else {
+      soundEffects.playVoiceUnmute();
+    }
+    this.roomManager?.setLocalVoiceState({
+      inVoice: true,
+      muted: res.micMuted,
+      deafened: res.deafened,
+    });
+    this.syncVoiceSnapshot();
+    this.notify();
+  }
+
+  public toggleVoiceDeafen(): void {
+    if (!voiceManager.inVoice) return;
+    const res = voiceManager.toggleDeafen();
+    if (res.deafened) {
+      soundEffects.playVoiceDeafen();
+    } else {
+      soundEffects.playVoiceUndeafen();
+    }
+    this.roomManager?.setLocalVoiceState({
+      inVoice: true,
+      muted: res.micMuted,
+      deafened: res.deafened,
+    });
+    this.syncVoiceSnapshot();
+    this.notify();
+  }
+
+  public async applyVoicePreferences(prefs: VoicePreferences, persist = true): Promise<void> {
+    await voiceManager.applyPreferences(prefs, persist);
+    this.syncVoiceSnapshot();
+    this.notify();
+  }
+
+  public setPeerVoiceVolume(
+    peerId: string,
+    volume: number,
+    muted: boolean,
+    publicKey?: string,
+    username?: string,
+  ): UserVoiceVolumePreference {
+    const peer = this.peers.find((p) => p.id === peerId);
+    const saved = voiceManager.setRemotePeerVolume(
+      peerId,
+      volume,
+      muted,
+      publicKey ?? peer?.publicKey,
+      username ?? peer?.username,
+    );
+    this.syncVoiceSnapshot();
+    this.notify();
+    return saved;
+  }
+
+  public getPeerVoiceVolume(
+    peerId: string,
+    publicKey?: string,
+    username?: string,
+  ): UserVoiceVolumePreference {
+    const peer = this.peers.find((p) => p.id === peerId);
+    return voiceManager.getRemotePeerVolume(
+      peerId,
+      publicKey ?? peer?.publicKey,
+      username ?? peer?.username,
+    );
   }
 }
 
