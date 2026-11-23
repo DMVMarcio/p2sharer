@@ -40,8 +40,8 @@ export const DEFAULT_VOICE_PREFERENCES: VoicePreferences = {
   inputVolume: 100,
   outputVolume: 100,
   noiseSuppressionMode: 'standard',
-  echoCancellation: true,
-  autoGainControl: true,
+  echoCancellation: false,
+  autoGainControl: false,
   autoSensitivity: true,
   sensitivityDb: -50,
 };
