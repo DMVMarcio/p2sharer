@@ -78,17 +78,17 @@ test('native receiver gives negotiation its own deadline and checks first video 
   const f = receiverFixture(context);
   f.at(4000); await f.internal.checkReceiver(f.route);
   assert.equal(f.messages.length, 0, 'ICE connected does not mean DTLS and media are ready');
-  f.at(12000); f.pc.connectionState = 'connected'; await f.internal.checkReceiver(f.route);
-  f.at(17500); await f.internal.checkReceiver(f.route);
+  f.at(9000); f.pc.connectionState = 'connected'; await f.internal.checkReceiver(f.route);
+  f.at(14500); await f.internal.checkReceiver(f.route);
   assert.equal(f.messages.length, 0, 'First-video grace starts at the completed connection');
-  f.at(18000); await f.internal.checkReceiver(f.route);
+  f.at(15000); await f.internal.checkReceiver(f.route);
   assert.equal(f.messages[0]?.kind, 'reject');
   assert.equal(f.pc.connectionState, 'closed');
 });
 
 test('native receiver still falls back when setup never completes', async context => {
   const f = receiverFixture(context);
-  f.at(18000); await f.internal.checkReceiver(f.route);
+  f.at(10000); await f.internal.checkReceiver(f.route);
   assert.equal(f.messages[0]?.kind, 'reject');
   assert.equal(f.pc.connectionState, 'closed');
 });

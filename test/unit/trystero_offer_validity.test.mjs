@@ -190,3 +190,60 @@ test('renegotiate recovers a stale unanswered have-local-offer after timeout', a
     assert.equal(signals.filter((s) => s.type === 'offer').length >= 2, true);
   } finally { peer.destroy(); }
 });
+
+test('fatal SDP collision errors tear down an open peer instead of looping', async () => {
+  const conn = createRenegotiationConnection('stable');
+  const origSetRemote = conn.setRemoteDescription.bind(conn);
+  let shouldFailFatal = false;
+  conn.setRemoteDescription = async (desc) => {
+    if (shouldFailFatal) {
+      const err = new Error('Failed to set remote offer sdp: Session error code: ERROR_CONTENT. RTP extension ID reassignment not supported');
+      err.name = 'InvalidAccessError';
+      throw err;
+    }
+    return origSetRemote(desc);
+  };
+  const peer = createPeer(false, { rtcPolyfill: class { constructor() { return conn; } }, trickleIce: true });
+  const errors = [];
+  peer.setHandlers({ signal: () => {}, error: (err) => errors.push(err) });
+  conn.ondatachannel({ channel: conn.channel });
+  try {
+    shouldFailFatal = true;
+    await peer.signal({ type: 'offer', sdp: `${validSdp}a=ice-ufrag:fatal1\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\n` });
+    assert.equal(errors.length, 1);
+    assert.match(errors[0].message, /RTP extension ID reassignment|failed to apply remote signal/i);
+  } finally { peer.destroy(); }
+});
+
+test('transient open-peer negotiation errors recover up to threshold then fail', async () => {
+  const conn = createRenegotiationConnection('stable');
+  const origSetLocal = conn.setLocalDescription.bind(conn);
+  let failCreateOffer = false;
+  conn.setLocalDescription = async (desc) => {
+    if (!desc && failCreateOffer && conn.signalingState === 'stable') {
+      throw new Error('transient negotiation failure');
+    }
+    return origSetLocal(desc);
+  };
+  const peer = createPeer(false, { rtcPolyfill: class { constructor() { return conn; } }, trickleIce: true });
+  const errors = [];
+  peer.setHandlers({ signal: () => {}, error: (err) => errors.push(err) });
+  conn.ondatachannel({ channel: conn.channel });
+  try {
+    failCreateOffer = true;
+    await peer.renegotiate();
+    await peer.renegotiate();
+    await peer.renegotiate();
+    assert.equal(errors.length, 0, 'recovers for up to 3 consecutive transient errors');
+    // Successful remote offer+answer resets counter
+    await peer.signal({ type: 'offer', sdp: `${validSdp}a=ice-ufrag:ok1\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\n` });
+    assert.equal(errors.length, 0);
+    // Now 3 transient errors recover, 4th escalates
+    await peer.renegotiate();
+    await peer.renegotiate();
+    await peer.renegotiate();
+    assert.equal(errors.length, 0);
+    await peer.renegotiate();
+    assert.equal(errors.length, 1);
+  } finally { peer.destroy(); }
+});

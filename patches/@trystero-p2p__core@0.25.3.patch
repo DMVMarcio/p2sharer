@@ -169,10 +169,10 @@ index 7340a4f4bd7192c2c9f064d40311433436effc0f..76076fb6d1649100358ca3c7d12b51bb
  	makeOffer;
  	pool = [];
 diff --git a/dist/peer.mjs b/dist/peer.mjs
-index 8003df9196a808650bc233f9243be5eae14b4a1d..73600f3d073481e7820c001f470a352df0205a3a 100644
+index 8003df9196a808650bc233f9243be5eae14b4a1d..01ec4ab7f36da64b17e6ceffbf9d1b2f508f53e4 100644
 --- a/dist/peer.mjs
 +++ b/dist/peer.mjs
-@@ -1,13 +1,19 @@
+@@ -1,13 +1,21 @@
  import { all, alloc, candidateType, resetTimer, toError } from "./utils.mjs";
  //#region src/peer.ts
  const iceTimeout = 15e3;
@@ -183,6 +183,8 @@ index 8003df9196a808650bc233f9243be5eae14b4a1d..73600f3d073481e7820c001f470a352d
  const offerType = "offer";
  const answerType = "answer";
  const outOfRangePattern = /out of range/i;
++const fatalSdpPattern = /RTP extension ID reassignment|order of m-lines|ERROR_CONTENT/i;
++const isFatalSdpError = (err) => err?.name === "InvalidAccessError" || fatalSdpPattern.test(String(err?.message ?? err ?? ""));
  const rewriteMdnsCandidatesToLoopback = (sdp) => sdp.replace(/ (\S+\.local) (\d+) typ host/g, " 127.0.0.1 $2 typ host");
 +// Initial room offers must negotiate the data channel. Empty offers can appear
 +// after offer recycling/rollback and otherwise consume an entire ICE timeout.
@@ -193,7 +195,7 @@ index 8003df9196a808650bc233f9243be5eae14b4a1d..73600f3d073481e7820c001f470a352d
  var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig, _test_only_mdnsHostFallbackToLoopback }) => {
  	const pc = new (rtcPolyfill ?? RTCPeerConnection)({
  		iceServers: defaultIceServers.concat(turnConfig ?? []),
-@@ -19,8 +25,17 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
+@@ -19,8 +27,18 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
  	const shouldTrickleIce = trickleIce !== false;
  	const pendingRemoteCandidates = [];
  	const pendingTracks = [];
@@ -202,6 +204,7 @@ index 8003df9196a808650bc233f9243be5eae14b4a1d..73600f3d073481e7820c001f470a352d
  	let isSettingRemoteAnswerPending = false;
 +	let localOfferCreatedAt = null;
 +	let needsRenegotiation = false;
++	let consecutiveNegotiationErrors = 0;
 +	let signalQueue = Promise.resolve();
 +	const enqueueSignal = (fn) => {
 +		const task = signalQueue.then(fn, fn);
@@ -211,7 +214,7 @@ index 8003df9196a808650bc233f9243be5eae14b4a1d..73600f3d073481e7820c001f470a352d
  	let dataChannel = null;
  	let disconnectedCloseTimer = null;
  	let didEmitClose = false;
-@@ -143,22 +158,44 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
+@@ -143,22 +161,46 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
  		dataChannel = channel;
  		setupDataChannel(channel);
  	};
@@ -238,10 +241,12 @@ index 8003df9196a808650bc233f9243be5eae14b4a1d..73600f3d073481e7820c001f470a352d
  				if (typeof pc.restartIce === "function") pc.restartIce();
  			}
  			await pc.setLocalDescription(restartIce ? await pc.createOffer({ iceRestart: true }) : void 0);
++			consecutiveNegotiationErrors = 0;
 +			localOfferCreatedAt = Date.now();
  			return await emitLocalDescriptionSignal();
  		} catch (err) {
-+			if (dataChannel?.readyState === "open" && pc.connectionState !== "failed" && pc.connectionState !== "closed") {
++			if (dataChannel?.readyState === "open" && pc.connectionState !== "failed" && pc.connectionState !== "closed" && !isFatalSdpError(err) && consecutiveNegotiationErrors < 3) {
++				consecutiveNegotiationErrors++;
 +				console.warn("trystero: createOffer failed on open peer, recovering:", err);
 +				if (pc.signalingState === "have-local-offer") {
 +					await pc.setLocalDescription({ type: "rollback" }).catch(() => {});
@@ -258,7 +263,7 @@ index 8003df9196a808650bc233f9243be5eae14b4a1d..73600f3d073481e7820c001f470a352d
  	pc.onnegotiationneeded = async () => createOffer(false);
  	pc.onicecandidate = ({ candidate }) => {
  		if (!shouldTrickleIce || !candidate) return;
-@@ -185,7 +222,7 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
+@@ -185,7 +227,7 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
  		if (pc.connectionState === "disconnected" || pc.iceConnectionState === "disconnected") {
  			if (!disconnectedCloseTimer) disconnectedCloseTimer = setTimeout(() => {
  				disconnectedCloseTimer = null;
@@ -267,7 +272,7 @@ index 8003df9196a808650bc233f9243be5eae14b4a1d..73600f3d073481e7820c001f470a352d
  			}, disconnectedCloseDelayMs);
  			return;
  		}
-@@ -224,9 +261,9 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
+@@ -224,9 +266,9 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
  		},
  		getOffer: async (restartIce = false) => {
  			if (!initiator) return;
@@ -280,7 +285,7 @@ index 8003df9196a808650bc233f9243be5eae14b4a1d..73600f3d073481e7820c001f470a352d
  		},
  		async signal(sdp) {
  			if (sdp.type === "candidate") {
-@@ -238,34 +275,87 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
+@@ -238,34 +280,90 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
  				}
  				return;
  			}
@@ -334,6 +339,7 @@ index 8003df9196a808650bc233f9243be5eae14b4a1d..73600f3d073481e7820c001f470a352d
 -					} finally {
 -						isSettingRemoteAnswerPending = false;
 +						await pc.setLocalDescription();
++						consecutiveNegotiationErrors = 0;
 +						const signalOut = await emitLocalDescriptionSignal();
 +						if (needsRenegotiation && pc.signalingState === "stable" && pc.connectionState !== "closed") {
 +							needsRenegotiation = false;
@@ -347,6 +353,7 @@ index 8003df9196a808650bc233f9243be5eae14b4a1d..73600f3d073481e7820c001f470a352d
 +						isSettingRemoteAnswerPending = true;
 +						try {
 +							await pc.setRemoteDescription(rtcSdp);
++							consecutiveNegotiationErrors = 0;
 +							localOfferCreatedAt = null;
 +							await flushPendingRemoteCandidates();
 +						} finally {
@@ -360,7 +367,8 @@ index 8003df9196a808650bc233f9243be5eae14b4a1d..73600f3d073481e7820c001f470a352d
 +						}
  					}
 +				} catch (err) {
-+					if (dataChannel?.readyState === "open" && pc.connectionState !== "failed" && pc.connectionState !== "closed") {
++					if (dataChannel?.readyState === "open" && pc.connectionState !== "failed" && pc.connectionState !== "closed" && !isFatalSdpError(err) && consecutiveNegotiationErrors < 3) {
++						consecutiveNegotiationErrors++;
 +						console.warn("trystero: signal failed on open peer, recovering:", err);
 +						if (pc.signalingState !== "stable") {
 +							await pc.setLocalDescription({ type: "rollback" }).catch(() => {});
@@ -390,16 +398,17 @@ index 8003df9196a808650bc233f9243be5eae14b4a1d..73600f3d073481e7820c001f470a352d
  		sendData: (data) => dataChannel?.send(data),
  		destroy: () => {
  			clearDisconnectedCloseTimer();
-@@ -273,6 +363,8 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
+@@ -273,6 +371,9 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
  			pc.close();
  			makingOffer = false;
  			isSettingRemoteAnswerPending = false;
 +			localOfferCreatedAt = null;
 +			needsRenegotiation = false;
++			consecutiveNegotiationErrors = 0;
  			emitClose();
  		},
  		setHandlers: (newHandlers) => {
-@@ -286,9 +378,9 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
+@@ -286,9 +387,9 @@ var peer_default = (initiator, { trickleIce, rtcConfig, rtcPolyfill, turnConfig,
  			});
  		},
  		offerPromise,

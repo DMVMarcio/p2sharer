@@ -11,7 +11,7 @@ function fixture() {
   manager.room = { makeAction: (name: string) => {
     const action = { send: (data: any, options: any) => { sent.push({ name, data, options }); } };
     actions.set(name, action); return action;
-  }, getPeers: () => ({}) };
+  }, getPeers: () => ({ host: {}, alice: {}, bob: {} }) };
   manager.callbacks = { onStreamsUpdate() {}, onSlotsUpdate: (value: any) => slots.push(value), onPeersUpdate() {}, onStatusChange() {} };
   for (const id of ['host', 'alice', 'bob']) manager.peerTracker.addPeer(id, id);
   manager.remoteDescriptors.set('host', [descriptor('screen'), descriptor('camera')]);

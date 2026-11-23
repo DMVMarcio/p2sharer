@@ -192,6 +192,34 @@ fn native_candidate_available(ip: std::net::IpAddr) -> bool {
         && std::net::UdpSocket::bind((ip, 0)).is_ok()
 }
 
+/// Cap STUN URLs to at most two distinct servers so multi-interface hosts do not
+/// duplicate reflexive candidates across six public endpoints while keeping all TURN servers.
+fn trim_native_ice_servers(ice_servers: Vec<IceServer>) -> Vec<RTCIceServer> {
+    let mut seen_stun = std::collections::HashSet::new();
+    let mut result = Vec::with_capacity(ice_servers.len());
+    for server in ice_servers {
+        let mut urls = Vec::with_capacity(server.urls.len());
+        for url in server.urls {
+            let normalized = url.trim().to_ascii_lowercase();
+            if normalized.starts_with("stun:") {
+                if seen_stun.len() < 2 && seen_stun.insert(normalized) {
+                    urls.push(url);
+                }
+            } else {
+                urls.push(url);
+            }
+        }
+        if !urls.is_empty() {
+            result.push(RTCIceServer {
+                urls,
+                username: server.username,
+                credential: server.credential,
+            });
+        }
+    }
+    result
+}
+
 fn valid_id(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= 100
@@ -370,14 +398,7 @@ pub async fn create_native_video_offer(
         .with_interceptor_registry(registry)
         .with_setting_engine(setting)
         .build();
-    let servers = ice_servers
-        .into_iter()
-        .map(|s| RTCIceServer {
-            urls: s.urls,
-            username: s.username,
-            credential: s.credential,
-        })
-        .collect();
+    let servers = trim_native_ice_servers(ice_servers);
     let pc = Arc::new(
         api.new_peer_connection(RTCConfiguration {
             ice_servers: servers,
@@ -476,17 +497,19 @@ pub async fn create_native_video_offer(
     }));
     let state_id = id.clone();
     let state_key = capture.keyframe.clone();
+    let state_wgc_thread = capture.wgc_thread_id.clone();
     let diagnostic_route = Arc::downgrade(&value);
     pc.on_peer_connection_state_change(Box::new(move |state| {
         let app = state_app.clone();
         let id = state_id.clone();
         let key = state_key.clone();
+        let wgc_thread = state_wgc_thread.clone();
         let diagnostic_route = diagnostic_route.clone();
         Box::pin(async move {
             crate::logger::log_msg("INFO", "transmission.native.ice",
                 &format!("Native sender state routeId={id} connection={state}"));
             if state == RTCPeerConnectionState::Connected {
-                key.store(true, Ordering::Relaxed);
+                crate::screen_sources::request_capture_keyframe(&key, &wgc_thread);
                 if let Some(route) = diagnostic_route.upgrade() {
                     let id = id.clone();
                     tokio::spawn(async move { log_native_route(&id, &route, "connected").await; });
@@ -528,6 +551,7 @@ pub async fn create_native_video_offer(
 
     let rtcp_value = value.clone();
     let rtcp_key = capture.keyframe.clone();
+    let rtcp_wgc_thread = capture.wgc_thread_id.clone();
     tokio::spawn(async move {
         let mut last_key = Instant::now() - Duration::from_secs(1);
         let mut last_adjust = Instant::now();
@@ -541,7 +565,7 @@ pub async fn create_native_video_offer(
                 if (p.as_any().is::<PictureLossIndication>() || p.as_any().is::<FullIntraRequest>())
                     && last_key.elapsed() >= Duration::from_millis(250)
                 {
-                    rtcp_key.store(true, Ordering::Relaxed);
+                    crate::screen_sources::request_capture_keyframe(&rtcp_key, &rtcp_wgc_thread);
                     last_key = Instant::now();
                 }
                 if let Some(rr) = p.as_any().downcast_ref::<ReceiverReport>() {
@@ -606,7 +630,7 @@ pub async fn create_native_video_offer(
                 Ok(Ok(_)) | Err(_) => continue,
                 Ok(Err(tokio::sync::broadcast::error::RecvError::Lagged(_))) => {
                     gate.wait_key = true;
-                    capture.keyframe.store(true, Ordering::Relaxed);
+                    crate::screen_sources::request_capture_keyframe(&capture.keyframe, &capture.wgc_thread_id);
                     continue;
                 }
                 _ => break,
@@ -631,7 +655,7 @@ pub async fn create_native_video_offer(
                 gate.wait_key = true;
                 value.gaps.fetch_add(1, Ordering::Relaxed);
                 if last_key.elapsed() >= Duration::from_millis(250) {
-                    capture.keyframe.store(true, Ordering::Relaxed);
+                    crate::screen_sources::request_capture_keyframe(&capture.keyframe, &capture.wgc_thread_id);
                     last_key = Instant::now();
                 }
                 continue;
@@ -640,7 +664,7 @@ pub async fn create_native_video_offer(
             if decision == Decision::Recover {
                 value.gaps.fetch_add(1, Ordering::Relaxed);
                 if last_key.elapsed() >= Duration::from_millis(250) {
-                    capture.keyframe.store(true, Ordering::Relaxed);
+                    crate::screen_sources::request_capture_keyframe(&capture.keyframe, &capture.wgc_thread_id);
                     last_key = Instant::now();
                 }
                 continue;
@@ -710,7 +734,7 @@ pub async fn create_native_video_offer(
             }
             if !complete {
                 gate.wait_key = true;
-                capture.keyframe.store(true, Ordering::Relaxed);
+                crate::screen_sources::request_capture_keyframe(&capture.keyframe, &capture.wgc_thread_id);
                 send_failures += 1;
                 if send_failures >= 3 {
                     break;
@@ -1061,6 +1085,53 @@ mod tests {
         assert!(EncodedFrame::parse(&p).is_some());
         p[5] = 2;
         assert!(EncodedFrame::parse(&p).is_none());
+    }
+    #[test]
+    fn trim_native_ice_servers_caps_stun_at_two_and_keeps_all_turn() {
+        let input = vec![
+            IceServer {
+                urls: vec![
+                    "stun:stun.cloudflare.com:3478".into(),
+                    "stun:stun.l.google.com:19302".into(),
+                    "stun:stun.l.google.com:19302".into(),
+                    "stun:stun1.l.google.com:19302".into(),
+                    "stun:stun2.l.google.com:19302".into(),
+                ],
+                username: String::new(),
+                credential: String::new(),
+            },
+            IceServer {
+                urls: vec!["stun:stun3.l.google.com:19302".into()],
+                username: String::new(),
+                credential: String::new(),
+            },
+            IceServer {
+                urls: vec![
+                    "turn:turn.example.invalid:3478?transport=udp".into(),
+                    "turns:turn.example.invalid:5349?transport=tcp".into(),
+                ],
+                username: "user".into(),
+                credential: "pass".into(),
+            },
+        ];
+        let trimmed = trim_native_ice_servers(input);
+        assert_eq!(trimmed.len(), 2);
+        assert_eq!(
+            trimmed[0].urls,
+            vec![
+                "stun:stun.cloudflare.com:3478",
+                "stun:stun.l.google.com:19302",
+            ]
+        );
+        assert_eq!(
+            trimmed[1].urls,
+            vec![
+                "turn:turn.example.invalid:3478?transport=udp",
+                "turns:turn.example.invalid:5349?transport=tcp",
+            ]
+        );
+        assert_eq!(trimmed[1].username, "user");
+        assert_eq!(trimmed[1].credential, "pass");
     }
 }
 

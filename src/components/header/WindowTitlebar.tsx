@@ -62,14 +62,19 @@ export const WindowTitlebar: React.FC<{ onVisibilityChange: (visible: boolean) =
       try {
         if (confirmClose && !await confirmClose()) { closing = false; return; }
       } catch (error) { closing = false; report(error); return; }
+      void invoke('arm_exit_watchdog').catch(() => {});
       try {
         await Promise.race([
           roomService.leaveRoom(),
           new Promise((resolve) => setTimeout(resolve, 1500)),
         ]);
       } catch (error) { console.warn('[Window] Room shutdown failed:', error); }
-      try { await nativeWindow.destroy(); }
-      catch (error) { report(error); }
+      try {
+        await Promise.race([
+          nativeWindow.destroy(),
+          new Promise((resolve) => setTimeout(resolve, 1000)),
+        ]);
+      } catch (error) { report(error); }
       try { await invoke('exit_application'); }
       catch {}
     }));

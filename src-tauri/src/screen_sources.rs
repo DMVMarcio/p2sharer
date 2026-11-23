@@ -60,6 +60,7 @@ static FRAME_SENDER: std::sync::OnceLock<broadcast::Sender<Message>> = std::sync
 struct CaptureSession {
     nvenc_enabled: Arc<AtomicBool>,
     nvenc_keyframe: Arc<AtomicBool>,
+    wgc_thread_id: Arc<std::sync::atomic::AtomicU32>,
     nvenc_bitrate: Arc<std::sync::atomic::AtomicU32>,
     source: String,
     active: Arc<AtomicBool>,
@@ -89,8 +90,31 @@ pub struct EncodedCapture {
     pub frames: broadcast::Receiver<Message>,
     pub active: Arc<AtomicBool>,
     pub keyframe: Arc<AtomicBool>,
+    pub wgc_thread_id: Arc<std::sync::atomic::AtomicU32>,
     pub bitrate: Arc<std::sync::atomic::AtomicU32>,
     pub load: Arc<crate::video_load::CaptureLoad>,
+}
+impl EncodedCapture {
+    pub fn request_keyframe(&self) {
+        request_capture_keyframe(&self.keyframe, &self.wgc_thread_id);
+    }
+}
+pub fn request_capture_keyframe(keyframe: &AtomicBool, wgc_thread_id: &std::sync::atomic::AtomicU32) {
+    keyframe.store(true, Ordering::Release);
+    #[cfg(windows)]
+    {
+        let thread_id = wgc_thread_id.load(Ordering::Acquire);
+        if thread_id != 0 {
+            unsafe {
+                let _ = windows_capture_api::Win32::UI::WindowsAndMessaging::PostThreadMessageW(
+                    thread_id,
+                    WM_APP_REQUEST_KEYFRAME,
+                    windows_capture_api::Win32::Foundation::WPARAM(0),
+                    windows_capture_api::Win32::Foundation::LPARAM(0),
+                );
+            }
+        }
+    }
 }
 pub fn encoded_capture(id: &str, token: &str) -> Result<EncodedCapture, String> {
     let sessions = SESSIONS.lock().map_err(|_| "Capture session lock poisoned")?;
@@ -98,7 +122,8 @@ pub fn encoded_capture(id: &str, token: &str) -> Result<EncodedCapture, String> 
     session.load.validate_token(token)?;
     if !session.nvenc_enabled.load(Ordering::Relaxed) { return Err("Native encoder is unavailable".into()); }
     Ok(EncodedCapture { frames: session.sender.subscribe(), active: session.active.clone(),
-        keyframe: session.nvenc_keyframe.clone(), bitrate: session.nvenc_bitrate.clone(), load: session.load.clone() })
+        keyframe: session.nvenc_keyframe.clone(), wgc_thread_id: session.wgc_thread_id.clone(),
+        bitrate: session.nvenc_bitrate.clone(), load: session.load.clone() })
 }
 
 #[derive(Default)]
@@ -263,7 +288,7 @@ pub fn control_capture_encoder(session_id: String, feedback_token: String, disab
             session.metrics.nvenc_fallbacks.fetch_add(1, Ordering::Relaxed);
         }
     }
-    else { session.nvenc_keyframe.store(true, Ordering::Relaxed); }
+    else { request_capture_keyframe(&session.nvenc_keyframe, &session.wgc_thread_id); }
     Ok(())
 }
 
@@ -723,7 +748,7 @@ impl NativeWgcHandler {
             self.load.fps(),
             self.nvenc_bitrate.load(Ordering::Relaxed),
             self.start_instant.elapsed().as_micros() as u64,
-            false,
+            self.nvenc_keyframe.swap(false, Ordering::AcqRel),
         ) {
             Ok(bytes) => {
                 if !enqueue_capture_frame(
@@ -748,6 +773,56 @@ impl NativeWgcHandler {
             Err(_) => {
                 self.refinements_remaining = 0;
                 false
+            }
+        }
+    }
+
+    fn encode_requested_keyframe(&mut self, device: &windows_capture_api::Win32::Graphics::Direct3D11::ID3D11Device) {
+        if !self.nvenc_keyframe.load(Ordering::Acquire)
+            || !self.nvenc_enabled.load(Ordering::Relaxed)
+            || !self.lifecycle.active.load(Ordering::Relaxed)
+        {
+            return;
+        }
+        if !self.legacy_pacing && !self.delivery.0.lock().map_or(false, |pacer| pacer.has_encode_capacity()) {
+            return;
+        }
+        let Some((texture, width, height)) = self.last_encoded.as_ref().map(|(t, w, h)| (t.clone(), *w, *h)) else {
+            return;
+        };
+        let Some(encoder) = self.nvenc.as_mut() else {
+            return;
+        };
+        let force_keyframe = self.nvenc_keyframe.swap(false, Ordering::AcqRel);
+        match encoder.encode(
+            device,
+            &texture,
+            width,
+            height,
+            self.load.fps(),
+            self.nvenc_bitrate.load(Ordering::Relaxed),
+            self.start_instant.elapsed().as_micros() as u64,
+            force_keyframe,
+        ) {
+            Ok(bytes) => {
+                if !enqueue_capture_frame(
+                    &self.delivery,
+                    Arc::new(bytes),
+                    self.start_instant.elapsed().as_micros() as u64,
+                    self.legacy_pacing,
+                    &self.lifecycle.active,
+                    &self.sender,
+                    &self.metrics,
+                ) {
+                    self.nvenc_keyframe.store(true, Ordering::Release);
+                    return;
+                }
+                self.metrics.images.fetch_add(1, Ordering::Relaxed);
+                self.metrics.nvenc_images.fetch_add(1, Ordering::Relaxed);
+                self.last_hw_encode = Some(std::time::Instant::now());
+            }
+            Err(_) => {
+                self.nvenc_keyframe.store(true, Ordering::Release);
             }
         }
     }
@@ -800,6 +875,8 @@ fn copy_refine_texture(
 const WM_APP_UPDATE_CURSOR: u32 = 0x8000 + 0x101;
 #[cfg(windows)]
 const WM_APP_ARM_REFINE: u32 = 0x8000 + 0x102;
+#[cfg(windows)]
+const WM_APP_REQUEST_KEYFRAME: u32 = 0x8000 + 0x103;
 
 #[cfg(windows)]
 struct WgcControl {
@@ -1314,6 +1391,10 @@ fn start_wgc_capture(source: &str, capture_mouse: bool, flags: CaptureFlags) -> 
                     if msg.message == WM_APP_UPDATE_CURSOR && cursor_supported {
                         let desired = desired_thread.load(Ordering::Acquire);
                         apply_wgc_cursor_visibility(&session, &metrics, &applied_cursor, desired, &session_id);
+                    } else if msg.message == WM_APP_REQUEST_KEYFRAME {
+                        if let Ok(mut guard) = handler.lock() {
+                            guard.encode_requested_keyframe(&d3d_device);
+                        }
                     } else if msg.message == WM_APP_ARM_REFINE {
                         if refine_timer_active {
                             let _ = unsafe { KillTimer(None, refine_timer_id) };
@@ -2026,9 +2107,11 @@ pub fn start_capture_session(
     crate::logger::log_msg("INFO", "capture.start", &format!("session={session_id} source={source_id} requested={width}x{height}@{fps} cursor={should_draw_mouse} jpeg_quality={jpeg_quality} preference={} nvenc_requested={try_nvenc} mf_requested={try_mf}",
         encoder_preference.as_deref().unwrap_or("auto")));
     let nvenc_keyframe = Arc::new(AtomicBool::new(true));
+    let wgc_thread_id = Arc::new(std::sync::atomic::AtomicU32::new(0));
     let nvenc_bitrate = Arc::new(std::sync::atomic::AtomicU32::new(15_000_000));
     SESSIONS.lock().map_err(|_| "Capture session lock poisoned")?.insert(session_id.clone(), CaptureSession {
-        nvenc_enabled: nvenc_enabled.clone(), nvenc_keyframe: nvenc_keyframe.clone(), nvenc_bitrate: nvenc_bitrate.clone(),
+        nvenc_enabled: nvenc_enabled.clone(), nvenc_keyframe: nvenc_keyframe.clone(), wgc_thread_id: wgc_thread_id.clone(),
+        nvenc_bitrate: nvenc_bitrate.clone(),
         source: source_id.clone(),
         active: is_capturing.clone(), sender: sender.clone(),
         terminal_signal: None,
@@ -2074,6 +2157,9 @@ pub fn start_capture_session(
                 if let Ok(mut sessions) = SESSIONS.lock() {
                     if let Some(session) = sessions.get_mut(&session_id) {
                         if Arc::ptr_eq(&session.active, &flags.active_flag) && session.active.load(Ordering::Acquire) {
+                            if let Some(ActiveCaptureControl::Wgc(ref wgc)) = control {
+                                session.wgc_thread_id.store(wgc.thread_id, Ordering::Release);
+                            }
                             session.control = control.take();
                         }
                     }
@@ -2431,6 +2517,7 @@ pub fn stop_capture_session(session_id: String) -> Result<bool, String> {
             session.metrics.images.load(Ordering::Relaxed), session.metrics.nvenc_images.load(Ordering::Relaxed),
             session.metrics.nvenc_fallbacks.load(Ordering::Relaxed), session.metrics.readback_errors.load(Ordering::Relaxed), session.metrics.jpeg_errors.load(Ordering::Relaxed)));
         session.active.store(false, Ordering::SeqCst);
+        session.wgc_thread_id.store(0, Ordering::Release);
         #[cfg(windows)]
         if let Some(control) = session.control { safely_stop_capture_control(control); }
     }
@@ -2686,7 +2773,9 @@ mod tests {
         let (b, _) = broadcast::channel(32);
         for (id, sender) in [("socket-test-a", a.clone()), ("socket-test-b", b.clone())] {
             SESSIONS.lock().unwrap().insert(id.into(), CaptureSession {
-                nvenc_enabled: Arc::new(AtomicBool::new(false)), nvenc_keyframe: Arc::new(AtomicBool::new(true)), nvenc_bitrate: Arc::new(std::sync::atomic::AtomicU32::new(15_000_000)),
+                nvenc_enabled: Arc::new(AtomicBool::new(false)), nvenc_keyframe: Arc::new(AtomicBool::new(true)),
+                wgc_thread_id: Arc::new(std::sync::atomic::AtomicU32::new(0)),
+                nvenc_bitrate: Arc::new(std::sync::atomic::AtomicU32::new(15_000_000)),
                 metrics: Arc::new(CaptureMetrics::default()),
                 load: Arc::new(crate::video_load::CaptureLoad::new(60, 0, 0, None)),
                 source: "screen:0".into(), active: Arc::new(AtomicBool::new(true)), sender,

@@ -6,7 +6,7 @@ settings:
 
 patchedDependencies:
   '@trystero-p2p/core@0.25.3':
-    hash: b0569614aa4b61a353a2976d837ac81ddcc7aa1d2064c6c7ebabfdbddef20cbb
+    hash: 7e91f6d267fdc704851667462fcbf244d8796c83a58795af7fcbacb7e5434108
     path: patches/@trystero-p2p__core@0.25.3.patch
 
 importers:
@@ -126,7 +126,7 @@ importers:
         version: 3.31.3
       '@trystero-p2p/core':
         specifier: 0.25.3
-        version: 0.25.3(patch_hash=b0569614aa4b61a353a2976d837ac81ddcc7aa1d2064c6c7ebabfdbddef20cbb)
+        version: 0.25.3(patch_hash=7e91f6d267fdc704851667462fcbf244d8796c83a58795af7fcbacb7e5434108)
       '@trystero-p2p/mqtt':
         specifier: ^0.25.3
         version: 0.25.3
@@ -2876,11 +2876,11 @@ snapshots:
       y-protocols: 1.0.7(yjs@13.6.33)
       yjs: 13.6.33
 
-  '@trystero-p2p/core@0.25.3(patch_hash=b0569614aa4b61a353a2976d837ac81ddcc7aa1d2064c6c7ebabfdbddef20cbb)': {}
+  '@trystero-p2p/core@0.25.3(patch_hash=7e91f6d267fdc704851667462fcbf244d8796c83a58795af7fcbacb7e5434108)': {}
 
   '@trystero-p2p/mqtt@0.25.3':
     dependencies:
-      '@trystero-p2p/core': 0.25.3(patch_hash=b0569614aa4b61a353a2976d837ac81ddcc7aa1d2064c6c7ebabfdbddef20cbb)
+      '@trystero-p2p/core': 0.25.3(patch_hash=7e91f6d267fdc704851667462fcbf244d8796c83a58795af7fcbacb7e5434108)
       mqtt: 5.15.2
     transitivePeerDependencies:
       - bufferutil
@@ -2890,11 +2890,11 @@ snapshots:
   '@trystero-p2p/nostr@0.25.3':
     dependencies:
       '@noble/secp256k1': 3.1.0
-      '@trystero-p2p/core': 0.25.3(patch_hash=b0569614aa4b61a353a2976d837ac81ddcc7aa1d2064c6c7ebabfdbddef20cbb)
+      '@trystero-p2p/core': 0.25.3(patch_hash=7e91f6d267fdc704851667462fcbf244d8796c83a58795af7fcbacb7e5434108)
 
   '@trystero-p2p/torrent@0.25.3':
     dependencies:
-      '@trystero-p2p/core': 0.25.3(patch_hash=b0569614aa4b61a353a2976d837ac81ddcc7aa1d2064c6c7ebabfdbddef20cbb)
+      '@trystero-p2p/core': 0.25.3(patch_hash=7e91f6d267fdc704851667462fcbf244d8796c83a58795af7fcbacb7e5434108)
 
   '@types/babel__core@7.20.5':
     dependencies:

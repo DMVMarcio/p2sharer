@@ -528,6 +528,7 @@ export class GroupRoomManager {
     if (!validStreamPointerState(state)) return;
     for (const watcher of this.getStreamWatchers('local')) {
       if (!this.pointerAction || !this.peerTracker.isVerified(watcher.peerId) ||
+          !this.isLivePeerTarget(watcher.peerId) ||
           (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(watcher.peerId)))) continue;
       void Promise.resolve(this.pointerAction.send(state, { target: watcher.peerId })).catch(() => {});
     }
@@ -536,6 +537,7 @@ export class GroupRoomManager {
   public sendStreamPointer(packet: StreamPointerPacket, target: string): void {
     if (!validStreamPointer(packet)) return;
     if (!this.pointerAction || !this.peerTracker.isVerified(target) ||
+        !this.isLivePeerTarget(target) ||
         (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(target)))) return;
     void Promise.resolve(this.pointerAction.send(packet, { target })).catch(() => {});
   }
@@ -543,6 +545,7 @@ export class GroupRoomManager {
   public sendRemoteControlClient(packet: RemoteControlClientPacket, target: string): void {
     if (!validRemoteControlClientPacket(packet)) return;
     if (!this.remoteControlAction || !this.peerTracker.isVerified(target) ||
+        !this.isLivePeerTarget(target) ||
         (this.authority && (!this.localAdmitted || !this.isAdmittedPeer(target)))) return;
     if (packet.type === 'request') {
       this.payloadChannels.ensure(target);
@@ -819,9 +822,15 @@ export class GroupRoomManager {
     return list;
   }
 
+  private isLivePeerTarget(peerId: string): boolean {
+    const livePeers = this.room?.getPeers?.();
+    return !livePeers || Object.prototype.hasOwnProperty.call(livePeers, peerId);
+  }
+
   private admittedTargets(): string[] {
     return Array.from(this.peerTracker.directConnectedPeers).filter((peerId) =>
-      !this.authority || (this.localAdmitted && this.isAdmittedPeer(peerId)));
+      this.isLivePeerTarget(peerId) &&
+      (!this.authority || (this.localAdmitted && this.isAdmittedPeer(peerId))));
   }
 
   private isAdmittedPeer(peerId: string): boolean {
@@ -852,7 +861,9 @@ export class GroupRoomManager {
     if (!actionName) return;
 
     for (const [indirectPeerId, intermediaryPeerId] of this.rumorIntermediaries) {
-      if (this.peerTracker.isRelayed(indirectPeerId) && this.peerTracker.directConnectedPeers.has(intermediaryPeerId)) {
+      if (this.peerTracker.isRelayed(indirectPeerId) &&
+          this.peerTracker.directConnectedPeers.has(intermediaryPeerId) &&
+          this.isLivePeerTarget(intermediaryPeerId)) {
         try {
           this.meshRelayAction.send(
             { target: indirectPeerId, origin: selfId, kind: 'action_relay', action: actionName, payload: data },
@@ -2057,7 +2068,7 @@ export class GroupRoomManager {
             console.log(
               `[P2P/Recovery] Triggering stream recovery request for broadcaster ${peerId} (streamId: ${data.streamId})`
             );
-            if (this.streamReqAction) {
+            if (this.streamReqAction && this.isLivePeerTarget(peerId)) {
               const reqPayload: StreamRequestPayload = {
                 request: true,
                 broadcasterId: peerId,
@@ -2264,7 +2275,7 @@ export class GroupRoomManager {
         } else if (data.kind === 'stream_req' && data.origin === meta.peerId && this.localStream) {
           this.sendStreamToPeer(data.origin, true);
         }
-      } else if (data.target && this.peerTracker.hasPeer(data.target)) {
+      } else if (data.target && this.peerTracker.hasPeer(data.target) && this.isLivePeerTarget(data.target)) {
         try {
           this.meshRelayAction.send(data, { target: data.target });
         } catch {}
@@ -2294,7 +2305,11 @@ export class GroupRoomManager {
     this.nativeVideoAction = this.room.makeAction('native_video_v1');
     this.nativeVideo = new NativeVideoTransport({
       rtc: () => this.getFreshRtcConfiguration(),
-      send: (peerId, signal) => this.nativeVideoAction?.send(signal, { target: peerId }),
+      send: (peerId, signal) => {
+        if (this.room === boundRoom && this.isLivePeerTarget(peerId)) {
+          return this.nativeVideoAction?.send(signal, { target: peerId });
+        }
+      },
       permitted: (peerId, descriptor) => this.room === boundRoom && this.peerTracker.isVerified(peerId) &&
         (!this.authority || this.localAdmitted && this.isAdmittedPeer(peerId)) &&
         (!descriptor || !!this.remoteDescriptors.get(peerId)?.some(entry => entry.id === descriptor.id && entry.videoTrackId === descriptor.videoTrackId)),
@@ -2592,7 +2607,7 @@ export class GroupRoomManager {
       if (this.pingAction) {
         this.peerTracker.directConnectedPeers.forEach((pid) => {
           try {
-            if (!this.authority || this.admittedTargets().includes(pid)) {
+            if (this.isLivePeerTarget(pid) && (!this.authority || this.admittedTargets().includes(pid))) {
               this.pingAction.send({ t: Date.now() }, { target: pid });
             }
           } catch {}
@@ -2868,7 +2883,7 @@ export class GroupRoomManager {
   public requestStreamFromPeer(peerId: string) {
     if (peerId === 'local') return;
     console.log(`[P2P] Requesting live stream from peer ${peerId}`);
-    if (this.streamReqAction) {
+    if (this.streamReqAction && this.isLivePeerTarget(peerId)) {
       const payload: StreamRequestPayload = {
         request: true,
         broadcasterId: peerId,
@@ -3067,7 +3082,9 @@ export class GroupRoomManager {
     const payload = { ...MediaCoordinator.buildStreamStatusPayload(this.localStream, !!this.localStream, this.username),
       revision: this.mediaRevision,
       streams: Array.from(this.localMedia.values(), (entry) => entry.descriptor) };
-    if (target) this.streamStatusAction.send(payload, { target });
+    if (target) {
+      if (this.isLivePeerTarget(target)) this.streamStatusAction.send(payload, { target });
+    }
     else this.sendRoomAction(this.streamStatusAction, payload);
   }
 

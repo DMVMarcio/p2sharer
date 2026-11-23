@@ -92,12 +92,34 @@ fn cancel_app_update(window: tauri::Window) -> Result<(), String> {
     process_manager::set_update_installer_breakaway(false)
 }
 
-#[tauri::command]
-fn exit_application(app: tauri::AppHandle) -> Result<(), String> {
+static EXIT_WATCHDOG_ARMED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+fn shutdown_native_subsystems() {
     remote_control::shutdown_remote_control();
+    gamepad::shutdown_gamepads();
     let _ = stop_native_screen_capture();
     let _ = stop_audio_capture();
     chat_files::sweep_chat_clipboard();
+}
+
+#[tauri::command]
+fn arm_exit_watchdog(window: tauri::Window) -> Result<(), String> {
+    if window.label() != "main" {
+        return Err("Only the main window can arm the exit watchdog".into());
+    }
+    if !EXIT_WATCHDOG_ARMED.swap(true, std::sync::atomic::Ordering::AcqRel) {
+        std::thread::spawn(|| {
+            std::thread::sleep(std::time::Duration::from_secs(4));
+            shutdown_native_subsystems();
+            std::process::exit(0);
+        });
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn exit_application(app: tauri::AppHandle) -> Result<(), String> {
+    shutdown_native_subsystems();
     app.exit(0);
     std::process::exit(0);
 }
@@ -171,19 +193,18 @@ pub fn run() {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 let label = window.label();
                 if label == "main" {
-                    remote_control::shutdown_remote_control();
-                    let _ = stop_native_screen_capture();
-                    let _ = stop_audio_capture();
+                    std::thread::spawn(|| {
+                        remote_control::shutdown_remote_control();
+                        let _ = stop_native_screen_capture();
+                        let _ = stop_audio_capture();
+                    });
                 } else if label.starts_with("pip-") {
                     let peer_id = label.trim_start_matches("pip-").to_string();
                     let _ = window.app_handle().emit("pip-window-closed", peer_id);
                 }
             }
             if matches!(event, tauri::WindowEvent::Destroyed) && window.label() == "main" {
-                remote_control::shutdown_remote_control();
-                let _ = stop_native_screen_capture();
-                let _ = stop_audio_capture();
-                chat_files::sweep_chat_clipboard();
+                shutdown_native_subsystems();
                 std::process::exit(0);
             }
         })
@@ -250,6 +271,7 @@ pub fn run() {
             network_diagnostic::run_network_diagnostics,
             prepare_app_update,
             cancel_app_update,
+            arm_exit_watchdog,
             exit_application,
             browser_shortcuts::disable_browser_shortcuts,
             window_chrome::show_window_menu,
@@ -343,10 +365,7 @@ pub fn run() {
         .expect("error while building tauri application")
         .run(|_app_handle, event| {
             if let tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit = event {
-                remote_control::shutdown_remote_control();
-                gamepad::shutdown_gamepads();
-                let _ = stop_native_screen_capture();
-                let _ = stop_audio_capture();
+                shutdown_native_subsystems();
                 std::process::exit(0);
             }
         });
