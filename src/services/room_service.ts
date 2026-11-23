@@ -1,6 +1,6 @@
 import { isMobileDevice } from '../core/platform.ts';
 import { localizeError, t } from '../i18n/index.ts';
-import { reconcilePinnedRoomSlot, streamOwner, type MediaKind, type StreamDescriptor } from "../core/media_streams.ts";
+import { reconcilePinnedRoomSlot, streamOwner, streamSlotKey, type MediaKind, type StreamDescriptor } from "../core/media_streams.ts";
 import { StreamPointerReceiver } from './stream_pointer_receiver.ts';
 import { generateUserColor } from '../p2p/group_room.ts';
 import { validStreamPointer, validStreamPointerState, type StreamPointerState, type StreamPointerPacket } from '../core/stream_pointer.ts';
@@ -1611,7 +1611,6 @@ export class RoomService {
       }
       const id = editingId || crypto.randomUUID();
       const bridge = prepared?.bridge || (isTauri() && kind === 'screen' ? new NativeVideoBridge(crypto.randomUUID()) : undefined);
-      if (prepared?.bridge) prepared.bridge.setConsumerActive('modal-preview', false);
       let stream: MediaStream | undefined;
       let acquiredAudio: MediaStreamTrack | null = null;
       try {
@@ -1640,19 +1639,27 @@ export class RoomService {
         const descriptor: StreamDescriptor = { id, kind, get label() { return (label || (kind === 'camera' ? t("message.dafb61aca12d") :
           sourceId.startsWith('window:') ? t("message.28014ef35252") : t("message.2d31efc9c2ed"))).slice(0, 200); }, videoTrackId: track.id, fps, bitrate,
           hasAudio: previous ? previous.stream.getAudioTracks().length > 0 : Boolean(acquiredAudio || stream.getAudioTracks().length > 0) };
-        const initialPreview = Boolean(stateStore.localPreviewStreams[id] ?? stateStore.localPreviewStreams['local'] ?? (kind === 'camera'));
+        const slotPreviewKey = streamSlotKey('local', id);
+        const initialPreview = Boolean(
+          stateStore.localPreviewStreams[slotPreviewKey] ??
+          stateStore.localPreviewStreams[id] ??
+          stateStore.localPreviewStreams['local'] ??
+          (kind === 'camera')
+        );
         let capture: { sourceId: string; kind: MediaKind; stream: MediaStream;
           bridge?: NativeVideoBridge; fps: number; resolution: { width: number; height: number }; mouse: boolean; quality: number; bitrate: number } | undefined;
         try {
           if (previous) {
+            capture = { sourceId, kind, stream: previous.stream, bridge, fps, resolution: res, mouse, quality, bitrate };
+            this.localCaptures.set(id, capture);
+            bridge?.setConsumerActive('local-preview', initialPreview);
             await manager.replaceMediaTrack(id, track, descriptor);
             this.pointerReceivers.get(id)?.clear();
             this.pointerReceivers.delete(id);
             stream = previous.stream;
-            capture = { sourceId, kind, stream, bridge, fps, resolution: res, mouse, quality, bitrate };
-            this.localCaptures.set(id, capture);
-            bridge?.setConsumerActive('local-preview', initialPreview);
             manager.syncCaptureConsumers(id);
+            if (prepared?.bridge) prepared.bridge.setConsumerActive('modal-preview', false);
+            bridge?.requestKeyframe();
             const slot = stateStore.roomSlots.find((slot) => slot.isLocal && slot.mediaId === id);
             if (slot) pipService.updateStream(slot.peerId, stream);
           } else {
@@ -1660,6 +1667,8 @@ export class RoomService {
             this.localCaptures.set(id, capture);
             bridge?.setConsumerActive('local-preview', initialPreview);
             manager.shareStream(stream, bitrate * 1000, fps, descriptor);
+            if (prepared?.bridge) prepared.bridge.setConsumerActive('modal-preview', false);
+            bridge?.requestKeyframe();
           }
           track.onended = () => { if (this.localCaptures.get(id) === capture) this.stopTransmission(id); };
           if (bridge) bridge.onFallbackNeeded = () => {
@@ -1672,7 +1681,9 @@ export class RoomService {
             nativeSession: bridge?.sessionId, settings: track.getSettings(), elapsedMs: Math.round(performance.now() - captureStarted) });
           showToast(previous ? t("message.d1943a972148") : t("message.3c3d7ea79d61"));
         } catch (innerError) {
-          if (!previous && capture && this.localCaptures.get(id) === capture) {
+          if (previous && this.localCaptures.get(id) === capture) {
+            this.localCaptures.set(id, previous);
+          } else if (!previous && capture && this.localCaptures.get(id) === capture) {
             this.localCaptures.delete(id);
           }
           throw innerError;

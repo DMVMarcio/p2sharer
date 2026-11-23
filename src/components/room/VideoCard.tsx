@@ -85,6 +85,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   const currentBitrate = capture?.bitrate || defaultBitrate;
   const isPipActive = useStore((s) => s.isPeerInPip(slot.peerId));
   const audioTracksKey = slot.stream?.getAudioTracks().map(track => `${track.id}:${track.readyState}`).join(',');
+  const videoTracksKey = slot.stream?.getVideoTracks().map(track => `${track.id}:${track.readyState}`).join(',');
 
   const [liveFps, setLiveFps] = useState<number>(() => (slot.isLocal ? currentFps : 60));
   const [liveBitrate, setLiveBitrate] = useState<number>(0);
@@ -182,6 +183,9 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   };
   const currentStreamRef = useRef(slot.stream);
   currentStreamRef.current = slot.stream;
+  const currentVideoTracksKeyRef = useRef(videoTracksKey);
+  currentVideoTracksKeyRef.current = videoTracksKey;
+  const boundVideoTracksKeyRef = useRef<string | undefined>(undefined);
 
   const pointer = useStreamPointer(cardRef, videoElementRef, slot.peerId, slot.pointerEligible !== false && !slot.isLocal && !inTray && !isPipActive && !!slot.stream && !remoteControl.active,
     slot.stream, false, slot.pointerEligible !== false && !isPipActive && !!slot.stream && !(inTray && isSelectedFeatured) && (!slot.isLocal || showLocalPreview) && !remoteControl.active);
@@ -201,6 +205,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     (el: HTMLVideoElement | null) => {
       if (videoElementRef.current && videoElementRef.current !== el) {
         cleanupVideoElement(videoElementRef.current);
+        boundVideoTracksKeyRef.current = undefined;
       }
       videoElementRef.current = el;
 
@@ -208,6 +213,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
         const stream = currentStreamRef.current;
         if (stream) {
           if (el.srcObject !== stream) {
+            boundVideoTracksKeyRef.current = currentVideoTracksKeyRef.current;
             el.srcObject = stream;
             el.play().catch(() => {});
           } else if (el.paused) {
@@ -217,6 +223,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
             setIsVideoReady(true);
           }
         } else {
+          boundVideoTracksKeyRef.current = undefined;
           cleanupVideoElement(el);
         }
       }
@@ -229,14 +236,23 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     const element = videoElementRef.current;
     if (!element) return;
     if (slot.stream && element.srcObject !== slot.stream) {
+      boundVideoTracksKeyRef.current = videoTracksKey;
       if (!slot.isLocal) setIsVideoReady(false);
       element.srcObject = slot.stream;
       void element.play().catch(() => {});
+    } else if (slot.stream && boundVideoTracksKeyRef.current !== videoTracksKey) {
+      // replaceMediaTrack swaps the video track in-place without changing slot.stream identity.
+      boundVideoTracksKeyRef.current = videoTracksKey;
+      if (!slot.isLocal && element.readyState < 2) setIsVideoReady(false);
+      element.srcObject = null;
+      element.srcObject = slot.stream;
+      void element.play().catch(() => {});
     } else if (!slot.stream && element.srcObject) {
+      boundVideoTracksKeyRef.current = undefined;
       cleanupVideoElement(element);
       if (!slot.isLocal) setIsVideoReady(false);
     }
-  }, [slot.stream, slot.isLocal, cleanupVideoElement]);
+  }, [slot.stream, slot.isLocal, videoTracksKey, cleanupVideoElement]);
 
   useEffect(() => {
     if (!slot.isLocal || !slot.stream) return;
@@ -245,7 +261,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     return () => {
       roomService.setCaptureConsumer(stream, 'local-preview', false);
     };
-  }, [slot.isLocal, slot.stream, showLocalPreview]);
+  }, [slot.isLocal, slot.stream, videoTracksKey, showLocalPreview]);
 
   useEffect(() => {
     const element = videoElementRef.current;
@@ -282,7 +298,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     if (isPipActive) {
       pipService.updateStream(slot.peerId, slot.stream);
     }
-  }, [isPipActive, slot.peerId, slot.stream, audioTracksKey]);
+  }, [isPipActive, slot.peerId, slot.stream, videoTracksKey, audioTracksKey]);
 
   useEffect(() => {
     if (inTray || (!slot.isStreaming && slot.isLocal)) return;

@@ -4,6 +4,7 @@ import { reconcilePinnedRoomSlot, snapOverlay, resizeOverlay, streamOwner, strea
 import type { RoomSlotInfo } from '../../src/core/types.ts';
 import { GroupRoomManager } from '../../src/p2p/group_room.ts';
 import { MediaCoordinator } from '../../src/p2p/media_coordinator.ts';
+import { NativeVideoTransport } from '../../src/p2p/native_video_transport.ts';
 import { signalingManager } from '../../src/p2p/signaling_manager.ts';
 
 test('spotlight follows its participant through stream start and stop without switching an existing selected source', () => {
@@ -433,5 +434,54 @@ test('stopStream removes addTrack-owned tracks and stream recovery requests rene
     (signalingManager as any).joinRoom = originalJoin;
     (signalingManager as any).leaveRoom = originalLeave;
     (signalingManager as any).reannounce = originalReannounce;
+  }
+});
+
+test('replaceMediaTrack clears blocked native routes and dispatches the replacement track cleanly', async () => {
+  const manager = new GroupRoomManager('Owner', 'test', '', true);
+  const internal = manager as any;
+  const stream = fakeStream('screen');
+  const oldTrack = stream.getVideoTracks()[0];
+  const replacement = fakeStream('monitor2').getVideoTracks()[0];
+  manager.shareStream(stream, 8_000_000, 60, descriptor('screen'));
+  internal.peerTracker.receivePeerExchange('viewer', true, 'Viewer');
+  const sender = { track: oldTrack, async replaceTrack(track: MediaStreamTrack) { this.track = track; } };
+  internal.room = { getPeers: () => ({ viewer: { getSenders: () => [sender] } }), makeAction: () => ({ send: async () => {} }) };
+
+  const transport = new NativeVideoTransport({
+    rtc: () => ({}),
+    send: () => {},
+    permitted: () => true,
+    receive: () => {},
+    fallback: () => {},
+  });
+  (transport as any).blocked.add('viewer/screen');
+  const dispatched: Array<{ peer: string; stream: MediaStream; track: MediaStreamTrack; blockedAtDispatch: boolean }> = [];
+  transport.dispatch = (peer, targetStream, desc) => {
+    dispatched.push({
+      peer,
+      stream: targetStream,
+      track: targetStream.getVideoTracks()[0],
+      blockedAtDispatch: transport.isBlocked(peer, desc.id),
+    });
+    return true;
+  };
+  internal.nativeVideo = transport;
+
+  try {
+    assert.equal(transport.isBlocked('viewer', 'screen'), true);
+    await manager.replaceMediaTrack('screen', replacement, { ...descriptor('screen'), videoTrackId: replacement.id });
+    assert.equal(transport.isBlocked('viewer', 'screen'), false);
+    assert.equal(dispatched.length, 1);
+    assert.equal(dispatched[0].peer, 'viewer');
+    assert.equal(dispatched[0].stream, stream);
+    assert.equal(dispatched[0].track, replacement);
+    assert.equal(dispatched[0].blockedAtDispatch, false);
+    assert.equal(sender.track, replacement);
+  } finally {
+    transport.close();
+    internal.nativeVideo = null;
+    internal.room = null;
+    manager.stopStream();
   }
 });

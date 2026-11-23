@@ -105,6 +105,23 @@ export class NativeVideoBridge implements VideoCaptureBridge {
     return this.consumers.size > 0;
   }
 
+  /** Requests an immediate keyframe and canvas frame flush after live track handoff. */
+  public requestKeyframe(): void {
+    if (this.isCapturingNative() && this.encoderFeedbackToken && !this.previewEncoderFailed) {
+      void invoke('control_capture_encoder', {
+        sessionId: this.sessionId,
+        feedbackToken: this.encoderFeedbackToken,
+        disable: false,
+      }).catch(() => {});
+    }
+    const track = this.activeStream?.getVideoTracks()[0];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (track && typeof (track as any).requestFrame === 'function') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      try { (track as any).requestFrame(); } catch {}
+    }
+  }
+
   public isCapturingDirectGpu(): boolean {
     return this.isCapturing && this.isDirectGpu;
   }

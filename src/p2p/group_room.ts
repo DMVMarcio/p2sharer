@@ -3130,6 +3130,7 @@ export class GroupRoomManager {
     old?.stop();
     this.publishMediaManifest();
     this.nativeVideo?.stop(id);
+    this.nativeVideo?.clearBlocked(id);
     for (const peerId of this.peerTracker.directConnectedPeers) this.sendStreamToPeer(peerId);
     this.boostSenders();
     this.lastStreamsHash = '';
