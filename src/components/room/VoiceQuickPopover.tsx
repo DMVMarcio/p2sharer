@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { autoUpdate, computePosition, flip, offset, shift } from '@floating-ui/dom';
-import { Headphones, Mic, Settings2, Volume2 } from 'lucide-react';
+import { Headphones, Mic, Settings2, Square, Volume2 } from 'lucide-react';
 import { t } from '../../i18n';
 import { useLocale } from '../../hooks/useLocale';
 import { useDropdownPresence } from '../../hooks/useDropdownPresence';
@@ -29,6 +29,8 @@ export const VoiceQuickPopover: React.FC<VoiceQuickPopoverProps> = ({
     voiceMicMuted,
     voiceInputLevelDb,
     voiceThresholdDb,
+    voiceMicTestActive,
+    voiceTestGateOpen,
     isLocalSpeaking,
     voicePreferences,
   } = useRoom();
@@ -113,6 +115,17 @@ export const VoiceQuickPopover: React.FC<VoiceQuickPopoverProps> = ({
     };
   }, [popoverState, onClose]);
 
+  useEffect(() => {
+    if (panel !== 'input') {
+      roomService.stopVoiceMicTest?.();
+    }
+    return () => {
+      if (panel === 'input') {
+        roomService.stopVoiceMicTest?.();
+      }
+    };
+  }, [panel]);
+
   if (!retained) return null;
 
   const prefs = voicePreferences ?? roomService.voicePreferences ?? DEFAULT_VOICE_PREFERENCES;
@@ -143,11 +156,13 @@ export const VoiceQuickPopover: React.FC<VoiceQuickPopoverProps> = ({
       : []),
   ];
 
-  const meterPercent = Math.max(0, Math.min(100, (voiceInputLevelDb ?? -100) + 100));
+  const meterActive = Boolean(voiceMicTestActive || (inVoice && !voiceMicMuted));
+  const meterPercent = meterActive ? Math.max(0, Math.min(100, (voiceInputLevelDb ?? -100) + 100)) : 0;
   const thresholdPercent = Math.max(
     0,
     Math.min(100, (prefs.autoSensitivity ? (voiceThresholdDb ?? -50) : prefs.sensitivityDb) + 100),
   );
+  const gateOpen = meterActive && (voiceMicTestActive ? Boolean(voiceTestGateOpen) : Boolean(isLocalSpeaking));
 
   return createPortal(
     <div
@@ -206,17 +221,44 @@ export const VoiceQuickPopover: React.FC<VoiceQuickPopoverProps> = ({
             />
           </div>
 
-          {inVoice && (
-            <div className="voice-quick-field">
-              <div className="voice-meter-track" aria-hidden="true">
-                <div
-                  className={`voice-meter-fill${isLocalSpeaking && !voiceMicMuted ? ' is-active' : ''}`}
-                  style={{ width: `${voiceMicMuted ? 0 : meterPercent}%` }}
-                />
-                <div className="voice-meter-threshold" style={{ left: `${thresholdPercent}%` }} />
-              </div>
+          <div className="voice-quick-field">
+            <div className="voice-slider-header">
+              <span className="settings-label">{t('voice.micTestTitle')}</span>
+              <button
+                type="button"
+                id="btn-voice-quick-mic-test"
+                className={`btn btn-sm btn-compact ${voiceMicTestActive ? 'btn-danger' : 'btn-outline'}`}
+                onClick={() => {
+                  if (voiceMicTestActive) {
+                    roomService.stopVoiceMicTest?.();
+                  } else {
+                    void roomService.startVoiceMicTest?.();
+                  }
+                }}
+              >
+                {voiceMicTestActive ? (
+                  <Square size={11} fill="currentColor" aria-hidden="true" />
+                ) : (
+                  <Mic size={11} aria-hidden="true" />
+                )}
+                <span>{voiceMicTestActive ? t('voice.stopMicTest') : t('voice.startMicTest')}</span>
+              </button>
             </div>
-          )}
+            <div
+              className="voice-meter-track"
+              role="meter"
+              aria-label={t('voice.inputMeterAria')}
+              aria-valuemin={-100}
+              aria-valuemax={0}
+              aria-valuenow={meterActive ? (voiceInputLevelDb ?? -100) : -100}
+            >
+              <div
+                className={`voice-meter-fill${gateOpen ? ' is-active' : ''}`}
+                style={{ width: `${meterPercent}%` }}
+              />
+              <div className="voice-meter-threshold" style={{ left: `${thresholdPercent}%` }} aria-hidden="true" />
+            </div>
+          </div>
 
           <div className="voice-quick-field">
             <label className="settings-label" htmlFor="voice-quick-noise-suppression">

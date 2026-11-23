@@ -33,6 +33,7 @@ import { AppUpdateDialog } from './components/modals/AppUpdateDialog';
 import { ReleaseNotesDialog } from './components/modals/ReleaseNotesDialog';
 import { startAutomaticUpdateChecks } from './services/app_updates';
 import { startRoomDeepLinks } from './services/room_deep_links';
+import { startVoiceShortcuts } from './services/voice_shortcuts';
 import { releaseNotes } from './services/release_notes';
 import { isTauri } from '@tauri-apps/api/core';
 import { BrowserCaptureModal } from './components/modals/BrowserCaptureModal';
@@ -69,6 +70,7 @@ const MainApp: React.FC<{ webNavigation?: WebRoomNavigation }> = ({ webNavigatio
     if (!notesState.pending) return startAutomaticUpdateChecks();
   }, [notesState.pending]);
   useEffect(startRoomDeepLinks, []);
+  useEffect(startVoiceShortcuts, []);
   useEffect(() => startWebRoomNavigation(roomExit.confirmExit, webNavigation), [roomExit.confirmExit, webNavigation]);
   useEffect(() => setHomeScrolled(false), [isInRoom]);
 

@@ -16,6 +16,14 @@ import {
   saveUserVoiceVolume,
   saveVoicePreferences,
 } from '../../src/core/voice_preferences.ts';
+import {
+  createDefaultInputBindings,
+  DEFAULT_SHORTCUTS,
+  loadInputBindings,
+  resetInputBindingsCacheForTest,
+  sanitizeInputBindingsConfig,
+  saveInputBindings,
+} from '../../src/core/input_bindings.ts';
 
 function createMemoryStorage(): Storage {
   const store = new Map<string, string>();
@@ -266,21 +274,52 @@ test('VoiceControlsBar opens input and output VoiceQuickPopover cleanly without 
   };
 
   let openedSettingsTab: string | null = null;
+  let micTestStarts = 0;
+  let micTestStops = 0;
   let appliedPreferences = { ...DEFAULT_VOICE_PREFERENCES };
+  const roomListeners = new Set<() => void>();
   const g = globalThis as Record<string, unknown>;
+  let fixtureState = {
+    inVoice: true,
+    voiceMicMuted: true,
+    voiceDeafened: false,
+    voiceInputLevelDb: -100,
+    voiceThresholdDb: -50,
+    voiceMicTestActive: false,
+    voiceTestGateOpen: false,
+    isLocalSpeaking: false,
+    voicePreferences: appliedPreferences,
+  };
   g.__voicePopoverTestFixture = {
-    roomState: {
-      inVoice: true,
-      voiceMicMuted: true,
-      voiceDeafened: false,
-      voiceInputLevelDb: -60,
-      voiceThresholdDb: -50,
-      isLocalSpeaking: false,
-      voicePreferences: appliedPreferences,
+    listeners: roomListeners,
+    get roomState() {
+      return fixtureState;
     },
     applyVoicePreferences(next: typeof DEFAULT_VOICE_PREFERENCES) {
       appliedPreferences = { ...next };
-      (g.__voicePopoverTestFixture as { roomState: { voicePreferences: typeof DEFAULT_VOICE_PREFERENCES } }).roomState.voicePreferences = appliedPreferences;
+      fixtureState = { ...fixtureState, voicePreferences: appliedPreferences };
+      roomListeners.forEach((fn) => fn());
+    },
+    startVoiceMicTest() {
+      micTestStarts += 1;
+      fixtureState = {
+        ...fixtureState,
+        voiceMicTestActive: true,
+        voiceInputLevelDb: -28,
+        voiceTestGateOpen: true,
+      };
+      roomListeners.forEach((fn) => fn());
+    },
+    stopVoiceMicTest() {
+      if (!fixtureState.voiceMicTestActive) return;
+      micTestStops += 1;
+      fixtureState = {
+        ...fixtureState,
+        voiceMicTestActive: false,
+        voiceInputLevelDb: -100,
+        voiceTestGateOpen: false,
+      };
+      roomListeners.forEach((fn) => fn());
     },
     openSettings(tab?: string) {
       openedSettingsTab = tab ?? null;
@@ -288,10 +327,16 @@ test('VoiceControlsBar opens input and output VoiceQuickPopover cleanly without 
   };
 
   const mocks: Record<string, string> = {
-    useRoom: 'export const useRoom = () => globalThis.__voicePopoverTestFixture.roomState;',
+    useRoom: `import { useSyncExternalStore } from 'react';
+      export const useRoom = () => useSyncExternalStore(
+        (fn) => { globalThis.__voicePopoverTestFixture.listeners.add(fn); return () => globalThis.__voicePopoverTestFixture.listeners.delete(fn); },
+        () => globalThis.__voicePopoverTestFixture.roomState,
+      );`,
     room_service: `export const roomService = {
       get voicePreferences() { return globalThis.__voicePopoverTestFixture.roomState.voicePreferences; },
       applyVoicePreferences: (next) => { globalThis.__voicePopoverTestFixture.applyVoicePreferences(next); return Promise.resolve(); },
+      startVoiceMicTest: () => { globalThis.__voicePopoverTestFixture.startVoiceMicTest(); return Promise.resolve(); },
+      stopVoiceMicTest: () => { globalThis.__voicePopoverTestFixture.stopVoiceMicTest(); },
       toggleVoiceMute: () => Promise.resolve(),
       toggleVoiceDeafen: () => {},
     };`,
@@ -359,13 +404,25 @@ test('VoiceControlsBar opens input and output VoiceQuickPopover cleanly without 
     assert.ok(document.getElementById('voice-quick-auto-sensitivity'), 'auto sensitivity switch should render');
     assert.ok(document.querySelector('.voice-quick-settings-btn'), 'open communication settings button should render');
 
-    // Open output quick-config dropdown from output chevron.
+    // Quick mic test uses the inline meter bar as live preview even when mic is muted.
+    const quickMicTestBtn = document.getElementById('btn-voice-quick-mic-test') as HTMLButtonElement | null;
+    assert.ok(quickMicTestBtn, 'quick mic test button should render inside input popover');
+    await act(async () => {
+      quickMicTestBtn.click();
+    });
+    assert.equal(micTestStarts, 1);
+    const meterFill = inputPopover.querySelector<HTMLElement>('.voice-meter-fill');
+    assert.ok(meterFill?.classList.contains('is-active'), 'preview meter should show active state during test');
+    assert.equal(meterFill?.style.width, '72%', 'preview meter width should reflect live dB level during test');
+
+    // Switching to output quick-config stops the active quick mic test automatically.
     await act(async () => {
       outputConfigBtn.click();
     });
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 25));
     });
+    assert.equal(micTestStops, 1);
 
     const outputPopover = document.querySelector<HTMLElement>('.voice-quick-popover');
     assert.ok(outputPopover, 'output quick popover should remain mounted cleanly');
@@ -395,5 +452,241 @@ test('VoiceControlsBar opens input and output VoiceQuickPopover cleanly without 
     }
     if (prevAct === undefined) delete (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT;
     else (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = prevAct;
+  }
+});
+
+test('voice shortcuts default to unassigned, bind in Shortcuts & Keyboard settings, and execute when not paused', async () => {
+  assert.equal(DEFAULT_SHORTCUTS.toggleVoiceMute, null);
+  assert.equal(DEFAULT_SHORTCUTS.toggleVoiceDeafen, null);
+
+  const defaults = createDefaultInputBindings();
+  assert.equal(defaults.shortcuts.toggleVoiceMute, null);
+  assert.equal(defaults.shortcuts.toggleVoiceDeafen, null);
+
+  const sanitized = sanitizeInputBindingsConfig({
+    shortcuts: {
+      toggleVoiceMute: { code: 'KeyM', ctrlKey: true, shiftKey: true, altKey: false },
+      toggleVoiceDeafen: { code: 'F9', ctrlKey: false, shiftKey: false, altKey: false },
+    },
+  });
+  assert.deepEqual(sanitized.shortcuts.toggleVoiceMute, {
+    code: 'KeyM',
+    ctrlKey: true,
+    shiftKey: true,
+    altKey: false,
+  });
+  assert.deepEqual(sanitized.shortcuts.toggleVoiceDeafen, {
+    code: 'F9',
+    ctrlKey: false,
+    shiftKey: false,
+    altKey: false,
+  });
+
+  const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', { url: 'http://localhost' });
+  const prevGlobals: Record<string, unknown> = {};
+  const keys = [
+    'window',
+    'document',
+    'HTMLElement',
+    'Element',
+    'MutationObserver',
+    'HTMLInputElement',
+    'HTMLTextAreaElement',
+    'Node',
+    'DOMParser',
+    'CustomEvent',
+    'localStorage',
+    'getComputedStyle',
+  ];
+  for (const key of keys) {
+    prevGlobals[key] = (globalThis as Record<string, unknown>)[key];
+    if (key === 'getComputedStyle') {
+      (globalThis as Record<string, unknown>)[key] = dom.window.getComputedStyle.bind(dom.window);
+    } else {
+      (globalThis as Record<string, unknown>)[key] = dom.window[key];
+    }
+  }
+  const prevAct = (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT;
+  (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
+  (dom.window as unknown as { matchMedia: () => { matches: boolean } }).matchMedia = () => ({ matches: false });
+  resetInputBindingsCacheForTest();
+
+  let muteToggles = 0;
+  let deafenToggles = 0;
+  const g = globalThis as Record<string, unknown>;
+  g.__voiceShortcutTestCounts = {
+    toggleVoiceMute: () => { muteToggles += 1; },
+    toggleVoiceDeafen: () => { deafenToggles += 1; },
+  };
+
+  const mocks: Record<string, string> = {
+    core: 'export const isTauri = () => false; export const invoke = async () => {};',
+    event: 'export const listen = async () => () => {};',
+    room_service: `export const roomService = {
+      toggleVoiceMute: () => { globalThis.__voiceShortcutTestCounts.toggleVoiceMute(); return Promise.resolve(); },
+      toggleVoiceDeafen: () => { globalThis.__voiceShortcutTestCounts.toggleVoiceDeafen(); },
+    };`,
+  };
+
+  const require = createRequire(import.meta.url);
+  const bundle = await build({
+    stdin: {
+      contents: `
+        export * from './src/services/voice_shortcuts.ts';
+        export { KeybindingsSettingsPane } from './src/components/modals/KeybindingsSettingsPane.tsx';
+        export * from './src/core/input_bindings.ts';
+      `,
+      resolveDir: process.cwd(),
+    },
+    bundle: true,
+    write: false,
+    format: 'esm',
+    platform: 'node',
+    jsx: 'automatic',
+    plugins: [{
+      name: 'voice-shortcuts-fixtures',
+      setup(b) {
+        b.onResolve({ filter: /^@tauri-apps\/api\/(core|event)$/ }, (args) => ({
+          namespace: 'fixture',
+          path: args.path.split('/').at(-1)!,
+        }));
+        b.onResolve({ filter: /\/room_service(\.ts)?$/ }, () => ({
+          namespace: 'fixture',
+          path: 'room_service',
+        }));
+        b.onLoad({ filter: /.*/, namespace: 'fixture' }, (args) => ({
+          contents: mocks[args.path],
+          loader: 'js',
+        }));
+        b.onResolve({ filter: /^[^./]/ }, (args) => ({
+          path: pathToFileURL(require.resolve(args.path)).href,
+          external: true,
+        }));
+      },
+    }],
+  });
+
+  const bundled = await import(
+    `data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`
+  );
+  const { createRoot } = await import('react-dom/client');
+  const root = createRoot(document.getElementById('root')!);
+
+  let stopShortcuts: (() => void) | null = null;
+  let latestConfig = bundled.createDefaultInputBindings();
+  try {
+    bundled.resetInputBindingsCacheForTest();
+    stopShortcuts = bundled.startVoiceShortcuts();
+
+    function Harness() {
+      const [cfg, setCfg] = React.useState(bundled.createDefaultInputBindings);
+      const [subTab, setSubTab] = React.useState<'keyboard' | 'gamepad'>('keyboard');
+      latestConfig = cfg;
+      return React.createElement(bundled.KeybindingsSettingsPane, {
+        value: cfg,
+        onChange: (next: typeof cfg) => {
+          latestConfig = next;
+          setCfg(next);
+          bundled.saveInputBindings(next);
+        },
+        subTab,
+        onSubTabChange: setSubTab,
+      });
+    }
+
+    await act(async () => {
+      root.render(React.createElement(Harness));
+    });
+
+    const muteCaptureBtn = document.getElementById('btn-shortcut-toggleVoiceMute') as HTMLButtonElement | null;
+    const deafenCaptureBtn = document.getElementById('btn-shortcut-toggleVoiceDeafen') as HTMLButtonElement | null;
+    assert.ok(muteCaptureBtn && deafenCaptureBtn, 'voice shortcut rows must appear in Shortcuts & Keyboard settings');
+
+    // Bind Ctrl+Shift+M to mute toggle; global firing is paused during capture.
+    await act(async () => {
+      muteCaptureBtn.click();
+    });
+    await act(async () => {
+      window.dispatchEvent(new dom.window.KeyboardEvent('keydown', {
+        code: 'KeyM',
+        ctrlKey: true,
+        shiftKey: true,
+        bubbles: true,
+      }));
+    });
+    assert.deepEqual(latestConfig.shortcuts.toggleVoiceMute, {
+      code: 'KeyM',
+      ctrlKey: true,
+      shiftKey: true,
+      altKey: false,
+    });
+    assert.equal(muteToggles, 0, 'binding the shortcut must not trigger toggle during capture');
+
+    // Bind F9 to deafen toggle.
+    await act(async () => {
+      deafenCaptureBtn.click();
+    });
+    await act(async () => {
+      window.dispatchEvent(new dom.window.KeyboardEvent('keydown', { code: 'F9', bubbles: true }));
+    });
+    assert.deepEqual(latestConfig.shortcuts.toggleVoiceDeafen, {
+      code: 'F9',
+      ctrlKey: false,
+      shiftKey: false,
+      altKey: false,
+    });
+
+    // Pressing bound keys triggers actions once per press (ignoring auto-repeat).
+    await act(async () => {
+      window.dispatchEvent(new dom.window.KeyboardEvent('keydown', {
+        code: 'KeyM',
+        ctrlKey: true,
+        shiftKey: true,
+        repeat: false,
+        bubbles: true,
+      }));
+      window.dispatchEvent(new dom.window.KeyboardEvent('keydown', {
+        code: 'KeyM',
+        ctrlKey: true,
+        shiftKey: true,
+        repeat: true,
+        bubbles: true,
+      }));
+      window.dispatchEvent(new dom.window.KeyboardEvent('keydown', {
+        code: 'F9',
+        repeat: false,
+        bubbles: true,
+      }));
+    });
+    assert.equal(muteToggles, 1);
+    assert.equal(deafenToggles, 1);
+    assert.deepEqual(loadInputBindings().shortcuts.toggleVoiceMute, {
+      code: 'KeyM',
+      ctrlKey: true,
+      shiftKey: true,
+      altKey: false,
+    });
+
+    // Clear mute shortcut back to unassigned via the row clear button.
+    const clearMuteBtn = muteCaptureBtn.parentElement?.querySelector<HTMLButtonElement>('.btn-stream-pin');
+    assert.ok(clearMuteBtn, 'clear button should render when shortcut is assigned');
+    await act(async () => {
+      clearMuteBtn.click();
+    });
+    assert.equal(latestConfig.shortcuts.toggleVoiceMute, null);
+    bundled.saveInputBindings(bundled.createDefaultInputBindings());
+    saveInputBindings(createDefaultInputBindings());
+  } finally {
+    stopShortcuts?.();
+    await act(async () => root.unmount());
+    dom.window.close();
+    delete g.__voiceShortcutTestCounts;
+    for (const key of keys) {
+      if (prevGlobals[key] === undefined) delete (globalThis as Record<string, unknown>)[key];
+      else (globalThis as Record<string, unknown>)[key] = prevGlobals[key];
+    }
+    if (prevAct === undefined) delete (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT;
+    else (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = prevAct;
+    resetInputBindingsCacheForTest();
   }
 });

@@ -7,7 +7,7 @@ use tauri::{AppHandle, Emitter, Manager};
 
 const HOST_PRIORITY_MS: u64 = 1500;
 const MONITOR_INTERVAL_MS: u64 = 16;
-const P2SHARER_INPUT_TAG: usize = 0x5032_5348;
+pub(crate) const P2SHARER_INPUT_TAG: usize = 0x5032_5348;
 const HOST_MOUSE_JITTER_PX: i32 = 5;
 
 #[derive(Debug, Clone, Deserialize)]
@@ -300,14 +300,14 @@ impl Default for HostControlState {
     }
 }
 
-struct HookThreadHandle {
-    thread_id: u32,
-    stop: Arc<AtomicBool>,
-    join: std::thread::JoinHandle<()>,
+pub(crate) struct HookThreadHandle {
+    pub(crate) thread_id: u32,
+    pub(crate) stop: Arc<AtomicBool>,
+    pub(crate) join: std::thread::JoinHandle<()>,
 }
 
 #[cfg(windows)]
-fn join_hook_thread(handle: HookThreadHandle) {
+pub(crate) fn join_hook_thread(handle: HookThreadHandle) {
     use windows::Win32::Foundation::{LPARAM, WPARAM};
     use windows::Win32::UI::WindowsAndMessaging::{PostThreadMessageW, WM_QUIT};
     handle.stop.store(true, Ordering::Release);
@@ -1262,7 +1262,7 @@ fn make_unicode_units_inputs(
         .collect()
 }
 
-fn dom_code_to_vk(code: &str) -> Option<(u16, bool)> {
+pub(crate) fn dom_code_to_vk(code: &str) -> Option<(u16, bool)> {
     if let Some(letter) = code.strip_prefix("Key") {
         let bytes = letter.as_bytes();
         if bytes.len() == 1 && bytes[0].is_ascii_uppercase() {

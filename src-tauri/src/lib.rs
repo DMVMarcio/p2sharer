@@ -13,6 +13,7 @@ pub mod pip_manager;
 pub mod stream_pointer;
 pub mod remote_control;
 pub mod remote_control_helper;
+pub mod voice_shortcuts;
 pub mod gamepad;
 pub mod process_manager;
 pub mod room_vault;
@@ -95,6 +96,7 @@ fn cancel_app_update(window: tauri::Window) -> Result<(), String> {
 static EXIT_WATCHDOG_ARMED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 fn shutdown_native_subsystems() {
+    voice_shortcuts::shutdown();
     remote_control::shutdown_remote_control();
     gamepad::shutdown_gamepads();
     let _ = stop_native_screen_capture();
@@ -297,6 +299,7 @@ pub fn run() {
             remote_control::enable_remote_control_elevation,
             remote_control::is_remote_control_elevation_ready,
             remote_control::set_remote_control_controller_elevation,
+            voice_shortcuts::configure_voice_shortcuts,
             gamepad::get_remote_control_gamepads,
             gamepad::recheck_remote_control_gamepad_driver,
             gamepad::reorder_remote_control_gamepads,

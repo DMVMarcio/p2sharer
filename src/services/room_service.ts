@@ -2341,6 +2341,31 @@ export class RoomService {
     this.notify();
   }
 
+  public async startVoiceMicTest(): Promise<void> {
+    try {
+      await voiceManager.startMicTest();
+    } catch (err) {
+      voiceManager.stopMicTest();
+      const name = err instanceof DOMException ? err.name : '';
+      const msg = name === 'NotAllowedError' || name === 'PermissionDeniedError'
+        ? t('voice.micPermissionError')
+        : t('voice.micUnavailableError');
+      showToast(msg, 4500, 'error');
+      logDiagnostic('ERROR', 'voice.mic', 'Failed to start microphone test', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      this.syncVoiceSnapshot();
+      this.notify();
+    }
+  }
+
+  public stopVoiceMicTest(): void {
+    voiceManager.stopMicTest();
+    this.syncVoiceSnapshot();
+    this.notify();
+  }
+
   public setPeerVoiceVolume(
     peerId: string,
     volume: number,

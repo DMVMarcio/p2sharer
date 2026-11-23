@@ -19,6 +19,7 @@ import {
   type RemoteShortcutAction,
 } from '../../core/input_bindings';
 import { readGamepadSnapshotState } from '../../core/remote_control';
+import { setVoiceShortcutCapturePaused } from '../../services/voice_shortcuts';
 import { t } from '../../i18n';
 import { ModalDialog } from '../common/ModalDialog';
 import { Select } from '../common/Select';
@@ -142,6 +143,14 @@ export const KeybindingsSettingsPane: React.FC<KeybindingsSettingsPaneProps> = (
     setCapturingPadTarget(null);
     setPreviewCooldownActive(false);
   }, [subTab]);
+
+  // Pause global voice shortcuts while capturing so an existing binding does not toggle audio during rebinding
+  useEffect(() => {
+    setVoiceShortcutCapturePaused(Boolean(capturingShortcut || capturingKeyField));
+    return () => {
+      setVoiceShortcutCapturePaused(false);
+    };
+  }, [capturingShortcut, capturingKeyField]);
 
   // Capture keyboard shortcut combos or individual key remaps (intercepts Escape before ModalDialog)
   useEffect(() => {
@@ -363,6 +372,7 @@ export const KeybindingsSettingsPane: React.FC<KeybindingsSettingsPaneProps> = (
       onChange({
         ...value,
         shortcuts: {
+          ...value.shortcuts,
           toggleMouseLock: DEFAULT_SHORTCUTS.toggleMouseLock
             ? { ...DEFAULT_SHORTCUTS.toggleMouseLock }
             : null,
@@ -396,7 +406,7 @@ export const KeybindingsSettingsPane: React.FC<KeybindingsSettingsPaneProps> = (
     setCapturingKeyField({ ruleId: newId, side: 'from' });
   };
 
-  const shortcutItems: ReadonlyArray<{ action: RemoteShortcutAction; label: string; hint: string }> = [
+  const remoteShortcutItems: ReadonlyArray<{ action: RemoteShortcutAction; label: string; hint: string }> = [
     {
       action: 'toggleMouseLock',
       label: t('inputBindings.shortcutMouseLock'),
@@ -413,6 +423,64 @@ export const KeybindingsSettingsPane: React.FC<KeybindingsSettingsPaneProps> = (
       hint: t('inputBindings.shortcutExitControlHint'),
     },
   ];
+
+  const voiceShortcutItems: ReadonlyArray<{ action: RemoteShortcutAction; label: string; hint: string }> = [
+    {
+      action: 'toggleVoiceMute',
+      label: t('inputBindings.shortcutVoiceMute'),
+      hint: t('inputBindings.shortcutVoiceMuteHint'),
+    },
+    {
+      action: 'toggleVoiceDeafen',
+      label: t('inputBindings.shortcutVoiceDeafen'),
+      hint: t('inputBindings.shortcutVoiceDeafenHint'),
+    },
+  ];
+
+  const renderShortcutRow = ({ action, label, hint }: { action: RemoteShortcutAction; label: string; hint: string }) => {
+    const current = value.shortcuts[action];
+    const isListening = capturingShortcut === action;
+    const formatted = formatShortcutCombo(current);
+    return (
+      <div className="input-binding-row" key={action}>
+        <div className="input-binding-copy">
+          <strong>{label}</strong>
+          <small>{hint}</small>
+        </div>
+        <div className="input-binding-actions">
+          <button
+            type="button"
+            id={`btn-shortcut-${action}`}
+            className={`btn btn-sm input-binding-capture-btn ${isListening ? 'is-listening' : ''}`}
+            onClick={() =>
+              setCapturingShortcut((prev) => (prev === action ? null : action))
+            }
+          >
+            {isListening
+              ? t('inputBindings.pressShortcutPrompt')
+              : formatted || t('inputBindings.unbound')}
+          </button>
+          {current && (
+            <Tooltip content={t('inputBindings.clearAction')}>
+              <button
+                type="button"
+                className="btn-stream-pin"
+                aria-label={`${t('inputBindings.clearAction')}: ${label}`}
+                onClick={() =>
+                  onChange({
+                    ...value,
+                    shortcuts: { ...value.shortcuts, [action]: null },
+                  })
+                }
+              >
+                <X size={13} aria-hidden="true" />
+              </button>
+            </Tooltip>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   const gamepadGroups: ReadonlyArray<{
     title: string;
@@ -552,49 +620,39 @@ export const KeybindingsSettingsPane: React.FC<KeybindingsSettingsPaneProps> = (
             </div>
 
             <div className="input-bindings-list">
-              {shortcutItems.map(({ action, label, hint }) => {
-                const current = value.shortcuts[action];
-                const isListening = capturingShortcut === action;
-                const formatted = formatShortcutCombo(current);
-                return (
-                  <div className="input-binding-row" key={action}>
-                    <div className="input-binding-copy">
-                      <strong>{label}</strong>
-                      <small>{hint}</small>
-                    </div>
-                    <div className="input-binding-actions">
-                      <button
-                        type="button"
-                        className={`btn btn-sm input-binding-capture-btn ${isListening ? 'is-listening' : ''}`}
-                        onClick={() =>
-                          setCapturingShortcut((prev) => (prev === action ? null : action))
-                        }
-                      >
-                        {isListening
-                          ? t('inputBindings.pressShortcutPrompt')
-                          : formatted || t('inputBindings.unbound')}
-                      </button>
-                      {current && (
-                        <Tooltip content={t('inputBindings.clearAction')}>
-                          <button
-                            type="button"
-                            className="btn-stream-pin"
-                            aria-label={`${t('inputBindings.clearAction')}: ${label}`}
-                            onClick={() =>
-                              onChange({
-                                ...value,
-                                shortcuts: { ...value.shortcuts, [action]: null },
-                              })
-                            }
-                          >
-                            <X size={13} aria-hidden="true" />
-                          </button>
-                        </Tooltip>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+              {remoteShortcutItems.map(renderShortcutRow)}
+            </div>
+          </div>
+
+          <div className="settings-row">
+            <div className="input-bindings-section-head">
+              <div>
+                <label className="settings-label">{t('inputBindings.voiceShortcutsHeading')}</label>
+                <p className="input-bindings-subdesc">{t('inputBindings.voiceShortcutsDesc')}</p>
+              </div>
+              {(value.shortcuts.toggleVoiceMute || value.shortcuts.toggleVoiceDeafen) && (
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() =>
+                    onChange({
+                      ...value,
+                      shortcuts: {
+                        ...value.shortcuts,
+                        toggleVoiceMute: null,
+                        toggleVoiceDeafen: null,
+                      },
+                    })
+                  }
+                >
+                  <RotateCcw size={13} aria-hidden="true" />
+                  <span>{t('inputBindings.clearAll')}</span>
+                </button>
+              )}
+            </div>
+
+            <div className="input-bindings-list">
+              {voiceShortcutItems.map(renderShortcutRow)}
             </div>
           </div>
 

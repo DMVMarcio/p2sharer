@@ -1,7 +1,11 @@
 export type RemoteShortcutAction =
   | 'toggleMouseLock'
   | 'toggleImmersive'
-  | 'exitRemoteControl';
+  | 'exitRemoteControl'
+  | 'toggleVoiceMute'
+  | 'toggleVoiceDeafen';
+
+export type VoiceShortcutAction = 'toggleVoiceMute' | 'toggleVoiceDeafen';
 
 export interface ShortcutBinding {
   code: string;
@@ -78,6 +82,8 @@ export const DEFAULT_SHORTCUTS: Record<RemoteShortcutAction, ShortcutBinding | n
   toggleMouseLock: { code: 'KeyM', ctrlKey: true, shiftKey: true, altKey: false },
   toggleImmersive: null,
   exitRemoteControl: null,
+  toggleVoiceMute: null,
+  toggleVoiceDeafen: null,
 };
 
 export const DEFAULT_GAMEPAD_BINDINGS: Record<GamepadTargetControl, GamepadSourceBinding> = {
@@ -180,6 +186,8 @@ export function createDefaultInputBindings(): InputBindingsConfig {
       toggleMouseLock: DEFAULT_SHORTCUTS.toggleMouseLock ? { ...DEFAULT_SHORTCUTS.toggleMouseLock } : null,
       toggleImmersive: null,
       exitRemoteControl: null,
+      toggleVoiceMute: null,
+      toggleVoiceDeafen: null,
     },
     keyRemaps: [],
     gamepadProfiles: {
@@ -252,7 +260,13 @@ export function sanitizeInputBindingsConfig(raw: unknown): InputBindingsConfig {
 
   if (obj.shortcuts && typeof obj.shortcuts === 'object') {
     const rawShortcuts = obj.shortcuts as Record<string, unknown>;
-    (['toggleMouseLock', 'toggleImmersive', 'exitRemoteControl'] as const).forEach((action) => {
+    ([
+      'toggleMouseLock',
+      'toggleImmersive',
+      'exitRemoteControl',
+      'toggleVoiceMute',
+      'toggleVoiceDeafen',
+    ] as const).forEach((action) => {
       if (action in rawShortcuts) {
         base.shortcuts[action] = sanitizeShortcut(rawShortcuts[action]);
       }
