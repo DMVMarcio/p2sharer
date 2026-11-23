@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { autoUpdate, computePosition, flip, offset, shift } from '@floating-ui/dom';
 import { Headphones, Mic, Settings2, Volume2 } from 'lucide-react';
@@ -9,7 +9,7 @@ import { modalManager } from '../../hooks/useModal';
 import { useRoom } from '../../hooks/useRoom';
 import { roomService } from '../../services/room_service';
 import { listAudioDevices, onAudioDevicesChanged, type AudioDeviceLists } from '../../audio/voice_devices';
-import type { NoiseSuppressionMode, VoicePreferences } from '../../core/voice_preferences';
+import { DEFAULT_VOICE_PREFERENCES, type NoiseSuppressionMode, type VoicePreferences } from '../../core/voice_preferences';
 import { Select } from '../common/Select';
 
 export interface VoiceQuickPopoverProps {
@@ -33,7 +33,10 @@ export const VoiceQuickPopover: React.FC<VoiceQuickPopoverProps> = ({
     voicePreferences,
   } = useRoom();
 
-  const popoverState = panel && anchorEl ? { panel, anchorEl } : null;
+  const popoverState = useMemo(
+    () => (panel && anchorEl ? { panel, anchorEl } : null),
+    [panel, anchorEl],
+  );
   const presence = useDropdownPresence(popoverState);
   const retained = presence.value;
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -59,7 +62,7 @@ export const VoiceQuickPopover: React.FC<VoiceQuickPopoverProps> = ({
 
   useLayoutEffect(() => {
     const floating = popoverRef.current;
-    if (!popoverState || !floating) return;
+    if (!popoverState || !retained || !floating) return;
     let disposed = false;
     setPositioned(false);
     const update = async () => {
@@ -79,7 +82,7 @@ export const VoiceQuickPopover: React.FC<VoiceQuickPopoverProps> = ({
       disposed = true;
       cleanup();
     };
-  }, [popoverState?.panel, popoverState?.anchorEl]);
+  }, [popoverState, retained]);
 
   useEffect(() => {
     if (!popoverState) return;
@@ -112,7 +115,7 @@ export const VoiceQuickPopover: React.FC<VoiceQuickPopoverProps> = ({
 
   if (!retained) return null;
 
-  const prefs = voicePreferences ?? roomService.voicePreferences;
+  const prefs = voicePreferences ?? roomService.voicePreferences ?? DEFAULT_VOICE_PREFERENCES;
   const updatePrefs = (patch: Partial<VoicePreferences>) => {
     const next: VoicePreferences = { ...prefs, ...patch };
     void roomService.applyVoicePreferences?.(next, true);
@@ -314,7 +317,7 @@ export const VoiceQuickPopover: React.FC<VoiceQuickPopoverProps> = ({
           className="btn btn-sm btn-outline voice-quick-settings-btn"
           onClick={() => {
             onClose();
-            modalManager.openSettings('communication');
+            modalManager.openSettings?.('communication');
           }}
         >
           <Settings2 size={14} aria-hidden="true" />
