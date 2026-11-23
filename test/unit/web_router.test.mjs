@@ -38,6 +38,8 @@ const bundle = await build({ stdin: { contents: `export { webRoutes } from './ap
   plugins: [{ name: 'web-fixtures', setup(builder) {
     builder.onResolve({ filter: /\/(appearance_preferences|useAppTheme|useLocale|i18n|language|Select|ContextMenu|DownloadPanel|AppContextMenu|app_runtime|state_store|room_invite|room_service|App)$/ }, args => ({ namespace: 'fixture', path: args.path.split('/').at(-1) }));
     builder.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: mocks[args.path], loader: 'js' }));
+    builder.onResolve({ filter: /\.css$/ }, args => ({ namespace: 'empty-css', path: args.path }));
+    builder.onLoad({ filter: /.*/, namespace: 'empty-css' }, () => ({ contents: '', loader: 'js' }));
     builder.onResolve({ filter: /^[^./]/ }, args => ({ path: pathToFileURL(require.resolve(args.path)).href, external: true }));
   } }] });
 const { webRoutes, WebApp, NavigationFeedback } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
