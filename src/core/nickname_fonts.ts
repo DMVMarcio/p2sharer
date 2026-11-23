@@ -1,0 +1,16 @@
+import '@fontsource/boogaloo/400.css';
+import '@fontsource/jacquard-24/400.css';
+import '@fontsource/honk/400.css';
+import '@fontsource/faster-one/400.css';
+import '@fontsource/exile/400.css';
+import '@fontsource/nunito/400.css';
+import '@fontsource/nunito/700.css';
+import '@fontsource/pacifico/400.css';
+import '@fontsource/syne/400.css';
+import '@fontsource/syne/700.css';
+import '@fontsource/permanent-marker/400.css';
+import '@fontsource/bangers/400.css';
+import '@fontsource/silkscreen/400.css';
+import '@fontsource/silkscreen/700.css';
+import '@fontsource/cinzel/400.css';
+import '@fontsource/cinzel/700.css';
