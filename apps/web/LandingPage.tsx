@@ -5,6 +5,7 @@ import { DownloadButton } from '../../src/components/common/DownloadButton';
 import { SiteFooter } from './SiteFooter';
 import {
   ArrowUpRight,
+  Briefcase,
   Check,
   Crown,
   FolderUp,
@@ -22,7 +23,7 @@ import { LANGUAGE_OPTIONS } from '../../src/i18n/language';
 import { Select } from '../../src/components/common/Select';
 import logo from '../../src/assets/logo.png';
 import { HeroRoomPreview } from './landing/HeroRoomPreview';
-import { FilesDemo, PlayCreateDemo, RemoteDemo, Showcase, StreamDemo, WatchDemo, type Tone } from './landing/Showcase';
+import { FilesDemo, MeetingsDemo, PlayCreateDemo, RemoteDemo, Showcase, StreamDemo, WatchDemo, type Tone } from './landing/Showcase';
 import { P2PJourney } from './landing/P2PJourney';
 import { AppDock } from './landing/AppDock';
 import { useScrollReveal } from './landing/motion';
@@ -179,11 +180,22 @@ export function LandingPage() {
           <RemoteDemo />
         </Showcase>
         <Showcase
+          id="meetings"
+          tone="teal"
+          icon={<Briefcase size={13} />}
+          tag="web.meetingsTag"
+          title="web.meetingsTitle"
+          points={['web.meetingsPoint1', 'web.meetingsPoint2', 'web.meetingsPoint3']}
+        >
+          <MeetingsDemo />
+        </Showcase>
+        <Showcase
           tone="rose"
           icon={<Tv size={13} />}
           tag="web.featWatchTag"
           title="web.featWatchTitle"
           points={['web.splitWatchItem1', 'web.splitWatchItem2', 'web.splitWatchItem3']}
+          reverse
         >
           <WatchDemo />
         </Showcase>
@@ -193,7 +205,6 @@ export function LandingPage() {
           tag="web.featFilesTag"
           title="web.featFilesTitle"
           points={['web.splitFilesItem1', 'web.filesPoint2', 'web.filesPoint3']}
-          reverse
         >
           <FilesDemo />
         </Showcase>
@@ -203,6 +214,7 @@ export function LandingPage() {
           tag="web.playCreateTag"
           title="web.playCreateTitle"
           points={['web.splitGamesItem1', 'web.splitFilesItem2', 'web.splitFilesItem3']}
+          reverse
         >
           <PlayCreateDemo />
         </Showcase>

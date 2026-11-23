@@ -3,8 +3,11 @@ import {
   Check,
   CloudOff,
   FileArchive,
+  FileText,
   Gamepad2,
   Keyboard,
+  Mic,
+  MicOff,
   MousePointer2,
   Globe,
   Laptop,
@@ -21,7 +24,7 @@ import { t } from '../../../src/i18n';
 import { GameScene, LevelMeter, LiveCursor, MiniChessBoard, PEERS, PeerAvatar, WhiteboardSketch } from './scenes';
 import { useInView } from './motion';
 
-export type Tone = 'violet' | 'rose' | 'emerald' | 'amber' | 'sky' | 'pink';
+export type Tone = 'violet' | 'rose' | 'emerald' | 'amber' | 'sky' | 'pink' | 'teal';
 
 interface ShowcaseProps {
   id?: string;
@@ -301,6 +304,79 @@ export function RemoteDemo() {
             {REMAPS.map(([from, to]) => (
               <span key={from} className="lp-remap-row"><b>{from}</b><i>→</i><b>{to}</b></span>
             ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Browser-friendly meeting room: shared presentation, interactive mic, chat, and direct file drop. */
+export function MeetingsDemo() {
+  const [micMuted, setMicMuted] = useState(false);
+  return (
+    <div className="lp-demo lp-meetings-demo">
+      <div className="lp-meeting-stage" aria-hidden="true">
+        <div className="lp-meeting-bar">
+          <span className="lp-meeting-dots"><i /><i /><i /></span>
+          <span className="lp-meeting-url">p2sharer.com/app</span>
+          <span className="lp-chip is-glass"><Globe size={11} />{t('web.meetingsVisualBrowser')}</span>
+        </div>
+        <div className="lp-meeting-slide">
+          <div className="lp-meeting-slide-head">
+            <strong>{t('web.meetingsVisualSlide')}</strong>
+            <span className="lp-meeting-live">LIVE</span>
+          </div>
+          <div className="lp-meeting-slide-body">
+            <div className="lp-meeting-chart">
+              {[42, 68, 54, 86, 74, 96].map((height, index) => (
+                <span key={index} style={{ '--h': `${height}%`, '--i': index } as CSSProperties} />
+              ))}
+            </div>
+            <div className="lp-meeting-notes">
+              <span /><span /><span />
+            </div>
+          </div>
+          <LiveCursor peer={PEERS[0]} className="lp-meeting-cursor" />
+        </div>
+      </div>
+      <div className="lp-meeting-panel">
+        <div className="lp-meeting-voice">
+          <div className="lp-meeting-row" aria-hidden="true">
+            <PeerAvatar peer={PEERS[0]} size={24} speaking />
+            <span className="lp-meeting-person"><strong>Ana</strong><small>{t('web.meetingsVisualBrowser')}</small></span>
+            <LevelMeter bars={5} />
+          </div>
+          <button
+            type="button"
+            className={`lp-meeting-row is-toggle${micMuted ? ' is-off' : ''}`}
+            aria-pressed={!micMuted}
+            aria-label={t(micMuted ? 'voice.unmuteMic' : 'voice.muteMic')}
+            onClick={() => setMicMuted(value => !value)}
+          >
+            <PeerAvatar peer={PEERS[3]} size={24} speaking={!micMuted} />
+            <span className="lp-meeting-person" aria-hidden="true"><strong>{t('browser.you')}</strong></span>
+            <LevelMeter bars={5} muted={micMuted} />
+            <span className="lp-meeting-mic" aria-hidden="true">
+              {micMuted ? <MicOff size={14} /> : <Mic size={14} />}
+            </span>
+          </button>
+        </div>
+        <div className="lp-meeting-collab" aria-hidden="true">
+          <div className="lp-meeting-msg">
+            <PeerAvatar peer={PEERS[2]} size={22} />
+            <div>
+              <strong>Mia</strong>
+              <span>{t('web.meetingsVisualChat')}</span>
+            </div>
+          </div>
+          <div className="lp-meeting-file">
+            <span className="lp-meeting-file-icon"><FileText size={16} /></span>
+            <div className="lp-meeting-file-meta">
+              <strong>deck-q4.pdf</strong>
+              <small>24 MB • P2P</small>
+            </div>
+            <ShieldCheck size={14} className="lp-meeting-file-ok" />
           </div>
         </div>
       </div>
