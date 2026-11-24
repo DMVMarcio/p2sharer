@@ -578,16 +578,60 @@ index cf12b0b808d11b85878e2a038138e8a64b5c40ba..bf5ab30db118736c30499e48cab33208
  const legacyCandidateKey = "__legacy__";
  const offerRelayPlaceholder = "offer-placeholder";
 diff --git a/dist/strategy.mjs b/dist/strategy.mjs
-index a75dfcfddd14b2174d9acee37ecb84cd3c16c0eb..d42c6ee6c3d1b7b8b9b2f67d95c43ece18dd546a 100644
+index a75dfcfddd14b2174d9acee37ecb84cd3c16c0eb..bf30ed35aceac83166196a6348214220299c003e 100644
 --- a/dist/strategy.mjs
 +++ b/dist/strategy.mjs
-@@ -330,6 +330,9 @@ var strategy_default = ({ init, subscribe, announce, deactivate }) => {
+@@ -64,7 +64,6 @@ var strategy_default = ({ init, subscribe, announce, deactivate }) => {
+ 	};
+ 	let didInit = false;
+ 	let initPromises = [];
+-	let offerPool = null;
+ 	let cleanupWatchOnline = noOp;
+ 	return (config, roomId, callbacks) => {
+ 		if (!config) throw mkErr("requires a config map as the first argument");
+@@ -92,9 +91,10 @@ var strategy_default = ({ init, subscribe, announce, deactivate }) => {
+ 		const toPlain = withKey(decrypt);
+ 		const toCipher = withKey(encrypt);
+ 		const sharedPeerMap = sharedPeers.getMap(appId);
++		// Keep OfferPool scoped to each room so probes or different RTC configs never freeze stale ICE/TURN settings.
+ 		const makeOffer = () => peer_default(true, config);
+-		offerPool ||= new OfferPool(makeOffer);
+-		const pool = offerPool;
++		const pool = new OfferPool(makeOffer);
++		const skipPoolWarmup = Boolean(callbacks?.backgroundProbe);
+ 		const encryptOffer = async (peer) => {
+ 			const plainOffer = await peer.getOffer(Date.now() - peer.created > offerTtl);
+ 			if (!plainOffer || plainOffer.type !== "offer") throw mkErr("failed to get offer for peer");
+@@ -211,7 +211,7 @@ var strategy_default = ({ init, subscribe, announce, deactivate }) => {
+ 			didInit = true;
+ 			cleanupWatchOnline = config.relayConfig?.manualReconnection ? noOp : watchOnline();
+ 		}
+-		if (!isPassive && !pool.isActive) pool.warmup();
++		if (!isPassive && !skipPoolWarmup && !pool.isActive) pool.warmup();
+ 		ctx.announceIntervals = initPromises.map(() => announceIntervalMs);
+ 		const announceAttemptCounts = initPromises.map(() => 0);
+ 		const announceErrorStreaks = initPromises.map(() => 0);
+@@ -253,7 +253,7 @@ var strategy_default = ({ init, subscribe, announce, deactivate }) => {
+ 				announceTimeouts.forEach(resetTimer);
+ 				announceTimeouts.length = 0;
+ 				passiveActivationTimeout = resetTimer(passiveActivationTimeout);
+-				if (!pool.isActive) pool.warmup();
++				if (!skipPoolWarmup && !pool.isActive) pool.warmup();
+ 				if (roomRegistration?.roomToken) advertiseRoomPresenceToAll(appId, roomRegistration.roomToken, true);
+ 				passiveActivationTimeout = setTimeout(checkDeactivate, passiveActivationGraceMs);
+ 				initPromises.forEach(async (relayP, i) => {
+@@ -329,10 +329,12 @@ var strategy_default = ({ init, subscribe, announce, deactivate }) => {
+ 			unsubFns.forEach(async (f) => {
  				(await f)();
  			});
++			pool.destroy();
  			if (hasActiveRooms()) return;
 +			keys(sharedPeers.getMap(appId)).forEach((peerId) => {
 +				sharedPeers.clear(appId, peerId, { destroyPeer: true });
 +			});
  			didInit = false;
- 			pool.destroy();
- 			offerPool = null;
+-			pool.destroy();
+-			offerPool = null;
+ 			cleanupWatchOnline();
+ 			cleanupRoomPresenceHandler(appId);
+ 		}, roomOptions);
