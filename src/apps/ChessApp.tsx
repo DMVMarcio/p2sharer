@@ -673,7 +673,7 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
                       </div>
                     )}
                     {game.status !== 'playing' && (
-                      <button type="button" className="btn btn-secondary cozy-pgn-export" onClick={() => { setPgnCopied(false); setPgnDialogOpen(true); }}>
+                      <button type="button" className="cozy-wood-btn is-secondary cozy-pgn-export" onClick={() => { setPgnCopied(false); setPgnDialogOpen(true); }}>
                         <Download size={15} aria-hidden="true" />{t('chess.exportPgn')}
                       </button>
                     )}
