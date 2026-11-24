@@ -1626,6 +1626,24 @@
   padding-top: 6px;
 }
 
+.cozy-pgn-export {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+.chess-pgn-preview {
+  min-height: 260px;
+  resize: vertical;
+  font-family: var(--font-mono);
+  line-height: 1.55;
+  white-space: pre;
+}
+
 .cozy-moves-list {
   display: flex;
   flex-wrap: wrap;

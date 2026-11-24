@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Crown } from 'lucide-react';
+import { Clipboard, ClipboardCheck, Crown, Download } from 'lucide-react';
 import { t } from '../i18n/index.ts';
 import { useLocale } from '../hooks/useLocale.ts';
 import { roomAppsService } from './room_apps_service.ts';
@@ -29,6 +29,7 @@ import { BoardPlanningOverlay, useBoardPlanning } from './BoardPlanningOverlay.t
 import { boardGameSounds } from './board_game_sounds.ts';
 import { useBoardReturnAnimation } from './useBoardReturnAnimation.ts';
 import { useTimedBoardMatch } from './useTimedBoardMatch.ts';
+import { buildChessPgn } from './chess_pgn.ts';
 import { ModalDialog } from '../components/common/ModalDialog.tsx';
 
 interface DraggingPieceState {
@@ -59,6 +60,8 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
   const [selectedSquare, setSelectedSquare] = useState<number | null>(null);
   const [pendingPromotion, setPendingPromotion] = useState<{ from: number; to: number; color: ChessColor } | null>(null);
   const [dragging, setDragging] = useState<DraggingPieceState | null>(null);
+  const [pgnDialogOpen, setPgnDialogOpen] = useState(false);
+  const [pgnCopied, setPgnCopied] = useState(false);
   const suppressClickRef = useRef(false);
   const lastSoundSnapshotRef = useRef<{
     roomId: string;
@@ -210,6 +213,31 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
       ? t('games.statusTurnNamed', { name: person.name })
       : t('games.statusTurnSide', { side: game.turn === 'w' ? t('games.white') : t('games.black') });
     return game.inCheck ? `${base} · ${t('chess.check')}` : base;
+  };
+
+  const getPgn = (room: ChessRoomState): string => {
+    const playerName = (actorId: string | null, fallback: string) =>
+      (actorId ? resolveActor(actorId, model.localActor)?.name : undefined) || fallback;
+    return buildChessPgn(room.game, {
+      event: room.name,
+      white: playerName(room.players.seat1, 'White'),
+      black: playerName(room.players.seat2, 'Black'),
+    });
+  };
+
+  const copyPgn = async (pgn: string) => {
+    await navigator.clipboard.writeText(pgn);
+    setPgnCopied(true);
+  };
+
+  const downloadPgn = (room: ChessRoomState) => {
+    const blob = new Blob([getPgn(room)], { type: 'application/x-chess-pgn;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${(room.name || 'p2sharer-chess').replace(/[^\p{L}\p{N}-]+/gu, '-').replace(/^-|-$/g, '') || 'p2sharer-chess'}.pgn`;
+    anchor.click();
+    URL.revokeObjectURL(url);
   };
 
   if (compact) {
@@ -644,6 +672,11 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
                         ))}
                       </div>
                     )}
+                    {game.status !== 'playing' && (
+                      <button type="button" className="btn btn-secondary cozy-pgn-export" onClick={() => { setPgnCopied(false); setPgnDialogOpen(true); }}>
+                        <Download size={15} aria-hidden="true" />{t('chess.exportPgn')}
+                      </button>
+                    )}
                   </div>
                 </div>
               }
@@ -678,6 +711,26 @@ export const ChessApp: React.FC<RoomAppViewProps> = ({ instanceId, compact = fal
                     </button>
                   ))}
                 </div>
+              </ModalDialog>
+            )}
+            {pgnDialogOpen && game.status !== 'playing' && (
+              <ModalDialog
+                title={t('chess.exportPgnTitle')}
+                subtitle={t('chess.exportPgnSubtitle')}
+                onClose={() => setPgnDialogOpen(false)}
+                footer={(close) => (
+                  <>
+                    <button type="button" className="btn btn-secondary" onClick={() => void copyPgn(getPgn(room))}>
+                      {pgnCopied ? <ClipboardCheck size={16} aria-hidden="true" /> : <Clipboard size={16} aria-hidden="true" />}
+                      {pgnCopied ? t('chess.pgnCopied') : t('chess.copyPgn')}
+                    </button>
+                    <button type="button" className="btn btn-primary" onClick={() => { downloadPgn(room); close(); }}>
+                      <Download size={16} aria-hidden="true" />{t('chess.downloadPgn')}
+                    </button>
+                  </>
+                )}
+              >
+                <textarea className="text-input chess-pgn-preview" value={getPgn(room)} readOnly aria-label={t('chess.exportPgnTitle')} />
               </ModalDialog>
             )}
           </div>
