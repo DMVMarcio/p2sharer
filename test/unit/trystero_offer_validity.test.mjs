@@ -247,3 +247,29 @@ test('transient open-peer negotiation errors recover up to threshold then fail',
     assert.equal(errors.length, 1);
   } finally { peer.destroy(); }
 });
+
+test('stale answer m-line mismatch on open peer is ignored instead of tearing down connection', async () => {
+  const conn = createRenegotiationConnection('stable');
+  const origSetRemote = conn.setRemoteDescription.bind(conn);
+  let failStaleAnswer = false;
+  conn.setRemoteDescription = async (desc) => {
+    if (desc?.type === 'answer' && failStaleAnswer) {
+      const err = new Error("Failed to set remote answer sdp: The order of m-lines in answer doesn't match order in offer. Rejecting answer.");
+      err.name = 'InvalidAccessError';
+      throw err;
+    }
+    return origSetRemote(desc);
+  };
+  const peer = createPeer(true, { rtcPolyfill: class { constructor() { return conn; } }, trickleIce: true });
+  const errors = [];
+  peer.setHandlers({ signal: () => {}, error: (err) => errors.push(err) });
+  try {
+    await peer.renegotiate();
+    assert.equal(conn.signalingState, 'have-local-offer');
+    failStaleAnswer = true;
+    await peer.signal({ type: 'answer', sdp: `${validSdp}a=ice-ufrag:stale1\r\n` });
+    assert.equal(errors.length, 0);
+    assert.equal(peer.isDead, false);
+    assert.equal(conn.signalingState, 'have-local-offer');
+  } finally { peer.destroy(); }
+});

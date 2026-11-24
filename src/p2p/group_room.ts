@@ -52,6 +52,7 @@ import type {
 } from '../core/types.ts';
 import { getLocalPlatform } from '../core/platform.ts';
 import {
+  buildDirectRtcConfiguration,
   buildRtcConfiguration,
   createJoinErrorHandler,
   resolveTurnConfig,
@@ -528,6 +529,7 @@ export class GroupRoomManager {
   private currentTargetFps: number = 60;
   private signalingTopic: string = '';
   private rtcConfig: RTCConfiguration | null = null;
+  private fallbackRtcConfig: RTCConfiguration | null = null;
 
   constructor(username: string, roomId: string, password = '', isCreator = false, turnConfig?: TurnConfig,
     shortLookup = false, backgroundProbe = false) {
@@ -565,16 +567,45 @@ export class GroupRoomManager {
   public getLocalPeerId(): string { return selfId; }
   public getRtcConfiguration(): RTCConfiguration { return structuredClone(this.rtcConfig ?? buildRtcConfiguration(this.turnConfig)); }
 
-  private async getFreshRtcConfiguration(): Promise<RTCConfiguration> {
+  private applyTurnConfiguration(turnConfig: TurnConfig | null): void {
+    const useImmediateTurn = Boolean(turnConfig?.enabled && (turnConfig.forceRelay || !turnConfig.automatic));
+    if (useImmediateTurn) {
+      this.rtcConfig = buildRtcConfiguration(turnConfig);
+      this.fallbackRtcConfig = null;
+    } else {
+      this.rtcConfig = buildDirectRtcConfiguration();
+      this.fallbackRtcConfig = turnConfig?.enabled ? buildRtcConfiguration(turnConfig) : null;
+    }
+  }
+
+  private async peerUsesRelayRoute(peerId: string): Promise<boolean> {
+    try {
+      const pc = this.room?.getPeers?.()?.[peerId] as RTCPeerConnection | undefined;
+      if (!pc || typeof pc.getStats !== 'function') return false;
+      const stats = await pc.getStats();
+      const selected = selectedIcePair(Array.from(stats.values()) as IceStat[]);
+      return selected?.local?.candidateType === 'relay' || selected?.remote?.candidateType === 'relay';
+    } catch {
+      return false;
+    }
+  }
+
+  private async getFreshRtcConfiguration(peerId?: string): Promise<RTCConfiguration> {
     if (this.snapshot?.connection || this.backgroundProbe) {
       return this.getRtcConfiguration();
     }
     const freshTurn = await resolveTurnConfig(stateStore.getTurnConfig());
     if (!this.leavePromise) {
       this.turnConfig = freshTurn;
-      this.rtcConfig = buildRtcConfiguration(freshTurn);
+      this.applyTurnConfiguration(freshTurn);
     }
-    return structuredClone(this.rtcConfig ?? buildRtcConfiguration(freshTurn));
+    if (this.fallbackRtcConfig && peerId) {
+      if (await this.peerUsesRelayRoute(peerId)) {
+        return structuredClone(this.fallbackRtcConfig);
+      }
+      return structuredClone(this.rtcConfig ?? buildDirectRtcConfiguration());
+    }
+    return structuredClone(this.fallbackRtcConfig ?? this.rtcConfig ?? buildRtcConfiguration(freshTurn));
   }
 
   public sendStreamPointerState(state: StreamPointerState): void {
@@ -1013,7 +1044,7 @@ export class GroupRoomManager {
       if (this.leavePromise) return;
     }
 
-    this.rtcConfig = buildRtcConfiguration(this.turnConfig);
+    this.applyTurnConfiguration(this.turnConfig);
 
     if (!this.backgroundProbe) {
       signalingManager.setRoomReconnectionHandler(async () => {
@@ -1070,6 +1101,7 @@ export class GroupRoomManager {
       if (this.snapshot?.connection) {
         // LAN rooms exclude public STUN/TURN; same-host interface discovery stays local.
         this.turnConfig = null;
+        this.fallbackRtcConfig = null;
         this.rtcConfig = { iceServers: [], iceTransportPolicy: 'all', iceCandidatePoolSize: 0 };
         await signalingManager.prepareLan(this.snapshot.connection, this.roomId, this.isCreator, (connected) => {
           if (!connected) this.callbacks?.onStatusChange(t('lan.signalingUnavailable'));
@@ -1112,6 +1144,7 @@ export class GroupRoomManager {
     const joinConfig = {
       appId: APP_ID,
       rtcConfig: this.rtcConfig,
+      ...(this.fallbackRtcConfig ? { fallbackRtcConfig: this.fallbackRtcConfig } : {}),
       rtcPolyfill: createFileOptimizedPeerConnection(connectionMode),
       // WebRTC is a full mesh: every participant must advertise so two
       // joiners can establish their own direct edge, not only reach the creator.
@@ -1153,10 +1186,12 @@ export class GroupRoomManager {
     if (!this.snapshot?.connection && !this.backgroundProbe) {
       this.turnConfig = await resolveTurnConfig(stateStore.getTurnConfig());
     }
-    const baseRtcConfig: RTCConfiguration = this.snapshot?.connection
-      ? { iceServers: [], iceTransportPolicy: 'all', iceCandidatePoolSize: 0 }
-      : buildRtcConfiguration(this.turnConfig);
-    this.rtcConfig = this.snapshot?.connection ? await withLocalInterfaceStun(baseRtcConfig) : baseRtcConfig;
+    if (this.snapshot?.connection) {
+      this.fallbackRtcConfig = null;
+      this.rtcConfig = await withLocalInterfaceStun({ iceServers: [], iceTransportPolicy: 'all', iceCandidatePoolSize: 0 });
+    } else {
+      this.applyTurnConfiguration(this.turnConfig);
+    }
     if (this.leavePromise) return;
 
     console.log('[P2P] Re-establishing room bindings on new transport...');
@@ -2568,7 +2603,7 @@ export class GroupRoomManager {
     this.nativeVideo?.close();
     this.nativeVideoAction = this.room.makeAction('native_video_v1');
     this.nativeVideo = new NativeVideoTransport({
-      rtc: () => this.getFreshRtcConfiguration(),
+      rtc: (peerId) => this.getFreshRtcConfiguration(peerId),
       send: (peerId, signal) => {
         if (this.room === boundRoom && this.isLivePeerTarget(peerId)) {
           return this.nativeVideoAction?.send(signal, { target: peerId });

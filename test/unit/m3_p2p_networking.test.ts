@@ -6,6 +6,7 @@ import { PeerTracker } from '../../src/p2p/peer_tracker.ts';
 import {
   sanitizeTurnUrl,
   buildIceServers,
+  buildNativeIceServers,
   buildRtcConfiguration,
   formatJoinError,
   resolveTurnConfig,
@@ -396,9 +397,30 @@ describe('M3 Unit Tests: Robust P2P Networking & Signaling Failover', () => {
         const cached = await resolveTurnConfig(undefined, { fetch: mockFetch });
         assert.equal(fetchCalls, 1);
         assert.deepEqual(cached, first);
+        assert.equal(first.automatic, true);
       } finally {
         clearTurnFallbackCache();
       }
+    });
+
+    it('buildNativeIceServers filters out TCP TURN and IPv6 literal URLs for Rust webrtc-ice', () => {
+      const filtered = buildNativeIceServers([
+        { urls: ['stun:stun.cloudflare.com:3478', 'stun:[2001:db8::2]:3478'] },
+        {
+          urls: [
+            'turn:203.0.113.10:3478?transport=udp',
+            'turn:203.0.113.10:3478?transport=tcp',
+            'turn:[2001:db8::1]:3478?transport=udp',
+            'turn:[2001:db8::1]:3478?transport=tcp',
+          ],
+          username: 'u',
+          credential: 'p',
+        },
+      ]);
+      assert.deepEqual(filtered, [
+        { urls: ['stun:stun.cloudflare.com:3478'], username: '', credential: '' },
+        { urls: ['turn:203.0.113.10:3478?transport=udp'], username: 'u', credential: 'p' },
+      ]);
     });
   });
 });

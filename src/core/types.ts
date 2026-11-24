@@ -134,6 +134,8 @@ export interface TurnConfig {
   credential?: string;
   forceRelay?: boolean;
   fallbackEnabled?: boolean;
+  /** True when credentials came from automatic first-party fallback rather than manual user config. */
+  automatic?: boolean;
 }
 
 export interface ResolutionConfig {

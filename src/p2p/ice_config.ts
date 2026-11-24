@@ -226,19 +226,24 @@ export async function resolveTurnConfig(
           .map(sanitizeTurnUrl)
           .filter(isValidTurnUrl);
         if (urls.length > 0) {
+          // Prefer IPv4 UDP/TCP routes when present to avoid doubling Coturn allocations with redundant IPv6 relays.
+          const uniqueUrls = [...new Set(urls)];
+          const ipv4Urls = uniqueUrls.filter((u) => !/^turns?:\[/i.test(u));
+          const selectedUrls = (ipv4Urls.length > 0 ? ipv4Urls : uniqueUrls).slice(0, 2);
           const ttlSeconds = typeof data.ttl === 'number' && Number.isFinite(data.ttl) && data.ttl > 60
             ? data.ttl
             : 21600;
           const resolved: TurnConfig = {
             enabled: true,
-            url: [...new Set(urls)].join('\n'),
+            url: selectedUrls.join('\n'),
             username: data.username,
             credential: data.credential,
             forceRelay: false,
             fallbackEnabled: true,
+            automatic: true,
           };
           logDiagnostic('INFO', 'p2p.turn', 'Automatic TURN fallback credentials resolved', {
-            serverCount: urls.length,
+            serverCount: selectedUrls.length,
             ttlSeconds,
             elapsedMs: Math.round(performance.now() - started),
           });
@@ -294,6 +299,36 @@ export function buildIceServers(turnConfig?: TurnConfig | null): RTCIceServer[] 
   }
 
   return iceServers;
+}
+
+export function buildDirectRtcConfiguration(): RTCConfiguration {
+  return {
+    iceServers: [{ urls: DEFAULT_STUN_SERVERS }],
+    iceTransportPolicy: 'all',
+    iceCandidatePoolSize: 0,
+  };
+}
+
+/** Filters ICE servers for Rust webrtc-ice, which only supports UDP IPv4 relay/STUN URLs cleanly. */
+export function buildNativeIceServers(
+  servers?: RTCIceServer[],
+): Array<{ urls: string[]; username: string; credential: string }> {
+  const result: Array<{ urls: string[]; username: string; credential: string }> = [];
+  for (const server of servers ?? []) {
+    const rawUrls = Array.isArray(server.urls) ? server.urls : [server.urls];
+    const filtered = rawUrls.filter((url) =>
+      typeof url === 'string' &&
+      !/\?transport=tcp$/i.test(url) &&
+      !/^(?:turns?|stuns?):\[/i.test(url));
+    if (filtered.length > 0) {
+      result.push({
+        urls: filtered,
+        username: server.username ?? '',
+        credential: typeof server.credential === 'string' ? server.credential : '',
+      });
+    }
+  }
+  return result;
 }
 
 export function buildRtcConfiguration(turnConfig?: TurnConfig | null): RTCConfiguration {
