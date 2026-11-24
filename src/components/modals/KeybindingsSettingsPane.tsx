@@ -8,6 +8,7 @@ import {
   detectGamepadCapture,
   formatKeyCode,
   formatShortcutCombo,
+  formatShortcutModifiers,
   GAMEPAD_DEFAULT_PROFILE_ID,
   getBindingForTarget,
   isModifierOnlyCode,
@@ -99,6 +100,12 @@ export const KeybindingsSettingsPane: React.FC<KeybindingsSettingsPaneProps> = (
 }) => {
   const subTabRefs = useRef<Partial<Record<'keyboard' | 'gamepad', HTMLButtonElement>>>({});
   const [capturingShortcut, setCapturingShortcut] = useState<RemoteShortcutAction | null>(null);
+  const [heldModifiers, setHeldModifiers] = useState<{ ctrlKey: boolean; shiftKey: boolean; altKey: boolean }>({
+    ctrlKey: false,
+    shiftKey: false,
+    altKey: false,
+  });
+  const suppressNextClickRef = useRef(false);
   const [capturingKeyField, setCapturingKeyField] = useState<{
     ruleId: string;
     side: 'from' | 'to';
@@ -154,7 +161,16 @@ export const KeybindingsSettingsPane: React.FC<KeybindingsSettingsPaneProps> = (
 
   // Capture keyboard shortcut combos or individual key remaps (intercepts Escape before ModalDialog)
   useEffect(() => {
+    if (!capturingShortcut) {
+      setHeldModifiers({ ctrlKey: false, shiftKey: false, altKey: false });
+    }
     if (!capturingShortcut && !capturingKeyField) return;
+
+    const readModifierState = (event: KeyboardEvent) => ({
+      ctrlKey: event.ctrlKey || event.code === 'ControlLeft' || event.code === 'ControlRight',
+      shiftKey: event.shiftKey || event.code === 'ShiftLeft' || event.code === 'ShiftRight',
+      altKey: event.altKey || event.code === 'AltLeft' || event.code === 'AltRight',
+    });
 
     const handleKeyDown = (event: KeyboardEvent) => {
       event.preventDefault();
@@ -165,7 +181,10 @@ export const KeybindingsSettingsPane: React.FC<KeybindingsSettingsPaneProps> = (
       if (!code) return;
 
       if (capturingShortcut) {
-        if (isModifierOnlyCode(code)) return;
+        if (isModifierOnlyCode(code)) {
+          setHeldModifiers(readModifierState(event));
+          return;
+        }
         if (code === 'Escape' && !event.ctrlKey && !event.shiftKey && !event.altKey) {
           setCapturingShortcut(null);
           return;
@@ -182,7 +201,14 @@ export const KeybindingsSettingsPane: React.FC<KeybindingsSettingsPaneProps> = (
             },
           },
         };
+        if (code === 'Space' || code === 'Enter' || code === 'NumpadEnter') {
+          suppressNextClickRef.current = true;
+          window.setTimeout(() => {
+            suppressNextClickRef.current = false;
+          }, 0);
+        }
         onChange(next);
+        setHeldModifiers({ ctrlKey: false, shiftKey: false, altKey: false });
         setCapturingShortcut(null);
         return;
       }
@@ -200,9 +226,24 @@ export const KeybindingsSettingsPane: React.FC<KeybindingsSettingsPaneProps> = (
       }
     };
 
+    const handleKeyUp = (event: KeyboardEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation?.();
+      if (capturingShortcut && isModifierOnlyCode(event.code)) {
+        setHeldModifiers({
+          ctrlKey: event.ctrlKey && event.code !== 'ControlLeft' && event.code !== 'ControlRight',
+          shiftKey: event.shiftKey && event.code !== 'ShiftLeft' && event.code !== 'ShiftRight',
+          altKey: event.altKey && event.code !== 'AltLeft' && event.code !== 'AltRight',
+        });
+      }
+    };
+
     window.addEventListener('keydown', handleKeyDown, { capture: true });
+    window.addEventListener('keyup', handleKeyUp, { capture: true });
     return () => {
       window.removeEventListener('keydown', handleKeyDown, { capture: true });
+      window.removeEventListener('keyup', handleKeyUp, { capture: true });
     };
   }, [capturingKeyField, capturingShortcut, onChange]);
 
@@ -441,6 +482,11 @@ export const KeybindingsSettingsPane: React.FC<KeybindingsSettingsPaneProps> = (
     const current = value.shortcuts[action];
     const isListening = capturingShortcut === action;
     const formatted = formatShortcutCombo(current);
+    const liveModParts = isListening ? formatShortcutModifiers(heldModifiers) : [];
+    const listeningLabel =
+      liveModParts.length > 0
+        ? `${liveModParts.join(' + ')} + ...`
+        : t('inputBindings.pressShortcutPrompt');
     return (
       <div className="input-binding-row" key={action}>
         <div className="input-binding-copy">
@@ -452,12 +498,16 @@ export const KeybindingsSettingsPane: React.FC<KeybindingsSettingsPaneProps> = (
             type="button"
             id={`btn-shortcut-${action}`}
             className={`btn btn-sm input-binding-capture-btn ${isListening ? 'is-listening' : ''}`}
-            onClick={() =>
-              setCapturingShortcut((prev) => (prev === action ? null : action))
-            }
+            onClick={() => {
+              if (suppressNextClickRef.current) {
+                suppressNextClickRef.current = false;
+                return;
+              }
+              setCapturingShortcut((prev) => (prev === action ? null : action));
+            }}
           >
             {isListening
-              ? t('inputBindings.pressShortcutPrompt')
+              ? listeningLabel
               : formatted || t('inputBindings.unbound')}
           </button>
           {current && (

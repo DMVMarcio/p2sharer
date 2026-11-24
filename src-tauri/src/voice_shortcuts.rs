@@ -87,6 +87,27 @@ pub(crate) fn encode_shortcut(spec: Option<&ShortcutSpec>) -> u64 {
     encoded
 }
 
+pub(crate) fn normalize_ll_vk(vk: u16, is_extended: bool) -> u16 {
+    if is_extended {
+        return vk;
+    }
+    // Windows translates Shift+Numpad into non-extended navigation VKs when NumLock is active.
+    match vk {
+        0x2D => 0x60, // Insert -> Numpad0
+        0x23 => 0x61, // End -> Numpad1
+        0x28 => 0x62, // Down -> Numpad2
+        0x22 => 0x63, // PageDown -> Numpad3
+        0x25 => 0x64, // Left -> Numpad4
+        0x0C => 0x65, // Clear -> Numpad5
+        0x27 => 0x66, // Right -> Numpad6
+        0x24 => 0x67, // Home -> Numpad7
+        0x26 => 0x68, // Up -> Numpad8
+        0x21 => 0x69, // PageUp -> Numpad9
+        0x2E => 0x6E, // Delete -> NumpadDecimal
+        _ => vk,
+    }
+}
+
 pub(crate) fn matches_encoded_shortcut(
     encoded: u64,
     vk: u16,
@@ -99,11 +120,12 @@ pub(crate) fn matches_encoded_shortcut(
         return false;
     }
     let target_vk = (encoded & 0xFFFF) as u16;
-    if vk != target_vk {
+    let normalized_vk = normalize_ll_vk(vk, is_extended);
+    if normalized_vk != target_vk {
         return false;
     }
     // Distinguish Enter vs NumpadEnter while staying tolerant of driver extended-flag differences on other keys.
-    if vk == 0x0D && ((encoded & FLAG_EXTENDED) != 0) != is_extended {
+    if normalized_vk == 0x0D && ((encoded & FLAG_EXTENDED) != 0) != is_extended {
         return false;
     }
     ((encoded & FLAG_CTRL) != 0) == ctrl_down
@@ -126,7 +148,9 @@ unsafe extern "system" fn voice_shortcut_keyboard_proc(
     if code >= 0 {
         let kb = &*(lparam.0 as *const KBDLLHOOKSTRUCT);
         if kb.dwExtraInfo != P2SHARER_INPUT_TAG {
-            let vk = kb.vkCode as u16;
+            let is_extended = (kb.flags.0 & LLKHF_EXTENDED.0) != 0;
+            let raw_vk = kb.vkCode as u16;
+            let vk = normalize_ll_vk(raw_vk, is_extended);
             let vk_u32 = vk as u32;
             let msg = wparam.0 as u32;
             let down = msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN;
@@ -140,7 +164,6 @@ unsafe extern "system" fn voice_shortcut_keyboard_proc(
                     HELD_DEAFEN_VK.store(0, Ordering::Release);
                 }
             } else if down && !PAUSED.load(Ordering::Acquire) {
-                let is_extended = (kb.flags.0 & LLKHF_EXTENDED.0) != 0;
                 let alt_down = (kb.flags.0 & LLKHF_ALTDOWN.0) != 0
                     || (GetAsyncKeyState(0x12) < 0)
                     || (GetAsyncKeyState(0xA4) < 0)
@@ -422,5 +445,25 @@ mod tests {
         assert!(!matches_encoded_shortcut(enter_encoded, 0x0D, true, false, false, true));
         assert!(matches_encoded_shortcut(numpad_encoded, 0x0D, true, false, false, true));
         assert!(!matches_encoded_shortcut(numpad_encoded, 0x0D, false, false, false, true));
+
+        let shift_numpad1 = ShortcutSpec {
+            code: "Numpad1".into(),
+            ctrl_key: false,
+            shift_key: true,
+            alt_key: false,
+        };
+        let shift_numpad1_encoded = encode_shortcut(Some(&shift_numpad1));
+        assert!(matches_encoded_shortcut(shift_numpad1_encoded, 0x23, false, false, true, false));
+        assert!(!matches_encoded_shortcut(shift_numpad1_encoded, 0x23, true, false, true, false));
+
+        let triple_mod = ShortcutSpec {
+            code: "KeyD".into(),
+            ctrl_key: true,
+            shift_key: true,
+            alt_key: true,
+        };
+        let triple_encoded = encode_shortcut(Some(&triple_mod));
+        assert!(matches_encoded_shortcut(triple_encoded, b'D' as u16, false, true, true, true));
+        assert!(!matches_encoded_shortcut(triple_encoded, b'D' as u16, false, true, true, false));
     }
 }

@@ -46,6 +46,12 @@ class VoiceNoiseGateProcessor extends AudioWorkletProcessor {
     this.autoSensitivity = true;
     this.sensitivityDb = -50;
     this.muted = false;
+    this.targetInputGain = 1;
+    this.smoothedInputGain = 1;
+
+    // Adaptive speech auto-leveler (lifts quiet raw mics toward -13 dBFS RMS without pumping silence).
+    this.speechRms = 0.06;
+    this.normalizerGain = 3.5;
 
     // 2nd-order Butterworth high-pass @ ~85 Hz (recalculated when sampleRate differs).
     this.hpB0 = 1;
@@ -115,6 +121,9 @@ class VoiceNoiseGateProcessor extends AudioWorkletProcessor {
       }
       if (typeof data.muted === 'boolean') {
         this.muted = data.muted;
+      }
+      if (typeof data.inputGain === 'number' && Number.isFinite(data.inputGain)) {
+        this.targetInputGain = Math.max(0, Math.min(2, data.inputGain));
       }
     };
   }
@@ -209,7 +218,7 @@ class VoiceNoiseGateProcessor extends AudioWorkletProcessor {
     if (initPhase) {
       this.noiseInitFrames += 1;
     }
-    const likelySpeech = !initPhase && frameEnergy > noiseEnergy * 3.5;
+    const likelySpeech = !initPhase && (this.gateOpen || frameEnergy > noiseEnergy * 2.5);
 
     for (let k = 0; k < NUM_BINS; k += 1) {
       const m2 = this.magSq[k];
@@ -217,7 +226,7 @@ class VoiceNoiseGateProcessor extends AudioWorkletProcessor {
 
       if (initPhase) {
         psd = Math.max(1e-8, psd * 0.7 + m2 * 0.3);
-      } else if (m2 < psd) {
+      } else if (!this.gateOpen && m2 < psd) {
         psd = Math.max(1e-8, psd * 0.94 + m2 * 0.06);
       } else if (!likelySpeech) {
         psd = Math.max(1e-8, psd * 0.992 + m2 * 0.008);
@@ -384,12 +393,28 @@ class VoiceNoiseGateProcessor extends AudioWorkletProcessor {
       }
     }
 
-    const targetGain = !this.muted && this.gateOpen ? 1 : 0;
+    if (!this.muted && this.gateOpen && rms >= 0.004 && levelDb >= thresholdDb) {
+      this.speechRms = this.speechRms * 0.96 + rms * 0.04;
+      const targetSpeechRms = 0.22; // ~ -13.1 dBFS conversational target
+      const desiredGain = Math.max(0.8, Math.min(10.0, targetSpeechRms / Math.max(this.speechRms, 0.005)));
+      const adaptCoeff = desiredGain < this.normalizerGain ? 0.08 : 0.015;
+      this.normalizerGain += (desiredGain - this.normalizerGain) * adaptCoeff;
+    }
+
+    this.smoothedInputGain += (this.targetInputGain - this.smoothedInputGain) * 0.15;
+    const outputGain = this.normalizerGain * this.smoothedInputGain;
+    const targetGate = !this.muted && this.gateOpen ? 1 : 0;
     let env = this.gateEnvelope;
-    const coeff = targetGain > env ? this.attackCoeff : this.releaseCoeff;
+    const coeff = targetGate > env ? this.attackCoeff : this.releaseCoeff;
     for (let i = 0; i < len; i += 1) {
-      env += (targetGain - env) * coeff;
-      const sample = Math.max(-1, Math.min(1, outChannel0[i] * env));
+      env += (targetGate - env) * coeff;
+      let sample = outChannel0[i] * env * outputGain;
+      const absSample = sample < 0 ? -sample : sample;
+      if (absSample > 0.78) {
+        const excess = absSample - 0.78;
+        const limited = 0.78 + (0.20 * excess) / (0.20 + excess);
+        sample = sample < 0 ? -limited : limited;
+      }
       outChannel0[i] = sample;
     }
     this.gateEnvelope = env;

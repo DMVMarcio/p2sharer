@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { after, test } from 'node:test';
 import { pathToFileURL } from 'node:url';
+import vm from 'node:vm';
 import { build } from 'esbuild';
 import { JSDOM } from 'jsdom';
 import React, { act } from 'react';
@@ -602,8 +604,45 @@ test('voice shortcuts default to unassigned, bind in Shortcuts & Keyboard settin
     const deafenCaptureBtn = document.getElementById('btn-shortcut-toggleVoiceDeafen') as HTMLButtonElement | null;
     assert.ok(muteCaptureBtn && deafenCaptureBtn, 'voice shortcut rows must appear in Shortcuts & Keyboard settings');
 
-    // Bind Ctrl+Shift+M to mute toggle; global firing is paused during capture.
+    // Hold Ctrl + Shift first: live modifier preview shows "Ctrl + Shift + ...".
     await act(async () => {
+      muteCaptureBtn.click();
+    });
+    await act(async () => {
+      window.dispatchEvent(new dom.window.KeyboardEvent('keydown', {
+        code: 'ControlLeft',
+        ctrlKey: true,
+        bubbles: true,
+      }));
+      window.dispatchEvent(new dom.window.KeyboardEvent('keydown', {
+        code: 'ShiftLeft',
+        ctrlKey: true,
+        shiftKey: true,
+        bubbles: true,
+      }));
+    });
+    assert.equal(muteCaptureBtn.textContent, 'Ctrl + Shift + ...');
+
+    // Bind Ctrl+Space first, then verify subsequent click/keyup bounce does not reopen capture.
+    await act(async () => {
+      window.dispatchEvent(new dom.window.KeyboardEvent('keydown', {
+        code: 'Space',
+        ctrlKey: true,
+        bubbles: true,
+      }));
+      muteCaptureBtn.click();
+    });
+    assert.deepEqual(latestConfig.shortcuts.toggleVoiceMute, {
+      code: 'Space',
+      ctrlKey: true,
+      shiftKey: false,
+      altKey: false,
+    });
+    assert.equal(muteCaptureBtn.classList.contains('is-listening'), false);
+
+    // Re-enter capture after click suppression settles and bind Ctrl+Shift+M cleanly.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
       muteCaptureBtn.click();
     });
     await act(async () => {
@@ -689,4 +728,67 @@ test('voice shortcuts default to unassigned, bind in Shortcuts & Keyboard settin
     else (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = prevAct;
     resetInputBindingsCacheForTest();
   }
+});
+
+test('VoiceNoiseGateProcessor normalizes quiet microphones cleanly without clipping up to 200% input gain', () => {
+  type ProcessorInstance = {
+    port: { onmessage: ((ev: { data: Record<string, unknown> }) => void) | null };
+    process: (inputs: Float32Array[][], outputs: Float32Array[][]) => boolean;
+  };
+  let RegisteredClass: (new () => ProcessorInstance) | null = null;
+  const sandbox = {
+    sampleRate: 48000,
+    Float32Array,
+    Uint16Array,
+    Math,
+    AudioWorkletProcessor: class {
+      port = { onmessage: null, postMessage() {} };
+    },
+    registerProcessor: (_name: string, cls: new () => ProcessorInstance) => {
+      RegisteredClass = cls;
+    },
+  };
+  vm.runInNewContext(fs.readFileSync('public/audio/voice-processor.worklet.js', 'utf8'), sandbox);
+  assert.ok(RegisteredClass, 'worklet processor should register');
+
+  const runSignal = (amp: number, inputGain: number) => {
+    const proc = new RegisteredClass!();
+    proc.port.onmessage?.({
+      data: { noiseSuppressionMode: 'standard', autoSensitivity: false, sensitivityDb: -90, muted: false, inputGain },
+    });
+    for (let b = 0; b < 30; b += 1) {
+      const inp = new Float32Array(128).map((_, i) => 0.001 * Math.sin(i));
+      proc.process([[inp]], [[new Float32Array(128)]]);
+    }
+    let inSq = 0;
+    let outSq = 0;
+    let peak = 0;
+    let samples = 0;
+    for (let b = 0; b < 180; b += 1) {
+      const inp = new Float32Array(128).map((_, i) => amp * Math.sin((b * 128 + i) * 0.08));
+      const out = new Float32Array(128);
+      proc.process([[inp]], [[out]]);
+      if (b >= 90) {
+        for (let i = 0; i < 128; i += 1) {
+          inSq += inp[i] * inp[i];
+          outSq += out[i] * out[i];
+          peak = Math.max(peak, Math.abs(out[i]));
+          samples += 1;
+        }
+      }
+    }
+    const inRms = Math.sqrt(inSq / samples);
+    const outRms = Math.sqrt(outSq / samples);
+    return { inRms, outRms, peak, outDb: 20 * Math.log10(outRms) };
+  };
+
+  // Quiet -33.5 dBFS mic at 100% input gain is boosted into audible ~ -15 dBFS range.
+  const quiet = runSignal(0.03, 1.0);
+  assert.ok(quiet.outRms / quiet.inRms >= 5.0, `expected strong speech boost, got ${(quiet.outRms / quiet.inRms).toFixed(2)}x`);
+  assert.ok(quiet.outDb >= -18 && quiet.outDb <= -10, `expected normalized speech dBFS, got ${quiet.outDb.toFixed(1)}`);
+
+  // 200% input gain boosts louder without hard-clipping (soft limiter keeps peak < 0.98).
+  const boosted = runSignal(0.08, 2.0);
+  assert.ok(boosted.outRms > quiet.outRms, '200% input gain should increase output loudness');
+  assert.ok(boosted.peak < 0.98, `soft limiter must prevent hard clipping, got peak ${boosted.peak.toFixed(3)}`);
 });

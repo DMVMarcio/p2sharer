@@ -1320,6 +1320,7 @@ pub(crate) fn dom_code_to_vk(code: &str) -> Option<(u16, bool)> {
         "NumpadAdd" => (0x6B, false),
         "NumpadSubtract" => (0x6D, false),
         "NumpadDecimal" => (0x6E, false),
+        "NumpadComma" => (0xC2, false),
         "NumpadDivide" => (0x6F, true),
         "NumLock" => (0x90, true),
         "ScrollLock" => (0x91, false),

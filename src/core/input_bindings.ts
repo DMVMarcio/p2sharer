@@ -706,6 +706,16 @@ export function formatKeyCode(code: string): string {
       return 'R-Win';
     case 'ContextMenu':
       return 'Menu';
+    case 'NumLock':
+      return 'Num Lock';
+    case 'ScrollLock':
+      return 'Scroll Lock';
+    case 'Pause':
+      return 'Pause';
+    case 'PrintScreen':
+      return 'PrtSc';
+    case 'NumpadComma':
+      return 'Num ,';
     case 'ArrowUp':
       return '↑';
     case 'ArrowDown':
@@ -741,12 +751,19 @@ export function formatKeyCode(code: string): string {
   }
 }
 
+export function formatShortcutModifiers(mods: {
+  ctrlKey?: boolean;
+  shiftKey?: boolean;
+  altKey?: boolean;
+}): string[] {
+  const parts: string[] = [];
+  if (mods.ctrlKey) parts.push('Ctrl');
+  if (mods.altKey) parts.push('Alt');
+  if (mods.shiftKey) parts.push('Shift');
+  return parts;
+}
+
 export function formatShortcutCombo(shortcut: ShortcutBinding | null | undefined): string {
   if (!shortcut || !shortcut.code) return '';
-  const parts: string[] = [];
-  if (shortcut.ctrlKey) parts.push('Ctrl');
-  if (shortcut.altKey) parts.push('Alt');
-  if (shortcut.shiftKey) parts.push('Shift');
-  parts.push(formatKeyCode(shortcut.code));
-  return parts.join(' + ');
+  return [...formatShortcutModifiers(shortcut), formatKeyCode(shortcut.code)].join(' + ');
 }

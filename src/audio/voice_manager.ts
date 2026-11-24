@@ -236,7 +236,7 @@ export class VoiceManager {
 
     if (!this.inputGainNode) {
       this.inputGainNode = this.inputCtx.createGain();
-      this.inputGainNode.gain.value = clampVoiceVolume(prefs.inputVolume) / 100;
+      this.inputGainNode.gain.value = 1;
     }
 
     if (!this.workletNode && !this.fallbackGateGain) {
@@ -473,8 +473,9 @@ export class VoiceManager {
       );
     }
     if (this.inputGainNode && this.inputCtx) {
+      const targetPreGain = this.workletNode ? 1 : (clampVoiceVolume(prefs.inputVolume) / 100) * 3.5;
       this.inputGainNode.gain.setTargetAtTime(
-        clampVoiceVolume(prefs.inputVolume) / 100,
+        targetPreGain,
         this.inputCtx.currentTime,
         0.015,
       );
@@ -485,6 +486,7 @@ export class VoiceManager {
         autoSensitivity: prefs.autoSensitivity,
         sensitivityDb: clampSensitivityDb(prefs.sensitivityDb),
         muted: processorMuted,
+        inputGain: clampVoiceVolume(prefs.inputVolume) / 100,
       });
     }
     if (this.fallbackHighPass && this.inputCtx) {
@@ -520,11 +522,11 @@ export class VoiceManager {
 
       this.masterGainNode = this.outputCtx.createGain();
       this.outputLimiter = this.outputCtx.createDynamicsCompressor();
-      this.outputLimiter.threshold.value = -3;
-      this.outputLimiter.knee.value = 12;
-      this.outputLimiter.ratio.value = 6;
-      this.outputLimiter.attack.value = 0.003;
-      this.outputLimiter.release.value = 0.15;
+      this.outputLimiter.threshold.value = -1.5;
+      this.outputLimiter.knee.value = 3;
+      this.outputLimiter.ratio.value = 12;
+      this.outputLimiter.attack.value = 0.002;
+      this.outputLimiter.release.value = 0.1;
 
       this.masterGainNode.connect(this.outputLimiter);
 
